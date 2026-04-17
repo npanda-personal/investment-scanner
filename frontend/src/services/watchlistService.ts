@@ -27,6 +27,14 @@ export interface UpdateWatchlistRequest {
   symbols?: string[];
 }
 
+export interface SearchResult {
+  symbol: string;
+  name: string;
+  region: string;
+  exchange?: string;
+  source: 'database' | 'external';
+}
+
 /**
  * Fetch all watchlists for the current user.
  */
@@ -99,5 +107,15 @@ export async function removeSymbolFromWatchlist(watchlistId: string, symbol: str
     `${API_BASE}/watchlists/${watchlistId}/symbols/${symbol}`,
     { headers: { 'x-user-id': TEST_USER_ID } }
   );
+  return response.data;
+}
+
+/**
+ * Search for assets using database-first search.
+ */
+export async function searchAssets(query: string): Promise<SearchResult[]> {
+  const response = await axios.get<SearchResult[]>(`${API_BASE}/stocks/search`, {
+    params: { q: query },
+  });
   return response.data;
 }

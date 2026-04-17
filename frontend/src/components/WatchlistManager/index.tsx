@@ -18,6 +18,9 @@ import {
   Divider,
   Alert,
   CircularProgress,
+  Tabs,
+  Tab,
+  Autocomplete,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -30,13 +33,18 @@ import {
   deleteWatchlist,
   addSymbolToWatchlist,
   removeSymbolFromWatchlist,
+  searchAssets,
   Watchlist,
+  SearchResult,
 } from '../../services/watchlistService';
 
 const WatchlistManager: React.FC = () => {
   const [watchlists, setWatchlists] = useState<Watchlist[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Tab selection
+  const [selectedTabIndex, setSelectedTabIndex] = useState(0);
 
   // New watchlist dialog
   const [openDialog, setOpenDialog] = useState(false);
@@ -49,10 +57,44 @@ const WatchlistManager: React.FC = () => {
   const [openSymbolDialog, setOpenSymbolDialog] = useState(false);
   const [selectedWatchlist, setSelectedWatchlist] = useState<Watchlist | null>(null);
   const [newSymbol, setNewSymbol] = useState('');
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   useEffect(() => {
     loadWatchlists();
   }, []);
+
+  // Search effect
+  useEffect(() => {
+    if (searchQuery.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        setSearchLoading(true);
+        const results = await searchAssets(searchQuery);
+        setSearchResults(results);
+      } catch (err) {
+        console.error('Search failed:', err);
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Reset search state when dialog opens/closes
+  useEffect(() => {
+    if (!openSymbolDialog) {
+      setSearchQuery('');
+      setSearchResults([]);
+      setNewSymbol('');
+    }
+  }, [openSymbolDialog]);
 
   const loadWatchlists = async () => {
     try {
@@ -178,61 +220,54 @@ const WatchlistManager: React.FC = () => {
           </Typography>
         </Paper>
       ) : (
-        <List sx={{ bgcolor: 'background.paper' }}>
-          {watchlists.map((watchlist) => (
-            <React.Fragment key={watchlist.id}>
-              <ListItem alignItems="flex-start">
-                <ListItemText
-                  primary={
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography variant="h6">{watchlist.name}</Typography>
-                      {watchlist.description && (
-                        <Typography variant="body2" color="text.secondary">
-                          {watchlist.description}
-                        </Typography>
-                      )}
+        <Box>
+          <Tabs value={selectedTabIndex} onChange={(e, newValue) => setSelectedTabIndex(newValue)}>
+            {watchlists.map((watchlist, index) => (
+              <Tab key={watchlist.id} label={watchlist.name} />
+            ))}
+          </Tabs>
+          {watchlists.map((watchlist, index) => (
+            <Box key={watchlist.id} role="tabpanel" hidden={selectedTabIndex !== index}>
+              {selectedTabIndex === index && (
+                <Box sx={{ p: 3 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography variant="h5">{watchlist.name}</Typography>
+                    <Box>
+                      <IconButton onClick={() => handleOpenDialog(watchlist)}>
+                        <EditIcon />
+                      </IconButton>
+                      <IconButton onClick={() => handleDeleteWatchlist(watchlist.id)}>
+                        <DeleteIcon />
+                      </IconButton>
                     </Box>
-                  }
-                  secondary={
-                    <Box sx={{ mt: 1 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Created {new Date(watchlist.createdAt).toLocaleDateString()} •{' '}
-                        {watchlist.symbols.length} symbols
-                      </Typography>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
-                        {watchlist.symbols.map((symbol) => (
-                          <Chip
-                            key={symbol}
-                            label={symbol}
-                            size="small"
-                            onDelete={() => handleRemoveSymbol(watchlist.id, symbol)}
-                            deleteIcon={<RemoveCircleOutlineIcon />}
-                          />
-                        ))}
-                        <Chip
-                          icon={<AddIcon />}
-                          label="Add"
-                          size="small"
-                          variant="outlined"
-                          onClick={() => handleOpenSymbolDialog(watchlist)}
-                        />
-                      </Box>
-                    </Box>
-                  }
-                />
-                <ListItemSecondaryAction>
-                  <IconButton edge="end" aria-label="edit" onClick={() => handleOpenDialog(watchlist)}>
-                    <EditIcon />
-                  </IconButton>
-                  <IconButton edge="end" aria-label="delete" onClick={() => handleDeleteWatchlist(watchlist.id)}>
-                    <DeleteIcon />
-                  </IconButton>
-                </ListItemSecondaryAction>
-              </ListItem>
-              <Divider component="li" />
-            </React.Fragment>
+                  </Box>
+                  {watchlist.description && (
+                    <Typography variant="body2" color="text.secondary" paragraph>
+                      {watchlist.description}
+                    </Typography>
+                  )}
+                  <Typography variant="body2" color="text.secondary" paragraph>
+                    Created {new Date(watchlist.createdAt).toLocaleDateString()} • {watchlist.symbols.length} symbols
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 2 }}>
+                    {watchlist.symbols.map((symbol) => (
+                      <Chip
+                        key={symbol}
+                        label={symbol}
+                        size="small"
+                        onDelete={() => handleRemoveSymbol(watchlist.id, symbol)}
+                        deleteIcon={<RemoveCircleOutlineIcon />}
+                      />
+                    ))}
+                  </Box>
+                  <Button variant="outlined" startIcon={<AddIcon />} onClick={() => handleOpenSymbolDialog(watchlist)}>
+                    Add Symbol
+                  </Button>
+                </Box>
+              )}
+            </Box>
           ))}
-        </List>
+        </Box>
       )}
 
       {/* Create/Edit Watchlist Dialog */}
@@ -277,18 +312,41 @@ const WatchlistManager: React.FC = () => {
       </Dialog>
 
       {/* Add Symbol Dialog */}
-      <Dialog open={openSymbolDialog} onClose={handleCloseSymbolDialog} maxWidth="xs" fullWidth>
+      <Dialog open={openSymbolDialog} onClose={handleCloseSymbolDialog} maxWidth="sm" fullWidth>
         <DialogTitle>Add Symbol to {selectedWatchlist?.name}</DialogTitle>
         <DialogContent>
-          <TextField
+          <Autocomplete
+            freeSolo
             autoFocus
-            margin="dense"
-            label="Symbol"
-            fullWidth
-            variant="outlined"
-            value={newSymbol}
-            onChange={(e) => setNewSymbol(e.target.value.toUpperCase())}
-            placeholder="AAPL"
+            options={searchResults}
+            loading={searchLoading}
+            inputValue={searchQuery}
+            onInputChange={(event, newInputValue) => {
+              setSearchQuery(newInputValue);
+            }}
+            onChange={(event, newValue) => {
+              if (typeof newValue === 'string') {
+                setNewSymbol(newValue);
+              } else if (newValue && typeof newValue === 'object') {
+                setNewSymbol(newValue.symbol);
+              } else {
+                setNewSymbol('');
+              }
+            }}
+            getOptionLabel={(option) => {
+              if (typeof option === 'string') return option;
+              return `${option.symbol} - ${option.name} (${option.region})`;
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                margin="dense"
+                label="Symbol"
+                variant="outlined"
+                placeholder="Search for a stock..."
+                helperText="Start typing to search database and external sources"
+              />
+            )}
           />
         </DialogContent>
         <DialogActions>

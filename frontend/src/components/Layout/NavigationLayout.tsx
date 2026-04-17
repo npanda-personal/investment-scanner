@@ -27,6 +27,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import TimelineIcon from '@mui/icons-material/Timeline';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import SettingsIcon from '@mui/icons-material/Settings';
+import ListIcon from '@mui/icons-material/List';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import { useTheme as useCustomTheme } from '../../contexts/ThemeContext';
@@ -37,6 +38,7 @@ const collapsedWidth = 72;
 const navItems = [
   { path: '/', label: 'Dashboard', icon: <DashboardIcon /> },
   { path: '/stocks', label: 'Stock Management', icon: <InventoryIcon /> },
+  { path: '/watchlists', label: 'Watchlists', icon: <ListIcon /> },
   { path: '/scanner', label: 'Real‑Time Scanner', icon: <SearchIcon /> },
   { path: '/backtester', label: 'Strategy Backtester', icon: <TimelineIcon /> },
   { path: '/settings', label: 'User Settings', icon: <SettingsIcon /> },

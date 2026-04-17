@@ -46,6 +46,27 @@ router.get('/', async (req, res) => {
 });
 
 /**
+ * GET /api/stocks/search
+ * Query parameter: q (search query)
+ * Searches for assets with database-first fallback to external API.
+ * If an asset is not found locally, searches via Yahoo Finance,
+ * persists new assets to the database, and returns results.
+ */
+router.get('/search', async (req, res) => {
+  try {
+    const query = req.query.q as string;
+    if (!query || query.trim().length === 0) {
+      return res.status(400).json({ error: 'Missing search query' });
+    }
+    const results = await stockService.searchAssets(query);
+    return res.json(results);
+  } catch (error) {
+    console.error('Error searching assets:', error);
+    return res.status(500).json({ error: 'Failed to search assets' });
+  }
+});
+
+/**
  * GET /api/stocks/:id
  */
 router.get('/:id', async (req, res) => {

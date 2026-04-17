@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import defaultPrisma from '../../db/prisma';
 import { YahooFinanceIngestionService } from '../../data/ingestion/yahoo.service';
+import type { SearchResult } from '../../data/ingestion/yahoo.service';
 import { enqueueIngestionJob } from '../../queue/ingestion.queue';
 
 export interface CreateStockRequest {
@@ -188,5 +189,66 @@ export class StockService {
       console.error(`Data ingestion failed for ${stock.symbol}:`, error);
       return { success: false, message: error.message };
     }
+  }
+
+  /**
+   * Search for assets with database-first fallback to external API.
+   * If an asset is not found locally, it will be searched via Yahoo Finance,
+   * persisted to the local database, and then returned.
+   */
+  async searchAssets(query: string): Promise<any[]> {
+    // First, search local database
+    const localResults = await this.prisma.stock.findMany({
+      where: {
+        OR: [
+          { symbol: { contains: query, mode: 'insensitive' } },
+          { name: { contains: query, mode: 'insensitive' } },
+        ],
+      },
+      take: 10,
+    });
+
+    if (localResults.length > 0) {
+      return localResults.map(stock => ({
+        symbol: stock.symbol,
+        name: stock.name,
+        region: stock.region,
+        exchange: stock.exchange,
+        source: 'database',
+      }));
+    }
+
+    // If no local results, search external API
+    const externalResults: SearchResult[] = await this.ingestionService.search(query);
+    const createdStocks = [];
+
+    for (const ext of externalResults) {
+      // Check if already exists (maybe just added by previous iteration)
+      const existing = await this.prisma.stock.findUnique({
+        where: { symbol: ext.symbol },
+      });
+      if (existing) {
+        createdStocks.push(existing);
+        continue;
+      }
+      // Infer region and exchange from symbol
+      const regionInfo = this.ingestionService.inferRegion(ext.symbol);
+      const stock = await this.create({
+        symbol: ext.symbol,
+        name: ext.name,
+        region: regionInfo.region || 'US',
+        exchange: regionInfo.exchange,
+      }, true); // trigger ingestion in background
+      createdStocks.push(stock);
+    }
+
+    // Return combined results (should be only external ones)
+    return createdStocks.map(stock => ({
+      symbol: stock.symbol,
+      name: stock.name,
+      region: stock.region,
+      exchange: stock.exchange,
+      source: 'external',
+    }));
   }
 }
