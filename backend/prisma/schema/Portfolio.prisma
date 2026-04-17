@@ -1,0 +1,29 @@
+model Portfolio {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  currency    String   @default("USD")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  holdings    Holding[]
+
+  @@map("portfolios")
+}
+
+model Holding {
+  id           String   @id @default(cuid())
+  symbol       String
+  quantity     Decimal
+  averagePrice Decimal
+  currency     String   @default("USD")
+  acquiredAt   DateTime?
+  notes        String?
+  portfolioId  String
+  portfolio    Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("holdings")
+}

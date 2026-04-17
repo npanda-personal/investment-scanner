@@ -1,0 +1,183 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["prismaSchemaFolder"]
+}
+
+model Alert {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  condition   Json // flexible condition structure
+  isActive    Boolean   @default(true)
+  triggeredAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("alerts")
+}
+
+model PriceTick {
+  id        String   @id @default(cuid())
+  symbol    String
+  region    String? // e.g., "US", "EU", "ASIA"
+  exchange  String? // e.g., "NASDAQ", "NYSE"
+  timestamp DateTime
+  open      Decimal
+  high      Decimal
+  low       Decimal
+  close     Decimal
+  volume    BigInt?
+  source    String? // e.g., "yahoo", "coinbase"
+
+  @@index([symbol, timestamp])
+  @@index([region])
+  @@map("price_ticks")
+}
+
+model LatestPrice {
+  symbol    String   @id
+  region    String? // region for filtering
+  price     Decimal
+  timestamp DateTime
+  updatedAt DateTime @updatedAt
+
+  @@map("latest_prices")
+}
+
+model Portfolio {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  holdings    Json? // flexible structure for holdings (symbol, quantity, avgPrice)
+
+  @@map("portfolios")
+}
+
+model User {
+  id              String           @id @default(cuid())
+  email           String           @unique
+  passwordHash    String
+  firstName       String?
+  lastName        String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  portfolios      Portfolio[]
+  watchlists      Watchlist[]
+  alerts          Alert[]
+  scannerRules    ScannerRule[]
+  backtestConfigs BacktestConfig[]
+
+  @@map("users")
+}
+
+model Watchlist {
+  id                 String        @id @default(cuid())
+  name               String
+  description        String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  userId             String
+  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  symbols            String[] // array of symbols
+  targetScannerRules ScannerRule[] @relation("ScannerTargetWatchlist")
+  sourceScannerRules ScannerRule[] @relation("ScannerSourceWatchlist")
+
+  @@map("watchlists")
+}
+
+model ScannerRule {
+  id                String     @id @default(cuid())
+  name              String
+  description       String?
+  condition         Json // flexible condition structure (e.g., RSI > 70)
+  sourceWatchlistId String? // optional watchlist defining the security universe
+  sourceSymbols     Json? // alternative: explicit list of symbols as JSON array
+  targetWatchlistId String // watchlist where matched symbols will be added
+  isActive          Boolean    @default(true)
+  schedule          String? // cron expression for scheduled scanning; null for real‑time only
+  nextScanAt        DateTime?
+  lastTriggeredAt   DateTime?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  userId            String
+  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetWatchlist   Watchlist  @relation("ScannerTargetWatchlist", fields: [targetWatchlistId], references: [id], onDelete: Cascade)
+  sourceWatchlist   Watchlist? @relation("ScannerSourceWatchlist", fields: [sourceWatchlistId], references: [id], onDelete: SetNull)
+  ScanLog           ScanLog[]
+
+  @@map("scanner_rules")
+}
+
+model ScanLog {
+  id               String      @id @default(cuid())
+  ruleId           String
+  rule             ScannerRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  symbol           String
+  matchedData      Json? // snapshot of the data that triggered the rule (e.g., price, indicators)
+  triggeredAt      DateTime    @default(now())
+  addedToWatchlist Boolean     @default(true) // whether the symbol was successfully added to target watchlist
+  error            String? // if addition failed
+
+  @@index([ruleId])
+  @@index([triggeredAt])
+  @@map("scan_logs")
+}
+
+model BacktestConfig {
+  id             String   @id @default(cuid())
+  name           String
+  description    String?
+  watchlistIds   Json // array of watchlist IDs (string[])
+  startDate      DateTime
+  endDate        DateTime
+  strategyConfig Json // entry/exit rules, indicator parameters, etc.
+  positionSizing Json? // e.g., { "type": "fixed", "amount": 1000 }
+  stopLoss       Decimal? // as percentage (e.g., 0.05 for 5%)
+  takeProfit     Decimal?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  results BacktestResult[]
+
+  @@map("backtest_configs")
+}
+
+model BacktestResult {
+  id          String         @id @default(cuid())
+  configId    String
+  config      BacktestConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  startedAt   DateTime       @default(now())
+  completedAt DateTime
+  status      String         @default("completed") // "pending", "running", "completed", "failed"
+  error       String?
+
+  // Performance metrics
+  sharpeRatio  Decimal?
+  maxDrawdown  Decimal?
+  winRate      Decimal?
+  profitFactor Decimal?
+  totalReturn  Decimal?
+  totalTrades  Int?
+
+  // Detailed data
+  equityCurve    Json? // array of { timestamp: DateTime, equity: Decimal }
+  tradeLedger    Json? // array of trades
+  monthlyReturns Json? // heatmap data
+
+  @@index([configId])
+  @@index([startedAt])
+  @@map("backtest_results")
+}

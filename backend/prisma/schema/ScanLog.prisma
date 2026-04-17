@@ -1,0 +1,14 @@
+model ScanLog {
+  id          String   @id @default(cuid())
+  ruleId      String
+  rule        ScannerRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  symbol      String
+  matchedData Json?     // snapshot of the data that triggered the rule (e.g., price, indicators)
+  triggeredAt DateTime @default(now())
+  addedToWatchlist Boolean @default(true) // whether the symbol was successfully added to target watchlist
+  error       String?  // if addition failed
+
+  @@index([ruleId])
+  @@index([triggeredAt])
+  @@map("scan_logs")
+}

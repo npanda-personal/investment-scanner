@@ -1,0 +1,110 @@
+model Alert {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  condition   Json     // flexible condition structure
+  isActive    Boolean  @default(true)
+  triggeredAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("alerts")
+}// Market data time-series (TimescaleDB hypertable)
+model PriceTick {
+  id        String   @id @default(cuid())
+  symbol    String
+  region    String?  // e.g., "US", "EU", "ASIA"
+  exchange  String?  // e.g., "NASDAQ", "NYSE"
+  timestamp DateTime
+  open      Decimal
+  high      Decimal
+  low       Decimal
+  close     Decimal
+  volume    BigInt?
+  source    String?  // e.g., "yahoo", "coinbase"
+
+  @@index([symbol, timestamp])
+  @@index([region])
+  @@map("price_ticks")
+}
+
+// For faster lookups of latest price per symbol
+model LatestPrice {
+  symbol    String   @id
+  region    String?  // region for filtering
+  price     Decimal
+  timestamp DateTime
+  updatedAt DateTime @updatedAt
+
+  @@map("latest_prices")
+}model Portfolio {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  currency    String   @default("USD")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  holdings    Holding[]
+
+  @@map("portfolios")
+}
+
+model Holding {
+  id           String   @id @default(cuid())
+  symbol       String
+  quantity     Decimal
+  averagePrice Decimal
+  currency     String   @default("USD")
+  acquiredAt   DateTime?
+  notes        String?
+  portfolioId  String
+  portfolio    Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("holdings")
+}model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  // Relationships
+  watchlists   Watchlist[]
+  portfolios   Portfolio[]
+  alerts       Alert[]
+  // Optional: store user preferences as JSON
+  preferences  Json?
+
+  @@map("users")
+}model Watchlist {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items       WatchlistItem[]
+
+  @@map("watchlists")
+}
+
+model WatchlistItem {
+  id          String    @id @default(cuid())
+  symbol      String
+  assetType   String?   // stock, crypto, etc.
+  addedAt     DateTime  @default(now())
+  notes       String?
+  watchlistId String
+  watchlist   Watchlist @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
+
+  @@unique([watchlistId, symbol])
+  @@map("watchlist_items")
+}

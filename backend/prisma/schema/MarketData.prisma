@@ -1,0 +1,29 @@
+// Market data time-series (TimescaleDB hypertable)
+model PriceTick {
+  id        String   @id @default(cuid())
+  symbol    String
+  region    String?  // e.g., "US", "EU", "ASIA"
+  exchange  String?  // e.g., "NASDAQ", "NYSE"
+  timestamp DateTime
+  open      Decimal
+  high      Decimal
+  low       Decimal
+  close     Decimal
+  volume    BigInt?
+  source    String?  // e.g., "yahoo", "coinbase"
+
+  @@index([symbol, timestamp])
+  @@index([region])
+  @@map("price_ticks")
+}
+
+// For faster lookups of latest price per symbol
+model LatestPrice {
+  symbol    String   @id
+  region    String?  // region for filtering
+  price     Decimal
+  timestamp DateTime
+  updatedAt DateTime @updatedAt
+
+  @@map("latest_prices")
+}

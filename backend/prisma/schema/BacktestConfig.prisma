@@ -1,0 +1,20 @@
+model BacktestConfig {
+  id               String   @id @default(cuid())
+  name             String
+  description      String?
+  watchlistIds     Json     // array of watchlist IDs (string[])
+  startDate        DateTime
+  endDate          DateTime
+  strategyConfig   Json     // entry/exit rules, indicator parameters, etc.
+  positionSizing   Json?    // e.g., { "type": "fixed", "amount": 1000 }
+  stopLoss         Decimal? // as percentage (e.g., 0.05 for 5%)
+  takeProfit       Decimal?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  results          BacktestResult[]
+
+  @@map("backtest_configs")
+}

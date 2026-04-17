@@ -1,0 +1,14 @@
+model Alert {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  condition   Json     // flexible condition structure
+  isActive    Boolean  @default(true)
+  triggeredAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("alerts")
+}

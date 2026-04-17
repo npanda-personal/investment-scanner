@@ -1,0 +1,16 @@
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  // Relationships
+  watchlists   Watchlist[]
+  portfolios   Portfolio[]
+  alerts       Alert[]
+  // Optional: store user preferences as JSON
+  preferences  Json?
+
+  @@map("users")
+}
