@@ -51,6 +51,20 @@ model LatestPrice {
   @@map("latest_prices")
 }
 
+model Stock {
+  id                           String   @id @default(cuid())
+  symbol                       String   @unique
+  name                         String
+  region                       String   // IN, US, EU, UK, CN
+  exchange                     String?
+  isActive                     Boolean  @default(true)
+  lastSuccessfulDataLoadTimestamp DateTime?
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
+
+  @@map("stocks")
+}
+
 model Portfolio {
   id          String   @id @default(cuid())
   name        String

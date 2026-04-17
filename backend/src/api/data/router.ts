@@ -4,6 +4,20 @@ import { YahooFinanceIngestionService } from '../../data/ingestion/yahoo.service
 const router = express.Router();
 const ingestionService = new YahooFinanceIngestionService();
 
+router.get('/search', async (req, res) => {
+  const { q } = req.query;
+  if (!q || typeof q !== 'string') {
+    return res.status(400).json({ error: 'Missing or invalid query parameter "q"' });
+  }
+  try {
+    const results = await ingestionService.search(q);
+    return res.json(results);
+  } catch (error) {
+    console.error('Search error:', error);
+    return res.status(500).json({ error: 'Failed to perform external search' });
+  }
+});
+
 router.post('/ingest', async (req, res) => {
   const { symbol } = req.body;
   if (!symbol || typeof symbol !== 'string') {

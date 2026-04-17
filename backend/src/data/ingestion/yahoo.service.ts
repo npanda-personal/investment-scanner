@@ -18,6 +18,14 @@ export interface RegionInfo {
   exchange?: string;
 }
 
+export interface SearchResult {
+  symbol: string;
+  name: string;
+  type?: string;
+  exchange?: string;
+  region?: string;
+}
+
 export class YahooFinanceIngestionService {
   public prisma: PrismaClient;
   private batchDelayMs: number;
@@ -42,6 +50,9 @@ export class YahooFinanceIngestionService {
     if (symbol.endsWith('.AS')) return { region: 'EU', exchange: 'Euronext' };
     if (symbol.endsWith('.PA')) return { region: 'EU', exchange: 'Euronext' };
     if (symbol.endsWith('.MI')) return { region: 'EU', exchange: 'Borsa Italiana' };
+    // Indian exchanges
+    if (symbol.endsWith('.NS')) return { region: 'IN', exchange: 'NSE' };
+    if (symbol.endsWith('.BO')) return { region: 'IN', exchange: 'BSE' };
     if (symbol.includes('.')) {
       // Generic fallback: assume US with exchange suffix
       const parts = symbol.split('.');
@@ -49,6 +60,38 @@ export class YahooFinanceIngestionService {
     }
     // Default assumption: US stock
     return { region: 'US', exchange: 'NASDAQ' };
+  }
+
+  /**
+   * Search for symbols using Yahoo Finance search.
+   */
+  async search(query: string): Promise<SearchResult[]> {
+    try {
+      const response = await this.yahooFinance.search(query);
+      // The yahoo-finance2 search returns an object with a 'quotes' array
+      const quotes = Array.isArray(response) ? response : response.quotes || [];
+      const results: SearchResult[] = [];
+      for (const item of quotes) {
+        if (!item.symbol) continue;
+        try {
+          const region = this.inferRegion(item.symbol).region;
+          results.push({
+            symbol: item.symbol,
+            name: item.name || '',
+            type: item.type || '',
+            exchange: item.exchange || '',
+            region,
+          });
+        } catch (err) {
+          // skip items with region inference errors
+          continue;
+        }
+      }
+      return results;
+    } catch (error) {
+      console.error(`Failed to search for "${query}":`, error);
+      throw error;
+    }
   }
 
   /**
