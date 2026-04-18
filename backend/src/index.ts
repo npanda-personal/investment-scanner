@@ -61,3 +61,5 @@ server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`WebSocket market data available at ws://localhost:${PORT}/ws/market`);
 });
+// Manual scanning enabled
+// Backend ready

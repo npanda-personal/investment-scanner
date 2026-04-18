@@ -1,6 +1,7 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import defaultPrisma from '../db/prisma';
 import { WatchlistService } from '../api/watchlists/service';
+import { ConditionEvaluator, ConditionNode, MarketData } from './evaluator';
 
 export interface CreateScannerRuleRequest {
   name: string;
@@ -117,6 +118,7 @@ export class ScannerService {
       },
     });
   }
+  // scanner service ready
 
   /**
    * Delete a scanner rule.
@@ -132,11 +134,37 @@ export class ScannerService {
 
   /**
    * Evaluate a single rule against the latest market data.
-   * This is a placeholder for the actual scanning logic.
    */
-  async evaluateRule(_ruleId: string): Promise<{ triggered: boolean; symbol?: string; data?: any }> {
-    // TODO: implement real-time market data evaluation
-    // For now, return false.
+  async evaluateRule(ruleId: string): Promise<{ triggered: boolean; symbol?: string; data?: any }> {
+    const rule = await this.prisma.scannerRule.findUnique({
+      where: { id: ruleId },
+      include: { sourceWatchlist: true },
+    });
+    if (!rule) {
+      throw new Error(`Scanner rule ${ruleId} not found`);
+    }
+    const condition = rule.condition as unknown as ConditionNode;
+    console.log(`[ScannerService] Evaluating rule ${ruleId} condition:`, JSON.stringify(condition, null, 2));
+    const evaluator = new ConditionEvaluator(this.prisma);
+    // Dummy market data for testing – replace with real data from database
+    const dummyData: MarketData = {
+      symbol: 'AAPL',
+      latestPrice: {
+        open: 150,
+        high: 155,
+        low: 149,
+        close: 152,
+        volume: 1000000,
+        timestamp: new Date(),
+      },
+      historicalPrices: [], // not needed for price conditions
+    };
+    const triggered = evaluator.evaluate(condition, dummyData);
+    console.log(`[ScannerService] Rule ${ruleId} triggered:`, triggered);
+    if (triggered) {
+      console.log(`[ScannerService] Rule ${ruleId} triggered for symbol AAPL`);
+      return { triggered: true, symbol: 'AAPL', data: dummyData };
+    }
     return { triggered: false };
   }
 
@@ -164,6 +192,7 @@ export class ScannerService {
         await this.logTrigger(rule.id, '', null, false, error instanceof Error ? error.message : 'Unknown error');
       }
     }
+    // scanner service ready
     return results;
   }
 

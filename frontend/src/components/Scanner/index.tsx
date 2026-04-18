@@ -401,7 +401,7 @@ const Scanner: React.FC = () => {
   "operator": ">",
   "value": 70
 }`}
-            helperText="Define the scanning condition as a JSON object. Example: RSI > 70"
+            helperText="Define the scanning condition as a JSON object. Supported indicators: RSI, MACD, SMA, EMA, BB, STOCH, ADX, ATR, OBV, Williams %R, CCI, ROC."
           />
           <TextField
             margin="dense"

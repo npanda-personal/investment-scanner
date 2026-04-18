@@ -217,6 +217,12 @@ All selected libraries and frameworks are under permissive open‑source license
 - **CI/CD**: GitHub Actions runs tests, builds Docker images, and deploys to staging on push.
 - **Production**: Containerized deployment on Fly.io with PostgreSQL managed service.
 
+## Scanner Engine Design
+Detailed design is documented in [`plans/designs/scanner_design.md`](plans/designs/scanner_design.md).
+
+## Backtesting Engine Design
+Detailed design is documented in [`plans/designs/backtest_design.md`](plans/designs/backtest_design.md).
+
 ## Status Tracking
 | Feature | Phase | Status | Notes |
 |---------|-------|--------|-------|

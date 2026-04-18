@@ -1,6 +1,5 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server as HTTPServer } from 'http';
-import { ScannerService } from '../../scanners/service';
 
 interface MarketData {
   symbol: string;
@@ -15,13 +14,11 @@ interface MarketData {
 
 export class MarketWebSocketServer {
   private wss: WebSocketServer;
-  private scannerService: ScannerService;
   private subscribedSymbols: Set<string> = new Set();
   private mockInterval?: NodeJS.Timeout;
 
   constructor(server: HTTPServer) {
     this.wss = new WebSocketServer({ server, path: '/ws/market' });
-    this.scannerService = new ScannerService();
     this.setup();
   }
 
@@ -90,23 +87,9 @@ export class MarketWebSocketServer {
       }
     });
     // Optionally evaluate scanner rules on this new data
-    this.evaluateScannerRules(data);
+    // this.evaluateScannerRules(data); // Disabled for manual scanning only
   }
 
-  /**
-   * Evaluate active scanner rules against the new market data.
-   * This is a simplified version – in production you would evaluate all active rules
-   * for the specific symbol and potentially across a time window.
-   */
-  private async evaluateScannerRules(_data: MarketData) {
-    try {
-      // For now, just trigger the scanActiveRules which will evaluate all rules.
-      // This is inefficient; better to evaluate only rules that involve this symbol.
-      await this.scannerService.scanActiveRules();
-    } catch (error) {
-      console.error('Error evaluating scanner rules:', error);
-    }
-  }
 
   /**
    * Start a mock data generator that broadcasts random price updates every 3 seconds.

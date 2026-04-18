@@ -80,6 +80,7 @@ const Backtester: React.FC = () => {
         fetchWatchlists(),
       ]);
       setConfigs(configsData);
+      console.log('Loaded configs:', configsData);
       setWatchlists(watchlistsData);
       setError(null);
     } catch (err: any) {
@@ -198,6 +199,7 @@ const Backtester: React.FC = () => {
     );
   }
 
+  console.log('Rendering Backtester with configs:', configs);
   return (
     <Box sx={{ p: 3, maxWidth: 1400, mx: 'auto' }}>
       <Typography variant="h4" gutterBottom>
@@ -274,10 +276,10 @@ const Backtester: React.FC = () => {
                                 {results[config.id].map((result) => (
                                   <TableRow key={result.id}>
                                     <TableCell>{new Date(result.completedAt).toLocaleString()}</TableCell>
-                                    <TableCell>{result.sharpeRatio?.toFixed(3) ?? '-'}</TableCell>
-                                    <TableCell>{result.maxDrawdown?.toFixed(3) ?? '-'}</TableCell>
-                                    <TableCell>{result.winRate ? `${(result.winRate * 100).toFixed(1)}%` : '-'}</TableCell>
-                                    <TableCell>{result.totalReturn ? `${(result.totalReturn * 100).toFixed(2)}%` : '-'}</TableCell>
+                                    <TableCell>{result.sharpeRatio !== null ? Number(result.sharpeRatio).toFixed(3) : '-'}</TableCell>
+                                    <TableCell>{result.maxDrawdown !== null ? Number(result.maxDrawdown).toFixed(3) : '-'}</TableCell>
+                                    <TableCell>{result.winRate !== null ? `${(Number(result.winRate) * 100).toFixed(1)}%` : '-'}</TableCell>
+                                    <TableCell>{result.totalReturn !== null ? `${(Number(result.totalReturn) * 100).toFixed(2)}%` : '-'}</TableCell>
                                     <TableCell>
                                       <Chip
                                         label={result.status}
