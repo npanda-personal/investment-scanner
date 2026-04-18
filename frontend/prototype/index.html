@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Investment Scanner – Condition Builder Prototype</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f9fafb;
+            color: #111827;
+            line-height: 1.5;
+            padding: 24px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .header {
+            margin-bottom: 32px;
+        }
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: #111827;
+        }
+        .header p {
+            font-size: 16px;
+            color: #6b7280;
+            margin-top: 8px;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+            padding: 32px;
+            margin-bottom: 24px;
+        }
+        .card-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .card-title i {
+            color: #0066ff;
+        }
+        .form-group {
+            margin-bottom: 24px;
+        }
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 8px;
+        }
+        .form-hint {
+            font-size: 13px;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+        .radio-group {
+            display: flex;
+            gap: 24px;
+            margin-top: 12px;
+        }
+        .radio-card {
+            flex: 1;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .radio-card:hover {
+            border-color: #9ca3af;
+        }
+        .radio-card.selected {
+            border-color: #0066ff;
+            background-color: #f0f7ff;
+        }
+        .radio-card h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 8px;
+        }
+        .radio-card p {
+            font-size: 14px;
+            color: #6b7280;
+        }
+        .condition-builder {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 24px;
+            background-color: #f9fafb;
+        }
+        .condition-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 16px;
+            padding: 16px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+        .condition-row:last-child {
+            margin-bottom: 0;
+        }
+        .condition-group {
+            border-left: 4px solid #0066ff;
+            padding-left: 20px;
+            margin-bottom: 24px;
+            background-color: #f8fafc;
+            border-radius: 0 8px 8px 0;
+        }
+        .group-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .group-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #374151;
+        }
+        .group-operator {
+            padding: 6px 12px;
+            background: #e0f2fe;
+            color: #0369a1;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .dropdown {
+            flex: 1;
+            min-width: 180px;
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #111827;
+            background-color: white;
+            cursor: pointer;
+        }
+        .dropdown:focus {
+            outline: none;
+            border-color: #0066ff;
+            box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.1);
+        }
+        .input-number {
+            flex: 0.5;
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #111827;
+            background-color: white;
+        }
+        .input-number:focus {
+            outline: none;
+            border-color: #0066ff;
+            box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.1);
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .btn-primary {
+            background-color: #0066ff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #0052d6;
+        }
+        .btn-secondary {
+            background-color: #f3f4f6;
+            color: #374151;
+        }
+        .btn-secondary:hover {
+            background-color: #e5e7eb;
+        }
+        .btn-icon {
+            padding: 8px 12px;
+            border-radius: 6px;
+            background: transparent;
+            color: #6b7280;
+            border: 1px solid #d1d5db;
+            cursor: pointer;
+        }
+        .btn-icon:hover {
+            background-color: #f3f4f6;
+        }
+        .actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+        .preview {
+            margin-top: 32px;
+            padding: 20px;
+            background-color: #f8fafc;
+            border-radius: 8px;
+            border: 1px dashed #9ca3af;
+        }
+        .preview-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 12px;
+        }
+        .preview-text {
+            font-family: 'Courier New', monospace;
+            font-size: 15px;
+            color: #111827;
+            white-space: pre-wrap;
+            background: white;
+            padding: 16px;
+            border-radius: 6px;
+            border: 1px solid #e5e7eb;
+        }
+        .footer-note {
+            text-align: center;
+            margin-top: 40px;
+            font-size: 14px;
+            color: #9ca3af;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Investment Scanner – Condition Builder Prototype</h1>
+            <p>Interactive prototype for the visual condition builder. This is a high‑fidelity mockup of the new scanner/backtest interface.</p>
+        </div>
+
+        <div class="card">
+            <div class="card-title">
+                <i class="fas fa-globe"></i>
+                Scan Scope
+            </div>
+            <div class="form-group">
+                <div class="form-label">Select the universe of symbols to scan</div>
+                <div class="radio-group">
+                    <div class="radio-card selected" id="scope-db">
+                        <h3>Complete Stock Database</h3>
+                        <p>Scan all symbols available in the system (default).</p>
+                    </div>
+                    <div class="radio-card" id="scope-watchlist">
+                        <h3>My Watchlist</h3>
+                        <p>Scan only the symbols in one of your watchlists.</p>
+                    </div>
+                    <div class="radio-card" id="scope-custom">
+                        <h3>Custom List</h3>
+                        <p>Manually pick symbols or upload a CSV.</p>
+                    </div>
+                </div>
+                <div class="form-hint">The scanner will evaluate your condition against every symbol in the selected universe.</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">
+                <i class="fas fa-sitemap"></i>
+                Condition Builder
+            </div>
+            <div class="form-group">
+                <div class="form-label">Define your scanning rule</div>
+                <div class="condition-builder" id="condition-builder">
+                    <!-- Single condition row -->
+                    <div class="condition-row" id="condition-row-1">
+                        <select class="dropdown condition-indicator">
+                            <option value="RSI">RSI (Relative Strength Index)</option>
+                            <option value="MACD">MACD (Moving Average Convergence Divergence)</option>
+                            <option value="SMA">SMA (Simple Moving Average)</option>
+                            <option value="EMA">EMA (Exponential Moving Average)</option>
+                            <option value="BB">Bollinger Bands (Middle)</option>
+                            <option value="STOCH">Stochastic %K</option>
+                            <option value="ADX">ADX (Average Directional Index)</option>
+                            <option value="ATR">ATR (Average True Range)</option>
+                            <option value="OBV">OBV (On‑Balance Volume)</option>
+                            <option value="WILLR">Williams %R</option>
+                            <option value="CCI">CCI (Commodity Channel Index)</option>
+                            <option value="ROC">ROC (Rate of Change)</option>
+                        </select>
+                        <select class="dropdown condition-operator">
+                            <option value=">">greater than</option>
+                            <option value=">=">greater than or equal</option>
+                            <option value="<">less than</option>
+                            <option value="<=">less than or equal</option>
+                            <option value="==">equals</option>
+                            <option value="!=">not equals</option>
+                        </select>
+                        <input type="number" class="input-number condition-value" value="70" step="0.1">
+                        <button class="btn-icon condition-remove" title="Remove condition">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                    <!-- Add buttons -->
+                    <div class="actions">
+                        <button class="btn btn-secondary" id="add-condition">
+                            <i class="fas fa-plus"></i> Add Condition
+                        </button>
+                        <button class="btn btn-secondary" id="add-group">
+                            <i class="fas fa-layer-group"></i> Add Group (AND/OR)
+                        </button>
+                    </div>
+                </div>
+                <div class="form-hint">Conditions are evaluated in order. Groups allow you to nest AND/OR logic.</div>
+            </div>
+        </div>
+
+        <div class="preview">
+            <div class="preview-title">Live Preview (Human‑Readable)</div>
+            <div class="preview-text" id="preview-text">
+                RSI is greater than 70
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">
+                <i class="fas fa-play-circle"></i>
+                Actions
+            </div>
+            <div class="form-group">
+                <div class="form-label">Run the scan or save the rule</div>
+                <div class="actions">
+                    <button class="btn btn-primary">
+                        <i class="fas fa-rocket"></i> Run Scan Now
+                    </button>
+                    <button class="btn btn-secondary">
+                        <i class="fas fa-save"></i> Save Rule
+                    </button>
+                    <button class="btn btn-secondary">
+                        <i class="fas fa-history"></i> Schedule
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer-note">
+            This is a static prototype. Interactions are simulated. © 2026 Investment Scanner.
+        </div>
+    </div>
+
+    <script>
+        // Radio card selection
+        const radioCards = document.querySelectorAll('.radio-card');
+        radioCards.forEach(card => {
+            card.addEventListener('click', () => {
+                radioCards.forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
+            });
+        });
+
+        // Update preview on input change
+        function updatePreview() {
+            const indicator = document.querySelector('.condition-indicator').value;
+            const operator = document.querySelector('.condition-operator').value;
+            const value = document.querySelector('.condition-value').value;
+            const operatorText = {
+                '>': 'is greater than',
+                '>=': 'is greater than or equal to',
+                '<': 'is less than',
+                '<=': 'is less than or equal to',
+                '==': 'equals',
+                '!=': 'does not equal'
+            }[operator] || operator;
+            document.getElementById('preview-text').textContent = `${indicator} ${operatorText} ${value}`;
+        }
+
+        document.querySelector('.condition-indicator').addEventListener('change', updatePreview);
+        document.querySelector('.condition-operator').addEventListener('change', updatePreview);
+        document.querySelector('.condition-value').addEventListener('input', updatePreview);
+
+        // Add condition row
+        document.getElementById('add-condition').addEventListener('click', () => {
+            const builder = document.getElementById('condition-builder');
+            const newRow = document.createElement('div');
+            newRow.className = 'condition-row';
+            newRow.innerHTML = `
+                <select class="dropdown condition-indicator">
+                    <option value="RSI">RSI (Relative Strength Index)</option>
+                    <option value="MACD">MACD (Moving Average Convergence Divergence)</option>
+                    <option value="SMA">SMA (Simple Moving Average)</option>
+                    <option value="EMA">EMA (Exponential Moving Average)</option>
+                    <option value="BB">Bollinger Bands (Middle)</option>
+                    <option value="STOCH">Stochastic %K</option>
+                    <option value="ADX">ADX (Average Directional Index)</option>
+                    <option value="ATR">ATR (Average True Range)</option>
+                    <option value="OBV">OBV (On‑Balance Volume)</option>
+                    <option value="WILLR">Williams %R</option>
+                    <option value="CCI">CCI (Commodity Channel Index)</option>
+                    <option value="ROC">ROC (Rate of Change)</option>
+                </select>
+                <select class="dropdown condition-operator">
+                    <option value=">">greater than</option>
+                    <option value=">=">greater than or equal</option>
+                    <option value="<">less than</option>
+                    <option value="<=">less than or equal</option>
+                    <option value="==">equals</option>
+                    <option value="!=">not equals</option>
+                </select>
+                <input type="number" class="input-number condition-value" value="70" step="0.1">
+                <button class="btn-icon condition-remove" title="Remove condition">
+                    <i class="fas fa-trash"></i>
+                </button>
+            `;
+            // Insert before the actions div
+            const actions = document.querySelector('.actions');
+            builder.insertBefore(newRow, actions);
+            // Attach events
+            newRow.querySelector('.condition-indicator').addEventListener('change', updatePreview);
+            newRow.querySelector('.condition-operator').addEventListener('change', updatePreview);
+            newRow.querySelector('.condition-value').addEventListener('input', updatePreview);
+            newRow.querySelector('.condition-remove').addEventListener('click', function() {
+                newRow.remove();
+                updatePreview();
+            });
+            updatePreview();
+        });
+
+        // Remove condition
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.condition-remove')) {
+                e.target.closest('.condition-row').remove();
+                updatePreview();
+            }
+        });
+
+        // Add group (simplified)
+        document.getElementById('add-group').addEventListener('click', () => {
+            alert('In a full implementation, this would insert a nested group with AND/OR logic.');
+        });
+    </script>
+</body>
+</html>

@@ -49,6 +49,9 @@ import {
   CreateScannerRuleRequest,
 } from '../../services/scannerService';
 import { fetchWatchlists, Watchlist } from '../../services/watchlistService';
+import ConditionInputDualMode from '../ConditionBuilder/ConditionInputDualMode';
+import ScanScopeSelector, { ScanScope } from '../ScanScopeSelector/ScanScopeSelector';
+import { ConditionNode } from '../../types/scanner';
 
 const Scanner: React.FC = () => {
   const [rules, setRules] = useState<ScannerRule[]>([]);
@@ -62,16 +65,26 @@ const Scanner: React.FC = () => {
   const [editingRule, setEditingRule] = useState<ScannerRule | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [condition, setCondition] = useState('{}');
-  const [sourceWatchlistId, setSourceWatchlistId] = useState<string>('');
-  const [sourceSymbolsInput, setSourceSymbolsInput] = useState('');
   const [targetWatchlistId, setTargetWatchlistId] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [schedule, setSchedule] = useState('');
+  const [scanScope, setScanScope] = useState<ScanScope>('database');
+  const [selectedWatchlistId, setSelectedWatchlistId] = useState<string>('');
+  const [customSymbols, setCustomSymbols] = useState<string[]>([]);
+  const [conditionNode, setConditionNode] = useState<ConditionNode>({ type: 'indicator', name: 'RSI', parameters: {}, operator: '>', value: 70 });
 
   useEffect(() => {
     loadData();
   }, []);
+
+  // Sync target watchlist with source watchlist when scope is watchlist
+  useEffect(() => {
+    if (scanScope === 'watchlist') {
+      setTargetWatchlistId(selectedWatchlistId);
+    } else {
+      setTargetWatchlistId('');
+    }
+  }, [scanScope, selectedWatchlistId]);
 
   const loadData = async () => {
     try {
@@ -104,9 +117,21 @@ const Scanner: React.FC = () => {
       setEditingRule(rule);
       setName(rule.name);
       setDescription(rule.description || '');
-      setCondition(JSON.stringify(rule.condition, null, 2));
-      setSourceWatchlistId(rule.sourceWatchlistId || '');
-      setSourceSymbolsInput(rule.sourceSymbols ? JSON.stringify(rule.sourceSymbols) : '');
+      setConditionNode(rule.condition);
+      // Determine scan scope
+      if (rule.sourceWatchlistId) {
+        setScanScope('watchlist');
+        setSelectedWatchlistId(rule.sourceWatchlistId);
+        setCustomSymbols([]);
+      } else if (rule.sourceSymbols && rule.sourceSymbols.length > 0) {
+        setScanScope('custom');
+        setSelectedWatchlistId('');
+        setCustomSymbols(rule.sourceSymbols);
+      } else {
+        setScanScope('database');
+        setSelectedWatchlistId('');
+        setCustomSymbols([]);
+      }
       setTargetWatchlistId(rule.targetWatchlistId);
       setIsActive(rule.isActive);
       setSchedule(rule.schedule || '');
@@ -114,9 +139,10 @@ const Scanner: React.FC = () => {
       setEditingRule(null);
       setName('');
       setDescription('');
-      setCondition('{}');
-      setSourceWatchlistId('');
-      setSourceSymbolsInput('');
+      setConditionNode({ type: 'indicator', name: 'RSI', parameters: {}, operator: '>', value: 70 });
+      setScanScope('database');
+      setSelectedWatchlistId('');
+      setCustomSymbols([]);
       setTargetWatchlistId('');
       setIsActive(true);
       setSchedule('');
@@ -130,32 +156,21 @@ const Scanner: React.FC = () => {
 
   const handleSaveRule = async () => {
     try {
-      let parsedCondition;
-      let parsedSourceSymbols: string[] | undefined;
-      try {
-        parsedCondition = JSON.parse(condition);
-      } catch {
-        setError('Invalid JSON in condition');
-        return;
+      // Determine source watchlist and symbols based on scan scope
+      let sourceWatchlistId: string | undefined = undefined;
+      let sourceSymbols: string[] | undefined = undefined;
+      if (scanScope === 'watchlist') {
+        sourceWatchlistId = selectedWatchlistId || undefined;
+      } else if (scanScope === 'custom') {
+        sourceSymbols = customSymbols.length > 0 ? customSymbols : undefined;
       }
-      if (sourceSymbolsInput.trim()) {
-        try {
-          parsedSourceSymbols = JSON.parse(sourceSymbolsInput);
-          if (!Array.isArray(parsedSourceSymbols)) {
-            setError('sourceSymbols must be an array of strings');
-            return;
-          }
-        } catch {
-          setError('Invalid JSON in source symbols');
-          return;
-        }
-      }
+
       const data: CreateScannerRuleRequest = {
         name,
         description,
-        condition: parsedCondition,
-        sourceWatchlistId: sourceWatchlistId || undefined,
-        sourceSymbols: parsedSourceSymbols,
+        condition: conditionNode,
+        sourceWatchlistId,
+        sourceSymbols,
         targetWatchlistId,
         isActive,
         schedule: schedule || undefined,
@@ -209,6 +224,13 @@ const Scanner: React.FC = () => {
       </Box>
     );
   }
+
+  // Validation errors
+  const validationErrors: string[] = [];
+  if (!name.trim()) validationErrors.push('Rule name is required.');
+  if (!conditionNode) validationErrors.push('At least one condition must be defined.');
+  if (scanScope === 'watchlist' && !selectedWatchlistId) validationErrors.push('A watchlist must be selected.');
+  // TODO: add validation for custom symbols if needed
 
   return (
     <Box sx={{ p: 3, maxWidth: 1400, mx: 'auto' }}>
@@ -347,62 +369,26 @@ const Scanner: React.FC = () => {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
-          <FormControl fullWidth margin="dense">
-            <InputLabel>Target Watchlist *</InputLabel>
-            <Select
-              value={targetWatchlistId}
-              label="Target Watchlist *"
-              onChange={(e) => setTargetWatchlistId(e.target.value)}
-              required
-            >
-              {watchlists.map((wl) => (
-                <MenuItem key={wl.id} value={wl.id}>
-                  {wl.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl fullWidth margin="dense">
-            <InputLabel>Source Watchlist (optional)</InputLabel>
-            <Select
-              value={sourceWatchlistId}
-              label="Source Watchlist (optional)"
-              onChange={(e) => setSourceWatchlistId(e.target.value)}
-            >
-              <MenuItem value="">None</MenuItem>
-              {watchlists.map((wl) => (
-                <MenuItem key={wl.id} value={wl.id}>
-                  {wl.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <TextField
-            margin="dense"
-            label="Source Symbols (JSON array, optional)"
-            fullWidth
-            variant="outlined"
-            value={sourceSymbolsInput}
-            onChange={(e) => setSourceSymbolsInput(e.target.value)}
-            placeholder='["AAPL", "MSFT"]'
-            helperText="Provide a JSON array of symbols. Overrides source watchlist."
+          <ScanScopeSelector
+            value={{
+              scope: scanScope,
+              watchlistId: selectedWatchlistId,
+              customSymbols: customSymbols,
+            }}
+            onChange={(value) => {
+              setScanScope(value.scope);
+              setSelectedWatchlistId(value.watchlistId || '');
+              setCustomSymbols(value.customSymbols || []);
+            }}
+            watchlists={watchlists}
           />
-          <TextField
-            margin="dense"
-            label="Condition (JSON)"
-            fullWidth
-            variant="outlined"
-            multiline
-            rows={6}
-            value={condition}
-            onChange={(e) => setCondition(e.target.value)}
-            placeholder={`{
-  "indicator": "RSI",
-  "operator": ">",
-  "value": 70
-}`}
-            helperText="Define the scanning condition as a JSON object. Supported indicators: RSI, MACD, SMA, EMA, BB, STOCH, ADX, ATR, OBV, Williams %R, CCI, ROC."
-          />
+          <Box sx={{ mt: 3 }}>
+            <Typography variant="subtitle2" gutterBottom>Condition</Typography>
+            <ConditionInputDualMode
+              value={conditionNode}
+              onChange={(node) => setConditionNode(node)}
+            />
+          </Box>
           <TextField
             margin="dense"
             label="Schedule (Cron expression, optional)"
@@ -419,8 +405,20 @@ const Scanner: React.FC = () => {
           />
         </DialogContent>
         <DialogActions>
+          <Box sx={{ flexGrow: 1 }}>
+            {validationErrors.length > 0 && (
+              <Alert severity="error" sx={{ mb: 1 }}>
+                <Typography variant="subtitle2">Please fix the following errors:</Typography>
+                <ul style={{ margin: 0, paddingLeft: '20px' }}>
+                  {validationErrors.map((err, idx) => (
+                    <li key={idx}>{err}</li>
+                  ))}
+                </ul>
+              </Alert>
+            )}
+          </Box>
           <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleSaveRule} variant="contained">
+          <Button onClick={handleSaveRule} variant="contained" disabled={validationErrors.length > 0}>
             Save
           </Button>
         </DialogActions>
