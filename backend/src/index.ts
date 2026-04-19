@@ -9,6 +9,7 @@ import watchlistRouter from './api/watchlists/router';
 import scannerRouter from './api/scanners/router';
 import backtestRouter from './api/backtest/router';
 import stocksRouter from './api/stocks/router';
+import smartMoneyRouter from './api/smart-money/router';
 import { MarketWebSocketServer } from './data/websocket/market-ws';
 
 dotenv.config();
@@ -34,6 +35,7 @@ app.use('/api/watchlists', watchlistRouter);
 app.use('/api/scanners', scannerRouter);
 app.use('/api/backtest', backtestRouter);
 app.use('/api/stocks', stocksRouter);
+app.use('/api/smart-money', smartMoneyRouter);
 
 // 404 handler
 app.use((_req, res) => {
