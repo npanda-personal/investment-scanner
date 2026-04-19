@@ -2,33 +2,27 @@ import React, { useState, useEffect } from 'react';
 import {
   Box,
   Button,
-  TextField,
   Typography,
   List,
   ListItem,
   ListItemText,
   ListItemSecondaryAction,
   IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Chip,
   Paper,
   Divider,
   Alert,
   CircularProgress,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  Grid,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -47,6 +41,8 @@ import {
   CreateBacktestConfigRequest,
 } from '../../services/backtestService';
 import { fetchWatchlists, Watchlist } from '../../services/watchlistService';
+import BacktestWizardDialog, { WizardData } from './BacktestWizardDialog';
+import BacktestResultsView from './BacktestResultsView';
 
 const Backtester: React.FC = () => {
   const [configs, setConfigs] = useState<BacktestConfig[]>([]);
@@ -54,19 +50,15 @@ const Backtester: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [watchlists, setWatchlists] = useState<Watchlist[]>([]);
   const [results, setResults] = useState<Record<string, BacktestResult[]>>({}); // configId -> results
+  const [runningConfigId, setRunningConfigId] = useState<string | null>(null);
 
   // New config dialog
   const [openDialog, setOpenDialog] = useState(false);
   const [editingConfig, setEditingConfig] = useState<BacktestConfig | null>(null);
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [selectedWatchlistIds, setSelectedWatchlistIds] = useState<string[]>([]);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [strategyConfig, setStrategyConfig] = useState('{}');
-  const [positionSizing, setPositionSizing] = useState('');
-  const [stopLoss, setStopLoss] = useState('');
-  const [takeProfit, setTakeProfit] = useState('');
+
+  // Results visualization dialog
+  const [selectedResult, setSelectedResult] = useState<BacktestResult | null>(null);
+  const [resultsDialogOpen, setResultsDialogOpen] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -100,29 +92,7 @@ const Backtester: React.FC = () => {
   };
 
   const handleOpenDialog = (config?: BacktestConfig) => {
-    if (config) {
-      setEditingConfig(config);
-      setName(config.name);
-      setDescription(config.description || '');
-      setSelectedWatchlistIds(config.watchlistIds);
-      setStartDate(config.startDate.split('T')[0]);
-      setEndDate(config.endDate.split('T')[0]);
-      setStrategyConfig(JSON.stringify(config.strategyConfig, null, 2));
-      setPositionSizing(config.positionSizing ? JSON.stringify(config.positionSizing, null, 2) : '');
-      setStopLoss(config.stopLoss?.toString() || '');
-      setTakeProfit(config.takeProfit?.toString() || '');
-    } else {
-      setEditingConfig(null);
-      setName('');
-      setDescription('');
-      setSelectedWatchlistIds([]);
-      setStartDate('');
-      setEndDate('');
-      setStrategyConfig('{}');
-      setPositionSizing('');
-      setStopLoss('');
-      setTakeProfit('');
-    }
+    setEditingConfig(config || null);
     setOpenDialog(true);
   };
 
@@ -130,34 +100,22 @@ const Backtester: React.FC = () => {
     setOpenDialog(false);
   };
 
-  const handleSaveConfig = async () => {
+  const handleSaveConfig = async (wizardData: WizardData) => {
     try {
-      let parsedStrategyConfig;
-      let parsedPositionSizing;
-      try {
-        parsedStrategyConfig = JSON.parse(strategyConfig);
-      } catch {
-        setError('Invalid JSON in strategy config');
-        return;
-      }
-      if (positionSizing.trim()) {
-        try {
-          parsedPositionSizing = JSON.parse(positionSizing);
-        } catch {
-          setError('Invalid JSON in position sizing');
-          return;
-        }
-      }
+      const strategyConfig = {
+        entry: wizardData.entryCondition,
+        exit: wizardData.exitCondition,
+      };
       const data: CreateBacktestConfigRequest = {
-        name,
-        description,
-        watchlistIds: selectedWatchlistIds,
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
-        strategyConfig: parsedStrategyConfig,
-        positionSizing: parsedPositionSizing,
-        stopLoss: stopLoss ? parseFloat(stopLoss) : undefined,
-        takeProfit: takeProfit ? parseFloat(takeProfit) : undefined,
+        name: wizardData.name,
+        description: wizardData.description,
+        watchlistIds: wizardData.watchlistIds,
+        startDate: new Date(wizardData.startDate),
+        endDate: new Date(wizardData.endDate),
+        strategyConfig,
+        positionSizing: wizardData.positionSizing,
+        stopLoss: wizardData.stopLoss ?? undefined,
+        takeProfit: wizardData.takeProfit ?? undefined,
       };
       if (editingConfig) {
         await updateBacktestConfig(editingConfig.id, data);
@@ -182,13 +140,26 @@ const Backtester: React.FC = () => {
   };
 
   const handleRunBacktest = async (id: string) => {
+    setRunningConfigId(id);
     try {
       await runBacktest(id);
       // Refresh results
       await loadResultsForConfig(id);
     } catch (err: any) {
       setError('Failed to run backtest: ' + err.message);
+    } finally {
+      setRunningConfigId(null);
     }
+  };
+
+  const handleOpenResults = (result: BacktestResult) => {
+    setSelectedResult(result);
+    setResultsDialogOpen(true);
+  };
+
+  const handleCloseResults = () => {
+    setResultsDialogOpen(false);
+    setSelectedResult(null);
   };
 
   if (loading) {
@@ -274,7 +245,14 @@ const Backtester: React.FC = () => {
                               </TableHead>
                               <TableBody>
                                 {results[config.id].map((result) => (
-                                  <TableRow key={result.id}>
+                                  <TableRow
+                                    key={result.id}
+                                    onClick={() => handleOpenResults(result)}
+                                    sx={{
+                                      cursor: 'pointer',
+                                      '&:hover': { bgcolor: 'action.hover' },
+                                    }}
+                                  >
                                     <TableCell>{new Date(result.completedAt).toLocaleString()}</TableCell>
                                     <TableCell>{result.sharpeRatio !== null ? Number(result.sharpeRatio).toFixed(3) : '-'}</TableCell>
                                     <TableCell>{result.maxDrawdown !== null ? Number(result.maxDrawdown).toFixed(3) : '-'}</TableCell>
@@ -298,8 +276,17 @@ const Backtester: React.FC = () => {
                   }
                 />
                 <ListItemSecondaryAction>
-                  <IconButton edge="end" aria-label="run" onClick={() => handleRunBacktest(config.id)}>
-                    <PlayArrowIcon />
+                  <IconButton
+                    edge="end"
+                    aria-label="run"
+                    onClick={() => handleRunBacktest(config.id)}
+                    disabled={runningConfigId === config.id}
+                  >
+                    {runningConfigId === config.id ? (
+                      <CircularProgress size={20} />
+                    ) : (
+                      <PlayArrowIcon />
+                    )}
                   </IconButton>
                   <IconButton edge="end" aria-label="edit" onClick={() => handleOpenDialog(config)}>
                     <EditIcon />
@@ -315,154 +302,27 @@ const Backtester: React.FC = () => {
         </List>
       )}
 
-      {/* Create/Edit Config Dialog */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-        <DialogTitle>{editingConfig ? 'Edit Backtest Configuration' : 'Create New Backtest Configuration'}</DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2}>
-            <Grid item xs={12}>
-              <TextField
-                autoFocus
-                margin="dense"
-                label="Name"
-                fullWidth
-                variant="outlined"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                margin="dense"
-                label="Description"
-                fullWidth
-                variant="outlined"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <FormControl fullWidth margin="dense">
-                <InputLabel>Watchlists *</InputLabel>
-                <Select
-                  multiple
-                  value={selectedWatchlistIds}
-                  label="Watchlists *"
-                  onChange={(e) => setSelectedWatchlistIds(e.target.value as string[])}
-                  required
-                >
-                  {watchlists.map((wl) => (
-                    <MenuItem key={wl.id} value={wl.id}>
-                      {wl.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                margin="dense"
-                label="Start Date"
-                type="date"
-                fullWidth
-                variant="outlined"
-                InputLabelProps={{ shrink: true }}
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                required
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                margin="dense"
-                label="End Date"
-                type="date"
-                fullWidth
-                variant="outlined"
-                InputLabelProps={{ shrink: true }}
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                required
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                margin="dense"
-                label="Strategy Config (JSON)"
-                fullWidth
-                variant="outlined"
-                multiline
-                rows={6}
-                value={strategyConfig}
-                onChange={(e) => setStrategyConfig(e.target.value)}
-                placeholder={`{
-  "entry": {
-    "indicator": "SMA",
-    "fast": 10,
-    "slow": 30,
-    "type": "crossover"
-  },
-  "exit": {
-    "indicator": "SMA",
-    "fast": 10,
-    "slow": 30,
-    "type": "crossunder"
-  }
-}`}
-                helperText="Define the trading strategy as a JSON object."
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                margin="dense"
-                label="Position Sizing (JSON, optional)"
-                fullWidth
-                variant="outlined"
-                multiline
-                rows={3}
-                value={positionSizing}
-                onChange={(e) => setPositionSizing(e.target.value)}
-                placeholder={`{
-  "type": "fixed",
-  "amount": 1000
-}`}
-                helperText="Define position sizing logic."
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                margin="dense"
-                label="Stop Loss (%)"
-                type="number"
-                fullWidth
-                variant="outlined"
-                value={stopLoss}
-                onChange={(e) => setStopLoss(e.target.value)}
-                placeholder="5"
-                helperText="Optional"
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                margin="dense"
-                label="Take Profit (%)"
-                type="number"
-                fullWidth
-                variant="outlined"
-                value={takeProfit}
-                onChange={(e) => setTakeProfit(e.target.value)}
-                placeholder="10"
-                helperText="Optional"
-              />
-            </Grid>
-          </Grid>
+      <BacktestWizardDialog
+        open={openDialog}
+        onClose={handleCloseDialog}
+        onSave={handleSaveConfig}
+        watchlists={watchlists}
+        editingConfig={editingConfig}
+      />
+      {/* Results detail dialog */}
+      <Dialog
+        open={resultsDialogOpen}
+        onClose={handleCloseResults}
+        maxWidth="lg"
+        fullWidth
+        scroll="paper"
+      >
+        <DialogTitle>Backtest Result Details</DialogTitle>
+        <DialogContent dividers>
+          {selectedResult && <BacktestResultsView result={selectedResult} />}
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleSaveConfig} variant="contained">
-            Save
-          </Button>
+          <Button onClick={handleCloseResults}>Close</Button>
         </DialogActions>
       </Dialog>
     </Box>

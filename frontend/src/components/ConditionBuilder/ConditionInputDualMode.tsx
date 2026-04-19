@@ -362,51 +362,6 @@ const ConditionInputDualMode: React.FC<ConditionInputDualModeProps> = ({ value, 
   );
 };
 
-// Helper functions
-function rowsToConditionNode(rows: Row[], logicalOp: 'and' | 'or'): ConditionNode | null {
-  if (rows.length === 0) return null;
-  const primitives: PrimitiveCondition[] = rows.map(row => ({
-    type: 'indicator',
-    name: row.field as any,
-    parameters: {},
-    operator: row.operator as any,
-    value: parseFloat(row.value) || 0,
-  }));
-  if (primitives.length === 1) return primitives[0];
-  return {
-    operator: logicalOp,
-    conditions: primitives,
-  };
-}
-
-function conditionNodeToRows(node: ConditionNode): {
-  rows: Row[];
-  logicalOp: 'and' | 'or';
-} {
-  const rows: Row[] = [];
-  let logicalOp: 'and' | 'or' = 'and';
-  if (isLogicalCondition(node)) {
-    logicalOp = node.operator === 'not' ? 'and' : node.operator; // map 'not' to 'and' for UI
-    node.conditions.forEach((cond) => {
-      if (!isLogicalCondition(cond) && cond.type === 'indicator') {
-        rows.push({
-          id: nextId++,
-          field: cond.name,
-          operator: cond.operator,
-          value: cond.value.toString(),
-        });
-      }
-    });
-  } else if (node.type === 'indicator') {
-    rows.push({
-      id: nextId++,
-      field: node.name,
-      operator: node.operator,
-      value: node.value.toString(),
-    });
-  }
-  return { rows, logicalOp };
-}
 
 function groupsToConditionNode(groups: Group[]): ConditionNode | null {
   if (groups.length === 0) return null;

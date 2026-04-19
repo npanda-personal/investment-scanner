@@ -4,10 +4,6 @@ import {
   Button,
   TextField,
   Typography,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemSecondaryAction,
   IconButton,
   Dialog,
   DialogTitle,
@@ -15,7 +11,6 @@ import {
   DialogActions,
   Chip,
   Paper,
-  Divider,
   Alert,
   CircularProgress,
   Tabs,
@@ -221,14 +216,14 @@ const WatchlistManager: React.FC = () => {
         </Paper>
       ) : (
         <Box>
-          <Tabs value={selectedTabIndex} onChange={(e, newValue) => setSelectedTabIndex(newValue)}>
-            {watchlists.map((watchlist, index) => (
+          <Tabs value={selectedTabIndex} onChange={(_, newValue) => setSelectedTabIndex(newValue)}>
+            {watchlists.map((watchlist, _index) => (
               <Tab key={watchlist.id} label={watchlist.name} />
             ))}
           </Tabs>
-          {watchlists.map((watchlist, index) => (
-            <Box key={watchlist.id} role="tabpanel" hidden={selectedTabIndex !== index}>
-              {selectedTabIndex === index && (
+          {watchlists.map((watchlist, _index) => (
+            <Box key={watchlist.id} role="tabpanel" hidden={selectedTabIndex !== _index}>
+              {selectedTabIndex === _index && (
                 <Box sx={{ p: 3 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                     <Typography variant="h5">{watchlist.name}</Typography>
@@ -321,10 +316,10 @@ const WatchlistManager: React.FC = () => {
             options={searchResults}
             loading={searchLoading}
             inputValue={searchQuery}
-            onInputChange={(event, newInputValue) => {
+            onInputChange={(_, newInputValue) => {
               setSearchQuery(newInputValue);
             }}
-            onChange={(event, newValue) => {
+            onChange={(_, newValue) => {
               if (typeof newValue === 'string') {
                 setNewSymbol(newValue);
               } else if (newValue && typeof newValue === 'object') {

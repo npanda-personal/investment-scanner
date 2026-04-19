@@ -41,26 +41,6 @@ import {
   createStock,
 } from '../../services/stockService';
 
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`stock-tabpanel-${index}`}
-      aria-labelledby={`stock-tab-${index}`}
-      {...other}
-    >
-      {value === index && <Box sx={{ pt: 3 }}>{children}</Box>}
-    </div>
-  );
-}
 
 const StockManager: React.FC = () => {
   // Tabs state
@@ -77,7 +57,6 @@ const StockManager: React.FC = () => {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
 
   // Sorting state
   const [sortBy, setSortBy] = useState<string>('symbol');
@@ -108,7 +87,6 @@ const StockManager: React.FC = () => {
       });
       setStocks(response.stocks);
       setTotal(response.total);
-      setTotalPages(response.totalPages);
     } catch (err: any) {
       setError(err.message || 'Failed to load stocks');
     } finally {
