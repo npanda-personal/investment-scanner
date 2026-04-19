@@ -49,9 +49,6 @@ router.post('/', async (req, res) => {
     if (!condition) {
       return res.status(400).json({ error: 'Missing condition' });
     }
-    if (!targetWatchlistId || typeof targetWatchlistId !== 'string') {
-      return res.status(400).json({ error: 'Missing or invalid targetWatchlistId' });
-    }
 
     const rule = await scannerService.create(userId, {
       name,
@@ -59,7 +56,7 @@ router.post('/', async (req, res) => {
       condition,
       sourceWatchlistId,
       sourceSymbols,
-      targetWatchlistId,
+      targetWatchlistId, // Optional now
       isActive,
       schedule,
       nextScanAt: nextScanAt ? new Date(nextScanAt) : undefined,
@@ -162,7 +159,19 @@ router.post('/:id/scan', async (req, res) => {
     return res.json(result);
   } catch (error) {
     console.error('Error scanning rule:', error);
-    return res.status(500).json({ error: 'Failed to scan rule' });
+    // Provide more informative error messages
+    if (error instanceof Error) {
+      if (error.message.includes('No historical price data available')) {
+        return res.status(400).json({
+          error: 'Cannot evaluate indicator: No historical price data available. Please ensure stock data is loaded.',
+          details: error.message
+        });
+      }
+      if (error.message.includes('Scanner rule')) {
+        return res.status(404).json({ error: error.message });
+      }
+    }
+    return res.status(500).json({ error: 'Failed to scan rule', details: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 

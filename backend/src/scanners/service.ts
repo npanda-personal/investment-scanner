@@ -9,7 +9,7 @@ export interface CreateScannerRuleRequest {
   condition: any; // JSON condition
   sourceWatchlistId?: string;
   sourceSymbols?: string[];
-  targetWatchlistId: string;
+  targetWatchlistId?: string; // Optional now
   isActive?: boolean;
   schedule?: string; // cron expression
   nextScanAt?: Date;
@@ -181,10 +181,14 @@ export class ScannerService {
       try {
         const evalResult = await this.evaluateRule(rule.id);
         if (evalResult.triggered && evalResult.symbol) {
-          // Add symbol to target watchlist
-          await this.watchlistService.addSymbol(rule.userId, rule.targetWatchlistId, evalResult.symbol);
+          let addedToWatchlist = false;
+          // Check if rule has a target watchlist and it's not the "Scanner Results" watchlist
+          if (rule.targetWatchlistId && rule.targetWatchlist && rule.targetWatchlist.name !== 'Scanner Results') {
+            await this.watchlistService.addSymbol(rule.userId, rule.targetWatchlistId, evalResult.symbol);
+            addedToWatchlist = true;
+          }
           // Log the trigger
-          await this.logTrigger(rule.id, evalResult.symbol, evalResult.data, true);
+          await this.logTrigger(rule.id, evalResult.symbol, evalResult.data, addedToWatchlist);
           results.push({ ruleId: rule.id, triggered: true, symbol: evalResult.symbol });
         }
       } catch (error) {

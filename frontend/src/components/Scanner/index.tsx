@@ -26,6 +26,10 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -61,7 +65,6 @@ const Scanner: React.FC = () => {
   const [editingRule, setEditingRule] = useState<ScannerRule | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [targetWatchlistId, setTargetWatchlistId] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [schedule, setSchedule] = useState('');
   const [scanScope, setScanScope] = useState<ScanScope>('database');
@@ -72,15 +75,6 @@ const Scanner: React.FC = () => {
   useEffect(() => {
     loadData();
   }, []);
-
-  // Sync target watchlist with source watchlist when scope is watchlist
-  useEffect(() => {
-    if (scanScope === 'watchlist') {
-      setTargetWatchlistId(selectedWatchlistId);
-    } else {
-      setTargetWatchlistId('');
-    }
-  }, [scanScope, selectedWatchlistId]);
 
   const loadData = async () => {
     try {
@@ -128,7 +122,6 @@ const Scanner: React.FC = () => {
         setSelectedWatchlistId('');
         setCustomSymbols([]);
       }
-      setTargetWatchlistId(rule.targetWatchlistId);
       setIsActive(rule.isActive);
       setSchedule(rule.schedule || '');
     } else {
@@ -139,7 +132,6 @@ const Scanner: React.FC = () => {
       setScanScope('database');
       setSelectedWatchlistId('');
       setCustomSymbols([]);
-      setTargetWatchlistId('');
       setIsActive(true);
       setSchedule('');
     }
@@ -161,13 +153,39 @@ const Scanner: React.FC = () => {
         sourceSymbols = customSymbols.length > 0 ? customSymbols : undefined;
       }
 
+      // Find or create a "Scanner Results" watchlist
+      let scannerResultsWatchlist = watchlists.find(wl => wl.name === 'Scanner Results');
+      if (!scannerResultsWatchlist) {
+        try {
+          const { createWatchlist } = await import('../../services/watchlistService');
+          scannerResultsWatchlist = await createWatchlist({
+            name: 'Scanner Results',
+            description: 'Auto-generated watchlist for scanner results (symbols not actually saved)',
+            symbols: [],
+          });
+          // Refresh watchlists
+          const updatedWatchlists = await fetchWatchlists();
+          setWatchlists(updatedWatchlists);
+        } catch (createErr) {
+          console.warn('Failed to create Scanner Results watchlist:', createErr);
+          // Use first available watchlist as fallback
+          scannerResultsWatchlist = watchlists[0];
+        }
+      }
+
+      if (!scannerResultsWatchlist) {
+        setError('No watchlist available for scanner results. Please create a watchlist first.');
+        return;
+      }
+
+      // Use the scanner results watchlist ID
       const data: CreateScannerRuleRequest = {
         name,
         description,
         condition: conditionNode,
         sourceWatchlistId,
         sourceSymbols,
-        targetWatchlistId,
+        targetWatchlistId: scannerResultsWatchlist.id,
         isActive,
         schedule: schedule || undefined,
       };
@@ -225,7 +243,7 @@ const Scanner: React.FC = () => {
   const validationErrors: string[] = [];
   if (!name.trim()) validationErrors.push('Rule name is required.');
   if (!conditionNode) validationErrors.push('At least one condition must be defined.');
-  if (scanScope === 'watchlist' && !selectedWatchlistId) validationErrors.push('A watchlist must be selected.');
+  if (scanScope === 'watchlist' && !selectedWatchlistId) validationErrors.push('A source watchlist must be selected.');
   // TODO: add validation for custom symbols if needed
 
   return (
@@ -234,7 +252,7 @@ const Scanner: React.FC = () => {
         Real-Time Market Scanner
       </Typography>
       <Typography variant="body1" color="text.secondary" paragraph>
-        Create scanner rules that automatically add matching securities to watchlists.
+        Create scanner rules to monitor market conditions and trigger alerts when criteria are met.
       </Typography>
 
       {error && (

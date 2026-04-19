@@ -117,7 +117,7 @@ model ScannerRule {
   condition         Json // flexible condition structure (e.g., RSI > 70)
   sourceWatchlistId String? // optional watchlist defining the security universe
   sourceSymbols     Json? // alternative: explicit list of symbols as JSON array
-  targetWatchlistId String // watchlist where matched symbols will be added
+  targetWatchlistId String? // watchlist where matched symbols will be added (optional)
   isActive          Boolean    @default(true)
   schedule          String? // cron expression for scheduled scanning; null for real‑time only
   nextScanAt        DateTime?
@@ -126,7 +126,7 @@ model ScannerRule {
   updatedAt         DateTime   @updatedAt
   userId            String
   user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  targetWatchlist   Watchlist  @relation("ScannerTargetWatchlist", fields: [targetWatchlistId], references: [id], onDelete: Cascade)
+  targetWatchlist   Watchlist? @relation("ScannerTargetWatchlist", fields: [targetWatchlistId], references: [id], onDelete: Cascade)
   sourceWatchlist   Watchlist? @relation("ScannerSourceWatchlist", fields: [sourceWatchlistId], references: [id], onDelete: SetNull)
   ScanLog           ScanLog[]
 
