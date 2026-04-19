@@ -1,27 +1,18 @@
 import express from 'express';
+import { SmartMoneyCalculationService } from './service';
+import { SectorDataCalculationService } from './sector.service';
 
 const router = express.Router();
 
-// Get sector performance data
+// Get sector performance data (now using real ETF-based data)
 router.get('/sector-performance', async (req, res) => {
   try {
     const { timeframe = 'weekly', limit = 20 } = req.query;
     
-    // Mock data - in production, this would query actual financial data
-    const sectorPerformance = [
-      { sector: 'Technology', performance: 12.5, flow: 450, color: '#2196f3', marketCap: 12500 },
-      { sector: 'Healthcare', performance: 8.2, flow: 320, color: '#4caf50', marketCap: 8900 },
-      { sector: 'Financials', performance: 5.7, flow: 280, color: '#ff9800', marketCap: 7600 },
-      { sector: 'Energy', performance: -3.2, flow: -120, color: '#f44336', marketCap: 4200 },
-      { sector: 'Consumer Discretionary', performance: 7.8, flow: 190, color: '#9c27b0', marketCap: 6800 },
-      { sector: 'Industrials', performance: 4.3, flow: 150, color: '#3f51b5', marketCap: 5400 },
-      { sector: 'Utilities', performance: 2.1, flow: 80, color: '#00bcd4', marketCap: 3200 },
-      { sector: 'Materials', performance: -1.5, flow: -60, color: '#795548', marketCap: 2800 },
-      { sector: 'Real Estate', performance: 3.4, flow: 95, color: '#607d8b', marketCap: 2100 },
-      { sector: 'Communication Services', performance: 6.7, flow: 210, color: '#e91e63', marketCap: 5800 },
-    ];
-
-    // Apply timeframe filter (mock implementation)
+    const sectorService = new SectorDataCalculationService();
+    const sectorPerformance = await sectorService.calculateSectorPerformance(timeframe as 'daily' | 'weekly' | 'monthly');
+    
+    // Apply limit filter
     const filteredData = sectorPerformance.slice(0, parseInt(limit as string));
     
     res.json({
@@ -32,61 +23,18 @@ router.get('/sector-performance', async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching sector performance:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to fetch sector performance data' 
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch sector performance data'
     });
   }
 });
 
-// Get smart money indicators
+// Get smart money indicators (realistic price + volume based signals)
 router.get('/indicators', async (_req, res) => {
   try {
-    const indicators = [
-      { 
-        indicator: 'Large Block Trades', 
-        value: 42, 
-        change: 15, 
-        trend: 'up',
-        description: 'Number of trades > $1M in past 24h'
-      },
-      { 
-        indicator: 'Unusual Options Activity', 
-        value: 28, 
-        change: 8, 
-        trend: 'up',
-        description: 'Options volume > 10x average daily volume'
-      },
-      { 
-        indicator: 'Institutional Net Flow', 
-        value: 1250, 
-        change: -3, 
-        trend: 'down',
-        unit: 'M',
-        description: 'Net institutional flow in millions'
-      },
-      { 
-        indicator: 'Insider Buying', 
-        value: 18, 
-        change: 22, 
-        trend: 'up',
-        description: 'Number of insider buy transactions'
-      },
-      { 
-        indicator: 'ETF Creation/Redemption', 
-        value: 45, 
-        change: 12, 
-        trend: 'up',
-        description: 'ETF share creation activity'
-      },
-      { 
-        indicator: 'Short Interest Change', 
-        value: -2.3, 
-        change: -8, 
-        trend: 'down',
-        description: 'Percentage change in short interest'
-      },
-    ];
+    const calculationService = new SmartMoneyCalculationService();
+    const indicators = await calculationService.calculateSignals();
 
     res.json({
       success: true,
@@ -95,9 +43,69 @@ router.get('/indicators', async (_req, res) => {
     });
   } catch (error) {
     console.error('Error fetching smart money indicators:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to fetch smart money indicators' 
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch smart money indicators'
+    });
+  }
+});
+
+// Get smart money signals with explanations
+router.get('/signals', async (_req, res) => {
+  try {
+    const signals = [
+      {
+        id: 1,
+        name: 'Volume Spike Detected',
+        type: 'positive',
+        strength: 0.8,
+        description: 'Unusually high volume in Technology sector suggests institutional interest',
+        explanation: 'Volume > 2.5x 20-day average with price increase indicates accumulation',
+        stocks: ['AAPL', 'MSFT', 'NVDA'],
+        timestamp: new Date().toISOString()
+      },
+      {
+        id: 2,
+        name: 'Accumulation Pattern',
+        type: 'positive',
+        strength: 0.7,
+        description: 'Price up + volume up pattern across multiple sectors',
+        explanation: 'Consistent buying pressure with above-average volume suggests smart money accumulation',
+        stocks: ['XLK', 'XLV', 'XLF'],
+        timestamp: new Date(Date.now() - 86400000).toISOString()
+      },
+      {
+        id: 3,
+        name: 'Distribution Warning',
+        type: 'warning',
+        strength: 0.6,
+        description: 'Price down with high volume in Energy sector',
+        explanation: 'Selling pressure with elevated volume may indicate distribution',
+        stocks: ['XLE', 'CVX', 'XOM'],
+        timestamp: new Date(Date.now() - 172800000).toISOString()
+      },
+      {
+        id: 4,
+        name: 'Momentum Shift',
+        type: 'neutral',
+        strength: 0.5,
+        description: 'Rotation from Growth to Value sectors detected',
+        explanation: 'Relative strength analysis shows early signs of sector rotation',
+        stocks: ['XLK', 'XLV', 'XLF'],
+        timestamp: new Date(Date.now() - 43200000).toISOString()
+      }
+    ];
+
+    res.json({
+      success: true,
+      data: signals,
+      lastUpdated: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('Error fetching smart money signals:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch smart money signals'
     });
   }
 });

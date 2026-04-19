@@ -31,6 +31,8 @@ import ListIcon from '@mui/icons-material/List';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
+import ShowChartIcon from '@mui/icons-material/ShowChart';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
 import { useTheme as useCustomTheme } from '../../contexts/ThemeContext';
 
 const drawerWidth = 260;
@@ -39,6 +41,8 @@ const collapsedWidth = 72;
 const navItems = [
   { path: '/', label: 'Dashboard', icon: <DashboardIcon /> },
   { path: '/smart-money', label: 'Smart Money', icon: <AccountBalanceIcon /> },
+  { path: '/sector', label: 'Sector Analysis', icon: <ShowChartIcon /> },
+  { path: '/macro', label: 'Macro Indicators', icon: <AnalyticsIcon /> },
   { path: '/stocks', label: 'Stock Management', icon: <InventoryIcon /> },
   { path: '/watchlists', label: 'Watchlists', icon: <ListIcon /> },
   { path: '/scanner', label: 'Real‑Time Scanner', icon: <SearchIcon /> },
