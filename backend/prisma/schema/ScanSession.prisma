@@ -1,0 +1,18 @@
+model ScanSession {
+  id           String   @id @default(cuid())
+  userId       String
+  scopeType    String   // 'PRESET' | 'WATCHLIST' | 'CUSTOM'
+  scopeData    Json     // JSON containing symbols or watchlist ID
+  status       String   // 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED'
+  startedAt    DateTime @default(now())
+  completedAt  DateTime?
+  results      Json?    // JSON array of ScoredOpportunity
+  metadata     Json?    // Statistics and metadata
+  
+  // Indexes for performance
+  @@index([userId, startedAt])
+  @@index([status])
+  @@index([userId, status])
+  
+  @@map("scan_sessions")
+}

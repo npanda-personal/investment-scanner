@@ -1,0 +1,10 @@
+model ScannerConfig {
+  id                    String   @id @default(cuid())
+  key                   String   @unique
+  value                 Json
+  description           String?
+  category              String   // 'PERFORMANCE' | 'RATE_LIMIT' | 'SIGNAL' | 'UI'
+  isUserConfigurable    Boolean  @default(false)
+  
+  @@map("scanner_configs")
+}

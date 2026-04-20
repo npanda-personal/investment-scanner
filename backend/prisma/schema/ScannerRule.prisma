@@ -16,6 +16,13 @@ model ScannerRule {
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   targetWatchlist   Watchlist @relation("ScannerTargetWatchlist", fields: [targetWatchlistId], references: [id], onDelete: Cascade)
   sourceWatchlist   Watchlist? @relation("ScannerSourceWatchlist", fields: [sourceWatchlistId], references: [id], onDelete: SetNull)
+  ScanLog           ScanLog[]
+
+  // New fields for batch scanning
+  scanSessionId     String?   // Reference to batch scan session
+  scanSession       ScanSession? @relation(fields: [scanSessionId], references: [id], onDelete: SetNull)
+  batchEnabled      Boolean   @default(false) // Whether rule can be run in batch mode
+  priority          Int       @default(5)     // 1-10, higher = more important
 
   @@map("scanner_rules")
 }

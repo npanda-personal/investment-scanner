@@ -1,0 +1,12 @@
+model ScanPreset {
+  id          String   @id @default(cuid())
+  name        String   // e.g., 'Top 100 by Market Cap', 'S&P 500', 'NASDAQ 100'
+  code        String   @unique // e.g., 'TOP_100', 'SP500', 'NASDAQ100'
+  description String?
+  symbols     String[] // Array of symbols
+  isActive    Boolean  @default(true)
+  category    String?  // 'INDEX' | 'SECTOR' | 'MARKET_CAP'
+  region      String?  // 'US' | 'EU' | 'ASIA' | 'GLOBAL'
+  
+  @@map("scan_presets")
+}

@@ -1,14 +1,23 @@
 model ScanLog {
-  id          String   @id @default(cuid())
-  ruleId      String
-  rule        ScannerRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
-  symbol      String
-  matchedData Json?     // snapshot of the data that triggered the rule (e.g., price, indicators)
-  triggeredAt DateTime @default(now())
-  addedToWatchlist Boolean @default(true) // whether the symbol was successfully added to target watchlist
-  error       String?  // if addition failed
-
-  @@index([ruleId])
-  @@index([triggeredAt])
+  id               String      @id @default(cuid())
+  ruleId           String
+  rule             ScannerRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  symbol           String
+  matchedData      Json?       // snapshot of the data that triggered the rule (e.g., price, indicators)
+  triggeredAt      DateTime    @default(now())
+  addedToWatchlist Boolean     @default(true) // whether the symbol was successfully added to target watchlist
+  error            String?     // if addition failed
+  
+  // New fields for batch scanning
+  scanSessionId    String?
+  scanSession      ScanSession? @relation(fields: [scanSessionId], references: [id], onDelete: SetNull)
+  signalCount      Int         @default(0) // Number of signals detected
+  confidenceScore  Float?      // Confidence score for this match
+  rankingPosition  Int?        // Position in ranked results
+  
+  @@index([ruleId, triggeredAt])
+  @@index([scanSessionId])
+  @@index([symbol, triggeredAt])
+  
   @@map("scan_logs")
 }

@@ -1,0 +1,17 @@
+model SignalDefinition {
+  id          String   @id @default(cuid())
+  type        String   // 'RSI' | 'EMA' | 'MACD' | 'VOLUME' | 'PRICE_CHANGE' | 'CROSSOVER'
+  name        String   // Human-readable name (e.g., 'RSI Oversold', 'EMA Crossover Bullish')
+  code        String   // Machine identifier (e.g., 'RSI_OVERSOLD', 'EMA_CROSSOVER_BULLISH')
+  description String?
+  parameters  Json     // Default parameters (e.g., {"period": 14, "threshold": 30})
+  weight      Float    @default(1.0)  // Default weight for ranking
+  isActive    Boolean  @default(true)
+  category    String   // 'MOMENTUM' | 'TREND' | 'VOLUME' | 'VOLATILITY'
+  confidence  Float    @default(0.7)  // Historical accuracy confidence
+  
+  // Unique constraint to prevent duplicates
+  @@unique([type, code])
+  
+  @@map("signal_definitions")
+}
