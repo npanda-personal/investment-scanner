@@ -1,6 +1,7 @@
 import express from 'express';
 import { SmartMoneyCalculationService } from './service';
 import { SectorDataCalculationService } from './sector.service';
+import { MacroDataCalculationService } from './macro.service';
 
 const router = express.Router();
 
@@ -113,37 +114,41 @@ router.get('/signals', async (_req, res) => {
 // Get economic cycle data
 router.get('/economic-cycle', async (_req, res) => {
   try {
+    const macroService = new MacroDataCalculationService();
+    const economicCycle = await macroService.determineEconomicCycle();
+    
+    // Create economic cycle phases for visualization
     const economicCyclePhases = [
-      { 
-        phase: 'Recovery', 
+      {
+        phase: 'Recovery',
         description: 'Early economic rebound after contraction',
         leadingSectors: ['Financials', 'Consumer Discretionary', 'Technology'],
         color: '#4caf50',
-        currentPhase: false,
+        currentPhase: economicCycle.phase === 'Recovery',
         durationMonths: 6
       },
-      { 
-        phase: 'Expansion', 
+      {
+        phase: 'Expansion',
         description: 'Strong growth period with rising corporate profits',
         leadingSectors: ['Technology', 'Industrials', 'Materials'],
         color: '#2196f3',
-        currentPhase: true,
+        currentPhase: economicCycle.phase === 'Expansion',
         durationMonths: 18
       },
-      { 
-        phase: 'Slowdown', 
+      {
+        phase: 'Slowdown',
         description: 'Growth deceleration, rising inflation concerns',
         leadingSectors: ['Healthcare', 'Consumer Staples', 'Utilities'],
         color: '#ff9800',
-        currentPhase: false,
+        currentPhase: economicCycle.phase === 'Slowdown',
         durationMonths: 9
       },
-      { 
-        phase: 'Contraction', 
+      {
+        phase: 'Contraction',
         description: 'Economic decline, falling corporate profits',
         leadingSectors: ['Utilities', 'Healthcare', 'Consumer Staples'],
         color: '#f44336',
-        currentPhase: false,
+        currentPhase: economicCycle.phase === 'Contraction',
         durationMonths: 12
       },
     ];
@@ -151,14 +156,15 @@ router.get('/economic-cycle', async (_req, res) => {
     res.json({
       success: true,
       data: economicCyclePhases,
-      currentPhase: 'Expansion',
+      currentPhase: economicCycle.phase,
+      cycleAnalysis: economicCycle,
       lastUpdated: new Date().toISOString(),
     });
   } catch (error) {
     console.error('Error fetching economic cycle data:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to fetch economic cycle data' 
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch economic cycle data'
     });
   }
 });
@@ -256,62 +262,8 @@ router.get('/relative-strength', async (req, res) => {
 // Get macroeconomic indicators
 router.get('/macro-indicators', async (_req, res) => {
   try {
-    const indicators = [
-      {
-        name: 'GDP Growth Forecast',
-        value: 2.8,
-        unit: '%',
-        change: 0.2,
-        trend: 'up',
-        targetRange: { min: 2.0, max: 3.5 },
-        description: 'Annualized GDP growth projection',
-      },
-      {
-        name: 'Inflation Rate (CPI)',
-        value: 3.2,
-        unit: '%',
-        change: -0.1,
-        trend: 'down',
-        targetRange: { min: 2.0, max: 2.5 },
-        description: 'Consumer Price Index year-over-year',
-      },
-      {
-        name: 'Unemployment Rate',
-        value: 3.9,
-        unit: '%',
-        change: 0.1,
-        trend: 'up',
-        targetRange: { min: 3.5, max: 4.5 },
-        description: 'Seasonally adjusted unemployment rate',
-      },
-      {
-        name: 'Fed Funds Rate',
-        value: 5.25,
-        unit: '%',
-        change: 0,
-        trend: 'stable',
-        targetRange: { min: 5.0, max: 5.5 },
-        description: 'Federal Reserve target rate',
-      },
-      {
-        name: '10-Year Treasury Yield',
-        value: 4.35,
-        unit: '%',
-        change: 0.05,
-        trend: 'up',
-        targetRange: { min: 4.0, max: 4.5 },
-        description: 'US Treasury 10-year bond yield',
-      },
-      {
-        name: 'VIX Index',
-        value: 15.2,
-        unit: '',
-        change: -0.8,
-        trend: 'down',
-        targetRange: { min: 12, max: 20 },
-        description: 'Market volatility index',
-      },
-    ];
+    const macroService = new MacroDataCalculationService();
+    const indicators = await macroService.fetchMacroIndicators();
 
     res.json({
       success: true,
@@ -320,9 +272,9 @@ router.get('/macro-indicators', async (_req, res) => {
     });
   } catch (error) {
     console.error('Error fetching macroeconomic indicators:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to fetch macroeconomic indicators' 
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch macroeconomic indicators'
     });
   }
 });
