@@ -36,6 +36,7 @@ model PriceTick {
   volume    BigInt?
   source    String? // e.g., "yahoo", "coinbase"
 
+  @@unique([symbol, timestamp])
   @@index([symbol, timestamp])
   @@index([region])
   @@map("price_ticks")

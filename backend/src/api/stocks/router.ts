@@ -171,4 +171,50 @@ router.post('/:id/sync', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/stocks/sync-all
+ * Trigger data ingestion for all active stocks using horizontal worker system.
+ * Optional query parameters:
+ * - workerCount (default: 4) - Number of parallel workers (3-5 recommended)
+ * - workerConcurrency (default: 4) - Concurrent requests per worker (3-5 recommended)
+ * - delayBetweenBatchesMs (default: 3000) - Delay between worker batches in milliseconds
+ */
+router.post('/sync-all', async (req, res) => {
+  try {
+    const workerCount = parseInt(req.query.workerCount as string) || 4;
+    const workerConcurrency = parseInt(req.query.workerConcurrency as string) || 4;
+    const delayBetweenBatchesMs = parseInt(req.query.delayBetweenBatchesMs as string) || 3000;
+    
+    // Validate parameters
+    if (workerCount < 1 || workerCount > 10) {
+      return res.status(400).json({
+        success: false,
+        message: 'workerCount must be between 1 and 10'
+      });
+    }
+    
+    if (workerConcurrency < 1 || workerConcurrency > 10) {
+      return res.status(400).json({
+        success: false,
+        message: 'workerConcurrency must be between 1 and 10'
+      });
+    }
+    
+    console.log(`Starting bulk sync with ${workerCount} workers, ${workerConcurrency} concurrency each`);
+    const result = await stockService.syncAll(workerCount, workerConcurrency, delayBetweenBatchesMs);
+    
+    if (result.success) {
+      return res.json(result);
+    } else {
+      return res.status(500).json(result);
+    }
+  } catch (error: any) {
+    console.error('Error in bulk sync:', error);
+    return res.status(500).json({
+      success: false,
+      message: `Bulk sync failed: ${error.message}`
+    });
+  }
+});
+
 export default router;

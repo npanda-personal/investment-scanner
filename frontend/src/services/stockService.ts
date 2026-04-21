@@ -110,6 +110,19 @@ export async function syncStockData(id: string): Promise<Stock> {
 }
 
 /**
+ * Trigger bulk sync for all active stocks.
+ */
+export async function syncAllStocks(batchSize?: number, delayBetweenBatchesMs?: number): Promise<any> {
+  const params = new URLSearchParams();
+  if (batchSize !== undefined) params.append('batchSize', batchSize.toString());
+  if (delayBetweenBatchesMs !== undefined) params.append('delayBetweenBatchesMs', delayBetweenBatchesMs.toString());
+  
+  const url = `${API_BASE}/stocks/sync-all${params.toString() ? `?${params.toString()}` : ''}`;
+  const response = await axios.post(url);
+  return response.data;
+}
+
+/**
  * Search for stocks using external API (Yahoo Finance).
  */
 export async function externalSearch(query: string): Promise<any[]> {

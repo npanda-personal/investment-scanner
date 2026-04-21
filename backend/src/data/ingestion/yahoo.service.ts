@@ -141,50 +141,90 @@ export class YahooFinanceIngestionService {
       prev.date > current.date ? prev : current
     );
 
-    // Use a transaction to ensure consistency
-    await this.prisma.$transaction(async (tx: any) => {
-      // Insert price ticks
-      for (const price of prices) {
-        await tx.priceTick.create({
-          data: {
-            symbol: price.symbol,
+    console.log(`  Storing ${prices.length} price ticks for ${prices[0].symbol}...`);
+
+    try {
+      // Use a transaction with increased timeout for large datasets
+      await this.prisma.$transaction(async (tx: any) => {
+        // Process in smaller batches to avoid transaction timeout
+        const batchSize = 100;
+        for (let i = 0; i < prices.length; i += batchSize) {
+          const batch = prices.slice(i, i + batchSize);
+          
+          // Create upsert operations for the batch
+          const upsertOperations = batch.map(price =>
+            tx.priceTick.upsert({
+              where: {
+                symbol_timestamp: {
+                  symbol: price.symbol,
+                  timestamp: price.date,
+                },
+              },
+              update: {
+                open: new Prisma.Decimal(price.open),
+                high: new Prisma.Decimal(price.high),
+                low: new Prisma.Decimal(price.low),
+                close: new Prisma.Decimal(price.close),
+                volume: price.volume ? BigInt(price.volume) : null,
+                source: 'yahoo',
+                region: regionInfo.region,
+                exchange: regionInfo.exchange,
+              },
+              create: {
+                symbol: price.symbol,
+                region: regionInfo.region,
+                exchange: regionInfo.exchange,
+                timestamp: price.date,
+                open: new Prisma.Decimal(price.open),
+                high: new Prisma.Decimal(price.high),
+                low: new Prisma.Decimal(price.low),
+                close: new Prisma.Decimal(price.close),
+                volume: price.volume ? BigInt(price.volume) : null,
+                source: 'yahoo',
+              },
+            })
+          );
+
+          // Execute batch in parallel but within transaction
+          await Promise.all(upsertOperations);
+          
+          if (batch.length === batchSize) {
+            console.log(`    Processed ${i + batchSize} of ${prices.length} records...`);
+          }
+        }
+
+        // Upsert latest price
+        await tx.latestPrice.upsert({
+          where: { symbol: latest.symbol },
+          update: {
             region: regionInfo.region,
-            exchange: regionInfo.exchange,
-            timestamp: price.date,
-            open: new Prisma.Decimal(price.open),
-            high: new Prisma.Decimal(price.high),
-            low: new Prisma.Decimal(price.low),
-            close: new Prisma.Decimal(price.close),
-            volume: price.volume ? BigInt(price.volume) : null,
-            source: 'yahoo',
+            price: new Prisma.Decimal(latest.close),
+            timestamp: latest.date,
+            updatedAt: new Date(),
+          },
+          create: {
+            symbol: latest.symbol,
+            region: regionInfo.region,
+            price: new Prisma.Decimal(latest.close),
+            timestamp: latest.date,
+            updatedAt: new Date(),
           },
         });
-      }
-
-      // Upsert latest price
-      await tx.latestPrice.upsert({
-        where: { symbol: latest.symbol },
-        update: {
-          region: regionInfo.region,
-          price: new Prisma.Decimal(latest.close),
-          timestamp: latest.date,
-          updatedAt: new Date(),
-        },
-        create: {
-          symbol: latest.symbol,
-          region: regionInfo.region,
-          price: new Prisma.Decimal(latest.close),
-          timestamp: latest.date,
-          updatedAt: new Date(),
-        },
+      }, {
+        maxWait: 30000, // 30 seconds max wait
+        timeout: 60000, // 60 seconds timeout for large datasets
       });
-    });
 
-    console.log(`Stored ${prices.length} price ticks for ${prices[0].symbol}`);
+      console.log(`  Successfully stored ${prices.length} price ticks for ${prices[0].symbol}`);
+    } catch (error) {
+      console.error(`  Failed to store price ticks for ${prices[0].symbol}:`, error);
+      throw error;
+    }
   }
 
   /**
    * Fetch and store historical data for a single symbol with delay.
+   * Uses incremental loading based on lastSuccessfulDataLoadTimestamp.
    */
   async ingestSymbol(
     symbol: string,
@@ -192,8 +232,62 @@ export class YahooFinanceIngestionService {
     endDate?: Date
   ): Promise<void> {
     console.log(`Ingesting ${symbol}...`);
-    const prices = await this.fetchHistorical(symbol, startDate, endDate);
+    
+    // Get the stock record to check last successful load timestamp
+    const stock = await this.prisma.stock.findUnique({
+      where: { symbol }
+    });
+    
+    // Determine effective start date for incremental loading
+    let effectiveStartDate = startDate;
+    
+    if (!effectiveStartDate) {
+      if (stock?.lastSuccessfulDataLoadTimestamp) {
+        // For incremental loads, start from the day after last successful load
+        // to avoid fetching already stored data
+        effectiveStartDate = new Date(stock.lastSuccessfulDataLoadTimestamp);
+        effectiveStartDate.setDate(effectiveStartDate.getDate() + 1);
+        console.log(`  Using incremental start date: ${effectiveStartDate.toISOString().split('T')[0]} (based on lastSuccessfulDataLoadTimestamp)`);
+      } else {
+        // First-time load: default to 30 days ago
+        effectiveStartDate = new Date();
+        effectiveStartDate.setDate(effectiveStartDate.getDate() - 30);
+        console.log(`  Using default start date: ${effectiveStartDate.toISOString().split('T')[0]} (first-time load)`);
+      }
+    }
+    
+    // Ensure we don't fetch future dates
+    const effectiveEndDate = endDate || new Date();
+    
+    // Don't fetch if start date is after end date (already up to date)
+    if (effectiveStartDate >= effectiveEndDate) {
+      console.log(`  Skipping ${symbol}: already up to date (last load: ${stock?.lastSuccessfulDataLoadTimestamp})`);
+      return;
+    }
+    
+    console.log(`  Fetching data from ${effectiveStartDate.toISOString().split('T')[0]} to ${effectiveEndDate.toISOString().split('T')[0]}`);
+    
+    const prices = await this.fetchHistorical(symbol, effectiveStartDate, effectiveEndDate);
+    
+    if (prices.length === 0) {
+      console.log(`  No new price data available for ${symbol}`);
+      // Still update timestamp to indicate successful check
+      await this.prisma.stock.update({
+        where: { symbol },
+        data: { lastSuccessfulDataLoadTimestamp: new Date() }
+      });
+      return;
+    }
+    
     await this.storeHistorical(prices);
+    
+    // Update lastSuccessfulDataLoadTimestamp after successful storage
+    await this.prisma.stock.update({
+      where: { symbol },
+      data: { lastSuccessfulDataLoadTimestamp: new Date() }
+    });
+    
+    console.log(`  Successfully ingested ${prices.length} price ticks for ${symbol}`);
   }
 
   /**

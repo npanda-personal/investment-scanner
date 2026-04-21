@@ -37,6 +37,7 @@ import {
   deleteStock,
   toggleStockActive,
   syncStockData,
+  syncAllStocks,
   externalSearch,
   createStock,
 } from '../../services/stockService';
@@ -51,6 +52,7 @@ const StockManager: React.FC = () => {
   // Table state
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [loading, setLoading] = useState(false);
+  const [bulkSyncLoading, setBulkSyncLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Pagination state
@@ -138,6 +140,26 @@ const StockManager: React.FC = () => {
     }
   };
 
+  const handleBulkSync = async () => {
+    setBulkSyncLoading(true);
+    setError(null);
+    try {
+      const result = await syncAllStocks();
+      if (result.success) {
+        // Show success message
+        console.log(`Bulk sync completed: ${result.message}`);
+        // Refresh the stock list to show updated timestamps
+        await loadStocks();
+      } else {
+        setError(result.message || 'Bulk sync failed');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Bulk sync failed');
+    } finally {
+      setBulkSyncLoading(false);
+    }
+  };
+
   const handleExternalSearch = async () => {
     if (!externalQuery.trim()) return;
     setExternalLoading(true);
@@ -209,15 +231,15 @@ const StockManager: React.FC = () => {
           }}
           sx={{ width: 300 }}
         />
-        <Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Button
             variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={loadStocks}
-            disabled={loading}
+            startIcon={bulkSyncLoading ? <CircularProgress size={20} /> : <RefreshIcon />}
+            onClick={handleBulkSync}
+            disabled={bulkSyncLoading || loading}
             sx={{ mr: 2 }}
           >
-            Refresh
+            {bulkSyncLoading ? 'Syncing...' : 'Refresh'}
           </Button>
           <Button
             variant="contained"

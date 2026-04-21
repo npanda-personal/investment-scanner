@@ -163,6 +163,9 @@ export class StockService {
   /**
    * Trigger data ingestion for a stock (historical data) synchronously.
    * This is used for manual sync (user‑triggered).
+   * Simple incremental loading logic:
+   * - If stock has lastSuccessfulDataLoadTimestamp → incremental load from that timestamp
+   * - If no lastSuccessfulDataLoadTimestamp → full load from Jan 1, 2010
    */
   async syncData(id: string) {
     const stock = await this.prisma.stock.findUnique({
@@ -173,9 +176,21 @@ export class StockService {
     }
 
     try {
-      // Fetch last 15 years of historical data
-      const startDate = new Date();
-      startDate.setFullYear(startDate.getFullYear() - 15);
+      // Determine start date based on lastSuccessfulDataLoadTimestamp
+      let startDate: Date | undefined;
+      
+      if (!stock.lastSuccessfulDataLoadTimestamp) {
+        // First-time load: start from Jan 1, 2010
+        startDate = new Date('2010-01-01');
+        console.log(`First-time load for ${stock.symbol} from ${startDate.toISOString().split('T')[0]}`);
+      } else {
+        // Incremental load: start from day after last successful load
+        startDate = new Date(stock.lastSuccessfulDataLoadTimestamp);
+        startDate.setDate(startDate.getDate() + 1);
+        console.log(`Incremental load for ${stock.symbol} from ${startDate.toISOString().split('T')[0]}`);
+      }
+
+      // Use ingestSymbol with determined start date
       await this.ingestionService.ingestSymbol(stock.symbol, startDate, new Date());
 
       // Update last successful load timestamp
@@ -250,5 +265,116 @@ export class StockService {
       exchange: stock.exchange,
       source: 'external',
     }));
+  }
+
+  /**
+   * Trigger data ingestion for all active stocks using horizontal worker system.
+   * Uses 3-5 workers with 3-5 concurrency each for optimal Yahoo API usage.
+   * Returns progress information.
+   */
+  async syncAll(
+    workerCount: number = 4,          // 4 workers (horizontal scaling)
+    workerConcurrency: number = 4,    // 4 concurrent requests per worker
+    delayBetweenBatchesMs: number = 3000  // 3 seconds delay between batches
+  ) {
+    try {
+      // Get all active stocks
+      const allStocks = await this.prisma.stock.findMany({
+        where: { isActive: true },
+        select: { id: true, symbol: true, lastSuccessfulDataLoadTimestamp: true },
+      });
+
+      const totalStocks = allStocks.length;
+      const results: Array<{symbol: string, success: boolean, message: string, timestamp: string, workerId?: number}> = [];
+      const errors: Array<{symbol: string, success: boolean, message: string, timestamp: string, workerId?: number}> = [];
+
+      console.log(`🚀 Starting bulk sync for ${totalStocks} active stocks`);
+      console.log(`⚙️  Configuration: ${workerCount} workers, ${workerConcurrency} concurrency per worker, ${delayBetweenBatchesMs}ms delay between batches`);
+      console.log(`📊 Estimated speedup: ${workerCount * workerConcurrency}x faster than sequential processing\n`);
+
+      // Import worker dynamically to avoid circular dependencies
+      const workerModule = await import('../../workers/stockSyncWorker');
+      const StockSyncWorker = workerModule.StockSyncWorker;
+
+      // Create workers
+      const workers: InstanceType<typeof StockSyncWorker>[] = [];
+      for (let i = 0; i < workerCount; i++) {
+        workers.push(new StockSyncWorker(i + 1, workerConcurrency));
+      }
+
+      // Distribute tasks evenly among workers
+      const tasksPerWorker = Math.ceil(totalStocks / workerCount);
+      const workerTasks: Array<Array<any>> = [];
+
+      for (let i = 0; i < workerCount; i++) {
+        const startIdx = i * tasksPerWorker;
+        const endIdx = Math.min(startIdx + tasksPerWorker, totalStocks);
+        workerTasks.push(allStocks.slice(startIdx, endIdx));
+      }
+
+      console.log(`📦 Task distribution:`);
+      workerTasks.forEach((tasks, idx) => {
+        console.log(`   Worker ${idx + 1}: ${tasks.length} stocks`);
+      });
+      console.log('');
+
+      // Process all workers in parallel
+      const workerPromises = workers.map(async (worker, idx) => {
+        const tasks = workerTasks[idx];
+        if (tasks.length === 0) return [];
+
+        console.log(`👷 Worker ${idx + 1} starting with ${tasks.length} tasks...`);
+        const workerResults = await worker.processTasks(tasks);
+        
+        // Add delay between worker completions to avoid overwhelming the system
+        if (idx < workers.length - 1) {
+          console.log(`⏳ Waiting ${delayBetweenBatchesMs}ms before next worker batch...`);
+          await new Promise(resolve => setTimeout(resolve, delayBetweenBatchesMs));
+        }
+        
+        return workerResults;
+      });
+
+      // Wait for all workers to complete
+      const allWorkerResults = await Promise.all(workerPromises);
+      
+      // Flatten results
+      const flattenedResults = allWorkerResults.flat();
+      results.push(...flattenedResults);
+      
+      // Separate errors
+      flattenedResults.filter(r => !r.success).forEach(r => errors.push(r));
+
+      // Clean up workers
+      await Promise.all(workers.map(worker => worker.disconnect()));
+
+      // Calculate statistics
+      const totalSuccesses = results.filter(r => r.success).length;
+      const totalFailures = results.filter(r => !r.success).length;
+
+      console.log(`\n✅ Bulk sync completed!`);
+      console.log(`   Successfully processed: ${totalSuccesses} stocks`);
+      console.log(`   Failed: ${totalFailures} stocks`);
+      console.log(`   Total time saved: ~${Math.round((totalStocks * 6) / 60)} minutes estimated`);
+
+      return {
+        success: true,
+        message: `Bulk sync completed using ${workerCount} workers. ${totalSuccesses} succeeded, ${totalFailures} failed.`,
+        totalStocks,
+        succeeded: totalSuccesses,
+        failed: totalFailures,
+        workerCount,
+        workerConcurrency,
+        errors: errors.length > 0 ? errors : undefined,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error: any) {
+      console.error('❌ Bulk sync failed:', error);
+      return {
+        success: false,
+        message: `Bulk sync failed: ${error.message}`,
+        timestamp: new Date().toISOString()
+      };
+    }
   }
 }
