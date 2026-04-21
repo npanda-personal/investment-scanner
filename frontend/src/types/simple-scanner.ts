@@ -13,13 +13,31 @@ export interface SimplifiedOpportunity {
   changePct: number;
   changeAmount: number;
   volume: number;
-  score: number; // 0-100
+  score: number; // 0-100 (legacy)
+  conviction?: number; // 0-100 (new conviction score)
   confidence: number; // 0-100
   rank: number;
   signals: SimplifiedSignal[];
   sector?: string;
   marketCap?: number;
   lastUpdated: string;
+  // New fields from backend revamp
+  alignment?: string; // e.g., "BULLISH/NEUTRAL/BEARISH"
+  alignmentScore?: number; // 0-100 alignment score for guard filters
+  insight?: string; // Human-readable insight
+  confidenceLevel?: 'VERY_HIGH' | 'HIGH' | 'MEDIUM' | 'LOW'; // For color coding
+  // Phase 1: Decision Clarity
+  decision?: 'BUY' | 'WATCH' | 'AVOID'; // Clear trading decision
+  setupType?: 'PULLBACK' | 'BREAKOUT' | 'REVERSAL' | 'RANGE'; // Entry context
+  volumeVisibility?: 'HIGH' | 'NORMAL' | 'LOW'; // Volume confirmation
+  riskLevel?: 'LOW' | 'MEDIUM' | 'HIGH'; // Risk assessment
+  // Phase 2: Entry Quality Assessment
+  entryQuality?: 'IDEAL' | 'OK' | 'LATE'; // Entry quality: IDEAL = Pullback + near support + volume, LATE = Extended breakout, OK = Mid-range
+  // Phase 3: Advanced Metrics
+  distanceToSupport?: 'NEAR' | 'MID' | 'FAR'; // Distance to nearest support/resistance
+  trendStrength?: 'STRONG' | 'MODERATE' | 'WEAK'; // Strength of the current trend
+  // Phase 4: Portfolio Relevance
+  portfolioRelevance?: 'CORE' | 'SATELLITE' | 'AVOID' | 'SMALL'; // Position sizing guidance
 }
 
 export interface SimplifiedSignal {
@@ -88,23 +106,52 @@ export const transformBackendToSimplified = (
     });
   }
   
+  // Determine confidence level based on conviction/score
+  const getConfidenceLevel = (score: number): 'VERY_HIGH' | 'HIGH' | 'MEDIUM' | 'LOW' => {
+    if (score >= 80) return 'VERY_HIGH';
+    if (score >= 60) return 'HIGH';
+    if (score >= 40) return 'MEDIUM';
+    return 'LOW';
+  };
+
+  const convictionScore = backendOpportunity.conviction || backendOpportunity.score;
+  const confidenceLevel = getConfidenceLevel(convictionScore);
+
   return {
     id: backendOpportunity.id || `simplified-${backendOpportunity.symbol}`,
     symbol: backendOpportunity.symbol,
-    price: backendOpportunity.metadata?.price || 0,
-    changePct: backendOpportunity.metadata?.change || 0,
+    price: backendOpportunity.price || backendOpportunity.metadata?.price || 0,
+    changePct: backendOpportunity.changePercent || backendOpportunity.metadata?.change || 0,
     changeAmount: calculateChangeAmount(
-      backendOpportunity.metadata?.price || 0,
-      backendOpportunity.metadata?.change || 0
+      backendOpportunity.price || backendOpportunity.metadata?.price || 0,
+      backendOpportunity.changePercent || backendOpportunity.metadata?.change || 0
     ),
-    volume: backendOpportunity.metadata?.volume || 0,
-    score: backendOpportunity.score || 0,
+    volume: backendOpportunity.volume || backendOpportunity.metadata?.volume || 0,
+    score: backendOpportunity.score || 0, // legacy
+    conviction: convictionScore,
     confidence: backendOpportunity.confidence || 0,
     rank: backendOpportunity.rank || 0,
     signals,
     sector: backendOpportunity.metadata?.sector,
     marketCap: backendOpportunity.metadata?.marketCap,
     lastUpdated: backendOpportunity.detectedAt || new Date().toISOString(),
+    // New fields
+    alignment: backendOpportunity.alignment,
+    alignmentScore: backendOpportunity.breakdown?.alignmentScore,
+    insight: backendOpportunity.insight,
+    confidenceLevel,
+    // Phase 1: Decision Clarity
+    decision: backendOpportunity.decision,
+    setupType: backendOpportunity.setupType,
+    volumeVisibility: backendOpportunity.volumeVisibility,
+    riskLevel: backendOpportunity.riskLevel,
+    // Phase 2: Entry Quality Assessment
+    entryQuality: backendOpportunity.entryQuality,
+    // Phase 3: Advanced Metrics
+    distanceToSupport: backendOpportunity.distanceToSupport,
+    trendStrength: backendOpportunity.trendStrength,
+    // Phase 4: Portfolio Relevance
+    portfolioRelevance: backendOpportunity.portfolioRelevance,
   };
 };
 
@@ -198,6 +245,188 @@ export const generateInsightText = (opportunities: SimplifiedOpportunity[]): str
   }
 };
 
+// Helper to determine decision based on conviction and alignment
+const getMockDecision = (conviction: number, alignment?: string): 'BUY' | 'WATCH' | 'AVOID' => {
+  // Extract alignment score from alignment string
+  let alignmentScore = 50; // default
+  if (alignment) {
+    const bullishCount = (alignment.match(/BULLISH/g) || []).length;
+    alignmentScore = bullishCount * 30; // 0, 30, 60, 90
+  }
+  
+  // Extract weekly trend from alignment string (format: "DAILY/WEEKLY/MONTHLY")
+  let weeklyTrend: 'BULLISH' | 'BEARISH' | 'NEUTRAL' = 'NEUTRAL';
+  if (alignment) {
+    const parts = alignment.split('/');
+    if (parts.length > 1) {
+      const weeklyPart = parts[1];
+      if (weeklyPart === 'BULLISH') weeklyTrend = 'BULLISH';
+      else if (weeklyPart === 'BEARISH') weeklyTrend = 'BEARISH';
+    }
+  }
+  
+  // Apply tightened decision logic (same as backend)
+  // BUY requires strong conviction, strong alignment, AND weekly bullish trend
+  if (
+    conviction >= 75 &&
+    alignmentScore >= 80 &&
+    weeklyTrend === "BULLISH"
+  ) {
+    return "BUY";
+  }
+
+  // AVOID when weekly trend is bearish (hard filter)
+  if (weeklyTrend === "BEARISH") {
+    return "AVOID";
+  }
+
+  // WATCH only if: conviction >= 55 AND alignment >= 60
+  if (
+    conviction >= 55 &&
+    alignmentScore >= 60
+  ) {
+    return "WATCH";
+  }
+
+  // Everything else: AVOID
+  return "AVOID";
+};
+
+// Helper to generate random setup type
+const getMockSetupType = (trend?: string, changePct?: number): 'PULLBACK' | 'BREAKOUT' | 'REVERSAL' | 'RANGE' => {
+  const setupTypes = ['PULLBACK', 'BREAKOUT', 'REVERSAL', 'RANGE'] as const;
+  // Simple logic based on trend and change
+  if (trend?.includes('BULLISH') && changePct && changePct < -2) {
+    return 'PULLBACK';
+  }
+  if (Math.abs(changePct || 0) > 5) {
+    return 'BREAKOUT';
+  }
+  if (trend?.includes('BEARISH') && changePct && changePct > 3) {
+    return 'REVERSAL';
+  }
+  // Default random
+  return setupTypes[Math.floor(Math.random() * setupTypes.length)];
+};
+
+// Helper to generate random volume visibility
+const getMockVolumeVisibility = (volume: number): 'HIGH' | 'NORMAL' | 'LOW' => {
+  const avgVolume = 25000000; // Mock average volume
+  const ratio = volume / avgVolume;
+  
+  if (ratio > 1.5) return 'HIGH';
+  if (ratio < 0.7) return 'LOW';
+  return 'NORMAL';
+};
+
+// Helper to generate random risk level (depends on alignment and trend, NOT conviction)
+const getMockRiskLevel = (
+  alignment?: string
+): 'LOW' | 'MEDIUM' | 'HIGH' => {
+  // Parse alignment string to get trend info
+  // Alignment format: "DAILY/WEEKLY/MONTHLY" e.g., "BULLISH/BULLISH/NEUTRAL"
+  const parts = alignment?.split('/') || [];
+  const weeklyTrend = parts.length > 1 ? parts[1] : 'NEUTRAL';
+  
+  // Calculate alignment score (simplified)
+  let alignmentScore = 50; // Default
+  const bullishCount = parts.filter(p => p === 'BULLISH').length;
+  if (bullishCount === 3) alignmentScore = 90;
+  else if (bullishCount === 2) alignmentScore = 70;
+  else if (bullishCount === 1) alignmentScore = 40;
+  else alignmentScore = 20;
+  
+  // Apply same logic as backend: Risk depends on trend + alignment
+  if (alignmentScore >= 80 && weeklyTrend === "BULLISH") {
+    return "LOW";
+  }
+  
+  if (alignmentScore >= 50) {
+    return "MEDIUM";
+  }
+  
+  return "HIGH";
+};
+
+// Helper to generate mock entry quality
+const getMockEntryQuality = (conviction: number, alignment?: string): 'IDEAL' | 'OK' | 'LATE' => {
+  // Simple mock logic for IDEAL/OK/LATE
+  // For mock data, we'll randomly assign based on conviction
+  const random = Math.random();
+  
+  if (conviction >= 85 && random > 0.7) {
+    return "IDEAL"; // High conviction with some randomness
+  } else if (conviction <= 50 || random < 0.3) {
+    return "LATE"; // Low conviction or random chance for LATE
+  } else {
+    return "OK"; // Default
+  }
+};
+
+// Helper to generate mock distance to support
+const getMockDistanceToSupport = (changePct: number, alignment?: string): 'NEAR' | 'MID' | 'FAR' => {
+  // If price is down recently, it's likely near support
+  if (changePct < -3) {
+    return "NEAR";
+  } else if (changePct > 5) {
+    return "FAR"; // Extended rally, far from support
+  } else if (alignment?.includes('BEARISH')) {
+    return "MID"; // Bearish trend, moderate distance
+  } else {
+    return "MID"; // Default
+  }
+};
+
+// Helper to generate mock trend strength
+const getMockTrendStrength = (alignment?: string, conviction?: number): 'STRONG' | 'MODERATE' | 'WEAK' => {
+  const bullishCount = alignment ? (alignment.match(/BULLISH/g) || []).length : 0;
+  const bearishCount = alignment ? (alignment.match(/BEARISH/g) || []).length : 0;
+  
+  // Strong trend if all timeframes agree
+  if (bullishCount === 3 || bearishCount === 3) {
+    return "STRONG";
+  }
+  
+  // Moderate trend if 2 out of 3 agree
+  if (bullishCount === 2 || bearishCount === 2) {
+    return "MODERATE";
+  }
+  
+  // Weak trend if mixed or neutral
+  return "WEAK";
+};
+
+// Helper to generate mock portfolio relevance
+const getMockPortfolioRelevance = (
+  decision?: 'BUY' | 'WATCH' | 'AVOID',
+  conviction?: number,
+  riskLevel?: 'LOW' | 'MEDIUM' | 'HIGH',
+  entryQuality?: 'IDEAL' | 'OK' | 'LATE'
+): 'CORE' | 'SATELLITE' | 'AVOID' | 'SMALL' => {
+  // AVOID decisions should not be in portfolio
+  if (decision === 'AVOID') {
+    return 'AVOID';
+  }
+  
+  // WATCH decisions are small positions at best
+  if (decision === 'WATCH') {
+    return 'SMALL';
+  }
+  
+  // BUY decisions with strong criteria become CORE positions
+  if ((conviction || 0) >= 80 && riskLevel === 'LOW' && entryQuality === 'IDEAL') {
+    return 'CORE';
+  }
+  
+  // BUY decisions with good criteria become SATELLITE positions
+  if ((conviction || 0) >= 70 && riskLevel !== 'HIGH' && entryQuality !== 'LATE') {
+    return 'SATELLITE';
+  }
+  
+  // Other BUY decisions are SMALL positions
+  return 'SMALL';
+};
+
 // Mock data for development
 export const generateMockOpportunity = (overrides: Partial<SimplifiedOpportunity> = {}): SimplifiedOpportunity => {
   const base: SimplifiedOpportunity = {
@@ -209,6 +438,7 @@ export const generateMockOpportunity = (overrides: Partial<SimplifiedOpportunity
     changeAmount: 2.63,
     volume: 45000000,
     score: 85,
+    conviction: 85,
     confidence: 78,
     rank: 1,
     signals: [
@@ -230,27 +460,142 @@ export const generateMockOpportunity = (overrides: Partial<SimplifiedOpportunity
     sector: 'Technology',
     marketCap: 2750000000000,
     lastUpdated: new Date().toISOString(),
+    // New fields
+    alignment: 'BULLISH/BULLISH/NEUTRAL',
+    insight: 'Strong positional trend with multi-timeframe support',
+    confidenceLevel: 'VERY_HIGH',
+    // Phase 1: Decision Clarity
+    decision: 'BUY', // Default for high conviction
+    setupType: 'PULLBACK', // Default setup type
+    volumeVisibility: 'NORMAL', // Default volume visibility
+    riskLevel: 'MEDIUM', // Default risk level
   };
   
-  return { ...base, ...overrides };
+  const result = { ...base, ...overrides };
+  
+  // Ensure decision is calculated if not overridden
+  if (!overrides.decision) {
+    result.decision = getMockDecision(result.conviction || result.score, result.alignment);
+  }
+  
+  // Ensure setup type is calculated if not overridden
+  if (!overrides.setupType) {
+    result.setupType = getMockSetupType(result.alignment, result.changePct);
+  }
+  
+  // Ensure volume visibility is calculated if not overridden
+  if (!overrides.volumeVisibility) {
+    result.volumeVisibility = getMockVolumeVisibility(result.volume);
+  }
+  
+  // Ensure risk level is calculated if not overridden
+  if (!overrides.riskLevel) {
+    result.riskLevel = getMockRiskLevel(result.alignment);
+  }
+
+  // Ensure entry quality is calculated if not overridden
+  if (!overrides.entryQuality) {
+    result.entryQuality = getMockEntryQuality(result.conviction || result.score, result.alignment);
+  }
+
+  // Ensure distance to support is calculated if not overridden
+  if (!overrides.distanceToSupport) {
+    result.distanceToSupport = getMockDistanceToSupport(result.changePct, result.alignment);
+  }
+
+  // Ensure trend strength is calculated if not overridden
+  if (!overrides.trendStrength) {
+    result.trendStrength = getMockTrendStrength(result.alignment, result.conviction || result.score);
+  }
+
+  // Ensure portfolio relevance is calculated if not overridden
+  if (!overrides.portfolioRelevance) {
+    result.portfolioRelevance = getMockPortfolioRelevance(
+      result.decision,
+      result.conviction || result.score,
+      result.riskLevel,
+      result.entryQuality
+    );
+  }
+  
+  return result;
 };
 
 export const generateMockOpportunities = (count: number = 10): SimplifiedOpportunity[] => {
   const symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA', 'META', 'JPM', 'JNJ', 'V'];
   const sectors = ['Technology', 'Healthcare', 'Financial', 'Consumer', 'Industrial'];
   
-  return Array.from({ length: count }, (_, i) => generateMockOpportunity({
-    id: `mock-${i}`,
-    symbol: symbols[i % symbols.length],
-    companyName: `${symbols[i % symbols.length]} Company`,
-    price: 100 + Math.random() * 200,
-    changePct: -5 + Math.random() * 10,
-    changeAmount: -10 + Math.random() * 20,
-    volume: 10000000 + Math.random() * 40000000,
-    score: 50 + Math.random() * 50,
-    confidence: 60 + Math.random() * 40,
-    rank: i + 1,
-    sector: sectors[i % sectors.length],
-    marketCap: 1000000000 + Math.random() * 9000000000,
-  }));
+  const alignments = [
+    'BULLISH/BULLISH/BULLISH',
+    'BULLISH/BULLISH/NEUTRAL',
+    'BULLISH/BEARISH/BEARISH',
+    'NEUTRAL/NEUTRAL/NEUTRAL',
+    'BEARISH/BEARISH/BEARISH',
+  ];
+  
+  const insights = [
+    'Strong positional trend with multi-timeframe support',
+    'Short-term bounce against larger downtrend (risky)',
+    'Strong downtrend across all timeframes (avoid)',
+    'Consolidation phase, waiting for breakout',
+    'Mixed signals, low conviction setup',
+  ];
+  
+  const confidenceLevels = ['VERY_HIGH', 'HIGH', 'MEDIUM', 'LOW'] as const;
+
+  return Array.from({ length: count }, (_, i) => {
+    const baseScore = 50 + Math.random() * 50;
+    const alignment = alignments[i % alignments.length];
+    
+    // Apply penalty for bearish alignments (matching backend logic)
+    let conviction = Math.round(baseScore);
+    const parts = alignment.split('/');
+    const weeklyTrend = parts.length > 1 ? parts[1] : 'NEUTRAL';
+    
+    // Check if this would have bullish signals (RSI oversold, MACD bullish)
+    // For mock data, we'll assume 50% chance of bullish signals
+    const hasBullishSignals = Math.random() > 0.5;
+    
+    if (weeklyTrend === "BEARISH") {
+      // Base penalty for bearish weekly trend
+      conviction = Math.round(conviction * 0.6); // reduce by 40% for bearish weekly trend
+      
+      // Additional penalty for bullish signals in bearish trends (dead-cat bounces)
+      if (hasBullishSignals) {
+        conviction = Math.round(conviction * 0.7); // additional 30% penalty (total ~58% reduction)
+      }
+    }
+    
+    const confidenceIndex = Math.floor(conviction / 25);
+    
+    // Calculate decision based on conviction and alignment
+    const decision = getMockDecision(conviction, alignment);
+    
+    const changePct = -5 + Math.random() * 10;
+    const volume = 10000000 + Math.random() * 40000000;
+    const setupType = getMockSetupType(alignment, changePct);
+    const volumeVisibility = getMockVolumeVisibility(volume);
+    
+    return generateMockOpportunity({
+      id: `mock-${i}`,
+      symbol: symbols[i % symbols.length],
+      companyName: `${symbols[i % symbols.length]} Company`,
+      price: 100 + Math.random() * 200,
+      changePct: changePct,
+      changeAmount: -10 + Math.random() * 20,
+      volume: volume,
+      score: conviction, // Score should match conviction
+      conviction: conviction,
+      confidence: 60 + Math.random() * 40,
+      rank: i + 1,
+      sector: sectors[i % sectors.length],
+      marketCap: 1000000000 + Math.random() * 9000000000,
+      alignment: alignment,
+      insight: insights[i % insights.length],
+      confidenceLevel: confidenceLevels[Math.min(confidenceIndex, 3)],
+      decision: decision,
+      setupType: setupType,
+      volumeVisibility: volumeVisibility,
+    });
+  });
 };

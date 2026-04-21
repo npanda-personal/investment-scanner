@@ -56,22 +56,173 @@ const getScanProgressText = (scanType: ScanType, progress: number): string => {
   }
 };
 
+// Dynamic scanner summary based on actual results
 const getEnhancedInsightText = (opportunities: SimplifiedOpportunity[]): string => {
   if (opportunities.length === 0) {
     return 'No opportunities found. Try running a scan.';
   }
   
-  const topOpportunities = opportunities.slice(0, 2);
-  const symbols = topOpportunities.map(opp => opp.symbol).join(' and ');
-  const avgScore = opportunities.reduce((sum, opp) => sum + opp.score, 0) / opportunities.length;
+  const buyCount = opportunities.filter(r => r.decision === "BUY").length;
+  const watchCount = opportunities.filter(r => r.decision === "WATCH").length;
+  const avoidCount = opportunities.filter(r => r.decision === "AVOID").length;
   
-  if (avgScore > 75) {
-    return `Strong opportunities detected! ${symbols} showing excellent signals.`;
-  } else if (avgScore > 60) {
-    return `Good opportunities found. ${symbols} look promising.`;
-  } else {
-    return `Found ${opportunities.length} opportunities. ${symbols} worth watching.`;
+  // Calculate average metrics for smarter insights
+  const avgConviction = opportunities.reduce((sum, opp) => sum + (opp.conviction || opp.score || 0), 0) / opportunities.length;
+  const avgAlignment = opportunities.reduce((sum, opp) => sum + (opp.alignmentScore || 0), 0) / opportunities.length;
+  
+  // Count ideal entries and near support opportunities
+  const idealEntryCount = opportunities.filter(opp => opp.entryQuality === "IDEAL").length;
+  const nearSupportCount = opportunities.filter(opp => opp.distanceToSupport === "NEAR").length;
+  const strongTrendCount = opportunities.filter(opp => opp.trendStrength === "STRONG").length;
+  
+  // Market condition assessment
+  let marketCondition = "mixed";
+  if (buyCount >= opportunities.length * 0.3) {
+    marketCondition = "bullish";
+  } else if (avoidCount >= opportunities.length * 0.7) {
+    marketCondition = "bearish";
+  } else if (watchCount >= opportunities.length * 0.5) {
+    marketCondition = "neutral";
   }
+  
+  // Generate smart summary based on metrics
+  if (buyCount > 0) {
+    const buyOpportunities = opportunities.filter(r => r.decision === "BUY");
+    const bestBuy = buyOpportunities[0]; // Already sorted by rank
+    
+    let additionalInsights = [];
+    if (idealEntryCount > 0) additionalInsights.push(`${idealEntryCount} ideal entries`);
+    if (nearSupportCount > 0) additionalInsights.push(`${nearSupportCount} near support`);
+    if (strongTrendCount > 0) additionalInsights.push(`${strongTrendCount} strong trends`);
+    
+    const additionalText = additionalInsights.length > 0 ? ` (${additionalInsights.join(', ')})` : '';
+    
+    return `${buyCount} high-conviction setups found in ${marketCondition} market${additionalText}. Avg conviction: ${avgConviction.toFixed(0)}/100`;
+  } else if (watchCount > 0) {
+    // Analyze why no BUY opportunities
+    const lowConvictionCount = opportunities.filter(opp => (opp.conviction || opp.score || 0) < 55).length;
+    const poorAlignmentCount = opportunities.filter(opp => (opp.alignmentScore || 0) < 60).length;
+    
+    let reason = "market is mixed";
+    if (lowConvictionCount >= watchCount * 0.7) {
+      reason = "low conviction across opportunities";
+    } else if (poorAlignmentCount >= watchCount * 0.7) {
+      reason = "poor trend alignment";
+    } else if (strongTrendCount === 0) {
+      reason = "weak trend strength";
+    }
+    
+    return `No strong setups. ${watchCount} watch candidates found (${reason}). Avg alignment: ${avgAlignment.toFixed(0)}/100`;
+  } else {
+    // All AVOID - market is unfavorable
+    const bearishTrendCount = opportunities.filter(opp => opp.alignment?.includes("BEARISH")).length;
+    const highRiskCount = opportunities.filter(opp => opp.riskLevel === "HIGH").length;
+    
+    let reason = "market conditions unfavorable";
+    if (bearishTrendCount >= avoidCount * 0.8) {
+      reason = "predominantly bearish trends";
+    } else if (highRiskCount >= avoidCount * 0.8) {
+      reason = "high risk across opportunities";
+    } else if (avgConviction < 40) {
+      reason = "very low conviction";
+    }
+    
+    return `No actionable setups. ${avoidCount} opportunities filtered out (${reason}).`;
+  }
+};
+
+// Identify top pick (best opportunity) with guard filters
+const getTopPick = (opportunities: SimplifiedOpportunity[]): SimplifiedOpportunity | null => {
+  if (opportunities.length === 0) return null;
+  
+  // Apply guard filters: decision === 'BUY' AND conviction >= 75 AND alignmentScore >= 80
+  const qualifiedBuyOpportunities = opportunities.filter(opp =>
+    opp.decision === "BUY" &&
+    (opp.conviction || opp.score) >= 75 &&
+    (opp.alignmentScore || 0) >= 80
+  );
+  
+  if (qualifiedBuyOpportunities.length > 0) {
+    // Return the qualified BUY with highest conviction
+    return qualifiedBuyOpportunities.reduce((best, current) =>
+      (current.conviction || current.score) > (best.conviction || best.score) ? current : best
+    );
+  }
+  
+  // If no qualified BUY, fall back to any BUY (but warn about missing guard filters)
+  const anyBuyOpportunities = opportunities.filter(opp => opp.decision === "BUY");
+  if (anyBuyOpportunities.length > 0) {
+    // Return the BUY with highest conviction (but it doesn't meet guard filters)
+    return anyBuyOpportunities.reduce((best, current) =>
+      (current.conviction || current.score) > (best.conviction || best.score) ? current : best
+    );
+  }
+  
+  // If no BUY at all, look for WATCH with highest conviction
+  const watchOpportunities = opportunities.filter(opp => opp.decision === "WATCH");
+  if (watchOpportunities.length > 0) {
+    return watchOpportunities.reduce((best, current) =>
+      (current.conviction || current.score) > (best.conviction || best.score) ? current : best
+    );
+  }
+  
+  return null;
+};
+
+// Get top pick description
+const getTopPickDescription = (opportunity: SimplifiedOpportunity | null): string => {
+  if (!opportunity) return '';
+  
+  const parts = [];
+  
+  // Add trend info
+  if (opportunity.alignment) {
+    const alignmentParts = opportunity.alignment.split('/');
+    if (alignmentParts.length >= 2) {
+      const weeklyTrend = alignmentParts[1];
+      if (weeklyTrend === 'BULLISH') parts.push('Strong trend');
+      else if (weeklyTrend === 'BEARISH') parts.push('Counter-trend');
+    }
+  }
+  
+  // Add volume info
+  if (opportunity.volumeVisibility === 'HIGH') {
+    parts.push('High volume');
+  }
+  
+  // Add setup type
+  if (opportunity.setupType) {
+    parts.push(opportunity.setupType.toLowerCase());
+  }
+  
+  // Add conviction
+  const conviction = opportunity.conviction || opportunity.score;
+  if (conviction >= 80) parts.push('High conviction');
+  
+  return parts.length > 0 ? `— ${parts.join(' + ')}` : '';
+};
+
+// Detect trap warning (counter-trend bounce)
+const getTrapWarning = (opportunity: SimplifiedOpportunity): string | null => {
+  if (!opportunity.alignment) return null;
+  
+  const alignmentParts = opportunity.alignment.split('/');
+  if (alignmentParts.length < 2) return null;
+  
+  const dailyTrend = alignmentParts[0];
+  const weeklyTrend = alignmentParts[1];
+  
+  // Trap: Daily bullish but weekly bearish (counter-trend bounce)
+  if (dailyTrend === "BULLISH" && weeklyTrend === "BEARISH") {
+    return "⚠️ Counter-trend bounce (avoid)";
+  }
+  
+  // Also flag if daily bearish but weekly bullish (potential reversal)
+  if (dailyTrend === "BEARISH" && weeklyTrend === "BULLISH") {
+    return "⚠️ Pullback in uptrend (watch for entry)";
+  }
+  
+  return null;
 };
 
 const formatTimeAgo = (dateString: string | null): string => {
@@ -249,6 +400,14 @@ const SimplifiedScannerDashboard: React.FC = () => {
   // Use enhanced insight text
   const insightText = getEnhancedInsightText(opportunities);
   const insightSeverity = opportunities.length > 0 && opportunities.reduce((sum, opp) => sum + opp.score, 0) / opportunities.length > 70 ? "success" : "info";
+  
+  // Get top pick and trap warnings
+  const topPick = getTopPick(opportunities);
+  const topPickDescription = getTopPickDescription(topPick);
+  const trapWarnings = opportunities.map(opp => ({
+    opportunity: opp,
+    warning: getTrapWarning(opp)
+  })).filter(item => item.warning);
 
   return (
     <Box sx={{ p: 3, maxWidth: 1200, margin: '0 auto' }}>
@@ -398,6 +557,81 @@ const SimplifiedScannerDashboard: React.FC = () => {
           </Typography>
         </Alert>
       </Fade>
+
+      {/* Top Pick Highlight */}
+      {topPick && (
+        <Fade in={!isLoading}>
+          <Alert
+            severity="success"
+            icon={<span>⭐</span>}
+            sx={{ mb: 2, border: '1px solid', borderColor: 'success.light', backgroundColor: 'success.50' }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+              <Box>
+                <Typography variant="body1" fontWeight="bold">
+                  ⭐ Top Pick: {topPick.symbol} — {topPick.companyName}
+                </Typography>
+                <Typography variant="body2">
+                  {topPickDescription} • Conviction: {topPick.conviction || topPick.score}/100
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Chip
+                  label={topPick.decision}
+                  color={topPick.decision === 'BUY' ? 'success' : topPick.decision === 'WATCH' ? 'warning' : 'error'}
+                  size="small"
+                  variant="outlined"
+                />
+                <Chip
+                  label={topPick.setupType || 'SETUP'}
+                  color="primary"
+                  size="small"
+                  variant="outlined"
+                />
+              </Box>
+            </Box>
+          </Alert>
+        </Fade>
+      )}
+
+      {/* Trap Warnings */}
+      {trapWarnings.length > 0 && (
+        <Fade in={!isLoading}>
+          <Alert
+            severity="warning"
+            icon={<span>⚠️</span>}
+            sx={{ mb: 2, border: '1px solid', borderColor: 'warning.light', backgroundColor: 'warning.50' }}
+          >
+            <Typography variant="body1" fontWeight="bold" gutterBottom>
+              ⚠️ Trap Warnings ({trapWarnings.length} detected)
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+              {trapWarnings.slice(0, 3).map((item, index) => (
+                <Chip
+                  key={index}
+                  label={`${item.opportunity.symbol}: ${item.warning}`}
+                  size="small"
+                  color="warning"
+                  variant="outlined"
+                  sx={{ fontSize: '0.75rem' }}
+                />
+              ))}
+              {trapWarnings.length > 3 && (
+                <Chip
+                  label={`+${trapWarnings.length - 3} more`}
+                  size="small"
+                  color="warning"
+                  variant="outlined"
+                  sx={{ fontSize: '0.75rem' }}
+                />
+              )}
+            </Box>
+            <Typography variant="body2" sx={{ mt: 1, fontSize: '0.75rem' }}>
+              Counter-trend bounces often fail. Consider avoiding these setups.
+            </Typography>
+          </Alert>
+        </Fade>
+      )}
 
       {/* Error Alert */}
       {error && (

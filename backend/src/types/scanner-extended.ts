@@ -54,12 +54,27 @@ export interface ScoredOpportunity {
   signals: Signal[];
   score: number;
   breakdown: {
-    signalScore: number;
+    alignmentScore: number;
+    momentumScore: number;
     volumeScore: number;
-    changeScore: number;
-    recencyScore: number;
   };
   rank: number;
+  // New fields for enhanced insights
+  alignment?: string; // e.g., "BULLISH/NEUTRAL/BEARISH"
+  insight?: string; // Human-readable insight
+  indicators?: Record<string, number>; // Daily timeframe indicators
+  // Phase 1: Decision Clarity
+  decision?: 'BUY' | 'WATCH' | 'AVOID'; // Clear trading decision
+  setupType?: 'PULLBACK' | 'BREAKOUT' | 'REVERSAL' | 'RANGE'; // Entry context
+  volumeVisibility?: 'HIGH' | 'NORMAL' | 'LOW'; // Volume confirmation
+  riskLevel?: 'LOW' | 'MEDIUM' | 'HIGH'; // Risk assessment
+  // Phase 2: Entry Quality Assessment
+  entryQuality?: 'IDEAL' | 'OK' | 'LATE'; // Entry quality: IDEAL = Pullback + near support + volume, LATE = Extended breakout, OK = Mid-range
+  // Phase 3: Advanced Metrics
+  distanceToSupport?: 'NEAR' | 'MID' | 'FAR'; // Distance to nearest support/resistance
+  trendStrength?: 'STRONG' | 'MODERATE' | 'WEAK'; // Strength of the current trend
+  // Phase 4: Portfolio Relevance
+  portfolioRelevance?: 'CORE' | 'SATELLITE' | 'AVOID' | 'SMALL'; // Position sizing guidance
 }
 
 export interface ScanSession {
@@ -138,8 +153,35 @@ export interface MarketDataRequest {
   includeHistorical: boolean;
 }
 
-export interface EnhancedMarketData extends MarketData {
+export interface TimeframeData {
   indicators: Record<string, number>;
+  latestPrice?: {
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume?: number;
+    timestamp: Date;
+  };
+  historicalPrices?: Array<{
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume?: number;
+    timestamp: Date;
+  }>;
+}
+
+export interface EnhancedMarketData extends MarketData {
+  // For backward compatibility, keep indicators as daily timeframe
+  indicators: Record<string, number>;
+  // New multi-timeframe structure
+  timeframes?: {
+    daily: TimeframeData;
+    weekly: TimeframeData;
+    monthly: TimeframeData;
+  };
   signals: Signal[];
   metadata: {
     lastUpdated: Date;
