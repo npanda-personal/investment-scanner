@@ -6,6 +6,7 @@ import SmartMoneyPage from './pages/SmartMoneyPage';
 import SectorPage from './pages/SectorPage';
 import MacroPage from './pages/MacroPage';
 import Scanner from './components/Scanner';
+import SimplifiedScannerDashboard from './components/Scanner/SimpleScanner';
 import Backtester from './components/Backtester';
 import StockManager from './components/StockManager';
 import WatchlistManager from './components/WatchlistManager';
@@ -24,6 +25,7 @@ function App() {
             <Route path="stocks" element={<StockManager />} />
             <Route path="watchlists" element={<WatchlistManager />} />
             <Route path="scanner" element={<Scanner />} />
+            <Route path="smart-scanner" element={<SimplifiedScannerDashboard />} />
             <Route path="backtester" element={<Backtester />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>

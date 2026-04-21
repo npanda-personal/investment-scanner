@@ -46,6 +46,7 @@ const navItems = [
   { path: '/stocks', label: 'Stock Management', icon: <InventoryIcon /> },
   { path: '/watchlists', label: 'Watchlists', icon: <ListIcon /> },
   { path: '/scanner', label: 'Real‑Time Scanner', icon: <SearchIcon /> },
+  { path: '/smart-scanner', label: 'Smart Scanner', icon: <SearchIcon /> },
   { path: '/backtester', label: 'Strategy Backtester', icon: <TimelineIcon /> },
   { path: '/settings', label: 'User Settings', icon: <SettingsIcon /> },
 ];

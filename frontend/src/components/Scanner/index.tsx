@@ -26,6 +26,8 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -49,12 +51,18 @@ import ConditionInputDualMode from '../ConditionBuilder/ConditionInputDualMode';
 import ScanScopeSelector, { ScanScope } from '../ScanScopeSelector/ScanScopeSelector';
 import { ConditionNode } from '../../types/scanner';
 
+// Import real-time scanner components
+import ScannerDashboard from './RealTimeScanner/components/ScannerDashboard';
+
 const Scanner: React.FC = () => {
   const [rules, setRules] = useState<ScannerRule[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [logs, setLogs] = useState<Record<string, ScanLog[]>>({}); // ruleId -> logs
   const [watchlists, setWatchlists] = useState<Watchlist[]>([]);
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState(0);
 
   // New rule dialog
   const [openDialog, setOpenDialog] = useState(false);
@@ -245,10 +253,10 @@ const Scanner: React.FC = () => {
   return (
     <Box sx={{ p: 3, maxWidth: 1400, mx: 'auto' }}>
       <Typography variant="h4" gutterBottom>
-        Real-Time Market Scanner
+        Market Scanner
       </Typography>
       <Typography variant="body1" color="text.secondary" paragraph>
-        Create scanner rules to monitor market conditions and trigger alerts when criteria are met.
+        Choose between automated rule-based scanning or real-time session-based scanning
       </Typography>
 
       {error && (
@@ -257,20 +265,45 @@ const Scanner: React.FC = () => {
         </Alert>
       )}
 
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h6">Active Scanner Rules</Typography>
-        <Box sx={{ display: 'flex', gap: 2 }}>
-          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={loadData}>
-            Refresh
-          </Button>
-          <Button variant="contained" startIcon={<PlayArrowIcon />} onClick={handleScanAll}>
-            Scan All Rules
-          </Button>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenDialog()}>
-            New Rule
-          </Button>
-        </Box>
+      {/* Tab Navigation */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 4 }}>
+        <Tabs value={activeTab} onChange={(_, newValue) => setActiveTab(newValue)}>
+          <Tab label="Real-Time Scanner" />
+          <Tab label="Automated Scanner" />
+        </Tabs>
       </Box>
+
+      {/* Real-Time Scanner Tab (New Session-based Scanner) */}
+      {activeTab === 0 && (
+        <Box>
+          <ScannerDashboard />
+          <Alert severity="info" sx={{ mt: 3 }}>
+            <Typography variant="body2">
+              The Real-Time Scanner provides session-based scanning with advanced signal detection,
+              ranking configuration, and real-time progress monitoring. Use the dashboard above to
+              get started.
+            </Typography>
+          </Alert>
+        </Box>
+      )}
+
+      {/* Automated Scanner Tab (Existing Rule-based Scanner) */}
+      {activeTab === 1 && (
+        <Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Typography variant="h6">Active Scanner Rules</Typography>
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <Button variant="outlined" startIcon={<RefreshIcon />} onClick={loadData}>
+                Refresh
+              </Button>
+              <Button variant="contained" startIcon={<PlayArrowIcon />} onClick={handleScanAll}>
+                Scan All Rules
+              </Button>
+              <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenDialog()}>
+                New Rule
+              </Button>
+            </Box>
+          </Box>
 
       {rules.length === 0 ? (
         <Paper sx={{ p: 4, textAlign: 'center' }}>
@@ -433,6 +466,9 @@ const Scanner: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+        </Box>
+      )}
+
     </Box>
   );
 };
