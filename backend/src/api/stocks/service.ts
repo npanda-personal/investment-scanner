@@ -268,6 +268,23 @@ export class StockService {
   }
 
   /**
+   * Search Yahoo Finance directly without auto-creating stocks.
+   * Returns search results with region information inferred from symbol.
+   * Used by the global search bar in the frontend.
+   */
+  async yahooSearch(query: string): Promise<any[]> {
+    const externalResults: SearchResult[] = await this.ingestionService.search(query);
+    return externalResults.map(result => ({
+      symbol: result.symbol,
+      name: result.name,
+      type: result.type,
+      exchange: result.exchange,
+      region: result.region,
+      source: 'yahoo',
+    }));
+  }
+
+  /**
    * Trigger data ingestion for all active stocks using horizontal worker system.
    * Uses 3-5 workers with 3-5 concurrency each for optimal Yahoo API usage.
    * Returns progress information.

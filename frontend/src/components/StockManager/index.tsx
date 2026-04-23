@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -25,12 +25,16 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Tooltip,
+  useTheme,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SyncIcon from '@mui/icons-material/Sync';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import PublicIcon from '@mui/icons-material/Public';
+import CloseIcon from '@mui/icons-material/Close';
 import {
   Stock,
   fetchStocks,
@@ -40,14 +44,65 @@ import {
   syncAllStocks,
   externalSearch,
   createStock,
+  yahooSearch,
 } from '../../services/stockService';
 
 
+// Exchange-to-region mapping for determining which tab a stock belongs to.
+// The exchange field from Yahoo Finance is more reliable than the region field.
+const EXCHANGE_TO_REGION: Record<string, string> = {
+  // Indian exchanges
+  NSE: 'IN',
+  BSE: 'IN',
+  // US exchanges
+  NYSE: 'US',
+  NASDAQ: 'US',
+  NYSEARCA: 'US',
+  NYSEMKT: 'US',
+  // Hong Kong
+  HKG: 'HK',
+  // European
+  XETRA: 'EU',
+  EURONEXT: 'EU',
+  LSE: 'UK',
+  BORSA_ITALIANA: 'EU',
+  // Canadian
+  TSX: 'CA',
+  TSXV: 'CA',
+};
+
+const EXCHANGE_REGION_LABELS: Record<string, string> = {
+  IN: 'India (IN)',
+  US: 'United States (US)',
+  HK: 'Hong Kong (HK)',
+  EU: 'Europe (EU)',
+  UK: 'United Kingdom (UK)',
+  CA: 'Canada (CA)',
+};
+
+/**
+ * Map an exchange code to a region code.
+ * Uses the exchange-to-region mapping first.
+ * Falls back to the Yahoo Finance region field if exchange is unknown.
+ */
+function mapExchangeToRegion(exchange: string | undefined, _fallbackRegion: string | undefined): string {
+  if (exchange) {
+    const upperExchange = exchange.toUpperCase();
+    if (EXCHANGE_TO_REGION[upperExchange]) {
+      return EXCHANGE_TO_REGION[upperExchange];
+    }
+  }
+  // If exchange is not in our mapping, return empty string (unmapped)
+  return '';
+}
+
 const StockManager: React.FC = () => {
+  const theme = useTheme();
+
   // Tabs state
   const [tabValue, setTabValue] = useState(0);
-  const regions = ['IN', 'US'];
-  const regionLabels = ['India (IN)', 'United States (US)'];
+  const [regions, setRegions] = useState<string[]>(['IN', 'US']);
+  const regionLabels: Record<string, string> = { ...EXCHANGE_REGION_LABELS };
 
   // Table state
   const [stocks, setStocks] = useState<Stock[]>([]);
@@ -64,10 +119,22 @@ const StockManager: React.FC = () => {
   const [sortBy, setSortBy] = useState<string>('symbol');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
-  // Search filter
+  // Table search filter (local DB)
   const [search, setSearch] = useState('');
 
-  // External search dialog
+  // Global search (Yahoo Finance)
+  const [globalQuery, setGlobalQuery] = useState('');
+  const [globalResults, setGlobalResults] = useState<any[]>([]);
+  const [globalLoading, setGlobalLoading] = useState(false);
+  const [globalSearched, setGlobalSearched] = useState(false);
+
+  // Per-stock sync loading state (keyed by stock symbol)
+  const [syncingStocks, setSyncingStocks] = useState<Record<string, boolean>>({});
+
+  // Set of symbols already in DB (to disable "+" button)
+  const [existingSymbols, setExistingSymbols] = useState<Set<string>>(new Set());
+
+  // External search dialog (legacy)
   const [externalSearchOpen, setExternalSearchOpen] = useState(false);
   const [externalQuery, setExternalQuery] = useState('');
   const [externalResults, setExternalResults] = useState<any[]>([]);
@@ -75,7 +142,18 @@ const StockManager: React.FC = () => {
 
   const currentRegion = regions[tabValue];
 
-  const loadStocks = async () => {
+  // Load all existing symbols from DB for "+" button disable logic
+  const loadExistingSymbols = useCallback(async () => {
+    try {
+      const response = await fetchStocks({ pageSize: 10000 });
+      const symbols = new Set<string>(response.stocks.map((s: Stock) => s.symbol));
+      setExistingSymbols(symbols);
+    } catch (err) {
+      console.error('Failed to load existing symbols:', err);
+    }
+  }, []);
+
+  const loadStocks = async (regionOverride?: string) => {
     setLoading(true);
     setError(null);
     try {
@@ -84,7 +162,7 @@ const StockManager: React.FC = () => {
         pageSize,
         sortBy,
         sortOrder,
-        region: currentRegion,
+        region: regionOverride ?? currentRegion,
         search: search.trim() || undefined,
       });
       setStocks(response.stocks);
@@ -99,6 +177,11 @@ const StockManager: React.FC = () => {
   useEffect(() => {
     loadStocks();
   }, [page, pageSize, sortBy, sortOrder, currentRegion, search]);
+
+  // Load existing symbols on mount and when stocks change
+  useEffect(() => {
+    loadExistingSymbols();
+  }, [stocks, loadExistingSymbols]);
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -131,12 +214,15 @@ const StockManager: React.FC = () => {
     }
   };
 
-  const handleSync = async (id: string) => {
+  const handleSync = async (id: string, symbol: string) => {
+    setSyncingStocks(prev => ({ ...prev, [symbol]: true }));
     try {
       await syncStockData(id);
       await loadStocks();
     } catch (err: any) {
       setError(err.message || 'Sync failed');
+    } finally {
+      setSyncingStocks(prev => ({ ...prev, [symbol]: false }));
     }
   };
 
@@ -146,9 +232,7 @@ const StockManager: React.FC = () => {
     try {
       const result = await syncAllStocks();
       if (result.success) {
-        // Show success message
         console.log(`Bulk sync completed: ${result.message}`);
-        // Refresh the stock list to show updated timestamps
         await loadStocks();
       } else {
         setError(result.message || 'Bulk sync failed');
@@ -157,6 +241,80 @@ const StockManager: React.FC = () => {
       setError(err.message || 'Bulk sync failed');
     } finally {
       setBulkSyncLoading(false);
+    }
+  };
+
+  // Global search handler - triggered by button click or Enter key
+  const handleGlobalSearch = async () => {
+    if (!globalQuery.trim()) return;
+    setGlobalLoading(true);
+    setGlobalSearched(true);
+    setError(null);
+    try {
+      const results = await yahooSearch(globalQuery);
+      setGlobalResults(results);
+    } catch (err: any) {
+      setError('Global search failed: ' + err.message);
+      setGlobalResults([]);
+    } finally {
+      setGlobalLoading(false);
+    }
+  };
+
+  // Handle adding a stock from global search results
+  const handleAddFromGlobal = async (result: any) => {
+    // Use exchange-to-region mapping first, fall back to Yahoo's region field
+    const region = mapExchangeToRegion(result.exchange, result.region);
+
+    try {
+      // Create the stock
+      const newStock = await createStock({
+        symbol: result.symbol,
+        name: result.name || result.symbol,
+        region,
+        exchange: result.exchange || 'N/A',
+      });
+
+      // If region is not already in the tabs list, add a new tab
+      if (!regions.includes(region)) {
+        setRegions(prev => [...prev, region]);
+      }
+
+      // Switch to the appropriate tab
+      const tabIndex = regions.indexOf(region);
+      if (tabIndex >= 0) {
+        setTabValue(tabIndex);
+      } else {
+        // Newly added region - switch to the last tab (after state update)
+        setTabValue(regions.length);
+      }
+
+      // Mark this stock as syncing
+      setSyncingStocks(prev => ({ ...prev, [result.symbol]: true }));
+
+      // Auto-trigger historical price loading
+      try {
+        await syncStockData(newStock.id);
+      } catch (syncErr: any) {
+        console.error(`Sync failed for ${result.symbol}:`, syncErr);
+      } finally {
+        setSyncingStocks(prev => ({ ...prev, [result.symbol]: false }));
+      }
+
+      // Refresh the stock list using the target region directly (avoids stale closure bug)
+      await loadStocks(region);
+      await loadExistingSymbols();
+
+      // Remove this result from the global results list
+      setGlobalResults(prev => prev.filter(r => r.symbol !== result.symbol));
+
+    } catch (err: any) {
+      if (err.message?.includes('already exists')) {
+        // Stock already exists - just update existing symbols and disable the button
+        await loadExistingSymbols();
+      } else {
+        setError('Failed to add stock: ' + err.message);
+      }
     }
   };
 
@@ -177,7 +335,7 @@ const StockManager: React.FC = () => {
     try {
       await createStock({
         symbol: result.symbol,
-        name: result.name || result.symbol, // fallback to symbol if name empty
+        name: result.name || result.symbol,
         region: result.region || currentRegion,
         exchange: result.exchange || 'N/A',
       });
@@ -196,20 +354,155 @@ const StockManager: React.FC = () => {
     return date.toLocaleString();
   };
 
+  const getRegionLabel = (region: string) => {
+    return regionLabels[region] || `${region}`;
+  };
+
   return (
     <Box sx={{ p: 3, maxWidth: 1400, mx: 'auto' }}>
       <Typography variant="h4" gutterBottom>
         Stock Management Dashboard
       </Typography>
       <Typography variant="body1" color="text.secondary" paragraph>
-        Manage stocks from different markets. Toggle active status, trigger data sync, or add new stocks via external search.
+        Manage stocks from different markets. Toggle active status, trigger data sync, or add new stocks via global search.
       </Typography>
+
+      {/* Global Search Bar */}
+      <Paper elevation={1} sx={{ p: 2, mb: 3, bgcolor: theme.palette.mode === 'dark' ? 'background.paper' : 'grey.50' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <PublicIcon color="primary" />
+          <TextField
+            fullWidth
+            placeholder="Global Search - search for any stock..."
+            variant="outlined"
+            size="small"
+            value={globalQuery}
+            onChange={(e) => setGlobalQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleGlobalSearch();
+              }
+            }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+              endAdornment: (globalQuery || globalSearched) ? (
+                <InputAdornment position="end">
+                  <IconButton
+                    size="small"
+                    onClick={() => {
+                      setGlobalQuery('');
+                      setGlobalResults([]);
+                      setGlobalSearched(false);
+                    }}
+                    edge="end"
+                    sx={{ mr: 0.5 }}
+                  >
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              ) : undefined,
+            }}
+          />
+          <Button
+            variant="contained"
+            onClick={handleGlobalSearch}
+            disabled={globalLoading || !globalQuery.trim()}
+            startIcon={globalLoading ? <CircularProgress size={20} color="inherit" /> : <SearchIcon />}
+            sx={{ minWidth: 120, height: 40 }}
+          >
+            {globalLoading ? 'Searching...' : 'Search'}
+          </Button>
+        </Box>
+
+        {/* Global Search Results */}
+        {globalSearched && (
+          <Box sx={{ mt: 2 }}>
+            {globalLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+                <CircularProgress />
+              </Box>
+            ) : globalResults.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" sx={{ py: 1, textAlign: 'center' }}>
+                No results found. Try a different search term.
+              </Typography>
+            ) : (
+              <TableContainer component={Paper} variant="outlined">
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600 }}>Symbol</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Exchange</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Region</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }} align="center">Action</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {globalResults.map((result, idx) => {
+                      const isAlreadyAdded = existingSymbols.has(result.symbol);
+                      const isSyncing = syncingStocks[result.symbol];
+                      const mappedRegion = mapExchangeToRegion(result.exchange, result.region);
+                      const regionUnmapped = !mappedRegion;
+                      return (
+                        <TableRow key={idx} hover>
+                          <TableCell>
+                            <Typography variant="body2" fontWeight={600}>
+                              {result.symbol}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>{result.name}</TableCell>
+                          <TableCell>
+                            <Chip label={result.exchange || 'N/A'} size="small" variant="outlined" />
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={mappedRegion || 'Unmapped'}
+                              size="small"
+                              color={mappedRegion === 'IN' ? 'success' : mappedRegion === 'US' ? 'primary' : 'default'}
+                              variant="outlined"
+                            />
+                          </TableCell>
+                          <TableCell align="center">
+                            {isSyncing ? (
+                              <CircularProgress size={24} />
+                            ) : (
+                              <Tooltip title={regionUnmapped ? 'Cannot add: unknown region' : isAlreadyAdded ? 'Already in database' : 'Add this stock'}>
+                                <span>
+                                  <Button
+                                    size="small"
+                                    variant={isAlreadyAdded || regionUnmapped ? 'outlined' : 'contained'}
+                                    color={isAlreadyAdded || regionUnmapped ? 'inherit' : 'primary'}
+                                    disabled={isAlreadyAdded || regionUnmapped}
+                                    onClick={() => handleAddFromGlobal(result)}
+                                    startIcon={isAlreadyAdded || regionUnmapped ? undefined : <AddIcon />}
+                                  >
+                                    {isAlreadyAdded ? 'Added' : regionUnmapped ? 'N/A' : '+'}
+                                  </Button>
+                                </span>
+                              </Tooltip>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Box>
+        )}
+      </Paper>
 
       {/* Region Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Tabs value={tabValue} onChange={handleTabChange}>
-          {regions.map((region, idx) => (
-            <Tab key={region} label={regionLabels[idx]} />
+          {regions.map((region) => (
+            <Tab key={region} label={getRegionLabel(region)} />
           ))}
         </Tabs>
       </Box>
@@ -334,15 +627,19 @@ const StockManager: React.FC = () => {
                     </Box>
                   </TableCell>
                   <TableCell align="center">
-                    <IconButton
-                      color="primary"
-                      title="Sync data"
-                      onClick={() => handleSync(stock.id)}
-                      size="small"
-                      sx={{ mr: 1 }}
-                    >
-                      <SyncIcon />
-                    </IconButton>
+                    {syncingStocks[stock.symbol] ? (
+                      <CircularProgress size={24} sx={{ mr: 1 }} />
+                    ) : (
+                      <IconButton
+                        color="primary"
+                        title="Sync data"
+                        onClick={() => handleSync(stock.id, stock.symbol)}
+                        size="small"
+                        sx={{ mr: 1 }}
+                      >
+                        <SyncIcon />
+                      </IconButton>
+                    )}
                     <IconButton
                       color="error"
                       title="Delete"
@@ -387,7 +684,7 @@ const StockManager: React.FC = () => {
               placeholder="Enter symbol or company name..."
               value={externalQuery}
               onChange={(e) => setExternalQuery(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleExternalSearch()}
+              onKeyDown={(e) => e.key === 'Enter' && handleExternalSearch()}
             />
             <Button
               variant="contained"

@@ -67,6 +67,26 @@ router.get('/search', async (req, res) => {
 });
 
 /**
+ * GET /api/stocks/yahoo-search
+ * Query parameter: q (search query)
+ * Searches Yahoo Finance directly without auto-creating stocks.
+ * Returns results with region information for the global search bar.
+ */
+router.get('/yahoo-search', async (req, res) => {
+  try {
+    const query = req.query.q as string;
+    if (!query || query.trim().length === 0) {
+      return res.status(400).json({ error: 'Missing search query' });
+    }
+    const results = await stockService.yahooSearch(query);
+    return res.json(results);
+  } catch (error) {
+    console.error('Error in Yahoo search:', error);
+    return res.status(500).json({ error: 'Failed to search Yahoo Finance' });
+  }
+});
+
+/**
  * GET /api/stocks/:id
  */
 router.get('/:id', async (req, res) => {

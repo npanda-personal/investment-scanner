@@ -129,3 +129,13 @@ export async function externalSearch(query: string): Promise<any[]> {
   const response = await axios.get(`${API_BASE}/data/search?q=${encodeURIComponent(query)}`);
   return response.data;
 }
+
+/**
+ * Search Yahoo Finance directly without auto-creating stocks.
+ * Used by the global search bar in the Stock Manager.
+ * Returns results with region information.
+ */
+export async function yahooSearch(query: string): Promise<any[]> {
+  const response = await axios.get(`${API_BASE}/stocks/yahoo-search?q=${encodeURIComponent(query)}`);
+  return response.data;
+}
