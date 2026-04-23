@@ -51,51 +51,105 @@ router.get('/indicators', async (_req, res) => {
   }
 });
 
-// Get smart money signals with explanations
+// Get smart money signals with explanations (database-driven)
 router.get('/signals', async (_req, res) => {
   try {
-    const signals = [
-      {
-        id: 1,
+    const calculationService = new SmartMoneyCalculationService();
+    const indicators = await calculationService.calculateSignals();
+
+    // Build signals from computed indicators
+    const signals: any[] = [];
+    let id = 1;
+
+    // Signal 1: Volume Spike
+    const volumeSpike = indicators.find(i => i.indicator === 'Volume Spikes');
+    if (volumeSpike && volumeSpike.value > 0) {
+      signals.push({
+        id: id++,
         name: 'Volume Spike Detected',
-        type: 'positive',
-        strength: 0.8,
-        description: 'Unusually high volume in Technology sector suggests institutional interest',
-        explanation: 'Volume > 2.5x 20-day average with price increase indicates accumulation',
-        stocks: ['AAPL', 'MSFT', 'NVDA'],
+        type: volumeSpike.value > 10 ? 'positive' : 'neutral',
+        strength: Math.min(0.9, volumeSpike.value / 20),
+        description: `${volumeSpike.value} stocks showing volume > 2x 20-day average, suggesting institutional interest`,
+        explanation: 'Volume spikes with price increases often indicate accumulation by institutional investors',
+        stocks: [],
         timestamp: new Date().toISOString()
-      },
-      {
-        id: 2,
+      });
+    }
+
+    // Signal 2: Accumulation
+    const accumulation = indicators.find(i => i.indicator === 'Accumulation Signal');
+    if (accumulation) {
+      signals.push({
+        id: id++,
         name: 'Accumulation Pattern',
-        type: 'positive',
-        strength: 0.7,
-        description: 'Price up + volume up pattern across multiple sectors',
+        type: accumulation.value > 40 ? 'positive' : 'neutral',
+        strength: Math.min(0.9, accumulation.value / 60),
+        description: `${accumulation.value}% of stocks showing price up + volume up pattern`,
         explanation: 'Consistent buying pressure with above-average volume suggests smart money accumulation',
-        stocks: ['XLK', 'XLV', 'XLF'],
-        timestamp: new Date(Date.now() - 86400000).toISOString()
-      },
-      {
-        id: 3,
+        stocks: [],
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Signal 3: Distribution Warning
+    const distribution = indicators.find(i => i.indicator === 'Distribution Signal');
+    if (distribution) {
+      signals.push({
+        id: id++,
         name: 'Distribution Warning',
-        type: 'warning',
-        strength: 0.6,
-        description: 'Price down with high volume in Energy sector',
-        explanation: 'Selling pressure with elevated volume may indicate distribution',
-        stocks: ['XLE', 'CVX', 'XOM'],
-        timestamp: new Date(Date.now() - 172800000).toISOString()
-      },
-      {
-        id: 4,
-        name: 'Momentum Shift',
-        type: 'neutral',
-        strength: 0.5,
-        description: 'Rotation from Growth to Value sectors detected',
-        explanation: 'Relative strength analysis shows early signs of sector rotation',
-        stocks: ['XLK', 'XLV', 'XLF'],
-        timestamp: new Date(Date.now() - 43200000).toISOString()
-      }
-    ];
+        type: distribution.value > 25 ? 'warning' : 'neutral',
+        strength: Math.min(0.8, distribution.value / 40),
+        description: `${distribution.value}% of stocks showing price down with high volume`,
+        explanation: 'Selling pressure with elevated volume may indicate distribution by institutional investors',
+        stocks: [],
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Signal 4: Market Momentum
+    const momentum = indicators.find(i => i.indicator === 'Market Momentum');
+    if (momentum) {
+      signals.push({
+        id: id++,
+        name: 'Market Momentum',
+        type: momentum.value > 60 ? 'positive' : momentum.value < 40 ? 'warning' : 'neutral',
+        strength: Math.abs(momentum.value - 50) / 50,
+        description: `${momentum.value}% of top US stocks showing positive 5-day momentum`,
+        explanation: 'Momentum analysis based on individual stock price changes across the market',
+        stocks: [],
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Signal 5: Relative Strength
+    const relStrength = indicators.find(i => i.indicator.startsWith('Relative Strength'));
+    if (relStrength) {
+      signals.push({
+        id: id++,
+        name: 'Tech vs Market Relative Strength',
+        type: relStrength.value > 1.05 ? 'positive' : relStrength.value < 0.95 ? 'warning' : 'neutral',
+        strength: Math.min(0.9, Math.abs(relStrength.value - 1) * 10),
+        description: `Tech stocks ${relStrength.value > 1 ? 'outperforming' : 'underperforming'} broad market (ratio: ${relStrength.value.toFixed(2)})`,
+        explanation: 'Relative strength calculated by comparing average returns of top tech stocks vs broad market stocks',
+        stocks: [],
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Signal 6: Volume Activity
+    const volActivity = indicators.find(i => i.indicator === 'Volume Activity');
+    if (volActivity) {
+      signals.push({
+        id: id++,
+        name: 'Volume Activity Level',
+        type: volActivity.value > 1.5 ? 'positive' : volActivity.value < 0.8 ? 'warning' : 'neutral',
+        strength: Math.min(0.8, (volActivity.value - 1) * 2),
+        description: `Average volume ratio of ${volActivity.value.toFixed(2)}x across top stocks`,
+        explanation: 'Higher volume activity suggests increased market participation and liquidity',
+        stocks: [],
+        timestamp: new Date().toISOString()
+      });
+    }
 
     res.json({
       success: true,
@@ -169,47 +223,103 @@ router.get('/economic-cycle', async (_req, res) => {
   }
 });
 
-// Get actionable insights
+// Get actionable insights (database-driven)
 router.get('/insights', async (_req, res) => {
   try {
-    const insights = [
-      {
-        id: 1,
-        title: 'Strong Institutional Inflow',
-        description: 'Technology sector shows +$450M institutional inflow over past week, suggesting smart money accumulation.',
-        type: 'positive',
-        confidence: 0.85,
-        sectors: ['Technology'],
-        timestamp: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-      },
-      {
-        id: 2,
-        title: 'Sector Rotation Signal',
-        description: 'Early signs of rotation from Energy to Healthcare detected, consistent with late-cycle behavior.',
+    const calculationService = new SmartMoneyCalculationService();
+    const sectorService = new SectorDataCalculationService();
+    const indicators = await calculationService.calculateSignals();
+    const sectorPerformance = await sectorService.calculateSectorPerformance('weekly');
+
+    const insights: any[] = [];
+    let id = 1;
+
+    // Insight 1: Accumulation / Distribution balance
+    const accumulation = indicators.find(i => i.indicator === 'Accumulation Signal');
+    const distribution = indicators.find(i => i.indicator === 'Distribution Signal');
+    if (accumulation && distribution) {
+      const netPressure = accumulation.value - distribution.value;
+      if (netPressure > 10) {
+        insights.push({
+          id: id++,
+          title: 'Net Accumulation Detected',
+          description: `${netPressure.toFixed(0)}% more stocks showing accumulation than distribution patterns, suggesting broad institutional buying interest.`,
+          type: 'positive',
+          confidence: Math.min(0.9, 0.5 + netPressure / 100),
+          sectors: [],
+          timestamp: new Date().toISOString(),
+        });
+      } else if (netPressure < -10) {
+        insights.push({
+          id: id++,
+          title: 'Net Distribution Warning',
+          description: `${Math.abs(netPressure).toFixed(0)}% more stocks showing distribution than accumulation patterns, suggesting broad institutional selling.`,
+          type: 'negative',
+          confidence: Math.min(0.9, 0.5 + Math.abs(netPressure) / 100),
+          sectors: [],
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }
+
+    // Insight 2: Volume spike insight
+    const volumeSpike = indicators.find(i => i.indicator === 'Volume Spikes');
+    if (volumeSpike && volumeSpike.value > 5) {
+      insights.push({
+        id: id++,
+        title: 'Elevated Volume Activity',
+        description: `${volumeSpike.value} stocks showing volume > 2x their 20-day average, indicating heightened market participation.`,
         type: 'neutral',
-        confidence: 0.72,
-        sectors: ['Energy', 'Healthcare'],
-        timestamp: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
-      },
-      {
-        id: 3,
-        title: 'Unusual Options Activity',
-        description: 'Large call option volume in Financials sector suggests institutional positioning for upcoming earnings season.',
-        type: 'warning',
-        confidence: 0.68,
-        sectors: ['Financials'],
-        timestamp: new Date(Date.now() - 43200000).toISOString(), // 12 hours ago
-      },
-      {
-        id: 4,
-        title: 'Warning: Energy Outflows',
-        description: 'Energy sector shows -$120M outflow, largest weekly decline in 3 months.',
-        type: 'negative',
-        confidence: 0.91,
-        sectors: ['Energy'],
-        timestamp: new Date(Date.now() - 21600000).toISOString(), // 6 hours ago
-      },
-    ];
+        confidence: Math.min(0.85, 0.5 + volumeSpike.value / 30),
+        sectors: [],
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Insight 3: Sector rotation from top/bottom performers
+    const sortedSectors = [...sectorPerformance].sort((a, b) => b.performance - a.performance);
+    if (sortedSectors.length >= 2) {
+      const topSector = sortedSectors[0];
+      const bottomSector = sortedSectors[sortedSectors.length - 1];
+      const spread = topSector.performance - bottomSector.performance;
+      if (spread > 5) {
+        insights.push({
+          id: id++,
+          title: 'Sector Rotation Signal',
+          description: `${topSector.sector} (${topSector.performance.toFixed(1)}%) leading while ${bottomSector.sector} (${bottomSector.performance.toFixed(1)}%) lagging — ${spread.toFixed(1)}% spread suggests rotation.`,
+          type: 'neutral',
+          confidence: Math.min(0.8, 0.4 + spread / 20),
+          sectors: [topSector.sector, bottomSector.sector],
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }
+
+    // Insight 4: Momentum insight
+    const momentum = indicators.find(i => i.indicator === 'Market Momentum');
+    if (momentum) {
+      if (momentum.value > 65) {
+        insights.push({
+          id: id++,
+          title: 'Broad Market Strength',
+          description: `${momentum.value}% of top US stocks showing positive momentum — broad market participation suggests sustained uptrend.`,
+          type: 'positive',
+          confidence: Math.min(0.85, 0.4 + momentum.value / 100),
+          sectors: [],
+          timestamp: new Date().toISOString(),
+        });
+      } else if (momentum.value < 40) {
+        insights.push({
+          id: id++,
+          title: 'Broad Market Weakness',
+          description: `Only ${momentum.value}% of top US stocks showing positive momentum — lack of broad participation suggests caution.`,
+          type: 'negative',
+          confidence: Math.min(0.85, 0.4 + (100 - momentum.value) / 100),
+          sectors: [],
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }
 
     res.json({
       success: true,
@@ -219,9 +329,9 @@ router.get('/insights', async (_req, res) => {
     });
   } catch (error) {
     console.error('Error fetching insights:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to fetch insights' 
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch insights'
     });
   }
 });
@@ -232,17 +342,8 @@ router.get('/relative-strength', async (req, res) => {
     const { sectors } = req.query;
     const requestedSectors = sectors ? (sectors as string).split(',') : ['Technology', 'Healthcare', 'Financials'];
     
-    // Mock relative strength data
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug'];
-    const strengthData = requestedSectors.map(sector => ({
-      sector,
-      values: months.map((month, index) => ({
-        month,
-        value: Math.floor(Math.random() * 30) + 60 + index * 5, // Mock trending data
-      })),
-      currentStrength: Math.floor(Math.random() * 30) + 70,
-      trend: Math.random() > 0.5 ? 'up' : 'down',
-    }));
+    const sectorService = new SectorDataCalculationService();
+    const strengthData = await sectorService.calculateRelativeStrength(requestedSectors);
 
     res.json({
       success: true,
@@ -252,9 +353,9 @@ router.get('/relative-strength', async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching relative strength data:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to fetch relative strength data' 
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch relative strength data'
     });
   }
 });

@@ -147,3 +147,43 @@ export async function scanAllActiveRules(): Promise<{ message: string; results: 
   });
   return response.data;
 }
+
+// ── Scan Run API (persisted scanner results) ──
+
+export interface ScanResultItem {
+  id: string;
+  symbol: string;
+  signalType: string;
+  strength: number;
+  description: string;
+  explanation: string;
+  stocks: string[];
+  timestamp: string;
+}
+
+export interface ScanRunResponse {
+  id: string;
+  userId: string;
+  createdAt: string;
+  results: ScanResultItem[];
+}
+
+/**
+ * Run a scan and persist results.
+ */
+export async function runScan(): Promise<ScanRunResponse> {
+  const response = await axios.post<ScanRunResponse>(`${API_BASE}/scanner/run`, {}, {
+    headers: { 'x-user-id': TEST_USER_ID },
+  });
+  return response.data;
+}
+
+/**
+ * Fetch a stored scan run by ID.
+ */
+export async function fetchScanRun(id: string): Promise<ScanRunResponse> {
+  const response = await axios.get<ScanRunResponse>(`${API_BASE}/scanner/${id}`, {
+    headers: { 'x-user-id': TEST_USER_ID },
+  });
+  return response.data;
+}

@@ -9,6 +9,7 @@ model User {
   watchlists   Watchlist[]
   portfolios   Portfolio[]
   alerts       Alert[]
+  scanRuns     ScanRun[]
   // Optional: store user preferences as JSON
   preferences  Json?
 

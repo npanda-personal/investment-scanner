@@ -1,6 +1,6 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import defaultPrisma from '../db/prisma';
-import { YahooFinanceIngestionService } from '../data/ingestion/yahoo.service';
+import { BacktestEngine, BacktestConfigInput } from './engine';
 
 export interface CreateBacktestConfigRequest {
   name: string;
@@ -40,12 +40,11 @@ export interface BacktestResultSummary {
 
 export class BacktestService {
   public prisma: PrismaClient;
-  // @ts-ignore unused for now, kept for future extension
-  private _ingestionService: YahooFinanceIngestionService;
+  private engine: BacktestEngine;
 
   constructor(prisma?: PrismaClient) {
     this.prisma = prisma || defaultPrisma;
-    this._ingestionService = new YahooFinanceIngestionService(this.prisma);
+    this.engine = new BacktestEngine(this.prisma);
   }
 
   /**
@@ -137,9 +136,7 @@ export class BacktestService {
   }
 
   /**
-   * Run a backtest for a given configuration.
-   * This is a placeholder that returns dummy results.
-   * TODO: implement actual backtest engine.
+   * Run a backtest for a given configuration using the real BacktestEngine.
    */
   async runBacktest(userId: string, configId: string): Promise<BacktestResultSummary> {
     const config = await this.get(userId, configId);
@@ -147,23 +144,43 @@ export class BacktestService {
       throw new Error('Backtest configuration not found');
     }
 
-    // Simulate some processing time
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Resolve watchlist IDs to actual symbols
+    // Watchlist model has a `symbols` field (String[]) directly
+    const watchlists = await this.prisma.watchlist.findMany({
+      where: { id: { in: config.watchlistIds as string[] } },
+    });
+    const symbols = [...new Set(watchlists.flatMap((wl) => wl.symbols))];
 
-    // Dummy results for now
+    if (symbols.length === 0) {
+      throw new Error('No symbols found in the selected watchlists');
+    }
+
+    // Extract engine config from the backtest config
+    const engineConfig: BacktestConfigInput = {
+      startDate: config.startDate,
+      endDate: config.endDate,
+      initialCapital: 10_000,
+      stopLoss: config.stopLoss ? Number(config.stopLoss) : undefined,
+      takeProfit: config.takeProfit ? Number(config.takeProfit) : undefined,
+      maxHoldingDays: (config.strategyConfig as any)?.maxHoldingDays ?? 10,
+      positionSizeFraction: (config.strategyConfig as any)?.positionSizeFraction ?? undefined,
+      symbols,
+    };
+
+    // Run the engine
+    const result = await this.engine.run(engineConfig);
+
+    // Build summary
     const summary: BacktestResultSummary = {
-      sharpeRatio: 1.2,
-      maxDrawdown: -0.05,
-      winRate: 0.6,
-      profitFactor: 1.8,
-      totalReturn: 0.15,
-      totalTrades: 42,
-      equityCurve: [
-        { timestamp: new Date('2026-01-01'), equity: 10000 },
-        { timestamp: new Date('2026-01-31'), equity: 11500 },
-      ],
-      tradeLedger: [],
-      monthlyReturns: [],
+      sharpeRatio: result.metrics.sharpeRatio,
+      maxDrawdown: result.metrics.maxDrawdown,
+      winRate: result.metrics.winRate,
+      profitFactor: result.metrics.profitFactor,
+      totalReturn: result.metrics.totalReturn,
+      totalTrades: result.metrics.totalTrades,
+      equityCurve: result.equityCurve,
+      tradeLedger: result.tradeLedger,
+      monthlyReturns: this.computeMonthlyReturns(result.equityCurve),
     };
 
     // Store the result in the database
@@ -179,13 +196,54 @@ export class BacktestService {
         profitFactor: summary.profitFactor,
         totalReturn: summary.totalReturn,
         totalTrades: summary.totalTrades,
-        equityCurve: summary.equityCurve,
-        tradeLedger: summary.tradeLedger,
-        monthlyReturns: summary.monthlyReturns,
+        equityCurve: summary.equityCurve as Prisma.InputJsonValue,
+        tradeLedger: summary.tradeLedger as Prisma.InputJsonValue,
+        monthlyReturns: summary.monthlyReturns as Prisma.InputJsonValue,
       },
     });
 
     return summary;
+  }
+
+  /**
+   * Compute monthly returns from an equity curve.
+   */
+  private computeMonthlyReturns(
+    equityCurve: Array<{ timestamp: Date; equity: number }>
+  ): Array<{ month: string; return: number }> {
+    if (equityCurve.length < 2) return [];
+
+    const monthlyMap = new Map<string, number[]>();
+
+    for (const pt of equityCurve) {
+      const monthKey = `${pt.timestamp.getFullYear()}-${String(pt.timestamp.getMonth() + 1).padStart(2, '0')}`;
+      if (!monthlyMap.has(monthKey)) {
+        monthlyMap.set(monthKey, []);
+      }
+      monthlyMap.get(monthKey)!.push(pt.equity);
+    }
+
+    const monthlyReturns: Array<{ month: string; return: number }> = [];
+    let prevMonthEnd: number | null = null;
+
+    const sortedMonths = Array.from(monthlyMap.keys()).sort();
+    for (const month of sortedMonths) {
+      const values = monthlyMap.get(month)!;
+      const monthStart = values[0];
+      const monthEnd = values[values.length - 1];
+
+      if (prevMonthEnd !== null) {
+        const ret = (monthStart - prevMonthEnd) / prevMonthEnd;
+        monthlyReturns.push({ month, return: ret });
+      }
+
+      const ret = (monthEnd - monthStart) / monthStart;
+      monthlyReturns.push({ month, return: ret });
+
+      prevMonthEnd = monthEnd;
+    }
+
+    return monthlyReturns;
   }
 
   /**

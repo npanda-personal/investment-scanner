@@ -1,8 +1,12 @@
 import express from 'express';
+import { Prisma } from '@prisma/client';
 import { BacktestService } from '../../backtest/service';
+import { BacktestEngine } from '../../backtest/engine';
+import { ScanRunService } from '../../scanners/scan-run.service';
 
 const router = express.Router();
 const backtestService = new BacktestService();
+const scanRunService = new ScanRunService();
 
 // Helper to extract user ID (temporary: from header x-user-id)
 const getUserId = (req: express.Request): string => {
@@ -14,6 +18,141 @@ const getUserId = (req: express.Request): string => {
   }
   return userId;
 };
+
+// POST /api/backtest/from-scan — create and run a backtest from a scan run
+router.post('/from-scan', async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const { scanRunId, startDate, endDate } = req.body;
+
+    if (!scanRunId) {
+      return res.status(400).json({ error: 'Missing scanRunId' });
+    }
+
+    // Fetch scan results
+    const scanRun = await scanRunService.getScanRun(scanRunId);
+    if (!scanRun || scanRun.results.length === 0) {
+      return res.status(400).json({ error: 'No scan results found for this scan run' });
+    }
+
+    // Extract unique symbols from all scan results
+    const symbols = [...new Set(scanRun.results.flatMap((r) => r.stocks))];
+    if (symbols.length === 0) {
+      return res.status(400).json({ error: 'No symbols found in scan results' });
+    }
+
+    // Create a backtest config for record-keeping
+    const config = await backtestService.create(userId, {
+      name: `Backtest from Scan ${scanRunId.slice(0, 8)}`,
+      description: `Auto-generated backtest from scan run ${scanRunId}`,
+      watchlistIds: [],
+      startDate: startDate ? new Date(startDate) : new Date(Date.now() - 90 * 24 * 60 * 60 * 1000),
+      endDate: endDate ? new Date(endDate) : new Date(),
+      strategyConfig: {
+        type: 'smart-money-scan',
+        scanRunId,
+        maxHoldingDays: 10,
+        positionSizeFraction: undefined,
+      },
+    });
+
+    // Run the backtest engine directly with the scanned symbols
+    // (BacktestService.runBacktest resolves symbols from watchlists, but we
+    //  already have the symbols from the scan results)
+    const engine = new BacktestEngine();
+    const engineResult = await engine.run({
+      startDate: config.startDate,
+      endDate: config.endDate,
+      initialCapital: 10_000,
+      stopLoss: config.stopLoss ? Number(config.stopLoss) : undefined,
+      takeProfit: config.takeProfit ? Number(config.takeProfit) : undefined,
+      maxHoldingDays: (config.strategyConfig as any)?.maxHoldingDays ?? 10,
+      positionSizeFraction: (config.strategyConfig as any)?.positionSizeFraction ?? undefined,
+      symbols,
+    });
+
+    // Compute monthly returns from equity curve
+    const monthlyReturns = computeMonthlyReturns(engineResult.equityCurve);
+
+    // Build summary
+    const summary = {
+      sharpeRatio: engineResult.metrics.sharpeRatio,
+      maxDrawdown: engineResult.metrics.maxDrawdown,
+      winRate: engineResult.metrics.winRate,
+      profitFactor: engineResult.metrics.profitFactor,
+      totalReturn: engineResult.metrics.totalReturn,
+      totalTrades: engineResult.metrics.totalTrades,
+      equityCurve: engineResult.equityCurve,
+      tradeLedger: engineResult.tradeLedger,
+      monthlyReturns,
+    };
+
+    // Store the result in the database
+    const prisma = (backtestService as any).prisma;
+    await prisma.backtestResult.create({
+      data: {
+        configId: config.id,
+        startedAt: new Date(),
+        completedAt: new Date(),
+        status: 'completed',
+        sharpeRatio: summary.sharpeRatio,
+        maxDrawdown: summary.maxDrawdown,
+        winRate: summary.winRate,
+        profitFactor: summary.profitFactor,
+        totalReturn: summary.totalReturn,
+        totalTrades: summary.totalTrades,
+        equityCurve: summary.equityCurve as unknown as Prisma.InputJsonValue,
+        tradeLedger: summary.tradeLedger as unknown as Prisma.InputJsonValue,
+        monthlyReturns: summary.monthlyReturns as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    return res.status(201).json({
+      configId: config.id,
+      scanRunId,
+      symbols,
+      result: summary,
+    });
+  } catch (error) {
+    console.error('Error running backtest from scan:', error);
+    if (error instanceof Error && error.message === 'ScanRun not found') {
+      return res.status(404).json({ error: 'Scan run not found' });
+    }
+    return res.status(500).json({ error: 'Failed to run backtest from scan' });
+  }
+});
+
+/**
+ * Compute monthly returns from an equity curve.
+ */
+function computeMonthlyReturns(equityCurve: Array<{ timestamp: Date; equity: number }>): Array<{ month: string; return: number }> {
+  if (equityCurve.length < 2) return [];
+
+  const monthlyMap = new Map<string, number[]>();
+  for (const pt of equityCurve) {
+    const key = `${pt.timestamp.getFullYear()}-${String(pt.timestamp.getMonth() + 1).padStart(2, '0')}`;
+    if (!monthlyMap.has(key)) monthlyMap.set(key, []);
+    monthlyMap.get(key)!.push(pt.equity);
+  }
+
+  const months = Array.from(monthlyMap.entries()).sort(([a], [b]) => a.localeCompare(b));
+  const result: Array<{ month: string; return: number }> = [];
+
+  for (let i = 1; i < months.length; i++) {
+    const [, prevEquities] = months[i - 1];
+    const [, currEquities] = months[i];
+    const prevEnd = prevEquities[prevEquities.length - 1];
+    const currEnd = currEquities[currEquities.length - 1];
+    if (prevEnd !== 0) {
+      result.push({
+        month: months[i][0],
+        return: (currEnd - prevEnd) / prevEnd,
+      });
+    }
+  }
+
+  return result;
+}
 
 // List all backtest configurations for the current user
 router.get('/', async (req, res) => {
@@ -154,6 +293,69 @@ router.post('/:id/run', async (req, res) => {
     if (!config) {
       return res.status(404).json({ error: 'Backtest configuration not found' });
     }
+
+    // Check if this is a scan-based config (no watchlists, symbols from scan results)
+    const strategyConfig = config.strategyConfig as any;
+    if (strategyConfig?.type === 'smart-money-scan' && strategyConfig?.scanRunId) {
+      // Use BacktestEngine directly with symbols from the scan results
+      const scanRun = await scanRunService.getScanRun(strategyConfig.scanRunId);
+      if (!scanRun || scanRun.results.length === 0) {
+        return res.status(400).json({ error: 'No scan results found for the associated scan run' });
+      }
+
+      const symbols = [...new Set(scanRun.results.flatMap((r) => r.stocks))];
+      if (symbols.length === 0) {
+        return res.status(400).json({ error: 'No symbols found in scan results' });
+      }
+
+      const engine = new BacktestEngine();
+      const engineResult = await engine.run({
+        startDate: config.startDate,
+        endDate: config.endDate,
+        initialCapital: 10_000,
+        stopLoss: config.stopLoss ? Number(config.stopLoss) : undefined,
+        takeProfit: config.takeProfit ? Number(config.takeProfit) : undefined,
+        maxHoldingDays: strategyConfig?.maxHoldingDays ?? 10,
+        positionSizeFraction: strategyConfig?.positionSizeFraction ?? undefined,
+        symbols,
+      });
+
+      const monthlyReturns = computeMonthlyReturns(engineResult.equityCurve);
+      const summary = {
+        sharpeRatio: engineResult.metrics.sharpeRatio,
+        maxDrawdown: engineResult.metrics.maxDrawdown,
+        winRate: engineResult.metrics.winRate,
+        profitFactor: engineResult.metrics.profitFactor,
+        totalReturn: engineResult.metrics.totalReturn,
+        totalTrades: engineResult.metrics.totalTrades,
+        equityCurve: engineResult.equityCurve,
+        tradeLedger: engineResult.tradeLedger,
+        monthlyReturns,
+      };
+
+      const prisma = (backtestService as any).prisma;
+      await prisma.backtestResult.create({
+        data: {
+          configId: id,
+          startedAt: new Date(),
+          completedAt: new Date(),
+          status: 'completed',
+          sharpeRatio: summary.sharpeRatio,
+          maxDrawdown: summary.maxDrawdown,
+          winRate: summary.winRate,
+          profitFactor: summary.profitFactor,
+          totalReturn: summary.totalReturn,
+          totalTrades: summary.totalTrades,
+          equityCurve: summary.equityCurve as unknown as Prisma.InputJsonValue,
+          tradeLedger: summary.tradeLedger as unknown as Prisma.InputJsonValue,
+          monthlyReturns: summary.monthlyReturns as unknown as Prisma.InputJsonValue,
+        },
+      });
+
+      return res.json(summary);
+    }
+
+    // Standard path: use BacktestService which resolves symbols from watchlists
     const result = await backtestService.runBacktest(userId, id);
     return res.json(result);
   } catch (error) {

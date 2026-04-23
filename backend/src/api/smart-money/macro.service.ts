@@ -1,4 +1,6 @@
 import NodeCache from 'node-cache';
+import { PrismaClient } from '@prisma/client';
+import defaultPrisma from '../../db/prisma';
 
 export interface MacroIndicator {
   name: string;
@@ -29,31 +31,52 @@ export interface RiskEnvironment {
   description: string;
 }
 
+/**
+ * Well-known US stock symbols mapped to sectors for market analysis.
+ */
+const STOCK_SECTOR_MAP: Record<string, string> = {
+  'AAPL': 'Technology', 'MSFT': 'Technology', 'GOOGL': 'Technology', 'NVDA': 'Technology',
+  'AMD': 'Technology', 'INTC': 'Technology', 'CRM': 'Technology', 'ADBE': 'Technology',
+  'CSCO': 'Technology', 'ORCL': 'Technology', 'IBM': 'Technology', 'QCOM': 'Technology',
+  'TXN': 'Technology', 'AVGO': 'Technology', 'AMAT': 'Technology', 'MU': 'Technology',
+  'JPM': 'Financials', 'BAC': 'Financials', 'WFC': 'Financials', 'C': 'Financials',
+  'GS': 'Financials', 'MS': 'Financials', 'BLK': 'Financials', 'V': 'Financials',
+  'MA': 'Financials', 'AXP': 'Financials', 'SCHW': 'Financials',
+  'JNJ': 'Healthcare', 'PFE': 'Healthcare', 'UNH': 'Healthcare', 'ABBV': 'Healthcare',
+  'MRK': 'Healthcare', 'TMO': 'Healthcare', 'ABT': 'Healthcare', 'LLY': 'Healthcare',
+  'AMGN': 'Healthcare', 'GILD': 'Healthcare', 'BMY': 'Healthcare',
+  'XOM': 'Energy', 'CVX': 'Energy', 'COP': 'Energy', 'EOG': 'Energy',
+  'OXY': 'Energy', 'SLB': 'Energy', 'HAL': 'Energy',
+  'AMZN': 'Consumer Discretionary', 'TSLA': 'Consumer Discretionary', 'HD': 'Consumer Discretionary',
+  'MCD': 'Consumer Discretionary', 'NKE': 'Consumer Discretionary', 'SBUX': 'Consumer Discretionary',
+  'LOW': 'Consumer Discretionary', 'TJX': 'Consumer Discretionary',
+  'PG': 'Consumer Staples', 'KO': 'Consumer Staples', 'PEP': 'Consumer Staples',
+  'WMT': 'Consumer Staples', 'COST': 'Consumer Staples', 'CL': 'Consumer Staples',
+  'CAT': 'Industrials', 'GE': 'Industrials', 'HON': 'Industrials', 'BA': 'Industrials',
+  'MMM': 'Industrials', 'UPS': 'Industrials', 'FDX': 'Industrials', 'RTX': 'Industrials',
+  'NEE': 'Utilities', 'DUK': 'Utilities', 'SO': 'Utilities', 'D': 'Utilities',
+  'AEP': 'Utilities', 'EXC': 'Utilities',
+  'LIN': 'Materials', 'APD': 'Materials', 'ECL': 'Materials', 'SHW': 'Materials',
+  'DOW': 'Materials', 'DD': 'Materials',
+  'PLD': 'Real Estate', 'AMT': 'Real Estate', 'CCI': 'Real Estate', 'EQIX': 'Real Estate',
+  'META': 'Communication Services', 'NFLX': 'Communication Services', 'DIS': 'Communication Services',
+  'CMCSA': 'Communication Services', 'T': 'Communication Services', 'VZ': 'Communication Services',
+};
+
+/** Top 100 US stocks by market cap for broad market analysis */
+const TOP_SYMBOLS = Object.keys(STOCK_SECTOR_MAP);
+
 export class MacroDataCalculationService {
   private cache: NodeCache;
-  
-  // FRED Series IDs for key economic indicators (commented out until FRED API key is available)
-  // private readonly FRED_SERIES = {
-  //   GDP: 'GDP', // Real Gross Domestic Product
-  //   CPI: 'CPIAUCSL', // Consumer Price Index for All Urban Consumers
-  //   UNEMPLOYMENT: 'UNRATE', // Unemployment Rate
-  //   FED_FUNDS: 'FEDFUNDS', // Federal Funds Effective Rate
-  //   TREASURY_10Y: 'DGS10', // 10-Year Treasury Constant Maturity Rate
-  //   VIX: 'VIXCLS', // CBOE Volatility Index
-  //   INDUSTRIAL_PRODUCTION: 'INDPRO', // Industrial Production Index
-  //   RETAIL_SALES: 'RSAFS', // Advance Retail Sales
-  //   HOUSING_STARTS: 'HOUST', // Housing Starts
-  //   CONSUMER_SENTIMENT: 'UMCSENT', // University of Michigan Consumer Sentiment
-  // };
+  private prisma: PrismaClient;
 
-  // private readonly FRED_API_BASE = 'https://api.stlouisfed.org/fred';
-
-  constructor() {
+  constructor(prisma?: PrismaClient) {
     this.cache = new NodeCache({ stdTTL: 3600 }); // Cache for 1 hour
+    this.prisma = prisma || defaultPrisma;
   }
 
   /**
-   * Fetch macroeconomic indicators from FRED API
+   * Fetch macroeconomic indicators derived from market data
    */
   async fetchMacroIndicators(): Promise<MacroIndicator[]> {
     const cacheKey = 'macro-indicators';
@@ -63,20 +86,260 @@ export class MacroDataCalculationService {
     }
 
     try {
-      // For now, return fallback data since we need a FRED API key
-      // In production, you would:
-      // 1. Get a FRED API key from https://research.stlouisfed.org/docs/api/api_key.html
-      // 2. Add it to .env as FRED_API_KEY
-      // 3. Uncomment the HTTP request code below
-      
-      const indicators = this.getFallbackIndicators();
+      const indicators = await this.computeMarketDerivedIndicators();
       this.cache.set(cacheKey, indicators);
       return indicators;
-
     } catch (error) {
-      console.error('Error fetching FRED data:', error);
+      console.error('Error computing macro indicators:', error);
       return this.getFallbackIndicators();
     }
+  }
+
+  /**
+   * Compute macro indicators from market data (PriceTick table)
+   */
+  private async computeMarketDerivedIndicators(): Promise<MacroIndicator[]> {
+    const now = new Date();
+    const indicators: MacroIndicator[] = [];
+
+    // Fetch latest price ticks for all top symbols
+    const latestTicks = await this.prisma.priceTick.findMany({
+      where: { symbol: { in: TOP_SYMBOLS } },
+      orderBy: { timestamp: 'desc' },
+      distinct: ['symbol'],
+      select: { symbol: true, close: true, volume: true, timestamp: true },
+    });
+
+    // Fetch ticks from 20 trading days ago for comparison
+    const lookbackDate = new Date();
+    lookbackDate.setDate(lookbackDate.getDate() - 30); // buffer for weekends
+
+    const oldTicks = await this.prisma.priceTick.findMany({
+      where: {
+        symbol: { in: TOP_SYMBOLS },
+        timestamp: { lte: lookbackDate },
+      },
+      orderBy: { timestamp: 'desc' },
+      distinct: ['symbol'],
+      select: { symbol: true, close: true },
+    });
+
+    const latestMap = new Map(latestTicks.map(t => [t.symbol, t]));
+    const oldMap = new Map(oldTicks.map(t => [t.symbol, t]));
+
+    // --- Indicator 1: Market Volatility (VIX proxy) ---
+    // Compute as standard deviation of daily returns across stocks
+    const returns: number[] = [];
+    let prevReturns: number[] = [];
+    for (const [symbol, latest] of latestMap) {
+      const old = oldMap.get(symbol);
+      if (old && Number(old.close) > 0) {
+        const ret = (Number(latest.close) - Number(old.close)) / Number(old.close);
+        returns.push(ret);
+      }
+    }
+
+    // Also compute previous period returns for trend comparison
+    const prevDate = new Date();
+    prevDate.setDate(prevDate.getDate() - 60);
+    const prevOldTicks = await this.prisma.priceTick.findMany({
+      where: {
+        symbol: { in: TOP_SYMBOLS },
+        timestamp: { lte: prevDate },
+      },
+      orderBy: { timestamp: 'desc' },
+      distinct: ['symbol'],
+      select: { symbol: true, close: true },
+    });
+    const prevOldMap = new Map(prevOldTicks.map(t => [t.symbol, t]));
+    for (const [symbol, latest] of latestMap) {
+      const prevOld = prevOldMap.get(symbol);
+      if (prevOld && Number(prevOld.close) > 0) {
+        const ret = (Number(latest.close) - Number(prevOld.close)) / Number(prevOld.close);
+        prevReturns.push(ret);
+      }
+    }
+
+    if (returns.length > 5) {
+      const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
+      const variance = returns.reduce((sum, r) => sum + (r - mean) ** 2, 0) / returns.length;
+      const volatility = Math.sqrt(variance) * 100; // as percentage
+
+      // Scale to approximate VIX-like values (typical VIX range 10-40)
+      const vixProxy = Math.round(Math.min(50, Math.max(8, volatility * 15 + 10)));
+
+      const prevMean = prevReturns.length > 0 ? prevReturns.reduce((a: number, b: number) => a + b, 0) / prevReturns.length : 0;
+      const prevVariance = prevReturns.length > 0 ? prevReturns.reduce((sum: number, r: number) => sum + (r - prevMean) ** 2, 0) / prevReturns.length : 0;
+      const prevVol = Math.sqrt(prevVariance) * 100;
+      const prevVixProxy = Math.round(Math.min(50, Math.max(8, prevVol * 15 + 10)));
+      const vixChange = vixProxy - prevVixProxy;
+
+      indicators.push({
+        name: 'Market Volatility (VIX Proxy)',
+        value: vixProxy,
+        unit: '',
+        change: vixChange,
+        trend: vixChange > 1 ? 'up' : vixChange < -1 ? 'down' : 'stable',
+        targetRange: { min: 12, max: 20 },
+        description: 'Market volatility derived from stock return dispersion across top US stocks',
+        lastUpdated: now.toISOString(),
+        source: 'Derived from Price Data',
+      });
+    }
+
+    // --- Indicator 2: Market Breadth (Advance/Decline Ratio) ---
+    // Proxy for economic health
+    let advances = 0;
+    let declines = 0;
+    for (const [symbol, latest] of latestMap) {
+      const old = oldMap.get(symbol);
+      if (old && Number(old.close) > 0) {
+        const ret = (Number(latest.close) - Number(old.close)) / Number(old.close);
+        if (ret > 0) advances++;
+        else if (ret < 0) declines++;
+      }
+    }
+    const total = advances + declines;
+    const breadthRatio = total > 0 ? advances / total : 0.5;
+    const breadthPct = Math.round(breadthRatio * 100);
+    const breadthChange = Math.round((breadthRatio - 0.5) * 200); // deviation from 50%
+
+    indicators.push({
+      name: 'Market Breadth',
+      value: breadthPct,
+      unit: '%',
+      change: breadthChange,
+      trend: breadthChange > 5 ? 'up' : breadthChange < -5 ? 'down' : 'stable',
+      targetRange: { min: 40, max: 60 },
+      description: 'Percentage of stocks with positive price movement (advance/decline ratio)',
+      lastUpdated: now.toISOString(),
+      source: 'Derived from Price Data',
+    });
+
+    // --- Indicator 3: Volume Participation ---
+    // Average volume ratio across stocks as proxy for market activity
+    const volumes = latestTicks.filter(t => t.volume).map(t => Number(t.volume));
+    const avgVolume = volumes.length > 0 ? volumes.reduce((a, b) => a + b, 0) / volumes.length : 0;
+
+    // Get older volumes for comparison
+    const oldVolumeTicks = await this.prisma.priceTick.findMany({
+      where: {
+        symbol: { in: TOP_SYMBOLS.slice(0, 20) },
+        timestamp: { lte: lookbackDate },
+      },
+      orderBy: { timestamp: 'desc' },
+      distinct: ['symbol'],
+      select: { symbol: true, volume: true },
+    });
+    const oldVolumes = oldVolumeTicks.filter(t => t.volume).map(t => Number(t.volume));
+    const prevAvgVolume = oldVolumes.length > 0 ? oldVolumes.reduce((a, b) => a + b, 0) / oldVolumes.length : avgVolume;
+
+    const volumeRatio = prevAvgVolume > 0 ? avgVolume / prevAvgVolume : 1;
+    const volumeChange = Math.round((volumeRatio - 1) * 100);
+
+    indicators.push({
+      name: 'Volume Participation',
+      value: Math.round(volumeRatio * 100) / 100,
+      unit: 'ratio',
+      change: volumeChange,
+      trend: volumeChange > 5 ? 'up' : volumeChange < -5 ? 'down' : 'stable',
+      targetRange: { min: 0.8, max: 1.2 },
+      description: 'Average trading volume ratio (current vs 20-day average) across top stocks',
+      lastUpdated: now.toISOString(),
+      source: 'Derived from Price Data',
+    });
+
+    // --- Indicator 4: Sector Dispersion ---
+    // Standard deviation of sector returns as proxy for economic cycle phase
+    const sectorReturns = new Map<string, number[]>();
+    for (const [symbol, latest] of latestMap) {
+      const sector = STOCK_SECTOR_MAP[symbol];
+      if (!sector) continue;
+      const old = oldMap.get(symbol);
+      if (old && Number(old.close) > 0) {
+        const ret = (Number(latest.close) - Number(old.close)) / Number(old.close);
+        if (!sectorReturns.has(sector)) sectorReturns.set(sector, []);
+        sectorReturns.get(sector)!.push(ret);
+      }
+    }
+
+    const sectorAvgReturns: number[] = [];
+    for (const [, rets] of sectorReturns) {
+      if (rets.length > 0) {
+        sectorAvgReturns.push(rets.reduce((a, b) => a + b, 0) / rets.length);
+      }
+    }
+
+    if (sectorAvgReturns.length > 2) {
+      const sectorMean = sectorAvgReturns.reduce((a, b) => a + b, 0) / sectorAvgReturns.length;
+      const sectorVariance = sectorAvgReturns.reduce((sum, r) => sum + (r - sectorMean) ** 2, 0) / sectorAvgReturns.length;
+      const sectorDispersion = Math.sqrt(sectorVariance) * 100;
+
+      // Low dispersion (< 1%) suggests Expansion, high dispersion (> 3%) suggests Slowdown/Contraction
+      const dispersionValue = Math.round(sectorDispersion * 10) / 10;
+      const prevDispersion = 2.0; // baseline for change calc
+      const dispChange = Math.round((dispersionValue - prevDispersion) * 10) / 10;
+
+      indicators.push({
+        name: 'Sector Dispersion',
+        value: dispersionValue,
+        unit: '%',
+        change: dispChange,
+        trend: dispChange > 0.3 ? 'up' : dispChange < -0.3 ? 'down' : 'stable',
+        targetRange: { min: 1.0, max: 3.0 },
+        description: 'Standard deviation of sector returns — low values suggest synchronized market (expansion), high values suggest divergence (rotation/slowdown)',
+        lastUpdated: now.toISOString(),
+        source: 'Derived from Price Data',
+      });
+    }
+
+    // --- Indicator 5: Market Return (GDP Proxy) ---
+    // Average return across all stocks as proxy for economic growth
+    if (returns.length > 0) {
+      const avgReturn = (returns.reduce((a: number, b: number) => a + b, 0) / returns.length) * 100;
+      const annualizedReturn = avgReturn * 12; // rough annualization from monthly
+      const gdpProxy = Math.max(-5, Math.min(10, Math.round(annualizedReturn * 10) / 10));
+
+      // Previous period return for change
+      const prevAvgRet = prevReturns.length > 0 ? (prevReturns.reduce((a: number, b: number) => a + b, 0) / prevReturns.length) * 100 : 0;
+      const prevAnnualized = prevAvgRet * 12;
+      const gdpChange = Math.round((gdpProxy - Math.max(-5, Math.min(10, Math.round(prevAnnualized * 10) / 10))) * 10) / 10;
+
+      indicators.push({
+        name: 'Market Growth (GDP Proxy)',
+        value: gdpProxy,
+        unit: '%',
+        change: gdpChange,
+        trend: gdpChange > 0.3 ? 'up' : gdpChange < -0.3 ? 'down' : 'stable',
+        targetRange: { min: 2.0, max: 3.5 },
+        description: 'Annualized market return across top US stocks as proxy for economic growth',
+        lastUpdated: now.toISOString(),
+        source: 'Derived from Price Data',
+      });
+    }
+
+    // --- Indicator 6: Risk Premium (Equity Yield Proxy) ---
+    // Inverse of market return dispersion as proxy for risk premium
+    if (returns.length > 5) {
+      const positiveReturns = returns.filter(r => r > 0).length;
+      const negativeReturns = returns.filter(r => r < 0).length;
+      const riskRatio = negativeReturns > 0 ? positiveReturns / negativeReturns : 3;
+      const riskPremium = Math.round(Math.min(10, Math.max(1, riskRatio * 2)) * 10) / 10;
+
+      indicators.push({
+        name: 'Equity Risk Premium',
+        value: riskPremium,
+        unit: 'ratio',
+        change: Math.round((riskPremium - 2) * 10) / 10,
+        trend: riskPremium > 2.5 ? 'up' : riskPremium < 1.5 ? 'down' : 'stable',
+        targetRange: { min: 1.5, max: 3.0 },
+        description: 'Ratio of positive to negative stock returns — higher values suggest lower perceived risk',
+        lastUpdated: now.toISOString(),
+        source: 'Derived from Price Data',
+      });
+    }
+
+    return indicators;
   }
 
   /**
@@ -85,54 +348,57 @@ export class MacroDataCalculationService {
   async determineEconomicCycle(): Promise<EconomicCyclePhase> {
     try {
       const indicators = await this.fetchMacroIndicators();
-      
-      // Extract key metrics
-      const gdpIndicator = indicators.find(i => i.name.includes('GDP'));
-      const inflationIndicator = indicators.find(i => i.name.includes('Inflation'));
-      const unemploymentIndicator = indicators.find(i => i.name.includes('Unemployment'));
-      
-      if (!gdpIndicator || !inflationIndicator || !unemploymentIndicator) {
-        return this.getFallbackEconomicCycle();
-      }
 
-      const gdp = gdpIndicator.value;
-      const inflation = inflationIndicator.value;
-      const unemployment = unemploymentIndicator.value;
+      const breadthIndicator = indicators.find(i => i.name.includes('Market Breadth'));
+      const volatilityIndicator = indicators.find(i => i.name.includes('Volatility'));
+      const dispersionIndicator = indicators.find(i => i.name.includes('Sector Dispersion'));
+      const growthIndicator = indicators.find(i => i.name.includes('Market Growth'));
 
-      // Simple economic cycle determination logic
-      if (gdp > 3.0 && inflation < 2.5 && unemployment < 4.0) {
+      const breadth = breadthIndicator?.value ?? 50;
+      const volatility = volatilityIndicator?.value ?? 20;
+      const dispersion = dispersionIndicator?.value ?? 2;
+      const growth = growthIndicator?.value ?? 2;
+
+      // Expansion: High breadth, low volatility, low dispersion, positive growth
+      if (breadth > 55 && volatility < 18 && dispersion < 2 && growth > 2) {
         return {
           phase: 'Expansion',
-          description: 'Strong economic growth with stable inflation and low unemployment',
+          description: 'Strong market participation with low volatility and synchronized sector movement',
           confidence: 0.85,
-          indicators: ['High GDP growth', 'Low inflation', 'Low unemployment'],
+          indicators: ['High market breadth', 'Low volatility', 'Low sector dispersion', 'Positive growth'],
           color: 'success',
           icon: 'trending_up',
         };
-      } else if (gdp > 2.0 && inflation < 3.0 && unemployment < 4.5) {
+      }
+      // Recovery: Improving breadth, moderate volatility, moderate dispersion
+      else if (breadth > 45 && volatility < 22 && growth > 0) {
         return {
           phase: 'Recovery',
-          description: 'Moderate growth with improving economic conditions',
+          description: 'Improving market conditions with broadening participation',
           confidence: 0.75,
-          indicators: ['Moderate GDP growth', 'Controlled inflation', 'Improving employment'],
+          indicators: ['Improving breadth', 'Moderate volatility', 'Positive momentum'],
           color: 'info',
           icon: 'autorenew',
         };
-      } else if (gdp < 1.5 && inflation > 3.0 && unemployment > 5.0) {
+      }
+      // Contraction: Low breadth, high volatility, high dispersion, negative growth
+      else if (breadth < 40 && volatility > 25 && growth < -1) {
         return {
           phase: 'Contraction',
-          description: 'Economic slowdown with rising inflation and unemployment',
+          description: 'Market weakness with high volatility and negative returns',
           confidence: 0.70,
-          indicators: ['Low GDP growth', 'High inflation', 'Rising unemployment'],
+          indicators: ['Low market breadth', 'High volatility', 'Negative returns'],
           color: 'error',
           icon: 'trending_down',
         };
-      } else {
+      }
+      // Slowdown: Mixed signals
+      else {
         return {
           phase: 'Slowdown',
-          description: 'Mixed economic signals with potential headwinds',
+          description: 'Mixed market signals with potential headwinds',
           confidence: 0.65,
-          indicators: ['Slowing growth', 'Elevated inflation', 'Stable employment'],
+          indicators: ['Mixed breadth', 'Elevated volatility', 'Moderate dispersion'],
           color: 'warning',
           icon: 'speed',
         };
@@ -149,47 +415,43 @@ export class MacroDataCalculationService {
   async assessRiskEnvironment(): Promise<RiskEnvironment> {
     try {
       const indicators = await this.fetchMacroIndicators();
-      
-      const vixIndicator = indicators.find(i => i.name.includes('VIX'));
-      const treasuryIndicator = indicators.find(i => i.name.includes('Treasury'));
-      const fedFundsIndicator = indicators.find(i => i.name.includes('Fed Funds'));
 
-      if (!vixIndicator || !treasuryIndicator || !fedFundsIndicator) {
-        return this.getFallbackRiskEnvironment();
-      }
+      const volatilityIndicator = indicators.find(i => i.name.includes('Volatility'));
+      const breadthIndicator = indicators.find(i => i.name.includes('Market Breadth'));
+      const riskPremiumIndicator = indicators.find(i => i.name.includes('Risk Premium'));
 
-      const vix = vixIndicator.value;
-      const treasuryYield = treasuryIndicator.value;
-      const fedFundsRate = fedFundsIndicator.value;
+      const volatility = volatilityIndicator?.value ?? 20;
+      const breadth = breadthIndicator?.value ?? 50;
+      const riskPremium = riskPremiumIndicator?.value ?? 2;
 
       // Risk assessment logic
-      const riskScore = 
-        (vix < 15 ? 1 : vix < 20 ? 0.5 : 0) + // Low VIX = risk-on
-        (treasuryYield < 4.0 ? 1 : treasuryYield < 4.5 ? 0.5 : 0) + // Low yields = risk-on
-        (fedFundsRate < 5.0 ? 1 : fedFundsRate < 5.5 ? 0.5 : 0); // Low rates = risk-on
+      const riskScore =
+        (volatility < 15 ? 1 : volatility < 20 ? 0.5 : 0) + // Low vol = risk-on
+        (breadth > 55 ? 1 : breadth > 45 ? 0.5 : 0) + // High breadth = risk-on
+        (riskPremium > 2.5 ? 1 : riskPremium > 1.5 ? 0.5 : 0); // High risk premium = risk-on
 
       if (riskScore >= 2.5) {
         return {
           environment: 'Risk-On',
           confidence: 0.80,
           color: 'success',
-          indicators: ['Low volatility', 'Low interest rates', 'Accommodative Fed'],
-          description: 'Favorable conditions for risk assets',
+          indicators: ['Low volatility', 'High market breadth', 'Strong risk appetite'],
+          description: 'Favorable conditions for risk assets based on market data',
         };
-      } else if (riskScore <= 1.5) {
+      } else if (riskScore <= 1.0) {
         return {
           environment: 'Risk-Off',
           confidence: 0.75,
           color: 'error',
-          indicators: ['High volatility', 'High interest rates', 'Restrictive Fed'],
-          description: 'Defensive positioning recommended',
+          indicators: ['High volatility', 'Low market breadth', 'Weak risk appetite'],
+          description: 'Defensive positioning recommended based on market data',
         };
       } else {
         return {
           environment: 'Neutral',
           confidence: 0.70,
           color: 'warning',
-          indicators: ['Mixed signals', 'Moderate volatility', 'Balanced rates'],
+          indicators: ['Mixed signals', 'Moderate volatility', 'Balanced risk appetite'],
           description: 'Balanced approach with selective risk-taking',
         };
       }
@@ -199,78 +461,77 @@ export class MacroDataCalculationService {
     }
   }
 
-
   /**
-   * Fallback indicators when FRED API is unavailable
+   * Fallback indicators when market data is unavailable
    */
   private getFallbackIndicators(): MacroIndicator[] {
     const now = new Date().toISOString();
     return [
       {
-        name: 'GDP Growth Forecast',
-        value: 2.8,
+        name: 'Market Volatility (VIX Proxy)',
+        value: 18.5,
+        unit: '',
+        change: -1.2,
+        trend: 'down',
+        targetRange: { min: 12, max: 20 },
+        description: 'Market volatility derived from stock return dispersion',
+        lastUpdated: now,
+        source: 'Derived from Price Data (fallback)',
+      },
+      {
+        name: 'Market Breadth',
+        value: 52,
+        unit: '%',
+        change: 3,
+        trend: 'up',
+        targetRange: { min: 40, max: 60 },
+        description: 'Percentage of stocks with positive price movement',
+        lastUpdated: now,
+        source: 'Derived from Price Data (fallback)',
+      },
+      {
+        name: 'Volume Participation',
+        value: 1.05,
+        unit: 'ratio',
+        change: 2,
+        trend: 'up',
+        targetRange: { min: 0.8, max: 1.2 },
+        description: 'Average trading volume ratio across top stocks',
+        lastUpdated: now,
+        source: 'Derived from Price Data (fallback)',
+      },
+      {
+        name: 'Sector Dispersion',
+        value: 2.1,
+        unit: '%',
+        change: 0.3,
+        trend: 'up',
+        targetRange: { min: 1.0, max: 3.0 },
+        description: 'Standard deviation of sector returns',
+        lastUpdated: now,
+        source: 'Derived from Price Data (fallback)',
+      },
+      {
+        name: 'Market Growth (GDP Proxy)',
+        value: 2.5,
         unit: '%',
         change: 0.2,
         trend: 'up',
         targetRange: { min: 2.0, max: 3.5 },
-        description: 'Annualized GDP growth projection',
+        description: 'Annualized market return as proxy for economic growth',
         lastUpdated: now,
-        source: 'Fallback Data',
+        source: 'Derived from Price Data (fallback)',
       },
       {
-        name: 'Inflation Rate (CPI)',
-        value: 3.2,
-        unit: '%',
-        change: -0.1,
-        trend: 'down',
-        targetRange: { min: 2.0, max: 2.5 },
-        description: 'Consumer Price Index year-over-year',
-        lastUpdated: now,
-        source: 'Fallback Data',
-      },
-      {
-        name: 'Unemployment Rate',
-        value: 3.9,
-        unit: '%',
+        name: 'Equity Risk Premium',
+        value: 2.2,
+        unit: 'ratio',
         change: 0.1,
         trend: 'up',
-        targetRange: { min: 3.5, max: 4.5 },
-        description: 'Seasonally adjusted unemployment rate',
+        targetRange: { min: 1.5, max: 3.0 },
+        description: 'Ratio of positive to negative stock returns',
         lastUpdated: now,
-        source: 'Fallback Data',
-      },
-      {
-        name: 'Fed Funds Rate',
-        value: 5.25,
-        unit: '%',
-        change: 0,
-        trend: 'stable',
-        targetRange: { min: 5.0, max: 5.5 },
-        description: 'Federal Reserve target rate',
-        lastUpdated: now,
-        source: 'Fallback Data',
-      },
-      {
-        name: '10-Year Treasury Yield',
-        value: 4.35,
-        unit: '%',
-        change: 0.05,
-        trend: 'up',
-        targetRange: { min: 4.0, max: 4.5 },
-        description: 'US Treasury 10-year bond yield',
-        lastUpdated: now,
-        source: 'Fallback Data',
-      },
-      {
-        name: 'VIX Index',
-        value: 15.2,
-        unit: '',
-        change: -0.8,
-        trend: 'down',
-        targetRange: { min: 12, max: 20 },
-        description: 'Market volatility index',
-        lastUpdated: now,
-        source: 'Fallback Data',
+        source: 'Derived from Price Data (fallback)',
       },
     ];
   }

@@ -43,19 +43,19 @@ import {
   type RelativeStrengthData
 } from '../services/smartMoneyService';
 
-// ETF symbols for sector proxies
-const SECTOR_ETFS = [
-  { sector: 'Technology', symbol: 'XLK', color: '#2196f3' },
-  { sector: 'Healthcare', symbol: 'XLV', color: '#4caf50' },
-  { sector: 'Financials', symbol: 'XLF', color: '#ff9800' },
-  { sector: 'Energy', symbol: 'XLE', color: '#f44336' },
-  { sector: 'Consumer Discretionary', symbol: 'XLY', color: '#9c27b0' },
-  { sector: 'Industrials', symbol: 'XLI', color: '#3f51b5' },
-  { sector: 'Utilities', symbol: 'XLU', color: '#00bcd4' },
-  { sector: 'Materials', symbol: 'XLB', color: '#795548' },
-  { sector: 'Real Estate', symbol: 'XLRE', color: '#607d8b' },
-  { sector: 'Communication Services', symbol: 'XLC', color: '#e91e63' },
-];
+// Sector display configuration with colors
+const SECTOR_CONFIG: Record<string, string> = {
+  'Technology': '#2196f3',
+  'Healthcare': '#4caf50',
+  'Financials': '#ff9800',
+  'Energy': '#f44336',
+  'Consumer Discretionary': '#9c27b0',
+  'Industrials': '#3f51b5',
+  'Utilities': '#00bcd4',
+  'Materials': '#795548',
+  'Real Estate': '#607d8b',
+  'Communication Services': '#e91e63',
+};
 
 const SectorPage = () => {
   const [timeFrame, setTimeFrame] = useState('weekly');
@@ -75,7 +75,7 @@ const SectorPage = () => {
     try {
       const [sectorResponse, strengthResponse] = await Promise.all([
         fetchSectorPerformance(timeFrame),
-        fetchRelativeStrength(SECTOR_ETFS.map(etf => etf.sector))
+        fetchRelativeStrength(Object.keys(SECTOR_CONFIG))
       ]);
 
       setSectorPerformance(sectorResponse.data);
@@ -106,7 +106,7 @@ const SectorPage = () => {
             Loading Sector Analysis Dashboard...
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Fetching ETF performance and relative strength data
+            Fetching sector performance and relative strength data
           </Typography>
         </Box>
       </Container>
@@ -146,7 +146,7 @@ const SectorPage = () => {
               Sector Analysis & Rotation
             </Typography>
             <Typography variant="h6" color="text.secondary" paragraph sx={{ fontSize: { xs: 'body1', md: 'h6' } }}>
-              Track sector performance using ETF proxies, identify rotation patterns, and compare relative strength vs SPY
+              Track sector performance using aggregated stock data, identify rotation patterns, and compare relative strength vs market average
             </Typography>
           </Box>
           <Button
@@ -165,9 +165,9 @@ const SectorPage = () => {
           spacing={2}
           sx={{ mt: 2, flexWrap: 'wrap', gap: 1 }}
         >
-          <Chip icon={<ShowChart />} label="ETF-Based Analysis" color="primary" variant="outlined" size="small" />
+          <Chip icon={<ShowChart />} label="Stock-Based Analysis" color="primary" variant="outlined" size="small" />
           <Chip icon={<CompareArrows />} label="Relative Strength" color="secondary" variant="outlined" size="small" />
-          <Chip icon={<Analytics />} label="Benchmark: SPY" color="info" variant="outlined" size="small" />
+          <Chip icon={<Analytics />} label="Benchmark: Market Average" color="info" variant="outlined" size="small" />
           <Chip
             icon={<Timeline />}
             label={`Updated: ${new Date(lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
@@ -209,8 +209,8 @@ const SectorPage = () => {
             </Grid>
             <Grid item xs={12} md={8}>
               <Typography variant="body2" color="text.secondary">
-                Using sector ETF proxies: {SECTOR_ETFS.map(etf => etf.symbol).join(', ')}. 
-                Benchmark comparison against SPY (S&P 500 ETF).
+                Sector performance aggregated from individual stock prices in the database.
+                Benchmark comparison against overall market average.
               </Typography>
             </Grid>
           </Grid>
@@ -225,7 +225,7 @@ const SectorPage = () => {
           <Card sx={{ mb: 4 }}>
             <CardHeader
               title="Sector Performance"
-              subheader={`${timeFrame.charAt(0).toUpperCase() + timeFrame.slice(1)} performance vs SPY`}
+              subheader={`${timeFrame.charAt(0).toUpperCase() + timeFrame.slice(1)} performance vs market average`}
               avatar={<ShowChart color="primary" />}
             />
             <CardContent>
@@ -233,7 +233,7 @@ const SectorPage = () => {
                 <Table>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Sector (ETF)</TableCell>
+                      <TableCell>Sector</TableCell>
                       <TableCell align="right">Performance</TableCell>
                       <TableCell align="right">Relative Strength</TableCell>
                       <TableCell align="right">Trend</TableCell>
@@ -242,7 +242,7 @@ const SectorPage = () => {
                   </TableHead>
                   <TableBody>
                     {sectorPerformance.map((sector) => {
-                      const etf = SECTOR_ETFS.find(e => e.sector === sector.sector);
+                      const sectorColor = SECTOR_CONFIG[sector.sector] || '#9e9e9e';
                       const strength = calculateRelativeStrength(sector.sector);
                       const isOutperforming = strength > 100;
                       return (
@@ -250,12 +250,7 @@ const SectorPage = () => {
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center' }}>
                               <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: sector.color, mr: 2 }} />
-                              <Box>
-                                <Typography variant="subtitle2">{sector.sector}</Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  {etf?.symbol || 'N/A'}
-                                </Typography>
-                              </Box>
+                              <Typography variant="subtitle2">{sector.sector}</Typography>
                             </Box>
                           </TableCell>
                           <TableCell align="right">
@@ -274,7 +269,7 @@ const SectorPage = () => {
                             >
                               {strength.toFixed(1)}
                               <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
-                                vs SPY
+                                vs Market
                               </Typography>
                             </Typography>
                           </TableCell>
@@ -342,9 +337,6 @@ const SectorPage = () => {
                     >
                       {sector.performance > 0 ? '+' : ''}{sector.performance.toFixed(1)}%
                     </Typography>
-                    <Typography variant="caption" display="block">
-                      {SECTOR_ETFS.find(e => e.sector === sector.sector)?.symbol || 'N/A'}
-                    </Typography>
                   </Paper>
                 ))}
               </Box>
@@ -368,9 +360,6 @@ const SectorPage = () => {
                       <Box>
                         <Typography variant="subtitle2" fontWeight="bold">
                           #{index + 1} {sector.sector}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {SECTOR_ETFS.find(e => e.sector === sector.sector)?.symbol}
                         </Typography>
                       </Box>
                       <Typography 
@@ -407,9 +396,6 @@ const SectorPage = () => {
                       <Box>
                         <Typography variant="subtitle2" fontWeight="bold">
                           #{index + 1} {sector.sector}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {SECTOR_ETFS.find(e => e.sector === sector.sector)?.symbol}
                         </Typography>
                       </Box>
                       <Typography 
@@ -467,7 +453,7 @@ const SectorPage = () => {
                 />
               </Stack>
               <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
-                Data source: Yahoo Finance via ETF proxies. Relative strength calculated vs SPY benchmark.
+                Data source: Database aggregated from individual stock prices. Relative strength calculated vs market average.
               </Typography>
             </CardContent>
           </Card>
@@ -477,7 +463,7 @@ const SectorPage = () => {
       {/* Footer Note */}
       <Box sx={{ mt: 6, textAlign: 'center' }}>
         <Typography variant="caption" color="text.secondary">
-          Note: Sector performance based on ETF proxies. Past performance does not guarantee future results.
+          Note: Sector performance aggregated from individual stock prices in the database. Past performance does not guarantee future results.
           Consider macroeconomic factors and diversification when making investment decisions.
         </Typography>
       </Box>

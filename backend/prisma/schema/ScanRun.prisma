@@ -1,0 +1,10 @@
+model ScanRun {
+  id              String       @id @default(cuid())
+  userId          String
+  strategyConfig  Json         // snapshot of strategy config used for this scan
+  createdAt       DateTime     @default(now())
+  results         ScanResult[]
+
+  @@index([userId, createdAt])
+  @@map("scan_runs")
+}

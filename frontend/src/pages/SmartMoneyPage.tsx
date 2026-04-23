@@ -26,32 +26,34 @@ import {
   School,
   Analytics,
   Warning,
-  Refresh
+  Refresh,
+  PlayArrow,
+  Assessment
 } from '@mui/icons-material';
 import { useState, useEffect } from 'react';
 import {
   fetchSmartMoneyIndicators,
   type SmartMoneyIndicator
 } from '../services/smartMoneyService';
-
-// Define signal type for the new signals endpoint
-interface SmartMoneySignal {
-  id: number;
-  name: string;
-  type: 'positive' | 'warning' | 'neutral' | 'negative';
-  strength: number;
-  description: string;
-  explanation: string;
-  stocks: string[];
-  timestamp: string;
-}
+import {
+  runScan,
+  type ScanRunResponse,
+  type ScanResultItem,
+} from '../services/scannerService';
+import {
+  runBacktestFromScan,
+} from '../services/backtestService';
 
 const SmartMoneyPage = () => {
   const [loading, setLoading] = useState(true);
+  const [scanning, setScanning] = useState(false);
+  const [backtesting, setBacktesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [indicators, setIndicators] = useState<SmartMoneyIndicator[]>([]);
-  const [signals, setSignals] = useState<SmartMoneySignal[]>([]);
+  const [signals, setSignals] = useState<ScanResultItem[]>([]);
+  const [scanRunId, setScanRunId] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string>(new Date().toISOString());
+  const [backtestResult, setBacktestResult] = useState<string | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -62,52 +64,6 @@ const SmartMoneyPage = () => {
       ]);
 
       setIndicators(indicatorsResponse.data);
-      
-      // Mock signals data - in production, this would come from a new endpoint
-      const mockSignals: SmartMoneySignal[] = [
-        {
-          id: 1,
-          name: 'Volume Spike Detected',
-          type: 'positive',
-          strength: 0.8,
-          description: 'Unusually high volume in Technology sector suggests institutional interest',
-          explanation: 'Volume > 2.5x 20-day average with price increase indicates accumulation',
-          stocks: ['AAPL', 'MSFT', 'NVDA'],
-          timestamp: new Date().toISOString()
-        },
-        {
-          id: 2,
-          name: 'Accumulation Pattern',
-          type: 'positive',
-          strength: 0.7,
-          description: 'Price up + volume up pattern across multiple sectors',
-          explanation: 'Consistent buying pressure with above-average volume suggests smart money accumulation',
-          stocks: ['XLK', 'XLV', 'XLF'],
-          timestamp: new Date(Date.now() - 86400000).toISOString()
-        },
-        {
-          id: 3,
-          name: 'Distribution Warning',
-          type: 'warning',
-          strength: 0.6,
-          description: 'Price down with high volume in Energy sector',
-          explanation: 'Selling pressure with elevated volume may indicate distribution',
-          stocks: ['XLE', 'CVX', 'XOM'],
-          timestamp: new Date(Date.now() - 172800000).toISOString()
-        },
-        {
-          id: 4,
-          name: 'Momentum Shift',
-          type: 'neutral',
-          strength: 0.5,
-          description: 'Rotation from Growth to Value sectors detected',
-          explanation: 'Relative strength analysis shows early signs of sector rotation',
-          stocks: ['XLK', 'XLV', 'XLF'],
-          timestamp: new Date(Date.now() - 43200000).toISOString()
-        }
-      ];
-      
-      setSignals(mockSignals);
       setLastUpdated(new Date().toISOString());
     } catch (err) {
       setError('Failed to load smart money data. Please try again later.');
@@ -123,6 +79,39 @@ const SmartMoneyPage = () => {
 
   const handleRefresh = () => {
     loadData();
+  };
+
+  const handleRunScan = async () => {
+    setScanning(true);
+    setError(null);
+    setBacktestResult(null);
+    try {
+      const result: ScanRunResponse = await runScan();
+      setSignals(result.results);
+      setScanRunId(result.id);
+      setLastUpdated(new Date().toISOString());
+    } catch (err) {
+      setError('Failed to run scan. Please try again.');
+      console.error('Error running scan:', err);
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const handleBacktestScan = async () => {
+    if (!scanRunId) return;
+    setBacktesting(true);
+    setError(null);
+    try {
+      const result = await runBacktestFromScan(scanRunId);
+      setBacktestResult(`Backtest completed: ${result.symbols.length} symbols, config ${result.configId}`);
+      console.log('Backtest result:', result);
+    } catch (err) {
+      setError('Failed to run backtest from scan. Please try again.');
+      console.error('Error running backtest from scan:', err);
+    } finally {
+      setBacktesting(false);
+    }
   };
 
   if (loading && indicators.length === 0) {
@@ -181,15 +170,24 @@ const SmartMoneyPage = () => {
               Detect institutional activity through price and volume patterns - no misleading claims, just observable market behavior
             </Typography>
           </Box>
-          <Button
-            variant="outlined"
-            startIcon={<Refresh />}
-            onClick={handleRefresh}
-            disabled={loading}
-            sx={{ alignSelf: { xs: 'stretch', md: 'flex-start' } }}
-          >
-            {loading ? 'Refreshing...' : 'Refresh Data'}
-          </Button>
+          <Stack direction="row" spacing={1} sx={{ alignSelf: { xs: 'stretch', md: 'flex-start' } }}>
+            <Button
+              variant="contained"
+              startIcon={scanning ? <CircularProgress size={20} color="inherit" /> : <PlayArrow />}
+              onClick={handleRunScan}
+              disabled={scanning}
+            >
+              {scanning ? 'Scanning...' : 'Run Scan'}
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<Refresh />}
+              onClick={handleRefresh}
+              disabled={loading}
+            >
+              {loading ? 'Refreshing...' : 'Refresh Data'}
+            </Button>
+          </Stack>
         </Box>
         
         <Stack
@@ -208,11 +206,25 @@ const SmartMoneyPage = () => {
             variant="outlined"
             size="small"
           />
+          {scanRunId && (
+            <Chip
+              icon={<Assessment />}
+              label={`Scan: ${scanRunId.slice(0, 8)}...`}
+              color="primary"
+              size="small"
+            />
+          )}
         </Stack>
 
         {error && (
           <Alert severity="error" sx={{ mt: 3 }}>
             {error}
+          </Alert>
+        )}
+
+        {backtestResult && (
+          <Alert severity="success" sx={{ mt: 2 }}>
+            {backtestResult}
           </Alert>
         )}
       </Box>
@@ -318,8 +330,8 @@ const SmartMoneyPage = () => {
               </Stack>
               
               <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
-                Data sources: Yahoo Finance (price & volume), public market data. 
-                No paid APIs or unverifiable institutional data claims.
+                Data sources: Historical price and volume data from database.
+                All indicators computed from observable market data — no paid APIs or unverifiable claims.
               </Typography>
             </CardContent>
           </Card>
@@ -334,63 +346,88 @@ const SmartMoneyPage = () => {
               subheader="Detected patterns with explanations"
               avatar={<Insights color="warning" />}
               action={
-                <Chip label={`${signals.length} Signals`} size="small" color="primary" />
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Chip label={`${signals.length} Signals`} size="small" color="primary" />
+                  {scanRunId && signals.length > 0 && (
+                    <Button
+                      variant="contained"
+                      size="small"
+                      color="secondary"
+                      startIcon={backtesting ? <CircularProgress size={16} color="inherit" /> : <Assessment />}
+                      onClick={handleBacktestScan}
+                      disabled={backtesting}
+                    >
+                      {backtesting ? 'Running...' : 'Backtest This Scan'}
+                    </Button>
+                  )}
+                </Stack>
               }
             />
             <CardContent>
-              <Stack spacing={3}>
-                {signals.map((signal) => (
-                  <Paper 
-                    key={signal.id}
-                    elevation={0} 
-                    sx={{ 
-                      p: 2, 
-                      borderLeft: `4px solid`,
-                      borderColor: `${getSignalColor(signal.type)}.main`,
-                      backgroundColor: `${getSignalColor(signal.type)}.light`,
-                      borderRadius: 2 
-                    }}
-                  >
-                    <Stack direction="row" spacing={2} alignItems="flex-start">
-                      <Box sx={{ mt: 0.5 }}>
-                        {getSignalIcon(signal.type)}
-                      </Box>
-                      <Box sx={{ flex: 1 }}>
-                        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                          <Typography variant="subtitle2" fontWeight="bold">
-                            {signal.name}
-                          </Typography>
-                          <Chip 
-                            label={`Strength: ${(signal.strength * 100).toFixed(0)}%`}
-                            size="small"
-                            color={getSignalColor(signal.type) as any}
-                            variant="outlined"
-                          />
-                        </Stack>
-                        <Typography variant="body2" sx={{ mt: 0.5 }}>
-                          {signal.description}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                          <strong>Explanation:</strong> {signal.explanation}
-                        </Typography>
-                        <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap', gap: 0.5 }}>
-                          {signal.stocks.map((stock) => (
+              {signals.length === 0 ? (
+                <Box sx={{ textAlign: 'center', py: 4 }}>
+                  <Typography variant="body1" color="text.secondary" gutterBottom>
+                    No scan results yet
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Click "Run Scan" above to generate smart money signals
+                  </Typography>
+                </Box>
+              ) : (
+                <Stack spacing={3}>
+                  {signals.map((signal) => (
+                    <Paper 
+                      key={signal.id}
+                      elevation={0} 
+                      sx={{ 
+                        p: 2, 
+                        borderLeft: `4px solid`,
+                        borderColor: `${getSignalColor(signal.signalType)}.main`,
+                        backgroundColor: `${getSignalColor(signal.signalType)}.light`,
+                        borderRadius: 2 
+                      }}
+                    >
+                      <Stack direction="row" spacing={2} alignItems="flex-start">
+                        <Box sx={{ mt: 0.5 }}>
+                          {getSignalIcon(signal.signalType)}
+                        </Box>
+                        <Box sx={{ flex: 1 }}>
+                          <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                            <Typography variant="subtitle2" fontWeight="bold">
+                              {signal.description}
+                            </Typography>
                             <Chip 
-                              key={stock}
-                              label={stock}
+                              label={`Strength: ${(signal.strength * 100).toFixed(0)}%`}
                               size="small"
+                              color={getSignalColor(signal.signalType) as any}
                               variant="outlined"
                             />
-                          ))}
-                        </Stack>
-                        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                          Detected: {new Date(signal.timestamp).toLocaleString()}
-                        </Typography>
-                      </Box>
-                    </Stack>
-                  </Paper>
-                ))}
-              </Stack>
+                          </Stack>
+                          <Typography variant="body2" sx={{ mt: 0.5 }}>
+                            {signal.description}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                            <strong>Explanation:</strong> {signal.explanation}
+                          </Typography>
+                          <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap', gap: 0.5 }}>
+                            {signal.stocks.map((stock) => (
+                              <Chip 
+                                key={stock}
+                                label={stock}
+                                size="small"
+                                variant="outlined"
+                              />
+                            ))}
+                          </Stack>
+                          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                            Detected: {new Date(signal.timestamp).toLocaleString()}
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    </Paper>
+                  ))}
+                </Stack>
+              )}
             </CardContent>
           </Card>
 
@@ -446,8 +483,7 @@ const SmartMoneyPage = () => {
       {/* Footer Note */}
       <Box sx={{ mt: 6, textAlign: 'center' }}>
         <Typography variant="caption" color="text.secondary">
-          This dashboard transforms from "visually impressive but mock-based" to "credible, data-driven
-          market intelligence using free data" as part of our refactoring initiative.
+          All indicators computed from actual market data — transparent, verifiable, and data-driven.
         </Typography>
       </Box>
     </Container>

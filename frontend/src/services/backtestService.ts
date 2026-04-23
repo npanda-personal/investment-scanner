@@ -145,3 +145,21 @@ export async function fetchBacktestResult(resultId: string): Promise<BacktestRes
   });
   return response.data;
 }
+
+/**
+ * Run a backtest from a scan run.
+ */
+export async function runBacktestFromScan(
+  scanRunId: string,
+  startDate?: Date,
+  endDate?: Date
+): Promise<{ configId: string; scanRunId: string; symbols: string[]; result: BacktestResult }> {
+  const response = await axios.post(`${API_BASE}/backtest/from-scan`, {
+    scanRunId,
+    startDate: startDate?.toISOString(),
+    endDate: endDate?.toISOString(),
+  }, {
+    headers: { 'x-user-id': TEST_USER_ID },
+  });
+  return response.data;
+}

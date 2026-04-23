@@ -1,0 +1,14 @@
+model ScanResult {
+  id          String   @id @default(cuid())
+  scanRunId   String
+  scanRun     ScanRun  @relation(fields: [scanRunId], references: [id], onDelete: Cascade)
+  symbol      String
+  signalType  String   // 'positive' | 'warning' | 'neutral' | 'negative'
+  strength    Float    // 0.0 to 1.0
+  metadata    Json?    // flexible: description, explanation, etc.
+  timestamp   DateTime @default(now())
+
+  @@index([scanRunId])
+  @@index([symbol])
+  @@map("scan_results")
+}
