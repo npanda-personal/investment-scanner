@@ -179,12 +179,12 @@ export class RealTimeScannerService {
       const chunk = symbols.slice(i, i + chunkSize);
       // Note: chunk start time tracking removed as it was unused
 
-      // Update progress
+      // Update progress using actual symbols scanned count
       await this.sessionStorage.updateProgress(sessionId, {
-        completed: i,
+        completed: symbolsScanned,
         total: symbols.length,
         currentChunk: chunk,
-        estimatedTimeRemaining: this.calculateETR(i, symbols.length, startTime),
+        estimatedTimeRemaining: this.calculateETR(symbolsScanned, symbols.length, startTime),
       });
 
       try {

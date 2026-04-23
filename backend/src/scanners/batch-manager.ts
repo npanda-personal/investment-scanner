@@ -218,7 +218,9 @@ export class MarketDataBatchManager extends BatchAPIManager {
     config: Partial<BatchConfig> = {},
     cacheTtl: number = 5 * 60 * 1000 // 5 minutes default
   ) {
-    super({ ...config, rateLimiterName: 'yahoo' });
+    // MarketDataBatchManager only queries local database (not external APIs),
+    // so no rate limiter is needed. Rate limiting would cause unnecessary delays.
+    super({ ...config });
     this.cacheTtl = cacheTtl;
   }
 

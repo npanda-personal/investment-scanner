@@ -301,25 +301,30 @@ const SimplifiedScannerDashboard: React.FC = () => {
     const startedAt = Date.now();
 
     while (Date.now() - startedAt < SCAN_POLL_TIMEOUT_MS) {
-      const progress = await fetchSessionProgress(sessionId);
-      setScanProgress(Math.max(25, progress.progress.percentage));
+      try {
+        const progress = await fetchSessionProgress(sessionId);
+        setScanProgress(progress.progress.percentage);
 
-      if (progress.status === 'FAILED' || progress.status === 'CANCELLED') {
-        throw new Error(`Scan ${progress.status.toLowerCase()}.`);
-      }
+        if (progress.status === 'FAILED' || progress.status === 'CANCELLED') {
+          throw new Error(`Scan ${progress.status.toLowerCase()}.`);
+        }
 
-      if (progress.status === 'COMPLETED') {
-        const resultsPayload = await fetchSessionResults(sessionId);
-        return resultsPayload.results
-          .map(transformBackendToSimplified)
-          .sort((a: SimplifiedOpportunity, b: SimplifiedOpportunity) => {
-            const aPriority = a.rank || Number.MAX_SAFE_INTEGER;
-            const bPriority = b.rank || Number.MAX_SAFE_INTEGER;
-            if (aPriority !== bPriority) {
-              return aPriority - bPriority;
-            }
-            return (b.conviction ?? b.score ?? 0) - (a.conviction ?? a.score ?? 0);
-          });
+        if (progress.status === 'COMPLETED') {
+          const resultsPayload = await fetchSessionResults(sessionId);
+          return resultsPayload.results
+            .map(transformBackendToSimplified)
+            .sort((a: SimplifiedOpportunity, b: SimplifiedOpportunity) => {
+              const aPriority = a.rank || Number.MAX_SAFE_INTEGER;
+              const bPriority = b.rank || Number.MAX_SAFE_INTEGER;
+              if (aPriority !== bPriority) {
+                return aPriority - bPriority;
+              }
+              return (b.conviction ?? b.score ?? 0) - (a.conviction ?? a.score ?? 0);
+            });
+        }
+      } catch (pollError) {
+        // If progress fetch fails (e.g., progress not yet available), log and retry
+        console.warn('Progress fetch failed, retrying...', pollError);
       }
 
       await sleep(SCAN_POLL_INTERVAL_MS);
