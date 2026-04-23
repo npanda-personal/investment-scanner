@@ -220,7 +220,8 @@ export class MarketDataBatchManager extends BatchAPIManager {
   ) {
     // MarketDataBatchManager only queries local database (not external APIs),
     // so no rate limiter is needed. Rate limiting would cause unnecessary delays.
-    super({ ...config });
+    // Explicitly disable rate limiter to override DEFAULT_BATCH_CONFIG.rateLimiterName
+    super({ ...config, rateLimiterName: undefined });
     this.cacheTtl = cacheTtl;
   }
 

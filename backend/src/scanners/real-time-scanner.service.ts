@@ -185,7 +185,7 @@ export class RealTimeScannerService {
         total: symbols.length,
         currentChunk: chunk,
         estimatedTimeRemaining: this.calculateETR(symbolsScanned, symbols.length, startTime),
-      });
+      }, 'RUNNING');
 
       try {
         // Fetch market data for chunk
@@ -291,11 +291,11 @@ export class RealTimeScannerService {
       },
     });
 
-    // Clear progress
+    // Clear progress with COMPLETED status so frontend polling stops
     await this.sessionStorage.updateProgress(sessionId, {
       completed: symbols.length,
       total: symbols.length,
-    });
+    }, 'COMPLETED');
   }
 
   /**

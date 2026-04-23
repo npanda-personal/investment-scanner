@@ -270,8 +270,9 @@ const SimplifiedScannerDashboard: React.FC = () => {
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [foundDuringScan, setFoundDuringScan] = useState<number>(0);
   
-  // Refs for intervals
+  // Refs for intervals and scan guard
   const autoRefreshRef = useRef<number | null>(null);
+  const isScanningRef = useRef(false);
 
   // Load initial data
   useEffect(() => {
@@ -301,30 +302,35 @@ const SimplifiedScannerDashboard: React.FC = () => {
     const startedAt = Date.now();
 
     while (Date.now() - startedAt < SCAN_POLL_TIMEOUT_MS) {
+      let progress;
       try {
-        const progress = await fetchSessionProgress(sessionId);
-        setScanProgress(progress.progress.percentage);
-
-        if (progress.status === 'FAILED' || progress.status === 'CANCELLED') {
-          throw new Error(`Scan ${progress.status.toLowerCase()}.`);
-        }
-
-        if (progress.status === 'COMPLETED') {
-          const resultsPayload = await fetchSessionResults(sessionId);
-          return resultsPayload.results
-            .map(transformBackendToSimplified)
-            .sort((a: SimplifiedOpportunity, b: SimplifiedOpportunity) => {
-              const aPriority = a.rank || Number.MAX_SAFE_INTEGER;
-              const bPriority = b.rank || Number.MAX_SAFE_INTEGER;
-              if (aPriority !== bPriority) {
-                return aPriority - bPriority;
-              }
-              return (b.conviction ?? b.score ?? 0) - (a.conviction ?? a.score ?? 0);
-            });
-        }
+        progress = await fetchSessionProgress(sessionId);
       } catch (pollError) {
         // If progress fetch fails (e.g., progress not yet available), log and retry
         console.warn('Progress fetch failed, retrying...', pollError);
+        await sleep(SCAN_POLL_INTERVAL_MS);
+        continue;
+      }
+
+      setScanProgress(progress.progress.percentage);
+
+      if (progress.status === 'FAILED' || progress.status === 'CANCELLED') {
+        throw new Error(`Scan ${progress.status.toLowerCase()}.`);
+      }
+
+      if (progress.status === 'COMPLETED') {
+        // Fetch results once - errors here should NOT cause a retry loop
+        const resultsPayload = await fetchSessionResults(sessionId);
+        return resultsPayload.results
+          .map(transformBackendToSimplified)
+          .sort((a: SimplifiedOpportunity, b: SimplifiedOpportunity) => {
+            const aPriority = a.rank || Number.MAX_SAFE_INTEGER;
+            const bPriority = b.rank || Number.MAX_SAFE_INTEGER;
+            if (aPriority !== bPriority) {
+              return aPriority - bPriority;
+            }
+            return (b.conviction ?? b.score ?? 0) - (a.conviction ?? a.score ?? 0);
+          });
       }
 
       await sleep(SCAN_POLL_INTERVAL_MS);
@@ -397,6 +403,13 @@ const SimplifiedScannerDashboard: React.FC = () => {
   }, [autoRefresh]);
 
   const handleRunScan = async () => {
+    // Prevent multiple simultaneous scans using ref for synchronous check
+    if (isScanningRef.current) {
+      console.warn('Scan already in progress, ignoring duplicate click');
+      return;
+    }
+    isScanningRef.current = true;
+
     try {
       setIsScanning(true);
       setError(null);
@@ -423,6 +436,7 @@ const SimplifiedScannerDashboard: React.FC = () => {
       setIsScanning(false);
       setScanProgress(0);
       setFoundDuringScan(0);
+      isScanningRef.current = false;
       return;
     }
 
@@ -430,6 +444,7 @@ const SimplifiedScannerDashboard: React.FC = () => {
       setIsScanning(false);
       setScanProgress(0);
       setFoundDuringScan(0);
+      isScanningRef.current = false;
     }, 200);
   };
 

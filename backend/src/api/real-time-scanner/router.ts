@@ -11,6 +11,7 @@
 
 import express from 'express';
 import { RealTimeScannerService } from '../../scanners/real-time-scanner.service';
+import { ScanProgressResponse } from '../../types/scanner-extended';
 
 const router = express.Router();
 const scannerService = new RealTimeScannerService();
@@ -82,6 +83,10 @@ router.get('/scan/:sessionId/progress', async (req, res) => {
     if (!progress) {
       return res.status(404).json({ error: 'Progress data not available' });
     }
+
+    // Override progress status with actual session status
+    // (progress always has 'RUNNING' hardcoded, but session may be COMPLETED/FAILED/CANCELLED)
+    progress.status = session.status as ScanProgressResponse['status'];
 
     return res.json(progress);
   } catch (error) {

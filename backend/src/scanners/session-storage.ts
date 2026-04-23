@@ -310,11 +310,12 @@ export class SessionStorageService {
       total: number;
       currentChunk?: string[];
       estimatedTimeRemaining?: number;
-    }
+    },
+    status?: ScanProgressResponse['status']
   ): Promise<void> {
     const progressData: ScanProgressResponse = {
       sessionId,
-      status: 'RUNNING',
+      status: status || 'RUNNING',
       progress: {
         completed: progress.completed,
         total: progress.total,
@@ -448,8 +449,12 @@ export class SessionStorageService {
       }
     }
 
-    // Sort by startedAt (newest first)
-    return sessions.sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime()).slice(0, limit);
+    // Sort by startedAt (newest first) - handle both Date objects and ISO strings from Redis serialization
+    return sessions.sort((a, b) => {
+      const aTime = typeof a.startedAt === 'string' ? new Date(a.startedAt).getTime() : a.startedAt.getTime();
+      const bTime = typeof b.startedAt === 'string' ? new Date(b.startedAt).getTime() : b.startedAt.getTime();
+      return bTime - aTime;
+    }).slice(0, limit);
   }
 
   /**
