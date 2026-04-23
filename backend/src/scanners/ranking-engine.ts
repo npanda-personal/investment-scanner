@@ -718,7 +718,6 @@ export function getDecision(
     weeklyTrend,
     monthlyTrend,
     setupType,
-    riskLevel,
     entryQuality,
     trendStrength,
     signals,
@@ -745,15 +744,7 @@ export function getDecision(
     alignmentScore >= 80;
   const favorableSetup = setupType === 'PULLBACK' || setupType === 'BREAKOUT';
 
-  if (
-    weeklyTrend === 'BEARISH' ||
-    riskLevel === 'HIGH' ||
-    trapWarning === 'WARNING_COUNTER_TREND' ||
-    bearishSignals > bullishSignals + 1
-  ) {
-    return 'AVOID';
-  }
-
+  // ── Step 1: BUY (highest quality, strict conditions) ──
   if (
     convictionScore >= 80 &&
     strongTrendAlignment &&
@@ -765,26 +756,31 @@ export function getDecision(
     return 'BUY';
   }
 
+  // ── Step 2: ACCUMULATE (good setups forming, relaxed thresholds) ──
   if (
-    convictionScore >= 68 &&
-    weeklyTrend === 'BULLISH' &&
-    alignmentScore >= 60 &&
-    (setupType === 'PULLBACK' || setupType === 'REVERSAL' || entryQuality === 'IDEAL') &&
-    trendStrength !== 'WEAK'
+    convictionScore >= 60 &&
+    weeklyTrend !== 'BEARISH' &&
+    alignmentScore >= 50 &&
+    (setupType === 'PULLBACK' || setupType === 'REVERSAL' || setupType === 'BREAKOUT')
   ) {
     return 'ACCUMULATE';
   }
 
+  // ── Step 3: AVOID (strict — only clear negatives) ──
+  const isBearishTrend = weeklyTrend === 'BEARISH';
+  const isLowAlignment = alignmentScore < 50;
+  const isLowConviction = convictionScore < 50;
+  const isCounterTrendTrap = trapWarning === 'WARNING_COUNTER_TREND' && convictionScore < 60;
+
   if (
-    convictionScore >= 45 ||
-    alignmentScore >= 50 ||
-    weeklyTrend === 'NEUTRAL' ||
-    hasConflict
+    (isBearishTrend && isLowAlignment && isLowConviction) ||
+    isCounterTrendTrap
   ) {
-    return 'WAIT';
+    return 'AVOID';
   }
 
-  return 'AVOID';
+  // ── Step 4: WAIT (default — most common output) ──
+  return 'WAIT';
 }
 
 /**
