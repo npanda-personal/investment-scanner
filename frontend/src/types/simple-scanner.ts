@@ -169,6 +169,7 @@ export const translateSignal = (signal: any): SimplifiedSignal | null => {
   if (!signal || !signal.type) return null;
   
   const { type, value, threshold = 0, parameters = {} } = signal;
+  const safeValue = value ?? 0;
   
   // Default translations
   const translations: Record<string, SignalTranslation> = {
@@ -176,7 +177,7 @@ export const translateSignal = (signal: any): SimplifiedSignal | null => {
       type: 'RSI',
       condition: (val) => val < 30 || val > 70,
       name: (val) => val < 30 ? 'RSI Oversold' : val > 70 ? 'RSI Overbought' : 'RSI Neutral',
-      description: (val) => `RSI value of ${val.toFixed(1)} indicates ${val < 30 ? 'oversold' : 'overbought'} conditions.`,
+      description: (val) => `RSI value of ${(val ?? 0).toFixed(1)} indicates ${val < 30 ? 'oversold' : 'overbought'} conditions.`,
       direction: (val) => val < 30 ? 'bullish' : val > 70 ? 'bearish' : 'neutral',
     },
     EMA: {
@@ -190,7 +191,7 @@ export const translateSignal = (signal: any): SimplifiedSignal | null => {
         return 'EMA Signal';
       },
       description: () => 'EMA crossover suggests trend change.',
-      direction: (val) => val > 0 ? 'bullish' : 'bearish',
+      direction: (val) => (val ?? 0) > 0 ? 'bullish' : 'bearish',
     },
     MACD: {
       type: 'MACD',
@@ -210,7 +211,7 @@ export const translateSignal = (signal: any): SimplifiedSignal | null => {
       type: 'PRICE_CHANGE',
       condition: (val) => Math.abs(val) > 2,
       name: (val) => val > 0 ? 'Price Up' : 'Price Down',
-      description: (val) => `Price change of ${val.toFixed(1)}%.`,
+      description: (val) => `Price change of ${(val ?? 0).toFixed(1)}%.`,
       direction: (val) => val > 0 ? 'bullish' : 'bearish',
     },
   };
@@ -229,10 +230,10 @@ export const translateSignal = (signal: any): SimplifiedSignal | null => {
   
   return {
     type: translation.type,
-    name: translation.name(value, threshold),
+    name: translation.name(safeValue, threshold),
     confidence: signal.confidence || 50,
-    direction: translation.direction(value, threshold),
-    description: translation.description(value, threshold),
+    direction: translation.direction(safeValue, threshold),
+    description: translation.description(safeValue, threshold),
   };
 };
 

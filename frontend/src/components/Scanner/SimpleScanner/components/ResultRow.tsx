@@ -27,23 +27,25 @@ const ResultRow: React.FC<ResultRowProps> = ({ opportunity, onAddToWatchlist, ra
 
   // Format price with 2 decimal places
   const formatPrice = (price: number) => {
-    return `$${price.toFixed(2)}`;
+    const safePrice = price ?? 0;
+    return `$${safePrice.toFixed(2)}`;
   };
 
   // Format percentage change with sign
   const formatChange = (change: number) => {
-    const sign = change >= 0 ? '+' : '';
-    return `${sign}${change.toFixed(2)}%`;
+    const safeChange = change ?? 0;
+    const sign = safeChange >= 0 ? '+' : '';
+    return `${sign}${safeChange.toFixed(2)}%`;
   };
 
   // Get color for change
   const getChangeColor = (change: number) => {
-    return change >= 0 ? 'success.main' : 'error.main';
+    return (change ?? 0) >= 0 ? 'success.main' : 'error.main';
   };
 
   // Get conviction score (use conviction if available, otherwise score)
   const getConvictionScore = () => {
-    return opportunity.conviction ?? opportunity.score;
+    return opportunity.conviction ?? opportunity.score ?? 0;
   };
 
   // Get conviction badge color
@@ -832,7 +834,7 @@ const ResultRow: React.FC<ResultRowProps> = ({ opportunity, onAddToWatchlist, ra
                     Volume
                   </Typography>
                   <Typography variant="body1" fontWeight="medium">
-                    {(opportunity.volume / 1000000).toFixed(1)}M
+                    {((opportunity.volume ?? 0) / 1000000).toFixed(1)}M
                   </Typography>
                 </Box>
                 
