@@ -49,122 +49,186 @@ interface OHLCVBar {
 /** All signal definitions the scanner checks against every stock. */
 const SIGNAL_DEFINITIONS: SignalGroup[] = [
   {
-    symbol: 'VOLUME_SPIKE',
+    symbol: 'SMART_MONEY_ACCUMULATION',
+    signalType: 'positive',
+    strength: 0.95,
+    description: 'Strong accumulation pattern in {count} stock(s) with volume + price confirmation',
+    explanation: 'Price up > 2% with volume > 2x average and RSI < 70 suggests institutional buying',
+    match: (ind, bar) => {
+      const avgVol = ind.VOLUME_AVG;
+      const change = ind.priceChange ?? 0;
+      const rsi = ind.RSI;
+      return !!avgVol && bar.volume > avgVol * 2 && change > 2 && (!rsi || rsi < 70);
+    },
+  },
+  {
+    symbol: 'HIGH_CONVICTION_BULLISH',
+    signalType: 'positive',
+    strength: 0.95,
+    description: 'High conviction bullish setup in {count} stock(s)',
+    explanation: 'MACD bullish crossover + EMA9 > EMA20 > EMA50 + volume > 1.5x average + price up > 1.5% + RSI 40-60',
+    match: (ind, bar) => {
+      const macd = ind.MACD;
+      const macdSignal = ind.MACD_SIGNAL;
+      const ema9 = ind.ema9;
+      const ema20 = ind.ema20;
+      const ema50 = ind.ema50;
+      const rsi = ind.RSI;
+      const avgVol = ind.VOLUME_AVG;
+      const change = ind.priceChange ?? 0;
+
+      return !!macd && !!macdSignal && !!ema9 && !!ema20 && !!ema50 && !!avgVol &&
+             macd > macdSignal &&
+             ema9 > ema20 && ema20 > ema50 &&
+             bar.volume > avgVol * 1.5 &&
+             change > 1.5 &&
+             (!rsi || (rsi >= 40 && rsi <= 60));
+    },
+  },
+  {
+    symbol: 'TREND_REVERSAL_BULLISH',
+    signalType: 'positive',
+    strength: 0.85,
+    description: 'Potential trend reversal (bullish) in {count} stock(s)',
+    explanation: 'RSI oversold bounce (30-40) with volume spike and positive price change',
+    match: (ind, bar) => {
+      const avgVol = ind.VOLUME_AVG;
+      const change = ind.priceChange ?? 0;
+      const rsi = ind.RSI;
+      return !!avgVol && bar.volume > avgVol * 1.8 && change > 1.5 &&
+             !!rsi && rsi > 30 && rsi < 40;
+    },
+  },
+  {
+    symbol: 'STRONG_MOMENTUM',
     signalType: 'positive',
     strength: 0.8,
-    description: 'Unusually high volume detected in {count} stock(s) suggesting institutional interest',
-    explanation: 'Volume > 2x 20-day average with positive price change indicates accumulation',
+    description: 'Strong momentum continuation in {count} stock(s)',
+    explanation: 'EMA9 > EMA20 > EMA50 alignment with above-average volume and positive price change',
     match: (ind, bar) => {
       const avgVol = ind.VOLUME_AVG;
       const change = ind.priceChange ?? 0;
-      return !!avgVol && bar.volume > avgVol * 2 && change > 0;
+      const ema9 = ind.ema9;
+      const ema20 = ind.ema20;
+      const ema50 = ind.ema50;
+      return !!avgVol && bar.volume > avgVol * 1.5 && change > 1 &&
+             !!ema9 && !!ema20 && !!ema50 && ema9 > ema20 && ema20 > ema50;
     },
   },
   {
-    symbol: 'ACCUMULATION',
-    signalType: 'positive',
-    strength: 0.7,
-    description: 'Price up + volume up pattern in {count} stock(s)',
-    explanation: 'Consistent buying pressure with above-average volume suggests smart money accumulation',
-    match: (ind, bar) => {
-      const avgVol = ind.VOLUME_AVG;
-      const change = ind.priceChange ?? 0;
-      return !!avgVol && bar.volume > avgVol * 1.3 && change > 2;
-    },
-  },
-  {
-    symbol: 'DISTRIBUTION',
+    symbol: 'OVERBOUGHT_WARNING',
     signalType: 'warning',
-    strength: 0.6,
-    description: 'Price down with high volume in {count} stock(s)',
-    explanation: 'Selling pressure with elevated volume may indicate distribution',
-    match: (ind, bar) => {
-      const avgVol = ind.VOLUME_AVG;
-      const change = ind.priceChange ?? 0;
-      return !!avgVol && bar.volume > avgVol * 1.5 && change < -2;
+    strength: 0.75,
+    description: 'Overbought with bearish divergence in {count} stock(s)',
+    explanation: 'RSI > 70 with MACD bearish crossover suggests potential reversal',
+    match: (ind) => {
+      const macd = ind.MACD;
+      const macdSignal = ind.MACD_SIGNAL;
+      const rsi = ind.RSI;
+      return !!macd && !!macdSignal && !!rsi &&
+             rsi > 70 && macd < macdSignal;
     },
   },
   {
-    symbol: 'RSI_OVERSOLD',
-    signalType: 'positive',
+    symbol: 'DISTRIBUTION_PATTERN',
+    signalType: 'warning',
     strength: 0.7,
-    description: 'RSI oversold bounce opportunity in {count} stock(s)',
-    explanation: 'RSI below 30 suggests stock is oversold and may reverse upward',
-    match: (ind) => ind.RSI !== undefined && ind.RSI < 30,
+    description: 'Distribution pattern detected in {count} stock(s)',
+    explanation: 'Price down > 2% with high volume and EMA9 < EMA20 suggests institutional selling',
+    match: (ind, bar) => {
+      const avgVol = ind.VOLUME_AVG;
+      const change = ind.priceChange ?? 0;
+      const ema9 = ind.ema9;
+      const ema20 = ind.ema20;
+      return !!avgVol && bar.volume > avgVol * 2 && change < -2 &&
+             !!ema9 && !!ema20 && ema9 < ema20;
+    },
+  },
+  {
+    symbol: 'VOLUME_BREAKOUT',
+    signalType: 'positive',
+    strength: 0.75,
+    description: 'Volume breakout with price confirmation in {count} stock(s)',
+    explanation: 'Volume > 3x average with price change > 3% suggests strong interest',
+    match: (ind, bar) => {
+      const avgVol = ind.VOLUME_AVG;
+      const change = ind.priceChange ?? 0;
+      return !!avgVol && bar.volume > avgVol * 3 && Math.abs(change) > 3;
+    },
+  },
+  {
+    symbol: 'BEARISH_MOMENTUM',
+    signalType: 'warning',
+    strength: 0.8,
+    description: 'Strong bearish momentum in {count} stock(s)',
+    explanation: 'EMA9 < EMA20 < EMA50 with volume > 1.5x average and price down > 1.5%',
+    match: (ind, bar) => {
+      const avgVol = ind.VOLUME_AVG;
+      const change = ind.priceChange ?? 0;
+      const ema9 = ind.ema9;
+      const ema20 = ind.ema20;
+      const ema50 = ind.ema50;
+      return !!avgVol && bar.volume > avgVol * 1.5 && change < -1.5 &&
+             !!ema9 && !!ema20 && !!ema50 && ema9 < ema20 && ema20 < ema50;
+    },
+  },
+  {
+    symbol: 'MACD_BEARISH_CROSSOVER',
+    signalType: 'warning',
+    strength: 0.8,
+    description: 'MACD bearish crossover in {count} stock(s)',
+    explanation: 'MACD crossed below signal line with EMA9 < EMA20 < EMA50 and RSI > 50 suggests strong momentum shift',
+    match: (ind) => {
+      const macd = ind.MACD;
+      const macdSignal = ind.MACD_SIGNAL;
+      const ema9 = ind.ema9;
+      const ema20 = ind.ema20;
+      const ema50 = ind.ema50;
+      const rsi = ind.RSI;
+      return !!macd && !!macdSignal && !!ema9 && !!ema20 && !!ema50 &&
+             macd < macdSignal &&
+             ema9 < ema20 && ema20 < ema50 &&
+             (!rsi || rsi > 50);
+    },
   },
   {
     symbol: 'RSI_OVERBOUGHT',
     signalType: 'warning',
-    strength: 0.6,
+    strength: 0.7,
     description: 'RSI overbought in {count} stock(s) — caution advised',
-    explanation: 'RSI above 70 suggests stock is overbought and may reverse downward',
-    match: (ind) => ind.RSI !== undefined && ind.RSI > 70,
+    explanation: 'RSI > 70 with MACD bearish divergence suggests potential reversal',
+    match: (ind) => {
+      const macd = ind.MACD;
+      const macdSignal = ind.MACD_SIGNAL;
+      const rsi = ind.RSI;
+      return !!macd && !!macdSignal && !!rsi &&
+             rsi > 70 && macd < macdSignal;
+    },
   },
   {
-    symbol: 'EMA_CROSSOVER_BULLISH',
+    symbol: 'RSI_OVERSOLD_BOUNCE',
     signalType: 'positive',
     strength: 0.75,
-    description: 'Bullish EMA crossover in {count} stock(s)',
-    explanation: 'EMA9 crossed above EMA20 — short-term momentum turning bullish',
-    match: (ind) => {
-      if (ind.ema9 === undefined || ind.ema20 === undefined) return false;
-      return ind.ema9 > ind.ema20;
-    },
-  },
-  {
-    symbol: 'EMA_CROSSOVER_BEARISH',
-    signalType: 'warning',
-    strength: 0.65,
-    description: 'Bearish EMA crossover in {count} stock(s)',
-    explanation: 'EMA9 crossed below EMA20 — short-term momentum turning bearish',
-    match: (ind) => {
-      if (ind.ema9 === undefined || ind.ema20 === undefined) return false;
-      return ind.ema9 < ind.ema20;
-    },
-  },
-  {
-    symbol: 'MACD_BULLISH',
-    signalType: 'positive',
-    strength: 0.7,
-    description: 'MACD bullish in {count} stock(s)',
-    explanation: 'MACD above signal line indicates bullish momentum',
-    match: (ind) => {
-      if (ind.MACD === undefined || ind.MACD_SIGNAL === undefined) return false;
-      return ind.MACD > ind.MACD_SIGNAL;
-    },
-  },
-  {
-    symbol: 'MOMENTUM_SHIFT',
-    signalType: 'neutral',
-    strength: 0.5,
-    description: 'Momentum shift detected in {count} stock(s)',
-    explanation: 'Price change > 4% with above-average volume suggests momentum shift',
+    description: 'RSI oversold bounce opportunity in {count} stock(s)',
+    explanation: 'RSI < 30 with positive price change and volume spike suggests potential reversal',
     match: (ind, bar) => {
       const avgVol = ind.VOLUME_AVG;
       const change = ind.priceChange ?? 0;
-      return !!avgVol && bar.volume > avgVol * 1.2 && Math.abs(change) > 4;
+      const rsi = ind.RSI;
+      return !!avgVol && bar.volume > avgVol * 1.5 && change > 1 &&
+             !!rsi && rsi < 30;
     },
   },
   {
     symbol: 'PRICE_SURGE',
     signalType: 'positive',
-    strength: 0.6,
+    strength: 0.7,
     description: 'Price surge in {count} stock(s)',
-    explanation: 'Price increased more than 5% in a single session',
-    match: (ind) => {
+    explanation: 'Price increased > 4% in single session with above-average volume',
+    match: (ind, bar) => {
+      const avgVol = ind.VOLUME_AVG;
       const change = ind.priceChange ?? 0;
-      return change > 5;
-    },
-  },
-  {
-    symbol: 'PRICE_DECLINE',
-    signalType: 'warning',
-    strength: 0.55,
-    description: 'Price decline in {count} stock(s)',
-    explanation: 'Price dropped more than 5% in a single session',
-    match: (ind) => {
-      const change = ind.priceChange ?? 0;
-      return change < -5;
+      return !!avgVol && bar.volume > avgVol * 1.2 && change > 4;
     },
   },
 ];
@@ -290,6 +354,34 @@ export class ScanRunService {
       });
     }
 
+    // 5. Filter and prioritize signals for better quality results
+    // Only show signals with minimum strength and limit total results
+    const filteredSignals = signals.filter(signal => {
+      // Minimum strength threshold - only show high-quality signals
+      if (signal.strength < 0.6) return false;
+
+      // For positive signals, require at least some meaningful count
+      if (signal.signalType === 'positive' && signal.stocks.length < 3) return false;
+
+      // For warning signals, require reasonable count
+      if (signal.signalType === 'warning' && signal.stocks.length < 2) return false;
+
+      return true;
+    });
+
+    // Sort by strength (descending) and stock count (descending)
+    const sortedSignals = filteredSignals.sort((a, b) => {
+      // First by strength
+      if (b.strength !== a.strength) {
+        return b.strength - a.strength;
+      }
+      // Then by number of stocks affected
+      return b.stocks.length - a.stocks.length;
+    });
+
+    // Limit to top 6 most relevant signals to avoid overwhelming users
+    const finalSignals = sortedSignals.slice(0, 6);
+
     // 5. Persist ScanRun + ScanResults in a transaction
     const scanRun = await this.prisma.$transaction(async (tx) => {
       const run = await tx.scanRun.create({
@@ -302,7 +394,7 @@ export class ScanRunService {
         },
       });
 
-      for (const signal of signals) {
+      for (const signal of finalSignals) {
         await tx.scanResult.create({
           data: {
             scanRunId: run.id,

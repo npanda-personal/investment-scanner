@@ -256,89 +256,63 @@ const SmartMoneyPage = () => {
       </Card>
 
       {/* Main Dashboard Grid */}
-      <Grid container spacing={4}>
-        {/* Left Column: Key Indicators */}
-        <Grid item xs={12} md={6}>
-          <Card sx={{ mb: 4, height: '100%' }}>
-            <CardHeader
-              title="Smart Money Indicators"
-              subheader="Based on observable price + volume patterns"
-              avatar={<Analytics color="primary" />}
-            />
-            <CardContent>
-              <Typography variant="body2" color="text.secondary" paragraph>
-                These indicators use publicly available data to detect patterns that often precede market moves.
-                All values are computed from actual market data, not claimed institutional access.
-              </Typography>
-              
-              <Grid container spacing={2}>
-                {indicators.map((indicator) => (
-                  <Grid item xs={12} md={6} key={indicator.indicator}>
-                    <Paper sx={{ p: 2, height: '100%' }}>
-                      <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
-                        {indicator.indicator}
+      <Grid container spacing={3}>
+        {/* Top Section: Key Indicators */}
+        <Grid item xs={12}>
+          <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Analytics fontSize="small" color="primary" />
+            <Typography variant="subtitle1" fontWeight="bold">Smart Money Indicators</Typography>
+            <Typography variant="caption" color="text.secondary">— observable price + volume patterns</Typography>
+          </Box>
+          <Grid container spacing={1.5}>
+            {indicators.map((indicator) => (
+              <Grid item xs={6} sm={4} md={3} key={indicator.indicator}>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: 1.5,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 0.5,
+                    borderRadius: 2,
+                    borderColor: indicator.trend === 'up' ? 'success.light' : indicator.trend === 'down' ? 'error.light' : 'divider',
+                  }}
+                >
+                  <Typography variant="caption" color="text.secondary" noWrap>
+                    {indicator.indicator}
+                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5 }}>
+                    <Typography variant="h6" fontWeight="bold" lineHeight={1}>
+                      {indicator.value}
+                    </Typography>
+                    {indicator.unit && (
+                      <Typography variant="caption" color="text.secondary">
+                        {indicator.unit}
                       </Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'baseline', mb: 1 }}>
-                        <Typography variant="h4" fontWeight="bold">
-                          {indicator.value}
-                        </Typography>
-                        {indicator.unit && (
-                          <Typography variant="body2" color="text.secondary" sx={{ ml: 0.5 }}>
-                            {indicator.unit}
-                          </Typography>
-                        )}
-                      </Box>
-                      <Stack direction="row" alignItems="center" spacing={0.5}>
-                        {indicator.trend === 'up' ? (
-                          <TrendingUp fontSize="small" color="success" />
-                        ) : indicator.trend === 'down' ? (
-                          <TrendingDown fontSize="small" color="error" />
-                        ) : null}
-                        <Typography 
-                          variant="body2" 
-                          color={indicator.trend === 'up' ? 'success.main' : indicator.trend === 'down' ? 'error.main' : 'text.secondary'}
-                        >
-                          {indicator.change > 0 ? '+' : ''}{indicator.change}%
-                        </Typography>
-                      </Stack>
-                      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                        {indicator.description}
-                      </Typography>
-                    </Paper>
-                  </Grid>
-                ))}
+                    )}
+                  </Box>
+                  <Stack direction="row" alignItems="center" spacing={0.25}>
+                    {indicator.trend === 'up' ? (
+                      <TrendingUp sx={{ fontSize: 14 }} color="success" />
+                    ) : indicator.trend === 'down' ? (
+                      <TrendingDown sx={{ fontSize: 14 }} color="error" />
+                    ) : null}
+                    <Typography
+                      variant="caption"
+                      fontWeight="medium"
+                      color={indicator.trend === 'up' ? 'success.main' : indicator.trend === 'down' ? 'error.main' : 'text.secondary'}
+                    >
+                      {indicator.change > 0 ? '+' : ''}{indicator.change}%
+                    </Typography>
+                  </Stack>
+                </Paper>
               </Grid>
-            </CardContent>
-          </Card>
-
-          {/* Methodology */}
-          <Card>
-            <CardHeader
-              title="Methodology & Data Sources"
-              avatar={<School color="info" />}
-            />
-            <CardContent>
-              <Typography variant="body2" paragraph>
-                This dashboard uses the following approach to detect smart money patterns:
-              </Typography>
-              
-              <Stack spacing={1}>
-                <Chip label="Volume Ratio = Current Volume / 20-day Average" size="small" variant="outlined" />
-                <Chip label="Accumulation = Price ↑ + Volume Ratio > 1.5" size="small" variant="outlined" />
-                <Chip label="Distribution = Price ↓ + Volume Ratio > 1.5" size="small" variant="outlined" />
-                <Chip label="Momentum = % of sectors with positive performance" size="small" variant="outlined" />
-              </Stack>
-              
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
-                Data sources: Historical price and volume data from database.
-                All indicators computed from observable market data — no paid APIs or unverifiable claims.
-              </Typography>
-            </CardContent>
-          </Card>
+            ))}
+          </Grid>
         </Grid>
 
-        {/* Right Column: Signals & Insights */}
-        <Grid item xs={12} md={6}>
+        {/* Bottom Section: Signals & Insights */}
+        <Grid item xs={12}>
           {/* Active Signals */}
           <Card sx={{ mb: 4 }}>
             <CardHeader
@@ -363,72 +337,112 @@ const SmartMoneyPage = () => {
                 </Stack>
               }
             />
-            <CardContent>
-              {signals.length === 0 ? (
-                <Box sx={{ textAlign: 'center', py: 4 }}>
-                  <Typography variant="body1" color="text.secondary" gutterBottom>
-                    No scan results yet
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Click "Run Scan" above to generate smart money signals
-                  </Typography>
-                </Box>
-              ) : (
-                <Stack spacing={3}>
-                  {signals.map((signal) => (
-                    <Paper 
-                      key={signal.id}
-                      elevation={0} 
-                      sx={{ 
-                        p: 2, 
-                        borderLeft: `4px solid`,
-                        borderColor: `${getSignalColor(signal.signalType)}.main`,
-                        backgroundColor: `${getSignalColor(signal.signalType)}.light`,
-                        borderRadius: 2 
-                      }}
-                    >
-                      <Stack direction="row" spacing={2} alignItems="flex-start">
-                        <Box sx={{ mt: 0.5 }}>
-                          {getSignalIcon(signal.signalType)}
-                        </Box>
-                        <Box sx={{ flex: 1 }}>
-                          <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                            <Typography variant="subtitle2" fontWeight="bold">
-                              {signal.description}
-                            </Typography>
-                            <Chip 
-                              label={`Strength: ${(signal.strength * 100).toFixed(0)}%`}
-                              size="small"
-                              color={getSignalColor(signal.signalType) as any}
-                              variant="outlined"
-                            />
-                          </Stack>
-                          <Typography variant="body2" sx={{ mt: 0.5 }}>
-                            {signal.description}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                            <strong>Explanation:</strong> {signal.explanation}
-                          </Typography>
-                          <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap', gap: 0.5 }}>
-                            {signal.stocks.map((stock) => (
-                              <Chip 
-                                key={stock}
-                                label={stock}
-                                size="small"
-                                variant="outlined"
-                              />
-                            ))}
-                          </Stack>
-                          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                            Detected: {new Date(signal.timestamp).toLocaleString()}
-                          </Typography>
-                        </Box>
-                      </Stack>
-                    </Paper>
-                  ))}
-                </Stack>
-              )}
-            </CardContent>
+           <CardContent>
+               {signals.length === 0 ? (
+                 <Box sx={{ textAlign: 'center', py: 4 }}>
+                   <Typography variant="body1" color="text.secondary" gutterBottom>
+                     No scan results yet
+                   </Typography>
+                   <Typography variant="body2" color="text.secondary">
+                     Click "Run Scan" above to generate smart money signals
+                   </Typography>
+                 </Box>
+               ) : (
+                 <Box sx={{
+                   display: 'grid',
+                   gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                   gap: 3,
+                   mt: 1
+                 }}>
+                   {signals.map((signal) => (
+                     <Paper
+                       key={signal.id}
+                       elevation={0}
+                       sx={{
+                         p: 2.5,
+                         borderLeft: `4px solid`,
+                         borderColor: `${getSignalColor(signal.signalType)}.main`,
+                         backgroundColor: `${getSignalColor(signal.signalType)}.light`,
+                         borderRadius: 2,
+                         transition: 'transform 0.2s ease',
+                         '&:hover': {
+                           transform: 'translateY(-2px)'
+                         }
+                       }}
+                     >
+                       <Stack spacing={2}>
+                         {/* Header with icon and title */}
+                         <Stack direction="row" spacing={1.5} alignItems="center">
+                           <Box sx={{
+                             p: 1,
+                             borderRadius: 1,
+                             bgcolor: `${getSignalColor(signal.signalType)}.main`,
+                             color: `${getSignalColor(signal.signalType)}.contrastText`
+                           }}>
+                             {getSignalIcon(signal.signalType)}
+                           </Box>
+                           <Typography variant="subtitle1" fontWeight="bold" sx={{ flex: 1 }}>
+                             {signal.description}
+                           </Typography>
+                         </Stack>
+
+                         {/* Strength indicator */}
+                         <Box>
+                           <Chip
+                             label={`Strength: ${(signal.strength * 100).toFixed(0)}%`}
+                             size="small"
+                             color={getSignalColor(signal.signalType) as any}
+                             variant="filled"
+                             sx={{
+                               fontWeight: 'bold',
+                               borderRadius: 1
+                             }}
+                           />
+                         </Box>
+
+                         {/* Explanation */}
+                         <Box>
+                           <Typography variant="body2" color="text.primary" sx={{ mb: 0.5, fontWeight: 500 }}>
+                             Explanation:
+                           </Typography>
+                           <Typography variant="body2" color="text.secondary">
+                             {signal.explanation}
+                           </Typography>
+                         </Box>
+
+                         {/* Stocks */}
+                         <Box>
+                           <Typography variant="body2" color="text.primary" sx={{ mb: 0.5, fontWeight: 500 }}>
+                             Affected Stocks:
+                           </Typography>
+                           <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
+                             {signal.stocks.map((stock) => (
+                               <Chip
+                                 key={stock}
+                                 label={stock}
+                                 size="small"
+                                 variant="outlined"
+                                 sx={{
+                                   borderColor: 'divider',
+                                   bgcolor: 'background.paper'
+                                 }}
+                               />
+                             ))}
+                           </Stack>
+                         </Box>
+
+                         {/* Timestamp */}
+                         <Divider sx={{ my: 1 }} />
+                         <Typography variant="caption" color="text.secondary">
+                           <Box component="span" sx={{ fontWeight: 'bold', mr: 1 }}>Detected:</Box>
+                           {new Date(signal.timestamp).toLocaleString()}
+                         </Typography>
+                       </Stack>
+                     </Paper>
+                   ))}
+                 </Box>
+               )}
+             </CardContent>
           </Card>
 
           {/* Key Takeaways */}
