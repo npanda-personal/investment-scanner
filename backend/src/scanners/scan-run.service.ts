@@ -18,6 +18,7 @@ export interface ScanRunDTO {
   userId: string;
   createdAt: string;
   results: ScanResultDTO[];
+  noNewData?: boolean;
 }
 
 /** Minimum number of price ticks required to compute indicators. */
@@ -245,7 +246,37 @@ export class ScanRunService {
    * persist ScanRun + ScanResults, return DTO.
    */
   async runScan(userId: string): Promise<ScanRunDTO> {
-    // 1. Fetch all active stocks from the database
+    // 1. Check if there's new candle data available for scanning
+    const maxLastLoadTimestamp = await this.prisma.stock.aggregate({
+      _max: {
+        lastSuccessfulDataLoadTimestamp: true,
+      },
+      where: { isActive: true },
+    });
+
+    const currentTime = new Date();
+    const hasNewData = !maxLastLoadTimestamp._max.lastSuccessfulDataLoadTimestamp ||
+                      currentTime > new Date(maxLastLoadTimestamp._max.lastSuccessfulDataLoadTimestamp);
+
+    if (!hasNewData) {
+      // Create a scan run with a special flag indicating no new data
+      const scanRun = await this.prisma.$transaction(async (tx) => {
+        const run = await tx.scanRun.create({
+          data: {
+            userId,
+            strategyConfig: {
+              type: 'smart-money',
+              description: 'Price + Volume pattern detection',
+              noNewData: true,
+            } as Prisma.InputJsonValue,
+          },
+        });
+        return run;
+      });
+      return this.getScanRun(scanRun.id);
+    }
+
+    // 2. Fetch all active stocks from the database
     const stocks = await this.prisma.stock.findMany({
       where: { isActive: true },
       select: { symbol: true },
@@ -432,6 +463,23 @@ export class ScanRunService {
     return this.toDTO(run);
   }
 
+  /**
+   * Get the latest scan run for a user.
+   */
+  async getLatestScanRun(userId: string): Promise<ScanRunDTO | null> {
+    const run = await this.prisma.scanRun.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      include: { results: { orderBy: { timestamp: 'desc' } } },
+    });
+
+    if (!run) {
+      return null;
+    }
+
+    return this.toDTO(run);
+  }
+
   // ── Private helpers ───────────────────────────
 
   /**
@@ -519,6 +567,7 @@ export class ScanRunService {
         stocks: (r.metadata as any)?.stocks ?? [],
         timestamp: r.timestamp.toISOString(),
       })),
+      noNewData: (run.strategyConfig as any)?.noNewData ?? false,
     };
   }
 }

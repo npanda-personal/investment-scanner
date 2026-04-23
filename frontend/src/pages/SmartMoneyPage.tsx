@@ -37,6 +37,7 @@ import {
 } from '../services/smartMoneyService';
 import {
   runScan,
+  fetchLatestScanRun,
   type ScanRunResponse,
   type ScanResultItem,
 } from '../services/scannerService';
@@ -59,11 +60,24 @@ const SmartMoneyPage = () => {
     setLoading(true);
     setError(null);
     try {
-      const [indicatorsResponse] = await Promise.all([
-        fetchSmartMoneyIndicators()
+      const [indicatorsResponse, latestScan] = await Promise.all([
+        fetchSmartMoneyIndicators(),
+        fetchLatestScanRun()
       ]);
 
       setIndicators(indicatorsResponse.data);
+
+      // Load latest scan results if available
+      if (latestScan) {
+        setSignals(latestScan.results);
+        setScanRunId(latestScan.id);
+
+        // Check if the latest scan had no new data
+        if (latestScan.noNewData) {
+          setError('No new data available for a new scan. Showing latest results.');
+        }
+      }
+
       setLastUpdated(new Date().toISOString());
     } catch (err) {
       setError('Failed to load smart money data. Please try again later.');
@@ -87,9 +101,14 @@ const SmartMoneyPage = () => {
     setBacktestResult(null);
     try {
       const result: ScanRunResponse = await runScan();
-      setSignals(result.results);
-      setScanRunId(result.id);
-      setLastUpdated(new Date().toISOString());
+
+      if (result.noNewData) {
+        setError('No new data available for a new scan. Showing existing results.');
+      } else {
+        setSignals(result.results);
+        setScanRunId(result.id);
+        setLastUpdated(new Date().toISOString());
+      }
     } catch (err) {
       setError('Failed to run scan. Please try again.');
       console.error('Error running scan:', err);

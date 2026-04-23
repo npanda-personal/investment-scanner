@@ -166,6 +166,7 @@ export interface ScanRunResponse {
   userId: string;
   createdAt: string;
   results: ScanResultItem[];
+  noNewData?: boolean;
 }
 
 /**
@@ -186,4 +187,21 @@ export async function fetchScanRun(id: string): Promise<ScanRunResponse> {
     headers: { 'x-user-id': TEST_USER_ID },
   });
   return response.data;
+}
+
+/**
+ * Fetch the latest scan run for the current user.
+ */
+export async function fetchLatestScanRun(): Promise<ScanRunResponse | null> {
+  try {
+    const response = await axios.get<ScanRunResponse>(`${API_BASE}/scanner/latest`, {
+      headers: { 'x-user-id': TEST_USER_ID },
+    });
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      return null;
+    }
+    throw error;
+  }
 }

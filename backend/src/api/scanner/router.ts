@@ -40,4 +40,19 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// GET /api/scanner/latest — fetch the latest scan run for the current user
+router.get('/latest', async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const result = await scanRunService.getLatestScanRun(userId);
+    if (!result) {
+      return res.status(404).json({ error: 'No scan runs found for this user' });
+    }
+    return res.json(result);
+  } catch (error) {
+    console.error('Error fetching latest scan run:', error);
+    return res.status(500).json({ error: 'Failed to fetch latest scan run' });
+  }
+});
+
 export default router;
