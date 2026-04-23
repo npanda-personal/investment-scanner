@@ -46,6 +46,16 @@ export interface PaginatedResponse {
   totalPages: number;
 }
 
+interface BackendPaginatedResponse {
+  stocks: Stock[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
 /**
  * Fetch stocks with pagination and filtering.
  */
@@ -58,8 +68,14 @@ export async function fetchStocks(options: PaginationOptions = {}): Promise<Pagi
   if (options.region) params.append('region', options.region);
   if (options.search) params.append('search', options.search);
 
-  const response = await axios.get<PaginatedResponse>(`${API_BASE}/stocks?${params.toString()}`);
-  return response.data;
+  const response = await axios.get<BackendPaginatedResponse>(`${API_BASE}/stocks?${params.toString()}`);
+  return {
+    stocks: response.data.stocks,
+    total: response.data.pagination.total,
+    page: response.data.pagination.page,
+    pageSize: response.data.pagination.pageSize,
+    totalPages: response.data.pagination.totalPages,
+  };
 }
 
 /**

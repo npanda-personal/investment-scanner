@@ -27,7 +27,7 @@ export interface SimplifiedOpportunity {
   insight?: string; // Human-readable insight
   confidenceLevel?: 'VERY_HIGH' | 'HIGH' | 'MEDIUM' | 'LOW'; // For color coding
   // Phase 1: Decision Clarity
-  decision?: 'BUY' | 'WATCH' | 'AVOID'; // Clear trading decision
+  decision?: 'BUY' | 'ACCUMULATE' | 'WAIT' | 'AVOID'; // Clear trading decision
   setupType?: 'PULLBACK' | 'BREAKOUT' | 'REVERSAL' | 'RANGE'; // Entry context
   volumeVisibility?: 'HIGH' | 'NORMAL' | 'LOW'; // Volume confirmation
   riskLevel?: 'LOW' | 'MEDIUM' | 'HIGH'; // Risk assessment
@@ -116,15 +116,19 @@ export const transformBackendToSimplified = (
 
   const convictionScore = backendOpportunity.conviction || backendOpportunity.score;
   const confidenceLevel = getConfidenceLevel(convictionScore);
+  const rawChangePercent = backendOpportunity.changePercent ?? backendOpportunity.metadata?.change ?? 0;
+  const normalizedChangePercent = Math.abs(rawChangePercent) < 1 ? rawChangePercent * 100 : rawChangePercent;
+  const alignmentScore = backendOpportunity.alignmentScore ?? backendOpportunity.breakdown?.alignmentScore ?? 0;
 
   return {
     id: backendOpportunity.id || `simplified-${backendOpportunity.symbol}`,
     symbol: backendOpportunity.symbol,
+    companyName: backendOpportunity.companyName || backendOpportunity.metadata?.companyName,
     price: backendOpportunity.price || backendOpportunity.metadata?.price || 0,
-    changePct: backendOpportunity.changePercent || backendOpportunity.metadata?.change || 0,
+    changePct: normalizedChangePercent,
     changeAmount: calculateChangeAmount(
       backendOpportunity.price || backendOpportunity.metadata?.price || 0,
-      backendOpportunity.changePercent || backendOpportunity.metadata?.change || 0
+      normalizedChangePercent
     ),
     volume: backendOpportunity.volume || backendOpportunity.metadata?.volume || 0,
     score: backendOpportunity.score || 0, // legacy
@@ -137,7 +141,7 @@ export const transformBackendToSimplified = (
     lastUpdated: backendOpportunity.detectedAt || new Date().toISOString(),
     // New fields
     alignment: backendOpportunity.alignment,
-    alignmentScore: backendOpportunity.breakdown?.alignmentScore,
+    alignmentScore,
     insight: backendOpportunity.insight,
     confidenceLevel,
     // Phase 1: Decision Clarity
@@ -246,7 +250,7 @@ export const generateInsightText = (opportunities: SimplifiedOpportunity[]): str
 };
 
 // Helper to determine decision based on conviction and alignment
-const getMockDecision = (conviction: number, alignment?: string): 'BUY' | 'WATCH' | 'AVOID' => {
+const getMockDecision = (conviction: number, alignment?: string): 'BUY' | 'ACCUMULATE' | 'WAIT' | 'AVOID' => {
   // Extract alignment score from alignment string
   let alignmentScore = 50; // default
   if (alignment) {
@@ -280,12 +284,12 @@ const getMockDecision = (conviction: number, alignment?: string): 'BUY' | 'WATCH
     return "AVOID";
   }
 
-  // WATCH only if: conviction >= 55 AND alignment >= 60
-  if (
-    conviction >= 55 &&
-    alignmentScore >= 60
-  ) {
-    return "WATCH";
+  if (conviction >= 75 && alignmentScore >= 70) {
+    return "ACCUMULATE";
+  }
+
+  if (conviction >= 55 || alignmentScore >= 60) {
+    return "WAIT";
   }
 
   // Everything else: AVOID
@@ -349,7 +353,7 @@ const getMockRiskLevel = (
 };
 
 // Helper to generate mock entry quality
-const getMockEntryQuality = (conviction: number, alignment?: string): 'IDEAL' | 'OK' | 'LATE' => {
+const getMockEntryQuality = (conviction: number, _alignment?: string): 'IDEAL' | 'OK' | 'LATE' => {
   // Simple mock logic for IDEAL/OK/LATE
   // For mock data, we'll randomly assign based on conviction
   const random = Math.random();
@@ -378,7 +382,7 @@ const getMockDistanceToSupport = (changePct: number, alignment?: string): 'NEAR'
 };
 
 // Helper to generate mock trend strength
-const getMockTrendStrength = (alignment?: string, conviction?: number): 'STRONG' | 'MODERATE' | 'WEAK' => {
+const getMockTrendStrength = (alignment?: string, _conviction?: number): 'STRONG' | 'MODERATE' | 'WEAK' => {
   const bullishCount = alignment ? (alignment.match(/BULLISH/g) || []).length : 0;
   const bearishCount = alignment ? (alignment.match(/BEARISH/g) || []).length : 0;
   
@@ -398,7 +402,7 @@ const getMockTrendStrength = (alignment?: string, conviction?: number): 'STRONG'
 
 // Helper to generate mock portfolio relevance
 const getMockPortfolioRelevance = (
-  decision?: 'BUY' | 'WATCH' | 'AVOID',
+  decision?: 'BUY' | 'ACCUMULATE' | 'WAIT' | 'AVOID',
   conviction?: number,
   riskLevel?: 'LOW' | 'MEDIUM' | 'HIGH',
   entryQuality?: 'IDEAL' | 'OK' | 'LATE'
@@ -408,9 +412,13 @@ const getMockPortfolioRelevance = (
     return 'AVOID';
   }
   
-  // WATCH decisions are small positions at best
-  if (decision === 'WATCH') {
+  // WAIT decisions are small positions at best
+  if (decision === 'WAIT') {
     return 'SMALL';
+  }
+
+  if (decision === 'ACCUMULATE') {
+    return 'SATELLITE';
   }
   
   // BUY decisions with strong criteria become CORE positions

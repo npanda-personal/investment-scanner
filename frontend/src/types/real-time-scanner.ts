@@ -39,6 +39,24 @@ export interface ScoredOpportunity {
   score: number;
   confidence: number; // 0-100
   signals: Signal[];
+  price?: number;
+  changePercent?: number;
+  volume?: number;
+  breakdown?: {
+    alignmentScore: number;
+    momentumScore: number;
+    volumeScore: number;
+  };
+  alignment?: string;
+  insight?: string;
+  decision?: 'BUY' | 'ACCUMULATE' | 'WAIT' | 'AVOID';
+  setupType?: 'PULLBACK' | 'BREAKOUT' | 'REVERSAL' | 'RANGE';
+  volumeVisibility?: 'HIGH' | 'NORMAL' | 'LOW';
+  riskLevel?: 'LOW' | 'MEDIUM' | 'HIGH';
+  entryQuality?: 'IDEAL' | 'OK' | 'LATE';
+  distanceToSupport?: 'NEAR' | 'MID' | 'FAR';
+  trendStrength?: 'STRONG' | 'MODERATE' | 'WEAK';
+  portfolioRelevance?: 'CORE' | 'SATELLITE' | 'AVOID' | 'SMALL';
   metadata: {
     price: number;
     change: number;
@@ -157,26 +175,58 @@ export interface ChunkStatus {
 }
 
 export interface DashboardData {
-  stats: DashboardStats;
-  recentSessions: ScanSession[];
-  recentOpportunities: ScoredOpportunity[];
-  topPresets: ScanPreset[];
+  stats?: DashboardStats;
+  recentSessions?: ScanSession[];
+  recentOpportunities?: ScoredOpportunity[];
+  topOpportunities?: ScoredOpportunity[];
+  topPresets?: ScanPreset[];
+  signalStats?: Record<string, number>;
+  lastUpdated?: string;
 }
 
 // ==================== Request Types ====================
 
 export interface TriggerScanRequest {
   scope: {
-    type: 'preset' | 'watchlist' | 'custom' | 'database';
+    type: 'preset' | 'watchlist' | 'custom' | 'database' | 'PRESET' | 'WATCHLIST' | 'CUSTOM';
     presetId?: string;
     watchlistId?: string;
     symbols?: string[];
     filters?: Record<string, any>;
   };
-  signals: SignalDefinition[];
+  signals: SignalDefinition[] | string[];
   rankingConfig: RankingConfig;
   name?: string;
   description?: string;
+}
+
+export interface StartScanResponse {
+  message: string;
+  sessionId: string;
+  totalSymbols: number;
+  pollUrl: string;
+  resultsUrl: string;
+}
+
+export interface BackendScanProgressResponse {
+  sessionId: string;
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+  progress: {
+    completed: number;
+    total: number;
+    percentage: number;
+  };
+  estimatedTimeRemaining?: number;
+  currentChunk?: string[];
+}
+
+export interface BackendScanResultsResponse {
+  sessionId: string;
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+  startedAt: string;
+  completedAt?: string;
+  metadata?: Record<string, any>;
+  results: ScoredOpportunity[];
 }
 
 export interface SessionConfig {

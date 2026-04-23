@@ -64,7 +64,7 @@ export interface ScoredOpportunity {
   insight?: string; // Human-readable insight
   indicators?: Record<string, number>; // Daily timeframe indicators
   // Phase 1: Decision Clarity
-  decision?: 'BUY' | 'WATCH' | 'AVOID'; // Clear trading decision
+  decision?: 'BUY' | 'ACCUMULATE' | 'WAIT' | 'AVOID'; // Clear trading decision
   setupType?: 'PULLBACK' | 'BREAKOUT' | 'REVERSAL' | 'RANGE'; // Entry context
   volumeVisibility?: 'HIGH' | 'NORMAL' | 'LOW'; // Volume confirmation
   riskLevel?: 'LOW' | 'MEDIUM' | 'HIGH'; // Risk assessment

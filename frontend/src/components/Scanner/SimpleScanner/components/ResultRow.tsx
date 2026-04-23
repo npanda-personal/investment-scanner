@@ -251,27 +251,35 @@ const ResultRow: React.FC<ResultRowProps> = ({ opportunity, onAddToWatchlist, ra
   };
 
   // Get decision display properties
-  const getDecisionDisplay = (decision?: 'BUY' | 'WATCH' | 'AVOID') => {
+  const getDecisionDisplay = (decision?: 'BUY' | 'ACCUMULATE' | 'WAIT' | 'AVOID') => {
     switch (decision) {
       case 'BUY':
         return {
-          text: '✅ BUY',
+          text: 'BUY',
           color: '#10b981', // green
           bgColor: '#10b98120',
           icon: '✅',
           reason: 'High conviction + aligned trend'
         };
-      case 'WATCH':
+      case 'ACCUMULATE':
         return {
-          text: '⚠️ WATCH',
+          text: 'ACCUMULATE',
+          color: '#0ea5e9',
+          bgColor: '#0ea5e920',
+          icon: '⚠️',
+          reason: 'Trend supportive, confirmation still building'
+        };
+      case 'WAIT':
+        return {
+          text: 'WAIT',
           color: '#f59e0b', // yellow/orange
           bgColor: '#f59e0b20',
-          icon: '⚠️',
-          reason: 'Trend not fully aligned'
+          icon: '...',
+          reason: 'Setup forming, not ready'
         };
       case 'AVOID':
         return {
-          text: '❌ AVOID',
+          text: 'AVOID',
           color: '#ef4444', // red
           bgColor: '#ef444420',
           icon: '❌',
@@ -316,7 +324,8 @@ const ResultRow: React.FC<ResultRowProps> = ({ opportunity, onAddToWatchlist, ra
     // Default reasons based on decision
     switch (opportunity.decision) {
       case 'BUY': return 'High conviction + aligned trend';
-      case 'WATCH': return 'Trend not fully aligned';
+      case 'ACCUMULATE': return 'Trend supportive with partial confirmation';
+      case 'WAIT': return 'Setup forming, not ready';
       case 'AVOID': return 'Poor setup or risk';
       default: return 'No clear edge';
     }
@@ -361,7 +370,8 @@ const ResultRow: React.FC<ResultRowProps> = ({ opportunity, onAddToWatchlist, ra
                   borderRadius: '50%',
                   backgroundColor: isTopInSection ?
                     (opportunity.decision === 'BUY' ? '#10b981' :
-                     opportunity.decision === 'WATCH' ? '#f59e0b' : '#ef4444') :
+                     opportunity.decision === 'ACCUMULATE' ? '#0ea5e9' :
+                     opportunity.decision === 'WAIT' ? '#f59e0b' : '#ef4444') :
                     'action.hover',
                   color: isTopInSection ? 'white' : 'text.secondary',
                   fontSize: '0.7rem',
@@ -956,7 +966,7 @@ const ResultRow: React.FC<ResultRowProps> = ({ opportunity, onAddToWatchlist, ra
                     startIcon={<AddIcon />}
                     onClick={() => onAddToWatchlist(opportunity.symbol)}
                   >
-                    Add to Watchlist
+                    Add to watchlist
                   </Button>
                 )}
                 <Button size="small" variant="text">
@@ -972,3 +982,5 @@ const ResultRow: React.FC<ResultRowProps> = ({ opportunity, onAddToWatchlist, ra
 };
 
 export default ResultRow;
+
+

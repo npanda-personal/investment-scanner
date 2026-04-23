@@ -57,7 +57,7 @@ const ScannerDashboard: React.FC<ScannerDashboardProps> = ({
   onQuickScan,
   refreshInterval = 30000, // 30 seconds
 }) => {
-  const [dashboardStats, setDashboardStats] = useState<DashboardStats>(MOCK_DASHBOARD_STATS);
+  const [dashboardStats] = useState<DashboardStats>(MOCK_DASHBOARD_STATS);
   const [activeSessions, setActiveSessions] = useState<ScanSession[]>([]);
   const [recentOpportunities, setRecentOpportunities] = useState<ScoredOpportunity[]>([]);
   const [loading, setLoading] = useState(true);

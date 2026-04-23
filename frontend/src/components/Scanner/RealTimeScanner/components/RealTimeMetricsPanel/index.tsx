@@ -24,14 +24,13 @@ import {
 import {
   Refresh as RefreshIcon,
   TrendingUp as TrendingUpIcon,
-  TrendingDown as TrendingDownIcon,
   Memory as MemoryIcon,
   Speed as SpeedIcon,
   ErrorOutline as ErrorIcon,
   Storage as StorageIcon,
   Timeline as TimelineIcon,
 } from '@mui/icons-material';
-import { RealTimeMetricsPanelProps, SystemMetrics, MetricsHistory } from '../../../../../types/real-time-scanner';
+import { RealTimeMetricsPanelProps, SystemMetrics } from '../../../../../types/real-time-scanner';
 
 // Mock data for development
 const generateMockMetrics = (): SystemMetrics => ({
@@ -45,7 +44,7 @@ const generateMockMetrics = (): SystemMetrics => ({
 });
 
 const RealTimeMetricsPanel: React.FC<RealTimeMetricsPanelProps> = ({
-  sessionId,
+  sessionId: _sessionId,
   refreshInterval = 10000, // 10 seconds default
   compact = false,
 }) => {

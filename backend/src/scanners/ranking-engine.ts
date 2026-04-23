@@ -95,8 +95,7 @@ export class RankingEngine {
       // Calculate breakdown for decision logic
       const breakdown = this.calculateScoreBreakdown(opportunity);
       
-      // Calculate decision tag (using weekly trend as hard filter)
-      const decision = getDecision(Math.round(score), breakdown.alignmentScore, weeklyTrend);
+      const convictionScore = Math.round(score);
       
       // Calculate setup type
       const priceChange = this.calculateSimplePriceChange(opportunity);
@@ -111,6 +110,38 @@ export class RankingEngine {
       
       // Calculate risk level (depends on alignment and weekly trend, NOT conviction)
       const riskLevel = getRiskLevel(breakdown.alignmentScore, weeklyTrend);
+      const distanceToSupport = getDistanceToSupport(
+        { ...dailyIndicators, priceChange },
+        dailyTrend
+      );
+      const trendStrength = getTrendStrength(
+        { ...dailyIndicators, priceChange },
+        dailyTrend
+      );
+      const entryQuality = getEntryQuality(
+        { ...dailyIndicators, priceChange },
+        volumeContext,
+        setupType,
+        distanceToSupport
+      );
+      const decision = getDecision({
+        convictionScore,
+        alignmentScore: breakdown.alignmentScore,
+        dailyTrend,
+        weeklyTrend,
+        monthlyTrend,
+        setupType,
+        riskLevel,
+        entryQuality,
+        trendStrength,
+        signals: opportunity.signals || [],
+      });
+      const portfolioRelevance = getPortfolioRelevance(
+        decision,
+        convictionScore,
+        riskLevel,
+        entryQuality
+      );
       
       const scoredOpportunity: ScoredOpportunity = {
         symbol: opportunity.symbol,
@@ -118,18 +149,22 @@ export class RankingEngine {
         changePercent: priceChange,
         volume: currentVolume,
         signals: opportunity.signals || [],
-        score: Math.round(score), // conviction score rounded
+        score: convictionScore, // conviction score rounded
         breakdown: breakdown,
         rank: 0, // Will be set after sorting
         // New fields
         alignment: `${dailyTrend}/${weeklyTrend}/${monthlyTrend}`,
-        insight: generateInsight(dailyTrend, weeklyTrend, monthlyTrend, decision, Math.round(score), breakdown.alignmentScore, volumeContext),
+        insight: generateInsight(dailyTrend, weeklyTrend, monthlyTrend, decision, convictionScore, breakdown.alignmentScore, volumeContext),
         indicators: dailyIndicators,
         // Phase 1: Decision Clarity
         decision: decision,
         setupType: setupType,
         volumeVisibility: volumeVisibility,
-        riskLevel: riskLevel
+        riskLevel: riskLevel,
+        entryQuality,
+        distanceToSupport,
+        trendStrength,
+        portfolioRelevance,
       };
       scoredOpportunities.push(scoredOpportunity);
     }
@@ -594,7 +629,7 @@ export function getAlignmentSummary(
  * @param d - Daily trend ('BULLISH' | 'BEARISH' | 'NEUTRAL')
  * @param w - Weekly trend ('BULLISH' | 'BEARISH' | 'NEUTRAL')
  * @param m - Monthly trend ('BULLISH' | 'BEARISH' | 'NEUTRAL')
- * @param decision - Trading decision ('BUY' | 'WATCH' | 'AVOID')
+ * @param decision - Trading decision ('BUY' | 'ACCUMULATE' | 'WAIT' | 'AVOID')
  * @param convictionScore - Conviction score (0-100)
  * @param alignmentScore - Alignment score (20-90)
  * @returns Actionable insight explaining the decision
@@ -603,7 +638,7 @@ export function generateInsight(
   d: 'BULLISH' | 'BEARISH' | 'NEUTRAL',
   w: 'BULLISH' | 'BEARISH' | 'NEUTRAL',
   m: 'BULLISH' | 'BEARISH' | 'NEUTRAL',
-  decision: 'BUY' | 'WATCH' | 'AVOID',
+  decision: 'BUY' | 'ACCUMULATE' | 'WAIT' | 'AVOID',
   convictionScore: number,
   alignmentScore: number,
   volumeContext?: { label: string; emoji: string; meaning: string }
@@ -650,14 +685,17 @@ export function generateInsight(
       }
       return `${trendSummary}. ${setupContext}.${volumeInfo} BUY with ${convictionScore} conviction - consider scaling in.`;
       
-    case 'WATCH':
+    case 'ACCUMULATE':
+      return `${trendSummary}. ${setupContext}.${volumeInfo} ACCUMULATE while the broader trend remains supportive.`;
+
+    case 'WAIT':
       if (neutralCount >= 2) {
-        return `${trendSummary}. ${setupContext}.${volumeInfo} WATCH for breakout confirmation.`;
+        return `${trendSummary}. ${setupContext}.${volumeInfo} WAIT for breakout confirmation.`;
       }
       if (bullishCount === bearishCount) {
-        return `${trendSummary}. ${setupContext}.${volumeInfo} WATCH - conflicting signals need resolution.`;
+        return `${trendSummary}. ${setupContext}.${volumeInfo} WAIT - conflicting signals need resolution.`;
       }
-      return `${trendSummary}. ${setupContext}.${volumeInfo} WATCH - monitor for improved setup (${convictionScore} conviction).`;
+      return `${trendSummary}. ${setupContext}.${volumeInfo} WAIT - monitor for improved setup (${convictionScore} conviction).`;
       
     case 'AVOID':
       // Use getRejectReason for specific rejection clarity
@@ -670,41 +708,83 @@ export function generateInsight(
 }
 
 /**
- * Determine trading decision based on conviction, alignment scores, and weekly trend
- * @param convictionScore - Conviction score (0-100)
- * @param alignmentScore - Alignment score (20-90)
- * @param trendWeekly - Weekly trend: "BULLISH" | "BEARISH" | "NEUTRAL"
- * @returns Decision tag: "BUY" | "WATCH" | "AVOID"
+ * Determine trading decision from conviction, trend alignment, setup quality, and risk.
  */
 export function getDecision(
-  convictionScore: number,
-  alignmentScore: number,
-  trendWeekly: 'BULLISH' | 'BEARISH' | 'NEUTRAL'
-): 'BUY' | 'WATCH' | 'AVOID' {
-  // BUY requires strong conviction, strong alignment, AND weekly bullish trend
+  {
+    convictionScore,
+    alignmentScore,
+    dailyTrend,
+    weeklyTrend,
+    monthlyTrend,
+    setupType,
+    riskLevel,
+    entryQuality,
+    trendStrength,
+    signals,
+  }: {
+    convictionScore: number;
+    alignmentScore: number;
+    dailyTrend: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+    weeklyTrend: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+    monthlyTrend: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+    setupType: 'PULLBACK' | 'BREAKOUT' | 'REVERSAL' | 'RANGE';
+    riskLevel: 'LOW' | 'MEDIUM' | 'HIGH';
+    entryQuality: 'IDEAL' | 'OK' | 'LATE';
+    trendStrength: 'STRONG' | 'MODERATE' | 'WEAK';
+    signals: Signal[];
+  }
+): 'BUY' | 'ACCUMULATE' | 'WAIT' | 'AVOID' {
+  const trapWarning = getTrapWarning(dailyTrend, weeklyTrend);
+  const bullishSignals = signals.filter(signal => signal.direction === 'BULLISH').length;
+  const bearishSignals = signals.filter(signal => signal.direction === 'BEARISH').length;
+  const hasConflict = bullishSignals > 0 && bearishSignals > 0;
+  const strongTrendAlignment =
+    weeklyTrend === 'BULLISH' &&
+    monthlyTrend === 'BULLISH' &&
+    alignmentScore >= 80;
+  const favorableSetup = setupType === 'PULLBACK' || setupType === 'BREAKOUT';
+
   if (
-    convictionScore >= 75 &&
-    alignmentScore >= 80 &&
-    trendWeekly === "BULLISH"
+    weeklyTrend === 'BEARISH' ||
+    riskLevel === 'HIGH' ||
+    trapWarning === 'WARNING_COUNTER_TREND' ||
+    bearishSignals > bullishSignals + 1
   ) {
-    return "BUY";
+    return 'AVOID';
   }
 
-  // AVOID when weekly trend is bearish (hard filter)
-  if (trendWeekly === "BEARISH") {
-    return "AVOID";
-  }
-
-  // WATCH only if: conviction >= 55 AND alignment >= 60
   if (
-    convictionScore >= 55 &&
-    alignmentScore >= 60
+    convictionScore >= 80 &&
+    strongTrendAlignment &&
+    favorableSetup &&
+    entryQuality !== 'LATE' &&
+    trendStrength === 'STRONG' &&
+    !hasConflict
   ) {
-    return "WATCH";
+    return 'BUY';
   }
 
-  // Everything else: AVOID
-  return "AVOID";
+  if (
+    convictionScore >= 68 &&
+    weeklyTrend === 'BULLISH' &&
+    alignmentScore >= 60 &&
+    (setupType === 'PULLBACK' || setupType === 'REVERSAL' || entryQuality === 'IDEAL') &&
+    trendStrength !== 'WEAK'
+  ) {
+    return 'ACCUMULATE';
+  }
+
+  if (
+    convictionScore >= 45 ||
+    alignmentScore >= 50 ||
+    weeklyTrend === 'NEUTRAL' ||
+    hasConflict
+  ) {
+    return 'WAIT';
+  }
+
+  return 'AVOID';
 }
 
 /**
@@ -923,12 +1003,12 @@ export function getTrapWarning(
 ): string | null {
   // Trap: Daily bullish but weekly bearish (counter-trend bounce)
   if (trendDaily === "BULLISH" && trendWeekly === "BEARISH") {
-    return "⚠️ Counter-trend bounce (avoid)";
+    return "WARNING_COUNTER_TREND";
   }
   
   // Also flag if daily bearish but weekly bullish (potential reversal)
   if (trendDaily === "BEARISH" && trendWeekly === "BULLISH") {
-    return "⚠️ Pullback in uptrend (watch for entry)";
+    return "WARNING_PULLBACK";
   }
   
   return null;
@@ -1194,35 +1274,38 @@ export function getTrendStrength(
 
 /**
  * Calculate portfolio relevance (position sizing guidance)
- * @param decision - Trading decision (BUY/WATCH/AVOID)
+ * @param decision - Trading decision (BUY/ACCUMULATE/WAIT/AVOID)
  * @param convictionScore - Conviction score (0-100)
  * @param riskLevel - Risk level (LOW/MEDIUM/HIGH)
  * @param entryQuality - Entry quality (STRONG/AVERAGE/WEAK)
  * @returns Portfolio relevance: "CORE" | "SATELLITE" | "AVOID" | "SMALL"
  */
 export function getPortfolioRelevance(
-  decision: 'BUY' | 'WATCH' | 'AVOID',
+  decision: 'BUY' | 'ACCUMULATE' | 'WAIT' | 'AVOID',
   convictionScore: number,
   riskLevel: 'LOW' | 'MEDIUM' | 'HIGH',
-  entryQuality: 'STRONG' | 'AVERAGE' | 'WEAK'
+  entryQuality: 'IDEAL' | 'OK' | 'LATE'
 ): 'CORE' | 'SATELLITE' | 'AVOID' | 'SMALL' {
   // AVOID decisions should not be in portfolio
   if (decision === 'AVOID') {
     return 'AVOID';
   }
   
-  // WATCH decisions are small positions at best
-  if (decision === 'WATCH') {
+  if (decision === 'WAIT') {
     return 'SMALL';
+  }
+
+  if (decision === 'ACCUMULATE') {
+    return riskLevel === 'LOW' ? 'SATELLITE' : 'SMALL';
   }
   
   // BUY decisions with strong criteria become CORE positions
-  if (convictionScore >= 80 && riskLevel === 'LOW' && entryQuality === 'STRONG') {
+  if (convictionScore >= 80 && riskLevel === 'LOW' && entryQuality === 'IDEAL') {
     return 'CORE'; // 3-5% portfolio allocation
   }
   
   // BUY decisions with good criteria become SATELLITE positions
-  if (convictionScore >= 70 && riskLevel !== 'HIGH' && entryQuality !== 'WEAK') {
+  if (convictionScore >= 70 && riskLevel !== 'HIGH' && entryQuality !== 'LATE') {
     return 'SATELLITE'; // 1-3% portfolio allocation
   }
   

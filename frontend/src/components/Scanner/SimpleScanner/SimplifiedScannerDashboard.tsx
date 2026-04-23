@@ -27,10 +27,18 @@ import {
   SimplifiedOpportunity,
   ScanType,
   SCAN_CONFIG,
-  generateMockOpportunities,
+  transformBackendToSimplified,
 } from '../../../types/simple-scanner';
-// Note: realTimeScannerService imports would be used in a real implementation
-// import { startQuickScan, fetchSessionProgress, fetchSessionResults } from '../../../services/realTimeScannerService';
+import realTimeScannerService, {
+  startQuickScan,
+  fetchSessionProgress,
+  fetchSessionResults,
+} from '../../../services/realTimeScannerService';
+import { fetchStocks } from '../../../services/stockService';
+
+const DEFAULT_SCAN_SYMBOL_LIMIT = 50;
+const SCAN_POLL_INTERVAL_MS = 1500;
+const SCAN_POLL_TIMEOUT_MS = 120000;
 
 // Helper functions
 const getScanTypeDescription = (scanType: ScanType): string => {
@@ -63,7 +71,8 @@ const getEnhancedInsightText = (opportunities: SimplifiedOpportunity[]): string 
   }
   
   const buyCount = opportunities.filter(r => r.decision === "BUY").length;
-  const watchCount = opportunities.filter(r => r.decision === "WATCH").length;
+  const accumulateCount = opportunities.filter(r => r.decision === "ACCUMULATE").length;
+  const waitCount = opportunities.filter(r => r.decision === "WAIT").length;
   const avoidCount = opportunities.filter(r => r.decision === "AVOID").length;
   
   // Calculate average metrics for smarter insights
@@ -81,15 +90,12 @@ const getEnhancedInsightText = (opportunities: SimplifiedOpportunity[]): string 
     marketCondition = "bullish";
   } else if (avoidCount >= opportunities.length * 0.7) {
     marketCondition = "bearish";
-  } else if (watchCount >= opportunities.length * 0.5) {
+  } else if (accumulateCount + waitCount >= opportunities.length * 0.5) {
     marketCondition = "neutral";
   }
   
   // Generate smart summary based on metrics
   if (buyCount > 0) {
-    const buyOpportunities = opportunities.filter(r => r.decision === "BUY");
-    const bestBuy = buyOpportunities[0]; // Already sorted by rank
-    
     let additionalInsights = [];
     if (idealEntryCount > 0) additionalInsights.push(`${idealEntryCount} ideal entries`);
     if (nearSupportCount > 0) additionalInsights.push(`${nearSupportCount} near support`);
@@ -98,21 +104,22 @@ const getEnhancedInsightText = (opportunities: SimplifiedOpportunity[]): string 
     const additionalText = additionalInsights.length > 0 ? ` (${additionalInsights.join(', ')})` : '';
     
     return `${buyCount} high-conviction setups found in ${marketCondition} market${additionalText}. Avg conviction: ${avgConviction.toFixed(0)}/100`;
-  } else if (watchCount > 0) {
-    // Analyze why no BUY opportunities
+  } else if (accumulateCount > 0) {
+    return `${accumulateCount} accumulation candidates found. Trend remains constructive, but entries still need scaling discipline.`;
+  } else if (waitCount > 0) {
     const lowConvictionCount = opportunities.filter(opp => (opp.conviction || opp.score || 0) < 55).length;
     const poorAlignmentCount = opportunities.filter(opp => (opp.alignmentScore || 0) < 60).length;
     
     let reason = "market is mixed";
-    if (lowConvictionCount >= watchCount * 0.7) {
+    if (lowConvictionCount >= waitCount * 0.7) {
       reason = "low conviction across opportunities";
-    } else if (poorAlignmentCount >= watchCount * 0.7) {
+    } else if (poorAlignmentCount >= waitCount * 0.7) {
       reason = "poor trend alignment";
     } else if (strongTrendCount === 0) {
       reason = "weak trend strength";
     }
     
-    return `No strong setups. ${watchCount} watch candidates found (${reason}). Avg alignment: ${avgAlignment.toFixed(0)}/100`;
+    return `Setups are still forming. ${waitCount} names need more confirmation (${reason}). Avg alignment: ${avgAlignment.toFixed(0)}/100`;
   } else {
     // All AVOID - market is unfavorable
     const bearishTrendCount = opportunities.filter(opp => opp.alignment?.includes("BEARISH")).length;
@@ -158,10 +165,16 @@ const getTopPick = (opportunities: SimplifiedOpportunity[]): SimplifiedOpportuni
     );
   }
   
-  // If no BUY at all, look for WATCH with highest conviction
-  const watchOpportunities = opportunities.filter(opp => opp.decision === "WATCH");
-  if (watchOpportunities.length > 0) {
-    return watchOpportunities.reduce((best, current) =>
+  const accumulateOpportunities = opportunities.filter(opp => opp.decision === "ACCUMULATE");
+  if (accumulateOpportunities.length > 0) {
+    return accumulateOpportunities.reduce((best, current) =>
+      (current.conviction || current.score) > (best.conviction || best.score) ? current : best
+    );
+  }
+
+  const waitOpportunities = opportunities.filter(opp => opp.decision === "WAIT");
+  if (waitOpportunities.length > 0) {
+    return waitOpportunities.reduce((best, current) =>
       (current.conviction || current.score) > (best.conviction || best.score) ? current : best
     );
   }
@@ -219,7 +232,7 @@ const getTrapWarning = (opportunity: SimplifiedOpportunity): string | null => {
   
   // Also flag if daily bearish but weekly bullish (potential reversal)
   if (dailyTrend === "BEARISH" && weeklyTrend === "BULLISH") {
-    return "⚠️ Pullback in uptrend (watch for entry)";
+    return "⚠️ Pullback in uptrend (wait for entry)";
   }
   
   return null;
@@ -243,6 +256,8 @@ const formatTimeAgo = (dateString: string | null): string => {
   return date.toLocaleDateString();
 };
 
+const sleep = (ms: number) => new Promise(resolve => window.setTimeout(resolve, ms));
+
 const SimplifiedScannerDashboard: React.FC = () => {
   // State
   const [scanType, setScanType] = useState<ScanType>('momentum');
@@ -257,7 +272,6 @@ const SimplifiedScannerDashboard: React.FC = () => {
   
   // Refs for intervals
   const autoRefreshRef = useRef<number | null>(null);
-  const scanIntervalRef = useRef<number | null>(null);
 
   // Load initial data
   useEffect(() => {
@@ -265,23 +279,96 @@ const SimplifiedScannerDashboard: React.FC = () => {
   }, []);
 
   const loadInitialData = async () => {
+    await loadDashboardOpportunities(false);
+  };
+
+  const getDatabaseSymbolsForScan = async (): Promise<string[]> => {
+    const response = await fetchStocks({
+      page: 1,
+      pageSize: DEFAULT_SCAN_SYMBOL_LIMIT,
+      sortBy: 'symbol',
+      sortOrder: 'asc',
+    });
+
+    return response.stocks
+      .filter(stock => stock.isActive)
+      .map(stock => stock.symbol)
+      .filter(Boolean)
+      .slice(0, DEFAULT_SCAN_SYMBOL_LIMIT);
+  };
+
+  const pollScanResults = async (sessionId: string): Promise<SimplifiedOpportunity[]> => {
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < SCAN_POLL_TIMEOUT_MS) {
+      const progress = await fetchSessionProgress(sessionId);
+      setScanProgress(Math.max(25, progress.progress.percentage));
+
+      if (progress.status === 'FAILED' || progress.status === 'CANCELLED') {
+        throw new Error(`Scan ${progress.status.toLowerCase()}.`);
+      }
+
+      if (progress.status === 'COMPLETED') {
+        const resultsPayload = await fetchSessionResults(sessionId);
+        return resultsPayload.results
+          .map(transformBackendToSimplified)
+          .sort((a: SimplifiedOpportunity, b: SimplifiedOpportunity) => {
+            const aPriority = a.rank || Number.MAX_SAFE_INTEGER;
+            const bPriority = b.rank || Number.MAX_SAFE_INTEGER;
+            if (aPriority !== bPriority) {
+              return aPriority - bPriority;
+            }
+            return (b.conviction ?? b.score ?? 0) - (a.conviction ?? a.score ?? 0);
+          });
+      }
+
+      await sleep(SCAN_POLL_INTERVAL_MS);
+    }
+
+    throw new Error('Scan timed out before results were ready.');
+  };
+
+  const loadDashboardOpportunities = async (showScanState: boolean) => {
     try {
-      setIsLoading(true);
+      if (showScanState) {
+        setIsScanning(true);
+        setScanProgress(20);
+      } else {
+        setIsLoading(true);
+      }
       setError(null);
-      
-      // For now, use mock data
-      // In a real implementation, we would fetch cached results or run a default scan
-      const mockData = generateMockOpportunities(10);
-      setOpportunities(mockData);
-      setLastUpdated(new Date().toISOString());
+
+      const dashboardData = await realTimeScannerService.fetchDashboardData();
+      const liveOpportunities = (dashboardData.topOpportunities || dashboardData.recentOpportunities || [])
+        .map(transformBackendToSimplified)
+        .sort((a, b) => {
+          const aPriority = a.rank || Number.MAX_SAFE_INTEGER;
+          const bPriority = b.rank || Number.MAX_SAFE_INTEGER;
+          if (aPriority !== bPriority) {
+            return aPriority - bPriority;
+          }
+          return (b.conviction ?? b.score ?? 0) - (a.conviction ?? a.score ?? 0);
+        });
+
+      if (showScanState) {
+        setScanProgress(80);
+      }
+
+      setOpportunities(liveOpportunities);
+      setFoundDuringScan(liveOpportunities.length);
+      setLastUpdated(dashboardData.lastUpdated || new Date().toISOString());
     } catch (err) {
-      console.error('Error loading initial data:', err);
-      setError('Failed to load initial data. Using mock data instead.');
-      // Fallback to mock data
-      const mockData = generateMockOpportunities(10);
-      setOpportunities(mockData);
-      setLastUpdated(new Date().toISOString());
+      console.error('Error loading scanner data:', err);
+      setError('Failed to load live scanner data from the database.');
     } finally {
+      if (showScanState) {
+        setScanProgress(100);
+        setTimeout(() => {
+          setIsScanning(false);
+          setScanProgress(0);
+          setFoundDuringScan(0);
+        }, 150);
+      }
       setIsLoading(false);
     }
   };
@@ -304,84 +391,41 @@ const SimplifiedScannerDashboard: React.FC = () => {
     };
   }, [autoRefresh]);
 
-  // Poll for scan progress (mock implementation)
-  useEffect(() => {
-    if (isScanning) {
-      // Clear any existing interval
-      if (scanIntervalRef.current) {
-        clearInterval(scanIntervalRef.current);
-      }
-
-      // Simulate scan progress with dynamic found count
-      let progress = 0;
-      let foundCount = 0;
-      
-      scanIntervalRef.current = window.setInterval(() => {
-        progress += 8; // Slightly slower for better UX
-        setScanProgress(progress);
-        
-        // Simulate finding opportunities during scan
-        if (progress > 20 && progress < 80 && Math.random() > 0.7) {
-          foundCount += Math.floor(Math.random() * 3) + 1;
-          setFoundDuringScan(foundCount);
-        }
-        
-        if (progress >= 100) {
-          // Scan completed
-          if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
-          setIsScanning(false);
-          setFoundDuringScan(0);
-          
-          // Generate mock results (keep some from previous if any)
-          const mockData = generateMockOpportunities(10);
-          setOpportunities(mockData);
-          setLastUpdated(new Date().toISOString());
-          setError(null);
-        }
-      }, 600); // Update every 600ms
-    } else {
-      // Clean up interval when not scanning
-      if (scanIntervalRef.current) {
-        clearInterval(scanIntervalRef.current);
-        scanIntervalRef.current = null;
-      }
-    }
-
-    return () => {
-      if (scanIntervalRef.current) {
-        clearInterval(scanIntervalRef.current);
-      }
-    };
-  }, [isScanning]);
-
   const handleRunScan = async () => {
     try {
       setIsScanning(true);
       setError(null);
-      setScanProgress(0);
+      setScanProgress(10);
       setFoundDuringScan(0);
 
-      // DO NOT clear previous results - keep them visible during scan
-      // This provides continuity and avoids empty screen
-      
-      // Note: In a real implementation, we would use:
-      // const signalTypes = SCAN_CONFIG[scanType];
-      
-      // In a real implementation, we would call:
-      // const session = await startQuickScan(demoSymbols, signalTypes);
-      // setActiveSessionId(session.id);
-      
-      // For demo, we'll simulate the scan with the progress timer above
+      const symbols = await getDatabaseSymbolsForScan();
+      if (symbols.length === 0) {
+        throw new Error('No active stocks are available in the database to scan.');
+      }
+
+      const scanSession = await startQuickScan(symbols, SCAN_CONFIG[scanType]);
+      setScanProgress(20);
+
+      const liveResults = await pollScanResults(scanSession.sessionId);
+      setScanProgress(100);
+      setOpportunities(liveResults);
+      setFoundDuringScan(liveResults.length);
+      setLastUpdated(new Date().toISOString());
     } catch (err) {
       console.error('Error starting scan:', err);
-      setError('Failed to start scan. Using mock data instead.');
-      
-      // Fallback to mock data
-      const mockData = generateMockOpportunities(10);
-      setOpportunities(mockData);
-      setLastUpdated(new Date().toISOString());
+      const message = err instanceof Error ? err.message : 'Failed to complete live scan.';
+      setError(message);
       setIsScanning(false);
+      setScanProgress(0);
+      setFoundDuringScan(0);
+      return;
     }
+
+    window.setTimeout(() => {
+      setIsScanning(false);
+      setScanProgress(0);
+      setFoundDuringScan(0);
+    }, 200);
   };
 
   const handleRefresh = () => {
@@ -562,9 +606,20 @@ const SimplifiedScannerDashboard: React.FC = () => {
       {topPick && (
         <Fade in={!isLoading}>
           <Alert
-            severity="success"
+            severity={topPick.decision === 'AVOID' ? 'error' : topPick.decision === 'WAIT' ? 'info' : 'success'}
             icon={<span>⭐</span>}
-            sx={{ mb: 2, border: '1px solid', borderColor: 'success.light', backgroundColor: 'success.50' }}
+            sx={{
+              mb: 2,
+              border: '1px solid',
+              borderColor:
+                topPick.decision === 'BUY'
+                  ? 'success.light'
+                  : topPick.decision === 'ACCUMULATE'
+                    ? 'info.light'
+                    : topPick.decision === 'WAIT'
+                      ? 'warning.light'
+                      : 'error.light',
+            }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
               <Box>
@@ -578,7 +633,15 @@ const SimplifiedScannerDashboard: React.FC = () => {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Chip
                   label={topPick.decision}
-                  color={topPick.decision === 'BUY' ? 'success' : topPick.decision === 'WATCH' ? 'warning' : 'error'}
+                  color={
+                    topPick.decision === 'BUY'
+                      ? 'success'
+                      : topPick.decision === 'ACCUMULATE'
+                        ? 'info'
+                        : topPick.decision === 'WAIT'
+                          ? 'warning'
+                          : 'error'
+                  }
                   size="small"
                   variant="outlined"
                 />

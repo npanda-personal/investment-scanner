@@ -21,21 +21,16 @@ import {
   Alert,
   CircularProgress,
   Paper,
-  Divider,
-  IconButton,
   Tooltip,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import InfoIcon from '@mui/icons-material/Info';
 import {
   SessionCreationWizardProps,
   ScanPreset,
   SignalDefinition,
   SessionConfig,
-  TriggerScanRequest,
-  SignalType,
 } from '../../../../../types/real-time-scanner';
 
 // Mock data for development
@@ -124,7 +119,7 @@ const DEFAULT_SESSION_CONFIG: SessionConfig = {
 const steps = ['Scope Selection', 'Signal Configuration', 'Ranking & Filtering', 'Review & Launch'];
 
 const SessionCreationWizard: React.FC<SessionCreationWizardProps> = ({
-  userId,
+  userId: _userId,
   onSuccess,
   onCancel,
   initialPresetId,
@@ -138,7 +133,6 @@ const SessionCreationWizard: React.FC<SessionCreationWizardProps> = ({
     },
   });
   const [availablePresets, setAvailablePresets] = useState<ScanPreset[]>([]);
-  const [availableSignals, setAvailableSignals] = useState<SignalDefinition[]>([]);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -151,7 +145,6 @@ const SessionCreationWizard: React.FC<SessionCreationWizardProps> = ({
         // TODO: Replace with actual API calls
         // For now, use mock data
         setAvailablePresets(MOCK_PRESETS);
-        setAvailableSignals(MOCK_SIGNALS);
       } catch (err) {
         console.error('Failed to load presets/signals:', err);
       } finally {

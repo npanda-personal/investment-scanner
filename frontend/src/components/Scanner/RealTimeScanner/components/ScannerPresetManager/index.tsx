@@ -10,14 +10,12 @@ import {
   Button,
   IconButton,
   Tooltip,
-  Divider,
   TextField,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   Alert,
-  Stack,
   MenuItem,
   Select,
   FormControl,
@@ -28,7 +26,6 @@ import {
 } from '@mui/material';
 import {
   Add,
-  Edit,
   Delete,
   ContentCopy,
   Star,
@@ -38,7 +35,6 @@ import {
   Psychology,
   Timeline,
   Save,
-  Cancel,
   MoreVert,
 } from '@mui/icons-material';
 import { ScannerPresetManagerProps, ScanPreset } from '../../../../../types/real-time-scanner';

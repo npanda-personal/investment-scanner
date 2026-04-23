@@ -4,16 +4,34 @@ import {
   ScoredOpportunity,
   DashboardStats,
   ScanProgressResponse,
+  BackendScanProgressResponse,
+  BackendScanResultsResponse,
   SignalDefinition,
   ScanPreset,
   SessionConfig,
   TriggerScanRequest,
   DashboardData,
   ResultFilters,
+  StartScanResponse,
 } from '../types/real-time-scanner';
 
 const API_BASE = '/api';
 const REAL_TIME_SCANNER_BASE = `${API_BASE}/real-time-scanner`;
+
+const toBackendScopeType = (scopeType: SessionConfig['scope']['type'] | TriggerScanRequest['scope']['type']) => {
+  switch (scopeType) {
+    case 'preset':
+    case 'PRESET':
+      return 'PRESET';
+    case 'watchlist':
+    case 'WATCHLIST':
+      return 'WATCHLIST';
+    case 'custom':
+    case 'CUSTOM':
+    default:
+      return 'CUSTOM';
+  }
+};
 
 // Helper to get current user ID (in a real app, this would come from auth context)
 const getCurrentUserId = (): string => {
@@ -61,12 +79,15 @@ export const fetchDashboardStats = async (): Promise<DashboardStats> => {
 };
 
 // Session Management API
-export const startScanSession = async (config: SessionConfig): Promise<ScanSession> => {
+export const startScanSession = async (config: SessionConfig): Promise<StartScanResponse> => {
   try {
     const userId = getCurrentUserId();
     const request: TriggerScanRequest = {
-      scope: config.scope,
-      signals: config.signals,
+      scope: {
+        ...config.scope,
+        type: toBackendScopeType(config.scope.type),
+      },
+      signals: config.signals.map(signal => signal.type),
       rankingConfig: config.rankingConfig,
       name: config.name,
       description: config.description,
@@ -92,7 +113,7 @@ export const fetchScanSession = async (sessionId: string): Promise<ScanSession> 
   }
 };
 
-export const fetchSessionProgress = async (sessionId: string): Promise<ScanProgressResponse> => {
+export const fetchSessionProgress = async (sessionId: string): Promise<BackendScanProgressResponse> => {
   try {
     const response = await axios.get(`${REAL_TIME_SCANNER_BASE}/scan/${sessionId}/progress`);
     return response.data;
@@ -107,7 +128,7 @@ export const fetchSessionResults = async (
   filters?: ResultFilters,
   page = 1,
   pageSize = 50
-): Promise<{ opportunities: ScoredOpportunity[]; total: number }> => {
+): Promise<BackendScanResultsResponse> => {
   try {
     const response = await axios.get(`${REAL_TIME_SCANNER_BASE}/scan/${sessionId}/results`, {
       params: { 
@@ -224,25 +245,15 @@ export const deleteScanPreset = async (presetId: string): Promise<void> => {
 };
 
 // Quick Scan API
-export const startQuickScan = async (symbols: string[], signalTypes?: string[]): Promise<ScanSession> => {
+export const startQuickScan = async (symbols: string[], signalTypes?: string[]): Promise<StartScanResponse> => {
   try {
     const userId = getCurrentUserId();
     const request: TriggerScanRequest = {
       scope: {
-        type: 'custom',
+        type: 'CUSTOM',
         symbols,
       },
-      signals: signalTypes 
-        ? signalTypes.map(type => ({ 
-            id: `quick-${type}`, 
-            type: type as any, 
-            name: type, 
-            description: `Quick ${type} scan`,
-            enabled: true,
-            parameters: {},
-            weight: 100 / (signalTypes.length || 1),
-          }))
-        : [],
+      signals: signalTypes || [],
       rankingConfig: {
         signalWeight: 70,
         volumeWeight: 15,
@@ -255,7 +266,7 @@ export const startQuickScan = async (symbols: string[], signalTypes?: string[]):
       description: 'Quick scan session',
     };
     
-    const response = await axios.post(`${REAL_TIME_SCANNER_BASE}/scan/quick`, request, {
+    const response = await axios.post(`${REAL_TIME_SCANNER_BASE}/scan/start`, request, {
       params: { userId },
     });
     return response.data;
@@ -483,8 +494,8 @@ export const mockFetchSessionProgress = async (sessionId: string): Promise<ScanP
 };
 
 export const mockFetchSessionResults = async (
-  sessionId: string, 
-  filters?: ResultFilters,
+  _sessionId: string, 
+  _filters?: ResultFilters,
   page = 1,
   pageSize = 50
 ): Promise<{ opportunities: ScoredOpportunity[]; total: number }> => {
@@ -512,6 +523,9 @@ const realTimeScannerService = {
   fetchDashboardData: isMockMode ? mockFetchDashboardData : fetchDashboardData,
   fetchDashboardStats: isMockMode ? async (): Promise<DashboardStats> => {
     const data = await mockFetchDashboardData();
+    if (!data.stats) {
+      throw new Error('Mock dashboard stats unavailable');
+    }
     return data.stats;
   } : fetchDashboardStats,
   
@@ -582,7 +596,7 @@ const realTimeScannerService = {
   } : deleteScanPreset,
   
   // Quick Scan
-  startQuickScan: isMockMode ? async (symbols: string[], signalTypes?: string[]) => {
+  startQuickScan: isMockMode ? async (symbols: string[], _signalTypes?: string[]) => {
     await new Promise(resolve => setTimeout(resolve, 600));
     return generateMockSession({
       name: `Quick Scan - ${symbols.length} symbols`,
@@ -592,7 +606,7 @@ const realTimeScannerService = {
   } : startQuickScan,
   
   // Export
-  exportResultsToCSV: isMockMode ? async (sessionId: string) => {
+  exportResultsToCSV: isMockMode ? async (_sessionId: string) => {
     await new Promise(resolve => setTimeout(resolve, 800));
     return new Blob(['Mock CSV data'], { type: 'text/csv' });
   } : exportResultsToCSV,

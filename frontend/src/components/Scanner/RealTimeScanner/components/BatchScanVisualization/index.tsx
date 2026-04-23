@@ -16,14 +16,12 @@ import {
 } from '@mui/material';
 import {
   PlayCircle,
-  PauseCircle,
   CheckCircle,
   Error,
   Schedule,
   Speed,
   GridView,
   Timeline,
-  BarChart,
   ZoomIn,
 } from '@mui/icons-material';
 import { BatchScanVisualizationProps, ChunkStatus } from '../../../../../types/real-time-scanner';

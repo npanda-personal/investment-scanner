@@ -64,6 +64,7 @@ const EXCHANGE_TO_REGION: Record<string, string> = {
   // European
   XETRA: 'EU',
   EURONEXT: 'EU',
+  AMS: 'EU',
   LSE: 'UK',
   BORSA_ITALIANA: 'EU',
   // Canadian

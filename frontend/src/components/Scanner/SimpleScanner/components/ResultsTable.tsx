@@ -44,17 +44,14 @@ const ResultsTable: React.FC<ResultsTableProps> = ({
     );
   }
 
-  // Group opportunities by decision type and sort by conviction DESC, then alignment
   const sortOpportunities = (opps: SimplifiedOpportunity[]) => {
     return [...opps].sort((a, b) => {
-      // First by conviction (higher is better)
       const aConviction = a.conviction ?? a.score ?? 0;
       const bConviction = b.conviction ?? b.score ?? 0;
       if (bConviction !== aConviction) {
         return bConviction - aConviction;
       }
-      
-      // Then by alignment score (higher is better)
+
       const aAlignment = a.alignmentScore ?? 0;
       const bAlignment = b.alignmentScore ?? 0;
       return bAlignment - aAlignment;
@@ -62,11 +59,12 @@ const ResultsTable: React.FC<ResultsTableProps> = ({
   };
 
   const buyOpportunities = sortOpportunities(opportunities.filter(opp => opp.decision === 'BUY'));
-  const watchOpportunities = sortOpportunities(opportunities.filter(opp => opp.decision === 'WATCH'));
+  const accumulateOpportunities = sortOpportunities(opportunities.filter(opp => opp.decision === 'ACCUMULATE'));
+  const waitOpportunities = sortOpportunities(opportunities.filter(opp => opp.decision === 'WAIT'));
   const avoidOpportunities = sortOpportunities(opportunities.filter(opp => opp.decision === 'AVOID'));
 
-  const renderSection = (title: string, opportunities: SimplifiedOpportunity[], color: string, icon: string) => {
-    if (opportunities.length === 0) return null;
+  const renderSection = (title: string, sectionOpportunities: SimplifiedOpportunity[], color: string, icon: string) => {
+    if (sectionOpportunities.length === 0) return null;
 
     return (
       <>
@@ -74,11 +72,11 @@ const ResultsTable: React.FC<ResultsTableProps> = ({
           <TableCell colSpan={9} sx={{ py: 1, borderBottom: `2px solid ${color}30` }}>
             <Typography variant="subtitle1" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <span>{icon}</span>
-              {title} ({opportunities.length})
+              {title} ({sectionOpportunities.length})
             </Typography>
           </TableCell>
         </TableRow>
-        {opportunities.map((opportunity, index) => (
+        {sectionOpportunities.map((opportunity, index) => (
           <ResultRow
             key={opportunity.id}
             opportunity={opportunity}
@@ -140,9 +138,10 @@ const ResultsTable: React.FC<ResultsTableProps> = ({
           </TableRow>
         </TableHead>
         <TableBody>
-          {renderSection('✅ BUY (Top Opportunities)', buyOpportunities, '#10b981', '✅')}
-          {renderSection('👀 WATCH (Potential Setups)', watchOpportunities, '#f59e0b', '👀')}
-          {renderSection('❌ AVOID (Filtered Out)', avoidOpportunities, '#ef4444', '❌')}
+          {renderSection('BUY (Highest Priority)', buyOpportunities, '#10b981', '▲')}
+          {renderSection('ACCUMULATE (Constructive)', accumulateOpportunities, '#0ea5e9', '+')}
+          {renderSection('WAIT (Setup Forming)', waitOpportunities, '#f59e0b', '...')}
+          {renderSection('AVOID (Risk Elevated)', avoidOpportunities, '#ef4444', 'x')}
         </TableBody>
       </Table>
     </TableContainer>
