@@ -25,34 +25,36 @@ router.post('/run', async (req, res) => {
   }
 });
 
-// GET /api/scanner/:id — fetch stored scan results
-router.get('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const result = await scanRunService.getScanRun(id);
-    return res.json(result);
-  } catch (error) {
-    if (error instanceof Error && error.message === 'ScanRun not found') {
-      return res.status(404).json({ error: 'Scan run not found' });
+  // GET /api/scanner/latest — fetch the latest scan run for the current user
+  router.get('/latest', async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      let result = await scanRunService.getLatestScanRun(userId);
+      if (!result) {
+        // If no scan run is found, trigger a new scan
+        console.log('No latest scan run found, triggering a new scan...');
+        result = await scanRunService.runScan(userId);
+      }
+      return res.json(result);
+    } catch (error) {
+      console.error('Error fetching/running latest scan run:', error);
+      return res.status(500).json({ error: 'Failed to fetch or run latest scan run' });
     }
-    console.error('Error fetching scan run:', error);
-    return res.status(500).json({ error: 'Failed to fetch scan run' });
-  }
-});
-
-// GET /api/scanner/latest — fetch the latest scan run for the current user
-router.get('/latest', async (req, res) => {
-  try {
-    const userId = getUserId(req);
-    const result = await scanRunService.getLatestScanRun(userId);
-    if (!result) {
-      return res.status(404).json({ error: 'No scan runs found for this user' });
+  });
+  
+  // GET /api/scanner/:id — fetch stored scan results
+  router.get('/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const result = await scanRunService.getScanRun(id);
+      return res.json(result);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'ScanRun not found') {
+        return res.status(404).json({ error: 'Scan run not found' });
+      }
+      console.error('Error fetching scan run:', error);
+      return res.status(500).json({ error: 'Failed to fetch scan run' });
     }
-    return res.json(result);
-  } catch (error) {
-    console.error('Error fetching latest scan run:', error);
-    return res.status(500).json({ error: 'Failed to fetch latest scan run' });
-  }
-});
+  });
 
 export default router;

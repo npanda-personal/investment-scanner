@@ -246,6 +246,9 @@ export class ScanRunService {
    * persist ScanRun + ScanResults, return DTO.
    */
   async runScan(userId: string): Promise<ScanRunDTO> {
+    console.log('Starting runScan...'); // Added log
+    console.log('runScan received userId:', userId); // Log userId
+
     // 1. Check if there's new candle data available for scanning
     const maxLastLoadTimestamp = await this.prisma.stock.aggregate({
       _max: {
@@ -258,23 +261,24 @@ export class ScanRunService {
     const hasNewData = !maxLastLoadTimestamp._max.lastSuccessfulDataLoadTimestamp ||
                       currentTime > new Date(maxLastLoadTimestamp._max.lastSuccessfulDataLoadTimestamp);
 
-    if (!hasNewData) {
-      // Create a scan run with a special flag indicating no new data
-      const scanRun = await this.prisma.$transaction(async (tx) => {
-        const run = await tx.scanRun.create({
-          data: {
-            userId,
-            strategyConfig: {
-              type: 'smart-money',
-              description: 'Price + Volume pattern detection',
-              noNewData: true,
-            } as Prisma.InputJsonValue,
-          },
+      if (!hasNewData) {
+        // Create a scan run with a special flag indicating no new data
+        const scanRun = await this.prisma.$transaction(async (tx) => {
+          const run = await tx.scanRun.create({
+            data: {
+              userId,
+              strategyConfig: {
+                type: 'smart-money',
+                description: 'Price + Volume pattern detection',
+                noNewData: true,
+              } as Prisma.InputJsonValue,
+            },
+          });
+          console.log('Created ScanRun (no new data) with ID:', run.id, 'userId:', run.userId);
+          return run;
         });
-        return run;
-      });
-      return this.getScanRun(scanRun.id);
-    }
+        return this.getScanRun(scanRun.id);
+      }
 
     // 2. Fetch all active stocks from the database
     const stocks = await this.prisma.stock.findMany({
@@ -282,22 +286,23 @@ export class ScanRunService {
       select: { symbol: true },
     });
 
-    if (stocks.length === 0) {
-      // No stocks to scan — create an empty scan run
-      const scanRun = await this.prisma.$transaction(async (tx) => {
-        const run = await tx.scanRun.create({
-          data: {
-            userId,
-            strategyConfig: {
-              type: 'smart-money',
-              description: 'Price + Volume pattern detection',
-            } as Prisma.InputJsonValue,
-          },
+      if (stocks.length === 0) {
+        // No stocks to scan — create an empty scan run
+        const scanRun = await this.prisma.$transaction(async (tx) => {
+          const run = await tx.scanRun.create({
+            data: {
+              userId,
+              strategyConfig: {
+                type: 'smart-money',
+                description: 'Price + Volume pattern detection',
+              } as Prisma.InputJsonValue,
+            },
+          });
+          console.log('Created empty ScanRun with ID:', run.id, 'userId:', run.userId);
+          return run;
         });
-        return run;
-      });
-      return this.getScanRun(scanRun.id);
-    }
+        return this.getScanRun(scanRun.id);
+      }
 
     const symbols = stocks.map((s) => s.symbol);
 
@@ -432,6 +437,7 @@ export class ScanRunService {
             symbol: signal.symbol,
             signalType: signal.signalType,
             strength: signal.strength,
+            timestamp: run.createdAt, // Add timestamp
             metadata: {
               description: signal.description,
               explanation: signal.explanation,
@@ -467,17 +473,20 @@ export class ScanRunService {
    * Get the latest scan run for a user.
    */
   async getLatestScanRun(userId: string): Promise<ScanRunDTO | null> {
-    const run = await this.prisma.scanRun.findFirst({
+    const runs = await this.prisma.scanRun.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
-      include: { results: { orderBy: { timestamp: 'desc' } } },
+      include: { results: { orderBy: { timestamp: 'desc' } } }, // Ensure results are sorted by their timestamp
     });
 
-    if (!run) {
-      return null;
+    // Find the first run that actually has results
+    const latestRunWithResults = runs.find(run => run.results && run.results.length > 0);
+
+    if (!latestRunWithResults) {
+      return null; // No scan runs with results found
     }
 
-    return this.toDTO(run);
+    return this.toDTO(latestRunWithResults);
   }
 
   // ── Private helpers ───────────────────────────
@@ -565,7 +574,7 @@ export class ScanRunService {
         description: (r.metadata as any)?.description ?? '',
         explanation: (r.metadata as any)?.explanation ?? '',
         stocks: (r.metadata as any)?.stocks ?? [],
-        timestamp: r.timestamp.toISOString(),
+        timestamp: r.timestamp ? r.timestamp.toISOString() : new Date().toISOString(),
       })),
       noNewData: (run.strategyConfig as any)?.noNewData ?? false,
     };
