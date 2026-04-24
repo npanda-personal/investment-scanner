@@ -17,6 +17,28 @@ const getUserId = (req: express.Request): string => {
 router.post('/run', async (req, res) => {
   try {
     const userId = getUserId(req);
+    // Check for new data availability
+    const maxStock = await scanRunService.prisma.stock.aggregate({
+      _max: { lastSuccessfulDataLoadTimestamp: true },
+      where: { isActive: true },
+    });
+    const maxResult = await scanRunService.prisma.scanResult.aggregate({
+      _max: { timestamp: true },
+    });
+
+    const stockTs = maxStock._max.lastSuccessfulDataLoadTimestamp;
+    const scanTs = maxResult._max.timestamp;
+
+    console.log('[ScanCheck] stockTs:', stockTs, 'scanTs:', scanTs);
+
+    // If no scan results yet, proceed with scan (first scan)
+    if (!scanTs) {
+      // proceed
+    } else if (!stockTs || stockTs <= scanTs) {
+      return res
+        .status(200)
+        .json({ noNewData: true, message: 'No new data available for running a new scan.' });
+    }
     const result = await scanRunService.runScan(userId);
     return res.status(201).json(result);
   } catch (error) {
