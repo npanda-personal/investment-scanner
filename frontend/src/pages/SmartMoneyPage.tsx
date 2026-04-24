@@ -123,7 +123,7 @@ const SmartMoneyPage = () => {
     setError(null);
     try {
       const result = await runBacktestFromScan(scanRunId);
-      setBacktestResult(`Backtest completed: ${result.symbols.length} symbols, config ${result.configId}`);
+      setBacktestResult(`Backtest config creation completed: ${result.symbols.length} symbols. Please check the backtest page to run the backtest and view results. Config ${result.configId}`);
       console.log('Backtest result:', result);
     } catch (err) {
       setError('Failed to run backtest from scan. Please try again.');
