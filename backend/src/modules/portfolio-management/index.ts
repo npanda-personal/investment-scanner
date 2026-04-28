@@ -18,6 +18,7 @@ export type {
   CreatePortfolioRequest,
   CreateTransactionRequest,
   HoldingValuationDto,
+  AllocationBucketDto,
   PortfolioAllocationDto,
   PortfolioDto,
   PortfolioHoldingDto,
@@ -27,4 +28,3 @@ export type {
   UpdateHoldingRequest,
   UpdatePortfolioRequest,
 } from './portfolio-management.types';
-

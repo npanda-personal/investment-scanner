@@ -19,6 +19,7 @@ import {
 } from '@mui/material';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { SignalBadge } from '@/features/signal-generation-engine';
+import { PortfolioIntelligencePanel } from '@/features/portfolio-intelligence';
 import {
   addHolding,
   createPortfolio,
@@ -355,6 +356,8 @@ const PortfolioManagementPage: React.FC = () => {
                 <AllocationList title="Countries" buckets={allocation.byCountry} currency={baseCurrency} />
               </Box>
             )}
+
+            <PortfolioIntelligencePanel portfolioId={selectedId} />
 
             <Paper sx={{ p: 2 }}>
               <Typography variant="h6" sx={{ mb: 2 }}>Transactions</Typography>
