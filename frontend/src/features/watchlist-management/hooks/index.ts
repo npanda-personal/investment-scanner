@@ -1,0 +1,1 @@
+export { useWatchlistManagement } from './useWatchlistManagement';

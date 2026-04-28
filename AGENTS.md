@@ -2,13 +2,14 @@ You are working inside my existing full-stack TypeScript project.
 
 # Primary Goal
 
-Refactor and evolve this project into a modular monolith architecture where:
+Build and evolve this project as a clean modular monolith architecture where:
 
 - Each business capability is independently organized.
 - Changes in one module are unlikely to break another.
-- Legacy code is gradually retired.
-- New development happens only in modular boundaries.
-- The codebase remains production-safe during refactors.
+- New development happens only within modular boundaries.
+- The codebase remains production-safe during changes.
+- Product delivery speed stays high.
+- Code ownership is clear.
 
 # Current Tech Stack
 
@@ -23,62 +24,50 @@ Refactor and evolve this project into a modular monolith architecture where:
 - Vite
 - TypeScript
 
-# Product Domains / Modules
+# Current Active Product Modules
 
-Examples include:
+Backend modules are located in:
 
-- auth
-- users
+backend/src/modules/{module-name}
+
+Frontend features are located in:
+
+frontend/src/features/{feature-name}
+
+Current modules include:
+
 - market-data-foundation
 - stock-research-workbench
-- scanner
-- real-time scanner
-- backtester
-- watchlists
-- smart money
-- sector rotation
-- macro
-- portfolio
-- alerts
+- signal-generation-engine
+- portfolio-management
+- portfolio-intelligence
+- watchlist-management
 
-# Core Working Model
+# Important Current State
 
-## IMPORTANT
+Legacy code has already been cleaned up and removed.
 
-The project may contain legacy code from earlier architecture.
+Do NOT assume legacy folders still exist.
 
-Treat legacy code as migration source only.
+Do NOT create compatibility shims for removed legacy code unless explicitly requested.
 
-## Golden Rule
+This project now uses modular architecture as the primary source of truth. :contentReference[oaicite:0]{index=0}
 
-New code must live in modular structure.
+# Golden Rule
 
-Legacy code must not become a dependency of new modules.
+All new code must live in modular structure.
 
-If useful logic exists in legacy code:
+Prefer extending an existing module when ownership clearly belongs there.
 
-- extract it
-- copy/refactor it
-- move ownership into the correct module
+Create a new module only when the capability deserves separate ownership.
 
-Do NOT keep cross-dependencies on legacy folders.
-
-# Mandatory Tasks For Any Refactor / Feature Work
+# Mandatory Tasks For Any Feature / Refactor
 
 1. Analyze current folder structure first.
-2. Identify all dependent files before moving code:
-   - routes
-   - services
-   - tests
-   - workers
-   - queues
-   - providers
-   - frontend imports
-   - docs
-   - compatibility shims
-3. Propose minimal safe changes.
-4. Implement in stages.
-5. Keep app working after every stage.
+2. Understand existing module ownership.
+3. Reuse public exports from active modules when appropriate.
+4. Keep changes small, safe, and staged.
+5. Preserve working behavior unless explicitly changing it.
 6. Run build/tests/typecheck when available.
 7. Summarize all changes.
 
@@ -100,12 +89,12 @@ backend/src/modules/{module-name}
 - {module}.provider.ts (optional)
 - {module}.worker.ts (optional)
 - {module}.queue.ts (optional)
-- {module}.md (documentation)
+- {module}.md
 - index.ts
 
 ## Flat File Rule
 
-Backend module files should remain flat by default.
+Backend modules should remain flat by default.
 
 Do NOT create nested folders like:
 
@@ -120,8 +109,8 @@ Do NOT create nested folders like:
 
 Unless:
 
-1. Explicitly requested by user, OR  
-2. Module has genuinely outgrown flat structure
+1. Explicitly requested, OR
+2. Module has clearly outgrown flat structure
 
 If exception is made:
 
@@ -142,16 +131,16 @@ frontend/src/features/{feature-name}
 - routes.tsx
 - index.ts
 
-## Frontend Rules
+# Frontend Rules
 
-- Feature-specific UI stays inside feature folder.
+- Feature-specific UI stays inside the feature folder.
 - Shared UI belongs in:
 
 frontend/src/shared/components
 
-- Outside callers import only from feature index.ts
+- Outside callers should import from feature index.ts when practical.
 
-Never from internal paths unless explicitly required.
+Avoid deep imports into another feature’s internal files.
 
 # Architecture Rules
 
@@ -188,96 +177,75 @@ Each module owns its own:
 
 If another module needs functionality:
 
-Use public service/provider exports.
+Use public services/providers/exports only.
 
 Never reach into internals.
 
-# Legacy Code Rules
+# API Rules
 
-Examples of likely legacy locations:
+Preserve working API behavior unless explicitly asked to change it.
 
-- backend/src/api/*
-- backend/src/scanners/*
-- backend/src/backtest/*
-- frontend/src/services/*
-- frontend/src/components/*
-- old feature aliases
-- compatibility exports
-
-## Rules
-
-- Do not build new features there.
-- Do not add new dependencies on them.
-- Migrate functionality into modules.
-- Remove duplicate legacy files once callers are migrated.
-
-# API Compatibility Rules
-
-Preserve working external API behavior unless explicitly asked to change it.
-
-If legacy URLs must remain:
-
-Mount new module routers in app route registry.
-
-Example:
+Register backend routes centrally in:
 
 backend/src/api/routes.ts
 
-Do NOT keep old route files just to preserve URLs.
+Register frontend routes centrally in:
+
+frontend/src/app/routes.tsx
+
+# Product Development Rules
+
+## MVP First
+
+Build what creates immediate user value first.
+
+Avoid premature V2/V3 complexity.
+
+## Good Examples
+
+- clear stock research workflows
+- understandable signal engine
+- practical portfolio insights
+- simple watchlist workflows
+- fast user feedback loops
+
+## Avoid
+
+- overbuilt abstractions
+- premature microservices
+- speculative frameworks
+- unnecessary complexity
 
 # Refactor Rules
 
 ## Prefer
 
 - move files
+- simplify code
+- improve ownership boundaries
 - fix imports
 - preserve behavior
 - incremental cleanup
 
 ## Avoid
 
-- rewriting stable logic
+- rewriting stable logic without reason
 - giant-bang refactors
-- changing behavior without reason
 - mixing multiple epics in one pass
-
-# Data / Product Rules
-
-## Prefer MVP-first scope
-
-Build only what delivers user value now.
-
-## Keep future-ready but lean
-
-Do not overengineer V2/V3 features early.
-
-## Example
-
-Good:
-
-- simple signal engine
-- clear stock research page
-- practical portfolio insights
-
-Bad:
-
-- overbuilt abstractions
-- premature microservices
-- unused generic frameworks
 
 # Documentation Rules
 
-Every module should maintain its own:
+Every backend module should maintain:
 
 {module}.md
 
 Update docs when:
 
-- files move
-- ownership changes
 - routes change
+- ownership changes
 - persistence changes
-- compatibility shims removed
+- response shapes change
+- calculations change
 - limitations discovered
 
 # Testing Rules
@@ -297,16 +265,12 @@ If tests do not exist:
 
 Make small, safe changes in stages.
 
-After deleting duplicate files:
+After deleting code:
 
 1. search for stale imports
-2. verify deleted paths unused
-3. verify builds still pass
-
-If removing folders fails:
-
-- verify obsolete
-- retry safely
+2. verify builds still pass
+3. verify routes still work
+4. verify docs still reflect reality
 
 # Output Expectations For Any Task
 
@@ -315,6 +279,7 @@ Always provide summary:
 ## Structural Changes
 
 - modules created
+- files added
 - files moved
 - files removed
 
@@ -322,7 +287,7 @@ Always provide summary:
 
 - imports updated
 - APIs preserved/changed
-- logic reused/refactored
+- logic added/refactored
 
 ## Validation
 
@@ -339,20 +304,38 @@ Always provide summary:
 
 # Decision Heuristics
 
-When unsure whether work belongs in an existing module or new module:
-
-## Put in Existing Module if:
+## Extend Existing Module If:
 
 - same business capability
 - same ownership boundary
-- mostly extending current workflows
+- same user workflow
+- minimal new domain complexity
 
-## Create New Module if:
+## Create New Module If:
 
 - new user-facing capability
-- distinct domain logic
+- distinct business ownership
 - likely to scale independently
-- should be deploy-safe from unrelated changes
+- should release safely without affecting other modules
+
+# Current Shared Infrastructure
+
+Approved shared roots:
+
+Backend:
+- backend/src/db
+- backend/src/shared
+- backend/src/config
+
+Frontend:
+- frontend/src/shared
+- frontend/src/app
+
+# Current Cross-Module UI Patterns
+
+- Signal cards may open feature-owned action dialogs through public frontend exports, such as Portfolio Management and Watchlist Management.
+- Stock Research Workbench may expose action buttons that consume public frontend feature exports, such as adding an instrument to a watchlist.
+- These integrations must not import backend repositories or frontend feature internals directly.
 
 # Final Principle
 
@@ -362,29 +345,7 @@ Optimize for:
 - clear ownership
 - safe iteration
 - product delivery speed
-- eventual removal of legacy code
+- understandable code
+- scalable modular growth
 
-Not for theoretical perfection.
-
-## Legacy Dependency Rule
-
-Anything outside the modular structure should be treated as legacy unless explicitly documented as shared infrastructure.
-
-Current approved modular roots:
-
-- backend/src/modules/*
-- frontend/src/features/*
-
-Approved shared infrastructure:
-
-- backend/src/db
-- backend/src/shared
-- backend/src/config
-- frontend/src/shared
-- frontend/src/app
-
-New modules must not import runtime code from legacy folders.
-
-If useful logic exists in legacy code, copy/refactor it into the owning module and make the module own it.
-
-Legacy code may be referenced for understanding, but not used as a dependency by new modules.
+Not theoretical perfection.

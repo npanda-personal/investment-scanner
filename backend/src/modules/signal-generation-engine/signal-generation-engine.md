@@ -160,6 +160,8 @@ Signal cards display current price, currency, daily price change, and daily perc
 
 Signal cards also expose an `Add to Portfolio` action. The action opens a frontend dialog that fetches portfolios through the Portfolio Management public frontend API, collects quantity, average cost, currency, and optional notes, then submits to the existing `POST /api/v1/portfolios/:id/holdings` endpoint. Duplicate holding API errors are translated into a user-friendly message: `This stock already exists in this portfolio. Edit the existing holding instead.`
 
+Signal cards also expose an `Add to Watchlist` action. The action uses the Watchlist Management public frontend exports, lets the user select a watchlist, add an optional note/tags, and submits to `POST /api/v1/watchlists/:id/items`. Duplicate watchlist items are handled gracefully in the dialog.
+
 The Stock Research Workbench includes a compact signal widget with score, direction, confidence, top reasons, generated timestamp, and link to the full signals page.
 
 The dashboard and cards link stocks to `/research/stocks/:id`.

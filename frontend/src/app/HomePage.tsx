@@ -29,6 +29,11 @@ export default function HomePage() {
           <Typography color="text.secondary" sx={{ mb: 2 }}>Track manual portfolios, holdings, valuation, allocation, and transactions.</Typography>
           <Button component={Link} to="/portfolios">Open</Button>
         </Paper>
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="h6">Watchlist Management</Typography>
+          <Typography color="text.secondary" sx={{ mb: 2 }}>Track stock ideas with price, signal, notes, and research links.</Typography>
+          <Button component={Link} to="/watchlists">Open</Button>
+        </Paper>
       </Box>
     </Box>
   );

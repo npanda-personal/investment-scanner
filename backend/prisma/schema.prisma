@@ -67,6 +67,7 @@ model Stock {
   signalResults                SignalResult[]
   portfolioHoldings            PortfolioHolding[]
   portfolioTransactions        PortfolioTransaction[]
+  watchlistItems                WatchlistItem[]
 
   @@map("stocks")
 }
@@ -212,6 +213,36 @@ model PortfolioTransaction {
   @@index([portfolioId, transactionDate])
   @@index([instrumentId])
   @@map("portfolio_transactions")
+}
+
+model Watchlist {
+  id          String          @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  items       WatchlistItem[]
+
+  @@map("watchlists")
+}
+
+model WatchlistItem {
+  id           String    @id @default(cuid())
+  watchlistId  String
+  watchlist    Watchlist @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
+  instrumentId String
+  stock        Stock     @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  symbol       String
+  companyName  String?
+  notes        String?
+  tags         Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([watchlistId, instrumentId])
+  @@index([watchlistId])
+  @@index([instrumentId])
+  @@map("watchlist_items")
 }
 
 

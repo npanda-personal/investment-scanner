@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Alert,
   Box,
@@ -7,6 +7,7 @@ import {
   Chip,
   CircularProgress,
   Paper,
+  Snackbar,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
@@ -24,6 +25,7 @@ import {
 import { fetchStockResearchWorkbench } from '../api/stockResearchWorkbenchService';
 import type { ResearchRange, ResearchWorkbenchResponse } from '../types';
 import { SignalWidget } from '@/features/signal-generation-engine';
+import { AddToWatchlistDialog } from '@/features/watchlist-management';
 
 const ranges: ResearchRange[] = ['1W', '1M', '3M', '6M', 'YTD', '1Y', '3Y', '5Y', 'MAX'];
 
@@ -56,6 +58,8 @@ const StockResearchWorkbenchPage: React.FC = () => {
   const [data, setData] = useState<ResearchWorkbenchResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [watchlistDialogOpen, setWatchlistDialogOpen] = useState(false);
+  const [successWatchlistId, setSuccessWatchlistId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -113,9 +117,26 @@ const StockResearchWorkbenchPage: React.FC = () => {
               {overview.source} | {formatDateTime(overview.last_updated_timestamp)}
             </Typography>
             <Box sx={{ mt: 1 }}><StatusChip status={overview.data_status} /></Box>
+            <Button size="small" variant="outlined" sx={{ mt: 1 }} onClick={() => setWatchlistDialogOpen(true)}>
+              Add to Watchlist
+            </Button>
           </Box>
         </Box>
       </Paper>
+
+      <AddToWatchlistDialog
+        open={watchlistDialogOpen}
+        instrumentId={String(overview.instrument_id)}
+        symbol={String(overview.symbol)}
+        companyName={String(overview.company_name)}
+        onClose={() => setWatchlistDialogOpen(false)}
+        onAdded={(watchlistId) => setSuccessWatchlistId(watchlistId)}
+      />
+      <Snackbar open={Boolean(successWatchlistId)} autoHideDuration={5000} onClose={() => setSuccessWatchlistId(null)}>
+        <Alert severity="success" variant="filled" onClose={() => setSuccessWatchlistId(null)}>
+          Added {String(overview.symbol)} to watchlist. <Button color="inherit" component={Link} to={successWatchlistId ? `/watchlists/${successWatchlistId}` : '/watchlists'} size="small">Open</Button>
+        </Alert>
+      </Snackbar>
 
       <SignalWidget instrumentId={String(overview.instrument_id || '')} />
 

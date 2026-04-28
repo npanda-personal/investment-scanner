@@ -7,6 +7,7 @@ import { stockResearchWorkbenchRouter } from '../modules/stock-research-workbenc
 import { signalGenerationEngineRouter } from '../modules/signal-generation-engine';
 import { portfolioManagementRouter } from '../modules/portfolio-management';
 import { portfolioIntelligenceRouter } from '../modules/portfolio-intelligence';
+import { watchlistManagementRouter } from '../modules/watchlist-management';
 
 export interface ApiModule {
   path: string;
@@ -19,6 +20,7 @@ export const apiModules: ApiModule[] = [
   { path: '/api/v1', router: signalGenerationEngineRouter },
   { path: '/api/v1', router: portfolioManagementRouter },
   { path: '/api/v1', router: portfolioIntelligenceRouter },
+  { path: '/api/v1', router: watchlistManagementRouter },
   { path: '/api/market-data-foundation', router: marketDataFoundationRouter },
 ];
 

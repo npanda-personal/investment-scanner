@@ -3,6 +3,7 @@ import { Alert, Box, Button, Paper, Snackbar, Typography } from '@mui/material';
 import { Link, useNavigate } from 'react-router-dom';
 import { SignalBadge } from './SignalBadge';
 import { AddSignalToPortfolioDialog } from './AddSignalToPortfolioDialog';
+import { AddToWatchlistDialog } from '@/features/watchlist-management';
 import type { SignalResult } from '../types';
 
 const formatDateTime = (value: string) => new Date(value).toLocaleString();
@@ -30,6 +31,8 @@ export const SignalCard: React.FC<{ signal: SignalResult }> = ({ signal }) => {
   const reasons = signal.triggered_signals.length > 0 ? signal.triggered_signals : signal.negative_signals;
   const [portfolioDialogOpen, setPortfolioDialogOpen] = React.useState(false);
   const [successPortfolioId, setSuccessPortfolioId] = React.useState<string | null>(null);
+  const [watchlistDialogOpen, setWatchlistDialogOpen] = React.useState(false);
+  const [successWatchlistId, setSuccessWatchlistId] = React.useState<string | null>(null);
 
   return (
     <>
@@ -59,6 +62,7 @@ export const SignalCard: React.FC<{ signal: SignalResult }> = ({ signal }) => {
         <Box sx={{ mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           <Button size="small" onClick={() => navigate(`/research/stocks/${signal.instrument_id}`)}>Research</Button>
           <Button size="small" variant="outlined" onClick={() => setPortfolioDialogOpen(true)}>Add to Portfolio</Button>
+          <Button size="small" variant="outlined" onClick={() => setWatchlistDialogOpen(true)}>Add to Watchlist</Button>
         </Box>
       </Paper>
       <AddSignalToPortfolioDialog
@@ -67,9 +71,22 @@ export const SignalCard: React.FC<{ signal: SignalResult }> = ({ signal }) => {
         onClose={() => setPortfolioDialogOpen(false)}
         onAdded={(portfolioId) => setSuccessPortfolioId(portfolioId)}
       />
+      <AddToWatchlistDialog
+        open={watchlistDialogOpen}
+        instrumentId={signal.instrument_id}
+        symbol={signal.symbol}
+        companyName={signal.company_name}
+        onClose={() => setWatchlistDialogOpen(false)}
+        onAdded={(watchlistId) => setSuccessWatchlistId(watchlistId)}
+      />
       <Snackbar open={Boolean(successPortfolioId)} autoHideDuration={5000} onClose={() => setSuccessPortfolioId(null)}>
         <Alert severity="success" variant="filled" onClose={() => setSuccessPortfolioId(null)}>
           Added {signal.symbol} to portfolio. <Button color="inherit" component={Link} to={successPortfolioId ? `/portfolios/${successPortfolioId}` : '/portfolios'} size="small">Open</Button>
+        </Alert>
+      </Snackbar>
+      <Snackbar open={Boolean(successWatchlistId)} autoHideDuration={5000} onClose={() => setSuccessWatchlistId(null)}>
+        <Alert severity="success" variant="filled" onClose={() => setSuccessWatchlistId(null)}>
+          Added {signal.symbol} to watchlist. <Button color="inherit" component={Link} to={successWatchlistId ? `/watchlists/${successWatchlistId}` : '/watchlists'} size="small">Open</Button>
         </Alert>
       </Snackbar>
     </>
