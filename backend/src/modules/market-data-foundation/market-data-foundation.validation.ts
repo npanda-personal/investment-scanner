@@ -1,4 +1,4 @@
-import type { HistoricalPrice, ValidationResult } from '../types/market-data.types';
+import type { HistoricalPrice, ValidationResult } from './market-data-foundation.types';
 
 const isFiniteNumber = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value);

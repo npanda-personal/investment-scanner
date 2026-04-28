@@ -1,60 +1,22 @@
 import axios from 'axios';
+import type {
+  BackendPaginatedResponse,
+  CreateStockRequest,
+  PaginatedResponse,
+  PaginationOptions,
+  Stock,
+  UpdateStockRequest,
+} from '../types';
 
 const API_BASE = '/api';
 
-export interface Stock {
-  id: string;
-  symbol: string;
-  name: string;
-  region: string;
-  exchange: string;
-  isActive: boolean;
-  lastSuccessfulDataLoadTimestamp: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateStockRequest {
-  symbol: string;
-  name: string;
-  region: string;
-  exchange: string;
-}
-
-export interface UpdateStockRequest {
-  symbol?: string;
-  name?: string;
-  region?: string;
-  exchange?: string;
-  isActive?: boolean;
-}
-
-export interface PaginationOptions {
-  page?: number;
-  pageSize?: number;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
-  region?: string;
-  search?: string;
-}
-
-export interface PaginatedResponse {
-  stocks: Stock[];
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
-}
-
-interface BackendPaginatedResponse {
-  stocks: Stock[];
-  pagination: {
-    page: number;
-    pageSize: number;
-    total: number;
-    totalPages: number;
-  };
-}
+export type {
+  CreateStockRequest,
+  PaginatedResponse,
+  PaginationOptions,
+  Stock,
+  UpdateStockRequest,
+} from '../types';
 
 /**
  * Fetch stocks with pagination and filtering.

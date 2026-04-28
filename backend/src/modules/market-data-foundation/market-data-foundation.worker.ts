@@ -1,30 +1,20 @@
 import { PrismaClient } from '@prisma/client';
-import { YahooFinanceIngestionService } from '../providers/yahoo-finance.provider';
-
-export interface StockSyncTask {
-  id: string;
-  symbol: string;
-  lastSuccessfulDataLoadTimestamp: Date | null;
-}
-
-export interface WorkerResult {
-  symbol: string;
-  success: boolean;
-  message: string;
-  timestamp: string;
-  workerId: number;
-}
+import { MarketDataFoundationRepository } from './market-data-foundation.repository';
+import { MarketDataFoundationService } from './market-data-foundation.service';
+import type { StockSyncTask, WorkerResult } from './market-data-foundation.types';
 
 export class StockSyncWorker {
   private workerId: number;
   private prisma: PrismaClient;
-  private ingestionService: YahooFinanceIngestionService;
+  private marketDataService: MarketDataFoundationService;
   private concurrency: number;
 
   constructor(workerId: number, concurrency: number = 3) {
     this.workerId = workerId;
     this.prisma = new PrismaClient();
-    this.ingestionService = new YahooFinanceIngestionService(this.prisma);
+    this.marketDataService = new MarketDataFoundationService(
+      new MarketDataFoundationRepository(this.prisma)
+    );
     this.concurrency = concurrency;
   }
 
@@ -44,14 +34,7 @@ export class StockSyncWorker {
         console.log(`[Worker ${this.workerId}] Incremental load for ${task.symbol} from ${startDate.toISOString().split('T')[0]}`);
       }
 
-      // Use ingestSymbol with determined start date
-      await this.ingestionService.ingestSymbol(task.symbol, startDate, new Date());
-
-      // Update last successful load timestamp
-      await this.prisma.stock.update({
-        where: { id: task.id },
-        data: { lastSuccessfulDataLoadTimestamp: new Date() },
-      });
+      await this.marketDataService.ingestSymbol(task.symbol, startDate, new Date());
 
       return {
         symbol: task.symbol,

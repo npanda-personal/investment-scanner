@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import defaultPrisma from '../db/prisma';
-import { YahooFinanceIngestionService } from '../data/ingestion/yahoo.service';
+import { YahooFinanceIngestionService } from '../modules/market-data-foundation';
 import { MarketDataBatchManager } from './batch-manager';
 import { ConditionEvaluator } from './evaluator';
 import {

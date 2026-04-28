@@ -10,7 +10,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
-import { YahooFinanceIngestionService } from '../data/ingestion/yahoo.service';
+import { YahooFinanceIngestionService } from '../modules/market-data-foundation';
 import { MarketDataBatchManager } from './batch-manager';
 import { MarketDataService } from './market-data-service';
 import { SignalDetector } from './signal-detector';

@@ -21,6 +21,29 @@ export interface SearchResult {
   region?: string;
 }
 
+export interface CreateStockRequest {
+  symbol: string;
+  name: string;
+  region: string;
+  exchange?: string;
+}
+
+export interface UpdateStockRequest {
+  name?: string;
+  region?: string;
+  exchange?: string;
+  isActive?: boolean;
+}
+
+export interface PaginationOptions {
+  page: number;
+  pageSize: number;
+  sortBy?: 'symbol' | 'name' | 'lastSuccessfulDataLoadTimestamp' | 'createdAt';
+  sortOrder?: 'asc' | 'desc';
+  region?: string;
+  search?: string;
+}
+
 export interface CoreFundamentals {
   symbol: string;
   revenue: number | null;
@@ -53,4 +76,18 @@ export interface ValidationResult<T> {
     item: unknown;
     errors: string[];
   }>;
+}
+
+export interface StockSyncTask {
+  id: string;
+  symbol: string;
+  lastSuccessfulDataLoadTimestamp: Date | null;
+}
+
+export interface WorkerResult {
+  symbol: string;
+  success: boolean;
+  message: string;
+  timestamp: string;
+  workerId: number;
 }

@@ -1,5 +1,6 @@
-import { YahooFinanceIngestionService } from '../providers/yahoo-finance.provider';
-import defaultPrisma from '../../../db/prisma';
+import { MarketDataFoundationRepository } from './market-data-foundation.repository';
+import { MarketDataFoundationService } from './market-data-foundation.service';
+import defaultPrisma from '../../db/prisma';
 
 /**
  * Enqueue a stock ingestion job with optional delay.
@@ -16,17 +17,13 @@ export async function enqueueIngestionJob(
   delayMs: number = 1000
 ) {
   console.warn(`Redis unavailable, running ingestion synchronously for ${symbol} after ${delayMs}ms`);
-  const ingestionService = new YahooFinanceIngestionService(defaultPrisma);
+  const marketDataService = new MarketDataFoundationService(
+    new MarketDataFoundationRepository(defaultPrisma)
+  );
   // Use setTimeout to simulate background job with throttling
   setTimeout(async () => {
     try {
-      await ingestionService.ingestSymbol(symbol, startDate, endDate);
-      // Update stock's lastSuccessfulDataLoadTimestamp
-      // Using bracket notation to avoid TypeScript errors
-      await (defaultPrisma as any).stock.update({
-        where: { symbol },
-        data: { lastSuccessfulDataLoadTimestamp: new Date() },
-      });
+      await marketDataService.ingestSymbol(symbol, startDate, endDate);
       console.log(`Synchronous ingestion completed for ${symbol}`);
     } catch (error) {
       console.error(`Synchronous ingestion failed for ${symbol}:`, error);

@@ -1,56 +1,21 @@
 import axios from 'axios';
+import type {
+  CorporateActionsResponse,
+  CoreFundamentals,
+  IngestResponse,
+  PricesResponse,
+} from '../types';
 
 const API_BASE = '/api'; // proxy to backend
 
-export interface HistoricalPrice {
-  timestamp: string;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
-  region: string;
-  exchange: string;
-}
-
-export interface IngestResponse {
-  success: boolean;
-  message: string;
-}
-
-export interface PricesResponse {
-  symbol: string;
-  prices: HistoricalPrice[];
-}
-
-export interface CoreFundamentals {
-  symbol: string;
-  revenue: number | null;
-  earnings: number | null;
-  ratios: {
-    trailingPe: number | null;
-    forwardPe: number | null;
-    priceToBook: number | null;
-    profitMargins: number | null;
-    returnOnEquity: number | null;
-    debtToEquity: number | null;
-  };
-  source: string;
-  asOf: string;
-}
-
-export interface CorporateAction {
-  symbol: string;
-  type: 'dividend' | 'split';
-  date: string;
-  value: number | string;
-  source: string;
-}
-
-export interface CorporateActionsResponse {
-  symbol: string;
-  actions: CorporateAction[];
-}
+export type {
+  CorporateAction,
+  CorporateActionsResponse,
+  CoreFundamentals,
+  HistoricalPrice,
+  IngestResponse,
+  PricesResponse,
+} from '../types';
 
 /**
  * Trigger ingestion for a given symbol

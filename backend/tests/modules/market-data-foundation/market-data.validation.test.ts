@@ -3,7 +3,7 @@ import {
   partitionHistoricalPrices,
   validateHistoricalPrice,
   validateRequiredString,
-} from '../../../src/modules/market-data-foundation/validation/market-data.validation';
+} from '../../../src/modules/market-data-foundation';
 
 describe('market data validation', () => {
   it('accepts a complete historical price row', () => {

@@ -1,5 +1,5 @@
 /// <reference types="@types/jest" />
-import { YahooFinanceIngestionService } from '../../../src/data/ingestion/yahoo.service';
+import { YahooFinanceIngestionService } from '../../../src/modules/market-data-foundation';
 import { Prisma } from '@prisma/client';
 
 // Mock yahoo-finance2
@@ -196,17 +196,19 @@ describe('YahooFinanceIngestionService', () => {
         },
       ];
       const fetchSpy = jest.spyOn(service, 'fetchHistorical').mockResolvedValue(mockPrices);
-      const storeSpy = jest.spyOn(service, 'storeHistorical').mockResolvedValue();
       mockStockFindUnique.mockResolvedValue(null);
       mockStockUpdate.mockResolvedValue({});
 
       await service.ingestSymbol('AAPL');
 
       expect(fetchSpy).toHaveBeenCalledWith('AAPL', expect.any(Date), expect.any(Date));
-      expect(storeSpy).toHaveBeenCalledWith(mockPrices);
+      expect(mockPriceTickUpsert).toHaveBeenCalledTimes(1);
+      expect(mockStockUpdate).toHaveBeenCalledWith({
+        where: { symbol: 'AAPL' },
+        data: { lastSuccessfulDataLoadTimestamp: expect.any(Date) },
+      });
 
       fetchSpy.mockRestore();
-      storeSpy.mockRestore();
     });
   });
 });

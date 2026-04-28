@@ -34,7 +34,7 @@ import realTimeScannerService, {
   fetchSessionProgress,
   fetchSessionResults,
 } from '../../../services/realTimeScannerService';
-import { fetchStocks } from '../../../services/stockService';
+import { fetchStocks } from '../../../features/market-data-foundation';
 
 const DEFAULT_SCAN_SYMBOL_LIMIT = 50;
 const SCAN_POLL_INTERVAL_MS = 1500;
