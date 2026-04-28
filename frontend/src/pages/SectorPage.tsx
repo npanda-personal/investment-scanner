@@ -242,7 +242,6 @@ const SectorPage = () => {
                   </TableHead>
                   <TableBody>
                     {sectorPerformance.map((sector) => {
-                      const sectorColor = SECTOR_CONFIG[sector.sector] || '#9e9e9e';
                       const strength = calculateRelativeStrength(sector.sector);
                       const isOutperforming = strength > 100;
                       return (

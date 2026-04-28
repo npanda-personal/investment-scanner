@@ -1,39 +1,45 @@
 /// <reference types="@types/jest" />
 import { YahooFinanceIngestionService } from '../../../src/data/ingestion/yahoo.service';
-import yahooFinance from 'yahoo-finance2';
 import { Prisma } from '@prisma/client';
 
 // Mock yahoo-finance2
+var mockYahooHistorical = jest.fn<any, any>();
+var mockYahooSearch = jest.fn<any, any>();
+var mockYahooQuoteSummary = jest.fn<any, any>();
 jest.mock('yahoo-finance2', () => ({
   __esModule: true,
-  default: {
-    historical: jest.fn<any, any>(),
-  },
+  default: jest.fn<any, any>().mockImplementation(() => ({
+    historical: mockYahooHistorical,
+    search: mockYahooSearch,
+    quoteSummary: mockYahooQuoteSummary,
+  })),
 }));
 
 // Mock PrismaClient
-const mockPriceTickCreate = jest.fn<any, any>();
-const mockLatestPriceUpsert = jest.fn<any, any>();
-const mockTransaction = jest.fn<any, any>((cb: any) => cb({
-  priceTick: { create: mockPriceTickCreate },
+var mockPriceTickUpsert = jest.fn<any, any>();
+var mockLatestPriceUpsert = jest.fn<any, any>();
+var mockStockFindUnique = jest.fn<any, any>();
+var mockStockUpdate = jest.fn<any, any>();
+var mockTransaction = jest.fn<any, any>((cb: any) => cb({
+  priceTick: { upsert: mockPriceTickUpsert },
   latestPrice: { upsert: mockLatestPriceUpsert },
 }));
-const mockDisconnect = jest.fn<any, any>();
+var mockDisconnect = jest.fn<any, any>();
+var mockPrismaClient: any = {
+  priceTick: { upsert: mockPriceTickUpsert },
+  latestPrice: { upsert: mockLatestPriceUpsert },
+  stock: { findUnique: mockStockFindUnique, update: mockStockUpdate },
+  $transaction: mockTransaction,
+  $disconnect: mockDisconnect,
+};
 
 jest.mock('@prisma/client', () => {
   const actual = jest.requireActual('@prisma/client');
   return {
     ...actual,
-    PrismaClient: jest.fn<any, any>().mockImplementation(() => ({
-      priceTick: { create: mockPriceTickCreate },
-      latestPrice: { upsert: mockLatestPriceUpsert },
-      $transaction: mockTransaction,
-      $disconnect: mockDisconnect,
-    })),
+    PrismaClient: jest.fn<any, any>().mockImplementation(() => mockPrismaClient),
   };
 });
-
-const mockedYahooFinance = yahooFinance as jest.Mocked<typeof yahooFinance>;
 
 describe('YahooFinanceIngestionService', () => {
   let service: YahooFinanceIngestionService;
@@ -41,7 +47,7 @@ describe('YahooFinanceIngestionService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     // Create a new instance which will use the mocked PrismaClient
-    service = new YahooFinanceIngestionService();
+    service = new YahooFinanceIngestionService(mockPrismaClient);
   });
 
   describe('inferRegion', () => {
@@ -86,10 +92,10 @@ describe('YahooFinanceIngestionService', () => {
           volume: 1200000,
         },
       ];
-      (mockedYahooFinance.historical as any).mockResolvedValue(mockData as any);
+      mockYahooHistorical.mockResolvedValue(mockData as any);
 
       const result = await service.fetchHistorical('AAPL');
-      expect(mockedYahooFinance.historical).toHaveBeenCalledWith('AAPL', {
+      expect(mockYahooHistorical).toHaveBeenCalledWith('AAPL', {
         period1: expect.any(Date),
         period2: expect.any(Date),
         interval: '1d',
@@ -117,7 +123,7 @@ describe('YahooFinanceIngestionService', () => {
     });
 
     it('should throw error when Yahoo API fails', async () => {
-      (mockedYahooFinance.historical as any).mockRejectedValue(new Error('API error'));
+      mockYahooHistorical.mockRejectedValue(new Error('API error'));
       await expect(service.fetchHistorical('INVALID')).rejects.toThrow('API error');
     });
   });
@@ -149,8 +155,8 @@ describe('YahooFinanceIngestionService', () => {
 
       // Expect transaction called
       expect(mockTransaction).toHaveBeenCalledTimes(1);
-      // Expect two priceTick.create calls
-      expect(mockPriceTickCreate).toHaveBeenCalledTimes(2);
+      // Expect two priceTick.upsert calls
+      expect(mockPriceTickUpsert).toHaveBeenCalledTimes(2);
       // Expect latestPrice.upsert called with latest price
       expect(mockLatestPriceUpsert).toHaveBeenCalledWith({
         where: { symbol: 'AAPL' },
@@ -191,10 +197,12 @@ describe('YahooFinanceIngestionService', () => {
       ];
       const fetchSpy = jest.spyOn(service, 'fetchHistorical').mockResolvedValue(mockPrices);
       const storeSpy = jest.spyOn(service, 'storeHistorical').mockResolvedValue();
+      mockStockFindUnique.mockResolvedValue(null);
+      mockStockUpdate.mockResolvedValue({});
 
       await service.ingestSymbol('AAPL');
 
-      expect(fetchSpy).toHaveBeenCalledWith('AAPL', undefined, undefined);
+      expect(fetchSpy).toHaveBeenCalledWith('AAPL', expect.any(Date), expect.any(Date));
       expect(storeSpy).toHaveBeenCalledWith(mockPrices);
 
       fetchSpy.mockRestore();

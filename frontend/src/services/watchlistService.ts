@@ -114,7 +114,7 @@ export async function removeSymbolFromWatchlist(watchlistId: string, symbol: str
  * Search for assets using database-first search.
  */
 export async function searchAssets(query: string): Promise<SearchResult[]> {
-  const response = await axios.get<SearchResult[]>(`${API_BASE}/stocks/search`, {
+  const response = await axios.get<SearchResult[]>(`${API_BASE}/market-data-foundation/stocks/search`, {
     params: { q: query },
   });
   return response.data;

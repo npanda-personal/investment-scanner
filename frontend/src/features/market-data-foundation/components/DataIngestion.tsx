@@ -15,7 +15,7 @@ import {
   TableRow,
   Chip,
 } from '@mui/material';
-import { ingestSymbol, fetchPrices, HistoricalPrice } from '../../services/dataService';
+import { ingestSymbol, fetchPrices, HistoricalPrice } from '../api/priceDataService';
 
 const DataIngestion: React.FC = () => {
   const [symbol, setSymbol] = useState('');
@@ -55,7 +55,7 @@ const DataIngestion: React.FC = () => {
   return (
     <Box sx={{ p: 3, maxWidth: 1200, mx: 'auto' }}>
       <Typography variant="h4" gutterBottom>
-        Data Ingestion from Yahoo Finance
+        Price Data Ingestion
       </Typography>
       <Typography variant="body1" color="text.secondary" paragraph>
         Enter a stock symbol (e.g., AAPL, VOW.DE) to ingest historical price data and display the latest prices.

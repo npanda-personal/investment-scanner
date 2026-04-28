@@ -45,7 +45,7 @@ import {
   externalSearch,
   createStock,
   yahooSearch,
-} from '../../services/stockService';
+} from '../api/marketDataFoundationService';
 
 
 // Exchange-to-region mapping for determining which tab a stock belongs to.
@@ -97,7 +97,7 @@ function mapExchangeToRegion(exchange: string | undefined, _fallbackRegion: stri
   return '';
 }
 
-const StockManager: React.FC = () => {
+const MarketDataFoundationPage: React.FC = () => {
   const theme = useTheme();
 
   // Tabs state
@@ -362,10 +362,10 @@ const StockManager: React.FC = () => {
   return (
     <Box sx={{ p: 3, maxWidth: 1400, mx: 'auto' }}>
       <Typography variant="h4" gutterBottom>
-        Stock Management Dashboard
+        Market Data Foundation
       </Typography>
       <Typography variant="body1" color="text.secondary" paragraph>
-        Manage stocks from different markets. Toggle active status, trigger data sync, or add new stocks via global search.
+        Manage market instruments, end-of-day prices, historical data sync, and foundational market data coverage.
       </Typography>
 
       {/* Global Search Bar */}
@@ -739,4 +739,4 @@ const StockManager: React.FC = () => {
   );
 };
 
-export default StockManager;
+export default MarketDataFoundationPage;

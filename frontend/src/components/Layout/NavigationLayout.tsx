@@ -43,7 +43,7 @@ const navItems = [
   { path: '/smart-money', label: 'Smart Money', icon: <AccountBalanceIcon /> },
   { path: '/sector', label: 'Sector Analysis', icon: <ShowChartIcon /> },
   { path: '/macro', label: 'Macro Indicators', icon: <AnalyticsIcon /> },
-  { path: '/stocks', label: 'Stock Management', icon: <InventoryIcon /> },
+  { path: '/market-data-foundation', label: 'Market Data Foundation', icon: <InventoryIcon /> },
   { path: '/watchlists', label: 'Watchlists', icon: <ListIcon /> },
   { path: '/scanner', label: 'Real‑Time Scanner', icon: <SearchIcon /> },
   { path: '/smart-scanner', label: 'Smart Scanner', icon: <SearchIcon /> },

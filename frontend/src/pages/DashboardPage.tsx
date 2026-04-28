@@ -1,5 +1,5 @@
 import { Box, Typography } from '@mui/material';
-import DataIngestion from '../components/DataIngestion';
+import { DataIngestion } from '@/features/market-data-foundation';
 import WatchlistManager from '../components/WatchlistManager';
 
 const DashboardPage = () => {
