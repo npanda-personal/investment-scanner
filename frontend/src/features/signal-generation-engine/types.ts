@@ -15,6 +15,7 @@ export interface SignalResult {
   company_name: string | null;
   sector: string | null;
   country: string | null;
+  currency?: string | null;
   score: number;
   direction: SignalDirection;
   confidence: SignalConfidence;
@@ -51,4 +52,3 @@ export interface SignalRunResponse {
   results: SignalResult[];
   generated_at: string;
 }
-

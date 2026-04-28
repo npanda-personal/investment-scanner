@@ -8,7 +8,7 @@ export default function HomePage() {
       <Typography color="text.secondary" sx={{ mb: 3 }}>
         Modular market data, stock research, and signal generation workspace.
       </Typography>
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 2 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 2 }}>
         <Paper sx={{ p: 2 }}>
           <Typography variant="h6">Market Data Foundation</Typography>
           <Typography color="text.secondary" sx={{ mb: 2 }}>Explore instruments, prices, fundamentals, corporate actions, and FX metadata.</Typography>
@@ -24,8 +24,12 @@ export default function HomePage() {
           <Typography color="text.secondary" sx={{ mb: 2 }}>Review generated bullish, neutral, and bearish stock signals.</Typography>
           <Button component={Link} to="/signals">Open</Button>
         </Paper>
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="h6">Portfolio Management</Typography>
+          <Typography color="text.secondary" sx={{ mb: 2 }}>Track manual portfolios, holdings, valuation, allocation, and transactions.</Typography>
+          <Button component={Link} to="/portfolios">Open</Button>
+        </Paper>
       </Box>
     </Box>
   );
 }
-

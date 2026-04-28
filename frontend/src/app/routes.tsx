@@ -4,6 +4,7 @@ import HomePage from './HomePage';
 import { marketDataFoundationRoutes } from '@/features/market-data-foundation';
 import { stockResearchWorkbenchRoutes } from '@/features/stock-research-workbench';
 import { signalGenerationEngineRoutes } from '@/features/signal-generation-engine';
+import { portfolioManagementRoutes } from '@/features/portfolio-management';
 
 export const appRoutes: RouteObject[] = [
   {
@@ -14,6 +15,7 @@ export const appRoutes: RouteObject[] = [
       ...marketDataFoundationRoutes,
       ...stockResearchWorkbenchRoutes,
       ...signalGenerationEngineRoutes,
+      ...portfolioManagementRoutes,
     ],
   },
 ];

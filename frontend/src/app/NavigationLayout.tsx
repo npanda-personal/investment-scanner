@@ -24,6 +24,7 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import InsightsIcon from '@mui/icons-material/Insights';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import { useThemeMode } from './ThemeContext';
@@ -35,6 +36,7 @@ const navItems = [
   { path: '/', label: 'Dashboard', icon: <DashboardIcon /> },
   { path: '/market-data-foundation', label: 'Market Data Foundation', icon: <InventoryIcon /> },
   { path: '/signals', label: 'Signals', icon: <InsightsIcon /> },
+  { path: '/portfolios', label: 'Portfolios', icon: <AccountBalanceWalletIcon /> },
 ];
 
 export default function NavigationLayout() {
@@ -107,4 +109,3 @@ export default function NavigationLayout() {
     </Box>
   );
 }
-
