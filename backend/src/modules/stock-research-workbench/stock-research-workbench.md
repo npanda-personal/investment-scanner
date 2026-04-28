@@ -97,6 +97,7 @@ Implemented MVP UX:
 
 - Overview header shows symbol, company, exchange, country, sector, industry, currency, market cap context, latest price, daily change, source, last updated timestamp, and status chip.
 - Overview header exposes an `Add to Watchlist` action through the Watchlist Management public frontend feature.
+- Overview header exposes a `Create Price Alert` action through the Alerts & Monitoring public frontend feature.
 - Price chart supports `1W`, `1M`, `3M`, `6M`, `YTD`, `1Y`, `3Y`, `5Y`, and `MAX`.
 - Performance panel displays selected range return plus fixed horizon metrics.
 - Fundamentals, valuation, peers, and corporate actions render clear empty states when data is missing.

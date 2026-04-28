@@ -26,6 +26,7 @@ import { fetchStockResearchWorkbench } from '../api/stockResearchWorkbenchServic
 import type { ResearchRange, ResearchWorkbenchResponse } from '../types';
 import { SignalWidget } from '@/features/signal-generation-engine';
 import { AddToWatchlistDialog } from '@/features/watchlist-management';
+import { CreateAlertDialog } from '@/features/alerts-monitoring';
 
 const ranges: ResearchRange[] = ['1W', '1M', '3M', '6M', 'YTD', '1Y', '3Y', '5Y', 'MAX'];
 
@@ -60,6 +61,7 @@ const StockResearchWorkbenchPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [watchlistDialogOpen, setWatchlistDialogOpen] = useState(false);
   const [successWatchlistId, setSuccessWatchlistId] = useState<string | null>(null);
+  const [alertDialogOpen, setAlertDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -120,6 +122,9 @@ const StockResearchWorkbenchPage: React.FC = () => {
             <Button size="small" variant="outlined" sx={{ mt: 1 }} onClick={() => setWatchlistDialogOpen(true)}>
               Add to Watchlist
             </Button>
+            <Button size="small" variant="outlined" sx={{ mt: 1, ml: 1 }} onClick={() => setAlertDialogOpen(true)}>
+              Create Price Alert
+            </Button>
           </Box>
         </Box>
       </Paper>
@@ -137,6 +142,17 @@ const StockResearchWorkbenchPage: React.FC = () => {
           Added {String(overview.symbol)} to watchlist. <Button color="inherit" component={Link} to={successWatchlistId ? `/watchlists/${successWatchlistId}` : '/watchlists'} size="small">Open</Button>
         </Alert>
       </Snackbar>
+      <CreateAlertDialog
+        open={alertDialogOpen}
+        onClose={() => setAlertDialogOpen(false)}
+        defaults={{
+          name: `${String(overview.symbol)} price above ${formatNumber(overview.latest_price)}`,
+          type: 'PRICE_ABOVE',
+          scope: 'STOCK',
+          instrumentId: String(overview.instrument_id),
+          condition: { threshold: typeof overview.latest_price === 'number' ? overview.latest_price : undefined },
+        }}
+      />
 
       <SignalWidget instrumentId={String(overview.instrument_id || '')} />
 

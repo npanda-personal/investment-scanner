@@ -26,6 +26,7 @@ import InventoryIcon from '@mui/icons-material/Inventory';
 import InsightsIcon from '@mui/icons-material/Insights';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
+import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import { useThemeMode } from './ThemeContext';
@@ -39,6 +40,7 @@ const navItems = [
   { path: '/signals', label: 'Signals', icon: <InsightsIcon /> },
   { path: '/portfolios', label: 'Portfolios', icon: <AccountBalanceWalletIcon /> },
   { path: '/watchlists', label: 'Watchlists', icon: <StarBorderIcon /> },
+  { path: '/alerts', label: 'Alerts', icon: <NotificationsNoneIcon /> },
 ];
 
 export default function NavigationLayout() {

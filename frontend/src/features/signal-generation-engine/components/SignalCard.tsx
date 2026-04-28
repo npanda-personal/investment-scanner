@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { SignalBadge } from './SignalBadge';
 import { AddSignalToPortfolioDialog } from './AddSignalToPortfolioDialog';
 import { AddToWatchlistDialog } from '@/features/watchlist-management';
+import { CreateAlertDialog } from '@/features/alerts-monitoring';
 import type { SignalResult } from '../types';
 
 const formatDateTime = (value: string) => new Date(value).toLocaleString();
@@ -33,6 +34,7 @@ export const SignalCard: React.FC<{ signal: SignalResult }> = ({ signal }) => {
   const [successPortfolioId, setSuccessPortfolioId] = React.useState<string | null>(null);
   const [watchlistDialogOpen, setWatchlistDialogOpen] = React.useState(false);
   const [successWatchlistId, setSuccessWatchlistId] = React.useState<string | null>(null);
+  const [alertDialogOpen, setAlertDialogOpen] = React.useState(false);
 
   return (
     <>
@@ -63,6 +65,7 @@ export const SignalCard: React.FC<{ signal: SignalResult }> = ({ signal }) => {
           <Button size="small" onClick={() => navigate(`/research/stocks/${signal.instrument_id}`)}>Research</Button>
           <Button size="small" variant="outlined" onClick={() => setPortfolioDialogOpen(true)}>Add to Portfolio</Button>
           <Button size="small" variant="outlined" onClick={() => setWatchlistDialogOpen(true)}>Add to Watchlist</Button>
+          <Button size="small" variant="outlined" onClick={() => setAlertDialogOpen(true)}>Create Alert</Button>
         </Box>
       </Paper>
       <AddSignalToPortfolioDialog
@@ -78,6 +81,17 @@ export const SignalCard: React.FC<{ signal: SignalResult }> = ({ signal }) => {
         companyName={signal.company_name}
         onClose={() => setWatchlistDialogOpen(false)}
         onAdded={(watchlistId) => setSuccessWatchlistId(watchlistId)}
+      />
+      <CreateAlertDialog
+        open={alertDialogOpen}
+        onClose={() => setAlertDialogOpen(false)}
+        defaults={{
+          name: `${signal.symbol} signal score above ${signal.score}`,
+          type: 'SIGNAL_SCORE_ABOVE',
+          scope: 'STOCK',
+          instrumentId: signal.instrument_id,
+          condition: { threshold: signal.score },
+        }}
       />
       <Snackbar open={Boolean(successPortfolioId)} autoHideDuration={5000} onClose={() => setSuccessPortfolioId(null)}>
         <Alert severity="success" variant="filled" onClose={() => setSuccessPortfolioId(null)}>

@@ -42,6 +42,7 @@ Current modules include:
 - portfolio-management
 - portfolio-intelligence
 - watchlist-management
+- alerts-monitoring
 
 # Important Current State
 
@@ -334,7 +335,9 @@ Frontend:
 # Current Cross-Module UI Patterns
 
 - Signal cards may open feature-owned action dialogs through public frontend exports, such as Portfolio Management and Watchlist Management.
+- Signal cards may open Alerts & Monitoring rule dialogs through public frontend exports.
 - Stock Research Workbench may expose action buttons that consume public frontend feature exports, such as adding an instrument to a watchlist.
+- Alert/status badges should use existing MUI `Chip` severity colors unless a shared design-system component is introduced later.
 - These integrations must not import backend repositories or frontend feature internals directly.
 
 # Final Principle

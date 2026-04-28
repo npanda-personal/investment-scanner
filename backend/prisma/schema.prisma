@@ -68,6 +68,8 @@ model Stock {
   portfolioHoldings            PortfolioHolding[]
   portfolioTransactions        PortfolioTransaction[]
   watchlistItems                WatchlistItem[]
+  alertRules                    AlertRule[]
+  alertEvents                   AlertEvent[]
 
   @@map("stocks")
 }
@@ -169,6 +171,8 @@ model Portfolio {
   updatedAt    DateTime              @updatedAt
   holdings     PortfolioHolding[]
   transactions PortfolioTransaction[]
+  alertRules   AlertRule[]
+  alertEvents  AlertEvent[]
 
   @@map("portfolios")
 }
@@ -222,8 +226,60 @@ model Watchlist {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
   items       WatchlistItem[]
+  alertRules  AlertRule[]
+  alertEvents AlertEvent[]
 
   @@map("watchlists")
+}
+
+model AlertRule {
+  id          String       @id @default(cuid())
+  name        String
+  type        String
+  scope       String
+  instrumentId String?
+  stock       Stock?       @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  portfolioId String?
+  portfolio   Portfolio?   @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  watchlistId String?
+  watchlist   Watchlist?   @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
+  condition   Json
+  enabled     Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  events      AlertEvent[]
+
+  @@index([type, scope])
+  @@index([enabled])
+  @@index([instrumentId])
+  @@index([portfolioId])
+  @@index([watchlistId])
+  @@map("alert_rules")
+}
+
+model AlertEvent {
+  id            String     @id @default(cuid())
+  alertRuleId   String
+  alertRule     AlertRule  @relation(fields: [alertRuleId], references: [id], onDelete: Cascade)
+  type          String
+  severity      String
+  title         String
+  message       String
+  instrumentId  String?
+  stock         Stock?      @relation(fields: [instrumentId], references: [id], onDelete: SetNull)
+  portfolioId   String?
+  portfolio     Portfolio?  @relation(fields: [portfolioId], references: [id], onDelete: SetNull)
+  watchlistId   String?
+  watchlist     Watchlist?  @relation(fields: [watchlistId], references: [id], onDelete: SetNull)
+  metadata      Json
+  triggeredAt   DateTime    @default(now())
+  readAt        DateTime?
+  dismissedAt   DateTime?
+
+  @@index([alertRuleId, triggeredAt])
+  @@index([readAt])
+  @@index([dismissedAt])
+  @@map("alert_events")
 }
 
 model WatchlistItem {

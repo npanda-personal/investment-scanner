@@ -1,0 +1,106 @@
+import React, { useState } from 'react';
+import { Alert, Box, Button, Chip, CircularProgress, Paper, Stack, Typography } from '@mui/material';
+import { Link } from 'react-router-dom';
+import { deleteAlertRule, dismissAlert, evaluateAlerts, markAlertRead, markAllAlertsRead, updateAlertRule } from '../api/alertsMonitoringService';
+import { useAlertsMonitoring } from '../hooks';
+import { CreateAlertDialog } from './CreateAlertDialog';
+import type { AlertEvent } from '../types';
+
+const severityColor = (severity: string) => severity === 'CRITICAL' ? 'error' : severity === 'WARNING' ? 'warning' : 'info';
+const contextLink = (event: AlertEvent) => event.instrumentId ? `/research/stocks/${event.instrumentId}` : event.portfolioId ? `/portfolios/${event.portfolioId}` : event.watchlistId ? `/watchlists/${event.watchlistId}` : '/alerts';
+
+export const AlertsMonitoringPage: React.FC = () => {
+  const { rules, events, loading, error, reload } = useAlertsMonitoring();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const run = async () => {
+    setActionError(null);
+    try {
+      await evaluateAlerts();
+      await reload();
+    } catch (err: any) {
+      setActionError(err.response?.data?.error || err.message || 'Failed to evaluate alerts');
+    }
+  };
+
+  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>;
+
+  return (
+    <Box sx={{ p: 3, maxWidth: 1400, mx: 'auto' }}>
+      <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2} sx={{ mb: 3 }}>
+        <Box>
+          <Typography variant="h4">Alerts & Monitoring</Typography>
+          <Typography color="text.secondary">Batch/on-demand monitoring for stocks, signals, portfolios, and watchlists.</Typography>
+        </Box>
+        <Stack direction="row" spacing={1}>
+          <Button variant="outlined" onClick={run}>Evaluate Now</Button>
+          <Button variant="contained" onClick={() => setDialogOpen(true)}>Create Alert</Button>
+        </Stack>
+      </Stack>
+      {(error || actionError) && <Alert severity="error" sx={{ mb: 2 }}>{error || actionError}</Alert>}
+      <CreateAlertDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onCreated={reload} />
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '1.4fr 1fr' }, gap: 3 }}>
+        <Paper sx={{ p: 2 }}>
+          <Stack direction="row" justifyContent="space-between" sx={{ mb: 2 }}>
+            <Typography variant="h6">Alert Inbox</Typography>
+            <Button size="small" onClick={async () => { await markAllAlertsRead(); await reload(); }}>Mark All Read</Button>
+          </Stack>
+          {events.length === 0 ? (
+            <Typography color="text.secondary">No alert events yet. Create rules and run evaluation.</Typography>
+          ) : (
+            <Stack spacing={1.5}>
+              {events.filter((event) => !event.dismissedAt).map((event) => (
+                <Paper key={event.id} variant="outlined" sx={{ p: 1.5, bgcolor: event.readAt ? 'background.paper' : 'action.hover' }}>
+                  <Stack direction="row" justifyContent="space-between" spacing={1}>
+                    <Box>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Chip size="small" color={severityColor(event.severity)} label={event.severity} />
+                        <Typography fontWeight={700}>{event.title}</Typography>
+                      </Stack>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{event.message}</Typography>
+                      <Typography variant="caption" color="text.secondary">{new Date(event.triggeredAt).toLocaleString()}</Typography>
+                    </Box>
+                    <Stack direction="row" spacing={1}>
+                      <Button component={Link} to={contextLink(event)} size="small">Open</Button>
+                      {!event.readAt && <Button size="small" onClick={async () => { await markAlertRead(event.id); await reload(); }}>Read</Button>}
+                      <Button color="error" size="small" onClick={async () => { await dismissAlert(event.id); await reload(); }}>Dismiss</Button>
+                    </Stack>
+                  </Stack>
+                </Paper>
+              ))}
+            </Stack>
+          )}
+        </Paper>
+
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="h6" sx={{ mb: 2 }}>Alert Rules</Typography>
+          {rules.length === 0 ? (
+            <Typography color="text.secondary">No alert rules yet.</Typography>
+          ) : (
+            <Stack spacing={1.5}>
+              {rules.map((rule) => (
+                <Paper key={rule.id} variant="outlined" sx={{ p: 1.5 }}>
+                  <Stack direction="row" justifyContent="space-between" spacing={1}>
+                    <Box>
+                      <Typography fontWeight={700}>{rule.name}</Typography>
+                      <Typography variant="body2" color="text.secondary">{rule.type} · {rule.scope} · Threshold {rule.condition.threshold ?? 'N/A'}</Typography>
+                    </Box>
+                    <Chip size="small" color={rule.enabled ? 'success' : 'default'} label={rule.enabled ? 'Enabled' : 'Disabled'} />
+                  </Stack>
+                  <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                    <Button size="small" onClick={async () => { await updateAlertRule(rule.id, { enabled: !rule.enabled }); await reload(); }}>{rule.enabled ? 'Disable' : 'Enable'}</Button>
+                    <Button size="small" color="error" onClick={async () => { await deleteAlertRule(rule.id); await reload(); }}>Delete</Button>
+                  </Stack>
+                </Paper>
+              ))}
+            </Stack>
+          )}
+        </Paper>
+      </Box>
+    </Box>
+  );
+};
+
+export default AlertsMonitoringPage;

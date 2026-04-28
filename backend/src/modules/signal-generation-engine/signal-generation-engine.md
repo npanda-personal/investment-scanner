@@ -162,6 +162,8 @@ Signal cards also expose an `Add to Portfolio` action. The action opens a fronte
 
 Signal cards also expose an `Add to Watchlist` action. The action uses the Watchlist Management public frontend exports, lets the user select a watchlist, add an optional note/tags, and submits to `POST /api/v1/watchlists/:id/items`. Duplicate watchlist items are handled gracefully in the dialog.
 
+Signal cards expose a `Create Alert` action for stock signal score alerts through the Alerts & Monitoring public frontend exports.
+
 The Stock Research Workbench includes a compact signal widget with score, direction, confidence, top reasons, generated timestamp, and link to the full signals page.
 
 The dashboard and cards link stocks to `/research/stocks/:id`.

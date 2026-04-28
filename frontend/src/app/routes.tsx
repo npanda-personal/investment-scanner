@@ -6,6 +6,7 @@ import { stockResearchWorkbenchRoutes } from '@/features/stock-research-workbenc
 import { signalGenerationEngineRoutes } from '@/features/signal-generation-engine';
 import { portfolioManagementRoutes } from '@/features/portfolio-management';
 import { watchlistManagementRoutes } from '@/features/watchlist-management';
+import { alertsMonitoringRoutes } from '@/features/alerts-monitoring';
 
 export const appRoutes: RouteObject[] = [
   {
@@ -18,6 +19,7 @@ export const appRoutes: RouteObject[] = [
       ...signalGenerationEngineRoutes,
       ...portfolioManagementRoutes,
       ...watchlistManagementRoutes,
+      ...alertsMonitoringRoutes,
     ],
   },
 ];

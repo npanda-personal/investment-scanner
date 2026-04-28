@@ -34,6 +34,11 @@ export default function HomePage() {
           <Typography color="text.secondary" sx={{ mb: 2 }}>Track stock ideas with price, signal, notes, and research links.</Typography>
           <Button component={Link} to="/watchlists">Open</Button>
         </Paper>
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="h6">Alerts & Monitoring</Typography>
+          <Typography color="text.secondary" sx={{ mb: 2 }}>Review alert rules and in-app monitoring events.</Typography>
+          <Button component={Link} to="/alerts">Open</Button>
+        </Paper>
       </Box>
     </Box>
   );
