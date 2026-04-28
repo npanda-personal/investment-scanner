@@ -1,5 +1,5 @@
 import { BrowserRouter, useRoutes } from 'react-router-dom';
-import { CustomThemeProvider } from './contexts/ThemeContext';
+import { CustomThemeProvider } from './app/ThemeContext';
 import { appRoutes } from './app/routes';
 
 function AppRoutes() {

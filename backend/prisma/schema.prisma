@@ -79,8 +79,36 @@ model Stock {
   updatedAt                    DateTime @updatedAt
   fundamentals                 Fundamental[]
   corporateActions             CorporateAction[]
+  signalResults                SignalResult[]
 
   @@map("stocks")
+}
+
+model SignalResult {
+  id               String   @id @default(cuid())
+  instrumentId     String
+  stock            Stock    @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  symbol           String
+  companyName      String?
+  sector           String?
+  country          String?
+  score            Float
+  direction        String
+  confidence       String
+  triggeredSignals Json
+  negativeSignals  Json
+  explanation      String
+  generatedAt      DateTime @default(now())
+  source           String   @default("signal-generation-engine")
+  dataStatus       String   @default("PARTIAL")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([instrumentId, generatedAt])
+  @@index([direction, score])
+  @@index([sector])
+  @@index([country])
+  @@map("signal_results")
 }
 
 model Fundamental {

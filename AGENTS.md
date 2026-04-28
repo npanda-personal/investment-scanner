@@ -365,3 +365,26 @@ Optimize for:
 - eventual removal of legacy code
 
 Not for theoretical perfection.
+
+## Legacy Dependency Rule
+
+Anything outside the modular structure should be treated as legacy unless explicitly documented as shared infrastructure.
+
+Current approved modular roots:
+
+- backend/src/modules/*
+- frontend/src/features/*
+
+Approved shared infrastructure:
+
+- backend/src/db
+- backend/src/shared
+- backend/src/config
+- frontend/src/shared
+- frontend/src/app
+
+New modules must not import runtime code from legacy folders.
+
+If useful logic exists in legacy code, copy/refactor it into the owning module and make the module own it.
+
+Legacy code may be referenced for understanding, but not used as a dependency by new modules.

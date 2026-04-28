@@ -23,6 +23,7 @@ import {
 } from 'recharts';
 import { fetchStockResearchWorkbench } from '../api/stockResearchWorkbenchService';
 import type { ResearchRange, ResearchWorkbenchResponse } from '../types';
+import { SignalWidget } from '@/features/signal-generation-engine';
 
 const ranges: ResearchRange[] = ['1W', '1M', '3M', '6M', 'YTD', '1Y', '3Y', '5Y', 'MAX'];
 
@@ -115,6 +116,8 @@ const StockResearchWorkbenchPage: React.FC = () => {
           </Box>
         </Box>
       </Paper>
+
+      <SignalWidget instrumentId={String(overview.instrument_id || '')} />
 
       <Paper sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, mb: 2, flexDirection: { xs: 'column', md: 'row' } }}>
