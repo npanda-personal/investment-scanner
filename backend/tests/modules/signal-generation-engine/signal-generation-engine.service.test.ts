@@ -105,5 +105,89 @@ describe('SignalGenerationEngineService', () => {
     expect(saved[0].triggered_signals.length).toBeGreaterThan(0);
     expect(saved[0].explanation).toContain('Bullish because');
   });
-});
 
+  it('enriches top signal responses with current price context', async () => {
+    const repository = {
+      latestSignals: jest.fn().mockResolvedValue([{
+        id: 'signal-1',
+        instrument_id: 'stock-1',
+        symbol: 'ABC',
+        company_name: 'ABC Co',
+        sector: 'Technology',
+        country: 'US',
+        currentPrice: null,
+        previousClose: null,
+        dailyChange: null,
+        dailyChangePercent: null,
+        currency: null,
+        priceTimestamp: null,
+        score: 80,
+        direction: 'BULLISH',
+        confidence: 'HIGH',
+        triggered_signals: [],
+        negative_signals: [],
+        explanation: 'Bullish because price is above SMA50.',
+        generated_at: '2026-04-28T00:00:00.000Z',
+        source: 'signal-generation-engine',
+        data_status: 'COMPLETE',
+      }]),
+    };
+    const marketDataService = {
+      getInstrument: jest.fn().mockResolvedValue({ id: 'stock-1', currency: 'USD' }),
+      latestPriceByInstrumentId: jest.fn().mockResolvedValue({ latest: { adjusted_close: 105, date: '2026-04-28T00:00:00.000Z' } }),
+      listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: [{ adjusted_close: 105 }, { adjusted_close: 100 }] }),
+    };
+    const service = new SignalGenerationEngineService(repository as any, marketDataService as any, {} as any);
+
+    const signals = await service.topSignals({ limit: 5 });
+
+    expect(signals[0]).toMatchObject({
+      currentPrice: 105,
+      previousClose: 100,
+      dailyChange: 5,
+      dailyChangePercent: 0.05,
+      currency: 'USD',
+      priceTimestamp: '2026-04-28T00:00:00.000Z',
+    });
+  });
+
+  it('returns null price context when market data is unavailable', async () => {
+    const service = new SignalGenerationEngineService({} as any, {
+      getInstrument: jest.fn().mockRejectedValue(new Error('missing')),
+      latestPriceByInstrumentId: jest.fn().mockRejectedValue(new Error('missing')),
+      listPricesByInstrumentId: jest.fn().mockRejectedValue(new Error('missing')),
+    } as any, {} as any);
+
+    const signal = await service.enrichSignal({
+      instrument_id: 'stock-1',
+      symbol: 'ABC',
+      company_name: 'ABC Co',
+      sector: null,
+      country: null,
+      currentPrice: null,
+      previousClose: null,
+      dailyChange: null,
+      dailyChangePercent: null,
+      currency: null,
+      priceTimestamp: null,
+      score: 50,
+      direction: 'NEUTRAL',
+      confidence: 'LOW',
+      triggered_signals: [],
+      negative_signals: [],
+      explanation: 'Neutral because data is limited.',
+      generated_at: '2026-04-28T00:00:00.000Z',
+      source: 'signal-generation-engine',
+      data_status: 'MISSING',
+    });
+
+    expect(signal).toMatchObject({
+      currentPrice: null,
+      previousClose: null,
+      dailyChange: null,
+      dailyChangePercent: null,
+      currency: null,
+      priceTimestamp: null,
+    });
+  });
+});

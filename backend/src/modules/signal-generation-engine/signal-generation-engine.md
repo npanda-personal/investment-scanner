@@ -38,6 +38,8 @@ Repository behavior:
 - `latestSignals` reads persisted results, applies filters, collapses to the latest result per instrument, and sorts by score descending.
 - `GET /api/v1/signals/:instrumentId` calculates and persists on demand when no result exists yet.
 
+Signal API responses are enriched at response time with latest price context from Market Data Foundation public services. These fields are not persisted on `SignalResult`.
+
 ## Endpoints
 
 Mounted under `/api/v1`:
@@ -58,6 +60,17 @@ Query and request behavior:
 - `sector` and `country`: exact case-insensitive repository filters for persisted results.
 - `signalType`: filters against signal code substrings or signal category names.
 - `POST /signals/run` accepts `instrumentId`, `symbol`, or a limited instrument universe. Symbol lookup uses Market Data Foundation public instrument search.
+
+Signal response price fields:
+
+- `currentPrice`
+- `previousClose`
+- `dailyChange`
+- `dailyChangePercent`
+- `currency`
+- `priceTimestamp`
+
+Price data comes from Market Data Foundation latest and historical price APIs. If price data is unavailable or the price lookup fails, these fields return `null` and the signal endpoint still succeeds.
 
 ## Signal Definitions
 
@@ -142,6 +155,8 @@ Route:
 - `/signals`
 
 The dashboard shows top bullish signals, top bearish signals, momentum leaders, recently generated signals, a filterable screener, manual signal generation, empty states, loading states, and links to `/research/stocks/:id`.
+
+Signal cards display current price, currency, daily price change, and daily percentage move with positive/negative visual styling. Missing price data is shown as unavailable rather than blocking the card.
 
 Signal cards also expose an `Add to Portfolio` action. The action opens a frontend dialog that fetches portfolios through the Portfolio Management public frontend API, collects quantity, average cost, currency, and optional notes, then submits to the existing `POST /api/v1/portfolios/:id/holdings` endpoint. Duplicate holding API errors are translated into a user-friendly message: `This stock already exists in this portfolio. Edit the existing holding instead.`
 

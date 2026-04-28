@@ -24,12 +24,12 @@ export class SignalGenerationEngineService {
   ) {}
 
   async topSignals(query: SignalQuery) {
-    return this.repository.latestSignals(query);
+    return this.enrichSignals(await this.repository.latestSignals(query));
   }
 
   async screener(query: SignalQuery) {
     return {
-      signals: await this.repository.latestSignals(query),
+      signals: await this.enrichSignals(await this.repository.latestSignals(query)),
       filters: query,
       source: 'signal-generation-engine',
       generated_at: new Date().toISOString(),
@@ -38,8 +38,9 @@ export class SignalGenerationEngineService {
 
   async latestForInstrument(instrumentId: string): Promise<SignalResultDto | null> {
     const latest = await this.repository.latestForInstrument(instrumentId);
-    if (latest) return latest;
-    return this.generateForInstrument(instrumentId);
+    if (latest) return this.enrichSignal(latest);
+    const generated = await this.generateForInstrument(instrumentId);
+    return generated ? this.enrichSignal(generated) : null;
   }
 
   async run(request: SignalRunRequest): Promise<SignalRunResponse> {
@@ -112,6 +113,12 @@ export class SignalGenerationEngineService {
       company_name: instrument.company_name ?? null,
       sector: instrument.sector ?? null,
       country: instrument.country ?? null,
+      currentPrice: null,
+      previousClose: null,
+      dailyChange: null,
+      dailyChangePercent: null,
+      currency: instrument.currency ?? null,
+      priceTimestamp: null,
       score,
       direction,
       confidence,
@@ -124,6 +131,44 @@ export class SignalGenerationEngineService {
     };
 
     return this.repository.createSignalResult(result);
+  }
+
+  async enrichSignals(signals: SignalResultDto[]): Promise<SignalResultDto[]> {
+    return Promise.all(signals.map((signal) => this.enrichSignal(signal)));
+  }
+
+  async enrichSignal(signal: SignalResultDto): Promise<SignalResultDto> {
+    try {
+      const [instrument, latest, prices] = await Promise.all([
+        this.marketDataService.getInstrument(signal.instrument_id).catch(() => null),
+        this.marketDataService.latestPriceByInstrumentId(signal.instrument_id).catch(() => null),
+        this.marketDataService.listPricesByInstrumentId(signal.instrument_id, 2).catch(() => null),
+      ]);
+      const latestPrice = latest?.latest?.adjusted_close ?? latest?.latest?.close ?? null;
+      const previousPrice = prices?.prices?.[1]?.adjusted_close ?? prices?.prices?.[1]?.close ?? null;
+      const currentPrice = typeof latestPrice === 'number' && Number.isFinite(latestPrice) ? latestPrice : null;
+      const previousClose = typeof previousPrice === 'number' && Number.isFinite(previousPrice) ? previousPrice : null;
+      const dailyChange = currentPrice !== null && previousClose !== null ? currentPrice - previousClose : null;
+      return {
+        ...signal,
+        currentPrice,
+        previousClose,
+        dailyChange,
+        dailyChangePercent: dailyChange !== null && previousClose !== null && previousClose > 0 ? dailyChange / previousClose : null,
+        currency: instrument?.currency ?? signal.currency ?? null,
+        priceTimestamp: latest?.latest?.date ? new Date(latest.latest.date).toISOString() : null,
+      };
+    } catch {
+      return {
+        ...signal,
+        currentPrice: null,
+        previousClose: null,
+        dailyChange: null,
+        dailyChangePercent: null,
+        currency: signal.currency ?? null,
+        priceTimestamp: null,
+      };
+    }
   }
 
   evaluateTechnical(prices: SignalPricePoint[]) {
@@ -339,4 +384,3 @@ export class SignalGenerationEngineService {
     return values.reduce((sum, value) => sum + value, 0) / values.length;
   }
 }
-

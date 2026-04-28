@@ -15,7 +15,12 @@ export interface SignalResult {
   company_name: string | null;
   sector: string | null;
   country: string | null;
-  currency?: string | null;
+  currentPrice: number | null;
+  previousClose: number | null;
+  dailyChange: number | null;
+  dailyChangePercent: number | null;
+  currency: string | null;
+  priceTimestamp: string | null;
   score: number;
   direction: SignalDirection;
   confidence: SignalConfidence;

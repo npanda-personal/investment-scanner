@@ -6,6 +6,24 @@ import { AddSignalToPortfolioDialog } from './AddSignalToPortfolioDialog';
 import type { SignalResult } from '../types';
 
 const formatDateTime = (value: string) => new Date(value).toLocaleString();
+const formatPrice = (value: number | null, currency: string | null) => {
+  if (value === null) return 'Price unavailable';
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: currency || 'USD',
+      maximumFractionDigits: 2,
+    }).format(value);
+  } catch {
+    return `${currency || ''} ${value.toFixed(2)}`.trim();
+  }
+};
+
+const formatChange = (value: number | null) => value === null ? 'N/A' : `${value >= 0 ? '+' : ''}${(value * 100).toFixed(1)}%`;
+const priceTone = (value: number | null) => {
+  if (value === null || value === 0) return 'text.secondary';
+  return value > 0 ? 'success.main' : 'error.main';
+};
 
 export const SignalCard: React.FC<{ signal: SignalResult }> = ({ signal }) => {
   const navigate = useNavigate();
@@ -25,6 +43,13 @@ export const SignalCard: React.FC<{ signal: SignalResult }> = ({ signal }) => {
         </Box>
         <Typography variant="h5">{signal.score}</Typography>
         <Typography variant="caption" color="text.secondary">Confidence: {signal.confidence}</Typography>
+        <Box sx={{ mt: 1, display: 'flex', gap: 1, alignItems: 'baseline', flexWrap: 'wrap' }}>
+          <Typography fontWeight={700}>{formatPrice(signal.currentPrice, signal.currency)}</Typography>
+          <Typography color={priceTone(signal.dailyChangePercent)} variant="body2">
+            {signal.dailyChange !== null && signal.dailyChange >= 0 ? '+' : ''}{signal.dailyChange?.toFixed(2) ?? 'N/A'} ({formatChange(signal.dailyChangePercent)})
+          </Typography>
+          {signal.priceTimestamp && <Typography variant="caption" color="text.secondary">{new Date(signal.priceTimestamp).toLocaleDateString()}</Typography>}
+        </Box>
         <Box component="ul" sx={{ pl: 2, my: 1 }}>
           {reasons.slice(0, 3).map((reason) => (
             <Typography key={reason.code} component="li" variant="body2">{reason.label}</Typography>

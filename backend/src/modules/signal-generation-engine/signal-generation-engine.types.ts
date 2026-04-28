@@ -17,6 +17,12 @@ export interface SignalResultDto {
   company_name: string | null;
   sector: string | null;
   country: string | null;
+  currentPrice: number | null;
+  previousClose: number | null;
+  dailyChange: number | null;
+  dailyChangePercent: number | null;
+  currency: string | null;
+  priceTimestamp: string | null;
   score: number;
   direction: SignalDirection;
   confidence: SignalConfidence;
@@ -60,4 +66,3 @@ export interface SignalPricePoint {
   adjusted_close: number;
   volume: number | null;
 }
-
