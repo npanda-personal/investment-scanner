@@ -63,6 +63,15 @@ export class MarketDataFoundationRepository {
     return this.prisma.stock.findUnique({ where: { symbol } });
   }
 
+  findStockBySymbolAndExchange(symbol: string, exchange: string) {
+    return this.prisma.stock.findFirst({
+      where: {
+        symbol,
+        exchange,
+      },
+    });
+  }
+
   createStock(data: CreateStockRequest) {
     return this.prisma.stock.create({
       data: {
@@ -156,6 +165,67 @@ export class MarketDataFoundationRepository {
       close: price.close.toString(),
       volume: price.volume !== null ? price.volume.toString() : null,
     }));
+  }
+
+  async latestPrice(symbol: string) {
+    const latestTick = await this.prisma.priceTick.findFirst({
+      where: { symbol },
+      orderBy: { timestamp: 'desc' },
+      select: {
+        timestamp: true,
+        open: true,
+        high: true,
+        low: true,
+        close: true,
+        volume: true,
+        region: true,
+        exchange: true,
+        source: true,
+      },
+    });
+
+    if (latestTick) {
+      return {
+        ...latestTick,
+        open: latestTick.open.toString(),
+        high: latestTick.high.toString(),
+        low: latestTick.low.toString(),
+        close: latestTick.close.toString(),
+        volume: latestTick.volume !== null ? latestTick.volume.toString() : null,
+      };
+    }
+
+    const latestPrice = await this.prisma.latestPrice.findUnique({
+      where: { symbol },
+    });
+    if (!latestPrice) {
+      return null;
+    }
+
+    return {
+      timestamp: latestPrice.timestamp,
+      open: null,
+      high: null,
+      low: null,
+      close: latestPrice.price.toString(),
+      volume: null,
+      region: latestPrice.region,
+      exchange: null,
+      source: 'latest_prices',
+    };
+  }
+
+  instrumentCount() {
+    return this.prisma.stock.count();
+  }
+
+  async latestDataTimestamp() {
+    const latestPrice = await this.prisma.priceTick.findFirst({
+      orderBy: { timestamp: 'desc' },
+      select: { timestamp: true },
+    });
+
+    return latestPrice?.timestamp ?? null;
   }
 
   async storeHistorical(

@@ -2,20 +2,44 @@ import axios from 'axios';
 import type {
   BackendPaginatedResponse,
   CreateStockRequest,
+  BulkSyncResponse,
+  MarketDataHealth,
   PaginatedResponse,
   PaginationOptions,
+  SyncResponse,
   Stock,
   UpdateStockRequest,
+  V1CorporateActionsResponse,
+  V1CreateInstrumentRequest,
+  V1FundamentalsResponse,
+  V1Instrument,
+  V1InstrumentsResponse,
+  V1LatestPriceResponse,
+  V1PricesResponse,
+  V1SyncRequest,
+  V1SyncResponse,
 } from '../types';
 
 const API_BASE = '/api';
 
 export type {
   CreateStockRequest,
+  BulkSyncResponse,
+  MarketDataHealth,
   PaginatedResponse,
   PaginationOptions,
+  SyncResponse,
   Stock,
   UpdateStockRequest,
+  V1CorporateActionsResponse,
+  V1CreateInstrumentRequest,
+  V1FundamentalsResponse,
+  V1Instrument,
+  V1InstrumentsResponse,
+  V1LatestPriceResponse,
+  V1PricesResponse,
+  V1SyncRequest,
+  V1SyncResponse,
 } from '../types';
 
 /**
@@ -82,21 +106,22 @@ export async function toggleStockActive(id: string): Promise<Stock> {
 /**
  * Trigger a manual data sync for a stock.
  */
-export async function syncStockData(id: string): Promise<Stock> {
-  const response = await axios.post<Stock>(`${API_BASE}/market-data-foundation/stocks/${id}/sync`);
+export async function syncStockData(id: string): Promise<SyncResponse> {
+  const response = await axios.post<SyncResponse>(`${API_BASE}/market-data-foundation/stocks/${id}/sync`);
   return response.data;
 }
 
 /**
  * Trigger bulk sync for all active stocks.
  */
-export async function syncAllStocks(batchSize?: number, delayBetweenBatchesMs?: number): Promise<any> {
+export async function syncAllStocks(workerCount?: number, workerConcurrency?: number, delayBetweenBatchesMs?: number): Promise<BulkSyncResponse> {
   const params = new URLSearchParams();
-  if (batchSize !== undefined) params.append('batchSize', batchSize.toString());
+  if (workerCount !== undefined) params.append('workerCount', workerCount.toString());
+  if (workerConcurrency !== undefined) params.append('workerConcurrency', workerConcurrency.toString());
   if (delayBetweenBatchesMs !== undefined) params.append('delayBetweenBatchesMs', delayBetweenBatchesMs.toString());
   
   const url = `${API_BASE}/market-data-foundation/stocks/sync-all${params.toString() ? `?${params.toString()}` : ''}`;
-  const response = await axios.post(url);
+  const response = await axios.post<BulkSyncResponse>(url);
   return response.data;
 }
 
@@ -115,5 +140,54 @@ export async function externalSearch(query: string): Promise<any[]> {
  */
 export async function yahooSearch(query: string): Promise<any[]> {
   const response = await axios.get(`${API_BASE}/market-data-foundation/stocks/yahoo-search?q=${encodeURIComponent(query)}`);
+  return response.data;
+}
+
+export async function fetchMarketDataHealth(): Promise<MarketDataHealth> {
+  const response = await axios.get<MarketDataHealth>(`${API_BASE}/v1/market-data/health`);
+  return response.data;
+}
+
+export async function fetchInstruments(search?: string): Promise<V1InstrumentsResponse> {
+  const response = await axios.get<V1InstrumentsResponse>(`${API_BASE}/v1/instruments`, {
+    params: search ? { search } : undefined,
+  });
+  return response.data;
+}
+
+export async function createInstrument(data: V1CreateInstrumentRequest): Promise<V1Instrument> {
+  const response = await axios.post<V1Instrument>(`${API_BASE}/v1/instruments`, data);
+  return response.data;
+}
+
+export async function fetchInstrument(id: string): Promise<V1Instrument> {
+  const response = await axios.get<V1Instrument>(`${API_BASE}/v1/instruments/${id}`);
+  return response.data;
+}
+
+export async function fetchInstrumentPrices(id: string, limit = 250): Promise<V1PricesResponse> {
+  const response = await axios.get<V1PricesResponse>(`${API_BASE}/v1/prices/${id}`, {
+    params: { limit },
+  });
+  return response.data;
+}
+
+export async function fetchInstrumentLatestPrice(id: string): Promise<V1LatestPriceResponse> {
+  const response = await axios.get<V1LatestPriceResponse>(`${API_BASE}/v1/prices/${id}/latest`);
+  return response.data;
+}
+
+export async function fetchInstrumentFundamentals(id: string): Promise<V1FundamentalsResponse> {
+  const response = await axios.get<V1FundamentalsResponse>(`${API_BASE}/v1/fundamentals/${id}`);
+  return response.data;
+}
+
+export async function fetchInstrumentCorporateActions(id: string): Promise<V1CorporateActionsResponse> {
+  const response = await axios.get<V1CorporateActionsResponse>(`${API_BASE}/v1/corporate-actions/${id}`);
+  return response.data;
+}
+
+export async function syncMarketData(data: V1SyncRequest): Promise<V1SyncResponse> {
+  const response = await axios.post<V1SyncResponse>(`${API_BASE}/v1/ingestion/sync`, data);
   return response.data;
 }

@@ -4,8 +4,10 @@ export {
   createMarketDataDataRouter,
   createMarketDataFoundationRouter,
   createMarketDataStocksRouter,
+  createMarketDataV1Router,
   marketDataDataRouter,
   marketDataStocksRouter,
+  marketDataV1Router,
 } from './market-data-foundation.router';
 export { MarketDataFoundationController } from './market-data-foundation.controller';
 export { MarketDataFoundationService, StockService } from './market-data-foundation.service';
@@ -22,6 +24,7 @@ export {
 export {
   partitionHistoricalPrices,
   validateHistoricalPrice,
+  validateInstrumentInput,
   validateRequiredString,
 } from './market-data-foundation.validation';
 export type {

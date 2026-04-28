@@ -1,5 +1,5 @@
 import { Box, Typography } from '@mui/material';
-import { DataIngestion } from '@/features/market-data-foundation';
+import { DataIngestion, MarketDataStatusPanel } from '@/features/market-data-foundation';
 import WatchlistManager from '../components/WatchlistManager';
 
 const DashboardPage = () => {
@@ -16,6 +16,8 @@ const DashboardPage = () => {
           The frontend is successfully set up. Connect to the backend API to start scanning markets.
         </Typography>
       </Box>
+
+      <MarketDataStatusPanel />
 
       {/* Data Ingestion Section */}
       <DataIngestion />

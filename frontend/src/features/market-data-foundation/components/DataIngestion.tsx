@@ -1,154 +1,97 @@
 import React, { useState } from 'react';
 import {
+  Alert,
   Box,
   Button,
+  CircularProgress,
+  Paper,
   TextField,
   Typography,
-  CircularProgress,
-  Alert,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Chip,
 } from '@mui/material';
-import { ingestSymbol, fetchPrices, HistoricalPrice } from '../api/priceDataService';
+import SyncIcon from '@mui/icons-material/Sync';
+import { syncMarketData, type V1SyncResponse } from '../api/marketDataFoundationService';
 
 const DataIngestion: React.FC = () => {
   const [symbol, setSymbol] = useState('');
+  const [exchange, setExchange] = useState('');
   const [loading, setLoading] = useState(false);
-  const [ingestResult, setIngestResult] = useState<{ success: boolean; message: string } | null>(null);
-  const [prices, setPrices] = useState<HistoricalPrice[]>([]);
+  const [result, setResult] = useState<V1SyncResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleIngest = async () => {
-    if (!symbol.trim()) return;
+  const handleSync = async () => {
+    if (!symbol.trim()) {
+      setError('Symbol is required.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
-    setIngestResult(null);
+    setResult(null);
     try {
-      const result = await ingestSymbol(symbol);
-      setIngestResult(result);
-      // After ingestion, fetch prices
-      await handleFetchPrices();
+      const response = await syncMarketData({
+        symbol: symbol.trim().toUpperCase(),
+        exchange: exchange.trim().toUpperCase() || undefined,
+        asset_type: 'EQUITY',
+      });
+      setResult(response);
     } catch (err: any) {
-      setError(err.message || 'Ingestion failed');
+      setError(err.response?.data?.message || err.message || 'Market data sync failed');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleFetchPrices = async () => {
-    if (!symbol.trim()) return;
-    try {
-      const result = await fetchPrices(symbol);
-      setPrices(result.prices);
-      setError(null);
-    } catch (err: any) {
-      setError('Failed to fetch prices: ' + err.message);
     }
   };
 
   return (
     <Box sx={{ p: 3, maxWidth: 1200, mx: 'auto' }}>
       <Typography variant="h4" gutterBottom>
-        Price Data Ingestion
+        Market Data Ingestion
       </Typography>
-      <Typography variant="body1" color="text.secondary" paragraph>
-        Enter a stock symbol (e.g., AAPL, VOW.DE) to ingest historical price data and display the latest prices.
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+        Trigger a manual sync from the configured free market data provider.
       </Typography>
 
-      <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', mb: 4 }}>
-        <TextField
-          label="Symbol"
-          variant="outlined"
-          value={symbol}
-          onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-          placeholder="AAPL"
-          disabled={loading}
-          sx={{ width: 200 }}
-        />
-        <Button
-          variant="contained"
-          onClick={handleIngest}
-          disabled={loading || !symbol.trim()}
-          startIcon={loading ? <CircularProgress size={20} /> : null}
-        >
-          {loading ? 'Ingesting...' : 'Ingest Data'}
-        </Button>
-        <Button
-          variant="outlined"
-          onClick={handleFetchPrices}
-          disabled={loading || !symbol.trim()}
-        >
-          Refresh Prices
-        </Button>
-      </Box>
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', flexDirection: { xs: 'column', sm: 'row' } }}>
+          <TextField
+            required
+            label="Symbol"
+            value={symbol}
+            onChange={(event) => setSymbol(event.target.value.toUpperCase())}
+            placeholder="AAPL"
+            disabled={loading}
+          />
+          <TextField
+            label="Exchange"
+            value={exchange}
+            onChange={(event) => setExchange(event.target.value.toUpperCase())}
+            placeholder="NASDAQ"
+            disabled={loading}
+          />
+          <Button
+            variant="contained"
+            onClick={handleSync}
+            disabled={loading || !symbol.trim()}
+            startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <SyncIcon />}
+            sx={{ minWidth: 150, height: 56 }}
+          >
+            {loading ? 'Syncing...' : 'Sync'}
+          </Button>
+        </Box>
+      </Paper>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {error}
+      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
+      {result && (
+        <Alert severity={result.success ? 'success' : 'warning'} sx={{ mb: 2 }}>
+          <Typography variant="body2">{result.message}</Typography>
+          {result.instrument && (
+            <Typography variant="caption" display="block">
+              {result.instrument.symbol} | prices: {result.pricesStored ? 'stored' : 'not stored'} | fundamentals: {result.fundamentalsAvailable ? 'available' : 'not available'} | actions: {result.corporateActionsAvailable ? 'available' : 'not available'}
+            </Typography>
+          )}
+          {result.errors?.map((item) => (
+            <Typography key={item} variant="caption" display="block">{item}</Typography>
+          ))}
         </Alert>
-      )}
-
-      {ingestResult && (
-        <Alert severity={ingestResult.success ? 'success' : 'info'} sx={{ mb: 3 }}>
-          {ingestResult.message}
-        </Alert>
-      )}
-
-      {prices.length > 0 && (
-        <>
-          <Typography variant="h6" gutterBottom>
-            Latest Prices for {symbol}
-          </Typography>
-          <TableContainer component={Paper} sx={{ mb: 4 }}>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Date</TableCell>
-                  <TableCell align="right">Open</TableCell>
-                  <TableCell align="right">High</TableCell>
-                  <TableCell align="right">Low</TableCell>
-                  <TableCell align="right">Close</TableCell>
-                  <TableCell align="right">Volume</TableCell>
-                  <TableCell>Region</TableCell>
-                  <TableCell>Exchange</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {prices.map((price, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell>{new Date(price.timestamp).toLocaleDateString()}</TableCell>
-                    <TableCell align="right">{price.open.toFixed(2)}</TableCell>
-                    <TableCell align="right">{price.high.toFixed(2)}</TableCell>
-                    <TableCell align="right">{price.low.toFixed(2)}</TableCell>
-                    <TableCell align="right">{price.close.toFixed(2)}</TableCell>
-                    <TableCell align="right">{price.volume.toLocaleString()}</TableCell>
-                    <TableCell>
-                      <Chip label={price.region} size="small" color="primary" variant="outlined" />
-                    </TableCell>
-                    <TableCell>
-                      <Chip label={price.exchange} size="small" variant="outlined" />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-          <Typography variant="caption" color="text.secondary">
-            Showing {prices.length} most recent price ticks.
-          </Typography>
-        </>
-      )}
-
-      {prices.length === 0 && !loading && ingestResult && (
-        <Typography variant="body2" color="text.secondary">
-          No price data found for {symbol}. Try ingesting first.
-        </Typography>
       )}
     </Box>
   );

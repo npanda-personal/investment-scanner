@@ -45,7 +45,26 @@ export const createMarketDataDataRouter = (
   return router;
 };
 
+export const createMarketDataV1Router = (
+  controller = new MarketDataFoundationController()
+) => {
+  const router = express.Router();
+
+  router.get('/market-data/health', controller.health);
+  router.get('/instruments', controller.listInstruments);
+  router.post('/instruments', controller.createInstrument);
+  router.get('/instruments/:id', controller.getInstrument);
+  router.get('/prices/:instrumentId', controller.listInstrumentPrices);
+  router.get('/prices/:instrumentId/latest', controller.getInstrumentLatestPrice);
+  router.get('/fundamentals/:instrumentId', controller.getInstrumentFundamentals);
+  router.get('/corporate-actions/:instrumentId', controller.getInstrumentCorporateActions);
+  router.post('/ingestion/sync', controller.syncV1);
+
+  return router;
+};
+
 export const marketDataStocksRouter = createMarketDataStocksRouter();
 export const marketDataDataRouter = createMarketDataDataRouter();
+export const marketDataV1Router = createMarketDataV1Router();
 
 export default createMarketDataFoundationRouter();

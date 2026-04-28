@@ -28,6 +28,49 @@ export interface CreateStockRequest {
   exchange?: string;
 }
 
+export interface V1CreateInstrumentRequest {
+  symbol: string;
+  company_name: string;
+  exchange: string;
+  currency: string;
+  asset_type: string;
+  isin?: string;
+}
+
+export interface V1Instrument {
+  id: string;
+  symbol: string;
+  company_name: string;
+  exchange: string | null;
+  currency: string;
+  asset_type: string;
+  isin: string | null;
+  source: string;
+  ingestion_timestamp: string;
+  last_updated_timestamp: string;
+  data_status: 'COMPLETE' | 'PARTIAL' | 'DELAYED';
+}
+
+export interface V1IngestionRequest {
+  symbol?: string;
+  instrumentId?: string;
+  company_name?: string;
+  exchange?: string;
+  currency?: string;
+  asset_type?: string;
+  isin?: string;
+}
+
+export interface V1SyncResult {
+  success: boolean;
+  instrument: V1Instrument | null;
+  message: string;
+  pricesStored?: boolean;
+  fundamentalsAvailable?: boolean;
+  corporateActionsAvailable?: boolean;
+  errors?: string[];
+}
+
 export interface UpdateStockRequest {
   name?: string;
   region?: string;

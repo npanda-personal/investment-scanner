@@ -2,6 +2,7 @@
 import {
   partitionHistoricalPrices,
   validateHistoricalPrice,
+  validateInstrumentInput,
   validateRequiredString,
 } from '../../../src/modules/market-data-foundation';
 
@@ -67,5 +68,25 @@ describe('market data validation', () => {
   it('validates required string inputs', () => {
     expect(validateRequiredString('AAPL', 'symbol')).toBeNull();
     expect(validateRequiredString('', 'symbol')).toBe('symbol is required');
+  });
+
+  it('validates required instrument inputs', () => {
+    expect(validateInstrumentInput({
+      symbol: 'AAPL',
+      company_name: 'Apple Inc.',
+      exchange: 'NASDAQ',
+      currency: 'USD',
+      asset_type: 'EQUITY',
+    })).toEqual([]);
+
+    expect(validateInstrumentInput({})).toEqual(
+      expect.arrayContaining([
+        'symbol is required',
+        'exchange is required',
+        'currency is required',
+        'asset_type is required',
+        'company_name is required',
+      ])
+    );
   });
 });

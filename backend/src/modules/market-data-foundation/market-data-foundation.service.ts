@@ -7,9 +7,16 @@ import type {
   PaginationOptions,
   SearchResult,
   UpdateStockRequest,
+  V1CreateInstrumentRequest,
+  V1IngestionRequest,
+  V1Instrument,
+  V1SyncResult,
 } from './market-data-foundation.types';
+import { validateInstrumentInput } from './market-data-foundation.validation';
 
 export class MarketDataFoundationService {
+  private static lastIngestionAt = 0;
+
   constructor(
     private readonly repository = new MarketDataFoundationRepository(),
     private readonly marketDataProvider = new YahooFinanceIngestionService()
@@ -17,6 +24,21 @@ export class MarketDataFoundationService {
 
   list(options: PaginationOptions) {
     return this.repository.listStocks(options);
+  }
+
+  async health() {
+    const [instrumentCount, latestDataTimestamp] = await Promise.all([
+      this.repository.instrumentCount(),
+      this.repository.latestDataTimestamp(),
+    ]);
+
+    return {
+      status: 'ok',
+      module: 'market-data-foundation',
+      instrumentCount,
+      latestDataTimestamp: latestDataTimestamp?.toISOString() ?? null,
+      timestamp: new Date().toISOString(),
+    };
   }
 
   get(id: string) {
@@ -38,6 +60,48 @@ export class MarketDataFoundationService {
     }
 
     return stock;
+  }
+
+  async listInstruments(options: Partial<PaginationOptions> = {}) {
+    const result = await this.list({
+      page: options.page ?? 1,
+      pageSize: options.pageSize ?? 50,
+      sortBy: options.sortBy,
+      sortOrder: options.sortOrder,
+      region: options.region,
+      search: options.search,
+    });
+
+    return {
+      instruments: result.stocks.map((stock) => this.toV1Instrument(stock)),
+      pagination: result.pagination,
+    };
+  }
+
+  async getInstrument(id: string) {
+    const stock = await this.get(id);
+    return stock ? this.toV1Instrument(stock) : null;
+  }
+
+  async createInstrument(data: V1CreateInstrumentRequest) {
+    const errors = validateInstrumentInput(data);
+    if (errors.length > 0) {
+      throw new Error(errors.join('; '));
+    }
+
+    const existing = await this.repository.findStockBySymbolAndExchange(data.symbol, data.exchange);
+    if (existing) {
+      throw new Error(`Instrument with symbol ${data.symbol} and exchange ${data.exchange} already exists`);
+    }
+
+    const stock = await this.create({
+      symbol: data.symbol.trim().toUpperCase(),
+      name: data.company_name.trim(),
+      region: this.inferRegionFromInstrument(data),
+      exchange: data.exchange.trim().toUpperCase(),
+    }, false);
+
+    return this.toV1Instrument(stock, data);
   }
 
   update(id: string, data: UpdateStockRequest) {
@@ -150,6 +214,115 @@ export class MarketDataFoundationService {
     return this.repository.listPrices(symbol, limit);
   }
 
+  async listPricesByInstrumentId(instrumentId: string, limit = 250) {
+    const stock = await this.repository.findStockById(instrumentId);
+    if (!stock) {
+      return null;
+    }
+
+    const prices = await this.repository.listPrices(stock.symbol, limit);
+    return {
+      instrument_id: stock.id,
+      symbol: stock.symbol,
+      adjustment_strategy: 'adjusted_close is not persisted; close is returned as adjusted_close for MVP display.',
+      prices: prices.map((price) => ({
+        date: price.timestamp,
+        open: Number(price.open),
+        high: Number(price.high),
+        low: Number(price.low),
+        close: Number(price.close),
+        adjusted_close: Number(price.close),
+        volume: price.volume !== null ? Number(price.volume) : null,
+        source: 'source' in price && price.source ? price.source : 'database',
+        data_status: 'COMPLETE',
+      })),
+    };
+  }
+
+  async latestPriceByInstrumentId(instrumentId: string) {
+    const stock = await this.repository.findStockById(instrumentId);
+    if (!stock) {
+      return null;
+    }
+
+    const price = await this.repository.latestPrice(stock.symbol);
+    if (!price) {
+      return {
+        instrument_id: stock.id,
+        symbol: stock.symbol,
+        latest: null,
+        data_status: 'PARTIAL',
+      };
+    }
+
+    return {
+      instrument_id: stock.id,
+      symbol: stock.symbol,
+      latest: {
+        date: price.timestamp,
+        open: price.open !== null ? Number(price.open) : null,
+        high: price.high !== null ? Number(price.high) : null,
+        low: price.low !== null ? Number(price.low) : null,
+        close: Number(price.close),
+        adjusted_close: Number(price.close),
+        volume: price.volume !== null ? Number(price.volume) : null,
+        source: price.source || 'database',
+        last_updated_timestamp: new Date().toISOString(),
+      },
+      data_status: 'COMPLETE',
+    };
+  }
+
+  async fundamentalsByInstrumentId(instrumentId: string) {
+    const stock = await this.repository.findStockById(instrumentId);
+    if (!stock) {
+      return null;
+    }
+
+    const fundamentals = await this.fetchCoreFundamentals(stock.symbol);
+    return {
+      instrument_id: stock.id,
+      symbol: stock.symbol,
+      records: [
+        {
+          revenue: fundamentals.revenue,
+          net_income: fundamentals.earnings,
+          pe_ratio: fundamentals.ratios.trailingPe,
+          period_type: 'TTM',
+          period_end_date: fundamentals.asOf,
+          source: fundamentals.source,
+          ingestion_timestamp: new Date().toISOString(),
+          last_updated_timestamp: fundamentals.asOf,
+          data_status: fundamentals.revenue || fundamentals.earnings || fundamentals.ratios.trailingPe ? 'PARTIAL' : 'DELAYED',
+        },
+      ],
+    };
+  }
+
+  async corporateActionsByInstrumentId(instrumentId: string) {
+    const stock = await this.repository.findStockById(instrumentId);
+    if (!stock) {
+      return null;
+    }
+
+    const actions = await this.fetchCorporateActions(stock.symbol);
+    return {
+      instrument_id: stock.id,
+      symbol: stock.symbol,
+      actions: actions.map((action) => ({
+        action_type: action.type,
+        effective_date: action.date,
+        value: action.value,
+        ratio: action.type === 'split' ? action.value : null,
+        amount: action.type === 'dividend' ? action.value : null,
+        source: action.source,
+        ingestion_timestamp: new Date().toISOString(),
+        last_updated_timestamp: new Date().toISOString(),
+        data_status: 'COMPLETE',
+      })),
+    };
+  }
+
   fetchHistorical(symbol: string, startDate?: Date, endDate?: Date) {
     return this.marketDataProvider.fetchHistorical(symbol, startDate, endDate);
   }
@@ -205,6 +378,68 @@ export class MarketDataFoundationService {
     await this.repository.updateStockLoadTimestampBySymbol(symbol);
 
     console.log(`  Successfully ingested ${prices.length} price ticks for ${symbol}`);
+  }
+
+  async syncV1(request: V1IngestionRequest): Promise<V1SyncResult> {
+    await this.throttleIngestion();
+
+    const errors: string[] = [];
+    let stock = request.instrumentId ? await this.repository.findStockById(request.instrumentId) : null;
+    let symbol = stock?.symbol || request.symbol?.trim().toUpperCase();
+
+    if (!symbol) {
+      return { success: false, instrument: null, message: 'symbol or instrumentId is required', errors: ['symbol or instrumentId is required'] };
+    }
+
+    if (!stock) {
+      const existing = await this.repository.findStockBySymbol(symbol);
+      if (existing) {
+        stock = existing;
+      } else {
+        const searchResults = await this.marketDataProvider.search(symbol).catch((error) => {
+          errors.push(`External search failed: ${error instanceof Error ? error.message : 'unknown error'}`);
+          return [] as SearchResult[];
+        });
+        const match = searchResults.find((result) => result.symbol === symbol) || searchResults[0];
+        const regionInfo = this.marketDataProvider.inferRegion(symbol);
+        stock = await this.create({
+          symbol,
+          name: request.company_name || match?.name || symbol,
+          region: regionInfo.region || 'US',
+          exchange: request.exchange || match?.exchange || regionInfo.exchange || 'UNKNOWN',
+        }, false);
+      }
+    }
+
+    let pricesStored = false;
+    try {
+      await this.ingestSymbol(stock.symbol);
+      pricesStored = true;
+    } catch (error) {
+      errors.push(`Price ingestion failed: ${error instanceof Error ? error.message : 'unknown error'}`);
+    }
+
+    const [fundamentals, corporateActions] = await Promise.all([
+      this.fetchCoreFundamentals(stock.symbol).catch(() => null),
+      this.fetchCorporateActions(stock.symbol).catch(() => []),
+    ]);
+
+    return {
+      success: errors.length === 0 || pricesStored,
+      instrument: this.toV1Instrument(stock, {
+        symbol: stock.symbol,
+        company_name: stock.name,
+        exchange: stock.exchange || request.exchange || 'UNKNOWN',
+        currency: request.currency || this.defaultCurrencyForRegion(stock.region),
+        asset_type: request.asset_type || 'EQUITY',
+        isin: request.isin,
+      }),
+      message: errors.length > 0 ? 'Sync completed with partial data' : 'Sync completed',
+      pricesStored,
+      fundamentalsAvailable: Boolean(fundamentals && (fundamentals.revenue || fundamentals.earnings || fundamentals.ratios.trailingPe)),
+      corporateActionsAvailable: corporateActions.length > 0,
+      errors: errors.length > 0 ? errors : undefined,
+    };
   }
 
   async ingestSymbols(symbols: string[], startDate?: Date, endDate?: Date): Promise<void> {
@@ -309,6 +544,48 @@ export class MarketDataFoundationService {
 
   disconnect() {
     return this.repository.prisma.$disconnect();
+  }
+
+  private toV1Instrument(stock: any, overrides?: Partial<V1CreateInstrumentRequest>): V1Instrument {
+    return {
+      id: stock.id,
+      symbol: stock.symbol,
+      company_name: overrides?.company_name || stock.name,
+      exchange: overrides?.exchange || stock.exchange || null,
+      currency: overrides?.currency || this.defaultCurrencyForRegion(stock.region),
+      asset_type: overrides?.asset_type || 'EQUITY',
+      isin: overrides?.isin || null,
+      source: 'database',
+      ingestion_timestamp: stock.createdAt instanceof Date ? stock.createdAt.toISOString() : new Date(stock.createdAt).toISOString(),
+      last_updated_timestamp: stock.updatedAt instanceof Date ? stock.updatedAt.toISOString() : new Date(stock.updatedAt).toISOString(),
+      data_status: stock.lastSuccessfulDataLoadTimestamp ? 'COMPLETE' : 'PARTIAL',
+    };
+  }
+
+  private defaultCurrencyForRegion(region?: string | null): string {
+    if (region === 'IN') return 'INR';
+    if (region === 'UK') return 'GBP';
+    if (region === 'EU') return 'EUR';
+    if (region === 'CA') return 'CAD';
+    return 'USD';
+  }
+
+  private inferRegionFromInstrument(data: V1CreateInstrumentRequest): string {
+    const exchange = data.exchange.toUpperCase();
+    if (exchange === 'NSE' || exchange === 'BSE' || data.currency.toUpperCase() === 'INR') return 'IN';
+    if (exchange === 'LSE' || data.currency.toUpperCase() === 'GBP') return 'UK';
+    if (data.currency.toUpperCase() === 'EUR') return 'EU';
+    if (data.currency.toUpperCase() === 'CAD') return 'CA';
+    return 'US';
+  }
+
+  private async throttleIngestion(minDelayMs = 1000) {
+    const now = Date.now();
+    const elapsed = now - MarketDataFoundationService.lastIngestionAt;
+    if (elapsed < minDelayMs) {
+      await new Promise(resolve => setTimeout(resolve, minDelayMs - elapsed));
+    }
+    MarketDataFoundationService.lastIngestionAt = Date.now();
   }
 }
 

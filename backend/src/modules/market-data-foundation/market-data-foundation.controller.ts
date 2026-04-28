@@ -250,4 +250,122 @@ export class MarketDataFoundationController {
       return res.status(500).json({ error: 'Failed to fetch corporate actions' });
     }
   };
+
+  health = async (_req: Request, res: Response) => {
+    try {
+      return res.json(await this.service.health());
+    } catch (error) {
+      console.error('Market data health error:', error);
+      return res.status(500).json({ error: 'Market data health check failed' });
+    }
+  };
+
+  listInstruments = async (req: Request, res: Response) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const pageSize = parseInt(req.query.pageSize as string) || 50;
+      const search = req.query.search as string | undefined;
+      const result = await this.service.listInstruments({ page, pageSize, search });
+      return res.json(result);
+    } catch (error) {
+      console.error('Error listing instruments:', error);
+      return res.status(500).json({ error: 'Failed to list instruments' });
+    }
+  };
+
+  createInstrument = async (req: Request, res: Response) => {
+    try {
+      const instrument = await this.service.createInstrument(req.body);
+      return res.status(201).json(instrument);
+    } catch (error: any) {
+      console.error('Error creating instrument:', error);
+      if (error.message.includes('required')) {
+        return res.status(400).json({ error: error.message });
+      }
+      if (error.message.includes('already exists')) {
+        return res.status(409).json({ error: error.message });
+      }
+      return res.status(500).json({ error: 'Failed to create instrument' });
+    }
+  };
+
+  getInstrument = async (req: Request, res: Response) => {
+    try {
+      const instrument = await this.service.getInstrument(this.getParam(req.params.id));
+      if (!instrument) {
+        return res.status(404).json({ error: 'Instrument not found' });
+      }
+      return res.json(instrument);
+    } catch (error) {
+      console.error('Error fetching instrument:', error);
+      return res.status(500).json({ error: 'Failed to fetch instrument' });
+    }
+  };
+
+  listInstrumentPrices = async (req: Request, res: Response) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 250;
+      const result = await this.service.listPricesByInstrumentId(this.getParam(req.params.instrumentId), limit);
+      if (!result) {
+        return res.status(404).json({ error: 'Instrument not found' });
+      }
+      return res.json(result);
+    } catch (error) {
+      console.error('Error fetching instrument prices:', error);
+      return res.status(500).json({ error: 'Failed to fetch instrument prices' });
+    }
+  };
+
+  getInstrumentLatestPrice = async (req: Request, res: Response) => {
+    try {
+      const result = await this.service.latestPriceByInstrumentId(this.getParam(req.params.instrumentId));
+      if (!result) {
+        return res.status(404).json({ error: 'Instrument not found' });
+      }
+      return res.json(result);
+    } catch (error) {
+      console.error('Error fetching latest instrument price:', error);
+      return res.status(500).json({ error: 'Failed to fetch latest price' });
+    }
+  };
+
+  getInstrumentFundamentals = async (req: Request, res: Response) => {
+    try {
+      const result = await this.service.fundamentalsByInstrumentId(this.getParam(req.params.instrumentId));
+      if (!result) {
+        return res.status(404).json({ error: 'Instrument not found' });
+      }
+      return res.json(result);
+    } catch (error) {
+      console.error('Error fetching instrument fundamentals:', error);
+      return res.status(500).json({ error: 'Failed to fetch fundamentals' });
+    }
+  };
+
+  getInstrumentCorporateActions = async (req: Request, res: Response) => {
+    try {
+      const result = await this.service.corporateActionsByInstrumentId(this.getParam(req.params.instrumentId));
+      if (!result) {
+        return res.status(404).json({ error: 'Instrument not found' });
+      }
+      return res.json(result);
+    } catch (error) {
+      console.error('Error fetching instrument corporate actions:', error);
+      return res.status(500).json({ error: 'Failed to fetch corporate actions' });
+    }
+  };
+
+  syncV1 = async (req: Request, res: Response) => {
+    try {
+      const result = await this.service.syncV1(req.body);
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error: any) {
+      console.error('Market data sync error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Market data sync failed',
+        errors: [error.message],
+      });
+    }
+  };
 }

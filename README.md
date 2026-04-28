@@ -82,6 +82,25 @@ Copy `backend/.env.example` to `backend/.env` and adjust values as needed.
 
 See the individual README files in `backend/` and `frontend/` for detailed instructions.
 
+## Market Data Foundation APIs
+
+The Market Data Foundation module uses free/open-source tooling and free market data access through the `yahoo-finance2` package. MVP REST endpoints:
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /health` | Application health check |
+| `GET /api/v1/market-data/health` | Market data module status, instrument count, and freshness |
+| `GET /api/v1/instruments` | List/search instruments |
+| `POST /api/v1/instruments` | Create an instrument with required symbol, exchange, currency, and asset type |
+| `GET /api/v1/instruments/:id` | Get instrument details |
+| `GET /api/v1/prices/:instrumentId` | Get historical OHLCV prices |
+| `GET /api/v1/prices/:instrumentId/latest` | Get latest price |
+| `GET /api/v1/fundamentals/:instrumentId` | Get core fundamentals from the provider |
+| `GET /api/v1/corporate-actions/:instrumentId` | Get dividends and splits from the provider |
+| `POST /api/v1/ingestion/sync` | Manually sync market data by `symbol` or `instrumentId` |
+
+The frontend Market Data Foundation feature lives under `frontend/src/features/market-data-foundation` and exposes the instrument explorer, add-instrument form, detail page, dashboard status panel, and manual ingestion page.
+
 ## Project Structure
 
 ```

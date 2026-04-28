@@ -1,4 +1,5 @@
 import type { HistoricalPrice, ValidationResult } from './market-data-foundation.types';
+import type { V1CreateInstrumentRequest } from './market-data-foundation.types';
 
 const isFiniteNumber = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value);
@@ -60,4 +61,21 @@ export const validateRequiredString = (value: unknown, fieldName: string): strin
   }
 
   return null;
+};
+
+export const validateInstrumentInput = (
+  value: Partial<V1CreateInstrumentRequest>
+): string[] => {
+  const errors = [
+    validateRequiredString(value.symbol, 'symbol'),
+    validateRequiredString(value.exchange, 'exchange'),
+    validateRequiredString(value.currency, 'currency'),
+    validateRequiredString(value.asset_type, 'asset_type'),
+  ].filter((error): error is string => Boolean(error));
+
+  if (!value.company_name || typeof value.company_name !== 'string' || value.company_name.trim().length === 0) {
+    errors.push('company_name is required');
+  }
+
+  return errors;
 };

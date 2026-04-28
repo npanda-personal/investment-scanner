@@ -10,6 +10,7 @@ import {
   marketDataDataRouter,
   marketDataFoundationRouter,
   marketDataStocksRouter,
+  marketDataV1Router,
 } from '../modules/market-data-foundation';
 
 export interface ApiModule {
@@ -20,6 +21,7 @@ export interface ApiModule {
 export const apiModules: ApiModule[] = [
   { path: '/api/auth', router: authRouter },
   { path: '/api/data', router: marketDataDataRouter },
+  { path: '/api/v1', router: marketDataV1Router },
   { path: '/api/market-data-foundation', router: marketDataFoundationRouter },
   { path: '/api/watchlists', router: watchlistRouter },
   { path: '/api/scanners', router: scannerRouter },
