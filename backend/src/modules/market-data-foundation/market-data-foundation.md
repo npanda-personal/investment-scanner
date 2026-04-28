@@ -4,10 +4,12 @@ The Market Data Foundation module owns the application baseline market data capa
 
 ## Backend Structure
 
+Backend module code is intentionally flat. Do not recreate nested `routes/`, `services/`, `types/`, `validation/`, `providers/`, `queue`, or `workers` folders for this module unless the module is intentionally redesigned and this document is updated.
+
 - `market-data-foundation.module.ts`
   - Module manifest exposing router, controller, service, and repository classes.
 - `market-data-foundation.router.ts`
-  - Canonical router for `/stocks` and `/data` endpoints inside `/api/market-data-foundation`.
+  - Canonical router and route factories for `/stocks` and `/data` endpoints. It also exposes scoped routers for legacy `/api/stocks` and `/api/data` mounts.
 - `market-data-foundation.controller.ts`
   - HTTP request/response handlers. Controllers call services.
 - `market-data-foundation.service.ts`
@@ -25,9 +27,9 @@ The Market Data Foundation module owns the application baseline market data capa
 - `market-data-foundation.queue.ts`
   - Local ingestion queue adapter. It currently runs without paid services.
 - `index.ts`
-  - Public module exports. Compatibility files outside the module import from this public entry point.
+  - Public module exports. Code outside the module should import from this public entry point instead of internal module files.
 
-The old backend shim files under `backend/src/api/stocks`, `backend/src/api/data`, `backend/src/data/ingestion`, `backend/src/workers`, and `backend/src/queue` have been removed. Legacy API paths are still mounted directly from the Market Data Foundation module in `backend/src/api/routes.ts`.
+The old backend shim files and folders under `backend/src/api/stocks`, `backend/src/api/data`, `backend/src/data/ingestion`, `backend/src/workers`, and `backend/src/queue` have been removed. Legacy API paths are still mounted directly from the Market Data Foundation module in `backend/src/api/routes.ts`.
 
 ## Frontend Structure
 
@@ -52,7 +54,11 @@ The old frontend compatibility exports in `frontend/src/services/stockService.ts
 The canonical module namespace is:
 
 - `/api/market-data-foundation/stocks`
+- `/api/market-data-foundation/stocks/search`
+- `/api/market-data-foundation/stocks/yahoo-search`
 - `/api/market-data-foundation/data`
+- `/api/market-data-foundation/data/search`
+- `/api/market-data-foundation/data/ingest`
 - `/api/market-data-foundation/data/prices/:symbol`
 - `/api/market-data-foundation/data/fundamentals/:symbol`
 - `/api/market-data-foundation/data/corporate-actions/:symbol`
@@ -75,7 +81,7 @@ Core fundamentals and corporate actions are exposed through provider calls, but 
 ## Assumptions
 
 - All tooling and data integration remains free/open-source and locally runnable, per `docs/instructions.md`.
-- Existing stock behavior is preserved through compatibility routes and exports.
+- Existing stock and data API behavior is preserved through compatibility route mounts.
 - Malformed historical price rows are skipped with a warning so one bad row does not fail an entire ingestion batch.
 - Future extraction should use `backend/src/modules/market-data-foundation` and `frontend/src/features/market-data-foundation` as the detachable module roots.
 - Legacy compatibility files and empty legacy directories were removed after callers were migrated to the module exports.
