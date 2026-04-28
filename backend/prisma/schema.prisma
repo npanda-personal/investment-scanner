@@ -282,6 +282,36 @@ model AlertEvent {
   @@map("alert_events")
 }
 
+model BacktestStrategy {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  config      Json
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  runs        BacktestRun[]
+
+  @@map("backtest_strategies")
+}
+
+model BacktestRun {
+  id           String            @id @default(cuid())
+  strategyId   String?
+  strategy     BacktestStrategy? @relation(fields: [strategyId], references: [id], onDelete: SetNull)
+  config       Json
+  status       String
+  startedAt    DateTime          @default(now())
+  completedAt  DateTime?
+  metrics      Json?
+  equityCurve  Json?
+  trades       Json?
+  error        String?
+
+  @@index([strategyId])
+  @@index([startedAt])
+  @@map("backtest_runs")
+}
+
 model WatchlistItem {
   id           String    @id @default(cuid())
   watchlistId  String

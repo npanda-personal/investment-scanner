@@ -8,6 +8,7 @@ import { portfolioManagementRoutes } from '@/features/portfolio-management';
 import { watchlistManagementRoutes } from '@/features/watchlist-management';
 import { alertsMonitoringRoutes } from '@/features/alerts-monitoring';
 import { marketContextIntelligenceRoutes } from '@/features/market-context-intelligence';
+import { backtestingStrategyLabRoutes } from '@/features/backtesting-strategy-lab';
 
 export const appRoutes: RouteObject[] = [
   {
@@ -22,6 +23,7 @@ export const appRoutes: RouteObject[] = [
       ...watchlistManagementRoutes,
       ...alertsMonitoringRoutes,
       ...marketContextIntelligenceRoutes,
+      ...backtestingStrategyLabRoutes,
     ],
   },
 ];

@@ -44,6 +44,11 @@ export default function HomePage() {
           <Typography color="text.secondary" sx={{ mb: 2 }}>Understand regime, sector rotation, breadth, country strength, and macro context.</Typography>
           <Button component={Link} to="/market-context">Open</Button>
         </Paper>
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="h6">Backtesting & Strategy Lab</Typography>
+          <Typography color="text.secondary" sx={{ mb: 2 }}>Run daily close simulations for simple signal and trend strategies.</Typography>
+          <Button component={Link} to="/backtests">Open</Button>
+        </Paper>
       </Box>
     </Box>
   );

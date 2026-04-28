@@ -28,6 +28,7 @@ import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import PublicIcon from '@mui/icons-material/Public';
+import TimelineIcon from '@mui/icons-material/Timeline';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import { useThemeMode } from './ThemeContext';
@@ -43,6 +44,7 @@ const navItems = [
   { path: '/watchlists', label: 'Watchlists', icon: <StarBorderIcon /> },
   { path: '/alerts', label: 'Alerts', icon: <NotificationsNoneIcon /> },
   { path: '/market-context', label: 'Market Context', icon: <PublicIcon /> },
+  { path: '/backtests', label: 'Backtests', icon: <TimelineIcon /> },
 ];
 
 export default function NavigationLayout() {

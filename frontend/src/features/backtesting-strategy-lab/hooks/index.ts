@@ -1,0 +1,1 @@
+export { useBacktestingStrategyLab } from './useBacktestingStrategyLab';

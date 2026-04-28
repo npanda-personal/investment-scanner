@@ -1,0 +1,259 @@
+import { MarketDataFoundationService } from '../market-data-foundation';
+import { WatchlistManagementService } from '../watchlist-management';
+import { BacktestingStrategyLabRepository } from './backtesting-strategy-lab.repository';
+import type {
+  BacktestMetrics,
+  BacktestRunDto,
+  BacktestStrategyConfig,
+  BacktestTrade,
+  CreateBacktestStrategyRequest,
+  EquityCurvePoint,
+  HistoricalBar,
+  RunBacktestRequest,
+  UpdateBacktestStrategyRequest,
+} from './backtesting-strategy-lab.types';
+import { validateConfig, validateStrategyInput } from './backtesting-strategy-lab.validation';
+
+interface Position { instrumentId: string; symbol: string; entryDate: string; entryPrice: number; quantity: number; entryBarIndex: number; cost: number }
+
+export class BacktestingStrategyLabService {
+  constructor(
+    private readonly repository = new BacktestingStrategyLabRepository(),
+    private readonly marketDataService = new MarketDataFoundationService(),
+    private readonly watchlistService = new WatchlistManagementService()
+  ) {}
+
+  listStrategies() { return this.repository.listStrategies(); }
+  getStrategy(id: string) { return this.repository.getStrategy(id); }
+  deleteStrategy(id: string) { return this.repository.deleteStrategy(id); }
+  listRuns() { return this.repository.listRuns(); }
+  getRun(id: string) { return this.repository.getRun(id); }
+  deleteRun(id: string) { return this.repository.deleteRun(id); }
+
+  async createStrategy(input: CreateBacktestStrategyRequest) {
+    this.throwIfErrors(validateStrategyInput(input));
+    return this.repository.createStrategy(input);
+  }
+
+  async updateStrategy(id: string, input: UpdateBacktestStrategyRequest) {
+    const existing = await this.repository.getStrategy(id);
+    if (!existing) throw new Error('Strategy not found');
+    this.throwIfErrors(validateStrategyInput({ ...existing, ...input, config: input.config ?? existing.config }, false));
+    return this.repository.updateStrategy(id, input);
+  }
+
+  async run(request: RunBacktestRequest): Promise<BacktestRunDto> {
+    const strategy = request.strategyId ? await this.repository.getStrategy(request.strategyId) : null;
+    if (request.strategyId && !strategy) throw new Error('Strategy not found');
+    const config = request.config ?? strategy?.config;
+    this.throwIfErrors(validateConfig(config));
+    try {
+      const result = await this.simulate(config!);
+      return this.repository.createRun({
+        strategyId: request.strategyId ?? null,
+        config: config!,
+        status: 'COMPLETED',
+        completedAt: new Date().toISOString(),
+        metrics: result.metrics,
+        equityCurve: result.equityCurve,
+        trades: result.trades,
+        error: null,
+      });
+    } catch (error: any) {
+      return this.repository.createRun({
+        strategyId: request.strategyId ?? null,
+        config: config!,
+        status: 'FAILED',
+        completedAt: new Date().toISOString(),
+        metrics: null,
+        equityCurve: [],
+        trades: [],
+        error: error.message || 'Backtest failed',
+      });
+    }
+  }
+
+  async runStrategy(id: string) {
+    return this.run({ strategyId: id });
+  }
+
+  async simulate(config: BacktestStrategyConfig): Promise<{ metrics: BacktestMetrics; trades: BacktestTrade[]; equityCurve: EquityCurvePoint[] }> {
+    const instruments = await this.resolveUniverse(config);
+    const histories = new Map<string, { instrumentId: string; symbol: string; bars: HistoricalBar[] }>();
+    for (const instrument of instruments) {
+      const response = await this.marketDataService.listPricesByInstrumentId(instrument.instrumentId, 5000, new Date(config.startDate), new Date(config.endDate)).catch(() => null);
+      const bars = (response?.prices || [])
+        .map((price: any) => ({ date: new Date(price.date).toISOString().slice(0, 10), close: Number(price.adjusted_close ?? price.close) }))
+        .filter((bar: HistoricalBar) => Number.isFinite(bar.close))
+        .sort((a: HistoricalBar, b: HistoricalBar) => a.date.localeCompare(b.date));
+      if (bars.length > 20) histories.set(instrument.instrumentId, { ...instrument, bars });
+    }
+    const dates = [...new Set([...histories.values()].flatMap((item) => item.bars.map((bar) => bar.date)))].sort();
+    let cash = config.initialCapital;
+    let peak = config.initialCapital;
+    const positions = new Map<string, Position>();
+    const trades: BacktestTrade[] = [];
+    const curve: EquityCurvePoint[] = [];
+
+    dates.forEach((date) => {
+      for (const history of histories.values()) {
+        const barIndex = history.bars.findIndex((bar) => bar.date === date);
+        if (barIndex < 0) continue;
+        const bar = history.bars[barIndex];
+        const position = positions.get(history.instrumentId);
+        if (position && this.shouldExit(config, history.bars, barIndex, position)) {
+          const trade = this.closePosition(config, position, bar, 'Exit rule');
+          cash += position.quantity * bar.close - Math.abs(position.quantity * bar.close * config.transactionCostPercent);
+          trades.push(trade);
+          positions.delete(history.instrumentId);
+        }
+      }
+      for (const history of histories.values()) {
+        if (positions.size >= config.maxPositions || positions.has(history.instrumentId)) continue;
+        const barIndex = history.bars.findIndex((bar) => bar.date === date);
+        if (barIndex < 0 || !this.shouldEnter(config, history.bars, barIndex)) continue;
+        const amount = config.positionSizeType === 'FIXED_AMOUNT' ? Number(config.fixedAmountPerTrade) : cash / Math.max(1, config.maxPositions - positions.size);
+        const costAdjustedAmount = Math.min(cash, amount);
+        const bar = history.bars[barIndex];
+        const transactionCost = costAdjustedAmount * config.transactionCostPercent;
+        const tradeAmount = costAdjustedAmount - transactionCost;
+        if (tradeAmount <= 0 || cash < costAdjustedAmount) continue;
+        const quantity = tradeAmount / bar.close;
+        cash -= costAdjustedAmount;
+        positions.set(history.instrumentId, { instrumentId: history.instrumentId, symbol: history.symbol, entryDate: date, entryPrice: bar.close, quantity, entryBarIndex: barIndex, cost: transactionCost });
+      }
+      const investedValue = [...positions.values()].reduce((sum, position) => {
+        const history = histories.get(position.instrumentId);
+        const latest = this.barAtOrBefore(history?.bars || [], date);
+        return sum + position.quantity * (latest?.close || position.entryPrice);
+      }, 0);
+      const equity = cash + investedValue;
+      peak = Math.max(peak, equity);
+      curve.push({ date, equity, cash, investedValue, drawdownPercent: peak > 0 ? (equity - peak) / peak : 0 });
+    });
+
+    const lastDate = dates[dates.length - 1];
+    for (const position of positions.values()) {
+      const history = histories.get(position.instrumentId);
+      const bar = this.barAtOrBefore(history?.bars || [], lastDate);
+      if (bar) trades.push(this.closePosition(config, position, bar, 'End of test'));
+    }
+    return { metrics: this.metrics(config.initialCapital, curve, trades, config), trades, equityCurve: this.sampleCurve(curve) };
+  }
+
+  shouldEnter(config: BacktestStrategyConfig, bars: HistoricalBar[], index: number): boolean {
+    const signal = this.signalProxy(bars, index);
+    if (config.entryRule.type === 'SIGNAL_SCORE_ABOVE') return signal.score > Number(config.entryRule.threshold);
+    if (config.entryRule.type === 'SIGNAL_DIRECTION_BULLISH') return signal.direction === 'BULLISH';
+    if (config.entryRule.type === 'PRICE_ABOVE_SMA50') return this.priceAboveSma(bars, index, 50);
+    return this.sma(bars, index, 50) !== null && this.sma(bars, index, 200) !== null && this.sma(bars, index, 50)! > this.sma(bars, index, 200)!;
+  }
+
+  shouldExit(config: BacktestStrategyConfig, bars: HistoricalBar[], index: number, position: Position): boolean {
+    const signal = this.signalProxy(bars, index);
+    if (config.exitRule.type === 'SIGNAL_SCORE_BELOW') return signal.score < Number(config.exitRule.threshold);
+    if (config.exitRule.type === 'SIGNAL_DIRECTION_BEARISH') return signal.direction === 'BEARISH';
+    if (config.exitRule.type === 'PRICE_BELOW_SMA50') return !this.priceAboveSma(bars, index, 50);
+    return index - position.entryBarIndex >= Number(config.exitRule.holdingDays);
+  }
+
+  metrics(initialCapital: number, curve: EquityCurvePoint[], trades: BacktestTrade[], config?: BacktestStrategyConfig): BacktestMetrics {
+    const ending = curve[curve.length - 1]?.equity ?? initialCapital;
+    const totalReturn = initialCapital > 0 ? (ending - initialCapital) / initialCapital : 0;
+    const years = config ? (new Date(config.endDate).getTime() - new Date(config.startDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000) : curve.length / 252;
+    const returns = curve.slice(1).map((point, index) => curve[index].equity > 0 ? (point.equity - curve[index].equity) / curve[index].equity : 0);
+    const volatility = this.stddev(returns) * Math.sqrt(252);
+    const avgReturn = returns.length > 0 ? returns.reduce((sum, value) => sum + value, 0) / returns.length : 0;
+    const wins = trades.filter((trade) => trade.netPnL > 0);
+    const losses = trades.filter((trade) => trade.netPnL < 0);
+    return {
+      totalReturn,
+      cagr: years > 0 ? Math.pow(1 + totalReturn, 1 / years) - 1 : null,
+      maxDrawdown: Math.min(0, ...curve.map((point) => point.drawdownPercent)),
+      volatility: Number.isFinite(volatility) ? volatility : null,
+      sharpeRatio: volatility > 0 ? (avgReturn * 252) / volatility : null,
+      winRate: trades.length > 0 ? wins.length / trades.length : null,
+      averageWin: wins.length > 0 ? wins.reduce((sum, trade) => sum + trade.netPnL, 0) / wins.length : null,
+      averageLoss: losses.length > 0 ? losses.reduce((sum, trade) => sum + trade.netPnL, 0) / losses.length : null,
+      profitFactor: losses.length > 0 ? wins.reduce((sum, trade) => sum + trade.netPnL, 0) / Math.abs(losses.reduce((sum, trade) => sum + trade.netPnL, 0)) : null,
+      numberOfTrades: trades.length,
+      averageHoldingDays: trades.length > 0 ? trades.reduce((sum, trade) => sum + trade.holdingDays, 0) / trades.length : null,
+      bestTrade: trades.length > 0 ? Math.max(...trades.map((trade) => trade.returnPercent)) : null,
+      worstTrade: trades.length > 0 ? Math.min(...trades.map((trade) => trade.returnPercent)) : null,
+    };
+  }
+
+  private async resolveUniverse(config: BacktestStrategyConfig): Promise<Array<{ instrumentId: string; symbol: string }>> {
+    if (config.universe.type === 'INSTRUMENTS') return (config.universe.instrumentIds || []).map((instrumentId) => ({ instrumentId, symbol: instrumentId }));
+    if (config.universe.type === 'SYMBOLS') {
+      const found = await Promise.all((config.universe.symbols || []).map(async (symbol) => {
+        const result = await this.marketDataService.listInstruments({ search: symbol, pageSize: 10 });
+        const match = result.instruments.find((instrument: any) => instrument.symbol === symbol || instrument.symbol === symbol.toUpperCase());
+        return match ? { instrumentId: match.id, symbol: match.symbol } : null;
+      }));
+      return found.filter((item): item is { instrumentId: string; symbol: string } => Boolean(item));
+    }
+    if (config.universe.type === 'WATCHLIST' && config.universe.watchlistId) {
+      const detail = await this.watchlistService.detail(config.universe.watchlistId);
+      return (detail?.items || []).map((item: any) => ({ instrumentId: item.instrumentId, symbol: item.symbol }));
+    }
+    const result = await this.marketDataService.listInstruments({ page: 1, pageSize: 50 });
+    return result.instruments.map((instrument: any) => ({ instrumentId: instrument.id, symbol: instrument.symbol }));
+  }
+
+  private closePosition(config: BacktestStrategyConfig, position: Position, bar: HistoricalBar, exitReason: string): BacktestTrade {
+    const gross = position.quantity * (bar.close - position.entryPrice);
+    const exitCost = position.quantity * bar.close * config.transactionCostPercent;
+    const net = gross - position.cost - exitCost;
+    return {
+      instrumentId: position.instrumentId,
+      symbol: position.symbol,
+      entryDate: position.entryDate,
+      entryPrice: position.entryPrice,
+      exitDate: bar.date,
+      exitPrice: bar.close,
+      quantity: position.quantity,
+      grossPnL: gross,
+      netPnL: net,
+      returnPercent: (bar.close - position.entryPrice) / position.entryPrice - config.transactionCostPercent * 2,
+      holdingDays: Math.max(1, Math.round((new Date(bar.date).getTime() - new Date(position.entryDate).getTime()) / (24 * 60 * 60 * 1000))),
+      exitReason,
+    };
+  }
+
+  private signalProxy(bars: HistoricalBar[], index: number) {
+    const score = (this.priceAboveSma(bars, index, 50) ? 40 : 10) + (this.sma(bars, index, 50)! > (this.sma(bars, index, 200) ?? Infinity) ? 40 : 10) + (index > 21 && bars[index].close > bars[index - 21].close ? 20 : 5);
+    return { score, direction: score >= 70 ? 'BULLISH' : score < 40 ? 'BEARISH' : 'NEUTRAL' };
+  }
+
+  private priceAboveSma(bars: HistoricalBar[], index: number, period: number) {
+    const average = this.sma(bars, index, period);
+    return average !== null && bars[index].close > average;
+  }
+
+  private sma(bars: HistoricalBar[], index: number, period: number): number | null {
+    if (index + 1 < period) return null;
+    const values = bars.slice(index + 1 - period, index + 1).map((bar) => bar.close);
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+  }
+
+  private barAtOrBefore(bars: HistoricalBar[], date: string) {
+    return [...bars].reverse().find((bar) => bar.date <= date);
+  }
+
+  private sampleCurve(curve: EquityCurvePoint[]) {
+    if (curve.length <= 500) return curve;
+    const step = Math.ceil(curve.length / 500);
+    return curve.filter((_point, index) => index % step === 0 || index === curve.length - 1);
+  }
+
+  private stddev(values: number[]) {
+    if (values.length < 2) return 0;
+    const avg = values.reduce((sum, value) => sum + value, 0) / values.length;
+    return Math.sqrt(values.reduce((sum, value) => sum + Math.pow(value - avg, 2), 0) / (values.length - 1));
+  }
+
+  private throwIfErrors(errors: string[]) {
+    if (errors.length > 0) throw new Error(errors.join('; '));
+  }
+}
