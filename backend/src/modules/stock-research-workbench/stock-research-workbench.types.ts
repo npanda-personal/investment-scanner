@@ -10,6 +10,7 @@ export interface ResearchPricePoint {
 }
 
 export interface ResearchPerformanceMetrics {
+  selected_range_return: number | null;
   return_1d: number | null;
   return_1w: number | null;
   return_1m: number | null;

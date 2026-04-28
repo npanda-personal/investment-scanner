@@ -20,7 +20,7 @@ export class StockResearchWorkbenchService {
     const pricePoints = this.toPricePoints(prices?.prices || []);
     const selectedPrices = this.filterByRange(pricePoints, range);
     const latestFundamental = fundamentals?.records?.[0] || null;
-    const peers = await this.peerComparison(instrument, instrumentId);
+    const peers = await this.peerComparison(instrument, instrumentId, range);
     const valuation = this.valuationSnapshot(latestFundamental, peers, instrument.market_cap);
     const performance = this.performanceMetrics(pricePoints, selectedPrices);
     const relativeStrength = this.relativeStrengthSnapshot(selectedPrices, peers);
@@ -89,6 +89,7 @@ export class StockResearchWorkbenchService {
 
   performanceMetrics(allPrices: ResearchPricePoint[], selectedPrices: ResearchPricePoint[]): ResearchPerformanceMetrics {
     return {
+      selected_range_return: this.periodReturn(selectedPrices),
       return_1d: this.returnAtOffset(allPrices, 1),
       return_1w: this.returnAtOffset(allPrices, 5),
       return_1m: this.returnAtOffset(allPrices, 21),
@@ -123,7 +124,7 @@ export class StockResearchWorkbenchService {
     return Math.pow(latest / old, 1 / years) - 1;
   }
 
-  private async peerComparison(instrument: any, instrumentId: string) {
+  private async peerComparison(instrument: any, instrumentId: string, range: ResearchRange) {
     const universe = await this.marketDataService.listInstruments({ page: 1, pageSize: 10000 });
     const candidates = universe.instruments
       .filter((peer: any) => peer.id !== instrumentId)
@@ -138,9 +139,10 @@ export class StockResearchWorkbenchService {
       const [latest, fundamentals, prices] = await Promise.all([
         this.marketDataService.latestPriceByInstrumentId(peer.id),
         this.marketDataService.fundamentalsByInstrumentId(peer.id),
-        this.marketDataService.listPricesByInstrumentId(peer.id, 260),
+        this.marketDataService.listPricesByInstrumentId(peer.id, 5000),
       ]);
       const points = this.toPricePoints(prices?.prices || []);
+      const selectedPeerPrices = this.filterByRange(points, range);
       const latestFundamental = fundamentals?.records?.[0] || null;
       return {
         instrument_id: peer.id,
@@ -149,6 +151,7 @@ export class StockResearchWorkbenchService {
         exchange: peer.exchange,
         market_cap: peer.market_cap,
         latest_price: latest?.latest?.close ?? null,
+        return_selected: this.periodReturn(selectedPeerPrices),
         return_1m: this.returnAtOffset(points, 21),
         return_1y: this.returnAtOffset(points, 252),
         pe_ratio: latestFundamental?.pe_ratio ?? null,
@@ -175,7 +178,7 @@ export class StockResearchWorkbenchService {
 
   private relativeStrengthSnapshot(selectedPrices: ResearchPricePoint[], peers: Array<Record<string, any>>) {
     const stockReturn = this.periodReturn(selectedPrices);
-    const peerReturns = peers.map((peer) => peer.return_1y).filter((value) => typeof value === 'number') as number[];
+    const peerReturns = peers.map((peer) => peer.return_selected).filter((value) => typeof value === 'number') as number[];
     const peerAverage = this.average(peerReturns);
     return {
       benchmark_symbol: null,

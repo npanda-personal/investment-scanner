@@ -147,8 +147,9 @@ const StockResearchWorkbenchPage: React.FC = () => {
       </Paper>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 3 }}>
-        <Section title="Performance" status={data.trust.data_status}>
+        <Section title="Performance" status={data.trust.data_status} source={data.trust.source} updatedAt={data.trust.last_updated_timestamp}>
           <MetricGrid items={{
+            [`${range} Return`]: formatPercent(data.performance.selected_range_return),
             '1D Return': formatPercent(data.performance.return_1d),
             '1W Return': formatPercent(data.performance.return_1w),
             '1M Return': formatPercent(data.performance.return_1m),
@@ -160,7 +161,12 @@ const StockResearchWorkbenchPage: React.FC = () => {
           }} />
         </Section>
 
-        <Section title="Fundamental Snapshot" status={String(fundamentals?.data_status || 'MISSING')}>
+        <Section
+          title="Fundamental Snapshot"
+          status={String(fundamentals?.data_status || 'MISSING')}
+          source={String(fundamentals?.source || 'database')}
+          updatedAt={typeof fundamentals?.last_updated_timestamp === 'string' ? fundamentals.last_updated_timestamp : null}
+        >
           {fundamentals ? (
             <MetricGrid items={{
               Revenue: formatNumber(fundamentals.revenue),
@@ -175,36 +181,45 @@ const StockResearchWorkbenchPage: React.FC = () => {
           ) : <Typography color="text.secondary">No fundamentals available.</Typography>}
         </Section>
 
-        <Section title="Valuation Context" status={data.trust.data_status}>
-          <MetricGrid items={{
-            'Stock P/E': formatNumber(valuation.pe_ratio),
-            'Peer Avg P/E': formatNumber(valuation.peer_average_pe),
-            'Dividend Yield': formatPercent(valuation.dividend_yield),
-            'Peer Avg Yield': formatPercent(valuation.peer_average_dividend_yield),
-            'Market Cap Rank': valuation.market_cap_rank ? `${valuation.market_cap_rank} of ${valuation.peer_count + 1}` : 'N/A',
-          }} />
+        <Section title="Valuation Context" status={data.trust.data_status} source={data.trust.source} updatedAt={data.trust.last_updated_timestamp}>
+          {!fundamentals && data.peers.length === 0 ? (
+            <Typography color="text.secondary">No valuation context available because fundamentals and peers are missing.</Typography>
+          ) : (
+            <MetricGrid items={{
+              'Stock P/E': formatNumber(valuation.pe_ratio),
+              'Peer Avg P/E': formatNumber(valuation.peer_average_pe),
+              'Dividend Yield': formatPercent(valuation.dividend_yield),
+              'Peer Avg Yield': formatPercent(valuation.peer_average_dividend_yield),
+              'Market Cap Rank': valuation.market_cap_rank ? `${valuation.market_cap_rank} of ${valuation.peer_count + 1}` : 'N/A',
+            }} />
+          )}
         </Section>
 
-        <Section title="Relative Strength" status={String(data.relative_strength.data_status || 'MISSING')}>
+        <Section title="Relative Strength" status={String(data.relative_strength.data_status || 'MISSING')} source={data.trust.source} updatedAt={data.trust.last_updated_timestamp}>
           <MetricGrid items={{
             'Stock Return': formatPercent(data.relative_strength.stock_return),
             'Peer Avg Return': formatPercent(data.relative_strength.peer_average_return),
             'Relative to Peers': formatPercent(data.relative_strength.relative_to_peer_average),
-            Fallback: String(data.relative_strength.fallback_used || 'N/A'),
+            Basis: `${range} ${String(data.relative_strength.fallback_used || 'N/A')}`,
           }} />
         </Section>
       </Box>
 
-      <Section title="Peer Comparison" status={data.peers.length > 0 ? 'PARTIAL' : 'MISSING'}>
+      <Section title="Peer Comparison" status={data.peers.length > 0 ? 'PARTIAL' : 'MISSING'} source={data.trust.source} updatedAt={data.trust.last_updated_timestamp}>
         {data.peers.length === 0 ? (
           <Typography color="text.secondary">No peers available from the current instrument universe.</Typography>
         ) : (
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 1.5 }}>
             {data.peers.map((peer) => (
-              <Paper key={String(peer.instrument_id)} variant="outlined" sx={{ p: 1.5 }}>
+              <Paper
+                key={String(peer.instrument_id)}
+                variant="outlined"
+                onClick={() => navigate(`/research/stocks/${String(peer.instrument_id)}`)}
+                sx={{ p: 1.5, cursor: 'pointer', '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover' } }}
+              >
                 <Typography fontWeight={700}>{String(peer.symbol)} | {String(peer.company_name)}</Typography>
                 <Typography variant="body2" color="text.secondary">{String(peer.exchange || 'UNKNOWN')}</Typography>
-                <Typography variant="body2">Price: {formatNumber(peer.latest_price)} | 1Y: {formatPercent(peer.return_1y)}</Typography>
+                <Typography variant="body2">Price: {formatNumber(peer.latest_price)} | {range}: {formatPercent(peer.return_selected)}</Typography>
                 <Typography variant="body2">P/E: {formatNumber(peer.pe_ratio)} | Yield: {formatPercent(peer.dividend_yield)}</Typography>
               </Paper>
             ))}
@@ -212,7 +227,12 @@ const StockResearchWorkbenchPage: React.FC = () => {
         )}
       </Section>
 
-      <Section title="Corporate Actions" status={data.corporate_actions.length > 0 ? 'COMPLETE' : 'MISSING'}>
+      <Section
+        title="Corporate Actions"
+        status={data.corporate_actions.length > 0 ? 'COMPLETE' : 'MISSING'}
+        source={String(data.corporate_actions[0]?.source || data.trust.source)}
+        updatedAt={String(data.corporate_actions[0]?.last_updated_timestamp || data.trust.last_updated_timestamp || '') || null}
+      >
         {data.corporate_actions.length === 0 ? (
           <Typography color="text.secondary">No corporate actions available.</Typography>
         ) : (
@@ -231,10 +251,17 @@ const StockResearchWorkbenchPage: React.FC = () => {
   );
 };
 
-const Section: React.FC<{ title: string; status?: string; children: React.ReactNode }> = ({ title, status, children }) => (
+const Section: React.FC<{ title: string; status?: string; source?: string; updatedAt?: string | null; children: React.ReactNode }> = ({ title, status, source, updatedAt, children }) => (
   <Paper sx={{ p: 2, mb: 3 }}>
     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-      <Typography variant="h6">{title}</Typography>
+      <Box>
+        <Typography variant="h6">{title}</Typography>
+        {(source || updatedAt) && (
+          <Typography variant="caption" color="text.secondary">
+            {source || 'database'} | {formatDateTime(updatedAt)}
+          </Typography>
+        )}
+      </Box>
       <StatusChip status={status} />
     </Box>
     {children}
