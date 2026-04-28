@@ -3,7 +3,9 @@ import type { PrismaClient } from '@prisma/client';
 import { setTimeout } from 'timers/promises';
 import type {
   CorporateAction,
+  CompanyMasterData,
   CoreFundamentals,
+  FxRateInput,
   HistoricalPrice,
   RegionInfo,
   SearchResult,
@@ -12,7 +14,9 @@ import { partitionHistoricalPrices } from './market-data-foundation.validation';
 
 export type {
   CorporateAction,
+  CompanyMasterData,
   CoreFundamentals,
+  FxRateInput,
   HistoricalPrice,
   RegionInfo,
   SearchResult,
@@ -29,6 +33,21 @@ export class YahooFinanceIngestionService {
 
   private toNumber(value: unknown): number | null {
     return typeof value === 'number' && Number.isFinite(value) ? value : null;
+  }
+
+  private toSplitRatio(value: unknown): number | null {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const parts = value.split(':').map((part) => Number(part));
+      if (parts.length === 2 && parts.every((part) => Number.isFinite(part)) && parts[1] !== 0) {
+        return parts[0] / parts[1];
+      }
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric : null;
+    }
+    return null;
   }
 
   /**
@@ -115,6 +134,7 @@ export class YahooFinanceIngestionService {
         high: item.high,
         low: item.low,
         close: item.close,
+        adjustedClose: item.adjClose ?? item.adjclose ?? item.adjustedClose ?? null,
         volume: item.volume,
       }));
       const validation = partitionHistoricalPrices(prices);
@@ -133,17 +153,24 @@ export class YahooFinanceIngestionService {
   async fetchCoreFundamentals(symbol: string): Promise<CoreFundamentals> {
     try {
       const summary = await this.yahooFinance.quoteSummary(symbol, {
-        modules: ['financialData', 'defaultKeyStatistics', 'summaryDetail'],
+        modules: ['financialData', 'defaultKeyStatistics', 'summaryDetail', 'price'],
       });
 
       const financialData = summary?.financialData || {};
       const keyStats = summary?.defaultKeyStatistics || {};
       const summaryDetail = summary?.summaryDetail || {};
+      const price = summary?.price || {};
 
       return {
         symbol,
         revenue: this.toNumber(financialData.totalRevenue),
+        eps: this.toNumber(keyStats.trailingEps) ?? this.toNumber(keyStats.forwardEps),
         earnings: this.toNumber(financialData.netIncomeToCommon),
+        dividendYield: this.toNumber(summaryDetail.dividendYield),
+        sharesOutstanding: this.toNumber(keyStats.sharesOutstanding),
+        marketCap: this.toNumber(price.marketCap) ?? this.toNumber(summaryDetail.marketCap),
+        currency: typeof price.currency === 'string' ? price.currency : null,
+        periodType: 'TTM',
         ratios: {
           trailingPe: this.toNumber(summaryDetail.trailingPE),
           forwardPe: this.toNumber(summaryDetail.forwardPE),
@@ -160,7 +187,13 @@ export class YahooFinanceIngestionService {
       return {
         symbol,
         revenue: null,
+        eps: null,
         earnings: null,
+        dividendYield: null,
+        sharesOutstanding: null,
+        marketCap: null,
+        currency: null,
+        periodType: 'TTM',
         ratios: {
           trailingPe: null,
           forwardPe: null,
@@ -177,13 +210,30 @@ export class YahooFinanceIngestionService {
 
   async fetchCorporateActions(symbol: string): Promise<CorporateAction[]> {
     try {
-      const rows = (await this.yahooFinance.historical(symbol, {
-        period1: new Date('1970-01-01'),
-        period2: new Date(),
-        events: 'dividends|splits',
-      })) as any[];
+      const [dividendResult, splitResult] = await Promise.allSettled([
+        this.yahooFinance.historical(symbol, {
+          period1: new Date('1970-01-01'),
+          period2: new Date(),
+          events: 'dividends',
+        }),
+        this.yahooFinance.historical(symbol, {
+          period1: new Date('1970-01-01'),
+          period2: new Date(),
+          events: 'split',
+        }),
+      ]);
 
-      return rows.flatMap((row) => {
+      if (dividendResult.status === 'rejected') {
+        console.warn(`Failed to fetch dividends for ${symbol}:`, dividendResult.reason);
+      }
+      if (splitResult.status === 'rejected') {
+        console.warn(`Failed to fetch splits for ${symbol}:`, splitResult.reason);
+      }
+
+      const dividendRows = dividendResult.status === 'fulfilled' ? dividendResult.value as any[] : [];
+      const splitRows = splitResult.status === 'fulfilled' ? splitResult.value as any[] : [];
+
+      const dividendActions = dividendRows.flatMap((row) => {
         const date = row.date instanceof Date ? row.date.toISOString() : new Date(row.date).toISOString();
         const actions: CorporateAction[] = [];
 
@@ -193,24 +243,127 @@ export class YahooFinanceIngestionService {
             type: 'dividend',
             date,
             value: row.dividends,
+            amount: this.toNumber(row.dividends),
+            splitRatio: null,
+            currency: null,
             source: 'yahoo',
           });
         }
         if (row.stockSplits !== undefined && row.stockSplits !== null) {
+          const splitRatio = this.toNumber(row.stockSplits);
           actions.push({
             symbol,
-            type: 'split',
+            type: splitRatio !== null && splitRatio > 0 && splitRatio < 1 ? 'reverse_split' : 'split',
             date,
             value: row.stockSplits,
+            amount: null,
+            splitRatio,
+            currency: null,
             source: 'yahoo',
           });
         }
 
         return actions;
       });
+
+      const splitActions = splitRows.flatMap((row) => {
+        const date = row.date instanceof Date ? row.date.toISOString() : new Date(row.date).toISOString();
+        const splitRatio = this.toSplitRatio(row.stockSplits);
+        if (splitRatio === null) {
+          return [];
+        }
+
+        return [{
+          symbol,
+          type: splitRatio > 0 && splitRatio < 1 ? 'reverse_split' : 'split',
+          date,
+          value: row.stockSplits,
+          amount: null,
+          splitRatio,
+          currency: null,
+          source: 'yahoo',
+        } satisfies CorporateAction];
+      });
+
+      return [...dividendActions, ...splitActions].sort((a, b) => a.date.localeCompare(b.date));
     } catch (error) {
       console.error(`Failed to fetch corporate actions for ${symbol}:`, error);
       return [];
+    }
+  }
+
+  async fetchCompanyMasterData(symbol: string): Promise<CompanyMasterData> {
+    try {
+      const summary = await this.yahooFinance.quoteSummary(symbol, {
+        modules: ['price', 'summaryProfile'],
+      });
+      const price = summary?.price || {};
+      const profile = summary?.summaryProfile || {};
+      const inferred = this.inferRegion(symbol);
+
+      return {
+        symbol,
+        companyName: typeof price.longName === 'string' ? price.longName : typeof price.shortName === 'string' ? price.shortName : null,
+        exchange: typeof price.exchangeName === 'string' ? price.exchangeName : inferred.exchange || null,
+        country: typeof profile.country === 'string' ? profile.country : inferred.region || null,
+        sector: typeof profile.sector === 'string' ? profile.sector : null,
+        industry: typeof profile.industry === 'string' ? profile.industry : null,
+        currency: typeof price.currency === 'string' ? price.currency : null,
+        marketCap: this.toNumber(price.marketCap),
+        assetType: typeof price.quoteType === 'string' ? price.quoteType : 'EQUITY',
+        isDelisted: false,
+        ipoDate: null,
+        source: 'yahoo',
+        dataStatus: 'PARTIAL',
+      };
+    } catch (error) {
+      console.error(`Failed to fetch company master data for ${symbol}:`, error);
+      const inferred = this.inferRegion(symbol);
+      return {
+        symbol,
+        companyName: null,
+        exchange: inferred.exchange || null,
+        country: inferred.region || null,
+        sector: null,
+        industry: null,
+        currency: null,
+        marketCap: null,
+        assetType: 'EQUITY',
+        isDelisted: null,
+        ipoDate: null,
+        source: 'yahoo',
+        dataStatus: 'MISSING',
+      };
+    }
+  }
+
+  async fetchFxRate(pair: string): Promise<FxRateInput | null> {
+    const normalizedPair = pair.replace('/', '').toUpperCase();
+    const baseCurrency = normalizedPair.slice(0, 3);
+    const quoteCurrency = normalizedPair.slice(3, 6);
+    if (baseCurrency.length !== 3 || quoteCurrency.length !== 3) {
+      return null;
+    }
+
+    try {
+      const quote = await this.yahooFinance.quote(`${baseCurrency}${quoteCurrency}=X`);
+      const rate = this.toNumber((quote as any)?.regularMarketPrice);
+      if (rate === null) {
+        return null;
+      }
+
+      return {
+        pair: `${baseCurrency}/${quoteCurrency}`,
+        baseCurrency,
+        quoteCurrency,
+        rate,
+        rateTimestamp: new Date(),
+        source: 'yahoo',
+        dataStatus: 'COMPLETE',
+      };
+    } catch (error) {
+      console.error(`Failed to fetch FX rate for ${pair}:`, error);
+      return null;
     }
   }
 

@@ -51,6 +51,7 @@ const MarketDataStatusPanel: React.FC = () => {
       <Paper sx={{ p: 2 }}>
         <Typography variant="overline" color="text.secondary">System Status</Typography>
         <Typography variant="h6">{status?.status === 'ok' ? 'Healthy' : 'Unknown'}</Typography>
+        <Typography variant="caption" color="text.secondary">Trust: {status?.data_status || 'MISSING'}</Typography>
       </Paper>
       <Paper sx={{ p: 2 }}>
         <Typography variant="overline" color="text.secondary">Instruments</Typography>

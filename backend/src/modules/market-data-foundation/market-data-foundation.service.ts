@@ -4,8 +4,10 @@ import { enqueueIngestionJob } from './market-data-foundation.queue';
 import type {
   CreateStockRequest,
   HistoricalPrice,
+  MarketDataStatus,
   PaginationOptions,
   SearchResult,
+  SyncSummary,
   UpdateStockRequest,
   V1CreateInstrumentRequest,
   V1IngestionRequest,
@@ -37,6 +39,10 @@ export class MarketDataFoundationService {
       module: 'market-data-foundation',
       instrumentCount,
       latestDataTimestamp: latestDataTimestamp?.toISOString() ?? null,
+      source: 'database',
+      ingestion_timestamp: new Date().toISOString(),
+      last_updated_timestamp: latestDataTimestamp?.toISOString() ?? null,
+      data_status: latestDataTimestamp ? 'COMPLETE' : 'MISSING',
       timestamp: new Date().toISOString(),
     };
   }
@@ -96,10 +102,18 @@ export class MarketDataFoundationService {
 
     const stock = await this.create({
       symbol: data.symbol.trim().toUpperCase(),
-      name: data.company_name.trim(),
-      region: this.inferRegionFromInstrument(data),
-      exchange: data.exchange.trim().toUpperCase(),
-    }, false);
+        name: data.company_name.trim(),
+        region: this.inferRegionFromInstrument(data),
+        exchange: data.exchange.trim().toUpperCase(),
+        country: data.country,
+        sector: data.sector,
+        industry: data.industry,
+        currency: data.currency.trim().toUpperCase(),
+        marketCap: data.market_cap,
+        assetType: data.asset_type.trim().toUpperCase(),
+        ipoDate: data.ipo_date ? new Date(data.ipo_date) : null,
+        isin: data.isin,
+      }, false);
 
     return this.toV1Instrument(stock, data);
   }
@@ -123,21 +137,10 @@ export class MarketDataFoundationService {
     }
 
     try {
-      let startDate: Date | undefined;
-
-      if (!stock.lastSuccessfulDataLoadTimestamp) {
-        startDate = new Date('2010-01-01');
-        console.log(`First-time load for ${stock.symbol} from ${startDate.toISOString().split('T')[0]}`);
-      } else {
-        startDate = new Date(stock.lastSuccessfulDataLoadTimestamp);
-        startDate.setDate(startDate.getDate() + 1);
-        console.log(`Incremental load for ${stock.symbol} from ${startDate.toISOString().split('T')[0]}`);
-      }
-
-      await this.ingestSymbol(stock.symbol, startDate, new Date());
+      const syncSummary = await this.ingestSymbol(stock.symbol, undefined, new Date());
       await this.repository.updateStockLoadTimestampById(id);
 
-      return { success: true, message: `Data ingestion completed for ${stock.symbol}` };
+      return { success: true, message: `Data ingestion completed for ${stock.symbol}`, syncSummary };
     } catch (error: any) {
       console.error(`Data ingestion failed for ${stock.symbol}:`, error);
       return { success: false, message: error.message };
@@ -210,31 +213,37 @@ export class MarketDataFoundationService {
     return this.marketDataProvider.fetchCorporateActions(symbol);
   }
 
-  listPrices(symbol: string, limit: number) {
-    return this.repository.listPrices(symbol, limit);
+  listPrices(symbol: string, limit: number, startDate?: Date, endDate?: Date) {
+    return this.repository.listPrices(symbol, limit, startDate, endDate);
   }
 
-  async listPricesByInstrumentId(instrumentId: string, limit = 250) {
+  async listPricesByInstrumentId(instrumentId: string, limit = 250, startDate?: Date, endDate?: Date) {
     const stock = await this.repository.findStockById(instrumentId);
     if (!stock) {
       return null;
     }
 
-    const prices = await this.repository.listPrices(stock.symbol, limit);
+    const prices = await this.repository.listPrices(stock.symbol, limit, startDate, endDate);
     return {
       instrument_id: stock.id,
       symbol: stock.symbol,
       adjustment_strategy: 'adjusted_close is not persisted; close is returned as adjusted_close for MVP display.',
+      source: prices[0]?.source || 'database',
+      ingestion_timestamp: prices[0]?.ingestionTimestamp instanceof Date ? prices[0].ingestionTimestamp.toISOString() : null,
+      last_updated_timestamp: prices[0]?.lastUpdatedTimestamp instanceof Date ? prices[0].lastUpdatedTimestamp.toISOString() : null,
+      data_status: prices.length > 0 ? 'COMPLETE' : 'MISSING',
       prices: prices.map((price) => ({
         date: price.timestamp,
         open: Number(price.open),
         high: Number(price.high),
         low: Number(price.low),
         close: Number(price.close),
-        adjusted_close: Number(price.close),
+        adjusted_close: price.adjustedClose !== null ? Number(price.adjustedClose) : Number(price.close),
         volume: price.volume !== null ? Number(price.volume) : null,
         source: 'source' in price && price.source ? price.source : 'database',
-        data_status: 'COMPLETE',
+        ingestion_timestamp: price.ingestionTimestamp instanceof Date ? price.ingestionTimestamp.toISOString() : new Date().toISOString(),
+        last_updated_timestamp: price.lastUpdatedTimestamp instanceof Date ? price.lastUpdatedTimestamp.toISOString() : new Date().toISOString(),
+        data_status: price.dataStatus || 'COMPLETE',
       })),
     };
   }
@@ -264,12 +273,17 @@ export class MarketDataFoundationService {
         high: price.high !== null ? Number(price.high) : null,
         low: price.low !== null ? Number(price.low) : null,
         close: Number(price.close),
-        adjusted_close: Number(price.close),
+        adjusted_close: price.adjustedClose !== null ? Number(price.adjustedClose) : Number(price.close),
         volume: price.volume !== null ? Number(price.volume) : null,
         source: price.source || 'database',
-        last_updated_timestamp: new Date().toISOString(),
+        ingestion_timestamp: price.ingestionTimestamp instanceof Date ? price.ingestionTimestamp.toISOString() : new Date().toISOString(),
+        last_updated_timestamp: price.lastUpdatedTimestamp instanceof Date ? price.lastUpdatedTimestamp.toISOString() : new Date().toISOString(),
+        data_status: price.dataStatus || 'COMPLETE',
       },
-      data_status: 'COMPLETE',
+      source: price.source || 'database',
+      ingestion_timestamp: price.ingestionTimestamp instanceof Date ? price.ingestionTimestamp.toISOString() : new Date().toISOString(),
+      last_updated_timestamp: price.lastUpdatedTimestamp instanceof Date ? price.lastUpdatedTimestamp.toISOString() : new Date().toISOString(),
+      data_status: price.dataStatus || 'COMPLETE',
     };
   }
 
@@ -279,23 +293,36 @@ export class MarketDataFoundationService {
       return null;
     }
 
-    const fundamentals = await this.fetchCoreFundamentals(stock.symbol);
+    let records = await this.repository.listFundamentals(stock.id);
+    if (records.length === 0) {
+      const fundamentals = await this.fetchCoreFundamentals(stock.symbol);
+      await this.repository.upsertFundamentals(stock.id, fundamentals);
+      records = await this.repository.listFundamentals(stock.id);
+    }
+
     return {
       instrument_id: stock.id,
       symbol: stock.symbol,
-      records: [
-        {
-          revenue: fundamentals.revenue,
-          net_income: fundamentals.earnings,
-          pe_ratio: fundamentals.ratios.trailingPe,
-          period_type: 'TTM',
-          period_end_date: fundamentals.asOf,
-          source: fundamentals.source,
-          ingestion_timestamp: new Date().toISOString(),
-          last_updated_timestamp: fundamentals.asOf,
-          data_status: fundamentals.revenue || fundamentals.earnings || fundamentals.ratios.trailingPe ? 'PARTIAL' : 'DELAYED',
-        },
-      ],
+      source: records[0]?.source || 'database',
+      ingestion_timestamp: records[0]?.ingestionTimestamp?.toISOString?.() ?? null,
+      last_updated_timestamp: records[0]?.lastUpdatedTimestamp?.toISOString?.() ?? null,
+      data_status: records.length > 0 ? records[0].dataStatus : 'MISSING',
+      records: records.map((record: any) => ({
+        revenue: record.revenue !== null ? Number(record.revenue) : null,
+        eps: record.eps !== null ? Number(record.eps) : null,
+        net_income: record.netIncome !== null ? Number(record.netIncome) : null,
+        pe_ratio: record.peRatio !== null ? Number(record.peRatio) : null,
+        dividend_yield: record.dividendYield !== null ? Number(record.dividendYield) : null,
+        shares_outstanding: record.sharesOutstanding !== null ? Number(record.sharesOutstanding) : null,
+        market_cap: record.marketCap !== null ? Number(record.marketCap) : null,
+        currency: record.currency,
+        period_type: record.periodType,
+        period_end_date: record.periodEndDate.toISOString(),
+        source: record.source,
+        ingestion_timestamp: record.ingestionTimestamp.toISOString(),
+        last_updated_timestamp: record.lastUpdatedTimestamp.toISOString(),
+        data_status: record.dataStatus,
+      })),
     };
   }
 
@@ -305,20 +332,33 @@ export class MarketDataFoundationService {
       return null;
     }
 
-    const actions = await this.fetchCorporateActions(stock.symbol);
+    let actions = await this.repository.listCorporateActions(stock.id);
+    if (actions.length === 0) {
+      const providerActions = await this.fetchCorporateActions(stock.symbol);
+      await this.repository.upsertCorporateActions(stock.id, providerActions);
+      actions = await this.repository.listCorporateActions(stock.id);
+    }
+
     return {
       instrument_id: stock.id,
       symbol: stock.symbol,
-      actions: actions.map((action) => ({
-        action_type: action.type,
-        effective_date: action.date,
-        value: action.value,
-        ratio: action.type === 'split' ? action.value : null,
-        amount: action.type === 'dividend' ? action.value : null,
+      source: actions[0]?.source || 'database',
+      ingestion_timestamp: actions[0]?.ingestionTimestamp?.toISOString?.() ?? null,
+      last_updated_timestamp: actions[0]?.lastUpdatedTimestamp?.toISOString?.() ?? null,
+      data_status: actions.length > 0 ? 'COMPLETE' : 'MISSING',
+      actions: actions.map((action: any) => ({
+        action_type: action.actionType,
+        effective_date: action.effectiveDate.toISOString(),
+        declared_date: action.declaredDate?.toISOString?.() ?? null,
+        payment_date: action.paymentDate?.toISOString?.() ?? null,
+        value: action.actionType === 'dividend' ? (action.amount !== null ? Number(action.amount) : null) : (action.splitRatio !== null ? Number(action.splitRatio) : null),
+        ratio: action.splitRatio !== null ? Number(action.splitRatio) : null,
+        amount: action.amount !== null ? Number(action.amount) : null,
+        currency: action.currency,
         source: action.source,
-        ingestion_timestamp: new Date().toISOString(),
-        last_updated_timestamp: new Date().toISOString(),
-        data_status: 'COMPLETE',
+        ingestion_timestamp: action.ingestionTimestamp.toISOString(),
+        last_updated_timestamp: action.lastUpdatedTimestamp.toISOString(),
+        data_status: action.dataStatus,
       })),
     };
   }
@@ -327,9 +367,9 @@ export class MarketDataFoundationService {
     return this.marketDataProvider.fetchHistorical(symbol, startDate, endDate);
   }
 
-  async storeHistorical(prices: HistoricalPrice[]): Promise<void> {
+  async storeHistorical(prices: HistoricalPrice[]): Promise<SyncSummary> {
     try {
-      await this.repository.storeHistorical(
+      return await this.repository.storeHistorical(
         prices,
         this.marketDataProvider.inferRegion.bind(this.marketDataProvider)
       );
@@ -339,21 +379,30 @@ export class MarketDataFoundationService {
     }
   }
 
-  async ingestSymbol(symbol: string, startDate?: Date, endDate?: Date): Promise<void> {
+  async ingestSymbol(symbol: string, startDate?: Date, endDate?: Date): Promise<SyncSummary> {
     console.log(`Ingesting ${symbol}...`);
 
     const stock = await this.repository.findStockBySymbol(symbol);
     let effectiveStartDate = startDate;
 
     if (!effectiveStartDate) {
-      if (stock?.lastSuccessfulDataLoadTimestamp) {
+      const backfillStartDate = this.defaultBackfillStartDate();
+      const coverage = await this.repository.priceCoverage(symbol);
+      const hasEnoughHistory = coverage.oldestTimestamp && coverage.oldestTimestamp <= this.backfillCoverageCutoffDate(backfillStartDate);
+
+      if (!hasEnoughHistory) {
+        effectiveStartDate = backfillStartDate;
+        console.log(`  Backfilling ${symbol} from ${effectiveStartDate.toISOString().split('T')[0]} (stored rows: ${coverage.count})`);
+      } else if (stock?.lastSuccessfulDataLoadTimestamp) {
         effectiveStartDate = new Date(stock.lastSuccessfulDataLoadTimestamp);
         effectiveStartDate.setDate(effectiveStartDate.getDate() + 1);
         console.log(`  Using incremental start date: ${effectiveStartDate.toISOString().split('T')[0]} (based on lastSuccessfulDataLoadTimestamp)`);
       } else {
-        effectiveStartDate = new Date();
-        effectiveStartDate.setDate(effectiveStartDate.getDate() - 30);
-        console.log(`  Using default start date: ${effectiveStartDate.toISOString().split('T')[0]} (first-time load)`);
+        effectiveStartDate = coverage.latestTimestamp ? new Date(coverage.latestTimestamp) : backfillStartDate;
+        if (coverage.latestTimestamp) {
+          effectiveStartDate.setDate(effectiveStartDate.getDate() + 1);
+        }
+        console.log(`  Using default start date: ${effectiveStartDate.toISOString().split('T')[0]} (15-year first-time load)`);
       }
     }
 
@@ -361,7 +410,7 @@ export class MarketDataFoundationService {
 
     if (effectiveStartDate >= effectiveEndDate) {
       console.log(`  Skipping ${symbol}: already up to date (last load: ${stock?.lastSuccessfulDataLoadTimestamp})`);
-      return;
+      return { rowsReceived: 0, rowsInserted: 0, rowsUpdated: 0, rowsSkipped: 0, warningCount: 0, warnings: [] };
     }
 
     console.log(`  Fetching data from ${effectiveStartDate.toISOString().split('T')[0]} to ${effectiveEndDate.toISOString().split('T')[0]}`);
@@ -371,13 +420,14 @@ export class MarketDataFoundationService {
     if (prices.length === 0) {
       console.log(`  No new price data available for ${symbol}`);
       await this.repository.updateStockLoadTimestampBySymbol(symbol);
-      return;
+      return { rowsReceived: 0, rowsInserted: 0, rowsUpdated: 0, rowsSkipped: 0, warningCount: 0, warnings: [] };
     }
 
-    await this.storeHistorical(prices);
+    const syncSummary = await this.storeHistorical(prices);
     await this.repository.updateStockLoadTimestampBySymbol(symbol);
 
     console.log(`  Successfully ingested ${prices.length} price ticks for ${symbol}`);
+    return syncSummary;
   }
 
   async syncV1(request: V1IngestionRequest): Promise<V1SyncResult> {
@@ -412,8 +462,30 @@ export class MarketDataFoundationService {
     }
 
     let pricesStored = false;
+    let syncSummary: SyncSummary | undefined;
     try {
-      await this.ingestSymbol(stock.symbol);
+      const masterData = await this.marketDataProvider.fetchCompanyMasterData(stock.symbol).catch(() => null);
+      if (masterData) {
+        stock = await this.repository.updateCompanyMasterData(stock.id, {
+          name: masterData.companyName || stock.name,
+          exchange: request.exchange || masterData.exchange || stock.exchange || undefined,
+          country: masterData.country,
+          sector: masterData.sector,
+          industry: masterData.industry,
+          currency: request.currency || masterData.currency,
+          marketCap: masterData.marketCap,
+          assetType: request.asset_type || masterData.assetType,
+          isDelisted: masterData.isDelisted ?? false,
+          ipoDate: masterData.ipoDate,
+          isin: request.isin,
+        });
+      }
+    } catch (error) {
+      errors.push(`Company master sync failed: ${error instanceof Error ? error.message : 'unknown error'}`);
+    }
+
+    try {
+      syncSummary = await this.ingestSymbol(stock.symbol);
       pricesStored = true;
     } catch (error) {
       errors.push(`Price ingestion failed: ${error instanceof Error ? error.message : 'unknown error'}`);
@@ -423,6 +495,16 @@ export class MarketDataFoundationService {
       this.fetchCoreFundamentals(stock.symbol).catch(() => null),
       this.fetchCorporateActions(stock.symbol).catch(() => []),
     ]);
+    if (fundamentals) {
+      await this.repository.upsertFundamentals(stock.id, fundamentals).catch((error) => {
+        errors.push(`Fundamentals persistence failed: ${error instanceof Error ? error.message : 'unknown error'}`);
+      });
+    }
+    if (corporateActions.length > 0) {
+      await this.repository.upsertCorporateActions(stock.id, corporateActions).catch((error) => {
+        errors.push(`Corporate action persistence failed: ${error instanceof Error ? error.message : 'unknown error'}`);
+      });
+    }
 
     return {
       success: errors.length === 0 || pricesStored,
@@ -438,6 +520,7 @@ export class MarketDataFoundationService {
       pricesStored,
       fundamentalsAvailable: Boolean(fundamentals && (fundamentals.revenue || fundamentals.earnings || fundamentals.ratios.trailingPe)),
       corporateActionsAvailable: corporateActions.length > 0,
+      syncSummary,
       errors: errors.length > 0 ? errors : undefined,
     };
   }
@@ -542,6 +625,45 @@ export class MarketDataFoundationService {
     }
   }
 
+  async syncFxRates(pairs = ['USD/EUR', 'USD/GBP', 'USD/INR', 'EUR/GBP']) {
+    const results = [];
+    for (const pair of pairs) {
+      await this.throttleIngestion(250);
+      const rate = await this.marketDataProvider.fetchFxRate(pair);
+      if (rate) {
+        results.push(await this.repository.upsertFxRate(rate));
+      }
+    }
+    return results;
+  }
+
+  async listFxRates() {
+    let rates = await this.repository.listFxRates();
+    if (rates.length === 0) {
+      await this.syncFxRates();
+      rates = await this.repository.listFxRates();
+    }
+    return {
+      source: rates[0]?.source || 'yahoo',
+      ingestion_timestamp: rates[0]?.ingestionTimestamp?.toISOString?.() ?? null,
+      last_updated_timestamp: rates[0]?.lastUpdatedTimestamp?.toISOString?.() ?? null,
+      data_status: rates.length > 0 ? 'COMPLETE' : 'MISSING',
+      rates: rates.map((rate: any) => this.toV1FxRate(rate)),
+    };
+  }
+
+  async getFxRate(pair: string) {
+    const normalizedPair = this.normalizePair(pair);
+    let rate = await this.repository.findFxRate(normalizedPair);
+    if (!rate) {
+      const providerRate = await this.marketDataProvider.fetchFxRate(normalizedPair);
+      if (providerRate) {
+        rate = await this.repository.upsertFxRate(providerRate);
+      }
+    }
+    return rate ? this.toV1FxRate(rate) : null;
+  }
+
   disconnect() {
     return this.repository.prisma.$disconnect();
   }
@@ -552,13 +674,20 @@ export class MarketDataFoundationService {
       symbol: stock.symbol,
       company_name: overrides?.company_name || stock.name,
       exchange: overrides?.exchange || stock.exchange || null,
-      currency: overrides?.currency || this.defaultCurrencyForRegion(stock.region),
-      asset_type: overrides?.asset_type || 'EQUITY',
-      isin: overrides?.isin || null,
-      source: 'database',
+      country: stock.country || null,
+      sector: stock.sector || null,
+      industry: stock.industry || null,
+      currency: overrides?.currency || stock.currency || this.defaultCurrencyForRegion(stock.region),
+      market_cap: stock.marketCap !== null && stock.marketCap !== undefined ? Number(stock.marketCap) : null,
+      asset_type: overrides?.asset_type || stock.assetType || 'EQUITY',
+      is_active: stock.isActive ?? true,
+      is_delisted: stock.isDelisted ?? false,
+      ipo_date: stock.ipoDate instanceof Date ? stock.ipoDate.toISOString() : stock.ipoDate ? new Date(stock.ipoDate).toISOString() : null,
+      isin: overrides?.isin || stock.isin || null,
+      source: stock.source || 'database',
       ingestion_timestamp: stock.createdAt instanceof Date ? stock.createdAt.toISOString() : new Date(stock.createdAt).toISOString(),
       last_updated_timestamp: stock.updatedAt instanceof Date ? stock.updatedAt.toISOString() : new Date(stock.updatedAt).toISOString(),
-      data_status: stock.lastSuccessfulDataLoadTimestamp ? 'COMPLETE' : 'PARTIAL',
+      data_status: (stock.dataStatus || (stock.lastSuccessfulDataLoadTimestamp ? 'COMPLETE' : 'PARTIAL')) as MarketDataStatus,
     };
   }
 
@@ -579,6 +708,19 @@ export class MarketDataFoundationService {
     return 'US';
   }
 
+  private defaultBackfillStartDate(): Date {
+    const date = new Date();
+    date.setFullYear(date.getFullYear() - 15);
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }
+
+  private backfillCoverageCutoffDate(backfillStartDate: Date): Date {
+    const cutoff = new Date(backfillStartDate);
+    cutoff.setDate(cutoff.getDate() + 14);
+    return cutoff;
+  }
+
   private async throttleIngestion(minDelayMs = 1000) {
     const now = Date.now();
     const elapsed = now - MarketDataFoundationService.lastIngestionAt;
@@ -586,6 +728,25 @@ export class MarketDataFoundationService {
       await new Promise(resolve => setTimeout(resolve, minDelayMs - elapsed));
     }
     MarketDataFoundationService.lastIngestionAt = Date.now();
+  }
+
+  private normalizePair(pair: string): string {
+    const stripped = pair.replace('/', '').toUpperCase();
+    return `${stripped.slice(0, 3)}/${stripped.slice(3, 6)}`;
+  }
+
+  private toV1FxRate(rate: any) {
+    return {
+      pair: rate.pair,
+      base_currency: rate.baseCurrency,
+      quote_currency: rate.quoteCurrency,
+      rate: Number(rate.rate),
+      rate_timestamp: rate.rateTimestamp.toISOString(),
+      source: rate.source,
+      ingestion_timestamp: rate.ingestionTimestamp.toISOString(),
+      last_updated_timestamp: rate.lastUpdatedTimestamp.toISOString(),
+      data_status: rate.dataStatus,
+    };
   }
 }
 

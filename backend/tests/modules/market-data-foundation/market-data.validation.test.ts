@@ -41,6 +41,27 @@ describe('market data validation', () => {
     );
   });
 
+  it('reports negative prices, invalid volume, and open/close outside range', () => {
+    const errors = validateHistoricalPrice({
+      symbol: 'AAPL',
+      date: new Date('2025-01-01'),
+      open: 120,
+      high: 110,
+      low: 95,
+      close: -1,
+      volume: -10,
+    });
+
+    expect(errors).toEqual(
+      expect.arrayContaining([
+        'close must be greater than 0',
+        'volume cannot be negative',
+        'open must be within low/high range',
+        'close must be within low/high range',
+      ])
+    );
+  });
+
   it('partitions valid and invalid historical price rows', () => {
     const result = partitionHistoricalPrices([
       {
@@ -63,6 +84,43 @@ describe('market data validation', () => {
 
     expect(result.valid).toHaveLength(1);
     expect(result.invalid).toHaveLength(1);
+  });
+
+  it('partitions duplicate bars and abnormal price spikes as warnings/skips', () => {
+    const result = partitionHistoricalPrices([
+      {
+        symbol: 'AAPL',
+        date: new Date('2025-01-01'),
+        open: 100,
+        high: 110,
+        low: 95,
+        close: 100,
+      },
+      {
+        symbol: 'AAPL',
+        date: new Date('2025-01-01'),
+        open: 100,
+        high: 110,
+        low: 95,
+        close: 100,
+      },
+      {
+        symbol: 'AAPL',
+        date: new Date('2025-01-02'),
+        open: 200,
+        high: 210,
+        low: 190,
+        close: 205,
+      },
+    ], 0.5);
+
+    expect(result.valid).toHaveLength(1);
+    expect(result.invalid.flatMap((row) => row.errors)).toEqual(
+      expect.arrayContaining([
+        'duplicate price bar in batch',
+        'abnormal price spike exceeds threshold 0.5',
+      ])
+    );
   });
 
   it('validates required string inputs', () => {

@@ -12,6 +12,8 @@ import type {
   V1CorporateActionsResponse,
   V1CreateInstrumentRequest,
   V1FundamentalsResponse,
+  V1FxRate,
+  V1FxRatesResponse,
   V1Instrument,
   V1InstrumentsResponse,
   V1LatestPriceResponse,
@@ -34,6 +36,8 @@ export type {
   V1CorporateActionsResponse,
   V1CreateInstrumentRequest,
   V1FundamentalsResponse,
+  V1FxRate,
+  V1FxRatesResponse,
   V1Instrument,
   V1InstrumentsResponse,
   V1LatestPriceResponse,
@@ -189,5 +193,15 @@ export async function fetchInstrumentCorporateActions(id: string): Promise<V1Cor
 
 export async function syncMarketData(data: V1SyncRequest): Promise<V1SyncResponse> {
   const response = await axios.post<V1SyncResponse>(`${API_BASE}/v1/ingestion/sync`, data);
+  return response.data;
+}
+
+export async function fetchFxRates(): Promise<V1FxRatesResponse> {
+  const response = await axios.get<V1FxRatesResponse>(`${API_BASE}/v1/fx-rates`);
+  return response.data;
+}
+
+export async function fetchFxRate(pair: string): Promise<V1FxRate> {
+  const response = await axios.get<V1FxRate>(`${API_BASE}/v1/fx-rates/${encodeURIComponent(pair)}`);
   return response.data;
 }

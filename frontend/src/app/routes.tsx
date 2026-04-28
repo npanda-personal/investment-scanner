@@ -8,6 +8,7 @@ import SmartMoneyPage from '@/pages/SmartMoneyPage';
 import Backtester from '@/features/backtester';
 import { Scanner, SimplifiedScannerDashboard } from '@/features/scanner';
 import { marketDataFoundationRoutes } from '@/features/market-data-foundation';
+import { stockResearchWorkbenchRoutes } from '@/features/stock-research-workbench';
 import WatchlistManager from '@/features/watchlists';
 
 export const appRoutes: RouteObject[] = [
@@ -20,6 +21,7 @@ export const appRoutes: RouteObject[] = [
       { path: 'sector', element: <SectorPage /> },
       { path: 'macro', element: <MacroPage /> },
       ...marketDataFoundationRoutes,
+      ...stockResearchWorkbenchRoutes,
       { path: 'watchlists', element: <WatchlistManager /> },
       { path: 'scanner', element: <Scanner /> },
       { path: 'smart-scanner', element: <SimplifiedScannerDashboard /> },

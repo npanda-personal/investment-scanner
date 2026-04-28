@@ -17,6 +17,9 @@ jest.mock('yahoo-finance2', () => ({
 
 // Mock PrismaClient
 var mockPriceTickUpsert = jest.fn<any, any>();
+var mockPriceTickFindMany = jest.fn<any, any>();
+var mockPriceTickCount = jest.fn<any, any>();
+var mockPriceTickFindFirst = jest.fn<any, any>();
 var mockLatestPriceUpsert = jest.fn<any, any>();
 var mockStockFindUnique = jest.fn<any, any>();
 var mockStockUpdate = jest.fn<any, any>();
@@ -26,7 +29,12 @@ var mockTransaction = jest.fn<any, any>((cb: any) => cb({
 }));
 var mockDisconnect = jest.fn<any, any>();
 var mockPrismaClient: any = {
-  priceTick: { upsert: mockPriceTickUpsert },
+  priceTick: {
+    upsert: mockPriceTickUpsert,
+    findMany: mockPriceTickFindMany,
+    count: mockPriceTickCount,
+    findFirst: mockPriceTickFindFirst,
+  },
   latestPrice: { upsert: mockLatestPriceUpsert },
   stock: { findUnique: mockStockFindUnique, update: mockStockUpdate },
   $transaction: mockTransaction,
@@ -46,6 +54,9 @@ describe('YahooFinanceIngestionService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPriceTickFindMany.mockResolvedValue([]);
+    mockPriceTickCount.mockResolvedValue(0);
+    mockPriceTickFindFirst.mockResolvedValue(null);
     // Create a new instance which will use the mocked PrismaClient
     service = new YahooFinanceIngestionService(mockPrismaClient);
   });
@@ -81,6 +92,7 @@ describe('YahooFinanceIngestionService', () => {
           high: 105,
           low: 99,
           close: 102,
+          adjustedClose: null,
           volume: 1000000,
         },
         {
@@ -108,6 +120,7 @@ describe('YahooFinanceIngestionService', () => {
           high: 105,
           low: 99,
           close: 102,
+          adjustedClose: null,
           volume: 1000000,
         },
         {
@@ -117,6 +130,7 @@ describe('YahooFinanceIngestionService', () => {
           high: 108,
           low: 101,
           close: 107,
+          adjustedClose: null,
           volume: 1200000,
         },
       ]);
@@ -209,6 +223,35 @@ describe('YahooFinanceIngestionService', () => {
       });
 
       fetchSpy.mockRestore();
+    });
+  });
+
+  describe('fetchCorporateActions', () => {
+    it('fetches dividends and splits with separate Yahoo event requests', async () => {
+      mockYahooHistorical
+        .mockResolvedValueOnce([
+          { date: new Date('2025-01-01'), dividends: 0.25 },
+        ])
+        .mockResolvedValueOnce([
+          { date: new Date('2025-02-01'), stockSplits: '4:1' },
+        ]);
+
+      const result = await service.fetchCorporateActions('AAPL');
+
+      expect(mockYahooHistorical).toHaveBeenNthCalledWith(1, 'AAPL', {
+        period1: new Date('1970-01-01'),
+        period2: expect.any(Date),
+        events: 'dividends',
+      });
+      expect(mockYahooHistorical).toHaveBeenNthCalledWith(2, 'AAPL', {
+        period1: new Date('1970-01-01'),
+        period2: expect.any(Date),
+        events: 'split',
+      });
+      expect(result).toEqual([
+        expect.objectContaining({ type: 'dividend', amount: 0.25 }),
+        expect.objectContaining({ type: 'split', splitRatio: 4 }),
+      ]);
     });
   });
 });

@@ -15,13 +15,20 @@ export interface V1Instrument {
   symbol: string;
   company_name: string;
   exchange: string | null;
+  country: string | null;
+  sector: string | null;
+  industry: string | null;
   currency: string;
+  market_cap: number | null;
   asset_type: string;
+  is_active: boolean;
+  is_delisted: boolean;
+  ipo_date: string | null;
   isin: string | null;
   source: string;
   ingestion_timestamp: string;
   last_updated_timestamp: string;
-  data_status: 'COMPLETE' | 'PARTIAL' | 'DELAYED';
+  data_status: 'COMPLETE' | 'PARTIAL' | 'DELAYED' | 'MISSING' | 'ERROR';
 }
 
 export interface V1CreateInstrumentRequest {
@@ -31,6 +38,11 @@ export interface V1CreateInstrumentRequest {
   currency: string;
   asset_type: string;
   isin?: string;
+  country?: string;
+  sector?: string;
+  industry?: string;
+  market_cap?: number;
+  ipo_date?: string;
 }
 
 export interface V1InstrumentsResponse {
@@ -52,6 +64,8 @@ export interface V1PriceRecord {
   adjusted_close: number;
   volume: number | null;
   source: string;
+  ingestion_timestamp: string;
+  last_updated_timestamp: string;
   data_status: string;
 }
 
@@ -59,6 +73,10 @@ export interface V1PricesResponse {
   instrument_id: string;
   symbol: string;
   adjustment_strategy: string;
+  source: string;
+  ingestion_timestamp: string | null;
+  last_updated_timestamp: string | null;
+  data_status: string;
   prices: V1PriceRecord[];
 }
 
@@ -71,8 +89,13 @@ export interface V1LatestPriceResponse {
 
 export interface V1FundamentalRecord {
   revenue: number | null;
+  eps: number | null;
   net_income: number | null;
   pe_ratio: number | null;
+  dividend_yield: number | null;
+  shares_outstanding: number | null;
+  market_cap: number | null;
+  currency: string | null;
   period_type: string;
   period_end_date: string;
   source: string;
@@ -84,15 +107,22 @@ export interface V1FundamentalRecord {
 export interface V1FundamentalsResponse {
   instrument_id: string;
   symbol: string;
+  source: string;
+  ingestion_timestamp: string | null;
+  last_updated_timestamp: string | null;
+  data_status: string;
   records: V1FundamentalRecord[];
 }
 
 export interface V1CorporateActionRecord {
-  action_type: 'dividend' | 'split';
+  action_type: 'dividend' | 'split' | 'reverse_split';
   effective_date: string;
+  declared_date: string | null;
+  payment_date: string | null;
   value: number | string;
   ratio: number | string | null;
   amount: number | string | null;
+  currency: string | null;
   source: string;
   ingestion_timestamp: string;
   last_updated_timestamp: string;
@@ -102,7 +132,31 @@ export interface V1CorporateActionRecord {
 export interface V1CorporateActionsResponse {
   instrument_id: string;
   symbol: string;
+  source: string;
+  ingestion_timestamp: string | null;
+  last_updated_timestamp: string | null;
+  data_status: string;
   actions: V1CorporateActionRecord[];
+}
+
+export interface V1FxRate {
+  pair: string;
+  base_currency: string;
+  quote_currency: string;
+  rate: number;
+  rate_timestamp: string;
+  source: string;
+  ingestion_timestamp: string;
+  last_updated_timestamp: string;
+  data_status: string;
+}
+
+export interface V1FxRatesResponse {
+  source: string;
+  ingestion_timestamp: string | null;
+  last_updated_timestamp: string | null;
+  data_status: string;
+  rates: V1FxRate[];
 }
 
 export interface V1SyncRequest {
@@ -122,6 +176,14 @@ export interface V1SyncResponse {
   pricesStored?: boolean;
   fundamentalsAvailable?: boolean;
   corporateActionsAvailable?: boolean;
+  syncSummary?: {
+    rowsReceived: number;
+    rowsInserted: number;
+    rowsUpdated: number;
+    rowsSkipped: number;
+    warningCount: number;
+    warnings: string[];
+  };
   errors?: string[];
 }
 
@@ -130,6 +192,10 @@ export interface MarketDataHealth {
   module: string;
   instrumentCount: number;
   latestDataTimestamp: string | null;
+  source: string;
+  ingestion_timestamp: string;
+  last_updated_timestamp: string | null;
+  data_status: string;
   timestamp: string;
 }
 

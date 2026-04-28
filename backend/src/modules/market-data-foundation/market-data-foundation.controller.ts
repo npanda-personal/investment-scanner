@@ -305,7 +305,9 @@ export class MarketDataFoundationController {
   listInstrumentPrices = async (req: Request, res: Response) => {
     try {
       const limit = parseInt(req.query.limit as string) || 250;
-      const result = await this.service.listPricesByInstrumentId(this.getParam(req.params.instrumentId), limit);
+      const startDate = typeof req.query.startDate === 'string' ? new Date(req.query.startDate) : undefined;
+      const endDate = typeof req.query.endDate === 'string' ? new Date(req.query.endDate) : undefined;
+      const result = await this.service.listPricesByInstrumentId(this.getParam(req.params.instrumentId), limit, startDate, endDate);
       if (!result) {
         return res.status(404).json({ error: 'Instrument not found' });
       }
@@ -366,6 +368,38 @@ export class MarketDataFoundationController {
         message: 'Market data sync failed',
         errors: [error.message],
       });
+    }
+  };
+
+  listFxRates = async (_req: Request, res: Response) => {
+    try {
+      return res.json(await this.service.listFxRates());
+    } catch (error) {
+      console.error('Error fetching FX rates:', error);
+      return res.status(500).json({ error: 'Failed to fetch FX rates' });
+    }
+  };
+
+  getFxRate = async (req: Request, res: Response) => {
+    try {
+      const result = await this.service.getFxRate(this.getParam(req.params.pair));
+      if (!result) {
+        return res.status(404).json({ error: 'FX rate not found' });
+      }
+      return res.json(result);
+    } catch (error) {
+      console.error('Error fetching FX rate:', error);
+      return res.status(500).json({ error: 'Failed to fetch FX rate' });
+    }
+  };
+
+  syncFxRates = async (_req: Request, res: Response) => {
+    try {
+      const rates = await this.service.syncFxRates();
+      return res.json({ success: true, ratesSynced: rates.length });
+    } catch (error: any) {
+      console.error('Error syncing FX rates:', error);
+      return res.status(500).json({ success: false, message: error.message });
     }
   };
 }

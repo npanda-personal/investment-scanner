@@ -31,23 +31,69 @@ export const validateHistoricalPrice = (price: HistoricalPrice): string[] => {
   if (price.volume !== undefined && !isFiniteNumber(price.volume)) {
     errors.push('volume must be a finite number when provided');
   }
+  if (price.volume !== undefined && isFiniteNumber(price.volume) && price.volume < 0) {
+    errors.push('volume cannot be negative');
+  }
+  for (const field of ['open', 'high', 'low', 'close'] as const) {
+    if (isFiniteNumber(price[field]) && price[field] <= 0) {
+      errors.push(`${field} must be greater than 0`);
+    }
+  }
   if (isFiniteNumber(price.low) && isFiniteNumber(price.high) && price.low > price.high) {
     errors.push('low cannot be greater than high');
+  }
+  if (
+    isFiniteNumber(price.open) &&
+    isFiniteNumber(price.low) &&
+    isFiniteNumber(price.high) &&
+    (price.open < price.low || price.open > price.high)
+  ) {
+    errors.push('open must be within low/high range');
+  }
+  if (
+    isFiniteNumber(price.close) &&
+    isFiniteNumber(price.low) &&
+    isFiniteNumber(price.high) &&
+    (price.close < price.low || price.close > price.high)
+  ) {
+    errors.push('close must be within low/high range');
   }
 
   return errors;
 };
 
 export const partitionHistoricalPrices = (
-  prices: HistoricalPrice[]
+  prices: HistoricalPrice[],
+  spikeThreshold = Number(process.env.MARKET_DATA_SPIKE_THRESHOLD ?? '0.5')
 ): ValidationResult<HistoricalPrice> => {
-  return prices.reduce<ValidationResult<HistoricalPrice>>(
+  const seen = new Set<string>();
+  const sorted = [...prices].sort((a, b) => a.date.getTime() - b.date.getTime());
+  let previousValidCloseBySymbol = new Map<string, number>();
+
+  return sorted.reduce<ValidationResult<HistoricalPrice>>(
     (result, price) => {
       const errors = validateHistoricalPrice(price);
+      const duplicateKey = `${price.symbol}:${price.date instanceof Date ? price.date.toISOString() : String(price.date)}`;
+      if (seen.has(duplicateKey)) {
+        errors.push('duplicate price bar in batch');
+      }
+      seen.add(duplicateKey);
+
+      const previousClose = previousValidCloseBySymbol.get(price.symbol);
+      if (
+        errors.length === 0 &&
+        previousClose !== undefined &&
+        previousClose > 0 &&
+        Math.abs(price.close - previousClose) / previousClose > spikeThreshold
+      ) {
+        errors.push(`abnormal price spike exceeds threshold ${spikeThreshold}`);
+      }
+
       if (errors.length > 0) {
         result.invalid.push({ item: price, errors });
       } else {
         result.valid.push(price);
+        previousValidCloseBySymbol.set(price.symbol, price.close);
       }
       return result;
     },

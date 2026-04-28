@@ -26,6 +26,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import SyncIcon from '@mui/icons-material/Sync';
 import {
   fetchInstruments,
+  syncAllStocks,
   syncMarketData,
   type V1Instrument,
 } from '../api/marketDataFoundationService';
@@ -41,6 +42,7 @@ const MarketDataFoundationPage: React.FC = () => {
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [catalogSyncing, setCatalogSyncing] = useState(false);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -82,6 +84,29 @@ const MarketDataFoundationPage: React.FC = () => {
     }
   };
 
+  const handleCatalogSync = async () => {
+    setCatalogSyncing(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const result = await syncAllStocks(4, 4, 3000);
+      if (!result.success) {
+        setError(result.message || 'Catalog sync failed');
+      } else {
+        const summary = [
+          result.succeeded !== undefined ? `${result.succeeded} succeeded` : null,
+          result.failed !== undefined ? `${result.failed} failed` : null,
+        ].filter(Boolean).join(', ');
+        setSuccess(summary ? `${result.message} (${summary})` : result.message);
+        await loadInstruments();
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.message || 'Catalog sync failed');
+    } finally {
+      setCatalogSyncing(false);
+    }
+  };
+
   const visibleInstruments = instruments.slice(page * pageSize, page * pageSize + pageSize);
 
   return (
@@ -96,6 +121,14 @@ const MarketDataFoundationPage: React.FC = () => {
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={catalogSyncing ? <CircularProgress size={18} /> : <SyncIcon />}
+            onClick={handleCatalogSync}
+            disabled={catalogSyncing}
+          >
+            {catalogSyncing ? 'Syncing Catalog...' : 'Sync Catalog'}
+          </Button>
           <Button variant="outlined" startIcon={<SyncIcon />} onClick={() => navigate('/market-data-foundation/ingestion')}>
             Ingestion
           </Button>

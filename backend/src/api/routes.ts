@@ -12,6 +12,7 @@ import {
   marketDataStocksRouter,
   marketDataV1Router,
 } from '../modules/market-data-foundation';
+import { stockResearchWorkbenchRouter } from '../modules/stock-research-workbench';
 
 export interface ApiModule {
   path: string;
@@ -22,6 +23,7 @@ export const apiModules: ApiModule[] = [
   { path: '/api/auth', router: authRouter },
   { path: '/api/data', router: marketDataDataRouter },
   { path: '/api/v1', router: marketDataV1Router },
+  { path: '/api/v1', router: stockResearchWorkbenchRouter },
   { path: '/api/market-data-foundation', router: marketDataFoundationRouter },
   { path: '/api/watchlists', router: watchlistRouter },
   { path: '/api/scanners', router: scannerRouter },

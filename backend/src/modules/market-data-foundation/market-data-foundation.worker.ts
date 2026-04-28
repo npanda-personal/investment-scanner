@@ -20,26 +20,12 @@ export class StockSyncWorker {
 
   async processTask(task: StockSyncTask): Promise<WorkerResult> {
     try {
-      // Determine start date based on lastSuccessfulDataLoadTimestamp
-      let startDate: Date | undefined;
-      
-      if (!task.lastSuccessfulDataLoadTimestamp) {
-        // First-time load: start from Jan 1, 2010
-        startDate = new Date('2010-01-01');
-        console.log(`[Worker ${this.workerId}] First-time load for ${task.symbol} from ${startDate.toISOString().split('T')[0]}`);
-      } else {
-        // Incremental load: start from day after last successful load
-        startDate = new Date(task.lastSuccessfulDataLoadTimestamp);
-        startDate.setDate(startDate.getDate() + 1);
-        console.log(`[Worker ${this.workerId}] Incremental load for ${task.symbol} from ${startDate.toISOString().split('T')[0]}`);
-      }
-
-      await this.marketDataService.ingestSymbol(task.symbol, startDate, new Date());
+      const summary = await this.marketDataService.ingestSymbol(task.symbol, undefined, new Date());
 
       return {
         symbol: task.symbol,
         success: true,
-        message: 'Sync completed',
+        message: `Sync completed: ${summary.rowsInserted} inserted, ${summary.rowsUpdated} updated, ${summary.rowsSkipped} skipped`,
         timestamp: new Date().toISOString(),
         workerId: this.workerId
       };

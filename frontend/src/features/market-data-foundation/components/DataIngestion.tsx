@@ -88,6 +88,11 @@ const DataIngestion: React.FC = () => {
               {result.instrument.symbol} | prices: {result.pricesStored ? 'stored' : 'not stored'} | fundamentals: {result.fundamentalsAvailable ? 'available' : 'not available'} | actions: {result.corporateActionsAvailable ? 'available' : 'not available'}
             </Typography>
           )}
+          {result.syncSummary && (
+            <Typography variant="caption" display="block">
+              rows received: {result.syncSummary.rowsReceived} | inserted: {result.syncSummary.rowsInserted} | updated: {result.syncSummary.rowsUpdated} | skipped: {result.syncSummary.rowsSkipped} | warnings: {result.syncSummary.warningCount}
+            </Typography>
+          )}
           {result.errors?.map((item) => (
             <Typography key={item} variant="caption" display="block">{item}</Typography>
           ))}

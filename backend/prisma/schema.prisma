@@ -24,17 +24,21 @@ model Alert {
 }
 
 model PriceTick {
-  id        String   @id @default(cuid())
-  symbol    String
-  region    String? // e.g., "US", "EU", "ASIA"
-  exchange  String? // e.g., "NASDAQ", "NYSE"
-  timestamp DateTime
-  open      Decimal
-  high      Decimal
-  low      Decimal
-  close     Decimal
-  volume    BigInt?
-  source    String? // e.g., "yahoo", "coinbase"
+  id                   String   @id @default(cuid())
+  symbol               String
+  region               String? // e.g., "US", "EU", "ASIA"
+  exchange             String? // e.g., "NASDAQ", "NYSE"
+  timestamp            DateTime
+  open                 Decimal
+  high                 Decimal
+  low                  Decimal
+  close                Decimal
+  adjustedClose        Decimal?
+  volume               BigInt?
+  source               String? // e.g., "yahoo", "coinbase"
+  ingestionTimestamp   DateTime @default(now())
+  lastUpdatedTimestamp DateTime @updatedAt
+  dataStatus           String   @default("COMPLETE")
 
   @@unique([symbol, timestamp])
   @@index([symbol, timestamp])
@@ -58,12 +62,86 @@ model Stock {
   name                         String
   region                       String   // IN, US, EU, UK, CN
   exchange                     String?
+  country                      String?
+  sector                       String?
+  industry                     String?
+  currency                     String?
+  marketCap                    Decimal?
+  assetType                    String?
+  isDelisted                   Boolean  @default(false)
+  ipoDate                      DateTime?
+  isin                         String?
+  source                       String   @default("database")
+  dataStatus                   String   @default("PARTIAL")
   isActive                     Boolean  @default(true)
   lastSuccessfulDataLoadTimestamp DateTime?
   createdAt                    DateTime @default(now())
   updatedAt                    DateTime @updatedAt
+  fundamentals                 Fundamental[]
+  corporateActions             CorporateAction[]
 
   @@map("stocks")
+}
+
+model Fundamental {
+  id                   String   @id @default(cuid())
+  stockId              String
+  stock                Stock    @relation(fields: [stockId], references: [id], onDelete: Cascade)
+  revenue              Decimal?
+  eps                  Decimal?
+  netIncome            Decimal?
+  peRatio              Decimal?
+  dividendYield        Decimal?
+  sharesOutstanding    BigInt?
+  marketCap            Decimal?
+  currency             String?
+  periodType           String
+  periodEndDate        DateTime
+  source               String
+  ingestionTimestamp   DateTime @default(now())
+  lastUpdatedTimestamp DateTime @updatedAt
+  dataStatus           String   @default("PARTIAL")
+
+  @@unique([stockId, periodType, periodEndDate, source])
+  @@index([stockId, periodEndDate])
+  @@map("fundamentals")
+}
+
+model CorporateAction {
+  id                   String   @id @default(cuid())
+  stockId              String
+  stock                Stock    @relation(fields: [stockId], references: [id], onDelete: Cascade)
+  actionType           String
+  effectiveDate        DateTime
+  declaredDate         DateTime?
+  paymentDate          DateTime?
+  amount               Decimal?
+  splitRatio           Decimal?
+  currency             String?
+  source               String
+  ingestionTimestamp   DateTime @default(now())
+  lastUpdatedTimestamp DateTime @updatedAt
+  dataStatus           String   @default("COMPLETE")
+
+  @@unique([stockId, actionType, effectiveDate, source])
+  @@index([stockId, effectiveDate])
+  @@map("corporate_actions")
+}
+
+model FxRate {
+  id                   String   @id @default(cuid())
+  pair                 String   @unique
+  baseCurrency         String
+  quoteCurrency        String
+  rate                 Decimal
+  rateTimestamp        DateTime
+  source               String
+  ingestionTimestamp   DateTime @default(now())
+  lastUpdatedTimestamp DateTime @updatedAt
+  dataStatus           String   @default("COMPLETE")
+
+  @@index([baseCurrency, quoteCurrency])
+  @@map("fx_rates")
 }
 
 model Portfolio {

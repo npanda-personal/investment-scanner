@@ -58,6 +58,9 @@ export const createMarketDataV1Router = (
   router.get('/prices/:instrumentId/latest', controller.getInstrumentLatestPrice);
   router.get('/fundamentals/:instrumentId', controller.getInstrumentFundamentals);
   router.get('/corporate-actions/:instrumentId', controller.getInstrumentCorporateActions);
+  router.get('/fx-rates', controller.listFxRates);
+  router.get('/fx-rates/:pair', controller.getFxRate);
+  router.post('/fx-rates/sync', controller.syncFxRates);
   router.post('/ingestion/sync', controller.syncV1);
 
   return router;

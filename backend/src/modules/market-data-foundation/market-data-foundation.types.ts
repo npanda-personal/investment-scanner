@@ -5,7 +5,19 @@ export interface HistoricalPrice {
   high: number;
   low: number;
   close: number;
+  adjustedClose?: number | null;
   volume?: number;
+}
+
+export type MarketDataStatus = 'COMPLETE' | 'PARTIAL' | 'DELAYED' | 'MISSING' | 'ERROR';
+
+export interface SyncSummary {
+  rowsReceived: number;
+  rowsInserted: number;
+  rowsUpdated: number;
+  rowsSkipped: number;
+  warningCount: number;
+  warnings: string[];
 }
 
 export interface RegionInfo {
@@ -21,11 +33,36 @@ export interface SearchResult {
   region?: string;
 }
 
+export interface CompanyMasterData {
+  symbol: string;
+  companyName: string | null;
+  exchange: string | null;
+  country: string | null;
+  sector: string | null;
+  industry: string | null;
+  currency: string | null;
+  marketCap: number | null;
+  assetType: string | null;
+  isDelisted: boolean | null;
+  ipoDate: Date | null;
+  source: string;
+  dataStatus: MarketDataStatus;
+}
+
 export interface CreateStockRequest {
   symbol: string;
   name: string;
   region: string;
   exchange?: string;
+  country?: string | null;
+  sector?: string | null;
+  industry?: string | null;
+  currency?: string | null;
+  marketCap?: number | null;
+  assetType?: string | null;
+  isDelisted?: boolean;
+  ipoDate?: Date | null;
+  isin?: string | null;
 }
 
 export interface V1CreateInstrumentRequest {
@@ -35,6 +72,11 @@ export interface V1CreateInstrumentRequest {
   currency: string;
   asset_type: string;
   isin?: string;
+  country?: string;
+  sector?: string;
+  industry?: string;
+  market_cap?: number;
+  ipo_date?: string;
 }
 
 export interface V1Instrument {
@@ -42,13 +84,20 @@ export interface V1Instrument {
   symbol: string;
   company_name: string;
   exchange: string | null;
+  country: string | null;
+  sector: string | null;
+  industry: string | null;
   currency: string;
+  market_cap: number | null;
   asset_type: string;
+  is_active: boolean;
+  is_delisted: boolean;
+  ipo_date: string | null;
   isin: string | null;
   source: string;
   ingestion_timestamp: string;
   last_updated_timestamp: string;
-  data_status: 'COMPLETE' | 'PARTIAL' | 'DELAYED';
+  data_status: MarketDataStatus;
 }
 
 export interface V1IngestionRequest {
@@ -68,6 +117,7 @@ export interface V1SyncResult {
   pricesStored?: boolean;
   fundamentalsAvailable?: boolean;
   corporateActionsAvailable?: boolean;
+  syncSummary?: SyncSummary;
   errors?: string[];
 }
 
@@ -90,7 +140,13 @@ export interface PaginationOptions {
 export interface CoreFundamentals {
   symbol: string;
   revenue: number | null;
+  eps: number | null;
   earnings: number | null;
+  dividendYield: number | null;
+  sharesOutstanding: number | null;
+  marketCap: number | null;
+  currency: string | null;
+  periodType: string;
   ratios: {
     trailingPe: number | null;
     forwardPe: number | null;
@@ -107,10 +163,25 @@ export type CorporateActionType = 'dividend' | 'split';
 
 export interface CorporateAction {
   symbol: string;
-  type: CorporateActionType;
+  type: CorporateActionType | 'reverse_split';
   date: string;
   value: number | string;
+  declaredDate?: string | null;
+  paymentDate?: string | null;
+  amount?: number | null;
+  splitRatio?: number | null;
+  currency?: string | null;
   source: string;
+}
+
+export interface FxRateInput {
+  pair: string;
+  baseCurrency: string;
+  quoteCurrency: string;
+  rate: number;
+  rateTimestamp: Date;
+  source: string;
+  dataStatus?: MarketDataStatus;
 }
 
 export interface ValidationResult<T> {

@@ -143,9 +143,14 @@ const InstrumentDetailPage: React.FC = () => {
           <Typography variant="h4">{instrument.symbol}</Typography>
           <Typography color="text.secondary">{instrument.company_name}</Typography>
         </Box>
-        <Button variant="contained" startIcon={<SyncIcon />} onClick={handleSync} disabled={syncing}>
-          {syncing ? 'Syncing...' : 'Sync Market Data'}
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+          <Button variant="outlined" onClick={() => navigate(`/research/stocks/${instrument.id}`)}>
+            Research
+          </Button>
+          <Button variant="contained" startIcon={<SyncIcon />} onClick={handleSync} disabled={syncing}>
+            {syncing ? 'Syncing...' : 'Sync Market Data'}
+          </Button>
+        </Box>
       </Box>
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
@@ -214,8 +219,13 @@ const InstrumentDetailPage: React.FC = () => {
             <TableCell>{record.period_type}</TableCell>
             <TableCell>{formatDate(record.period_end_date)}</TableCell>
             <TableCell align="right">{formatNumber(record.revenue)}</TableCell>
+            <TableCell align="right">{formatNumber(record.eps)}</TableCell>
             <TableCell align="right">{formatNumber(record.net_income)}</TableCell>
             <TableCell align="right">{formatNumber(record.pe_ratio)}</TableCell>
+            <TableCell align="right">{formatNumber(record.dividend_yield)}</TableCell>
+            <TableCell align="right">{formatNumber(record.shares_outstanding)}</TableCell>
+            <TableCell align="right">{formatNumber(record.market_cap)}</TableCell>
+            <TableCell>{record.currency || 'N/A'}</TableCell>
             <TableCell>{record.source}</TableCell>
             <TableCell>{record.data_status}</TableCell>
           </TableRow>
@@ -227,9 +237,12 @@ const InstrumentDetailPage: React.FC = () => {
           <TableRow key={`${action.action_type}-${action.effective_date}-${action.value}`}>
             <TableCell>{action.action_type}</TableCell>
             <TableCell>{formatDate(action.effective_date)}</TableCell>
+            <TableCell>{action.declared_date ? formatDate(action.declared_date) : 'N/A'}</TableCell>
+            <TableCell>{action.payment_date ? formatDate(action.payment_date) : 'N/A'}</TableCell>
             <TableCell>{formatNumber(action.value)}</TableCell>
             <TableCell>{formatNumber(action.ratio)}</TableCell>
             <TableCell>{formatNumber(action.amount)}</TableCell>
+            <TableCell>{action.currency || 'N/A'}</TableCell>
             <TableCell>{action.source}</TableCell>
             <TableCell>{action.data_status}</TableCell>
           </TableRow>
@@ -265,8 +278,13 @@ const TableSection: React.FC<{ title: string; children: React.ReactNode }> = ({ 
                 <TableCell>Period</TableCell>
                 <TableCell>Period End</TableCell>
                 <TableCell align="right">Revenue</TableCell>
+                <TableCell align="right">EPS</TableCell>
                 <TableCell align="right">Net Income</TableCell>
                 <TableCell align="right">PE Ratio</TableCell>
+                <TableCell align="right">Dividend Yield</TableCell>
+                <TableCell align="right">Shares</TableCell>
+                <TableCell align="right">Market Cap</TableCell>
+                <TableCell>Currency</TableCell>
                 <TableCell>Source</TableCell>
                 <TableCell>Status</TableCell>
               </>
@@ -275,9 +293,12 @@ const TableSection: React.FC<{ title: string; children: React.ReactNode }> = ({ 
               <>
                 <TableCell>Type</TableCell>
                 <TableCell>Effective Date</TableCell>
+                <TableCell>Declared Date</TableCell>
+                <TableCell>Payment Date</TableCell>
                 <TableCell>Value</TableCell>
                 <TableCell>Ratio</TableCell>
                 <TableCell>Amount</TableCell>
+                <TableCell>Currency</TableCell>
                 <TableCell>Source</TableCell>
                 <TableCell>Status</TableCell>
               </>
