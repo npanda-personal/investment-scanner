@@ -39,6 +39,11 @@ export default function HomePage() {
           <Typography color="text.secondary" sx={{ mb: 2 }}>Review alert rules and in-app monitoring events.</Typography>
           <Button component={Link} to="/alerts">Open</Button>
         </Paper>
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="h6">Market Context Intelligence</Typography>
+          <Typography color="text.secondary" sx={{ mb: 2 }}>Understand regime, sector rotation, breadth, country strength, and macro context.</Typography>
+          <Button component={Link} to="/market-context">Open</Button>
+        </Paper>
       </Box>
     </Box>
   );

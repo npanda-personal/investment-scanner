@@ -164,6 +164,8 @@ Signal cards also expose an `Add to Watchlist` action. The action uses the Watch
 
 Signal cards expose a `Create Alert` action for stock signal score alerts through the Alerts & Monitoring public frontend exports.
 
+The Signal Generation dashboard includes a compact Market Context Intelligence widget showing the current market regime and score.
+
 The Stock Research Workbench includes a compact signal widget with score, direction, confidence, top reasons, generated timestamp, and link to the full signals page.
 
 The dashboard and cards link stocks to `/research/stocks/:id`.

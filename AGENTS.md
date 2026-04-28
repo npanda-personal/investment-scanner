@@ -43,6 +43,7 @@ Current modules include:
 - portfolio-intelligence
 - watchlist-management
 - alerts-monitoring
+- market-context-intelligence
 
 # Important Current State
 
@@ -338,6 +339,7 @@ Frontend:
 - Signal cards may open Alerts & Monitoring rule dialogs through public frontend exports.
 - Stock Research Workbench may expose action buttons that consume public frontend feature exports, such as adding an instrument to a watchlist.
 - Alert/status badges should use existing MUI `Chip` severity colors unless a shared design-system component is introduced later.
+- Market context dashboards should use compact cards, `Chip` status labels, and concise takeaway lists rather than large tables.
 - These integrations must not import backend repositories or frontend feature internals directly.
 
 # Final Principle

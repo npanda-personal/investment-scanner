@@ -3,6 +3,7 @@ import { Alert, Box, Button, CircularProgress, MenuItem, Paper, TextField, Typog
 import { fetchSignalScreener, fetchTopSignals, runSignals } from '../api/signalGenerationEngineService';
 import { SignalCard } from './SignalCard';
 import type { SignalDirection, SignalResult } from '../types';
+import { MarketRegimeWidget } from '@/features/market-context-intelligence';
 
 const SignalSection: React.FC<{ title: string; signals: SignalResult[] }> = ({ title, signals }) => (
   <Paper sx={{ p: 2 }}>
@@ -85,6 +86,8 @@ const SignalsDashboardPage: React.FC = () => {
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
+      <MarketRegimeWidget />
+
       <Paper sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2 }}>
           <TextField select label="Direction" value={direction} onChange={(event) => setDirection(event.target.value as SignalDirection | '')}>
@@ -117,4 +120,3 @@ const SignalsDashboardPage: React.FC = () => {
 };
 
 export default SignalsDashboardPage;
-

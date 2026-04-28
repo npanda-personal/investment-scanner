@@ -9,6 +9,7 @@ import { portfolioManagementRouter } from '../modules/portfolio-management';
 import { portfolioIntelligenceRouter } from '../modules/portfolio-intelligence';
 import { watchlistManagementRouter } from '../modules/watchlist-management';
 import { alertsMonitoringRouter } from '../modules/alerts-monitoring';
+import { marketContextIntelligenceRouter } from '../modules/market-context-intelligence';
 
 export interface ApiModule {
   path: string;
@@ -23,6 +24,7 @@ export const apiModules: ApiModule[] = [
   { path: '/api/v1', router: portfolioIntelligenceRouter },
   { path: '/api/v1', router: watchlistManagementRouter },
   { path: '/api/v1', router: alertsMonitoringRouter },
+  { path: '/api/v1', router: marketContextIntelligenceRouter },
   { path: '/api/market-data-foundation', router: marketDataFoundationRouter },
 ];
 
