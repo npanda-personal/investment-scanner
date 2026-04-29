@@ -50,6 +50,10 @@ export class YahooFinanceIngestionService {
     return null;
   }
 
+  private toDate(value: unknown): Date {
+    return value instanceof Date ? value : new Date(value as any);
+  }
+
   /**
    * Infer region and exchange from symbol (basic heuristic).
    * This can be extended with a proper mapping.
@@ -125,16 +129,16 @@ export class YahooFinanceIngestionService {
     };
 
     try {
-      // yahooFinance.historical returns an array of historical quotes
-      const result = (await this.yahooFinance.historical(symbol, queryOptions)) as any[];
-      const prices = result.map((item: any) => ({
+      const result = await this.yahooFinance.chart(symbol, { ...queryOptions, return: 'array' });
+      const quotes = Array.isArray(result?.quotes) ? result.quotes : [];
+      const prices = quotes.map((item: any) => ({
         symbol,
-        date: item.date,
+        date: this.toDate(item.date),
         open: item.open,
         high: item.high,
         low: item.low,
         close: item.close,
-        adjustedClose: item.adjClose ?? item.adjclose ?? item.adjustedClose ?? null,
+        adjustedClose: item.adjClose ?? item.adjclose ?? item.adjustedClose ?? item.close ?? null,
         volume: item.volume,
       }));
       const validation = partitionHistoricalPrices(prices);
@@ -210,65 +214,43 @@ export class YahooFinanceIngestionService {
 
   async fetchCorporateActions(symbol: string): Promise<CorporateAction[]> {
     try {
-      const [dividendResult, splitResult] = await Promise.allSettled([
-        this.yahooFinance.historical(symbol, {
-          period1: new Date('1970-01-01'),
-          period2: new Date(),
-          events: 'dividends',
-        }),
-        this.yahooFinance.historical(symbol, {
-          period1: new Date('1970-01-01'),
-          period2: new Date(),
-          events: 'split',
-        }),
-      ]);
-
-      if (dividendResult.status === 'rejected') {
-        console.warn(`Failed to fetch dividends for ${symbol}:`, dividendResult.reason);
-      }
-      if (splitResult.status === 'rejected') {
-        console.warn(`Failed to fetch splits for ${symbol}:`, splitResult.reason);
-      }
-
-      const dividendRows = dividendResult.status === 'fulfilled' ? dividendResult.value as any[] : [];
-      const splitRows = splitResult.status === 'fulfilled' ? splitResult.value as any[] : [];
-
-      const dividendActions = dividendRows.flatMap((row) => {
-        const date = row.date instanceof Date ? row.date.toISOString() : new Date(row.date).toISOString();
-        const actions: CorporateAction[] = [];
-
-        if (this.toNumber(row.dividends) !== null) {
-          actions.push({
-            symbol,
-            type: 'dividend',
-            date,
-            value: row.dividends,
-            amount: this.toNumber(row.dividends),
-            splitRatio: null,
-            currency: null,
-            source: 'yahoo',
-          });
-        }
-        if (row.stockSplits !== undefined && row.stockSplits !== null) {
-          const splitRatio = this.toNumber(row.stockSplits);
-          actions.push({
-            symbol,
-            type: splitRatio !== null && splitRatio > 0 && splitRatio < 1 ? 'reverse_split' : 'split',
-            date,
-            value: row.stockSplits,
-            amount: null,
-            splitRatio,
-            currency: null,
-            source: 'yahoo',
-          });
-        }
-
-        return actions;
+      const result = await this.yahooFinance.chart(symbol, {
+        period1: new Date('1970-01-01'),
+        period2: new Date(),
+        interval: '1d',
+        events: 'div|split',
+        return: 'array',
       });
 
-      const splitActions = splitRows.flatMap((row) => {
-        const date = row.date instanceof Date ? row.date.toISOString() : new Date(row.date).toISOString();
-        const splitRatio = this.toSplitRatio(row.stockSplits);
+      const dividendRows = Array.isArray(result?.events?.dividends) ? result.events.dividends : [];
+      const splitRows = Array.isArray(result?.events?.splits) ? result.events.splits : [];
+
+      const dividendActions = dividendRows.flatMap((row: any) => {
+        const date = this.toDate(row.date).toISOString();
+        const amount = this.toNumber(row.amount);
+        if (amount === null) {
+          return [];
+        }
+
+        return [{
+          symbol,
+          type: 'dividend',
+          date,
+          value: amount,
+          amount,
+          splitRatio: null,
+          currency: null,
+          source: 'yahoo',
+        } satisfies CorporateAction];
+      });
+
+      const splitActions = splitRows.flatMap((row: any) => {
+        const date = this.toDate(row.date).toISOString();
+        const splitRatio = this.toSplitRatio(row.splitRatio) ?? (
+          this.toNumber(row.numerator) !== null && this.toNumber(row.denominator) !== null && this.toNumber(row.denominator)! !== 0
+            ? this.toNumber(row.numerator)! / this.toNumber(row.denominator)!
+            : null
+        );
         if (splitRatio === null) {
           return [];
         }
@@ -277,7 +259,7 @@ export class YahooFinanceIngestionService {
           symbol,
           type: splitRatio > 0 && splitRatio < 1 ? 'reverse_split' : 'split',
           date,
-          value: row.stockSplits,
+          value: row.splitRatio ?? splitRatio,
           amount: null,
           splitRatio,
           currency: null,

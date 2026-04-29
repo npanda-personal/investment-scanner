@@ -90,12 +90,14 @@ model SignalResult {
   negativeSignals  Json
   explanation      String
   generatedAt      DateTime @default(now())
+  generatedDate    DateTime?
   modelVersion     String   @default("signal-engine-v1")
   source           String   @default("signal-generation-engine")
   dataStatus       String   @default("PARTIAL")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
+  @@unique([instrumentId, modelVersion, generatedDate])
   @@index([instrumentId, generatedAt])
   @@index([direction, score])
   @@index([sector])
@@ -128,6 +130,7 @@ model SignalCalibrationResult {
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
 
+  @@unique([signalResultId, calibrationModelVersion])
   @@index([instrumentId, generatedAt])
   @@index([calibratedDirection, calibratedScore])
   @@index([sector])

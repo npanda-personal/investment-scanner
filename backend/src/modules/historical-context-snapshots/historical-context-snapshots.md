@@ -33,6 +33,16 @@ Prisma models:
 
 Snapshot dates are normalized to UTC midnight. Unique keys prevent duplicate snapshots for the same date/context pair.
 
+Natural keys:
+
+- `MarketContextSnapshot`: `snapshotDate`
+- `SectorContextSnapshot`: `snapshotDate + sector`
+- `CountryContextSnapshot`: `snapshotDate + country`
+- `SmartMoneyContextSnapshot`: `snapshotDate + instrumentId`
+- `DataQualitySnapshot`: `snapshotDate + instrumentId`
+
+Repeated snapshot generation uses upsert behavior and returns inserted/updated/skipped counts. It should not create duplicate logical snapshots for the same UTC day.
+
 ## Generation Behavior
 
 `POST /context-snapshots/generate`:

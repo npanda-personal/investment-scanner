@@ -24,7 +24,7 @@ describe('MarketDataFoundationRepository', () => {
     const summary = await repository.storeHistorical([
       {
         symbol: 'AAPL',
-        date: new Date('2025-01-01T00:00:00.000Z'),
+        date: new Date('2025-01-01T15:30:00.000Z'),
         open: 100,
         high: 110,
         low: 95,
@@ -43,6 +43,7 @@ describe('MarketDataFoundationRepository', () => {
     ], () => ({ region: 'US', exchange: 'NASDAQ' }));
 
     expect(upsert).toHaveBeenCalledTimes(2);
+    expect(upsert.mock.calls[0][0].where.symbol_timestamp.timestamp).toEqual(new Date('2025-01-01T00:00:00.000Z'));
     expect(summary).toMatchObject({
       rowsReceived: 2,
       rowsInserted: 1,
@@ -86,7 +87,7 @@ describe('MarketDataFoundationRepository', () => {
     );
 
     await repository.upsertCorporateActions('stock-1', [
-      { symbol: 'AAPL', type: 'dividend', date: '2026-01-02T00:00:00.000Z', value: 0.25, amount: 0.25, source: 'yahoo' },
+      { symbol: 'AAPL', type: 'dividend', date: '2026-01-02T18:15:00.000Z', value: 0.25, amount: 0.25, source: 'yahoo' },
     ]);
 
     await repository.upsertFxRate({
@@ -100,6 +101,9 @@ describe('MarketDataFoundationRepository', () => {
 
     expect(prisma.fundamental.upsert).toHaveBeenCalledTimes(1);
     expect(prisma.corporateAction.upsert).toHaveBeenCalledTimes(1);
+    expect(prisma.corporateAction.upsert.mock.calls[0][0].where.stockId_actionType_effectiveDate_source.effectiveDate).toEqual(
+      new Date('2026-01-02T00:00:00.000Z')
+    );
     expect(prisma.fxRate.upsert).toHaveBeenCalledTimes(1);
   });
 });

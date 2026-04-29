@@ -43,6 +43,12 @@ The MVP uses one latest row per instrument via upsert on `instrumentId`. This ke
 
 Stored fields include coverage score/status, signal readiness score/status, liquidity score/status, eligibility flags, gaps, warnings, readiness reasons/blockers, and evaluation timestamp.
 
+Natural key:
+
+- `instrumentId`
+
+Repeated evaluations update the latest row for the instrument. They do not create historical duplicates. Modules that need point-in-time readiness should use Historical Context Snapshots, which persists separate `DataQualitySnapshot` rows by snapshot date.
+
 ## Coverage Methodology
 
 Coverage score is `0-100` and considers:

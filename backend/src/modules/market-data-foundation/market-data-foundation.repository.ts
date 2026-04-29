@@ -308,6 +308,8 @@ export class MarketDataFoundationRepository {
       };
     }
 
+    prices = prices.map((price) => ({ ...price, date: this.normalizeUtcDay(price.date) }));
+
     const regionInfo = inferRegion(prices[0].symbol);
     const latest = prices.reduce((prev, current) =>
       prev.date > current.date ? prev : current
@@ -479,7 +481,7 @@ export class MarketDataFoundationRepository {
 
   async upsertCorporateActions(stockId: string, actions: CorporateAction[]) {
     const operations = actions.map((action) => {
-      const effectiveDate = new Date(action.date);
+      const effectiveDate = this.normalizeUtcDay(action.date);
       return (this.prisma as any).corporateAction.upsert({
         where: {
           stockId_actionType_effectiveDate_source: {
@@ -552,6 +554,10 @@ export class MarketDataFoundationRepository {
   }
 
   private normalizePeriodEndDate(value: string | Date): Date {
+    return this.normalizeUtcDay(value);
+  }
+
+  private normalizeUtcDay(value: string | Date): Date {
     const date = value instanceof Date ? new Date(value) : new Date(value);
     date.setUTCHours(0, 0, 0, 0);
     return date;

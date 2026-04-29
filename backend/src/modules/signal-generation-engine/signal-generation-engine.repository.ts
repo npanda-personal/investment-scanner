@@ -6,26 +6,39 @@ export class SignalGenerationEngineRepository {
   constructor(private readonly db = prisma) {}
 
   async createSignalResult(result: SignalResultDto): Promise<SignalResultDto> {
-    const created = await this.db.signalResult.create({
-      data: {
-        instrumentId: result.instrument_id,
-        symbol: result.symbol,
-        companyName: result.company_name,
-        sector: result.sector,
-        country: result.country,
-        score: result.score,
-        direction: result.direction,
-        confidence: result.confidence,
-        triggeredSignals: result.triggered_signals as unknown as Prisma.InputJsonValue,
-        negativeSignals: result.negative_signals as unknown as Prisma.InputJsonValue,
-        explanation: result.explanation,
-        generatedAt: new Date(result.generated_at),
-        modelVersion: result.modelVersion || 'signal-engine-v1',
-        source: result.source,
-        dataStatus: result.data_status,
+    const generatedAt = new Date(result.generated_at);
+    const generatedDate = this.normalizeUtcDay(generatedAt);
+    const modelVersion = result.modelVersion || 'signal-engine-v1';
+    const data = {
+      instrumentId: result.instrument_id,
+      symbol: result.symbol,
+      companyName: result.company_name,
+      sector: result.sector,
+      country: result.country,
+      score: result.score,
+      direction: result.direction,
+      confidence: result.confidence,
+      triggeredSignals: result.triggered_signals as unknown as Prisma.InputJsonValue,
+      negativeSignals: result.negative_signals as unknown as Prisma.InputJsonValue,
+      explanation: result.explanation,
+      generatedAt,
+      generatedDate,
+      modelVersion,
+      source: result.source,
+      dataStatus: result.data_status,
+    };
+    const saved = await this.db.signalResult.upsert({
+      where: {
+        instrumentId_modelVersion_generatedDate: {
+          instrumentId: result.instrument_id,
+          modelVersion,
+          generatedDate,
+        },
       },
+      create: data,
+      update: data,
     });
-    return this.toDto(created);
+    return this.toDto(saved);
   }
 
   async latestForInstrument(instrumentId: string): Promise<SignalResultDto | null> {
@@ -127,6 +140,12 @@ export class SignalGenerationEngineRepository {
     return [...result.triggered_signals, ...result.negative_signals].some((signal) =>
       signal.code.toLowerCase().includes(needle) || signal.category.toLowerCase() === needle
     );
+  }
+
+  private normalizeUtcDay(value: Date): Date {
+    const date = new Date(value);
+    date.setUTCHours(0, 0, 0, 0);
+    return date;
   }
 
   private toDto(record: any): SignalResultDto {

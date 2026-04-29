@@ -129,6 +129,14 @@ Prisma model:
 
 Stored fields include raw score/direction/confidence, calibrated score/direction/confidence, boosts, penalties, reasons, gaps, calibration model version, raw signal model version, and timestamps.
 
+Calibration results are idempotent for a raw signal/model pair. Recalibrating the same `SignalResult` with the same `calibrationModelVersion` updates the existing row instead of creating duplicate calibrated results.
+
+Natural key:
+
+- `signalResultId + calibrationModelVersion`
+
+The migration `202604290008_stock_data_idempotency` removes duplicate calibration rows for the same natural key by keeping the most recently updated row before adding the database uniqueness constraint.
+
 ## Transparency
 
 Frontend route:

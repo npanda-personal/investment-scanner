@@ -6,31 +6,39 @@ export class SignalCalibrationEngineRepository {
   constructor(private readonly db = prisma) {}
 
   async create(result: SignalCalibrationResultDto): Promise<SignalCalibrationResultDto> {
-    const created = await this.db.signalCalibrationResult.create({
-      data: {
-        signalResultId: result.signalResultId,
-        instrumentId: result.instrumentId,
-        symbol: result.symbol,
-        companyName: result.companyName,
-        sector: result.sector,
-        country: result.country,
-        rawScore: result.rawScore,
-        calibratedScore: result.calibratedScore,
-        scoreDelta: result.scoreDelta,
-        rawDirection: result.rawDirection,
-        calibratedDirection: result.calibratedDirection,
-        rawConfidence: result.rawConfidence,
-        calibratedConfidence: result.calibratedConfidence,
-        boosts: result.boosts as unknown as Prisma.InputJsonValue,
-        penalties: result.penalties as unknown as Prisma.InputJsonValue,
-        calibrationReasons: result.calibrationReasons as unknown as Prisma.InputJsonValue,
-        dataGaps: result.dataGaps as unknown as Prisma.InputJsonValue,
-        calibrationModelVersion: result.calibrationModelVersion,
-        rawSignalModelVersion: result.rawSignalModelVersion,
-        generatedAt: new Date(result.generatedAt),
+    const data = {
+      signalResultId: result.signalResultId,
+      instrumentId: result.instrumentId,
+      symbol: result.symbol,
+      companyName: result.companyName,
+      sector: result.sector,
+      country: result.country,
+      rawScore: result.rawScore,
+      calibratedScore: result.calibratedScore,
+      scoreDelta: result.scoreDelta,
+      rawDirection: result.rawDirection,
+      calibratedDirection: result.calibratedDirection,
+      rawConfidence: result.rawConfidence,
+      calibratedConfidence: result.calibratedConfidence,
+      boosts: result.boosts as unknown as Prisma.InputJsonValue,
+      penalties: result.penalties as unknown as Prisma.InputJsonValue,
+      calibrationReasons: result.calibrationReasons as unknown as Prisma.InputJsonValue,
+      dataGaps: result.dataGaps as unknown as Prisma.InputJsonValue,
+      calibrationModelVersion: result.calibrationModelVersion,
+      rawSignalModelVersion: result.rawSignalModelVersion,
+      generatedAt: new Date(result.generatedAt),
+    };
+    const saved = await this.db.signalCalibrationResult.upsert({
+      where: {
+        signalResultId_calibrationModelVersion: {
+          signalResultId: result.signalResultId,
+          calibrationModelVersion: result.calibrationModelVersion,
+        },
       },
+      create: data,
+      update: data,
     });
-    return this.toDto(created);
+    return this.toDto(saved);
   }
 
   async latestForInstrument(instrumentId: string): Promise<SignalCalibrationResultDto | null> {

@@ -140,6 +140,8 @@ MVP rules:
 
 `SignalResult.modelVersion` was added with default value `signal-engine-v1`. Existing rows receive this default through the migration.
 
+Signal Generation now also persists a normalized `generatedDate` for new rows. Signal results are daily idempotent by `instrumentId + modelVersion + generatedDate`, so repeated same-day manual generation updates the logical signal instead of inflating historical outcome samples.
+
 ## Frontend
 
 Frontend feature:

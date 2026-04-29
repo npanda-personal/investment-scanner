@@ -362,6 +362,7 @@ Frontend:
 - Data Quality Engine owns data coverage, liquidity, and signal-readiness evaluations. It consumes Market Data Foundation through public exports and should expose batch-safe evaluation flows for downstream modules.
 - Long-running universe workflows should expose `batchSize` plus `offset`/cursor progress metadata and let the frontend run sequential batches, refresh visible data after each batch, and keep action buttons in a disabled loading state until complete.
 - Downstream modules may consume Data Quality Engine public filtering helpers to skip or warn on low-readiness instruments, but they must not duplicate readiness, coverage, or liquidity scoring logic.
+- Persisted stock-data models must document whether they are append-only or idempotent/upserted. Idempotent models need a clear natural key, date/timestamp normalization where relevant, repository-level upsert/skip behavior, and database uniqueness where practical.
 - These integrations must not import backend repositories or frontend feature internals directly.
 
 # Final Principle

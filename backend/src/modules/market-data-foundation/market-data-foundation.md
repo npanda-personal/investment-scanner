@@ -153,8 +153,10 @@ Implemented validations:
 - Abnormal price spikes are skipped using `MARKET_DATA_SPIKE_THRESHOLD`, defaulting to `0.5`.
 - Malformed historical price rows are skipped with warnings before storage.
 - Price storage uses Prisma upsert on `symbol + timestamp`.
+- Historical daily price timestamps are normalized to UTC midnight before duplicate checks and upsert, so repeated syncs for the same trading day update one `PriceTick`.
 - Historical ingestion checks stored price coverage. If the oldest stored price is not near the 15-year backfill start, the sync backfills history instead of trusting a prior `lastSuccessfulDataLoadTimestamp`.
 - Fundamentals storage normalizes `periodEndDate` to UTC midnight before upsert so repeated provider snapshots for the same period update one row instead of creating duplicates.
+- Corporate action effective dates are normalized to UTC midnight before upsert.
 - Manual `/api/v1/ingestion/sync` accepts either `symbol` or `instrumentId`, throttles provider calls, catches provider failures, persists available data, and can return partial success.
 
 Sync responses include:
@@ -174,18 +176,45 @@ Data status values are normalized as:
 - `MISSING`
 - `ERROR`
 
+## Idempotent Persistence Rules
+
+Natural keys for stock-data records owned by this module:
+
+| Model | Natural key | Behavior |
+| --- | --- | --- |
+| `Stock` | `symbol` for current MVP | Upsert/update through instrument workflows; long-term risk is documented because `symbol + exchange` is preferred. |
+| `PriceTick` | `symbol + normalized daily timestamp` | Upsert; repeated historical sync updates existing bars. |
+| `LatestPrice` | `symbol` | Latest-only upsert. |
+| `Fundamental` | `stockId + periodType + normalized periodEndDate + source` | Upsert; repeated same-period provider snapshots update one row. |
+| `CorporateAction` | `stockId + actionType + normalized effectiveDate + source` | Upsert; amount/split ratio are updated on the logical action row. |
+| `FxRate` | `pair` | Latest-only upsert. |
+
+Project-level duplicate diagnostics are available in:
+
+- `backend/src/scripts/auditStockDataDuplicates.ts`
+
+The script runs in dry-run mode by default and can report duplicate logical groups across Market Data Foundation, signal, calibration, data-quality, and context snapshot tables. Use `--cleanup` only after reviewing samples.
+
 ## Data Sources
 
 Current provider:
 
 - Yahoo Finance via the free/open-source `yahoo-finance2` package.
 
+Historical price provider behavior:
+
+- Daily OHLCV history uses `yahoo-finance2` `chart()` directly with `interval: '1d'`.
+- The older `historical()` helper is not used, which avoids the Yahoo Finance deprecated historical API warning.
+- Chart quotes are mapped to the module's internal `HistoricalPrice` DTO: `date`, `open`, `high`, `low`, `close`, `adjustedClose`, and `volume`.
+- When Yahoo chart data does not include adjusted close, `adjustedClose` falls back to `close`, preserving the existing adjusted-close fallback behavior.
+- Malformed chart rows are partitioned by the existing historical price validation and skipped with warnings.
+
 Corporate action provider behavior:
 
-- Yahoo Finance historical events must be fetched separately.
-- Dividends use `events: 'dividends'`.
-- Splits use `events: 'split'`.
-- The module merges those result sets before persistence.
+- Yahoo Finance corporate actions use `chart()` with `events: 'div|split'`.
+- Dividend events map `amount` to dividend `value`/`amount`.
+- Split events map `splitRatio` or numerator/denominator into persisted split ratios.
+- Declared date and payment date remain nullable because Yahoo chart events do not reliably provide them.
 
 FX support:
 

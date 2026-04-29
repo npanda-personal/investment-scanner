@@ -28,14 +28,21 @@ Prisma model:
 
 - `SignalResult`
 
-Fields include instrument reference, symbol, company name, sector, country, score, direction, confidence, triggered signals JSON, negative signals JSON, explanation, generated timestamp, model version, source, data status, created timestamp, and updated timestamp.
+Fields include instrument reference, symbol, company name, sector, country, score, direction, confidence, triggered signals JSON, negative signals JSON, explanation, generated timestamp, normalized generated date, model version, source, data status, created timestamp, and updated timestamp.
 
 `modelVersion` defaults to `signal-engine-v1` and is exposed so Signal Quality Lab can measure results across model versions later.
 
-Results are append-only MVP daily/on-demand snapshots. Latest endpoints select the newest result per instrument.
+Results are daily idempotent MVP snapshots. Re-running generation for the same instrument, signal model version, and UTC trading day updates the existing row instead of creating duplicate logical results. This keeps Signal Quality Lab and Signal Calibration Engine from counting repeated manual runs as independent signal history.
+
+Natural key:
+
+- `instrumentId + modelVersion + generatedDate`
+
+`generatedDate` is normalized to UTC midnight. `generatedAt` remains the actual generation timestamp for display and ordering.
 
 Repository behavior:
 
+- `createSignalResult` upserts by the daily natural key.
 - `latestForInstrument` returns the newest persisted result for an instrument.
 - `latestSignals` reads persisted results, applies filters, collapses to the latest result per instrument, and sorts by score descending.
 - `GET /api/v1/signals/:instrumentId` calculates and persists on demand when no result exists yet.
@@ -206,7 +213,7 @@ Coverage includes:
 - MVP is daily/batch/on-demand only.
 - No real-time streaming, intraday signals, backtesting, portfolio recommendations, smart money, sector rotation, macro signals, analyst revisions, transcripts, options flow, or AI adaptive scoring.
 - Peer-aware signal quality depends on Epic 2 peer context being available.
-- Append-only signal snapshots may need a scheduled daily runner in a later epic.
+- Intraday signal snapshots are intentionally out of scope; the current model keeps one row per instrument/model/day.
 - No frontend component tests are configured.
 
 ## Verification

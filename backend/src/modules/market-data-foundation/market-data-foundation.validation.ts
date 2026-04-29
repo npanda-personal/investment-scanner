@@ -73,7 +73,8 @@ export const partitionHistoricalPrices = (
   return sorted.reduce<ValidationResult<HistoricalPrice>>(
     (result, price) => {
       const errors = validateHistoricalPrice(price);
-      const duplicateKey = `${price.symbol}:${price.date instanceof Date ? price.date.toISOString() : String(price.date)}`;
+      const duplicateDate = price.date instanceof Date && Number.isFinite(price.date.getTime()) ? price.date.toISOString() : String(price.date);
+      const duplicateKey = `${price.symbol}:${duplicateDate}`;
       if (seen.has(duplicateKey)) {
         errors.push('duplicate price bar in batch');
       }
