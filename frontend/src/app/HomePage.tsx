@@ -49,6 +49,11 @@ export default function HomePage() {
           <Typography color="text.secondary" sx={{ mb: 2 }}>Run daily close simulations for simple signal and trend strategies.</Typography>
           <Button component={Link} to="/backtests">Open</Button>
         </Paper>
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="h6">Smart Money Intelligence</Typography>
+          <Typography color="text.secondary" sx={{ mb: 2 }}>Review price-volume accumulation, distribution warnings, and sector flow context.</Typography>
+          <Button component={Link} to="/smart-money">Open</Button>
+        </Paper>
       </Box>
     </Box>
   );

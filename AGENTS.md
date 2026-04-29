@@ -45,6 +45,7 @@ Current modules include:
 - alerts-monitoring
 - market-context-intelligence
 - backtesting-strategy-lab
+- smart-money-intelligence
 
 # Important Current State
 
@@ -342,6 +343,7 @@ Frontend:
 - Alert/status badges should use existing MUI `Chip` severity colors unless a shared design-system component is introduced later.
 - Market context dashboards should use compact cards, `Chip` status labels, and concise takeaway lists rather than large tables.
 - Backtesting dashboards should use compact metric cards, bounded trade tables, and chart views that summarize historical simulations without exposing raw config JSON as the primary UI.
+- Smart money dashboards must clearly separate real price-volume signals from unavailable insider/institutional placeholders and should use status chips plus concise explanations.
 - These integrations must not import backend repositories or frontend feature internals directly.
 
 # Final Principle

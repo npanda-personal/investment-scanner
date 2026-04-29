@@ -11,6 +11,7 @@ import { watchlistManagementRouter } from '../modules/watchlist-management';
 import { alertsMonitoringRouter } from '../modules/alerts-monitoring';
 import { marketContextIntelligenceRouter } from '../modules/market-context-intelligence';
 import { backtestingStrategyLabRouter } from '../modules/backtesting-strategy-lab';
+import { smartMoneyIntelligenceRouter } from '../modules/smart-money-intelligence';
 
 export interface ApiModule {
   path: string;
@@ -27,6 +28,7 @@ export const apiModules: ApiModule[] = [
   { path: '/api/v1', router: alertsMonitoringRouter },
   { path: '/api/v1', router: marketContextIntelligenceRouter },
   { path: '/api/v1', router: backtestingStrategyLabRouter },
+  { path: '/api/v1', router: smartMoneyIntelligenceRouter },
   { path: '/api/market-data-foundation', router: marketDataFoundationRouter },
 ];
 

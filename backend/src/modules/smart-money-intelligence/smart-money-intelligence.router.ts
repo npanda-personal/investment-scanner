@@ -1,0 +1,19 @@
+import express from 'express';
+import { SmartMoneyIntelligenceController } from './smart-money-intelligence.controller';
+
+export const createSmartMoneyIntelligenceRouter = (
+  controller = new SmartMoneyIntelligenceController()
+) => {
+  const router = express.Router();
+
+  router.get('/smart-money/health', controller.health);
+  router.get('/smart-money/sectors', controller.sectors);
+  router.get('/smart-money/top', controller.top);
+  router.get('/smart-money/distribution', controller.distribution);
+  router.get('/smart-money/stocks/:instrumentId', controller.stock);
+
+  return router;
+};
+
+export const smartMoneyIntelligenceRouter = createSmartMoneyIntelligenceRouter();
+export default smartMoneyIntelligenceRouter;
