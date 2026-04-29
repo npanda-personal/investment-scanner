@@ -342,8 +342,45 @@ model AppUser {
   alertRules      AlertRule[]
   backtestRuns    BacktestRun[]
   backtestStrategies BacktestStrategy[]
+  notificationPreferences NotificationPreference?
+  notificationEvents NotificationEvent[]
 
   @@map("app_users")
+}
+
+model NotificationPreference {
+  id                         String   @id @default(cuid())
+  userId                     String   @unique
+  user                       AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailNotificationsEnabled  Boolean  @default(false)
+  alertEmailsEnabled         Boolean  @default(false)
+  dailyDigestEnabled         Boolean  @default(false)
+  weeklyDigestEnabled        Boolean  @default(false)
+  quietHoursStart            String?
+  quietHoursEnd              String?
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  @@map("notification_preferences")
+}
+
+model NotificationEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  user      AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  channel   String
+  title     String
+  message   String
+  payload   Json
+  status    String
+  error     String?
+  createdAt DateTime @default(now())
+  sentAt    DateTime?
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@map("notification_events")
 }
 
 model SubscriptionPlan {

@@ -15,6 +15,7 @@ import { smartMoneyIntelligenceRouter } from '../modules/smart-money-intelligenc
 import { aiInvestmentCopilotRouter } from '../modules/ai-investment-copilot';
 import { subscriptionBillingRouter } from '../modules/subscription-billing';
 import { authIdentityRouter } from '../modules/auth-identity';
+import { notificationsDeliveryRouter } from '../modules/notifications-delivery';
 
 export interface ApiModule {
   path: string;
@@ -35,6 +36,7 @@ export const apiModules: ApiModule[] = [
   { path: '/api/v1', router: smartMoneyIntelligenceRouter },
   { path: '/api/v1', router: aiInvestmentCopilotRouter },
   { path: '/api/v1', router: subscriptionBillingRouter },
+  { path: '/api/v1', router: notificationsDeliveryRouter },
   { path: '/api/market-data-foundation', router: marketDataFoundationRouter },
 ];
 

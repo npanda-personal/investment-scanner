@@ -49,6 +49,7 @@ Current modules include:
 - ai-investment-copilot
 - subscription-billing
 - auth-identity
+- notifications-delivery
 
 # Important Current State
 
@@ -350,6 +351,7 @@ Frontend:
 - Copilot summaries must be deterministic and cost-free by default, show source modules and data gaps, and include the research-support disclaimer instead of direct financial advice.
 - Subscription gates must stay centralized in `subscription-billing`; feature modules may call the public service but must not duplicate plan-limit logic.
 - Authenticated user context is provided by `auth-identity` through `requireAuth`; user-owned modules must filter by current user and may read legacy `userId = null` rows during migration.
+- Notification delivery should remain free/local-friendly by default. Use notification preferences and delivery records from `notifications-delivery`; paid/external delivery providers must be optional, env-driven, and disabled unless explicitly configured.
 - These integrations must not import backend repositories or frontend feature internals directly.
 
 # Final Principle

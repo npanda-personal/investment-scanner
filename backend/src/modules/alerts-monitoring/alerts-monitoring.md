@@ -6,6 +6,8 @@ Alerts & Monitoring owns in-app alert rules, manual/batch evaluation, and alert 
 
 It monitors stocks, signals, portfolios, and watchlists through public module services. It does not own email, push notifications, real-time streaming, broker execution, or scheduling in the MVP.
 
+Notification delivery is owned by `notifications-delivery`, which can build email-style alert digests from alert events through the public Alerts Monitoring service.
+
 ## Endpoints
 
 Mounted under `/api/v1`:
@@ -101,7 +103,7 @@ Cross-feature entry points:
 - Auth Identity now protects alert routes. New alert rules are owned by the authenticated user. Existing nullable-owner alert rules remain readable during migration.
 - Subscription Billing gates alert rule creation by plan limits.
 
-- Manual evaluation only; no scheduler, WebSocket, email, or push.
+- Manual evaluation only; no scheduler, WebSocket, or push. Email-style digest delivery is handled separately by `notifications-delivery`.
 - No historical crossing-state memory beyond duplicate active-event suppression.
 - Rule form is MVP-oriented and expects IDs for portfolio/watchlist rules.
 - Alert count badge in global navigation is not implemented yet.

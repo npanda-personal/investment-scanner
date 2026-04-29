@@ -43,6 +43,8 @@ Integrated checks:
 - backtest run creation
 - copilot summary generation
 
+Notifications Delivery currently uses only local/log delivery and does not enforce plan gates. Future SMTP or external providers should be gated here centrally rather than duplicating subscription logic inside `notifications-delivery`.
+
 The gate error message is user-facing and points users to the billing page.
 
 ## Usage Counters

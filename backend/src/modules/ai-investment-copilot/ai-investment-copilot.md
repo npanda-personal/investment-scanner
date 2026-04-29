@@ -72,6 +72,8 @@ Alert digest uses:
 
 - `alerts-monitoring`
 
+Notifications Delivery may reuse deterministic market brief and alert digest summaries to compose local/email-log daily and weekly digests. Copilot remains the summary layer; Notifications Delivery owns preferences, delivery records, and provider behavior.
+
 All cross-module access is through public module exports only.
 
 ## Safety Language Rules

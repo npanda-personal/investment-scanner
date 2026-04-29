@@ -33,6 +33,7 @@ import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import PsychologyIcon from '@mui/icons-material/Psychology';
 import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import MarkEmailReadIcon from '@mui/icons-material/MarkEmailRead';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import { useThemeMode } from './ThemeContext';
@@ -53,6 +54,7 @@ const navItems = [
   { path: '/smart-money', label: 'Smart Money', icon: <AccountTreeIcon /> },
   { path: '/copilot', label: 'AI Copilot', icon: <PsychologyIcon /> },
   { path: '/billing', label: 'Billing', icon: <WorkspacePremiumIcon /> },
+  { path: '/notifications', label: 'Notifications', icon: <MarkEmailReadIcon /> },
   { path: '/account', label: 'Account', icon: <AccountCircleIcon /> },
 ];
 

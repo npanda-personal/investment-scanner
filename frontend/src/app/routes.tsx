@@ -13,6 +13,7 @@ import { smartMoneyIntelligenceRoutes } from '@/features/smart-money-intelligenc
 import { aiInvestmentCopilotRoutes } from '@/features/ai-investment-copilot';
 import { subscriptionBillingRoutes } from '@/features/subscription-billing';
 import { protectedAuthIdentityRoutes, ProtectedRoute, publicAuthIdentityRoutes } from '@/features/auth-identity';
+import { notificationsDeliveryRoutes } from '@/features/notifications-delivery';
 
 export const appRoutes: RouteObject[] = [
   ...publicAuthIdentityRoutes,
@@ -36,6 +37,7 @@ export const appRoutes: RouteObject[] = [
           ...smartMoneyIntelligenceRoutes,
           ...aiInvestmentCopilotRoutes,
           ...subscriptionBillingRoutes,
+          ...notificationsDeliveryRoutes,
           ...protectedAuthIdentityRoutes,
         ],
       },
