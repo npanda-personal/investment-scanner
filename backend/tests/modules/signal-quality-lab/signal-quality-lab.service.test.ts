@@ -36,7 +36,10 @@ const prices: PricePoint[] = Array.from({ length: 70 }).map((_, index) => ({
 function serviceWithSignals(signals: SignalResultDto[]) {
   return new SignalQualityLabService(
     { recalculate: jest.fn().mockResolvedValue({ persistedOutcomes: false }) } as any,
-    { signalHistory: jest.fn().mockResolvedValue(signals) } as any,
+    {
+      signalHistory: jest.fn().mockImplementation((query) => signals.slice(query.offset ?? 0, (query.offset ?? 0) + query.limit)),
+      signalHistoryCount: jest.fn().mockResolvedValue(signals.length),
+    } as any,
     {
       listPricesByInstrumentId: jest.fn().mockResolvedValue({
         prices: prices.map((price) => ({ date: price.date, adjusted_close: price.adjustedClose })),
@@ -96,6 +99,23 @@ describe('signal quality lab service', () => {
     const service = serviceWithSignals([baseSignal({ id: 's1' })]);
     const rows = await service.byRegime({ horizon: '5D', limit: 10, minSampleSize: 0 });
     expect(rows[0]).toMatchObject({ group: 'RISK_ON', sampleSize: 1 });
+  });
+
+  it('returns batch-safe recalculation progress metadata', async () => {
+    const service = serviceWithSignals([baseSignal({ id: 's1' }), baseSignal({ id: 's2' })]);
+    const result = await service.recalculate({ batchSize: 1, offset: 0 });
+    expect(result).toMatchObject({
+      processedCount: 1,
+      totalCount: 2,
+      batchSize: 1,
+      offset: 0,
+      inserted: 0,
+      updated: 0,
+      skipped: 1,
+      nextOffset: 1,
+      hasMore: true,
+    });
+    expect(result.warnings[0]).toContain('on demand');
   });
 
   it('detects failed bullish, failed bearish, low confidence, stale, and flip noise', () => {

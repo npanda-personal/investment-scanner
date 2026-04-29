@@ -22,6 +22,7 @@ import { useSignalQualityLab } from '../hooks';
 import type { QualityHorizon, QualityMetricGroup, SignalHistoryItem, SignalOutcomeSet, SignalTypePerformance } from '../types';
 
 const horizons: QualityHorizon[] = ['1D', '5D', '10D', '20D', '60D'];
+const DEFAULT_BATCH_SIZE = 25;
 const percent = (value: number | null | undefined) => value === null || value === undefined ? 'N/A' : `${(value * 100).toFixed(2)}%`;
 const number = (value: number | null | undefined) => value === null || value === undefined ? 'N/A' : value.toLocaleString();
 
@@ -75,6 +76,7 @@ const SignalQualityLabPage: React.FC = () => {
   const [outcomes, setOutcomes] = useState<SignalOutcomeSet[]>([]);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [recalculating, setRecalculating] = useState(false);
   const { summary, byType, bySector, byRegime, noisy, loading, error, reload } = useSignalQualityLab(horizon);
 
   const loadInstrument = async () => {
@@ -92,9 +94,33 @@ const SignalQualityLabPage: React.FC = () => {
   };
 
   const recalculate = async () => {
-    const result = await recalculateSignalQuality();
-    setActionMessage(result.message);
-    await reload();
+    setFormError(null);
+    setActionMessage(null);
+    setRecalculating(true);
+    let offset = 0;
+    let batch = 0;
+    let processedTotal = 0;
+    try {
+      while (true) {
+        const result = await recalculateSignalQuality({ batchSize: DEFAULT_BATCH_SIZE, offset });
+        batch += 1;
+        processedTotal = result.offset + result.processedCount;
+        setActionMessage(
+          `Batch ${batch} complete. Processed ${Math.min(processedTotal, result.totalCount)} / ${result.totalCount} signal records. ` +
+          `Skipped ${result.skipped}. Warnings: ${result.warnings.length}.`
+        );
+        await reload();
+        if (!result.hasMore || result.nextOffset === null) {
+          setActionMessage(`Signal quality recalculation complete. Processed ${Math.min(processedTotal, result.totalCount)} / ${result.totalCount} signal records.`);
+          break;
+        }
+        offset = result.nextOffset;
+      }
+    } catch (err: any) {
+      setFormError(err.response?.data?.error || err.message || 'Signal quality recalculation failed');
+    } finally {
+      setRecalculating(false);
+    }
   };
 
   if (loading && !summary) {
@@ -112,7 +138,15 @@ const SignalQualityLabPage: React.FC = () => {
           <TextField select size="small" label="Horizon" value={horizon} onChange={(event) => setHorizon(event.target.value as QualityHorizon)}>
             {horizons.map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
           </TextField>
-          <Button variant="outlined" onClick={recalculate}>Recalculate</Button>
+          <Button component={Link} to="/signals/calibration" variant="outlined">Calibration Engine</Button>
+          <Button
+            variant="outlined"
+            onClick={recalculate}
+            disabled={recalculating}
+            startIcon={recalculating ? <CircularProgress size={16} /> : undefined}
+          >
+            {recalculating ? 'Recalculating' : 'Recalculate'}
+          </Button>
         </Stack>
       </Stack>
 

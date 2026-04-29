@@ -14,6 +14,27 @@ export interface QualityQuery {
   minSampleSize: number;
 }
 
+export interface QualityRecalculateRequest {
+  batchSize: number;
+  offset: number;
+  from?: string;
+  to?: string;
+}
+
+export interface QualityRecalculateResponse {
+  processedCount: number;
+  totalCount: number;
+  batchSize: number;
+  offset: number;
+  nextOffset: number | null;
+  hasMore: boolean;
+  inserted: number;
+  updated: number;
+  skipped: number;
+  warnings: string[];
+  durationMs: number;
+}
+
 export interface SignalHistoryItem extends SignalResultDto {
   signalResultId: string;
   researchUrl: string;

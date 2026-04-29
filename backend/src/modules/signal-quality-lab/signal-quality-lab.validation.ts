@@ -27,6 +27,18 @@ export function requireInstrumentId(value: unknown): string {
   return value.trim();
 }
 
+export function parseQualityRecalculateRequest(input: any): { batchSize: number; offset: number; from?: string; to?: string } {
+  const from = validDate(input?.from) ? input.from : undefined;
+  const to = validDate(input?.to) ? input.to : undefined;
+  if (from && to && new Date(from).getTime() > new Date(to).getTime()) throw new Error('from must be before to');
+  return {
+    batchSize: clampInt(input?.batchSize, 25, 1, 100),
+    offset: clampInt(input?.offset ?? input?.cursor, 0, 0, Number.MAX_SAFE_INTEGER),
+    from,
+    to,
+  };
+}
+
 function clampInt(value: unknown, fallback: number, min: number, max: number): number {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return fallback;

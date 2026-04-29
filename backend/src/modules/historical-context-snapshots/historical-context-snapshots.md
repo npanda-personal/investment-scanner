@@ -75,6 +75,8 @@ Signal Quality Lab now uses this module to group `/signals/quality/by-regime` by
 
 If no snapshots exist, Signal Quality Lab keeps returning the documented `MISSING_REGIME_CONTEXT` grouping.
 
+Signal Calibration Engine also uses lookup results for regime, sector leadership, smart-money, and data-quality adjustments.
+
 ## Limitations
 
 - Manual generation only; no cron scheduler.

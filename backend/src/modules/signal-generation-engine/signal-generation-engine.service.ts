@@ -84,6 +84,18 @@ export class SignalGenerationEngineService {
     return this.repository.signalHistory(query);
   }
 
+  async signalHistoryCount(query: Omit<SignalHistoryQuery, 'limit'>) {
+    return this.repository.signalHistoryCount(query);
+  }
+
+  async latestSignalUniverse(query: SignalQuery) {
+    return this.repository.latestSignalUniverse(query);
+  }
+
+  async latestSignalUniverseCount(query: Omit<SignalQuery, 'limit'>) {
+    return this.repository.latestSignalUniverseCount(query);
+  }
+
   async generateForInstrument(instrumentId: string): Promise<SignalResultDto | null> {
     const [instrument, pricesResponse, fundamentalsResponse, research] = await Promise.all([
       this.marketDataService.getInstrument(instrumentId),

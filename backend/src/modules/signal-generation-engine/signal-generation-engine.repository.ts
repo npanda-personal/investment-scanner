@@ -57,6 +57,35 @@ export class SignalGenerationEngineRepository {
     return [...latestByInstrument.values()].sort((a, b) => b.score - a.score);
   }
 
+  async latestSignalUniverse(query: SignalQuery): Promise<SignalResultDto[]> {
+    const results = await this.db.signalResult.findMany({
+      where: {
+        direction: query.direction,
+        score: query.minScore !== undefined ? { gte: query.minScore } : undefined,
+        sector: query.sector ? { equals: query.sector, mode: 'insensitive' } : undefined,
+        country: query.country ? { equals: query.country, mode: 'insensitive' } : undefined,
+      },
+      orderBy: [{ instrumentId: 'asc' }, { generatedAt: 'desc' }],
+      distinct: ['instrumentId'],
+      skip: query.offset ?? 0,
+      take: query.limit,
+    });
+    return results.map((item) => this.toDto(item)).filter((result) => !query.signalType || this.hasSignal(result, query.signalType));
+  }
+
+  async latestSignalUniverseCount(query: Omit<SignalQuery, 'limit'>): Promise<number> {
+    const groups = await this.db.signalResult.groupBy({
+      by: ['instrumentId'],
+      where: {
+        direction: query.direction,
+        score: query.minScore !== undefined ? { gte: query.minScore } : undefined,
+        sector: query.sector ? { equals: query.sector, mode: 'insensitive' } : undefined,
+        country: query.country ? { equals: query.country, mode: 'insensitive' } : undefined,
+      },
+    });
+    return groups.length;
+  }
+
   async signalHistory(query: SignalHistoryQuery): Promise<SignalResultDto[]> {
     const results = await this.db.signalResult.findMany({
       where: {
@@ -72,8 +101,25 @@ export class SignalGenerationEngineRepository {
       },
       orderBy: { generatedAt: 'desc' },
       take: query.limit,
+      skip: query.offset ?? 0,
     });
     return results.map((item) => this.toDto(item)).filter((result) => !query.signalType || this.hasSignal(result, query.signalType));
+  }
+
+  async signalHistoryCount(query: Omit<SignalHistoryQuery, 'limit'>): Promise<number> {
+    return this.db.signalResult.count({
+      where: {
+        instrumentId: query.instrumentId,
+        direction: query.direction,
+        score: query.minScore !== undefined ? { gte: query.minScore } : undefined,
+        sector: query.sector ? { equals: query.sector, mode: 'insensitive' } : undefined,
+        country: query.country ? { equals: query.country, mode: 'insensitive' } : undefined,
+        generatedAt: {
+          gte: query.from ? new Date(query.from) : undefined,
+          lte: query.to ? new Date(query.to) : undefined,
+        },
+      },
+    });
   }
 
   private hasSignal(result: SignalResultDto, signalType: string): boolean {

@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { SignalQualityLabService } from './signal-quality-lab.service';
-import { parseQualityQuery, requireInstrumentId } from './signal-quality-lab.validation';
+import { parseQualityQuery, parseQualityRecalculateRequest, requireInstrumentId } from './signal-quality-lab.validation';
 
 export class SignalQualityLabController {
   constructor(private readonly service = new SignalQualityLabService()) {}
@@ -45,8 +45,8 @@ export class SignalQualityLabController {
     catch (error) { return this.error(res, error, 'Failed to load signal outcomes', 400); }
   };
 
-  recalculate = async (_req: Request, res: Response) => {
-    try { return res.json(await this.service.recalculate()); }
+  recalculate = async (req: Request, res: Response) => {
+    try { return res.json(await this.service.recalculate(parseQualityRecalculateRequest({ ...req.query, ...(req.body || {}) }))); }
     catch (error) { return this.error(res, error, 'Failed to recalculate signal outcomes', 400); }
   };
 

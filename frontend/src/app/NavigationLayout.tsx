@@ -36,6 +36,7 @@ import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import MarkEmailReadIcon from '@mui/icons-material/MarkEmailRead';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import TuneIcon from '@mui/icons-material/Tune';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import { useThemeMode } from './ThemeContext';
@@ -49,6 +50,7 @@ const navItems = [
   { path: '/market-data-foundation', label: 'Market Data Foundation', icon: <InventoryIcon /> },
   { path: '/signals', label: 'Signals', icon: <InsightsIcon /> },
   { path: '/signals/quality', label: 'Signal Quality', icon: <FactCheckIcon /> },
+  { path: '/signals/calibration', label: 'Signal Calibration', icon: <TuneIcon /> },
   { path: '/portfolios', label: 'Portfolios', icon: <AccountBalanceWalletIcon /> },
   { path: '/watchlists', label: 'Watchlists', icon: <StarBorderIcon /> },
   { path: '/alerts', label: 'Alerts', icon: <NotificationsNoneIcon /> },

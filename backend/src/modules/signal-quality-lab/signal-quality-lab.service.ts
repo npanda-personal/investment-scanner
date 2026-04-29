@@ -10,6 +10,8 @@ import type {
   QualityHorizon,
   QualityMetricGroup,
   QualityQuery,
+  QualityRecalculateRequest,
+  QualityRecalculateResponse,
   QualitySummary,
   SignalHistoryItem,
   SignalOutcomeSet,
@@ -30,7 +32,7 @@ const STALE_SIGNAL_DAYS = 7;
 
 export class SignalQualityLabService {
   constructor(
-    private readonly repository = new SignalQualityLabRepository(),
+    _repository = new SignalQualityLabRepository(),
     private readonly signalService = new SignalGenerationEngineService(),
     private readonly marketDataService = new MarketDataFoundationService(),
     private readonly historicalContextService = new HistoricalContextSnapshotsService()
@@ -103,8 +105,40 @@ export class SignalQualityLabService {
     return this.detectNoisySignals(signals, await this.outcomesForSignals(signals));
   }
 
-  recalculate() {
-    return this.repository.recalculate();
+  async recalculate(input: QualityRecalculateRequest): Promise<QualityRecalculateResponse> {
+    const started = Date.now();
+    const batchSize = this.clampInt(input.batchSize, 25, 1, 100);
+    const offset = this.clampInt(input.offset, 0, 0, Number.MAX_SAFE_INTEGER);
+    const [totalCount, signals] = await Promise.all([
+      this.signalService.signalHistoryCount({ from: input.from, to: input.to }),
+      this.signalService.signalHistory({
+        limit: batchSize,
+        offset,
+        from: input.from,
+        to: input.to,
+      }),
+    ]);
+    const processedCount = signals.length;
+    const nextOffset = offset + processedCount;
+    return {
+      processedCount,
+      totalCount,
+      batchSize,
+      offset,
+      nextOffset: nextOffset < totalCount ? nextOffset : null,
+      hasMore: nextOffset < totalCount,
+      inserted: 0,
+      updated: 0,
+      skipped: processedCount,
+      warnings: ['Signal Quality Lab outcomes are calculated on demand; no cached rows were persisted.'],
+      durationMs: Date.now() - started,
+    };
+  }
+
+  private clampInt(value: unknown, fallback: number, min: number, max: number): number {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return fallback;
+    return Math.min(max, Math.max(min, Math.trunc(numeric)));
   }
 
   async loadSignals(query: QualityQuery): Promise<SignalResultDto[]> {

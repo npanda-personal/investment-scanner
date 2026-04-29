@@ -20,7 +20,7 @@ Mounted under `/api/v1`:
 | GET | `/signals/quality/noisy` | Noisy/churning signal diagnostics |
 | GET | `/signals/:instrumentId/history` | Historical signal results for one instrument |
 | GET | `/signals/:instrumentId/outcomes` | Forward-return outcomes for one instrument |
-| POST | `/signals/quality/recalculate` | No-op recalculation response because outcomes are on demand |
+| POST | `/signals/quality/recalculate` | Batch-safe recalculation/progress response because outcomes are on demand |
 
 Supported query params:
 
@@ -34,6 +34,40 @@ Supported query params:
 - `minSampleSize`
 
 Limits are clamped to safe bounds.
+
+## Batch Recalculation
+
+`POST /signals/quality/recalculate` is intentionally batch-safe so the frontend does not ask the backend to process the entire signal universe in one request.
+
+Request body or query params:
+
+- `batchSize`: default `25`, clamped from `1` to `100`
+- `offset` or `cursor`: default `0`
+- `from` optional signal generated-at lower bound
+- `to` optional signal generated-at upper bound
+
+Response fields:
+
+- `processedCount`
+- `totalCount`
+- `batchSize`
+- `offset`
+- `nextOffset`
+- `hasMore`
+- `inserted`
+- `updated`
+- `skipped`
+- `warnings`
+- `durationMs`
+
+Outcomes are still calculated on demand in this MVP, so the endpoint pages through signal records, reports progress metadata, and returns `inserted = 0`, `updated = 0`, and `skipped = processedCount`. Malformed or unsupported future cached-outcome work should return warnings without turning completed batches into a full failure.
+
+Frontend behavior:
+
+- The `/signals/quality` Recalculate button runs batches sequentially.
+- The button shows a spinner and remains disabled while the loop is active.
+- After every successful batch, the dashboard refetches summary, type, sector, regime, and noisy-signal data.
+- If one batch fails, the loop stops and leaves already completed batches intact.
 
 ## Outcome Methodology
 
@@ -100,6 +134,8 @@ Route:
 - `/signals/quality`
 
 The dashboard shows quality summary cards, performance by signal type, performance by sector, regime context state, noisy signals, and instrument-level signal history/outcomes.
+
+The dashboard links to `/signals/calibration`, where Signal Calibration Engine applies explainable score and confidence adjustments using these measured outcomes.
 
 ## Historical Context Integration
 

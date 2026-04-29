@@ -18,6 +18,7 @@ import { authIdentityRouter } from '../modules/auth-identity';
 import { notificationsDeliveryRouter } from '../modules/notifications-delivery';
 import { signalQualityLabRouter } from '../modules/signal-quality-lab';
 import { historicalContextSnapshotsRouter } from '../modules/historical-context-snapshots';
+import { signalCalibrationEngineRouter } from '../modules/signal-calibration-engine';
 
 export interface ApiModule {
   path: string;
@@ -41,6 +42,7 @@ export const apiModules: ApiModule[] = [
   { path: '/api/v1', router: notificationsDeliveryRouter },
   { path: '/api/v1', router: signalQualityLabRouter },
   { path: '/api/v1', router: historicalContextSnapshotsRouter },
+  { path: '/api/v1', router: signalCalibrationEngineRouter },
   { path: '/api/market-data-foundation', router: marketDataFoundationRouter },
 ];
 

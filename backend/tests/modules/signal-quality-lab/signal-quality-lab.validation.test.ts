@@ -1,5 +1,5 @@
 /// <reference types="@types/jest" />
-import { parseQualityQuery, requireInstrumentId } from '../../../src/modules/signal-quality-lab';
+import { parseQualityQuery, parseQualityRecalculateRequest, requireInstrumentId } from '../../../src/modules/signal-quality-lab';
 
 describe('signal quality lab validation', () => {
   it('parses and clamps query params', () => {
@@ -22,5 +22,17 @@ describe('signal quality lab validation', () => {
   it('requires instrument id', () => {
     expect(() => requireInstrumentId('')).toThrow('instrumentId is required');
     expect(requireInstrumentId('abc')).toBe('abc');
+  });
+
+  it('parses recalculation batch request and clamps batch size', () => {
+    expect(parseQualityRecalculateRequest({ batchSize: '999', offset: '10' })).toMatchObject({
+      batchSize: 100,
+      offset: 10,
+    });
+    expect(parseQualityRecalculateRequest({ cursor: '5', batchSize: '0' })).toMatchObject({
+      batchSize: 1,
+      offset: 5,
+    });
+    expect(() => parseQualityRecalculateRequest({ from: '2026-02-01', to: '2026-01-01' })).toThrow('from must be before to');
   });
 });

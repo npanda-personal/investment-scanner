@@ -48,6 +48,7 @@ export interface SignalQuery {
   direction?: SignalDirection;
   minScore?: number;
   limit: number;
+  offset?: number;
   sector?: string;
   country?: string;
   signalType?: string;

@@ -1,5 +1,15 @@
 import axios from 'axios';
-import type { NoisySignalItem, QualityHorizon, QualityMetricGroup, QualitySummary, SignalHistoryItem, SignalOutcomeSet, SignalTypePerformance } from '../types';
+import type {
+  NoisySignalItem,
+  QualityHorizon,
+  QualityMetricGroup,
+  QualityRecalculateRequest,
+  QualityRecalculateResponse,
+  QualitySummary,
+  SignalHistoryItem,
+  SignalOutcomeSet,
+  SignalTypePerformance,
+} from '../types';
 
 const API_BASE = '/api/v1/signals';
 
@@ -40,7 +50,7 @@ export async function fetchSignalOutcomes(instrumentId: string): Promise<SignalO
   return response.data.items;
 }
 
-export async function recalculateSignalQuality(): Promise<{ persistedOutcomes: boolean; message: string; recalculatedAt: string }> {
-  const response = await axios.post(`${API_BASE}/quality/recalculate`);
+export async function recalculateSignalQuality(input: QualityRecalculateRequest = {}): Promise<QualityRecalculateResponse> {
+  const response = await axios.post<QualityRecalculateResponse>(`${API_BASE}/quality/recalculate`, input);
   return response.data;
 }

@@ -102,6 +102,38 @@ model SignalResult {
   @@map("signal_results")
 }
 
+model SignalCalibrationResult {
+  id                       String   @id @default(cuid())
+  signalResultId           String
+  instrumentId             String
+  symbol                   String
+  companyName              String?
+  sector                   String?
+  country                  String?
+  rawScore                 Float
+  calibratedScore          Float
+  scoreDelta               Float
+  rawDirection             String
+  calibratedDirection      String
+  rawConfidence            String
+  calibratedConfidence     String
+  boosts                   Json
+  penalties                Json
+  calibrationReasons       Json
+  dataGaps                 Json
+  calibrationModelVersion  String
+  rawSignalModelVersion    String?
+  generatedAt              DateTime @default(now())
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@index([instrumentId, generatedAt])
+  @@index([calibratedDirection, calibratedScore])
+  @@index([sector])
+  @@index([country])
+  @@map("signal_calibration_results")
+}
+
 model Fundamental {
   id                   String   @id @default(cuid())
   stockId              String
