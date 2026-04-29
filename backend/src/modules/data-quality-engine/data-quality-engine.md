@@ -146,7 +146,22 @@ The dashboard shows summary cards, a batch evaluation runner, filterable instrum
 
 ## Downstream Integration
 
-No downstream engine behavior is changed in this MVP. Signal Generation, Signal Quality, Calibration, and Backtesting can consume these persisted evaluations in later passes. Missing evaluations do not block existing workflows.
+Public service methods:
+
+- `getLatestEvaluationForInstrument(instrumentId)`
+- `getEvaluationsForInstruments(instrumentIds)`
+- `filterEligibleInstruments(instrumentIds, options)`
+
+Downstream modules consume these methods through the module index and never import the repository directly.
+
+Current consumers:
+
+- Signal Generation can optionally filter batch runs by readiness/coverage/liquidity.
+- Signal Quality Lab can filter measured outcomes by readiness, coverage, liquidity, and signal-ready eligibility.
+- Signal Calibration applies bounded data-quality penalties and includes the latest evaluation in comparison responses.
+- Backtesting can optionally filter the universe before simulation and returns before/after metadata in metrics.
+
+Missing evaluations do not block existing workflows by default. Callers may opt into skip behavior.
 
 ## Known Limitations
 

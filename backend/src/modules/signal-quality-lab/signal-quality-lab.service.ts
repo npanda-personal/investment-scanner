@@ -1,6 +1,7 @@
 import { MarketDataFoundationService } from '../market-data-foundation';
 import { SignalGenerationEngineService, type SignalItem, type SignalResultDto } from '../signal-generation-engine';
 import { HistoricalContextSnapshotsService } from '../historical-context-snapshots';
+import { DataQualityEngineService } from '../data-quality-engine';
 import { SignalQualityLabRepository } from './signal-quality-lab.repository';
 import type {
   ForwardOutcome,
@@ -10,6 +11,7 @@ import type {
   QualityHorizon,
   QualityMetricGroup,
   QualityQuery,
+  DataQualityFilterSummary,
   QualityRecalculateRequest,
   QualityRecalculateResponse,
   QualitySummary,
@@ -35,7 +37,8 @@ export class SignalQualityLabService {
     _repository = new SignalQualityLabRepository(),
     private readonly signalService = new SignalGenerationEngineService(),
     private readonly marketDataService = new MarketDataFoundationService(),
-    private readonly historicalContextService = new HistoricalContextSnapshotsService()
+    private readonly historicalContextService = new HistoricalContextSnapshotsService(),
+    private readonly dataQualityService = new DataQualityEngineService()
   ) {}
 
   async history(instrumentId: string, query: QualityQuery): Promise<SignalHistoryItem[]> {
@@ -70,6 +73,7 @@ export class SignalQualityLabService {
       noisySignalCount: noisy.length,
       dataStatus: signals.length === 0 ? 'MISSING' : evaluated.length < signals.length ? 'PARTIAL' : 'COMPLETE',
       generatedAt: new Date().toISOString(),
+      dataQualityFilterSummary: await this.dataQualityFilterSummary(query),
     };
   }
 
@@ -86,6 +90,19 @@ export class SignalQualityLabService {
   async byScoreBucket(query: QualityQuery): Promise<QualityMetricGroup[]> {
     return this.groupMetrics(await this.outcomesForSignals(await this.loadSignals(query)), query.horizon, (item) => this.scoreBucket(item.score))
       .filter((item) => item.sampleSize >= query.minSampleSize);
+  }
+
+  async byDataQuality(query: QualityQuery): Promise<QualityMetricGroup[]> {
+    const signals = await this.loadSignals(query);
+    const outcomes = await this.outcomesForSignals(signals);
+    const evaluations = await this.dataQualityService.getEvaluationsForInstruments(signals.map((signal) => signal.instrument_id)).catch(() => []);
+    const byId = new Map(evaluations.map((evaluation) => [evaluation.instrumentId, evaluation]));
+    const groups = [
+      ...this.groupMetrics(outcomes, query.horizon, (item) => `coverage:${byId.get(item.instrumentId)?.coverageStatus || 'MISSING'}`),
+      ...this.groupMetrics(outcomes, query.horizon, (item) => `readiness:${byId.get(item.instrumentId)?.signalReadinessStatus || 'MISSING'}`),
+      ...this.groupMetrics(outcomes, query.horizon, (item) => `liquidity:${byId.get(item.instrumentId)?.liquidityStatus || 'MISSING'}`),
+    ];
+    return groups.filter((item) => item.sampleSize >= query.minSampleSize);
   }
 
   async byRegime(query: QualityQuery): Promise<QualityMetricGroup[]> {
@@ -142,7 +159,46 @@ export class SignalQualityLabService {
   }
 
   async loadSignals(query: QualityQuery): Promise<SignalResultDto[]> {
-    return this.signalService.signalHistory(query);
+    const signals = await this.signalService.signalHistory(query);
+    return this.applyDataQualityFilters(signals, query);
+  }
+
+  async dataQualityFilterSummary(query: QualityQuery): Promise<DataQualityFilterSummary> {
+    const filterApplied = this.qualityFilterApplied(query);
+    const before = await this.signalService.signalHistory(query);
+    if (!filterApplied) {
+      return { totalSignalsBeforeFilter: before.length, totalSignalsAfterFilter: before.length, excludedByDataQuality: 0, missingQualityEvaluationCount: 0, filterApplied: false };
+    }
+    const after = await this.applyDataQualityFilters(before, query);
+    const evaluations = await this.dataQualityService.getEvaluationsForInstruments(before.map((signal) => signal.instrument_id)).catch(() => []);
+    return {
+      totalSignalsBeforeFilter: before.length,
+      totalSignalsAfterFilter: after.length,
+      excludedByDataQuality: before.length - after.length,
+      missingQualityEvaluationCount: before.length - evaluations.length,
+      filterApplied: true,
+    };
+  }
+
+  private async applyDataQualityFilters(signals: SignalResultDto[], query: QualityQuery): Promise<SignalResultDto[]> {
+    if (!this.qualityFilterApplied(query)) return signals;
+    const evaluations = await this.dataQualityService.getEvaluationsForInstruments(signals.map((signal) => signal.instrument_id)).catch(() => []);
+    const byId = new Map(evaluations.map((evaluation) => [evaluation.instrumentId, evaluation]));
+    return signals.filter((signal) => {
+      const evaluation = byId.get(signal.instrument_id);
+      if (!evaluation) return true;
+      if (query.readinessStatus && evaluation.signalReadinessStatus !== query.readinessStatus) return false;
+      if (query.coverageStatus && evaluation.coverageStatus !== query.coverageStatus) return false;
+      if (query.liquidityStatus && evaluation.liquidityStatus !== query.liquidityStatus) return false;
+      if (query.minReadinessScore !== undefined && evaluation.signalReadinessScore < query.minReadinessScore) return false;
+      if (query.onlySignalReady && !evaluation.eligibleForSignals) return false;
+      if (query.excludePoorQuality && ['POOR', 'UNUSABLE'].includes(evaluation.coverageStatus)) return false;
+      return true;
+    });
+  }
+
+  private qualityFilterApplied(query: QualityQuery): boolean {
+    return Boolean(query.readinessStatus || query.coverageStatus || query.liquidityStatus || query.minReadinessScore !== undefined || query.onlySignalReady || query.excludePoorQuality);
   }
 
   async outcomesForSignals(signals: SignalResultDto[]): Promise<SignalOutcomeSet[]> {

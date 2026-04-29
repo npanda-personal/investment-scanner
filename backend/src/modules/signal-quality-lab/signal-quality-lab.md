@@ -17,6 +17,7 @@ Mounted under `/api/v1`:
 | GET | `/signals/quality/by-sector` | Performance grouped by sector |
 | GET | `/signals/quality/by-score` | Performance grouped by MVP score bucket |
 | GET | `/signals/quality/by-regime` | Performance grouped by historical market regime snapshot when available |
+| GET | `/signals/quality/by-data-quality` | Performance grouped by coverage, readiness, and liquidity status |
 | GET | `/signals/quality/noisy` | Noisy/churning signal diagnostics |
 | GET | `/signals/:instrumentId/history` | Historical signal results for one instrument |
 | GET | `/signals/:instrumentId/outcomes` | Forward-return outcomes for one instrument |
@@ -32,8 +33,24 @@ Supported query params:
 - `to`
 - `limit`
 - `minSampleSize`
+- `readinessStatus`
+- `coverageStatus`
+- `liquidityStatus`
+- `minReadinessScore`
+- `onlySignalReady`
+- `excludePoorQuality`
 
 Limits are clamped to safe bounds.
+
+## Data Quality Filters
+
+Signal Quality Lab can restrict measured outcomes to instruments with matching Data Quality Engine evaluations.
+
+Supported filters include readiness status, coverage status, liquidity status, minimum readiness score, signal-ready-only, and excluding poor/unusable coverage.
+
+The summary response includes `dataQualityFilterSummary` with before/after counts, exclusions, missing evaluation count, and whether a filter was applied. Missing data-quality evaluations are not excluded by default, so older signal history remains measurable unless callers opt into stricter filters elsewhere.
+
+The frontend exposes these filters and adds a Performance by Data Quality section.
 
 ## Batch Recalculation
 

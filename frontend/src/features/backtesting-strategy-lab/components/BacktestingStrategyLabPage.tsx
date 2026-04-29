@@ -8,6 +8,8 @@ import {
   CircularProgress,
   Divider,
   FormControl,
+  FormControlLabel,
+  Checkbox,
   InputLabel,
   MenuItem,
   Paper,
@@ -50,6 +52,11 @@ const defaultConfig: BacktestStrategyConfig = {
   fixedAmountPerTrade: 10000,
   maxPositions: 10,
   transactionCostPercent: 0.001,
+  useDataQualityFilter: false,
+  minSignalReadinessScore: 70,
+  excludeNotReady: true,
+  excludeIlliquid: true,
+  excludeMissingQuality: false,
 };
 
 const fmtMoney = (value: number | null | undefined) => value === null || value === undefined
@@ -182,6 +189,13 @@ export default function BacktestingStrategyLabPage() {
                 <TextField label="Max positions" type="number" value={config.maxPositions} onChange={(event) => updateConfig({ maxPositions: Number(event.target.value) })} size="small" fullWidth />
                 <TextField label="Cost %" type="number" value={config.transactionCostPercent * 100} onChange={(event) => updateConfig({ transactionCostPercent: Number(event.target.value) / 100 })} size="small" fullWidth />
               </Stack>
+              <FormControlLabel
+                control={<Checkbox checked={Boolean(config.useDataQualityFilter)} onChange={(event) => updateConfig({ useDataQualityFilter: event.target.checked })} />}
+                label="Use data quality filter"
+              />
+              {config.useDataQualityFilter && (
+                <TextField label="Minimum readiness score" type="number" value={config.minSignalReadinessScore ?? 70} onChange={(event) => updateConfig({ minSignalReadinessScore: Number(event.target.value) })} size="small" helperText="Filters instruments with insufficient, stale, or illiquid data." />
+              )}
               <FormControl size="small">
                 <InputLabel>Position size</InputLabel>
                 <Select label="Position size" value={config.positionSizeType} onChange={(event) => updateConfig({ positionSizeType: event.target.value as PositionSizeType })}>
@@ -296,6 +310,12 @@ function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: 
           </ResponsiveContainer>
         </Box>
       </Paper>
+      {metrics?.dataQualityMetadata && (
+        <Alert severity="info">
+          Data quality filter universe: {metrics.dataQualityMetadata.universeAfterDataQualityFilter} / {metrics.dataQualityMetadata.universeBeforeDataQualityFilter} included;
+          excluded {metrics.dataQualityMetadata.excludedForDataQuality}, missing evaluations {metrics.dataQualityMetadata.missingQualityEvaluationCount}.
+        </Alert>
+      )}
       <Paper sx={{ p: 2 }}>
         <Typography variant="h6" sx={{ mb: 1 }}>Trade Log</Typography>
         {run.trades.length === 0 ? <Typography color="text.secondary">No trades were generated for this configuration.</Typography> : (

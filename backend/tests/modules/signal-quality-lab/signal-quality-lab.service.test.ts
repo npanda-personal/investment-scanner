@@ -101,6 +101,34 @@ describe('signal quality lab service', () => {
     expect(rows[0]).toMatchObject({ group: 'RISK_ON', sampleSize: 1 });
   });
 
+  it('filters metrics by data quality readiness and groups by data quality', async () => {
+    const signals = [baseSignal({ id: 's1', instrument_id: 'ready' }), baseSignal({ id: 's2', instrument_id: 'limited' })];
+    const service = new SignalQualityLabService(
+      {} as any,
+      {
+        signalHistory: jest.fn().mockResolvedValue(signals),
+        signalHistoryCount: jest.fn().mockResolvedValue(signals.length),
+      } as any,
+      {
+        listPricesByInstrumentId: jest.fn().mockResolvedValue({
+          prices: prices.map((price) => ({ date: price.date, adjusted_close: price.adjustedClose })),
+        }),
+      } as any,
+      { regimeForDate: jest.fn().mockResolvedValue('RISK_ON') } as any,
+      {
+        getEvaluationsForInstruments: jest.fn().mockResolvedValue([
+          { instrumentId: 'ready', signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', signalReadinessScore: 90, eligibleForSignals: true },
+          { instrumentId: 'limited', signalReadinessStatus: 'LIMITED', coverageStatus: 'PARTIAL', liquidityStatus: 'THIN', signalReadinessScore: 60, eligibleForSignals: false },
+        ]),
+      } as any
+    );
+    const summary = await service.summary({ horizon: '5D', limit: 10, minSampleSize: 0, readinessStatus: 'READY' });
+    expect(summary.totalSignals).toBe(1);
+    expect(summary.dataQualityFilterSummary).toMatchObject({ totalSignalsBeforeFilter: 2, totalSignalsAfterFilter: 1, excludedByDataQuality: 1 });
+    const byDataQuality = await service.byDataQuality({ horizon: '5D', limit: 10, minSampleSize: 0 });
+    expect(byDataQuality.map((item) => item.group)).toEqual(expect.arrayContaining(['coverage:GOOD', 'readiness:READY', 'liquidity:LIQUID']));
+  });
+
   it('returns batch-safe recalculation progress metadata', async () => {
     const service = serviceWithSignals([baseSignal({ id: 's1' }), baseSignal({ id: 's2' })]);
     const result = await service.recalculate({ batchSize: 1, offset: 0 });

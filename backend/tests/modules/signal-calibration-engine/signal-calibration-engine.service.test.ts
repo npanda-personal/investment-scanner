@@ -95,6 +95,31 @@ describe('signal calibration engine service', () => {
     expect(result.calibratedConfidence).toBe('LOW');
   });
 
+  it('applies persisted data quality penalties and includes data quality in response', () => {
+    const result = service().instance.calibrate(rawSignal(), context({
+      dataQualityEvaluation: {
+        coverageScore: 25,
+        coverageStatus: 'UNUSABLE',
+        signalReadinessScore: 20,
+        signalReadinessStatus: 'NOT_READY',
+        liquidityScore: 10,
+        liquidityStatus: 'ILLIQUID',
+        eligibleForSignals: false,
+        eligibleForCalibration: false,
+        warnings: ['Adjusted close fallback'],
+        readinessBlockers: ['SMA200 requires at least 200 price rows.'],
+      } as any,
+    }));
+    expect(result.scoreDelta).toBeLessThan(0);
+    expect(result.penalties.map((item) => item.label)).toEqual(expect.arrayContaining(['Data quality coverage is unusable.', 'Signal readiness is not ready.', 'Liquidity quality is illiquid.']));
+    expect(result.dataQuality).toMatchObject({ coverageStatus: 'UNUSABLE', signalReadinessStatus: 'NOT_READY', liquidityStatus: 'ILLIQUID' });
+  });
+
+  it('adds a data gap without penalty when data quality evaluation is missing', () => {
+    const result = service().instance.calibrate(rawSignal(), context({ dataQualityEvaluation: null }));
+    expect(result.dataGaps).toContain('Missing latest Data Quality Engine evaluation.');
+  });
+
   it('clamps calibrated score to 0-100 and total delta to bounds', () => {
     const bullish = service().instance.calibrate(rawSignal({ score: 95 }), context());
     expect(bullish.calibratedScore).toBeLessThanOrEqual(100);

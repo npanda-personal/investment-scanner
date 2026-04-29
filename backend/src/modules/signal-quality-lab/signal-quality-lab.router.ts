@@ -11,6 +11,7 @@ export const createSignalQualityLabRouter = (controller = new SignalQualityLabCo
   router.get('/signals/quality/by-sector', controller.bySector);
   router.get('/signals/quality/by-score', controller.byScoreBucket);
   router.get('/signals/quality/by-regime', controller.byRegime);
+  router.get('/signals/quality/by-data-quality', controller.byDataQuality);
   router.get('/signals/quality/noisy', controller.noisy);
   router.get('/signals/:instrumentId/history', controller.history);
   router.get('/signals/:instrumentId/outcomes', controller.outcomes);

@@ -31,6 +31,12 @@ export function parseRunRequest(body: any): SignalRunRequest {
     direction: normalizeDirection(body?.direction),
     sector: typeof body?.sector === 'string' ? body.sector.trim() || undefined : undefined,
     country: typeof body?.country === 'string' ? body.country.trim() || undefined : undefined,
+    useDataQualityFilter: body?.useDataQualityFilter === true,
+    minSignalReadinessScore: Number.isFinite(Number(body?.minSignalReadinessScore)) ? Math.min(100, Math.max(0, Number(body.minSignalReadinessScore))) : undefined,
+    allowedReadinessStatuses: Array.isArray(body?.allowedReadinessStatuses) ? body.allowedReadinessStatuses : undefined,
+    includeLimited: body?.includeLimited === true,
+    skipUnusable: body?.skipUnusable !== undefined ? body.skipUnusable === true : undefined,
+    missingQualityBehavior: ['WARN_AND_PROCESS', 'SKIP'].includes(body?.missingQualityBehavior) ? body.missingQualityBehavior : undefined,
   };
 }
 
@@ -38,4 +44,3 @@ export function validateInstrumentId(instrumentId: string | undefined): string |
   if (!instrumentId || instrumentId.trim().length === 0) return 'instrumentId is required';
   return null;
 }
-

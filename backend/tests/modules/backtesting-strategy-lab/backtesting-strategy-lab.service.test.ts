@@ -53,9 +53,20 @@ const createService = (overrides: any = {}) => {
     ...overrides.marketDataService,
   };
   const watchlistService = { detail: jest.fn(), ...overrides.watchlistService };
+  const dataQualityService = {
+    filterEligibleInstruments: jest.fn().mockResolvedValue({
+      eligibleInstrumentIds: ['stock-1', 'stock-2'],
+      excludedInstrumentIds: [],
+      missingQualityEvaluationCount: 0,
+      warnings: [],
+      evaluationsByInstrumentId: {},
+    }),
+    ...overrides.dataQualityService,
+  };
   return {
-    service: new BacktestingStrategyLabService(repository as any, marketDataService as any, watchlistService as any, { assertAllowed: jest.fn(), recordUsage: jest.fn() } as any),
+    service: new BacktestingStrategyLabService(repository as any, marketDataService as any, watchlistService as any, { assertAllowed: jest.fn(), recordUsage: jest.fn() } as any, dataQualityService as any),
     repository,
+    dataQualityService,
   };
 };
 
@@ -113,5 +124,28 @@ describe('BacktestingStrategyLabService', () => {
 
     expect(repository.getStrategy).toHaveBeenCalledWith('strategy-1', 'default-user');
     expect(repository.createRun).toHaveBeenCalledWith(expect.objectContaining({ strategyId: 'strategy-1' }), 'default-user');
+  });
+
+  it('filters backtest universe by data quality when enabled and returns metadata', async () => {
+    const { service, dataQualityService } = createService({
+      dataQualityService: {
+        filterEligibleInstruments: jest.fn().mockResolvedValue({
+          eligibleInstrumentIds: ['stock-1'],
+          excludedInstrumentIds: ['stock-2'],
+          missingQualityEvaluationCount: 0,
+          warnings: [],
+          evaluationsByInstrumentId: {},
+        }),
+      },
+    });
+
+    const run = await service.run({ config: { ...config, useDataQualityFilter: true, minSignalReadinessScore: 70 } });
+
+    expect(dataQualityService.filterEligibleInstruments).toHaveBeenCalled();
+    expect(run.metrics?.dataQualityMetadata).toMatchObject({
+      universeBeforeDataQualityFilter: 2,
+      universeAfterDataQualityFilter: 1,
+      excludedForDataQuality: 1,
+    });
   });
 });

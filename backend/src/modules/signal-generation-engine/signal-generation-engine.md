@@ -62,6 +62,11 @@ Query and request behavior:
 - `sector` and `country`: exact case-insensitive repository filters for persisted results.
 - `signalType`: filters against signal code substrings or signal category names.
 - `POST /signals/run` accepts `instrumentId`, `symbol`, or a limited instrument universe. Symbol lookup uses Market Data Foundation public instrument search.
+- `POST /signals/run` optionally accepts `useDataQualityFilter`, `minSignalReadinessScore`, `allowedReadinessStatuses`, `includeLimited`, `skipUnusable`, and `missingQualityBehavior`.
+- Data-quality filtering is disabled by default for backward compatibility.
+- When enabled, Signal Generation consumes Data Quality Engine public service methods and skips instruments that are not eligible for signals, fail readiness thresholds, or have unusable coverage.
+- Missing quality evaluations default to `WARN_AND_PROCESS`; callers may set `missingQualityBehavior: "SKIP"`.
+- Run responses include `warnings` and a `dataQuality` summary with before/after counts and missing evaluation count.
 
 Signal response price fields:
 
@@ -157,6 +162,8 @@ Route:
 - `/signals`
 
 The dashboard shows top bullish signals, top bearish signals, momentum leaders, recently generated signals, a filterable screener, manual signal generation, empty states, loading states, and links to `/research/stocks/:id`.
+
+Manual signal generation includes an optional `Use data quality filter` checkbox. When enabled, the run skips instruments with insufficient, stale, illiquid, or unusable data according to Data Quality Engine evaluations and shows skipped/warning counts.
 
 Signal cards display current price, currency, daily price change, and daily percentage move with positive/negative visual styling. Missing price data is shown as unavailable rather than blocking the card.
 

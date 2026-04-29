@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Box, Button, CircularProgress, MenuItem, Paper, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Checkbox, CircularProgress, FormControlLabel, MenuItem, Paper, TextField, Typography } from '@mui/material';
 import { fetchSignalScreener, fetchTopSignals, runSignals } from '../api/signalGenerationEngineService';
 import { SignalCard } from './SignalCard';
 import type { SignalDirection, SignalResult } from '../types';
@@ -30,6 +30,8 @@ const SignalsDashboardPage: React.FC = () => {
   const [sector, setSector] = useState('');
   const [country, setCountry] = useState('');
   const [runLimit, setRunLimit] = useState('25');
+  const [useDataQualityFilter, setUseDataQualityFilter] = useState(false);
+  const [runMessage, setRunMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,8 +68,15 @@ const SignalsDashboardPage: React.FC = () => {
   const runManualSignals = () => {
     setRunning(true);
     setError(null);
-    runSignals({ limit: Number(runLimit) || 25 })
-      .then(load)
+    setRunMessage(null);
+    runSignals({ limit: Number(runLimit) || 25, useDataQualityFilter, minSignalReadinessScore: 70 })
+      .then((result) => {
+        const dq = result.dataQuality;
+        setRunMessage(dq?.filterApplied
+          ? `Generated ${result.generated}; skipped ${result.skipped}. Data quality excluded ${dq.excludedByDataQuality}, missing evaluations ${dq.missingQualityEvaluationCount}.`
+          : `Generated ${result.generated}; skipped ${result.skipped}.`);
+        load();
+      })
       .catch((err: any) => setError(err.response?.data?.error || err.message || 'Failed to run signals'))
       .finally(() => setRunning(false));
   };
@@ -81,12 +90,17 @@ const SignalsDashboardPage: React.FC = () => {
         </Box>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
           <TextField size="small" label="Run limit" value={runLimit} onChange={(event) => setRunLimit(event.target.value)} sx={{ width: 110 }} />
+          <FormControlLabel
+            control={<Checkbox checked={useDataQualityFilter} onChange={(event) => setUseDataQualityFilter(event.target.checked)} />}
+            label="Use data quality filter"
+          />
           <Button component={Link} to="/signals/quality" variant="outlined">View Signal Quality Lab</Button>
           <Button variant="contained" onClick={runManualSignals} disabled={running}>{running ? 'Running...' : 'Run Signals'}</Button>
         </Box>
       </Box>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {runMessage && <Alert severity="info" sx={{ mb: 2 }}>{runMessage}</Alert>}
 
       <MarketRegimeWidget />
 

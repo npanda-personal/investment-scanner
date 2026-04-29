@@ -82,6 +82,25 @@ export interface DataQualityEvaluateResponse {
   durationMs: number;
 }
 
+export interface DataQualityFilterOptions {
+  minSignalReadinessScore?: number;
+  allowedReadinessStatuses?: SignalReadinessStatus[];
+  includeLimited?: boolean;
+  skipUnusable?: boolean;
+  missingQualityBehavior?: 'WARN_AND_PROCESS' | 'SKIP';
+  excludeNotReady?: boolean;
+  excludeIlliquid?: boolean;
+  excludeMissingQuality?: boolean;
+}
+
+export interface DataQualityFilterResult {
+  eligibleInstrumentIds: string[];
+  excludedInstrumentIds: string[];
+  missingQualityEvaluationCount: number;
+  warnings: string[];
+  evaluationsByInstrumentId: Record<string, DataQualityEvaluationDto>;
+}
+
 export interface PriceForQuality {
   date: string | Date;
   close: number;

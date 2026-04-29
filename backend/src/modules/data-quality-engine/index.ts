@@ -9,6 +9,8 @@ export type {
   DataQualityEvaluateRequest,
   DataQualityEvaluateResponse,
   DataQualityEvaluationDto,
+  DataQualityFilterOptions,
+  DataQualityFilterResult,
   DataQualityQuery,
   DataQualityStatus,
   DataQualitySummary,

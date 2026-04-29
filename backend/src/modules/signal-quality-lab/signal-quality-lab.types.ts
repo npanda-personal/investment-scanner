@@ -12,6 +12,20 @@ export interface QualityQuery {
   to?: string;
   limit: number;
   minSampleSize: number;
+  readinessStatus?: 'READY' | 'LIMITED' | 'NOT_READY';
+  coverageStatus?: 'GOOD' | 'PARTIAL' | 'POOR' | 'UNUSABLE';
+  liquidityStatus?: 'LIQUID' | 'THIN' | 'ILLIQUID' | 'UNKNOWN';
+  minReadinessScore?: number;
+  onlySignalReady?: boolean;
+  excludePoorQuality?: boolean;
+}
+
+export interface DataQualityFilterSummary {
+  totalSignalsBeforeFilter: number;
+  totalSignalsAfterFilter: number;
+  excludedByDataQuality: number;
+  missingQualityEvaluationCount: number;
+  filterApplied: boolean;
 }
 
 export interface QualityRecalculateRequest {
@@ -110,6 +124,7 @@ export interface QualitySummary {
   noisySignalCount: number;
   dataStatus: 'COMPLETE' | 'PARTIAL' | 'MISSING';
   generatedAt: string;
+  dataQualityFilterSummary?: DataQualityFilterSummary;
 }
 
 export interface PricePoint {

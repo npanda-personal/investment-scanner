@@ -207,6 +207,19 @@ const SignalCalibrationEnginePage: React.FC = () => {
               <Typography>{comparison.calibratedSignal.calibratedScore} ({delta(comparison.calibratedSignal.scoreDelta)}) / {comparison.calibratedSignal.calibratedDirection} / {comparison.calibratedSignal.calibratedConfidence}</Typography>
               <Typography variant="body2" sx={{ mt: 1 }}>Boosts: {comparison.calibratedSignal.boosts.map((item) => item.label).join('; ') || 'None'}</Typography>
               <Typography variant="body2">Penalties: {comparison.calibratedSignal.penalties.map((item) => item.label).join('; ') || 'None'}</Typography>
+              {comparison.calibratedSignal.dataQuality && (
+                <Paper variant="outlined" sx={{ p: 1.5, mt: 1 }}>
+                  <Typography variant="body2" fontWeight={700}>Data Quality</Typography>
+                  <Typography variant="body2">
+                    Coverage {comparison.calibratedSignal.dataQuality.coverageScore} {comparison.calibratedSignal.dataQuality.coverageStatus};
+                    {' '}Readiness {comparison.calibratedSignal.dataQuality.signalReadinessScore} {comparison.calibratedSignal.dataQuality.signalReadinessStatus};
+                    {' '}Liquidity {comparison.calibratedSignal.dataQuality.liquidityStatus}.
+                  </Typography>
+                  {comparison.calibratedSignal.dataQuality.readinessBlockers.length > 0 && (
+                    <Typography color="text.secondary" variant="body2">Blockers: {comparison.calibratedSignal.dataQuality.readinessBlockers.join('; ')}</Typography>
+                  )}
+                </Paper>
+              )}
               {comparison.calibratedSignal.dataGaps.length > 0 && <Typography color="text.secondary" variant="body2">Gaps: {comparison.calibratedSignal.dataGaps.join('; ')}</Typography>}
             </Paper>
           </Box>

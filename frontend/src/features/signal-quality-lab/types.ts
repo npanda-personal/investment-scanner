@@ -15,6 +15,13 @@ export interface QualitySummary {
   noisySignalCount: number;
   dataStatus: 'COMPLETE' | 'PARTIAL' | 'MISSING';
   generatedAt: string;
+  dataQualityFilterSummary?: {
+    totalSignalsBeforeFilter: number;
+    totalSignalsAfterFilter: number;
+    excludedByDataQuality: number;
+    missingQualityEvaluationCount: number;
+    filterApplied: boolean;
+  };
 }
 
 export interface QualityMetricGroup {
@@ -29,6 +36,14 @@ export interface QualityMetricGroup {
   worstReturn: number | null;
   positiveCount: number;
   negativeCount: number;
+}
+
+export interface QualityFilters {
+  readinessStatus?: '' | 'READY' | 'LIMITED' | 'NOT_READY';
+  coverageStatus?: '' | 'GOOD' | 'PARTIAL' | 'POOR' | 'UNUSABLE';
+  liquidityStatus?: '' | 'LIQUID' | 'THIN' | 'ILLIQUID' | 'UNKNOWN';
+  onlySignalReady?: boolean;
+  excludePoorQuality?: boolean;
 }
 
 export interface SignalTypePerformance extends QualityMetricGroup {

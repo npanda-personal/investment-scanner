@@ -19,6 +19,14 @@ export class DataQualityEngineRepository {
     return evaluation ? this.toDto(evaluation) : null;
   }
 
+  async latestForInstruments(instrumentIds: string[]): Promise<DataQualityEvaluationDto[]> {
+    if (instrumentIds.length === 0) return [];
+    const evaluations = await this.db.dataQualityEvaluation.findMany({
+      where: { instrumentId: { in: instrumentIds } },
+    });
+    return evaluations.map((evaluation) => this.toDto(evaluation));
+  }
+
   async list(query: DataQualityQuery): Promise<DataQualityEvaluationDto[]> {
     const rows = await this.db.dataQualityEvaluation.findMany({
       where: this.where(query),

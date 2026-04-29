@@ -1,6 +1,7 @@
 import { HistoricalContextSnapshotsService } from '../historical-context-snapshots';
 import { SignalGenerationEngineService, type SignalResultDto } from '../signal-generation-engine';
 import { SignalQualityLabService, type QualityHorizon, type QualityMetricGroup, type SignalTypePerformance } from '../signal-quality-lab';
+import { DataQualityEngineService } from '../data-quality-engine';
 import { SignalCalibrationEngineRepository } from './signal-calibration-engine.repository';
 import type {
   CalibrationAdjustment,
@@ -25,7 +26,8 @@ export class SignalCalibrationEngineService {
     private readonly repository = new SignalCalibrationEngineRepository(),
     private readonly signalService = new SignalGenerationEngineService(),
     private readonly qualityService = new SignalQualityLabService(),
-    private readonly contextService = new HistoricalContextSnapshotsService()
+    private readonly contextService = new HistoricalContextSnapshotsService(),
+    private readonly dataQualityService = new DataQualityEngineService()
   ) {}
 
   async latestForInstrument(instrumentId: string): Promise<SignalCalibrationResultDto | null> {
@@ -140,6 +142,7 @@ export class SignalCalibrationEngineService {
     this.sectorLeadershipAdjustment(signal, context.sectorLeadership, add, context.dataGaps);
     this.smartMoneyAdjustment(signal, context.smartMoneyStatus, add, context.dataGaps);
     this.dataQualityAdjustment(signal, context.dataQuality, add, context.dataGaps);
+    this.persistedDataQualityAdjustment(context.dataQualityEvaluation || null, add, context.dataGaps);
     for (const issue of context.noisyIssueTypes) add({ type: 'NOISE', label: `Noise flag detected: ${issue}.`, delta: issue.includes('FAILED') ? -6 : -3, evidence: { issue } });
 
     const rawDelta = [...boosts, ...penalties].reduce((sum, adjustment) => sum + adjustment.delta, 0);
@@ -169,6 +172,18 @@ export class SignalCalibrationEngineService {
       rawSignalModelVersion: signal.modelVersion || null,
       generatedAt: new Date().toISOString(),
       dataStatus: context.dataGaps.length > 0 ? 'PARTIAL' : 'COMPLETE',
+      dataQuality: context.dataQualityEvaluation ? {
+        coverageScore: context.dataQualityEvaluation.coverageScore,
+        coverageStatus: context.dataQualityEvaluation.coverageStatus,
+        signalReadinessScore: context.dataQualityEvaluation.signalReadinessScore,
+        signalReadinessStatus: context.dataQualityEvaluation.signalReadinessStatus,
+        liquidityScore: context.dataQualityEvaluation.liquidityScore,
+        liquidityStatus: context.dataQualityEvaluation.liquidityStatus,
+        eligibleForSignals: context.dataQualityEvaluation.eligibleForSignals,
+        eligibleForCalibration: context.dataQualityEvaluation.eligibleForCalibration,
+        warnings: context.dataQualityEvaluation.warnings,
+        readinessBlockers: context.dataQualityEvaluation.readinessBlockers,
+      } : null,
       researchUrl: `/research/stocks/${signal.instrument_id}`,
     };
   }
@@ -179,12 +194,13 @@ export class SignalCalibrationEngineService {
 
   private async context(signal: SignalResultDto): Promise<CalibrationContext> {
     const query = { horizon: QUALITY_HORIZON, limit: 1000, minSampleSize: 0, sector: signal.sector || undefined, country: signal.country || undefined };
-    const [byType, byScore, bySector, noisy, lookup] = await Promise.all([
+    const [byType, byScore, bySector, noisy, lookup, dataQualityEvaluation] = await Promise.all([
       this.qualityService.byType(query).catch(() => []),
       this.qualityService.byScoreBucket(query).catch(() => []),
       this.qualityService.bySector(query).catch(() => []),
       this.qualityService.noisy({ ...query, limit: 250 }).catch(() => []),
       this.contextService.lookup(new Date(signal.generated_at), 7, { instrumentId: signal.instrument_id, sector: signal.sector || undefined, country: signal.country || undefined }).catch(() => null),
+      this.dataQualityService.getLatestEvaluationForInstrument(signal.instrument_id).catch(() => null),
     ]);
     const typeMetrics = new Map<string, { winRate: number | null; averageForwardReturn: number | null; sampleSize: number }>();
     for (const metric of byType as SignalTypePerformance[]) typeMetrics.set(metric.signalType, metric);
@@ -197,6 +213,7 @@ export class SignalCalibrationEngineService {
       sectorLeadership: lookup?.sector?.leadershipStatus ?? null,
       smartMoneyStatus: lookup?.smartMoney?.status ?? null,
       dataQuality: lookup?.dataQuality ?? null,
+      dataQualityEvaluation,
       noisyIssueTypes: (noisy || []).filter((item) => item.instrumentId === signal.instrument_id).map((item) => item.issueType),
       dataGaps: lookup?.gaps?.length ? [...lookup.gaps] : lookup ? [] : ['Historical context lookup unavailable.'],
     };
@@ -276,6 +293,19 @@ export class SignalCalibrationEngineService {
     if ((dataQuality.priceHistoryDays ?? 0) < 200) add({ type: 'DATA_QUALITY', label: 'Insufficient price history for robust calibration.', delta: -4 });
     const usesFundamentals = [...signal.triggered_signals, ...signal.negative_signals].some((item) => item.category === 'FUNDAMENTAL');
     if (usesFundamentals && !dataQuality.hasFundamentals) add({ type: 'DATA_QUALITY', label: 'Fundamental signal exists but fundamentals are missing.', delta: -4 });
+  }
+
+  private persistedDataQualityAdjustment(dataQuality: CalibrationContext['dataQualityEvaluation'], add: (adjustment: CalibrationAdjustment) => void, gaps: string[]): void {
+    if (!dataQuality) {
+      gaps.push('Missing latest Data Quality Engine evaluation.');
+      return;
+    }
+    if (dataQuality.coverageStatus === 'UNUSABLE') add({ type: 'DATA_QUALITY', label: 'Data quality coverage is unusable.', delta: -10, evidence: dataQuality as any });
+    else if (dataQuality.coverageStatus === 'POOR') add({ type: 'DATA_QUALITY', label: 'Data quality coverage is poor.', delta: -6, evidence: dataQuality as any });
+    if (dataQuality.signalReadinessStatus === 'NOT_READY') add({ type: 'DATA_QUALITY', label: 'Signal readiness is not ready.', delta: -10, evidence: dataQuality as any });
+    else if (dataQuality.signalReadinessStatus === 'LIMITED') add({ type: 'DATA_QUALITY', label: 'Signal readiness is limited.', delta: -4, evidence: dataQuality as any });
+    if (dataQuality.liquidityStatus === 'ILLIQUID') add({ type: 'DATA_QUALITY', label: 'Liquidity quality is illiquid.', delta: -6, evidence: dataQuality as any });
+    else if (dataQuality.liquidityStatus === 'UNKNOWN') add({ type: 'DATA_QUALITY', label: 'Liquidity quality is unknown.', delta: -3, evidence: dataQuality as any });
   }
 
   private confidence(raw: SignalCalibrationResultDto['rawConfidence'], boosts: CalibrationAdjustment[], penalties: CalibrationAdjustment[], context: CalibrationContext): SignalCalibrationResultDto['calibratedConfidence'] {

@@ -2,6 +2,7 @@ import axios from 'axios';
 import type {
   NoisySignalItem,
   QualityHorizon,
+  QualityFilters,
   QualityMetricGroup,
   QualityRecalculateRequest,
   QualityRecalculateResponse,
@@ -13,30 +14,35 @@ import type {
 
 const API_BASE = '/api/v1/signals';
 
-const params = (horizon: QualityHorizon) => ({ horizon, limit: 500, minSampleSize: 0 });
+const params = (horizon: QualityHorizon, filters: QualityFilters = {}) => ({ horizon, limit: 500, minSampleSize: 0, ...filters });
 
-export async function fetchSignalQualitySummary(horizon: QualityHorizon): Promise<QualitySummary> {
-  const response = await axios.get<QualitySummary>(`${API_BASE}/quality/summary`, { params: params(horizon) });
+export async function fetchSignalQualitySummary(horizon: QualityHorizon, filters: QualityFilters = {}): Promise<QualitySummary> {
+  const response = await axios.get<QualitySummary>(`${API_BASE}/quality/summary`, { params: params(horizon, filters) });
   return response.data;
 }
 
-export async function fetchSignalQualityByType(horizon: QualityHorizon): Promise<SignalTypePerformance[]> {
-  const response = await axios.get<{ items: SignalTypePerformance[] }>(`${API_BASE}/quality/by-type`, { params: params(horizon) });
+export async function fetchSignalQualityByType(horizon: QualityHorizon, filters: QualityFilters = {}): Promise<SignalTypePerformance[]> {
+  const response = await axios.get<{ items: SignalTypePerformance[] }>(`${API_BASE}/quality/by-type`, { params: params(horizon, filters) });
   return response.data.items;
 }
 
-export async function fetchSignalQualityBySector(horizon: QualityHorizon): Promise<QualityMetricGroup[]> {
-  const response = await axios.get<{ items: QualityMetricGroup[] }>(`${API_BASE}/quality/by-sector`, { params: params(horizon) });
+export async function fetchSignalQualityBySector(horizon: QualityHorizon, filters: QualityFilters = {}): Promise<QualityMetricGroup[]> {
+  const response = await axios.get<{ items: QualityMetricGroup[] }>(`${API_BASE}/quality/by-sector`, { params: params(horizon, filters) });
   return response.data.items;
 }
 
-export async function fetchSignalQualityByRegime(horizon: QualityHorizon): Promise<QualityMetricGroup[]> {
-  const response = await axios.get<{ items: QualityMetricGroup[] }>(`${API_BASE}/quality/by-regime`, { params: params(horizon) });
+export async function fetchSignalQualityByRegime(horizon: QualityHorizon, filters: QualityFilters = {}): Promise<QualityMetricGroup[]> {
+  const response = await axios.get<{ items: QualityMetricGroup[] }>(`${API_BASE}/quality/by-regime`, { params: params(horizon, filters) });
   return response.data.items;
 }
 
-export async function fetchNoisySignals(horizon: QualityHorizon): Promise<NoisySignalItem[]> {
-  const response = await axios.get<{ items: NoisySignalItem[] }>(`${API_BASE}/quality/noisy`, { params: params(horizon) });
+export async function fetchSignalQualityByDataQuality(horizon: QualityHorizon, filters: QualityFilters = {}): Promise<QualityMetricGroup[]> {
+  const response = await axios.get<{ items: QualityMetricGroup[] }>(`${API_BASE}/quality/by-data-quality`, { params: params(horizon, filters) });
+  return response.data.items;
+}
+
+export async function fetchNoisySignals(horizon: QualityHorizon, filters: QualityFilters = {}): Promise<NoisySignalItem[]> {
+  const response = await axios.get<{ items: NoisySignalItem[] }>(`${API_BASE}/quality/noisy`, { params: params(horizon, filters) });
   return response.data.items;
 }
 

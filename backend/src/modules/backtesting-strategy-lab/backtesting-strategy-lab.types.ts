@@ -26,6 +26,11 @@ export interface BacktestStrategyConfig {
   fixedAmountPerTrade?: number;
   maxPositions: number;
   transactionCostPercent: number;
+  useDataQualityFilter?: boolean;
+  minSignalReadinessScore?: number;
+  excludeNotReady?: boolean;
+  excludeIlliquid?: boolean;
+  excludeMissingQuality?: boolean;
 }
 
 export interface BacktestStrategyDto {
@@ -86,6 +91,12 @@ export interface BacktestMetrics {
   averageHoldingDays: number | null;
   bestTrade: number | null;
   worstTrade: number | null;
+  dataQualityMetadata?: {
+    universeBeforeDataQualityFilter: number;
+    universeAfterDataQualityFilter: number;
+    excludedForDataQuality: number;
+    missingQualityEvaluationCount: number;
+  };
 }
 
 export interface BacktestRunDto {

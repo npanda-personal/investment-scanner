@@ -1,11 +1,12 @@
 import { MarketDataFoundationService } from '../market-data-foundation';
-import { SignalGenerationEngineService } from '../signal-generation-engine';
 import { DataQualityEngineRepository } from './data-quality-engine.repository';
 import type {
   CoverageStatus,
   DataQualityEvaluateRequest,
   DataQualityEvaluateResponse,
   DataQualityEvaluationDto,
+  DataQualityFilterOptions,
+  DataQualityFilterResult,
   DataQualityQuery,
   LiquidityStatus,
   PriceForQuality,
@@ -19,7 +20,7 @@ export class DataQualityEngineService {
   constructor(
     private readonly repository = new DataQualityEngineRepository(),
     private readonly marketDataService = new MarketDataFoundationService(),
-    private readonly signalService = new SignalGenerationEngineService()
+    private readonly signalService: { signalHistory(input: any): Promise<any[]> } | null = null
   ) {}
 
   async summary() {
@@ -44,6 +45,55 @@ export class DataQualityEngineService {
     if (existing) return existing;
     const instrument = await this.marketDataService.getInstrument(instrumentId);
     return instrument ? this.evaluateAndPersistInstrument(instrument) : null;
+  }
+
+  getLatestEvaluationForInstrument(instrumentId: string): Promise<DataQualityEvaluationDto | null> {
+    return this.repository.latestForInstrument(instrumentId);
+  }
+
+  async getEvaluationsForInstruments(instrumentIds: string[]): Promise<DataQualityEvaluationDto[]> {
+    return this.repository.latestForInstruments([...new Set(instrumentIds)]);
+  }
+
+  async filterEligibleInstruments(instrumentIds: string[], options: DataQualityFilterOptions = {}): Promise<DataQualityFilterResult> {
+    const evaluations = await this.getEvaluationsForInstruments(instrumentIds);
+    const byId = new Map(evaluations.map((evaluation) => [evaluation.instrumentId, evaluation]));
+    const allowed = options.allowedReadinessStatuses || (options.includeLimited ? ['READY', 'LIMITED'] : ['READY']);
+    const minScore = options.minSignalReadinessScore ?? 70;
+    const skipUnusable = options.skipUnusable ?? true;
+    const missingBehavior = options.missingQualityBehavior ?? (options.excludeMissingQuality ? 'SKIP' : 'WARN_AND_PROCESS');
+    const eligible: string[] = [];
+    const excluded: string[] = [];
+    const warnings: string[] = [];
+    let missingQualityEvaluationCount = 0;
+
+    for (const instrumentId of instrumentIds) {
+      const evaluation = byId.get(instrumentId);
+      if (!evaluation) {
+        missingQualityEvaluationCount += 1;
+        warnings.push(`${instrumentId}: missing data quality evaluation`);
+        if (missingBehavior === 'SKIP') excluded.push(instrumentId);
+        else eligible.push(instrumentId);
+        continue;
+      }
+      const blocked =
+        !evaluation.eligibleForSignals ||
+        evaluation.signalReadinessScore < minScore ||
+        (!allowed.includes(evaluation.signalReadinessStatus) && !(options.includeLimited && evaluation.signalReadinessStatus === 'LIMITED')) ||
+        (options.excludeNotReady && evaluation.signalReadinessStatus === 'NOT_READY') ||
+        (skipUnusable && evaluation.coverageStatus === 'UNUSABLE') ||
+        (options.excludeIlliquid && evaluation.liquidityStatus === 'ILLIQUID');
+      if (blocked) excluded.push(instrumentId);
+      else eligible.push(instrumentId);
+    }
+
+    return {
+      eligibleInstrumentIds: eligible,
+      excludedInstrumentIds: excluded,
+      missingQualityEvaluationCount,
+      warnings,
+      evaluationsByInstrumentId: Object.fromEntries(evaluations.map((evaluation) => [evaluation.instrumentId, evaluation])),
+    };
   }
 
   async evaluate(request: DataQualityEvaluateRequest): Promise<DataQualityEvaluateResponse> {
@@ -87,7 +137,7 @@ export class DataQualityEngineService {
       this.marketDataService.latestPriceByInstrumentId(instrument.id).catch(() => null),
       this.marketDataService.fundamentalsByInstrumentId(instrument.id).catch(() => null),
       this.marketDataService.corporateActionsByInstrumentId(instrument.id).catch(() => null),
-      this.signalService.signalHistory({ instrumentId: instrument.id, limit: 1 }).catch(() => []),
+      this.signalService?.signalHistory({ instrumentId: instrument.id, limit: 1 }).catch(() => []) ?? Promise.resolve([]),
     ]);
     const prices = this.normalizePrices(pricesResponse?.prices || []);
     const latest = latestResponse?.latest || null;

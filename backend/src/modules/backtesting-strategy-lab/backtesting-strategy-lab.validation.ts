@@ -30,6 +30,7 @@ export function validateConfig(config?: BacktestStrategyConfig): string[] {
   if (!Number.isFinite(config.initialCapital) || config.initialCapital <= 0) errors.push('initial capital must be greater than 0');
   if (!Number.isFinite(config.maxPositions) || config.maxPositions <= 0 || config.maxPositions > 100) errors.push('max positions must be 1-100');
   if (!Number.isFinite(config.transactionCostPercent) || config.transactionCostPercent < 0 || config.transactionCostPercent > 0.1) errors.push('transaction cost must be 0-10%');
+  if (config.minSignalReadinessScore !== undefined && (!Number.isFinite(config.minSignalReadinessScore) || config.minSignalReadinessScore < 0 || config.minSignalReadinessScore > 100)) errors.push('minimum signal readiness score must be 0-100');
   if (!POSITION_SIZES.includes(config.positionSizeType)) errors.push('position sizing is invalid');
   if (config.positionSizeType === 'FIXED_AMOUNT' && (!Number.isFinite(config.fixedAmountPerTrade) || Number(config.fixedAmountPerTrade) <= 0)) errors.push('fixed amount per trade must be greater than 0');
   if (config.entryRule?.type === 'SIGNAL_SCORE_ABOVE' && !Number.isFinite(config.entryRule.threshold)) errors.push('entry signal threshold is required');

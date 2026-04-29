@@ -99,6 +99,21 @@ Required bounds:
 - thresholds for signal score rules
 - holding days for fixed holding-period exit
 
+Optional data-quality-aware universe filters:
+
+- `useDataQualityFilter`
+- `minSignalReadinessScore`
+- `excludeNotReady`
+- `excludeIlliquid`
+- `excludeMissingQuality`
+
+The filter is disabled by default. When enabled, the service consumes Data Quality Engine public methods before loading price history. Run metrics include:
+
+- `universeBeforeDataQualityFilter`
+- `universeAfterDataQualityFilter`
+- `excludedForDataQuality`
+- `missingQualityEvaluationCount`
+
 ## Simulation Methodology
 
 The MVP engine:
@@ -158,6 +173,7 @@ The UI includes:
 - performance metric cards
 - equity and drawdown chart
 - trade log with bounded display
+- optional data-quality filter controls and universe before/after metadata in results
 
 ## Known Limitations
 

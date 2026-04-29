@@ -1,5 +1,6 @@
 import { MarketDataFoundationService } from '../market-data-foundation';
 import { StockResearchWorkbenchService } from '../stock-research-workbench';
+import { DataQualityEngineService } from '../data-quality-engine';
 import { SignalGenerationEngineRepository } from './signal-generation-engine.repository';
 import type {
   SignalConfidence,
@@ -21,7 +22,8 @@ export class SignalGenerationEngineService {
   constructor(
     private readonly repository = new SignalGenerationEngineRepository(),
     private readonly marketDataService = new MarketDataFoundationService(),
-    private readonly researchService = new StockResearchWorkbenchService()
+    private readonly researchService = new StockResearchWorkbenchService(),
+    private readonly dataQualityService = new DataQualityEngineService()
   ) {}
 
   async topSignals(query: SignalQuery) {
@@ -47,8 +49,41 @@ export class SignalGenerationEngineService {
   async run(request: SignalRunRequest): Promise<SignalRunResponse> {
     const generatedAt = new Date().toISOString();
     const errors: string[] = [];
+    const warnings: string[] = [];
     const results: SignalResultDto[] = [];
-    const instrumentIds = await this.resolveRunUniverse(request);
+    const resolvedInstrumentIds = await this.resolveRunUniverse(request);
+    let instrumentIds = resolvedInstrumentIds;
+    let dataQuality: SignalRunResponse['dataQuality'] = {
+      filterApplied: Boolean(request.useDataQualityFilter),
+      beforeFilter: resolvedInstrumentIds.length,
+      afterFilter: resolvedInstrumentIds.length,
+      excludedByDataQuality: 0,
+      missingQualityEvaluationCount: 0,
+    };
+
+    if (request.useDataQualityFilter) {
+      const filtered = await this.dataQualityService.filterEligibleInstruments(resolvedInstrumentIds, {
+        minSignalReadinessScore: request.minSignalReadinessScore ?? 70,
+        allowedReadinessStatuses: request.allowedReadinessStatuses,
+        includeLimited: request.includeLimited,
+        skipUnusable: request.skipUnusable ?? true,
+        missingQualityBehavior: request.missingQualityBehavior ?? 'WARN_AND_PROCESS',
+      }).catch((error: any) => {
+        warnings.push(`Data quality filter unavailable: ${error?.message || 'unknown error'}`);
+        return null;
+      });
+      if (filtered) {
+        instrumentIds = filtered.eligibleInstrumentIds;
+        warnings.push(...filtered.warnings);
+        dataQuality = {
+          filterApplied: true,
+          beforeFilter: resolvedInstrumentIds.length,
+          afterFilter: instrumentIds.length,
+          excludedByDataQuality: filtered.excludedInstrumentIds.length,
+          missingQualityEvaluationCount: filtered.missingQualityEvaluationCount,
+        };
+      }
+    }
 
     for (const instrumentId of instrumentIds) {
       try {
@@ -61,8 +96,10 @@ export class SignalGenerationEngineService {
 
     return {
       generated: results.length,
-      skipped: Math.max(0, instrumentIds.length - results.length - errors.length),
+      skipped: Math.max(0, resolvedInstrumentIds.length - results.length - errors.length),
       errors,
+      warnings,
+      dataQuality,
       results,
       generated_at: generatedAt,
     };

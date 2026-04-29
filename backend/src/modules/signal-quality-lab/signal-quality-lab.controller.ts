@@ -30,6 +30,11 @@ export class SignalQualityLabController {
     catch (error) { return this.error(res, error, 'Failed to load regime signal quality'); }
   };
 
+  byDataQuality = async (req: Request, res: Response) => {
+    try { return res.json({ items: await this.service.byDataQuality(parseQualityQuery(req.query)) }); }
+    catch (error) { return this.error(res, error, 'Failed to load data-quality signal quality'); }
+  };
+
   noisy = async (req: Request, res: Response) => {
     try { return res.json({ items: await this.service.noisy(parseQualityQuery(req.query)) }); }
     catch (error) { return this.error(res, error, 'Failed to load noisy signals'); }

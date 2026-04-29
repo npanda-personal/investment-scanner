@@ -1,6 +1,7 @@
 import { MarketDataFoundationService } from '../market-data-foundation';
 import { SubscriptionBillingService } from '../subscription-billing';
 import { WatchlistManagementService } from '../watchlist-management';
+import { DataQualityEngineService } from '../data-quality-engine';
 import { BacktestingStrategyLabRepository } from './backtesting-strategy-lab.repository';
 import type {
   BacktestMetrics,
@@ -22,7 +23,8 @@ export class BacktestingStrategyLabService {
     private readonly repository = new BacktestingStrategyLabRepository(),
     private readonly marketDataService = new MarketDataFoundationService(),
     private readonly watchlistService = new WatchlistManagementService(),
-    private readonly subscriptionService = new SubscriptionBillingService()
+    private readonly subscriptionService = new SubscriptionBillingService(),
+    private readonly dataQualityService = new DataQualityEngineService()
   ) {}
 
   listStrategies(userId = 'default-user') { return this.repository.listStrategies(userId); }
@@ -83,7 +85,9 @@ export class BacktestingStrategyLabService {
   }
 
   async simulate(config: BacktestStrategyConfig): Promise<{ metrics: BacktestMetrics; trades: BacktestTrade[]; equityCurve: EquityCurvePoint[] }> {
-    const instruments = await this.resolveUniverse(config);
+    const resolvedUniverse = await this.resolveUniverse(config);
+    const filterResult = await this.applyDataQualityFilter(resolvedUniverse, config);
+    const instruments = filterResult.instruments;
     const histories = new Map<string, { instrumentId: string; symbol: string; bars: HistoricalBar[] }>();
     for (const instrument of instruments) {
       const response = await this.marketDataService.listPricesByInstrumentId(instrument.instrumentId, 5000, new Date(config.startDate), new Date(config.endDate)).catch(() => null);
@@ -143,7 +147,7 @@ export class BacktestingStrategyLabService {
       const bar = this.barAtOrBefore(history?.bars || [], lastDate);
       if (bar) trades.push(this.closePosition(config, position, bar, 'End of test'));
     }
-    return { metrics: this.metrics(config.initialCapital, curve, trades, config), trades, equityCurve: this.sampleCurve(curve) };
+    return { metrics: { ...this.metrics(config.initialCapital, curve, trades, config), dataQualityMetadata: filterResult.metadata }, trades, equityCurve: this.sampleCurve(curve) };
   }
 
   shouldEnter(config: BacktestStrategyConfig, bars: HistoricalBar[], index: number): boolean {
@@ -204,6 +208,42 @@ export class BacktestingStrategyLabService {
     }
     const result = await this.marketDataService.listInstruments({ page: 1, pageSize: 50 });
     return result.instruments.map((instrument: any) => ({ instrumentId: instrument.id, symbol: instrument.symbol }));
+  }
+
+  private async applyDataQualityFilter(instruments: Array<{ instrumentId: string; symbol: string }>, config: BacktestStrategyConfig): Promise<{
+    instruments: Array<{ instrumentId: string; symbol: string }>;
+    metadata: NonNullable<BacktestMetrics['dataQualityMetadata']>;
+  }> {
+    if (!config.useDataQualityFilter) {
+      return {
+        instruments,
+        metadata: {
+          universeBeforeDataQualityFilter: instruments.length,
+          universeAfterDataQualityFilter: instruments.length,
+          excludedForDataQuality: 0,
+          missingQualityEvaluationCount: 0,
+        },
+      };
+    }
+    const result = await this.dataQualityService.filterEligibleInstruments(instruments.map((instrument) => instrument.instrumentId), {
+      minSignalReadinessScore: config.minSignalReadinessScore ?? 70,
+      includeLimited: !config.excludeNotReady,
+      excludeNotReady: config.excludeNotReady ?? true,
+      excludeIlliquid: config.excludeIlliquid ?? true,
+      excludeMissingQuality: config.excludeMissingQuality ?? false,
+      missingQualityBehavior: config.excludeMissingQuality ? 'SKIP' : 'WARN_AND_PROCESS',
+    });
+    const eligible = new Set(result.eligibleInstrumentIds);
+    const filtered = instruments.filter((instrument) => eligible.has(instrument.instrumentId));
+    return {
+      instruments: filtered,
+      metadata: {
+        universeBeforeDataQualityFilter: instruments.length,
+        universeAfterDataQualityFilter: filtered.length,
+        excludedForDataQuality: result.excludedInstrumentIds.length,
+        missingQualityEvaluationCount: result.missingQualityEvaluationCount,
+      },
+    };
   }
 
   private closePosition(config: BacktestStrategyConfig, position: Position, bar: HistoricalBar, exitReason: string): BacktestTrade {

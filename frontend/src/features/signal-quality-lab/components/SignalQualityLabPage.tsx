@@ -3,8 +3,10 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Chip,
   CircularProgress,
+  FormControlLabel,
   MenuItem,
   Paper,
   Stack,
@@ -19,7 +21,7 @@ import {
 import { Link } from 'react-router-dom';
 import { fetchSignalHistory, fetchSignalOutcomes, recalculateSignalQuality } from '../api/signalQualityLabService';
 import { useSignalQualityLab } from '../hooks';
-import type { QualityHorizon, QualityMetricGroup, SignalHistoryItem, SignalOutcomeSet, SignalTypePerformance } from '../types';
+import type { QualityFilters, QualityHorizon, QualityMetricGroup, SignalHistoryItem, SignalOutcomeSet, SignalTypePerformance } from '../types';
 
 const horizons: QualityHorizon[] = ['1D', '5D', '10D', '20D', '60D'];
 const DEFAULT_BATCH_SIZE = 25;
@@ -71,13 +73,14 @@ const MetricTable: React.FC<{ title: string; rows: (QualityMetricGroup | SignalT
 
 const SignalQualityLabPage: React.FC = () => {
   const [horizon, setHorizon] = useState<QualityHorizon>('20D');
+  const [filters, setFilters] = useState<QualityFilters>({});
   const [instrumentId, setInstrumentId] = useState('');
   const [history, setHistory] = useState<SignalHistoryItem[]>([]);
   const [outcomes, setOutcomes] = useState<SignalOutcomeSet[]>([]);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [recalculating, setRecalculating] = useState(false);
-  const { summary, byType, bySector, byRegime, noisy, loading, error, reload } = useSignalQualityLab(horizon);
+  const { summary, byType, bySector, byRegime, byDataQuality, noisy, loading, error, reload } = useSignalQualityLab(horizon, filters);
 
   const loadInstrument = async () => {
     setFormError(null);
@@ -152,6 +155,31 @@ const SignalQualityLabPage: React.FC = () => {
 
       {(error || formError) && <Alert severity="error" sx={{ mb: 2 }}>{error || formError}</Alert>}
       {actionMessage && <Alert severity="info" sx={{ mb: 2 }}>{actionMessage}</Alert>}
+      {summary?.dataQualityFilterSummary?.filterApplied && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Data quality filter applied: {summary.dataQualityFilterSummary.totalSignalsAfterFilter} / {summary.dataQualityFilterSummary.totalSignalsBeforeFilter} signals included,
+          excluded {summary.dataQualityFilterSummary.excludedByDataQuality}, missing evaluations {summary.dataQualityFilterSummary.missingQualityEvaluationCount}.
+        </Alert>
+      )}
+
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
+          <TextField select size="small" label="Readiness" value={filters.readinessStatus || ''} onChange={(event) => setFilters({ ...filters, readinessStatus: event.target.value as any })} sx={{ minWidth: 150 }}>
+            <MenuItem value="">All</MenuItem>
+            {['READY', 'LIMITED', 'NOT_READY'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
+          </TextField>
+          <TextField select size="small" label="Coverage" value={filters.coverageStatus || ''} onChange={(event) => setFilters({ ...filters, coverageStatus: event.target.value as any })} sx={{ minWidth: 150 }}>
+            <MenuItem value="">All</MenuItem>
+            {['GOOD', 'PARTIAL', 'POOR', 'UNUSABLE'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
+          </TextField>
+          <TextField select size="small" label="Liquidity" value={filters.liquidityStatus || ''} onChange={(event) => setFilters({ ...filters, liquidityStatus: event.target.value as any })} sx={{ minWidth: 150 }}>
+            <MenuItem value="">All</MenuItem>
+            {['LIQUID', 'THIN', 'ILLIQUID', 'UNKNOWN'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
+          </TextField>
+          <FormControlLabel control={<Checkbox checked={Boolean(filters.onlySignalReady)} onChange={(event) => setFilters({ ...filters, onlySignalReady: event.target.checked })} />} label="Only signal-ready" />
+          <FormControlLabel control={<Checkbox checked={Boolean(filters.excludePoorQuality)} onChange={(event) => setFilters({ ...filters, excludePoorQuality: event.target.checked })} />} label="Exclude poor quality" />
+        </Stack>
+      </Paper>
 
       {summary && (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2, mb: 3 }}>
@@ -170,6 +198,7 @@ const SignalQualityLabPage: React.FC = () => {
         <MetricTable title="Performance by Signal Type" rows={byType} nameKey="signalType" />
         <MetricTable title="Performance by Sector" rows={bySector} />
         <MetricTable title="Performance by Regime" rows={byRegime} />
+        <MetricTable title="Performance by Data Quality" rows={byDataQuality} />
         <Paper sx={{ p: 2, overflowX: 'auto' }}>
           <Typography variant="h6" sx={{ mb: 2 }}>Noisy Signals</Typography>
           {noisy.length === 0 ? (

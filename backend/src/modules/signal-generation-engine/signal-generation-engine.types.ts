@@ -42,6 +42,12 @@ export interface SignalRunRequest {
   direction?: SignalDirection;
   sector?: string;
   country?: string;
+  useDataQualityFilter?: boolean;
+  minSignalReadinessScore?: number;
+  allowedReadinessStatuses?: Array<'READY' | 'LIMITED' | 'NOT_READY'>;
+  includeLimited?: boolean;
+  skipUnusable?: boolean;
+  missingQualityBehavior?: 'WARN_AND_PROCESS' | 'SKIP';
 }
 
 export interface SignalQuery {
@@ -64,6 +70,14 @@ export interface SignalRunResponse {
   generated: number;
   skipped: number;
   errors: string[];
+  warnings: string[];
+  dataQuality?: {
+    filterApplied: boolean;
+    beforeFilter: number;
+    afterFilter: number;
+    excludedByDataQuality: number;
+    missingQualityEvaluationCount: number;
+  };
   results: SignalResultDto[];
   generated_at: string;
 }

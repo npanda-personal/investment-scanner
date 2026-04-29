@@ -190,4 +190,48 @@ describe('SignalGenerationEngineService', () => {
       priceTimestamp: null,
     });
   });
+
+  it('skips not-ready instruments when data quality filter is enabled and warns on missing evaluations', async () => {
+    const repository = { createSignalResult: jest.fn() };
+    const marketDataService = {
+      listInstruments: jest.fn().mockResolvedValue({ instruments: [{ id: 'ready', symbol: 'RDY' }, { id: 'blocked', symbol: 'BLK' }, { id: 'missing', symbol: 'MSG' }] }),
+    };
+    const dataQualityService = {
+      filterEligibleInstruments: jest.fn().mockResolvedValue({
+        eligibleInstrumentIds: ['ready', 'missing'],
+        excludedInstrumentIds: ['blocked'],
+        missingQualityEvaluationCount: 1,
+        warnings: ['missing: missing data quality evaluation'],
+      }),
+    };
+    const service = new SignalGenerationEngineService(repository as any, marketDataService as any, {} as any, dataQualityService as any);
+    jest.spyOn(service, 'generateForInstrument').mockImplementation(async (instrumentId) => ({
+      instrument_id: instrumentId,
+      symbol: instrumentId,
+      company_name: null,
+      sector: null,
+      country: null,
+      currentPrice: null,
+      previousClose: null,
+      dailyChange: null,
+      dailyChangePercent: null,
+      currency: null,
+      priceTimestamp: null,
+      score: 50,
+      direction: 'NEUTRAL',
+      confidence: 'LOW',
+      triggered_signals: [],
+      negative_signals: [],
+      explanation: 'Neutral because data is limited.',
+      generated_at: new Date().toISOString(),
+      source: 'signal-generation-engine',
+      data_status: 'PARTIAL',
+    }));
+
+    const result = await service.run({ limit: 3, useDataQualityFilter: true });
+
+    expect(result.generated).toBe(2);
+    expect(result.dataQuality).toMatchObject({ beforeFilter: 3, afterFilter: 2, excludedByDataQuality: 1, missingQualityEvaluationCount: 1 });
+    expect(result.warnings[0]).toContain('missing data quality');
+  });
 });

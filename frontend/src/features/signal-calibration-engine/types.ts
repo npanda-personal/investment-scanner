@@ -30,6 +30,18 @@ export interface SignalCalibrationResult {
   rawSignalModelVersion: string | null;
   generatedAt: string;
   dataStatus: string;
+  dataQuality?: {
+    coverageScore: number;
+    coverageStatus: string;
+    signalReadinessScore: number;
+    signalReadinessStatus: string;
+    liquidityScore: number;
+    liquidityStatus: string;
+    eligibleForSignals: boolean;
+    eligibleForCalibration: boolean;
+    warnings: string[];
+    readinessBlockers: string[];
+  } | null;
   researchUrl: string;
 }
 

@@ -13,6 +13,12 @@ export function parseQualityQuery(query: any): QualityQuery {
     to: validDate(query.to) ? query.to : undefined,
     limit: clampInt(query.limit, 500, 1, 5000),
     minSampleSize: clampInt(query.minSampleSize, 0, 0, 1000),
+    readinessStatus: parseEnum(query.readinessStatus, ['READY', 'LIMITED', 'NOT_READY']),
+    coverageStatus: parseEnum(query.coverageStatus, ['GOOD', 'PARTIAL', 'POOR', 'UNUSABLE']),
+    liquidityStatus: parseEnum(query.liquidityStatus, ['LIQUID', 'THIN', 'ILLIQUID', 'UNKNOWN']),
+    minReadinessScore: clampNumber(query.minReadinessScore, undefined, 0, 100),
+    onlySignalReady: query.onlySignalReady === 'true' || query.onlySignalReady === true,
+    excludePoorQuality: query.excludePoorQuality === 'true' || query.excludePoorQuality === true,
   };
 }
 
@@ -43,6 +49,17 @@ function clampInt(value: unknown, fallback: number, min: number, max: number): n
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return fallback;
   return Math.min(max, Math.max(min, Math.trunc(numeric)));
+}
+
+function clampNumber(value: unknown, fallback: number | undefined, min: number, max: number): number | undefined {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(max, Math.max(min, numeric));
+}
+
+function parseEnum<T extends string>(value: unknown, allowed: T[]): T | undefined {
+  const normalized = String(value || '').trim().toUpperCase();
+  return allowed.includes(normalized as T) ? normalized as T : undefined;
 }
 
 function validDate(value: unknown): boolean {

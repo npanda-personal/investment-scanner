@@ -97,6 +97,18 @@ MVP categories:
 
 Each boost or penalty is returned with a label, delta, type, and evidence where available.
 
+Data Quality Engine penalties:
+
+- coverage `UNUSABLE`: `-10`
+- coverage `POOR`: `-6`
+- readiness `NOT_READY`: `-10`
+- readiness `LIMITED`: `-4`
+- liquidity `ILLIQUID`: `-6`
+- liquidity `UNKNOWN`: `-3`
+- missing latest data-quality evaluation: no penalty, but a data gap is added
+
+These penalties respect the existing per-adjustment and total delta caps.
+
 ## Confidence Methodology
 
 Calibrated confidence considers:
@@ -132,6 +144,9 @@ Uses public module exports:
 - `signal-generation-engine` for raw/latest signals
 - `signal-quality-lab` for measured quality metrics and noisy flags
 - `historical-context-snapshots` for regime, sector, smart-money, and data-quality lookup
+- `data-quality-engine` for latest coverage, readiness, liquidity, warnings, and blockers
+
+Raw-vs-calibrated comparison responses include a `dataQuality` object when a latest evaluation exists. The frontend displays this as a data-quality caution panel alongside boosts and penalties.
 
 ## Known Limitations
 

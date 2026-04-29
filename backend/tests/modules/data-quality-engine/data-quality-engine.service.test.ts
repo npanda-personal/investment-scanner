@@ -102,4 +102,21 @@ describe('data quality engine service', () => {
     expect(result).toMatchObject({ processedCount: 2, evaluatedCount: 1, failedCount: 1, hasMore: false });
     expect(result.warnings[0]).toContain('write failed');
   });
+
+  it('filters eligible instruments using readiness, coverage, liquidity, and missing quality behavior', async () => {
+    const setup = service({
+      repository: {
+        latestForInstruments: jest.fn().mockResolvedValue([
+          { instrumentId: 'ready', eligibleForSignals: true, signalReadinessScore: 90, signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID' },
+          { instrumentId: 'blocked', eligibleForSignals: false, signalReadinessScore: 25, signalReadinessStatus: 'NOT_READY', coverageStatus: 'UNUSABLE', liquidityStatus: 'ILLIQUID' },
+        ]),
+      },
+    });
+
+    const result = await setup.instance.filterEligibleInstruments(['ready', 'blocked', 'missing'], { missingQualityBehavior: 'SKIP' });
+
+    expect(result.eligibleInstrumentIds).toEqual(['ready']);
+    expect(result.excludedInstrumentIds).toEqual(['blocked', 'missing']);
+    expect(result.missingQualityEvaluationCount).toBe(1);
+  });
 });

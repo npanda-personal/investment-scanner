@@ -1,4 +1,5 @@
 import type { SignalConfidence, SignalDirection, SignalItem, SignalResultDto } from '../signal-generation-engine';
+import type { DataQualityEvaluationDto } from '../data-quality-engine';
 
 export type CalibrationDataStatus = 'COMPLETE' | 'PARTIAL' | 'MISSING' | 'ERROR';
 export type CalibrationAdjustmentType = 'SIGNAL_TYPE' | 'SCORE_BUCKET' | 'REGIME' | 'SECTOR' | 'SMART_MONEY' | 'DATA_QUALITY' | 'NOISE';
@@ -33,6 +34,11 @@ export interface SignalCalibrationResultDto {
   rawSignalModelVersion: string | null;
   generatedAt: string;
   dataStatus: CalibrationDataStatus;
+  dataQuality?: Pick<DataQualityEvaluationDto,
+    'coverageScore' | 'coverageStatus' | 'signalReadinessScore' | 'signalReadinessStatus' |
+    'liquidityScore' | 'liquidityStatus' | 'eligibleForSignals' | 'eligibleForCalibration' |
+    'warnings' | 'readinessBlockers'
+  > | null;
   researchUrl: string;
 }
 
@@ -96,6 +102,7 @@ export interface CalibrationContext {
   sectorLeadership: string | null;
   smartMoneyStatus: string | null;
   dataQuality: any | null;
+  dataQualityEvaluation?: DataQualityEvaluationDto | null;
   noisyIssueTypes: string[];
   dataGaps: string[];
 }
