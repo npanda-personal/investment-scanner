@@ -254,8 +254,11 @@ Frontend routes:
 | `/market-data-foundation` | Instrument explorer |
 | `/market-data-foundation/add` | Add instrument |
 | `/market-data-foundation/ingestion` | Manual market data sync |
-| `/market-data-foundation/:id` | Instrument detail |
+| `/market-data-foundation/:id` | Compatibility stock workspace with tabs |
+| `/stocks/:id` | Canonical unified stock workspace with tabs |
 | `/stocks` | Redirects to `/market-data-foundation` |
+
+The instrument explorer is table-first and server-paginated. It supports market tabs plus filters for search, exchange, asset type, currency, and sector. Column sorting is wired through the `/api/v1/instruments` query parameters.
 
 The dashboard also uses `MarketDataStatusPanel` and `DataIngestion` from this feature.
 

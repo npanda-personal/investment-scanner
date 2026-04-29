@@ -3,7 +3,6 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
   CircularProgress,
   MenuItem,
   Paper,
@@ -13,6 +12,8 @@ import {
 } from '@mui/material';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { SignalBadge } from '@/features/signal-generation-engine';
+import { DataTable, InstrumentSearchSelect, StatusBadge, type DataTableColumn } from '@/shared/components';
+import type { V1Instrument } from '@/features/market-data-foundation';
 import {
   addWatchlistItem,
   createWatchlist,
@@ -42,9 +43,11 @@ const WatchlistManagementPage: React.FC = () => {
   const [formError, setFormError] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [instrumentId, setInstrumentId] = useState('');
+  const [selectedInstrument, setSelectedInstrument] = useState<V1Instrument | null>(null);
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
   const [tagDrafts, setTagDrafts] = useState<Record<string, string>>({});
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
 
   const submitWatchlist = async () => {
     setFormError(null);
@@ -60,11 +63,11 @@ const WatchlistManagementPage: React.FC = () => {
   };
 
   const submitItem = async () => {
-    if (!id) return;
+    if (!id || !selectedInstrument) return;
     setFormError(null);
     try {
-      await addWatchlistItem(id, { instrumentId });
-      setInstrumentId('');
+      await addWatchlistItem(id, { instrumentId: selectedInstrument.id });
+      setSelectedInstrument(null);
       await reload();
     } catch (err: any) {
       setFormError(err.response?.data?.error || err.message || 'Failed to add stock');
@@ -79,6 +82,44 @@ const WatchlistManagementPage: React.FC = () => {
     });
     await reload();
   };
+
+  const itemColumns: DataTableColumn<WatchlistDashboardItem>[] = [
+    { id: 'symbol', label: 'Symbol', render: (item) => <Button component={Link} to={item.researchUrl} size="small">{item.symbol}</Button> },
+    { id: 'companyName', label: 'Company', render: (item) => item.companyName || 'Unknown company' },
+    { id: 'sector', label: 'Sector', render: (item) => item.sector || 'N/A' },
+    { id: 'country', label: 'Country', render: (item) => item.country || 'N/A' },
+    { id: 'currentPrice', label: 'Price', align: 'right', render: (item) => money(item.currentPrice, item.currency) },
+    { id: 'dailyChange', label: 'Daily', align: 'right', render: (item) => <Typography color={item.dailyChangePercent === null ? 'text.secondary' : item.dailyChangePercent >= 0 ? 'success.main' : 'error.main'}>{percent(item.dailyChangePercent)}</Typography> },
+    {
+      id: 'signal',
+      label: 'Signal',
+      render: (item) => item.latestSignal ? <SignalBadge direction={item.latestSignal.direction} label={`${item.latestSignal.direction} ${item.latestSignal.score}`} /> : <StatusBadge label="No signal" />,
+    },
+    {
+      id: 'notes',
+      label: 'Notes / Tags',
+      render: (item) => (
+        <Stack spacing={1}>
+          <TextField label="Notes" value={noteDrafts[item.id] ?? item.notes ?? ''} onChange={(event) => setNoteDrafts({ ...noteDrafts, [item.id]: event.target.value })} size="small" fullWidth />
+          <TextField label="Tags" value={tagDrafts[item.id] ?? item.tags.join(', ')} onChange={(event) => setTagDrafts({ ...tagDrafts, [item.id]: event.target.value })} size="small" />
+        </Stack>
+      ),
+    },
+    {
+      id: 'actions',
+      label: 'Actions',
+      render: (item) => (
+        <Stack direction="row" spacing={1} onClick={(event) => event.stopPropagation()}>
+          <Button onClick={() => void saveItem(item)}>Save</Button>
+          <Button color="error" onClick={async () => {
+            if (!id) return;
+            await removeWatchlistItem(id, item.id);
+            await reload();
+          }}>Remove</Button>
+        </Stack>
+      ),
+    },
+  ];
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>;
 
@@ -135,50 +176,31 @@ const WatchlistManagementPage: React.FC = () => {
 
             <Paper sx={{ p: 2 }}>
               <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-                <TextField label="Instrument ID" value={instrumentId} onChange={(event) => setInstrumentId(event.target.value)} fullWidth size="small" />
-                <TextField select label="Sort" value={sort} onChange={(event) => setSort(event.target.value as WatchlistSortOption)} size="small" sx={{ minWidth: 190 }}>
+                <Box sx={{ flex: 1 }}>
+                  <InstrumentSearchSelect value={selectedInstrument} onChange={setSelectedInstrument} />
+                </Box>
+                <TextField select label="Sort" value={sort} onChange={(event) => { setSort(event.target.value as WatchlistSortOption); setPage(0); }} size="small" sx={{ minWidth: 190 }}>
                   <MenuItem value="recentlyAdded">Recently Added</MenuItem>
                   <MenuItem value="signalScoreDesc">Signal Score</MenuItem>
                   <MenuItem value="dailyChangeDesc">Daily Change High</MenuItem>
                   <MenuItem value="dailyChangeAsc">Daily Change Low</MenuItem>
                   <MenuItem value="symbolAsc">Symbol</MenuItem>
                 </TextField>
-                <Button variant="contained" onClick={submitItem}>Add Stock</Button>
+                <Button variant="contained" onClick={submitItem} disabled={!selectedInstrument}>Add Stock</Button>
               </Stack>
             </Paper>
 
-            {detail.items.length === 0 ? (
-              <Paper sx={{ p: 3 }}>
-                <Typography color="text.secondary">This watchlist has no stocks yet.</Typography>
-              </Paper>
-            ) : (
-              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: 'repeat(2, 1fr)' }, gap: 2 }}>
-                {detail.items.map((item) => (
-                  <Paper key={item.id} variant="outlined" sx={{ p: 2 }}>
-                    <Stack direction="row" justifyContent="space-between" spacing={2}>
-                      <Box>
-                        <Button component={Link} to={item.researchUrl} size="small">{item.symbol}</Button>
-                        <Typography color="text.secondary" variant="body2">{item.companyName || 'Unknown company'} · {item.sector || 'N/A'} · {item.country || 'N/A'}</Typography>
-                      </Box>
-                      {item.latestSignal ? <SignalBadge direction={item.latestSignal.direction} label={`${item.latestSignal.direction} ${item.latestSignal.score}`} /> : <Chip size="small" label="No signal" variant="outlined" />}
-                    </Stack>
-                    <Stack direction="row" spacing={2} sx={{ mt: 1, flexWrap: 'wrap' }}>
-                      <Typography fontWeight={700}>{money(item.currentPrice, item.currency)}</Typography>
-                      <Typography color={item.dailyChangePercent === null ? 'text.secondary' : item.dailyChangePercent >= 0 ? 'success.main' : 'error.main'}>{money(item.dailyChange, item.currency)} ({percent(item.dailyChangePercent)})</Typography>
-                    </Stack>
-                    <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ mt: 2 }}>
-                      <TextField label="Notes" value={noteDrafts[item.id] ?? item.notes ?? ''} onChange={(event) => setNoteDrafts({ ...noteDrafts, [item.id]: event.target.value })} size="small" fullWidth />
-                      <TextField label="Tags" value={tagDrafts[item.id] ?? item.tags.join(', ')} onChange={(event) => setTagDrafts({ ...tagDrafts, [item.id]: event.target.value })} size="small" />
-                      <Button onClick={() => saveItem(item)}>Save</Button>
-                      <Button color="error" onClick={async () => {
-                        await removeWatchlistItem(id, item.id);
-                        await reload();
-                      }}>Remove</Button>
-                    </Stack>
-                  </Paper>
-                ))}
-              </Box>
-            )}
+            <DataTable
+              columns={itemColumns}
+              rows={(detail.items || []).slice(page * pageSize, page * pageSize + pageSize)}
+              getRowId={(item) => item.id}
+              page={page}
+              pageSize={pageSize}
+              totalCount={detail.items.length}
+              emptyMessage="This watchlist has no stocks yet."
+              onPageChange={setPage}
+              onPageSizeChange={(nextPageSize) => { setPageSize(nextPageSize); setPage(0); }}
+            />
           </Stack>
         )}
       </Box>

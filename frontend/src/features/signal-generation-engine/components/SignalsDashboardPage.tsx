@@ -1,23 +1,22 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Box, Button, Checkbox, CircularProgress, FormControlLabel, MenuItem, Paper, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Checkbox, FormControlLabel, MenuItem, Paper, Tab, Tabs, TextField, Typography } from '@mui/material';
 import { fetchSignalScreener, fetchTopSignals, runSignals } from '../api/signalGenerationEngineService';
-import { SignalCard } from './SignalCard';
 import type { SignalDirection, SignalResult } from '../types';
 import { MarketRegimeWidget } from '@/features/market-context-intelligence';
 import { Link } from 'react-router-dom';
+import { SignalTable } from './SignalTable';
+import { FilterBar, type SortDirection } from '@/shared/components';
 
-const SignalSection: React.FC<{ title: string; signals: SignalResult[] }> = ({ title, signals }) => (
-  <Paper sx={{ p: 2 }}>
-    <Typography variant="h6" sx={{ mb: 2 }}>{title}</Typography>
-    {signals.length === 0 ? (
-      <Typography color="text.secondary">No signals generated yet.</Typography>
-    ) : (
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 1.5 }}>
-        {signals.map((signal) => <SignalCard key={signal.id || `${signal.instrument_id}-${signal.generated_at}`} signal={signal} />)}
-      </Box>
-    )}
-  </Paper>
-);
+type SignalTab = 'bullish' | 'bearish' | 'neutral' | 'momentum' | 'recent' | 'screener';
+
+const tabs: Array<{ value: SignalTab; label: string }> = [
+  { value: 'bullish', label: 'Bullish' },
+  { value: 'bearish', label: 'Bearish' },
+  { value: 'neutral', label: 'Neutral' },
+  { value: 'momentum', label: 'Momentum Leaders' },
+  { value: 'recent', label: 'Recent' },
+  { value: 'screener', label: 'Screener' },
+];
 
 const SignalsDashboardPage: React.FC = () => {
   const [bullish, setBullish] = useState<SignalResult[]>([]);
@@ -25,6 +24,11 @@ const SignalsDashboardPage: React.FC = () => {
   const [momentum, setMomentum] = useState<SignalResult[]>([]);
   const [recent, setRecent] = useState<SignalResult[]>([]);
   const [screener, setScreener] = useState<SignalResult[]>([]);
+  const [activeTab, setActiveTab] = useState<SignalTab>('bullish');
+  const [pageByTab, setPageByTab] = useState<Record<SignalTab, number>>({ bullish: 0, bearish: 0, neutral: 0, momentum: 0, recent: 0, screener: 0 });
+  const [pageSizeByTab, setPageSizeByTab] = useState<Record<SignalTab, number>>({ bullish: 25, bearish: 25, neutral: 25, momentum: 25, recent: 25, screener: 25 });
+  const [sortBy, setSortBy] = useState('score');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [direction, setDirection] = useState<SignalDirection | ''>('');
   const [minScore, setMinScore] = useState('60');
   const [sector, setSector] = useState('');
@@ -40,21 +44,23 @@ const SignalsDashboardPage: React.FC = () => {
     setLoading(true);
     setError(null);
     Promise.all([
-      fetchTopSignals({ direction: 'BULLISH', limit: 6 }),
-      fetchTopSignals({ direction: 'BEARISH', limit: 6 }),
-      fetchSignalScreener({ signalType: 'MOMENTUM', minScore: 60, limit: 6 }),
-      fetchTopSignals({ limit: 8 }),
+      fetchTopSignals({ direction: 'BULLISH', limit: 100 }),
+      fetchTopSignals({ direction: 'BEARISH', limit: 100 }),
+      fetchTopSignals({ direction: 'NEUTRAL', limit: 100 }),
+      fetchSignalScreener({ signalType: 'MOMENTUM', minScore: 60, limit: 100 }),
+      fetchTopSignals({ limit: 100 }),
       fetchSignalScreener({
         direction: direction || undefined,
         minScore: minScore ? Number(minScore) : undefined,
         sector: sector || undefined,
         country: country || undefined,
-        limit: 20,
+        limit: 100,
       }),
     ])
-      .then(([bullishSignals, bearishSignals, momentumSignals, recentSignals, screenerSignals]) => {
+      .then(([bullishSignals, bearishSignals, neutralSignals, momentumSignals, recentSignals, screenerSignals]) => {
         setBullish(bullishSignals);
         setBearish(bearishSignals);
+        setNeutral(neutralSignals);
         setMomentum(momentumSignals);
         setRecent(recentSignals);
         setScreener(screenerSignals);
@@ -81,6 +87,16 @@ const SignalsDashboardPage: React.FC = () => {
       .finally(() => setRunning(false));
   };
 
+  const [neutral, setNeutral] = useState<SignalResult[]>([]);
+  const activeSignals = {
+    bullish,
+    bearish,
+    neutral,
+    momentum,
+    recent,
+    screener,
+  }[activeTab];
+
   return (
     <Box sx={{ p: 3, maxWidth: 1500, mx: 'auto' }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, mb: 3, flexDirection: { xs: 'column', md: 'row' } }}>
@@ -104,8 +120,8 @@ const SignalsDashboardPage: React.FC = () => {
 
       <MarketRegimeWidget />
 
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2 }}>
+      <Box sx={{ mb: 3 }}>
+        <FilterBar onReset={() => { setDirection(''); setMinScore('60'); setSector(''); setCountry(''); }}>
           <TextField select label="Direction" value={direction} onChange={(event) => setDirection(event.target.value as SignalDirection | '')}>
             <MenuItem value="">Any</MenuItem>
             <MenuItem value="BULLISH">Bullish</MenuItem>
@@ -115,22 +131,33 @@ const SignalsDashboardPage: React.FC = () => {
           <TextField label="Min score" value={minScore} onChange={(event) => setMinScore(event.target.value)} />
           <TextField label="Sector" value={sector} onChange={(event) => setSector(event.target.value)} />
           <TextField label="Country" value={country} onChange={(event) => setCountry(event.target.value)} />
-        </Box>
+        </FilterBar>
+      </Box>
+
+      <Paper sx={{ mb: 2 }}>
+        <Tabs value={activeTab} onChange={(_event, value) => setActiveTab(value)} variant="scrollable" scrollButtons="auto">
+          {tabs.map((tab) => <Tab key={tab.value} value={tab.value} label={tab.label} />)}
+        </Tabs>
       </Paper>
 
-      {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>
-      ) : (
-        <Box sx={{ display: 'grid', gap: 3 }}>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '1fr 1fr' }, gap: 3 }}>
-            <SignalSection title="Top Bullish Signals" signals={bullish} />
-            <SignalSection title="Top Bearish Signals" signals={bearish} />
-            <SignalSection title="Momentum Leaders" signals={momentum} />
-            <SignalSection title="Recently Generated Signals" signals={recent} />
-          </Box>
-          <SignalSection title="Screener Results" signals={screener} />
-        </Box>
-      )}
+      <SignalTable
+        signals={activeSignals}
+        loading={loading}
+        page={pageByTab[activeTab]}
+        pageSize={pageSizeByTab[activeTab]}
+        sortBy={sortBy}
+        sortDirection={sortDirection}
+        onSortChange={(nextSortBy, nextDirection) => {
+          setSortBy(nextSortBy);
+          setSortDirection(nextDirection);
+          setPageByTab({ ...pageByTab, [activeTab]: 0 });
+        }}
+        onPageChange={(nextPage) => setPageByTab({ ...pageByTab, [activeTab]: nextPage })}
+        onPageSizeChange={(nextPageSize) => {
+          setPageSizeByTab({ ...pageSizeByTab, [activeTab]: nextPageSize });
+          setPageByTab({ ...pageByTab, [activeTab]: 0 });
+        }}
+      />
     </Box>
   );
 };

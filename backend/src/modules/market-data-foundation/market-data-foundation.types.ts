@@ -131,9 +131,14 @@ export interface UpdateStockRequest {
 export interface PaginationOptions {
   page: number;
   pageSize: number;
-  sortBy?: 'symbol' | 'name' | 'lastSuccessfulDataLoadTimestamp' | 'createdAt';
+  sortBy?: 'symbol' | 'name' | 'marketCap' | 'country' | 'exchange' | 'sector' | 'currency' | 'assetType' | 'lastSuccessfulDataLoadTimestamp' | 'createdAt';
   sortOrder?: 'asc' | 'desc';
   region?: string;
+  country?: string;
+  exchange?: string;
+  assetType?: string;
+  currency?: string;
+  sector?: string;
   search?: string;
 }
 

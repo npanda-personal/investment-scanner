@@ -17,6 +17,11 @@ export class MarketDataFoundationController {
       const sortOrder = req.query.sortOrder as 'asc' | 'desc' | undefined;
       const region = req.query.region as string | undefined;
       const search = req.query.search as string | undefined;
+      const country = req.query.country as string | undefined;
+      const exchange = req.query.exchange as string | undefined;
+      const assetType = req.query.assetType as string | undefined;
+      const currency = req.query.currency as string | undefined;
+      const sector = req.query.sector as string | undefined;
 
       if (page < 1) {
         return res.status(400).json({ error: 'Page must be at least 1' });
@@ -25,7 +30,7 @@ export class MarketDataFoundationController {
         return res.status(400).json({ error: 'PageSize must be between 1 and 100' });
       }
 
-      const result = await this.service.list({ page, pageSize, sortBy, sortOrder, region, search });
+      const result = await this.service.list({ page, pageSize, sortBy, sortOrder, region, country, exchange, assetType, currency, sector, search });
       return res.json(result);
     } catch (error) {
       console.error('Error listing stocks:', error);
@@ -265,7 +270,15 @@ export class MarketDataFoundationController {
       const page = parseInt(req.query.page as string) || 1;
       const pageSize = parseInt(req.query.pageSize as string) || 50;
       const search = req.query.search as string | undefined;
-      const result = await this.service.listInstruments({ page, pageSize, search });
+      const sortBy = req.query.sortBy as any;
+      const sortOrder = req.query.sortOrder as 'asc' | 'desc' | undefined;
+      const region = req.query.region as string | undefined;
+      const country = req.query.country as string | undefined;
+      const exchange = req.query.exchange as string | undefined;
+      const assetType = req.query.assetType as string | undefined;
+      const currency = req.query.currency as string | undefined;
+      const sector = req.query.sector as string | undefined;
+      const result = await this.service.listInstruments({ page, pageSize, sortBy, sortOrder, region, country, exchange, assetType, currency, sector, search });
       return res.json(result);
     } catch (error) {
       console.error('Error listing instruments:', error);

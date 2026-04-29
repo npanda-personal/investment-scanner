@@ -2,6 +2,45 @@
 import { MarketDataFoundationRepository } from '../../../src/modules/market-data-foundation';
 
 describe('MarketDataFoundationRepository', () => {
+  it('lists stocks with pagination, sorting, and market segmentation filters', async () => {
+    const prisma = {
+      stock: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await repository.listStocks({
+      page: 2,
+      pageSize: 25,
+      sortBy: 'marketCap',
+      sortOrder: 'desc',
+      region: 'US',
+      country: 'US',
+      exchange: 'NASDAQ',
+      assetType: 'EQUITY',
+      currency: 'USD',
+      sector: 'Technology',
+      search: 'apple',
+    });
+
+    expect(prisma.stock.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      skip: 25,
+      take: 25,
+      orderBy: { marketCap: 'desc' },
+      where: expect.objectContaining({
+        region: 'US',
+        country: { equals: 'US', mode: 'insensitive' },
+        exchange: { equals: 'NASDAQ', mode: 'insensitive' },
+        assetType: { equals: 'EQUITY', mode: 'insensitive' },
+        currency: { equals: 'USD', mode: 'insensitive' },
+        sector: { equals: 'Technology', mode: 'insensitive' },
+        OR: expect.any(Array),
+      }),
+    }));
+  });
+
   it('stores historical prices with upsert summary and duplicate prevention', async () => {
     const upsert = jest.fn().mockResolvedValue({});
     const latestPriceUpsert = jest.fn().mockResolvedValue({});

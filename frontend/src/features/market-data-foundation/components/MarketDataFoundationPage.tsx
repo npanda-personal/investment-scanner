@@ -4,18 +4,13 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
   CircularProgress,
   IconButton,
   InputAdornment,
+  MenuItem,
   Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TablePagination,
-  TableRow,
+  Tabs,
+  Tab,
   TextField,
   Tooltip,
   Typography,
@@ -31,15 +26,32 @@ import {
   type V1Instrument,
 } from '../api/marketDataFoundationService';
 import MarketDataStatusPanel from './MarketDataStatusPanel';
+import { DataTable, FilterBar, StatusBadge, type DataTableColumn, type SortDirection } from '@/shared/components';
 
 const formatTimestamp = (timestamp: string) => new Date(timestamp).toLocaleString();
+const formatMarketCap = (value: number | null) => value === null ? 'N/A' : new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(value);
+
+const marketTabs = [
+  { label: 'All', value: '' },
+  { label: 'US', value: 'US' },
+  { label: 'India', value: 'IN' },
+  { label: 'Europe', value: 'EU' },
+  { label: 'Other', value: 'OTHER' },
+];
 
 const MarketDataFoundationPage: React.FC = () => {
   const navigate = useNavigate();
   const [instruments, setInstruments] = useState<V1Instrument[]>([]);
   const [search, setSearch] = useState('');
+  const [market, setMarket] = useState('');
+  const [exchange, setExchange] = useState('');
+  const [assetType, setAssetType] = useState('');
+  const [currency, setCurrency] = useState('');
+  const [sector, setSector] = useState('');
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(25);
+  const [sortBy, setSortBy] = useState('symbol');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [catalogSyncing, setCatalogSyncing] = useState(false);
@@ -51,7 +63,18 @@ const MarketDataFoundationPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetchInstruments(search.trim() || undefined);
+      const response = await fetchInstruments({
+        page: page + 1,
+        pageSize,
+        sortBy,
+        sortOrder: sortDirection,
+        region: market || undefined,
+        exchange: exchange.trim() || undefined,
+        assetType: assetType.trim() || undefined,
+        currency: currency.trim() || undefined,
+        sector: sector.trim() || undefined,
+        search: search.trim() || undefined,
+      });
       setInstruments(response.instruments);
       setTotal(response.pagination.total);
     } catch (err: any) {
@@ -59,7 +82,7 @@ const MarketDataFoundationPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, [assetType, currency, exchange, market, page, pageSize, search, sector, sortBy, sortDirection]);
 
   useEffect(() => {
     loadInstruments();
@@ -107,7 +130,54 @@ const MarketDataFoundationPage: React.FC = () => {
     }
   };
 
-  const visibleInstruments = instruments.slice(page * pageSize, page * pageSize + pageSize);
+  const columns: DataTableColumn<V1Instrument>[] = [
+    {
+      id: 'symbol',
+      label: 'Symbol',
+      sortable: true,
+      render: (instrument) => <Typography fontWeight={700}>{instrument.symbol}</Typography>,
+    },
+    { id: 'name', label: 'Company', sortable: true, render: (instrument) => instrument.company_name },
+    { id: 'exchange', label: 'Exchange', sortable: true, render: (instrument) => <StatusBadge label={instrument.exchange || 'UNKNOWN'} /> },
+    { id: 'country', label: 'Country', sortable: true, render: (instrument) => instrument.country || 'N/A' },
+    { id: 'currency', label: 'Currency', sortable: true, render: (instrument) => instrument.currency },
+    { id: 'assetType', label: 'Asset Type', sortable: true, render: (instrument) => instrument.asset_type },
+    { id: 'sector', label: 'Sector', sortable: true, render: (instrument) => instrument.sector || 'N/A' },
+    { id: 'marketCap', label: 'Market Cap', sortable: true, align: 'right', render: (instrument) => formatMarketCap(instrument.market_cap) },
+    { id: 'dataStatus', label: 'Status', render: (instrument) => <StatusBadge label={instrument.data_status} /> },
+    { id: 'lastSuccessfulDataLoadTimestamp', label: 'Last Updated', sortable: true, render: (instrument) => formatTimestamp(instrument.last_updated_timestamp) },
+    {
+      id: 'sync',
+      label: 'Sync',
+      align: 'center',
+      render: (instrument) => (
+        <Tooltip title="Sync market data">
+          <span>
+            <IconButton
+              color="primary"
+              disabled={syncingId === instrument.id}
+              onClick={(event) => {
+                event.stopPropagation();
+                void handleSync(instrument);
+              }}
+            >
+              {syncingId === instrument.id ? <CircularProgress size={22} /> : <SyncIcon />}
+            </IconButton>
+          </span>
+        </Tooltip>
+      ),
+    },
+  ];
+
+  const resetFilters = () => {
+    setSearch('');
+    setMarket('');
+    setExchange('');
+    setAssetType('');
+    setCurrency('');
+    setSector('');
+    setPage(0);
+  };
 
   return (
     <Box sx={{ p: 3, maxWidth: 1400, mx: 'auto' }}>
@@ -140,10 +210,17 @@ const MarketDataFoundationPage: React.FC = () => {
 
       <MarketDataStatusPanel />
 
-      <Paper sx={{ p: 2, mb: 2 }}>
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexDirection: { xs: 'column', sm: 'row' } }}>
+      <Paper sx={{ mb: 2 }}>
+        <Tabs value={market} onChange={(_event, value) => { setMarket(value); setPage(0); }} variant="scrollable" scrollButtons="auto">
+          {marketTabs.map((tab) => <Tab key={tab.label} label={tab.label} value={tab.value} />)}
+        </Tabs>
+      </Paper>
+
+      <Box sx={{ mb: 2 }}>
+        <FilterBar onReset={resetFilters}>
           <TextField
-            fullWidth
+            sx={{ minWidth: { md: 320 }, flex: 1 }}
+            size="small"
             label="Search by symbol or company"
             value={search}
             onChange={(event) => {
@@ -158,6 +235,13 @@ const MarketDataFoundationPage: React.FC = () => {
               ),
             }}
           />
+          <TextField size="small" label="Exchange" value={exchange} onChange={(event) => { setExchange(event.target.value); setPage(0); }} sx={{ minWidth: 140 }} />
+          <TextField select size="small" label="Asset Type" value={assetType} onChange={(event) => { setAssetType(event.target.value); setPage(0); }} sx={{ minWidth: 150 }}>
+            <MenuItem value="">All</MenuItem>
+            {['EQUITY', 'ETF', 'INDEX', 'FX'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
+          </TextField>
+          <TextField size="small" label="Currency" value={currency} onChange={(event) => { setCurrency(event.target.value.toUpperCase()); setPage(0); }} sx={{ minWidth: 120 }} />
+          <TextField size="small" label="Sector" value={sector} onChange={(event) => { setSector(event.target.value); setPage(0); }} sx={{ minWidth: 180 }} />
           <Button
             variant="outlined"
             startIcon={loading ? <CircularProgress size={18} /> : <RefreshIcon />}
@@ -167,85 +251,32 @@ const MarketDataFoundationPage: React.FC = () => {
           >
             Refresh
           </Button>
-        </Box>
-      </Paper>
+        </FilterBar>
+      </Box>
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>{success}</Alert>}
 
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Symbol</TableCell>
-              <TableCell>Company Name</TableCell>
-              <TableCell>Exchange</TableCell>
-              <TableCell>Currency</TableCell>
-              <TableCell>Asset Type</TableCell>
-              <TableCell>Data Status</TableCell>
-              <TableCell>Last Updated</TableCell>
-              <TableCell align="center">Sync</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
-                  <CircularProgress />
-                </TableCell>
-              </TableRow>
-            ) : visibleInstruments.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
-                  <Typography color="text.secondary">No instruments found.</Typography>
-                </TableCell>
-              </TableRow>
-            ) : (
-              visibleInstruments.map((instrument) => (
-                <TableRow
-                  key={instrument.id}
-                  hover
-                  onClick={() => navigate(`/market-data-foundation/${instrument.id}`)}
-                  sx={{ cursor: 'pointer' }}
-                >
-                  <TableCell>
-                    <Typography fontWeight={700}>{instrument.symbol}</Typography>
-                  </TableCell>
-                  <TableCell>{instrument.company_name}</TableCell>
-                  <TableCell><Chip label={instrument.exchange || 'UNKNOWN'} size="small" variant="outlined" /></TableCell>
-                  <TableCell>{instrument.currency}</TableCell>
-                  <TableCell>{instrument.asset_type}</TableCell>
-                  <TableCell><Chip label={instrument.data_status} size="small" color={instrument.data_status === 'COMPLETE' ? 'success' : 'warning'} variant="outlined" /></TableCell>
-                  <TableCell>{formatTimestamp(instrument.last_updated_timestamp)}</TableCell>
-                  <TableCell align="center" onClick={(event) => event.stopPropagation()}>
-                    <Tooltip title="Sync market data">
-                      <span>
-                        <IconButton
-                          color="primary"
-                          disabled={syncingId === instrument.id}
-                          onClick={() => handleSync(instrument)}
-                        >
-                          {syncingId === instrument.id ? <CircularProgress size={22} /> : <SyncIcon />}
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-
-      <TablePagination
-        component="div"
-        count={total || instruments.length}
+      <DataTable
+        columns={columns}
+        rows={instruments}
+        getRowId={(instrument) => instrument.id}
+        loading={loading}
+        emptyMessage="No instruments found for the selected market and filters."
         page={page}
-        rowsPerPage={pageSize}
-        rowsPerPageOptions={[5, 10, 25, 50]}
-        onPageChange={(_event, nextPage) => setPage(nextPage)}
-        onRowsPerPageChange={(event) => {
-          setPageSize(parseInt(event.target.value, 10));
+        pageSize={pageSize}
+        totalCount={total}
+        sortBy={sortBy}
+        sortDirection={sortDirection}
+        onSortChange={(nextSortBy, nextDirection) => {
+          setSortBy(nextSortBy);
+          setSortDirection(nextDirection);
+          setPage(0);
+        }}
+        onRowClick={(instrument) => navigate(`/stocks/${instrument.id}`)}
+        onPageChange={setPage}
+        onPageSizeChange={(nextPageSize) => {
+          setPageSize(nextPageSize);
           setPage(0);
         }}
       />

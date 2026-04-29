@@ -61,6 +61,8 @@ If latest price or signal data is unavailable, the affected fields return `null`
 
 ## Frontend
 
+The watchlist detail view is table-first for tracked stocks. Users add stocks with a searchable instrument selector rather than typing raw instrument IDs. Watchlist items remain sortable through the backend sort options and are paginated in the frontend table to avoid unbounded card grids.
+
 Frontend feature root:
 
 - `frontend/src/features/watchlist-management`

@@ -75,6 +75,11 @@ export class MarketDataFoundationService {
       sortBy: options.sortBy,
       sortOrder: options.sortOrder,
       region: options.region,
+      country: options.country,
+      exchange: options.exchange,
+      assetType: options.assetType,
+      currency: options.currency,
+      sector: options.sector,
       search: options.search,
     });
 

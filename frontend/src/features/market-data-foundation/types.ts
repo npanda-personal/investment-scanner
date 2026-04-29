@@ -220,6 +220,11 @@ export interface PaginationOptions {
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   region?: string;
+  country?: string;
+  exchange?: string;
+  assetType?: string;
+  currency?: string;
+  sector?: string;
   search?: string;
 }
 

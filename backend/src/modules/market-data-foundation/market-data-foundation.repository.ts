@@ -23,6 +23,11 @@ export class MarketDataFoundationRepository {
       sortBy = 'symbol',
       sortOrder = 'asc',
       region,
+      country,
+      exchange,
+      assetType,
+      currency,
+      sector,
       search,
     } = options;
     const skip = (page - 1) * pageSize;
@@ -30,6 +35,21 @@ export class MarketDataFoundationRepository {
 
     if (region) {
       where.region = region;
+    }
+    if (country) {
+      where.country = { equals: country, mode: 'insensitive' };
+    }
+    if (exchange) {
+      where.exchange = { equals: exchange, mode: 'insensitive' };
+    }
+    if (assetType) {
+      where.assetType = { equals: assetType, mode: 'insensitive' };
+    }
+    if (currency) {
+      where.currency = { equals: currency, mode: 'insensitive' };
+    }
+    if (sector) {
+      where.sector = { equals: sector, mode: 'insensitive' };
     }
     if (search) {
       where.OR = [

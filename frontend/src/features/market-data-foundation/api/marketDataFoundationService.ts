@@ -56,6 +56,11 @@ export async function fetchStocks(options: PaginationOptions = {}): Promise<Pagi
   if (options.sortBy) params.append('sortBy', options.sortBy);
   if (options.sortOrder) params.append('sortOrder', options.sortOrder);
   if (options.region) params.append('region', options.region);
+  if (options.country) params.append('country', options.country);
+  if (options.exchange) params.append('exchange', options.exchange);
+  if (options.assetType) params.append('assetType', options.assetType);
+  if (options.currency) params.append('currency', options.currency);
+  if (options.sector) params.append('sector', options.sector);
   if (options.search) params.append('search', options.search);
 
   const response = await axios.get<BackendPaginatedResponse>(`${API_BASE}/market-data-foundation/stocks?${params.toString()}`);
@@ -152,9 +157,10 @@ export async function fetchMarketDataHealth(): Promise<MarketDataHealth> {
   return response.data;
 }
 
-export async function fetchInstruments(search?: string): Promise<V1InstrumentsResponse> {
+export async function fetchInstruments(options: PaginationOptions | string = {}): Promise<V1InstrumentsResponse> {
+  const resolvedOptions = typeof options === 'string' ? { search: options } : options;
   const response = await axios.get<V1InstrumentsResponse>(`${API_BASE}/v1/instruments`, {
-    params: search ? { search } : undefined,
+    params: resolvedOptions,
   });
   return response.data;
 }

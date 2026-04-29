@@ -349,6 +349,9 @@ Frontend:
 - Signal cards may open Alerts & Monitoring rule dialogs through public frontend exports.
 - Stock Research Workbench may expose action buttons that consume public frontend feature exports, such as adding an instrument to a watchlist.
 - Alert/status badges should use existing MUI `Chip` severity colors unless a shared design-system component is introduced later.
+- Shared table-heavy UX should use `frontend/src/shared/components/DataTable` for pagination, sorting, loading, error, and empty states where practical.
+- Shared entity lookup UX should use searchable selectors from `frontend/src/shared/components`, starting with `InstrumentSearchSelect`, instead of asking users to type raw IDs.
+- Unified stock/entity pages should prefer tabs for related views; `/stocks/:id` is the canonical stock workspace route and compatibility routes may render or redirect into it.
 - Market context dashboards should use compact cards, `Chip` status labels, and concise takeaway lists rather than large tables.
 - Backtesting dashboards should use compact metric cards, bounded trade tables, and chart views that summarize historical simulations without exposing raw config JSON as the primary UI.
 - Smart money dashboards must clearly separate real price-volume signals from unavailable insider/institutional placeholders and should use status chips plus concise explanations.

@@ -164,11 +164,19 @@ Frontend files:
 - `routes.tsx`
 - `index.ts`
 
-Route:
+Routes:
 
 - `/signals`
+- `/stocks/:id?tab=signals` links into the unified stock workspace context when stock-level signal views are expanded.
 
-The dashboard shows top bullish signals, top bearish signals, momentum leaders, recently generated signals, a filterable screener, manual signal generation, empty states, loading states, and links to `/research/stocks/:id`.
+The dashboard uses tabbed table views for Bullish, Bearish, Neutral, Momentum Leaders, Recent, and Screener. Signal lists are paginated client-side after bounded backend fetches, support column sorting for comparison fields, and keep actions available per row.
+
+Rows show current price, daily move, score, confidence, generated timestamp, top reasons, and actions:
+
+- View stock
+- Add to Watchlist
+- Add to Portfolio
+- Create Alert
 
 Manual signal generation includes an optional `Use data quality filter` checkbox. When enabled, the run skips instruments with insufficient, stale, illiquid, or unusable data according to Data Quality Engine evaluations and shows skipped/warning counts.
 
