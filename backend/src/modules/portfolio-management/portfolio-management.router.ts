@@ -1,10 +1,12 @@
 import express from 'express';
+import { requireAuth } from '../auth-identity';
 import { PortfolioManagementController } from './portfolio-management.controller';
 
 export const createPortfolioManagementRouter = (
   controller = new PortfolioManagementController()
 ) => {
   const router = express.Router();
+  router.use(requireAuth);
 
   router.get('/portfolios', controller.listPortfolios);
   router.post('/portfolios', controller.createPortfolio);
@@ -25,4 +27,3 @@ export const createPortfolioManagementRouter = (
 export const portfolioManagementRouter = createPortfolioManagementRouter();
 
 export default portfolioManagementRouter;
-

@@ -1,7 +1,9 @@
 import type { Request, Response } from 'express';
 import { SubscriptionBillingProvider } from './subscription-billing.provider';
 import { SubscriptionBillingService } from './subscription-billing.service';
-import { getParam, getUserId, requireAdmin } from './subscription-billing.validation';
+import { getParam, requireAdmin } from './subscription-billing.validation';
+
+const currentUserId = (req: Request) => (req as any).user?.id || 'default-user';
 
 export class SubscriptionBillingController {
   constructor(
@@ -9,14 +11,14 @@ export class SubscriptionBillingController {
     private readonly provider = new SubscriptionBillingProvider()
   ) {}
 
-  me = async (req: Request, res: Response) => this.respond(res, () => this.service.me(getUserId(req.headers['x-user-id'])));
+  me = async (req: Request, res: Response) => this.respond(res, () => this.service.me(currentUserId(req)));
   plans = async (_req: Request, res: Response) => this.respond(res, () => this.service.plans());
-  usage = async (req: Request, res: Response) => this.respond(res, () => this.service.usage(getUserId(req.headers['x-user-id'])));
-  features = async (req: Request, res: Response) => this.respond(res, () => this.service.features(getUserId(req.headers['x-user-id'])));
+  usage = async (req: Request, res: Response) => this.respond(res, () => this.service.usage(currentUserId(req)));
+  features = async (req: Request, res: Response) => this.respond(res, () => this.service.features(currentUserId(req)));
   providerStatus = async (_req: Request, res: Response) => this.respond(res, () => this.provider.providerStatus());
 
   changePlan = async (req: Request, res: Response) => this.respond(res, () =>
-    this.service.changePlan(req.body, getUserId(req.headers['x-user-id']))
+    this.service.changePlan(req.body, currentUserId(req))
   );
 
   adminChangePlan = async (req: Request, res: Response) => this.respond(res, () => {

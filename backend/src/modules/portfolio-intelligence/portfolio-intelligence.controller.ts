@@ -2,12 +2,14 @@ import type { Request, Response } from 'express';
 import { PortfolioIntelligenceService } from './portfolio-intelligence.service';
 import { getPortfolioId } from './portfolio-intelligence.validation';
 
+const currentUserId = (req: Request) => (req as any).user?.id || 'default-user';
+
 export class PortfolioIntelligenceController {
   constructor(private readonly service = new PortfolioIntelligenceService()) {}
 
   intelligence = async (req: Request, res: Response) => {
     try {
-      const result = await this.service.intelligence(getPortfolioId(req.params.id));
+      const result = await this.service.intelligence(getPortfolioId(req.params.id), currentUserId(req));
       if (!result) return res.status(404).json({ error: 'Portfolio not found' });
       return res.json(result);
     } catch (error) {
@@ -17,7 +19,7 @@ export class PortfolioIntelligenceController {
 
   redFlags = async (req: Request, res: Response) => {
     try {
-      const redFlags = await this.service.redFlags(getPortfolioId(req.params.id));
+      const redFlags = await this.service.redFlags(getPortfolioId(req.params.id), currentUserId(req));
       if (!redFlags) return res.status(404).json({ error: 'Portfolio not found' });
       return res.json({ redFlags });
     } catch (error) {
@@ -27,7 +29,7 @@ export class PortfolioIntelligenceController {
 
   review = async (req: Request, res: Response) => {
     try {
-      const review = await this.service.review(getPortfolioId(req.params.id));
+      const review = await this.service.review(getPortfolioId(req.params.id), currentUserId(req));
       if (!review) return res.status(404).json({ error: 'Portfolio not found' });
       return res.json({ review });
     } catch (error) {

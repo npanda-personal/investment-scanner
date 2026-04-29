@@ -25,18 +25,18 @@ export class WatchlistManagementService {
     private readonly subscriptionService = new SubscriptionBillingService()
   ) {}
 
-  listWatchlists() {
-    return this.repository.listWatchlists();
+  listWatchlists(userId = 'default-user') {
+    return this.repository.listWatchlists(userId);
   }
 
-  async createWatchlist(input: CreateWatchlistRequest) {
+  async createWatchlist(input: CreateWatchlistRequest, userId = 'default-user') {
     this.throwIfErrors(validateWatchlistInput(input));
-    await this.subscriptionService.assertAllowed('CREATE_WATCHLIST');
-    return this.repository.createWatchlist(input);
+    await this.subscriptionService.assertAllowed('CREATE_WATCHLIST', userId);
+    return this.repository.createWatchlist(input, userId);
   }
 
-  async detail(id: string, sort: WatchlistSortOption = 'recentlyAdded'): Promise<WatchlistDetailDto | null> {
-    const watchlist = await this.repository.getWatchlist(id);
+  async detail(id: string, sort: WatchlistSortOption = 'recentlyAdded', userId = 'default-user'): Promise<WatchlistDetailDto | null> {
+    const watchlist = await this.repository.getWatchlist(id, userId);
     if (!watchlist) return null;
     const items = await this.repository.listItems(id);
     const enriched = await Promise.all(items.map((item) => this.enrichItem(item)));
@@ -48,18 +48,18 @@ export class WatchlistManagementService {
     };
   }
 
-  async updateWatchlist(id: string, input: UpdateWatchlistRequest) {
+  async updateWatchlist(id: string, input: UpdateWatchlistRequest, userId = 'default-user') {
     this.throwIfErrors(validateWatchlistInput(input, true));
-    return this.repository.updateWatchlist(id, input);
+    return this.repository.updateWatchlist(id, input, userId);
   }
 
-  deleteWatchlist(id: string) {
-    return this.repository.deleteWatchlist(id);
+  deleteWatchlist(id: string, userId = 'default-user') {
+    return this.repository.deleteWatchlist(id, userId);
   }
 
-  async addItem(watchlistId: string, input: AddWatchlistItemRequest) {
+  async addItem(watchlistId: string, input: AddWatchlistItemRequest, userId = 'default-user') {
     this.throwIfErrors(validateWatchlistItemInput(input));
-    const watchlist = await this.repository.getWatchlist(watchlistId);
+    const watchlist = await this.repository.getWatchlist(watchlistId, userId);
     if (!watchlist) throw new Error('Watchlist not found');
     const duplicate = await this.repository.findItemByInstrument(watchlistId, input.instrumentId);
     if (duplicate) throw new Error('This stock already exists in this watchlist.');

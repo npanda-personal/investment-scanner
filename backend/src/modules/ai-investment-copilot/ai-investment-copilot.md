@@ -104,7 +104,8 @@ No Prisma model was added. Summaries are generated on demand.
 
 ## Known Limitations
 
-- Subscription Billing now gates copilot summaries by daily plan limits and records summary usage.
+- Auth Identity now protects copilot routes. Copilot usage gates are tied to the authenticated user.
+- Subscription Billing gates copilot summaries by daily plan limits and records summary usage.
 
 - No open-ended autonomous chat.
 - No mandatory LLM provider.

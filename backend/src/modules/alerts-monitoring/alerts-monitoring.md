@@ -98,7 +98,8 @@ Cross-feature entry points:
 
 ## Known Limitations
 
-- Subscription Billing now gates alert rule creation by plan limits. Existing alert rules remain supported and ownership is nullable until real auth is introduced.
+- Auth Identity now protects alert routes. New alert rules are owned by the authenticated user. Existing nullable-owner alert rules remain readable during migration.
+- Subscription Billing gates alert rule creation by plan limits.
 
 - Manual evaluation only; no scheduler, WebSocket, email, or push.
 - No historical crossing-state memory beyond duplicate active-event suppression.

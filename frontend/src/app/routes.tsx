@@ -12,24 +12,33 @@ import { backtestingStrategyLabRoutes } from '@/features/backtesting-strategy-la
 import { smartMoneyIntelligenceRoutes } from '@/features/smart-money-intelligence';
 import { aiInvestmentCopilotRoutes } from '@/features/ai-investment-copilot';
 import { subscriptionBillingRoutes } from '@/features/subscription-billing';
+import { protectedAuthIdentityRoutes, ProtectedRoute, publicAuthIdentityRoutes } from '@/features/auth-identity';
 
 export const appRoutes: RouteObject[] = [
+  ...publicAuthIdentityRoutes,
   {
     path: '/',
-    element: <NavigationLayout />,
+    element: <ProtectedRoute />,
     children: [
-      { index: true, element: <HomePage /> },
-      ...marketDataFoundationRoutes,
-      ...stockResearchWorkbenchRoutes,
-      ...signalGenerationEngineRoutes,
-      ...portfolioManagementRoutes,
-      ...watchlistManagementRoutes,
-      ...alertsMonitoringRoutes,
-      ...marketContextIntelligenceRoutes,
-      ...backtestingStrategyLabRoutes,
-      ...smartMoneyIntelligenceRoutes,
-      ...aiInvestmentCopilotRoutes,
-      ...subscriptionBillingRoutes,
+      {
+        path: '/',
+        element: <NavigationLayout />,
+        children: [
+          { index: true, element: <HomePage /> },
+          ...marketDataFoundationRoutes,
+          ...stockResearchWorkbenchRoutes,
+          ...signalGenerationEngineRoutes,
+          ...portfolioManagementRoutes,
+          ...watchlistManagementRoutes,
+          ...alertsMonitoringRoutes,
+          ...marketContextIntelligenceRoutes,
+          ...backtestingStrategyLabRoutes,
+          ...smartMoneyIntelligenceRoutes,
+          ...aiInvestmentCopilotRoutes,
+          ...subscriptionBillingRoutes,
+          ...protectedAuthIdentityRoutes,
+        ],
+      },
     ],
   },
 ];

@@ -10,24 +10,26 @@ import type {
 export class BacktestingStrategyLabRepository {
   constructor(private readonly db = prisma) {}
 
-  async listStrategies(): Promise<BacktestStrategyDto[]> {
-    const rows = await this.db.backtestStrategy.findMany({ orderBy: { updatedAt: 'desc' } });
+  async listStrategies(userId = 'default-user'): Promise<BacktestStrategyDto[]> {
+    const rows = await this.db.backtestStrategy.findMany({ where: this.ownerWhere(userId), orderBy: { updatedAt: 'desc' } });
     return rows.map(this.toStrategyDto);
   }
 
-  async createStrategy(input: CreateBacktestStrategyRequest): Promise<BacktestStrategyDto> {
+  async createStrategy(input: CreateBacktestStrategyRequest, userId = 'default-user'): Promise<BacktestStrategyDto> {
     const row = await this.db.backtestStrategy.create({
-      data: { name: input.name.trim(), userId: 'default-user', description: input.description ?? null, config: input.config as unknown as Prisma.InputJsonValue },
+      data: { name: input.name.trim(), userId, description: input.description ?? null, config: input.config as unknown as Prisma.InputJsonValue },
     });
     return this.toStrategyDto(row);
   }
 
-  async getStrategy(id: string): Promise<BacktestStrategyDto | null> {
-    const row = await this.db.backtestStrategy.findUnique({ where: { id } });
+  async getStrategy(id: string, userId = 'default-user'): Promise<BacktestStrategyDto | null> {
+    const row = await this.db.backtestStrategy.findFirst({ where: { id, ...this.ownerWhere(userId) } });
     return row ? this.toStrategyDto(row) : null;
   }
 
-  async updateStrategy(id: string, input: UpdateBacktestStrategyRequest): Promise<BacktestStrategyDto> {
+  async updateStrategy(id: string, input: UpdateBacktestStrategyRequest, userId = 'default-user'): Promise<BacktestStrategyDto> {
+    const existing = await this.getStrategy(id, userId);
+    if (!existing) throw new Error('Strategy not found');
     const row = await this.db.backtestStrategy.update({
       where: { id },
       data: {
@@ -39,15 +41,17 @@ export class BacktestingStrategyLabRepository {
     return this.toStrategyDto(row);
   }
 
-  async deleteStrategy(id: string): Promise<void> {
+  async deleteStrategy(id: string, userId = 'default-user'): Promise<void> {
+    const existing = await this.getStrategy(id, userId);
+    if (!existing) throw new Error('Strategy not found');
     await this.db.backtestStrategy.delete({ where: { id } });
   }
 
-  async createRun(data: Omit<BacktestRunDto, 'id' | 'startedAt'>): Promise<BacktestRunDto> {
+  async createRun(data: Omit<BacktestRunDto, 'id' | 'startedAt'>, userId = 'default-user'): Promise<BacktestRunDto> {
     const row = await this.db.backtestRun.create({
       data: {
         strategyId: data.strategyId,
-        userId: 'default-user',
+        userId,
         config: data.config as unknown as Prisma.InputJsonValue,
         status: data.status,
         completedAt: data.completedAt ? new Date(data.completedAt) : null,
@@ -60,18 +64,24 @@ export class BacktestingStrategyLabRepository {
     return this.toRunDto(row);
   }
 
-  async listRuns(): Promise<BacktestRunDto[]> {
-    const rows = await this.db.backtestRun.findMany({ orderBy: { startedAt: 'desc' }, take: 100 });
+  async listRuns(userId = 'default-user'): Promise<BacktestRunDto[]> {
+    const rows = await this.db.backtestRun.findMany({ where: this.ownerWhere(userId), orderBy: { startedAt: 'desc' }, take: 100 });
     return rows.map(this.toRunDto);
   }
 
-  async getRun(id: string): Promise<BacktestRunDto | null> {
-    const row = await this.db.backtestRun.findUnique({ where: { id } });
+  async getRun(id: string, userId = 'default-user'): Promise<BacktestRunDto | null> {
+    const row = await this.db.backtestRun.findFirst({ where: { id, ...this.ownerWhere(userId) } });
     return row ? this.toRunDto(row) : null;
   }
 
-  async deleteRun(id: string): Promise<void> {
+  async deleteRun(id: string, userId = 'default-user'): Promise<void> {
+    const existing = await this.getRun(id, userId);
+    if (!existing) throw new Error('Backtest run not found');
     await this.db.backtestRun.delete({ where: { id } });
+  }
+
+  private ownerWhere(userId: string) {
+    return { OR: [{ userId }, { userId: null }] };
   }
 
   private toStrategyDto(row: any): BacktestStrategyDto {

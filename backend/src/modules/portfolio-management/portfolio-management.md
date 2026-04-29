@@ -88,7 +88,8 @@ Realized P&L and FIFO accounting are intentionally out of scope for this MVP.
 
 ## Known Limitations
 
-- Subscription Billing now gates portfolio creation by plan limits. Existing portfolios remain supported and ownership is nullable until real auth is introduced.
+- Auth Identity now protects portfolio routes. New portfolios are owned by the authenticated user. Existing nullable-owner portfolios remain readable during migration.
+- Subscription Billing gates portfolio creation by plan limits.
 
 - No multi-currency FX conversion is applied yet; values are calculated in the holding currency and portfolio base currency is metadata only.
 - No broker sync, rebalancing, recommendations, tax logic, optimization, or advanced attribution.

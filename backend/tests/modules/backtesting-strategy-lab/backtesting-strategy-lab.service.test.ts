@@ -111,7 +111,7 @@ describe('BacktestingStrategyLabService', () => {
 
     await service.runStrategy('strategy-1');
 
-    expect(repository.getStrategy).toHaveBeenCalledWith('strategy-1');
-    expect(repository.createRun).toHaveBeenCalledWith(expect.objectContaining({ strategyId: 'strategy-1' }));
+    expect(repository.getStrategy).toHaveBeenCalledWith('strategy-1', 'default-user');
+    expect(repository.createRun).toHaveBeenCalledWith(expect.objectContaining({ strategyId: 'strategy-1' }), 'default-user');
   });
 });

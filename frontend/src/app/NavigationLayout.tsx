@@ -32,9 +32,11 @@ import TimelineIcon from '@mui/icons-material/Timeline';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import PsychologyIcon from '@mui/icons-material/Psychology';
 import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import { useThemeMode } from './ThemeContext';
+import { useAuthIdentity } from '@/features/auth-identity';
 
 const drawerWidth = 260;
 const collapsedWidth = 72;
@@ -51,11 +53,13 @@ const navItems = [
   { path: '/smart-money', label: 'Smart Money', icon: <AccountTreeIcon /> },
   { path: '/copilot', label: 'AI Copilot', icon: <PsychologyIcon /> },
   { path: '/billing', label: 'Billing', icon: <WorkspacePremiumIcon /> },
+  { path: '/account', label: 'Account', icon: <AccountCircleIcon /> },
 ];
 
 export default function NavigationLayout() {
   const theme = useTheme();
   const { themeMode, toggleTheme } = useThemeMode();
+  const { user, logout } = useAuthIdentity();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [open, setOpen] = useState(!isMobile);
   const location = useLocation();
@@ -111,6 +115,8 @@ export default function NavigationLayout() {
             <Typography variant="h6" noWrap sx={{ fontWeight: 700 }}>{activeLabel}</Typography>
           </Stack>
           <Switch checked={themeMode === 'dark'} onChange={toggleTheme} size="small" icon={<Brightness4Icon fontSize="small" />} checkedIcon={<Brightness7Icon fontSize="small" />} />
+          {user && <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>{user.email}</Typography>}
+          {user && <IconButton color="inherit" size="small" onClick={() => void logout()} title="Log out"><AccountCircleIcon fontSize="small" /></IconButton>}
         </Toolbar>
       </AppBar>
       <Drawer variant={isMobile ? 'temporary' : 'persistent'} open={open} onClose={() => setOpen(false)} sx={{ width: open ? drawerWidth : collapsedWidth, flexShrink: 0, '& .MuiDrawer-paper': { width: open ? drawerWidth : collapsedWidth, boxSizing: 'border-box', borderRight: '1px solid', borderColor: 'divider' } }}>

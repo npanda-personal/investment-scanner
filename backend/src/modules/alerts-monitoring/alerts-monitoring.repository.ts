@@ -11,8 +11,8 @@ import type {
 export class AlertsMonitoringRepository {
   constructor(private readonly db = prisma) {}
 
-  async listRules(): Promise<AlertRuleDto[]> {
-    const rules = await this.db.alertRule.findMany({ orderBy: { updatedAt: 'desc' } });
+  async listRules(userId = 'default-user'): Promise<AlertRuleDto[]> {
+    const rules = await this.db.alertRule.findMany({ where: this.ownerWhere(userId), orderBy: { updatedAt: 'desc' } });
     return rules.map(this.toRuleDto);
   }
 
@@ -21,16 +21,16 @@ export class AlertsMonitoringRepository {
     return rules.map(this.toRuleDto);
   }
 
-  async getRule(id: string): Promise<AlertRuleDto | null> {
-    const rule = await this.db.alertRule.findUnique({ where: { id } });
+  async getRule(id: string, userId = 'default-user'): Promise<AlertRuleDto | null> {
+    const rule = await this.db.alertRule.findFirst({ where: { id, ...this.ownerWhere(userId) } });
     return rule ? this.toRuleDto(rule) : null;
   }
 
-  async createRule(input: CreateAlertRuleRequest): Promise<AlertRuleDto> {
+  async createRule(input: CreateAlertRuleRequest, userId = 'default-user'): Promise<AlertRuleDto> {
     const rule = await this.db.alertRule.create({
       data: {
         name: input.name.trim(),
-        userId: 'default-user',
+        userId,
         type: input.type,
         scope: input.scope,
         instrumentId: input.instrumentId ?? null,
@@ -107,6 +107,10 @@ export class AlertsMonitoringRepository {
   async markAllRead(): Promise<{ updated: number }> {
     const result = await this.db.alertEvent.updateMany({ where: { readAt: null, dismissedAt: null }, data: { readAt: new Date() } });
     return { updated: result.count };
+  }
+
+  private ownerWhere(userId: string) {
+    return { OR: [{ userId }, { userId: null }] };
   }
 
   private toRuleDto(record: any): AlertRuleDto {

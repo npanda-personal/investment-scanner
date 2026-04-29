@@ -14,6 +14,7 @@ import { backtestingStrategyLabRouter } from '../modules/backtesting-strategy-la
 import { smartMoneyIntelligenceRouter } from '../modules/smart-money-intelligence';
 import { aiInvestmentCopilotRouter } from '../modules/ai-investment-copilot';
 import { subscriptionBillingRouter } from '../modules/subscription-billing';
+import { authIdentityRouter } from '../modules/auth-identity';
 
 export interface ApiModule {
   path: string;
@@ -22,6 +23,7 @@ export interface ApiModule {
 
 export const apiModules: ApiModule[] = [
   { path: '/api/v1', router: marketDataV1Router },
+  { path: '/api/v1', router: authIdentityRouter },
   { path: '/api/v1', router: stockResearchWorkbenchRouter },
   { path: '/api/v1', router: signalGenerationEngineRouter },
   { path: '/api/v1', router: portfolioManagementRouter },

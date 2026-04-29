@@ -74,7 +74,8 @@ The feature exposes a reusable `AddToWatchlistDialog` used by Signal Generation 
 
 ## Known Limitations
 
-- Subscription Billing now gates watchlist creation by plan limits. Existing watchlists remain supported and ownership is nullable until real auth is introduced.
+- Auth Identity now protects watchlist routes. New watchlists are owned by the authenticated user. Existing nullable-owner watchlists remain readable during migration.
+- Subscription Billing gates watchlist creation by plan limits.
 
 - No alerts, notification rules, conviction scoring, or idea-stage workflow yet.
 - Tags are stored as a simple JSON string array.

@@ -27,18 +27,18 @@ export class PortfolioManagementService {
     private readonly subscriptionService = new SubscriptionBillingService()
   ) {}
 
-  listPortfolios() {
-    return this.repository.listPortfolios();
+  listPortfolios(userId = 'default-user') {
+    return this.repository.listPortfolios(userId);
   }
 
-  async createPortfolio(input: CreatePortfolioRequest) {
+  async createPortfolio(input: CreatePortfolioRequest, userId = 'default-user') {
     this.throwIfErrors(validatePortfolioInput(input));
-    await this.subscriptionService.assertAllowed('CREATE_PORTFOLIO');
-    return this.repository.createPortfolio(input);
+    await this.subscriptionService.assertAllowed('CREATE_PORTFOLIO', userId);
+    return this.repository.createPortfolio(input, userId);
   }
 
-  async getPortfolioDetail(id: string) {
-    const portfolio = await this.repository.getPortfolio(id);
+  async getPortfolioDetail(id: string, userId = 'default-user') {
+    const portfolio = await this.repository.getPortfolio(id, userId);
     if (!portfolio) return null;
     return {
       portfolio,
@@ -46,18 +46,18 @@ export class PortfolioManagementService {
     };
   }
 
-  async updatePortfolio(id: string, input: UpdatePortfolioRequest) {
+  async updatePortfolio(id: string, input: UpdatePortfolioRequest, userId = 'default-user') {
     this.throwIfErrors(validatePortfolioInput(input, true));
-    return this.repository.updatePortfolio(id, input);
+    return this.repository.updatePortfolio(id, input, userId);
   }
 
-  deletePortfolio(id: string) {
-    return this.repository.deletePortfolio(id);
+  deletePortfolio(id: string, userId = 'default-user') {
+    return this.repository.deletePortfolio(id, userId);
   }
 
-  async addHolding(portfolioId: string, input: CreateHoldingRequest) {
+  async addHolding(portfolioId: string, input: CreateHoldingRequest, userId = 'default-user') {
     this.throwIfErrors(validateHoldingInput(input));
-    const portfolio = await this.repository.getPortfolio(portfolioId);
+    const portfolio = await this.repository.getPortfolio(portfolioId, userId);
     if (!portfolio) throw new Error('Portfolio not found');
     const instrument = await this.marketDataService.getInstrument(input.instrumentId);
     if (!instrument) throw new Error('Instrument not found');
@@ -73,8 +73,8 @@ export class PortfolioManagementService {
     return this.repository.removeHolding(portfolioId, holdingId);
   }
 
-  async summary(portfolioId: string): Promise<PortfolioSummaryDto | null> {
-    const portfolio = await this.repository.getPortfolio(portfolioId);
+  async summary(portfolioId: string, userId = 'default-user'): Promise<PortfolioSummaryDto | null> {
+    const portfolio = await this.repository.getPortfolio(portfolioId, userId);
     if (!portfolio) return null;
     const holdings = await this.repository.listHoldings(portfolioId);
     const valuedHoldings = await Promise.all(holdings.map((holding) => this.valueHolding(holding)));
@@ -102,8 +102,8 @@ export class PortfolioManagementService {
     };
   }
 
-  async allocation(portfolioId: string): Promise<PortfolioAllocationDto | null> {
-    const summary = await this.summary(portfolioId);
+  async allocation(portfolioId: string, userId = 'default-user'): Promise<PortfolioAllocationDto | null> {
+    const summary = await this.summary(portfolioId, userId);
     if (!summary) return null;
     return {
       portfolioId,
@@ -123,9 +123,9 @@ export class PortfolioManagementService {
     return this.repository.listTransactions(portfolioId);
   }
 
-  async createTransaction(portfolioId: string, input: CreateTransactionRequest) {
+  async createTransaction(portfolioId: string, input: CreateTransactionRequest, userId = 'default-user') {
     this.throwIfErrors(validateTransactionInput(input));
-    const portfolio = await this.repository.getPortfolio(portfolioId);
+    const portfolio = await this.repository.getPortfolio(portfolioId, userId);
     if (!portfolio) throw new Error('Portfolio not found');
     if (input.instrumentId) {
       const instrument = await this.marketDataService.getInstrument(input.instrumentId);

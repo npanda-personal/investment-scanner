@@ -1,4 +1,5 @@
 import express from 'express';
+import { requireAuth } from '../auth-identity';
 import { SubscriptionBillingController } from './subscription-billing.controller';
 
 export const createSubscriptionBillingRouter = (
@@ -6,6 +7,7 @@ export const createSubscriptionBillingRouter = (
 ) => {
   const router = express.Router();
 
+  router.use(requireAuth);
   router.get('/subscription/me', controller.me);
   router.get('/subscription/plans', controller.plans);
   router.post('/subscription/change-plan', controller.changePlan);

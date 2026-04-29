@@ -1,10 +1,12 @@
 import express from 'express';
+import { requireAuth } from '../auth-identity';
 import { BacktestingStrategyLabController } from './backtesting-strategy-lab.controller';
 
 export const createBacktestingStrategyLabRouter = (
   controller = new BacktestingStrategyLabController()
 ) => {
   const router = express.Router();
+  router.use(requireAuth);
 
   router.get('/backtests/strategies', controller.listStrategies);
   router.post('/backtests/strategies', controller.createStrategy);

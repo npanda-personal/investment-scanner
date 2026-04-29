@@ -25,28 +25,28 @@ export class BacktestingStrategyLabService {
     private readonly subscriptionService = new SubscriptionBillingService()
   ) {}
 
-  listStrategies() { return this.repository.listStrategies(); }
-  getStrategy(id: string) { return this.repository.getStrategy(id); }
-  deleteStrategy(id: string) { return this.repository.deleteStrategy(id); }
-  listRuns() { return this.repository.listRuns(); }
-  getRun(id: string) { return this.repository.getRun(id); }
-  deleteRun(id: string) { return this.repository.deleteRun(id); }
+  listStrategies(userId = 'default-user') { return this.repository.listStrategies(userId); }
+  getStrategy(id: string, userId = 'default-user') { return this.repository.getStrategy(id, userId); }
+  deleteStrategy(id: string, userId = 'default-user') { return this.repository.deleteStrategy(id, userId); }
+  listRuns(userId = 'default-user') { return this.repository.listRuns(userId); }
+  getRun(id: string, userId = 'default-user') { return this.repository.getRun(id, userId); }
+  deleteRun(id: string, userId = 'default-user') { return this.repository.deleteRun(id, userId); }
 
-  async createStrategy(input: CreateBacktestStrategyRequest) {
+  async createStrategy(input: CreateBacktestStrategyRequest, userId = 'default-user') {
     this.throwIfErrors(validateStrategyInput(input));
-    return this.repository.createStrategy(input);
+    return this.repository.createStrategy(input, userId);
   }
 
-  async updateStrategy(id: string, input: UpdateBacktestStrategyRequest) {
-    const existing = await this.repository.getStrategy(id);
+  async updateStrategy(id: string, input: UpdateBacktestStrategyRequest, userId = 'default-user') {
+    const existing = await this.repository.getStrategy(id, userId);
     if (!existing) throw new Error('Strategy not found');
     this.throwIfErrors(validateStrategyInput({ ...existing, ...input, config: input.config ?? existing.config }, false));
-    return this.repository.updateStrategy(id, input);
+    return this.repository.updateStrategy(id, input, userId);
   }
 
-  async run(request: RunBacktestRequest): Promise<BacktestRunDto> {
-    await this.subscriptionService.assertAllowed('RUN_BACKTEST');
-    const strategy = request.strategyId ? await this.repository.getStrategy(request.strategyId) : null;
+  async run(request: RunBacktestRequest, userId = 'default-user'): Promise<BacktestRunDto> {
+    await this.subscriptionService.assertAllowed('RUN_BACKTEST', userId);
+    const strategy = request.strategyId ? await this.repository.getStrategy(request.strategyId, userId) : null;
     if (request.strategyId && !strategy) throw new Error('Strategy not found');
     const config = request.config ?? strategy?.config;
     this.throwIfErrors(validateConfig(config));
@@ -61,8 +61,8 @@ export class BacktestingStrategyLabService {
         equityCurve: result.equityCurve,
         trades: result.trades,
         error: null,
-      });
-      await this.subscriptionService.recordUsage('RUN_BACKTEST');
+      }, userId);
+      await this.subscriptionService.recordUsage('RUN_BACKTEST', userId);
       return run;
     } catch (error: any) {
       return this.repository.createRun({
@@ -74,12 +74,12 @@ export class BacktestingStrategyLabService {
         equityCurve: [],
         trades: [],
         error: error.message || 'Backtest failed',
-      });
+      }, userId);
     }
   }
 
-  async runStrategy(id: string) {
-    return this.run({ strategyId: id });
+  async runStrategy(id: string, userId = 'default-user') {
+    return this.run({ strategyId: id }, userId);
   }
 
   async simulate(config: BacktestStrategyConfig): Promise<{ metrics: BacktestMetrics; trades: BacktestTrade[]; equityCurve: EquityCurvePoint[] }> {

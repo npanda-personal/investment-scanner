@@ -1,10 +1,12 @@
 import express from 'express';
+import { requireAuth } from '../auth-identity';
 import { AiInvestmentCopilotController } from './ai-investment-copilot.controller';
 
 export const createAiInvestmentCopilotRouter = (
   controller = new AiInvestmentCopilotController()
 ) => {
   const router = express.Router();
+  router.use(requireAuth);
 
   router.post('/copilot/stock-summary', controller.stockSummary);
   router.post('/copilot/portfolio-summary', controller.portfolioSummary);

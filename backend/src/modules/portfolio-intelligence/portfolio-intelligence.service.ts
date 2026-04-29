@@ -31,21 +31,21 @@ export class PortfolioIntelligenceService {
     private readonly thresholds: PortfolioIntelligenceThresholds = DEFAULT_PORTFOLIO_INTELLIGENCE_THRESHOLDS
   ) {}
 
-  async intelligence(portfolioId: string): Promise<PortfolioIntelligenceResponse | null> {
-    const summary = await this.portfolioService.summary(portfolioId);
+  async intelligence(portfolioId: string, userId = 'default-user'): Promise<PortfolioIntelligenceResponse | null> {
+    const summary = await this.portfolioService.summary(portfolioId, userId);
     if (!summary) return null;
-    const allocation = await this.portfolioService.allocation(portfolioId);
+    const allocation = await this.portfolioService.allocation(portfolioId, userId);
     if (!allocation) return null;
     return this.buildIntelligence(summary, allocation);
   }
 
-  async redFlags(portfolioId: string): Promise<RedFlag[] | null> {
-    const result = await this.intelligence(portfolioId);
+  async redFlags(portfolioId: string, userId = 'default-user'): Promise<RedFlag[] | null> {
+    const result = await this.intelligence(portfolioId, userId);
     return result?.redFlags ?? null;
   }
 
-  async review(portfolioId: string): Promise<ReviewItem[] | null> {
-    const result = await this.intelligence(portfolioId);
+  async review(portfolioId: string, userId = 'default-user'): Promise<ReviewItem[] | null> {
+    const result = await this.intelligence(portfolioId, userId);
     return result?.reviewRanking ?? null;
   }
 

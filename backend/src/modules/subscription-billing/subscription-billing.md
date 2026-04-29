@@ -21,7 +21,7 @@ Subscription statuses:
 - `CANCELED`
 - `EXPIRED`
 
-The MVP creates a local `default-user` until real auth is introduced.
+Authenticated flows use the current `auth-identity` user id. The legacy `default-user` remains only as a fallback for tests or unauthenticated internal calls.
 
 ## Feature Gates
 
@@ -123,7 +123,7 @@ The page shows:
 
 ## Known Limitations
 
-- No real authentication yet.
+- No external billing provider yet.
 - No organizations or multi-tenant hierarchy.
 - No Stripe checkout.
 - No invoices, tax, coupons, seat management, or SSO.

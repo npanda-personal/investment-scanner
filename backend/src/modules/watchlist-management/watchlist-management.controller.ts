@@ -2,12 +2,14 @@ import type { Request, Response } from 'express';
 import { WatchlistManagementService } from './watchlist-management.service';
 import { getParam, parseSortOption } from './watchlist-management.validation';
 
+const currentUserId = (req: Request) => (req as any).user?.id || 'default-user';
+
 export class WatchlistManagementController {
   constructor(private readonly service = new WatchlistManagementService()) {}
 
-  listWatchlists = async (_req: Request, res: Response) => {
+  listWatchlists = async (req: Request, res: Response) => {
     try {
-      return res.json({ watchlists: await this.service.listWatchlists() });
+      return res.json({ watchlists: await this.service.listWatchlists(currentUserId(req)) });
     } catch (error) {
       return this.error(res, error, 'Failed to list watchlists');
     }
@@ -15,7 +17,7 @@ export class WatchlistManagementController {
 
   createWatchlist = async (req: Request, res: Response) => {
     try {
-      return res.status(201).json(await this.service.createWatchlist(req.body));
+      return res.status(201).json(await this.service.createWatchlist(req.body, currentUserId(req)));
     } catch (error) {
       return this.error(res, error, 'Failed to create watchlist', 400);
     }
@@ -23,7 +25,7 @@ export class WatchlistManagementController {
 
   getWatchlist = async (req: Request, res: Response) => {
     try {
-      const result = await this.service.detail(getParam(req.params.id), parseSortOption(req.query.sort));
+      const result = await this.service.detail(getParam(req.params.id), parseSortOption(req.query.sort), currentUserId(req));
       if (!result) return res.status(404).json({ error: 'Watchlist not found' });
       return res.json(result);
     } catch (error) {
@@ -33,7 +35,7 @@ export class WatchlistManagementController {
 
   updateWatchlist = async (req: Request, res: Response) => {
     try {
-      return res.json(await this.service.updateWatchlist(getParam(req.params.id), req.body));
+      return res.json(await this.service.updateWatchlist(getParam(req.params.id), req.body, currentUserId(req)));
     } catch (error) {
       return this.error(res, error, 'Failed to update watchlist', 400);
     }
@@ -41,7 +43,7 @@ export class WatchlistManagementController {
 
   deleteWatchlist = async (req: Request, res: Response) => {
     try {
-      await this.service.deleteWatchlist(getParam(req.params.id));
+      await this.service.deleteWatchlist(getParam(req.params.id), currentUserId(req));
       return res.status(204).send();
     } catch (error) {
       return this.error(res, error, 'Failed to delete watchlist');
@@ -50,7 +52,7 @@ export class WatchlistManagementController {
 
   addItem = async (req: Request, res: Response) => {
     try {
-      return res.status(201).json(await this.service.addItem(getParam(req.params.id), req.body));
+      return res.status(201).json(await this.service.addItem(getParam(req.params.id), req.body, currentUserId(req)));
     } catch (error) {
       return this.error(res, error, 'Failed to add watchlist item', 400);
     }

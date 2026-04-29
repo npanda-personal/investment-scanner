@@ -1,10 +1,12 @@
 import express from 'express';
+import { requireAuth } from '../auth-identity';
 import { PortfolioIntelligenceController } from './portfolio-intelligence.controller';
 
 export const createPortfolioIntelligenceRouter = (
   controller = new PortfolioIntelligenceController()
 ) => {
   const router = express.Router();
+  router.use(requireAuth);
 
   router.get('/portfolios/:id/intelligence', controller.intelligence);
   router.get('/portfolios/:id/red-flags', controller.redFlags);

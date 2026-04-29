@@ -2,12 +2,14 @@ import type { Request, Response } from 'express';
 import { PortfolioManagementService } from './portfolio-management.service';
 import { getParam } from './portfolio-management.validation';
 
+const currentUserId = (req: Request) => (req as any).user?.id || 'default-user';
+
 export class PortfolioManagementController {
   constructor(private readonly service = new PortfolioManagementService()) {}
 
-  listPortfolios = async (_req: Request, res: Response) => {
+  listPortfolios = async (req: Request, res: Response) => {
     try {
-      return res.json({ portfolios: await this.service.listPortfolios() });
+      return res.json({ portfolios: await this.service.listPortfolios(currentUserId(req)) });
     } catch (error) {
       return this.error(res, error, 'Failed to list portfolios');
     }
@@ -15,7 +17,7 @@ export class PortfolioManagementController {
 
   createPortfolio = async (req: Request, res: Response) => {
     try {
-      return res.status(201).json(await this.service.createPortfolio(req.body));
+      return res.status(201).json(await this.service.createPortfolio(req.body, currentUserId(req)));
     } catch (error) {
       return this.error(res, error, 'Failed to create portfolio', 400);
     }
@@ -23,7 +25,7 @@ export class PortfolioManagementController {
 
   getPortfolio = async (req: Request, res: Response) => {
     try {
-      const result = await this.service.getPortfolioDetail(getParam(req.params.id));
+      const result = await this.service.getPortfolioDetail(getParam(req.params.id), currentUserId(req));
       if (!result) return res.status(404).json({ error: 'Portfolio not found' });
       return res.json(result);
     } catch (error) {
@@ -33,7 +35,7 @@ export class PortfolioManagementController {
 
   updatePortfolio = async (req: Request, res: Response) => {
     try {
-      return res.json(await this.service.updatePortfolio(getParam(req.params.id), req.body));
+      return res.json(await this.service.updatePortfolio(getParam(req.params.id), req.body, currentUserId(req)));
     } catch (error) {
       return this.error(res, error, 'Failed to update portfolio', 400);
     }
@@ -41,7 +43,7 @@ export class PortfolioManagementController {
 
   deletePortfolio = async (req: Request, res: Response) => {
     try {
-      await this.service.deletePortfolio(getParam(req.params.id));
+      await this.service.deletePortfolio(getParam(req.params.id), currentUserId(req));
       return res.status(204).send();
     } catch (error) {
       return this.error(res, error, 'Failed to delete portfolio');
@@ -50,7 +52,7 @@ export class PortfolioManagementController {
 
   addHolding = async (req: Request, res: Response) => {
     try {
-      return res.status(201).json(await this.service.addHolding(getParam(req.params.id), req.body));
+      return res.status(201).json(await this.service.addHolding(getParam(req.params.id), req.body, currentUserId(req)));
     } catch (error) {
       return this.error(res, error, 'Failed to add holding', 400);
     }
@@ -75,7 +77,7 @@ export class PortfolioManagementController {
 
   summary = async (req: Request, res: Response) => {
     try {
-      const result = await this.service.summary(getParam(req.params.id));
+      const result = await this.service.summary(getParam(req.params.id), currentUserId(req));
       if (!result) return res.status(404).json({ error: 'Portfolio not found' });
       return res.json(result);
     } catch (error) {
@@ -85,7 +87,7 @@ export class PortfolioManagementController {
 
   allocation = async (req: Request, res: Response) => {
     try {
-      const result = await this.service.allocation(getParam(req.params.id));
+      const result = await this.service.allocation(getParam(req.params.id), currentUserId(req));
       if (!result) return res.status(404).json({ error: 'Portfolio not found' });
       return res.json(result);
     } catch (error) {
@@ -103,7 +105,7 @@ export class PortfolioManagementController {
 
   createTransaction = async (req: Request, res: Response) => {
     try {
-      return res.status(201).json(await this.service.createTransaction(getParam(req.params.id), req.body));
+      return res.status(201).json(await this.service.createTransaction(getParam(req.params.id), req.body, currentUserId(req)));
     } catch (error) {
       return this.error(res, error, 'Failed to create transaction', 400);
     }
@@ -115,4 +117,3 @@ export class PortfolioManagementController {
     return res.status(status).json({ error: message });
   }
 }
-

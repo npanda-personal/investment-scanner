@@ -23,28 +23,32 @@ export class AlertsMonitoringService {
     private readonly subscriptionService = new SubscriptionBillingService()
   ) {}
 
-  listRules() { return this.repository.listRules(); }
-  getRule(id: string) { return this.repository.getRule(id); }
+  listRules(userId = 'default-user') { return this.repository.listRules(userId); }
+  getRule(id: string, userId = 'default-user') { return this.repository.getRule(id, userId); }
   listEvents() { return this.repository.listEvents(); }
   markRead(id: string) { return this.repository.markRead(id); }
   dismiss(id: string) { return this.repository.dismiss(id); }
   markAllRead() { return this.repository.markAllRead(); }
 
-  async createRule(input: CreateAlertRuleRequest) {
+  async createRule(input: CreateAlertRuleRequest, userId = 'default-user') {
     this.throwIfErrors(validateAlertRuleInput(input));
-    await this.subscriptionService.assertAllowed('CREATE_ALERT');
-    return this.repository.createRule(input);
+    await this.subscriptionService.assertAllowed('CREATE_ALERT', userId);
+    return this.repository.createRule(input, userId);
   }
 
-  async updateRule(id: string, input: UpdateAlertRuleRequest) {
-    const existing = await this.repository.getRule(id);
+  async updateRule(id: string, input: UpdateAlertRuleRequest, userId = 'default-user') {
+    const existing = await this.repository.getRule(id, userId);
     if (!existing) throw new Error('Alert rule not found');
     const merged = { ...existing, ...input, condition: input.condition ?? existing.condition };
     this.throwIfErrors(validateAlertRuleInput(merged, false));
     return this.repository.updateRule(id, input);
   }
 
-  deleteRule(id: string) { return this.repository.deleteRule(id); }
+  async deleteRule(id: string, userId = 'default-user') {
+    const existing = await this.repository.getRule(id, userId);
+    if (!existing) throw new Error('Alert rule not found');
+    return this.repository.deleteRule(id);
+  }
 
   async evaluate(): Promise<AlertEvaluationResult> {
     const rules = await this.repository.enabledRules();

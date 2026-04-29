@@ -13,28 +13,30 @@ import { normalizeTags } from './watchlist-management.validation';
 export class WatchlistManagementRepository {
   constructor(private readonly db = prisma) {}
 
-  async listWatchlists(): Promise<WatchlistDto[]> {
-    const watchlists = await this.db.watchlist.findMany({ orderBy: { updatedAt: 'desc' } });
+  async listWatchlists(userId = 'default-user'): Promise<WatchlistDto[]> {
+    const watchlists = await this.db.watchlist.findMany({ where: this.ownerWhere(userId), orderBy: { updatedAt: 'desc' } });
     return watchlists.map(this.toWatchlistDto);
   }
 
-  async createWatchlist(input: CreateWatchlistRequest): Promise<WatchlistDto> {
+  async createWatchlist(input: CreateWatchlistRequest, userId = 'default-user'): Promise<WatchlistDto> {
     const watchlist = await this.db.watchlist.create({
       data: {
         name: input.name.trim(),
-        userId: 'default-user',
+        userId,
         description: input.description ?? null,
       },
     });
     return this.toWatchlistDto(watchlist);
   }
 
-  async getWatchlist(id: string): Promise<WatchlistDto | null> {
-    const watchlist = await this.db.watchlist.findUnique({ where: { id } });
+  async getWatchlist(id: string, userId = 'default-user'): Promise<WatchlistDto | null> {
+    const watchlist = await this.db.watchlist.findFirst({ where: { id, ...this.ownerWhere(userId) } });
     return watchlist ? this.toWatchlistDto(watchlist) : null;
   }
 
-  async updateWatchlist(id: string, input: UpdateWatchlistRequest): Promise<WatchlistDto> {
+  async updateWatchlist(id: string, input: UpdateWatchlistRequest, userId = 'default-user'): Promise<WatchlistDto> {
+    const existing = await this.getWatchlist(id, userId);
+    if (!existing) throw new Error('Watchlist not found');
     const watchlist = await this.db.watchlist.update({
       where: { id },
       data: {
@@ -45,7 +47,9 @@ export class WatchlistManagementRepository {
     return this.toWatchlistDto(watchlist);
   }
 
-  async deleteWatchlist(id: string): Promise<void> {
+  async deleteWatchlist(id: string, userId = 'default-user'): Promise<void> {
+    const existing = await this.getWatchlist(id, userId);
+    if (!existing) throw new Error('Watchlist not found');
     await this.db.watchlist.delete({ where: { id } });
   }
 
@@ -93,6 +97,10 @@ export class WatchlistManagementRepository {
 
   async removeItem(watchlistId: string, itemId: string): Promise<void> {
     await this.db.watchlistItem.deleteMany({ where: { id: itemId, watchlistId } });
+  }
+
+  private ownerWhere(userId: string) {
+    return { OR: [{ userId }, { userId: null }] };
   }
 
   private toWatchlistDto(record: any): WatchlistDto {

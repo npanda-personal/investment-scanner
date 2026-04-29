@@ -29,8 +29,8 @@ export class AiInvestmentCopilotService {
     }
   ) {}
 
-  async stockSummary(instrumentId: string): Promise<CopilotSummaryResponse> {
-    await this.guardCopilotUsage();
+  async stockSummary(instrumentId: string, userId = 'default-user'): Promise<CopilotSummaryResponse> {
+    await this.guardCopilotUsage(userId);
     const [research, signal, smartMoney, marketContext] = await Promise.all([
       this.safe(() => this.dependencies.stockResearchService.workbench(instrumentId, '1Y')),
       this.safe(() => this.dependencies.signalService.latestForInstrument(instrumentId)),
@@ -85,11 +85,11 @@ export class AiInvestmentCopilotService {
     });
   }
 
-  async portfolioSummary(portfolioId: string): Promise<CopilotSummaryResponse> {
-    await this.guardCopilotUsage();
+  async portfolioSummary(portfolioId: string, userId = 'default-user'): Promise<CopilotSummaryResponse> {
+    await this.guardCopilotUsage(userId);
     const [summary, intelligence] = await Promise.all([
-      this.safe(() => this.dependencies.portfolioManagementService.summary(portfolioId)),
-      this.safe(() => this.dependencies.portfolioIntelligenceService.intelligence(portfolioId)),
+      this.safe(() => this.dependencies.portfolioManagementService.summary(portfolioId, userId)),
+      this.safe(() => this.dependencies.portfolioIntelligenceService.intelligence(portfolioId, userId)),
     ]);
     const redFlags = intelligence?.redFlags ?? [];
     const holdings = summary?.holdings ?? [];
@@ -124,9 +124,9 @@ export class AiInvestmentCopilotService {
     });
   }
 
-  async watchlistSummary(watchlistId: string): Promise<CopilotSummaryResponse> {
-    await this.guardCopilotUsage();
-    const detail = await this.safe(() => this.dependencies.watchlistManagementService.detail(watchlistId, 'signalScoreDesc'));
+  async watchlistSummary(watchlistId: string, userId = 'default-user'): Promise<CopilotSummaryResponse> {
+    await this.guardCopilotUsage(userId);
+    const detail = await this.safe(() => this.dependencies.watchlistManagementService.detail(watchlistId, 'signalScoreDesc', userId));
     const items = detail?.items ?? [];
     const strongest = [...items].sort((a: any, b: any) => (b.latestSignal?.score ?? -1) - (a.latestSignal?.score ?? -1)).slice(0, 5);
     const weakest = [...items].sort((a: any, b: any) => (a.latestSignal?.score ?? 101) - (b.latestSignal?.score ?? 101)).slice(0, 5);
@@ -153,8 +153,8 @@ export class AiInvestmentCopilotService {
     });
   }
 
-  async marketBrief(): Promise<CopilotSummaryResponse> {
-    await this.guardCopilotUsage();
+  async marketBrief(userId = 'default-user'): Promise<CopilotSummaryResponse> {
+    await this.guardCopilotUsage(userId);
     const [context, smartSectors] = await Promise.all([
       this.safe(() => this.dependencies.marketContextService.summary()),
       this.safe(() => this.dependencies.smartMoneyService.sectors('3M')),
@@ -192,8 +192,8 @@ export class AiInvestmentCopilotService {
     });
   }
 
-  async alertDigest(): Promise<CopilotSummaryResponse> {
-    await this.guardCopilotUsage();
+  async alertDigest(userId = 'default-user'): Promise<CopilotSummaryResponse> {
+    await this.guardCopilotUsage(userId);
     const events = await this.safe(() => this.dependencies.alertsMonitoringService.listEvents());
     const items = events ?? [];
     const unread = items.filter((event: any) => !event.readAt && !event.dismissedAt);
@@ -245,11 +245,11 @@ export class AiInvestmentCopilotService {
     }
   }
 
-  private async guardCopilotUsage() {
+  private async guardCopilotUsage(userId: string) {
     const service = this.dependencies.subscriptionService;
     if (!service) return;
-    await service.assertAllowed('RUN_COPILOT_SUMMARY');
-    await service.recordUsage('RUN_COPILOT_SUMMARY');
+    await service.assertAllowed('RUN_COPILOT_SUMMARY', userId);
+    await service.recordUsage('RUN_COPILOT_SUMMARY', userId);
   }
 
   private percent(value: number): string {

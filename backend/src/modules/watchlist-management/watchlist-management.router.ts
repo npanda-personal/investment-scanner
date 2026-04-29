@@ -1,10 +1,12 @@
 import express from 'express';
+import { requireAuth } from '../auth-identity';
 import { WatchlistManagementController } from './watchlist-management.controller';
 
 export const createWatchlistManagementRouter = (
   controller = new WatchlistManagementController()
 ) => {
   const router = express.Router();
+  router.use(requireAuth);
 
   router.get('/watchlists', controller.listWatchlists);
   router.post('/watchlists', controller.createWatchlist);

@@ -1,6 +1,7 @@
 import { BrowserRouter, useRoutes } from 'react-router-dom';
 import { CustomThemeProvider } from './app/ThemeContext';
 import { appRoutes } from './app/routes';
+import { AuthIdentityProvider } from './features/auth-identity';
 
 function AppRoutes() {
   return useRoutes(appRoutes);
@@ -9,9 +10,11 @@ function AppRoutes() {
 function App() {
   return (
     <CustomThemeProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
+      <AuthIdentityProvider>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </AuthIdentityProvider>
     </CustomThemeProvider>
   );
 }

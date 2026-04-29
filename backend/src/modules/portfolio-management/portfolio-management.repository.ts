@@ -13,16 +13,16 @@ import type {
 export class PortfolioManagementRepository {
   constructor(private readonly db = prisma) {}
 
-  async listPortfolios(): Promise<PortfolioDto[]> {
-    const portfolios = await this.db.portfolio.findMany({ orderBy: { updatedAt: 'desc' } });
+  async listPortfolios(userId = 'default-user'): Promise<PortfolioDto[]> {
+    const portfolios = await this.db.portfolio.findMany({ where: this.ownerWhere(userId), orderBy: { updatedAt: 'desc' } });
     return portfolios.map(this.toPortfolioDto);
   }
 
-  async createPortfolio(input: CreatePortfolioRequest): Promise<PortfolioDto> {
+  async createPortfolio(input: CreatePortfolioRequest, userId = 'default-user'): Promise<PortfolioDto> {
     const portfolio = await this.db.portfolio.create({
       data: {
         name: input.name.trim(),
-        userId: 'default-user',
+        userId,
         baseCurrency: input.baseCurrency.trim().toUpperCase(),
         description: input.description ?? null,
       },
@@ -30,12 +30,14 @@ export class PortfolioManagementRepository {
     return this.toPortfolioDto(portfolio);
   }
 
-  async getPortfolio(id: string): Promise<PortfolioDto | null> {
-    const portfolio = await this.db.portfolio.findUnique({ where: { id } });
+  async getPortfolio(id: string, userId = 'default-user'): Promise<PortfolioDto | null> {
+    const portfolio = await this.db.portfolio.findFirst({ where: { id, ...this.ownerWhere(userId) } });
     return portfolio ? this.toPortfolioDto(portfolio) : null;
   }
 
-  async updatePortfolio(id: string, input: UpdatePortfolioRequest): Promise<PortfolioDto> {
+  async updatePortfolio(id: string, input: UpdatePortfolioRequest, userId = 'default-user'): Promise<PortfolioDto> {
+    const existing = await this.getPortfolio(id, userId);
+    if (!existing) throw new Error('Portfolio not found');
     const portfolio = await this.db.portfolio.update({
       where: { id },
       data: {
@@ -47,7 +49,9 @@ export class PortfolioManagementRepository {
     return this.toPortfolioDto(portfolio);
   }
 
-  async deletePortfolio(id: string): Promise<void> {
+  async deletePortfolio(id: string, userId = 'default-user'): Promise<void> {
+    const existing = await this.getPortfolio(id, userId);
+    if (!existing) throw new Error('Portfolio not found');
     await this.db.portfolio.delete({ where: { id } });
   }
 
@@ -117,6 +121,10 @@ export class PortfolioManagementRepository {
       },
     });
     return this.toTransactionDto(transaction);
+  }
+
+  private ownerWhere(userId: string) {
+    return { OR: [{ userId }, { userId: null }] };
   }
 
   private toPortfolioDto(record: any): PortfolioDto {

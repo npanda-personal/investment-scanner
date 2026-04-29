@@ -1,10 +1,12 @@
 import express from 'express';
+import { requireAuth } from '../auth-identity';
 import { AlertsMonitoringController } from './alerts-monitoring.controller';
 
 export const createAlertsMonitoringRouter = (
   controller = new AlertsMonitoringController()
 ) => {
   const router = express.Router();
+  router.use(requireAuth);
 
   router.get('/alerts/rules', controller.listRules);
   router.post('/alerts/rules', controller.createRule);

@@ -2,24 +2,26 @@ import type { Request, Response } from 'express';
 import { BacktestingStrategyLabService } from './backtesting-strategy-lab.service';
 import { getParam } from './backtesting-strategy-lab.validation';
 
+const currentUserId = (req: Request) => (req as any).user?.id || 'default-user';
+
 export class BacktestingStrategyLabController {
   constructor(private readonly service = new BacktestingStrategyLabService()) {}
 
-  listStrategies = async (_req: Request, res: Response) => this.respond(res, () => this.service.listStrategies());
-  createStrategy = async (req: Request, res: Response) => this.respond(res, () => this.service.createStrategy(req.body), 201);
-  getStrategy = async (req: Request, res: Response) => this.respondMaybeFound(res, () => this.service.getStrategy(getParam(req.params.id)));
-  updateStrategy = async (req: Request, res: Response) => this.respond(res, () => this.service.updateStrategy(getParam(req.params.id), req.body));
+  listStrategies = async (req: Request, res: Response) => this.respond(res, () => this.service.listStrategies(currentUserId(req)));
+  createStrategy = async (req: Request, res: Response) => this.respond(res, () => this.service.createStrategy(req.body, currentUserId(req)), 201);
+  getStrategy = async (req: Request, res: Response) => this.respondMaybeFound(res, () => this.service.getStrategy(getParam(req.params.id), currentUserId(req)));
+  updateStrategy = async (req: Request, res: Response) => this.respond(res, () => this.service.updateStrategy(getParam(req.params.id), req.body, currentUserId(req)));
   deleteStrategy = async (req: Request, res: Response) => this.respond(res, async () => {
-    await this.service.deleteStrategy(getParam(req.params.id));
+    await this.service.deleteStrategy(getParam(req.params.id), currentUserId(req));
     return { success: true };
   });
 
-  run = async (req: Request, res: Response) => this.respond(res, () => this.service.run(req.body), 201);
-  runStrategy = async (req: Request, res: Response) => this.respond(res, () => this.service.runStrategy(getParam(req.params.id)), 201);
-  listRuns = async (_req: Request, res: Response) => this.respond(res, () => this.service.listRuns());
-  getRun = async (req: Request, res: Response) => this.respondMaybeFound(res, () => this.service.getRun(getParam(req.params.id)));
+  run = async (req: Request, res: Response) => this.respond(res, () => this.service.run(req.body, currentUserId(req)), 201);
+  runStrategy = async (req: Request, res: Response) => this.respond(res, () => this.service.runStrategy(getParam(req.params.id), currentUserId(req)), 201);
+  listRuns = async (req: Request, res: Response) => this.respond(res, () => this.service.listRuns(currentUserId(req)));
+  getRun = async (req: Request, res: Response) => this.respondMaybeFound(res, () => this.service.getRun(getParam(req.params.id), currentUserId(req)));
   deleteRun = async (req: Request, res: Response) => this.respond(res, async () => {
-    await this.service.deleteRun(getParam(req.params.id));
+    await this.service.deleteRun(getParam(req.params.id), currentUserId(req));
     return { success: true };
   });
 
