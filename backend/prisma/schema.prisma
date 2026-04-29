@@ -89,6 +89,7 @@ model SignalResult {
   negativeSignals  Json
   explanation      String
   generatedAt      DateTime @default(now())
+  modelVersion     String   @default("signal-engine-v1")
   source           String   @default("signal-generation-engine")
   dataStatus       String   @default("PARTIAL")
   createdAt        DateTime @default(now())

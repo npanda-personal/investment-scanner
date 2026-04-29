@@ -50,6 +50,7 @@ Current modules include:
 - subscription-billing
 - auth-identity
 - notifications-delivery
+- signal-quality-lab
 
 # Important Current State
 
@@ -352,6 +353,7 @@ Frontend:
 - Subscription gates must stay centralized in `subscription-billing`; feature modules may call the public service but must not duplicate plan-limit logic.
 - Authenticated user context is provided by `auth-identity` through `requireAuth`; user-owned modules must filter by current user and may read legacy `userId = null` rows during migration.
 - Notification delivery should remain free/local-friendly by default. Use notification preferences and delivery records from `notifications-delivery`; paid/external delivery providers must be optional, env-driven, and disabled unless explicitly configured.
+- Signal Quality Lab owns historical signal outcome measurement and quality dashboards. It must not change Signal Generation Engine scoring logic; consume signal results through public exports and calculate outcomes from Market Data Foundation price data.
 - These integrations must not import backend repositories or frontend feature internals directly.
 
 # Final Principle

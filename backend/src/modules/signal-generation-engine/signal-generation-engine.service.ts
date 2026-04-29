@@ -4,6 +4,7 @@ import { SignalGenerationEngineRepository } from './signal-generation-engine.rep
 import type {
   SignalConfidence,
   SignalDirection,
+  SignalHistoryQuery,
   SignalItem,
   SignalPricePoint,
   SignalQuery,
@@ -79,6 +80,10 @@ export class SignalGenerationEngineService {
     };
   }
 
+  async signalHistory(query: SignalHistoryQuery) {
+    return this.repository.signalHistory(query);
+  }
+
   async generateForInstrument(instrumentId: string): Promise<SignalResultDto | null> {
     const [instrument, pricesResponse, fundamentalsResponse, research] = await Promise.all([
       this.marketDataService.getInstrument(instrumentId),
@@ -126,6 +131,7 @@ export class SignalGenerationEngineService {
       negative_signals: negativeSignals,
       explanation: this.explain(direction, triggeredSignals, negativeSignals),
       generated_at: new Date().toISOString(),
+      modelVersion: 'signal-engine-v1',
       source: 'signal-generation-engine',
       data_status: prices.length >= 50 ? (prices.length >= 200 ? 'COMPLETE' : 'PARTIAL') : 'MISSING',
     };

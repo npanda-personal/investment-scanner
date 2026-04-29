@@ -4,6 +4,7 @@ import { fetchSignalScreener, fetchTopSignals, runSignals } from '../api/signalG
 import { SignalCard } from './SignalCard';
 import type { SignalDirection, SignalResult } from '../types';
 import { MarketRegimeWidget } from '@/features/market-context-intelligence';
+import { Link } from 'react-router-dom';
 
 const SignalSection: React.FC<{ title: string; signals: SignalResult[] }> = ({ title, signals }) => (
   <Paper sx={{ p: 2 }}>
@@ -80,6 +81,7 @@ const SignalsDashboardPage: React.FC = () => {
         </Box>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
           <TextField size="small" label="Run limit" value={runLimit} onChange={(event) => setRunLimit(event.target.value)} sx={{ width: 110 }} />
+          <Button component={Link} to="/signals/quality" variant="outlined">View Signal Quality Lab</Button>
           <Button variant="contained" onClick={runManualSignals} disabled={running}>{running ? 'Running...' : 'Run Signals'}</Button>
         </Box>
       </Box>

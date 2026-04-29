@@ -16,10 +16,10 @@ export {
 export type {
   SignalConfidence,
   SignalDirection,
+  SignalHistoryQuery,
   SignalItem,
   SignalQuery,
   SignalResultDto,
   SignalRunRequest,
   SignalRunResponse,
 } from './signal-generation-engine.types';
-

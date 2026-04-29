@@ -34,6 +34,7 @@ import PsychologyIcon from '@mui/icons-material/Psychology';
 import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import MarkEmailReadIcon from '@mui/icons-material/MarkEmailRead';
+import FactCheckIcon from '@mui/icons-material/FactCheck';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import { useThemeMode } from './ThemeContext';
@@ -46,6 +47,7 @@ const navItems = [
   { path: '/', label: 'Dashboard', icon: <DashboardIcon /> },
   { path: '/market-data-foundation', label: 'Market Data Foundation', icon: <InventoryIcon /> },
   { path: '/signals', label: 'Signals', icon: <InsightsIcon /> },
+  { path: '/signals/quality', label: 'Signal Quality', icon: <FactCheckIcon /> },
   { path: '/portfolios', label: 'Portfolios', icon: <AccountBalanceWalletIcon /> },
   { path: '/watchlists', label: 'Watchlists', icon: <StarBorderIcon /> },
   { path: '/alerts', label: 'Alerts', icon: <NotificationsNoneIcon /> },

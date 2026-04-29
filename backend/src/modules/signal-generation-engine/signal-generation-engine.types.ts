@@ -30,6 +30,7 @@ export interface SignalResultDto {
   negative_signals: SignalItem[];
   explanation: string;
   generated_at: string;
+  modelVersion?: string | null;
   source: string;
   data_status: MarketDataStatus;
 }
@@ -50,6 +51,12 @@ export interface SignalQuery {
   sector?: string;
   country?: string;
   signalType?: string;
+}
+
+export interface SignalHistoryQuery extends SignalQuery {
+  instrumentId?: string;
+  from?: string;
+  to?: string;
 }
 
 export interface SignalRunResponse {

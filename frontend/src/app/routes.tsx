@@ -14,6 +14,7 @@ import { aiInvestmentCopilotRoutes } from '@/features/ai-investment-copilot';
 import { subscriptionBillingRoutes } from '@/features/subscription-billing';
 import { protectedAuthIdentityRoutes, ProtectedRoute, publicAuthIdentityRoutes } from '@/features/auth-identity';
 import { notificationsDeliveryRoutes } from '@/features/notifications-delivery';
+import { signalQualityLabRoutes } from '@/features/signal-quality-lab';
 
 export const appRoutes: RouteObject[] = [
   ...publicAuthIdentityRoutes,
@@ -29,6 +30,7 @@ export const appRoutes: RouteObject[] = [
           ...marketDataFoundationRoutes,
           ...stockResearchWorkbenchRoutes,
           ...signalGenerationEngineRoutes,
+          ...signalQualityLabRoutes,
           ...portfolioManagementRoutes,
           ...watchlistManagementRoutes,
           ...alertsMonitoringRoutes,

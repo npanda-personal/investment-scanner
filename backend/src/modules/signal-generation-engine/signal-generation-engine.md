@@ -28,7 +28,9 @@ Prisma model:
 
 - `SignalResult`
 
-Fields include instrument reference, symbol, company name, sector, country, score, direction, confidence, triggered signals JSON, negative signals JSON, explanation, generated timestamp, source, data status, created timestamp, and updated timestamp.
+Fields include instrument reference, symbol, company name, sector, country, score, direction, confidence, triggered signals JSON, negative signals JSON, explanation, generated timestamp, model version, source, data status, created timestamp, and updated timestamp.
+
+`modelVersion` defaults to `signal-engine-v1` and is exposed so Signal Quality Lab can measure results across model versions later.
 
 Results are append-only MVP daily/on-demand snapshots. Latest endpoints select the newest result per instrument.
 
@@ -169,6 +171,8 @@ The Signal Generation dashboard includes a compact Market Context Intelligence w
 The Stock Research Workbench includes a compact signal widget with score, direction, confidence, top reasons, generated timestamp, and link to the full signals page.
 
 The dashboard and cards link stocks to `/research/stocks/:id`.
+
+The dashboard links to `/signals/quality`, where Signal Quality Lab measures historical forward-return outcomes and noisy signal patterns. Signal Quality Lab consumes persisted signal results through public service exports and does not own or modify signal scoring.
 
 ## Tests
 
