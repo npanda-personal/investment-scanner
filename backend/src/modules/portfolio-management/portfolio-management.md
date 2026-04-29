@@ -88,6 +88,8 @@ Realized P&L and FIFO accounting are intentionally out of scope for this MVP.
 
 ## Known Limitations
 
+- Subscription Billing now gates portfolio creation by plan limits. Existing portfolios remain supported and ownership is nullable until real auth is introduced.
+
 - No multi-currency FX conversion is applied yet; values are calculated in the holding currency and portfolio base currency is metadata only.
 - No broker sync, rebalancing, recommendations, tax logic, optimization, or advanced attribution.
 - Duplicate holdings for the same portfolio/instrument are prevented; users should edit the existing holding instead.

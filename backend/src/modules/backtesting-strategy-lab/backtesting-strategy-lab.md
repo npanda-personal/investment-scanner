@@ -161,6 +161,8 @@ The UI includes:
 
 ## Known Limitations
 
+- Subscription Billing now gates backtest runs by monthly plan limits and records successful run usage.
+
 - Daily close only.
 - No intraday fills or slippage model.
 - No broker/order execution.

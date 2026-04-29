@@ -74,6 +74,8 @@ The feature exposes a reusable `AddToWatchlistDialog` used by Signal Generation 
 
 ## Known Limitations
 
+- Subscription Billing now gates watchlist creation by plan limits. Existing watchlists remain supported and ownership is nullable until real auth is introduced.
+
 - No alerts, notification rules, conviction scoring, or idea-stage workflow yet.
 - Tags are stored as a simple JSON string array.
 - No dedicated watchlist analytics beyond current price, daily move, and latest signal.

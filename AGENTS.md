@@ -47,6 +47,7 @@ Current modules include:
 - backtesting-strategy-lab
 - smart-money-intelligence
 - ai-investment-copilot
+- subscription-billing
 
 # Important Current State
 
@@ -346,6 +347,7 @@ Frontend:
 - Backtesting dashboards should use compact metric cards, bounded trade tables, and chart views that summarize historical simulations without exposing raw config JSON as the primary UI.
 - Smart money dashboards must clearly separate real price-volume signals from unavailable insider/institutional placeholders and should use status chips plus concise explanations.
 - Copilot summaries must be deterministic and cost-free by default, show source modules and data gaps, and include the research-support disclaimer instead of direct financial advice.
+- Subscription gates must stay centralized in `subscription-billing`; feature modules may call the public service but must not duplicate plan-limit logic.
 - These integrations must not import backend repositories or frontend feature internals directly.
 
 # Final Principle

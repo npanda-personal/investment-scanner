@@ -35,4 +35,5 @@ export interface CopilotDependencies {
   portfolioIntelligenceService: any;
   watchlistManagementService: any;
   alertsMonitoringService: any;
+  subscriptionService?: any;
 }

@@ -1,5 +1,6 @@
 import { MarketDataFoundationService } from '../market-data-foundation';
 import { SignalGenerationEngineService } from '../signal-generation-engine';
+import { SubscriptionBillingService } from '../subscription-billing';
 import { PortfolioManagementRepository } from './portfolio-management.repository';
 import type {
   AllocationBucketDto,
@@ -22,7 +23,8 @@ export class PortfolioManagementService {
   constructor(
     private readonly repository = new PortfolioManagementRepository(),
     private readonly marketDataService = new MarketDataFoundationService(),
-    private readonly signalService = new SignalGenerationEngineService()
+    private readonly signalService = new SignalGenerationEngineService(),
+    private readonly subscriptionService = new SubscriptionBillingService()
   ) {}
 
   listPortfolios() {
@@ -31,6 +33,7 @@ export class PortfolioManagementService {
 
   async createPortfolio(input: CreatePortfolioRequest) {
     this.throwIfErrors(validatePortfolioInput(input));
+    await this.subscriptionService.assertAllowed('CREATE_PORTFOLIO');
     return this.repository.createPortfolio(input);
   }
 

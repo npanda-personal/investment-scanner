@@ -22,6 +22,7 @@ export class WatchlistManagementRepository {
     const watchlist = await this.db.watchlist.create({
       data: {
         name: input.name.trim(),
+        userId: 'default-user',
         description: input.description ?? null,
       },
     });

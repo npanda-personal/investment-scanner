@@ -62,7 +62,7 @@ const createService = (rules: any[], overrides: any = {}) => {
     }),
     ...overrides.watchlistService,
   };
-  return { service: new AlertsMonitoringService(repository as any, marketDataService as any, signalService as any, portfolioService as any, watchlistService as any), repository };
+  return { service: new AlertsMonitoringService(repository as any, marketDataService as any, signalService as any, portfolioService as any, watchlistService as any, { assertAllowed: jest.fn() } as any), repository };
 };
 
 describe('AlertsMonitoringService', () => {

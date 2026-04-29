@@ -58,7 +58,7 @@ const createService = (overrides: any = {}) => {
     ...overrides.signalService,
   };
   return {
-    service: new WatchlistManagementService(repository as any, marketDataService as any, signalService as any),
+    service: new WatchlistManagementService(repository as any, marketDataService as any, signalService as any, { assertAllowed: jest.fn() } as any),
     repository,
   };
 };

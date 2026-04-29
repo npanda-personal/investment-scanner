@@ -30,6 +30,7 @@ export class AlertsMonitoringRepository {
     const rule = await this.db.alertRule.create({
       data: {
         name: input.name.trim(),
+        userId: 'default-user',
         type: input.type,
         scope: input.scope,
         instrumentId: input.instrumentId ?? null,

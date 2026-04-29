@@ -1,5 +1,6 @@
 import { MarketDataFoundationService } from '../market-data-foundation';
 import { SignalGenerationEngineService } from '../signal-generation-engine';
+import { SubscriptionBillingService } from '../subscription-billing';
 import { WatchlistManagementRepository } from './watchlist-management.repository';
 import type {
   AddWatchlistItemRequest,
@@ -20,7 +21,8 @@ export class WatchlistManagementService {
   constructor(
     private readonly repository = new WatchlistManagementRepository(),
     private readonly marketDataService = new MarketDataFoundationService(),
-    private readonly signalService = new SignalGenerationEngineService()
+    private readonly signalService = new SignalGenerationEngineService(),
+    private readonly subscriptionService = new SubscriptionBillingService()
   ) {}
 
   listWatchlists() {
@@ -29,6 +31,7 @@ export class WatchlistManagementService {
 
   async createWatchlist(input: CreateWatchlistRequest) {
     this.throwIfErrors(validateWatchlistInput(input));
+    await this.subscriptionService.assertAllowed('CREATE_WATCHLIST');
     return this.repository.createWatchlist(input);
   }
 

@@ -11,6 +11,7 @@ import { marketContextIntelligenceRoutes } from '@/features/market-context-intel
 import { backtestingStrategyLabRoutes } from '@/features/backtesting-strategy-lab';
 import { smartMoneyIntelligenceRoutes } from '@/features/smart-money-intelligence';
 import { aiInvestmentCopilotRoutes } from '@/features/ai-investment-copilot';
+import { subscriptionBillingRoutes } from '@/features/subscription-billing';
 
 export const appRoutes: RouteObject[] = [
   {
@@ -28,6 +29,7 @@ export const appRoutes: RouteObject[] = [
       ...backtestingStrategyLabRoutes,
       ...smartMoneyIntelligenceRoutes,
       ...aiInvestmentCopilotRoutes,
+      ...subscriptionBillingRoutes,
     ],
   },
 ];

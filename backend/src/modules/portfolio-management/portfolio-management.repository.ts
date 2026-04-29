@@ -22,6 +22,7 @@ export class PortfolioManagementRepository {
     const portfolio = await this.db.portfolio.create({
       data: {
         name: input.name.trim(),
+        userId: 'default-user',
         baseCurrency: input.baseCurrency.trim().toUpperCase(),
         description: input.description ?? null,
       },

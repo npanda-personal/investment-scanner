@@ -104,6 +104,8 @@ No Prisma model was added. Summaries are generated on demand.
 
 ## Known Limitations
 
+- Subscription Billing now gates copilot summaries by daily plan limits and records summary usage.
+
 - No open-ended autonomous chat.
 - No mandatory LLM provider.
 - No internet access or paid data dependency.

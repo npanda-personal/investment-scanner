@@ -58,7 +58,7 @@ const createService = (overrides: any = {}) => {
   };
 
   return {
-    service: new PortfolioManagementService(repository as any, marketDataService as any, signalService as any),
+    service: new PortfolioManagementService(repository as any, marketDataService as any, signalService as any, { assertAllowed: jest.fn() } as any),
     repository,
     marketDataService,
     signalService,

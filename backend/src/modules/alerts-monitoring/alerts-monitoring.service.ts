@@ -1,6 +1,7 @@
 import { MarketDataFoundationService } from '../market-data-foundation';
 import { PortfolioManagementService } from '../portfolio-management';
 import { SignalGenerationEngineService } from '../signal-generation-engine';
+import { SubscriptionBillingService } from '../subscription-billing';
 import { WatchlistManagementService } from '../watchlist-management';
 import { AlertsMonitoringRepository } from './alerts-monitoring.repository';
 import type {
@@ -18,7 +19,8 @@ export class AlertsMonitoringService {
     private readonly marketDataService = new MarketDataFoundationService(),
     private readonly signalService = new SignalGenerationEngineService(),
     private readonly portfolioService = new PortfolioManagementService(),
-    private readonly watchlistService = new WatchlistManagementService()
+    private readonly watchlistService = new WatchlistManagementService(),
+    private readonly subscriptionService = new SubscriptionBillingService()
   ) {}
 
   listRules() { return this.repository.listRules(); }
@@ -30,6 +32,7 @@ export class AlertsMonitoringService {
 
   async createRule(input: CreateAlertRuleRequest) {
     this.throwIfErrors(validateAlertRuleInput(input));
+    await this.subscriptionService.assertAllowed('CREATE_ALERT');
     return this.repository.createRule(input);
   }
 

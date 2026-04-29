@@ -164,6 +164,8 @@ model FxRate {
 
 model Portfolio {
   id           String                 @id @default(cuid())
+  userId       String?
+  user         AppUser?               @relation(fields: [userId], references: [id], onDelete: SetNull)
   name         String
   baseCurrency String
   description  String?
@@ -174,6 +176,7 @@ model Portfolio {
   alertRules   AlertRule[]
   alertEvents  AlertEvent[]
 
+  @@index([userId])
   @@map("portfolios")
 }
 
@@ -221,6 +224,8 @@ model PortfolioTransaction {
 
 model Watchlist {
   id          String          @id @default(cuid())
+  userId      String?
+  user        AppUser?        @relation(fields: [userId], references: [id], onDelete: SetNull)
   name        String
   description String?
   createdAt   DateTime        @default(now())
@@ -229,11 +234,14 @@ model Watchlist {
   alertRules  AlertRule[]
   alertEvents AlertEvent[]
 
+  @@index([userId])
   @@map("watchlists")
 }
 
 model AlertRule {
   id          String       @id @default(cuid())
+  userId      String?
+  user        AppUser?     @relation(fields: [userId], references: [id], onDelete: SetNull)
   name        String
   type        String
   scope       String
@@ -249,6 +257,7 @@ model AlertRule {
   updatedAt   DateTime     @updatedAt
   events      AlertEvent[]
 
+  @@index([userId])
   @@index([type, scope])
   @@index([enabled])
   @@index([instrumentId])
@@ -284,6 +293,8 @@ model AlertEvent {
 
 model BacktestStrategy {
   id          String        @id @default(cuid())
+  userId      String?
+  user        AppUser?      @relation(fields: [userId], references: [id], onDelete: SetNull)
   name        String
   description String?
   config      Json
@@ -291,11 +302,14 @@ model BacktestStrategy {
   updatedAt   DateTime      @updatedAt
   runs        BacktestRun[]
 
+  @@index([userId])
   @@map("backtest_strategies")
 }
 
 model BacktestRun {
   id           String            @id @default(cuid())
+  userId       String?
+  user         AppUser?          @relation(fields: [userId], references: [id], onDelete: SetNull)
   strategyId   String?
   strategy     BacktestStrategy? @relation(fields: [strategyId], references: [id], onDelete: SetNull)
   config       Json
@@ -307,9 +321,67 @@ model BacktestRun {
   trades       Json?
   error        String?
 
+  @@index([userId])
   @@index([strategyId])
   @@index([startedAt])
   @@map("backtest_runs")
+}
+
+model AppUser {
+  id              String             @id @default(cuid())
+  email           String?            @unique
+  displayName     String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  subscription    UserSubscription?
+  usageCounters   UsageCounter[]
+  portfolios      Portfolio[]
+  watchlists      Watchlist[]
+  alertRules      AlertRule[]
+  backtestRuns    BacktestRun[]
+  backtestStrategies BacktestStrategy[]
+
+  @@map("app_users")
+}
+
+model SubscriptionPlan {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("subscription_plans")
+}
+
+model UserSubscription {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planCode  String
+  status    String
+  startedAt DateTime @default(now())
+  expiresAt DateTime?
+  updatedAt DateTime @updatedAt
+
+  @@index([planCode])
+  @@map("user_subscriptions")
+}
+
+model UsageCounter {
+  id          String   @id @default(cuid())
+  userId      String
+  user        AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key         String
+  period      String
+  periodStart DateTime
+  count       Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, key, periodStart])
+  @@index([key, periodStart])
+  @@map("usage_counters")
 }
 
 model WatchlistItem {

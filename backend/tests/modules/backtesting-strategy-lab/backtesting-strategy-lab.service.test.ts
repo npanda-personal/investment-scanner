@@ -54,7 +54,7 @@ const createService = (overrides: any = {}) => {
   };
   const watchlistService = { detail: jest.fn(), ...overrides.watchlistService };
   return {
-    service: new BacktestingStrategyLabService(repository as any, marketDataService as any, watchlistService as any),
+    service: new BacktestingStrategyLabService(repository as any, marketDataService as any, watchlistService as any, { assertAllowed: jest.fn(), recordUsage: jest.fn() } as any),
     repository,
   };
 };

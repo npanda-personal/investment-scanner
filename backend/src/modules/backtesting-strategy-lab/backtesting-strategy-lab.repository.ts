@@ -17,7 +17,7 @@ export class BacktestingStrategyLabRepository {
 
   async createStrategy(input: CreateBacktestStrategyRequest): Promise<BacktestStrategyDto> {
     const row = await this.db.backtestStrategy.create({
-      data: { name: input.name.trim(), description: input.description ?? null, config: input.config as unknown as Prisma.InputJsonValue },
+      data: { name: input.name.trim(), userId: 'default-user', description: input.description ?? null, config: input.config as unknown as Prisma.InputJsonValue },
     });
     return this.toStrategyDto(row);
   }
@@ -47,6 +47,7 @@ export class BacktestingStrategyLabRepository {
     const row = await this.db.backtestRun.create({
       data: {
         strategyId: data.strategyId,
+        userId: 'default-user',
         config: data.config as unknown as Prisma.InputJsonValue,
         status: data.status,
         completedAt: data.completedAt ? new Date(data.completedAt) : null,

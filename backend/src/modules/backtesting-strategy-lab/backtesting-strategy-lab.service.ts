@@ -1,4 +1,5 @@
 import { MarketDataFoundationService } from '../market-data-foundation';
+import { SubscriptionBillingService } from '../subscription-billing';
 import { WatchlistManagementService } from '../watchlist-management';
 import { BacktestingStrategyLabRepository } from './backtesting-strategy-lab.repository';
 import type {
@@ -20,7 +21,8 @@ export class BacktestingStrategyLabService {
   constructor(
     private readonly repository = new BacktestingStrategyLabRepository(),
     private readonly marketDataService = new MarketDataFoundationService(),
-    private readonly watchlistService = new WatchlistManagementService()
+    private readonly watchlistService = new WatchlistManagementService(),
+    private readonly subscriptionService = new SubscriptionBillingService()
   ) {}
 
   listStrategies() { return this.repository.listStrategies(); }
@@ -43,13 +45,14 @@ export class BacktestingStrategyLabService {
   }
 
   async run(request: RunBacktestRequest): Promise<BacktestRunDto> {
+    await this.subscriptionService.assertAllowed('RUN_BACKTEST');
     const strategy = request.strategyId ? await this.repository.getStrategy(request.strategyId) : null;
     if (request.strategyId && !strategy) throw new Error('Strategy not found');
     const config = request.config ?? strategy?.config;
     this.throwIfErrors(validateConfig(config));
     try {
       const result = await this.simulate(config!);
-      return this.repository.createRun({
+      const run = await this.repository.createRun({
         strategyId: request.strategyId ?? null,
         config: config!,
         status: 'COMPLETED',
@@ -59,6 +62,8 @@ export class BacktestingStrategyLabService {
         trades: result.trades,
         error: null,
       });
+      await this.subscriptionService.recordUsage('RUN_BACKTEST');
+      return run;
     } catch (error: any) {
       return this.repository.createRun({
         strategyId: request.strategyId ?? null,

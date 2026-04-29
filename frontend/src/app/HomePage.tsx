@@ -59,6 +59,11 @@ export default function HomePage() {
           <Typography color="text.secondary" sx={{ mb: 2 }}>Read deterministic plain-English summaries across market, portfolio, watchlist, stock, and alert context.</Typography>
           <Button component={Link} to="/copilot">Open</Button>
         </Paper>
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="h6">Subscription Billing</Typography>
+          <Typography color="text.secondary" sx={{ mb: 2 }}>Review plan, limits, usage counters, and SaaS readiness settings.</Typography>
+          <Button component={Link} to="/billing">Open</Button>
+        </Paper>
       </Box>
     </Box>
   );
