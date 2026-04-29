@@ -22,7 +22,7 @@ Mounted under `/api/v1`:
 
 ## Methodology
 
-The MVP calculates on demand and does not persist snapshots.
+The module calculates current/on-demand context. Historical persistence is owned by `historical-context-snapshots`, which calls this module's public service and stores daily/on-demand snapshots for later signal quality grouping.
 
 ### Regime
 
@@ -107,7 +107,7 @@ Portfolio exposure vs leading sectors is documented as a follow-up.
 
 ## Known Limitations
 
-- No persistence; all context is calculated on demand.
+- No persistence inside this module; historical persistence is handled by `historical-context-snapshots`.
 - Instrument sample is limited for MVP performance.
 - Macro snapshot is a placeholder until free proxy data is available.
 - No benchmark/volatility provider beyond available persisted price history.

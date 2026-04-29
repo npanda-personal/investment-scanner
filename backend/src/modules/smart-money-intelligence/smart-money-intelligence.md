@@ -118,9 +118,9 @@ Dashboard sections:
 
 ## Persistence
 
-No Prisma model was added for MVP. Smart-money summaries are calculated on demand from existing market data.
+Smart-money summaries are calculated on demand from existing market data inside this module.
 
-A future `SmartMoneySnapshot` can be added if historical smart-money state, caching, or alerting requires persistence.
+Historical stock-level smart-money context is persisted by `historical-context-snapshots`, which calls this module through public exports and stores daily/on-demand `SmartMoneyContextSnapshot` rows for later signal quality analysis.
 
 ## Known Limitations
 

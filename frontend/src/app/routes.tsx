@@ -15,6 +15,7 @@ import { subscriptionBillingRoutes } from '@/features/subscription-billing';
 import { protectedAuthIdentityRoutes, ProtectedRoute, publicAuthIdentityRoutes } from '@/features/auth-identity';
 import { notificationsDeliveryRoutes } from '@/features/notifications-delivery';
 import { signalQualityLabRoutes } from '@/features/signal-quality-lab';
+import { historicalContextSnapshotsRoutes } from '@/features/historical-context-snapshots';
 
 export const appRoutes: RouteObject[] = [
   ...publicAuthIdentityRoutes,
@@ -31,6 +32,7 @@ export const appRoutes: RouteObject[] = [
           ...stockResearchWorkbenchRoutes,
           ...signalGenerationEngineRoutes,
           ...signalQualityLabRoutes,
+          ...historicalContextSnapshotsRoutes,
           ...portfolioManagementRoutes,
           ...watchlistManagementRoutes,
           ...alertsMonitoringRoutes,

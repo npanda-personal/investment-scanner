@@ -51,6 +51,7 @@ Current modules include:
 - auth-identity
 - notifications-delivery
 - signal-quality-lab
+- historical-context-snapshots
 
 # Important Current State
 
@@ -354,6 +355,7 @@ Frontend:
 - Authenticated user context is provided by `auth-identity` through `requireAuth`; user-owned modules must filter by current user and may read legacy `userId = null` rows during migration.
 - Notification delivery should remain free/local-friendly by default. Use notification preferences and delivery records from `notifications-delivery`; paid/external delivery providers must be optional, env-driven, and disabled unless explicitly configured.
 - Signal Quality Lab owns historical signal outcome measurement and quality dashboards. It must not change Signal Generation Engine scoring logic; consume signal results through public exports and calculate outcomes from Market Data Foundation price data.
+- Historical Context Snapshots owns point-in-time persistence of market context, sector/country strength, smart-money context, and data-quality readiness. Current calculations remain owned by their source modules; snapshots enable historical grouping and lookup.
 - These integrations must not import backend repositories or frontend feature internals directly.
 
 # Final Principle

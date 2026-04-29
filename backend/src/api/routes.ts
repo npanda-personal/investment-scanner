@@ -17,6 +17,7 @@ import { subscriptionBillingRouter } from '../modules/subscription-billing';
 import { authIdentityRouter } from '../modules/auth-identity';
 import { notificationsDeliveryRouter } from '../modules/notifications-delivery';
 import { signalQualityLabRouter } from '../modules/signal-quality-lab';
+import { historicalContextSnapshotsRouter } from '../modules/historical-context-snapshots';
 
 export interface ApiModule {
   path: string;
@@ -39,6 +40,7 @@ export const apiModules: ApiModule[] = [
   { path: '/api/v1', router: subscriptionBillingRouter },
   { path: '/api/v1', router: notificationsDeliveryRouter },
   { path: '/api/v1', router: signalQualityLabRouter },
+  { path: '/api/v1', router: historicalContextSnapshotsRouter },
   { path: '/api/market-data-foundation', router: marketDataFoundationRouter },
 ];
 

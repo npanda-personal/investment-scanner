@@ -16,7 +16,7 @@ Mounted under `/api/v1`:
 | GET | `/signals/quality/by-type` | Performance by triggered/negative signal code |
 | GET | `/signals/quality/by-sector` | Performance grouped by sector |
 | GET | `/signals/quality/by-score` | Performance grouped by MVP score bucket |
-| GET | `/signals/quality/by-regime` | Regime grouping placeholder |
+| GET | `/signals/quality/by-regime` | Performance grouped by historical market regime snapshot when available |
 | GET | `/signals/quality/noisy` | Noisy/churning signal diagnostics |
 | GET | `/signals/:instrumentId/history` | Historical signal results for one instrument |
 | GET | `/signals/:instrumentId/outcomes` | Forward-return outcomes for one instrument |
@@ -99,12 +99,18 @@ Route:
 
 - `/signals/quality`
 
-The dashboard shows quality summary cards, performance by signal type, performance by sector, regime placeholder state, noisy signals, and instrument-level signal history/outcomes.
+The dashboard shows quality summary cards, performance by signal type, performance by sector, regime context state, noisy signals, and instrument-level signal history/outcomes.
+
+## Historical Context Integration
+
+Regime grouping uses `historical-context-snapshots` when persisted market snapshots are available. Each signal's `generatedAt` date is mapped to the nearest market context snapshot on or before that date within the default snapshot lookup window.
+
+If snapshots are unavailable, the API returns the documented `MISSING_REGIME_CONTEXT` grouping.
 
 ## Known Limitations
 
 - Outcomes need future prices after signal generation; fresh signals may be unevaluated.
-- Regime grouping returns a documented missing-context placeholder until regime snapshots are persisted or mapped to historical dates.
+- Regime grouping depends on historical context snapshots being generated near signal dates.
 - No signal calibration, strategy optimization, or trading recommendations.
 - No outcome persistence table yet.
 

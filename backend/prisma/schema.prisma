@@ -384,6 +384,117 @@ model NotificationEvent {
   @@map("notification_events")
 }
 
+model MarketContextSnapshot {
+  id                       String   @id @default(cuid())
+  snapshotDate             DateTime @unique
+  regime                   String
+  regimeScore              Float
+  breadthPercentAboveSma50 Float?
+  breadthPercentAboveSma200 Float?
+  advanceDeclineRatio      Float?
+  newHighCount             Int?
+  newLowCount              Int?
+  macroStatus              String?
+  explanation              String?
+  source                   String
+  dataStatus               String
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@index([snapshotDate])
+  @@map("market_context_snapshots")
+}
+
+model SectorContextSnapshot {
+  id                    String   @id @default(cuid())
+  snapshotDate          DateTime
+  sector                String
+  oneMonthReturn        Float?
+  threeMonthReturn      Float?
+  sixMonthReturn        Float?
+  relativeStrengthScore Float
+  instrumentCount       Int
+  bullishSignalCount    Int?
+  bearishSignalCount    Int?
+  leadershipStatus      String
+  source                String
+  dataStatus            String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([snapshotDate, sector])
+  @@index([snapshotDate])
+  @@index([sector])
+  @@map("sector_context_snapshots")
+}
+
+model CountryContextSnapshot {
+  id                    String   @id @default(cuid())
+  snapshotDate          DateTime
+  country               String
+  oneMonthReturn        Float?
+  threeMonthReturn      Float?
+  sixMonthReturn        Float?
+  relativeStrengthScore Float
+  bullishSignalCount    Int?
+  bearishSignalCount    Int?
+  source                String
+  dataStatus            String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([snapshotDate, country])
+  @@index([snapshotDate])
+  @@index([country])
+  @@map("country_context_snapshots")
+}
+
+model SmartMoneyContextSnapshot {
+  id                       String   @id @default(cuid())
+  snapshotDate             DateTime
+  instrumentId             String
+  symbol                   String
+  sector                   String?
+  smartMoneyScore          Float
+  status                   String
+  confidence               String
+  accumulationSignalCount  Int
+  distributionSignalCount  Int
+  unusualVolumeDetected    Boolean
+  explanation              String?
+  source                   String
+  dataStatus               String
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@unique([snapshotDate, instrumentId])
+  @@index([snapshotDate])
+  @@index([instrumentId])
+  @@index([sector])
+  @@map("smart_money_context_snapshots")
+}
+
+model DataQualitySnapshot {
+  id                   String   @id @default(cuid())
+  snapshotDate         DateTime
+  instrumentId         String
+  symbol               String
+  priceHistoryDays     Int
+  hasLatestPrice       Boolean
+  hasFundamentals      Boolean
+  hasSector            Boolean
+  hasIndustry          Boolean
+  dataStatus           String
+  signalReadinessScore Float
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([snapshotDate, instrumentId])
+  @@index([snapshotDate])
+  @@index([instrumentId])
+  @@map("data_quality_snapshots")
+}
+
 model SubscriptionPlan {
   id        String   @id @default(cuid())
   code      String   @unique

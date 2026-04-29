@@ -1,5 +1,6 @@
 import { MarketDataFoundationService } from '../market-data-foundation';
 import { SignalGenerationEngineService, type SignalItem, type SignalResultDto } from '../signal-generation-engine';
+import { HistoricalContextSnapshotsService } from '../historical-context-snapshots';
 import { SignalQualityLabRepository } from './signal-quality-lab.repository';
 import type {
   ForwardOutcome,
@@ -31,7 +32,8 @@ export class SignalQualityLabService {
   constructor(
     private readonly repository = new SignalQualityLabRepository(),
     private readonly signalService = new SignalGenerationEngineService(),
-    private readonly marketDataService = new MarketDataFoundationService()
+    private readonly marketDataService = new MarketDataFoundationService(),
+    private readonly historicalContextService = new HistoricalContextSnapshotsService()
   ) {}
 
   async history(instrumentId: string, query: QualityQuery): Promise<SignalHistoryItem[]> {
@@ -85,8 +87,14 @@ export class SignalQualityLabService {
   }
 
   async byRegime(query: QualityQuery): Promise<QualityMetricGroup[]> {
-    const outcomes = await this.outcomesForSignals(await this.loadSignals(query));
-    return this.groupMetrics(outcomes, query.horizon, () => 'MISSING_REGIME_CONTEXT')
+    const signals = await this.loadSignals(query);
+    const outcomes = await this.outcomesForSignals(signals);
+    const regimeBySignal = new Map<string, string>();
+    await Promise.all(signals.map(async (signal) => {
+      const regime = await this.historicalContextService.regimeForDate(new Date(signal.generated_at)).catch(() => null);
+      regimeBySignal.set(signal.id || signal.generated_at, regime || 'MISSING_REGIME_CONTEXT');
+    }));
+    return this.groupMetrics(outcomes, query.horizon, (item) => regimeBySignal.get(item.signalResultId) || 'MISSING_REGIME_CONTEXT')
       .filter((item) => item.sampleSize >= query.minSampleSize);
   }
 

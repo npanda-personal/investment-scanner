@@ -41,7 +41,8 @@ function serviceWithSignals(signals: SignalResultDto[]) {
       listPricesByInstrumentId: jest.fn().mockResolvedValue({
         prices: prices.map((price) => ({ date: price.date, adjusted_close: price.adjustedClose })),
       }),
-    } as any
+    } as any,
+    { regimeForDate: jest.fn().mockResolvedValue('RISK_ON') } as any
   );
 }
 
@@ -89,6 +90,12 @@ describe('signal quality lab service', () => {
     const service = serviceWithSignals([]);
     const parsed = service.parseSignalTypes(baseSignal());
     expect(parsed.map((item) => item.code)).toEqual(['PRICE_ABOVE_SMA50', 'PE_ABOVE_PEERS']);
+  });
+
+  it('groups by persisted historical regime when available', async () => {
+    const service = serviceWithSignals([baseSignal({ id: 's1' })]);
+    const rows = await service.byRegime({ horizon: '5D', limit: 10, minSampleSize: 0 });
+    expect(rows[0]).toMatchObject({ group: 'RISK_ON', sampleSize: 1 });
   });
 
   it('detects failed bullish, failed bearish, low confidence, stale, and flip noise', () => {

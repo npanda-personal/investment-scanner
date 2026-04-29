@@ -35,6 +35,7 @@ import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import MarkEmailReadIcon from '@mui/icons-material/MarkEmailRead';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import { useThemeMode } from './ThemeContext';
@@ -52,6 +53,7 @@ const navItems = [
   { path: '/watchlists', label: 'Watchlists', icon: <StarBorderIcon /> },
   { path: '/alerts', label: 'Alerts', icon: <NotificationsNoneIcon /> },
   { path: '/market-context', label: 'Market Context', icon: <PublicIcon /> },
+  { path: '/context-snapshots', label: 'Context Snapshots', icon: <CalendarMonthIcon /> },
   { path: '/backtests', label: 'Backtests', icon: <TimelineIcon /> },
   { path: '/smart-money', label: 'Smart Money', icon: <AccountTreeIcon /> },
   { path: '/copilot', label: 'AI Copilot', icon: <PsychologyIcon /> },
