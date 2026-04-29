@@ -53,6 +53,7 @@ Current modules include:
 - signal-quality-lab
 - historical-context-snapshots
 - signal-calibration-engine
+- data-quality-engine
 
 # Important Current State
 
@@ -358,6 +359,7 @@ Frontend:
 - Signal Quality Lab owns historical signal outcome measurement and quality dashboards. It must not change Signal Generation Engine scoring logic; consume signal results through public exports and calculate outcomes from Market Data Foundation price data.
 - Historical Context Snapshots owns point-in-time persistence of market context, sector/country strength, smart-money context, and data-quality readiness. Current calculations remain owned by their source modules; snapshots enable historical grouping and lookup.
 - Signal Calibration Engine owns explainable calibrated score/confidence outputs and model-version metadata. It must preserve raw Signal Generation Engine scores and persist calibration separately.
+- Data Quality Engine owns data coverage, liquidity, and signal-readiness evaluations. It consumes Market Data Foundation through public exports and should expose batch-safe evaluation flows for downstream modules.
 - Long-running universe workflows should expose `batchSize` plus `offset`/cursor progress metadata and let the frontend run sequential batches, refresh visible data after each batch, and keep action buttons in a disabled loading state until complete.
 - These integrations must not import backend repositories or frontend feature internals directly.
 

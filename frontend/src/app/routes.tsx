@@ -17,6 +17,7 @@ import { notificationsDeliveryRoutes } from '@/features/notifications-delivery';
 import { signalQualityLabRoutes } from '@/features/signal-quality-lab';
 import { historicalContextSnapshotsRoutes } from '@/features/historical-context-snapshots';
 import { signalCalibrationEngineRoutes } from '@/features/signal-calibration-engine';
+import { dataQualityEngineRoutes } from '@/features/data-quality-engine';
 
 export const appRoutes: RouteObject[] = [
   ...publicAuthIdentityRoutes,
@@ -34,6 +35,7 @@ export const appRoutes: RouteObject[] = [
           ...signalGenerationEngineRoutes,
           ...signalQualityLabRoutes,
           ...signalCalibrationEngineRoutes,
+          ...dataQualityEngineRoutes,
           ...historicalContextSnapshotsRoutes,
           ...portfolioManagementRoutes,
           ...watchlistManagementRoutes,

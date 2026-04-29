@@ -51,6 +51,7 @@ const navItems = [
   { path: '/signals', label: 'Signals', icon: <InsightsIcon /> },
   { path: '/signals/quality', label: 'Signal Quality', icon: <FactCheckIcon /> },
   { path: '/signals/calibration', label: 'Signal Calibration', icon: <TuneIcon /> },
+  { path: '/data-quality', label: 'Data Quality', icon: <FactCheckIcon /> },
   { path: '/portfolios', label: 'Portfolios', icon: <AccountBalanceWalletIcon /> },
   { path: '/watchlists', label: 'Watchlists', icon: <StarBorderIcon /> },
   { path: '/alerts', label: 'Alerts', icon: <NotificationsNoneIcon /> },

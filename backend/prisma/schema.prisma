@@ -65,6 +65,7 @@ model Stock {
   fundamentals                 Fundamental[]
   corporateActions             CorporateAction[]
   signalResults                SignalResult[]
+  dataQualityEvaluations       DataQualityEvaluation[]
   portfolioHoldings            PortfolioHolding[]
   portfolioTransactions        PortfolioTransaction[]
   watchlistItems                WatchlistItem[]
@@ -132,6 +133,42 @@ model SignalCalibrationResult {
   @@index([sector])
   @@index([country])
   @@map("signal_calibration_results")
+}
+
+model DataQualityEvaluation {
+  id                    String   @id @default(cuid())
+  instrumentId          String   @unique
+  stock                 Stock    @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  symbol                String
+  companyName           String?
+  sector                String?
+  industry              String?
+  country               String?
+  currency              String?
+  coverageScore         Float
+  coverageStatus        String
+  signalReadinessScore  Float
+  signalReadinessStatus String
+  liquidityScore        Float
+  liquidityStatus       String
+  eligibleForSignals    Boolean
+  eligibleForBacktesting Boolean
+  eligibleForCalibration Boolean
+  dataGaps              Json
+  warnings              Json
+  readinessReasons      Json
+  readinessBlockers     Json
+  evaluatedAt           DateTime @default(now())
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([coverageStatus])
+  @@index([signalReadinessStatus])
+  @@index([liquidityStatus])
+  @@index([sector])
+  @@index([country])
+  @@index([evaluatedAt])
+  @@map("data_quality_evaluations")
 }
 
 model Fundamental {
