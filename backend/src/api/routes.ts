@@ -12,6 +12,7 @@ import { alertsMonitoringRouter } from '../modules/alerts-monitoring';
 import { marketContextIntelligenceRouter } from '../modules/market-context-intelligence';
 import { backtestingStrategyLabRouter } from '../modules/backtesting-strategy-lab';
 import { smartMoneyIntelligenceRouter } from '../modules/smart-money-intelligence';
+import { aiInvestmentCopilotRouter } from '../modules/ai-investment-copilot';
 
 export interface ApiModule {
   path: string;
@@ -29,6 +30,7 @@ export const apiModules: ApiModule[] = [
   { path: '/api/v1', router: marketContextIntelligenceRouter },
   { path: '/api/v1', router: backtestingStrategyLabRouter },
   { path: '/api/v1', router: smartMoneyIntelligenceRouter },
+  { path: '/api/v1', router: aiInvestmentCopilotRouter },
   { path: '/api/market-data-foundation', router: marketDataFoundationRouter },
 ];
 

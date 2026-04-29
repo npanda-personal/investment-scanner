@@ -54,6 +54,11 @@ export default function HomePage() {
           <Typography color="text.secondary" sx={{ mb: 2 }}>Review price-volume accumulation, distribution warnings, and sector flow context.</Typography>
           <Button component={Link} to="/smart-money">Open</Button>
         </Paper>
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="h6">AI Investment Copilot</Typography>
+          <Typography color="text.secondary" sx={{ mb: 2 }}>Read deterministic plain-English summaries across market, portfolio, watchlist, stock, and alert context.</Typography>
+          <Button component={Link} to="/copilot">Open</Button>
+        </Paper>
       </Box>
     </Box>
   );

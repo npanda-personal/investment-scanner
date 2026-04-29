@@ -30,6 +30,7 @@ import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import PublicIcon from '@mui/icons-material/Public';
 import TimelineIcon from '@mui/icons-material/Timeline';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
+import PsychologyIcon from '@mui/icons-material/Psychology';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import { useThemeMode } from './ThemeContext';
@@ -47,6 +48,7 @@ const navItems = [
   { path: '/market-context', label: 'Market Context', icon: <PublicIcon /> },
   { path: '/backtests', label: 'Backtests', icon: <TimelineIcon /> },
   { path: '/smart-money', label: 'Smart Money', icon: <AccountTreeIcon /> },
+  { path: '/copilot', label: 'AI Copilot', icon: <PsychologyIcon /> },
 ];
 
 export default function NavigationLayout() {
