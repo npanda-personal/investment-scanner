@@ -156,6 +156,12 @@ Uses public module exports:
 
 Raw-vs-calibrated comparison responses include a `dataQuality` object when a latest evaluation exists. The frontend displays this as a data-quality caution panel alongside boosts and penalties.
 
+## Performance And UX Behavior
+
+- Calibration top/model/health endpoints are lightweight and bounded for initial page load.
+- Full calibration runs are manual and batch-based; the UI keeps the run button disabled with progress text until all batches finish.
+- Raw-vs-calibrated comparison is fetched only after a user selects one instrument from the searchable selector.
+
 ## Known Limitations
 
 - Calibration quality depends on historical signal outcomes and context snapshots being available.

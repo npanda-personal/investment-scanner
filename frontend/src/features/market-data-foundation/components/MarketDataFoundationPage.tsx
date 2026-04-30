@@ -26,7 +26,7 @@ import {
   type V1Instrument,
 } from '../api/marketDataFoundationService';
 import MarketDataStatusPanel from './MarketDataStatusPanel';
-import { DataTable, FilterBar, StatusBadge, type DataTableColumn, type SortDirection } from '@/shared/components';
+import { DataTable, FilterBar, PageHeader, StatusBadge, type DataTableColumn, type SortDirection } from '@/shared/components';
 
 const formatTimestamp = (timestamp: string) => new Date(timestamp).toLocaleString();
 const formatMarketCap = (value: number | null) => value === null ? 'N/A' : new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(value);
@@ -48,6 +48,7 @@ const MarketDataFoundationPage: React.FC = () => {
   const [assetType, setAssetType] = useState('');
   const [currency, setCurrency] = useState('');
   const [sector, setSector] = useState('');
+  const [industry, setIndustry] = useState('');
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [sortBy, setSortBy] = useState('symbol');
@@ -73,6 +74,7 @@ const MarketDataFoundationPage: React.FC = () => {
         assetType: assetType.trim() || undefined,
         currency: currency.trim() || undefined,
         sector: sector.trim() || undefined,
+        industry: industry.trim() || undefined,
         search: search.trim() || undefined,
       });
       setInstruments(response.instruments);
@@ -82,7 +84,7 @@ const MarketDataFoundationPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [assetType, currency, exchange, market, page, pageSize, search, sector, sortBy, sortDirection]);
+  }, [assetType, currency, exchange, industry, market, page, pageSize, search, sector, sortBy, sortDirection]);
 
   useEffect(() => {
     loadInstruments();
@@ -176,21 +178,22 @@ const MarketDataFoundationPage: React.FC = () => {
     setAssetType('');
     setCurrency('');
     setSector('');
+    setIndustry('');
     setPage(0);
   };
 
   return (
     <Box sx={{ p: 3, maxWidth: 1400, mx: 'auto' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, alignItems: { xs: 'stretch', sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, mb: 2 }}>
-        <Box>
-          <Typography variant="h4" gutterBottom>
-            Market Data Foundation
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Explore instruments, prices, fundamentals, corporate actions, and manual data sync status.
-          </Typography>
-        </Box>
-        <Box sx={{ display: 'flex', gap: 1 }}>
+      <PageHeader
+        title="Market Data Foundation"
+        subtitle="Explore instruments, prices, fundamentals, corporate actions, and manual data sync status."
+        primaryAction={
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/market-data-foundation/add')}>
+            Add Instrument
+          </Button>
+        }
+        secondaryActions={
+          <>
           <Button
             variant="outlined"
             startIcon={catalogSyncing ? <CircularProgress size={18} /> : <SyncIcon />}
@@ -202,11 +205,9 @@ const MarketDataFoundationPage: React.FC = () => {
           <Button variant="outlined" startIcon={<SyncIcon />} onClick={() => navigate('/market-data-foundation/ingestion')}>
             Ingestion
           </Button>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/market-data-foundation/add')}>
-            Add Instrument
-          </Button>
-        </Box>
-      </Box>
+          </>
+        }
+      />
 
       <MarketDataStatusPanel />
 
@@ -242,6 +243,7 @@ const MarketDataFoundationPage: React.FC = () => {
           </TextField>
           <TextField size="small" label="Currency" value={currency} onChange={(event) => { setCurrency(event.target.value.toUpperCase()); setPage(0); }} sx={{ minWidth: 120 }} />
           <TextField size="small" label="Sector" value={sector} onChange={(event) => { setSector(event.target.value); setPage(0); }} sx={{ minWidth: 180 }} />
+          <TextField size="small" label="Industry" value={industry} onChange={(event) => { setIndustry(event.target.value); setPage(0); }} sx={{ minWidth: 180 }} />
           <Button
             variant="outlined"
             startIcon={loading ? <CircularProgress size={18} /> : <RefreshIcon />}

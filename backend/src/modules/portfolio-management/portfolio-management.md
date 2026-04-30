@@ -86,6 +86,12 @@ The MVP ledger stores manual transactions only. Validation rules:
 
 Realized P&L and FIFO accounting are intentionally out of scope for this MVP.
 
+## UX Behavior
+
+- The portfolio page uses a sidebar/list selector for switching portfolios instead of rows of navigation buttons.
+- Portfolio detail sections use tabs for Overview, Holdings, Allocation, Intelligence, and Transactions.
+- Holding and transaction forms use a searchable stock selector instead of requiring users to paste instrument IDs.
+
 ## Known Limitations
 
 - Auth Identity now protects portfolio routes. New portfolios are owned by the authenticated user. Existing nullable-owner portfolios remain readable during migration.

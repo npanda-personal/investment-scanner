@@ -293,6 +293,12 @@ Recent data cleanup:
 - Duplicate fundamentals rows created by timestamp-level provider snapshot dates were removed from the local database.
 - Remaining fundamentals rows were normalized to UTC midnight `periodEndDate` values.
 
+## UX And Query Behavior
+
+- Instrument list filters support server-side pagination, sorting, and market segmentation.
+- Text metadata filters such as country, exchange, currency, sector, and industry are case-insensitive partial matches. For example, `sector=tech` matches `Technology`.
+- The frontend stock list uses the shared `PageHeader`, `FilterBar`, and `DataTable` patterns and routes row clicks into `/stocks/:id`.
+
 ## Assumptions
 
 - All tooling and data integration remains free/open-source and locally runnable, per `docs/instructions.md`.

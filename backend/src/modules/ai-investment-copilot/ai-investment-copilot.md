@@ -104,6 +104,12 @@ Every summary includes the disclaimer:
 
 No Prisma model was added. Summaries are generated on demand.
 
+## UX And Performance Behavior
+
+- Copilot modes use tabs instead of button-based mode switching.
+- Market brief, alert digest, and entity summaries are loaded only when the active tab action is requested.
+- Stock, portfolio, and watchlist summaries use searchable selectors rather than raw IDs.
+
 ## Known Limitations
 
 - Auth Identity now protects copilot routes. Copilot usage gates are tied to the authenticated user.

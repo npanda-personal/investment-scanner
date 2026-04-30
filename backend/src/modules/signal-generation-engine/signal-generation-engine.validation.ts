@@ -1,12 +1,18 @@
-import type { SignalDirection, SignalQuery, SignalRunRequest } from './signal-generation-engine.types';
+import type { SignalConfidence, SignalDirection, SignalQuery, SignalRunRequest } from './signal-generation-engine.types';
 
 const DIRECTIONS: SignalDirection[] = ['BULLISH', 'NEUTRAL', 'BEARISH'];
+const CONFIDENCES: SignalConfidence[] = ['LOW', 'MEDIUM', 'HIGH'];
 
 const first = (value: unknown): unknown => Array.isArray(value) ? value[0] : value;
 
 export function normalizeDirection(value: unknown): SignalDirection | undefined {
   const normalized = String(first(value) || '').trim().toUpperCase();
   return DIRECTIONS.includes(normalized as SignalDirection) ? normalized as SignalDirection : undefined;
+}
+
+export function normalizeConfidence(value: unknown): SignalConfidence | undefined {
+  const normalized = String(first(value) || '').trim().toUpperCase();
+  return CONFIDENCES.includes(normalized as SignalConfidence) ? normalized as SignalConfidence : undefined;
 }
 
 export function parseSignalQuery(query: Record<string, unknown>): SignalQuery {
@@ -19,6 +25,8 @@ export function parseSignalQuery(query: Record<string, unknown>): SignalQuery {
     sector: typeof first(query.sector) === 'string' ? String(first(query.sector)).trim() || undefined : undefined,
     country: typeof first(query.country) === 'string' ? String(first(query.country)).trim() || undefined : undefined,
     signalType: typeof first(query.signalType) === 'string' ? String(first(query.signalType)).trim() || undefined : undefined,
+    confidence: normalizeConfidence(query.confidence),
+    search: typeof first(query.search) === 'string' ? String(first(query.search)).trim() || undefined : undefined,
   };
 }
 

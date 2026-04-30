@@ -4,6 +4,9 @@ import {
   Box,
   Button,
   CircularProgress,
+  List,
+  ListItemButton,
+  ListItemText,
   MenuItem,
   Paper,
   Stack,
@@ -12,7 +15,7 @@ import {
 } from '@mui/material';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { SignalBadge } from '@/features/signal-generation-engine';
-import { DataTable, InstrumentSearchSelect, StatusBadge, type DataTableColumn } from '@/shared/components';
+import { DataTable, InstrumentSearchSelect, PageHeader, StatusBadge, type DataTableColumn } from '@/shared/components';
 import type { V1Instrument } from '@/features/market-data-foundation';
 import {
   addWatchlistItem,
@@ -125,8 +128,10 @@ const WatchlistManagementPage: React.FC = () => {
 
   return (
     <Box sx={{ p: 3, maxWidth: 1500, mx: 'auto' }}>
-      <Typography variant="h4">Watchlists</Typography>
-      <Typography color="text.secondary" sx={{ mb: 3 }}>Track stocks you are interested in before they become portfolio holdings.</Typography>
+      <PageHeader
+        title="Watchlists"
+        subtitle="Track stocks you are interested in before they become portfolio holdings."
+      />
       {(error || formError) && <Alert severity="error" sx={{ mb: 2 }}>{error || formError}</Alert>}
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '320px 1fr' }, gap: 3 }}>
@@ -136,11 +141,13 @@ const WatchlistManagementPage: React.FC = () => {
             {watchlists.length === 0 ? (
               <Typography color="text.secondary">No watchlists yet. Create one to start tracking ideas.</Typography>
             ) : (
-              <Stack spacing={1}>
+              <List dense disablePadding>
                 {watchlists.map((watchlist) => (
-                  <Button key={watchlist.id} component={Link} to={`/watchlists/${watchlist.id}`} variant={watchlist.id === id ? 'contained' : 'outlined'}>{watchlist.name}</Button>
+                  <ListItemButton key={watchlist.id} component={Link} to={`/watchlists/${watchlist.id}`} selected={watchlist.id === id}>
+                    <ListItemText primary={watchlist.name} secondary={watchlist.description || 'No description'} />
+                  </ListItemButton>
                 ))}
-              </Stack>
+              </List>
             )}
           </Paper>
           <Paper sx={{ p: 2 }}>

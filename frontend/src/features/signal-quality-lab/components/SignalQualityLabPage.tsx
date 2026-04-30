@@ -21,6 +21,8 @@ import {
 import { Link } from 'react-router-dom';
 import { fetchSignalHistory, fetchSignalOutcomes, recalculateSignalQuality } from '../api/signalQualityLabService';
 import { useSignalQualityLab } from '../hooks';
+import { InstrumentSearchSelect, PageHeader } from '@/shared/components';
+import type { V1Instrument } from '@/features/market-data-foundation';
 import type { QualityFilters, QualityHorizon, QualityMetricGroup, SignalHistoryItem, SignalOutcomeSet, SignalTypePerformance } from '../types';
 
 const horizons: QualityHorizon[] = ['1D', '5D', '10D', '20D', '60D'];
@@ -74,7 +76,7 @@ const MetricTable: React.FC<{ title: string; rows: (QualityMetricGroup | SignalT
 const SignalQualityLabPage: React.FC = () => {
   const [horizon, setHorizon] = useState<QualityHorizon>('20D');
   const [filters, setFilters] = useState<QualityFilters>({});
-  const [instrumentId, setInstrumentId] = useState('');
+  const [selectedInstrument, setSelectedInstrument] = useState<V1Instrument | null>(null);
   const [history, setHistory] = useState<SignalHistoryItem[]>([]);
   const [outcomes, setOutcomes] = useState<SignalOutcomeSet[]>([]);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -86,8 +88,8 @@ const SignalQualityLabPage: React.FC = () => {
     setFormError(null);
     try {
       const [nextHistory, nextOutcomes] = await Promise.all([
-        fetchSignalHistory(instrumentId),
-        fetchSignalOutcomes(instrumentId),
+        fetchSignalHistory(selectedInstrument?.id || ''),
+        fetchSignalOutcomes(selectedInstrument?.id || ''),
       ]);
       setHistory(nextHistory);
       setOutcomes(nextOutcomes);
@@ -132,16 +134,10 @@ const SignalQualityLabPage: React.FC = () => {
 
   return (
     <Box sx={{ p: 3, maxWidth: 1500, mx: 'auto' }}>
-      <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2} sx={{ mb: 3 }}>
-        <Box>
-          <Typography variant="h4">Signal Quality Lab</Typography>
-          <Typography color="text.secondary">Historical signal measurement. Outcomes describe past forward returns, not predictions or trading advice.</Typography>
-        </Box>
-        <Stack direction="row" spacing={1}>
-          <TextField select size="small" label="Horizon" value={horizon} onChange={(event) => setHorizon(event.target.value as QualityHorizon)}>
-            {horizons.map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
-          </TextField>
-          <Button component={Link} to="/signals/calibration" variant="outlined">Calibration Engine</Button>
+      <PageHeader
+        title="Signal Quality Lab"
+        subtitle="Historical signal measurement. Outcomes describe past forward returns, not predictions or trading advice."
+        primaryAction={
           <Button
             variant="outlined"
             onClick={recalculate}
@@ -150,8 +146,16 @@ const SignalQualityLabPage: React.FC = () => {
           >
             {recalculating ? 'Recalculating' : 'Recalculate'}
           </Button>
-        </Stack>
-      </Stack>
+        }
+        secondaryActions={
+          <>
+          <TextField select size="small" label="Horizon" value={horizon} onChange={(event) => setHorizon(event.target.value as QualityHorizon)}>
+            {horizons.map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
+          </TextField>
+          <Button component={Link} to="/signals/calibration" variant="outlined">Calibration Engine</Button>
+          </>
+        }
+      />
 
       {(error || formError) && <Alert severity="error" sx={{ mb: 2 }}>{error || formError}</Alert>}
       {actionMessage && <Alert severity="info" sx={{ mb: 2 }}>{actionMessage}</Alert>}
@@ -159,6 +163,11 @@ const SignalQualityLabPage: React.FC = () => {
         <Alert severity="info" sx={{ mb: 2 }}>
           Data quality filter applied: {summary.dataQualityFilterSummary.totalSignalsAfterFilter} / {summary.dataQualityFilterSummary.totalSignalsBeforeFilter} signals included,
           excluded {summary.dataQualityFilterSummary.excludedByDataQuality}, missing evaluations {summary.dataQualityFilterSummary.missingQualityEvaluationCount}.
+        </Alert>
+      )}
+      {summary && summary.totalSignals === 0 && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          No signal results are available for quality measurement yet. Run Signal Generation first, then rerun this page after enough future price data exists.
         </Alert>
       )}
 
@@ -221,10 +230,12 @@ const SignalQualityLabPage: React.FC = () => {
       </Box>
 
       <Paper sx={{ p: 2 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>Instrument Signal History</Typography>
+          <Typography variant="h6" sx={{ mb: 2 }}>Instrument Signal History</Typography>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ mb: 2 }}>
-          <TextField label="Instrument ID" size="small" value={instrumentId} onChange={(event) => setInstrumentId(event.target.value)} fullWidth />
-          <Button variant="contained" onClick={loadInstrument} disabled={!instrumentId.trim()}>Load</Button>
+          <Box sx={{ flex: 1 }}>
+            <InstrumentSearchSelect value={selectedInstrument} onChange={setSelectedInstrument} />
+          </Box>
+          <Button variant="contained" onClick={loadInstrument} disabled={!selectedInstrument}>Load</Button>
         </Stack>
         {history.length === 0 ? (
           <Typography color="text.secondary">Enter a Market Data Foundation instrument ID to review signal history and forward outcomes.</Typography>

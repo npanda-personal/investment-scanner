@@ -39,6 +39,8 @@ export interface SignalQuery {
   sector?: string;
   country?: string;
   signalType?: string;
+  confidence?: SignalConfidence;
+  search?: string;
 }
 
 export interface SignalRunRequest {

@@ -74,6 +74,12 @@ Route:
 
 The feature exposes a reusable `AddToWatchlistDialog` used by Signal Generation and Stock Research Workbench.
 
+## UX Behavior
+
+- Watchlist switching uses a selected list/sidebar pattern instead of a horizontal row of buttons.
+- Watchlist items remain table-first with pagination and sortable backend order options.
+- Adding stocks uses the shared searchable instrument selector.
+
 ## Known Limitations
 
 - Auth Identity now protects watchlist routes. New watchlists are owned by the authenticated user. Existing nullable-owner watchlists remain readable during migration.

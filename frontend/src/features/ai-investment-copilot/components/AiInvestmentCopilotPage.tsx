@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Chip,
@@ -8,12 +9,20 @@ import {
   Divider,
   Paper,
   Stack,
+  Tab,
+  Tabs,
   TextField,
   Typography,
 } from '@mui/material';
 import PsychologyIcon from '@mui/icons-material/Psychology';
 import { useAiInvestmentCopilot } from '../hooks';
 import type { CopilotSummaryResponse } from '../types';
+import { InstrumentSearchSelect, PageHeader } from '@/shared/components';
+import type { V1Instrument } from '@/features/market-data-foundation';
+import { fetchPortfolios, type Portfolio } from '@/features/portfolio-management';
+import { fetchWatchlists, type Watchlist } from '@/features/watchlist-management';
+
+type CopilotTab = 'market' | 'stock' | 'portfolio' | 'watchlist' | 'alerts';
 
 const statusColor = (status: string) => {
   if (status === 'COMPLETE') return 'success';
@@ -23,19 +32,26 @@ const statusColor = (status: string) => {
 
 export default function AiInvestmentCopilotPage() {
   const {
-    marketBrief,
-    alertDigest,
     activeSummary,
     loading,
     running,
     error,
     setError,
-    setActiveSummary,
+    loadMarketBrief,
+    loadAlertDigest,
     runSummary,
   } = useAiInvestmentCopilot();
-  const [instrumentId, setInstrumentId] = useState('');
-  const [portfolioId, setPortfolioId] = useState('');
-  const [watchlistId, setWatchlistId] = useState('');
+  const [activeTab, setActiveTab] = useState<CopilotTab>('market');
+  const [instrument, setInstrument] = useState<V1Instrument | null>(null);
+  const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
+  const [watchlist, setWatchlist] = useState<Watchlist | null>(null);
+  const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
+  const [watchlists, setWatchlists] = useState<Watchlist[]>([]);
+
+  useEffect(() => {
+    fetchPortfolios().then(setPortfolios).catch(() => setPortfolios([]));
+    fetchWatchlists().then(setWatchlists).catch(() => setWatchlists([]));
+  }, []);
 
   if (loading) {
     return <Stack alignItems="center" sx={{ py: 8 }}><CircularProgress /></Stack>;
@@ -43,52 +59,57 @@ export default function AiInvestmentCopilotPage() {
 
   return (
     <Box sx={{ maxWidth: 1280 }}>
-      <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" gap={2} sx={{ mb: 3 }}>
-        <Box>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <PsychologyIcon color="primary" />
-            <Typography variant="h4" fontWeight={700}>AI Investment Copilot</Typography>
-          </Stack>
-          <Typography color="text.secondary">Deterministic research summaries from your existing modules. For research support only, not financial advice.</Typography>
-        </Box>
-      </Stack>
+      <PageHeader
+        title="AI Investment Copilot"
+        badges={<PsychologyIcon color="primary" />}
+        subtitle="Deterministic research summaries from your existing modules. For research support only, not financial advice."
+      />
 
       {error && <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>{error}</Alert>}
 
+      <Paper sx={{ mb: 2 }}>
+        <Tabs value={activeTab} onChange={(_event, value) => setActiveTab(value)} variant="scrollable" scrollButtons="auto">
+          <Tab value="market" label="Market Brief" />
+          <Tab value="stock" label="Stock Summary" />
+          <Tab value="portfolio" label="Portfolio Summary" />
+          <Tab value="watchlist" label="Watchlist Summary" />
+          <Tab value="alerts" label="Alert Digest" />
+        </Tabs>
+      </Paper>
+
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '380px 1fr' }, gap: 2 }}>
         <Stack spacing={2}>
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" sx={{ mb: 1 }}>Copilot Dashboard</Typography>
-            <Stack spacing={1}>
-              <Button variant="outlined" onClick={() => marketBrief && setActiveSummary(marketBrief)}>Market Brief</Button>
-              <Button variant="outlined" onClick={() => alertDigest && setActiveSummary(alertDigest)}>Alerts Digest</Button>
-            </Stack>
-          </Paper>
-
-          <RequestCard
-            title="Stock Summary"
-            label="Instrument ID"
-            value={instrumentId}
-            onChange={setInstrumentId}
-            loading={running}
-            onRun={() => void runSummary('stock', instrumentId)}
-          />
-          <RequestCard
-            title="Portfolio Review"
-            label="Portfolio ID"
-            value={portfolioId}
-            onChange={setPortfolioId}
-            loading={running}
-            onRun={() => void runSummary('portfolio', portfolioId)}
-          />
-          <RequestCard
-            title="Watchlist Review"
-            label="Watchlist ID"
-            value={watchlistId}
-            onChange={setWatchlistId}
-            loading={running}
-            onRun={() => void runSummary('watchlist', watchlistId)}
-          />
+          {activeTab === 'market' && <ActionCard title="Market Brief" loading={running} onRun={() => void loadMarketBrief()} />}
+          {activeTab === 'alerts' && <ActionCard title="Alert Digest" loading={running} onRun={() => void loadAlertDigest()} />}
+          {activeTab === 'stock' && (
+            <RequestCard title="Stock Summary" loading={running} disabled={!instrument} onRun={() => instrument && void runSummary('stock', instrument.id)}>
+              <InstrumentSearchSelect value={instrument} onChange={setInstrument} />
+            </RequestCard>
+          )}
+          {activeTab === 'portfolio' && (
+            <RequestCard title="Portfolio Review" loading={running} disabled={!portfolio} onRun={() => portfolio && void runSummary('portfolio', portfolio.id)}>
+              <Autocomplete
+                options={portfolios}
+                value={portfolio}
+                onChange={(_event, value) => setPortfolio(value)}
+                getOptionLabel={(option) => `${option.name} (${option.baseCurrency})`}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                renderInput={(params) => <TextField {...params} label="Portfolio" size="small" />}
+              />
+            </RequestCard>
+          )}
+          {activeTab === 'watchlist' && (
+            <RequestCard title="Watchlist Review" loading={running} disabled={!watchlist} onRun={() => watchlist && void runSummary('watchlist', watchlist.id)}>
+              <Autocomplete
+                options={watchlists}
+                value={watchlist}
+                onChange={(_event, value) => setWatchlist(value)}
+                getOptionLabel={(option) => option.name}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                renderInput={(params) => <TextField {...params} label="Watchlist" size="small" />}
+              />
+            </RequestCard>
+          )}
         </Stack>
 
         <SummaryPanel summary={activeSummary} />
@@ -97,20 +118,30 @@ export default function AiInvestmentCopilotPage() {
   );
 }
 
-function RequestCard({ title, label, value, onChange, onRun, loading }: {
+function ActionCard({ title, onRun, loading }: { title: string; onRun: () => void; loading: boolean }) {
+  return (
+    <Paper sx={{ p: 2 }}>
+      <Typography variant="h6" sx={{ mb: 1 }}>{title}</Typography>
+      <Button variant="contained" disabled={loading} onClick={onRun}>
+        {loading ? 'Loading...' : 'Load Summary'}
+      </Button>
+    </Paper>
+  );
+}
+
+function RequestCard({ title, children, onRun, loading, disabled }: {
   title: string;
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
+  children: React.ReactNode;
   onRun: () => void;
   loading: boolean;
+  disabled: boolean;
 }) {
   return (
     <Paper sx={{ p: 2 }}>
       <Typography variant="h6" sx={{ mb: 1 }}>{title}</Typography>
       <Stack spacing={1}>
-        <TextField label={label} value={value} onChange={(event) => onChange(event.target.value)} size="small" />
-        <Button variant="contained" disabled={loading || !value.trim()} onClick={onRun}>
+        {children}
+        <Button variant="contained" disabled={loading || disabled} onClick={onRun}>
           {loading ? 'Summarizing...' : 'Summarize'}
         </Button>
       </Stack>

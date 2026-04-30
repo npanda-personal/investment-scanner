@@ -50,13 +50,9 @@ export class SignalGenerationEngineRepository {
   }
 
   async latestSignals(query: SignalQuery): Promise<SignalResultDto[]> {
+    const where = this.buildWhere(query);
     const results = await this.db.signalResult.findMany({
-      where: {
-        direction: query.direction,
-        score: query.minScore !== undefined ? { gte: query.minScore } : undefined,
-        sector: query.sector ? { equals: query.sector, mode: 'insensitive' } : undefined,
-        country: query.country ? { equals: query.country, mode: 'insensitive' } : undefined,
-      },
+      where,
       orderBy: [{ generatedAt: 'desc' }, { score: 'desc' }],
       take: Math.max(query.limit * 5, query.limit),
     });
@@ -72,12 +68,7 @@ export class SignalGenerationEngineRepository {
 
   async latestSignalUniverse(query: SignalQuery): Promise<SignalResultDto[]> {
     const results = await this.db.signalResult.findMany({
-      where: {
-        direction: query.direction,
-        score: query.minScore !== undefined ? { gte: query.minScore } : undefined,
-        sector: query.sector ? { equals: query.sector, mode: 'insensitive' } : undefined,
-        country: query.country ? { equals: query.country, mode: 'insensitive' } : undefined,
-      },
+      where: this.buildWhere(query),
       orderBy: [{ instrumentId: 'asc' }, { generatedAt: 'desc' }],
       distinct: ['instrumentId'],
       skip: query.offset ?? 0,
@@ -89,12 +80,7 @@ export class SignalGenerationEngineRepository {
   async latestSignalUniverseCount(query: Omit<SignalQuery, 'limit'>): Promise<number> {
     const groups = await this.db.signalResult.groupBy({
       by: ['instrumentId'],
-      where: {
-        direction: query.direction,
-        score: query.minScore !== undefined ? { gte: query.minScore } : undefined,
-        sector: query.sector ? { equals: query.sector, mode: 'insensitive' } : undefined,
-        country: query.country ? { equals: query.country, mode: 'insensitive' } : undefined,
-      },
+      where: this.buildWhere(query as SignalQuery),
     });
     return groups.length;
   }
@@ -102,11 +88,8 @@ export class SignalGenerationEngineRepository {
   async signalHistory(query: SignalHistoryQuery): Promise<SignalResultDto[]> {
     const results = await this.db.signalResult.findMany({
       where: {
+        ...this.buildWhere(query),
         instrumentId: query.instrumentId,
-        direction: query.direction,
-        score: query.minScore !== undefined ? { gte: query.minScore } : undefined,
-        sector: query.sector ? { equals: query.sector, mode: 'insensitive' } : undefined,
-        country: query.country ? { equals: query.country, mode: 'insensitive' } : undefined,
         generatedAt: {
           gte: query.from ? new Date(query.from) : undefined,
           lte: query.to ? new Date(query.to) : undefined,
@@ -122,17 +105,28 @@ export class SignalGenerationEngineRepository {
   async signalHistoryCount(query: Omit<SignalHistoryQuery, 'limit'>): Promise<number> {
     return this.db.signalResult.count({
       where: {
+        ...this.buildWhere(query as SignalQuery),
         instrumentId: query.instrumentId,
-        direction: query.direction,
-        score: query.minScore !== undefined ? { gte: query.minScore } : undefined,
-        sector: query.sector ? { equals: query.sector, mode: 'insensitive' } : undefined,
-        country: query.country ? { equals: query.country, mode: 'insensitive' } : undefined,
         generatedAt: {
           gte: query.from ? new Date(query.from) : undefined,
           lte: query.to ? new Date(query.to) : undefined,
         },
       },
     });
+  }
+
+  private buildWhere(query: SignalQuery): Prisma.SignalResultWhereInput {
+    return {
+      direction: query.direction,
+      confidence: query.confidence,
+      score: query.minScore !== undefined ? { gte: query.minScore } : undefined,
+      sector: query.sector ? { contains: query.sector, mode: 'insensitive' } : undefined,
+      country: query.country ? { contains: query.country, mode: 'insensitive' } : undefined,
+      OR: query.search ? [
+        { symbol: { contains: query.search, mode: 'insensitive' } },
+        { companyName: { contains: query.search, mode: 'insensitive' } },
+      ] : undefined,
+    };
   }
 
   private hasSignal(result: SignalResultDto, signalType: string): boolean {

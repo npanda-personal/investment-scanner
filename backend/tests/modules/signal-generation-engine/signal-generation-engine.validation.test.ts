@@ -8,11 +8,13 @@ describe('signal generation validation', () => {
   });
 
   it('parses query filters with safe limits', () => {
-    expect(parseSignalQuery({ direction: 'bearish', minScore: '110', limit: '999', sector: 'Tech' })).toMatchObject({
+    expect(parseSignalQuery({ direction: 'bearish', confidence: 'high', minScore: '110', limit: '999', sector: 'Tech', search: 'apple' })).toMatchObject({
       direction: 'BEARISH',
+      confidence: 'HIGH',
       minScore: 100,
       limit: 100,
       sector: 'Tech',
+      search: 'apple',
     });
   });
 
@@ -21,4 +23,3 @@ describe('signal generation validation', () => {
     expect(validateInstrumentId('')).toBe('instrumentId is required');
   });
 });
-

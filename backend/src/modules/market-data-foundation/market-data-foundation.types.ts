@@ -139,6 +139,7 @@ export interface PaginationOptions {
   assetType?: string;
   currency?: string;
   sector?: string;
+  industry?: string;
   search?: string;
 }
 

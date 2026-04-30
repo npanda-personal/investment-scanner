@@ -6,7 +6,7 @@ describe('signal quality lab validation', () => {
     expect(parseQualityQuery({ horizon: '5D', direction: 'BULLISH', limit: '99999', minSampleSize: '-1' })).toMatchObject({
       horizon: '5D',
       direction: 'BULLISH',
-      limit: 5000,
+      limit: 1000,
       minSampleSize: 0,
     });
   });

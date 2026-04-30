@@ -11,7 +11,7 @@ export function parseQualityQuery(query: any): QualityQuery {
     country: typeof query.country === 'string' && query.country.trim() ? query.country.trim() : undefined,
     from: validDate(query.from) ? query.from : undefined,
     to: validDate(query.to) ? query.to : undefined,
-    limit: clampInt(query.limit, 500, 1, 5000),
+    limit: clampInt(query.limit, 150, 1, 1000),
     minSampleSize: clampInt(query.minSampleSize, 0, 0, 1000),
     readinessStatus: parseEnum(query.readinessStatus, ['READY', 'LIMITED', 'NOT_READY']),
     coverageStatus: parseEnum(query.coverageStatus, ['GOOD', 'PARTIAL', 'POOR', 'UNUSABLE']),

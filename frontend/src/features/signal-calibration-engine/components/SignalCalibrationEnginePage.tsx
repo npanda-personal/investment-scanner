@@ -19,6 +19,8 @@ import { Link } from 'react-router-dom';
 import { fetchCalibrationComparison, runSignalCalibration } from '../api/signalCalibrationEngineService';
 import { useSignalCalibrationEngine } from '../hooks';
 import type { CalibrationComparison, SignalCalibrationResult } from '../types';
+import { InstrumentSearchSelect, PageHeader } from '@/shared/components';
+import type { V1Instrument } from '@/features/market-data-foundation';
 
 const delta = (value: number) => `${value >= 0 ? '+' : ''}${value}`;
 const DEFAULT_BATCH_SIZE = 25;
@@ -74,7 +76,7 @@ const TopTable: React.FC<{ rows: SignalCalibrationResult[] }> = ({ rows }) => (
 
 const SignalCalibrationEnginePage: React.FC = () => {
   const { top, model, health, loading, error, reload } = useSignalCalibrationEngine();
-  const [instrumentId, setInstrumentId] = useState('');
+  const [selectedInstrument, setSelectedInstrument] = useState<V1Instrument | null>(null);
   const [runLimit, setRunLimit] = useState('25');
   const [comparison, setComparison] = useState<CalibrationComparison | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -131,7 +133,7 @@ const SignalCalibrationEnginePage: React.FC = () => {
   const compare = async () => {
     setFormError(null);
     try {
-      setComparison(await fetchCalibrationComparison(instrumentId));
+      setComparison(await fetchCalibrationComparison(selectedInstrument?.id || ''));
       await reload();
     } catch (err: any) {
       setFormError(err.response?.data?.error || err.message || 'Failed to compare signal');
@@ -142,13 +144,10 @@ const SignalCalibrationEnginePage: React.FC = () => {
 
   return (
     <Box sx={{ p: 3, maxWidth: 1500, mx: 'auto' }}>
-      <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2} sx={{ mb: 3 }}>
-        <Box>
-          <Typography variant="h4">Signal Calibration Engine</Typography>
-          <Typography color="text.secondary">Explainable historical calibration. Raw signal scores remain visible and unchanged.</Typography>
-        </Box>
-        <Stack direction="row" spacing={1}>
-          <Button component={Link} to="/signals/quality" variant="outlined">Signal Quality Lab</Button>
+      <PageHeader
+        title="Signal Calibration Engine"
+        subtitle="Explainable historical calibration. Raw signal scores remain visible and unchanged."
+        primaryAction={
           <Button
             variant="contained"
             onClick={run}
@@ -157,8 +156,13 @@ const SignalCalibrationEnginePage: React.FC = () => {
           >
             {running ? 'Running' : 'Run Calibration'}
           </Button>
-        </Stack>
-      </Stack>
+        }
+        secondaryActions={
+          <>
+          <Button component={Link} to="/signals/quality" variant="outlined">Signal Quality Lab</Button>
+          </>
+        }
+      />
 
       {(error || formError) && <Alert severity="error" sx={{ mb: 2 }}>{error || formError}</Alert>}
       {actionMessage && <Alert severity="success" sx={{ mb: 2 }}>{actionMessage}</Alert>}
@@ -191,9 +195,11 @@ const SignalCalibrationEnginePage: React.FC = () => {
       <Paper sx={{ p: 2 }}>
         <Typography variant="h6" sx={{ mb: 2 }}>Raw vs Calibrated Comparison</Typography>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ mb: 2 }}>
-          <TextField label="Instrument ID" size="small" value={instrumentId} onChange={(event) => setInstrumentId(event.target.value)} fullWidth />
+          <Box sx={{ flex: 1 }}>
+            <InstrumentSearchSelect value={selectedInstrument} onChange={setSelectedInstrument} />
+          </Box>
           <TextField label="Batch size" size="small" value={runLimit} onChange={(event) => setRunLimit(event.target.value)} sx={{ width: 120 }} />
-          <Button variant="outlined" disabled={!instrumentId.trim()} onClick={compare}>Compare</Button>
+          <Button variant="outlined" disabled={!selectedInstrument} onClick={compare}>Compare</Button>
         </Stack>
         {comparison ? (
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
@@ -223,7 +229,7 @@ const SignalCalibrationEnginePage: React.FC = () => {
               {comparison.calibratedSignal.dataGaps.length > 0 && <Typography color="text.secondary" variant="body2">Gaps: {comparison.calibratedSignal.dataGaps.join('; ')}</Typography>}
             </Paper>
           </Box>
-        ) : <Typography color="text.secondary">Enter an instrument ID to compare raw and calibrated outputs.</Typography>}
+        ) : <Typography color="text.secondary">Select an instrument to compare raw and calibrated outputs.</Typography>}
       </Paper>
     </Box>
   );

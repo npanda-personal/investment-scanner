@@ -21,7 +21,8 @@ describe('MarketDataFoundationRepository', () => {
       exchange: 'NASDAQ',
       assetType: 'EQUITY',
       currency: 'USD',
-      sector: 'Technology',
+      sector: 'tech',
+      industry: 'software',
       search: 'apple',
     });
 
@@ -31,11 +32,12 @@ describe('MarketDataFoundationRepository', () => {
       orderBy: { marketCap: 'desc' },
       where: expect.objectContaining({
         region: 'US',
-        country: { equals: 'US', mode: 'insensitive' },
-        exchange: { equals: 'NASDAQ', mode: 'insensitive' },
-        assetType: { equals: 'EQUITY', mode: 'insensitive' },
-        currency: { equals: 'USD', mode: 'insensitive' },
-        sector: { equals: 'Technology', mode: 'insensitive' },
+        country: { contains: 'US', mode: 'insensitive' },
+        exchange: { contains: 'NASDAQ', mode: 'insensitive' },
+        assetType: { contains: 'EQUITY', mode: 'insensitive' },
+        currency: { contains: 'USD', mode: 'insensitive' },
+        sector: { contains: 'tech', mode: 'insensitive' },
+        industry: { contains: 'software', mode: 'insensitive' },
         OR: expect.any(Array),
       }),
     }));

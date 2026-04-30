@@ -6,9 +6,14 @@ import {
   Chip,
   CircularProgress,
   Divider,
+  List,
+  ListItemButton,
+  ListItemText,
   MenuItem,
   Paper,
   Stack,
+  Tab,
+  Tabs,
   Table,
   TableBody,
   TableCell,
@@ -20,6 +25,8 @@ import {
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { SignalBadge } from '@/features/signal-generation-engine';
 import { PortfolioIntelligencePanel } from '@/features/portfolio-intelligence';
+import { InstrumentSearchSelect, PageHeader } from '@/shared/components';
+import type { V1Instrument } from '@/features/market-data-foundation';
 import {
   addHolding,
   createPortfolio,
@@ -107,6 +114,9 @@ const PortfolioManagementPage: React.FC = () => {
   const [holdingForm, setHoldingForm] = useState(defaultHoldingForm);
   const [editingHolding, setEditingHolding] = useState<PortfolioHolding | null>(null);
   const [transactionForm, setTransactionForm] = useState(defaultTransactionForm);
+  const [selectedHoldingInstrument, setSelectedHoldingInstrument] = useState<V1Instrument | null>(null);
+  const [selectedTransactionInstrument, setSelectedTransactionInstrument] = useState<V1Instrument | null>(null);
+  const [activeSection, setActiveSection] = useState<'overview' | 'holdings' | 'allocation' | 'intelligence' | 'transactions'>('overview');
   const baseCurrency = selectedPortfolio?.baseCurrency || 'USD';
 
   const summaryTone = useMemo(() => {
@@ -160,6 +170,7 @@ const PortfolioManagementPage: React.FC = () => {
         await addHolding(selectedId, input);
       }
       setHoldingForm(defaultHoldingForm);
+      setSelectedHoldingInstrument(null);
       setEditingHolding(null);
       await reload();
     } catch (err: any) {
@@ -183,6 +194,7 @@ const PortfolioManagementPage: React.FC = () => {
     try {
       await createTransaction(selectedId, input);
       setTransactionForm(defaultTransactionForm);
+      setSelectedTransactionInstrument(null);
       await reload();
     } catch (err: any) {
       setFormError(err.response?.data?.error || err.message || 'Failed to add transaction');
@@ -206,13 +218,11 @@ const PortfolioManagementPage: React.FC = () => {
 
   return (
     <Box sx={{ p: 3, maxWidth: 1500, mx: 'auto' }}>
-      <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2} sx={{ mb: 3 }}>
-        <Box>
-          <Typography variant="h4">Portfolio Management</Typography>
-          <Typography color="text.secondary">Manual portfolios, holdings, valuation, allocation, and transaction tracking.</Typography>
-        </Box>
-        {summary && <Chip label={`${summary.dataStatus} data`} color={summary.dataStatus === 'COMPLETE' ? 'success' : 'warning'} variant="outlined" />}
-      </Stack>
+      <PageHeader
+        title="Portfolio Management"
+        subtitle="Manual portfolios, holdings, valuation, allocation, and transaction tracking."
+        badges={summary && <Chip label={`${summary.dataStatus} data`} color={summary.dataStatus === 'COMPLETE' ? 'success' : 'warning'} variant="outlined" />}
+      />
 
       {(error || formError) && <Alert severity="error" sx={{ mb: 2 }}>{error || formError}</Alert>}
 
@@ -223,20 +233,18 @@ const PortfolioManagementPage: React.FC = () => {
             {portfolios.length === 0 ? (
               <Typography color="text.secondary">No portfolios yet. Create one to start tracking holdings.</Typography>
             ) : (
-              <Stack spacing={1}>
+              <List dense disablePadding>
                 {portfolios.map((portfolio) => (
-                  <Button
+                  <ListItemButton
                     key={portfolio.id}
                     component={Link}
                     to={`/portfolios/${portfolio.id}`}
-                    variant={portfolio.id === selectedId ? 'contained' : 'outlined'}
-                    sx={{ justifyContent: 'space-between' }}
+                    selected={portfolio.id === selectedId}
                   >
-                    <span>{portfolio.name}</span>
-                    <span>{portfolio.baseCurrency}</span>
-                  </Button>
+                    <ListItemText primary={portfolio.name} secondary={portfolio.baseCurrency} />
+                  </ListItemButton>
                 ))}
-              </Stack>
+              </List>
             )}
           </Paper>
 
@@ -274,7 +282,17 @@ const PortfolioManagementPage: React.FC = () => {
               </Stack>
             </Paper>
 
-            {summary && (
+            <Paper sx={{ mb: 1 }}>
+              <Tabs value={activeSection} onChange={(_event, value) => setActiveSection(value)} variant="scrollable" scrollButtons="auto">
+                <Tab value="overview" label="Overview" />
+                <Tab value="holdings" label="Holdings" />
+                <Tab value="allocation" label="Allocation" />
+                <Tab value="intelligence" label="Intelligence" />
+                <Tab value="transactions" label="Transactions" />
+              </Tabs>
+            </Paper>
+
+            {activeSection === 'overview' && summary && (
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2 }}>
                 <SummaryCard label="Total Value" value={money(summary.totalValue, baseCurrency)} />
                 <SummaryCard label="Unrealized P&L" value={`${money(summary.totalUnrealizedPnL, baseCurrency)} (${percent(summary.totalUnrealizedPnLPercent)})`} tone={summaryTone} />
@@ -283,10 +301,10 @@ const PortfolioManagementPage: React.FC = () => {
               </Box>
             )}
 
-            <Paper sx={{ p: 2, overflowX: 'auto' }}>
+            {activeSection === 'holdings' && <Paper sx={{ p: 2, overflowX: 'auto' }}>
               <Typography variant="h6" sx={{ mb: 2 }}>Holdings</Typography>
               {!summary || summary.holdings.length === 0 ? (
-                <Typography color="text.secondary">No holdings yet. Add a Market Data Foundation instrument ID below.</Typography>
+                <Typography color="text.secondary">No holdings yet. Use the stock selector below to add one.</Typography>
               ) : (
                 <Table size="small">
                   <TableHead>
@@ -329,12 +347,22 @@ const PortfolioManagementPage: React.FC = () => {
                   </TableBody>
                 </Table>
               )}
-            </Paper>
+            </Paper>}
 
-            <Paper sx={{ p: 2 }}>
+            {activeSection === 'holdings' && <Paper sx={{ p: 2 }}>
               <Typography variant="h6" sx={{ mb: 2 }}>{editingHolding ? `Edit ${editingHolding.symbol}` : 'Add Holding'}</Typography>
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '2fr repeat(3, 1fr)' }, gap: 1.5 }}>
-                <TextField label="Instrument ID" value={holdingForm.instrumentId} onChange={(event) => setHoldingForm({ ...holdingForm, instrumentId: event.target.value })} size="small" disabled={Boolean(editingHolding)} />
+                {editingHolding ? (
+                  <TextField label="Instrument" value={holdingForm.instrumentId} size="small" disabled />
+                ) : (
+                  <InstrumentSearchSelect
+                    value={selectedHoldingInstrument}
+                    onChange={(instrument) => {
+                      setSelectedHoldingInstrument(instrument);
+                      setHoldingForm({ ...holdingForm, instrumentId: instrument?.id || '', currency: instrument?.currency || holdingForm.currency });
+                    }}
+                  />
+                )}
                 <TextField label="Quantity" value={holdingForm.quantity} onChange={(event) => setHoldingForm({ ...holdingForm, quantity: event.target.value })} size="small" />
                 <TextField label="Avg cost" value={holdingForm.averageCost} onChange={(event) => setHoldingForm({ ...holdingForm, averageCost: event.target.value })} size="small" />
                 <TextField label="Currency" value={holdingForm.currency} onChange={(event) => setHoldingForm({ ...holdingForm, currency: event.target.value.toUpperCase() })} size="small" />
@@ -347,9 +375,9 @@ const PortfolioManagementPage: React.FC = () => {
                   setHoldingForm(defaultHoldingForm);
                 }}>Cancel</Button>}
               </Stack>
-            </Paper>
+            </Paper>}
 
-            {allocation && (
+            {activeSection === 'allocation' && allocation && (
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'repeat(3, 1fr)' }, gap: 2 }}>
                 <AllocationList title="Top Holdings" buckets={allocation.byHolding} currency={baseCurrency} />
                 <AllocationList title="Sectors" buckets={allocation.bySector} currency={baseCurrency} />
@@ -357,9 +385,9 @@ const PortfolioManagementPage: React.FC = () => {
               </Box>
             )}
 
-            <PortfolioIntelligencePanel portfolioId={selectedId} />
+            {activeSection === 'intelligence' && <PortfolioIntelligencePanel portfolioId={selectedId} />}
 
-            <Paper sx={{ p: 2 }}>
+            {activeSection === 'transactions' && <Paper sx={{ p: 2 }}>
               <Typography variant="h6" sx={{ mb: 2 }}>Transactions</Typography>
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(6, 1fr)' }, gap: 1.5, mb: 2 }}>
                 <TextField select label="Type" value={transactionForm.type} onChange={(event) => setTransactionForm({ ...transactionForm, type: event.target.value as PortfolioTransactionType })} size="small">
@@ -368,7 +396,14 @@ const PortfolioManagementPage: React.FC = () => {
                   <MenuItem value="CASH_IN">CASH_IN</MenuItem>
                   <MenuItem value="CASH_OUT">CASH_OUT</MenuItem>
                 </TextField>
-                <TextField label="Instrument ID" value={transactionForm.instrumentId} onChange={(event) => setTransactionForm({ ...transactionForm, instrumentId: event.target.value })} size="small" />
+                <InstrumentSearchSelect
+                  value={selectedTransactionInstrument}
+                  onChange={(instrument) => {
+                    setSelectedTransactionInstrument(instrument);
+                    setTransactionForm({ ...transactionForm, instrumentId: instrument?.id || '', currency: instrument?.currency || transactionForm.currency });
+                  }}
+                  disabled={transactionForm.type === 'CASH_IN' || transactionForm.type === 'CASH_OUT'}
+                />
                 <TextField label="Quantity" value={transactionForm.quantity} onChange={(event) => setTransactionForm({ ...transactionForm, quantity: event.target.value })} size="small" />
                 <TextField label="Price" value={transactionForm.price} onChange={(event) => setTransactionForm({ ...transactionForm, price: event.target.value })} size="small" />
                 <TextField label="Amount" value={transactionForm.amount} onChange={(event) => setTransactionForm({ ...transactionForm, amount: event.target.value })} size="small" />
@@ -408,7 +443,7 @@ const PortfolioManagementPage: React.FC = () => {
                   </TableBody>
                 </Table>
               )}
-            </Paper>
+            </Paper>}
           </Stack>
         )}
       </Box>

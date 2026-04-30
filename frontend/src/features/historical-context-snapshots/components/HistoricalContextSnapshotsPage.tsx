@@ -19,6 +19,8 @@ import { Link } from 'react-router-dom';
 import { generateSnapshots, lookupSnapshots } from '../api/historicalContextSnapshotsService';
 import { useHistoricalContextSnapshots } from '../hooks';
 import type { SnapshotLookupResult } from '../types';
+import { InstrumentSearchSelect, PageHeader } from '@/shared/components';
+import type { V1Instrument } from '@/features/market-data-foundation';
 
 const today = () => new Date().toISOString().slice(0, 10);
 const pct = (value: number | null | undefined) => value === null || value === undefined ? 'N/A' : `${(value * 100).toFixed(1)}%`;
@@ -35,7 +37,7 @@ const HistoricalContextSnapshotsPage: React.FC = () => {
   const [snapshotDate, setSnapshotDate] = useState(today());
   const [limit, setLimit] = useState('50');
   const [lookupDate, setLookupDate] = useState(today());
-  const [instrumentId, setInstrumentId] = useState('');
+  const [selectedInstrument, setSelectedInstrument] = useState<V1Instrument | null>(null);
   const [sector, setSector] = useState('');
   const [country, setCountry] = useState('');
   const [lookup, setLookup] = useState<SnapshotLookupResult | null>(null);
@@ -59,7 +61,7 @@ const HistoricalContextSnapshotsPage: React.FC = () => {
     try {
       setLookup(await lookupSnapshots({
         date: lookupDate,
-        instrumentId: instrumentId || undefined,
+        instrumentId: selectedInstrument?.id || undefined,
         sector: sector || undefined,
         country: country || undefined,
       }));
@@ -74,13 +76,11 @@ const HistoricalContextSnapshotsPage: React.FC = () => {
 
   return (
     <Box sx={{ p: 3, maxWidth: 1500, mx: 'auto' }}>
-      <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2} sx={{ mb: 3 }}>
-        <Box>
-          <Typography variant="h4">Historical Context Snapshots</Typography>
-          <Typography color="text.secondary">Persist market regime, breadth, sector, country, smart-money, and data-quality context for historical signal evaluation.</Typography>
-        </Box>
-        <Button component={Link} to="/signals/quality" variant="outlined">Open Signal Quality Lab</Button>
-      </Stack>
+      <PageHeader
+        title="Historical Context Snapshots"
+        subtitle="Persist market regime, breadth, sector, country, smart-money, and data-quality context for historical signal evaluation."
+        primaryAction={<Button component={Link} to="/signals/quality" variant="outlined">Open Signal Quality Lab</Button>}
+      />
 
       {(error || formError) && <Alert severity="error" sx={{ mb: 2 }}>{error || formError}</Alert>}
       {message && <Alert severity="success" sx={{ mb: 2 }}>{message}</Alert>}
@@ -110,7 +110,9 @@ const HistoricalContextSnapshotsPage: React.FC = () => {
           <Stack spacing={1.5}>
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
               <TextField label="Date" type="date" value={lookupDate} onChange={(event) => setLookupDate(event.target.value)} size="small" />
-              <TextField label="Instrument ID" value={instrumentId} onChange={(event) => setInstrumentId(event.target.value)} size="small" />
+              <Box sx={{ minWidth: { md: 260 }, flex: 1 }}>
+                <InstrumentSearchSelect value={selectedInstrument} onChange={setSelectedInstrument} />
+              </Box>
               <TextField label="Sector" value={sector} onChange={(event) => setSector(event.target.value)} size="small" />
               <TextField label="Country" value={country} onChange={(event) => setCountry(event.target.value)} size="small" />
               <Button variant="outlined" onClick={runLookup}>Lookup</Button>

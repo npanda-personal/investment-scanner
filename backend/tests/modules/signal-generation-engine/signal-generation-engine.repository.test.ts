@@ -61,4 +61,33 @@ describe('SignalGenerationEngineRepository', () => {
     expect(upsert.mock.calls[0][0].create.generatedDate).toEqual(new Date('2026-04-29T00:00:00.000Z'));
     expect(saved).toMatchObject({ id: 'signal-1', instrument_id: 'stock-1', score: 75 });
   });
+
+  it('applies searchable, partial, and confidence filters to latest signals', async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const repository = new SignalGenerationEngineRepository({ signalResult: { findMany } } as any);
+
+    await repository.latestSignals({
+      direction: 'BULLISH',
+      confidence: 'HIGH',
+      minScore: 70,
+      sector: 'tech',
+      country: 'us',
+      search: 'app',
+      limit: 25,
+    });
+
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        direction: 'BULLISH',
+        confidence: 'HIGH',
+        score: { gte: 70 },
+        sector: { contains: 'tech', mode: 'insensitive' },
+        country: { contains: 'us', mode: 'insensitive' },
+        OR: [
+          { symbol: { contains: 'app', mode: 'insensitive' } },
+          { companyName: { contains: 'app', mode: 'insensitive' } },
+        ],
+      }),
+    }));
+  });
 });

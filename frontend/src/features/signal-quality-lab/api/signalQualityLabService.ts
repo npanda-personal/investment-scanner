@@ -14,7 +14,7 @@ import type {
 
 const API_BASE = '/api/v1/signals';
 
-const params = (horizon: QualityHorizon, filters: QualityFilters = {}) => ({ horizon, limit: 500, minSampleSize: 0, ...filters });
+const params = (horizon: QualityHorizon, filters: QualityFilters = {}) => ({ horizon, limit: 150, minSampleSize: 0, ...filters });
 
 export async function fetchSignalQualitySummary(horizon: QualityHorizon, filters: QualityFilters = {}): Promise<QualitySummary> {
   const response = await axios.get<QualitySummary>(`${API_BASE}/quality/summary`, { params: params(horizon, filters) });

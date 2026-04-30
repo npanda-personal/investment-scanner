@@ -156,6 +156,13 @@ The dashboard shows quality summary cards, performance by signal type, performan
 
 The dashboard links to `/signals/calibration`, where Signal Calibration Engine applies explainable score and confidence adjustments using these measured outcomes.
 
+## Performance And UX Behavior
+
+- Dashboard API calls are bounded by a conservative default `limit` so the page can load quickly on local datasets.
+- Recalculation is never triggered on page load. The frontend runs manual recalculation in batches and refreshes visible quality data after each batch.
+- Instrument history uses a searchable instrument selector rather than raw IDs.
+- Empty states distinguish no raw signal data from insufficient future price data or no data after filters.
+
 ## Historical Context Integration
 
 Regime grouping uses `historical-context-snapshots` when persisted market snapshots are available. Each signal's `generatedAt` date is mapped to the nearest market context snapshot on or before that date within the default snapshot lookup window.

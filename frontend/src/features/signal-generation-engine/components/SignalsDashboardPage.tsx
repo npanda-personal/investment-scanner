@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Box, Button, Checkbox, FormControlLabel, MenuItem, Paper, Tab, Tabs, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Checkbox, FormControlLabel, MenuItem, Paper, Tab, Tabs, TextField } from '@mui/material';
 import { fetchSignalScreener, fetchTopSignals, runSignals } from '../api/signalGenerationEngineService';
-import type { SignalDirection, SignalResult } from '../types';
+import type { SignalConfidence, SignalDirection, SignalResult } from '../types';
 import { MarketRegimeWidget } from '@/features/market-context-intelligence';
 import { Link } from 'react-router-dom';
 import { SignalTable } from './SignalTable';
-import { FilterBar, type SortDirection } from '@/shared/components';
+import { FilterBar, PageHeader, type SortDirection } from '@/shared/components';
 
 type SignalTab = 'bullish' | 'bearish' | 'neutral' | 'momentum' | 'recent' | 'screener';
 
@@ -33,6 +33,9 @@ const SignalsDashboardPage: React.FC = () => {
   const [minScore, setMinScore] = useState('60');
   const [sector, setSector] = useState('');
   const [country, setCountry] = useState('');
+  const [confidence, setConfidence] = useState<SignalConfidence | ''>('');
+  const [signalType, setSignalType] = useState('');
+  const [search, setSearch] = useState('');
   const [runLimit, setRunLimit] = useState('25');
   const [useDataQualityFilter, setUseDataQualityFilter] = useState(false);
   const [runMessage, setRunMessage] = useState<string | null>(null);
@@ -54,6 +57,9 @@ const SignalsDashboardPage: React.FC = () => {
         minScore: minScore ? Number(minScore) : undefined,
         sector: sector || undefined,
         country: country || undefined,
+        confidence: confidence || undefined,
+        signalType: signalType || undefined,
+        search: search || undefined,
         limit: 100,
       }),
     ])
@@ -69,7 +75,7 @@ const SignalsDashboardPage: React.FC = () => {
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, [direction, minScore, sector, country]);
+  useEffect(load, [direction, minScore, sector, country, confidence, signalType, search]);
 
   const runManualSignals = () => {
     setRunning(true);
@@ -99,21 +105,21 @@ const SignalsDashboardPage: React.FC = () => {
 
   return (
     <Box sx={{ p: 3, maxWidth: 1500, mx: 'auto' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, mb: 3, flexDirection: { xs: 'column', md: 'row' } }}>
-        <Box>
-          <Typography variant="h4">Signal Generation Engine</Typography>
-          <Typography color="text.secondary">Daily explainable bullish, neutral, and bearish stock signals.</Typography>
-        </Box>
-        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+      <PageHeader
+        title="Signal Generation Engine"
+        subtitle="Daily explainable bullish, neutral, and bearish stock signals."
+        primaryAction={<Button variant="contained" onClick={runManualSignals} disabled={running}>{running ? 'Running...' : 'Run Signals'}</Button>}
+        secondaryActions={
+          <>
           <TextField size="small" label="Run limit" value={runLimit} onChange={(event) => setRunLimit(event.target.value)} sx={{ width: 110 }} />
           <FormControlLabel
             control={<Checkbox checked={useDataQualityFilter} onChange={(event) => setUseDataQualityFilter(event.target.checked)} />}
             label="Use data quality filter"
           />
           <Button component={Link} to="/signals/quality" variant="outlined">View Signal Quality Lab</Button>
-          <Button variant="contained" onClick={runManualSignals} disabled={running}>{running ? 'Running...' : 'Run Signals'}</Button>
-        </Box>
-      </Box>
+          </>
+        }
+      />
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {runMessage && <Alert severity="info" sx={{ mb: 2 }}>{runMessage}</Alert>}
@@ -121,14 +127,22 @@ const SignalsDashboardPage: React.FC = () => {
       <MarketRegimeWidget />
 
       <Box sx={{ mb: 3 }}>
-        <FilterBar onReset={() => { setDirection(''); setMinScore('60'); setSector(''); setCountry(''); }}>
+        <FilterBar onReset={() => { setDirection(''); setMinScore('60'); setSector(''); setCountry(''); setConfidence(''); setSignalType(''); setSearch(''); }}>
+          <TextField label="Search" value={search} onChange={(event) => setSearch(event.target.value)} />
           <TextField select label="Direction" value={direction} onChange={(event) => setDirection(event.target.value as SignalDirection | '')}>
             <MenuItem value="">Any</MenuItem>
             <MenuItem value="BULLISH">Bullish</MenuItem>
             <MenuItem value="NEUTRAL">Neutral</MenuItem>
             <MenuItem value="BEARISH">Bearish</MenuItem>
           </TextField>
+          <TextField select label="Confidence" value={confidence} onChange={(event) => setConfidence(event.target.value as SignalConfidence | '')}>
+            <MenuItem value="">Any</MenuItem>
+            <MenuItem value="HIGH">High</MenuItem>
+            <MenuItem value="MEDIUM">Medium</MenuItem>
+            <MenuItem value="LOW">Low</MenuItem>
+          </TextField>
           <TextField label="Min score" value={minScore} onChange={(event) => setMinScore(event.target.value)} />
+          <TextField label="Signal type" value={signalType} onChange={(event) => setSignalType(event.target.value)} />
           <TextField label="Sector" value={sector} onChange={(event) => setSector(event.target.value)} />
           <TextField label="Country" value={country} onChange={(event) => setCountry(event.target.value)} />
         </FilterBar>

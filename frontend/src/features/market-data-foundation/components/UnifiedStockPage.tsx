@@ -2,6 +2,7 @@ import { Box, Paper, Tab, Tabs, Typography } from '@mui/material';
 import { useSearchParams } from 'react-router-dom';
 import InstrumentDetailPage from './InstrumentDetailPage';
 import StockResearchWorkbenchPage from '@/features/stock-research-workbench';
+import { PageHeader } from '@/shared/components';
 
 const tabs = [
   { value: 'overview', label: 'Overview' },
@@ -20,6 +21,12 @@ export default function UnifiedStockPage() {
 
   return (
     <Box sx={{ maxWidth: 1500, mx: 'auto' }}>
+      <PageHeader
+        title="Stock Workspace"
+        subtitle="Unified stock overview, research, prices, fundamentals, signals, calibration, and smart-money context."
+        backTo="/market-data-foundation"
+        backLabel="Back to stock list"
+      />
       <Paper sx={{ mb: 2 }}>
         <Tabs
           value={activeTab}

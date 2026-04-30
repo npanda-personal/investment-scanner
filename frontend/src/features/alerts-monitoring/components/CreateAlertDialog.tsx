@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
-import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Stack, TextField } from '@mui/material';
+import { Alert, Autocomplete, Button, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Stack, TextField } from '@mui/material';
 import { createAlertRule } from '../api/alertsMonitoringService';
 import type { AlertScope, AlertType, CreateAlertRuleInput } from '../types';
+import { InstrumentSearchSelect } from '@/shared/components';
+import type { V1Instrument } from '@/features/market-data-foundation';
+import { fetchPortfolios, type Portfolio } from '@/features/portfolio-management';
+import { fetchWatchlists, type Watchlist } from '@/features/watchlist-management';
 
 interface CreateAlertDialogProps {
   open: boolean;
@@ -15,8 +19,13 @@ export const CreateAlertDialog: React.FC<CreateAlertDialogProps> = ({ open, onCl
   const [type, setType] = useState<AlertType>(defaults?.type || 'PRICE_ABOVE');
   const [scope, setScope] = useState<AlertScope>(defaults?.scope || 'STOCK');
   const [instrumentId, setInstrumentId] = useState(defaults?.instrumentId || '');
+  const [selectedInstrument, setSelectedInstrument] = useState<V1Instrument | null>(null);
   const [portfolioId, setPortfolioId] = useState(defaults?.portfolioId || '');
   const [watchlistId, setWatchlistId] = useState(defaults?.watchlistId || '');
+  const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
+  const [watchlist, setWatchlist] = useState<Watchlist | null>(null);
+  const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
+  const [watchlists, setWatchlists] = useState<Watchlist[]>([]);
   const [threshold, setThreshold] = useState(String(defaults?.condition?.threshold ?? ''));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -27,10 +36,15 @@ export const CreateAlertDialog: React.FC<CreateAlertDialogProps> = ({ open, onCl
     setType(defaults?.type || 'PRICE_ABOVE');
     setScope(defaults?.scope || 'STOCK');
     setInstrumentId(defaults?.instrumentId || '');
+    setSelectedInstrument(null);
     setPortfolioId(defaults?.portfolioId || '');
     setWatchlistId(defaults?.watchlistId || '');
+    setPortfolio(null);
+    setWatchlist(null);
     setThreshold(String(defaults?.condition?.threshold ?? ''));
     setError(null);
+    void fetchPortfolios().then(setPortfolios).catch(() => setPortfolios([]));
+    void fetchWatchlists().then(setWatchlists).catch(() => setWatchlists([]));
   }, [open, defaults]);
 
   const submit = async () => {
@@ -80,9 +94,42 @@ export const CreateAlertDialog: React.FC<CreateAlertDialogProps> = ({ open, onCl
             <MenuItem value="WATCHLIST_PRICE_ABOVE">Watchlist Price Above</MenuItem>
             <MenuItem value="WATCHLIST_PRICE_BELOW">Watchlist Price Below</MenuItem>
           </TextField>
-          {scope === 'STOCK' && <TextField label="Instrument ID" value={instrumentId} onChange={(event) => setInstrumentId(event.target.value)} />}
-          {scope === 'PORTFOLIO' && <TextField label="Portfolio ID" value={portfolioId} onChange={(event) => setPortfolioId(event.target.value)} />}
-          {scope === 'WATCHLIST' && <TextField label="Watchlist ID" value={watchlistId} onChange={(event) => setWatchlistId(event.target.value)} />}
+          {scope === 'STOCK' && (
+            <InstrumentSearchSelect
+              value={selectedInstrument}
+              onChange={(instrument) => {
+                setSelectedInstrument(instrument);
+                setInstrumentId(instrument?.id || defaults?.instrumentId || '');
+              }}
+              label={defaults?.instrumentId ? `Stock (${defaults.instrumentId})` : 'Stock'}
+            />
+          )}
+          {scope === 'PORTFOLIO' && (
+            <Autocomplete
+              options={portfolios}
+              value={portfolio}
+              onChange={(_event, value) => {
+                setPortfolio(value);
+                setPortfolioId(value?.id || defaults?.portfolioId || '');
+              }}
+              getOptionLabel={(option) => `${option.name} (${option.baseCurrency})`}
+              isOptionEqualToValue={(option, value) => option.id === value.id}
+              renderInput={(params) => <TextField {...params} label={defaults?.portfolioId ? `Portfolio (${defaults.portfolioId})` : 'Portfolio'} />}
+            />
+          )}
+          {scope === 'WATCHLIST' && (
+            <Autocomplete
+              options={watchlists}
+              value={watchlist}
+              onChange={(_event, value) => {
+                setWatchlist(value);
+                setWatchlistId(value?.id || defaults?.watchlistId || '');
+              }}
+              getOptionLabel={(option) => option.name}
+              isOptionEqualToValue={(option, value) => option.id === value.id}
+              renderInput={(params) => <TextField {...params} label={defaults?.watchlistId ? `Watchlist (${defaults.watchlistId})` : 'Watchlist'} />}
+            />
+          )}
           <TextField label="Threshold" value={threshold} onChange={(event) => setThreshold(event.target.value)} />
         </Stack>
       </DialogContent>

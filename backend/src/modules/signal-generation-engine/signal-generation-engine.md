@@ -224,6 +224,12 @@ Coverage includes:
 - Intraday signal snapshots are intentionally out of scope; the current model keeps one row per instrument/model/day.
 - No frontend component tests are configured.
 
+## UX And Query Behavior
+
+- Signal list filters are backed by query params for direction, confidence, minimum score, sector, country, signal type, and symbol/company search.
+- Sector and country filters are case-insensitive partial matches.
+- Signal dashboard navigation uses tabs and table-first comparison views. Manual signal generation remains user-triggered and may optionally use the Data Quality filter.
+
 ## Verification
 
 Run:
