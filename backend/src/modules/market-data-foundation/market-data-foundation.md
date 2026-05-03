@@ -60,6 +60,7 @@ Backend module files are intentionally flat. Do not recreate nested `routes/`, `
   - Express request/response handlers. Controllers call services.
 - `market-data-foundation.service.ts`
   - Business workflows for instruments, prices, coverage-aware ingestion, sync summaries, fundamentals, corporate actions, and FX rates.
+  - Public batch lookup methods: `getInstrumentsByIds` and `getLatestPricesBySymbols`.
 - `market-data-foundation.repository.ts`
   - Prisma access for `Stock`, `PriceTick`, `LatestPrice`, `Fundamental`, `CorporateAction`, and `FxRate`, plus price coverage checks and normalized fundamentals upserts.
 - `market-data-foundation.validation.ts`

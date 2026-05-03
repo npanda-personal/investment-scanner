@@ -1,5 +1,6 @@
 import React from 'react';
-import { Alert, Box, Button, Snackbar, Typography } from '@mui/material';
+import { Alert, Box, Button, Snackbar, Tooltip, Typography } from '@mui/material';
+import { InfoOutlined, WarningAmberOutlined } from '@mui/icons-material';
 import { Link, useNavigate } from 'react-router-dom';
 import { AddSignalToPortfolioDialog } from './AddSignalToPortfolioDialog';
 import { AddToWatchlistDialog } from '@/features/watchlist-management';
@@ -16,9 +17,42 @@ const formatMoney = (value: number | null, currency: string | null) => {
   }
 };
 const formatPercent = (value: number | null) => value === null ? 'N/A' : `${value >= 0 ? '+' : ''}${(value * 100).toFixed(1)}%`;
-const reasonText = (signal: SignalResult) => {
-  const reasons = signal.triggered_signals.length > 0 ? signal.triggered_signals : signal.negative_signals;
-  return reasons.slice(0, 3).map((reason) => reason.label).join('; ') || 'No reasons available';
+
+const SignalReasons = ({ signal }: { signal: SignalResult }) => {
+  const triggered = signal.triggered_signals.map(s => s.label);
+  const negative = signal.negative_signals.map(s => s.label);
+  const warnings = signal.warnings || [];
+
+  return (
+    <Box sx={{ p: 1 }}>
+      {warnings.length > 0 && (
+        <Box sx={{ mb: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: 'orange' }}>Warnings:</Typography>
+          {warnings.map((w, i) => <Typography key={i} variant="caption" display="block">• {w}</Typography>)}
+        </Box>
+      )}
+      {triggered.length > 0 && (
+        <Box sx={{ mb: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#4caf50' }}>Bullish Factors:</Typography>
+          {triggered.map((s, i) => <Typography key={i} variant="caption" display="block">• {s}</Typography>)}
+        </Box>
+      )}
+      {negative.length > 0 && (
+        <Box>
+          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#f44336' }}>Bearish Factors:</Typography>
+          {negative.map((s, i) => <Typography key={i} variant="caption" display="block">• {s}</Typography>)}
+        </Box>
+      )}
+    </Box>
+  );
+};
+
+const reasonSummary = (signal: SignalResult) => {
+  const primary = signal.direction === 'BEARISH' ? signal.negative_signals : signal.triggered_signals;
+  const secondary = signal.direction === 'BEARISH' ? signal.triggered_signals : signal.negative_signals;
+  
+  const top = primary.length > 0 ? primary : secondary;
+  return top.slice(0, 2).map((reason) => reason.label).join('; ') || 'Insufficient data';
 };
 
 type SignalTableProps = {
@@ -60,7 +94,26 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
         </Typography>
       ),
     },
-    { id: 'reasons', label: 'Top Reasons', render: (signal) => <Typography variant="body2" sx={{ maxWidth: 360 }}>{reasonText(signal)}</Typography> },
+    { 
+      id: 'reasons', 
+      label: 'Summary', 
+      render: (signal) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography variant="body2" sx={{ maxWidth: 300, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {reasonSummary(signal)}
+          </Typography>
+          <Tooltip title={<SignalReasons signal={signal} />} arrow>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              {signal.warnings && signal.warnings.length > 0 ? (
+                <WarningAmberOutlined sx={{ fontSize: 18, color: 'warning.main', cursor: 'help' }} />
+              ) : (
+                <InfoOutlined sx={{ fontSize: 18, color: 'text.secondary', cursor: 'help' }} />
+              )}
+            </Box>
+          </Tooltip>
+        </Box>
+      ) 
+    },
     { id: 'generatedAt', label: 'Generated', sortable: true, render: (signal) => new Date(signal.generated_at).toLocaleString() },
     {
       id: 'actions',

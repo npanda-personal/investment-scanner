@@ -30,6 +30,7 @@ export interface SignalResult {
   generated_at: string;
   source: string;
   data_status: string;
+  warnings?: string[];
 }
 
 export interface SignalQuery {
@@ -51,6 +52,7 @@ export interface PaginatedSignalResponse {
   total: number;
   limit: number;
   offset: number;
+  warnings?: string[];
 }
 
 export interface SignalRunRequest {

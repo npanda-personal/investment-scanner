@@ -18,10 +18,17 @@ export function normalizeConfidence(value: unknown): SignalConfidence | undefine
 export function parseSignalQuery(query: Record<string, unknown>): SignalQuery {
   const minScoreValue = Number(first(query.minScore));
   const limitValue = Number(first(query.limit));
+  const offsetValue = Number(first(query.offset));
+  const sortBy = String(first(query.sortBy) || '').trim() || undefined;
+  const sortDirection = String(first(query.sortDirection) || '').toLowerCase();
+
   return {
     direction: normalizeDirection(query.direction),
     minScore: Number.isFinite(minScoreValue) ? Math.min(100, Math.max(0, minScoreValue)) : undefined,
     limit: Number.isFinite(limitValue) ? Math.min(100, Math.max(1, Math.floor(limitValue))) : 25,
+    offset: Number.isFinite(offsetValue) ? Math.max(0, Math.floor(offsetValue)) : undefined,
+    sortBy: sortBy,
+    sortDirection: sortDirection === 'asc' || sortDirection === 'desc' ? sortDirection : undefined,
     sector: typeof first(query.sector) === 'string' ? String(first(query.sector)).trim() || undefined : undefined,
     country: typeof first(query.country) === 'string' ? String(first(query.country)).trim() || undefined : undefined,
     signalType: typeof first(query.signalType) === 'string' ? String(first(query.signalType)).trim() || undefined : undefined,

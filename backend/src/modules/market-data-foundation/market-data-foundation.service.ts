@@ -94,6 +94,28 @@ export class MarketDataFoundationService {
     return stock ? this.toV1Instrument(stock) : null;
   }
 
+  async getInstrumentsByIds(ids: string[]) {
+    const stocks = await this.repository.prisma.stock.findMany({
+      where: { id: { in: ids } },
+    });
+    return stocks.map((stock) => this.toV1Instrument(stock));
+  }
+
+  async getLatestPricesBySymbols(symbols: string[]) {
+    const prices = await this.repository.prisma.priceTick.findMany({
+      where: { symbol: { in: symbols } },
+      orderBy: { timestamp: 'desc' },
+      distinct: ['symbol'],
+    });
+    return prices.map((price) => ({
+      symbol: price.symbol,
+      date: price.timestamp,
+      close: Number(price.close),
+      adjusted_close: price.adjustedClose !== null ? Number(price.adjustedClose) : Number(price.close),
+      timestamp: price.timestamp,
+    }));
+  }
+
   async createInstrument(data: V1CreateInstrumentRequest) {
     const errors = validateInstrumentInput(data);
     if (errors.length > 0) {

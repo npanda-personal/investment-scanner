@@ -44,28 +44,30 @@ Repository behavior:
 
 - `createSignalResult` upserts by the daily natural key.
 - `latestForInstrument` returns the newest persisted result for an instrument.
-- `latestSignals` reads persisted results, applies filters, collapses to the latest result per instrument, sorts by score descending, and returns a paginated object: `{ signals: SignalResultDto[], total: number, limit: number, offset: number }`.
+- `latestSignals` utilizes Prisma `distinct: ['instrumentId']` for efficient DB-level retrieval of the newest results per stock. It supports in-memory sorting of the reduced set and returns a paginated object: `{ signals: SignalResultDto[], total: number, limit: number, offset: number }`.
 - `GET /api/v1/signals/:instrumentId` calculates and persists on demand when no result exists yet.
 
-Signal API responses are enriched at response time with latest price context from Market Data Foundation public services. These fields are not persisted on `SignalResult`.
+Signal API responses are enriched at response time with latest price context from Market Data Foundation public batch services (`getInstrumentsByIds`, `getLatestPricesBySymbols`). This fixes the N+1 lookup bottleneck while keeping `SignalResult` lean.
 
 ## Endpoints
 
 Mounted under `/api/v1`:
 
-| Endpoint | Purpose |
-| --- | --- |
-| `GET /api/v1/signals/health` | Module health and latest generation timestamp |
-| `GET /api/v1/signals/top` | Top/latest signals with direction, min score, limit, sector, and country filters |
-| `GET /api/v1/signals/:instrumentId` | Latest signal for one instrument; calculates on demand if missing |
-| `POST /api/v1/signals/run` | Manual signal generation for one instrument, symbol, or a limited universe |
-| `GET /api/v1/signals/screener` | Filtered signal screener with direction, min score, signal type, sector, and country |
+| Endpoint | Purpose | Status |
+| --- | --- | --- |
+| `GET /api/v1/signals/health` | Module health and latest generation timestamp | Implemented |
+| `GET /api/v1/signals/top` | Top/latest signals with direction, min score, limit, sector, and country filters | Implemented |
+| `GET /api/v1/signals/:instrumentId` | Latest signal for one instrument; calculates on demand if missing | Implemented |
+| `POST /api/v1/signals/run` | Manual signal generation for one instrument, symbol, or a limited universe | Implemented |
+| `GET /api/v1/signals/screener` | Filtered signal screener with direction, min score, signal type, sector, and country | Implemented |
 
 Query and request behavior:
 
 - `direction`: `BULLISH`, `NEUTRAL`, or `BEARISH`; invalid values are ignored.
 - `minScore`: clamped to `0-100`.
 - `limit`: top/screener queries clamp to `1-100`; run requests clamp to `1-250`.
+- `offset`: supported for pagination.
+- `sortBy` and `sortDirection`: supported for score, currentPrice, dailyChangePercent, and generatedAt.
 - `sector` and `country`: exact case-insensitive repository filters for persisted results.
 - `signalType`: filters against signal code substrings or signal category names.
 - `POST /signals/run` accepts `instrumentId`, `symbol`, or a limited instrument universe. Symbol lookup uses Market Data Foundation public instrument search.
@@ -93,8 +95,8 @@ Technical signals:
 - price above or below SMA50
 - SMA50 above or below SMA200
 - near 52-week high or low
-- RSI recovering from oversold
-- RSI overbought reversal
+- RSI recovering from oversold (RSI < 30)
+- RSI overbought reversal (RSI > 70)
 - volume breakout or heavy down-volume selloff when volume is available
 
 Momentum signals:
@@ -122,7 +124,7 @@ MVP weights:
 - Momentum: 35%
 - Fundamentals: 25%
 
-Each category scores the ratio of positive signals to total positive plus negative signals. A category with no usable signals is neutral at `0.5`.
+Each category scores the ratio of positive signals to total signals evaluated. To avoid extreme scores with very low signal counts, Laplace smoothing (0.5) is applied: `(positive + 0.5) / (total + 1.0)`. A category with no signals defaults to `0.5`.
 
 Direction thresholds:
 
@@ -132,16 +134,26 @@ Direction thresholds:
 
 Confidence:
 
-- `HIGH`: at least 200 price rows, fundamentals available, and at least 6 total signals
-- `MEDIUM`: at least 50 price rows and at least 3 total signals
+- `HIGH`: at least 200 price rows, fundamentals available, at least 6 total signals evaluated, and latest price is NOT stale.
+- `MEDIUM`: at least 50 price rows and at least 3 total signals evaluated.
 - `LOW`: otherwise
+
+Staleness is defined as market data more than 5 calendar days old (allowing for weekends).
+
+## Indicator Formulas
+
+- **SMA:** Simple Moving Average of adjusted close prices over the period.
+- **RSI:** Industry-standard Wilder's smoothed Relative Strength Index.
+- **Momentum:** Simple percentage change from price at offset in trading days (21 for 1M, 63 for 3M, 126 for 6M).
+- **Acceleration:** 1M momentum > (3M momentum / 3) AND 3M momentum > (6M momentum / 2).
 
 ## Explainability
 
 Every result includes:
 
-- `triggered_signals`
-- `negative_signals`
+- `triggered_signals` (bullish/positive)
+- `negative_signals` (bearish/negative)
+- `warnings` (data quality, staleness)
 - human-readable `explanation`
 
 Explanations are deterministic and assembled from the strongest available triggered or negative reasons. No black-box scoring is used.
@@ -156,6 +168,7 @@ Frontend files:
 
 - `api/signalGenerationEngineService.ts`
 - `components/SignalsDashboardPage.tsx`
+- `components/SignalTable.tsx`
 - `components/SignalCard.tsx`
 - `components/SignalBadge.tsx`
 - `components/SignalWidget.tsx`
@@ -169,32 +182,22 @@ Routes:
 - `/signals`
 - `/stocks/:id?tab=signals` links into the unified stock workspace context when stock-level signal views are expanded.
 
-The dashboard uses tabbed table views for Bullish, Bearish, Neutral, Momentum Leaders, Recent, and Screener. Signal lists are paginated client-side after bounded backend fetches, support column sorting for comparison fields, and keep actions available per row.
+The dashboard uses tabbed table views for Bullish, Bearish, Neutral, Momentum Leaders, Recent, and Screener. Signal lists are server-paginated, support column sorting, and keep actions available per row.
 
-Rows show current price, daily move, score, confidence, generated timestamp, top reasons, and actions:
+Rows show current price, daily move, score, confidence, generated timestamp, summary reasons, and actions. 
 
+A detailed **Tooltip** is available for each signal, showing:
+- Data quality warnings (e.g. stale price)
+- Comprehensive list of Bullish Factors
+- Comprehensive list of Bearish Factors
+
+Actions:
 - View stock
 - Add to Watchlist
 - Add to Portfolio
 - Create Alert
 
 Manual signal generation includes an optional `Use data quality filter` checkbox. When enabled, the run skips instruments with insufficient, stale, illiquid, or unusable data according to Data Quality Engine evaluations and shows skipped/warning counts.
-
-Signal cards display current price, currency, daily price change, and daily percentage move with positive/negative visual styling. Missing price data is shown as unavailable rather than blocking the card.
-
-Signal cards also expose an `Add to Portfolio` action. The action opens a frontend dialog that fetches portfolios through the Portfolio Management public frontend API, collects quantity, average cost, currency, and optional notes, then submits to the existing `POST /api/v1/portfolios/:id/holdings` endpoint. Duplicate holding API errors are translated into a user-friendly message: `This stock already exists in this portfolio. Edit the existing holding instead.`
-
-Signal cards also expose an `Add to Watchlist` action. The action uses the Watchlist Management public frontend exports, lets the user select a watchlist, add an optional note/tags, and submits to `POST /api/v1/watchlists/:id/items`. Duplicate watchlist items are handled gracefully in the dialog.
-
-Signal cards expose a `Create Alert` action for stock signal score alerts through the Alerts & Monitoring public frontend exports.
-
-The Signal Generation dashboard includes a compact Market Context Intelligence widget showing the current market regime and score.
-
-The Stock Research Workbench includes a compact signal widget with score, direction, confidence, top reasons, generated timestamp, and link to the full signals page.
-
-The dashboard and cards link stocks to `/research/stocks/:id`.
-
-The dashboard links to `/signals/quality`, where Signal Quality Lab measures historical forward-return outcomes and noisy signal patterns. Signal Quality Lab consumes persisted signal results through public service exports and does not own or modify signal scoring.
 
 ## Tests
 
@@ -205,30 +208,25 @@ Current module test files:
 - `backend/tests/modules/signal-generation-engine/signal-generation-engine.routes.test.ts`
 
 Coverage includes:
-
 - SMA calculation
-- RSI calculation
+- Wilder's RSI calculation
 - 52-week high/low helper behavior
-- composite score calculation
-- direction threshold logic
-- explanation generation
-- instrument signal generation and persistence handoff
-- request/query validation
-- route registration
+- Composite score calculation with Laplace smoothing
+- Direction threshold logic
+- Confidence logic with staleness check
+- Enrichment with batch lookup optimization
+- Explanation generation
+- Instrument signal generation and persistence handoff
+- Request/query validation including offset and sorting
+- Route registration
 
 ## Known Limitations
 
 - MVP is daily/batch/on-demand only.
-- No real-time streaming, intraday signals, backtesting, portfolio recommendations, smart money, sector rotation, macro signals, analyst revisions, transcripts, options flow, or AI adaptive scoring.
+- No real-time streaming, intraday signals, backtesting, portfolio recommendations, macro signals, analyst revisions, transcripts, options flow, or AI adaptive scoring.
 - Peer-aware signal quality depends on Epic 2 peer context being available.
 - Intraday signal snapshots are intentionally out of scope; the current model keeps one row per instrument/model/day.
 - No frontend component tests are configured.
-
-## UX And Query Behavior
-
-- Signal list filters are backed by query params for direction, confidence, minimum score, sector, country, signal type, and symbol/company search.
-- Sector and country filters are case-insensitive partial matches.
-- Signal dashboard navigation uses tabs and table-first comparison views. Manual signal generation remains user-triggered and may optionally use the Data Quality filter.
 
 ## Verification
 
@@ -236,14 +234,12 @@ Run:
 
 - `backend`: `npx prisma generate`
 - `backend`: `npm.cmd run build`
-- `backend`: `npm.cmd test -- signal-generation-engine.service.test.ts signal-generation-engine.validation.test.ts signal-generation-engine.routes.test.ts --runInBand --forceExit`
-- `backend`: `npm.cmd test -- market-data.repository.test.ts market-data.routes.test.ts market-data.service.test.ts market-data.validation.test.ts stock-research-workbench.service.test.ts stock-research-workbench.routes.test.ts stock-research-workbench.validation.test.ts signal-generation-engine.service.test.ts signal-generation-engine.validation.test.ts signal-generation-engine.routes.test.ts --runInBand --forceExit`
+- `backend`: `npm.cmd test -- tests/modules/signal-generation-engine --runInBand --forceExit`
 - `frontend`: `npm.cmd run build`
 
-Latest result:
-
-- Prisma client generation passed.
-- Backend build passed.
-- Frontend build passed.
-- Signal Generation Engine tests passed: 3 suites, 10 tests.
-- Active modular backend tests passed: 10 suites, 32 tests.
+Manual verification:
+- Verify signal tooltips show both bullish and bearish factors.
+- Verify "Summary" column shows the most relevant reasons based on direction.
+- Verify stale data warning appears in tooltips for older signals.
+- Verify pagination and sorting work correctly on the dashboard.
+- Verify N+1 optimization by checking logs (minimal DB/external calls during list loading).

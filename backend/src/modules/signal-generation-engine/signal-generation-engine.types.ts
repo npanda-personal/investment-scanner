@@ -33,6 +33,15 @@ export interface SignalResultDto {
   modelVersion?: string | null;
   source: string;
   data_status: MarketDataStatus;
+  warnings?: string[];
+}
+
+export interface PaginatedSignalResponse {
+  signals: SignalResultDto[];
+  total: number;
+  limit: number;
+  offset: number;
+  warnings?: string[];
 }
 
 export interface SignalRunRequest {

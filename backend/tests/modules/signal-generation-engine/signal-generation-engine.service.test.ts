@@ -138,7 +138,8 @@ describe('SignalGenerationEngineService', () => {
       }),
     };
     const marketDataService = {
-      getInstrument: jest.fn().mockResolvedValue({ id: 'stock-1', currency: 'USD' }),
+      getInstrumentsByIds: jest.fn().mockResolvedValue([{ id: 'stock-1', currency: 'USD' }]),
+      getLatestPricesBySymbols: jest.fn().mockResolvedValue([{ symbol: 'ABC', adjusted_close: 105, date: '2026-04-28T00:00:00.000Z' }]),
       latestPriceByInstrumentId: jest.fn().mockResolvedValue({ latest: { adjusted_close: 105, date: '2026-04-28T00:00:00.000Z' } }),
       listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: [{ adjusted_close: 105 }, { adjusted_close: 100 }] }),
     };
@@ -159,6 +160,8 @@ describe('SignalGenerationEngineService', () => {
 
   it('returns null price context when market data is unavailable', async () => {
     const service = new SignalGenerationEngineService({} as any, {
+      getInstrumentsByIds: jest.fn().mockRejectedValue(new Error('missing')),
+      getLatestPricesBySymbols: jest.fn().mockRejectedValue(new Error('missing')),
       getInstrument: jest.fn().mockRejectedValue(new Error('missing')),
       latestPriceByInstrumentId: jest.fn().mockRejectedValue(new Error('missing')),
       listPricesByInstrumentId: jest.fn().mockRejectedValue(new Error('missing')),

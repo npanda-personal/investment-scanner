@@ -3,6 +3,7 @@ import { StockResearchWorkbenchService } from '../stock-research-workbench';
 import { DataQualityEngineService } from '../data-quality-engine';
 import { SignalGenerationEngineRepository } from './signal-generation-engine.repository';
 import type {
+  PaginatedSignalResponse,
   SignalConfidence,
   SignalDirection,
   SignalHistoryQuery,
@@ -26,7 +27,7 @@ export class SignalGenerationEngineService {
     private readonly dataQualityService = new DataQualityEngineService()
   ) {}
 
-  async topSignals(query: SignalQuery) {
+  async topSignals(query: SignalQuery): Promise<PaginatedSignalResponse> {
     const { signals, total } = await this.repository.latestSignals(query);
     return {
       signals: await this.enrichSignals(signals),
@@ -36,16 +37,13 @@ export class SignalGenerationEngineService {
     };
   }
 
-  async screener(query: SignalQuery) {
+  async screener(query: SignalQuery): Promise<PaginatedSignalResponse> {
     const { signals, total } = await this.repository.latestSignals(query);
     return {
       signals: await this.enrichSignals(signals),
       total,
       limit: query.limit,
       offset: query.offset || 0,
-      filters: query,
-      source: 'signal-generation-engine',
-      generated_at: new Date().toISOString(),
     };
   }
 
@@ -166,11 +164,26 @@ export class SignalGenerationEngineService {
     const technical = this.evaluateTechnical(prices);
     const momentum = this.evaluateMomentum(prices, relativeToPeers);
     const fundamentals = this.evaluateFundamentals(latestFundamental, peerAveragePe, peerAverageYield);
-    const score = this.compositeScore(technical.score, momentum.score, fundamentals.score);
-    const direction = this.directionForScore(score);
-    const confidence = this.confidenceFor(prices, latestFundamental, technical.signals.length + momentum.signals.length + fundamentals.signals.length);
+    
     const triggeredSignals = [...technical.signals, ...momentum.signals, ...fundamentals.signals];
     const negativeSignals = [...technical.negativeSignals, ...momentum.negativeSignals, ...fundamentals.negativeSignals];
+    const totalEvaluated = triggeredSignals.length + negativeSignals.length;
+
+    const score = this.compositeScore(technical.score, momentum.score, fundamentals.score);
+    const direction = this.directionForScore(score);
+    const confidence = this.confidenceFor(prices, latestFundamental, totalEvaluated);
+
+    const warnings: string[] = [];
+    const latestDate = prices[0]?.date ? new Date(prices[0].date) : null;
+    const fiveDaysAgo = new Date();
+    fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
+    if (latestDate && latestDate < fiveDaysAgo) {
+      warnings.push(`Market data is stale (last update: ${latestDate.toISOString().split('T')[0]})`);
+    }
+    if (prices.length < 50) {
+      warnings.push(`Insufficient price history (${prices.length} days) for reliable indicators`);
+    }
+
     const result: SignalResultDto = {
       instrument_id: instrument.id,
       symbol: instrument.symbol,
@@ -193,47 +206,70 @@ export class SignalGenerationEngineService {
       modelVersion: 'signal-engine-v1',
       source: 'signal-generation-engine',
       data_status: prices.length >= 50 ? (prices.length >= 200 ? 'COMPLETE' : 'PARTIAL') : 'MISSING',
+      warnings,
     };
 
     return this.repository.createSignalResult(result);
   }
 
   async enrichSignals(signals: SignalResultDto[]): Promise<SignalResultDto[]> {
-    return Promise.all(signals.map((signal) => this.enrichSignal(signal)));
-  }
-
-  async enrichSignal(signal: SignalResultDto): Promise<SignalResultDto> {
+    if (signals.length === 0) return [];
+    
     try {
-      const [instrument, latest, prices] = await Promise.all([
-        this.marketDataService.getInstrument(signal.instrument_id).catch(() => null),
-        this.marketDataService.latestPriceByInstrumentId(signal.instrument_id).catch(() => null),
-        this.marketDataService.listPricesByInstrumentId(signal.instrument_id, 2).catch(() => null),
+      const instrumentIds = Array.from(new Set(signals.map(s => s.instrument_id)));
+      const symbols = Array.from(new Set(signals.map(s => s.symbol)));
+
+      // Batch fetch instruments and latest prices using public service methods
+      const [instruments, latestPrices] = await Promise.all([
+        this.marketDataService.getInstrumentsByIds(instrumentIds),
+        this.marketDataService.getLatestPricesBySymbols(symbols)
       ]);
-      const latestPrice = latest?.latest?.adjusted_close ?? latest?.latest?.close ?? null;
-      const previousPrice = prices?.prices?.[1]?.adjusted_close ?? prices?.prices?.[1]?.close ?? null;
-      const currentPrice = typeof latestPrice === 'number' && Number.isFinite(latestPrice) ? latestPrice : null;
-      const previousClose = typeof previousPrice === 'number' && Number.isFinite(previousPrice) ? previousPrice : null;
-      const dailyChange = currentPrice !== null && previousClose !== null ? currentPrice - previousClose : null;
-      return {
-        ...signal,
-        currentPrice,
-        previousClose,
-        dailyChange,
-        dailyChangePercent: dailyChange !== null && previousClose !== null && previousClose > 0 ? dailyChange / previousClose : null,
-        currency: instrument?.currency ?? signal.currency ?? null,
-        priceTimestamp: latest?.latest?.date ? new Date(latest.latest.date).toISOString() : null,
-      };
-    } catch {
-      return {
+
+      const instrumentMap = new Map(instruments.map((i: any) => [i.id, i]));
+      const priceMap = new Map(latestPrices.map((p: any) => [p.symbol, p]));
+
+      return Promise.all(signals.map(async (signal) => {
+        const instrument = instrumentMap.get(signal.instrument_id);
+        const latest = priceMap.get(signal.symbol);
+        
+        const currentPrice = latest ? Number((latest as any).adjusted_close ?? (latest as any).close) : null;
+        
+        let previousClose: number | null = null;
+        if (latest) {
+          // For previous close, we still do a targeted lookup per signal for now
+          // to avoid fetching massive amounts of price history in one go.
+          const prevPrices = await this.marketDataService.listPricesByInstrumentId(signal.instrument_id, 2).catch(() => null);
+          previousClose = prevPrices?.prices?.[1]?.adjusted_close ?? null;
+        }
+
+        const dailyChange = currentPrice !== null && previousClose !== null ? currentPrice - previousClose : null;
+        
+        return {
+          ...signal,
+          currentPrice,
+          previousClose,
+          dailyChange,
+          dailyChangePercent: dailyChange !== null && previousClose !== null && previousClose > 0 ? dailyChange / previousClose : null,
+          currency: instrument?.currency ?? signal.currency ?? null,
+          priceTimestamp: (latest as any)?.date ? new Date((latest as any).date).toISOString() : null,
+        };
+      }));
+    } catch (error) {
+      console.error('Signal enrichment failed:', error);
+      return signals.map(signal => ({
         ...signal,
         currentPrice: null,
         previousClose: null,
         dailyChange: null,
         dailyChangePercent: null,
-        currency: signal.currency ?? null,
         priceTimestamp: null,
-      };
+      }));
     }
+  }
+
+  async enrichSignal(signal: SignalResultDto): Promise<SignalResultDto> {
+    const enriched = await this.enrichSignals([signal]);
+    return enriched[0];
   }
 
   evaluateTechnical(prices: SignalPricePoint[]) {
@@ -268,7 +304,7 @@ export class SignalGenerationEngineService {
     if (latest && low52 !== null && latest.adjusted_close <= low52 * 1.03) {
       negativeSignals.push(this.signal('NEAR_52_WEEK_LOW', 'price is near a 52-week low', 'TECHNICAL'));
     }
-    if (rsiNow !== null && rsiPrev !== null && rsiPrev < 35 && rsiNow > rsiPrev) {
+    if (rsiNow !== null && rsiPrev !== null && rsiPrev < 30 && rsiNow > rsiPrev) {
       signals.push(this.signal('RSI_RECOVERING', 'RSI is recovering from oversold levels', 'TECHNICAL'));
     }
     if (rsiNow !== null && rsiPrev !== null && rsiPrev > 70 && rsiNow < rsiPrev) {
@@ -338,18 +374,36 @@ export class SignalGenerationEngineService {
 
   rsi(prices: SignalPricePoint[], period: number): number | null {
     if (prices.length <= period) return null;
-    const chronological = [...prices].slice(0, period + 1).reverse();
-    let gains = 0;
-    let losses = 0;
-    for (let index = 1; index < chronological.length; index += 1) {
-      const change = chronological[index].adjusted_close - chronological[index - 1].adjusted_close;
-      if (change >= 0) gains += change;
-      else losses += Math.abs(change);
+    
+    // Wilder's RSI smoothing
+    const chronological = [...prices].slice(0, period * 2 + 1).reverse();
+    if (chronological.length < period + 1) return null;
+
+    let avgGain = 0;
+    let avgLoss = 0;
+
+    // Initial average
+    for (let i = 1; i <= period; i++) {
+      const change = chronological[i].adjusted_close - chronological[i - 1].adjusted_close;
+      if (change >= 0) avgGain += change;
+      else avgLoss += Math.abs(change);
     }
-    if (gains === 0 && losses === 0) return 50;
-    if (losses === 0) return 100;
-    const relativeStrength = (gains / period) / (losses / period);
-    return 100 - (100 / (1 + relativeStrength));
+    avgGain /= period;
+    avgLoss /= period;
+
+    // Smoothing
+    for (let i = period + 1; i < chronological.length; i++) {
+      const change = chronological[i].adjusted_close - chronological[i - 1].adjusted_close;
+      const currentGain = change >= 0 ? change : 0;
+      const currentLoss = change < 0 ? Math.abs(change) : 0;
+      
+      avgGain = (avgGain * (period - 1) + currentGain) / period;
+      avgLoss = (avgLoss * (period - 1) + currentLoss) / period;
+    }
+
+    if (avgLoss === 0) return 100;
+    const rs = avgGain / avgLoss;
+    return 100 - (100 / (1 + rs));
   }
 
   periodHigh(prices: SignalPricePoint[], period: number): number | null {
@@ -397,18 +451,25 @@ export class SignalGenerationEngineService {
   private categoryScore(positive: number, negative: number): number {
     const total = positive + negative;
     if (total === 0) return 0.5;
-    return positive / total;
+    // Laplace smoothing with 0.5 to avoid extreme scores with very low total signal counts
+    return (positive + 0.5) / (total + 1.0);
   }
 
   private confidenceFor(prices: SignalPricePoint[], fundamental: any, signalCount: number): SignalConfidence {
-    if (prices.length >= 200 && fundamental && signalCount >= 6) return 'HIGH';
+    // Check if the data is stale (more than 3 business days old)
+    const latestDate = prices[0]?.date ? new Date(prices[0].date) : null;
+    const threeDaysAgo = new Date();
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 5); // 5 cal days for safety margin on weekends
+    const isStale = latestDate ? latestDate < threeDaysAgo : true;
+
+    if (prices.length >= 200 && fundamental && signalCount >= 6 && !isStale) return 'HIGH';
     if (prices.length >= 50 && signalCount >= 3) return 'MEDIUM';
     return 'LOW';
   }
 
   private pushReturnSignal(value: number | null, code: string, positiveLabel: string, negativeLabel: string, signals: SignalItem[], negativeSignals: SignalItem[]) {
     if (value === null) return;
-    (value >= 0 ? signals : negativeSignals).push(this.signal(value >= 0 ? code : `${code}_NEGATIVE`, value >= 0 ? positiveLabel : negativeLabel, 'MOMENTUM'));
+    (value >= 0.0001 ? signals : negativeSignals).push(this.signal(value >= 0.0001 ? code : `${code}_NEGATIVE`, value >= 0.0001 ? positiveLabel : negativeLabel, 'MOMENTUM'));
   }
 
   private returnAtOffset(prices: SignalPricePoint[], offset: number): number | null {
