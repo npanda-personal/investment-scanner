@@ -66,40 +66,75 @@ export const partitionHistoricalPrices = (
   prices: HistoricalPrice[],
   spikeThreshold = Number(process.env.MARKET_DATA_SPIKE_THRESHOLD ?? '0.5')
 ): ValidationResult<HistoricalPrice> => {
-  const seen = new Set<string>();
-  const sorted = [...prices].sort((a, b) => a.date.getTime() - b.date.getTime());
-  let previousValidCloseBySymbol = new Map<string, number>();
+  const result: ValidationResult<HistoricalPrice> = { valid: [], invalid: [] };
+  let duplicateProviderRowsSkipped = 0;
 
-  return sorted.reduce<ValidationResult<HistoricalPrice>>(
-    (result, price) => {
-      const errors = validateHistoricalPrice(price);
-      const duplicateDate = price.date instanceof Date && Number.isFinite(price.date.getTime()) ? price.date.toISOString() : String(price.date);
-      const duplicateKey = `${price.symbol}:${duplicateDate}`;
-      if (seen.has(duplicateKey)) {
-        errors.push('duplicate price bar in batch');
-      }
-      seen.add(duplicateKey);
+  // First pass: validation and grouping by symbol:date
+  const validByDate = new Map<string, HistoricalPrice>();
+  const allInvalid: { item: HistoricalPrice; errors: string[] }[] = [];
 
-      const previousClose = previousValidCloseBySymbol.get(price.symbol);
-      if (
-        errors.length === 0 &&
-        previousClose !== undefined &&
-        previousClose > 0 &&
-        Math.abs(price.close - previousClose) / previousClose > spikeThreshold
-      ) {
-        errors.push(`abnormal price spike exceeds threshold ${spikeThreshold}`);
-      }
+  for (const price of prices) {
+    const errors = validateHistoricalPrice(price);
+    if (errors.length > 0) {
+      allInvalid.push({ item: price, errors });
+      continue;
+    }
 
-      if (errors.length > 0) {
-        result.invalid.push({ item: price, errors });
+    // Normalize date to UTC midnight for grouping
+    const normalizedDate = new Date(price.date);
+    normalizedDate.setUTCHours(0, 0, 0, 0);
+    const key = `${price.symbol}:${normalizedDate.toISOString()}`;
+
+    const existing = validByDate.get(key);
+    if (!existing) {
+      validByDate.set(key, price);
+    } else {
+      duplicateProviderRowsSkipped++;
+      // Determine the best row. We prefer rows with valid OHLCV and adjustedClose.
+      const existingScore = (isFiniteNumber(existing.adjustedClose) ? 1 : 0) + (isFiniteNumber(existing.volume) ? 1 : 0);
+      const newScore = (isFiniteNumber(price.adjustedClose) ? 1 : 0) + (isFiniteNumber(price.volume) ? 1 : 0);
+      
+      if (newScore > existingScore) {
+        validByDate.set(key, price);
+        allInvalid.push({ item: existing, errors: ['duplicate price bar in batch'] });
+      } else if (newScore === existingScore) {
+        // If equal, prefer the later provider timestamp if they differ in time
+        if (price.date.getTime() > existing.date.getTime()) {
+          validByDate.set(key, price);
+          allInvalid.push({ item: existing, errors: ['duplicate price bar in batch'] });
+        } else {
+          allInvalid.push({ item: price, errors: ['duplicate price bar in batch'] });
+        }
       } else {
-        result.valid.push(price);
-        previousValidCloseBySymbol.set(price.symbol, price.close);
+        allInvalid.push({ item: price, errors: ['duplicate price bar in batch'] });
       }
-      return result;
-    },
-    { valid: [], invalid: [] }
-  );
+    }
+  }
+
+  // Second pass: sort valid rows and check for price spikes
+  const sorted = Array.from(validByDate.values()).sort((a, b) => a.date.getTime() - b.date.getTime());
+  const previousValidCloseBySymbol = new Map<string, number>();
+
+  for (const price of sorted) {
+    const previousClose = previousValidCloseBySymbol.get(price.symbol);
+    if (
+      previousClose !== undefined &&
+      previousClose > 0 &&
+      Math.abs(price.close - previousClose) / previousClose > spikeThreshold
+    ) {
+      allInvalid.push({
+        item: price,
+        errors: [`abnormal price spike exceeds threshold ${spikeThreshold}`],
+      });
+    } else {
+      result.valid.push(price);
+      previousValidCloseBySymbol.set(price.symbol, price.close);
+    }
+  }
+
+  result.invalid = allInvalid;
+  (result as any).duplicateProviderRowsSkipped = duplicateProviderRowsSkipped;
+  return result;
 };
 
 export const validateRequiredString = (value: unknown, fieldName: string): string | null => {

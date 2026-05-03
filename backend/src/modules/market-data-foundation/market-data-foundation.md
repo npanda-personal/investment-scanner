@@ -13,7 +13,10 @@ Implemented:
 - 15-year first historical sync where the provider allows it.
 - Incremental repeated syncs using the stock's last successful load timestamp with a 3-day overlap to ensure updated provider data is captured.
 - Coverage-aware backfill: instruments with shallow stored price history are backfilled even if a prior partial sync set `lastSuccessfulDataLoadTimestamp`.
-- Duplicate price prevention and upsert behavior for `symbol + timestamp`.
+- Duplicate bars inside a fetched batch are identified and moved to the `invalid` array with a `duplicate price bar in batch` error.
+- Abnormal price spikes are identified and moved to the `invalid` array using `MARKET_DATA_SPIKE_THRESHOLD`, defaulting to `0.5`.
+- Malformed historical price rows (invalid symbol or date) are correctly captured in the `invalid` result instead of being silently skipped.
+- Price storage uses Prisma upsert on `symbol + timestamp`.
 - Detailed sync summary with true counts: `instrumentsInserted/Updated/Skipped`, `priceRowsInserted/Updated`, `fundamentalsInserted`, `corporateActionsUpdated`, etc.
 - Dedicated persisted fundamentals through `Fundamental` using a strict unique constraint `[stockId, periodType, source]` to guarantee idempotent snapshot updates.
 - Dedicated persisted corporate actions through `CorporateAction`.
@@ -144,9 +147,9 @@ Implemented validations:
 - `low > high` is rejected.
 - `open` outside the low/high range is rejected.
 - `close` outside the low/high range is rejected.
-- Duplicate bars inside a fetched batch are skipped.
-- Abnormal price spikes are skipped using `MARKET_DATA_SPIKE_THRESHOLD`, defaulting to `0.5`.
-- Malformed historical price rows are skipped with warnings before storage.
+- Duplicate bars inside a fetched batch are identified and moved to the `invalid` array with a `duplicate price bar in batch` error.
+- Abnormal price spikes are identified and moved to the `invalid` array using `MARKET_DATA_SPIKE_THRESHOLD`, defaulting to `0.5`.
+- Malformed historical price rows (invalid symbol or date) are correctly captured in the `invalid` result instead of being silently skipped.
 - Price storage uses Prisma upsert on `symbol + timestamp`.
 - Historical daily price timestamps are normalized to UTC midnight before duplicate checks and upsert, so repeated syncs for the same trading day update one `PriceTick`.
 - Historical ingestion checks stored price coverage. If the oldest stored price is not near the 15-year backfill start, the sync backfills history instead of trusting a prior `lastSuccessfulDataLoadTimestamp`.

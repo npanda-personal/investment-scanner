@@ -16,6 +16,7 @@ export interface SyncSummary {
   rowsInserted: number;
   rowsUpdated: number;
   rowsSkipped: number;
+  duplicateProviderRowsSkipped?: number;
   warningCount: number;
   warnings: string[];
 }
@@ -108,6 +109,7 @@ export interface V1IngestionRequest {
   currency?: string;
   asset_type?: string;
   isin?: string;
+  fullReload?: boolean;
 }
 
 export interface V1SyncResult {

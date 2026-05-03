@@ -4,6 +4,7 @@ import { createSignalQualityLabRouter } from '../../../src/modules/signal-qualit
 describe('signal quality lab routes', () => {
   it('registers MVP endpoints', () => {
     const router = createSignalQualityLabRouter({
+      dashboard: jest.fn(),
       summary: jest.fn(),
       byType: jest.fn(),
       bySector: jest.fn(),
@@ -19,6 +20,7 @@ describe('signal quality lab routes', () => {
       .filter((layer: any) => layer.route)
       .map((layer: any) => `${Object.keys(layer.route.methods)[0].toUpperCase()} ${layer.route.path}`);
     expect(routes).toEqual([
+      'GET /signals/quality/dashboard',
       'GET /signals/quality/summary',
       'GET /signals/quality/by-type',
       'GET /signals/quality/by-sector',

@@ -314,6 +314,7 @@ export class MarketDataFoundationRepository {
   ): Promise<SyncSummary> {
     const rowsReceived = prices.length;
     const validation = partitionHistoricalPrices(prices);
+    const duplicateProviderRowsSkipped = (validation as any).duplicateProviderRowsSkipped || 0;
     const warnings = validation.invalid.flatMap((invalid) =>
       invalid.errors.map((error) => `${(invalid.item as HistoricalPrice)?.symbol || 'UNKNOWN'}: ${error}`)
     );
@@ -327,6 +328,7 @@ export class MarketDataFoundationRepository {
         rowsInserted: 0,
         rowsUpdated: 0,
         rowsSkipped: validation.invalid.length,
+        duplicateProviderRowsSkipped,
         warningCount: warnings.length,
         warnings: warnings.slice(0, 10),
       };
@@ -426,6 +428,7 @@ export class MarketDataFoundationRepository {
       rowsInserted,
       rowsUpdated,
       rowsSkipped: validation.invalid.length,
+      duplicateProviderRowsSkipped,
       warningCount: warnings.length,
       warnings: warnings.slice(0, 10),
     };

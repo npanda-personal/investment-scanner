@@ -144,7 +144,8 @@ describe('SignalGenerationEngineService', () => {
     };
     const service = new SignalGenerationEngineService(repository as any, marketDataService as any, {} as any);
 
-    const signals = await service.topSignals({ limit: 5 });
+    const result = await service.topSignals({ limit: 5 });
+    const signals = result.signals;
 
     expect(signals[0]).toMatchObject({
       currentPrice: 105,

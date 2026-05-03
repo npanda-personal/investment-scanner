@@ -3,64 +3,49 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function cleanupDuplicates() {
-  console.log('Cleaning up duplicate price ticks...');
+  console.log('Detecting duplicates...');
+
+  let hasMore = true;
+  let totalDeleted = 0;
   
-  // First, let's check for duplicates
-  const duplicates = await prisma.$queryRaw`
-    SELECT symbol, timestamp, COUNT(*) as count
-    FROM price_ticks
-    GROUP BY symbol, timestamp
-    HAVING COUNT(*) > 1
-    ORDER BY count DESC
-    LIMIT 20
-  `;
-  
-  console.log(`Found ${Array.isArray(duplicates) ? duplicates.length : 0} duplicate groups (showing first 20):`);
-  
-  if (Array.isArray(duplicates)) {
-    for (const dup of duplicates) {
-      console.log(`  ${dup.symbol} at ${dup.timestamp}: ${dup.count} duplicates`);
+  while (hasMore) {
+    const duplicates: any[] = await prisma.$queryRaw`
+      SELECT symbol, DATE("timestamp" AT TIME ZONE 'UTC') as dt, array_agg(id) as ids
+      FROM price_ticks
+      GROUP BY symbol, DATE("timestamp" AT TIME ZONE 'UTC')
+      HAVING COUNT(*) > 1
+      LIMIT 5000;
+    `;
+
+    if (duplicates.length === 0) {
+      console.log('No more duplicates found.');
+      hasMore = false;
+      break;
     }
-  }
-  
-  // Delete duplicates, keeping only the most recent one (by id)
-  console.log('\nDeleting duplicates...');
-  
-  const result = await prisma.$executeRaw`
-    DELETE FROM price_ticks
-    WHERE id IN (
-      SELECT id
-      FROM (
-        SELECT id,
-               ROW_NUMBER() OVER (PARTITION BY symbol, timestamp ORDER BY id DESC) as rn
-        FROM price_ticks
-      ) t
-      WHERE t.rn > 1
-    )
-  `;
-  
-  console.log(`Deleted ${result} duplicate records`);
-  
-  // Verify cleanup
-  const remainingDuplicates = await prisma.$queryRaw`
-    SELECT symbol, timestamp, COUNT(*) as count
-    FROM price_ticks
-    GROUP BY symbol, timestamp
-    HAVING COUNT(*) > 1
-  `;
-  
-  if (Array.isArray(remainingDuplicates) && remainingDuplicates.length === 0) {
-    console.log('\n✅ All duplicates cleaned up successfully!');
-  } else {
-    console.log(`\n❌ Still found ${Array.isArray(remainingDuplicates) ? remainingDuplicates.length : 'some'} duplicate groups`);
+
+    console.log(`Found ${duplicates.length} duplicate groups in this batch. Cleaning up...`);
+
+    let deletedCount = 0;
+    for (const dup of duplicates) {
+      const ids: string[] = dup.ids;
+      const records = await prisma.priceTick.findMany({
+        where: { id: { in: ids } },
+        orderBy: { timestamp: 'desc' }
+      });
+
+      if (records.length > 1) {
+        let toKeep = records.find(r => r.timestamp.toISOString().endsWith('T00:00:00.000Z')) || records[0];
+        const toDelete = records.filter(r => r.id !== toKeep.id);
+
+        for (const row of toDelete) {
+          await prisma.priceTick.delete({ where: { id: row.id } });
+          deletedCount++;
+          totalDeleted++;
+        }
+      }
+    }
+    console.log(`Deleted ${deletedCount} rows in this batch. Total: ${totalDeleted}`);
   }
 }
 
-cleanupDuplicates()
-  .catch((error) => {
-    console.error('Cleanup failed:', error);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+cleanupDuplicates().catch(console.error).finally(() => prisma.$disconnect());

@@ -384,29 +384,22 @@ export class MarketDataFoundationService {
     }
   }
 
-  async ingestSymbol(symbol: string, startDate?: Date, endDate?: Date): Promise<SyncSummary> {
+  async ingestSymbol(symbol: string, startDate?: Date, endDate?: Date, fullReload = false): Promise<SyncSummary> {
     console.log(`Ingesting ${symbol}...`);
 
     const stock = await this.repository.findStockBySymbol(symbol);
     let effectiveStartDate = startDate;
 
     if (!effectiveStartDate) {
-      const backfillStartDate = this.defaultBackfillStartDate();
-      const coverage = await this.repository.priceCoverage(symbol);
-      const hasEnoughHistory = coverage.oldestTimestamp && coverage.oldestTimestamp <= this.backfillCoverageCutoffDate(backfillStartDate);
-
-      if (!hasEnoughHistory) {
-        effectiveStartDate = backfillStartDate;
-        console.log(`  Backfilling ${symbol} from ${effectiveStartDate.toISOString().split('T')[0]} (stored rows: ${coverage.count})`);
+      if (fullReload) {
+        effectiveStartDate = this.defaultBackfillStartDate();
+        console.log(`  Full reload requested for ${symbol} from ${effectiveStartDate.toISOString().split('T')[0]}`);
       } else if (stock?.lastSuccessfulDataLoadTimestamp) {
         effectiveStartDate = new Date(stock.lastSuccessfulDataLoadTimestamp);
         effectiveStartDate.setDate(effectiveStartDate.getDate() - 3);
         console.log(`  Using incremental start date: ${effectiveStartDate.toISOString().split('T')[0]} (based on lastSuccessfulDataLoadTimestamp with 3-day overlap)`);
       } else {
-        effectiveStartDate = coverage.latestTimestamp ? new Date(coverage.latestTimestamp) : backfillStartDate;
-        if (coverage.latestTimestamp) {
-          effectiveStartDate.setDate(effectiveStartDate.getDate() + 1);
-        }
+        effectiveStartDate = this.defaultBackfillStartDate();
         console.log(`  Using default start date: ${effectiveStartDate.toISOString().split('T')[0]} (15-year first-time load)`);
       }
     }
@@ -490,7 +483,7 @@ export class MarketDataFoundationService {
     }
 
     try {
-      syncSummary = await this.ingestSymbol(stock.symbol);
+      syncSummary = await this.ingestSymbol(stock.symbol, undefined, new Date(), request.fullReload);
       pricesStored = true;
     } catch (error) {
       errors.push(`Price ingestion failed: ${error instanceof Error ? error.message : 'unknown error'}`);
@@ -763,12 +756,6 @@ export class MarketDataFoundationService {
     date.setFullYear(date.getFullYear() - 15);
     date.setHours(0, 0, 0, 0);
     return date;
-  }
-
-  private backfillCoverageCutoffDate(backfillStartDate: Date): Date {
-    const cutoff = new Date(backfillStartDate);
-    cutoff.setDate(cutoff.getDate() + 14);
-    return cutoff;
   }
 
   private async throttleIngestion(minDelayMs = 1000) {

@@ -12,6 +12,7 @@ Mounted under `/api/v1`:
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
+| GET | `/signals/quality/dashboard` | Overall signal quality dashboard summary |
 | GET | `/signals/quality/summary` | Overall signal quality summary |
 | GET | `/signals/quality/by-type` | Performance by triggered/negative signal code |
 | GET | `/signals/quality/by-sector` | Performance grouped by sector |

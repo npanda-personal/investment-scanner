@@ -45,11 +45,60 @@ async function auditAndClean(dryRun = true) {
 
   // 2. Audit PriceTicks
   console.log('--- PRICETICKS ---');
-  // Since there's a unique constraint on symbol + timestamp, there CANNOT be DB duplicates.
-  // We can just verify count.
+  // Since there's a unique constraint on symbol + timestamp, there CANNOT be exact DB duplicates.
+  // But let's check for logical duplicates: same symbol, same calendar date (regardless of time).
   const priceCount = await prisma.priceTick.count();
   console.log(`PriceTick Rows: ${priceCount}`);
-  console.log('DB constraints prevent duplicate PriceTicks.\n');
+  
+  let hasMore = true;
+  while (hasMore) {
+    const logicalDuplicates: any[] = await prisma.$queryRaw`
+      SELECT symbol, DATE("timestamp") as dt, COUNT(*) as cnt
+      FROM price_ticks
+      GROUP BY symbol, DATE("timestamp")
+      HAVING COUNT(*) > 1
+      LIMIT 5000;
+    `;
+    
+    if (logicalDuplicates.length > 0) {
+      console.log(`Found ${logicalDuplicates.length} logical duplicate groups in this batch.`);
+      let deletedCount = 0;
+      for (const dup of logicalDuplicates) {
+        const dtObj = new Date(dup.dt);
+        const isoDateStr = dtObj.toISOString().split('T')[0];
+        const rows = await prisma.priceTick.findMany({
+          where: {
+            symbol: dup.symbol,
+            timestamp: {
+              gte: new Date(`${isoDateStr}T00:00:00.000Z`),
+              lt: new Date(`${isoDateStr}T23:59:59.999Z`),
+            }
+          },
+          orderBy: { timestamp: 'desc' }
+        });
+        
+        if (rows.length > 1) {
+          let toKeep = rows.find(r => r.timestamp.toISOString().endsWith('T00:00:00.000Z')) || rows[0];
+          const toDelete = rows.filter(r => r.id !== toKeep.id);
+          if (!dryRun) {
+            for (const row of toDelete) {
+              await prisma.priceTick.delete({ where: { id: row.id } });
+              deletedCount++;
+            }
+          } else {
+            deletedCount += toDelete.length;
+          }
+        }
+      }
+      
+      console.log(`Cleaned up ${deletedCount} logical PriceTick duplicates in batch.`);
+      if (dryRun) hasMore = false; // Don't loop infinitely in dry run if we don't delete
+    } else {
+      console.log('No logical duplicates found.');
+      hasMore = false;
+    }
+  }
+  console.log('');
 
   // 3. Audit LatestPrices
   console.log('--- LATEST PRICES ---');

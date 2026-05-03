@@ -44,7 +44,7 @@ Repository behavior:
 
 - `createSignalResult` upserts by the daily natural key.
 - `latestForInstrument` returns the newest persisted result for an instrument.
-- `latestSignals` reads persisted results, applies filters, collapses to the latest result per instrument, and sorts by score descending.
+- `latestSignals` reads persisted results, applies filters, collapses to the latest result per instrument, sorts by score descending, and returns a paginated object: `{ signals: SignalResultDto[], total: number, limit: number, offset: number }`.
 - `GET /api/v1/signals/:instrumentId` calculates and persists on demand when no result exists yet.
 
 Signal API responses are enriched at response time with latest price context from Market Data Foundation public services. These fields are not persisted on `SignalResult`.
