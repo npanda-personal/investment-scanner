@@ -175,7 +175,8 @@ export class MarketContextIntelligenceService {
   }
 
   private async loadSignalMap() {
-    const signals = await this.signalService.topSignals({ limit: 100 }).catch(() => []);
+    const response = await this.signalService.topSignals({ limit: 100 }).catch(() => ({ signals: [] }));
+    const signals = response && 'signals' in response ? response.signals : [];
     const map = new Map<string, Partial<ContextInstrument>>();
     for (const signal of signals as any[]) {
       map.set(signal.instrument_id, { signalDirection: signal.direction, signalScore: signal.score });

@@ -49,21 +49,45 @@ export class SignalGenerationEngineRepository {
     return result ? this.toDto(result) : null;
   }
 
-  async latestSignals(query: SignalQuery): Promise<SignalResultDto[]> {
+  async latestSignals(query: SignalQuery): Promise<{ signals: SignalResultDto[], total: number }> {
     const where = this.buildWhere(query);
     const results = await this.db.signalResult.findMany({
       where,
       orderBy: [{ generatedAt: 'desc' }, { score: 'desc' }],
-      take: Math.max(query.limit * 5, query.limit),
     });
 
     const latestByInstrument = new Map<string, SignalResultDto>();
-    for (const result of results.map((item) => this.toDto(item))) {
+    for (const item of results) {
+      const result = this.toDto(item);
       if (query.signalType && !this.hasSignal(result, query.signalType)) continue;
-      if (!latestByInstrument.has(result.instrument_id)) latestByInstrument.set(result.instrument_id, result);
-      if (latestByInstrument.size >= query.limit) break;
+      if (!latestByInstrument.has(result.instrument_id)) {
+        latestByInstrument.set(result.instrument_id, result);
+      }
     }
-    return [...latestByInstrument.values()].sort((a, b) => b.score - a.score);
+    
+    const finalResults = [...latestByInstrument.values()];
+    
+    const sortBy = query.sortBy || 'score';
+    const sortDirection = query.sortDirection === 'asc' ? 1 : -1;
+    finalResults.sort((a: any, b: any) => {
+      let left = a[sortBy];
+      let right = b[sortBy];
+      if (sortBy === 'dailyChangePercent' || sortBy === 'currentPrice') {
+        left = left ?? (sortDirection === 1 ? Infinity : -Infinity);
+        right = right ?? (sortDirection === 1 ? Infinity : -Infinity);
+      }
+      if (typeof left === 'number' && typeof right === 'number') return (left - right) * sortDirection;
+      return String(left).localeCompare(String(right)) * sortDirection;
+    });
+
+    const total = finalResults.length;
+    const offset = query.offset || 0;
+    const limit = query.limit || 25;
+
+    return {
+      signals: finalResults.slice(offset, offset + limit),
+      total,
+    };
   }
 
   async latestSignalUniverse(query: SignalQuery): Promise<SignalResultDto[]> {
@@ -169,3 +193,4 @@ export class SignalGenerationEngineRepository {
     };
   }
 }
+

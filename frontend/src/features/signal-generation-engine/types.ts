@@ -36,11 +36,21 @@ export interface SignalQuery {
   direction?: SignalDirection;
   minScore?: number;
   limit?: number;
+  offset?: number;
+  sortBy?: string;
+  sortDirection?: 'asc' | 'desc';
   sector?: string;
   country?: string;
   signalType?: string;
   confidence?: SignalConfidence;
   search?: string;
+}
+
+export interface PaginatedSignalResponse {
+  signals: SignalResult[];
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 export interface SignalRunRequest {
@@ -71,3 +81,4 @@ export interface SignalRunResponse {
   results: SignalResult[];
   generated_at: string;
 }
+

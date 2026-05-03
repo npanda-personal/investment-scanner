@@ -51,6 +51,52 @@ export class SignalQualityLabService {
     return this.outcomesForSignals(signals);
   }
 
+  async dashboard(query: QualityQuery) {
+    const signals = await this.loadSignals(query);
+    const outcomes = await this.outcomesForSignals(signals);
+    
+    const evaluated = outcomes.filter((item) => item.outcomes.some((outcome) => outcome.available));
+    const byType = this.signalTypePerformance(signals, outcomes, query.horizon).filter((item) => item.sampleSize >= query.minSampleSize);
+    const bySector = this.groupMetrics(outcomes, query.horizon, (item) => item.sector || 'Unknown').filter((item) => item.sampleSize >= query.minSampleSize);
+    const noisy = this.detectNoisySignals(signals, outcomes);
+    
+    const summary: QualitySummary = {
+      totalSignals: signals.length,
+      evaluatedSignals: evaluated.length,
+      unevaluatedSignals: signals.length - evaluated.length,
+      overallBullishWinRate: this.winRate(outcomes, query.horizon, 'BULLISH'),
+      overallBearishWinRate: this.winRate(outcomes, query.horizon, 'BEARISH'),
+      average5DReturn: this.averageHorizon(outcomes, '5D'),
+      average20DReturn: this.averageHorizon(outcomes, '20D'),
+      bestPerformingSignalType: byType[0]?.signalType ?? null,
+      worstPerformingSignalType: byType.length > 0 ? byType[byType.length - 1].signalType : null,
+      bestSector: bySector[0]?.group ?? null,
+      worstSector: bySector.length > 0 ? bySector[bySector.length - 1].group : null,
+      noisySignalCount: noisy.length,
+      dataStatus: signals.length === 0 ? 'MISSING' : evaluated.length < signals.length ? 'PARTIAL' : 'COMPLETE',
+      generatedAt: new Date().toISOString(),
+      dataQualityFilterSummary: await this.dataQualityFilterSummary(query),
+    };
+
+    const regimeBySignal = new Map<string, string>();
+    await Promise.all(signals.map(async (signal) => {
+      const regime = await this.historicalContextService.regimeForDate(new Date(signal.generated_at)).catch(() => null);
+      regimeBySignal.set(signal.id || signal.generated_at, regime || 'MISSING_REGIME_CONTEXT');
+    }));
+    const byRegime = this.groupMetrics(outcomes, query.horizon, (item) => regimeBySignal.get(item.signalResultId) || 'MISSING_REGIME_CONTEXT')
+      .filter((item) => item.sampleSize >= query.minSampleSize);
+
+    const evaluations = await this.dataQualityService.getEvaluationsForInstruments(signals.map((signal) => signal.instrument_id)).catch(() => []);
+    const byId = new Map(evaluations.map((evaluation) => [evaluation.instrumentId, evaluation]));
+    const byDataQuality = [
+      ...this.groupMetrics(outcomes, query.horizon, (item) => `coverage:${byId.get(item.instrumentId)?.coverageStatus || 'MISSING'}`),
+      ...this.groupMetrics(outcomes, query.horizon, (item) => `readiness:${byId.get(item.instrumentId)?.signalReadinessStatus || 'MISSING'}`),
+      ...this.groupMetrics(outcomes, query.horizon, (item) => `liquidity:${byId.get(item.instrumentId)?.liquidityStatus || 'MISSING'}`),
+    ].filter((item) => item.sampleSize >= query.minSampleSize);
+
+    return { summary, byType, bySector, byRegime, byDataQuality, noisy };
+  }
+
   async summary(query: QualityQuery): Promise<QualitySummary> {
     const signals = await this.loadSignals(query);
     const outcomes = await this.outcomesForSignals(signals);

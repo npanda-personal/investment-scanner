@@ -15,7 +15,6 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SyncIcon from '@mui/icons-material/Sync';
 import {
   Line,
@@ -38,6 +37,7 @@ import {
   type V1LatestPriceResponse,
   type V1PricesResponse,
 } from '../api/marketDataFoundationService';
+import { PageHeader } from '@/shared/components';
 
 const formatDate = (value: string) => new Date(value).toLocaleDateString();
 const formatDateTime = (value: string) => new Date(value).toLocaleString();
@@ -135,23 +135,21 @@ const InstrumentDetailPage: React.FC = () => {
 
   return (
     <Box sx={{ p: 3, maxWidth: 1400, mx: 'auto' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, mb: 3, flexDirection: { xs: 'column', md: 'row' } }}>
-        <Box>
-          <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/market-data-foundation')} sx={{ mb: 1 }}>
-            Back
-          </Button>
-          <Typography variant="h4">{instrument.symbol}</Typography>
-          <Typography color="text.secondary">{instrument.company_name}</Typography>
-        </Box>
-        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-          <Button variant="outlined" onClick={() => navigate(`/research/stocks/${instrument.id}`)}>
-            Research
-          </Button>
+      <PageHeader
+        title={instrument.symbol}
+        subtitle={instrument.company_name}
+        backTo="/market-data-foundation"
+        primaryAction={
           <Button variant="contained" startIcon={<SyncIcon />} onClick={handleSync} disabled={syncing}>
             {syncing ? 'Syncing...' : 'Sync Market Data'}
           </Button>
-        </Box>
-      </Box>
+        }
+        secondaryActions={
+          <Button variant="outlined" onClick={() => navigate(`/research/stocks/${instrument.id}`)}>
+            Research
+          </Button>
+        }
+      />
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>{success}</Alert>}

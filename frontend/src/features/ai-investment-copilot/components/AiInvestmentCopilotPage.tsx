@@ -58,7 +58,7 @@ export default function AiInvestmentCopilotPage() {
   }
 
   return (
-    <Box sx={{ maxWidth: 1280 }}>
+    <Box sx={{ p: 3, maxWidth: 1500, mx: 'auto' }}>
       <PageHeader
         title="AI Investment Copilot"
         badges={<PsychologyIcon color="primary" />}
@@ -123,7 +123,7 @@ function ActionCard({ title, onRun, loading }: { title: string; onRun: () => voi
     <Paper sx={{ p: 2 }}>
       <Typography variant="h6" sx={{ mb: 1 }}>{title}</Typography>
       <Button variant="contained" disabled={loading} onClick={onRun}>
-        {loading ? 'Loading...' : 'Load Summary'}
+        {loading ? 'Loading...' : 'Generate Report'}
       </Button>
     </Paper>
   );
@@ -139,7 +139,7 @@ function RequestCard({ title, children, onRun, loading, disabled }: {
   return (
     <Paper sx={{ p: 2 }}>
       <Typography variant="h6" sx={{ mb: 1 }}>{title}</Typography>
-      <Stack spacing={1}>
+      <Stack spacing={1.5}>
         {children}
         <Button variant="contained" disabled={loading || disabled} onClick={onRun}>
           {loading ? 'Summarizing...' : 'Summarize'}
@@ -154,7 +154,7 @@ function SummaryPanel({ summary }: { summary: CopilotSummaryResponse | null }) {
     return (
       <Paper sx={{ p: 3 }}>
         <Typography variant="h6">Summary</Typography>
-        <Typography color="text.secondary">Select a copilot card or enter an ID to generate a focused summary.</Typography>
+        <Typography color="text.secondary">Select an entity to generate a focused summary.</Typography>
       </Paper>
     );
   }

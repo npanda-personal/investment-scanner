@@ -55,6 +55,8 @@ export interface SignalQuery {
   minScore?: number;
   limit: number;
   offset?: number;
+  sortBy?: string;
+  sortDirection?: 'asc' | 'desc';
   sector?: string;
   country?: string;
   signalType?: string;

@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   CircularProgress,
-  List,
-  ListItemButton,
-  ListItemText,
+  Divider,
   MenuItem,
   Paper,
   Stack,
@@ -134,83 +133,84 @@ const WatchlistManagementPage: React.FC = () => {
       />
       {(error || formError) && <Alert severity="error" sx={{ mb: 2 }}>{error || formError}</Alert>}
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '320px 1fr' }, gap: 3 }}>
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} alignItems="flex-start">
+          <Box sx={{ flex: 1, width: '100%' }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>Select Watchlist</Typography>
+            <Autocomplete
+              options={watchlists}
+              value={watchlists.find(w => w.id === id) || null}
+              onChange={(_event, value) => {
+                if (value) navigate(`/watchlists/${value.id}`);
+                else navigate('/watchlists');
+              }}
+              getOptionLabel={(option) => option.name}
+              isOptionEqualToValue={(option, value) => option.id === value.id}
+              renderInput={(params) => <TextField {...params} label="Search watchlists..." size="small" />}
+            />
+          </Box>
+          <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' } }} />
+          <Box sx={{ flex: 1, width: '100%' }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>Create New</Typography>
+            <Stack direction="row" spacing={1}>
+              <TextField label="Name" value={name} onChange={(event) => setName(event.target.value)} size="small" sx={{ flex: 1 }} />
+              <TextField label="Description" value={description} onChange={(event) => setDescription(event.target.value)} size="small" sx={{ flex: 1 }} />
+              <Button variant="contained" onClick={submitWatchlist} disabled={!name}>Create</Button>
+            </Stack>
+          </Box>
+        </Stack>
+      </Paper>
+
+      {!id || !detail ? (
+        <Paper sx={{ p: 3 }}>
+          <Typography variant="h6">Select a watchlist</Typography>
+          <Typography color="text.secondary">Choose or create a watchlist to view tracked stocks.</Typography>
+        </Paper>
+      ) : (
         <Stack spacing={2}>
           <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" sx={{ mb: 2 }}>Your Watchlists</Typography>
-            {watchlists.length === 0 ? (
-              <Typography color="text.secondary">No watchlists yet. Create one to start tracking ideas.</Typography>
-            ) : (
-              <List dense disablePadding>
-                {watchlists.map((watchlist) => (
-                  <ListItemButton key={watchlist.id} component={Link} to={`/watchlists/${watchlist.id}`} selected={watchlist.id === id}>
-                    <ListItemText primary={watchlist.name} secondary={watchlist.description || 'No description'} />
-                  </ListItemButton>
-                ))}
-              </List>
-            )}
-          </Paper>
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" sx={{ mb: 2 }}>Create Watchlist</Typography>
-            <Stack spacing={1.5}>
-              <TextField label="Name" value={name} onChange={(event) => setName(event.target.value)} size="small" />
-              <TextField label="Description" value={description} onChange={(event) => setDescription(event.target.value)} size="small" multiline minRows={2} />
-              <Button variant="contained" onClick={submitWatchlist}>Create</Button>
+            <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2}>
+              <Box>
+                <Typography variant="h5">{detail.watchlist.name}</Typography>
+                <Typography color="text.secondary">{detail.watchlist.description || 'No description'}</Typography>
+              </Box>
+              <Button color="error" variant="outlined" onClick={async () => {
+                await deleteWatchlist(detail.watchlist.id);
+                navigate('/watchlists');
+                await reload();
+              }}>Delete Watchlist</Button>
             </Stack>
           </Paper>
-        </Stack>
 
-        {!id || !detail ? (
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6">Select a watchlist</Typography>
-            <Typography color="text.secondary">Choose or create a watchlist to view tracked stocks.</Typography>
+          <Paper sx={{ p: 2 }}>
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
+              <Box sx={{ flex: 1 }}>
+                <InstrumentSearchSelect value={selectedInstrument} onChange={setSelectedInstrument} />
+              </Box>
+              <TextField select label="Sort" value={sort} onChange={(event) => { setSort(event.target.value as WatchlistSortOption); setPage(0); }} size="small" sx={{ minWidth: 190 }}>
+                <MenuItem value="recentlyAdded">Recently Added</MenuItem>
+                <MenuItem value="signalScoreDesc">Signal Score</MenuItem>
+                <MenuItem value="dailyChangeDesc">Daily Change High</MenuItem>
+                <MenuItem value="dailyChangeAsc">Daily Change Low</MenuItem>
+                <MenuItem value="symbolAsc">Symbol</MenuItem>
+              </TextField>
+              <Button variant="contained" onClick={submitItem} disabled={!selectedInstrument}>Add Stock</Button>
+            </Stack>
           </Paper>
-        ) : (
-          <Stack spacing={2}>
-            <Paper sx={{ p: 2 }}>
-              <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2}>
-                <Box>
-                  <Typography variant="h5">{detail.watchlist.name}</Typography>
-                  <Typography color="text.secondary">{detail.watchlist.description || 'No description'}</Typography>
-                </Box>
-                <Button color="error" variant="outlined" onClick={async () => {
-                  await deleteWatchlist(detail.watchlist.id);
-                  navigate('/watchlists');
-                  await reload();
-                }}>Delete Watchlist</Button>
-              </Stack>
-            </Paper>
 
-            <Paper sx={{ p: 2 }}>
-              <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-                <Box sx={{ flex: 1 }}>
-                  <InstrumentSearchSelect value={selectedInstrument} onChange={setSelectedInstrument} />
-                </Box>
-                <TextField select label="Sort" value={sort} onChange={(event) => { setSort(event.target.value as WatchlistSortOption); setPage(0); }} size="small" sx={{ minWidth: 190 }}>
-                  <MenuItem value="recentlyAdded">Recently Added</MenuItem>
-                  <MenuItem value="signalScoreDesc">Signal Score</MenuItem>
-                  <MenuItem value="dailyChangeDesc">Daily Change High</MenuItem>
-                  <MenuItem value="dailyChangeAsc">Daily Change Low</MenuItem>
-                  <MenuItem value="symbolAsc">Symbol</MenuItem>
-                </TextField>
-                <Button variant="contained" onClick={submitItem} disabled={!selectedInstrument}>Add Stock</Button>
-              </Stack>
-            </Paper>
-
-            <DataTable
-              columns={itemColumns}
-              rows={(detail.items || []).slice(page * pageSize, page * pageSize + pageSize)}
-              getRowId={(item) => item.id}
-              page={page}
-              pageSize={pageSize}
-              totalCount={detail.items.length}
-              emptyMessage="This watchlist has no stocks yet."
-              onPageChange={setPage}
-              onPageSizeChange={(nextPageSize) => { setPageSize(nextPageSize); setPage(0); }}
-            />
-          </Stack>
-        )}
-      </Box>
+          <DataTable
+            columns={itemColumns}
+            rows={(detail.items || []).slice(page * pageSize, page * pageSize + pageSize)}
+            getRowId={(item) => item.id}
+            page={page}
+            pageSize={pageSize}
+            totalCount={detail.items.length}
+            emptyMessage="This watchlist has no stocks yet."
+            onPageChange={setPage}
+            onPageSizeChange={(nextPageSize) => { setPageSize(nextPageSize); setPage(0); }}
+          />
+        </Stack>
+      )}
     </Box>
   );
 };

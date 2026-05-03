@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import {
   AppBar,
@@ -45,24 +45,49 @@ import { useAuthIdentity } from '@/features/auth-identity';
 const drawerWidth = 260;
 const collapsedWidth = 72;
 
-const navItems = [
-  { path: '/', label: 'Dashboard', icon: <DashboardIcon /> },
-  { path: '/market-data-foundation', label: 'Market Data Foundation', icon: <InventoryIcon /> },
-  { path: '/signals', label: 'Signals', icon: <InsightsIcon /> },
-  { path: '/signals/quality', label: 'Signal Quality', icon: <FactCheckIcon /> },
-  { path: '/signals/calibration', label: 'Signal Calibration', icon: <TuneIcon /> },
-  { path: '/data-quality', label: 'Data Quality', icon: <FactCheckIcon /> },
-  { path: '/portfolios', label: 'Portfolios', icon: <AccountBalanceWalletIcon /> },
-  { path: '/watchlists', label: 'Watchlists', icon: <StarBorderIcon /> },
-  { path: '/alerts', label: 'Alerts', icon: <NotificationsNoneIcon /> },
-  { path: '/market-context', label: 'Market Context', icon: <PublicIcon /> },
-  { path: '/context-snapshots', label: 'Context Snapshots', icon: <CalendarMonthIcon /> },
-  { path: '/backtests', label: 'Backtests', icon: <TimelineIcon /> },
-  { path: '/smart-money', label: 'Smart Money', icon: <AccountTreeIcon /> },
-  { path: '/copilot', label: 'AI Copilot', icon: <PsychologyIcon /> },
-  { path: '/billing', label: 'Billing', icon: <WorkspacePremiumIcon /> },
-  { path: '/notifications', label: 'Notifications', icon: <MarkEmailReadIcon /> },
-  { path: '/account', label: 'Account', icon: <AccountCircleIcon /> },
+const navGroups = [
+  {
+    group: 'Overview',
+    items: [
+      { path: '/', label: 'Dashboard', icon: <DashboardIcon /> },
+      { path: '/market-data-foundation', label: 'Market Data Foundation', icon: <InventoryIcon /> },
+    ],
+  },
+  {
+    group: 'Research',
+    items: [
+      { path: '/signals', label: 'Signals', icon: <InsightsIcon /> },
+      { path: '/smart-money', label: 'Smart Money', icon: <AccountTreeIcon /> },
+      { path: '/market-context', label: 'Market Context', icon: <PublicIcon /> },
+    ],
+  },
+  {
+    group: 'Portfolio',
+    items: [
+      { path: '/portfolios', label: 'Portfolios', icon: <AccountBalanceWalletIcon /> },
+      { path: '/watchlists', label: 'Watchlists', icon: <StarBorderIcon /> },
+      { path: '/alerts', label: 'Alerts', icon: <NotificationsNoneIcon /> },
+    ],
+  },
+  {
+    group: 'Intelligence Lab',
+    items: [
+      { path: '/signals/quality', label: 'Signal Quality', icon: <FactCheckIcon /> },
+      { path: '/signals/calibration', label: 'Signal Calibration', icon: <TuneIcon /> },
+      { path: '/data-quality', label: 'Data Quality', icon: <FactCheckIcon /> },
+      { path: '/backtests', label: 'Backtests', icon: <TimelineIcon /> },
+      { path: '/context-snapshots', label: 'Context Snapshots', icon: <CalendarMonthIcon /> },
+    ],
+  },
+  {
+    group: 'Account',
+    items: [
+      { path: '/copilot', label: 'AI Copilot', icon: <PsychologyIcon /> },
+      { path: '/billing', label: 'Billing', icon: <WorkspacePremiumIcon /> },
+      { path: '/notifications', label: 'Notifications', icon: <MarkEmailReadIcon /> },
+      { path: '/account', label: 'Account', icon: <AccountCircleIcon /> },
+    ],
+  },
 ];
 
 export default function NavigationLayout() {
@@ -74,7 +99,7 @@ export default function NavigationLayout() {
   const location = useLocation();
 
   const handleDrawerToggle = () => setOpen(!open);
-  const activeLabel = navItems.find((item) => item.path === location.pathname)?.label || 'Investment Scanner';
+  const activeLabel = navGroups.flatMap(g => g.items).find((item) => item.path === location.pathname)?.label || 'Investment Scanner';
 
   const drawer = (
     <>
@@ -89,18 +114,28 @@ export default function NavigationLayout() {
         )}
       </Toolbar>
       <Divider />
-      <List sx={{ px: 1 }}>
-        {navItems.map((item) => {
-          const isActive = location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path));
-          return (
-            <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }}>
-              <ListItemButton component={Link} to={item.path} selected={isActive} sx={{ borderRadius: 2, py: 1.25 }}>
-                <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
-                {open && <ListItemText primary={item.label} />}
-              </ListItemButton>
-            </ListItem>
-          );
-        })}
+      <List sx={{ px: 1, py: 1 }}>
+        {navGroups.map((group, groupIndex) => (
+          <React.Fragment key={group.group}>
+            {open && (
+              <Typography variant="overline" sx={{ px: 2, mt: groupIndex > 0 ? 1 : 0, mb: 0.5, display: 'block', color: 'text.secondary', lineHeight: 1 }}>
+                {group.group}
+              </Typography>
+            )}
+            {group.items.map((item) => {
+              const isActive = location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path));
+              return (
+                <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }}>
+                  <ListItemButton component={Link} to={item.path} selected={isActive} sx={{ borderRadius: 2, py: 1 }}>
+                    <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
+                    {open && <ListItemText primary={item.label} primaryTypographyProps={{ variant: 'body2' }} />}
+                  </ListItemButton>
+                </ListItem>
+              );
+            })}
+            {groupIndex < navGroups.length - 1 && open && <Divider sx={{ my: 1, mx: 1 }} />}
+          </React.Fragment>
+        ))}
       </List>
       <Divider sx={{ mt: 'auto' }} />
       <Box sx={{ p: 2 }}>
@@ -123,9 +158,11 @@ export default function NavigationLayout() {
             {!open && <IconButton color="inherit" edge="start" onClick={handleDrawerToggle} sx={{ mr: 2 }}><MenuIcon /></IconButton>}
             <Typography variant="h6" noWrap sx={{ fontWeight: 700 }}>{activeLabel}</Typography>
           </Stack>
-          <Switch checked={themeMode === 'dark'} onChange={toggleTheme} size="small" icon={<Brightness4Icon fontSize="small" />} checkedIcon={<Brightness7Icon fontSize="small" />} />
-          {user && <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>{user.email}</Typography>}
-          {user && <IconButton color="inherit" size="small" onClick={() => void logout()} title="Log out"><AccountCircleIcon fontSize="small" /></IconButton>}
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <Switch checked={themeMode === 'dark'} onChange={toggleTheme} size="small" icon={<Brightness4Icon fontSize="small" />} checkedIcon={<Brightness7Icon fontSize="small" />} />
+            {user && <Typography variant="body2" color="text.secondary" sx={{ ml: 1, display: { xs: 'none', sm: 'block' } }}>{user.email}</Typography>}
+            {user && <IconButton color="inherit" size="small" onClick={() => void logout()} title="Log out"><AccountCircleIcon fontSize="small" /></IconButton>}
+          </Stack>
         </Toolbar>
       </AppBar>
       <Drawer variant={isMobile ? 'temporary' : 'persistent'} open={open} onClose={() => setOpen(false)} sx={{ width: open ? drawerWidth : collapsedWidth, flexShrink: 0, '& .MuiDrawer-paper': { width: open ? drawerWidth : collapsedWidth, boxSizing: 'border-box', borderRight: '1px solid', borderColor: 'divider' } }}>

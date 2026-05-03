@@ -60,7 +60,7 @@ describe('MarketContextIntelligenceService', () => {
       listInstruments: jest.fn().mockResolvedValue({ instruments: [{ id: 'stock-1', symbol: 'AAA', sector: 'Technology', country: 'US' }] }),
       listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: instrument().prices.map((close: number) => ({ adjusted_close: close })) }),
     };
-    const signalService = { topSignals: jest.fn().mockResolvedValue([{ instrument_id: 'stock-1', direction: 'BULLISH', score: 80 }]) };
+    const signalService = { topSignals: jest.fn().mockResolvedValue({ signals: [{ instrument_id: 'stock-1', direction: 'BULLISH', score: 80 }], total: 1, limit: 100, offset: 0 }) };
     const service = new MarketContextIntelligenceService(marketDataService as any, signalService as any);
 
     const summary = await service.summary();

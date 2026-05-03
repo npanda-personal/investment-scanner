@@ -27,12 +27,22 @@ export class SignalGenerationEngineService {
   ) {}
 
   async topSignals(query: SignalQuery) {
-    return this.enrichSignals(await this.repository.latestSignals(query));
+    const { signals, total } = await this.repository.latestSignals(query);
+    return {
+      signals: await this.enrichSignals(signals),
+      total,
+      limit: query.limit,
+      offset: query.offset || 0,
+    };
   }
 
   async screener(query: SignalQuery) {
+    const { signals, total } = await this.repository.latestSignals(query);
     return {
-      signals: await this.enrichSignals(await this.repository.latestSignals(query)),
+      signals: await this.enrichSignals(signals),
+      total,
+      limit: query.limit,
+      offset: query.offset || 0,
       filters: query,
       source: 'signal-generation-engine',
       generated_at: new Date().toISOString(),
@@ -106,7 +116,7 @@ export class SignalGenerationEngineService {
   }
 
   async health() {
-    const latest = await this.repository.latestSignals({ limit: 1 });
+    const { signals: latest } = await this.repository.latestSignals({ limit: 1 });
     return {
       status: 'ok',
       module: 'signal-generation-engine',
@@ -439,3 +449,4 @@ export class SignalGenerationEngineService {
     return values.reduce((sum, value) => sum + value, 0) / values.length;
   }
 }
+

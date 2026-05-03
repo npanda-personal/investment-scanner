@@ -7,7 +7,7 @@ export class SignalGenerationEngineController {
 
   top = async (req: Request, res: Response) => {
     try {
-      return res.json({ signals: await this.service.topSignals(parseSignalQuery(req.query)) });
+      return res.json(await this.service.topSignals(parseSignalQuery(req.query)));
     } catch (error) {
       console.error('Signal top endpoint error:', error);
       return res.status(500).json({ error: 'Failed to load top signals' });

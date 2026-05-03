@@ -6,6 +6,7 @@ export const createSignalQualityLabRouter = (controller = new SignalQualityLabCo
   const router = express.Router();
   router.use(requireAuth);
 
+  router.get('/signals/quality/dashboard', controller.dashboard);
   router.get('/signals/quality/summary', controller.summary);
   router.get('/signals/quality/by-type', controller.byType);
   router.get('/signals/quality/by-sector', controller.bySector);

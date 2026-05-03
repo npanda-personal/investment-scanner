@@ -23,6 +23,7 @@ const reasonText = (signal: SignalResult) => {
 
 type SignalTableProps = {
   signals: SignalResult[];
+  totalCount?: number;
   loading?: boolean;
   page: number;
   pageSize: number;
@@ -33,38 +34,13 @@ type SignalTableProps = {
   onSortChange: (sortBy: string, direction: SortDirection) => void;
 };
 
-export function SignalTable({ signals, loading, page, pageSize, sortBy, sortDirection, onPageChange, onPageSizeChange, onSortChange }: SignalTableProps) {
+export function SignalTable({ signals, totalCount, loading, page, pageSize, sortBy, sortDirection, onPageChange, onPageSizeChange, onSortChange }: SignalTableProps) {
   const navigate = useNavigate();
   const [portfolioSignal, setPortfolioSignal] = React.useState<SignalResult | null>(null);
   const [watchlistSignal, setWatchlistSignal] = React.useState<SignalResult | null>(null);
   const [alertSignal, setAlertSignal] = React.useState<SignalResult | null>(null);
   const [successPortfolioId, setSuccessPortfolioId] = React.useState<string | null>(null);
   const [successWatchlistId, setSuccessWatchlistId] = React.useState<string | null>(null);
-
-  const sorted = React.useMemo(() => {
-    const getValue = (signal: SignalResult): string | number => {
-      switch (sortBy) {
-        case 'symbol': return signal.symbol;
-        case 'score': return signal.score;
-        case 'direction': return signal.direction;
-        case 'confidence': return signal.confidence;
-        case 'currentPrice': return signal.currentPrice ?? -Infinity;
-        case 'dailyChangePercent': return signal.dailyChangePercent ?? -Infinity;
-        case 'generatedAt': return new Date(signal.generated_at).getTime();
-        default: return signal.score;
-      }
-    };
-    return [...signals].sort((a, b) => {
-      const left = getValue(a);
-      const right = getValue(b);
-      const result = typeof left === 'number' && typeof right === 'number'
-        ? left - right
-        : String(left).localeCompare(String(right));
-      return sortDirection === 'asc' ? result : -result;
-    });
-  }, [signals, sortBy, sortDirection]);
-
-  const paged = sorted.slice(page * pageSize, page * pageSize + pageSize);
 
   const columns: DataTableColumn<SignalResult>[] = [
     { id: 'symbol', label: 'Symbol', sortable: true, render: (signal) => <Button size="small" onClick={(event) => { event.stopPropagation(); navigate(`/stocks/${signal.instrument_id}`); }}>{signal.symbol}</Button> },
@@ -104,13 +80,13 @@ export function SignalTable({ signals, loading, page, pageSize, sortBy, sortDire
     <>
       <DataTable
         columns={columns}
-        rows={paged}
+        rows={signals}
         getRowId={(signal) => signal.id || `${signal.instrument_id}-${signal.generated_at}`}
         loading={loading}
         emptyMessage="No signals match this view."
         page={page}
         pageSize={pageSize}
-        totalCount={sorted.length}
+        totalCount={totalCount ?? signals.length}
         sortBy={sortBy}
         sortDirection={sortDirection}
         onSortChange={onSortChange}
@@ -150,3 +126,4 @@ export function SignalTable({ signals, loading, page, pageSize, sortBy, sortDire
     </>
   );
 }
+

@@ -42,7 +42,7 @@ function service(overrides: Record<string, any> = {}) {
   const signalService = {
     latestForInstrument: jest.fn().mockResolvedValue(rawSignal()),
     run: jest.fn().mockResolvedValue({ results: [rawSignal()] }),
-    topSignals: jest.fn().mockResolvedValue([rawSignal()]),
+    topSignals: jest.fn().mockResolvedValue({ signals: [rawSignal()], total: 1, limit: 100, offset: 0 }),
     latestSignalUniverse: jest.fn().mockResolvedValue([rawSignal()]),
     latestSignalUniverseCount: jest.fn().mockResolvedValue(1),
     ...overrides.signalService,

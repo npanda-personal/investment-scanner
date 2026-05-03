@@ -19,11 +19,8 @@ const tabs: Array<{ value: SignalTab; label: string }> = [
 ];
 
 const SignalsDashboardPage: React.FC = () => {
-  const [bullish, setBullish] = useState<SignalResult[]>([]);
-  const [bearish, setBearish] = useState<SignalResult[]>([]);
-  const [momentum, setMomentum] = useState<SignalResult[]>([]);
-  const [recent, setRecent] = useState<SignalResult[]>([]);
-  const [screener, setScreener] = useState<SignalResult[]>([]);
+  const [signals, setSignals] = useState<SignalResult[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [activeTab, setActiveTab] = useState<SignalTab>('bullish');
   const [pageByTab, setPageByTab] = useState<Record<SignalTab, number>>({ bullish: 0, bearish: 0, neutral: 0, momentum: 0, recent: 0, screener: 0 });
   const [pageSizeByTab, setPageSizeByTab] = useState<Record<SignalTab, number>>({ bullish: 25, bearish: 25, neutral: 25, momentum: 25, recent: 25, screener: 25 });
@@ -46,13 +43,17 @@ const SignalsDashboardPage: React.FC = () => {
   const load = () => {
     setLoading(true);
     setError(null);
-    Promise.all([
-      fetchTopSignals({ direction: 'BULLISH', limit: 100 }),
-      fetchTopSignals({ direction: 'BEARISH', limit: 100 }),
-      fetchTopSignals({ direction: 'NEUTRAL', limit: 100 }),
-      fetchSignalScreener({ signalType: 'MOMENTUM', minScore: 60, limit: 100 }),
-      fetchTopSignals({ limit: 100 }),
-      fetchSignalScreener({
+    const limit = pageSizeByTab[activeTab];
+    const offset = pageByTab[activeTab] * limit;
+
+    let fetchPromise;
+    switch (activeTab) {
+      case 'bullish': fetchPromise = fetchTopSignals({ direction: 'BULLISH', limit, offset, sortBy, sortDirection }); break;
+      case 'bearish': fetchPromise = fetchTopSignals({ direction: 'BEARISH', limit, offset, sortBy, sortDirection }); break;
+      case 'neutral': fetchPromise = fetchTopSignals({ direction: 'NEUTRAL', limit, offset, sortBy, sortDirection }); break;
+      case 'momentum': fetchPromise = fetchSignalScreener({ signalType: 'MOMENTUM', minScore: 60, limit, offset, sortBy, sortDirection }); break;
+      case 'recent': fetchPromise = fetchTopSignals({ limit, offset, sortBy, sortDirection }); break;
+      case 'screener': fetchPromise = fetchSignalScreener({
         direction: direction || undefined,
         minScore: minScore ? Number(minScore) : undefined,
         sector: sector || undefined,
@@ -60,22 +61,20 @@ const SignalsDashboardPage: React.FC = () => {
         confidence: confidence || undefined,
         signalType: signalType || undefined,
         search: search || undefined,
-        limit: 100,
-      }),
-    ])
-      .then(([bullishSignals, bearishSignals, neutralSignals, momentumSignals, recentSignals, screenerSignals]) => {
-        setBullish(bullishSignals);
-        setBearish(bearishSignals);
-        setNeutral(neutralSignals);
-        setMomentum(momentumSignals);
-        setRecent(recentSignals);
-        setScreener(screenerSignals);
+        limit, offset, sortBy, sortDirection
+      }); break;
+    }
+
+    fetchPromise
+      .then((response) => {
+        setSignals(response.signals);
+        setTotalCount(response.total);
       })
       .catch((err: any) => setError(err.response?.data?.error || err.message || 'Failed to load signals'))
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, [direction, minScore, sector, country, confidence, signalType, search]);
+  useEffect(load, [activeTab, pageByTab[activeTab], pageSizeByTab[activeTab], sortBy, sortDirection, direction, minScore, sector, country, confidence, signalType, search]);
 
   const runManualSignals = () => {
     setRunning(true);
@@ -92,16 +91,6 @@ const SignalsDashboardPage: React.FC = () => {
       .catch((err: any) => setError(err.response?.data?.error || err.message || 'Failed to run signals'))
       .finally(() => setRunning(false));
   };
-
-  const [neutral, setNeutral] = useState<SignalResult[]>([]);
-  const activeSignals = {
-    bullish,
-    bearish,
-    neutral,
-    momentum,
-    recent,
-    screener,
-  }[activeTab];
 
   return (
     <Box sx={{ p: 3, maxWidth: 1500, mx: 'auto' }}>
@@ -126,27 +115,29 @@ const SignalsDashboardPage: React.FC = () => {
 
       <MarketRegimeWidget />
 
-      <Box sx={{ mb: 3 }}>
-        <FilterBar onReset={() => { setDirection(''); setMinScore('60'); setSector(''); setCountry(''); setConfidence(''); setSignalType(''); setSearch(''); }}>
-          <TextField label="Search" value={search} onChange={(event) => setSearch(event.target.value)} />
-          <TextField select label="Direction" value={direction} onChange={(event) => setDirection(event.target.value as SignalDirection | '')}>
-            <MenuItem value="">Any</MenuItem>
-            <MenuItem value="BULLISH">Bullish</MenuItem>
-            <MenuItem value="NEUTRAL">Neutral</MenuItem>
-            <MenuItem value="BEARISH">Bearish</MenuItem>
-          </TextField>
-          <TextField select label="Confidence" value={confidence} onChange={(event) => setConfidence(event.target.value as SignalConfidence | '')}>
-            <MenuItem value="">Any</MenuItem>
-            <MenuItem value="HIGH">High</MenuItem>
-            <MenuItem value="MEDIUM">Medium</MenuItem>
-            <MenuItem value="LOW">Low</MenuItem>
-          </TextField>
-          <TextField label="Min score" value={minScore} onChange={(event) => setMinScore(event.target.value)} />
-          <TextField label="Signal type" value={signalType} onChange={(event) => setSignalType(event.target.value)} />
-          <TextField label="Sector" value={sector} onChange={(event) => setSector(event.target.value)} />
-          <TextField label="Country" value={country} onChange={(event) => setCountry(event.target.value)} />
-        </FilterBar>
-      </Box>
+      {activeTab === 'screener' && (
+        <Box sx={{ mb: 3 }}>
+          <FilterBar onReset={() => { setDirection(''); setMinScore('60'); setSector(''); setCountry(''); setConfidence(''); setSignalType(''); setSearch(''); }}>
+            <TextField label="Search" value={search} onChange={(event) => setSearch(event.target.value)} />
+            <TextField select label="Direction" value={direction} onChange={(event) => setDirection(event.target.value as SignalDirection | '')}>
+              <MenuItem value="">Any</MenuItem>
+              <MenuItem value="BULLISH">Bullish</MenuItem>
+              <MenuItem value="NEUTRAL">Neutral</MenuItem>
+              <MenuItem value="BEARISH">Bearish</MenuItem>
+            </TextField>
+            <TextField select label="Confidence" value={confidence} onChange={(event) => setConfidence(event.target.value as SignalConfidence | '')}>
+              <MenuItem value="">Any</MenuItem>
+              <MenuItem value="HIGH">High</MenuItem>
+              <MenuItem value="MEDIUM">Medium</MenuItem>
+              <MenuItem value="LOW">Low</MenuItem>
+            </TextField>
+            <TextField label="Min score" value={minScore} onChange={(event) => setMinScore(event.target.value)} />
+            <TextField label="Signal type" value={signalType} onChange={(event) => setSignalType(event.target.value)} />
+            <TextField label="Sector" value={sector} onChange={(event) => setSector(event.target.value)} />
+            <TextField label="Country" value={country} onChange={(event) => setCountry(event.target.value)} />
+          </FilterBar>
+        </Box>
+      )}
 
       <Paper sx={{ mb: 2 }}>
         <Tabs value={activeTab} onChange={(_event, value) => setActiveTab(value)} variant="scrollable" scrollButtons="auto">
@@ -155,7 +146,8 @@ const SignalsDashboardPage: React.FC = () => {
       </Paper>
 
       <SignalTable
-        signals={activeSignals}
+        signals={signals}
+        totalCount={totalCount}
         loading={loading}
         page={pageByTab[activeTab]}
         pageSize={pageSizeByTab[activeTab]}

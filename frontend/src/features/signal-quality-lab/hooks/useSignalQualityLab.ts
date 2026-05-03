@@ -1,12 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  fetchNoisySignals,
-  fetchSignalQualityByRegime,
-  fetchSignalQualityByDataQuality,
-  fetchSignalQualityBySector,
-  fetchSignalQualityByType,
-  fetchSignalQualitySummary,
-} from '../api/signalQualityLabService';
+import { fetchSignalQualityDashboard } from '../api/signalQualityLabService';
 import type { NoisySignalItem, QualityFilters, QualityHorizon, QualityMetricGroup, QualitySummary, SignalTypePerformance } from '../types';
 
 export function useSignalQualityLab(horizon: QualityHorizon, filters: QualityFilters = {}) {
@@ -23,20 +16,13 @@ export function useSignalQualityLab(horizon: QualityHorizon, filters: QualityFil
     setLoading(true);
     setError(null);
     try {
-      const [nextSummary, nextByType, nextBySector, nextByRegime, nextByDataQuality, nextNoisy] = await Promise.all([
-        fetchSignalQualitySummary(horizon, filters),
-        fetchSignalQualityByType(horizon, filters),
-        fetchSignalQualityBySector(horizon, filters),
-        fetchSignalQualityByRegime(horizon, filters),
-        fetchSignalQualityByDataQuality(horizon, filters),
-        fetchNoisySignals(horizon, filters),
-      ]);
-      setSummary(nextSummary);
-      setByType(nextByType);
-      setBySector(nextBySector);
-      setByRegime(nextByRegime);
-      setByDataQuality(nextByDataQuality);
-      setNoisy(nextNoisy);
+      const data = await fetchSignalQualityDashboard(horizon, filters);
+      setSummary(data.summary);
+      setByType(data.byType);
+      setBySector(data.bySector);
+      setByRegime(data.byRegime);
+      setByDataQuality(data.byDataQuality);
+      setNoisy(data.noisy);
     } catch (err: any) {
       setError(err.response?.data?.error || err.message || 'Failed to load signal quality');
     } finally {

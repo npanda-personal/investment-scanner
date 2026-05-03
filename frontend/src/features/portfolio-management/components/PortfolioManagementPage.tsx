@@ -1,14 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Chip,
   CircularProgress,
   Divider,
-  List,
-  ListItemButton,
-  ListItemText,
   MenuItem,
   Paper,
   Stack,
@@ -226,227 +224,222 @@ const PortfolioManagementPage: React.FC = () => {
 
       {(error || formError) && <Alert severity="error" sx={{ mb: 2 }}>{error || formError}</Alert>}
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '320px 1fr' }, gap: 3 }}>
-        <Stack spacing={2}>
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" sx={{ mb: 2 }}>Portfolios</Typography>
-            {portfolios.length === 0 ? (
-              <Typography color="text.secondary">No portfolios yet. Create one to start tracking holdings.</Typography>
-            ) : (
-              <List dense disablePadding>
-                {portfolios.map((portfolio) => (
-                  <ListItemButton
-                    key={portfolio.id}
-                    component={Link}
-                    to={`/portfolios/${portfolio.id}`}
-                    selected={portfolio.id === selectedId}
-                  >
-                    <ListItemText primary={portfolio.name} secondary={portfolio.baseCurrency} />
-                  </ListItemButton>
-                ))}
-              </List>
-            )}
-          </Paper>
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} alignItems="flex-start">
+          <Box sx={{ flex: 1, width: '100%' }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>Select Portfolio</Typography>
+            <Autocomplete
+              options={portfolios}
+              value={portfolios.find(p => p.id === selectedId) || null}
+              onChange={(_event, value) => {
+                if (value) navigate(`/portfolios/${value.id}`);
+                else navigate('/portfolios');
+              }}
+              getOptionLabel={(option) => option.name}
+              isOptionEqualToValue={(option, value) => option.id === value.id}
+              renderInput={(params) => <TextField {...params} label="Search portfolios..." size="small" />}
+            />
+          </Box>
+          <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' } }} />
+          <Box sx={{ flex: 1, width: '100%' }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>Create New</Typography>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ gap: 1 }}>
+              <TextField label="Name" value={portfolioName} onChange={(event) => setPortfolioName(event.target.value)} size="small" sx={{ flex: 1, minWidth: 120 }} />
+              <TextField label="Currency" value={portfolioCurrency} onChange={(event) => setPortfolioCurrency(event.target.value.toUpperCase())} size="small" sx={{ width: 90 }} />
+              <TextField label="Description" value={portfolioDescription} onChange={(event) => setPortfolioDescription(event.target.value)} size="small" sx={{ flex: 2, minWidth: 150 }} />
+              <Button variant="contained" onClick={submitPortfolio} disabled={!portfolioName}>Create</Button>
+            </Stack>
+          </Box>
+        </Stack>
+      </Paper>
 
+      {!selectedId || !selectedPortfolio ? (
+        <Paper sx={{ p: 3 }}>
+          <Typography variant="h6">Select a portfolio</Typography>
+          <Typography color="text.secondary">Choose or create a portfolio to view holdings, valuation, allocation, and transactions.</Typography>
+        </Paper>
+      ) : (
+        <Stack spacing={3}>
           <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" sx={{ mb: 2 }}>Create Portfolio</Typography>
-            <Stack spacing={1.5}>
-              <TextField label="Name" value={portfolioName} onChange={(event) => setPortfolioName(event.target.value)} size="small" />
-              <TextField label="Base currency" value={portfolioCurrency} onChange={(event) => setPortfolioCurrency(event.target.value.toUpperCase())} size="small" />
-              <TextField label="Description" value={portfolioDescription} onChange={(event) => setPortfolioDescription(event.target.value)} size="small" multiline minRows={2} />
-              <Button variant="contained" onClick={submitPortfolio}>Create</Button>
+            <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2}>
+              <Box>
+                <Typography variant="h5">{selectedPortfolio.name}</Typography>
+                <Typography color="text.secondary">{selectedPortfolio.description || 'No description'}</Typography>
+              </Box>
+              <Button color="error" variant="outlined" onClick={async () => {
+                await deletePortfolio(selectedPortfolio.id);
+                navigate('/portfolios');
+                await reload();
+              }}>
+                Delete Portfolio
+              </Button>
             </Stack>
           </Paper>
-        </Stack>
 
-        {!selectedId || !selectedPortfolio ? (
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6">Select a portfolio</Typography>
-            <Typography color="text.secondary">Choose or create a portfolio to view holdings, valuation, allocation, and transactions.</Typography>
+          <Paper sx={{ mb: 1 }}>
+            <Tabs value={activeSection} onChange={(_event, value) => setActiveSection(value)} variant="scrollable" scrollButtons="auto">
+              <Tab value="overview" label="Overview" />
+              <Tab value="holdings" label="Holdings" />
+              <Tab value="allocation" label="Allocation" />
+              <Tab value="intelligence" label="Intelligence" />
+              <Tab value="transactions" label="Transactions" />
+            </Tabs>
           </Paper>
-        ) : (
-          <Stack spacing={3}>
-            <Paper sx={{ p: 2 }}>
-              <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2}>
-                <Box>
-                  <Typography variant="h5">{selectedPortfolio.name}</Typography>
-                  <Typography color="text.secondary">{selectedPortfolio.description || 'No description'}</Typography>
-                </Box>
-                <Button color="error" variant="outlined" onClick={async () => {
-                  await deletePortfolio(selectedPortfolio.id);
-                  navigate('/portfolios');
-                  await reload();
-                }}>
-                  Delete Portfolio
-                </Button>
-              </Stack>
-            </Paper>
 
-            <Paper sx={{ mb: 1 }}>
-              <Tabs value={activeSection} onChange={(_event, value) => setActiveSection(value)} variant="scrollable" scrollButtons="auto">
-                <Tab value="overview" label="Overview" />
-                <Tab value="holdings" label="Holdings" />
-                <Tab value="allocation" label="Allocation" />
-                <Tab value="intelligence" label="Intelligence" />
-                <Tab value="transactions" label="Transactions" />
-              </Tabs>
-            </Paper>
+          {activeSection === 'overview' && summary && (
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2 }}>
+              <SummaryCard label="Total Value" value={money(summary.totalValue, baseCurrency)} />
+              <SummaryCard label="Unrealized P&L" value={`${money(summary.totalUnrealizedPnL, baseCurrency)} (${percent(summary.totalUnrealizedPnLPercent)})`} tone={summaryTone} />
+              <SummaryCard label="Daily Change" value={`${money(summary.dailyPnL, baseCurrency)} (${percent(summary.dailyPnLPercent)})`} tone={summary.dailyPnL >= 0 ? 'success' : 'error'} />
+              <SummaryCard label="Holdings" value={String(summary.numberOfHoldings)} />
+            </Box>
+          )}
 
-            {activeSection === 'overview' && summary && (
-              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2 }}>
-                <SummaryCard label="Total Value" value={money(summary.totalValue, baseCurrency)} />
-                <SummaryCard label="Unrealized P&L" value={`${money(summary.totalUnrealizedPnL, baseCurrency)} (${percent(summary.totalUnrealizedPnLPercent)})`} tone={summaryTone} />
-                <SummaryCard label="Daily Change" value={`${money(summary.dailyPnL, baseCurrency)} (${percent(summary.dailyPnLPercent)})`} tone={summary.dailyPnL >= 0 ? 'success' : 'error'} />
-                <SummaryCard label="Holdings" value={String(summary.numberOfHoldings)} />
-              </Box>
-            )}
-
-            {activeSection === 'holdings' && <Paper sx={{ p: 2, overflowX: 'auto' }}>
-              <Typography variant="h6" sx={{ mb: 2 }}>Holdings</Typography>
-              {!summary || summary.holdings.length === 0 ? (
-                <Typography color="text.secondary">No holdings yet. Use the stock selector below to add one.</Typography>
-              ) : (
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Symbol</TableCell>
-                      <TableCell>Company</TableCell>
-                      <TableCell align="right">Qty</TableCell>
-                      <TableCell align="right">Avg Cost</TableCell>
-                      <TableCell align="right">Current</TableCell>
-                      <TableCell align="right">Value</TableCell>
-                      <TableCell align="right">Unrealized</TableCell>
-                      <TableCell>Signal</TableCell>
-                      <TableCell align="right">Actions</TableCell>
+          {activeSection === 'holdings' && <Paper sx={{ p: 2, overflowX: 'auto' }}>
+            <Typography variant="h6" sx={{ mb: 2 }}>Holdings</Typography>
+            {!summary || summary.holdings.length === 0 ? (
+              <Typography color="text.secondary">No holdings yet. Use the stock selector below to add one.</Typography>
+            ) : (
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Symbol</TableCell>
+                    <TableCell>Company</TableCell>
+                    <TableCell align="right">Qty</TableCell>
+                    <TableCell align="right">Avg Cost</TableCell>
+                    <TableCell align="right">Current</TableCell>
+                    <TableCell align="right">Value</TableCell>
+                    <TableCell align="right">Unrealized</TableCell>
+                    <TableCell>Signal</TableCell>
+                    <TableCell align="right">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {summary.holdings.map((holding: HoldingValuation) => (
+                    <TableRow key={holding.id} hover>
+                      <TableCell>
+                        <Button component={Link} to={`/research/stocks/${holding.instrumentId}`} size="small">{holding.symbol}</Button>
+                      </TableCell>
+                      <TableCell>{holding.companyName || 'N/A'}</TableCell>
+                      <TableCell align="right">{holding.quantity}</TableCell>
+                      <TableCell align="right">{money(holding.averageCost, holding.currency)}</TableCell>
+                      <TableCell align="right">{money(holding.currentPrice, holding.currency)}</TableCell>
+                      <TableCell align="right">{money(holding.marketValue, holding.currency)}</TableCell>
+                      <TableCell align="right">{money(holding.unrealizedPnL, holding.currency)} ({percent(holding.unrealizedPnLPercent)})</TableCell>
+                      <TableCell>{holding.signal ? <SignalBadge direction={holding.signal.direction} label={`${holding.signal.direction} ${holding.signal.score}`} /> : <Chip size="small" label="No signal" variant="outlined" />}</TableCell>
+                      <TableCell align="right">
+                        <Button size="small" onClick={() => startEditHolding(holding)}>Edit</Button>
+                        <Button size="small" color="error" onClick={async () => {
+                          await removeHolding(selectedId, holding.id);
+                          await reload();
+                        }}>
+                          Remove
+                        </Button>
+                      </TableCell>
                     </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {summary.holdings.map((holding: HoldingValuation) => (
-                      <TableRow key={holding.id} hover>
-                        <TableCell>
-                          <Button component={Link} to={`/research/stocks/${holding.instrumentId}`} size="small">{holding.symbol}</Button>
-                        </TableCell>
-                        <TableCell>{holding.companyName || 'N/A'}</TableCell>
-                        <TableCell align="right">{holding.quantity}</TableCell>
-                        <TableCell align="right">{money(holding.averageCost, holding.currency)}</TableCell>
-                        <TableCell align="right">{money(holding.currentPrice, holding.currency)}</TableCell>
-                        <TableCell align="right">{money(holding.marketValue, holding.currency)}</TableCell>
-                        <TableCell align="right">{money(holding.unrealizedPnL, holding.currency)} ({percent(holding.unrealizedPnLPercent)})</TableCell>
-                        <TableCell>{holding.signal ? <SignalBadge direction={holding.signal.direction} label={`${holding.signal.direction} ${holding.signal.score}`} /> : <Chip size="small" label="No signal" variant="outlined" />}</TableCell>
-                        <TableCell align="right">
-                          <Button size="small" onClick={() => startEditHolding(holding)}>Edit</Button>
-                          <Button size="small" color="error" onClick={async () => {
-                            await removeHolding(selectedId, holding.id);
-                            await reload();
-                          }}>
-                            Remove
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </Paper>}
-
-            {activeSection === 'holdings' && <Paper sx={{ p: 2 }}>
-              <Typography variant="h6" sx={{ mb: 2 }}>{editingHolding ? `Edit ${editingHolding.symbol}` : 'Add Holding'}</Typography>
-              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '2fr repeat(3, 1fr)' }, gap: 1.5 }}>
-                {editingHolding ? (
-                  <TextField label="Instrument" value={holdingForm.instrumentId} size="small" disabled />
-                ) : (
-                  <InstrumentSearchSelect
-                    value={selectedHoldingInstrument}
-                    onChange={(instrument) => {
-                      setSelectedHoldingInstrument(instrument);
-                      setHoldingForm({ ...holdingForm, instrumentId: instrument?.id || '', currency: instrument?.currency || holdingForm.currency });
-                    }}
-                  />
-                )}
-                <TextField label="Quantity" value={holdingForm.quantity} onChange={(event) => setHoldingForm({ ...holdingForm, quantity: event.target.value })} size="small" />
-                <TextField label="Avg cost" value={holdingForm.averageCost} onChange={(event) => setHoldingForm({ ...holdingForm, averageCost: event.target.value })} size="small" />
-                <TextField label="Currency" value={holdingForm.currency} onChange={(event) => setHoldingForm({ ...holdingForm, currency: event.target.value.toUpperCase() })} size="small" />
-              </Box>
-              <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ mt: 1.5 }}>
-                <TextField label="Notes" value={holdingForm.notes} onChange={(event) => setHoldingForm({ ...holdingForm, notes: event.target.value })} size="small" fullWidth />
-                <Button variant="contained" onClick={submitHolding}>{editingHolding ? 'Save' : 'Add'}</Button>
-                {editingHolding && <Button onClick={() => {
-                  setEditingHolding(null);
-                  setHoldingForm(defaultHoldingForm);
-                }}>Cancel</Button>}
-              </Stack>
-            </Paper>}
-
-            {activeSection === 'allocation' && allocation && (
-              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'repeat(3, 1fr)' }, gap: 2 }}>
-                <AllocationList title="Top Holdings" buckets={allocation.byHolding} currency={baseCurrency} />
-                <AllocationList title="Sectors" buckets={allocation.bySector} currency={baseCurrency} />
-                <AllocationList title="Countries" buckets={allocation.byCountry} currency={baseCurrency} />
-              </Box>
+                  ))}
+                </TableBody>
+              </Table>
             )}
+          </Paper>}
 
-            {activeSection === 'intelligence' && <PortfolioIntelligencePanel portfolioId={selectedId} />}
-
-            {activeSection === 'transactions' && <Paper sx={{ p: 2 }}>
-              <Typography variant="h6" sx={{ mb: 2 }}>Transactions</Typography>
-              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(6, 1fr)' }, gap: 1.5, mb: 2 }}>
-                <TextField select label="Type" value={transactionForm.type} onChange={(event) => setTransactionForm({ ...transactionForm, type: event.target.value as PortfolioTransactionType })} size="small">
-                  <MenuItem value="BUY">BUY</MenuItem>
-                  <MenuItem value="SELL">SELL</MenuItem>
-                  <MenuItem value="CASH_IN">CASH_IN</MenuItem>
-                  <MenuItem value="CASH_OUT">CASH_OUT</MenuItem>
-                </TextField>
+          {activeSection === 'holdings' && <Paper sx={{ p: 2 }}>
+            <Typography variant="h6" sx={{ mb: 2 }}>{editingHolding ? `Edit ${editingHolding.symbol}` : 'Add Holding'}</Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '2fr repeat(3, 1fr)' }, gap: 1.5 }}>
+              {editingHolding ? (
+                <TextField label="Instrument" value={holdingForm.instrumentId} size="small" disabled />
+              ) : (
                 <InstrumentSearchSelect
-                  value={selectedTransactionInstrument}
+                  value={selectedHoldingInstrument}
                   onChange={(instrument) => {
-                    setSelectedTransactionInstrument(instrument);
-                    setTransactionForm({ ...transactionForm, instrumentId: instrument?.id || '', currency: instrument?.currency || transactionForm.currency });
+                    setSelectedHoldingInstrument(instrument);
+                    setHoldingForm({ ...holdingForm, instrumentId: instrument?.id || '', currency: instrument?.currency || holdingForm.currency });
                   }}
-                  disabled={transactionForm.type === 'CASH_IN' || transactionForm.type === 'CASH_OUT'}
                 />
-                <TextField label="Quantity" value={transactionForm.quantity} onChange={(event) => setTransactionForm({ ...transactionForm, quantity: event.target.value })} size="small" />
-                <TextField label="Price" value={transactionForm.price} onChange={(event) => setTransactionForm({ ...transactionForm, price: event.target.value })} size="small" />
-                <TextField label="Amount" value={transactionForm.amount} onChange={(event) => setTransactionForm({ ...transactionForm, amount: event.target.value })} size="small" />
-                <TextField label="Date" type="date" value={transactionForm.transactionDate} onChange={(event) => setTransactionForm({ ...transactionForm, transactionDate: event.target.value })} size="small" />
-              </Box>
-              <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ mb: 2 }}>
-                <TextField label="Currency" value={transactionForm.currency} onChange={(event) => setTransactionForm({ ...transactionForm, currency: event.target.value.toUpperCase() })} size="small" />
-                <TextField label="Notes" value={transactionForm.notes} onChange={(event) => setTransactionForm({ ...transactionForm, notes: event.target.value })} size="small" fullWidth />
-                <Button variant="contained" onClick={submitTransaction}>Add Transaction</Button>
-              </Stack>
-              <Divider sx={{ mb: 2 }} />
-              {transactions.length === 0 ? (
-                <Typography color="text.secondary">No transactions recorded yet.</Typography>
-              ) : (
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Date</TableCell>
-                      <TableCell>Type</TableCell>
-                      <TableCell>Instrument</TableCell>
-                      <TableCell align="right">Quantity</TableCell>
-                      <TableCell align="right">Price</TableCell>
-                      <TableCell align="right">Amount</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {transactions.map((transaction) => (
-                      <TableRow key={transaction.id}>
-                        <TableCell>{new Date(transaction.transactionDate).toLocaleDateString()}</TableCell>
-                        <TableCell>{transaction.type}</TableCell>
-                        <TableCell>{transaction.instrumentId || 'Cash'}</TableCell>
-                        <TableCell align="right">{transaction.quantity ?? 'N/A'}</TableCell>
-                        <TableCell align="right">{money(transaction.price, transaction.currency)}</TableCell>
-                        <TableCell align="right">{money(transaction.amount, transaction.currency)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
               )}
-            </Paper>}
-          </Stack>
-        )}
-      </Box>
+              <TextField label="Quantity" value={holdingForm.quantity} onChange={(event) => setHoldingForm({ ...holdingForm, quantity: event.target.value })} size="small" />
+              <TextField label="Avg cost" value={holdingForm.averageCost} onChange={(event) => setHoldingForm({ ...holdingForm, averageCost: event.target.value })} size="small" />
+              <TextField label="Currency" value={holdingForm.currency} onChange={(event) => setHoldingForm({ ...holdingForm, currency: event.target.value.toUpperCase() })} size="small" />
+            </Box>
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ mt: 1.5 }}>
+              <TextField label="Notes" value={holdingForm.notes} onChange={(event) => setHoldingForm({ ...holdingForm, notes: event.target.value })} size="small" fullWidth />
+              <Button variant="contained" onClick={submitHolding}>{editingHolding ? 'Save' : 'Add'}</Button>
+              {editingHolding && <Button onClick={() => {
+                setEditingHolding(null);
+                setHoldingForm(defaultHoldingForm);
+              }}>Cancel</Button>}
+            </Stack>
+          </Paper>}
+
+          {activeSection === 'allocation' && allocation && (
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'repeat(3, 1fr)' }, gap: 2 }}>
+              <AllocationList title="Top Holdings" buckets={allocation.byHolding} currency={baseCurrency} />
+              <AllocationList title="Sectors" buckets={allocation.bySector} currency={baseCurrency} />
+              <AllocationList title="Countries" buckets={allocation.byCountry} currency={baseCurrency} />
+            </Box>
+          )}
+
+          {activeSection === 'intelligence' && <PortfolioIntelligencePanel portfolioId={selectedId} />}
+
+          {activeSection === 'transactions' && <Paper sx={{ p: 2 }}>
+            <Typography variant="h6" sx={{ mb: 2 }}>Transactions</Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(6, 1fr)' }, gap: 1.5, mb: 2 }}>
+              <TextField select label="Type" value={transactionForm.type} onChange={(event) => setTransactionForm({ ...transactionForm, type: event.target.value as PortfolioTransactionType })} size="small">
+                <MenuItem value="BUY">BUY</MenuItem>
+                <MenuItem value="SELL">SELL</MenuItem>
+                <MenuItem value="CASH_IN">CASH_IN</MenuItem>
+                <MenuItem value="CASH_OUT">CASH_OUT</MenuItem>
+              </TextField>
+              <InstrumentSearchSelect
+                value={selectedTransactionInstrument}
+                onChange={(instrument) => {
+                  setSelectedTransactionInstrument(instrument);
+                  setTransactionForm({ ...transactionForm, instrumentId: instrument?.id || '', currency: instrument?.currency || transactionForm.currency });
+                }}
+                disabled={transactionForm.type === 'CASH_IN' || transactionForm.type === 'CASH_OUT'}
+              />
+              <TextField label="Quantity" value={transactionForm.quantity} onChange={(event) => setTransactionForm({ ...transactionForm, quantity: event.target.value })} size="small" />
+              <TextField label="Price" value={transactionForm.price} onChange={(event) => setTransactionForm({ ...transactionForm, price: event.target.value })} size="small" />
+              <TextField label="Amount" value={transactionForm.amount} onChange={(event) => setTransactionForm({ ...transactionForm, amount: event.target.value })} size="small" />
+              <TextField label="Date" type="date" value={transactionForm.transactionDate} onChange={(event) => setTransactionForm({ ...transactionForm, transactionDate: event.target.value })} size="small" />
+            </Box>
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ mb: 2 }}>
+              <TextField label="Currency" value={transactionForm.currency} onChange={(event) => setTransactionForm({ ...transactionForm, currency: event.target.value.toUpperCase() })} size="small" />
+              <TextField label="Notes" value={transactionForm.notes} onChange={(event) => setTransactionForm({ ...transactionForm, notes: event.target.value })} size="small" fullWidth />
+              <Button variant="contained" onClick={submitTransaction}>Add Transaction</Button>
+            </Stack>
+            <Divider sx={{ mb: 2 }} />
+            {transactions.length === 0 ? (
+              <Typography color="text.secondary">No transactions recorded yet.</Typography>
+            ) : (
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Date</TableCell>
+                    <TableCell>Type</TableCell>
+                    <TableCell>Instrument</TableCell>
+                    <TableCell align="right">Quantity</TableCell>
+                    <TableCell align="right">Price</TableCell>
+                    <TableCell align="right">Amount</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {transactions.map((transaction) => (
+                    <TableRow key={transaction.id}>
+                      <TableCell>{new Date(transaction.transactionDate).toLocaleDateString()}</TableCell>
+                      <TableCell>{transaction.type}</TableCell>
+                      <TableCell>{transaction.instrumentId || 'Cash'}</TableCell>
+                      <TableCell align="right">{transaction.quantity ?? 'N/A'}</TableCell>
+                      <TableCell align="right">{money(transaction.price, transaction.currency)}</TableCell>
+                      <TableCell align="right">{money(transaction.amount, transaction.currency)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </Paper>}
+        </Stack>
+      )}
     </Box>
   );
 };

@@ -5,6 +5,11 @@ import { parseQualityQuery, parseQualityRecalculateRequest, requireInstrumentId 
 export class SignalQualityLabController {
   constructor(private readonly service = new SignalQualityLabService()) {}
 
+  dashboard = async (req: Request, res: Response) => {
+    try { return res.json(await this.service.dashboard(parseQualityQuery(req.query))); }
+    catch (error) { return this.error(res, error, 'Failed to load signal quality dashboard'); }
+  };
+
   summary = async (req: Request, res: Response) => {
     try { return res.json(await this.service.summary(parseQualityQuery(req.query))); }
     catch (error) { return this.error(res, error, 'Failed to load signal quality summary'); }
