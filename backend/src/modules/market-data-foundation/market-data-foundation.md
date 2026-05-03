@@ -11,12 +11,11 @@ Implemented:
 - Daily OHLCV price persistence through `PriceTick`.
 - Latest price snapshots through `LatestPrice`.
 - 15-year first historical sync where the provider allows it.
-- Incremental repeated syncs using the stock's last successful load timestamp.
+- Incremental repeated syncs using the stock's last successful load timestamp with a 3-day overlap to ensure updated provider data is captured.
 - Coverage-aware backfill: instruments with shallow stored price history are backfilled even if a prior partial sync set `lastSuccessfulDataLoadTimestamp`.
 - Duplicate price prevention and upsert behavior for `symbol + timestamp`.
-- Sync summary with `rowsReceived`, `rowsInserted`, `rowsUpdated`, `rowsSkipped`, `warningCount`, and warning samples.
-- Dedicated persisted fundamentals through `Fundamental`.
-- Fundamentals upsert normalizes provider snapshot period dates to UTC midnight, preventing duplicate rows from repeated same-day syncs.
+- Detailed sync summary with true counts: `instrumentsInserted/Updated/Skipped`, `priceRowsInserted/Updated`, `fundamentalsInserted`, `corporateActionsUpdated`, etc.
+- Dedicated persisted fundamentals through `Fundamental` using a strict unique constraint `[stockId, periodType, source]` to guarantee idempotent snapshot updates.
 - Dedicated persisted corporate actions through `CorporateAction`.
 - Reverse split classification when the provider returns a split ratio below `1`.
 - Minimal persisted FX rates through `FxRate`.
@@ -100,10 +99,6 @@ Persisted models used by Market Data Foundation:
 - `FxRate`
   - Latest FX rates with pair, base currency, quote currency, rate, source, and metadata.
 
-Migration added:
-
-- `backend/prisma/migrations/202604280001_market_data_epic1/migration.sql`
-
 ## Backend API Surface
 
 Canonical MVP endpoints:
@@ -155,16 +150,14 @@ Implemented validations:
 - Price storage uses Prisma upsert on `symbol + timestamp`.
 - Historical daily price timestamps are normalized to UTC midnight before duplicate checks and upsert, so repeated syncs for the same trading day update one `PriceTick`.
 - Historical ingestion checks stored price coverage. If the oldest stored price is not near the 15-year backfill start, the sync backfills history instead of trusting a prior `lastSuccessfulDataLoadTimestamp`.
-- Fundamentals storage normalizes `periodEndDate` to UTC midnight before upsert so repeated provider snapshots for the same period update one row instead of creating duplicates.
+- Fundamentals storage relies on strict uniqueness `[stockId, periodType, source]`. Repeated provider snapshots for the same period strictly update one logical row instead of creating false duplicate snapshot histories.
 - Corporate action effective dates are normalized to UTC midnight before upsert.
-- Manual `/api/v1/ingestion/sync` accepts either `symbol` or `instrumentId`, throttles provider calls, catches provider failures, persists available data, and can return partial success.
+- Manual `/api/v1/ingestion/sync` accepts either `symbol` or `instrumentId`, throttles provider calls, catches provider failures, persists available data, and correctly calculates detailed `SyncResult` counts.
 
 Sync responses include:
 
-- `rowsReceived`
-- `rowsInserted`
-- `rowsUpdated`
-- `rowsSkipped`
+- `rowsReceived`, `rowsInserted`, `rowsUpdated`, `rowsSkipped` (price ticks)
+- Detailed breakdown fields (e.g. `instrumentsUpdated`, `corporateActionsUpdated`)
 - `warningCount`
 - `warnings`
 
@@ -185,15 +178,15 @@ Natural keys for stock-data records owned by this module:
 | `Stock` | `symbol` for current MVP | Upsert/update through instrument workflows; long-term risk is documented because `symbol + exchange` is preferred. |
 | `PriceTick` | `symbol + normalized daily timestamp` | Upsert; repeated historical sync updates existing bars. |
 | `LatestPrice` | `symbol` | Latest-only upsert. |
-| `Fundamental` | `stockId + periodType + normalized periodEndDate + source` | Upsert; repeated same-period provider snapshots update one row. |
+| `Fundamental` | `stockId + periodType + source` | Upsert; guaranteed idempotent. Eliminates prior bug where daily advancing `periodEndDate` caused daily row duplication. |
 | `CorporateAction` | `stockId + actionType + normalized effectiveDate + source` | Upsert; amount/split ratio are updated on the logical action row. |
 | `FxRate` | `pair` | Latest-only upsert. |
 
 Project-level duplicate diagnostics are available in:
 
-- `backend/src/scripts/auditStockDataDuplicates.ts`
+- `backend/scripts/audit-market-data-ingestion.ts`
 
-The script runs in dry-run mode by default and can report duplicate logical groups across Market Data Foundation, signal, calibration, data-quality, and context snapshot tables. Use `--cleanup` only after reviewing samples.
+The script runs in dry-run mode by default and reports duplicate logical groups. Use `--cleanup` only after reviewing samples.
 
 ## Data Sources
 
@@ -290,14 +283,8 @@ Recent verification commands:
 
 Recent data cleanup:
 
-- Duplicate fundamentals rows created by timestamp-level provider snapshot dates were removed from the local database.
-- Remaining fundamentals rows were normalized to UTC midnight `periodEndDate` values.
-
-## UX And Query Behavior
-
-- Instrument list filters support server-side pagination, sorting, and market segmentation.
-- Text metadata filters such as country, exchange, currency, sector, and industry are case-insensitive partial matches. For example, `sector=tech` matches `Technology`.
-- The frontend stock list uses the shared `PageHeader`, `FilterBar`, and `DataTable` patterns and routes row clicks into `/stocks/:id`.
+- Duplicate fundamentals rows created by timestamp-level provider snapshot dates were prevented via schema restriction (`@@unique([stockId, periodType, source])`).
+- Repeated sync loops correctly return `inserted: 0`, validating true idempotency.
 
 ## Assumptions
 

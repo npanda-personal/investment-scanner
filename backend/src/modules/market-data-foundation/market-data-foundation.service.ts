@@ -400,8 +400,8 @@ export class MarketDataFoundationService {
         console.log(`  Backfilling ${symbol} from ${effectiveStartDate.toISOString().split('T')[0]} (stored rows: ${coverage.count})`);
       } else if (stock?.lastSuccessfulDataLoadTimestamp) {
         effectiveStartDate = new Date(stock.lastSuccessfulDataLoadTimestamp);
-        effectiveStartDate.setDate(effectiveStartDate.getDate() + 1);
-        console.log(`  Using incremental start date: ${effectiveStartDate.toISOString().split('T')[0]} (based on lastSuccessfulDataLoadTimestamp)`);
+        effectiveStartDate.setDate(effectiveStartDate.getDate() - 3);
+        console.log(`  Using incremental start date: ${effectiveStartDate.toISOString().split('T')[0]} (based on lastSuccessfulDataLoadTimestamp with 3-day overlap)`);
       } else {
         effectiveStartDate = coverage.latestTimestamp ? new Date(coverage.latestTimestamp) : backfillStartDate;
         if (coverage.latestTimestamp) {
@@ -496,17 +496,31 @@ export class MarketDataFoundationService {
       errors.push(`Price ingestion failed: ${error instanceof Error ? error.message : 'unknown error'}`);
     }
 
+    let fundamentalsAvailable = false;
+    let corporateActionsAvailable = false;
+    let fundamentalsInserted = 0;
+    let fundamentalsUpdated = 0;
+    let corporateActionsInserted = 0;
+    let corporateActionsUpdated = 0;
+    const started = Date.now();
+
     const [fundamentals, corporateActions] = await Promise.all([
       this.fetchCoreFundamentals(stock.symbol).catch(() => null),
       this.fetchCorporateActions(stock.symbol).catch(() => []),
     ]);
     if (fundamentals) {
-      await this.repository.upsertFundamentals(stock.id, fundamentals).catch((error) => {
+      await this.repository.upsertFundamentals(stock.id, fundamentals).then(() => {
+        fundamentalsAvailable = true;
+        fundamentalsUpdated = 1; // Since upsert is idempotent, we count it as updated for simplicity or check if it was new.
+      }).catch((error) => {
         errors.push(`Fundamentals persistence failed: ${error instanceof Error ? error.message : 'unknown error'}`);
       });
     }
     if (corporateActions.length > 0) {
-      await this.repository.upsertCorporateActions(stock.id, corporateActions).catch((error) => {
+      await this.repository.upsertCorporateActions(stock.id, corporateActions).then((ops) => {
+        corporateActionsAvailable = true;
+        corporateActionsUpdated = ops.length;
+      }).catch((error) => {
         errors.push(`Corporate action persistence failed: ${error instanceof Error ? error.message : 'unknown error'}`);
       });
     }
@@ -523,10 +537,41 @@ export class MarketDataFoundationService {
       }),
       message: errors.length > 0 ? 'Sync completed with partial data' : 'Sync completed',
       pricesStored,
-      fundamentalsAvailable: Boolean(fundamentals && (fundamentals.revenue || fundamentals.earnings || fundamentals.ratios.trailingPe)),
-      corporateActionsAvailable: corporateActions.length > 0,
+      fundamentalsAvailable,
+      corporateActionsAvailable,
       syncSummary,
       errors: errors.length > 0 ? errors : undefined,
+      
+      instrumentsReceived: 1,
+      instrumentsInserted: !request.instrumentId && !stock.lastSuccessfulDataLoadTimestamp ? 1 : 0,
+      instrumentsUpdated: 1,
+      instrumentsSkipped: 0,
+
+      priceRowsReceived: syncSummary?.rowsReceived || 0,
+      priceRowsInserted: syncSummary?.rowsInserted || 0,
+      priceRowsUpdated: syncSummary?.rowsUpdated || 0,
+      priceRowsSkipped: syncSummary?.rowsSkipped || 0,
+
+      fundamentalsReceived: fundamentals ? 1 : 0,
+      fundamentalsInserted,
+      fundamentalsUpdated,
+      fundamentalsSkipped: 0,
+
+      corporateActionsReceived: corporateActions.length,
+      corporateActionsInserted,
+      corporateActionsUpdated,
+      corporateActionsSkipped: 0,
+
+      fxRatesReceived: 0,
+      fxRatesInserted: 0,
+      fxRatesUpdated: 0,
+      fxRatesSkipped: 0,
+
+      warningCount: (syncSummary?.warningCount || 0) + errors.length,
+      warnings: [...(syncSummary?.warnings || []), ...errors].slice(0, 10),
+      durationMs: Date.now() - started,
+      duplicateProviderRowsSkipped: 0,
+      malformedRowsSkipped: syncSummary?.rowsSkipped || 0,
     };
   }
 

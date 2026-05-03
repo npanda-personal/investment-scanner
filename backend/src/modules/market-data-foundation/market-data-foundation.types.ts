@@ -119,6 +119,38 @@ export interface V1SyncResult {
   corporateActionsAvailable?: boolean;
   syncSummary?: SyncSummary;
   errors?: string[];
+  
+  // Detailed Audit Counts
+  instrumentsReceived?: number;
+  instrumentsInserted?: number;
+  instrumentsUpdated?: number;
+  instrumentsSkipped?: number;
+
+  priceRowsReceived?: number;
+  priceRowsInserted?: number;
+  priceRowsUpdated?: number;
+  priceRowsSkipped?: number;
+
+  fundamentalsReceived?: number;
+  fundamentalsInserted?: number;
+  fundamentalsUpdated?: number;
+  fundamentalsSkipped?: number;
+
+  corporateActionsReceived?: number;
+  corporateActionsInserted?: number;
+  corporateActionsUpdated?: number;
+  corporateActionsSkipped?: number;
+
+  fxRatesReceived?: number;
+  fxRatesInserted?: number;
+  fxRatesUpdated?: number;
+  fxRatesSkipped?: number;
+
+  warningCount?: number;
+  warnings?: string[];
+  durationMs?: number;
+  duplicateProviderRowsSkipped?: number;
+  malformedRowsSkipped?: number;
 }
 
 export interface UpdateStockRequest {

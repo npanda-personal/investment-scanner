@@ -460,10 +460,9 @@ export class MarketDataFoundationRepository {
 
     return (this.prisma as any).fundamental.upsert({
       where: {
-        stockId_periodType_periodEndDate_source: {
+        stockId_periodType_source: {
           stockId,
           periodType: fundamentals.periodType,
-          periodEndDate,
           source: fundamentals.source,
         },
       },
@@ -476,6 +475,7 @@ export class MarketDataFoundationRepository {
         sharesOutstanding: fundamentals.sharesOutstanding !== null ? BigInt(Math.trunc(fundamentals.sharesOutstanding)) : null,
         marketCap: fundamentals.marketCap !== null ? new Prisma.Decimal(fundamentals.marketCap) : null,
         currency: fundamentals.currency,
+        periodEndDate,
         dataStatus,
       },
       create: {

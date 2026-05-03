@@ -123,7 +123,12 @@ describe('MarketDataFoundationRepository', () => {
       asOf: '2026-01-02T00:00:00.000Z',
     });
 
-    expect(prisma.fundamental.upsert.mock.calls[0][0].where.stockId_periodType_periodEndDate_source.periodEndDate).toEqual(
+    expect(prisma.fundamental.upsert.mock.calls[0][0].where.stockId_periodType_source).toEqual({
+      stockId: 'stock-1',
+      periodType: 'TTM',
+      source: 'yahoo',
+    });
+    expect(prisma.fundamental.upsert.mock.calls[0][0].update.periodEndDate).toEqual(
       new Date('2026-01-02T00:00:00.000Z')
     );
 

@@ -193,7 +193,7 @@ model Fundamental {
   lastUpdatedTimestamp DateTime @updatedAt
   dataStatus           String   @default("PARTIAL")
 
-  @@unique([stockId, periodType, periodEndDate, source])
+  @@unique([stockId, periodType, source])
   @@index([stockId, periodEndDate])
   @@map("fundamentals")
 }
