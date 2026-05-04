@@ -1,37 +1,99 @@
 # Research Hub Module
 
-The Research Hub acts as the central aggregation layer for the investment scanner's research section. It provides unified endpoints that correlate data from the four primary research modules.
+The Research Hub acts as the **Research Command Center** and triage layer for the investment scanner. It provides a prioritized, decision-oriented overview that guides the user through the daily research workflow.
 
-## Responsibilities
+## Core Mandate
 
-1.  **Pulse Monitoring**: Aggregates high-level summaries (Market Gate, Regime, Top Signals) into a single "Overview" response.
-2.  **Cross-Module Orchestration**: Simplifies frontend data fetching by providing consolidated views that would otherwise require multiple API calls.
-3.  **Unified API**: Exposes the `/api/v1/research/overview` endpoint for the Research Landing Page.
+1.  **Is today a good environment to look for trades?** (Market Readiness)
+2.  **What should I look at first?** (Research Priorities)
+3.  **Are my ideas confirmed by other data?** (Confirmation Layers)
+4.  **What changed since my last review?** (What Changed)
+5.  **Where do I go next?** (Next Actions)
+
+The Research Hub does not duplicate the full detail of child modules; it triages candidates for further investigation in those modules.
+
+## Architecture
+
+The module aggregates data from four primary research pillars:
+
+-   **Signal Generation Engine**: Raw scoring and technical/fundamental signals.
+-   **Strategy Decision Engine**: Validated trade setups, entry zones, and exit candidates.
+-   **Smart Money Intelligence**: Price-volume accumulation/distribution analysis.
+-   **Market Context Intelligence**: Market regime, breadth, and sector rotation.
 
 ## API Reference
 
 ### `GET /api/v1/research/overview`
-Returns a consolidated pulse of the market.
+
+Returns a consolidated decision-oriented response.
 
 **Response Structure**:
+
 ```json
 {
-  "marketGate": { ... },
-  "marketRegime": { ... },
-  "topSignals": [ ... ],
-  "topSmartMoney": [ ... ],
-  "topStrategyCandidates": [ ... ],
-  "updatedAt": "ISO-8601-TIMESTAMP"
+  "marketReadiness": {
+    "marketGate": "OPEN | SELECTIVE | CLOSED | UNKNOWN",
+    "marketCondition": "HEALTHY | MIXED | BAD | UNKNOWN",
+    "headline": "...",
+    "allowedActions": [],
+    "reasons": [],
+    "blockers": [],
+    "dataStatus": "OK | PARTIAL | MISSING"
+  },
+  "researchPriorities": {
+    "tradeCandidates": [],
+    "watchCandidates": [],
+    "avoidCandidates": [],
+    "exitCandidates": []
+  },
+  "confirmationSummary": {
+    "signalSummary": {
+      "topBullishCount": 24,
+      "topBearishCount": 12,
+      "reliabilityAvailable": true,
+      "notes": ["Significant bullish signal dominance."]
+    },
+    "smartMoneySummary": {
+      "accumulationCount": 15,
+      "distributionCount": 5,
+      "topConfirmations": ["AAPL: Strategy and Smart Money both see accumulation."],
+      "topContradictions": []
+    },
+    "marketContextSummary": {
+      "leadingSectors": ["Technology", "Healthcare"],
+      "weakSectors": ["Utilities"],
+      "breadthStatus": "72% above SMA50",
+      "notes": ["Market is risk-on because breadth is constructive."]
+    }
+  },
+  "whatChanged": {
+    "newTradeCandidates": ["AAPL", "MSFT"],
+    "downgradedCandidates": [],
+    "marketGateChange": null,
+    "warnings": []
+  },
+  "nextActions": [
+    {
+      "label": "Review 5 Trade Candidates",
+      "priority": "HIGH",
+      "targetRoute": "/research/strategy"
+    }
+  ],
+  "generatedAt": "2026-05-04T12:00:00Z",
+  "dataGaps": []
 }
 ```
 
-## Internal Dependencies
+## Performance & Resilience
 
-- `SignalGenerationEngineService`: For top bullish/bearish signals.
-- `StrategyDecisionEngineService`: For Market Gate status and top strategy candidates.
-- `SmartMoneyIntelligenceService`: For accumulation/distribution highlights.
-- `MarketContextIntelligenceService`: For market regime and breadth context.
+-   **Bounded Responses**: Lists are capped at 5-10 items to ensure fast response times and clear focus.
+-   **Partial Success**: The endpoint uses individual `catch` blocks for child module integrations. If one module fails (e.g., timeout or database error), the Research Hub returns a partial response with a entry in `dataGaps` rather than failing the entire request.
+-   **No Heavy Calculations**: The overview relies on persisted snapshots or indexed data. It does not trigger full-universe evaluations on load.
 
-## Usage in Frontend
+## User Workflow
 
-Consumned by the `ResearchOverviewPage` to display a holistic view of the market before diving into specific research sub-modules.
+1.  **Review the Hero Banner**: Confirm if new trades are allowed today.
+2.  **Triage Priorities**: Look at the Trade Candidates. Use the "Primary Next Action" button to drill into the Strategy Engine for trade plans.
+3.  **Check Confirmations**: See if Smart Money or Sector Winds align with your trade ideas.
+4.  **Manage Risk**: Review Exit Candidates and Avoid lists.
+5.  **Drill Down**: Use the Drilldown Analysis buttons for deep dives into specific research modules.

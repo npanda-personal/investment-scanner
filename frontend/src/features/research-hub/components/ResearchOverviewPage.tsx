@@ -10,21 +10,35 @@ import {
   Stack,
   Chip,
   Divider,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Card,
+  CardContent,
+  IconButton,
 } from '@mui/material';
 import {
-  ArrowForwardOutlined,
   CheckCircleOutline,
   LockOutlined,
   WarningAmberOutlined,
   TrendingUpOutlined,
-  TrendingDownOutlined,
   ShieldOutlined,
   LocalFireDepartmentOutlined,
+  SearchOutlined,
+  ArrowForwardOutlined,
+  UpdateOutlined,
+  GppGoodOutlined,
+  BugReportOutlined,
+  FlashOnOutlined,
+  TimelineOutlined,
 } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
 import { useResearchOverview } from '../hooks/useResearchOverview';
 import { PageHeader } from '@/shared/components';
 import type { StrategyDecisionDto } from '@/features/strategy-decision-engine';
+import type { ResearchOverview, NextAction } from '../api/researchHubApi';
 
 const ResearchOverviewPage: React.FC = () => {
   const { data, loading, error, reload } = useResearchOverview();
@@ -47,210 +61,381 @@ const ResearchOverviewPage: React.FC = () => {
     );
   }
 
-  const { 
-    marketGate = { marketGate: 'UNKNOWN', reasons: [], blockers: [], allowedActions: [] } as any, 
-    marketRegime = { regime: 'NEUTRAL' } as any, 
-    topSectors = [], 
-    weakSectors = [], 
-    breadth, 
-    topStrategyCandidates = [], 
-    topExits = [] 
+  const {
+    marketReadiness = {
+      marketGate: 'UNKNOWN',
+      marketCondition: 'UNKNOWN',
+      headline: '',
+      allowedActions: [],
+      reasons: [],
+      blockers: [],
+      dataStatus: 'MISSING'
+    },
+    researchPriorities = {
+      tradeCandidates: [],
+      watchCandidates: [],
+      avoidCandidates: [],
+      exitCandidates: []
+    },
+    confirmationSummary = {
+      signalSummary: { topBullishCount: 0, topBearishCount: 0, reliabilityAvailable: false, notes: [] },
+      smartMoneySummary: { accumulationCount: 0, distributionCount: 0, topConfirmations: [], topContradictions: [] },
+      marketContextSummary: { leadingSectors: [], weakSectors: [], breadthStatus: '', notes: [] }
+    },
+    whatChanged = {
+      newTradeCandidates: [],
+      downgradedCandidates: [],
+      marketGateChange: null,
+      warnings: []
+    },
+    nextActions = [],
+    dataGaps = []
   } = data;
-
-  const gateColor = marketGate.marketGate === 'OPEN' ? 'success' : marketGate.marketGate === 'CLOSED' ? 'error' : 'warning';
-  const gateIcon = marketGate.marketGate === 'OPEN' ? <CheckCircleOutline fontSize="large" /> : marketGate.marketGate === 'CLOSED' ? <LockOutlined fontSize="large" /> : <WarningAmberOutlined fontSize="large" />;
 
   return (
     <Box sx={{ p: 3, maxWidth: 1600, mx: 'auto' }}>
       <PageHeader
-        title="Research Decision Dashboard"
-        subtitle="Holistic market pulse and actionable high-conviction decisions."
-        primaryAction={<Button variant="outlined" onClick={reload}>Refresh Pulse</Button>}
+        title="Research Command Center"
+        subtitle="Prioritized market intelligence and triage for your next trade."
+        primaryAction={<Button variant="contained" onClick={reload} startIcon={<UpdateOutlined />}>Refresh Intelligence</Button>}
       />
 
-      {/* Hero Section: Market Verdict */}
-      <Paper 
-        elevation={0} 
-        sx={{ 
-          p: 4, 
-          mb: 4, 
-          borderRadius: 2,
-          borderLeft: '8px solid', 
-          borderColor: `${gateColor}.main`,
-          backgroundColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.01)'
-        }}
-      >
-        <Grid container spacing={4} alignItems="center">
-          <Grid item xs={12} md={7}>
-            <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
-              <Box sx={{ color: `${gateColor}.main`, display: 'flex' }}>
-                {gateIcon}
-              </Box>
-              <Typography variant="h4" fontWeight={800} sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>
-                Market is {marketGate.marketGate}
-              </Typography>
-            </Stack>
-            <Typography variant="h6" color="text.secondary" sx={{ mb: 3 }}>
-              {marketGate.reasons[0] || 'Market conditions are being evaluated.'} {marketGate.blockers[0]}
-            </Typography>
-            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ gap: 1 }}>
-              {marketGate.allowedActions.map(action => (
-                <Chip key={action} label={action.replace(/_/g, ' ')} color="primary" variant="outlined" />
-              ))}
-            </Stack>
-          </Grid>
-          
-          <Grid item xs={12} md={5}>
-            <Paper variant="outlined" sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <Stack spacing={2}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="body1" fontWeight={700}>Market Regime</Typography>
-                  <Chip size="small" label={marketRegime.regime} color={marketRegime.regime === 'RISK_ON' ? 'success' : marketRegime.regime === 'RISK_OFF' ? 'error' : 'default'} />
-                </Box>
-                <Divider />
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="body1" fontWeight={700}>Market Breadth</Typography>
-                  <Typography variant="body1">{((breadth?.percentAboveSma50 ?? 0) * 100).toFixed(1)}% above SMA50</Typography>
-                </Box>
-                <Divider />
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="body1" fontWeight={700}>Update Status</Typography>
-                  <Typography variant="body2" color="text.secondary">{new Date(data.updatedAt).toLocaleTimeString()}</Typography>
-                </Box>
-              </Stack>
-            </Paper>
-          </Grid>
-        </Grid>
-      </Paper>
-
-      {/* Sector Winds */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>Sector Winds</Typography>
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={6}>
-            <Paper variant="outlined" sx={{ p: 2, borderColor: 'success.light' }}>
-              <Typography variant="subtitle2" color="success.main" sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <TrendingUpOutlined fontSize="small" /> Tailwinds (Focus Here)
-              </Typography>
-              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ gap: 1 }}>
-                {topSectors.length === 0 ? <Typography variant="body2">No data</Typography> : topSectors.map(s => (
-                  <Chip key={s.sector} label={`${s.sector} (${s.relativeStrengthScore})`} size="small" />
-                ))}
-              </Stack>
-            </Paper>
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Paper variant="outlined" sx={{ p: 2, borderColor: 'error.light' }}>
-              <Typography variant="subtitle2" color="error.main" sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <TrendingDownOutlined fontSize="small" /> Headwinds (Avoid)
-              </Typography>
-              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ gap: 1 }}>
-                {weakSectors.length === 0 ? <Typography variant="body2">No data</Typography> : weakSectors.map(s => (
-                  <Chip key={s.sector} label={`${s.sector} (${s.relativeStrengthScore})`} size="small" />
-                ))}
-              </Stack>
-            </Paper>
-          </Grid>
-        </Grid>
-      </Box>
-
-      {/* Action Dashboard */}
       <Grid container spacing={4}>
-        {/* High Conviction Candidates */}
-        <Grid item xs={12} md={6}>
-          <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <LocalFireDepartmentOutlined color="primary" /> High Conviction Setups
-          </Typography>
-          <Paper sx={{ p: 2 }}>
-            {topStrategyCandidates.length === 0 ? (
-              <Box sx={{ py: 4, textAlign: 'center' }}>
-                <Typography color="text.secondary" sx={{ mb: 2 }}>No high-conviction trade candidates currently.</Typography>
-                <Button component={Link} to="/strategy" variant="outlined" size="small">Open Strategy Engine</Button>
-              </Box>
-            ) : (
-              <Stack spacing={2}>
-                {topStrategyCandidates.map((cand) => (
-                  <DecisionCard key={cand.id} cand={cand} type="buy" />
-                ))}
-                <Box sx={{ pt: 1 }}>
-                  <Button component={Link} to="/strategy" endIcon={<ArrowForwardOutlined />}>View Full Strategy Board</Button>
-                </Box>
-              </Stack>
-            )}
-          </Paper>
+        {/* 1. Market Readiness Hero */}
+        <Grid item xs={12}>
+          <MarketReadinessHero readiness={marketReadiness} nextActions={nextActions} />
         </Grid>
 
-        {/* Defensive Exits / Risk Reduction */}
-        <Grid item xs={12} md={6}>
-          <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <ShieldOutlined color="warning" /> Defensive Exits & Risk Reduction
+        {/* 2. Research Priority Board */}
+        <Grid item xs={12} md={8}>
+          <Typography variant="h6" sx={{ mb: 2, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <LocalFireDepartmentOutlined color="primary" /> Research Priority Board
           </Typography>
-          <Paper sx={{ p: 2 }}>
-            {topExits.length === 0 ? (
-              <Box sx={{ py: 4, textAlign: 'center' }}>
-                <Typography color="text.secondary" sx={{ mb: 2 }}>No active defensive exit warnings.</Typography>
-                <Button component={Link} to="/strategy" variant="outlined" size="small">Open Strategy Engine</Button>
-              </Box>
-            ) : (
-              <Stack spacing={2}>
-                {topExits.map((cand) => (
-                  <DecisionCard key={cand.id} cand={cand} type="sell" />
-                ))}
-                <Box sx={{ pt: 1 }}>
-                  <Button component={Link} to="/strategy" endIcon={<ArrowForwardOutlined />}>View Full Strategy Board</Button>
-                </Box>
-              </Stack>
-            )}
-          </Paper>
+          <ResearchPriorityBoard priorities={researchPriorities} />
+        </Grid>
+
+        {/* 3. Confirmation & What Changed Panel */}
+        <Grid item xs={12} md={4}>
+          <Stack spacing={4}>
+            <Box>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <GppGoodOutlined color="success" /> Confirmation Layers
+              </Typography>
+              <ConfirmationPanel summary={confirmationSummary} />
+            </Box>
+
+            <Box>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <TimelineOutlined color="info" /> What Changed
+              </Typography>
+              <WhatChangedPanel whatChanged={whatChanged} />
+            </Box>
+
+            <Box>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
+                Drilldown Analysis
+              </Typography>
+              <ResearchModuleDrilldowns />
+            </Box>
+          </Stack>
         </Grid>
       </Grid>
+      
+      {dataGaps.length > 0 && (
+        <Box sx={{ mt: 4 }}>
+          <Alert severity="warning">
+            <Typography variant="body2" fontWeight={700}>Partial Data Available</Typography>
+            <Typography variant="caption">{dataGaps.join('. ')}</Typography>
+          </Alert>
+        </Box>
+      )}
     </Box>
   );
 };
 
-const DecisionCard: React.FC<{ cand: StrategyDecisionDto; type: 'buy' | 'sell' }> = ({ cand, type }) => {
-  const isBuy = type === 'buy';
+const MarketReadinessHero: React.FC<{ readiness: ResearchOverview['marketReadiness'], nextActions: NextAction[] }> = ({ readiness, nextActions = [] }) => {
+  const gateColor = readiness?.marketGate === 'OPEN' ? 'success' : readiness?.marketGate === 'CLOSED' ? 'error' : 'warning';
+  const gateIcon = readiness?.marketGate === 'OPEN' ? <CheckCircleOutline fontSize="large" /> : readiness?.marketGate === 'CLOSED' ? <LockOutlined fontSize="large" /> : <WarningAmberOutlined fontSize="large" />;
+
   return (
-    <Box sx={{ 
-      p: 2, 
-      borderRadius: 1, 
-      border: '1px solid', 
-      borderColor: 'divider',
-      backgroundColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)'
-    }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1 }}>
-        <Box>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Typography variant="h6" fontWeight={700}>{cand.symbol}</Typography>
-            <Chip size="small" label={cand.action.replace(/_/g, ' ')} color={isBuy ? 'primary' : 'warning'} />
+    <Paper 
+      elevation={0} 
+      sx={{ 
+        p: 4, 
+        borderRadius: 2,
+        borderLeft: '8px solid', 
+        borderColor: `${gateColor}.main`,
+        backgroundColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.01)'
+      }}
+    >
+      <Grid container spacing={4} alignItems="center">
+        <Grid item xs={12} md={8}>
+          <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+            <Box sx={{ color: `${gateColor}.main`, display: 'flex' }}>
+              {gateIcon}
+            </Box>
+            <Typography variant="h4" fontWeight={800} sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>
+              Market is {readiness?.marketGate || 'UNKNOWN'}
+            </Typography>
           </Stack>
-          <Typography variant="caption" color="text.secondary">{cand.strategy}</Typography>
-        </Box>
-        <Typography variant="h6" fontWeight={700} color={isBuy ? 'success.main' : 'error.main'}>
-          {cand.decisionScore}
+          <Typography variant="h6" color="text.secondary" sx={{ mb: 3, fontWeight: 400 }}>
+            {readiness?.headline}
+          </Typography>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ gap: 1, mb: 3 }}>
+            {(readiness?.allowedActions || []).map(action => (
+              <Chip key={action} label={action.replace(/_/g, ' ')} color="primary" variant="outlined" size="small" />
+            ))}
+          </Stack>
+          
+          {(readiness?.blockers?.length ?? 0) > 0 && (
+            <Box sx={{ mt: 2, p: 2, bgcolor: 'error.main', color: 'error.contrastText', borderRadius: 1 }}>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <BugReportOutlined fontSize="small" /> ACTIVE BLOCKERS
+              </Typography>
+              <Typography variant="body2">{readiness.blockers[0]}</Typography>
+            </Box>
+          )}
+        </Grid>
+        
+        <Grid item xs={12} md={4}>
+          <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase' }}>
+            Recommended Next Actions
+          </Typography>
+          <Stack spacing={1}>
+            {nextActions.map((action, idx) => (
+              <Button 
+                key={idx} 
+                component={Link} 
+                to={action.targetRoute} 
+                variant={action.priority === 'HIGH' ? 'contained' : 'outlined'} 
+                color={action.priority === 'HIGH' ? 'primary' : 'inherit'}
+                size="small"
+                fullWidth
+                endIcon={<ArrowForwardOutlined />}
+                sx={{ justifyContent: 'space-between', textAlign: 'left', px: 2 }}
+              >
+                {action.label}
+              </Button>
+            ))}
+          </Stack>
+        </Grid>
+      </Grid>
+    </Paper>
+  );
+};
+
+const ResearchPriorityBoard: React.FC<{ priorities: ResearchOverview['researchPriorities'] }> = ({ priorities }) => {
+  return (
+    <Grid container spacing={3}>
+      <Grid item xs={12} sm={6}>
+        <PriorityCard title="Trade Candidates" items={priorities?.tradeCandidates || []} type="buy" emptyMsg="No high-conviction trade candidates." />
+      </Grid>
+      <Grid item xs={12} sm={6}>
+        <PriorityCard title="Defensive Exits" items={priorities?.exitCandidates || []} type="sell" emptyMsg="No active exit candidates found." />
+      </Grid>
+      <Grid item xs={12} sm={6}>
+        <PriorityCard title="Watch / Wait" items={priorities?.watchCandidates || []} type="watch" emptyMsg="No candidates in the watch zone." />
+      </Grid>
+      <Grid item xs={12} sm={6}>
+        <PriorityCard title="Avoid / Risk" items={priorities?.avoidCandidates || []} type="avoid" emptyMsg="No immediate risk warnings." />
+      </Grid>
+    </Grid>
+  );
+};
+
+const PriorityCard: React.FC<{ title: string; items: StrategyDecisionDto[]; type: 'buy' | 'sell' | 'watch' | 'avoid', emptyMsg: string }> = ({ title, items = [], type, emptyMsg }) => {
+  const getHeaderColor = () => {
+    if (type === 'buy') return 'primary.main';
+    if (type === 'sell') return 'error.main';
+    if (type === 'watch') return 'info.main';
+    return 'warning.main';
+  };
+
+  return (
+    <Paper variant="outlined" sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <Box sx={{ p: 1.5, bgcolor: 'background.paper', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="subtitle2" fontWeight={800} sx={{ color: getHeaderColor(), textTransform: 'uppercase' }}>
+          {title}
         </Typography>
-      </Stack>
-      <Typography variant="body2" sx={{ mb: 1.5 }}>
-        {cand.reasons[0] || cand.warnings[0] || cand.blockers[0]}
-      </Typography>
-      
-      {isBuy && cand.entryZone && (
-        <Stack direction="row" spacing={2} sx={{ mt: 1, p: 1, backgroundColor: 'background.paper', borderRadius: 1 }}>
-          <Box>
-            <Typography variant="caption" color="text.secondary" display="block">Entry Zone</Typography>
-            <Typography variant="body2" fontWeight={600}>${cand.entryZone.preferredEntryMin} - ${cand.entryZone.preferredEntryMax}</Typography>
+        <Chip size="small" label={items.length} />
+      </Box>
+      <CardContent sx={{ p: 0, flexGrow: 1 }}>
+        {items.length === 0 ? (
+          <Box sx={{ p: 4, textAlign: 'center' }}>
+            <Typography variant="body2" color="text.secondary">{emptyMsg}</Typography>
           </Box>
+        ) : (
+          <List disablePadding>
+            {items.map((item, idx) => (
+              <React.Fragment key={item.id || idx}>
+                <ListItem 
+                  disablePadding
+                  sx={{ '&:hover': { bgcolor: 'action.hover' } }}
+                  secondaryAction={
+                    <IconButton edge="end" size="small" component={Link} to={`/stocks/${item.instrumentId}`}>
+                      <ArrowForwardOutlined fontSize="small" />
+                    </IconButton>
+                  }
+                >
+                  <ListItemButton component={Link} to={`/stocks/${item.instrumentId}`} sx={{ py: 1.5, px: 2 }}>
+                    <ListItemIcon sx={{ minWidth: 40 }}>
+                      {type === 'buy' ? <FlashOnOutlined color="primary" /> : type === 'sell' ? <ShieldOutlined color="error" /> : <SearchOutlined />}
+                    </ListItemIcon>
+                    <ListItemText 
+                      primary={
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Typography variant="body1" fontWeight={700}>{item.symbol}</Typography>
+                          <Typography variant="caption" sx={{ px: 0.5, borderRadius: 0.5, bgcolor: 'action.selected' }}>{item.decisionScore}</Typography>
+                        </Stack>
+                      }
+                      secondary={item?.reasons?.[0] || item?.strategy}
+                      secondaryTypographyProps={{ noWrap: true, variant: 'caption' }}
+                    />
+                  </ListItemButton>
+                </ListItem>
+                {idx < items.length - 1 && <Divider />}
+              </React.Fragment>
+            ))}
+          </List>
+        )}
+      </CardContent>
+    </Paper>
+  );
+};
+
+const ConfirmationPanel: React.FC<{ summary: ResearchOverview['confirmationSummary'] }> = ({ summary }) => {
+  return (
+    <Card variant="outlined">
+      <CardContent sx={{ p: 0 }}>
+        <List disablePadding>
+          {/* Signal Confirmation */}
+          <ListItem sx={{ py: 2, px: 2 }}>
+            <ListItemIcon sx={{ minWidth: 40 }}><FlashOnOutlined /></ListItemIcon>
+            <ListItemText 
+              primary="Signal Pulse"
+              secondary={
+                <Box sx={{ mt: 0.5 }}>
+                  <Stack direction="row" spacing={1}>
+                    <Chip size="small" label={`${summary?.signalSummary?.topBullishCount || 0} Bullish`} color="success" variant="outlined" />
+                    <Chip size="small" label={`${summary?.signalSummary?.topBearishCount || 0} Bearish`} color="error" variant="outlined" />
+                  </Stack>
+                  <Typography variant="caption" display="block" sx={{ mt: 1 }}>{summary?.signalSummary?.notes?.[0]}</Typography>
+                </Box>
+              }
+            />
+          </ListItem>
+          <Divider />
+          
+          {/* Smart Money Confirmation */}
+          <ListItem sx={{ py: 2, px: 2 }}>
+            <ListItemIcon sx={{ minWidth: 40 }}><GppGoodOutlined /></ListItemIcon>
+            <ListItemText 
+              primary="Smart Money Alignment"
+              secondary={
+                <Box sx={{ mt: 0.5 }}>
+                  {(summary?.smartMoneySummary?.topConfirmations?.length || 0) > 0 ? (
+                    <Typography variant="caption" color="success.main" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <CheckCircleOutline fontSize="inherit" /> {summary.smartMoneySummary.topConfirmations[0]}
+                    </Typography>
+                  ) : (
+                    <Typography variant="caption">No direct smart money confirmations detected.</Typography>
+                  )}
+                  {(summary?.smartMoneySummary?.topContradictions?.length || 0) > 0 && (
+                    <Typography variant="caption" color="error.main" sx={{ mt: 0.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <WarningAmberOutlined fontSize="inherit" /> {summary.smartMoneySummary.topContradictions[0]}
+                    </Typography>
+                  )}
+                </Box>
+              }
+            />
+          </ListItem>
+          <Divider />
+          
+          {/* Market Context */}
+          <ListItem sx={{ py: 2, px: 2 }}>
+            <ListItemIcon sx={{ minWidth: 40 }}><TrendingUpOutlined /></ListItemIcon>
+            <ListItemText 
+              primary="Sector Tailwinds"
+              secondary={
+                <Box sx={{ mt: 0.5 }}>
+                  <Typography variant="caption" fontWeight={700}>Leading: </Typography>
+                  <Typography variant="caption">{(summary?.marketContextSummary?.leadingSectors || []).slice(0, 3).join(', ') || 'None'}</Typography>
+                  <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>{summary?.marketContextSummary?.breadthStatus}</Typography>
+                </Box>
+              }
+            />
+          </ListItem>
+        </List>
+      </CardContent>
+    </Card>
+  );
+};
+
+const WhatChangedPanel: React.FC<{ whatChanged: ResearchOverview['whatChanged'] }> = ({ whatChanged }) => {
+  return (
+    <Card variant="outlined" sx={{ bgcolor: 'background.paper' }}>
+      <CardContent>
+        {(whatChanged?.newTradeCandidates?.length || 0) > 0 ? (
           <Box>
-            <Typography variant="caption" color="text.secondary" display="block">Stop Loss</Typography>
-            <Typography variant="body2" fontWeight={600} color="error.main">${cand.riskPlan?.stopLoss}</Typography>
+            <Typography variant="caption" fontWeight={700} color="primary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+              <FlashOnOutlined fontSize="inherit" /> NEW TRADE CANDIDATES
+            </Typography>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              {whatChanged.newTradeCandidates.map(symbol => (
+                <Chip key={symbol} label={symbol} size="small" component={Link} to={`/stocks/${symbol}`} sx={{ cursor: 'pointer' }} />
+              ))}
+            </Stack>
           </Box>
-          <Box>
-            <Typography variant="caption" color="text.secondary" display="block">Target</Typography>
-            <Typography variant="body2" fontWeight={600} color="success.main">${cand.riskPlan?.targetPrice}</Typography>
+        ) : (
+          <Typography variant="body2" color="text.secondary">No new candidates since the last evaluation.</Typography>
+        )}
+        
+        {(whatChanged?.warnings?.length || 0) > 0 && (
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="caption" fontWeight={700} color="error" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+              <WarningAmberOutlined fontSize="inherit" /> WARNINGS
+            </Typography>
+            <Typography variant="caption" color="text.secondary">{whatChanged.warnings[0]}</Typography>
           </Box>
-        </Stack>
-      )}
-    </Box>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+const ResearchModuleDrilldowns: React.FC = () => {
+  const modules = [
+    { label: 'Strategy Engine', icon: <FlashOnOutlined />, route: '/research/strategy', desc: 'Decision board' },
+    { label: 'Signals', icon: <TimelineOutlined />, route: '/research/signals', desc: 'Raw score' },
+    { label: 'Smart Money', icon: <GppGoodOutlined />, route: '/research/smart-money', desc: 'Accumulation' },
+    { label: 'Market Context', icon: <TrendingUpOutlined />, route: '/research/market-context', desc: 'Regime' },
+  ];
+
+  return (
+    <Grid container spacing={1}>
+      {modules.map((m) => (
+        <Grid item xs={6} key={m.label}>
+          <Button
+            component={Link}
+            to={m.route}
+            variant="outlined"
+            fullWidth
+            sx={{ 
+              flexDirection: 'column', 
+              py: 2, 
+              height: '100%', 
+              borderColor: 'divider',
+              color: 'text.primary',
+              '&:hover': { bgcolor: 'action.hover' }
+            }}
+          >
+            {m.icon}
+            <Typography variant="caption" fontWeight={700} sx={{ mt: 1 }}>{m.label}</Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>{m.desc}</Typography>
+          </Button>
+        </Grid>
+      ))}
+    </Grid>
   );
 };
 

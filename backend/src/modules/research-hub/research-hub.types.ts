@@ -1,5 +1,4 @@
-import axios from 'axios';
-import type { MarketGate, MarketCondition, AllowedAction, StrategyDecisionDto } from '@/features/strategy-decision-engine';
+import type { StrategyDecisionDto, MarketGate, MarketCondition, AllowedAction } from '../strategy-decision-engine/strategy-decision-engine.types';
 
 export type PriorityLevel = 'HIGH' | 'MEDIUM' | 'LOW';
 
@@ -63,8 +62,3 @@ export interface ResearchOverview {
   generatedAt: string;
   dataGaps: string[];
 }
-
-export const fetchResearchOverview = async (): Promise<ResearchOverview> => {
-  const response = await axios.get<ResearchOverview>('/api/v1/research/overview');
-  return response.data;
-};
