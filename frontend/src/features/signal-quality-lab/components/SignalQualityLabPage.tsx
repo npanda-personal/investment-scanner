@@ -7,6 +7,7 @@ import {
   Chip,
   CircularProgress,
   FormControlLabel,
+  IconButton,
   MenuItem,
   Paper,
   Stack,
@@ -16,8 +17,13 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
+import { 
+  VisibilityOutlined, 
+  LaunchOutlined 
+} from '@mui/icons-material';
 import { Link } from 'react-router-dom';
 import { fetchSignalHistory, fetchSignalOutcomes, recalculateSignalQuality } from '../api/signalQualityLabService';
 import { useSignalQualityLab } from '../hooks';
@@ -216,11 +222,18 @@ const SignalQualityLabPage: React.FC = () => {
             <Stack spacing={1}>
               {noisy.slice(0, 12).map((item, index) => (
                 <Paper key={`${item.instrumentId}-${item.issueType}-${index}`} variant="outlined" sx={{ p: 1.5 }}>
-                  <Stack direction="row" justifyContent="space-between" spacing={1}>
-                    <Button component={Link} to={item.researchUrl} size="small">{item.symbol}</Button>
+                  <Stack direction="row" justifyContent="space-between" spacing={1} alignItems="center">
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Tooltip title="View Research" arrow>
+                        <IconButton size="small" component={Link} to={item.researchUrl}>
+                          <VisibilityOutlined fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Typography variant="body2" fontWeight={700}>{item.symbol}</Typography>
+                    </Box>
                     <Chip size="small" label={item.severity} color={item.severity === 'HIGH' ? 'error' : item.severity === 'MEDIUM' ? 'warning' : 'default'} />
                   </Stack>
-                  <Typography variant="body2" fontWeight={600}>{item.issueType}</Typography>
+                  <Typography variant="body2" fontWeight={600} sx={{ mt: 1 }}>{item.issueType}</Typography>
                   <Typography color="text.secondary" variant="body2">{item.description}</Typography>
                 </Paper>
               ))}
@@ -250,6 +263,7 @@ const SignalQualityLabPage: React.FC = () => {
                 <TableCell>Confidence</TableCell>
                 <TableCell>Model</TableCell>
                 <TableCell>Selected Outcome</TableCell>
+                <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -258,12 +272,19 @@ const SignalQualityLabPage: React.FC = () => {
                 return (
                   <TableRow key={item.signalResultId}>
                     <TableCell>{new Date(item.generated_at).toLocaleString()}</TableCell>
-                    <TableCell><Button component={Link} to={item.researchUrl} size="small">{item.symbol}</Button></TableCell>
+                    <TableCell><Typography variant="body2" fontWeight={700}>{item.symbol}</Typography></TableCell>
                     <TableCell>{item.score}</TableCell>
                     <TableCell>{item.direction}</TableCell>
                     <TableCell>{item.confidence}</TableCell>
                     <TableCell>{item.modelVersion || 'signal-engine-v1'}</TableCell>
                     <TableCell>{outcome?.available ? percent(outcome.forwardReturnPercent) : 'Insufficient future data'}</TableCell>
+                    <TableCell align="right">
+                      <Tooltip title="Open Research" arrow>
+                        <IconButton size="small" component={Link} to={item.researchUrl}>
+                          <VisibilityOutlined fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
                   </TableRow>
                 );
               })}

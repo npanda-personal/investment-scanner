@@ -9,6 +9,7 @@ import {
   InputAdornment,
   MenuItem,
   Paper,
+  Stack,
   Tabs,
   Tab,
   TextField,
@@ -19,6 +20,7 @@ import AddIcon from '@mui/icons-material/Add';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SearchIcon from '@mui/icons-material/Search';
 import SyncIcon from '@mui/icons-material/Sync';
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import {
   fetchInstruments,
   syncAllStocks,
@@ -149,24 +151,29 @@ const MarketDataFoundationPage: React.FC = () => {
     { id: 'dataStatus', label: 'Status', render: (instrument) => <StatusBadge label={instrument.data_status} /> },
     { id: 'lastSuccessfulDataLoadTimestamp', label: 'Last Updated', sortable: true, render: (instrument) => formatTimestamp(instrument.last_updated_timestamp) },
     {
-      id: 'sync',
-      label: 'Sync',
-      align: 'center',
+      id: 'actions',
+      label: 'Actions',
+      align: 'right',
       render: (instrument) => (
-        <Tooltip title="Sync market data">
-          <span>
-            <IconButton
-              color="primary"
-              disabled={syncingId === instrument.id}
-              onClick={(event) => {
-                event.stopPropagation();
-                void handleSync(instrument);
-              }}
-            >
-              {syncingId === instrument.id ? <CircularProgress size={22} /> : <SyncIcon />}
+        <Stack direction="row" spacing={0.5} justifyContent="flex-end" onClick={(event) => event.stopPropagation()}>
+          <Tooltip title="View Instrument Details" arrow>
+            <IconButton size="small" onClick={() => navigate(`/stocks/${instrument.id}`)}>
+              <VisibilityOutlinedIcon fontSize="small" />
             </IconButton>
-          </span>
-        </Tooltip>
+          </Tooltip>
+          <Tooltip title="Sync market data" arrow>
+            <span>
+              <IconButton
+                size="small"
+                color="primary"
+                disabled={syncingId === instrument.id}
+                onClick={() => void handleSync(instrument)}
+              >
+                {syncingId === instrument.id ? <CircularProgress size={18} /> : <SyncIcon fontSize="small" />}
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Stack>
       ),
     },
   ];

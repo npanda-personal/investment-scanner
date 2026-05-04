@@ -7,6 +7,7 @@ import {
   Chip,
   CircularProgress,
   Divider,
+  IconButton,
   MenuItem,
   Paper,
   Stack,
@@ -18,8 +19,10 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
+import { EditOutlined, DeleteOutline } from '@mui/icons-material';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { SignalBadge } from '@/features/signal-generation-engine';
 import { PortfolioIntelligencePanel } from '@/features/portfolio-intelligence';
@@ -328,13 +331,21 @@ const PortfolioManagementPage: React.FC = () => {
                       <TableCell align="right">{money(holding.unrealizedPnL, holding.currency)} ({percent(holding.unrealizedPnLPercent)})</TableCell>
                       <TableCell>{holding.signal ? <SignalBadge direction={holding.signal.direction} label={`${holding.signal.direction} ${holding.signal.score}`} /> : <Chip size="small" label="No signal" variant="outlined" />}</TableCell>
                       <TableCell align="right">
-                        <Button size="small" onClick={() => startEditHolding(holding)}>Edit</Button>
-                        <Button size="small" color="error" onClick={async () => {
-                          await removeHolding(selectedId, holding.id);
-                          await reload();
-                        }}>
-                          Remove
-                        </Button>
+                        <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                          <Tooltip title="Edit Holding" arrow>
+                            <IconButton size="small" onClick={() => startEditHolding(holding)}>
+                              <EditOutlined fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Remove Holding" arrow>
+                            <IconButton size="small" color="error" onClick={async () => {
+                              await removeHolding(selectedId, holding.id);
+                              await reload();
+                            }}>
+                              <DeleteOutline fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Stack>
                       </TableCell>
                     </TableRow>
                   ))}

@@ -7,6 +7,7 @@ import {
   Divider,
   FormControl,
   InputLabel,
+  IconButton,
   LinearProgress,
   MenuItem,
   Paper,
@@ -17,8 +18,14 @@ import {
   TableCell,
   TableHead,
   TableRow,
+  Tooltip,
   Typography,
 } from '@mui/material';
+import { 
+  InfoOutlined, 
+  SearchOutlined, 
+  LaunchOutlined 
+} from '@mui/icons-material';
 import { Link } from 'react-router-dom';
 import { useSmartMoneyIntelligence } from '../hooks';
 import type { SectorSmartMoneySummary, SmartMoneyRange, SmartMoneyStatus, SmartMoneyStockSummary } from '../types';
@@ -119,9 +126,17 @@ function StockList({ title, items, empty, onSelect }: { title: string; items: Sm
                 <Stack alignItems={{ xs: 'flex-start', md: 'flex-end' }} spacing={0.5}>
                   <Typography variant="h6">{item.smartMoneyScore}</Typography>
                   <Typography variant="body2" color={item.dailyChangePercent && item.dailyChangePercent < 0 ? 'error.main' : 'success.main'}>{fmtPercent(item.dailyChangePercent)}</Typography>
-                  <Stack direction="row" spacing={1}>
-                    <Button size="small" onClick={() => void onSelect(item.instrumentId)}>Details</Button>
-                    <Button size="small" component={Link} to={item.researchUrl}>Research</Button>
+                  <Stack direction="row" spacing={0.5}>
+                    <Tooltip title="View Smart Money Details" arrow>
+                      <IconButton size="small" onClick={() => void onSelect(item.instrumentId)}>
+                        <SearchOutlined fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Open Stock Research" arrow>
+                      <IconButton size="small" component={Link} to={item.researchUrl}>
+                        <LaunchOutlined fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
                   </Stack>
                 </Stack>
               </Stack>

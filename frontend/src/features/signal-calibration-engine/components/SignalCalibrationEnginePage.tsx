@@ -5,6 +5,7 @@ import {
   Button,
   Chip,
   CircularProgress,
+  IconButton,
   Paper,
   Stack,
   Table,
@@ -13,8 +14,12 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
+import { 
+  VisibilityOutlined 
+} from '@mui/icons-material';
 import { Link } from 'react-router-dom';
 import { fetchCalibrationComparison, runSignalCalibration } from '../api/signalCalibrationEngineService';
 import { useSignalCalibrationEngine } from '../hooks';
@@ -53,12 +58,13 @@ const TopTable: React.FC<{ rows: SignalCalibrationResult[] }> = ({ rows }) => (
             <TableCell>Confidence</TableCell>
             <TableCell>Top Boost</TableCell>
             <TableCell>Top Penalty</TableCell>
+            <TableCell align="right">Actions</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
           {rows.map((row) => (
             <TableRow key={row.id || row.instrumentId} hover>
-              <TableCell><Button component={Link} to={row.researchUrl} size="small">{row.symbol}</Button></TableCell>
+              <TableCell><Typography variant="body2" fontWeight={700}>{row.symbol}</Typography></TableCell>
               <TableCell>{row.rawScore}</TableCell>
               <TableCell>{row.calibratedScore}</TableCell>
               <TableCell><Chip size="small" label={delta(row.scoreDelta)} color={row.scoreDelta > 0 ? 'success' : row.scoreDelta < 0 ? 'warning' : 'default'} /></TableCell>
@@ -66,6 +72,13 @@ const TopTable: React.FC<{ rows: SignalCalibrationResult[] }> = ({ rows }) => (
               <TableCell>{row.calibratedConfidence}</TableCell>
               <TableCell>{row.boosts[0]?.label || 'None'}</TableCell>
               <TableCell>{row.penalties[0]?.label || 'None'}</TableCell>
+              <TableCell align="right">
+                <Tooltip title="Open Research" arrow>
+                  <IconButton size="small" component={Link} to={row.researchUrl}>
+                    <VisibilityOutlined fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Paper, Typography, CircularProgress, Alert, List, ListItem, ListItemIcon, ListItemText, Divider, Button } from '@mui/material';
-import { CheckCircleOutline, ErrorOutline, FactCheckOutlined } from '@mui/icons-material';
+import { Box, Paper, Typography, CircularProgress, Alert, List, ListItem, ListItemIcon, ListItemText, Divider, Button, IconButton, Tooltip } from '@mui/material';
+import { CheckCircleOutline, ErrorOutline, FactCheckOutlined, VisibilityOutlined, LaunchOutlined } from '@mui/icons-material';
 import { fetchLatestDecision, fetchMarketGate } from '../api/strategyDecisionApi';
 import type { StrategyDecisionDto, MarketGateResponse } from '../types';
 import { StatusBadge } from '@/shared/components';
@@ -75,20 +75,27 @@ const StrategyDecisionWidget: React.FC<StrategyDecisionWidgetProps> = ({ instrum
           </List>
 
           <Divider sx={{ my: 1 }} />
-          <Button 
-            component={Link} 
-            to="/strategy" 
-            size="small" 
-            sx={{ fontSize: '0.7rem', p: 0 }}
-          >
-            View Full Strategy Dashboard
-          </Button>
+          <Tooltip title="View Full Strategy Dashboard" arrow>
+            <IconButton 
+              component={Link} 
+              to="/strategy" 
+              size="small"
+            >
+              <LaunchOutlined fontSize="small" />
+            </IconButton>
+          </Tooltip>
         </Box>
       ) : (
-        <Typography variant="body2" color="textSecondary">
-          No strategy decision generated for this instrument yet. 
-          <Button component={Link} to="/strategy" size="small" sx={{ ml: 1 }}>Go to Strategy</Button>
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography variant="body2" color="textSecondary">
+            No strategy decision generated yet.
+          </Typography>
+          <Tooltip title="Go to Strategy Dashboard" arrow>
+            <IconButton component={Link} to="/strategy" size="small">
+              <LaunchOutlined fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Box>
       )}
     </Paper>
   );

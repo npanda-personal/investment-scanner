@@ -1,6 +1,13 @@
 import React from 'react';
-import { Alert, Box, Button, Snackbar, Tooltip, Typography } from '@mui/material';
-import { InfoOutlined, WarningAmberOutlined } from '@mui/icons-material';
+import { Alert, Box, Button, IconButton, Snackbar, Tooltip, Typography } from '@mui/material';
+import { 
+  InfoOutlined, 
+  WarningAmberOutlined, 
+  VisibilityOutlined, 
+  PlaylistAddOutlined, 
+  AccountBalanceWalletOutlined, 
+  NotificationsNoneOutlined 
+} from '@mui/icons-material';
 import { Link, useNavigate } from 'react-router-dom';
 import { AddSignalToPortfolioDialog } from './AddSignalToPortfolioDialog';
 import { AddToWatchlistDialog } from '@/features/watchlist-management';
@@ -119,11 +126,27 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
       id: 'actions',
       label: 'Actions',
       render: (signal) => (
-        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }} onClick={(event) => event.stopPropagation()}>
-          <Button size="small" onClick={() => navigate(`/stocks/${signal.instrument_id}`)}>View</Button>
-          <Button size="small" onClick={() => setWatchlistSignal(signal)}>Watchlist</Button>
-          <Button size="small" onClick={() => setPortfolioSignal(signal)}>Portfolio</Button>
-          <Button size="small" onClick={() => setAlertSignal(signal)}>Alert</Button>
+        <Box sx={{ display: 'flex', gap: 0.5 }} onClick={(event) => event.stopPropagation()}>
+          <Tooltip title="View Stock Details" arrow>
+            <IconButton size="small" onClick={() => navigate(`/stocks/${signal.instrument_id}`)}>
+              <VisibilityOutlined fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Add to Watchlist" arrow>
+            <IconButton size="small" onClick={() => setWatchlistSignal(signal)}>
+              <PlaylistAddOutlined fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Add to Portfolio" arrow>
+            <IconButton size="small" onClick={() => setPortfolioSignal(signal)}>
+              <AccountBalanceWalletOutlined fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Create Alert" arrow>
+            <IconButton size="small" onClick={() => setAlertSignal(signal)}>
+              <NotificationsNoneOutlined fontSize="small" />
+            </IconButton>
+          </Tooltip>
         </Box>
       ),
     },

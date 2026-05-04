@@ -10,6 +10,7 @@ import {
   FormControl,
   FormControlLabel,
   Checkbox,
+  IconButton,
   InputLabel,
   MenuItem,
   Paper,
@@ -21,17 +22,20 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import SaveIcon from '@mui/icons-material/Save';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
+import PlayArrowOutlinedIcon from '@mui/icons-material/PlayArrowOutlined';
 import {
   CartesianGrid,
   Line,
   LineChart,
   ResponsiveContainer,
-  Tooltip,
+  Tooltip as ChartTooltip,
   XAxis,
   YAxis,
 } from 'recharts';
@@ -223,8 +227,16 @@ export default function BacktestingStrategyLabPage() {
                         <Typography variant="body2" color="text.secondary">{strategy.config.entryRule.type}{' -> '}{strategy.config.exitRule.type}</Typography>
                       </Box>
                       <Stack direction="row" spacing={0.5}>
-                        <Button size="small" onClick={() => void rerunStrategy(strategy.id)}>Run</Button>
-                        <Button size="small" color="error" onClick={() => void removeStrategy(strategy.id)}><DeleteOutlineIcon fontSize="small" /></Button>
+                        <Tooltip title="Rerun Strategy" arrow>
+                          <IconButton size="small" onClick={() => void rerunStrategy(strategy.id)}>
+                            <PlayArrowOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete Strategy" arrow>
+                          <IconButton size="small" color="error" onClick={() => void removeStrategy(strategy.id)}>
+                            <DeleteOutlineIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                       </Stack>
                     </Stack>
                   </Paper>
@@ -248,9 +260,17 @@ export default function BacktestingStrategyLabPage() {
                         <Typography variant="body2">{new Date(run.startedAt).toLocaleString()}</Typography>
                         <Typography variant="body2" color="text.secondary">{fmtPercent(run.metrics?.totalReturn)}</Typography>
                       </Stack>
-                      <Stack direction="row" spacing={1}>
-                        <Button size="small" onClick={() => setSelectedRun(run)}>View</Button>
-                        <Button size="small" color="error" onClick={() => void removeRun(run.id)}>Delete</Button>
+                      <Stack direction="row" spacing={0.5}>
+                        <Tooltip title="View Results" arrow>
+                          <IconButton size="small" onClick={() => setSelectedRun(run)}>
+                            <VisibilityOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete Run" arrow>
+                          <IconButton size="small" color="error" onClick={() => void removeRun(run.id)}>
+                            <DeleteOutlineIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                       </Stack>
                     </Stack>
                   </Paper>
@@ -303,7 +323,7 @@ function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: 
               <XAxis dataKey="date" minTickGap={32} />
               <YAxis yAxisId="left" tickFormatter={(value) => `$${Math.round(Number(value) / 1000)}k`} />
               <YAxis yAxisId="right" orientation="right" tickFormatter={(value) => `${value}%`} />
-              <Tooltip formatter={(value, name) => name === 'drawdownLabel' ? [`${value}%`, 'Drawdown'] : [fmtMoney(Number(value)), 'Equity']} />
+              <ChartTooltip formatter={(value, name) => name === 'drawdownLabel' ? [`${value}%`, 'Drawdown'] : [fmtMoney(Number(value)), 'Equity']} />
               <Line yAxisId="left" type="monotone" dataKey="equityLabel" stroke="#1976d2" dot={false} strokeWidth={2} />
               <Line yAxisId="right" type="monotone" dataKey="drawdownLabel" stroke="#d32f2f" dot={false} strokeWidth={1.5} />
             </LineChart>

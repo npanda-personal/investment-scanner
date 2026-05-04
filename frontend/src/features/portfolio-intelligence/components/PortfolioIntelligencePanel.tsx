@@ -5,11 +5,17 @@ import {
   Button,
   Chip,
   CircularProgress,
+  IconButton,
   LinearProgress,
   Paper,
   Stack,
+  Tooltip,
   Typography,
 } from '@mui/material';
+import { 
+  VisibilityOutlined, 
+  LaunchOutlined 
+} from '@mui/icons-material';
 import { Link } from 'react-router-dom';
 import { usePortfolioIntelligence } from '../hooks';
 import { fetchExits, type StrategyDecisionDto } from '@/features/strategy-decision-engine';
@@ -24,7 +30,11 @@ const StrategyExitCard: React.FC<{ decision: StrategyDecisionDto }> = ({ decisio
     <Typography variant="body2" color="primary" sx={{ my: 0.5 }}>{decision.action.replace(/_/g, ' ')}</Typography>
     <Typography variant="caption" color="textSecondary">{decision.reasons[0]}</Typography>
     <Box sx={{ mt: 1 }}>
-      <Button component={Link} to="/strategy" size="small" sx={{ p: 0, fontSize: '0.7rem' }}>View Decision Detail</Button>
+      <Tooltip title="View Decision Detail" arrow>
+        <IconButton component={Link} to="/strategy" size="small">
+          <VisibilityOutlined fontSize="small" />
+        </IconButton>
+      </Tooltip>
     </Box>
   </Paper>
 );
@@ -74,9 +84,16 @@ const RedFlagCard: React.FC<{ flag: RedFlag }> = ({ flag }) => (
 const ReviewCard: React.FC<{ item: ReviewItem }> = ({ item }) => (
   <Paper variant="outlined" sx={{ p: 1.5 }}>
     <Stack direction="row" justifyContent="space-between" spacing={1}>
-      <Box>
-        <Button component={Link} to={`/research/stocks/${item.instrumentId}`} size="small">{item.symbol}</Button>
-        <Typography variant="body2" color="text.secondary">{item.companyName || 'Unknown company'}</Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Tooltip title="View Research" arrow>
+          <IconButton component={Link} to={`/research/stocks/${item.instrumentId}`} size="small">
+            <LaunchOutlined fontSize="small" />
+          </IconButton>
+        </Tooltip>
+        <Box>
+          <Typography fontWeight={700}>{item.symbol}</Typography>
+          <Typography variant="body2" color="text.secondary">{item.companyName || 'Unknown company'}</Typography>
+        </Box>
       </Box>
       <Chip size="small" color={decisionColor(item.decisionLabel)} label={item.decisionLabel} />
     </Stack>
@@ -96,9 +113,16 @@ const GroupSection: React.FC<{ title: string; items: GroupedHoldingSummary[] }> 
     ) : (
       <Stack spacing={1}>
         {items.slice(0, 5).map((item) => (
-          <Box key={item.holdingId}>
-            <Button component={Link} to={`/research/stocks/${item.instrumentId}`} size="small">{item.symbol}</Button>
-            <Typography variant="body2" color="text.secondary">{item.reasons[0]}</Typography>
+          <Box key={item.holdingId} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Tooltip title="View Research" arrow>
+              <IconButton component={Link} to={`/research/stocks/${item.instrumentId}`} size="small">
+                <LaunchOutlined fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Box>
+              <Typography variant="body2" fontWeight={700}>{item.symbol}</Typography>
+              <Typography variant="body2" color="text.secondary" noWrap sx={{ maxWidth: 150 }}>{item.reasons[0]}</Typography>
+            </Box>
           </Box>
         ))}
       </Stack>

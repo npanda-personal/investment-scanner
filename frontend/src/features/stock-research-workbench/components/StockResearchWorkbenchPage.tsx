@@ -9,11 +9,17 @@ import {
   Grid,
   Paper,
   Snackbar,
+  Stack,
   ToggleButton,
   ToggleButtonGroup,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { 
+  PlaylistAddOutlined, 
+  NotificationsNoneOutlined 
+} from '@mui/icons-material';
 import {
   Bar,
   ComposedChart,
@@ -121,12 +127,18 @@ const StockResearchWorkbenchPage: React.FC = () => {
               {overview.source} | {formatDateTime(overview.last_updated_timestamp)}
             </Typography>
             <Box sx={{ mt: 1 }}><StatusChip status={overview.data_status} /></Box>
-            <Button size="small" variant="outlined" sx={{ mt: 1 }} onClick={() => setWatchlistDialogOpen(true)}>
-              Add to Watchlist
-            </Button>
-            <Button size="small" variant="outlined" sx={{ mt: 1, ml: 1 }} onClick={() => setAlertDialogOpen(true)}>
-              Create Price Alert
-            </Button>
+            <Stack direction="row" spacing={0.5} justifyContent={{ xs: 'flex-start', md: 'flex-end' }} sx={{ mt: 1 }}>
+              <Tooltip title="Add to Watchlist" arrow>
+                <IconButton size="small" variant="outlined" onClick={() => setWatchlistDialogOpen(true)}>
+                  <PlaylistAddOutlined fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Create Price Alert" arrow>
+                <IconButton size="small" variant="outlined" onClick={() => setAlertDialogOpen(true)}>
+                  <NotificationsNoneOutlined fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Stack>
           </Box>
         </Box>
       </Paper>

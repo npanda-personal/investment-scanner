@@ -1,5 +1,23 @@
 import React, { useState } from 'react';
-import { Alert, Box, Button, Chip, CircularProgress, Paper, Stack, Typography } from '@mui/material';
+import { 
+  Alert, 
+  Box, 
+  Button, 
+  Chip, 
+  CircularProgress, 
+  IconButton, 
+  Paper, 
+  Stack, 
+  Tooltip, 
+  Typography 
+} from '@mui/material';
+import { 
+  LaunchOutlined, 
+  CheckCircleOutline, 
+  HighlightOffOutlined, 
+  DeleteOutline,
+  PowerSettingsNewOutlined
+} from '@mui/icons-material';
 import { Link } from 'react-router-dom';
 import { deleteAlertRule, dismissAlert, evaluateAlerts, markAlertRead, markAllAlertsRead, updateAlertRule } from '../api/alertsMonitoringService';
 import { useAlertsMonitoring } from '../hooks';
@@ -62,10 +80,24 @@ export const AlertsMonitoringPage: React.FC = () => {
                       <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{event.message}</Typography>
                       <Typography variant="caption" color="text.secondary">{new Date(event.triggeredAt).toLocaleString()}</Typography>
                     </Box>
-                    <Stack direction="row" spacing={1}>
-                      <Button component={Link} to={contextLink(event)} size="small">Open</Button>
-                      {!event.readAt && <Button size="small" onClick={async () => { await markAlertRead(event.id); await reload(); }}>Read</Button>}
-                      <Button color="error" size="small" onClick={async () => { await dismissAlert(event.id); await reload(); }}>Dismiss</Button>
+                    <Stack direction="row" spacing={0.5}>
+                      <Tooltip title="Open Context" arrow>
+                        <IconButton size="small" component={Link} to={contextLink(event)}>
+                          <LaunchOutlined fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      {!event.readAt && (
+                        <Tooltip title="Mark as Read" arrow>
+                          <IconButton size="small" onClick={async () => { await markAlertRead(event.id); await reload(); }}>
+                            <CheckCircleOutline fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                      <Tooltip title="Dismiss Alert" arrow>
+                        <IconButton size="small" color="error" onClick={async () => { await dismissAlert(event.id); await reload(); }}>
+                          <HighlightOffOutlined fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                     </Stack>
                   </Stack>
                 </Paper>
@@ -89,9 +121,17 @@ export const AlertsMonitoringPage: React.FC = () => {
                     </Box>
                     <Chip size="small" color={rule.enabled ? 'success' : 'default'} label={rule.enabled ? 'Enabled' : 'Disabled'} />
                   </Stack>
-                  <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                    <Button size="small" onClick={async () => { await updateAlertRule(rule.id, { enabled: !rule.enabled }); await reload(); }}>{rule.enabled ? 'Disable' : 'Enable'}</Button>
-                    <Button size="small" color="error" onClick={async () => { await deleteAlertRule(rule.id); await reload(); }}>Delete</Button>
+                  <Stack direction="row" spacing={0.5} sx={{ mt: 1 }}>
+                    <Tooltip title={rule.enabled ? "Disable Rule" : "Enable Rule"} arrow>
+                      <IconButton size="small" onClick={async () => { await updateAlertRule(rule.id, { enabled: !rule.enabled }); await reload(); }}>
+                        <PowerSettingsNewOutlined fontSize="small" color={rule.enabled ? "success" : "action"} />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Delete Rule" arrow>
+                      <IconButton size="small" color="error" onClick={async () => { await deleteAlertRule(rule.id); await reload(); }}>
+                        <DeleteOutline fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
                   </Stack>
                 </Paper>
               ))}

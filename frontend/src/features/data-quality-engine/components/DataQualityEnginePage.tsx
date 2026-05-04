@@ -5,6 +5,7 @@ import {
   Button,
   Chip,
   CircularProgress,
+  IconButton,
   MenuItem,
   Paper,
   Stack,
@@ -14,8 +15,13 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
+import { 
+  VisibilityOutlined, 
+  SearchOutlined 
+} from '@mui/icons-material';
 import { Link } from 'react-router-dom';
 import { evaluateDataQuality, fetchDataQualityDiagnostics } from '../api/dataQualityEngineService';
 import { useDataQualityEngine } from '../hooks';
@@ -160,12 +166,13 @@ const DataQualityEnginePage: React.FC = () => {
                   <TableCell>Gaps</TableCell>
                   <TableCell>Warnings</TableCell>
                   <TableCell>Last Evaluated</TableCell>
+                  <TableCell align="right">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {items.map((item) => (
                   <TableRow key={item.instrumentId} hover onClick={() => void loadDiagnostics(item.instrumentId)} sx={{ cursor: 'pointer' }}>
-                    <TableCell><Button component={Link} to={item.researchUrl} size="small" onClick={(event) => event.stopPropagation()}>{item.symbol}</Button></TableCell>
+                    <TableCell><Typography variant="body2" fontWeight={700}>{item.symbol}</Typography></TableCell>
                     <TableCell>{item.companyName || 'N/A'}</TableCell>
                     <TableCell><Chip size="small" label={`${item.coverageScore} ${item.coverageStatus}`} color={statusColor(item.coverageStatus)} /></TableCell>
                     <TableCell><Chip size="small" label={`${item.signalReadinessScore} ${item.signalReadinessStatus}`} color={statusColor(item.signalReadinessStatus)} /></TableCell>
@@ -175,6 +182,20 @@ const DataQualityEnginePage: React.FC = () => {
                     <TableCell>{item.dataGaps.length}</TableCell>
                     <TableCell>{item.warnings.length}</TableCell>
                     <TableCell>{new Date(item.lastEvaluatedAt).toLocaleString()}</TableCell>
+                    <TableCell align="right">
+                      <Stack direction="row" spacing={0.5} justifyContent="flex-end" onClick={(event) => event.stopPropagation()}>
+                        <Tooltip title="View Diagnostics" arrow>
+                          <IconButton size="small" onClick={() => void loadDiagnostics(item.instrumentId)}>
+                            <SearchOutlined fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Open Research" arrow>
+                          <IconButton size="small" component={Link} to={item.researchUrl}>
+                            <VisibilityOutlined fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -190,7 +211,11 @@ const DataQualityEnginePage: React.FC = () => {
             <Stack spacing={2}>
               <Stack direction="row" justifyContent="space-between" alignItems="center">
                 <Typography variant="subtitle1">{selected.symbol}</Typography>
-                <Button component={Link} to={selected.researchUrl} size="small">Research</Button>
+                <Tooltip title="Open Research" arrow>
+                  <IconButton size="small" component={Link} to={selected.researchUrl}>
+                    <VisibilityOutlined fontSize="small" />
+                  </IconButton>
+                </Tooltip>
               </Stack>
               <Box>
                 <Typography variant="body2" fontWeight={700}>Data Gaps</Typography>

@@ -1,5 +1,11 @@
 import React from 'react';
-import { Alert, Box, Button, Paper, Snackbar, Typography } from '@mui/material';
+import { Alert, Box, Button, IconButton, Paper, Snackbar, Tooltip, Typography } from '@mui/material';
+import { 
+  VisibilityOutlined, 
+  AccountBalanceWalletOutlined, 
+  PlaylistAddOutlined, 
+  NotificationsNoneOutlined 
+} from '@mui/icons-material';
 import { Link, useNavigate } from 'react-router-dom';
 import { SignalBadge } from './SignalBadge';
 import { AddSignalToPortfolioDialog } from './AddSignalToPortfolioDialog';
@@ -61,11 +67,27 @@ export const SignalCard: React.FC<{ signal: SignalResult }> = ({ signal }) => {
           ))}
         </Box>
         <Typography variant="caption" color="text.secondary">{formatDateTime(signal.generated_at)}</Typography>
-        <Box sx={{ mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-          <Button size="small" onClick={() => navigate(`/research/stocks/${signal.instrument_id}`)}>Research</Button>
-          <Button size="small" variant="outlined" onClick={() => setPortfolioDialogOpen(true)}>Add to Portfolio</Button>
-          <Button size="small" variant="outlined" onClick={() => setWatchlistDialogOpen(true)}>Add to Watchlist</Button>
-          <Button size="small" variant="outlined" onClick={() => setAlertDialogOpen(true)}>Create Alert</Button>
+        <Box sx={{ mt: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+          <Tooltip title="View Research" arrow>
+            <IconButton size="small" onClick={() => navigate(`/research/stocks/${signal.instrument_id}`)}>
+              <VisibilityOutlined fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Add to Portfolio" arrow>
+            <IconButton size="small" onClick={() => setPortfolioDialogOpen(true)}>
+              <AccountBalanceWalletOutlined fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Add to Watchlist" arrow>
+            <IconButton size="small" onClick={() => setWatchlistDialogOpen(true)}>
+              <PlaylistAddOutlined fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Create Alert" arrow>
+            <IconButton size="small" onClick={() => setAlertDialogOpen(true)}>
+              <NotificationsNoneOutlined fontSize="small" />
+            </IconButton>
+          </Tooltip>
         </Box>
       </Paper>
       <AddSignalToPortfolioDialog

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Alert, Box, Button, CircularProgress, Paper, Typography } from '@mui/material';
+import { Alert, Box, CircularProgress, IconButton, Paper, Tooltip, Typography } from '@mui/material';
+import { LaunchOutlined } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useInstrumentSignal } from '../hooks/useInstrumentSignal';
 import { SignalBadge } from './SignalBadge';
@@ -35,7 +36,11 @@ export const SignalWidget: React.FC<{ instrumentId?: string }> = ({ instrumentId
         <Typography color="text.secondary">No signal generated yet.</Typography>
       )}
       <Box sx={{ mt: 1 }}>
-        <Button size="small" onClick={() => navigate('/signals')}>Open Signals</Button>
+        <Tooltip title="Open Signals Dashboard" arrow>
+          <IconButton size="small" onClick={() => navigate('/signals')}>
+            <LaunchOutlined fontSize="small" />
+          </IconButton>
+        </Tooltip>
       </Box>
     </Paper>
   );

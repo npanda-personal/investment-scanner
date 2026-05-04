@@ -6,12 +6,15 @@ import {
   Button,
   CircularProgress,
   Divider,
+  IconButton,
   MenuItem,
   Paper,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
+import { SaveOutlined, DeleteOutline } from '@mui/icons-material';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { SignalBadge } from '@/features/signal-generation-engine';
 import { DataTable, InstrumentSearchSelect, PageHeader, StatusBadge, type DataTableColumn } from '@/shared/components';
@@ -111,13 +114,21 @@ const WatchlistManagementPage: React.FC = () => {
       id: 'actions',
       label: 'Actions',
       render: (item) => (
-        <Stack direction="row" spacing={1} onClick={(event) => event.stopPropagation()}>
-          <Button onClick={() => void saveItem(item)}>Save</Button>
-          <Button color="error" onClick={async () => {
-            if (!id) return;
-            await removeWatchlistItem(id, item.id);
-            await reload();
-          }}>Remove</Button>
+        <Stack direction="row" spacing={0.5} onClick={(event) => event.stopPropagation()}>
+          <Tooltip title="Save Notes/Tags" arrow>
+            <IconButton size="small" onClick={() => void saveItem(item)}>
+              <SaveOutlined fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Remove from Watchlist" arrow>
+            <IconButton size="small" color="error" onClick={async () => {
+              if (!id) return;
+              await removeWatchlistItem(id, item.id);
+              await reload();
+            }}>
+              <DeleteOutline fontSize="small" />
+            </IconButton>
+          </Tooltip>
         </Stack>
       ),
     },
