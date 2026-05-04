@@ -5,30 +5,28 @@ import {
   Chip,
   CircularProgress,
   Divider,
-  FormControl,
-  InputLabel,
   IconButton,
   LinearProgress,
   MenuItem,
   Paper,
-  Select,
   Stack,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableRow,
+  TextField,
   Tooltip,
   Typography,
 } from '@mui/material';
 import { 
-  InfoOutlined, 
   SearchOutlined, 
   LaunchOutlined 
 } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
 import { useSmartMoneyIntelligence } from '../hooks';
 import type { SectorSmartMoneySummary, SmartMoneyRange, SmartMoneyStatus, SmartMoneyStockSummary } from '../types';
+import { DataTable, FilterBar, PageHeader, type DataTableColumn } from '@/shared/components';
 
 const statusColor = (status: SmartMoneyStatus | string) => {
   if (status === 'ACCUMULATION' || status === 'ACCUMULATING') return 'success';
@@ -42,8 +40,16 @@ const fmtVolume = (value: number | null | undefined) => value === null || value 
 
 export default function SmartMoneyIntelligencePage() {
   const {
-    range,
-    setRange,
+    range, setRange,
+    sector, setSector,
+    topPage, setTopPage,
+    topPageSize, setTopPageSize,
+    topTotal,
+    topLoading,
+    distPage, setDistPage,
+    distPageSize, setDistPageSize,
+    distTotal,
+    distLoading,
     health,
     top,
     distribution,
@@ -56,36 +62,139 @@ export default function SmartMoneyIntelligencePage() {
     loadStock,
   } = useSmartMoneyIntelligence();
 
-  if (loading) {
+  const handleRun = async () => {
+    try {
+      await fetch('/api/v1/smart-money/run', { method: 'POST' });
+      window.location.reload();
+    } catch (e) {
+      setError('Failed to trigger run');
+    }
+  };
+
+  const columns: DataTableColumn<SmartMoneyStockSummary>[] = [
+    {
+      id: 'symbol',
+      label: 'Symbol',
+      render: (row) => (
+        <Box>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography fontWeight={700}>{row.symbol}</Typography>
+            <Chip size="small" label={row.status} color={statusColor(row.status)} />
+          </Stack>
+          <Typography variant="body2" color="text.secondary">{row.companyName || 'Unknown'} · {row.sector || 'N/A'}</Typography>
+        </Box>
+      ),
+    },
+    {
+      id: 'score',
+      label: 'Score',
+      align: 'right',
+      render: (row) => <Typography variant="h6">{row.smartMoneyScore}</Typography>,
+    },
+    {
+      id: 'change',
+      label: 'Daily',
+      align: 'right',
+      render: (row) => (
+        <Typography variant="body2" color={row.dailyChangePercent && row.dailyChangePercent < 0 ? 'error.main' : 'success.main'}>
+          {fmtPercent(row.dailyChangePercent)}
+        </Typography>
+      ),
+    },
+    {
+      id: 'actions',
+      label: 'Actions',
+      align: 'right',
+      render: (row) => (
+        <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+          <Tooltip title="View Smart Money Details" arrow>
+            <IconButton size="small" onClick={(e) => { e.stopPropagation(); void loadStock(row.instrumentId); }}>
+              <SearchOutlined fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Open Stock Research" arrow>
+            <IconButton size="small" component={Link} to={row.researchUrl} onClick={(e) => e.stopPropagation()}>
+              <LaunchOutlined fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Stack>
+      ),
+    },
+  ];
+
+  if (loading && !top.length && !distribution.length) {
     return <Stack alignItems="center" sx={{ py: 8 }}><CircularProgress /></Stack>;
   }
 
   return (
-    <Box sx={{ maxWidth: 1280 }}>
-      <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" gap={2} sx={{ mb: 3 }}>
-        <Box>
-          <Typography variant="h4" fontWeight={700}>Smart Money Intelligence</Typography>
-          <Typography color="text.secondary">Price-volume accumulation, distribution warnings, and sector flow context from free/local market data.</Typography>
-        </Box>
-        <FormControl size="small" sx={{ minWidth: 140 }}>
-          <InputLabel>Range</InputLabel>
-          <Select label="Range" value={range} onChange={(event) => setRange(event.target.value as SmartMoneyRange)}>
-            <MenuItem value="1M">1M</MenuItem>
-            <MenuItem value="3M">3M</MenuItem>
-            <MenuItem value="6M">6M</MenuItem>
-          </Select>
-        </FormControl>
-      </Stack>
+    <Box sx={{ p: 3, maxWidth: 1600, mx: 'auto' }}>
+      <PageHeader
+        title="Smart Money Intelligence"
+        subtitle="Price-volume accumulation, distribution warnings, and sector flow context."
+        primaryAction={<Button variant="contained" onClick={handleRun}>Refresh Snapshots</Button>}
+      />
+
+      <FilterBar onReset={() => { setSector(''); setRange('3M'); }}>
+        <TextField 
+          select 
+          label="Range" 
+          value={range} 
+          onChange={(event) => setRange(event.target.value as SmartMoneyRange)}
+          sx={{ minWidth: 120 }}
+        >
+          <MenuItem value="1M">1M</MenuItem>
+          <MenuItem value="3M">3M</MenuItem>
+          <MenuItem value="6M">6M</MenuItem>
+        </TextField>
+        <TextField 
+          select 
+          label="Sector" 
+          value={sector} 
+          onChange={(event) => setSector(event.target.value)}
+          sx={{ minWidth: 180 }}
+        >
+          <MenuItem value="">All Sectors</MenuItem>
+          {sectors.map(s => <MenuItem key={s.sector} value={s.sector}>{s.sector}</MenuItem>)}
+        </TextField>
+      </FilterBar>
 
       {error && <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>{error}</Alert>}
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1.1fr 0.9fr' }, gap: 2 }}>
-        <Stack spacing={2}>
-          <StockList title="Top Accumulation Candidates" items={top} empty="No accumulation candidates found yet." onSelect={loadStock} />
-          <StockList title="Top Distribution Warnings" items={distribution} empty="No distribution warnings found yet." onSelect={loadStock} />
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1.2fr 0.8fr' }, gap: 3, mt: 3 }}>
+        <Stack spacing={3}>
+          <Box>
+            <Typography variant="h6" sx={{ mb: 1 }}>Top Accumulation Candidates</Typography>
+            <DataTable
+              columns={columns}
+              rows={top}
+              getRowId={(row) => row.instrumentId}
+              loading={topLoading}
+              page={topPage}
+              pageSize={topPageSize}
+              totalCount={topTotal}
+              onPageChange={setTopPage}
+              onPageSizeChange={setTopPageSize}
+              onRowClick={(row) => void loadStock(row.instrumentId)}
+            />
+          </Box>
+          <Box>
+            <Typography variant="h6" sx={{ mb: 1 }}>Top Distribution Warnings</Typography>
+            <DataTable
+              columns={columns}
+              rows={distribution}
+              getRowId={(row) => row.instrumentId}
+              loading={distLoading}
+              page={distPage}
+              pageSize={distPageSize}
+              totalCount={distTotal}
+              onPageChange={setDistPage}
+              onPageSizeChange={setDistPageSize}
+              onRowClick={(row) => void loadStock(row.instrumentId)}
+            />
+          </Box>
           <SectorView sectors={sectors} />
         </Stack>
-        <Stack spacing={2}>
+        <Stack spacing={3}>
           <StockDetail stock={selectedStock} loading={detailLoading} />
           <Paper sx={{ p: 2 }}>
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
@@ -102,49 +211,6 @@ export default function SmartMoneyIntelligencePage() {
         </Stack>
       </Box>
     </Box>
-  );
-}
-
-function StockList({ title, items, empty, onSelect }: { title: string; items: SmartMoneyStockSummary[]; empty: string; onSelect: (instrumentId: string) => Promise<void> }) {
-  return (
-    <Paper sx={{ p: 2 }}>
-      <Typography variant="h6" sx={{ mb: 1 }}>{title}</Typography>
-      {items.length === 0 ? <Typography color="text.secondary">{empty}</Typography> : (
-        <Stack spacing={1}>
-          {items.map((item) => (
-            <Paper key={item.instrumentId} variant="outlined" sx={{ p: 1.25 }}>
-              <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" gap={1}>
-                <Box>
-                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                    <Typography fontWeight={700}>{item.symbol}</Typography>
-                    <Chip size="small" label={item.status} color={statusColor(item.status)} />
-                    <Chip size="small" label={item.dataStatus} variant="outlined" />
-                  </Stack>
-                  <Typography variant="body2" color="text.secondary">{item.companyName || 'Unknown company'}{item.sector ? ` · ${item.sector}` : ''}</Typography>
-                  <Typography variant="body2">{item.explanation}</Typography>
-                </Box>
-                <Stack alignItems={{ xs: 'flex-start', md: 'flex-end' }} spacing={0.5}>
-                  <Typography variant="h6">{item.smartMoneyScore}</Typography>
-                  <Typography variant="body2" color={item.dailyChangePercent && item.dailyChangePercent < 0 ? 'error.main' : 'success.main'}>{fmtPercent(item.dailyChangePercent)}</Typography>
-                  <Stack direction="row" spacing={0.5}>
-                    <Tooltip title="View Smart Money Details" arrow>
-                      <IconButton size="small" onClick={() => void onSelect(item.instrumentId)}>
-                        <SearchOutlined fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Open Stock Research" arrow>
-                      <IconButton size="small" component={Link} to={item.researchUrl}>
-                        <LaunchOutlined fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  </Stack>
-                </Stack>
-              </Stack>
-            </Paper>
-          ))}
-        </Stack>
-      )}
-    </Paper>
   );
 }
 

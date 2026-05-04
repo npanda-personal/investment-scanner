@@ -526,6 +526,7 @@ model SmartMoneyContextSnapshot {
   snapshotDate             DateTime
   instrumentId             String
   symbol                   String
+  companyName              String?
   sector                   String?
   smartMoneyScore          Float
   status                   String
@@ -536,13 +537,21 @@ model SmartMoneyContextSnapshot {
   explanation              String?
   source                   String
   dataStatus               String
+  latestClose              Float?
+  latestVolume             Float?
+  averageVolume20          Float?
+  dailyChangePercent       Float?
+  signals                  Json?
+  insiderOwnership         Json?
+  range                    String   @default("3M")
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
 
-  @@unique([snapshotDate, instrumentId])
+  @@unique([snapshotDate, instrumentId, range])
   @@index([snapshotDate])
   @@index([instrumentId])
   @@index([sector])
+  @@index([status, smartMoneyScore])
   @@map("smart_money_context_snapshots")
 }
 

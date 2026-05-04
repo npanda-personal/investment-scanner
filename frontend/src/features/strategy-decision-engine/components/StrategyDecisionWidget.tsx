@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Paper, Typography, CircularProgress, Alert, List, ListItem, ListItemIcon, ListItemText, Divider, Button, IconButton, Tooltip } from '@mui/material';
-import { CheckCircleOutline, ErrorOutline, FactCheckOutlined, VisibilityOutlined, LaunchOutlined } from '@mui/icons-material';
+import { Box, Paper, Typography, CircularProgress, Alert, List, ListItem, ListItemIcon, ListItemText, Divider, IconButton, Tooltip } from '@mui/material';
+import { CheckCircleOutline, ErrorOutline, FactCheckOutlined, LaunchOutlined } from '@mui/icons-material';
 import { fetchLatestDecision, fetchMarketGate } from '../api/strategyDecisionApi';
 import type { StrategyDecisionDto, MarketGateResponse } from '../types';
 import { StatusBadge } from '@/shared/components';

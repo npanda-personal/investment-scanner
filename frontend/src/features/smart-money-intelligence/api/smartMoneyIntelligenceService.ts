@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { SectorSmartMoneySummary, SmartMoneyHealth, SmartMoneyRange, SmartMoneyStockSummary } from '../types';
+import type { PaginatedSmartMoneyListResponse, SectorSmartMoneySummary, SmartMoneyHealth, SmartMoneyRange, SmartMoneyStockSummary } from '../types';
 
 const API_BASE = '/api/v1/smart-money';
 
@@ -8,13 +8,13 @@ export async function fetchSmartMoneyHealth(): Promise<SmartMoneyHealth> {
   return response.data;
 }
 
-export async function fetchSmartMoneyTop(limit = 10, range: SmartMoneyRange = '3M'): Promise<SmartMoneyStockSummary[]> {
-  const response = await axios.get<SmartMoneyStockSummary[]>(`${API_BASE}/top`, { params: { limit, range } });
+export async function fetchSmartMoneyTop(limit = 10, offset = 0, range: SmartMoneyRange = '3M', sector?: string): Promise<PaginatedSmartMoneyListResponse> {
+  const response = await axios.get<PaginatedSmartMoneyListResponse>(`${API_BASE}/top`, { params: { limit, offset, range, sector } });
   return response.data;
 }
 
-export async function fetchSmartMoneyDistribution(limit = 10, range: SmartMoneyRange = '3M'): Promise<SmartMoneyStockSummary[]> {
-  const response = await axios.get<SmartMoneyStockSummary[]>(`${API_BASE}/distribution`, { params: { limit, range } });
+export async function fetchSmartMoneyDistribution(limit = 10, offset = 0, range: SmartMoneyRange = '3M', sector?: string): Promise<PaginatedSmartMoneyListResponse> {
+  const response = await axios.get<PaginatedSmartMoneyListResponse>(`${API_BASE}/distribution`, { params: { limit, offset, range, sector } });
   return response.data;
 }
 

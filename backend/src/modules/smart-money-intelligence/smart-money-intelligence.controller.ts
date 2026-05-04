@@ -13,6 +13,10 @@ export class SmartMoneyIntelligenceController {
     this.service.sectors(parseRange(req.query.range))
   );
 
+  run = async (req: Request, res: Response) => this.respond(res, () =>
+    this.service.run(Number(req.body.batchSize) || 20)
+  );
+
   top = async (req: Request, res: Response) => this.respond(res, () =>
     this.service.top({
       limit: parseLimit(req.query.limit),

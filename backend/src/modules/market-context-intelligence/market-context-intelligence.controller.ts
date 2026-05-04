@@ -5,6 +5,9 @@ export class MarketContextIntelligenceController {
   constructor(private readonly service = new MarketContextIntelligenceService()) {}
 
   summary = async (_req: Request, res: Response) => this.respond(res, () => this.service.summary());
+
+  run = async (_req: Request, res: Response) => this.respond(res, () => this.service.run());
+
   regime = async (_req: Request, res: Response) => this.respond(res, () => this.service.regime());
   sectors = async (_req: Request, res: Response) => this.respond(res, () => this.service.sectors());
   breadth = async (_req: Request, res: Response) => this.respond(res, () => this.service.breadth());

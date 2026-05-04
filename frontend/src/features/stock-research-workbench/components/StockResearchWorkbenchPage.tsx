@@ -7,6 +7,7 @@ import {
   Chip,
   CircularProgress,
   Grid,
+  IconButton,
   Paper,
   Snackbar,
   Stack,
@@ -129,12 +130,12 @@ const StockResearchWorkbenchPage: React.FC = () => {
             <Box sx={{ mt: 1 }}><StatusChip status={overview.data_status} /></Box>
             <Stack direction="row" spacing={0.5} justifyContent={{ xs: 'flex-start', md: 'flex-end' }} sx={{ mt: 1 }}>
               <Tooltip title="Add to Watchlist" arrow>
-                <IconButton size="small" variant="outlined" onClick={() => setWatchlistDialogOpen(true)}>
+                <IconButton size="small" onClick={() => setWatchlistDialogOpen(true)}>
                   <PlaylistAddOutlined fontSize="small" />
                 </IconButton>
               </Tooltip>
               <Tooltip title="Create Price Alert" arrow>
-                <IconButton size="small" variant="outlined" onClick={() => setAlertDialogOpen(true)}>
+                <IconButton size="small" onClick={() => setAlertDialogOpen(true)}>
                   <NotificationsNoneOutlined fontSize="small" />
                 </IconButton>
               </Tooltip>

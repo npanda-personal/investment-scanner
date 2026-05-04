@@ -7,6 +7,7 @@ export const createSmartMoneyIntelligenceRouter = (
   const router = express.Router();
 
   router.get('/smart-money/health', controller.health);
+  router.post('/smart-money/run', controller.run);
   router.get('/smart-money/sectors', controller.sectors);
   router.get('/smart-money/top', controller.top);
   router.get('/smart-money/distribution', controller.distribution);

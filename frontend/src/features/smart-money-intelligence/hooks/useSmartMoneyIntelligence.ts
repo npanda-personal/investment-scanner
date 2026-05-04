@@ -10,30 +10,40 @@ import type { SectorSmartMoneySummary, SmartMoneyHealth, SmartMoneyRange, SmartM
 
 export function useSmartMoneyIntelligence() {
   const [range, setRange] = useState<SmartMoneyRange>('3M');
+  const [sector, setSector] = useState<string>('');
+  
+  // Pagination
+  const [topPage, setTopPage] = useState(0);
+  const [topPageSize, setTopPageSize] = useState(10);
+  const [topTotal, setTopTotal] = useState(0);
+  
+  const [distPage, setDistPage] = useState(0);
+  const [distPageSize, setDistPageSize] = useState(10);
+  const [distTotal, setDistTotal] = useState(0);
+
   const [health, setHealth] = useState<SmartMoneyHealth | null>(null);
   const [top, setTop] = useState<SmartMoneyStockSummary[]>([]);
   const [distribution, setDistribution] = useState<SmartMoneyStockSummary[]>([]);
   const [sectors, setSectors] = useState<SectorSmartMoneySummary[]>([]);
   const [selectedStock, setSelectedStock] = useState<SmartMoneyStockSummary | null>(null);
+  
   const [loading, setLoading] = useState(true);
+  const [topLoading, setTopLoading] = useState(false);
+  const [distLoading, setDistLoading] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const reload = useCallback(async () => {
+  // Initial load for health and sectors
+  const loadInitial = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [healthData, topData, distributionData, sectorData] = await Promise.all([
+      const [healthData, sectorData] = await Promise.all([
         fetchSmartMoneyHealth(),
-        fetchSmartMoneyTop(10, range),
-        fetchSmartMoneyDistribution(10, range),
         fetchSmartMoneySectors(range),
       ]);
       setHealth(healthData);
-      setTop(topData);
-      setDistribution(distributionData);
       setSectors(sectorData);
-      setSelectedStock((current) => current ?? topData[0] ?? distributionData[0] ?? null);
     } catch (err: any) {
       setError(err.response?.data?.error || err.message || 'Failed to load smart money data');
     } finally {
@@ -41,7 +51,36 @@ export function useSmartMoneyIntelligence() {
     }
   }, [range]);
 
-  useEffect(() => { void reload(); }, [reload]);
+  const loadTop = useCallback(async () => {
+    setTopLoading(true);
+    try {
+      const res = await fetchSmartMoneyTop(topPageSize, topPage * topPageSize, range, sector || undefined);
+      setTop(res.results);
+      setTopTotal(res.total);
+      if (!selectedStock && res.results.length > 0) setSelectedStock(res.results[0]);
+    } catch (err: any) {
+      setError(err.response?.data?.error || err.message || 'Failed to load accumulation candidates');
+    } finally {
+      setTopLoading(false);
+    }
+  }, [topPage, topPageSize, range, sector, selectedStock]);
+
+  const loadDist = useCallback(async () => {
+    setDistLoading(true);
+    try {
+      const res = await fetchSmartMoneyDistribution(distPageSize, distPage * distPageSize, range, sector || undefined);
+      setDistribution(res.results);
+      setDistTotal(res.total);
+    } catch (err: any) {
+      setError(err.response?.data?.error || err.message || 'Failed to load distribution warnings');
+    } finally {
+      setDistLoading(false);
+    }
+  }, [distPage, distPageSize, range, sector]);
+
+  useEffect(() => { void loadInitial(); }, [loadInitial]);
+  useEffect(() => { void loadTop(); }, [loadTop]);
+  useEffect(() => { void loadDist(); }, [loadDist]);
 
   const loadStock = async (instrumentId: string) => {
     setDetailLoading(true);
@@ -56,8 +95,19 @@ export function useSmartMoneyIntelligence() {
   };
 
   return {
-    range,
-    setRange,
+    range, setRange,
+    sector, setSector,
+    
+    topPage, setTopPage,
+    topPageSize, setTopPageSize,
+    topTotal,
+    topLoading,
+
+    distPage, setDistPage,
+    distPageSize, setDistPageSize,
+    distTotal,
+    distLoading,
+
     health,
     top,
     distribution,
@@ -67,7 +117,7 @@ export function useSmartMoneyIntelligence() {
     detailLoading,
     error,
     setError,
-    reload,
+    loadInitial,
     loadStock,
   };
 }

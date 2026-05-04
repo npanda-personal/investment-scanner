@@ -1,5 +1,6 @@
 import { MarketDataFoundationService } from '../market-data-foundation';
 import { SmartMoneyIntelligenceProvider } from './smart-money-intelligence.provider';
+import { SmartMoneyIntelligenceRepository } from './smart-money-intelligence.repository';
 import type {
   InsiderOwnershipSummary,
   SectorSmartMoneySummary,
@@ -24,6 +25,7 @@ const RANGE_LIMITS: Record<SmartMoneyRange, number> = { '1M': 35, '3M': 90, '6M'
 
 export class SmartMoneyIntelligenceService {
   constructor(
+    private readonly repository = new SmartMoneyIntelligenceRepository(),
     private readonly marketDataService = new MarketDataFoundationService(),
     private readonly provider = new SmartMoneyIntelligenceProvider()
   ) {}
@@ -38,38 +40,81 @@ export class SmartMoneyIntelligenceService {
       notes: [
         'Price and volume signals are calculated from local persisted market data.',
         'Insider and institutional ownership are explicit MISSING placeholders until a free provider is configured.',
+        'Data is persisted as daily snapshots to avoid N+1 calculation bottlenecks.'
       ],
     };
   }
 
+  async run(batchSize: number = 20): Promise<{ generated: number, skipped: number, errors: string[] }> {
+    // Process all active instruments to generate daily snapshots
+    const response = await this.marketDataService.listInstruments({ page: 1, pageSize: 5000 });
+    const instruments = response.instruments || [];
+    
+    let generated = 0;
+    let skipped = 0;
+    const errors: string[] = [];
+
+    // Parallel batch processing
+    for (let i = 0; i < instruments.length; i += batchSize) {
+      const chunk = instruments.slice(i, i + batchSize);
+      
+      await Promise.all(chunk.map(async (instrument: any) => {
+        try {
+          // Process 3M range by default for the snapshot
+          const range: SmartMoneyRange = '3M';
+          const bars = await this.loadBars(instrument.id, range).catch(() => []);
+          const ownership = this.missingOwnership(); // Placeholder until provider is configured
+          
+          const summary = this.calculateStockSummary(instrument, bars, ownership, range);
+          
+          if (summary.status !== 'INSUFFICIENT_DATA') {
+            await this.repository.saveSnapshot(summary);
+            generated++;
+          } else {
+            skipped++;
+          }
+        } catch (err: any) {
+          errors.push(`Failed for ${instrument.id}: ${err.message}`);
+        }
+      }));
+    }
+
+    return { generated, skipped, errors };
+  }
+
   async stock(instrumentId: string, range: SmartMoneyRange = '3M'): Promise<SmartMoneyStockSummary | null> {
     if (!instrumentId) throw new Error('instrumentId is required');
+    
+    // First try to return the persisted snapshot
+    const persisted = await this.repository.latestStockSnapshot(instrumentId, range);
+    if (persisted) return persisted;
+
+    // Fallback to on-the-fly calculation if missing
     const instrument = await this.marketDataService.getInstrument(instrumentId) as InstrumentLike | null;
     if (!instrument) return null;
     const bars = await this.loadBars(instrumentId, range);
     const ownership = await this.provider.fetchInsiderOwnership(instrument.symbol).catch(() => this.missingOwnership());
-    return this.calculateStockSummary(instrument, bars, ownership, range);
+    const summary = this.calculateStockSummary(instrument, bars, ownership, range);
+    
+    if (summary.status !== 'INSUFFICIENT_DATA') {
+        await this.repository.saveSnapshot(summary);
+    }
+    
+    return summary;
   }
 
-  async top(query: SmartMoneyListQuery): Promise<SmartMoneyStockSummary[]> {
-    const summaries = await this.loadUniverseSummaries(query.range, query.sector);
-    return summaries
-      .filter((item) => item.status === 'ACCUMULATION' || item.smartMoneyScore >= 60)
-      .sort((a, b) => b.smartMoneyScore - a.smartMoneyScore)
-      .slice(0, query.limit);
+  async top(query: SmartMoneyListQuery) {
+    const { results } = await this.repository.latestSnapshots(query, false);
+    return results;
   }
 
-  async distribution(query: SmartMoneyListQuery): Promise<SmartMoneyStockSummary[]> {
-    const summaries = await this.loadUniverseSummaries(query.range, query.sector);
-    return summaries
-      .filter((item) => item.status === 'DISTRIBUTION' || item.smartMoneyScore <= 40)
-      .sort((a, b) => a.smartMoneyScore - b.smartMoneyScore)
-      .slice(0, query.limit);
+  async distribution(query: SmartMoneyListQuery) {
+    const { results } = await this.repository.latestSnapshots(query, true);
+    return results;
   }
 
   async sectors(range: SmartMoneyRange = '3M'): Promise<SectorSmartMoneySummary[]> {
-    const summaries = await this.loadUniverseSummaries(range);
-    return this.aggregateSectors(summaries);
+    return this.repository.latestSectorSnapshots(range);
   }
 
   calculateStockSummary(
@@ -210,15 +255,7 @@ export class SmartMoneyIntelligenceService {
     }).sort((a, b) => b.averageSmartMoneyScore - a.averageSmartMoneyScore);
   }
 
-  private async loadUniverseSummaries(range: SmartMoneyRange, sector?: string): Promise<SmartMoneyStockSummary[]> {
-    const response = await this.marketDataService.listInstruments({ page: 1, pageSize: 75 });
-    const instruments = (response.instruments || []).filter((instrument: any) => !sector || instrument.sector === sector);
-    const summaries = await Promise.all(instruments.map(async (instrument: any) => {
-      const bars = await this.loadBars(instrument.id, range).catch(() => []);
-      return this.calculateStockSummary(instrument, bars, this.missingOwnership(), range);
-    }));
-    return summaries.filter((summary) => summary.status !== 'INSUFFICIENT_DATA');
-  }
+
 
   private async loadBars(instrumentId: string, range: SmartMoneyRange): Promise<SmartMoneyPriceBar[]> {
     const result = await this.marketDataService.listPricesByInstrumentId(instrumentId, RANGE_LIMITS[range]);

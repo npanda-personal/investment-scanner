@@ -21,6 +21,7 @@ import { historicalContextSnapshotsRouter } from '../modules/historical-context-
 import { signalCalibrationEngineRouter } from '../modules/signal-calibration-engine';
 import { dataQualityEngineRouter } from '../modules/data-quality-engine';
 import { strategyDecisionEngineRouter } from '../modules/strategy-decision-engine';
+import { researchHubRouter } from '../modules/research-hub';
 
 export interface ApiModule {
   path: string;
@@ -47,6 +48,7 @@ export const apiModules: ApiModule[] = [
   { path: '/api/v1', router: signalCalibrationEngineRouter },
   { path: '/api/v1', router: dataQualityEngineRouter },
   { path: '/api/v1/strategy', router: strategyDecisionEngineRouter },
+  { path: '/api/v1/research', router: researchHubRouter },
   { path: '/api/market-data-foundation', router: marketDataFoundationRouter },
 ];
 

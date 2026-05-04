@@ -56,6 +56,11 @@ export interface SectorSmartMoneySummary {
   updatedAt: string;
 }
 
+export interface PaginatedSmartMoneyListResponse {
+  results: SmartMoneyStockSummary[];
+  total: number;
+}
+
 export interface SmartMoneyHealth {
   status: 'ok';
   module: 'smart-money-intelligence';

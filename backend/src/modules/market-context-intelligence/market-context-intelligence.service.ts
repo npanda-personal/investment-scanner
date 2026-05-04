@@ -1,5 +1,6 @@
 import { MarketDataFoundationService } from '../market-data-foundation';
 import { SignalGenerationEngineService } from '../signal-generation-engine';
+import { MarketContextIntelligenceRepository } from './market-context-intelligence.repository';
 import type {
   ContextInstrument,
   CountryStrengthItem,
@@ -12,23 +13,26 @@ import type {
   SectorRotationItem,
 } from './market-context-intelligence.types';
 
-const SAMPLE_SIZE = 120;
+const SAMPLE_SIZE = 500;
 
 export class MarketContextIntelligenceService {
   constructor(
+    private readonly repository = new MarketContextIntelligenceRepository(),
     private readonly marketDataService = new MarketDataFoundationService(),
     private readonly signalService = new SignalGenerationEngineService()
   ) {}
 
-  async summary(): Promise<MarketContextSummary> {
+  async run(): Promise<{ status: string }> {
     const [items, signals] = await Promise.all([this.loadContextInstruments(), this.loadSignalMap()]);
     const enriched = items.map((item) => ({ ...item, ...signals.get(item.instrumentId) }));
+    
     const regime = this.calculateRegime(enriched);
     const sectors = this.rankSectors(enriched);
     const breadth = this.calculateBreadth(enriched);
     const countries = this.rankCountries(enriched);
     const macro = this.macro();
-    return {
+    
+    const summary: MarketContextSummary = {
       regime,
       topSectors: sectors.slice(0, 5),
       weakSectors: sectors.slice(-5).reverse(),
@@ -39,22 +43,37 @@ export class MarketContextIntelligenceService {
       updatedAt: new Date().toISOString(),
       dataStatus: items.length >= 30 ? 'PARTIAL' : items.length > 0 ? 'PARTIAL' : 'MISSING',
     };
+
+    await this.repository.saveSnapshot(summary);
+    return { status: 'success' };
+  }
+
+  async summary(): Promise<MarketContextSummary> {
+    const persisted = await this.repository.latestSnapshot();
+    if (persisted) return persisted;
+
+    await this.run();
+    return (await this.repository.latestSnapshot())!;
   }
 
   async regime() {
-    return this.calculateRegime(await this.loadContextInstrumentsWithSignals());
+    const s = await this.summary();
+    return s.regime;
   }
 
   async sectors() {
-    return this.rankSectors(await this.loadContextInstrumentsWithSignals());
+    const s = await this.summary();
+    return s.topSectors.concat(s.weakSectors);
   }
 
   async breadth() {
-    return this.calculateBreadth(await this.loadContextInstrumentsWithSignals());
+    const s = await this.summary();
+    return s.breadth;
   }
 
   async countries() {
-    return this.rankCountries(await this.loadContextInstrumentsWithSignals());
+    const s = await this.summary();
+    return s.countryStrength;
   }
 
   macro(): MacroSnapshot {
@@ -148,10 +167,7 @@ export class MarketContextIntelligenceService {
     return 'LAGGING';
   }
 
-  private async loadContextInstrumentsWithSignals(): Promise<ContextInstrument[]> {
-    const [items, signals] = await Promise.all([this.loadContextInstruments(), this.loadSignalMap()]);
-    return items.map((item) => ({ ...item, ...signals.get(item.instrumentId) }));
-  }
+
 
   private async loadContextInstruments(): Promise<ContextInstrument[]> {
     const response = await this.marketDataService.listInstruments({ page: 1, pageSize: SAMPLE_SIZE });

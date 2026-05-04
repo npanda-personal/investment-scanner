@@ -19,6 +19,7 @@ import { historicalContextSnapshotsRoutes } from '@/features/historical-context-
 import { signalCalibrationEngineRoutes } from '@/features/signal-calibration-engine';
 import { dataQualityEngineRoutes } from '@/features/data-quality-engine';
 import { strategyDecisionEngineRoutes } from '@/features/strategy-decision-engine';
+import { researchHubRoutes } from '@/features/research-hub';
 
 export const appRoutes: RouteObject[] = [
   ...publicAuthIdentityRoutes,
@@ -31,6 +32,7 @@ export const appRoutes: RouteObject[] = [
         element: <NavigationLayout />,
         children: [
           { index: true, element: <HomePage /> },
+          ...researchHubRoutes,
           ...marketDataFoundationRoutes,
           ...stockResearchWorkbenchRoutes,
           ...signalGenerationEngineRoutes,

@@ -29,7 +29,7 @@ export class HistoricalContextSnapshotsRepository {
   }
 
   async upsertSmartMoney(input: any): Promise<'inserted' | 'updated'> {
-    const where = { snapshotDate_instrumentId: { snapshotDate: input.snapshotDate, instrumentId: input.instrumentId } };
+    const where = { snapshotDate_instrumentId_range: { snapshotDate: input.snapshotDate, instrumentId: input.instrumentId, range: '3M' } };
     const existing = await this.db.smartMoneyContextSnapshot.findUnique({ where });
     await this.db.smartMoneyContextSnapshot.upsert({ where, create: input, update: input });
     return existing ? 'updated' : 'inserted';

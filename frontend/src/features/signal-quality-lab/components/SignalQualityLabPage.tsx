@@ -21,8 +21,7 @@ import {
   Typography,
 } from '@mui/material';
 import { 
-  VisibilityOutlined, 
-  LaunchOutlined 
+  VisibilityOutlined
 } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
 import { fetchSignalHistory, fetchSignalOutcomes, recalculateSignalQuality } from '../api/signalQualityLabService';

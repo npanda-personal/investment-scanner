@@ -77,6 +77,7 @@ export interface SmartMoneyHealth {
 
 export interface SmartMoneyListQuery {
   limit: number;
+  offset?: number;
   sector?: string;
   range: SmartMoneyRange;
 }

@@ -11,7 +11,7 @@ export const createMarketContextIntelligenceRouter = (
   router.get('/market-context/breadth', controller.breadth);
   router.get('/market-context/countries', controller.countries);
   router.get('/market-context/macro', controller.macro);
-  router.post('/market-context/refresh', controller.refresh);
+  router.post('/market-context/run', controller.run);
   return router;
 };
 
