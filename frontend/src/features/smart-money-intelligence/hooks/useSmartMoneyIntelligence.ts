@@ -55,9 +55,9 @@ export function useSmartMoneyIntelligence() {
     setTopLoading(true);
     try {
       const res = await fetchSmartMoneyTop(topPageSize, topPage * topPageSize, range, sector || undefined);
-      setTop(res.results);
-      setTopTotal(res.total);
-      if (!selectedStock && res.results.length > 0) setSelectedStock(res.results[0]);
+      setTop(res.results || []);
+      setTopTotal(res.total || 0);
+      if (!selectedStock && res.results && res.results.length > 0) setSelectedStock(res.results[0]);
     } catch (err: any) {
       setError(err.response?.data?.error || err.message || 'Failed to load accumulation candidates');
     } finally {
@@ -69,8 +69,8 @@ export function useSmartMoneyIntelligence() {
     setDistLoading(true);
     try {
       const res = await fetchSmartMoneyDistribution(distPageSize, distPage * distPageSize, range, sector || undefined);
-      setDistribution(res.results);
-      setDistTotal(res.total);
+      setDistribution(res.results || []);
+      setDistTotal(res.total || 0);
     } catch (err: any) {
       setError(err.response?.data?.error || err.message || 'Failed to load distribution warnings');
     } finally {

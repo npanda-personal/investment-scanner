@@ -104,13 +104,11 @@ export class SmartMoneyIntelligenceService {
   }
 
   async top(query: SmartMoneyListQuery) {
-    const { results } = await this.repository.latestSnapshots(query, false);
-    return results;
+    return this.repository.latestSnapshots(query, false);
   }
 
   async distribution(query: SmartMoneyListQuery) {
-    const { results } = await this.repository.latestSnapshots(query, true);
-    return results;
+    return this.repository.latestSnapshots(query, true);
   }
 
   async sectors(range: SmartMoneyRange = '3M'): Promise<SectorSmartMoneySummary[]> {
