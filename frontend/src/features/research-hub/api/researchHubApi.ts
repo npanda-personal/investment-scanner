@@ -1,19 +1,15 @@
 import axios from 'axios';
-import type { MarketGateResponse } from '@/features/strategy-decision-engine';
-import type { SignalResult } from '@/features/signal-generation-engine';
-import type { SmartMoneyStockSummary } from '@/features/smart-money-intelligence';
-import type { StrategyDecisionDto } from '@/features/strategy-decision-engine';
+import type { MarketGateResponse, StrategyDecisionDto } from '@/features/strategy-decision-engine';
+import type { MarketRegimeSummary, SectorRotationItem, MarketBreadth } from '@/features/market-context-intelligence';
 
 export interface ResearchOverview {
   marketGate: MarketGateResponse;
-  marketRegime: {
-    regime: string;
-    score: number;
-    explanation: string;
-  };
-  topSignals: SignalResult[];
-  topSmartMoney: SmartMoneyStockSummary[];
+  marketRegime: MarketRegimeSummary;
+  topSectors: SectorRotationItem[];
+  weakSectors: SectorRotationItem[];
+  breadth: MarketBreadth;
   topStrategyCandidates: StrategyDecisionDto[];
+  topExits: StrategyDecisionDto[];
   updatedAt: string;
 }
 
