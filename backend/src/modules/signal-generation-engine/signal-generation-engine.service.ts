@@ -283,40 +283,88 @@ export class SignalGenerationEngineService {
     const low52 = this.periodLow(prices, 252);
     const rsiNow = this.rsi(prices, 14);
     const rsiPrev = this.rsi(prices.slice(1), 14);
+    const currentAtr = this.atr(prices, 14);
+    const currentClosePos = this.closePosition(latest);
+    const currentAdx = this.adx(prices, 14);
+    const obvTrendingUp = this.isObvTrendingUp(prices, 10);
+    const obvTrendingDown = this.isObvTrendingDown(prices, 10);
+
+    const isRangeBound = currentAdx !== null && currentAdx < 20;
 
     if (latest && sma50 !== null) {
-      (latest.adjusted_close >= sma50 ? signals : negativeSignals).push(this.signal(
-        latest.adjusted_close >= sma50 ? 'PRICE_ABOVE_SMA50' : 'PRICE_BELOW_SMA50',
-        latest.adjusted_close >= sma50 ? 'price is above SMA50' : 'price is below SMA50',
-        'TECHNICAL'
-      ));
+      if (isRangeBound) {
+        // Mute SMA signals in range-bound markets (noise)
+      } else {
+        (latest.adjusted_close >= sma50 ? signals : negativeSignals).push(this.signal(
+          latest.adjusted_close >= sma50 ? 'PRICE_ABOVE_SMA50' : 'PRICE_BELOW_SMA50',
+          latest.adjusted_close >= sma50 ? 'price is above SMA50' : 'price is below SMA50',
+          'TECHNICAL'
+        ));
+      }
     }
     if (sma50 !== null && sma200 !== null) {
-      (sma50 >= sma200 ? signals : negativeSignals).push(this.signal(
-        sma50 >= sma200 ? 'SMA50_ABOVE_SMA200' : 'SMA50_BELOW_SMA200',
-        sma50 >= sma200 ? 'SMA50 is above SMA200' : 'SMA50 is below SMA200',
-        'TECHNICAL'
-      ));
+      if (isRangeBound) {
+        // Mute SMA crossover signals in range-bound markets
+      } else {
+        (sma50 >= sma200 ? signals : negativeSignals).push(this.signal(
+          sma50 >= sma200 ? 'SMA50_ABOVE_SMA200' : 'SMA50_BELOW_SMA200',
+          sma50 >= sma200 ? 'SMA50 is above SMA200' : 'SMA50 is below SMA200',
+          'TECHNICAL'
+        ));
+      }
     }
+    
+    // Candlestick Rejection & Breakouts
     if (latest && high52 !== null && latest.adjusted_close >= high52 * 0.97) {
-      signals.push(this.signal('NEAR_52_WEEK_HIGH', 'price is near a 52-week high', 'TECHNICAL'));
+      if (currentClosePos !== null && currentClosePos < 0.3) {
+         negativeSignals.push(this.signal('FALSE_BREAKOUT_REJECTION', 'price tagged 52-week high but closed in the bottom 30% of the daily range (Trap)', 'TECHNICAL'));
+      } else {
+         signals.push(this.signal('NEAR_52_WEEK_HIGH', 'price is near a 52-week high', 'TECHNICAL'));
+      }
     }
     if (latest && low52 !== null && latest.adjusted_close <= low52 * 1.03) {
-      negativeSignals.push(this.signal('NEAR_52_WEEK_LOW', 'price is near a 52-week low', 'TECHNICAL'));
+      if (currentClosePos !== null && currentClosePos > 0.7) {
+         signals.push(this.signal('FALSE_BREAKDOWN_REJECTION', 'price tagged 52-week low but closed in the top 30% of the daily range (Trap)', 'TECHNICAL'));
+      } else {
+         negativeSignals.push(this.signal('NEAR_52_WEEK_LOW', 'price is near a 52-week low', 'TECHNICAL'));
+      }
     }
+
+    // Mean Reversion is stronger in range-bound markets
     if (rsiNow !== null && rsiPrev !== null && rsiPrev < 30 && rsiNow > rsiPrev) {
-      signals.push(this.signal('RSI_RECOVERING', 'RSI is recovering from oversold levels', 'TECHNICAL'));
+      signals.push(this.signal(isRangeBound ? 'STRONG_RSI_RECOVERY' : 'RSI_RECOVERING', 'RSI is recovering from oversold levels', 'TECHNICAL'));
     }
     if (rsiNow !== null && rsiPrev !== null && rsiPrev > 70 && rsiNow < rsiPrev) {
-      negativeSignals.push(this.signal('RSI_OVERBOUGHT_REVERSAL', 'RSI is reversing from overbought levels', 'TECHNICAL'));
+      negativeSignals.push(this.signal(isRangeBound ? 'STRONG_RSI_REVERSAL' : 'RSI_OVERBOUGHT_REVERSAL', 'RSI is reversing from overbought levels', 'TECHNICAL'));
     }
+    
+    // Volatility-Adjusted Volume Breakout with Institutional Footprint (OBV)
     const averageVolume = this.average(prices.slice(1, 21).map((price) => price.volume).filter((value): value is number => typeof value === 'number'));
     if (latest?.volume && averageVolume && latest.volume >= averageVolume * 1.5) {
-      (previous && latest.adjusted_close < previous.adjusted_close ? negativeSignals : signals).push(this.signal(
-        previous && latest.adjusted_close < previous.adjusted_close ? 'DOWN_VOLUME_SELLOFF' : 'VOLUME_BREAKOUT',
-        previous && latest.adjusted_close < previous.adjusted_close ? 'heavy down-volume selloff' : 'volume breakout confirms the move',
-        'TECHNICAL'
-      ));
+      const priceMove = previous ? Math.abs(latest.adjusted_close - previous.adjusted_close) : 0;
+      
+      if (currentAtr !== null && priceMove > (currentAtr * 1.5)) {
+        if (previous && latest.adjusted_close < previous.adjusted_close) {
+          if (obvTrendingDown) {
+            negativeSignals.push(this.signal('CONFIRMED_DOWN_VOLUME_SELLOFF', 'heavy selloff exceeding 1.5x ATR with institutional distribution (OBV)', 'TECHNICAL'));
+          } else {
+            negativeSignals.push(this.signal('DOWN_VOLUME_SELLOFF', 'heavy down-volume selloff exceeding 1.5x ATR', 'TECHNICAL'));
+          }
+        } else {
+          if (obvTrendingUp) {
+            signals.push(this.signal('CONFIRMED_VOLUME_BREAKOUT', 'volume breakout exceeding 1.5x ATR with institutional accumulation (OBV)', 'TECHNICAL'));
+          } else {
+            signals.push(this.signal('VOLUME_BREAKOUT', 'volume breakout confirms the move exceeding 1.5x ATR', 'TECHNICAL'));
+          }
+        }
+      } else if (currentAtr === null) {
+        // Fallback if ATR is not available
+        (previous && latest.adjusted_close < previous.adjusted_close ? negativeSignals : signals).push(this.signal(
+          previous && latest.adjusted_close < previous.adjusted_close ? 'DOWN_VOLUME_SELLOFF' : 'VOLUME_BREAKOUT',
+          previous && latest.adjusted_close < previous.adjusted_close ? 'heavy down-volume selloff' : 'volume breakout confirms the move',
+          'TECHNICAL'
+        ));
+      }
     }
 
     return { score: this.categoryScore(signals.length, negativeSignals.length), signals, negativeSignals };
@@ -406,6 +454,114 @@ export class SignalGenerationEngineService {
     return 100 - (100 / (1 + rs));
   }
 
+  adx(prices: SignalPricePoint[], period: number): number | null {
+    if (prices.length <= period * 2) return null;
+    const chronological = [...prices].slice(0, period * 2 + 1).reverse();
+    
+    let trueRanges: number[] = [];
+    let plusDM: number[] = [];
+    let minusDM: number[] = [];
+
+    for (let i = 1; i < chronological.length; i++) {
+      const current = chronological[i];
+      const previous = chronological[i - 1];
+      
+      if (current.high === null || current.low === null || previous.high === null || previous.low === null) {
+        trueRanges.push(0);
+        plusDM.push(0);
+        minusDM.push(0);
+        continue;
+      }
+
+      const tr = Math.max(
+        current.high - current.low,
+        Math.abs(current.high - previous.adjusted_close),
+        Math.abs(current.low - previous.adjusted_close)
+      );
+      trueRanges.push(tr);
+
+      const upMove = current.high - previous.high;
+      const downMove = previous.low - current.low;
+
+      if (upMove > downMove && upMove > 0) {
+        plusDM.push(upMove);
+      } else {
+        plusDM.push(0);
+      }
+
+      if (downMove > upMove && downMove > 0) {
+        minusDM.push(downMove);
+      } else {
+        minusDM.push(0);
+      }
+    }
+
+    if (trueRanges.length < period * 2) return null;
+
+    let smoothedTR = trueRanges.slice(0, period).reduce((a, b) => a + b, 0);
+    let smoothedPlusDM = plusDM.slice(0, period).reduce((a, b) => a + b, 0);
+    let smoothedMinusDM = minusDM.slice(0, period).reduce((a, b) => a + b, 0);
+
+    let dxArray: number[] = [];
+
+    for (let i = period; i < trueRanges.length; i++) {
+      smoothedTR = smoothedTR - (smoothedTR / period) + trueRanges[i];
+      smoothedPlusDM = smoothedPlusDM - (smoothedPlusDM / period) + plusDM[i];
+      smoothedMinusDM = smoothedMinusDM - (smoothedMinusDM / period) + minusDM[i];
+
+      const plusDI = (smoothedPlusDM / smoothedTR) * 100;
+      const minusDI = (smoothedMinusDM / smoothedTR) * 100;
+
+      const dx = (Math.abs(plusDI - minusDI) / (plusDI + minusDI)) * 100;
+      dxArray.push(dx || 0);
+    }
+
+    if (dxArray.length < period) return null;
+
+    let adxVal = dxArray.slice(0, period).reduce((a, b) => a + b, 0) / period;
+    for (let i = period; i < dxArray.length; i++) {
+      adxVal = (adxVal * (period - 1) + dxArray[i]) / period;
+    }
+
+    return adxVal;
+  }
+
+  atr(prices: SignalPricePoint[], period: number): number | null {
+    if (prices.length <= period) return null;
+    const chronological = [...prices].slice(0, period * 2 + 1).reverse();
+    if (chronological.length < period + 1) return null;
+
+    let trueRanges: number[] = [];
+    for (let i = 1; i < chronological.length; i++) {
+      const current = chronological[i];
+      const previous = chronological[i - 1];
+      if (current.high === null || current.low === null) {
+        trueRanges.push(0);
+        continue;
+      }
+      const tr = Math.max(
+        current.high - current.low,
+        Math.abs(current.high - previous.adjusted_close),
+        Math.abs(current.low - previous.adjusted_close)
+      );
+      trueRanges.push(tr);
+    }
+
+    if (trueRanges.length < period) return null;
+    
+    let atrVal = trueRanges.slice(0, period).reduce((sum, val) => sum + val, 0) / period;
+    for (let i = period; i < trueRanges.length; i++) {
+      atrVal = (atrVal * (period - 1) + trueRanges[i]) / period;
+    }
+
+    return atrVal;
+  }
+
+  closePosition(price: SignalPricePoint | undefined): number | null {
+    if (!price || price.high === null || price.low === null || price.high === price.low) return null;
+    return (price.adjusted_close - price.low) / (price.high - price.low);
+  }
+
   periodHigh(prices: SignalPricePoint[], period: number): number | null {
     const values = prices.slice(0, period).map((price) => price.adjusted_close);
     return values.length > 0 ? Math.max(...values) : null;
@@ -483,6 +639,9 @@ export class SignalGenerationEngineService {
     return prices
       .map((price) => ({
         date: typeof price.date === 'string' ? price.date : new Date(price.date).toISOString(),
+        open: this.optionalNumber(price.open),
+        high: this.optionalNumber(price.high),
+        low: this.optionalNumber(price.low),
         close: Number(price.close),
         adjusted_close: Number(price.adjusted_close ?? price.close),
         volume: price.volume !== null && price.volume !== undefined ? Number(price.volume) : null,
@@ -508,6 +667,43 @@ export class SignalGenerationEngineService {
   private average(values: number[]): number | null {
     if (values.length === 0) return null;
     return values.reduce((sum, value) => sum + value, 0) / values.length;
+  }
+
+  obv(prices: SignalPricePoint[]): number[] {
+    if (prices.length === 0) return [];
+    const chronological = [...prices].reverse();
+    let currentOBV = 0;
+    const obvArray: number[] = [currentOBV];
+
+    for (let i = 1; i < chronological.length; i++) {
+      const current = chronological[i];
+      const previous = chronological[i - 1];
+      if (current.volume === null) {
+        obvArray.push(currentOBV);
+        continue;
+      }
+      
+      if (current.adjusted_close > previous.adjusted_close) {
+        currentOBV += current.volume;
+      } else if (current.adjusted_close < previous.adjusted_close) {
+        currentOBV -= current.volume;
+      }
+      obvArray.push(currentOBV);
+    }
+    
+    return obvArray.reverse();
+  }
+
+  isObvTrendingUp(prices: SignalPricePoint[], period: number = 10): boolean {
+    const obvArray = this.obv(prices);
+    if (obvArray.length < period) return false;
+    return obvArray[0] > obvArray[period - 1];
+  }
+
+  isObvTrendingDown(prices: SignalPricePoint[], period: number = 10): boolean {
+    const obvArray = this.obv(prices);
+    if (obvArray.length < period) return false;
+    return obvArray[0] < obvArray[period - 1];
   }
 }
 

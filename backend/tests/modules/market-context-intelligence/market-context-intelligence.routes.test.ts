@@ -10,7 +10,7 @@ describe('market context routes', () => {
       breadth: jest.fn(),
       countries: jest.fn(),
       macro: jest.fn(),
-      refresh: jest.fn(),
+      run: jest.fn(),
     } as any);
     const routes = router.stack.filter((layer: any) => layer.route).map((layer: any) => `${Object.keys(layer.route.methods)[0].toUpperCase()} ${layer.route.path}`);
 
@@ -21,7 +21,7 @@ describe('market context routes', () => {
       'GET /market-context/breadth',
       'GET /market-context/countries',
       'GET /market-context/macro',
-      'POST /market-context/refresh',
+      'POST /market-context/run',
     ]);
   });
 });

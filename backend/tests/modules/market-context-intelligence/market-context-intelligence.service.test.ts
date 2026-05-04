@@ -61,7 +61,21 @@ describe('MarketContextIntelligenceService', () => {
       listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: instrument().prices.map((close: number) => ({ adjusted_close: close })) }),
     };
     const signalService = { topSignals: jest.fn().mockResolvedValue({ signals: [{ instrument_id: 'stock-1', direction: 'BULLISH', score: 80 }], total: 1, limit: 100, offset: 0 }) };
-    const service = new MarketContextIntelligenceService(marketDataService as any, signalService as any);
+    const repository = {
+      latestSnapshot: jest.fn().mockResolvedValue({
+        regime: { regime: 'RISK_ON', score: 80, explanation: '', dataStatus: 'COMPLETE', updatedAt: '' },
+        topSectors: [],
+        weakSectors: [],
+        breadth: { percentAboveSma50: 0.8, percentAboveSma200: 0.8, advanceDeclineRatio: 1.5, newHigh52WeekCount: 10, newLow52WeekCount: 2, bullishSignalCount: 10, bearishSignalCount: 2, instrumentCount: 100, dataStatus: 'COMPLETE' },
+        countryStrength: [],
+        macro: { macroStatus: 'UNKNOWN', dataStatus: 'MISSING', explanation: 'Macro providers are not configured yet.', interestRateProxy: null, inflationProxy: null, usdStrengthProxy: null, commodityProxy: null },
+        explanation: ['Test'],
+        updatedAt: '2026-01-01',
+        dataStatus: 'COMPLETE'
+      }),
+      saveSnapshot: jest.fn(),
+    };
+    const service = new MarketContextIntelligenceService(repository as any, marketDataService as any, signalService as any);
 
     const summary = await service.summary();
 

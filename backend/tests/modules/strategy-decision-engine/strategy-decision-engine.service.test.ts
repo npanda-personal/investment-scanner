@@ -68,7 +68,7 @@ describe('StrategyDecisionEngineService', () => {
   describe('evaluateTrendMomentum', () => {
     it('returns TRADE_CANDIDATE when all rules align', () => {
       const ctx = {
-        instrument: { id: '1', symbol: 'ABC' },
+        instrument: { id: '1', symbol: 'ABC', sector: 'Tech' },
         prices: [100, 95, 90],
         latestPrice: 100,
         sma50: 90,
@@ -78,6 +78,7 @@ describe('StrategyDecisionEngineService', () => {
         smartMoney: { status: 'ACCUMULATION' },
         quality: { eligibleForSignals: true },
         gate: { marketGate: 'OPEN' },
+        sectors: [{ sector: 'Tech', relativeStrengthScore: 70 }],
       };
       const result = (service as any).evaluateTrendMomentum(ctx);
       expect(result.decision).toBe('TRADE_CANDIDATE');
@@ -86,13 +87,14 @@ describe('StrategyDecisionEngineService', () => {
 
     it('should return AVOID if price is below SMA50', () => {
       const ctx = {
-        instrument: { id: 'test', symbol: 'TEST' },
+        instrument: { id: 'test', symbol: 'TEST', sector: 'Tech' },
         prices: new Array(200).fill(100),
         latestPrice: 85,
         sma50: 90,
         sma200: 80,
         gate: { marketGate: 'OPEN' },
         quality: { eligibleForSignals: true },
+        sectors: [],
       };
       const result = (service as any).evaluateTrendMomentum(ctx);
       expect(result.decision).toBe('AVOID');
@@ -101,13 +103,14 @@ describe('StrategyDecisionEngineService', () => {
 
     it('should return AVOID if market gate is CLOSED', () => {
       const ctx = {
-        instrument: { id: 'test', symbol: 'TEST' },
+        instrument: { id: 'test', symbol: 'TEST', sector: 'Tech' },
         prices: new Array(200).fill(100),
         latestPrice: 110,
         sma50: 100,
         sma200: 90,
         gate: { marketGate: 'CLOSED' },
         quality: { eligibleForSignals: true },
+        sectors: [{ sector: 'Tech', relativeStrengthScore: 60 }],
       };
       const result = (service as any).evaluateTrendMomentum(ctx);
       expect(result.decision).toBe('AVOID');
@@ -116,13 +119,14 @@ describe('StrategyDecisionEngineService', () => {
 
     it('should include score breakdown and cap confidence if data gaps exist', () => {
       const ctx = {
-        instrument: { id: 'test', symbol: 'TEST' },
+        instrument: { id: 'test', symbol: 'TEST', sector: 'Tech' },
         prices: new Array(200).fill(100),
         latestPrice: 110,
         sma50: 100,
         sma200: 90,
         gate: { marketGate: 'OPEN' },
         quality: { eligibleForSignals: true },
+        sectors: [{ sector: 'Tech', relativeStrengthScore: 60 }],
         // missing calibrated, rawSignal, smartMoney
       };
       const result = (service as any).evaluateTrendMomentum(ctx);

@@ -97,6 +97,9 @@ export interface SignalRunResponse {
 
 export interface SignalPricePoint {
   date: string;
+  open: number | null;
+  high: number | null;
+  low: number | null;
   close: number;
   adjusted_close: number;
   volume: number | null;

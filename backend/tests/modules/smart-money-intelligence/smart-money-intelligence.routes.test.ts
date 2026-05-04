@@ -5,6 +5,7 @@ describe('smart money intelligence routes', () => {
   it('registers MVP endpoints', () => {
     const router = createSmartMoneyIntelligenceRouter({
       health: jest.fn(),
+      run: jest.fn(),
       sectors: jest.fn(),
       top: jest.fn(),
       distribution: jest.fn(),
@@ -14,6 +15,7 @@ describe('smart money intelligence routes', () => {
 
     expect(routes).toEqual([
       'GET /smart-money/health',
+      'POST /smart-money/run',
       'GET /smart-money/sectors',
       'GET /smart-money/top',
       'GET /smart-money/distribution',

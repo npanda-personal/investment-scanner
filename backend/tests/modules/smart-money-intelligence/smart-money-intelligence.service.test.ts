@@ -80,20 +80,23 @@ describe('SmartMoneyIntelligenceService', () => {
     expect(sectors[0].instrumentCount).toBe(2);
   });
 
-  it('returns top accumulation and distribution lists from mocked market data', async () => {
-    const marketDataService = {
-      listInstruments: jest.fn().mockResolvedValue({ instruments: [
-        { id: 'stock-1', symbol: 'AAA', company_name: 'AAA Co', sector: 'Technology' },
-        { id: 'stock-2', symbol: 'BBB', company_name: 'BBB Co', sector: 'Utilities' },
-      ] }),
-      listPricesByInstrumentId: jest.fn(async (id: string) => ({ prices: id === 'stock-1' ? bars('accumulation') : bars('distribution') })),
+  it('returns top accumulation and distribution lists from mocked repository', async () => {
+    const repository = {
+      latestSnapshots: jest.fn(async (_query, isDistribution) => ({
+        results: [
+          isDistribution 
+            ? { symbol: 'BBB', status: 'DISTRIBUTION' } 
+            : { symbol: 'AAA', status: 'ACCUMULATION' }
+        ],
+        total: 1
+      }))
     };
-    const service = new SmartMoneyIntelligenceService(marketDataService as any, {} as any);
+    const service = new SmartMoneyIntelligenceService(repository as any, {} as any, {} as any);
 
     const top = await service.top({ limit: 5, range: '3M' });
     const distribution = await service.distribution({ limit: 5, range: '3M' });
 
-    expect(top[0].symbol).toBe('AAA');
-    expect(distribution[0].symbol).toBe('BBB');
+    expect(top.results[0].symbol).toBe('AAA');
+    expect(distribution.results[0].symbol).toBe('BBB');
   });
 });

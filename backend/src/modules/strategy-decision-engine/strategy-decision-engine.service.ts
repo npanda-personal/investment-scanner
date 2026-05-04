@@ -314,12 +314,12 @@ export class StrategyDecisionEngineService {
     let dataQualityScore = 0;
     let sectorSmartMoneyScore = 0;
 
-    // 1. Market Gate (Weight: 20)
+    // 1. Market Gate (Weight: 15)
     if (ctx.gate.marketGate === 'OPEN') {
-      marketContextScore = 20;
+      marketContextScore = 15;
       reasons.push('Market gate is OPEN.');
     } else if (ctx.gate.marketGate === 'SELECTIVE') {
-      marketContextScore = 10;
+      marketContextScore = 8;
       warnings.push('Market gate is SELECTIVE; requiring higher quality.');
     } else if (ctx.gate.marketGate === 'CLOSED') {
       marketContextScore = 0;
@@ -329,29 +329,39 @@ export class StrategyDecisionEngineService {
       dataGaps.push('Market gate status is UNKNOWN.');
     }
 
-    // 2. Signal Strength (Weight: 30)
+    // 2. Signal Strength (Weight: 20)
     if (ctx.calibrated) {
       const calScore = ctx.calibrated.calibratedScore;
-      if (calScore >= 80) signalStrengthScore = 30;
-      else if (calScore >= 60) signalStrengthScore = 20;
+      if (calScore >= 80) signalStrengthScore = 20;
+      else if (calScore >= 60) signalStrengthScore = 15;
       else if (calScore >= 40) signalStrengthScore = 10;
       reasons.push(`Calibrated signal score is ${calScore}.`);
     } else {
       dataGaps.push('Calibration data missing; using raw signal.');
       const rawScore = ctx.rawSignal?.score ?? 0;
-      if (rawScore >= 80) signalStrengthScore = 20;
+      if (rawScore >= 80) signalStrengthScore = 15;
       else if (rawScore >= 60) signalStrengthScore = 10;
     }
 
-    // 3. Trend Technical (Weight: 20)
+    // 3. Trend Technical & MTFA (Weight: 20)
     const isAbove50 = ctx.latestPrice > (ctx.sma50 ?? 0);
     const isAbove200 = ctx.latestPrice > (ctx.sma200 ?? 0);
-    if (isAbove50 && isAbove200) {
+    
+    // Multi-Timeframe Alignment (MTFA) Check
+    // A daily breakout is dangerous if the weekly trend (represented by SMA200 slope and price vs SMA200) is bearish.
+    const sma200_20daysAgo = this.calculateSma(ctx.prices.slice(20), 200);
+    const isMacroUptrend = isAbove200 && (ctx.sma200 > (sma200_20daysAgo ?? 0));
+
+    if (isAbove50 && isMacroUptrend) {
       trendTechnicalScore = 20;
-      reasons.push('Price is above SMA50 and SMA200 (Uptrend).');
+      reasons.push('Price is above SMA50 with bullish Multi-Timeframe Alignment (Macro Uptrend).');
+    } else if (isAbove50 && isAbove200) {
+      trendTechnicalScore = 15;
+      reasons.push('Price is above SMA50 and SMA200.');
     } else if (isAbove50) {
-      trendTechnicalScore = 10;
-      reasons.push('Price is above SMA50 but below SMA200.');
+      trendTechnicalScore = 5;
+      warnings.push('Price is above SMA50 but fails Multi-Timeframe Alignment (Below SMA200).');
+      blockers.push('MTFA Failure: Macro weekly trend contradicts the daily breakout.');
     } else {
       trendTechnicalScore = 0;
       blockers.push('Price is below SMA50 support.');
@@ -378,13 +388,32 @@ export class StrategyDecisionEngineService {
       dataGaps.push('Smart money context missing.');
     }
 
-    const totalScore = marketContextScore + signalStrengthScore + trendTechnicalScore + dataQualityScore + sectorSmartMoneyScore;
+    // 6. Sector Wind Confluence (Weight: 15)
+    let sectorWindScore = 0;
+    const sectorContext = ctx.sectors.find((s: any) => s.sector === ctx.instrument.sector);
+    if (sectorContext) {
+      if (sectorContext.relativeStrengthScore >= 60) {
+        sectorWindScore = 15;
+        reasons.push(`Strong Sector Wind: ${ctx.instrument.sector} is leading/improving.`);
+      } else if (sectorContext.relativeStrengthScore <= 40) {
+        sectorWindScore = 0;
+        blockers.push(`Weak Sector Wind: ${ctx.instrument.sector} is lagging.`);
+      } else {
+        sectorWindScore = 8;
+      }
+    } else {
+      sectorWindScore = 8;
+      dataGaps.push('Sector context missing.');
+    }
+
+    const totalScore = marketContextScore + signalStrengthScore + trendTechnicalScore + dataQualityScore + sectorSmartMoneyScore + sectorWindScore;
     const scoreBreakdown = {
       marketContext: marketContextScore,
       signalStrength: signalStrengthScore,
       trendTechnical: trendTechnicalScore,
       dataQuality: dataQualityScore,
       sectorSmartMoney: sectorSmartMoneyScore,
+      sectorWind: sectorWindScore,
       total: totalScore,
     };
 

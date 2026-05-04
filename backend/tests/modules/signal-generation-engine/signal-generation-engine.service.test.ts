@@ -3,6 +3,9 @@ import { SignalGenerationEngineService } from '../../../src/modules/signal-gener
 
 const price = (index: number, adjusted_close: number, volume = 100) => ({
   date: new Date(2026, 3, 28 - index).toISOString(),
+  open: adjusted_close,
+  high: adjusted_close + 1,
+  low: adjusted_close - 1,
   close: adjusted_close,
   adjusted_close,
   volume,
