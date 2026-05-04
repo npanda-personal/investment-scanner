@@ -6,6 +6,7 @@ import { MarketRegimeWidget } from '@/features/market-context-intelligence';
 import { Link } from 'react-router-dom';
 import { SignalTable } from './SignalTable';
 import { FilterBar, PageHeader, type SortDirection } from '@/shared/components';
+import { FactCheckOutlined } from '@mui/icons-material';
 
 type SignalTab = 'bullish' | 'bearish' | 'neutral' | 'momentum' | 'recent' | 'screener';
 
@@ -106,6 +107,7 @@ const SignalsDashboardPage: React.FC = () => {
             label="Use data quality filter"
           />
           <Button component={Link} to="/signals/quality" variant="outlined">View Signal Quality Lab</Button>
+          <Button component={Link} to="/strategy" variant="outlined" startIcon={<FactCheckOutlined />}>View Strategy Decisions</Button>
           </>
         }
       />

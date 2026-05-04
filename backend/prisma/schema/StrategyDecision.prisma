@@ -1,0 +1,34 @@
+model StrategyDecisionResult {
+  id               String   @id @default(cuid())
+  instrumentId     String?
+  portfolioId      String?
+  holdingId        String?
+  symbol           String?
+  country          String?
+  exchange         String?
+  strategy         String   // TREND_MOMENTUM, PULLBACK_IN_UPTREND, DEFENSIVE_EXIT
+  decision         String   // TRADE_CANDIDATE, WATCH, WAIT, AVOID, EXIT_CANDIDATE, etc.
+  action           String   // CONSIDER_ENTRY, WAIT_FOR_PULLBACK, etc.
+  decisionScore    Int
+  confidence       String   // LOW, MEDIUM, HIGH
+  marketCondition  String
+  marketGate       String
+  entryZone        Json?
+  riskPlan         Json?
+  scoreBreakdown   Json?
+  reasons          Json
+  blockers         Json
+  warnings         Json
+  dataGaps         Json
+  modelVersion     String   @default("strategy-decision-v1")
+  generatedAt      DateTime @default(now())
+  generatedDate    DateTime // Normalized to UTC midnight for idempotency
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([instrumentId, strategy, modelVersion, generatedDate])
+  @@index([instrumentId])
+  @@index([portfolioId])
+  @@index([strategy])
+  @@map("strategy_decision_results")
+}

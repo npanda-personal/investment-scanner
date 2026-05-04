@@ -12,7 +12,22 @@ import {
 } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { usePortfolioIntelligence } from '../hooks';
+import { fetchExits, type StrategyDecisionDto } from '@/features/strategy-decision-engine';
 import type { GroupedHoldingSummary, RedFlag, ReviewItem } from '../types';
+
+const StrategyExitCard: React.FC<{ decision: StrategyDecisionDto }> = ({ decision }) => (
+  <Paper variant="outlined" sx={{ p: 1.5, borderLeft: '4px solid', borderColor: 'error.main' }}>
+    <Stack direction="row" justifyContent="space-between" alignItems="center">
+      <Typography fontWeight={700}>{decision.symbol}</Typography>
+      <Chip size="small" color="error" label={decision.decision.replace(/_/g, ' ')} />
+    </Stack>
+    <Typography variant="body2" color="primary" sx={{ my: 0.5 }}>{decision.action.replace(/_/g, ' ')}</Typography>
+    <Typography variant="caption" color="textSecondary">{decision.reasons[0]}</Typography>
+    <Box sx={{ mt: 1 }}>
+      <Button component={Link} to="/strategy" size="small" sx={{ p: 0, fontSize: '0.7rem' }}>View Decision Detail</Button>
+    </Box>
+  </Paper>
+);
 
 const percent = (value: number | null | undefined) =>
   value === null || value === undefined ? 'N/A' : `${(value * 100).toFixed(1)}%`;
@@ -93,6 +108,13 @@ const GroupSection: React.FC<{ title: string; items: GroupedHoldingSummary[] }> 
 
 export const PortfolioIntelligencePanel: React.FC<{ portfolioId?: string }> = ({ portfolioId }) => {
   const { intelligence, loading, error } = usePortfolioIntelligence(portfolioId);
+  const [strategyExits, setStrategyExits] = React.useState<StrategyDecisionDto[]>([]);
+
+  React.useEffect(() => {
+    if (portfolioId) {
+      fetchExits(portfolioId).then(setStrategyExits).catch(() => {});
+    }
+  }, [portfolioId]);
 
   if (!portfolioId) return null;
   if (loading) return <Paper sx={{ p: 3, textAlign: 'center' }}><CircularProgress /></Paper>;
@@ -166,6 +188,15 @@ export const PortfolioIntelligencePanel: React.FC<{ portfolioId?: string }> = ({
           {intelligence.reviewRanking.map((item) => <ReviewCard key={item.holdingId} item={item} />)}
         </Stack>
       </Paper>
+
+      {strategyExits.length > 0 && (
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="h6" sx={{ mb: 2 }} color="error">Strategy Exit Candidates</Typography>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 2 }}>
+            {strategyExits.map((d) => <StrategyExitCard key={d.id} decision={d} />)}
+          </Box>
+        </Paper>
+      )}
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'repeat(4, 1fr)' }, gap: 2 }}>
         <GroupSection title="Strong Holdings" items={intelligence.groupedSummary.strongHoldings} />

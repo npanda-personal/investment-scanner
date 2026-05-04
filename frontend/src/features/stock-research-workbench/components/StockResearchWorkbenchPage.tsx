@@ -6,6 +6,7 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Grid,
   Paper,
   Snackbar,
   ToggleButton,
@@ -25,6 +26,7 @@ import {
 import { fetchStockResearchWorkbench } from '../api/stockResearchWorkbenchService';
 import type { ResearchRange, ResearchWorkbenchResponse } from '../types';
 import { SignalWidget } from '@/features/signal-generation-engine';
+import { StrategyDecisionWidget } from '@/features/strategy-decision-engine';
 import { AddToWatchlistDialog } from '@/features/watchlist-management';
 import { CreateAlertDialog } from '@/features/alerts-monitoring';
 
@@ -154,7 +156,14 @@ const StockResearchWorkbenchPage: React.FC = () => {
         }}
       />
 
-      <SignalWidget instrumentId={String(overview.instrument_id || '')} />
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={6}>
+          <SignalWidget instrumentId={String(overview.instrument_id || '')} />
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <StrategyDecisionWidget instrumentId={String(overview.instrument_id || '')} />
+        </Grid>
+      </Grid>
 
       <Paper sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, mb: 2, flexDirection: { xs: 'column', md: 'row' } }}>

@@ -54,6 +54,7 @@ Current modules include:
 - historical-context-snapshots
 - signal-calibration-engine
 - data-quality-engine
+- strategy-decision-engine
 
 # Important Current State
 
@@ -369,6 +370,14 @@ Frontend:
 - Downstream modules may consume Data Quality Engine public filtering helpers to skip or warn on low-readiness instruments, but they must not duplicate readiness, coverage, or liquidity scoring logic.
 - Persisted stock-data models must document whether they are append-only or idempotent/upserted. Idempotent models need a clear natural key, date/timestamp normalization where relevant, repository-level upsert/skip behavior, and database uniqueness where practical.
 - These integrations must not import backend repositories or frontend feature internals directly.
+
+# Product Language Standard
+
+The following terminology MUST be used for specific modules:
+
+- Signal Generation: use "bullish", "bearish", "triggered".
+- Signal Reliability: use "noise", "overextended", "reliable".
+- Strategy Decision: use "candidate", "consider review", "risk level". Avoid financial advice terms like "buy" or "sell".
 
 # Final Principle
 

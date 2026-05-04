@@ -20,6 +20,7 @@ import { signalQualityLabRouter } from '../modules/signal-quality-lab';
 import { historicalContextSnapshotsRouter } from '../modules/historical-context-snapshots';
 import { signalCalibrationEngineRouter } from '../modules/signal-calibration-engine';
 import { dataQualityEngineRouter } from '../modules/data-quality-engine';
+import { strategyDecisionEngineRouter } from '../modules/strategy-decision-engine';
 
 export interface ApiModule {
   path: string;
@@ -45,6 +46,7 @@ export const apiModules: ApiModule[] = [
   { path: '/api/v1', router: historicalContextSnapshotsRouter },
   { path: '/api/v1', router: signalCalibrationEngineRouter },
   { path: '/api/v1', router: dataQualityEngineRouter },
+  { path: '/api/v1/strategy', router: strategyDecisionEngineRouter },
   { path: '/api/market-data-foundation', router: marketDataFoundationRouter },
 ];
 
