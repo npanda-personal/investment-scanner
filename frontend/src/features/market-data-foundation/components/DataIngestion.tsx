@@ -10,8 +10,10 @@ import {
 } from '@mui/material';
 import SyncIcon from '@mui/icons-material/Sync';
 import { syncMarketData, type V1SyncResponse } from '../api/marketDataFoundationService';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 
 const DataIngestion: React.FC = () => {
+  const { scope } = useMarketScope();
   const [symbol, setSymbol] = useState('');
   const [exchange, setExchange] = useState('');
   const [loading, setLoading] = useState(false);
@@ -30,8 +32,9 @@ const DataIngestion: React.FC = () => {
     try {
       const response = await syncMarketData({
         symbol: symbol.trim().toUpperCase(),
+        region: scope.region,
         exchange: exchange.trim().toUpperCase() || undefined,
-        asset_type: 'EQUITY',
+        asset_type: scope.assetType,
       });
       setResult(response);
     } catch (err: any) {
@@ -47,7 +50,7 @@ const DataIngestion: React.FC = () => {
         Market Data Ingestion
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Trigger a manual sync from the configured free market data provider.
+        Trigger a manual sync from the configured free market data provider for the global header market: {scope.region}.
       </Typography>
 
       <Paper sx={{ p: 3, mb: 3 }}>

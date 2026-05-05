@@ -104,6 +104,7 @@ export interface V1Instrument {
 export interface V1IngestionRequest {
   symbol?: string;
   instrumentId?: string;
+  region?: string;
   company_name?: string;
   exchange?: string;
   currency?: string;

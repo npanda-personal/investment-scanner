@@ -7,7 +7,12 @@ const formatTimestamp = (timestamp: string | null) => {
   return new Date(timestamp).toLocaleString();
 };
 
-const MarketDataStatusPanel: React.FC = () => {
+interface MarketDataStatusPanelProps {
+  region?: string;
+  assetType?: string;
+}
+
+const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, assetType }) => {
   const [status, setStatus] = useState<MarketDataHealth | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -15,7 +20,9 @@ const MarketDataStatusPanel: React.FC = () => {
   useEffect(() => {
     let mounted = true;
 
-    fetchMarketDataHealth()
+    setLoading(true);
+    setError(null);
+    fetchMarketDataHealth({ region, assetType })
       .then((result) => {
         if (mounted) setStatus(result);
       })
@@ -29,7 +36,7 @@ const MarketDataStatusPanel: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [region, assetType]);
 
   if (loading) {
     return (

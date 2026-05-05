@@ -2,15 +2,25 @@ import { Prisma } from '@prisma/client';
 
 export type MarketRegion = 'IN' | 'US' | 'EU' | 'GLOBAL';
 
+export function normalizeMarketRegion(region?: string | null): MarketRegion | undefined {
+  const value = String(region || '').trim().toUpperCase();
+  if (!value || value === 'GLOBAL' || value === 'ALL' || value === 'DEFAULT') return undefined;
+  if (value === 'INDIA') return 'IN';
+  if (value === 'EUROPE') return 'EU';
+  if (value === 'IN' || value === 'US' || value === 'EU') return value;
+  return value as MarketRegion;
+}
+
 /**
  * Maps a global region code to Prisma filter criteria for instruments/stocks.
  */
 export function resolveMarketRegionFilter(region?: string | null): Prisma.StockWhereInput {
-  if (!region || region === 'GLOBAL') {
+  const normalizedRegion = normalizeMarketRegion(region);
+  if (!normalizedRegion) {
     return {};
   }
 
-  const r = region.toUpperCase() as MarketRegion;
+  const r = normalizedRegion;
 
   switch (r) {
     case 'IN':

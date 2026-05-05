@@ -28,11 +28,17 @@ export class MarketDataFoundationService {
     return this.repository.listStocks(options);
   }
 
-  async health() {
+  async health(options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
     const [instrumentCount, latestDataTimestamp] = await Promise.all([
-      this.repository.instrumentCount(),
-      this.repository.latestDataTimestamp(),
+      this.repository.instrumentCount(options),
+      this.repository.latestDataTimestamp(options),
     ]);
+
+    console.log('[MarketDataFoundation] health market filter', {
+      receivedRegion: options.region || 'GLOBAL',
+      receivedAssetType: options.assetType || 'ALL',
+      instrumentCount,
+    });
 
     return {
       status: 'ok',
@@ -44,6 +50,8 @@ export class MarketDataFoundationService {
       last_updated_timestamp: latestDataTimestamp?.toISOString() ?? null,
       data_status: latestDataTimestamp ? 'COMPLETE' : 'MISSING',
       timestamp: new Date().toISOString(),
+      region: options.region || 'GLOBAL',
+      assetType: options.assetType || 'ALL',
     };
   }
 
@@ -80,6 +88,7 @@ export class MarketDataFoundationService {
       assetType: options.assetType,
       currency: options.currency,
       sector: options.sector,
+      industry: options.industry,
       search: options.search,
     });
 
@@ -89,8 +98,8 @@ export class MarketDataFoundationService {
     };
   }
 
-  async getInstrument(id: string) {
-    const stock = await this.get(id);
+  async getInstrument(id: string, options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
+    const stock = await this.repository.findStockByIdInScope(id, options);
     return stock ? this.toV1Instrument(stock) : null;
   }
 
@@ -244,8 +253,8 @@ export class MarketDataFoundationService {
     return this.repository.listPrices(symbol, limit, startDate, endDate);
   }
 
-  async listPricesByInstrumentId(instrumentId: string, limit = 250, startDate?: Date, endDate?: Date) {
-    const stock = await this.repository.findStockById(instrumentId);
+  async listPricesByInstrumentId(instrumentId: string, limit = 250, startDate?: Date, endDate?: Date, options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
+    const stock = await this.repository.findStockByIdInScope(instrumentId, options);
     if (!stock) {
       return null;
     }
@@ -275,8 +284,8 @@ export class MarketDataFoundationService {
     };
   }
 
-  async latestPriceByInstrumentId(instrumentId: string) {
-    const stock = await this.repository.findStockById(instrumentId);
+  async latestPriceByInstrumentId(instrumentId: string, options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
+    const stock = await this.repository.findStockByIdInScope(instrumentId, options);
     if (!stock) {
       return null;
     }
@@ -314,8 +323,8 @@ export class MarketDataFoundationService {
     };
   }
 
-  async fundamentalsByInstrumentId(instrumentId: string) {
-    const stock = await this.repository.findStockById(instrumentId);
+  async fundamentalsByInstrumentId(instrumentId: string, options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
+    const stock = await this.repository.findStockByIdInScope(instrumentId, options);
     if (!stock) {
       return null;
     }
@@ -353,8 +362,8 @@ export class MarketDataFoundationService {
     };
   }
 
-  async corporateActionsByInstrumentId(instrumentId: string) {
-    const stock = await this.repository.findStockById(instrumentId);
+  async corporateActionsByInstrumentId(instrumentId: string, options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
+    const stock = await this.repository.findStockByIdInScope(instrumentId, options);
     if (!stock) {
       return null;
     }
@@ -475,7 +484,7 @@ export class MarketDataFoundationService {
         stock = await this.create({
           symbol,
           name: request.company_name || match?.name || symbol,
-          region: regionInfo.region || 'US',
+          region: request.region || regionInfo.region || 'US',
           exchange: request.exchange || match?.exchange || regionInfo.exchange || 'UNKNOWN',
         }, false);
       }
@@ -604,15 +613,19 @@ export class MarketDataFoundationService {
   async syncAll(
     workerCount: number = 4,
     workerConcurrency: number = 4,
-    delayBetweenBatchesMs: number = 3000
+    delayBetweenBatchesMs: number = 3000,
+    options: Pick<PaginationOptions, 'region' | 'assetType'> = {}
   ) {
     try {
-      const allStocks = await this.repository.listActiveStockSyncTasks();
+      const allStocks = await this.repository.listActiveStockSyncTasks(options);
       const totalStocks = allStocks.length;
       const results: Array<{symbol: string, success: boolean, message: string, timestamp: string, workerId?: number}> = [];
       const errors: Array<{symbol: string, success: boolean, message: string, timestamp: string, workerId?: number}> = [];
 
-      console.log(`Starting bulk sync for ${totalStocks} active stocks`);
+      console.log(`Starting bulk sync for ${totalStocks} active stocks`, {
+        receivedRegion: options.region || 'GLOBAL',
+        receivedAssetType: options.assetType || 'ALL',
+      });
       console.log(`Configuration: ${workerCount} workers, ${workerConcurrency} concurrency per worker, ${delayBetweenBatchesMs}ms delay between batches`);
       console.log(`Estimated speedup: ${workerCount * workerConcurrency}x faster than sequential processing\n`);
 

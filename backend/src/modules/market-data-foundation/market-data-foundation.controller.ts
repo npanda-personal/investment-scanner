@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { MarketDataFoundationService } from './market-data-foundation.service';
 import { validateRequiredString } from './market-data-foundation.validation';
+import { normalizeMarketRegion } from '../../shared/utils/market-scope';
 
 export class MarketDataFoundationController {
   constructor(private readonly service = new MarketDataFoundationService()) {}
@@ -9,17 +10,30 @@ export class MarketDataFoundationController {
     return Array.isArray(value) ? value[0] : value || '';
   }
 
+  private getMarketFilter(req: Request) {
+    const rawRegion = (req.query.region || req.query.market || req.body?.region || req.body?.market) as string | undefined;
+    const region = normalizeMarketRegion(rawRegion);
+    const assetType = ((req.query.assetType || req.body?.assetType || req.body?.asset_type) as string | undefined)?.trim().toUpperCase() || undefined;
+    console.log('[MarketDataFoundation] received market filter', {
+      rawRegion: rawRegion || 'GLOBAL',
+      normalizedRegion: region || 'GLOBAL',
+      assetType: assetType || 'ALL',
+      path: req.originalUrl,
+    });
+    return { region, assetType };
+  }
+
   listStocks = async (req: Request, res: Response) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const pageSize = parseInt(req.query.pageSize as string) || 20;
       const sortBy = req.query.sortBy as any;
       const sortOrder = req.query.sortOrder as 'asc' | 'desc' | undefined;
-      const region = req.query.region as string | undefined;
+      const { region, assetType: scopedAssetType } = this.getMarketFilter(req);
       const search = req.query.search as string | undefined;
       const country = req.query.country as string | undefined;
       const exchange = req.query.exchange as string | undefined;
-      const assetType = req.query.assetType as string | undefined;
+      const assetType = (req.query.assetType as string | undefined) || scopedAssetType;
       const currency = req.query.currency as string | undefined;
       const sector = req.query.sector as string | undefined;
       const industry = req.query.industry as string | undefined;
@@ -154,6 +168,7 @@ export class MarketDataFoundationController {
       const workerCount = parseInt(req.query.workerCount as string) || 4;
       const workerConcurrency = parseInt(req.query.workerConcurrency as string) || 4;
       const delayBetweenBatchesMs = parseInt(req.query.delayBetweenBatchesMs as string) || 3000;
+      const { region, assetType } = this.getMarketFilter(req);
 
       if (workerCount < 1 || workerCount > 10) {
         return res.status(400).json({ success: false, message: 'workerCount must be between 1 and 10' });
@@ -163,7 +178,7 @@ export class MarketDataFoundationController {
       }
 
       console.log(`Starting bulk sync with ${workerCount} workers, ${workerConcurrency} concurrency each`);
-      const result = await this.service.syncAll(workerCount, workerConcurrency, delayBetweenBatchesMs);
+      const result = await this.service.syncAll(workerCount, workerConcurrency, delayBetweenBatchesMs, { region, assetType });
 
       if (result.success) {
         return res.json(result);
@@ -195,6 +210,7 @@ export class MarketDataFoundationController {
 
   ingestSymbol = async (req: Request, res: Response) => {
     const { symbol } = req.body;
+    this.getMarketFilter(req);
     if (!symbol || typeof symbol !== 'string') {
       return res.status(400).json({ error: 'Missing or invalid symbol' });
     }
@@ -257,9 +273,10 @@ export class MarketDataFoundationController {
     }
   };
 
-  health = async (_req: Request, res: Response) => {
+  health = async (req: Request, res: Response) => {
     try {
-      return res.json(await this.service.health());
+      const { region, assetType } = this.getMarketFilter(req);
+      return res.json(await this.service.health({ region, assetType }));
     } catch (error) {
       console.error('Market data health error:', error);
       return res.status(500).json({ error: 'Market data health check failed' });
@@ -273,10 +290,10 @@ export class MarketDataFoundationController {
       const search = req.query.search as string | undefined;
       const sortBy = req.query.sortBy as any;
       const sortOrder = req.query.sortOrder as 'asc' | 'desc' | undefined;
-      const region = req.query.region as string | undefined;
+      const { region, assetType: scopedAssetType } = this.getMarketFilter(req);
       const country = req.query.country as string | undefined;
       const exchange = req.query.exchange as string | undefined;
-      const assetType = req.query.assetType as string | undefined;
+      const assetType = (req.query.assetType as string | undefined) || scopedAssetType;
       const currency = req.query.currency as string | undefined;
       const sector = req.query.sector as string | undefined;
       const industry = req.query.industry as string | undefined;
@@ -306,7 +323,8 @@ export class MarketDataFoundationController {
 
   getInstrument = async (req: Request, res: Response) => {
     try {
-      const instrument = await this.service.getInstrument(this.getParam(req.params.id));
+      const { region, assetType } = this.getMarketFilter(req);
+      const instrument = await this.service.getInstrument(this.getParam(req.params.id), { region, assetType });
       if (!instrument) {
         return res.status(404).json({ error: 'Instrument not found' });
       }
@@ -322,7 +340,8 @@ export class MarketDataFoundationController {
       const limit = parseInt(req.query.limit as string) || 250;
       const startDate = typeof req.query.startDate === 'string' ? new Date(req.query.startDate) : undefined;
       const endDate = typeof req.query.endDate === 'string' ? new Date(req.query.endDate) : undefined;
-      const result = await this.service.listPricesByInstrumentId(this.getParam(req.params.instrumentId), limit, startDate, endDate);
+      const { region, assetType } = this.getMarketFilter(req);
+      const result = await this.service.listPricesByInstrumentId(this.getParam(req.params.instrumentId), limit, startDate, endDate, { region, assetType });
       if (!result) {
         return res.status(404).json({ error: 'Instrument not found' });
       }
@@ -335,7 +354,8 @@ export class MarketDataFoundationController {
 
   getInstrumentLatestPrice = async (req: Request, res: Response) => {
     try {
-      const result = await this.service.latestPriceByInstrumentId(this.getParam(req.params.instrumentId));
+      const { region, assetType } = this.getMarketFilter(req);
+      const result = await this.service.latestPriceByInstrumentId(this.getParam(req.params.instrumentId), { region, assetType });
       if (!result) {
         return res.status(404).json({ error: 'Instrument not found' });
       }
@@ -348,7 +368,8 @@ export class MarketDataFoundationController {
 
   getInstrumentFundamentals = async (req: Request, res: Response) => {
     try {
-      const result = await this.service.fundamentalsByInstrumentId(this.getParam(req.params.instrumentId));
+      const { region, assetType } = this.getMarketFilter(req);
+      const result = await this.service.fundamentalsByInstrumentId(this.getParam(req.params.instrumentId), { region, assetType });
       if (!result) {
         return res.status(404).json({ error: 'Instrument not found' });
       }
@@ -361,7 +382,8 @@ export class MarketDataFoundationController {
 
   getInstrumentCorporateActions = async (req: Request, res: Response) => {
     try {
-      const result = await this.service.corporateActionsByInstrumentId(this.getParam(req.params.instrumentId));
+      const { region, assetType } = this.getMarketFilter(req);
+      const result = await this.service.corporateActionsByInstrumentId(this.getParam(req.params.instrumentId), { region, assetType });
       if (!result) {
         return res.status(404).json({ error: 'Instrument not found' });
       }

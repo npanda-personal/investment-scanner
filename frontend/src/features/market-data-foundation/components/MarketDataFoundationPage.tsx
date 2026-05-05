@@ -10,8 +10,6 @@ import {
   MenuItem,
   Paper,
   Stack,
-  Tabs,
-  Tab,
   TextField,
   Tooltip,
   Typography,
@@ -30,24 +28,16 @@ import {
 import MarketDataStatusPanel from './MarketDataStatusPanel';
 import { DataTable, FilterBar, PageHeader, StatusBadge, type DataTableColumn, type SortDirection } from '@/shared/components';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
+import { normalizeMarketForApi } from '../api/marketScopeApi';
 
 const formatTimestamp = (timestamp: string) => new Date(timestamp).toLocaleString();
 const formatMarketCap = (value: number | null) => value === null ? 'N/A' : new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(value);
-
-const marketTabs = [
-  { label: 'Default', value: 'SCOPE' },
-  { label: 'All / Global', value: 'GLOBAL' },
-  { label: 'US', value: 'US' },
-  { label: 'India', value: 'IN' },
-  { label: 'Europe', value: 'EU' },
-];
 
 const MarketDataFoundationPage: React.FC = () => {
   const navigate = useNavigate();
   const { scope } = useMarketScope();
   const [instruments, setInstruments] = useState<V1Instrument[]>([]);
   const [search, setSearch] = useState('');
-  const [market, setMarket] = useState('SCOPE');
   const [exchange, setExchange] = useState('');
   const [assetType, setAssetType] = useState('');
   const [currency, setCurrency] = useState('');
@@ -63,19 +53,26 @@ const MarketDataFoundationPage: React.FC = () => {
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const normalizedMarket = normalizeMarketForApi(scope.region);
 
   const loadInstruments = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const selectedRegion = market === 'SCOPE' ? scope.region : (market === 'GLOBAL' ? undefined : market);
+      if (import.meta.env.DEV) {
+        console.debug('[MarketDataFoundation] selected global market', {
+          selectedGlobalMarket: scope.region,
+          normalizedMarketValue: normalizedMarket || 'GLOBAL',
+          selectedAssetType: scope.assetType,
+        });
+      }
       
       const response = await fetchInstruments({
         page: page + 1,
         pageSize,
         sortBy,
         sortOrder: sortDirection,
-        region: selectedRegion,
+        region: scope.region,
         exchange: exchange.trim() || undefined,
         assetType: assetType.trim() || scope.assetType,
         currency: currency.trim() || undefined,
@@ -90,7 +87,7 @@ const MarketDataFoundationPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [assetType, currency, exchange, industry, market, page, pageSize, search, sector, sortBy, sortDirection, scope.region, scope.assetType]);
+  }, [assetType, currency, exchange, industry, page, pageSize, search, sector, sortBy, sortDirection, scope.region, scope.assetType, normalizedMarket]);
 
   useEffect(() => {
     loadInstruments();
@@ -106,7 +103,7 @@ const MarketDataFoundationPage: React.FC = () => {
     setError(null);
     setSuccess(null);
     try {
-      const result = await syncMarketData({ instrumentId: instrument.id });
+      const result = await syncMarketData({ instrumentId: instrument.id, region: scope.region, asset_type: assetType.trim() || scope.assetType });
       if (!result.success) {
         setError(result.message);
       } else {
@@ -125,7 +122,7 @@ const MarketDataFoundationPage: React.FC = () => {
     setError(null);
     setSuccess(null);
     try {
-      const result = await syncAllStocks(4, 4, 3000);
+      const result = await syncAllStocks(4, 4, 3000, { region: scope.region, assetType: assetType.trim() || scope.assetType });
       if (!result.success) {
         setError(result.message || 'Catalog sync failed');
       } else {
@@ -189,7 +186,6 @@ const MarketDataFoundationPage: React.FC = () => {
 
   const resetFilters = () => {
     setSearch('');
-    setMarket('');
     setExchange('');
     setAssetType('');
     setCurrency('');
@@ -225,12 +221,13 @@ const MarketDataFoundationPage: React.FC = () => {
         }
       />
 
-      <MarketDataStatusPanel />
+      <MarketDataStatusPanel region={scope.region} assetType={assetType.trim() || scope.assetType} />
 
-      <Paper sx={{ mb: 2 }}>
-        <Tabs value={market} onChange={(_event, value) => { setMarket(value); setPage(0); }} variant="scrollable" scrollButtons="auto">
-          {marketTabs.map((tab) => <Tab key={tab.label} label={tab.label} value={tab.value} />)}
-        </Tabs>
+      <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+        <Typography variant="body2" color="text.secondary">
+          Market is controlled by the global header selector: <strong>{scope.region === 'GLOBAL' ? 'Global / All' : scope.region}</strong>
+          {normalizedMarket ? ` (${normalizedMarket})` : ' (all markets)'}
+        </Typography>
       </Paper>
 
       <Box sx={{ mb: 2 }}>
@@ -255,7 +252,7 @@ const MarketDataFoundationPage: React.FC = () => {
           <TextField size="small" label="Exchange" value={exchange} onChange={(event) => { setExchange(event.target.value); setPage(0); }} sx={{ minWidth: 140 }} />
           <TextField select size="small" label="Asset Type" value={assetType} onChange={(event) => { setAssetType(event.target.value); setPage(0); }} sx={{ minWidth: 150 }}>
             <MenuItem value="">All</MenuItem>
-            {['EQUITY', 'ETF', 'INDEX', 'FX'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
+            {['STOCK', 'EQUITY', 'ETF', 'INDEX', 'FX'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
           </TextField>
           <TextField size="small" label="Currency" value={currency} onChange={(event) => { setCurrency(event.target.value.toUpperCase()); setPage(0); }} sx={{ minWidth: 120 }} />
           <TextField size="small" label="Sector" value={sector} onChange={(event) => { setSector(event.target.value); setPage(0); }} sx={{ minWidth: 180 }} />

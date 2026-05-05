@@ -31,13 +31,28 @@ describe('MarketDataFoundationRepository', () => {
       take: 25,
       orderBy: { marketCap: 'desc' },
       where: expect.objectContaining({
-        OR: expect.arrayContaining([
-          { region: 'US' },
-          expect.objectContaining({ country: expect.anything() }),
+        AND: expect.arrayContaining([
+          expect.objectContaining({
+            OR: expect.arrayContaining([
+              { region: 'US' },
+              expect.objectContaining({ country: expect.anything() }),
+            ]),
+          }),
+          expect.objectContaining({
+            OR: expect.arrayContaining([
+              expect.objectContaining({ assetType: expect.objectContaining({ in: ['STOCK', 'EQUITY'] }) }),
+              { assetType: null },
+            ]),
+          }),
+          expect.objectContaining({
+            OR: expect.arrayContaining([
+              expect.objectContaining({ symbol: expect.anything() }),
+              expect.objectContaining({ name: expect.anything() }),
+            ]),
+          }),
         ]),
         country: { contains: 'US', mode: 'insensitive' },
         exchange: { contains: 'NASDAQ', mode: 'insensitive' },
-        assetType: { contains: 'EQUITY', mode: 'insensitive' },
         currency: { contains: 'USD', mode: 'insensitive' },
         sector: { contains: 'tech', mode: 'insensitive' },
         industry: { contains: 'software', mode: 'insensitive' },

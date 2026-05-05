@@ -162,6 +162,7 @@ export interface V1FxRatesResponse {
 export interface V1SyncRequest {
   symbol?: string;
   instrumentId?: string;
+  region?: string;
   company_name?: string;
   exchange?: string;
   currency?: string;

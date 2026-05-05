@@ -21,6 +21,7 @@ import type {
   V1SyncRequest,
   V1SyncResponse,
 } from '../types';
+import { logMarketDataApi, normalizeAssetTypeForMarketDataApi, normalizeMarketForApi } from './marketScopeApi';
 
 const API_BASE = '/api';
 
@@ -124,15 +125,25 @@ export async function syncStockData(id: string): Promise<SyncResponse> {
 /**
  * Trigger bulk sync for all active stocks.
  */
-export async function syncAllStocks(workerCount?: number, workerConcurrency?: number, delayBetweenBatchesMs?: number): Promise<BulkSyncResponse> {
+export async function syncAllStocks(workerCount?: number, workerConcurrency?: number, delayBetweenBatchesMs?: number, options: MarketScopedApiOptions = {}): Promise<BulkSyncResponse> {
   const params = new URLSearchParams();
   if (workerCount !== undefined) params.append('workerCount', workerCount.toString());
   if (workerConcurrency !== undefined) params.append('workerConcurrency', workerConcurrency.toString());
   if (delayBetweenBatchesMs !== undefined) params.append('delayBetweenBatchesMs', delayBetweenBatchesMs.toString());
+  const region = normalizeMarketForApi(options.region);
+  const assetType = normalizeAssetTypeForMarketDataApi(options.assetType);
+  if (region) params.append('region', region);
+  if (assetType) params.append('assetType', assetType);
   
   const url = `${API_BASE}/market-data-foundation/stocks/sync-all${params.toString() ? `?${params.toString()}` : ''}`;
+  logMarketDataApi(options.region || 'GLOBAL', region, Object.fromEntries(params.entries()), url);
   const response = await axios.post<BulkSyncResponse>(url);
   return response.data;
+}
+
+export interface MarketScopedApiOptions {
+  region?: string;
+  assetType?: string;
 }
 
 /**
@@ -153,15 +164,26 @@ export async function yahooSearch(query: string): Promise<any[]> {
   return response.data;
 }
 
-export async function fetchMarketDataHealth(): Promise<MarketDataHealth> {
-  const response = await axios.get<MarketDataHealth>(`${API_BASE}/v1/market-data/health`);
+export async function fetchMarketDataHealth(options: MarketScopedApiOptions = {}): Promise<MarketDataHealth> {
+  const params = {
+    region: normalizeMarketForApi(options.region),
+    assetType: normalizeAssetTypeForMarketDataApi(options.assetType),
+  };
+  logMarketDataApi(options.region || 'GLOBAL', params.region, params, 'health');
+  const response = await axios.get<MarketDataHealth>(`${API_BASE}/v1/market-data/health`, { params });
   return response.data;
 }
 
 export async function fetchInstruments(options: PaginationOptions | string = {}): Promise<V1InstrumentsResponse> {
   const resolvedOptions = typeof options === 'string' ? { search: options } : options;
+  const params = {
+    ...resolvedOptions,
+    region: normalizeMarketForApi(resolvedOptions.region),
+    assetType: normalizeAssetTypeForMarketDataApi(resolvedOptions.assetType),
+  };
+  logMarketDataApi(String(resolvedOptions.region || 'GLOBAL'), params.region, params, 'instruments');
   const response = await axios.get<V1InstrumentsResponse>(`${API_BASE}/v1/instruments`, {
-    params: resolvedOptions,
+    params,
   });
   return response.data;
 }
@@ -176,30 +198,57 @@ export async function fetchInstrument(id: string): Promise<V1Instrument> {
   return response.data;
 }
 
-export async function fetchInstrumentPrices(id: string, limit = 250): Promise<V1PricesResponse> {
+export async function fetchInstrumentPrices(id: string, limit = 250, options: MarketScopedApiOptions = {}): Promise<V1PricesResponse> {
+  const params = {
+    limit,
+    region: normalizeMarketForApi(options.region),
+    assetType: normalizeAssetTypeForMarketDataApi(options.assetType),
+  };
+  logMarketDataApi(options.region || 'GLOBAL', params.region, params, 'prices');
   const response = await axios.get<V1PricesResponse>(`${API_BASE}/v1/prices/${id}`, {
-    params: { limit },
+    params,
   });
   return response.data;
 }
 
-export async function fetchInstrumentLatestPrice(id: string): Promise<V1LatestPriceResponse> {
-  const response = await axios.get<V1LatestPriceResponse>(`${API_BASE}/v1/prices/${id}/latest`);
+export async function fetchInstrumentLatestPrice(id: string, options: MarketScopedApiOptions = {}): Promise<V1LatestPriceResponse> {
+  const params = {
+    region: normalizeMarketForApi(options.region),
+    assetType: normalizeAssetTypeForMarketDataApi(options.assetType),
+  };
+  logMarketDataApi(options.region || 'GLOBAL', params.region, params, 'latest-price');
+  const response = await axios.get<V1LatestPriceResponse>(`${API_BASE}/v1/prices/${id}/latest`, { params });
   return response.data;
 }
 
-export async function fetchInstrumentFundamentals(id: string): Promise<V1FundamentalsResponse> {
-  const response = await axios.get<V1FundamentalsResponse>(`${API_BASE}/v1/fundamentals/${id}`);
+export async function fetchInstrumentFundamentals(id: string, options: MarketScopedApiOptions = {}): Promise<V1FundamentalsResponse> {
+  const params = {
+    region: normalizeMarketForApi(options.region),
+    assetType: normalizeAssetTypeForMarketDataApi(options.assetType),
+  };
+  logMarketDataApi(options.region || 'GLOBAL', params.region, params, 'fundamentals');
+  const response = await axios.get<V1FundamentalsResponse>(`${API_BASE}/v1/fundamentals/${id}`, { params });
   return response.data;
 }
 
-export async function fetchInstrumentCorporateActions(id: string): Promise<V1CorporateActionsResponse> {
-  const response = await axios.get<V1CorporateActionsResponse>(`${API_BASE}/v1/corporate-actions/${id}`);
+export async function fetchInstrumentCorporateActions(id: string, options: MarketScopedApiOptions = {}): Promise<V1CorporateActionsResponse> {
+  const params = {
+    region: normalizeMarketForApi(options.region),
+    assetType: normalizeAssetTypeForMarketDataApi(options.assetType),
+  };
+  logMarketDataApi(options.region || 'GLOBAL', params.region, params, 'corporate-actions');
+  const response = await axios.get<V1CorporateActionsResponse>(`${API_BASE}/v1/corporate-actions/${id}`, { params });
   return response.data;
 }
 
 export async function syncMarketData(data: V1SyncRequest): Promise<V1SyncResponse> {
-  const response = await axios.post<V1SyncResponse>(`${API_BASE}/v1/ingestion/sync`, data);
+  const payload = {
+    ...data,
+    region: normalizeMarketForApi((data as any).region),
+    asset_type: normalizeAssetTypeForMarketDataApi(data.asset_type),
+  };
+  logMarketDataApi((data as any).region || 'GLOBAL', payload.region, payload, 'manual-sync');
+  const response = await axios.post<V1SyncResponse>(`${API_BASE}/v1/ingestion/sync`, payload);
   return response.data;
 }
 

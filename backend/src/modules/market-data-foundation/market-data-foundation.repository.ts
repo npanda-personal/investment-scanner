@@ -35,19 +35,13 @@ export class MarketDataFoundationRepository {
     const skip = (page - 1) * pageSize;
     
     // Combine explicit region filter with other filters
-    const regionFilter = resolveMarketRegionFilter(region);
-    const where: Prisma.StockWhereInput = {
-      ...regionFilter,
-    };
+    const where: Prisma.StockWhereInput = this.stockWhere({ region, assetType });
 
     if (country) {
       where.country = { contains: country.trim(), mode: 'insensitive' };
     }
     if (exchange) {
       where.exchange = { contains: exchange.trim(), mode: 'insensitive' };
-    }
-    if (assetType) {
-      where.assetType = { contains: assetType.trim(), mode: 'insensitive' };
     }
     if (currency) {
       where.currency = { contains: currency.trim(), mode: 'insensitive' };
@@ -59,10 +53,14 @@ export class MarketDataFoundationRepository {
       where.industry = { contains: industry.trim(), mode: 'insensitive' };
     }
     if (search) {
-      where.OR = [
-        ...(where.OR as any[] || []),
-        { symbol: { contains: search, mode: 'insensitive' } },
-        { name: { contains: search, mode: 'insensitive' } },
+      where.AND = [
+        ...this.asAndArray(where.AND),
+        {
+          OR: [
+            { symbol: { contains: search, mode: 'insensitive' } },
+            { name: { contains: search, mode: 'insensitive' } },
+          ],
+        },
       ];
     }
 
@@ -89,6 +87,10 @@ export class MarketDataFoundationRepository {
 
   findStockById(id: string) {
     return this.prisma.stock.findUnique({ where: { id } });
+  }
+
+  findStockByIdInScope(id: string, options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
+    return this.prisma.stock.findFirst({ where: { ...this.stockWhere(options), id } });
   }
 
   findStockBySymbol(symbol: string) {
@@ -160,9 +162,9 @@ export class MarketDataFoundationRepository {
     });
   }
 
-  listActiveStockSyncTasks() {
+  listActiveStockSyncTasks(options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
     return this.prisma.stock.findMany({
-      where: { isActive: true },
+      where: { ...this.stockWhere(options), isActive: true },
       select: { id: true, symbol: true, lastSuccessfulDataLoadTimestamp: true },
     });
   }
@@ -277,12 +279,18 @@ export class MarketDataFoundationRepository {
     };
   }
 
-  instrumentCount() {
-    return this.prisma.stock.count();
+  instrumentCount(options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
+    return this.prisma.stock.count({ where: this.stockWhere(options) });
   }
 
-  async latestDataTimestamp() {
+  async latestDataTimestamp(options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
+    const stocks = await this.prisma.stock.findMany({
+      where: this.stockWhere(options),
+      select: { symbol: true },
+    });
+    const symbols = stocks.map((stock) => stock.symbol);
     const latestPrice = await this.prisma.priceTick.findFirst({
+      where: symbols.length > 0 ? { symbol: { in: symbols } } : undefined,
       orderBy: { timestamp: 'desc' },
       select: { timestamp: true },
     });
@@ -592,5 +600,31 @@ export class MarketDataFoundationRepository {
     const date = value instanceof Date ? new Date(value) : new Date(value);
     date.setUTCHours(0, 0, 0, 0);
     return date;
+  }
+
+  private stockWhere(options: Pick<PaginationOptions, 'region' | 'assetType'>): Prisma.StockWhereInput {
+    const filters: Prisma.StockWhereInput[] = [];
+    const regionFilter = resolveMarketRegionFilter(options.region);
+    if (Object.keys(regionFilter).length > 0) filters.push(regionFilter);
+    const assetType = options.assetType?.trim();
+    if (assetType) {
+      const normalized = assetType.toUpperCase();
+      if (normalized === 'STOCK' || normalized === 'EQUITY') {
+        filters.push({
+          OR: [
+          { assetType: { in: ['STOCK', 'EQUITY'], mode: 'insensitive' } },
+          { assetType: null },
+          ],
+        });
+      } else {
+        filters.push({ assetType: { contains: assetType, mode: 'insensitive' } });
+      }
+    }
+    return filters.length > 0 ? { AND: filters } : {};
+  }
+
+  private asAndArray(value: Prisma.StockWhereInput['AND']): Prisma.StockWhereInput[] {
+    if (!value) return [];
+    return Array.isArray(value) ? value : [value];
   }
 }
