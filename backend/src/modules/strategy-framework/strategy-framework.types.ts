@@ -3,6 +3,7 @@ import type { SignalConfidence, SignalDirection, SignalItem, SignalPricePoint, S
 
 export type StrategyStatus = 'DRAFT' | 'ACTIVE' | 'DISABLED' | 'DEPRECATED';
 export type StrategyAutomationStatus = 'NOT_ELIGIBLE' | 'WATCHLIST_ONLY' | 'PAPER_TRADING_ELIGIBLE' | 'LIVE_TRADING_ELIGIBLE_FUTURE';
+export type StrategyReadinessLabel = 'RESEARCH_ONLY' | 'WATCHLIST_CANDIDATE' | 'PAPER_TEST_CANDIDATE' | 'NOT_AUTOMATION_READY';
 export type StrategyRatingGrade = 'EXCELLENT' | 'GOOD' | 'AVERAGE' | 'WEAK' | 'UNPROVEN';
 export type StrategyDecision = 'SIGNAL' | 'ENTRY_CANDIDATE' | 'WAIT' | 'WATCH' | 'AVOID' | 'EXIT_CANDIDATE' | 'REDUCE_RISK' | 'HOLD' | 'INSUFFICIENT_DATA';
 export type StrategyDirection = 'BULLISH' | 'BEARISH' | 'NEUTRAL';
@@ -174,6 +175,8 @@ export interface StrategyPerformanceSummaryDto {
   ratingScore: number;
   ratingGrade: StrategyRatingGrade;
   automationEligibility: StrategyAutomationStatus;
+  readinessLabel: StrategyReadinessLabel;
+  ratingReasons?: string[];
   backtestRunId?: string | null;
   generatedAt: string;
   createdAt?: string;
@@ -232,7 +235,7 @@ export interface StrategyBacktestRunResponse {
   availability: {
     timeframe: StrategyTimeframe;
     requestedYears: number;
-    status: 'AVAILABLE' | 'PARTIAL' | 'UNAVAILABLE';
+    status: 'AVAILABLE' | 'PARTIAL' | 'INSUFFICIENT_HISTORY' | 'NOT_RUN' | 'ERROR';
     message: string | null;
   };
 }

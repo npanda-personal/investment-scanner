@@ -1,8 +1,11 @@
 export type UniverseType = 'ALL' | 'INSTRUMENTS' | 'SYMBOLS' | 'WATCHLIST';
+export type BacktestMode = 'REGISTERED_STRATEGY' | 'CUSTOM_RULES';
 export type EntryRuleType = 'SIGNAL_SCORE_ABOVE' | 'SIGNAL_DIRECTION_BULLISH' | 'PRICE_ABOVE_SMA50' | 'SMA50_ABOVE_SMA200';
 export type ExitRuleType = 'SIGNAL_SCORE_BELOW' | 'SIGNAL_DIRECTION_BEARISH' | 'PRICE_BELOW_SMA50' | 'FIXED_HOLDING_PERIOD';
 export type PositionSizeType = 'EQUAL_WEIGHT' | 'FIXED_AMOUNT';
 export type BacktestStatus = 'COMPLETED' | 'FAILED';
+export type BacktestAvailabilityStatus = 'AVAILABLE' | 'PARTIAL' | 'INSUFFICIENT_HISTORY' | 'NOT_RUN' | 'ERROR';
+export type StrategyReadinessLabel = 'RESEARCH_ONLY' | 'WATCHLIST_CANDIDATE' | 'PAPER_TEST_CANDIDATE' | 'NOT_AUTOMATION_READY';
 
 export interface StrategyRule<T extends string> {
   type: T;
@@ -11,6 +14,12 @@ export interface StrategyRule<T extends string> {
 }
 
 export interface BacktestStrategyConfig {
+  mode?: BacktestMode;
+  strategyCode?: string;
+  strategyVersion?: string;
+  timeframe?: '1Y' | '3Y' | '5Y' | '10Y' | '15Y';
+  region?: string;
+  assetType?: string;
   universe: {
     type: UniverseType;
     instrumentIds?: string[];
@@ -64,6 +73,24 @@ export interface BacktestMetrics {
     excludedForDataQuality: number;
     missingQualityEvaluationCount: number;
   };
+  availabilityStatus?: BacktestAvailabilityStatus;
+  frameworkStrategyName?: string | null;
+  frameworkRating?: {
+    ratingScore: number;
+    ratingGrade: string;
+    readinessLabel: StrategyReadinessLabel;
+    ratingReasons: string[];
+    performanceSummaryId?: string;
+  } | null;
+  dataCoverage?: {
+    instrumentsConsidered: number;
+    instrumentsWithEnoughHistory: number;
+    instrumentsExcludedForHistory: number;
+    instrumentsExcludedForDataQuality: number;
+    missingPriceHistoryCount: number;
+    insufficientHistoryCount: number;
+    warnings: string[];
+  };
 }
 
 export interface BacktestTrade {
@@ -79,6 +106,9 @@ export interface BacktestTrade {
   returnPercent: number;
   holdingDays: number;
   exitReason: string;
+  entryReason?: string;
+  entryReasons?: string[];
+  exitReasons?: string[];
 }
 
 export interface EquityCurvePoint {

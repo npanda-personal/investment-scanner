@@ -754,6 +754,8 @@ model StrategyPerformanceSummary {
   ratingScore           Int
   ratingGrade           String
   automationEligibility String
+  readinessLabel        String   @default("RESEARCH_ONLY")
+  ratingReasons         Json?
   backtestRunId         String?
   generatedAt           DateTime @default(now())
   createdAt             DateTime @default(now())

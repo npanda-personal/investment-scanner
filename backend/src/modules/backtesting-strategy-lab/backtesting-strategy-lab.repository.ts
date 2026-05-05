@@ -64,6 +64,14 @@ export class BacktestingStrategyLabRepository {
     return this.toRunDto(row);
   }
 
+  async updateRunMetrics(id: string, metrics: BacktestRunDto['metrics']): Promise<BacktestRunDto> {
+    const row = await this.db.backtestRun.update({
+      where: { id },
+      data: { metrics: metrics as unknown as Prisma.InputJsonValue },
+    });
+    return this.toRunDto(row);
+  }
+
   async listRuns(userId = 'default-user'): Promise<BacktestRunDto[]> {
     const rows = await this.db.backtestRun.findMany({ where: this.ownerWhere(userId), orderBy: { startedAt: 'desc' }, take: 100 });
     return rows.map(this.toRunDto);

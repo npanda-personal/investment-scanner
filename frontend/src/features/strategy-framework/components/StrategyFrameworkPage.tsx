@@ -1,10 +1,10 @@
 import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Alert,
   Box,
   Button,
   Chip,
-  CircularProgress,
   Divider,
   FormControl,
   Grid,
@@ -15,23 +15,23 @@ import {
   Stack,
   Tab,
   Tabs,
-  TextField,
   Typography,
 } from '@mui/material';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import ScienceIcon from '@mui/icons-material/Science';
 import { DataTable, PageHeader } from '@/shared/components';
 import { InstrumentSearchSelect } from '@/shared/components/EntitySearchSelect';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import type { V1Instrument } from '@/features/market-data-foundation';
-import { evaluateStrategy, fetchStrategies, fetchStrategy, fetchStrategyPerformance, fetchStrategyRankings, runRegisteredStrategyBacktest } from '../api/strategyFrameworkApi';
+import { evaluateStrategy, fetchStrategies, fetchStrategy, fetchStrategyPerformance, fetchStrategyRankings } from '../api/strategyFrameworkApi';
 import type { StrategyDefinition, StrategyEvaluationResult, StrategyPerformanceSummary, StrategyTimeframe } from '../types';
 
 const timeframes: StrategyTimeframe[] = ['1Y', '3Y', '5Y', '10Y', '15Y'];
 
 const StrategyFrameworkPage: React.FC = () => {
   const { scope } = useMarketScope();
+  const [searchParams] = useSearchParams();
   const [tab, setTab] = React.useState(0);
   const [strategies, setStrategies] = React.useState<StrategyDefinition[]>([]);
   const [selectedCode, setSelectedCode] = React.useState('TREND_MOMENTUM');
@@ -41,15 +41,19 @@ const StrategyFrameworkPage: React.FC = () => {
   const [rankings, setRankings] = React.useState<StrategyPerformanceSummary[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [capital, setCapital] = React.useState(100000);
-  const [maxPositions, setMaxPositions] = React.useState(10);
-  const [cost, setCost] = React.useState(0.001);
-  const [backtestResult, setBacktestResult] = React.useState<StrategyPerformanceSummary | null>(null);
   const [running, setRunning] = React.useState(false);
   const [instrument, setInstrument] = React.useState<V1Instrument | null>(null);
   const [evaluation, setEvaluation] = React.useState<StrategyEvaluationResult[]>([]);
   const [sortBy, setSortBy] = React.useState('ratingScore');
   const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('desc');
+
+  React.useEffect(() => {
+    const linkedCode = searchParams.get('strategyCode');
+    if (linkedCode) {
+      setSelectedCode(linkedCode.toUpperCase());
+      setTab(2);
+    }
+  }, [searchParams]);
 
   React.useEffect(() => {
     setLoading(true);
@@ -67,7 +71,7 @@ const StrategyFrameworkPage: React.FC = () => {
     if (!selectedCode) return;
     Promise.all([
       fetchStrategy(selectedCode, { region: scope.region, assetType: scope.assetType }),
-      fetchStrategyPerformance(selectedCode, { timeframe, region: scope.region, assetType: scope.assetType }),
+      fetchStrategyPerformance(selectedCode, { region: scope.region, assetType: scope.assetType }),
       fetchStrategyRankings({ timeframe, region: scope.region, assetType: scope.assetType }),
     ])
       .then(([detail, perf, ranks]) => {
@@ -89,29 +93,6 @@ const StrategyFrameworkPage: React.FC = () => {
       return sortDirection === 'asc' ? left - right : right - left;
     });
   }, [rankings, sortBy, sortDirection]);
-
-  const runBacktest = async () => {
-    if (!selectedCode) return;
-    setRunning(true);
-    setError(null);
-    try {
-      const result = await runRegisteredStrategyBacktest(selectedCode, {
-        timeframe,
-        region: scope.region,
-        assetType: scope.assetType,
-        initialCapital: capital,
-        maxPositions,
-        transactionCostPercent: cost,
-      });
-      setBacktestResult(result.performanceSummary);
-      setPerformance([result.performanceSummary]);
-      setTab(2);
-    } catch (err: any) {
-      setError(err?.response?.data?.error || 'Backtest failed.');
-    } finally {
-      setRunning(false);
-    }
-  };
 
   const runEvaluation = async () => {
     if (!instrument) return;
@@ -145,7 +126,6 @@ const StrategyFrameworkPage: React.FC = () => {
           <Tab label="Detail" />
           <Tab label="Performance" />
           <Tab label="Rankings" />
-          <Tab label="Run Backtest" />
           <Tab label="Evaluate Stock" />
         </Tabs>
       </Paper>
@@ -157,8 +137,8 @@ const StrategyFrameworkPage: React.FC = () => {
             { id: 'status', label: 'Status', render: (row) => <Chip size="small" label={row.status} color={row.status === 'ACTIVE' ? 'success' : row.status === 'DRAFT' ? 'warning' : 'default'} /> },
             { id: 'style', label: 'Style', render: (row) => row.style },
             { id: 'rating', label: 'Latest rating', render: (row) => ratingChip(row.latestPerformance?.ratingGrade) },
-            { id: 'automation', label: 'Automation', render: (row) => <Chip size="small" label={row.latestPerformance?.automationEligibility || 'NOT_ELIGIBLE'} /> },
-            { id: 'action', label: 'Actions', render: (row) => <Button startIcon={<VisibilityIcon />} size="small" onClick={() => { setSelectedCode(row.code); setTab(1); }}>View</Button> },
+            { id: 'readiness', label: 'Readiness', render: (row) => readinessChip(row.latestPerformance?.readinessLabel) },
+            { id: 'action', label: 'Actions', render: (row) => <Stack direction="row" spacing={1}><Button startIcon={<VisibilityIcon />} size="small" onClick={() => { setSelectedCode(row.code); setTab(1); }}>View</Button><Button startIcon={<ScienceIcon />} size="small" href={labLink(row.code, '3Y', scope.region, scope.assetType)}>Backtest in Lab</Button></Stack> },
           ]}
           rows={strategies}
           getRowId={(row) => row.code}
@@ -173,12 +153,12 @@ const StrategyFrameworkPage: React.FC = () => {
         />
       )}
 
-      {tab === 1 && selected && <StrategyDetail strategy={selected} selectedCode={selectedCode} onStrategyChange={setSelectedCode} strategies={strategies} />}
+      {tab === 1 && selected && <StrategyDetail strategy={selected} selectedCode={selectedCode} onStrategyChange={setSelectedCode} strategies={strategies} region={scope.region} assetType={scope.assetType} />}
 
       {tab === 2 && (
         <Stack spacing={2}>
           <ToolbarSelector strategies={strategies} selectedCode={selectedCode} onStrategyChange={setSelectedCode} timeframe={timeframe} onTimeframeChange={setTimeframe} />
-          <PerformanceCards summary={performance[0] || backtestResult} />
+          <PerformanceMatrix summaries={performance} selectedCode={selectedCode} region={scope.region} assetType={scope.assetType} />
         </Stack>
       )}
 
@@ -192,7 +172,8 @@ const StrategyFrameworkPage: React.FC = () => {
               { id: 'cagr', label: 'CAGR', sortable: true, render: (row) => percent(row.cagr) },
               { id: 'maxDrawdown', label: 'Worst drawdown', sortable: true, render: (row) => percent(row.maxDrawdown) },
               { id: 'tradeCount', label: 'Trades', sortable: true, render: (row) => row.tradeCount },
-              { id: 'automationEligibility', label: 'Automation', render: (row) => <Chip size="small" label={row.automationEligibility} /> },
+              { id: 'readinessLabel', label: 'Readiness', render: (row) => readinessChip(row.readinessLabel) },
+              { id: 'action', label: 'Action', render: (row) => <Button size="small" href={labLink(row.strategyCode, row.timeframe, scope.region, scope.assetType)}>View Detailed Backtest</Button> },
             ]}
             rows={sortedRankings}
             getRowId={(row) => `${row.strategyCode}-${row.timeframe}-${row.region}`}
@@ -210,20 +191,6 @@ const StrategyFrameworkPage: React.FC = () => {
       )}
 
       {tab === 4 && (
-        <Paper variant="outlined" sx={{ p: 2 }}>
-          <Stack spacing={2}>
-            <ToolbarSelector strategies={strategies} selectedCode={selectedCode} onStrategyChange={setSelectedCode} timeframe={timeframe} onTimeframeChange={setTimeframe} />
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={4}><TextField fullWidth size="small" type="number" label="Initial capital" value={capital} onChange={(event) => setCapital(Number(event.target.value))} /></Grid>
-              <Grid item xs={12} md={4}><TextField fullWidth size="small" type="number" label="Max positions" value={maxPositions} onChange={(event) => setMaxPositions(Number(event.target.value))} /></Grid>
-              <Grid item xs={12} md={4}><TextField fullWidth size="small" type="number" label="Transaction cost" value={cost} onChange={(event) => setCost(Number(event.target.value))} /></Grid>
-            </Grid>
-            <Box><Button variant="contained" startIcon={running ? <CircularProgress size={18} /> : <PlayArrowIcon />} disabled={running} onClick={runBacktest}>Run Backtest</Button></Box>
-          </Stack>
-        </Paper>
-      )}
-
-      {tab === 5 && (
         <Stack spacing={2}>
           <Paper variant="outlined" sx={{ p: 2 }}>
             <Grid container spacing={2} alignItems="center">
@@ -264,13 +231,16 @@ function ToolbarStrategySelect({ strategies, selectedCode, onStrategyChange }: {
   );
 }
 
-function StrategyDetail({ strategy, selectedCode, onStrategyChange, strategies }: { strategy: StrategyDefinition; selectedCode: string; onStrategyChange: (value: string) => void; strategies: StrategyDefinition[] }) {
+function StrategyDetail({ strategy, selectedCode, onStrategyChange, strategies, region, assetType }: { strategy: StrategyDefinition; selectedCode: string; onStrategyChange: (value: string) => void; strategies: StrategyDefinition[]; region: string; assetType: string }) {
   return (
     <Stack spacing={2}>
       <ToolbarStrategySelect strategies={strategies} selectedCode={selectedCode} onStrategyChange={onStrategyChange} />
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Stack spacing={1}>
-          <Stack direction="row" spacing={1} alignItems="center"><Typography variant="h6">{strategy.name}</Typography><Chip size="small" label={strategy.status} /></Stack>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between">
+            <Stack direction="row" spacing={1} alignItems="center"><Typography variant="h6">{strategy.name}</Typography><Chip size="small" label={strategy.status} /></Stack>
+            <Button startIcon={<ScienceIcon />} variant="contained" href={labLink(strategy.code, '3Y', region, assetType)}>Backtest in Lab</Button>
+          </Stack>
           <Typography color="text.secondary">{strategy.description}</Typography>
           <Stack direction="row" spacing={1} flexWrap="wrap">{[strategy.category, strategy.style, strategy.timeframe, ...strategy.supportedRegions, ...strategy.assetTypes].map((item) => <Chip key={item} size="small" label={item} />)}</Stack>
           <Divider />
@@ -288,19 +258,32 @@ function RuleSection({ title, rules }: { title: string; rules: Array<{ code: str
   return <Box><Typography variant="subtitle2" gutterBottom>{title}</Typography><Stack spacing={0.5}>{rules.length ? rules.map((rule) => <Typography key={rule.code} variant="body2">- {rule.label}</Typography>) : <Typography variant="body2" color="text.secondary">None configured.</Typography>}</Stack></Box>;
 }
 
-function PerformanceCards({ summary }: { summary?: StrategyPerformanceSummary | null }) {
-  if (!summary) return <Alert severity="warning">No performance summary exists for this strategy/timeframe yet. Run a manual backtest to create one.</Alert>;
-  const items = [
-    ['Starting capital', money(summary.startingCapital)],
-    ['Ending capital', money(summary.endingCapital)],
-    ['Total return', percent(summary.totalReturn)],
-    ['CAGR', percent(summary.cagr)],
-    ['Max drawdown', percent(summary.maxDrawdown)],
-    ['Sharpe', value(summary.sharpe)],
-    ['Win rate', percent(summary.winRate)],
-    ['Profit factor', value(summary.profitFactor)],
-  ];
-  return <Grid container spacing={2}>{items.map(([label, content]) => <Grid item xs={12} sm={6} md={3} key={label}><Paper variant="outlined" sx={{ p: 2 }}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography variant="h6">{content}</Typography></Paper></Grid>)}<Grid item xs={12}><Stack direction="row" spacing={1}>{ratingChip(summary.ratingGrade)}<Chip label={summary.automationEligibility} /></Stack></Grid></Grid>;
+function PerformanceMatrix({ summaries, selectedCode, region, assetType }: { summaries: StrategyPerformanceSummary[]; selectedCode: string; region: string; assetType: string }) {
+  const byTimeframe = new Map(summaries.map((summary) => [summary.timeframe, summary]));
+  return (
+    <DataTable
+      columns={[
+        { id: 'timeframe', label: 'Timeframe', render: (row) => row.timeframe },
+        { id: 'availability', label: 'Availability', render: (row) => row.summary ? <Chip size="small" label="AVAILABLE" color="success" /> : <Chip size="small" label="NOT_RUN" /> },
+        { id: 'cagr', label: 'CAGR', render: (row) => percent(row.summary?.cagr) },
+        { id: 'totalReturn', label: 'Total return', render: (row) => percent(row.summary?.totalReturn) },
+        { id: 'maxDrawdown', label: 'Max drawdown', render: (row) => percent(row.summary?.maxDrawdown) },
+        { id: 'sharpe', label: 'Sharpe', render: (row) => value(row.summary?.sharpe) },
+        { id: 'trades', label: 'Trades', render: (row) => row.summary?.tradeCount ?? 0 },
+        { id: 'rating', label: 'Rating', render: (row) => ratingChip(row.summary?.ratingGrade) },
+        { id: 'readiness', label: 'Readiness', render: (row) => readinessChip(row.summary?.readinessLabel) },
+        { id: 'action', label: 'Action', render: (row) => <Button size="small" href={labLink(selectedCode, row.timeframe, region, assetType)}>Backtest in Lab</Button> },
+      ]}
+      rows={timeframes.map((item) => ({ timeframe: item, summary: byTimeframe.get(item) }))}
+      getRowId={(row) => row.timeframe}
+      page={0}
+      pageSize={5}
+      totalCount={5}
+      onPageChange={() => undefined}
+      onPageSizeChange={() => undefined}
+      emptyMessage="No performance summaries yet."
+    />
+  );
 }
 
 function EvaluationList({ results }: { results: StrategyEvaluationResult[] }) {
@@ -312,12 +295,17 @@ function ratingChip(grade?: string | null) {
   return <Chip size="small" label={grade || 'UNPROVEN'} color={grade === 'EXCELLENT' ? 'success' : grade === 'GOOD' ? 'primary' : grade === 'WEAK' ? 'warning' : 'default'} />;
 }
 
-function percent(value: number | null | undefined) {
-  return typeof value === 'number' ? `${(value * 100).toFixed(1)}%` : 'N/A';
+function readinessChip(label?: string | null) {
+  const safe = label === 'PAPER_TEST_CANDIDATE' || label === 'WATCHLIST_CANDIDATE' || label === 'NOT_AUTOMATION_READY' ? label : 'RESEARCH_ONLY';
+  return <Chip size="small" label={safe} color={safe === 'PAPER_TEST_CANDIDATE' ? 'primary' : safe === 'WATCHLIST_CANDIDATE' ? 'success' : safe === 'NOT_AUTOMATION_READY' ? 'warning' : 'default'} />;
 }
 
-function money(value: number) {
-  return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
+function labLink(code: string, timeframe: StrategyTimeframe, region: string, assetType: string) {
+  return `/backtests?mode=registered&strategyCode=${encodeURIComponent(code)}&timeframe=${timeframe}&region=${region}&assetType=${assetType}`;
+}
+
+function percent(value: number | null | undefined) {
+  return typeof value === 'number' ? `${(value * 100).toFixed(1)}%` : 'N/A';
 }
 
 function value(input: number | null | undefined) {

@@ -4,6 +4,8 @@ const ENTRY_RULES = ['SIGNAL_SCORE_ABOVE', 'SIGNAL_DIRECTION_BULLISH', 'PRICE_AB
 const EXIT_RULES = ['SIGNAL_SCORE_BELOW', 'SIGNAL_DIRECTION_BEARISH', 'PRICE_BELOW_SMA50', 'FIXED_HOLDING_PERIOD'];
 const POSITION_SIZES = ['EQUAL_WEIGHT', 'FIXED_AMOUNT'];
 const UNIVERSES = ['ALL', 'INSTRUMENTS', 'SYMBOLS', 'WATCHLIST'];
+const MODES = ['REGISTERED_STRATEGY', 'CUSTOM_RULES'];
+const TIMEFRAMES = ['1Y', '3Y', '5Y', '10Y', '15Y'];
 
 export function validateStrategyInput(input: CreateBacktestStrategyRequest | UpdateBacktestStrategyRequest, partial = false): string[] {
   const errors: string[] = [];
@@ -17,6 +19,12 @@ export function validateStrategyInput(input: CreateBacktestStrategyRequest | Upd
 export function validateConfig(config?: BacktestStrategyConfig): string[] {
   const errors: string[] = [];
   if (!config) return ['strategy config is required'];
+  const mode = config.mode || (config.strategyCode ? 'REGISTERED_STRATEGY' : 'CUSTOM_RULES');
+  if (!MODES.includes(mode)) errors.push('backtest mode is invalid');
+  if (mode === 'REGISTERED_STRATEGY') {
+    if (!config.strategyCode || typeof config.strategyCode !== 'string') errors.push('registered strategy code is required');
+    if (!config.timeframe || !TIMEFRAMES.includes(config.timeframe)) errors.push('registered strategy timeframe is required');
+  }
   const start = new Date(config.startDate);
   const end = new Date(config.endDate);
   if (!config.startDate || !config.endDate || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) errors.push('date range is required');

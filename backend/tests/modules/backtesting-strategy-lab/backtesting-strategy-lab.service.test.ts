@@ -1,6 +1,7 @@
 /// <reference types="@types/jest" />
 import { BacktestingStrategyLabService } from '../../../src/modules/backtesting-strategy-lab';
 import type { BacktestRunDto, BacktestStrategyConfig } from '../../../src/modules/backtesting-strategy-lab';
+import { StrategyFrameworkRegistry } from '../../../src/modules/strategy-framework';
 
 const makePrices = (symbol: string, start = '2024-01-01', days = 260, slope = 1) => {
   const startDate = new Date(start);
@@ -43,6 +44,18 @@ const createService = (overrides: any = {}) => {
       startedAt: new Date().toISOString(),
       ...input,
     })),
+    updateRunMetrics: jest.fn(async (_id, metrics): Promise<BacktestRunDto> => ({
+      id: 'run-1',
+      strategyId: null,
+      config,
+      status: 'COMPLETED',
+      startedAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+      metrics,
+      equityCurve: [],
+      trades: [],
+      error: null,
+    })),
     ...overrides.repository,
   };
   const marketDataService = {
@@ -63,10 +76,23 @@ const createService = (overrides: any = {}) => {
     }),
     ...overrides.dataQualityService,
   };
+  const strategyFrameworkService = {
+    getDefinition: jest.fn().mockReturnValue({ code: 'LOW_QUALITY_DATA_REJECTION', name: 'Low Quality Data Rejection', version: '1.0.0' }),
+    persistBacktestPerformance: jest.fn().mockResolvedValue({
+      id: 'summary-1',
+      ratingScore: 20,
+      ratingGrade: 'UNPROVEN',
+      readinessLabel: 'RESEARCH_ONLY',
+      ratingReasons: ['Too few trades.'],
+    }),
+    strategyToBacktestConfig: jest.fn(),
+    ...overrides.strategyFrameworkService,
+  };
   return {
-    service: new BacktestingStrategyLabService(repository as any, marketDataService as any, watchlistService as any, { assertAllowed: jest.fn(), recordUsage: jest.fn() } as any, dataQualityService as any),
+    service: new BacktestingStrategyLabService(repository as any, marketDataService as any, watchlistService as any, { assertAllowed: jest.fn(), recordUsage: jest.fn() } as any, dataQualityService as any, new StrategyFrameworkRegistry(), strategyFrameworkService as any),
     repository,
     dataQualityService,
+    strategyFrameworkService,
   };
 };
 
@@ -147,5 +173,52 @@ describe('BacktestingStrategyLabService', () => {
       universeAfterDataQualityFilter: 1,
       excludedForDataQuality: 1,
     });
+  });
+
+  it('runs registered strategy configs and syncs Strategy Framework performance', async () => {
+    const { service, repository, strategyFrameworkService } = createService();
+
+    const run = await service.run({
+      config: {
+        ...config,
+        mode: 'REGISTERED_STRATEGY',
+        strategyCode: 'LOW_QUALITY_DATA_REJECTION',
+        strategyVersion: '1.0.0',
+        timeframe: '1Y',
+        region: 'IN',
+        assetType: 'STOCK',
+        useDataQualityFilter: true,
+      },
+    });
+
+    expect(run.status).toBe('COMPLETED');
+    expect(strategyFrameworkService.getDefinition).toHaveBeenCalledWith('LOW_QUALITY_DATA_REJECTION');
+    expect(strategyFrameworkService.persistBacktestPerformance).toHaveBeenCalledWith(expect.objectContaining({
+      strategyCode: 'LOW_QUALITY_DATA_REJECTION',
+      timeframe: '1Y',
+      universeKey: 'SYMBOLS:AAA,BBB',
+    }));
+    expect(repository.updateRunMetrics).toHaveBeenCalled();
+  });
+
+  it('returns insufficient history honestly for registered timeframes', async () => {
+    const { service } = createService({
+      marketDataService: {
+        listPricesByInstrumentId: jest.fn(async () => ({ prices: makePrices('AAA', '2024-01-01', 20, 1) })),
+      },
+    });
+
+    const run = await service.run({
+      config: {
+        ...config,
+        mode: 'REGISTERED_STRATEGY',
+        strategyCode: 'LOW_QUALITY_DATA_REJECTION',
+        timeframe: '1Y',
+        useDataQualityFilter: true,
+      },
+    });
+
+    expect(run.metrics?.availabilityStatus).toBe('INSUFFICIENT_HISTORY');
+    expect(run.metrics?.dataCoverage?.insufficientHistoryCount).toBeGreaterThan(0);
   });
 });

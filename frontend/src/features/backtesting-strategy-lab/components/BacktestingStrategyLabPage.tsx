@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { SelectChangeEvent } from '@mui/material';
 import {
   Alert,
@@ -24,6 +25,8 @@ import {
   TextField,
   Tooltip,
   Typography,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import SaveIcon from '@mui/icons-material/Save';
@@ -42,11 +45,15 @@ import {
 import { useBacktestingStrategyLab } from '../hooks';
 import type { BacktestRun, BacktestStrategyConfig, EntryRuleType, ExitRuleType, PositionSizeType, UniverseType } from '../types';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
+import { fetchStrategies } from '@/features/strategy-framework/api/strategyFrameworkApi';
+import type { StrategyDefinition, StrategyTimeframe } from '@/features/strategy-framework';
 
 const today = new Date().toISOString().slice(0, 10);
 const defaultStart = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+const timeframes: StrategyTimeframe[] = ['1Y', '3Y', '5Y', '10Y', '15Y'];
 
 const defaultConfig: BacktestStrategyConfig = {
+  mode: 'CUSTOM_RULES',
   universe: { type: 'ALL', symbols: [] },
   entryRule: { type: 'PRICE_ABOVE_SMA50', threshold: 70 },
   exitRule: { type: 'PRICE_BELOW_SMA50', threshold: 40, holdingDays: 30 },
@@ -74,6 +81,7 @@ const fmtNumber = (value: number | null | undefined) => value === null || value 
 
 export default function BacktestingStrategyLabPage() {
   const { scope } = useMarketScope();
+  const [searchParams] = useSearchParams();
   const {
     strategies,
     runs,
@@ -93,9 +101,28 @@ export default function BacktestingStrategyLabPage() {
   const [description, setDescription] = useState('Daily close MVP strategy using trend and signal proxy rules.');
   const [symbolsText, setSymbolsText] = useState('AAPL,MSFT,SPY');
   const [config, setConfig] = useState<BacktestStrategyConfig>(defaultConfig);
+  const [mode, setMode] = useState<'registered' | 'custom' | 'runs'>(searchParams.get('mode') === 'custom' ? 'custom' : 'registered');
+  const [frameworkStrategies, setFrameworkStrategies] = useState<StrategyDefinition[]>([]);
+  const [registeredCode, setRegisteredCode] = useState(searchParams.get('strategyCode') || 'TREND_MOMENTUM');
+  const [registeredTimeframe, setRegisteredTimeframe] = useState<StrategyTimeframe>((searchParams.get('timeframe') as StrategyTimeframe) || '3Y');
+  const [registeredUniverse, setRegisteredUniverse] = useState<UniverseType>('ALL');
+  const [registeredSymbols, setRegisteredSymbols] = useState(searchParams.get('symbols') || '');
+  const [registeredCapital, setRegisteredCapital] = useState(100000);
+  const [registeredMaxPositions, setRegisteredMaxPositions] = useState(10);
+  const [registeredCost, setRegisteredCost] = useState(0.001);
 
   const canUseSymbols = config.universe.type === 'SYMBOLS';
   const latestRun = selectedRun ?? runs[0] ?? null;
+  const selectedFrameworkStrategy = frameworkStrategies.find((strategy) => strategy.code === registeredCode) ?? frameworkStrategies[0] ?? null;
+
+  useEffect(() => {
+    fetchStrategies({ region: searchParams.get('region') || scope.region, assetType: searchParams.get('assetType') || scope.assetType, status: 'ACTIVE' })
+      .then((items) => {
+        setFrameworkStrategies(items);
+        if (!items.some((item) => item.code === registeredCode)) setRegisteredCode(items[0]?.code || '');
+      })
+      .catch(() => undefined);
+  }, [scope.region, scope.assetType, searchParams, registeredCode]);
 
   const chartData = useMemo(() => (latestRun?.equityCurve || []).map((point) => ({
     ...point,
@@ -118,12 +145,39 @@ export default function BacktestingStrategyLabPage() {
 
   const normalizedConfig = (): BacktestStrategyConfig => ({
     ...config,
+    mode: 'CUSTOM_RULES',
     universe: {
       ...config.universe,
       region: config.universe.type === 'ALL' ? scope.region : undefined,
       assetType: config.universe.type === 'ALL' ? scope.assetType : undefined,
       symbols: canUseSymbols ? symbolsText.split(',').map((item) => item.trim().toUpperCase()).filter(Boolean) : config.universe.symbols,
     },
+  });
+
+  const registeredConfig = (): BacktestStrategyConfig => ({
+    mode: 'REGISTERED_STRATEGY',
+    strategyCode: registeredCode,
+    strategyVersion: selectedFrameworkStrategy?.version,
+    timeframe: registeredTimeframe,
+    region: searchParams.get('region') || scope.region,
+    assetType: searchParams.get('assetType') || scope.assetType,
+    universe: {
+      type: registeredUniverse,
+      symbols: registeredUniverse === 'SYMBOLS' ? registeredSymbols.split(',').map((item) => item.trim().toUpperCase()).filter(Boolean) : undefined,
+    },
+    entryRule: { type: 'SIGNAL_DIRECTION_BULLISH', threshold: 70 },
+    exitRule: { type: 'PRICE_BELOW_SMA50', threshold: 40, holdingDays: 45 },
+    startDate: startForTimeframe(registeredTimeframe),
+    endDate: today,
+    initialCapital: registeredCapital,
+    positionSizeType: 'EQUAL_WEIGHT',
+    maxPositions: registeredMaxPositions,
+    transactionCostPercent: registeredCost,
+    useDataQualityFilter: true,
+    minSignalReadinessScore: 65,
+    excludeNotReady: true,
+    excludeIlliquid: true,
+    excludeMissingQuality: false,
   });
 
   const handleSave = async () => {
@@ -148,8 +202,8 @@ export default function BacktestingStrategyLabPage() {
             <Chip label={`Scope: ${scope.region}`} size="small" variant="outlined" color="info" />
           </Stack>
         </Box>
-        <Button variant="contained" startIcon={<PlayArrowIcon />} onClick={() => void runConfig(normalizedConfig())} disabled={running}>
-          {running ? 'Running...' : 'Run Backtest'}
+        <Button variant="contained" startIcon={<PlayArrowIcon />} onClick={() => void runConfig(mode === 'registered' ? registeredConfig() : normalizedConfig())} disabled={running || (mode === 'registered' && !registeredCode)}>
+          {running ? 'Running...' : mode === 'registered' ? 'Run Registered Backtest' : 'Run Backtest'}
         </Button>
       </Stack>
 
@@ -158,8 +212,49 @@ export default function BacktestingStrategyLabPage() {
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '380px 1fr' }, gap: 2 }}>
         <Stack spacing={2}>
           <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" sx={{ mb: 2 }}>Strategy Setup</Typography>
+            <Tabs value={mode} onChange={(_event, value) => setMode(value)} variant="scrollable" scrollButtons="auto" sx={{ mb: 2 }}>
+              <Tab value="registered" label="Registered Strategy" />
+              <Tab value="custom" label="Custom Rules" />
+              <Tab value="runs" label="Saved Runs" />
+            </Tabs>
+            {mode === 'registered' && (
+              <Stack spacing={2}>
+                <Typography variant="h6">Registered Strategy</Typography>
+                <FormControl size="small">
+                  <InputLabel>Strategy</InputLabel>
+                  <Select label="Strategy" value={registeredCode} onChange={(event) => setRegisteredCode(event.target.value)}>
+                    {frameworkStrategies.map((strategy) => <MenuItem key={strategy.code} value={strategy.code}>{strategy.name}</MenuItem>)}
+                  </Select>
+                </FormControl>
+                {selectedFrameworkStrategy && <Typography variant="body2" color="text.secondary">{selectedFrameworkStrategy.description}</Typography>}
+                <FormControl size="small">
+                  <InputLabel>Timeframe</InputLabel>
+                  <Select label="Timeframe" value={registeredTimeframe} onChange={(event) => setRegisteredTimeframe(event.target.value as StrategyTimeframe)}>
+                    {timeframes.map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
+                  </Select>
+                </FormControl>
+                <FormControl size="small">
+                  <InputLabel>Universe</InputLabel>
+                  <Select label="Universe" value={registeredUniverse} onChange={(event) => setRegisteredUniverse(event.target.value as UniverseType)}>
+                    <MenuItem value="ALL">All eligible instruments</MenuItem>
+                    <MenuItem value="SYMBOLS">Symbols</MenuItem>
+                  </Select>
+                </FormControl>
+                {registeredUniverse === 'SYMBOLS' && <TextField label="Symbols" value={registeredSymbols} onChange={(event) => setRegisteredSymbols(event.target.value)} size="small" helperText="Comma separated symbols" />}
+                <Stack direction="row" spacing={1}>
+                  <TextField label="Initial capital" type="number" value={registeredCapital} onChange={(event) => setRegisteredCapital(Number(event.target.value))} size="small" fullWidth />
+                  <TextField label="Max positions" type="number" value={registeredMaxPositions} onChange={(event) => setRegisteredMaxPositions(Number(event.target.value))} size="small" fullWidth />
+                </Stack>
+                <TextField label="Transaction cost" type="number" value={registeredCost} onChange={(event) => setRegisteredCost(Number(event.target.value))} size="small" />
+                <Button startIcon={<PlayArrowIcon />} variant="contained" onClick={() => void runConfig(registeredConfig())} disabled={running || !registeredCode}>Run Registered Backtest</Button>
+              </Stack>
+            )}
+            {mode === 'custom' && (
             <Stack spacing={2}>
+              <Stack spacing={0.5}>
+                <Typography variant="h6">Custom Rule Backtest</Typography>
+                <Typography variant="body2" color="text.secondary">Experimental ad hoc rules. Registered Strategy is the primary strategy source.</Typography>
+              </Stack>
               <TextField label="Strategy name" value={name} onChange={(event) => setName(event.target.value)} size="small" />
               <TextField label="Description" value={description} onChange={(event) => setDescription(event.target.value)} size="small" multiline minRows={2} />
               <FormControl size="small">
@@ -220,9 +315,10 @@ export default function BacktestingStrategyLabPage() {
                 <Button startIcon={<PlayArrowIcon />} variant="contained" onClick={() => void runConfig(normalizedConfig())} disabled={running}>Run</Button>
               </Stack>
             </Stack>
+            )}
           </Paper>
 
-          <Paper sx={{ p: 2 }}>
+          {mode !== 'registered' && <Paper sx={{ p: 2 }}>
             <Typography variant="h6" sx={{ mb: 1 }}>Saved Strategies</Typography>
             {strategies.length === 0 ? <Typography color="text.secondary">No saved strategies yet.</Typography> : (
               <Stack spacing={1}>
@@ -250,7 +346,7 @@ export default function BacktestingStrategyLabPage() {
                 ))}
               </Stack>
             )}
-          </Paper>
+          </Paper>}
         </Stack>
 
         <Stack spacing={2}>
@@ -264,6 +360,7 @@ export default function BacktestingStrategyLabPage() {
                     <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" gap={1}>
                       <Stack direction="row" spacing={1} alignItems="center">
                         <Chip size="small" label={run.status} color={run.status === 'COMPLETED' ? 'success' : 'error'} />
+                        <Chip size="small" label={run.config.mode === 'REGISTERED_STRATEGY' || run.config.strategyCode ? 'Saved Registered Strategy Run' : 'Custom Rule Backtest'} />
                         <Typography variant="body2">{new Date(run.startedAt).toLocaleString()}</Typography>
                         <Typography variant="body2" color="text.secondary">{fmtPercent(run.metrics?.totalReturn)}</Typography>
                       </Stack>
@@ -306,9 +403,28 @@ function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: 
   }
 
   const metrics = run.metrics;
+  const isRegistered = run.config.mode === 'REGISTERED_STRATEGY' || Boolean(run.config.strategyCode);
   return (
     <Stack spacing={2}>
+      {isRegistered && (
+        <Paper sx={{ p: 2 }}>
+          <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" gap={1}>
+            <Box>
+              <Typography variant="h6">{metrics?.frameworkStrategyName || run.config.strategyCode}</Typography>
+              <Typography variant="body2" color="text.secondary">{run.config.strategyCode} {run.config.strategyVersion ? `v${run.config.strategyVersion}` : ''} · {run.config.timeframe} · {run.config.region || 'IN'} · {run.config.assetType || 'STOCK'}</Typography>
+            </Box>
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+              <Chip size="small" label={metrics?.frameworkRating?.ratingGrade || 'UNPROVEN'} color={metrics?.frameworkRating?.ratingGrade === 'EXCELLENT' ? 'success' : metrics?.frameworkRating?.ratingGrade === 'GOOD' ? 'primary' : 'default'} />
+              <Chip size="small" label={safeReadiness(metrics?.frameworkRating?.readinessLabel)} />
+              <Chip size="small" label={metrics?.availabilityStatus || 'NOT_RUN'} />
+              {run.config.strategyCode && <Button size="small" href={`/strategies?strategyCode=${encodeURIComponent(run.config.strategyCode)}`}>Strategy Framework</Button>}
+            </Stack>
+          </Stack>
+          {metrics?.frameworkRating?.ratingReasons?.length ? <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>{metrics.frameworkRating.ratingReasons.join(' ')}</Typography> : null}
+        </Paper>
+      )}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 1.5 }}>
+        <MetricCard label="Ending Capital" value={fmtMoney((run.config.initialCapital || 0) * (1 + (metrics?.totalReturn || 0)))} />
         <MetricCard label="Total Return" value={fmtPercent(metrics?.totalReturn)} />
         <MetricCard label="CAGR" value={fmtPercent(metrics?.cagr)} />
         <MetricCard label="Max Drawdown" value={fmtPercent(metrics?.maxDrawdown)} />
@@ -317,6 +433,7 @@ function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: 
         <MetricCard label="Trades" value={String(metrics?.numberOfTrades ?? 0)} />
         <MetricCard label="Profit Factor" value={fmtNumber(metrics?.profitFactor)} />
         <MetricCard label="Avg Hold" value={metrics?.averageHoldingDays ? `${metrics.averageHoldingDays.toFixed(0)} days` : 'N/A'} />
+        <MetricCard label="Exposure" value="N/A" />
       </Box>
       <Paper sx={{ p: 2 }}>
         <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
@@ -343,6 +460,13 @@ function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: 
           excluded {metrics.dataQualityMetadata.excludedForDataQuality}, missing evaluations {metrics.dataQualityMetadata.missingQualityEvaluationCount}.
         </Alert>
       )}
+      {metrics?.dataCoverage && (
+        <Alert severity={metrics.dataCoverage.warnings.length ? 'warning' : 'info'}>
+          Data coverage: {metrics.dataCoverage.instrumentsWithEnoughHistory} / {metrics.dataCoverage.instrumentsConsidered} instruments had enough history;
+          excluded for history {metrics.dataCoverage.instrumentsExcludedForHistory}, data quality {metrics.dataCoverage.instrumentsExcludedForDataQuality}.
+          {metrics.dataCoverage.warnings.length ? ` ${metrics.dataCoverage.warnings.join(' ')}` : ''}
+        </Alert>
+      )}
       <Paper sx={{ p: 2 }}>
         <Typography variant="h6" sx={{ mb: 1 }}>Trade Log</Typography>
         {run.trades.length === 0 ? <Typography color="text.secondary">No trades were generated for this configuration.</Typography> : (
@@ -366,7 +490,7 @@ function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: 
                     <TableCell>{trade.exitDate} @ {trade.exitPrice.toFixed(2)}</TableCell>
                     <TableCell align="right" sx={{ color: trade.returnPercent >= 0 ? 'success.main' : 'error.main' }}>{fmtPercent(trade.returnPercent)}</TableCell>
                     <TableCell align="right">{fmtMoney(trade.netPnL)}</TableCell>
-                    <TableCell>{trade.exitReason}</TableCell>
+                    <TableCell>{[trade.entryReason, trade.exitReason].filter(Boolean).join(' / ')}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -391,4 +515,16 @@ function MetricCard({ label, value }: { label: string; value: string }) {
       <Typography variant="h6" fontWeight={700}>{value}</Typography>
     </Paper>
   );
+}
+
+function startForTimeframe(timeframe: StrategyTimeframe) {
+  const years = Number(timeframe.replace('Y', '')) || 1;
+  const start = new Date();
+  start.setFullYear(start.getFullYear() - years);
+  return start.toISOString().slice(0, 10);
+}
+
+function safeReadiness(label?: string | null) {
+  if (label === 'PAPER_TEST_CANDIDATE' || label === 'WATCHLIST_CANDIDATE' || label === 'NOT_AUTOMATION_READY') return label;
+  return 'RESEARCH_ONLY';
 }

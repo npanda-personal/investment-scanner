@@ -106,19 +106,23 @@ Signal Generation remains owner of raw bullish/bearish/neutral signal primitives
 - `excludeNoiseFiltered`
 
 ### Backtesting Integration
-Backtesting Strategy Lab still owns simulation internals. Registered strategy backtests add `strategyCode`, `strategyVersion`, and `timeframe` to config and use the Strategy Framework evaluator for entry/exit checks. Existing custom backtest configs continue to work.
+Backtesting Strategy Lab owns detailed simulation internals, run history, equity curves, drawdowns, and trade logs. Strategy Framework owns definitions, versions, ratings, readiness labels, and compact performance summaries. Registered strategy backtests use `mode: REGISTERED_STRATEGY`, `strategyCode`, `strategyVersion`, `timeframe`, `region`, `assetType`, and a universe key. Backtesting Lab calls the Strategy Framework evaluator for entry/exit decisions and then syncs the compact summary back to Strategy Framework.
+
+Strategy Framework does not duplicate the detailed backtest experience. Its catalog, detail, rankings, and performance matrix link into Backtesting Lab with URLs such as:
+
+`/backtests?mode=registered&strategyCode=TREND_MOMENTUM&timeframe=3Y`
 
 ### Strategy Rating Model
-Ratings use CAGR, max drawdown, Sharpe, win rate, profit factor, trade count, and sample sufficiency. Grades are `EXCELLENT`, `GOOD`, `AVERAGE`, `WEAK`, and `UNPROVEN`.
+Ratings use CAGR, max drawdown, Sharpe, win rate, profit factor, trade count, sample sufficiency, and data coverage. Grades are `EXCELLENT`, `GOOD`, `AVERAGE`, `WEAK`, and `UNPROVEN`. Insufficient history or too few trades caps the rating at `UNPROVEN`.
 
 ### Automation Eligibility
-Automation statuses are `NOT_ELIGIBLE`, `WATCHLIST_ONLY`, `PAPER_TRADING_ELIGIBLE`, and `LIVE_TRADING_ELIGIBLE_FUTURE`. The MVP never enables real live trading. `LIVE_TRADING_ELIGIBLE_FUTURE` is only a strict placeholder for future review.
+User-facing readiness labels are conservative: `RESEARCH_ONLY`, `WATCHLIST_CANDIDATE`, `PAPER_TEST_CANDIDATE`, and `NOT_AUTOMATION_READY`. The UI must not display live-trading readiness. Existing stored `LIVE_TRADING_ELIGIBLE_FUTURE` values are mapped away in UI/readiness display and should be cleaned in a future data migration.
 
 ### Versioning
 Each strategy has a semantic `version`. Performance summaries are unique by strategy code, version, timeframe, region, asset type, and universe key.
 
 ### Persistence Model
-`StrategyDefinition` stores the registry definition shape. `StrategyPerformanceSummary` stores idempotent summary metrics and rating fields. Large backtest internals remain in `BacktestRun`.
+`StrategyDefinition` stores the registry definition shape. `StrategyPerformanceSummary` stores idempotent summary metrics and rating fields. Its natural key is `strategyCode + strategyVersion + timeframe + region + assetType + universeKey`, so rerunning the same registered strategy/timeframe/region/universe updates the existing summary. Large backtest internals remain in `BacktestRun`.
 
 ### API Design
 Endpoints under `/api/v1`:
@@ -132,7 +136,7 @@ Endpoints under `/api/v1`:
 - `GET /strategies/health`
 
 ### Frontend UX
-`/strategies` provides tabs for catalog, detail, performance, rankings, manual backtest, and stock evaluation. It uses market scope, shared `DataTable`, shared `PageHeader`, and `InstrumentSearchSelect`. Backtests are manual only.
+`/strategies` provides tabs for catalog, detail, performance, rankings, and stock evaluation. The performance tab shows a compact 1Y/3Y/5Y/10Y/15Y matrix and links to Backtesting Lab for detailed simulation. Backtests are manual only and run in Backtesting Lab.
 
 ### Built-In Strategies
 Active: `TREND_MOMENTUM`, `PULLBACK_IN_UPTREND`, `BREAKOUT_CONFIRMATION`, `SMART_MONEY_ACCUMULATION`, `SECTOR_LEADER_MOMENTUM`, `DEFENSIVE_EXIT`, `RISK_OFF_AVOIDANCE`, `LOW_QUALITY_DATA_REJECTION`.
@@ -150,6 +154,8 @@ Draft: `QUALITY_TREND`, `MEAN_REVERSION_PULLBACK`.
 ### Known Limitations
 - Sector/country context is available where snapshots exist; missing context returns data gaps.
 - Backtest registered strategies use historical price-derived context and local data quality proxies, not full historical calibrated signals.
+- Backtesting Lab is the detailed surface; Strategy Framework intentionally shows only compact summaries and deep links.
+- Conservative readiness labels are available now. Historical rows with live-trading placeholder eligibility need a follow-up cleanup if present.
 - Signal reliability engine is not a separate active backend module in this repo; noise hooks are declared and ready for a future/public reliability export.
 - Fundamentals remain partial/free-local and draft for `QUALITY_TREND`.
 - No live trading, broker execution, or order placement exists.

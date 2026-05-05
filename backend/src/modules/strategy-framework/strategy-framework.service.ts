@@ -91,39 +91,83 @@ export class StrategyFrameworkService {
     const { BacktestingStrategyLabService } = require('../backtesting-strategy-lab') as typeof import('../backtesting-strategy-lab');
     const backtestingService = new BacktestingStrategyLabService();
     const run = await backtestingService.run({ config }, userId);
-    const metrics = (run as any).metrics;
-    const timeframe = input.timeframe;
-    const availability = this.availability(timeframe, config.startDate, config.endDate, metrics?.numberOfTrades ?? 0);
-    const base: Omit<StrategyPerformanceSummaryDto, 'ratingScore' | 'ratingGrade' | 'automationEligibility'> = {
-      strategyCode: strategy.code,
-      strategyVersion: strategy.version,
-      timeframe,
+    const performanceSummary = (await this.performance(strategy.code, {
+      timeframe: input.timeframe,
       region: input.region || 'IN',
       assetType: input.assetType || 'STOCK',
       universeKey: this.universeKey(input.universe),
-      startingCapital: config.initialCapital,
-      endingCapital: metrics ? config.initialCapital * (1 + metrics.totalReturn) : config.initialCapital,
-      totalReturn: metrics?.totalReturn ?? 0,
-      cagr: metrics?.cagr ?? null,
-      maxDrawdown: metrics?.maxDrawdown ?? 0,
-      volatility: metrics?.volatility ?? null,
-      sharpe: metrics?.sharpeRatio ?? null,
-      winRate: metrics?.winRate ?? null,
-      profitFactor: metrics?.profitFactor ?? null,
-      tradeCount: metrics?.numberOfTrades ?? 0,
-      averageHoldingDays: metrics?.averageHoldingDays ?? null,
-      exposurePercent: null,
-      backtestRunId: (run as any).id,
-      generatedAt: new Date().toISOString(),
+    }))[0];
+    return {
+      run,
+      performanceSummary,
+      availability: {
+        timeframe: input.timeframe,
+        requestedYears: Number(input.timeframe.replace('Y', '')),
+        status: run.metrics?.availabilityStatus || (run.status === 'FAILED' ? 'ERROR' : 'NOT_RUN'),
+        message: run.error || null,
+      },
     };
-    const performanceSummary = await this.repository.upsertPerformance({ ...base, ...StrategyFrameworkEvaluator.rate(base) });
-    return { run, performanceSummary, availability };
+  }
+
+  async persistBacktestPerformance(input: {
+    strategyCode: string;
+    strategyVersion?: string;
+    timeframe: StrategyTimeframe;
+    region: string;
+    assetType: string;
+    universeKey: string;
+    initialCapital: number;
+    backtestRunId?: string | null;
+    metrics: {
+      totalReturn: number;
+      cagr: number | null;
+      maxDrawdown: number;
+      volatility: number | null;
+      sharpeRatio: number | null;
+      winRate: number | null;
+      profitFactor: number | null;
+      numberOfTrades: number;
+      averageHoldingDays: number | null;
+    };
+    exposurePercent?: number | null;
+    dataCoverageScore?: number;
+  }): Promise<StrategyPerformanceSummaryDto> {
+    const strategy = this.requireStrategy(input.strategyCode);
+    const base: Omit<StrategyPerformanceSummaryDto, 'ratingScore' | 'ratingGrade' | 'automationEligibility' | 'readinessLabel' | 'ratingReasons'> & { dataCoverageScore?: number } = {
+      strategyCode: strategy.code,
+      strategyVersion: input.strategyVersion || strategy.version,
+      timeframe: input.timeframe,
+      region: input.region || 'IN',
+      assetType: input.assetType || 'STOCK',
+      universeKey: input.universeKey || 'ALL_ELIGIBLE',
+      startingCapital: input.initialCapital,
+      endingCapital: input.initialCapital * (1 + input.metrics.totalReturn),
+      totalReturn: input.metrics.totalReturn,
+      cagr: input.metrics.cagr,
+      maxDrawdown: input.metrics.maxDrawdown,
+      volatility: input.metrics.volatility,
+      sharpe: input.metrics.sharpeRatio,
+      winRate: input.metrics.winRate,
+      profitFactor: input.metrics.profitFactor,
+      tradeCount: input.metrics.numberOfTrades,
+      averageHoldingDays: input.metrics.averageHoldingDays,
+      exposurePercent: input.exposurePercent ?? null,
+      backtestRunId: input.backtestRunId ?? null,
+      generatedAt: new Date().toISOString(),
+      dataCoverageScore: input.dataCoverageScore,
+    };
+    const rated = StrategyFrameworkEvaluator.rate(base);
+    return this.repository.upsertPerformance({ ...base, ...rated });
+  }
+
+  getDefinition(code: string): StrategyDefinition {
+    return this.requireStrategy(code);
   }
 
   model(): StrategyModelResponse {
     return {
       statuses: ['DRAFT', 'ACTIVE', 'DISABLED', 'DEPRECATED'],
-      automationStatuses: ['NOT_ELIGIBLE', 'WATCHLIST_ONLY', 'PAPER_TRADING_ELIGIBLE', 'LIVE_TRADING_ELIGIBLE_FUTURE'],
+      automationStatuses: ['NOT_ELIGIBLE', 'WATCHLIST_ONLY', 'PAPER_TRADING_ELIGIBLE'],
       timeframes: STRATEGY_TIMEFRAMES,
       decisions: ['SIGNAL', 'ENTRY_CANDIDATE', 'WAIT', 'WATCH', 'AVOID', 'EXIT_CANDIDATE', 'REDUCE_RISK', 'HOLD', 'INSUFFICIENT_DATA'],
       ratingMethodology: [
@@ -253,16 +297,10 @@ export class StrategyFrameworkService {
       ratingScore: 20,
       ratingGrade: 'UNPROVEN',
       automationEligibility: 'NOT_ELIGIBLE',
+      readinessLabel: 'RESEARCH_ONLY',
+      ratingReasons: ['No persisted performance summary exists yet.'],
       generatedAt: new Date().toISOString(),
     };
-  }
-
-  private availability(timeframe: StrategyTimeframe, startDate: string, endDate: string, trades: number) {
-    const requestedYears = Number(timeframe.replace('Y', ''));
-    const actualYears = (new Date(endDate).getTime() - new Date(startDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000);
-    if (trades === 0) return { timeframe, requestedYears, status: 'UNAVAILABLE' as const, message: 'No trades were produced; result is unproven.' };
-    if (actualYears + 0.05 < requestedYears) return { timeframe, requestedYears, status: 'PARTIAL' as const, message: 'Available price history is shorter than requested timeframe.' };
-    return { timeframe, requestedYears, status: 'AVAILABLE' as const, message: null };
   }
 
   private universeKey(universe?: RegisteredBacktestInput['universe']) {

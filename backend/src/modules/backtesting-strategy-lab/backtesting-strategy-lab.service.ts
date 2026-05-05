@@ -2,8 +2,7 @@ import { MarketDataFoundationService } from '../market-data-foundation';
 import { SubscriptionBillingService } from '../subscription-billing';
 import { WatchlistManagementService } from '../watchlist-management';
 import { DataQualityEngineService } from '../data-quality-engine';
-import { StrategyFrameworkEvaluator } from '../strategy-framework/strategy-framework.evaluator';
-import { StrategyFrameworkRegistry } from '../strategy-framework/strategy-framework.registry';
+import { StrategyFrameworkEvaluator, StrategyFrameworkRegistry, StrategyFrameworkService } from '../strategy-framework';
 import { BacktestingStrategyLabRepository } from './backtesting-strategy-lab.repository';
 import type {
   BacktestMetrics,
@@ -18,7 +17,7 @@ import type {
 } from './backtesting-strategy-lab.types';
 import { validateConfig, validateStrategyInput } from './backtesting-strategy-lab.validation';
 
-interface Position { instrumentId: string; symbol: string; entryDate: string; entryPrice: number; quantity: number; entryBarIndex: number; cost: number }
+interface Position { instrumentId: string; symbol: string; entryDate: string; entryPrice: number; quantity: number; entryBarIndex: number; cost: number; entryReasons?: string[] }
 
 export class BacktestingStrategyLabService {
   constructor(
@@ -27,7 +26,8 @@ export class BacktestingStrategyLabService {
     private readonly watchlistService = new WatchlistManagementService(),
     private readonly subscriptionService = new SubscriptionBillingService(),
     private readonly dataQualityService = new DataQualityEngineService(),
-    private readonly strategyRegistry = new StrategyFrameworkRegistry()
+    private readonly strategyRegistry = new StrategyFrameworkRegistry(),
+    private readonly strategyFrameworkService = new StrategyFrameworkService()
   ) {}
 
   listStrategies(userId = 'default-user') { return this.repository.listStrategies(userId); }
@@ -53,11 +53,12 @@ export class BacktestingStrategyLabService {
     await this.subscriptionService.assertAllowed('RUN_BACKTEST', userId);
     const strategy = request.strategyId ? await this.repository.getStrategy(request.strategyId, userId) : null;
     if (request.strategyId && !strategy) throw new Error('Strategy not found');
-    const config = request.config ?? strategy?.config;
+    const config = this.normalizeConfig(request.config ?? strategy?.config);
     this.throwIfErrors(validateConfig(config));
+    if (this.isRegisteredConfig(config!)) this.strategyFrameworkService.getDefinition(config!.strategyCode!);
     try {
       const result = await this.simulate(config!);
-      const run = await this.repository.createRun({
+      let run = await this.repository.createRun({
         strategyId: request.strategyId ?? null,
         config: config!,
         status: 'COMPLETED',
@@ -67,6 +68,31 @@ export class BacktestingStrategyLabService {
         trades: result.trades,
         error: null,
       }, userId);
+      if (this.isRegisteredConfig(config!) && run.metrics) {
+        const summary = await this.strategyFrameworkService.persistBacktestPerformance({
+          strategyCode: config!.strategyCode!,
+          strategyVersion: config!.strategyVersion,
+          timeframe: config!.timeframe!,
+          region: config!.region || 'IN',
+          assetType: config!.assetType || 'STOCK',
+          universeKey: this.universeKey(config!.universe),
+          initialCapital: config!.initialCapital,
+          backtestRunId: run.id,
+          metrics: run.metrics,
+          dataCoverageScore: this.coverageScore(run.metrics.dataCoverage),
+        });
+        run = await this.repository.updateRunMetrics(run.id, {
+          ...run.metrics,
+          frameworkStrategyName: this.strategyFrameworkService.getDefinition(config!.strategyCode!).name,
+          frameworkRating: {
+            ratingScore: summary.ratingScore,
+            ratingGrade: summary.ratingGrade,
+            readinessLabel: this.safeReadiness(summary.readinessLabel),
+            ratingReasons: summary.ratingReasons || [],
+            performanceSummaryId: summary.id,
+          },
+        });
+      }
       await this.subscriptionService.recordUsage('RUN_BACKTEST', userId);
       return run;
     } catch (error: any) {
@@ -92,14 +118,30 @@ export class BacktestingStrategyLabService {
     const filterResult = await this.applyDataQualityFilter(resolvedUniverse, config);
     const instruments = filterResult.instruments;
     const histories = new Map<string, { instrumentId: string; symbol: string; bars: HistoricalBar[] }>();
+    let missingPriceHistoryCount = 0;
+    let insufficientHistoryCount = 0;
+    const minBars = this.isRegisteredConfig(config) ? this.minimumBarsForTimeframe(config.timeframe) : 21;
     for (const instrument of instruments) {
       const response = await this.marketDataService.listPricesByInstrumentId(instrument.instrumentId, 5000, new Date(config.startDate), new Date(config.endDate)).catch(() => null);
       const bars = (response?.prices || [])
         .map((price: any) => ({ date: new Date(price.date).toISOString().slice(0, 10), close: Number(price.adjusted_close ?? price.close), volume: price.volume !== null && price.volume !== undefined ? Number(price.volume) : null }))
         .filter((bar: HistoricalBar) => Number.isFinite(bar.close))
         .sort((a: HistoricalBar, b: HistoricalBar) => a.date.localeCompare(b.date));
-      if (bars.length > 20) histories.set(instrument.instrumentId, { ...instrument, bars });
+      if (bars.length === 0) missingPriceHistoryCount += 1;
+      else if (bars.length < minBars) insufficientHistoryCount += 1;
+      if (bars.length >= minBars) histories.set(instrument.instrumentId, { ...instrument, bars });
     }
+    const dataCoverage = {
+      instrumentsConsidered: resolvedUniverse.length,
+      instrumentsWithEnoughHistory: histories.size,
+      instrumentsExcludedForHistory: missingPriceHistoryCount + insufficientHistoryCount,
+      instrumentsExcludedForDataQuality: filterResult.metadata.excludedForDataQuality,
+      missingPriceHistoryCount,
+      insufficientHistoryCount,
+      warnings: [] as string[],
+    };
+    if (histories.size === 0) dataCoverage.warnings.push('No instruments had enough price history for the requested timeframe.');
+    if (filterResult.metadata.excludedForDataQuality > 0) dataCoverage.warnings.push('Some instruments were excluded by Data Quality Engine readiness filters.');
     const dates = [...new Set([...histories.values()].flatMap((item) => item.bars.map((bar) => bar.date)))].sort();
     let cash = config.initialCapital;
     let peak = config.initialCapital;
@@ -114,7 +156,9 @@ export class BacktestingStrategyLabService {
         const bar = history.bars[barIndex];
         const position = positions.get(history.instrumentId);
         if (position && this.shouldExit(config, history.bars, barIndex, position)) {
-          const trade = this.closePosition(config, position, bar, 'Exit rule');
+          const registeredExit = this.evaluateRegisteredStrategy(config, history.bars, barIndex, true);
+          const exitReasons = registeredExit?.reasons || [];
+          const trade = this.closePosition(config, position, bar, exitReasons[0] || registeredExit?.blockers?.[0] || 'Exit rule', exitReasons);
           cash += position.quantity * bar.close - Math.abs(position.quantity * bar.close * config.transactionCostPercent);
           trades.push(trade);
           positions.delete(history.instrumentId);
@@ -123,7 +167,9 @@ export class BacktestingStrategyLabService {
       for (const history of histories.values()) {
         if (positions.size >= config.maxPositions || positions.has(history.instrumentId)) continue;
         const barIndex = history.bars.findIndex((bar) => bar.date === date);
-        if (barIndex < 0 || !this.shouldEnter(config, history.bars, barIndex)) continue;
+        if (barIndex < 0) continue;
+        const entry = this.entryDecision(config, history.bars, barIndex);
+        if (!entry.enter) continue;
         const amount = config.positionSizeType === 'FIXED_AMOUNT' ? Number(config.fixedAmountPerTrade) : cash / Math.max(1, config.maxPositions - positions.size);
         const costAdjustedAmount = Math.min(cash, amount);
         const bar = history.bars[barIndex];
@@ -132,7 +178,7 @@ export class BacktestingStrategyLabService {
         if (tradeAmount <= 0 || cash < costAdjustedAmount) continue;
         const quantity = tradeAmount / bar.close;
         cash -= costAdjustedAmount;
-        positions.set(history.instrumentId, { instrumentId: history.instrumentId, symbol: history.symbol, entryDate: date, entryPrice: bar.close, quantity, entryBarIndex: barIndex, cost: transactionCost });
+        positions.set(history.instrumentId, { instrumentId: history.instrumentId, symbol: history.symbol, entryDate: date, entryPrice: bar.close, quantity, entryBarIndex: barIndex, cost: transactionCost, entryReasons: entry.reasons });
       }
       const investedValue = [...positions.values()].reduce((sum, position) => {
         const history = histories.get(position.instrumentId);
@@ -150,17 +196,30 @@ export class BacktestingStrategyLabService {
       const bar = this.barAtOrBefore(history?.bars || [], lastDate);
       if (bar) trades.push(this.closePosition(config, position, bar, 'End of test'));
     }
-    return { metrics: { ...this.metrics(config.initialCapital, curve, trades, config), dataQualityMetadata: filterResult.metadata }, trades, equityCurve: this.sampleCurve(curve) };
+    return {
+      metrics: {
+        ...this.metrics(config.initialCapital, curve, trades, config),
+        dataQualityMetadata: filterResult.metadata,
+        dataCoverage,
+        availabilityStatus: this.availabilityStatus(config, histories.size, insufficientHistoryCount, missingPriceHistoryCount),
+      },
+      trades,
+      equityCurve: this.sampleCurve(curve),
+    };
   }
 
   shouldEnter(config: BacktestStrategyConfig, bars: HistoricalBar[], index: number): boolean {
+    return this.entryDecision(config, bars, index).enter;
+  }
+
+  private entryDecision(config: BacktestStrategyConfig, bars: HistoricalBar[], index: number): { enter: boolean; reasons: string[] } {
     const registered = this.evaluateRegisteredStrategy(config, bars, index);
-    if (registered) return registered.eligibleForBacktest && registered.eligibleForSignalGeneration;
+    if (registered) return { enter: registered.eligibleForBacktest && registered.eligibleForSignalGeneration, reasons: registered.reasons };
     const signal = this.signalProxy(bars, index);
-    if (config.entryRule.type === 'SIGNAL_SCORE_ABOVE') return signal.score > Number(config.entryRule.threshold);
-    if (config.entryRule.type === 'SIGNAL_DIRECTION_BULLISH') return signal.direction === 'BULLISH';
-    if (config.entryRule.type === 'PRICE_ABOVE_SMA50') return this.priceAboveSma(bars, index, 50);
-    return this.sma(bars, index, 50) !== null && this.sma(bars, index, 200) !== null && this.sma(bars, index, 50)! > this.sma(bars, index, 200)!;
+    if (config.entryRule.type === 'SIGNAL_SCORE_ABOVE') return { enter: signal.score > Number(config.entryRule.threshold), reasons: [`Signal score ${signal.score}`] };
+    if (config.entryRule.type === 'SIGNAL_DIRECTION_BULLISH') return { enter: signal.direction === 'BULLISH', reasons: [`Signal direction ${signal.direction}`] };
+    if (config.entryRule.type === 'PRICE_ABOVE_SMA50') return { enter: this.priceAboveSma(bars, index, 50), reasons: ['Price above SMA50'] };
+    return { enter: this.sma(bars, index, 50) !== null && this.sma(bars, index, 200) !== null && this.sma(bars, index, 50)! > this.sma(bars, index, 200)!, reasons: ['SMA50 above SMA200'] };
   }
 
   shouldExit(config: BacktestStrategyConfig, bars: HistoricalBar[], index: number, position: Position): boolean {
@@ -220,8 +279,8 @@ export class BacktestingStrategyLabService {
   }
 
   private evaluateRegisteredStrategy(config: BacktestStrategyConfig, bars: HistoricalBar[], index: number, exit = false) {
-    if (!config.strategyCode) return null;
-    const strategy = this.strategyRegistry.get(config.strategyCode);
+    if (!this.isRegisteredConfig(config)) return null;
+    const strategy = this.strategyRegistry.get(config.strategyCode!);
     if (!strategy) return null;
     const context = this.strategyContextFromBars(bars, index, config);
     const evaluator = new StrategyFrameworkEvaluator(strategy);
@@ -284,6 +343,58 @@ export class BacktestingStrategyLabService {
     };
   }
 
+  private normalizeConfig(config?: BacktestStrategyConfig): BacktestStrategyConfig | undefined {
+    if (!config) return undefined;
+    if (this.isRegisteredConfig(config) && (!config.startDate || !config.endDate || !config.entryRule || !config.exitRule)) {
+      return this.strategyFrameworkService.strategyToBacktestConfig({
+        strategyCode: config.strategyCode!,
+        timeframe: config.timeframe || '1Y',
+        region: config.region || 'IN',
+        assetType: config.assetType || 'STOCK',
+        universe: config.universe,
+        initialCapital: config.initialCapital,
+        maxPositions: config.maxPositions,
+        transactionCostPercent: config.transactionCostPercent,
+        positionSizeType: config.positionSizeType,
+        fixedAmountPerTrade: config.fixedAmountPerTrade,
+      });
+    }
+    return { ...config, mode: config.strategyCode ? 'REGISTERED_STRATEGY' : config.mode || 'CUSTOM_RULES' };
+  }
+
+  private isRegisteredConfig(config: BacktestStrategyConfig) {
+    return config.mode === 'REGISTERED_STRATEGY' || Boolean(config.strategyCode);
+  }
+
+  private minimumBarsForTimeframe(timeframe?: BacktestStrategyConfig['timeframe']) {
+    const years = Number(String(timeframe || '1Y').replace('Y', '')) || 1;
+    return Math.max(50, Math.floor(years * 252 * 0.7));
+  }
+
+  private availabilityStatus(config: BacktestStrategyConfig, enoughHistoryCount: number, insufficientHistoryCount: number, missingPriceHistoryCount: number): BacktestMetrics['availabilityStatus'] {
+    if (!this.isRegisteredConfig(config)) return enoughHistoryCount > 0 ? 'AVAILABLE' : 'NOT_RUN';
+    if (enoughHistoryCount === 0) return 'INSUFFICIENT_HISTORY';
+    if (insufficientHistoryCount > 0 || missingPriceHistoryCount > 0) return 'PARTIAL';
+    return 'AVAILABLE';
+  }
+
+  private universeKey(universe: BacktestStrategyConfig['universe']) {
+    if (!universe || universe.type === 'ALL') return 'ALL_ELIGIBLE';
+    if (universe.type === 'WATCHLIST') return `WATCHLIST:${universe.watchlistId || 'UNKNOWN'}`;
+    if (universe.type === 'SYMBOLS') return `SYMBOLS:${(universe.symbols || []).sort().join(',')}`;
+    return `INSTRUMENTS:${(universe.instrumentIds || []).sort().join(',')}`;
+  }
+
+  private coverageScore(coverage?: BacktestMetrics['dataCoverage']) {
+    if (!coverage || coverage.instrumentsConsidered <= 0) return 0;
+    return coverage.instrumentsWithEnoughHistory / coverage.instrumentsConsidered;
+  }
+
+  private safeReadiness(value: string): 'RESEARCH_ONLY' | 'WATCHLIST_CANDIDATE' | 'PAPER_TEST_CANDIDATE' | 'NOT_AUTOMATION_READY' {
+    if (value === 'PAPER_TEST_CANDIDATE' || value === 'WATCHLIST_CANDIDATE' || value === 'NOT_AUTOMATION_READY') return value;
+    return 'RESEARCH_ONLY';
+  }
+
   private rsiFromLatestFirst(values: number[], period: number): number | null {
     if (values.length <= period) return null;
     let gains = 0;
@@ -334,7 +445,7 @@ export class BacktestingStrategyLabService {
     };
   }
 
-  private closePosition(config: BacktestStrategyConfig, position: Position, bar: HistoricalBar, exitReason: string): BacktestTrade {
+  private closePosition(config: BacktestStrategyConfig, position: Position, bar: HistoricalBar, exitReason: string, exitReasons: string[] = []): BacktestTrade {
     const gross = position.quantity * (bar.close - position.entryPrice);
     const exitCost = position.quantity * bar.close * config.transactionCostPercent;
     const net = gross - position.cost - exitCost;
@@ -351,6 +462,9 @@ export class BacktestingStrategyLabService {
       returnPercent: (bar.close - position.entryPrice) / position.entryPrice - config.transactionCostPercent * 2,
       holdingDays: Math.max(1, Math.round((new Date(bar.date).getTime() - new Date(position.entryDate).getTime()) / (24 * 60 * 60 * 1000))),
       exitReason,
+      entryReason: position.entryReasons?.[0],
+      entryReasons: position.entryReasons,
+      exitReasons,
     };
   }
 

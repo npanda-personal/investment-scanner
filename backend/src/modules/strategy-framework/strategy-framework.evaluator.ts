@@ -81,6 +81,7 @@ export class StrategyFrameworkEvaluator implements StrategyEvaluator {
     const entry = String(this.definition.parameters.backtestEntryRule || 'SIGNAL_DIRECTION_BULLISH');
     const exit = String(this.definition.parameters.backtestExitRule || 'PRICE_BELOW_SMA50');
     return {
+      mode: 'REGISTERED_STRATEGY',
       strategyCode: this.definition.code,
       strategyVersion: this.definition.version,
       timeframe: input.timeframe,
@@ -104,9 +105,13 @@ export class StrategyFrameworkEvaluator implements StrategyEvaluator {
     } as BacktestStrategyConfig;
   }
 
-  static rate(summary: Omit<StrategyPerformanceSummaryDto, 'ratingScore' | 'ratingGrade' | 'automationEligibility'>): Pick<StrategyPerformanceSummaryDto, 'ratingScore' | 'ratingGrade' | 'automationEligibility'> {
+  static rate(summary: Omit<StrategyPerformanceSummaryDto, 'ratingScore' | 'ratingGrade' | 'automationEligibility' | 'readinessLabel' | 'ratingReasons'> & { dataCoverageScore?: number }): Pick<StrategyPerformanceSummaryDto, 'ratingScore' | 'ratingGrade' | 'automationEligibility' | 'readinessLabel' | 'ratingReasons'> {
+    const ratingReasons: string[] = [];
     if (summary.tradeCount < 10 || summary.cagr === null || summary.sharpe === null) {
-      return { ratingScore: 20, ratingGrade: 'UNPROVEN', automationEligibility: 'NOT_ELIGIBLE' };
+      if (summary.tradeCount < 10) ratingReasons.push('Too few completed trades for a proven rating.');
+      if (summary.cagr === null) ratingReasons.push('CAGR is unavailable.');
+      if (summary.sharpe === null) ratingReasons.push('Sharpe is unavailable.');
+      return { ratingScore: 20, ratingGrade: 'UNPROVEN', automationEligibility: 'NOT_ELIGIBLE', readinessLabel: 'RESEARCH_ONLY', ratingReasons };
     }
 
     let score = 0;
@@ -116,16 +121,29 @@ export class StrategyFrameworkEvaluator implements StrategyEvaluator {
     score += clamp((summary.winRate ?? 0) * 18, 0, 15);
     score += clamp((summary.profitFactor ?? 0) * 5, 0, 10);
     score += summary.tradeCount >= 30 ? 5 : 2;
+    score += clamp(((summary as any).dataCoverageScore ?? 1) * 5, 0, 5);
+    if (summary.maxDrawdown <= -0.35) {
+      score -= 15;
+      ratingReasons.push('High drawdown penalized the rating.');
+    }
+    if (summary.tradeCount < 30) ratingReasons.push('Sample size is moderate; rating remains conservative.');
+    if (((summary as any).dataCoverageScore ?? 1) < 0.8) ratingReasons.push('Partial data coverage reduced confidence.');
     const ratingScore = Math.round(clamp(score, 0, 100));
     const ratingGrade: StrategyRatingGrade = ratingScore >= 80 ? 'EXCELLENT' : ratingScore >= 65 ? 'GOOD' : ratingScore >= 45 ? 'AVERAGE' : ratingScore >= 25 ? 'WEAK' : 'UNPROVEN';
-    const automationEligibility = ratingGrade === 'EXCELLENT' && summary.tradeCount >= 50 && (summary.maxDrawdown ?? -1) > -0.3
-      ? 'LIVE_TRADING_ELIGIBLE_FUTURE'
-      : ratingGrade === 'EXCELLENT' || ratingGrade === 'GOOD'
+    const automationEligibility = ratingGrade === 'EXCELLENT' || ratingGrade === 'GOOD'
         ? 'PAPER_TRADING_ELIGIBLE'
         : ratingGrade === 'AVERAGE'
           ? 'WATCHLIST_ONLY'
           : 'NOT_ELIGIBLE';
-    return { ratingScore, ratingGrade, automationEligibility };
+    const readinessLabel = (ratingGrade === 'EXCELLENT' || ratingGrade === 'GOOD') && summary.tradeCount >= 30 && summary.maxDrawdown > -0.3
+      ? 'PAPER_TEST_CANDIDATE'
+      : ratingGrade === 'AVERAGE'
+        ? 'WATCHLIST_CANDIDATE'
+        : ratingGrade === 'UNPROVEN'
+          ? 'RESEARCH_ONLY'
+          : 'NOT_AUTOMATION_READY';
+    if (ratingReasons.length === 0) ratingReasons.push('Rating combines return, drawdown, Sharpe, win rate, profit factor, sample size, and data coverage.');
+    return { ratingScore, ratingGrade, automationEligibility, readinessLabel, ratingReasons };
   }
 
   private scoreTrendMomentum(context: StrategyContext, state: MutableState) {

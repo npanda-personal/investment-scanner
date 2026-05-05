@@ -107,6 +107,8 @@ export class StrategyFrameworkRepository {
       ratingScore: summary.ratingScore,
       ratingGrade: summary.ratingGrade,
       automationEligibility: summary.automationEligibility,
+      readinessLabel: summary.readinessLabel,
+      ratingReasons: (summary.ratingReasons || []) as unknown as Prisma.InputJsonValue,
       backtestRunId: summary.backtestRunId ?? null,
       generatedAt: new Date(summary.generatedAt),
     };
@@ -210,6 +212,8 @@ export class StrategyFrameworkRepository {
       ratingScore: row.ratingScore,
       ratingGrade: row.ratingGrade,
       automationEligibility: row.automationEligibility,
+      readinessLabel: row.readinessLabel || readinessFromAutomation(row.automationEligibility),
+      ratingReasons: Array.isArray(row.ratingReasons) ? row.ratingReasons : [],
       backtestRunId: row.backtestRunId,
       generatedAt: row.generatedAt.toISOString(),
       createdAt: row.createdAt.toISOString(),
@@ -220,4 +224,10 @@ export class StrategyFrameworkRepository {
 
 function ratingRank(grade: string): number {
   return { UNPROVEN: 0, WEAK: 1, AVERAGE: 2, GOOD: 3, EXCELLENT: 4 }[grade] ?? 0;
+}
+
+function readinessFromAutomation(value: string): StrategyPerformanceSummaryDto['readinessLabel'] {
+  if (value === 'PAPER_TRADING_ELIGIBLE' || value === 'LIVE_TRADING_ELIGIBLE_FUTURE') return 'PAPER_TEST_CANDIDATE';
+  if (value === 'WATCHLIST_ONLY') return 'WATCHLIST_CANDIDATE';
+  return 'RESEARCH_ONLY';
 }

@@ -55,4 +55,28 @@ describe('backtesting strategy validation', () => {
       'exit signal threshold is required',
     ]));
   });
+
+  it('accepts registered Strategy Framework configs with supported timeframes', () => {
+    expect(validateConfig({
+      ...config,
+      mode: 'REGISTERED_STRATEGY',
+      strategyCode: 'TREND_MOMENTUM',
+      timeframe: '15Y',
+      region: 'IN',
+      assetType: 'STOCK',
+    })).toEqual([]);
+  });
+
+  it('rejects registered configs without strategy code or valid timeframe', () => {
+    const errors = validateConfig({
+      ...config,
+      mode: 'REGISTERED_STRATEGY',
+      timeframe: '2Y' as any,
+    });
+
+    expect(errors).toEqual(expect.arrayContaining([
+      'registered strategy code is required',
+      'registered strategy timeframe is required',
+    ]));
+  });
 });

@@ -1,5 +1,6 @@
 export type StrategyStatus = 'DRAFT' | 'ACTIVE' | 'DISABLED' | 'DEPRECATED';
 export type StrategyAutomationStatus = 'NOT_ELIGIBLE' | 'WATCHLIST_ONLY' | 'PAPER_TRADING_ELIGIBLE' | 'LIVE_TRADING_ELIGIBLE_FUTURE';
+export type StrategyReadinessLabel = 'RESEARCH_ONLY' | 'WATCHLIST_CANDIDATE' | 'PAPER_TEST_CANDIDATE' | 'NOT_AUTOMATION_READY';
 export type StrategyRatingGrade = 'EXCELLENT' | 'GOOD' | 'AVERAGE' | 'WEAK' | 'UNPROVEN';
 export type StrategyTimeframe = '1Y' | '3Y' | '5Y' | '10Y' | '15Y';
 
@@ -34,6 +35,9 @@ export interface StrategyPerformanceSummary {
   ratingScore: number;
   ratingGrade: StrategyRatingGrade;
   automationEligibility: StrategyAutomationStatus;
+  readinessLabel: StrategyReadinessLabel;
+  ratingReasons?: string[];
+  backtestRunId?: string | null;
   generatedAt: string;
 }
 
@@ -93,7 +97,7 @@ export interface StrategyBacktestResponse {
   availability: {
     timeframe: StrategyTimeframe;
     requestedYears: number;
-    status: 'AVAILABLE' | 'PARTIAL' | 'UNAVAILABLE';
+    status: 'AVAILABLE' | 'PARTIAL' | 'INSUFFICIENT_HISTORY' | 'NOT_RUN' | 'ERROR';
     message: string | null;
   };
 }

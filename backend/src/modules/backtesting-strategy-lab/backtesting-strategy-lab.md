@@ -2,9 +2,9 @@
 
 ## Ownership
 
-`backtesting-strategy-lab` owns MVP historical strategy simulation for simple daily close strategies. It helps users test whether signal-style and trend-style rules would have worked historically.
+`backtesting-strategy-lab` owns MVP historical strategy simulation, detailed run history, equity curves, drawdowns, trade logs, and simulation diagnostics. It helps users test registered Strategy Framework strategies and secondary custom rule configs against historical daily-close data.
 
-It does not own live trading, broker execution, portfolio optimization, tax modeling, intraday backtesting, advanced quant research, walk-forward optimization, Monte Carlo, or machine-learning strategy search.
+It does not own Strategy Framework definitions/ratings, live trading, broker execution, portfolio optimization, tax modeling, intraday backtesting, advanced quant research, walk-forward optimization, Monte Carlo, paid providers, or machine-learning strategy search.
 
 ## Backend Structure
 
@@ -21,7 +21,7 @@ Backend module files are intentionally flat:
 - `index.ts`
 
 The service consumes Market Data Foundation and Watchlist Management through public module exports only.
-It can also consume Strategy Framework public registry/evaluator exports when a backtest config includes `strategyCode`.
+It consumes Strategy Framework public service/registry/evaluator exports when a backtest config includes `mode: REGISTERED_STRATEGY` or `strategyCode`. It must not duplicate registered strategy rules.
 
 ## Endpoints
 
@@ -72,15 +72,22 @@ Supported universes:
 - `INSTRUMENTS`
 - `WATCHLIST`
 
-Registered Strategy Framework configs may also include:
+Backtest modes:
 
+- `REGISTERED_STRATEGY`: primary mode. Strategy Framework is the source of truth for rules.
+- `CUSTOM_RULES`: secondary/experimental mode. Existing rule-based configs remain supported.
+
+Registered Strategy Framework configs include:
+
+- `mode: REGISTERED_STRATEGY`
 - `strategyCode`
 - `strategyVersion`
 - `timeframe`: `1Y`, `3Y`, `5Y`, `10Y`, `15Y`
 - `region`
 - `assetType`
+- `universe`: `ALL`, `SYMBOLS`, `INSTRUMENTS`, or `WATCHLIST`
 
-When `strategyCode` is present, entry/exit checks use the registered Strategy Framework evaluator. Legacy rule-only configs remain supported for compatibility.
+When registered mode or `strategyCode` is present, entry/exit checks use the registered Strategy Framework evaluator. Custom rule-only configs remain supported for compatibility but are no longer the primary strategy source.
 
 Supported entry rules:
 
@@ -163,6 +170,11 @@ Returned metrics:
 - average holding days
 - best trade return
 - worst trade return
+- availability status: `AVAILABLE`, `PARTIAL`, `INSUFFICIENT_HISTORY`, `NOT_RUN`, or `ERROR`
+- data coverage: instruments considered, enough history, excluded for history, excluded for data quality, missing history, insufficient history, warnings
+- registered strategy rating/readiness when applicable
+
+After a registered strategy run completes, the service upserts `StrategyPerformanceSummary` through Strategy Framework using the natural key `strategyCode + strategyVersion + timeframe + region + assetType + universeKey`.
 
 ## Frontend
 
@@ -176,14 +188,18 @@ Route:
 
 The UI includes:
 
-- strategy setup form
+- Registered Strategy setup as the default mode
+- Custom Rules setup as a secondary/experimental mode
+- URL deep-link support: `/backtests?mode=registered&strategyCode=TREND_MOMENTUM&timeframe=3Y`
 - save strategy action
 - run ad hoc strategy action
 - saved strategy list
 - saved run list
+- saved runs labeled as registered strategy runs or custom rule backtests
 - performance metric cards
 - equity and drawdown chart
 - trade log with bounded display
+- rating, readiness, availability, and data coverage diagnostics for registered runs
 - optional data-quality filter controls and universe before/after metadata in results
 
 ## Known Limitations
@@ -199,6 +215,8 @@ The UI includes:
 - No historical SignalResult archive; signal rules use a price-derived proxy.
 - Universe `ALL` is capped to the first available instruments for MVP runtime safety.
 - Currency conversion is not applied across instruments.
+- Registered strategy historical context is price-derived and does not reconstruct every historical market-context or smart-money snapshot yet.
+- Readiness labels are research/paper-test oriented only; no live-trading readiness is displayed.
 
 ## Verification
 
