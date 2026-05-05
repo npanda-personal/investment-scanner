@@ -68,4 +68,6 @@ export interface DataQualityFilters {
   liquidityStatus?: LiquidityStatus | '';
   sector?: string;
   country?: string;
+  region?: string;
+  assetType?: string;
 }

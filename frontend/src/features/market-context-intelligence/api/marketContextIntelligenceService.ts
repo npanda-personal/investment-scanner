@@ -3,8 +3,8 @@ import type { CountryStrengthItem, MacroSnapshot, MarketBreadth, MarketContextSu
 
 const API_BASE = '/api/v1/market-context';
 
-export async function fetchMarketContextSummary(): Promise<MarketContextSummary> {
-  const response = await axios.get<MarketContextSummary>(`${API_BASE}/summary`);
+export async function fetchMarketContextSummary(params: { region?: string } = {}): Promise<MarketContextSummary> {
+  const response = await axios.get<MarketContextSummary>(`${API_BASE}/summary`, { params });
   return response.data;
 }
 export async function fetchMarketRegime(): Promise<MarketRegimeSummary> {

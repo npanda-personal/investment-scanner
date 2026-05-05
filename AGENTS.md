@@ -84,6 +84,27 @@ Create a new module only when the capability deserves separate ownership.
 6. Run build/tests/typecheck when available.
 7. Summarize all changes.
 
+# Global Market Scope
+
+The application uses a global market region/asset context to filter data across all modules.
+
+- **Default Region**: India (IN)
+- **Supported Regions**: IN, US, EU, GLOBAL
+- **Asset Scope**: STOCK (currently), scalable for ETF, CRYPTO, etc.
+
+## Frontend Usage
+
+- Use the `useMarketScope()` hook to access the current `scope`.
+- All instrument/stock API calls should include `region: scope.region` and `assetType: scope.assetType`.
+- Components should refetch data when `scope.region` or `scope.assetType` changes.
+- Persisted in `localStorage` under `market_scope`.
+
+## Backend Implementation
+
+- Standardized query parameters: `region`, `assetType`.
+- Use the shared helpers `resolveMarketRegionFilter(region)` and `resolveRelatedMarketRegionFilter(region)` from `backend/src/shared/utils/market-scope.ts` in repositories to map global region codes to database-specific filters (country, exchange, etc.).
+- Market context snapshots are stored per region to ensure accurate breadth and regime analysis.
+
 # Backend Module Standard
 
 All backend modules belong in:

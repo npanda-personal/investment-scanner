@@ -41,6 +41,7 @@ import {
 } from 'recharts';
 import { useBacktestingStrategyLab } from '../hooks';
 import type { BacktestRun, BacktestStrategyConfig, EntryRuleType, ExitRuleType, PositionSizeType, UniverseType } from '../types';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 
 const today = new Date().toISOString().slice(0, 10);
 const defaultStart = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -72,6 +73,7 @@ const fmtPercent = (value: number | null | undefined) => value === null || value
 const fmtNumber = (value: number | null | undefined) => value === null || value === undefined ? 'N/A' : value.toFixed(2);
 
 export default function BacktestingStrategyLabPage() {
+  const { scope } = useMarketScope();
   const {
     strategies,
     runs,
@@ -118,6 +120,8 @@ export default function BacktestingStrategyLabPage() {
     ...config,
     universe: {
       ...config.universe,
+      region: config.universe.type === 'ALL' ? scope.region : undefined,
+      assetType: config.universe.type === 'ALL' ? scope.assetType : undefined,
       symbols: canUseSymbols ? symbolsText.split(',').map((item) => item.trim().toUpperCase()).filter(Boolean) : config.universe.symbols,
     },
   });
@@ -139,7 +143,10 @@ export default function BacktestingStrategyLabPage() {
       <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" gap={2} sx={{ mb: 3 }}>
         <Box>
           <Typography variant="h4" fontWeight={700}>Backtesting & Strategy Lab</Typography>
-          <Typography color="text.secondary">Historical daily-close simulations for simple signal and trend strategies. Results are not predictions.</Typography>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography color="text.secondary">Historical daily-close simulations. Results are not predictions.</Typography>
+            <Chip label={`Scope: ${scope.region}`} size="small" variant="outlined" color="info" />
+          </Stack>
         </Box>
         <Button variant="contained" startIcon={<PlayArrowIcon />} onClick={() => void runConfig(normalizedConfig())} disabled={running}>
           {running ? 'Running...' : 'Run Backtest'}

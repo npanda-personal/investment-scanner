@@ -72,7 +72,12 @@ The module uses the Signal Generation Engine public service export to attach the
 
 If a signal is missing or the signal service fails, the holding returns `signal = null`. Portfolio responses do not fail because of unavailable signal data.
 
-The Signal Generation Engine frontend can add a signaled stock to a portfolio by consuming Portfolio Management public frontend API exports and calling the existing add-holding endpoint. No extra backend endpoint is required for this workflow.
+## Global Market Scope Integration
+
+Portfolio Management is integrated with the application's global market scope:
+- **Search Context**: The stock searchable selector used for adding holdings and transactions defaults to the globally selected `region`.
+- **Visual Feedback**: The dashboard header displays the current scope, alerting users if they are adding instruments to a portfolio while outside their primary market region.
+- **Cross-Region Support**: Portfolios can contain holdings from multiple regions. The global scope filters the *selection* and *search* experience but does not hide existing cross-region holdings.
 
 ## Transaction Scope
 

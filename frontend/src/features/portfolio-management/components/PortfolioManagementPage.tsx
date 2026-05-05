@@ -38,6 +38,7 @@ import {
 } from '../api/portfolioManagementService';
 import { usePortfolioManagement } from '../hooks';
 import type { CreateHoldingInput, CreateTransactionInput, HoldingValuation, PortfolioHolding, PortfolioTransactionType } from '../types';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 
 const money = (value: number | null | undefined, currency = 'USD') =>
   value === null || value === undefined
@@ -106,6 +107,7 @@ const PortfolioManagementPage: React.FC = () => {
   const params = useParams();
   const navigate = useNavigate();
   const selectedId = params.id;
+  const { scope } = useMarketScope();
   const { portfolios, detail, summary, allocation, transactions, loading, error, reload } = usePortfolioManagement(selectedId);
   const selectedPortfolio = summary?.portfolio || detail?.portfolio || portfolios.find((portfolio) => portfolio.id === selectedId) || portfolios[0];
   const [formError, setFormError] = useState<string | null>(null);
@@ -222,7 +224,12 @@ const PortfolioManagementPage: React.FC = () => {
       <PageHeader
         title="Portfolio Management"
         subtitle="Manual portfolios, holdings, valuation, allocation, and transaction tracking."
-        badges={summary && <Chip label={`${summary.dataStatus} data`} color={summary.dataStatus === 'COMPLETE' ? 'success' : 'warning'} variant="outlined" />}
+        badges={
+          <Stack direction="row" spacing={1}>
+            <Chip label={`Scope: ${scope.region}`} color="info" variant="outlined" size="small" />
+            {summary && <Chip label={`${summary.dataStatus} data`} color={summary.dataStatus === 'COMPLETE' ? 'success' : 'warning'} variant="outlined" size="small" />}
+          </Stack>
+        }
       />
 
       {(error || formError) && <Alert severity="error" sx={{ mb: 2 }}>{error || formError}</Alert>}

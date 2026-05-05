@@ -16,6 +16,8 @@ export interface BacktestStrategyConfig {
     instrumentIds?: string[];
     symbols?: string[];
     watchlistId?: string;
+    region?: string;
+    assetType?: string;
   };
   entryRule: StrategyRule<EntryRuleType>;
   exitRule: StrategyRule<ExitRuleType>;

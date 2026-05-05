@@ -22,8 +22,8 @@ export class MarketContextIntelligenceService {
     private readonly signalService = new SignalGenerationEngineService()
   ) {}
 
-  async run(): Promise<{ status: string }> {
-    const [items, signals] = await Promise.all([this.loadContextInstruments(), this.loadSignalMap()]);
+  async run(region?: string): Promise<{ status: string }> {
+    const [items, signals] = await Promise.all([this.loadContextInstruments(region), this.loadSignalMap(region)]);
     const enriched = items.map((item) => ({ ...item, ...signals.get(item.instrumentId) }));
     
     const regime = this.calculateRegime(enriched);
@@ -48,31 +48,31 @@ export class MarketContextIntelligenceService {
     return { status: 'success' };
   }
 
-  async summary(): Promise<MarketContextSummary> {
-    const persisted = await this.repository.latestSnapshot();
+  async summary(query: { region?: string } = {}): Promise<MarketContextSummary> {
+    const persisted = await this.repository.latestSnapshot(query.region);
     if (persisted) return persisted;
 
-    await this.run();
-    return (await this.repository.latestSnapshot())!;
+    await this.run(query.region);
+    return (await this.repository.latestSnapshot(query.region))!;
   }
 
-  async regime() {
-    const s = await this.summary();
+  async regime(region?: string) {
+    const s = await this.summary({ region });
     return s.regime;
   }
 
-  async sectors() {
-    const s = await this.summary();
+  async sectors(region?: string) {
+    const s = await this.summary({ region });
     return s.topSectors.concat(s.weakSectors);
   }
 
-  async breadth() {
-    const s = await this.summary();
+  async breadth(region?: string) {
+    const s = await this.summary({ region });
     return s.breadth;
   }
 
-  async countries() {
-    const s = await this.summary();
+  async countries(region?: string) {
+    const s = await this.summary({ region });
     return s.countryStrength;
   }
 
@@ -169,8 +169,8 @@ export class MarketContextIntelligenceService {
 
 
 
-  private async loadContextInstruments(): Promise<ContextInstrument[]> {
-    const response = await this.marketDataService.listInstruments({ page: 1, pageSize: SAMPLE_SIZE });
+  private async loadContextInstruments(region?: string): Promise<ContextInstrument[]> {
+    const response = await this.marketDataService.listInstruments({ page: 1, pageSize: SAMPLE_SIZE, region });
     const instruments = response.instruments || [];
     const rows = await Promise.all(instruments.map(async (instrument: any) => {
       const pricesResponse = await this.marketDataService.listPricesByInstrumentId(instrument.id, 260).catch(() => null);
@@ -190,8 +190,8 @@ export class MarketContextIntelligenceService {
     return rows;
   }
 
-  private async loadSignalMap() {
-    const response = await this.signalService.topSignals({ limit: 100 }).catch(() => ({ signals: [] }));
+  private async loadSignalMap(region?: string) {
+    const response = await this.signalService.topSignals({ limit: 100, region }).catch(() => ({ signals: [] }));
     const signals = response && 'signals' in response ? response.signals : [];
     const map = new Map<string, Partial<ContextInstrument>>();
     for (const signal of signals as any[]) {

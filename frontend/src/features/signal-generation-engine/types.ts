@@ -42,6 +42,8 @@ export interface SignalQuery {
   sortDirection?: 'asc' | 'desc';
   sector?: string;
   country?: string;
+  region?: string;
+  assetType?: string;
   signalType?: string;
   confidence?: SignalConfidence;
   search?: string;
@@ -62,6 +64,8 @@ export interface SignalRunRequest {
   direction?: SignalDirection;
   sector?: string;
   country?: string;
+  region?: string;
+  assetType?: string;
   useDataQualityFilter?: boolean;
   minSignalReadinessScore?: number;
   includeLimited?: boolean;

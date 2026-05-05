@@ -18,6 +18,7 @@ import {
 import { Link } from 'react-router-dom';
 import { usePortfolioIntelligence } from '../hooks';
 import { fetchExits, type StrategyDecisionDto } from '@/features/strategy-decision-engine';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 import type { GroupedHoldingSummary, RedFlag, ReviewItem } from '../types';
 
 const StrategyExitCard: React.FC<{ decision: StrategyDecisionDto }> = ({ decision }) => (
@@ -130,14 +131,15 @@ const GroupSection: React.FC<{ title: string; items: GroupedHoldingSummary[] }> 
 );
 
 export const PortfolioIntelligencePanel: React.FC<{ portfolioId?: string }> = ({ portfolioId }) => {
+  const { scope } = useMarketScope();
   const { intelligence, loading, error } = usePortfolioIntelligence(portfolioId);
   const [strategyExits, setStrategyExits] = React.useState<StrategyDecisionDto[]>([]);
 
   React.useEffect(() => {
     if (portfolioId) {
-      fetchExits(portfolioId).then(setStrategyExits).catch(() => {});
+      fetchExits({ portfolioId, region: scope.region }).then(setStrategyExits).catch(() => {});
     }
-  }, [portfolioId]);
+  }, [portfolioId, scope.region]);
 
   if (!portfolioId) return null;
   if (loading) return <Paper sx={{ p: 3, textAlign: 'center' }}><CircularProgress /></Paper>;

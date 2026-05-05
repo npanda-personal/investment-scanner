@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import prisma from '../../db/prisma';
 import type { SignalHistoryQuery, SignalQuery, SignalResultDto } from './signal-generation-engine.types';
+import { resolveRelatedMarketRegionFilter } from '../../shared/utils/market-scope';
 
 export class SignalGenerationEngineRepository {
   constructor(private readonly db = prisma) {}
@@ -148,7 +149,10 @@ export class SignalGenerationEngineRepository {
   }
 
   private buildWhere(query: SignalQuery): Prisma.SignalResultWhereInput {
+    const regionFilter = resolveRelatedMarketRegionFilter(query.region);
+    
     return {
+      ...regionFilter,
       direction: query.direction,
       confidence: query.confidence,
       score: query.minScore !== undefined ? { gte: query.minScore } : undefined,

@@ -2,6 +2,7 @@ import { BrowserRouter, useRoutes } from 'react-router-dom';
 import { CustomThemeProvider } from './app/ThemeContext';
 import { appRoutes } from './app/routes';
 import { AuthIdentityProvider } from './features/auth-identity';
+import { MarketScopeProvider } from './contexts/MarketScopeContext';
 
 function AppRoutes() {
   return useRoutes(appRoutes);
@@ -10,11 +11,13 @@ function AppRoutes() {
 function App() {
   return (
     <CustomThemeProvider>
-      <AuthIdentityProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </AuthIdentityProvider>
+      <MarketScopeProvider>
+        <AuthIdentityProvider>
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </AuthIdentityProvider>
+      </MarketScopeProvider>
     </CustomThemeProvider>
   );
 }

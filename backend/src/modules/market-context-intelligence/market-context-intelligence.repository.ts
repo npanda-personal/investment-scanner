@@ -12,21 +12,21 @@ import type {
 export class MarketContextIntelligenceRepository {
   constructor(private readonly db: PrismaClient = prisma) {}
 
-  async latestSnapshot(): Promise<MarketContextSummary | null> {
+  async latestSnapshot(region: string = 'GLOBAL'): Promise<MarketContextSummary | null> {
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
 
     const [market, sectors, countries] = await Promise.all([
-      this.db.marketContextSnapshot.findUnique({ where: { snapshotDate: today } }),
-      this.db.sectorContextSnapshot.findMany({ where: { snapshotDate: today }, orderBy: { relativeStrengthScore: 'desc' } }),
-      this.db.countryContextSnapshot.findMany({ where: { snapshotDate: today }, orderBy: { relativeStrengthScore: 'desc' } })
+      this.db.marketContextSnapshot.findUnique({ where: { snapshotDate_region: { snapshotDate: today, region } } }),
+      this.db.sectorContextSnapshot.findMany({ where: { snapshotDate: today, region }, orderBy: { relativeStrengthScore: 'desc' } }),
+      this.db.countryContextSnapshot.findMany({ where: { snapshotDate: today, region }, orderBy: { relativeStrengthScore: 'desc' } })
     ]);
 
     if (!market) return null;
 
     const regime: MarketRegimeSummary = {
       regime: market.regime as any,
-      score: market.regimeScore,
+      score: Number(market.regimeScore),
       explanation: market.explanation || '',
       updatedAt: market.updatedAt.toISOString(),
       dataStatus: market.dataStatus as any,
@@ -38,7 +38,7 @@ export class MarketContextIntelligenceRepository {
       advanceDeclineRatio: market.advanceDeclineRatio,
       newHigh52WeekCount: market.newHighCount || 0,
       newLow52WeekCount: market.newLowCount || 0,
-      bullishSignalCount: 0, // This isn't on the market snapshot model directly, but could be.
+      bullishSignalCount: 0,
       bearishSignalCount: 0,
       instrumentCount: 0,
       dataStatus: market.dataStatus as any,
@@ -49,7 +49,7 @@ export class MarketContextIntelligenceRepository {
       return1M: s.oneMonthReturn,
       return3M: s.threeMonthReturn,
       return6M: s.sixMonthReturn,
-      relativeStrengthScore: s.relativeStrengthScore,
+      relativeStrengthScore: Math.round(s.relativeStrengthScore),
       instrumentCount: s.instrumentCount,
       bullishSignalCount: s.bullishSignalCount || 0,
       bearishSignalCount: s.bearishSignalCount || 0,
@@ -61,7 +61,7 @@ export class MarketContextIntelligenceRepository {
       return1M: c.oneMonthReturn,
       return3M: c.threeMonthReturn,
       return6M: c.sixMonthReturn,
-      relativeStrengthScore: c.relativeStrengthScore,
+      relativeStrengthScore: Math.round(c.relativeStrengthScore),
       instrumentCount: 0,
       bullishSignalCount: c.bullishSignalCount || 0,
     }));
@@ -89,15 +89,16 @@ export class MarketContextIntelligenceRepository {
     };
   }
 
-  async saveSnapshot(summary: MarketContextSummary): Promise<void> {
+  async saveSnapshot(summary: MarketContextSummary, region: string = 'GLOBAL'): Promise<void> {
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
 
     await this.db.$transaction([
       this.db.marketContextSnapshot.upsert({
-        where: { snapshotDate: today },
+        where: { snapshotDate_region: { snapshotDate: today, region } },
         create: {
           snapshotDate: today,
+          region,
           regime: summary.regime.regime,
           regimeScore: summary.regime.score,
           breadthPercentAboveSma50: summary.breadth.percentAboveSma50,
@@ -126,13 +127,15 @@ export class MarketContextIntelligenceRepository {
       ...summary.topSectors.concat(summary.weakSectors).map(s => 
         this.db.sectorContextSnapshot.upsert({
           where: {
-            snapshotDate_sector: {
+            snapshotDate_region_sector: {
               snapshotDate: today,
+              region,
               sector: s.sector
             }
           },
           create: {
             snapshotDate: today,
+            region,
             sector: s.sector,
             oneMonthReturn: s.return1M,
             threeMonthReturn: s.return3M,
@@ -160,13 +163,15 @@ export class MarketContextIntelligenceRepository {
       ...summary.countryStrength.map(c => 
         this.db.countryContextSnapshot.upsert({
           where: {
-            snapshotDate_country: {
+            snapshotDate_region_country: {
               snapshotDate: today,
+              region,
               country: c.country
             }
           },
           create: {
             snapshotDate: today,
+            region,
             country: c.country,
             oneMonthReturn: c.return1M,
             threeMonthReturn: c.return3M,

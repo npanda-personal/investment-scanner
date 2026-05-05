@@ -12,6 +12,8 @@ export function parseDataQualityQuery(query: Record<string, unknown>): DataQuali
     liquidityStatus: parseEnum(first(query.liquidityStatus), LIQUIDITY_STATUSES),
     sector: parseString(first(query.sector)),
     country: parseString(first(query.country)),
+    region: parseString(first(query.region)),
+    assetType: parseString(first(query.assetType)),
     minCoverageScore: clampNumber(first(query.minCoverageScore), undefined, 0, 100),
     minReadinessScore: clampNumber(first(query.minReadinessScore), undefined, 0, 100),
     limit: clampInt(first(query.limit), 100, 1, 500),
@@ -23,6 +25,8 @@ export function parseDataQualityEvaluateRequest(input: any): DataQualityEvaluate
   return {
     instrumentId: parseString(input?.instrumentId),
     symbol: parseString(input?.symbol)?.toUpperCase(),
+    region: parseString(input?.region),
+    assetType: parseString(input?.assetType),
     batchSize: clampInt(input?.batchSize, 25, 1, 100),
     offset: clampInt(input?.offset ?? input?.cursor, 0, 0, Number.MAX_SAFE_INTEGER),
   };

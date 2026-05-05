@@ -12,6 +12,12 @@ The Research Hub acts as the **Research Command Center** and triage layer for th
 
 The Research Hub does not duplicate the full detail of child modules; it triages candidates for further investigation in those modules.
 
+## Global Market Scope Integration
+
+The Research Hub is fully integrated with the application's global market scope.
+- **Region Filtering**: The `/api/v1/research/overview` endpoint accepts a `region` parameter. When provided, it ensures the Market Readiness (Gate/Regime), Research Priorities (Candidates/Exits), and Confirmations (Smart Money/Sectors) are all calculated for that specific market.
+- **Cross-Pillar Consistency**: The triage logic automatically passes the selected region down to all underlying pillars (Strategy, Signals, Smart Money, Context).
+
 ## Architecture
 
 The module aggregates data from four primary research pillars:

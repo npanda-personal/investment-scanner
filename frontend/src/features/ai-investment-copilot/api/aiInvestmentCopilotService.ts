@@ -3,8 +3,8 @@ import type { CopilotSummaryResponse } from '../types';
 
 const API_BASE = '/api/v1/copilot';
 
-export async function fetchMarketBrief(): Promise<CopilotSummaryResponse> {
-  const response = await axios.get<CopilotSummaryResponse>(`${API_BASE}/market-brief`);
+export async function fetchMarketBrief(params: { region?: string } = {}): Promise<CopilotSummaryResponse> {
+  const response = await axios.get<CopilotSummaryResponse>(`${API_BASE}/market-brief`, { params });
   return response.data;
 }
 

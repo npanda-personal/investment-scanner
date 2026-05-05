@@ -23,11 +23,13 @@ import { deleteAlertRule, dismissAlert, evaluateAlerts, markAlertRead, markAllAl
 import { useAlertsMonitoring } from '../hooks';
 import { CreateAlertDialog } from './CreateAlertDialog';
 import type { AlertEvent } from '../types';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 
 const severityColor = (severity: string) => severity === 'CRITICAL' ? 'error' : severity === 'WARNING' ? 'warning' : 'info';
 const contextLink = (event: AlertEvent) => event.instrumentId ? `/research/stocks/${event.instrumentId}` : event.portfolioId ? `/portfolios/${event.portfolioId}` : event.watchlistId ? `/watchlists/${event.watchlistId}` : '/alerts';
 
 export const AlertsMonitoringPage: React.FC = () => {
+  const { scope } = useMarketScope();
   const { rules, events, loading, error, reload } = useAlertsMonitoring();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -49,7 +51,10 @@ export const AlertsMonitoringPage: React.FC = () => {
       <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2} sx={{ mb: 3 }}>
         <Box>
           <Typography variant="h4">Alerts & Monitoring</Typography>
-          <Typography color="text.secondary">Batch/on-demand monitoring for stocks, signals, portfolios, and watchlists.</Typography>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography color="text.secondary">Batch/on-demand monitoring for stocks, signals, portfolios, and watchlists.</Typography>
+            <Chip label={`Scope: ${scope.region}`} size="small" variant="outlined" color="info" />
+          </Stack>
         </Box>
         <Stack direction="row" spacing={1}>
           <Button variant="outlined" onClick={run}>Evaluate Now</Button>

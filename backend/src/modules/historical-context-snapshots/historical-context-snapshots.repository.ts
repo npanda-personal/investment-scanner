@@ -5,9 +5,11 @@ export class HistoricalContextSnapshotsRepository {
   constructor(private readonly db = prisma) {}
 
   async upsertMarket(input: any): Promise<'inserted' | 'updated'> {
-    const existing = await this.db.marketContextSnapshot.findUnique({ where: { snapshotDate: input.snapshotDate } });
+    const region = input.region || 'GLOBAL';
+    const where = { snapshotDate_region: { snapshotDate: input.snapshotDate, region } };
+    const existing = await this.db.marketContextSnapshot.findUnique({ where });
     await this.db.marketContextSnapshot.upsert({
-      where: { snapshotDate: input.snapshotDate },
+      where,
       create: input,
       update: input,
     });
@@ -15,14 +17,16 @@ export class HistoricalContextSnapshotsRepository {
   }
 
   async upsertSector(input: any): Promise<'inserted' | 'updated'> {
-    const where = { snapshotDate_sector: { snapshotDate: input.snapshotDate, sector: input.sector } };
+    const region = input.region || 'GLOBAL';
+    const where = { snapshotDate_region_sector: { snapshotDate: input.snapshotDate, region, sector: input.sector } };
     const existing = await this.db.sectorContextSnapshot.findUnique({ where });
     await this.db.sectorContextSnapshot.upsert({ where, create: input, update: input });
     return existing ? 'updated' : 'inserted';
   }
 
   async upsertCountry(input: any): Promise<'inserted' | 'updated'> {
-    const where = { snapshotDate_country: { snapshotDate: input.snapshotDate, country: input.country } };
+    const region = input.region || 'GLOBAL';
+    const where = { snapshotDate_region_country: { snapshotDate: input.snapshotDate, region, country: input.country } };
     const existing = await this.db.countryContextSnapshot.findUnique({ where });
     await this.db.countryContextSnapshot.upsert({ where, create: input, update: input });
     return existing ? 'updated' : 'inserted';

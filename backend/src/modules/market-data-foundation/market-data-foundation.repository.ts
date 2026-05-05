@@ -12,6 +12,7 @@ import type {
 } from './market-data-foundation.types';
 import { partitionHistoricalPrices } from './market-data-foundation.validation';
 import type { YahooFinanceIngestionService } from './market-data-foundation.provider';
+import { resolveMarketRegionFilter } from '../../shared/utils/market-scope';
 
 export class MarketDataFoundationRepository {
   constructor(public readonly prisma: PrismaClient = defaultPrisma) {}
@@ -32,11 +33,13 @@ export class MarketDataFoundationRepository {
       search,
     } = options;
     const skip = (page - 1) * pageSize;
-    const where: Prisma.StockWhereInput = {};
+    
+    // Combine explicit region filter with other filters
+    const regionFilter = resolveMarketRegionFilter(region);
+    const where: Prisma.StockWhereInput = {
+      ...regionFilter,
+    };
 
-    if (region) {
-      where.region = region;
-    }
     if (country) {
       where.country = { contains: country.trim(), mode: 'insensitive' };
     }
@@ -57,6 +60,7 @@ export class MarketDataFoundationRepository {
     }
     if (search) {
       where.OR = [
+        ...(where.OR as any[] || []),
         { symbol: { contains: search, mode: 'insensitive' } },
         { name: { contains: search, mode: 'insensitive' } },
       ];

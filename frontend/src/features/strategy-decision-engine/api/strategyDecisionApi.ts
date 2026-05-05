@@ -11,8 +11,8 @@ import type {
 
 const API_BASE = '/api/v1/strategy';
 
-export const fetchMarketGate = async (): Promise<MarketGateResponse> => {
-  const response = await axios.get<MarketGateResponse>(`${API_BASE}/market-gate`);
+export const fetchMarketGate = async (params: { region?: string } = {}): Promise<MarketGateResponse> => {
+  const response = await axios.get<MarketGateResponse>(`${API_BASE}/market-gate`, { params });
   return response.data;
 };
 
@@ -26,8 +26,8 @@ export const fetchCandidates = async (query: StrategyQuery): Promise<StrategyCan
   return response.data;
 };
 
-export const fetchExits = async (portfolioId?: string): Promise<StrategyDecisionDto[]> => {
-  const response = await axios.get<StrategyDecisionDto[]>(`${API_BASE}/exits`, { params: { portfolioId } });
+export const fetchExits = async (params: { portfolioId?: string; region?: string } = {}): Promise<StrategyDecisionDto[]> => {
+  const response = await axios.get<StrategyDecisionDto[]>(`${API_BASE}/exits`, { params });
   return response.data;
 };
 

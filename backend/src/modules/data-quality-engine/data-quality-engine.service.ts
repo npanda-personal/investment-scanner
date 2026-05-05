@@ -23,9 +23,9 @@ export class DataQualityEngineService {
     private readonly signalService: { signalHistory(input: any): Promise<any[]> } | null = null
   ) {}
 
-  async summary() {
-    const total = await this.instrumentCount();
-    return this.repository.summary(total);
+  async summary(query: Partial<DataQualityQuery> = {}) {
+    const total = await this.instrumentCount(query);
+    return this.repository.summary(total, query);
   }
 
   list(query: DataQualityQuery) {
@@ -100,7 +100,7 @@ export class DataQualityEngineService {
     const started = Date.now();
     const warnings: string[] = [];
     const instruments = await this.resolveInstruments(request);
-    const totalCount = request.instrumentId || request.symbol ? instruments.length : await this.instrumentCount();
+    const totalCount = request.instrumentId || request.symbol ? instruments.length : await this.instrumentCount(request);
     let evaluatedCount = 0;
     let failedCount = 0;
 
@@ -226,17 +226,27 @@ export class DataQualityEngineService {
       return instrument ? [instrument] : [];
     }
     if (request.symbol) {
-      const result = await this.marketDataService.listInstruments({ search: request.symbol, pageSize: 25 });
+      const result = await this.marketDataService.listInstruments({ search: request.symbol, pageSize: 25, region: request.region });
       const match = result.instruments.find((instrument: any) => instrument.symbol.toUpperCase() === request.symbol);
       return match ? [match] : [];
     }
     const page = Math.floor(request.offset / request.batchSize) + 1;
-    const result = await this.marketDataService.listInstruments({ page, pageSize: request.batchSize });
+    const result = await this.marketDataService.listInstruments({ 
+      page, 
+      pageSize: request.batchSize, 
+      region: request.region, 
+      assetType: request.assetType 
+    });
     return result.instruments;
   }
 
-  private async instrumentCount(): Promise<number> {
-    const result = await this.marketDataService.listInstruments({ page: 1, pageSize: 1 });
+  private async instrumentCount(query: Partial<DataQualityQuery> = {}): Promise<number> {
+    const result = await this.marketDataService.listInstruments({ 
+      page: 1, 
+      pageSize: 1, 
+      region: query.region, 
+      assetType: query.assetType 
+    });
     return result.pagination.total;
   }
 

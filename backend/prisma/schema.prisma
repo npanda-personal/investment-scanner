@@ -71,6 +71,8 @@ model Stock {
   watchlistItems                WatchlistItem[]
   alertRules                    AlertRule[]
   alertEvents                   AlertEvent[]
+  smartMoneySnapshots           SmartMoneyContextSnapshot[]
+  strategyDecisions             StrategyDecisionResult[]
 
   @@map("stocks")
 }
@@ -458,7 +460,8 @@ model NotificationEvent {
 
 model MarketContextSnapshot {
   id                       String   @id @default(cuid())
-  snapshotDate             DateTime @unique
+  snapshotDate             DateTime
+  region                   String   @default("GLOBAL")
   regime                   String
   regimeScore              Float
   breadthPercentAboveSma50 Float?
@@ -473,6 +476,7 @@ model MarketContextSnapshot {
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
 
+  @@unique([snapshotDate, region])
   @@index([snapshotDate])
   @@map("market_context_snapshots")
 }
@@ -480,6 +484,7 @@ model MarketContextSnapshot {
 model SectorContextSnapshot {
   id                    String   @id @default(cuid())
   snapshotDate          DateTime
+  region                String   @default("GLOBAL")
   sector                String
   oneMonthReturn        Float?
   threeMonthReturn      Float?
@@ -494,7 +499,7 @@ model SectorContextSnapshot {
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
-  @@unique([snapshotDate, sector])
+  @@unique([snapshotDate, region, sector])
   @@index([snapshotDate])
   @@index([sector])
   @@map("sector_context_snapshots")
@@ -503,6 +508,7 @@ model SectorContextSnapshot {
 model CountryContextSnapshot {
   id                    String   @id @default(cuid())
   snapshotDate          DateTime
+  region                String   @default("GLOBAL")
   country               String
   oneMonthReturn        Float?
   threeMonthReturn      Float?
@@ -515,7 +521,7 @@ model CountryContextSnapshot {
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
-  @@unique([snapshotDate, country])
+  @@unique([snapshotDate, region, country])
   @@index([snapshotDate])
   @@index([country])
   @@map("country_context_snapshots")
@@ -525,6 +531,7 @@ model SmartMoneyContextSnapshot {
   id                       String   @id @default(cuid())
   snapshotDate             DateTime
   instrumentId             String
+  stock                    Stock    @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
   symbol                   String
   companyName              String?
   sector                   String?
@@ -638,6 +645,7 @@ model WatchlistItem {
 model StrategyDecisionResult {
   id               String   @id @default(cuid())
   instrumentId     String?
+  stock            Stock?    @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
   portfolioId      String?
   holdingId        String?
   symbol           String?

@@ -1,15 +1,18 @@
 import React from 'react';
 import { Autocomplete, CircularProgress, TextField } from '@mui/material';
 import { fetchInstruments, type V1Instrument } from '@/features/market-data-foundation';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 
 type InstrumentSearchSelectProps = {
   label?: string;
   value: V1Instrument | null;
   onChange: (value: V1Instrument | null) => void;
   disabled?: boolean;
+  global?: boolean;
 };
 
-export function InstrumentSearchSelect({ label = 'Stock / instrument', value, onChange, disabled }: InstrumentSearchSelectProps) {
+export function InstrumentSearchSelect({ label = 'Stock / instrument', value, onChange, disabled, global = false }: InstrumentSearchSelectProps) {
+  const { scope } = useMarketScope();
   const [inputValue, setInputValue] = React.useState('');
   const [options, setOptions] = React.useState<V1Instrument[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -18,7 +21,15 @@ export function InstrumentSearchSelect({ label = 'Stock / instrument', value, on
     let active = true;
     const handle = window.setTimeout(() => {
       setLoading(true);
-      fetchInstruments({ search: inputValue || undefined, page: 1, pageSize: 20, sortBy: 'symbol', sortOrder: 'asc' })
+      fetchInstruments({ 
+        search: inputValue || undefined, 
+        page: 1, 
+        pageSize: 20, 
+        sortBy: 'symbol', 
+        sortOrder: 'asc',
+        region: global ? undefined : scope.region,
+        assetType: global ? undefined : scope.assetType,
+      })
         .then((response) => {
           if (active) setOptions(response.instruments);
         })
@@ -34,7 +45,7 @@ export function InstrumentSearchSelect({ label = 'Stock / instrument', value, on
       active = false;
       window.clearTimeout(handle);
     };
-  }, [inputValue]);
+  }, [inputValue, scope.region, scope.assetType, global]);
 
   return (
     <Autocomplete

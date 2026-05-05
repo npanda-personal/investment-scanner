@@ -7,8 +7,10 @@ import {
   fetchSmartMoneyTop,
 } from '../api/smartMoneyIntelligenceService';
 import type { SectorSmartMoneySummary, SmartMoneyHealth, SmartMoneyRange, SmartMoneyStockSummary } from '../types';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 
 export function useSmartMoneyIntelligence() {
+  const { scope } = useMarketScope();
   const [range, setRange] = useState<SmartMoneyRange>('3M');
   const [sector, setSector] = useState<string>('');
   
@@ -40,7 +42,7 @@ export function useSmartMoneyIntelligence() {
     try {
       const [healthData, sectorData] = await Promise.all([
         fetchSmartMoneyHealth(),
-        fetchSmartMoneySectors(range),
+        fetchSmartMoneySectors(range, scope.region),
       ]);
       setHealth(healthData);
       setSectors(sectorData);
@@ -49,12 +51,12 @@ export function useSmartMoneyIntelligence() {
     } finally {
       setLoading(false);
     }
-  }, [range]);
+  }, [range, scope.region]);
 
   const loadTop = useCallback(async () => {
     setTopLoading(true);
     try {
-      const res = await fetchSmartMoneyTop(topPageSize, topPage * topPageSize, range, sector || undefined);
+      const res = await fetchSmartMoneyTop(topPageSize, topPage * topPageSize, range, sector || undefined, scope.region, scope.assetType);
       setTop(res.results || []);
       setTopTotal(res.total || 0);
       if (!selectedStock && res.results && res.results.length > 0) setSelectedStock(res.results[0]);
@@ -63,12 +65,12 @@ export function useSmartMoneyIntelligence() {
     } finally {
       setTopLoading(false);
     }
-  }, [topPage, topPageSize, range, sector, selectedStock]);
+  }, [topPage, topPageSize, range, sector, selectedStock, scope.region, scope.assetType]);
 
   const loadDist = useCallback(async () => {
     setDistLoading(true);
     try {
-      const res = await fetchSmartMoneyDistribution(distPageSize, distPage * distPageSize, range, sector || undefined);
+      const res = await fetchSmartMoneyDistribution(distPageSize, distPage * distPageSize, range, sector || undefined, scope.region, scope.assetType);
       setDistribution(res.results || []);
       setDistTotal(res.total || 0);
     } catch (err: any) {
@@ -76,11 +78,17 @@ export function useSmartMoneyIntelligence() {
     } finally {
       setDistLoading(false);
     }
-  }, [distPage, distPageSize, range, sector]);
+  }, [distPage, distPageSize, range, sector, scope.region, scope.assetType]);
 
   useEffect(() => { void loadInitial(); }, [loadInitial]);
   useEffect(() => { void loadTop(); }, [loadTop]);
   useEffect(() => { void loadDist(); }, [loadDist]);
+
+  useEffect(() => {
+    // Reset pagination on region change
+    setTopPage(0);
+    setDistPage(0);
+  }, [scope.region, scope.assetType]);
 
   const loadStock = async (instrumentId: string) => {
     setDetailLoading(true);

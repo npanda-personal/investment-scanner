@@ -30,8 +30,10 @@ import { fetchMarketGate, evaluateStrategy, fetchCandidates, fetchExits, fetchLa
 import type { MarketGateResponse, StrategyDecisionDto, StrategyModel } from '../types';
 import { PageHeader, StatusBadge, DataTable, InstrumentSearchSelect, type DataTableColumn } from '@/shared/components';
 import { Link } from 'react-router-dom';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 
 const StrategyDecisionDashboard: React.FC = () => {
+  const { scope } = useMarketScope();
   const [activeTab, setActiveTab] = useState(0);
   const [gate, setGate] = useState<MarketGateResponse | null>(null);
   const [candidates, setCandidates] = useState<StrategyDecisionDto[]>([]);
@@ -50,7 +52,7 @@ const StrategyDecisionDashboard: React.FC = () => {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [totalCount, setTotalCount] = useState(0);
-  const [countryFilter, setCountryFilter] = useState<string>('ALL');
+  const [countryFilter, setCountryFilter] = useState<string>('SCOPE');
 
   // Evaluation form state
   const [evalStrategy, setEvalStrategy] = useState<string>('ALL');
@@ -59,20 +61,24 @@ const StrategyDecisionDashboard: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
+      const selectedRegion = countryFilter === 'SCOPE' ? scope.region : (countryFilter === 'ALL' ? undefined : countryFilter);
+      
       const [gateRes, candRes, waitRes, exitRes, modelRes] = await Promise.all([
-        fetchMarketGate(),
+        fetchMarketGate({ region: scope.region }),
         fetchCandidates({ 
           limit: pageSize, 
           offset: page * pageSize, 
           decision: 'TRADE_CANDIDATE',
-          country: countryFilter === 'ALL' ? undefined : countryFilter
+          region: selectedRegion,
+          assetType: scope.assetType
         }),
         fetchCandidates({ 
           limit: 50, 
           decision: 'WAIT',
-          country: countryFilter === 'ALL' ? undefined : countryFilter
+          region: selectedRegion,
+          assetType: scope.assetType
         }),
-        fetchExits(),
+        fetchExits({ region: scope.region }),
         fetchModel(),
       ]);
       setGate(gateRes);
@@ -90,7 +96,11 @@ const StrategyDecisionDashboard: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, [page, pageSize, activeTab, countryFilter]);
+  }, [page, pageSize, activeTab, countryFilter, scope.region, scope.assetType]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [scope.region, scope.assetType]);
 
   const runEvaluate = async () => {
     setRunning(true);
@@ -106,6 +116,8 @@ const StrategyDecisionDashboard: React.FC = () => {
           strategy: evalStrategy as any, 
           batchSize, 
           offset,
+          region: scope.region,
+          assetType: scope.assetType,
           portfolioId: evalUniverse === 'PORTFOLIO' ? 'DEFAULT' : undefined // Placeholder
         });
         
@@ -207,13 +219,14 @@ const StrategyDecisionDashboard: React.FC = () => {
             <TextField
               select
               size="small"
-              label="Region"
+              label="Region Override"
               value={countryFilter}
               onChange={(e) => setCountryFilter(e.target.value)}
-              sx={{ minWidth: 120 }}
+              sx={{ minWidth: 160 }}
             >
+              <MenuItem value="SCOPE">Default (Global Scope)</MenuItem>
               <MenuItem value="ALL">All Regions</MenuItem>
-              <MenuItem value="IND">India</MenuItem>
+              <MenuItem value="IN">India</MenuItem>
               <MenuItem value="US">USA</MenuItem>
             </TextField>
           </Box>

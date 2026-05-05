@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import prisma from '../../db/prisma';
 import type { DataQualityEvaluationDto, DataQualityQuery, DataQualitySummary } from './data-quality-engine.types';
+import { resolveRelatedMarketRegionFilter } from '../../shared/utils/market-scope';
 
 export class DataQualityEngineRepository {
   constructor(private readonly db = prisma) {}
@@ -41,15 +42,21 @@ export class DataQualityEngineRepository {
     return this.db.dataQualityEvaluation.count({ where: this.where(query) });
   }
 
-  async summary(totalInstruments: number): Promise<DataQualitySummary> {
+  async summary(totalInstruments: number, query: Partial<DataQualityQuery> = {}): Promise<DataQualitySummary> {
+    const base = { region: query.region, assetType: query.assetType };
     const [good, partial, poor, unusable, ready, latest, all] = await Promise.all([
-      this.count({ status: 'GOOD' }),
-      this.count({ status: 'PARTIAL' }),
-      this.count({ status: 'POOR' }),
-      this.count({ status: 'UNUSABLE' }),
-      this.count({ readinessStatus: 'READY' }),
-      this.db.dataQualityEvaluation.findFirst({ orderBy: { evaluatedAt: 'desc' } }),
-      this.db.dataQualityEvaluation.findMany(),
+      this.count({ ...base, status: 'GOOD' }),
+      this.count({ ...base, status: 'PARTIAL' }),
+      this.count({ ...base, status: 'POOR' }),
+      this.count({ ...base, status: 'UNUSABLE' }),
+      this.count({ ...base, readinessStatus: 'READY' }),
+      this.db.dataQualityEvaluation.findFirst({
+        where: this.where(base),
+        orderBy: { evaluatedAt: 'desc' },
+      }),
+      this.db.dataQualityEvaluation.findMany({
+        where: this.where(base),
+      }),
     ]);
     const hasGap = (needle: string) => all.filter((item) => this.jsonArray(item.dataGaps).some((gap) => gap.includes(needle))).length;
     return {
@@ -73,7 +80,10 @@ export class DataQualityEngineRepository {
   }
 
   private where(query: Partial<DataQualityQuery>): any {
+    const regionFilter = resolveRelatedMarketRegionFilter(query.region);
+    
     return {
+      ...regionFilter,
       coverageStatus: query.status,
       signalReadinessStatus: query.readinessStatus,
       liquidityStatus: query.liquidityStatus,

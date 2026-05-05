@@ -79,5 +79,7 @@ export interface SmartMoneyListQuery {
   limit: number;
   offset?: number;
   sector?: string;
+  region?: string;
+  assetType?: string;
   range: SmartMoneyRange;
 }

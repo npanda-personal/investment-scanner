@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { fetchDataQualityEvaluations, fetchDataQualitySummary } from '../api/dataQualityEngineService';
 import type { DataQualityEvaluation, DataQualityFilters, DataQualitySummary } from '../types';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 
 export function useDataQualityEngine(filters: DataQualityFilters = {}) {
+  const { scope } = useMarketScope();
   const [summary, setSummary] = useState<DataQualitySummary | null>(null);
   const [items, setItems] = useState<DataQualityEvaluation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -13,8 +15,8 @@ export function useDataQualityEngine(filters: DataQualityFilters = {}) {
     setError(null);
     try {
       const [nextSummary, nextItems] = await Promise.all([
-        fetchDataQualitySummary(),
-        fetchDataQualityEvaluations(filters),
+        fetchDataQualitySummary({ region: scope.region }),
+        fetchDataQualityEvaluations({ ...filters, region: scope.region, assetType: scope.assetType }),
       ]);
       setSummary(nextSummary);
       setItems(nextItems);
@@ -23,7 +25,7 @@ export function useDataQualityEngine(filters: DataQualityFilters = {}) {
     } finally {
       setLoading(false);
     }
-  }, [filters.status, filters.readinessStatus, filters.liquidityStatus, filters.sector, filters.country]);
+  }, [filters.status, filters.readinessStatus, filters.liquidityStatus, filters.sector, filters.country, scope.region, scope.assetType]);
 
   useEffect(() => {
     void reload();

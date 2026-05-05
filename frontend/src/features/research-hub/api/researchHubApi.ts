@@ -64,7 +64,7 @@ export interface ResearchOverview {
   dataGaps: string[];
 }
 
-export const fetchResearchOverview = async (): Promise<ResearchOverview> => {
-  const response = await axios.get<ResearchOverview>('/api/v1/research/overview');
+export const fetchResearchOverview = async (params: { region?: string; assetType?: string } = {}): Promise<ResearchOverview> => {
+  const response = await axios.get<ResearchOverview>('/api/v1/research/overview', { params });
   return response.data;
 };

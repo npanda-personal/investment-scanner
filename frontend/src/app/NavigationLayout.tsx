@@ -41,6 +41,7 @@ import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import { useThemeMode } from './ThemeContext';
 import { useAuthIdentity } from '@/features/auth-identity';
+import { MarketScopeSelector } from '@/shared/components/MarketScopeSelector';
 
 const drawerWidth = 260;
 const collapsedWidth = 72;
@@ -160,9 +161,11 @@ export default function NavigationLayout() {
             {!open && <IconButton color="inherit" edge="start" onClick={handleDrawerToggle} sx={{ mr: 2 }}><MenuIcon /></IconButton>}
             <Typography variant="h6" noWrap sx={{ fontWeight: 700 }}>{activeLabel}</Typography>
           </Stack>
-          <Stack direction="row" alignItems="center" spacing={1}>
+          <Stack direction="row" alignItems="center" spacing={1.5}>
+            <MarketScopeSelector />
+            <Divider orientation="vertical" flexItem sx={{ height: 24, alignSelf: 'center', mx: 0.5 }} />
             <Switch checked={themeMode === 'dark'} onChange={toggleTheme} size="small" icon={<Brightness4Icon fontSize="small" />} checkedIcon={<Brightness7Icon fontSize="small" />} />
-            {user && <Typography variant="body2" color="text.secondary" sx={{ ml: 1, display: { xs: 'none', sm: 'block' } }}>{user.email}</Typography>}
+            {user && <Typography variant="body2" color="text.secondary" sx={{ ml: 1, display: { xs: 'none', lg: 'block' } }}>{user.email}</Typography>}
             {user && <IconButton color="inherit" size="small" onClick={() => void logout()} title="Log out"><AccountCircleIcon fontSize="small" /></IconButton>}
           </Stack>
         </Toolbar>

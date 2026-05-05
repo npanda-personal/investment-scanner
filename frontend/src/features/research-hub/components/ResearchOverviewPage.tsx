@@ -37,10 +37,12 @@ import {
 import { Link } from 'react-router-dom';
 import { useResearchOverview } from '../hooks/useResearchOverview';
 import { PageHeader } from '@/shared/components';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 import type { StrategyDecisionDto } from '@/features/strategy-decision-engine';
 import type { ResearchOverview, NextAction } from '../api/researchHubApi';
 
 const ResearchOverviewPage: React.FC = () => {
+  const { scope } = useMarketScope();
   const { data, loading, error, reload } = useResearchOverview();
 
   if (loading) {
@@ -96,7 +98,7 @@ const ResearchOverviewPage: React.FC = () => {
     <Box sx={{ p: 3, maxWidth: 1600, mx: 'auto' }}>
       <PageHeader
         title="Research Command Center"
-        subtitle="Prioritized market intelligence and triage for your next trade."
+        subtitle={`Prioritized market intelligence for ${scope.region} / ${scope.assetType}.`}
         primaryAction={<Button variant="contained" onClick={reload} startIcon={<UpdateOutlined />}>Refresh Intelligence</Button>}
       />
 

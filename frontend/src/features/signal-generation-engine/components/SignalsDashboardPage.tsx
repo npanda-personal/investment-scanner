@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { SignalTable } from './SignalTable';
 import { FilterBar, PageHeader, type SortDirection } from '@/shared/components';
 import { FactCheckOutlined } from '@mui/icons-material';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 
 type SignalTab = 'bullish' | 'bearish' | 'neutral' | 'momentum' | 'recent' | 'screener';
 
@@ -20,6 +21,7 @@ const tabs: Array<{ value: SignalTab; label: string }> = [
 ];
 
 const SignalsDashboardPage: React.FC = () => {
+  const { scope } = useMarketScope();
   const [signals, setSignals] = useState<SignalResult[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [activeTab, setActiveTab] = useState<SignalTab>('bullish');
@@ -48,13 +50,16 @@ const SignalsDashboardPage: React.FC = () => {
     const offset = pageByTab[activeTab] * limit;
 
     let fetchPromise;
+    const baseParams = { limit, offset, sortBy, sortDirection, region: scope.region, assetType: scope.assetType };
+
     switch (activeTab) {
-      case 'bullish': fetchPromise = fetchTopSignals({ direction: 'BULLISH', limit, offset, sortBy, sortDirection }); break;
-      case 'bearish': fetchPromise = fetchTopSignals({ direction: 'BEARISH', limit, offset, sortBy, sortDirection }); break;
-      case 'neutral': fetchPromise = fetchTopSignals({ direction: 'NEUTRAL', limit, offset, sortBy, sortDirection }); break;
-      case 'momentum': fetchPromise = fetchSignalScreener({ signalType: 'MOMENTUM', minScore: 60, limit, offset, sortBy, sortDirection }); break;
-      case 'recent': fetchPromise = fetchTopSignals({ limit, offset, sortBy, sortDirection }); break;
+      case 'bullish': fetchPromise = fetchTopSignals({ ...baseParams, direction: 'BULLISH' }); break;
+      case 'bearish': fetchPromise = fetchTopSignals({ ...baseParams, direction: 'BEARISH' }); break;
+      case 'neutral': fetchPromise = fetchTopSignals({ ...baseParams, direction: 'NEUTRAL' }); break;
+      case 'momentum': fetchPromise = fetchSignalScreener({ ...baseParams, signalType: 'MOMENTUM', minScore: 60 }); break;
+      case 'recent': fetchPromise = fetchTopSignals(baseParams); break;
       case 'screener': fetchPromise = fetchSignalScreener({
+        ...baseParams,
         direction: direction || undefined,
         minScore: minScore ? Number(minScore) : undefined,
         sector: sector || undefined,
@@ -62,7 +67,6 @@ const SignalsDashboardPage: React.FC = () => {
         confidence: confidence || undefined,
         signalType: signalType || undefined,
         search: search || undefined,
-        limit, offset, sortBy, sortDirection
       }); break;
     }
 
@@ -75,13 +79,24 @@ const SignalsDashboardPage: React.FC = () => {
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, [activeTab, pageByTab[activeTab], pageSizeByTab[activeTab], sortBy, sortDirection, direction, minScore, sector, country, confidence, signalType, search]);
+  useEffect(load, [activeTab, pageByTab[activeTab], pageSizeByTab[activeTab], sortBy, sortDirection, direction, minScore, sector, country, confidence, signalType, search, scope.region, scope.assetType]);
+
+  useEffect(() => {
+    // Reset pages when scope changes
+    setPageByTab({ bullish: 0, bearish: 0, neutral: 0, momentum: 0, recent: 0, screener: 0 });
+  }, [scope.region, scope.assetType]);
 
   const runManualSignals = () => {
     setRunning(true);
     setError(null);
     setRunMessage(null);
-    runSignals({ limit: Number(runLimit) || 25, useDataQualityFilter, minSignalReadinessScore: 70 })
+    runSignals({ 
+      limit: Number(runLimit) || 25, 
+      useDataQualityFilter, 
+      minSignalReadinessScore: 70,
+      region: scope.region,
+      assetType: scope.assetType 
+    })
       .then((result) => {
         const dq = result.dataQuality;
         setRunMessage(dq?.filterApplied

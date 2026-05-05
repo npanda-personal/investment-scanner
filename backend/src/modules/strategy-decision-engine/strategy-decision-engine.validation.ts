@@ -31,6 +31,8 @@ export function parseStrategyQuery(query: Record<string, unknown>): StrategyQuer
     confidence: normalizeConfidence(query.confidence),
     sector: typeof first(query.sector) === 'string' ? String(first(query.sector)).trim() || undefined : undefined,
     country: typeof first(query.country) === 'string' ? String(first(query.country)).trim() || undefined : undefined,
+    region: typeof first(query.region) === 'string' ? String(first(query.region)).trim() || undefined : undefined,
+    assetType: typeof first(query.assetType) === 'string' ? String(first(query.assetType)).trim() || undefined : undefined,
     limit: Number.isFinite(limitValue) ? Math.min(100, Math.max(1, Math.floor(limitValue))) : 25,
     offset: Number.isFinite(offsetValue) ? Math.max(0, Math.floor(offsetValue)) : undefined,
     sortBy: typeof first(query.sortBy) === 'string' ? String(first(query.sortBy)).trim() || undefined : undefined,
@@ -48,6 +50,8 @@ export function parseEvaluateRequest(body: any): StrategyEvaluateRequest {
     symbol: typeof body?.symbol === 'string' ? body.symbol.trim().toUpperCase() || undefined : undefined,
     portfolioId: typeof body?.portfolioId === 'string' ? body.portfolioId.trim() || undefined : undefined,
     watchlistId: typeof body?.watchlistId === 'string' ? body.watchlistId.trim() || undefined : undefined,
+    region: typeof body?.region === 'string' ? body.region.trim() || undefined : undefined,
+    assetType: typeof body?.assetType === 'string' ? body.assetType.trim() || undefined : undefined,
     batchSize: Number.isFinite(batchSize) ? Math.min(100, Math.max(1, Math.floor(batchSize))) : 25,
     offset: Number.isFinite(offset) ? Math.max(0, Math.floor(offset)) : 0,
   };

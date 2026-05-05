@@ -109,6 +109,8 @@ export interface StrategyEvaluateRequest {
   symbol?: string;
   portfolioId?: string;
   watchlistId?: string;
+  region?: string;
+  assetType?: string;
   batchSize?: number;
   offset?: number;
 }
@@ -135,6 +137,8 @@ export interface StrategyQuery {
   confidence?: DecisionConfidence;
   sector?: string;
   country?: string;
+  region?: string;
+  assetType?: string;
   limit?: number;
   offset?: number;
   sortBy?: string;

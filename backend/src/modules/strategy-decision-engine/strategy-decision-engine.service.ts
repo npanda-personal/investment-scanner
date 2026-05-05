@@ -38,9 +38,9 @@ export class StrategyDecisionEngineService {
     private readonly watchlistService = new WatchlistManagementService()
   ) {}
 
-  async marketGate(): Promise<MarketGateResponse> {
+  async marketGate(region?: string): Promise<MarketGateResponse> {
     const [summary, regime, breadth] = await Promise.all([
-      this.contextService.summary(),
+      this.contextService.summary({ region }),
       this.contextService.regime(),
       this.contextService.breadth(),
     ]);
@@ -109,7 +109,7 @@ export class StrategyDecisionEngineService {
     const instrumentIds = allInstrumentIds.slice(offset, offset + batchSize);
     
     const results: StrategyDecisionDto[] = [];
-    const gate = await this.marketGate();
+    const gate = await this.marketGate(request.region);
 
     // Controlled concurrency: Process 5 instruments at a time
     const concurrency = 5;
@@ -167,8 +167,8 @@ export class StrategyDecisionEngineService {
     return this.repository.candidates(query);
   }
 
-  async exits(portfolioId?: string) {
-    return this.repository.exits(portfolioId);
+  async exits(portfolioId?: string, region?: string) {
+    return this.repository.exits(portfolioId, region);
   }
 
   async watchlist(watchlistId: string) {
@@ -289,13 +289,13 @@ export class StrategyDecisionEngineService {
     return null;
   }
 
-  async latestForInstrument(instrumentId: string, strategy?: string): Promise<StrategyDecisionDto | null> {
+  async latestForInstrument(instrumentId: string, strategy?: string, region?: string): Promise<StrategyDecisionDto | null> {
     const latest = await this.repository.latestForInstrument(instrumentId, strategy);
     if (latest) return latest;
     
     // If not found, run evaluate for this single instrument
-    const gate = await this.marketGate();
-    const result = await this.evaluateInstrumentStrategy(instrumentId, 'TREND_MOMENTUM', gate);
+    const gate = await this.marketGate(region);
+    const result = await this.evaluateInstrumentStrategy(instrumentId, (strategy as any) || 'TREND_MOMENTUM', gate);
     if (result) {
       return this.repository.create(result);
     }
@@ -694,7 +694,7 @@ export class StrategyDecisionEngineService {
   private async resolveUniverse(request: StrategyEvaluateRequest): Promise<string[]> {
     if (request.instrumentId) return [request.instrumentId];
     if (request.symbol) {
-      const res = await this.marketDataService.listInstruments({ search: request.symbol, pageSize: 1 });
+      const res = await this.marketDataService.listInstruments({ search: request.symbol, pageSize: 1, region: request.region });
       const match = res.instruments.find(i => i.symbol === request.symbol);
       return match ? [match.id] : [];
     }
@@ -707,7 +707,7 @@ export class StrategyDecisionEngineService {
       return detail?.items.map(i => i.instrumentId) || [];
     }
     // Default: Top signals universe
-    const signals = await this.signalService.topSignals({ limit: 50 });
+    const signals = await this.signalService.topSignals({ limit: 50, region: request.region, assetType: request.assetType });
     return signals.signals.map(s => s.instrument_id);
   }
 

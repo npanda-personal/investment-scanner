@@ -5,8 +5,8 @@ import { parseDataQualityEvaluateRequest, parseDataQualityQuery, requireInstrume
 export class DataQualityEngineController {
   constructor(private readonly service = new DataQualityEngineService()) {}
 
-  summary = async (_req: Request, res: Response) => {
-    try { return res.json(await this.service.summary()); }
+  summary = async (req: Request, res: Response) => {
+    try { return res.json(await this.service.summary(parseDataQualityQuery(req.query))); }
     catch (error) { return this.error(res, error, 'Failed to load data quality summary'); }
   };
 

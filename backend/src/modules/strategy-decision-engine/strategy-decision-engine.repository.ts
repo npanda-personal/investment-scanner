@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import prisma from '../../db/prisma';
 import type { StrategyDecisionDto, StrategyQuery } from './strategy-decision-engine.types';
+import { resolveRelatedMarketRegionFilter } from '../../shared/utils/market-scope';
 
 export class StrategyDecisionEngineRepository {
   constructor(private readonly db = prisma) {}
@@ -81,7 +82,10 @@ export class StrategyDecisionEngineRepository {
   }
 
   async candidates(query: StrategyQuery): Promise<{ results: StrategyDecisionDto[]; total: number }> {
+    const regionFilter = resolveRelatedMarketRegionFilter(query.region);
+    
     const where: Prisma.StrategyDecisionResultWhereInput = {
+      ...regionFilter,
       strategy: query.strategy,
       decision: query.decision,
       decisionScore: query.minScore ? { gte: query.minScore } : undefined,
@@ -103,9 +107,11 @@ export class StrategyDecisionEngineRepository {
     };
   }
 
-  async exits(portfolioId?: string): Promise<StrategyDecisionDto[]> {
+  async exits(portfolioId?: string, region?: string): Promise<StrategyDecisionDto[]> {
+    const regionFilter = resolveRelatedMarketRegionFilter(region);
     const records = await this.db.strategyDecisionResult.findMany({
       where: {
+        ...regionFilter,
         portfolioId,
         strategy: 'DEFENSIVE_EXIT',
         decision: { in: ['EXIT_CANDIDATE', 'REDUCE_RISK'] },

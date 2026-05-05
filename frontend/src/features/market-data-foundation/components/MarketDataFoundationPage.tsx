@@ -29,23 +29,25 @@ import {
 } from '../api/marketDataFoundationService';
 import MarketDataStatusPanel from './MarketDataStatusPanel';
 import { DataTable, FilterBar, PageHeader, StatusBadge, type DataTableColumn, type SortDirection } from '@/shared/components';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 
 const formatTimestamp = (timestamp: string) => new Date(timestamp).toLocaleString();
 const formatMarketCap = (value: number | null) => value === null ? 'N/A' : new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(value);
 
 const marketTabs = [
-  { label: 'All', value: '' },
+  { label: 'Default', value: 'SCOPE' },
+  { label: 'All / Global', value: 'GLOBAL' },
   { label: 'US', value: 'US' },
   { label: 'India', value: 'IN' },
   { label: 'Europe', value: 'EU' },
-  { label: 'Other', value: 'OTHER' },
 ];
 
 const MarketDataFoundationPage: React.FC = () => {
   const navigate = useNavigate();
+  const { scope } = useMarketScope();
   const [instruments, setInstruments] = useState<V1Instrument[]>([]);
   const [search, setSearch] = useState('');
-  const [market, setMarket] = useState('');
+  const [market, setMarket] = useState('SCOPE');
   const [exchange, setExchange] = useState('');
   const [assetType, setAssetType] = useState('');
   const [currency, setCurrency] = useState('');
@@ -66,14 +68,16 @@ const MarketDataFoundationPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
+      const selectedRegion = market === 'SCOPE' ? scope.region : (market === 'GLOBAL' ? undefined : market);
+      
       const response = await fetchInstruments({
         page: page + 1,
         pageSize,
         sortBy,
         sortOrder: sortDirection,
-        region: market || undefined,
+        region: selectedRegion,
         exchange: exchange.trim() || undefined,
-        assetType: assetType.trim() || undefined,
+        assetType: assetType.trim() || scope.assetType,
         currency: currency.trim() || undefined,
         sector: sector.trim() || undefined,
         industry: industry.trim() || undefined,
@@ -86,11 +90,16 @@ const MarketDataFoundationPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [assetType, currency, exchange, industry, market, page, pageSize, search, sector, sortBy, sortDirection]);
+  }, [assetType, currency, exchange, industry, market, page, pageSize, search, sector, sortBy, sortDirection, scope.region, scope.assetType]);
 
   useEffect(() => {
     loadInstruments();
   }, [loadInstruments]);
+
+  useEffect(() => {
+    // Reset page when global scope changes
+    setPage(0);
+  }, [scope.region, scope.assetType]);
 
   const handleSync = async (instrument: V1Instrument) => {
     setSyncingId(instrument.id);

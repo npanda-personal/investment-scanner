@@ -3,8 +3,8 @@ import type { DataQualityEvaluateResponse, DataQualityEvaluation, DataQualityFil
 
 const API_BASE = '/api/v1/data-quality';
 
-export async function fetchDataQualitySummary(): Promise<DataQualitySummary> {
-  const response = await axios.get<DataQualitySummary>(`${API_BASE}/summary`);
+export async function fetchDataQualitySummary(params: { region?: string } = {}): Promise<DataQualitySummary> {
+  const response = await axios.get<DataQualitySummary>(`${API_BASE}/summary`, { params });
   return response.data;
 }
 
@@ -20,7 +20,7 @@ export async function fetchDataQualityDiagnostics(instrumentId: string): Promise
   return response.data;
 }
 
-export async function evaluateDataQuality(input: { instrumentId?: string; symbol?: string; batchSize?: number; offset?: number }): Promise<DataQualityEvaluateResponse> {
+export async function evaluateDataQuality(input: { instrumentId?: string; symbol?: string; batchSize?: number; offset?: number; region?: string; assetType?: string }): Promise<DataQualityEvaluateResponse> {
   const response = await axios.post<DataQualityEvaluateResponse>(`${API_BASE}/evaluate`, input);
   return response.data;
 }

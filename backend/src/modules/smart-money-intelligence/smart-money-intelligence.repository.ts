@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import prisma from '../../db/prisma';
 import type { SmartMoneyListQuery, SmartMoneyRange, SmartMoneyStockSummary, SectorSmartMoneySummary } from './smart-money-intelligence.types';
+import { resolveRelatedMarketRegionFilter } from '../../shared/utils/market-scope';
 
 export class SmartMoneyIntelligenceRepository {
   constructor(private readonly db: PrismaClient = prisma) {}
@@ -9,7 +10,10 @@ export class SmartMoneyIntelligenceRepository {
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
 
+    const regionFilter = resolveRelatedMarketRegionFilter(query.region);
+
     const where: any = {
+      ...regionFilter,
       snapshotDate: today,
       range: query.range,
       ...(query.sector && { sector: query.sector }),

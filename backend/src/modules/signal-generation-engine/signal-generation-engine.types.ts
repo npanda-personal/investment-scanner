@@ -51,6 +51,8 @@ export interface SignalRunRequest {
   direction?: SignalDirection;
   sector?: string;
   country?: string;
+  region?: string;
+  assetType?: string;
   useDataQualityFilter?: boolean;
   minSignalReadinessScore?: number;
   allowedReadinessStatuses?: Array<'READY' | 'LIMITED' | 'NOT_READY'>;
@@ -68,6 +70,8 @@ export interface SignalQuery {
   sortDirection?: 'asc' | 'desc';
   sector?: string;
   country?: string;
+  region?: string;
+  assetType?: string;
   signalType?: string;
   confidence?: SignalConfidence;
   search?: string;

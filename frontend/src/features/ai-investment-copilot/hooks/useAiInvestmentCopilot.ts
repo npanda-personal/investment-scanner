@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   fetchAlertDigest,
   fetchMarketBrief,
@@ -7,8 +7,10 @@ import {
   fetchWatchlistSummary,
 } from '../api/aiInvestmentCopilotService';
 import type { CopilotSummaryResponse } from '../types';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 
 export function useAiInvestmentCopilot() {
+  const { scope } = useMarketScope();
   const [marketBrief, setMarketBrief] = useState<CopilotSummaryResponse | null>(null);
   const [alertDigest, setAlertDigest] = useState<CopilotSummaryResponse | null>(null);
   const [activeSummary, setActiveSummary] = useState<CopilotSummaryResponse | null>(null);
@@ -20,7 +22,10 @@ export function useAiInvestmentCopilot() {
     setLoading(true);
     setError(null);
     try {
-      const [brief, alerts] = await Promise.all([fetchMarketBrief(), fetchAlertDigest()]);
+      const [brief, alerts] = await Promise.all([
+        fetchMarketBrief({ region: scope.region }), 
+        fetchAlertDigest()
+      ]);
       setMarketBrief(brief);
       setAlertDigest(alerts);
       setActiveSummary((current) => current ?? brief);
@@ -31,11 +36,11 @@ export function useAiInvestmentCopilot() {
     }
   };
 
-  const loadMarketBrief = async () => {
+  const loadMarketBrief = useCallback(async (force = false) => {
     setRunning(true);
     setError(null);
     try {
-      const result = marketBrief ?? await fetchMarketBrief();
+      const result = (!force && marketBrief) ? marketBrief : await fetchMarketBrief({ region: scope.region });
       setMarketBrief(result);
       setActiveSummary(result);
     } catch (err: any) {
@@ -43,7 +48,15 @@ export function useAiInvestmentCopilot() {
     } finally {
       setRunning(false);
     }
-  };
+  }, [marketBrief, scope.region]);
+
+  useEffect(() => {
+    // Clear brief on region change to ensure fresh generation
+    setMarketBrief(null);
+    if (activeSummary?.title.toLowerCase().includes('market')) {
+      setActiveSummary(null);
+    }
+  }, [scope.region, activeSummary?.title]);
 
   const loadAlertDigest = async () => {
     setRunning(true);

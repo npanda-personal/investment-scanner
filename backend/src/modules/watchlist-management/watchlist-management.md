@@ -51,9 +51,12 @@ Returned enriched fields include sector, country, currency, current price, daily
 
 Duplicate instruments are prevented per watchlist with a database unique constraint on `(watchlistId, instrumentId)`.
 
-The service also checks for duplicates before insert and returns:
+## Global Market Scope Integration
 
-`This stock already exists in this watchlist.`
+Watchlist Management is integrated with the application's global market scope:
+- **Filtered Addition**: The searchable stock selector used to add items to a watchlist defaults to the globally selected `region`.
+- **Transparency**: The header displays the active scope, helping users understand if they are searching for stocks in a region different from their primary market focus.
+- **Cross-Region Support**: Watchlists can track instruments from any region. The global scope does not hide existing cross-region watchlist items.
 
 ## Fallback Behavior
 

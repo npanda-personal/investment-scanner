@@ -4,6 +4,7 @@ import {
   Autocomplete,
   Box,
   Button,
+  Chip,
   CircularProgress,
   Divider,
   IconButton,
@@ -28,6 +29,7 @@ import {
 } from '../api/watchlistManagementService';
 import { useWatchlistManagement } from '../hooks';
 import type { WatchlistDashboardItem, WatchlistSortOption } from '../types';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 
 const money = (value: number | null, currency: string | null) => {
   if (value === null) return 'N/A';
@@ -43,6 +45,7 @@ const percent = (value: number | null) => value === null ? 'N/A' : `${value >= 0
 const WatchlistManagementPage: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { scope } = useMarketScope();
   const [sort, setSort] = useState<WatchlistSortOption>('recentlyAdded');
   const { watchlists, detail, loading, error, reload } = useWatchlistManagement(id, sort);
   const [formError, setFormError] = useState<string | null>(null);
@@ -141,6 +144,7 @@ const WatchlistManagementPage: React.FC = () => {
       <PageHeader
         title="Watchlists"
         subtitle="Track stocks you are interested in before they become portfolio holdings."
+        badges={<Chip label={`Scope: ${scope.region}`} color="info" variant="outlined" size="small" />}
       />
       {(error || formError) && <Alert severity="error" sx={{ mb: 2 }}>{error || formError}</Alert>}
 

@@ -5,9 +5,10 @@ import { parseEvaluateRequest, parseStrategyQuery } from './strategy-decision-en
 export class StrategyDecisionEngineController {
   constructor(private readonly service = new StrategyDecisionEngineService()) {}
 
-  marketGate = async (_req: Request, res: Response) => {
+  marketGate = async (req: Request, res: Response) => {
     try {
-      const gate = await this.service.marketGate();
+      const region = req.query.region as string | undefined;
+      const gate = await this.service.marketGate(region);
       return res.json(gate);
     } catch (error: any) {
       console.error('Market gate controller error:', error);
@@ -40,7 +41,8 @@ export class StrategyDecisionEngineController {
   exits = async (req: Request, res: Response) => {
     try {
       const portfolioId = req.query.portfolioId as string;
-      const response = await this.service.exits(portfolioId);
+      const region = req.query.region as string | undefined;
+      const response = await this.service.exits(portfolioId, region);
       return res.json(response);
     } catch (error: any) {
       console.error('Exits controller error:', error);

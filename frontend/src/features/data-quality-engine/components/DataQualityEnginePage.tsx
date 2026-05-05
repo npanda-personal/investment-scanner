@@ -26,6 +26,7 @@ import { Link } from 'react-router-dom';
 import { evaluateDataQuality, fetchDataQualityDiagnostics } from '../api/dataQualityEngineService';
 import { useDataQualityEngine } from '../hooks';
 import type { CoverageStatus, DataQualityEvaluation, DataQualityFilters, LiquidityStatus, SignalReadinessStatus } from '../types';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 
 const DEFAULT_BATCH_SIZE = 25;
 
@@ -44,6 +45,7 @@ const MetricCard: React.FC<{ label: string; value: number | string }> = ({ label
 );
 
 const DataQualityEnginePage: React.FC = () => {
+  const { scope } = useMarketScope();
   const [filters, setFilters] = useState<DataQualityFilters>({});
   const [selected, setSelected] = useState<DataQualityEvaluation | null>(null);
   const [running, setRunning] = useState(false);
@@ -62,7 +64,12 @@ const DataQualityEnginePage: React.FC = () => {
     let failedTotal = 0;
     try {
       while (true) {
-        const result = await evaluateDataQuality({ batchSize: DEFAULT_BATCH_SIZE, offset });
+        const result = await evaluateDataQuality({ 
+          batchSize: DEFAULT_BATCH_SIZE, 
+          offset,
+          region: scope.region,
+          assetType: scope.assetType
+        });
         batch += 1;
         evaluatedTotal += result.evaluatedCount;
         failedTotal += result.failedCount;
@@ -144,6 +151,11 @@ const DataQualityEnginePage: React.FC = () => {
           </TextField>
           <TextField size="small" label="Sector" value={filters.sector || ''} onChange={(event) => setFilters({ ...filters, sector: event.target.value })} />
           <TextField size="small" label="Country" value={filters.country || ''} onChange={(event) => setFilters({ ...filters, country: event.target.value })} />
+          <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+            <Typography variant="caption" color="text.secondary">
+              Global Scope: <strong>{scope.region}</strong> / <strong>{scope.assetType}</strong>
+            </Typography>
+          </Box>
         </Stack>
       </Paper>
 

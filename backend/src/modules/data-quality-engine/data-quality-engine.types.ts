@@ -9,6 +9,8 @@ export interface DataQualityQuery {
   liquidityStatus?: LiquidityStatus;
   sector?: string;
   country?: string;
+  region?: string;
+  assetType?: string;
   minCoverageScore?: number;
   minReadinessScore?: number;
   limit: number;
@@ -18,6 +20,8 @@ export interface DataQualityQuery {
 export interface DataQualityEvaluateRequest {
   instrumentId?: string;
   symbol?: string;
+  region?: string;
+  assetType?: string;
   batchSize: number;
   offset: number;
 }
