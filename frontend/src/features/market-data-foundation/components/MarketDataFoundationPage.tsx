@@ -21,8 +21,10 @@ import SyncIcon from '@mui/icons-material/Sync';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import {
   fetchInstruments,
+  fetchMarketDataSchedulerStatus,
   syncAllStocks,
   syncMarketData,
+  type MarketDataSchedulerRegionStatus,
   type V1Instrument,
 } from '../api/marketDataFoundationService';
 import MarketDataStatusPanel from './MarketDataStatusPanel';
@@ -32,6 +34,23 @@ import { normalizeMarketForApi } from '../api/marketScopeApi';
 
 const formatTimestamp = (timestamp: string) => new Date(timestamp).toLocaleString();
 const formatMarketCap = (value: number | null) => value === null ? 'N/A' : new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(value);
+
+const buildCandleStatusMessage = (status?: MarketDataSchedulerRegionStatus) => {
+  if (!status) return '';
+  if (status.candleSyncStatus === 'CURRENT') {
+    return ` Latest completed candle ${status.latestCompletedTradingDate} is synced. Latest stored candle: ${status.latestStoredTradingDate}.`;
+  }
+  if (status.candleSyncStatus === 'MISSING_LATEST_COMPLETED') {
+    return ` Latest completed candle ${status.latestCompletedTradingDate} is missing. Latest stored candle: ${status.latestStoredTradingDate || 'none'}.`;
+  }
+  if (status.candleSyncStatus === 'NO_STORED_CANDLES') {
+    return ' No daily candles are stored yet for this market.';
+  }
+  if (status.candleSyncStatus === 'TODAY_STORED_PENDING_FINAL_CONFIRMATION') {
+    return ` Today's candle ${status.todayTradingDate} is stored but still pending final confirmation.`;
+  }
+  return '';
+};
 
 const MarketDataFoundationPage: React.FC = () => {
   const navigate = useNavigate();
@@ -126,11 +145,15 @@ const MarketDataFoundationPage: React.FC = () => {
       if (!result.success) {
         setError(result.message || 'Catalog sync failed');
       } else {
+        const schedulerStatus = await fetchMarketDataSchedulerStatus().catch(() => null);
+        const regionStatus = schedulerStatus?.regionStatuses.find((item) => item.region === normalizedMarket);
+        const candleStatusMessage = buildCandleStatusMessage(regionStatus);
         const summary = [
-          result.succeeded !== undefined ? `${result.succeeded} succeeded` : null,
-          result.failed !== undefined ? `${result.failed} failed` : null,
+          result.noNewData ? null : result.succeeded !== undefined ? `${result.succeeded} succeeded` : null,
+          result.noNewData ? null : result.failed !== undefined ? `${result.failed} failed` : null,
+          result.providerFetchSkippedCount !== undefined ? `${result.providerFetchSkippedCount} provider fetches skipped` : null,
         ].filter(Boolean).join(', ');
-        setSuccess(summary ? `${result.message} (${summary})` : result.message);
+        setSuccess(`${result.message}${candleStatusMessage}${summary ? ` (${summary})` : ''}`);
         await loadInstruments();
       }
     } catch (err: any) {

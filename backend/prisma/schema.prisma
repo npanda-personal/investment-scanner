@@ -583,6 +583,32 @@ model DataQualitySnapshot {
   @@map("data_quality_snapshots")
 }
 
+model MarketDataSyncState {
+  id               String   @id @default(cuid())
+  region           String
+  assetType        String
+  scopeType        String   @default("CATALOG")
+  scopeKey         String   @default("DEFAULT")
+  timeframe        String   @default("1D")
+  tradingDate      DateTime
+  status           String
+  lastCheckedAt    DateTime?
+  lastProviderFetchAt DateTime?
+  lastRunAt        DateTime?
+  lastInsertedCount Int     @default(0)
+  lastUpdatedCount Int      @default(0)
+  lastNoOpCount    Int      @default(0)
+  lastSkippedCount Int      @default(0)
+  lastWarningCount Int      @default(0)
+  lastSummary      Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([region, assetType, scopeType, scopeKey, timeframe, tradingDate])
+  @@index([region, assetType, scopeType, timeframe, status])
+  @@map("market_data_sync_states")
+}
+
 model SubscriptionPlan {
   id        String   @id @default(cuid())
   code      String   @unique

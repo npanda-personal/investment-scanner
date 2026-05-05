@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { MarketDataFoundationService } from './market-data-foundation.service';
 import { validateRequiredString } from './market-data-foundation.validation';
 import { normalizeMarketRegion } from '../../shared/utils/market-scope';
+import { getMarketDataFoundationScheduler } from './market-data-foundation.scheduler';
 
 export class MarketDataFoundationController {
   constructor(private readonly service = new MarketDataFoundationService()) {}
@@ -168,6 +169,8 @@ export class MarketDataFoundationController {
       const workerCount = parseInt(req.query.workerCount as string) || 4;
       const workerConcurrency = parseInt(req.query.workerConcurrency as string) || 4;
       const delayBetweenBatchesMs = parseInt(req.query.delayBetweenBatchesMs as string) || 3000;
+      const force = this.parseBoolean(req.query.force as string | undefined) || this.parseBoolean(req.body?.force);
+      const fullReload = this.parseBoolean(req.query.fullReload as string | undefined) || this.parseBoolean(req.body?.fullReload);
       const { region, assetType } = this.getMarketFilter(req);
 
       if (workerCount < 1 || workerCount > 10) {
@@ -178,7 +181,7 @@ export class MarketDataFoundationController {
       }
 
       console.log(`Starting bulk sync with ${workerCount} workers, ${workerConcurrency} concurrency each`);
-      const result = await this.service.syncAll(workerCount, workerConcurrency, delayBetweenBatchesMs, { region, assetType });
+      const result = await this.service.syncAll(workerCount, workerConcurrency, delayBetweenBatchesMs, { region, assetType, force, fullReload });
 
       if (result.success) {
         return res.json(result);
@@ -280,6 +283,15 @@ export class MarketDataFoundationController {
     } catch (error) {
       console.error('Market data health error:', error);
       return res.status(500).json({ error: 'Market data health check failed' });
+    }
+  };
+
+  schedulerStatus = async (_req: Request, res: Response) => {
+    try {
+      return res.json(await getMarketDataFoundationScheduler().status());
+    } catch (error) {
+      console.error('Market data scheduler status error:', error);
+      return res.status(500).json({ error: 'Market data scheduler status check failed' });
     }
   };
 
@@ -407,6 +419,12 @@ export class MarketDataFoundationController {
       });
     }
   };
+
+  private parseBoolean(value: unknown): boolean {
+    if (typeof value === 'boolean') return value;
+    if (typeof value !== 'string') return false;
+    return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase());
+  }
 
   listFxRates = async (_req: Request, res: Response) => {
     try {

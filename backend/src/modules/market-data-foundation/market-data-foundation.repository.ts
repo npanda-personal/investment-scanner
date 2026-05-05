@@ -9,6 +9,10 @@ import type {
   PaginationOptions,
   SyncSummary,
   UpdateStockRequest,
+  MarketDataSyncStateDto,
+  MarketDataSyncScopeType,
+  MarketDataSyncStateStatus,
+  ScheduledRegionSyncSummary,
 } from './market-data-foundation.types';
 import { partitionHistoricalPrices } from './market-data-foundation.validation';
 import type { YahooFinanceIngestionService } from './market-data-foundation.provider';
@@ -162,10 +166,12 @@ export class MarketDataFoundationRepository {
     });
   }
 
-  listActiveStockSyncTasks(options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
+  listActiveStockSyncTasks(options: Pick<PaginationOptions, 'region' | 'assetType'> = {}, take?: number) {
     return this.prisma.stock.findMany({
       where: { ...this.stockWhere(options), isActive: true },
       select: { id: true, symbol: true, lastSuccessfulDataLoadTimestamp: true },
+      take,
+      orderBy: { symbol: 'asc' },
     });
   }
 
@@ -340,6 +346,7 @@ export class MarketDataFoundationRepository {
         rowsInserted: 0,
         rowsUpdated: 0,
         rowsSkipped: validation.invalid.length,
+        rowsNoOp: 0,
         duplicateProviderRowsSkipped,
         warningCount: warnings.length,
         warnings: warnings.slice(0, 10),
@@ -357,18 +364,25 @@ export class MarketDataFoundationRepository {
         symbol: prices[0].symbol,
         timestamp: { in: prices.map((price) => price.date) },
       },
-      select: { timestamp: true },
+      select: { timestamp: true, open: true, high: true, low: true, close: true, adjustedClose: true, volume: true },
     });
-    const existingTimestamps = new Set(existingRows.map((row) => row.timestamp.toISOString()));
-    const rowsUpdated = prices.filter((price) => existingTimestamps.has(price.date.toISOString())).length;
-    const rowsInserted = prices.length - rowsUpdated;
+    const existingByTimestamp = new Map(existingRows.map((row) => [row.timestamp.toISOString(), row]));
+    const rowsToInsert = prices.filter((price) => !existingByTimestamp.has(price.date.toISOString()));
+    const rowsToUpdate = prices.filter((price) => {
+      const existing = existingByTimestamp.get(price.date.toISOString());
+      return existing ? !this.sameDailyCandle(existing, price) : false;
+    });
+    const rowsNoOp = prices.length - rowsToInsert.length - rowsToUpdate.length;
+    const rowsInserted = rowsToInsert.length;
+    const rowsUpdated = rowsToUpdate.length;
+    const rowsToWrite = [...rowsToInsert, ...rowsToUpdate];
 
     console.log(`  Storing ${prices.length} price ticks for ${prices[0].symbol}...`);
 
     await this.prisma.$transaction(async (tx: any) => {
       const batchSize = 100;
-      for (let i = 0; i < prices.length; i += batchSize) {
-        const batch = prices.slice(i, i + batchSize);
+      for (let i = 0; i < rowsToWrite.length; i += batchSize) {
+        const batch = rowsToWrite.slice(i, i + batchSize);
         const upsertOperations = batch.map(price =>
           tx.priceTick.upsert({
             where: {
@@ -409,7 +423,7 @@ export class MarketDataFoundationRepository {
         await Promise.all(upsertOperations);
 
         if (batch.length === batchSize) {
-          console.log(`    Processed ${i + batchSize} of ${prices.length} records...`);
+          console.log(`    Processed ${i + batchSize} of ${rowsToWrite.length} changed records...`);
         }
       }
 
@@ -434,16 +448,118 @@ export class MarketDataFoundationRepository {
       timeout: 60000,
     });
 
-    console.log(`  Successfully stored ${prices.length} price ticks for ${prices[0].symbol}`);
+    console.log(`  Successfully stored ${prices.length} price ticks for ${prices[0].symbol}: ${rowsInserted} inserted, ${rowsUpdated} updated, ${rowsNoOp} no-op`);
     return {
       rowsReceived,
       rowsInserted,
       rowsUpdated,
       rowsSkipped: validation.invalid.length,
+      rowsNoOp,
       duplicateProviderRowsSkipped,
       warningCount: warnings.length,
       warnings: warnings.slice(0, 10),
     };
+  }
+
+  async latestStoredTradingDateForRegion(region: string, assetType: string): Promise<string | null> {
+    const stocks = await this.prisma.stock.findMany({
+      where: this.stockWhere({ region, assetType }),
+      select: { symbol: true },
+    });
+    const symbols = stocks.map((stock) => stock.symbol);
+    if (symbols.length === 0) return null;
+    const latest = await this.prisma.priceTick.findFirst({
+      where: { symbol: { in: symbols } },
+      orderBy: { timestamp: 'desc' },
+      select: { timestamp: true },
+    });
+    return latest?.timestamp.toISOString().slice(0, 10) ?? null;
+  }
+
+  async getSyncState(
+    region: string,
+    assetType: string,
+    tradingDate: string,
+    options: { scopeType?: MarketDataSyncScopeType; scopeKey?: string; timeframe?: string } = {}
+  ): Promise<MarketDataSyncStateDto | null> {
+    const scopeType = options.scopeType || 'CATALOG';
+    const scopeKey = options.scopeKey || region;
+    const timeframe = options.timeframe || '1D';
+    const row = await (this.prisma as any).marketDataSyncState.findUnique({
+      where: {
+        region_assetType_scopeType_scopeKey_timeframe_tradingDate: {
+          region,
+          assetType,
+          scopeType,
+          scopeKey,
+          timeframe,
+          tradingDate: new Date(`${tradingDate}T00:00:00.000Z`),
+        },
+      },
+    });
+    return row ? this.toSyncStateDto(row) : null;
+  }
+
+  async upsertSyncState(input: {
+    region: string;
+    assetType: string;
+    scopeType?: MarketDataSyncScopeType;
+    scopeKey?: string;
+    timeframe?: string;
+    tradingDate: string;
+    status: MarketDataSyncStateStatus;
+    summary?: ScheduledRegionSyncSummary | SyncSummary | null;
+    lastCheckedAt?: Date;
+    lastProviderFetchAt?: Date | null;
+  }): Promise<MarketDataSyncStateDto> {
+    const summary = input.summary;
+    const scopeType = input.scopeType || 'CATALOG';
+    const scopeKey = input.scopeKey || input.region;
+    const timeframe = input.timeframe || '1D';
+    const lastCheckedAt = input.lastCheckedAt || new Date();
+    const row = await (this.prisma as any).marketDataSyncState.upsert({
+      where: {
+        region_assetType_scopeType_scopeKey_timeframe_tradingDate: {
+          region: input.region,
+          assetType: input.assetType,
+          scopeType,
+          scopeKey,
+          timeframe,
+          tradingDate: new Date(`${input.tradingDate}T00:00:00.000Z`),
+        },
+      },
+      create: {
+        region: input.region,
+        assetType: input.assetType,
+        scopeType,
+        scopeKey,
+        timeframe,
+        tradingDate: new Date(`${input.tradingDate}T00:00:00.000Z`),
+        status: input.status,
+        lastCheckedAt,
+        lastProviderFetchAt: input.lastProviderFetchAt,
+        lastRunAt: lastCheckedAt,
+        lastInsertedCount: summary?.rowsInserted ?? 0,
+        lastUpdatedCount: summary?.rowsUpdated ?? 0,
+        lastNoOpCount: summary?.rowsNoOp ?? 0,
+        lastSkippedCount: summary?.providerFetchSkippedCount ?? summary?.skippedBeforeFetchCount ?? 0,
+        lastWarningCount: summary?.warningCount ?? 0,
+        lastSummary: summary as any,
+      },
+      update: {
+        status: input.status,
+        lastCheckedAt,
+        lastProviderFetchAt: input.lastProviderFetchAt === undefined ? undefined : input.lastProviderFetchAt,
+        lastRunAt: lastCheckedAt,
+        lastInsertedCount: summary?.rowsInserted ?? 0,
+        lastUpdatedCount: summary?.rowsUpdated ?? 0,
+        lastNoOpCount: summary?.rowsNoOp ?? 0,
+        lastSkippedCount: summary?.providerFetchSkippedCount ?? summary?.skippedBeforeFetchCount ?? 0,
+        lastWarningCount: summary?.warningCount ?? 0,
+        lastSummary: summary as any,
+      },
+    });
+    return this.toSyncStateDto(row);
   }
 
   async updateCompanyMasterData(stockId: string, data: Partial<CreateStockRequest>) {
@@ -600,6 +716,50 @@ export class MarketDataFoundationRepository {
     const date = value instanceof Date ? new Date(value) : new Date(value);
     date.setUTCHours(0, 0, 0, 0);
     return date;
+  }
+
+  private sameDailyCandle(existing: any, price: HistoricalPrice): boolean {
+    return this.sameDecimal(existing.open, price.open)
+      && this.sameDecimal(existing.high, price.high)
+      && this.sameDecimal(existing.low, price.low)
+      && this.sameDecimal(existing.close, price.close)
+      && this.sameNullableDecimal(existing.adjustedClose, price.adjustedClose ?? null)
+      && this.sameNullableBigInt(existing.volume, price.volume ?? null);
+  }
+
+  private sameDecimal(left: unknown, right: number, tolerance = 0.000001): boolean {
+    return Math.abs(Number(left) - Number(right)) <= tolerance;
+  }
+
+  private sameNullableDecimal(left: unknown, right: number | null, tolerance = 0.000001): boolean {
+    if (left === null || left === undefined || right === null || right === undefined) return (left === null || left === undefined) && (right === null || right === undefined);
+    return this.sameDecimal(left, right, tolerance);
+  }
+
+  private sameNullableBigInt(left: unknown, right: number | null): boolean {
+    if (left === null || left === undefined || right === null || right === undefined) return (left === null || left === undefined) && (right === null || right === undefined);
+    return BigInt(left as any) === BigInt(right);
+  }
+
+  private toSyncStateDto(row: any): MarketDataSyncStateDto {
+    return {
+      region: row.region,
+      assetType: row.assetType,
+      scopeType: row.scopeType || 'CATALOG',
+      scopeKey: row.scopeKey || row.region,
+      timeframe: row.timeframe || '1D',
+      tradingDate: row.tradingDate.toISOString().slice(0, 10),
+      status: row.status,
+      lastCheckedAt: row.lastCheckedAt ? row.lastCheckedAt.toISOString() : null,
+      lastProviderFetchAt: row.lastProviderFetchAt ? row.lastProviderFetchAt.toISOString() : null,
+      lastRunAt: row.lastRunAt ? row.lastRunAt.toISOString() : null,
+      lastInsertedCount: row.lastInsertedCount,
+      lastUpdatedCount: row.lastUpdatedCount,
+      lastNoOpCount: row.lastNoOpCount,
+      lastSkippedCount: row.lastSkippedCount ?? 0,
+      lastWarningCount: row.lastWarningCount,
+      lastSummary: row.lastSummary,
+    };
   }
 
   private stockWhere(options: Pick<PaginationOptions, 'region' | 'assetType'>): Prisma.StockWhereInput {

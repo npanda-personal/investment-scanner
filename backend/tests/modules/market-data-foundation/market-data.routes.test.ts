@@ -8,6 +8,7 @@ import {
 
 const controller = {
   health: jest.fn(),
+  schedulerStatus: jest.fn(),
   listInstruments: jest.fn(),
   createInstrument: jest.fn(),
   getInstrument: jest.fn(),
@@ -46,6 +47,7 @@ describe('market data routers', () => {
     expect(routePaths(createMarketDataV1Router(controller))).toEqual(
       expect.arrayContaining([
         'GET /market-data/health',
+        'GET /market-data/scheduler/status',
         'GET /instruments',
         'POST /instruments',
         'GET /instruments/:id',

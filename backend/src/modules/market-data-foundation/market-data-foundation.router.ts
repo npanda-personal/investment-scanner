@@ -50,6 +50,7 @@ export const createMarketDataV1Router = (
 ) => {
   const router = express.Router();
 
+  router.get('/market-data/scheduler/status', controller.schedulerStatus);
   router.get('/market-data/health', controller.health);
   router.get('/instruments', controller.listInstruments);
   router.post('/instruments', controller.createInstrument);

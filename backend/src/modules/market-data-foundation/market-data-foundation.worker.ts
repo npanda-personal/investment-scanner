@@ -18,14 +18,19 @@ export class StockSyncWorker {
     this.concurrency = concurrency;
   }
 
-  async processTask(task: StockSyncTask): Promise<WorkerResult> {
+  async processTask(task: StockSyncTask, options: { force?: boolean; skipFreshnessGate?: boolean } = {}): Promise<WorkerResult> {
     try {
-      const summary = await this.marketDataService.ingestSymbol(task.symbol, undefined, new Date());
+      const summary = await this.marketDataService.ingestSymbol(task.symbol, undefined, new Date(), options.force === true, {
+        force: options.force,
+        skipFreshnessGate: options.skipFreshnessGate,
+      });
 
       return {
         symbol: task.symbol,
         success: true,
-        message: `Sync completed: ${summary.rowsInserted} inserted, ${summary.rowsUpdated} updated, ${summary.rowsSkipped} skipped`,
+        message: summary.noNewData
+          ? `No new data to ingest: ${summary.skippedReasons?.join(', ') || 'skipped'}`
+          : `Sync completed: ${summary.rowsInserted} inserted, ${summary.rowsUpdated} updated, ${summary.rowsSkipped} skipped`,
         timestamp: new Date().toISOString(),
         workerId: this.workerId
       };
@@ -41,7 +46,7 @@ export class StockSyncWorker {
     }
   }
 
-  async processTasks(tasks: StockSyncTask[]): Promise<WorkerResult[]> {
+  async processTasks(tasks: StockSyncTask[], options: { force?: boolean; skipFreshnessGate?: boolean } = {}): Promise<WorkerResult[]> {
     const results: WorkerResult[] = [];
     
     // Process tasks with limited concurrency
@@ -52,7 +57,7 @@ export class StockSyncWorker {
       console.log(`[Worker ${this.workerId}] Processing chunk ${i + 1}/${taskChunks.length} (${chunk.length} tasks)`);
       
       // Process chunk in parallel
-      const chunkPromises = chunk.map(task => this.processTask(task));
+      const chunkPromises = chunk.map(task => this.processTask(task, options));
       const chunkResults = await Promise.all(chunkPromises);
       results.push(...chunkResults);
       

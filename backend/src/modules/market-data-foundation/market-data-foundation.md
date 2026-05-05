@@ -74,6 +74,10 @@ Backend module files are intentionally flat. Do not recreate nested `routes/`, `
   - Bulk historical data sync worker owned by this module.
 - `market-data-foundation.queue.ts`
   - Local ingestion queue adapter owned by this module.
+- `market-data-foundation.market-session.ts`
+  - Market-hours/session decision helper for scheduler-safe 1D ingestion.
+- `market-data-foundation.scheduler.ts`
+  - Disabled-by-default scheduled ingestion coordinator with overlap protection and status reporting.
 - `index.ts`
   - Public backend module exports.
 
@@ -103,6 +107,8 @@ Persisted models used by Market Data Foundation:
   - Dividends, splits, reverse splits, effective date, declared date, payment date, amount, split ratio, currency, source, metadata.
 - `FxRate`
   - Latest FX rates with pair, base currency, quote currency, rate, source, and metadata.
+- `MarketDataSyncState`
+  - Per-region/per-asset/per-trading-day scheduler state. The scheduler records `PENDING`, `SYNCED`, `FINAL_CONFIRMED`, or `FAILED` so server restarts do not cause repeated post-close API calls after the final daily candle is confirmed.
 
 ## Backend API Surface
 
@@ -121,6 +127,7 @@ Most list endpoints support standard `PaginationOptions`:
 | Endpoint | Purpose | Status |
 | --- | --- | --- |
 | `GET /api/v1/market-data/health` | Market data health, instrument count, freshness, trust metadata | Implemented |
+| `GET /api/v1/market-data/scheduler/status` | Scheduler config, active run state, region session decisions, and latest sync summaries | Implemented |
 | `GET /api/v1/instruments` | List/search instruments with `region` support | Implemented |
 | `POST /api/v1/instruments` | Create instrument | Implemented |
 | `GET /api/v1/instruments/:id` | Get instrument detail | Implemented |
@@ -128,6 +135,106 @@ Most list endpoints support standard `PaginationOptions`:
 | `POST /api/v1/ingestion/sync` | Sync by symbol or ID | Implemented |
 
 Legacy compatibility endpoints are still supported.
+
+## Market-Aware 1D Scheduler
+
+The scheduler is intentionally disabled by default and is designed for daily candles, not live trading. Manual full sync remains available through existing ingestion routes.
+
+Environment defaults:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `MARKET_DATA_SCHEDULER_ENABLED` | `false` | Enables background scheduled ingestion. |
+| `MARKET_DATA_SCHEDULER_INTERVAL_MINUTES` | `15` | Scheduler wake-up interval. |
+| `MARKET_DATA_SCHEDULER_REGIONS` | `IN` | Explicit comma-separated regions. `GLOBAL` is not expanded automatically. |
+| `MARKET_DATA_SCHEDULER_ASSET_TYPE` | `STOCK` | Current scheduled asset scope. |
+| `MARKET_DATA_SCHEDULER_BATCH_SIZE` | `25` | Max instruments processed per scheduled run. |
+| `MARKET_DATA_SCHEDULER_SYNC_DURING_MARKET_HOURS` | `false` | Default is post-close only for 1D strategy workflows. |
+| `MARKET_DATA_SCHEDULER_POST_CLOSE_WINDOW_MINUTES` | `120` | Window after close where final candle capture is useful. |
+| `MARKET_DATA_SCHEDULER_FINALIZATION_GRACE_MINUTES` | `15` | Grace period after close before final confirmation can be trusted. |
+| `MARKET_DATA_SCHEDULER_SKIP_WEEKENDS` | `true` | Skips non-trading weekends by default. |
+| `MARKET_DATA_MANUAL_SYNC_COOLDOWN_MINUTES` | `15` | Cooldown for manual catalog/instrument freshness checks before another provider fetch is eligible. |
+
+### Session Model
+
+`IN` is configured with `Asia/Kolkata`, regular hours `09:15-15:30`, Monday-Friday, a 120-minute post-close sync window, and a 15-minute finalization grace period. `US` and `EU` have documented approximate weekday sessions for future readiness. Holiday arrays are empty in MVP; no paid calendar API is used.
+
+Scheduler decision states:
+
+- `BEFORE_MARKET_OPEN`: skip.
+- `MARKET_OPEN`: skip by default for 1D data; run only if explicitly enabled.
+- `POST_CLOSE_FINALIZATION_WINDOW`: run incremental sync.
+- `FINAL_CANDLE_CONFIRMED`: skip until next trading day.
+- `MARKET_CLOSED_NO_SYNC`: skip after the useful window.
+- `WEEKEND_OR_HOLIDAY`: skip.
+- `MISSING_FINAL_CANDLE_RETRY`: allow a retry if the trading-day candle is missing after the window.
+
+### Scheduled Sync Behavior
+
+Scheduled sync is incremental only. It processes a bounded batch of active instruments for the configured region and asset type, using a recent lookback rather than the 15-year manual backfill path.
+
+The scheduler avoids overlapping runs with an in-process lock. Each region is evaluated independently, so `IN,US` will only run the region whose market window is useful at that moment.
+
+### Sync Freshness Gate
+
+The module distinguishes two different outcomes:
+
+- **No-op storage**: the provider was fetched, the returned candle matched the stored OHLCV/adjusted-close/volume values, and the `PriceTick` row was not rewritten.
+- **No-new-data skip**: the provider was not called because a catalog or instrument was checked recently, the market session cannot produce a useful new 1D candle, or the final daily candle is already confirmed.
+
+Manual catalog and instrument syncs use a freshness cooldown before provider fetch. The default is `MARKET_DATA_MANUAL_SYNC_COOLDOWN_MINUTES=15`. If Sync Catalog is clicked again inside this window, the service short-circuits before worker/provider execution and returns:
+
+- `noNewData: true`
+- `skippedBeforeFetchCount`
+- `providerFetchSkippedCount`
+- `skippedReasonCounts`
+- `skippedReasons`
+- `lastCheckedAt`
+- `nextEligibleSyncAt`
+
+Current skip reasons:
+
+- `RECENTLY_SYNCED`
+- `BEFORE_MARKET_OPEN`
+- `WEEKEND_OR_HOLIDAY`
+- `FINAL_CANDLE_CONFIRMED`
+- `MARKET_CLOSED_NO_NEW_DAILY_DATA`
+
+`force: true` or `fullReload: true` bypasses the freshness cooldown and still uses idempotent no-op storage, so corrected or explicitly requested candles can be checked without creating duplicate rows.
+
+The scheduler status endpoint also exposes candle freshness fields so the UI can separate "today is not useful before market open" from "the latest completed daily candle is synced":
+
+- `todayTradingDate`: market-local trading date being evaluated.
+- `latestCompletedTradingDate`: the most recent trading date whose final 1D candle should reasonably exist.
+- `latestStoredTradingDate`: newest `PriceTick` daily date stored for the region.
+- `todayCandleStored`: whether today's trading-date candle is already stored.
+- `latestCompletedCandleStored`: whether the latest completed trading date is stored.
+- `latestStoredCandleIsCurrent`: whether stored data is at least as recent as the latest completed trading date.
+- `candleSyncStatus`: `CURRENT`, `MISSING_LATEST_COMPLETED`, `NO_STORED_CANDLES`, `TODAY_STORED_PENDING_FINAL_CONFIRMATION`, or `UNKNOWN_SESSION`.
+
+### Final Candle Confirmation
+
+`MarketDataSyncState` persists one row per `region + assetType + tradingDate`. After post-close sync stores today's candle, a later no-op run confirms the provider candle is unchanged. When `rowsInserted = 0`, `rowsUpdated = 0`, `rowsNoOp > 0`, and today's candle exists, the state becomes `FINAL_CONFIRMED`; later scheduled runs skip that market until the next trading day.
+
+### Smart Candle No-Op Rules
+
+Daily candles are compared before writing:
+
+- `open`
+- `high`
+- `low`
+- `close`
+- `adjustedClose`
+- `volume`
+
+Decimal fields use a small numeric tolerance. Identical existing rows are counted as `rowsNoOp` and not rewritten. Changed rows are updated; missing rows are inserted.
+
+Known limitations:
+
+- Holiday handling is static/empty in MVP.
+- `US` and `EU` sessions are approximate defaults until exchange-specific calendars are introduced.
+- Scheduled batches are bounded by `MARKET_DATA_SCHEDULER_BATCH_SIZE`; broad universe rotation/cursoring can be added later.
+- The scheduler does not perform live trading, broker execution, order placement, or portfolio automation.
 
 ## Validation And Reliability
 
@@ -145,10 +252,13 @@ Natural keys for stock-data records owned by this module:
 | --- | --- | --- |
 | `Stock` | `symbol` | Upsert; long-term risk documented. |
 | `PriceTick` | `symbol + normalized daily timestamp` | Idempotent updates. |
+| `MarketDataSyncState` | `region + assetType + tradingDate` | Idempotent upsert of scheduler state and final-candle confirmation. |
 
 ## Frontend Structure
 
 - `MarketDataFoundationPage`: Integrated with `useMarketScope()`. Automatically filters by the globally selected region.
+  - Sync Catalog success/no-new-data alerts include daily candle freshness details from `/api/v1/market-data/scheduler/status`, so users can see whether the latest completed candle is already synced.
+- `MarketDataStatusPanel`: Shows health, instrument count, last data timestamp, and a Daily Candle card with the latest completed/stored candle status.
 - `InstrumentSearchSelect`: Shared component for picking stocks. Defaults to the active region scope with an optional `global` override.
 
 Frontend routes are defined in `routes.tsx` and exported via `index.ts`.
@@ -157,6 +267,15 @@ Frontend routes are defined in `routes.tsx` and exported via `index.ts`.
 
 - `backend/src/shared/utils/market-scope.test.ts`: Verifies regional mapping logic.
 - `backend/tests/modules/market-data-foundation/market-data.service.test.ts`: Verifies service logic.
+- `backend/tests/modules/market-data-foundation/market-data.market-session.test.ts`: Verifies IN market-session skip/run decisions.
+- `backend/tests/modules/market-data-foundation/market-data.scheduler.test.ts`: Verifies scheduler skip, incremental mode, and overlap protection.
+- `backend/tests/modules/market-data-foundation/market-data.repository.test.ts`: Verifies smart daily-candle no-op/update persistence.
+
+Verification commands:
+
+- `npx prisma generate` after applying the `MarketDataSyncState` schema.
+- `npm run build`
+- `npm test -- market-data --runInBand`
 
 ## Assumptions
 

@@ -156,4 +156,193 @@ describe('MarketDataFoundationService syncV1', () => {
       ],
     });
   });
+
+  it('marks scheduled post-close no-op runs as final confirmed', async () => {
+    const repository = {
+      listActiveStockSyncTasks: jest.fn().mockResolvedValue([{ id: 'stock-1', symbol: 'AAPL', lastSuccessfulDataLoadTimestamp: null }]),
+      upsertSyncState: jest.fn().mockResolvedValue({}),
+      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue('2026-05-05'),
+      getSyncState: jest.fn().mockResolvedValue(null),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+    jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
+      rowsReceived: 1,
+      rowsInserted: 0,
+      rowsUpdated: 0,
+      rowsSkipped: 0,
+      rowsNoOp: 1,
+      warningCount: 0,
+      warnings: [],
+    });
+
+    const summary = await service.syncScheduledRegion('IN', {
+      assetType: 'STOCK',
+      now: new Date('2026-05-05T10:30:00.000Z'),
+    });
+
+    expect(summary).toMatchObject({ rowsNoOp: 1, rowsInserted: 0, rowsUpdated: 0 });
+    expect(repository.upsertSyncState).toHaveBeenLastCalledWith(expect.objectContaining({
+      region: 'IN',
+      assetType: 'STOCK',
+      tradingDate: '2026-05-05',
+      status: 'FINAL_CONFIRMED',
+    }));
+  });
+
+  it('skips recently synced catalog before provider workers are started', async () => {
+    const lastCheckedAt = new Date(Date.now() - 5 * 60_000).toISOString();
+    const repository = {
+      listActiveStockSyncTasks: jest.fn().mockResolvedValue([{ id: 'stock-1', symbol: 'AAPL', lastSuccessfulDataLoadTimestamp: null }]),
+      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue(null),
+      getSyncState: jest.fn().mockResolvedValue({
+        status: 'SYNCED',
+        lastCheckedAt,
+      }),
+      upsertSyncState: jest.fn().mockResolvedValue({}),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+
+    const result = await service.syncAll(1, 1, 0, { region: 'GLOBAL', assetType: 'STOCK' });
+
+    expect(result).toMatchObject({
+      success: true,
+      noNewData: true,
+      message: 'No new data to ingest. Catalog was synced recently.',
+      providerFetchSkippedCount: 1,
+      skippedReasonCounts: { RECENTLY_SYNCED: 1 },
+    });
+  });
+
+  it('force instrument sync bypasses recent freshness gate and still allows no-op storage', async () => {
+    const repository = {
+      findStockBySymbol: jest.fn().mockResolvedValue({ symbol: 'AAPL', region: 'GLOBAL', assetType: 'STOCK', lastSuccessfulDataLoadTimestamp: new Date() }),
+      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue(null),
+      getSyncState: jest.fn().mockResolvedValue({
+        status: 'SYNCED',
+        lastCheckedAt: new Date().toISOString(),
+      }),
+      updateStockLoadTimestampBySymbol: jest.fn().mockResolvedValue({}),
+      upsertSyncState: jest.fn().mockResolvedValue({}),
+    };
+    const provider = {
+      inferRegion: jest.fn().mockReturnValue({ region: 'US', exchange: 'NASDAQ' }),
+      fetchHistorical: jest.fn().mockResolvedValue([
+        { symbol: 'AAPL', date: new Date('2026-05-05T00:00:00.000Z'), open: 1, high: 1, low: 1, close: 1, volume: 1 },
+      ]),
+    };
+    const service = new MarketDataFoundationService(repository as any, provider as any);
+    jest.spyOn(service, 'storeHistorical').mockResolvedValue({
+      rowsReceived: 1,
+      rowsInserted: 0,
+      rowsUpdated: 0,
+      rowsSkipped: 0,
+      rowsNoOp: 1,
+      warningCount: 0,
+      warnings: [],
+    });
+
+    const result = await service.ingestSymbol('AAPL', new Date('2026-05-02T00:00:00.000Z'), new Date('2026-05-05T00:00:00.000Z'), false, { force: true });
+
+    expect(provider.fetchHistorical).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({ rowsNoOp: 1, rowsInserted: 0, rowsUpdated: 0 });
+  });
+
+  it('skips provider fetch before market open for 1D data', async () => {
+    const repository = {
+      findStockBySymbol: jest.fn().mockResolvedValue({ symbol: 'RELIANCE.NS', region: 'IN', assetType: 'STOCK', lastSuccessfulDataLoadTimestamp: null }),
+      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue(null),
+      getSyncState: jest.fn().mockResolvedValue(null),
+      upsertSyncState: jest.fn().mockResolvedValue({}),
+    };
+    const provider = {
+      inferRegion: jest.fn().mockReturnValue({ region: 'IN', exchange: 'NSE' }),
+      fetchHistorical: jest.fn(),
+    };
+    const service = new MarketDataFoundationService(repository as any, provider as any);
+
+    const result = await service.ingestSymbol('RELIANCE.NS', undefined, new Date('2026-05-05T03:00:00.000Z'));
+
+    expect(provider.fetchHistorical).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      noNewData: true,
+      skippedReasonCounts: { BEFORE_MARKET_OPEN: 1 },
+    });
+  });
+
+  it('skips provider fetch when final daily candle is confirmed', async () => {
+    const repository = {
+      findStockBySymbol: jest.fn().mockResolvedValue({ symbol: 'RELIANCE.NS', region: 'IN', assetType: 'STOCK', lastSuccessfulDataLoadTimestamp: null }),
+      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue('2026-05-05'),
+      getSyncState: jest.fn().mockResolvedValue({
+        status: 'FINAL_CONFIRMED',
+        lastCheckedAt: new Date('2026-05-05T10:30:00.000Z').toISOString(),
+      }),
+      upsertSyncState: jest.fn().mockResolvedValue({}),
+    };
+    const provider = {
+      inferRegion: jest.fn().mockReturnValue({ region: 'IN', exchange: 'NSE' }),
+      fetchHistorical: jest.fn(),
+    };
+    const service = new MarketDataFoundationService(repository as any, provider as any);
+
+    const result = await service.ingestSymbol('RELIANCE.NS', undefined, new Date('2026-05-05T11:00:00.000Z'));
+
+    expect(provider.fetchHistorical).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      noNewData: true,
+      skippedReasonCounts: { FINAL_CANDLE_CONFIRMED: 1 },
+    });
+  });
+
+  it('skips provider fetch on weekends', async () => {
+    const repository = {
+      findStockBySymbol: jest.fn().mockResolvedValue({ symbol: 'RELIANCE.NS', region: 'IN', assetType: 'STOCK', lastSuccessfulDataLoadTimestamp: null }),
+      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue(null),
+      getSyncState: jest.fn().mockResolvedValue(null),
+      upsertSyncState: jest.fn().mockResolvedValue({}),
+    };
+    const provider = {
+      inferRegion: jest.fn().mockReturnValue({ region: 'IN', exchange: 'NSE' }),
+      fetchHistorical: jest.fn(),
+    };
+    const service = new MarketDataFoundationService(repository as any, provider as any);
+
+    const result = await service.ingestSymbol('RELIANCE.NS', undefined, new Date('2026-05-09T06:00:00.000Z'));
+
+    expect(provider.fetchHistorical).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      noNewData: true,
+      skippedReasonCounts: { WEEKEND_OR_HOLIDAY: 1 },
+    });
+  });
+
+  it('allows provider fetch in post-close finalization window when final candle is not confirmed', async () => {
+    const repository = {
+      findStockBySymbol: jest.fn().mockResolvedValue({ symbol: 'RELIANCE.NS', region: 'IN', assetType: 'STOCK', lastSuccessfulDataLoadTimestamp: null }),
+      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue(null),
+      getSyncState: jest.fn().mockResolvedValue(null),
+      updateStockLoadTimestampBySymbol: jest.fn().mockResolvedValue({}),
+      upsertSyncState: jest.fn().mockResolvedValue({}),
+    };
+    const provider = {
+      inferRegion: jest.fn().mockReturnValue({ region: 'IN', exchange: 'NSE' }),
+      fetchHistorical: jest.fn().mockResolvedValue([
+        { symbol: 'RELIANCE.NS', date: new Date('2026-05-05T00:00:00.000Z'), open: 1, high: 1, low: 1, close: 1, volume: 1 },
+      ]),
+    };
+    const service = new MarketDataFoundationService(repository as any, provider as any);
+    jest.spyOn(service, 'storeHistorical').mockResolvedValue({
+      rowsReceived: 1,
+      rowsInserted: 1,
+      rowsUpdated: 0,
+      rowsSkipped: 0,
+      rowsNoOp: 0,
+      warningCount: 0,
+      warnings: [],
+    });
+
+    await service.ingestSymbol('RELIANCE.NS', undefined, new Date('2026-05-05T10:30:00.000Z'));
+
+    expect(provider.fetchHistorical).toHaveBeenCalledTimes(1);
+  });
 });

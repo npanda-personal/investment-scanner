@@ -275,10 +275,46 @@ export interface BulkSyncResponse {
   totalStocks?: number;
   succeeded?: number;
   failed?: number;
+  noNewData?: boolean;
+  skippedBeforeFetchCount?: number;
+  providerFetchSkippedCount?: number;
+  skippedReasonCounts?: Record<string, number>;
+  skippedReasons?: string[];
+  lastCheckedAt?: string;
+  nextEligibleSyncAt?: string;
   workerCount?: number;
   workerConcurrency?: number;
   errors?: Array<{ symbol: string; success: boolean; message: string; timestamp: string; workerId?: number }>;
   timestamp?: string;
+}
+
+export interface MarketDataSchedulerRegionStatus {
+  region: string;
+  assetType: string;
+  sessionState: string;
+  shouldRunNow: boolean;
+  reason: string;
+  todayTradingDate: string | null;
+  latestCompletedTradingDate: string | null;
+  latestStoredTradingDate: string | null;
+  todayCandleStored: boolean;
+  latestCompletedCandleStored: boolean;
+  latestStoredCandleIsCurrent: boolean;
+  candleSyncStatus: 'CURRENT' | 'MISSING_LATEST_COMPLETED' | 'NO_STORED_CANDLES' | 'TODAY_STORED_PENDING_FINAL_CONFIRMATION' | 'UNKNOWN_SESSION';
+  finalConfirmed: boolean;
+  nextSuggestedRunAt?: string | null;
+  lastSummary?: unknown;
+}
+
+export interface MarketDataSchedulerStatus {
+  enabled: boolean;
+  intervalMinutes: number;
+  regions: string[];
+  assetType: string;
+  activeRun: boolean;
+  lastRunAt: string | null;
+  nextSuggestedRunAt: string | null;
+  regionStatuses: MarketDataSchedulerRegionStatus[];
 }
 
 export interface PricesResponse {

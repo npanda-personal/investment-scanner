@@ -16,9 +16,121 @@ export interface SyncSummary {
   rowsInserted: number;
   rowsUpdated: number;
   rowsSkipped: number;
+  rowsNoOp?: number;
+  noNewData?: boolean;
+  skippedBeforeFetchCount?: number;
+  providerFetchSkippedCount?: number;
+  skippedReasonCounts?: Record<string, number>;
+  skippedReasons?: string[];
+  lastCheckedAt?: string;
+  nextEligibleSyncAt?: string;
   duplicateProviderRowsSkipped?: number;
   warningCount: number;
   warnings: string[];
+}
+
+export type MarketDataSyncScopeType = 'CATALOG' | 'INSTRUMENT';
+export type MarketDataSyncStateStatus = 'PENDING' | 'SYNCED' | 'FINAL_CONFIRMED' | 'FAILED';
+
+export type MarketDataSyncSkipReason =
+  | 'RECENTLY_SYNCED'
+  | 'MARKET_CLOSED_NO_NEW_DAILY_DATA'
+  | 'BEFORE_MARKET_OPEN'
+  | 'WEEKEND_OR_HOLIDAY'
+  | 'FINAL_CANDLE_CONFIRMED';
+
+export type MarketDataSchedulerReasonCode =
+  | 'BEFORE_MARKET_OPEN'
+  | 'MARKET_OPEN'
+  | 'POST_CLOSE_FINALIZATION_WINDOW'
+  | 'FINAL_CANDLE_CONFIRMED'
+  | 'MARKET_CLOSED_NO_SYNC'
+  | 'WEEKEND_OR_HOLIDAY'
+  | 'UNKNOWN_SESSION'
+  | 'MISSING_FINAL_CANDLE_RETRY';
+
+export interface MarketDataSchedulerDecision {
+  shouldRun: boolean;
+  reasonCode: MarketDataSchedulerReasonCode;
+  reason: string;
+  sessionState: MarketDataSchedulerReasonCode;
+  todayTradingDate: string | null;
+  nextSuggestedRunAt?: string | null;
+}
+
+export interface LatestStoredCandleInfo {
+  latestTradingDate?: string | null;
+  finalConfirmed?: boolean;
+}
+
+export interface MarketDataSyncStateDto {
+  region: string;
+  assetType: string;
+  scopeType: MarketDataSyncScopeType;
+  scopeKey: string;
+  timeframe: string;
+  tradingDate: string;
+  status: MarketDataSyncStateStatus;
+  lastCheckedAt: string | null;
+  lastProviderFetchAt: string | null;
+  lastRunAt: string | null;
+  lastInsertedCount: number;
+  lastUpdatedCount: number;
+  lastNoOpCount: number;
+  lastSkippedCount: number;
+  lastWarningCount: number;
+  lastSummary?: unknown;
+}
+
+export interface ScheduledRegionSyncSummary {
+  region: string;
+  assetType: string;
+  tradingDate: string;
+  instrumentsProcessed: number;
+  rowsReceived: number;
+  rowsInserted: number;
+  rowsUpdated: number;
+  rowsSkipped: number;
+  rowsNoOp: number;
+  noNewData?: boolean;
+  skippedBeforeFetchCount?: number;
+  providerFetchSkippedCount?: number;
+  skippedReasonCounts?: Record<string, number>;
+  skippedReasons?: string[];
+  lastCheckedAt?: string;
+  nextEligibleSyncAt?: string;
+  warningCount: number;
+  warnings: string[];
+  errors: string[];
+}
+
+export interface MarketDataSchedulerRegionStatus {
+  region: string;
+  assetType: string;
+  sessionState: MarketDataSchedulerReasonCode;
+  shouldRunNow: boolean;
+  reason: string;
+  todayTradingDate: string | null;
+  latestCompletedTradingDate: string | null;
+  latestStoredTradingDate: string | null;
+  todayCandleStored: boolean;
+  latestCompletedCandleStored: boolean;
+  latestStoredCandleIsCurrent: boolean;
+  candleSyncStatus: 'CURRENT' | 'MISSING_LATEST_COMPLETED' | 'NO_STORED_CANDLES' | 'TODAY_STORED_PENDING_FINAL_CONFIRMATION' | 'UNKNOWN_SESSION';
+  finalConfirmed: boolean;
+  nextSuggestedRunAt?: string | null;
+  lastSummary?: unknown;
+}
+
+export interface MarketDataSchedulerStatus {
+  enabled: boolean;
+  intervalMinutes: number;
+  regions: string[];
+  assetType: string;
+  activeRun: boolean;
+  lastRunAt: string | null;
+  nextSuggestedRunAt: string | null;
+  regionStatuses: MarketDataSchedulerRegionStatus[];
 }
 
 export interface RegionInfo {
@@ -111,6 +223,7 @@ export interface V1IngestionRequest {
   asset_type?: string;
   isin?: string;
   fullReload?: boolean;
+  force?: boolean;
 }
 
 export interface V1SyncResult {
@@ -154,6 +267,13 @@ export interface V1SyncResult {
   durationMs?: number;
   duplicateProviderRowsSkipped?: number;
   malformedRowsSkipped?: number;
+  noNewData?: boolean;
+  skippedBeforeFetchCount?: number;
+  providerFetchSkippedCount?: number;
+  skippedReasonCounts?: Record<string, number>;
+  skippedReasons?: string[];
+  lastCheckedAt?: string;
+  nextEligibleSyncAt?: string;
 }
 
 export interface UpdateStockRequest {

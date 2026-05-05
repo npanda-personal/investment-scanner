@@ -22,6 +22,18 @@ export {
   StockSyncWorker,
 } from './market-data-foundation.worker';
 export {
+  MarketDataFoundationScheduler,
+  getMarketDataFoundationScheduler,
+  readMarketDataSchedulerConfig,
+  startMarketDataFoundationScheduler,
+} from './market-data-foundation.scheduler';
+export {
+  getMarketSessionConfig,
+  latestCompletedTradingDateForRegion,
+  shouldRunMarketDataSync,
+  tradingDateForRegion,
+} from './market-data-foundation.market-session';
+export {
   partitionHistoricalPrices,
   validateHistoricalPrice,
   validateInstrumentInput,
@@ -36,6 +48,9 @@ export type {
   FxRateInput,
   HistoricalPrice,
   MarketDataStatus,
+  MarketDataSchedulerDecision,
+  MarketDataSchedulerRegionStatus,
+  MarketDataSchedulerStatus,
   PaginationOptions,
   RegionInfo,
   SearchResult,

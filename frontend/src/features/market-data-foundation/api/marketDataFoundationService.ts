@@ -4,6 +4,7 @@ import type {
   CreateStockRequest,
   BulkSyncResponse,
   MarketDataHealth,
+  MarketDataSchedulerStatus,
   PaginatedResponse,
   PaginationOptions,
   SyncResponse,
@@ -29,6 +30,7 @@ export type {
   CreateStockRequest,
   BulkSyncResponse,
   MarketDataHealth,
+  MarketDataSchedulerStatus,
   PaginatedResponse,
   PaginationOptions,
   SyncResponse,
@@ -46,6 +48,7 @@ export type {
   V1SyncRequest,
   V1SyncResponse,
 } from '../types';
+export type { MarketDataSchedulerRegionStatus } from '../types';
 
 /**
  * Fetch stocks with pagination and filtering.
@@ -171,6 +174,11 @@ export async function fetchMarketDataHealth(options: MarketScopedApiOptions = {}
   };
   logMarketDataApi(options.region || 'GLOBAL', params.region, params, 'health');
   const response = await axios.get<MarketDataHealth>(`${API_BASE}/v1/market-data/health`, { params });
+  return response.data;
+}
+
+export async function fetchMarketDataSchedulerStatus(): Promise<MarketDataSchedulerStatus> {
+  const response = await axios.get<MarketDataSchedulerStatus>(`${API_BASE}/v1/market-data/scheduler/status`);
   return response.data;
 }
 
