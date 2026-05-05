@@ -26,6 +26,12 @@ The `marketGate` endpoint accepts a `region` parameter. This ensures the "OPEN/C
 ## Scoring Methodology
 ... (rest of definitions) ...
 
+## Strategy Framework Migration Note
+
+This module still preserves its existing decision API and persisted `StrategyDecisionResult` behavior. The overlapping strategies (`TREND_MOMENTUM`, `PULLBACK_IN_UPTREND`, `DEFENSIVE_EXIT`) are now also declared in Strategy Framework, which is the new source of truth for reusable strategy metadata, rule declarations, backtest integration, ratings, and future automation eligibility.
+
+Next migration step: replace the private hardcoded evaluators with calls to Strategy Framework public service/evaluator while preserving response shape for `/api/v1/strategy/*`.
+
 ## Frontend
 - `StrategyDecisionDashboard`: Subscribes to `useMarketScope()`. Automatically refetches candidates when the region changes.
 - Supports a local `Region Override` for specific comparisons.

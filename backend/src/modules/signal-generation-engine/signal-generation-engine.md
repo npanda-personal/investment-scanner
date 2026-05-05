@@ -28,6 +28,18 @@ Composite score (0-100) is calculated from Technical, Momentum, and Fundamental 
 
 ... (rest of definition remains same) ...
 
+## Strategy Framework Integration
+
+Raw signal generation remains owned here. Strategy Framework is consumed only as an opt-in strategy-aware enrichment path so existing signal behavior is preserved.
+
+Supported request/query flags:
+- `strategyCode`
+- `includeStrategyMatches`
+- `onlyStrategyEligible`
+- `excludeNoiseFiltered`
+
+When enabled, signal results may include `strategyMatches[]` and `blockedStrategies[]` explaining which registered strategies matched or were blocked by noise filters/data gaps.
+
 ## Frontend Structure
 - `SignalsDashboardPage`: Subscribes to `useMarketScope()`. Automatically refetches signals when the header region changes.
 - `Manual Run`: Generation runs default to the active market scope.

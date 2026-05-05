@@ -2,6 +2,8 @@ import { MarketDataFoundationService } from '../market-data-foundation';
 import { SubscriptionBillingService } from '../subscription-billing';
 import { WatchlistManagementService } from '../watchlist-management';
 import { DataQualityEngineService } from '../data-quality-engine';
+import { StrategyFrameworkEvaluator } from '../strategy-framework/strategy-framework.evaluator';
+import { StrategyFrameworkRegistry } from '../strategy-framework/strategy-framework.registry';
 import { BacktestingStrategyLabRepository } from './backtesting-strategy-lab.repository';
 import type {
   BacktestMetrics,
@@ -24,7 +26,8 @@ export class BacktestingStrategyLabService {
     private readonly marketDataService = new MarketDataFoundationService(),
     private readonly watchlistService = new WatchlistManagementService(),
     private readonly subscriptionService = new SubscriptionBillingService(),
-    private readonly dataQualityService = new DataQualityEngineService()
+    private readonly dataQualityService = new DataQualityEngineService(),
+    private readonly strategyRegistry = new StrategyFrameworkRegistry()
   ) {}
 
   listStrategies(userId = 'default-user') { return this.repository.listStrategies(userId); }
@@ -92,7 +95,7 @@ export class BacktestingStrategyLabService {
     for (const instrument of instruments) {
       const response = await this.marketDataService.listPricesByInstrumentId(instrument.instrumentId, 5000, new Date(config.startDate), new Date(config.endDate)).catch(() => null);
       const bars = (response?.prices || [])
-        .map((price: any) => ({ date: new Date(price.date).toISOString().slice(0, 10), close: Number(price.adjusted_close ?? price.close) }))
+        .map((price: any) => ({ date: new Date(price.date).toISOString().slice(0, 10), close: Number(price.adjusted_close ?? price.close), volume: price.volume !== null && price.volume !== undefined ? Number(price.volume) : null }))
         .filter((bar: HistoricalBar) => Number.isFinite(bar.close))
         .sort((a: HistoricalBar, b: HistoricalBar) => a.date.localeCompare(b.date));
       if (bars.length > 20) histories.set(instrument.instrumentId, { ...instrument, bars });
@@ -151,6 +154,8 @@ export class BacktestingStrategyLabService {
   }
 
   shouldEnter(config: BacktestStrategyConfig, bars: HistoricalBar[], index: number): boolean {
+    const registered = this.evaluateRegisteredStrategy(config, bars, index);
+    if (registered) return registered.eligibleForBacktest && registered.eligibleForSignalGeneration;
     const signal = this.signalProxy(bars, index);
     if (config.entryRule.type === 'SIGNAL_SCORE_ABOVE') return signal.score > Number(config.entryRule.threshold);
     if (config.entryRule.type === 'SIGNAL_DIRECTION_BULLISH') return signal.direction === 'BULLISH';
@@ -159,6 +164,10 @@ export class BacktestingStrategyLabService {
   }
 
   shouldExit(config: BacktestStrategyConfig, bars: HistoricalBar[], index: number, position: Position): boolean {
+    if (config.strategyCode) {
+      const registered = this.evaluateRegisteredStrategy(config, bars, index, true);
+      if (registered && ['EXIT_CANDIDATE', 'REDUCE_RISK', 'AVOID'].includes(registered.decision)) return true;
+    }
     const signal = this.signalProxy(bars, index);
     if (config.exitRule.type === 'SIGNAL_SCORE_BELOW') return signal.score < Number(config.exitRule.threshold);
     if (config.exitRule.type === 'SIGNAL_DIRECTION_BEARISH') return signal.direction === 'BEARISH';
@@ -206,8 +215,87 @@ export class BacktestingStrategyLabService {
       const detail = await this.watchlistService.detail(config.universe.watchlistId);
       return (detail?.items || []).map((item: any) => ({ instrumentId: item.instrumentId, symbol: item.symbol }));
     }
-    const result = await this.marketDataService.listInstruments({ page: 1, pageSize: 50 });
+    const result = await this.marketDataService.listInstruments({ page: 1, pageSize: 50, region: config.region, assetType: config.assetType });
     return result.instruments.map((instrument: any) => ({ instrumentId: instrument.id, symbol: instrument.symbol }));
+  }
+
+  private evaluateRegisteredStrategy(config: BacktestStrategyConfig, bars: HistoricalBar[], index: number, exit = false) {
+    if (!config.strategyCode) return null;
+    const strategy = this.strategyRegistry.get(config.strategyCode);
+    if (!strategy) return null;
+    const context = this.strategyContextFromBars(bars, index, config);
+    const evaluator = new StrategyFrameworkEvaluator(strategy);
+    return exit ? evaluator.evaluateExit(context) : evaluator.evaluateEntry(context);
+  }
+
+  private strategyContextFromBars(bars: HistoricalBar[], index: number, config: BacktestStrategyConfig) {
+    const window = bars.slice(0, index + 1);
+    const latestFirst = [...window].reverse();
+    const closes = latestFirst.map((bar) => bar.close);
+    const latest = bars[index];
+    const previous = bars[index - 1];
+    const averageVolume20 = this.average(latestFirst.slice(1, 21).map((bar) => bar.volume).filter((value): value is number => typeof value === 'number' && Number.isFinite(value)));
+    const signal = this.signalProxy(bars, index);
+    return {
+      latestPrice: latest?.close ?? null,
+      previousClose: previous?.close ?? null,
+      bars: latestFirst,
+      sma50: this.sma(bars, index, 50),
+      sma200: this.sma(bars, index, 200),
+      rsi: this.rsiFromLatestFirst(closes, 14),
+      return20d: closes.length > 20 && closes[20] > 0 ? (closes[0] - closes[20]) / closes[20] : null,
+      high52Week: closes.length > 0 ? Math.max(...closes.slice(0, 252)) : null,
+      low52Week: closes.length > 0 ? Math.min(...closes.slice(0, 252)) : null,
+      averageVolume20,
+      rawSignal: {
+        instrument_id: '',
+        symbol: '',
+        company_name: null,
+        sector: null,
+        country: null,
+        currentPrice: latest?.close ?? null,
+        previousClose: previous?.close ?? null,
+        dailyChange: latest && previous ? latest.close - previous.close : null,
+        dailyChangePercent: latest && previous && previous.close > 0 ? (latest.close - previous.close) / previous.close : null,
+        currency: null,
+        priceTimestamp: latest?.date ?? null,
+        score: signal.score,
+        direction: signal.direction as any,
+        confidence: closes.length >= 200 ? 'HIGH' : closes.length >= 50 ? 'MEDIUM' : 'LOW',
+        triggered_signals: [],
+        negative_signals: [],
+        explanation: 'Backtest proxy signal derived from registered strategy context.',
+        generated_at: latest?.date ?? new Date().toISOString(),
+        source: 'backtesting-strategy-lab',
+        data_status: closes.length >= 200 ? 'COMPLETE' : closes.length >= 50 ? 'PARTIAL' : 'MISSING',
+      } as any,
+      dataQuality: {
+        signalReadinessStatus: closes.length >= 200 ? 'READY' : closes.length >= 50 ? 'LIMITED' : 'NOT_READY',
+        coverageStatus: closes.length >= 252 ? 'GOOD' : closes.length >= 50 ? 'PARTIAL' : 'UNUSABLE',
+        liquidityStatus: averageVolume20 === null ? 'UNKNOWN' : averageVolume20 > 0 ? 'LIQUID' : 'ILLIQUID',
+        eligibleForSignals: closes.length >= 50,
+        eligibleForBacktesting: closes.length >= 252,
+      },
+      marketGate: 'UNKNOWN',
+      marketRegime: null,
+      region: config.region || 'IN',
+      assetType: config.assetType || 'STOCK',
+      backtestDate: latest?.date ?? null,
+    };
+  }
+
+  private rsiFromLatestFirst(values: number[], period: number): number | null {
+    if (values.length <= period) return null;
+    let gains = 0;
+    let losses = 0;
+    for (let i = 0; i < period; i++) {
+      const diff = values[i] - values[i + 1];
+      if (diff >= 0) gains += diff;
+      else losses += Math.abs(diff);
+    }
+    if (losses === 0) return 100;
+    const rs = (gains / period) / (losses / period);
+    return 100 - (100 / (1 + rs));
   }
 
   private async applyDataQualityFilter(instruments: Array<{ instrumentId: string; symbol: string }>, config: BacktestStrategyConfig): Promise<{
@@ -296,6 +384,11 @@ export class BacktestingStrategyLabService {
     if (values.length < 2) return 0;
     const avg = values.reduce((sum, value) => sum + value, 0) / values.length;
     return Math.sqrt(values.reduce((sum, value) => sum + Math.pow(value - avg, 2), 0) / (values.length - 1));
+  }
+
+  private average(values: number[]) {
+    if (values.length === 0) return null;
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
   }
 
   private throwIfErrors(errors: string[]) {

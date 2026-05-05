@@ -18,6 +18,7 @@ export type {
   SignalDirection,
   SignalHistoryQuery,
   SignalItem,
+  SignalPricePoint,
   SignalQuery,
   SignalResultDto,
   SignalRunRequest,

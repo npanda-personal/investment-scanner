@@ -11,6 +11,11 @@ export interface StrategyRule<T extends string> {
 }
 
 export interface BacktestStrategyConfig {
+  strategyCode?: string;
+  strategyVersion?: string;
+  timeframe?: '1Y' | '3Y' | '5Y' | '10Y' | '15Y';
+  region?: string;
+  assetType?: string;
   universe: {
     type: UniverseType;
     instrumentIds?: string[];
@@ -120,4 +125,5 @@ export interface RunBacktestRequest {
 export interface HistoricalBar {
   date: string;
   close: number;
+  volume?: number | null;
 }

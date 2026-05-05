@@ -20,6 +20,7 @@ import { signalCalibrationEngineRoutes } from '@/features/signal-calibration-eng
 import { dataQualityEngineRoutes } from '@/features/data-quality-engine';
 import { strategyDecisionEngineRoutes } from '@/features/strategy-decision-engine';
 import { researchHubRoutes } from '@/features/research-hub';
+import { strategyFrameworkRoutes } from '@/features/strategy-framework';
 
 export const appRoutes: RouteObject[] = [
   ...publicAuthIdentityRoutes,
@@ -40,6 +41,7 @@ export const appRoutes: RouteObject[] = [
           ...signalCalibrationEngineRoutes,
           ...dataQualityEngineRoutes,
           ...strategyDecisionEngineRoutes,
+          ...strategyFrameworkRoutes,
           ...historicalContextSnapshotsRoutes,
           ...portfolioManagementRoutes,
           ...watchlistManagementRoutes,

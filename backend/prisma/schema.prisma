@@ -677,6 +677,69 @@ model StrategyDecisionResult {
   @@map("strategy_decision_results")
 }
 
+model StrategyDefinition {
+  id               String   @id @default(cuid())
+  code             String   @unique
+  name             String
+  description      String
+  category         String
+  style            String
+  timeframe        String
+  assetTypes       Json
+  supportedRegions Json
+  version          String
+  status           String
+  parameters       Json
+  entryRules       Json
+  exitRules        Json
+  noiseFilters     Json
+  riskRules        Json
+  requiredInputs   Json
+  marketGateRules  Json
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([status])
+  @@index([category])
+  @@index([style])
+  @@map("strategy_definitions")
+}
+
+model StrategyPerformanceSummary {
+  id                    String   @id @default(cuid())
+  strategyCode          String
+  strategyVersion       String
+  timeframe             String
+  region                String
+  assetType             String
+  universeKey           String   @default("DEFAULT")
+  startingCapital       Float
+  endingCapital         Float
+  totalReturn           Float
+  cagr                  Float?
+  maxDrawdown           Float
+  volatility            Float?
+  sharpe                Float?
+  winRate               Float?
+  profitFactor          Float?
+  tradeCount            Int
+  averageHoldingDays    Float?
+  exposurePercent       Float?
+  ratingScore           Int
+  ratingGrade           String
+  automationEligibility String
+  backtestRunId         String?
+  generatedAt           DateTime @default(now())
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([strategyCode, strategyVersion, timeframe, region, assetType, universeKey])
+  @@index([strategyCode])
+  @@index([ratingGrade])
+  @@index([automationEligibility])
+  @@map("strategy_performance_summaries")
+}
+
 
 
 

@@ -36,6 +36,10 @@ export function parseSignalQuery(query: Record<string, unknown>): SignalQuery {
     signalType: typeof first(query.signalType) === 'string' ? String(first(query.signalType)).trim() || undefined : undefined,
     confidence: normalizeConfidence(query.confidence),
     search: typeof first(query.search) === 'string' ? String(first(query.search)).trim() || undefined : undefined,
+    strategyCode: typeof first(query.strategyCode) === 'string' ? String(first(query.strategyCode)).trim().toUpperCase() || undefined : undefined,
+    includeStrategyMatches: first(query.includeStrategyMatches) === 'true' || first(query.includeStrategyMatches) === true,
+    onlyStrategyEligible: first(query.onlyStrategyEligible) === 'true' || first(query.onlyStrategyEligible) === true,
+    excludeNoiseFiltered: first(query.excludeNoiseFiltered) === 'true' || first(query.excludeNoiseFiltered) === true,
   };
 }
 
@@ -56,6 +60,10 @@ export function parseRunRequest(body: any): SignalRunRequest {
     includeLimited: body?.includeLimited === true,
     skipUnusable: body?.skipUnusable !== undefined ? body.skipUnusable === true : undefined,
     missingQualityBehavior: ['WARN_AND_PROCESS', 'SKIP'].includes(body?.missingQualityBehavior) ? body.missingQualityBehavior : undefined,
+    strategyCode: typeof body?.strategyCode === 'string' ? body.strategyCode.trim().toUpperCase() || undefined : undefined,
+    includeStrategyMatches: body?.includeStrategyMatches === true,
+    onlyStrategyEligible: body?.onlyStrategyEligible === true,
+    excludeNoiseFiltered: body?.excludeNoiseFiltered === true,
   };
 }
 

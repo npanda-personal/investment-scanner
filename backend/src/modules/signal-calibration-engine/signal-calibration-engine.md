@@ -6,6 +6,8 @@
 
 It does not create raw signals, change raw signal scoring, optimize strategies, or provide trading advice. Raw `SignalResult` rows remain unchanged. Calibrated results are persisted separately in `SignalCalibrationResult`.
 
+Strategy Framework may consume calibrated score/direction/confidence as optional context. Calibration remains owned by this module and is not overwritten by strategy evaluation.
+
 ## Endpoints
 
 Mounted under `/api/v1`:

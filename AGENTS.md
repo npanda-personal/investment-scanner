@@ -412,3 +412,9 @@ Optimize for:
 - scalable modular growth
 
 Not theoretical perfection.
+
+## Strategy Framework Ownership
+
+- Strategy Framework owns reusable strategy definitions, versions, typed rule declarations, deterministic evaluators, performance summaries, ratings, and future automation eligibility flags.
+- Signal Generation, Strategy Decision, Backtesting, Alerts, and future automation modules should consume Strategy Framework through public exports/APIs instead of duplicating strategy rules.
+- Strategy Framework is research support only and must not enable live trading, broker execution, order placement, or autonomous real-money automation.

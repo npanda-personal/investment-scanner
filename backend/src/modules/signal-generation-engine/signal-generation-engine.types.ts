@@ -1,4 +1,5 @@
 import type { MarketDataStatus } from '../market-data-foundation';
+import type { StrategyMatchSummary } from '../strategy-framework/strategy-framework.types';
 
 export type SignalDirection = 'BULLISH' | 'NEUTRAL' | 'BEARISH';
 export type SignalConfidence = 'LOW' | 'MEDIUM' | 'HIGH';
@@ -34,6 +35,8 @@ export interface SignalResultDto {
   source: string;
   data_status: MarketDataStatus;
   warnings?: string[];
+  strategyMatches?: StrategyMatchSummary[];
+  blockedStrategies?: StrategyMatchSummary[];
 }
 
 export interface PaginatedSignalResponse {
@@ -59,6 +62,10 @@ export interface SignalRunRequest {
   includeLimited?: boolean;
   skipUnusable?: boolean;
   missingQualityBehavior?: 'WARN_AND_PROCESS' | 'SKIP';
+  strategyCode?: string;
+  includeStrategyMatches?: boolean;
+  onlyStrategyEligible?: boolean;
+  excludeNoiseFiltered?: boolean;
 }
 
 export interface SignalQuery {
@@ -75,6 +82,10 @@ export interface SignalQuery {
   signalType?: string;
   confidence?: SignalConfidence;
   search?: string;
+  strategyCode?: string;
+  includeStrategyMatches?: boolean;
+  onlyStrategyEligible?: boolean;
+  excludeNoiseFiltered?: boolean;
 }
 
 export interface SignalHistoryQuery extends SignalQuery {

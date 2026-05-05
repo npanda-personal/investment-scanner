@@ -21,6 +21,7 @@ Backend module files are intentionally flat:
 - `index.ts`
 
 The service consumes Market Data Foundation and Watchlist Management through public module exports only.
+It can also consume Strategy Framework public registry/evaluator exports when a backtest config includes `strategyCode`.
 
 ## Endpoints
 
@@ -70,6 +71,16 @@ Supported universes:
 - `SYMBOLS`
 - `INSTRUMENTS`
 - `WATCHLIST`
+
+Registered Strategy Framework configs may also include:
+
+- `strategyCode`
+- `strategyVersion`
+- `timeframe`: `1Y`, `3Y`, `5Y`, `10Y`, `15Y`
+- `region`
+- `assetType`
+
+When `strategyCode` is present, entry/exit checks use the registered Strategy Framework evaluator. Legacy rule-only configs remain supported for compatibility.
 
 Supported entry rules:
 

@@ -22,6 +22,7 @@ import { signalCalibrationEngineRouter } from '../modules/signal-calibration-eng
 import { dataQualityEngineRouter } from '../modules/data-quality-engine';
 import { strategyDecisionEngineRouter } from '../modules/strategy-decision-engine';
 import { researchHubRouter } from '../modules/research-hub';
+import { strategyFrameworkRouter } from '../modules/strategy-framework';
 
 export interface ApiModule {
   path: string;
@@ -33,6 +34,7 @@ export const apiModules: ApiModule[] = [
   { path: '/api/v1', router: authIdentityRouter },
   { path: '/api/v1', router: stockResearchWorkbenchRouter },
   { path: '/api/v1', router: signalGenerationEngineRouter },
+  { path: '/api/v1', router: strategyFrameworkRouter },
   { path: '/api/v1', router: portfolioManagementRouter },
   { path: '/api/v1', router: portfolioIntelligenceRouter },
   { path: '/api/v1', router: watchlistManagementRouter },

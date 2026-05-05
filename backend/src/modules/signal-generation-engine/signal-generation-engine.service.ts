@@ -1,6 +1,8 @@
 import { MarketDataFoundationService } from '../market-data-foundation';
 import { StockResearchWorkbenchService } from '../stock-research-workbench';
 import { DataQualityEngineService } from '../data-quality-engine';
+import { StrategyFrameworkEvaluator } from '../strategy-framework/strategy-framework.evaluator';
+import { StrategyFrameworkRegistry } from '../strategy-framework/strategy-framework.registry';
 import { SignalGenerationEngineRepository } from './signal-generation-engine.repository';
 import type {
   PaginatedSignalResponse,
@@ -24,13 +26,14 @@ export class SignalGenerationEngineService {
     private readonly repository = new SignalGenerationEngineRepository(),
     private readonly marketDataService = new MarketDataFoundationService(),
     private readonly researchService = new StockResearchWorkbenchService(),
-    private readonly dataQualityService = new DataQualityEngineService()
+    private readonly dataQualityService = new DataQualityEngineService(),
+    private readonly strategyRegistry = new StrategyFrameworkRegistry()
   ) {}
 
   async topSignals(query: SignalQuery): Promise<PaginatedSignalResponse> {
     const { signals, total } = await this.repository.latestSignals(query);
     return {
-      signals: await this.enrichSignals(signals),
+      signals: await this.enrichSignals(signals, query),
       total,
       limit: query.limit,
       offset: query.offset || 0,
@@ -40,7 +43,7 @@ export class SignalGenerationEngineService {
   async screener(query: SignalQuery): Promise<PaginatedSignalResponse> {
     const { signals, total } = await this.repository.latestSignals(query);
     return {
-      signals: await this.enrichSignals(signals),
+      signals: await this.enrichSignals(signals, query),
       total,
       limit: query.limit,
       offset: query.offset || 0,
@@ -95,7 +98,7 @@ export class SignalGenerationEngineService {
 
     for (const instrumentId of instrumentIds) {
       try {
-        const result = await this.generateForInstrument(instrumentId);
+        const result = await this.generateForInstrument(instrumentId, request);
         if (result) results.push(result);
       } catch (error: any) {
         errors.push(`${instrumentId}: ${error.message || 'signal generation failed'}`);
@@ -141,7 +144,7 @@ export class SignalGenerationEngineService {
     return this.repository.latestSignalUniverseCount(query);
   }
 
-  async generateForInstrument(instrumentId: string): Promise<SignalResultDto | null> {
+  async generateForInstrument(instrumentId: string, options: Pick<SignalRunRequest, 'strategyCode' | 'includeStrategyMatches' | 'onlyStrategyEligible' | 'excludeNoiseFiltered'> = {}): Promise<SignalResultDto | null> {
     const [instrument, pricesResponse, fundamentalsResponse, research] = await Promise.all([
       this.marketDataService.getInstrument(instrumentId),
       this.marketDataService.listPricesByInstrumentId(instrumentId, 5000),
@@ -184,7 +187,7 @@ export class SignalGenerationEngineService {
       warnings.push(`Insufficient price history (${prices.length} days) for reliable indicators`);
     }
 
-    const result: SignalResultDto = {
+    let result: SignalResultDto = {
       instrument_id: instrument.id,
       symbol: instrument.symbol,
       company_name: instrument.company_name ?? null,
@@ -209,10 +212,16 @@ export class SignalGenerationEngineService {
       warnings,
     };
 
+    if (options.includeStrategyMatches || options.strategyCode || options.onlyStrategyEligible || options.excludeNoiseFiltered) {
+      result = this.attachStrategyMatches(result, prices, instrument, options);
+      if (options.onlyStrategyEligible && (!result.strategyMatches || result.strategyMatches.length === 0)) return null;
+      if (options.excludeNoiseFiltered && result.blockedStrategies && result.blockedStrategies.length > 0 && (!result.strategyMatches || result.strategyMatches.length === 0)) return null;
+    }
+
     return this.repository.createSignalResult(result);
   }
 
-  async enrichSignals(signals: SignalResultDto[]): Promise<SignalResultDto[]> {
+  async enrichSignals(signals: SignalResultDto[], options: Pick<SignalQuery, 'strategyCode' | 'includeStrategyMatches' | 'onlyStrategyEligible' | 'excludeNoiseFiltered'> = {}): Promise<SignalResultDto[]> {
     if (signals.length === 0) return [];
     
     try {
@@ -228,7 +237,7 @@ export class SignalGenerationEngineService {
       const instrumentMap = new Map(instruments.map((i: any) => [i.id, i]));
       const priceMap = new Map(latestPrices.map((p: any) => [p.symbol, p]));
 
-      return Promise.all(signals.map(async (signal) => {
+      const enriched = await Promise.all(signals.map(async (signal) => {
         const instrument = instrumentMap.get(signal.instrument_id);
         const latest = priceMap.get(signal.symbol);
         
@@ -244,7 +253,7 @@ export class SignalGenerationEngineService {
 
         const dailyChange = currentPrice !== null && previousClose !== null ? currentPrice - previousClose : null;
         
-        return {
+        const result = {
           ...signal,
           currentPrice,
           previousClose,
@@ -253,7 +262,15 @@ export class SignalGenerationEngineService {
           currency: instrument?.currency ?? signal.currency ?? null,
           priceTimestamp: (latest as any)?.date ? new Date((latest as any).date).toISOString() : null,
         };
+        return (options.includeStrategyMatches || options.strategyCode || options.onlyStrategyEligible || options.excludeNoiseFiltered)
+          ? this.attachStrategyMatches(result, [], instrument, options)
+          : result;
       }));
+      return enriched.filter((signal) => {
+        if (options.onlyStrategyEligible && (!signal.strategyMatches || signal.strategyMatches.length === 0)) return false;
+        if (options.excludeNoiseFiltered && signal.blockedStrategies && signal.blockedStrategies.length > 0 && (!signal.strategyMatches || signal.strategyMatches.length === 0)) return false;
+        return true;
+      });
     } catch (error) {
       console.error('Signal enrichment failed:', error);
       return signals.map(signal => ({
@@ -413,6 +430,65 @@ export class SignalGenerationEngineService {
     if (marketCap !== null || fundamental) signals.push(this.signal('FUNDAMENTALS_AVAILABLE', 'market cap or fundamentals are available', 'FUNDAMENTAL'));
 
     return { score: this.categoryScore(signals.length, negativeSignals.length), signals, negativeSignals };
+  }
+
+  private attachStrategyMatches(
+    signal: SignalResultDto,
+    prices: SignalPricePoint[],
+    instrument: any,
+    options: Pick<SignalRunRequest, 'strategyCode' | 'includeStrategyMatches' | 'onlyStrategyEligible' | 'excludeNoiseFiltered'>
+  ): SignalResultDto {
+    const strategies = options.strategyCode && options.strategyCode !== 'ALL'
+      ? [this.strategyRegistry.get(options.strategyCode)].filter(Boolean)
+      : this.strategyRegistry.active();
+    const closes = prices.map((price) => price.adjusted_close);
+    const context = {
+      instrumentId: signal.instrument_id,
+      symbol: signal.symbol,
+      companyName: signal.company_name,
+      assetType: instrument?.assetType || instrument?.asset_type || 'STOCK',
+      region: instrument?.region || signal.country || 'IN',
+      exchange: instrument?.exchange ?? null,
+      sector: signal.sector,
+      country: signal.country,
+      latestPrice: signal.currentPrice ?? prices[0]?.adjusted_close ?? null,
+      previousClose: signal.previousClose ?? prices[1]?.adjusted_close ?? null,
+      prices,
+      sma50: this.sma(prices, 50),
+      sma200: this.sma(prices, 200),
+      rsi: this.rsi(prices, 14),
+      return20d: this.returnAtOffset(prices, 20),
+      high52Week: this.periodHigh(prices, 252),
+      low52Week: this.periodLow(prices, 252),
+      volatility: this.stddev(closes.slice(0, 63)),
+      averageVolume20: this.average(prices.slice(1, 21).map((price) => price.volume).filter((value): value is number => typeof value === 'number')),
+      rawSignal: signal,
+      dataQuality: {
+        signalReadinessStatus: signal.data_status === 'MISSING' ? 'NOT_READY' : signal.data_status === 'PARTIAL' ? 'LIMITED' : 'READY',
+        coverageStatus: signal.data_status === 'MISSING' ? 'UNUSABLE' : signal.data_status === 'PARTIAL' ? 'PARTIAL' : 'GOOD',
+        liquidityStatus: 'UNKNOWN',
+        eligibleForSignals: signal.data_status !== 'MISSING',
+        eligibleForBacktesting: prices.length >= 252,
+      },
+      marketGate: 'UNKNOWN',
+    };
+    const results = strategies.map((strategy: any) => new StrategyFrameworkEvaluator(strategy).evaluateSignalCandidate(context));
+    const summarize = (result: any) => ({
+      strategyCode: result.strategyCode,
+      strategyVersion: result.strategyVersion,
+      decision: result.decision,
+      direction: result.direction,
+      score: result.score,
+      confidence: result.confidence,
+      reasons: result.reasons,
+      blockers: result.blockers,
+      noiseFiltersTriggered: result.noiseFiltersTriggered,
+    });
+    return {
+      ...signal,
+      strategyMatches: results.filter((result) => result.eligibleForSignalGeneration && result.blockers.length === 0).map(summarize),
+      blockedStrategies: results.filter((result) => result.blockers.length > 0 || result.decision === 'INSUFFICIENT_DATA' || result.decision === 'AVOID').map(summarize),
+    };
   }
 
   sma(prices: SignalPricePoint[], period: number): number | null {
@@ -669,6 +745,12 @@ export class SignalGenerationEngineService {
     return values.reduce((sum, value) => sum + value, 0) / values.length;
   }
 
+  private stddev(values: number[]): number | null {
+    if (values.length < 2) return null;
+    const avg = this.average(values) ?? 0;
+    return Math.sqrt(values.reduce((sum, value) => sum + Math.pow(value - avg, 2), 0) / (values.length - 1));
+  }
+
   obv(prices: SignalPricePoint[]): number[] {
     if (prices.length === 0) return [];
     const chronological = [...prices].reverse();
@@ -706,4 +788,3 @@ export class SignalGenerationEngineService {
     return obvArray[0] < obvArray[period - 1];
   }
 }
-
