@@ -6,6 +6,8 @@ import { DataQualityEngineService } from '../data-quality-engine';
 import { SmartMoneyIntelligenceService } from '../smart-money-intelligence';
 import { PortfolioManagementService } from '../portfolio-management';
 import { WatchlistManagementService } from '../watchlist-management';
+import { StrategyFrameworkEvaluator, StrategyFrameworkRegistry, StrategyFrameworkService } from '../strategy-framework';
+import type { StrategyContext, StrategySignalOutput } from '../strategy-framework';
 import { StrategyDecisionEngineRepository } from './strategy-decision-engine.repository';
 import type {
   AllowedAction,
@@ -35,14 +37,16 @@ export class StrategyDecisionEngineService {
     private readonly dataQualityService = new DataQualityEngineService(),
     private readonly smartMoneyService = new SmartMoneyIntelligenceService(),
     private readonly portfolioService = new PortfolioManagementService(),
-    private readonly watchlistService = new WatchlistManagementService()
+    private readonly watchlistService = new WatchlistManagementService(),
+    private readonly strategyRegistry = new StrategyFrameworkRegistry(),
+    private readonly strategyFrameworkService = new StrategyFrameworkService()
   ) {}
 
   async marketGate(region?: string): Promise<MarketGateResponse> {
     const [summary, regime, breadth] = await Promise.all([
-      this.contextService.summary({ region }),
-      this.contextService.regime(),
-      this.contextService.breadth(),
+      this.contextService.summary({ region }).catch(() => null),
+      this.contextService.regime().catch(() => null),
+      this.contextService.breadth().catch(() => null),
     ]);
 
     const reasons: string[] = [];
@@ -51,7 +55,7 @@ export class StrategyDecisionEngineService {
     let marketGate: MarketGate = 'UNKNOWN';
     let allowedActions: AllowedAction[] = ['MANAGE_EXISTING_POSITIONS_ONLY'];
 
-    if (summary.dataStatus === 'MISSING') {
+    if (!summary || summary.dataStatus === 'MISSING') {
       reasons.push('Market context data is missing.');
       return {
         marketCondition,
@@ -65,10 +69,10 @@ export class StrategyDecisionEngineService {
       };
     }
 
-    const score = regime.score;
-    const isRiskOn = regime.regime === 'RISK_ON';
-    const isRiskOff = regime.regime === 'RISK_OFF';
-    const breadthAbove50 = breadth.percentAboveSma50 ?? 0;
+    const score = regime?.score ?? 0;
+    const isRiskOn = regime?.regime === 'RISK_ON';
+    const isRiskOff = regime?.regime === 'RISK_OFF';
+    const breadthAbove50 = breadth?.percentAboveSma50 ?? 0;
 
     if (isRiskOn && breadthAbove50 >= 0.6) {
       marketCondition = 'HEALTHY';
@@ -110,6 +114,7 @@ export class StrategyDecisionEngineService {
     
     const results: StrategyDecisionDto[] = [];
     const gate = await this.marketGate(request.region);
+    let failedCount = 0;
 
     // Controlled concurrency: Process 5 instruments at a time
     const concurrency = 5;
@@ -136,6 +141,7 @@ export class StrategyDecisionEngineService {
           return instrumentResults;
         } catch (error: any) {
           console.error(`Evaluation failed for ${instrumentId}:`, error);
+          failedCount += 1;
           return [];
         }
       }));
@@ -156,7 +162,7 @@ export class StrategyDecisionEngineService {
       hasMore: nextOffset !== null,
       generatedCount: results.length,
       skippedCount: 0,
-      failedCount: 0,
+      failedCount,
       warnings: [],
       durationMs: Date.now() - started,
       results,
@@ -250,37 +256,11 @@ export class StrategyDecisionEngineService {
     gate: MarketGateResponse,
     portfolioId?: string
   ): Promise<StrategyDecisionDto | null> {
-    const [instrument, pricesRes, rawSignal, calibrated, quality, smartMoney] = await Promise.all([
-      this.marketDataService.getInstrument(instrumentId),
-      this.marketDataService.listPricesByInstrumentId(instrumentId, 300),
-      this.signalService.latestForInstrument(instrumentId),
-      this.calibrationService.latestForInstrument(instrumentId),
-      this.dataQualityService.diagnostics(instrumentId),
-      this.smartMoneyService.stock(instrumentId, '3M'),
-    ]);
+    const context = await this.buildDecisionContext(instrumentId, gate, portfolioId);
+    if (!context?.instrument) return null;
 
-    if (!instrument || !pricesRes) return null;
-
-    const prices = pricesRes.prices.map(p => Number(p.adjusted_close ?? p.close));
-    const sma50 = this.calculateSma(prices, 50);
-    const sma200 = this.calculateSma(prices, 200);
-    const rsi = this.calculateRsi(prices, 14);
-    const latestPrice = prices[0];
-
-    const context = {
-      instrument,
-      prices,
-      latestPrice,
-      sma50,
-      sma200,
-      rsi,
-      rawSignal,
-      calibrated,
-      quality,
-      smartMoney,
-      gate,
-      portfolioId,
-    };
+    const frameworkDecision = await this.evaluateWithStrategyFramework(strategyName, context).catch(() => null);
+    if (frameworkDecision) return frameworkDecision;
 
     if (strategyName === 'TREND_MOMENTUM') return this.evaluateTrendMomentum(context);
     if (strategyName === 'PULLBACK_IN_UPTREND') return this.evaluatePullback(context);
@@ -300,6 +280,207 @@ export class StrategyDecisionEngineService {
       return this.repository.create(result);
     }
     return null;
+  }
+
+  private async buildDecisionContext(instrumentId: string, gate: MarketGateResponse, portfolioId?: string): Promise<any | null> {
+    const [instrument, pricesRes, rawSignal, calibrated, quality, smartMoney, marketSummary, portfolio] = await Promise.all([
+      this.marketDataService.getInstrument(instrumentId).catch(() => null),
+      this.marketDataService.listPricesByInstrumentId(instrumentId, 500).catch(() => ({ prices: [] })),
+      this.signalService.latestForInstrument(instrumentId).catch(() => null),
+      this.calibrationService.latestForInstrument(instrumentId).catch(() => null),
+      this.dataQualityService.diagnostics(instrumentId).catch(() => null),
+      this.smartMoneyService.stock(instrumentId, '3M').catch(() => null),
+      this.contextService.summary({ region: gate.marketGate === 'UNKNOWN' ? undefined : undefined }).catch(() => null),
+      portfolioId ? this.portfolioService.getPortfolioDetail(portfolioId).catch(() => null) : Promise.resolve(null),
+    ]);
+
+    if (!instrument) return null;
+
+    const pricePoints = this.toPricePoints(pricesRes?.prices || []);
+    const closes = pricePoints.map((price) => price.adjusted_close);
+    const latestPrice = closes[0] ?? null;
+    const sma50 = this.calculateSma(closes, 50);
+    const sma200 = this.calculateSma(closes, 200);
+    const rsi = this.calculateRsi(closes, 14);
+    const sectorContexts = [
+      ...(Array.isArray((marketSummary as any)?.topSectors) ? (marketSummary as any).topSectors : []),
+      ...(Array.isArray((marketSummary as any)?.weakSectors) ? (marketSummary as any).weakSectors : []),
+    ];
+    const sectorContext = sectorContexts.find((item: any) => item.sector === instrument.sector) || null;
+    const holding = portfolio?.holdings?.find((item: any) => item.instrumentId === instrumentId) || null;
+    const dataGaps: string[] = [];
+
+    if (pricePoints.length === 0) dataGaps.push('Price history is missing.');
+    if (!rawSignal) dataGaps.push('Raw signal is missing.');
+    if (!quality) dataGaps.push('Data quality evaluation is missing.');
+    if (!smartMoney) dataGaps.push('Smart-money context is missing.');
+    if (!marketSummary || gate.marketGate === 'UNKNOWN') dataGaps.push('Market context is missing or unknown.');
+    if (!sectorContext && instrument.sector) dataGaps.push('Sector context is missing.');
+
+    return {
+      instrument,
+      prices: closes,
+      pricePoints,
+      latestPrice,
+      sma50,
+      sma200,
+      rsi,
+      rawSignal,
+      calibrated,
+      quality,
+      smartMoney,
+      gate,
+      portfolioId,
+      holding,
+      sectors: sectorContexts,
+      sectorContext,
+      dataGaps,
+      marketSummary,
+    };
+  }
+
+  private async evaluateWithStrategyFramework(strategyName: StrategyName, ctx: any): Promise<StrategyDecisionDto | null> {
+    const definition = this.strategyRegistry.get(strategyName);
+    if (!definition) return null;
+    const strategyContext = this.toStrategyFrameworkContext(ctx);
+    const evaluator = new StrategyFrameworkEvaluator(definition);
+    const frameworkResult = strategyName === 'DEFENSIVE_EXIT'
+      ? evaluator.evaluateExit(strategyContext)
+      : evaluator.evaluateEntry(strategyContext);
+    const rating = await this.latestStrategyRating(definition.code, strategyContext.region || 'IN', strategyContext.assetType || 'STOCK');
+    return this.adaptFrameworkResult(ctx, frameworkResult, rating);
+  }
+
+  private toStrategyFrameworkContext(ctx: any): StrategyContext {
+    const closes = ctx.prices as number[];
+    return {
+      instrumentId: ctx.instrument.id,
+      symbol: ctx.instrument.symbol,
+      companyName: ctx.instrument.company_name ?? ctx.instrument.name ?? null,
+      exchange: ctx.instrument.exchange ?? null,
+      country: ctx.instrument.country ?? null,
+      sector: ctx.instrument.sector ?? null,
+      industry: ctx.instrument.industry ?? null,
+      currency: ctx.instrument.currency ?? null,
+      assetType: ctx.instrument.asset_type || ctx.instrument.assetType || 'STOCK',
+      region: ctx.instrument.region || ctx.instrument.country || 'IN',
+      latestPrice: ctx.latestPrice,
+      previousClose: closes[1] ?? null,
+      prices: ctx.pricePoints,
+      bars: ctx.pricePoints.map((price: any) => ({ date: price.date, close: price.adjusted_close, volume: price.volume })),
+      sma50: ctx.sma50,
+      sma200: ctx.sma200,
+      rsi: ctx.rsi,
+      return20d: closes.length > 20 && closes[20] > 0 ? (closes[0] - closes[20]) / closes[20] : null,
+      high52Week: closes.length > 0 ? Math.max(...closes.slice(0, 252)) : null,
+      low52Week: closes.length > 0 ? Math.min(...closes.slice(0, 252)) : null,
+      volatility: this.volatility(closes.slice(0, 63)),
+      averageVolume20: this.average(ctx.pricePoints.slice(0, 20).map((price: any) => price.volume).filter((value: unknown): value is number => typeof value === 'number')),
+      rawSignal: ctx.rawSignal,
+      calibratedSignal: ctx.calibrated ? {
+        calibratedScore: ctx.calibrated.calibratedScore,
+        calibratedDirection: ctx.calibrated.calibratedDirection ?? ctx.rawSignal?.direction ?? 'NEUTRAL',
+        calibratedConfidence: ctx.calibrated.calibratedConfidence ?? 'MEDIUM',
+      } : null,
+      dataQuality: ctx.quality ? {
+        coverageStatus: ctx.quality.coverageStatus,
+        signalReadinessStatus: ctx.quality.signalReadinessStatus,
+        liquidityStatus: ctx.quality.liquidityStatus,
+        signalReadinessScore: ctx.quality.signalReadinessScore,
+        eligibleForSignals: ctx.quality.eligibleForSignals,
+        eligibleForBacktesting: ctx.quality.eligibleForBacktesting,
+      } : null,
+      marketGate: ctx.gate.marketGate,
+      marketRegime: ctx.marketSummary?.regime?.regime ?? null,
+      sectorLeadership: ctx.sectorContext?.leadershipStatus ?? null,
+      sectorRelativeStrengthScore: ctx.sectorContext?.relativeStrengthScore ?? null,
+      smartMoneyStatus: ctx.smartMoney?.status ?? null,
+      smartMoneyScore: ctx.smartMoney?.smartMoneyScore ?? null,
+      holding: ctx.holding ? {
+        quantity: ctx.holding.quantity,
+        unrealizedPnLPercent: ctx.holding.unrealizedPnLPercent,
+        allocationPercent: ctx.holding.allocationPercent,
+      } : null,
+    };
+  }
+
+  private adaptFrameworkResult(ctx: any, result: StrategySignalOutput, rating: StrategyDecisionDto['strategyRating']): StrategyDecisionDto {
+    const mapped = this.mapFrameworkDecision(result);
+    const dataGaps = [...new Set([...(ctx.dataGaps || []), ...result.dataGaps])];
+    const warnings = [...result.warnings];
+    const blockers = [...result.blockers];
+
+    if (ctx.gate.marketGate === 'CLOSED' && result.strategyCode !== 'DEFENSIVE_EXIT') {
+      if (!blockers.some((item) => item.includes('Market gate'))) blockers.push('Market gate is closed; no new long trades.');
+      mapped.decision = 'AVOID';
+      mapped.action = 'AVOID_NEW_ENTRY';
+    } else if (ctx.gate.marketGate === 'SELECTIVE' && result.strategyCode !== 'DEFENSIVE_EXIT') {
+      warnings.push('Market is selective; only high-quality setups should be reviewed.');
+      if (mapped.decision === 'TRADE_CANDIDATE' && result.score < 85) {
+        mapped.decision = 'WATCH';
+        mapped.action = 'WAIT_FOR_CONFIRMATION';
+      }
+    } else if (ctx.gate.marketGate === 'UNKNOWN' && result.strategyCode !== 'DEFENSIVE_EXIT') {
+      dataGaps.push('Market gate is unknown; no healthy-market assumption was made.');
+      if (mapped.decision === 'TRADE_CANDIDATE') {
+        mapped.decision = 'WATCH';
+        mapped.action = 'WAIT_FOR_CONFIRMATION';
+      }
+    }
+
+    const scoreBreakdown = {
+      marketContext: ctx.gate.marketGate === 'OPEN' ? 20 : ctx.gate.marketGate === 'SELECTIVE' ? 10 : 0,
+      signalStrength: Math.min(30, Math.round(result.score * 0.3)),
+      trendTechnical: Math.min(25, result.entryRulesPassed.length * 8 + result.exitRulesTriggered.length * 8),
+      dataQuality: result.eligibleForSignalGeneration ? 15 : 0,
+      sectorSmartMoney: Math.min(15, Math.max(0, result.score - 70)),
+      total: result.score,
+      frameworkScore: result.score,
+    };
+
+    return this.buildDecisionDto(
+      ctx,
+      result.strategyCode as StrategyName,
+      mapped.decision,
+      mapped.action,
+      result.score,
+      scoreBreakdown,
+      result.reasons,
+      blockers,
+      warnings,
+      [...new Set(dataGaps)]
+    , {
+      strategyVersion: result.strategyVersion,
+      frameworkBacked: true,
+      frameworkDecision: result.decision,
+      frameworkAction: mapped.frameworkAction,
+      entryRulesPassed: result.entryRulesPassed,
+      exitRulesTriggered: result.exitRulesTriggered,
+      noiseFiltersTriggered: result.noiseFiltersTriggered,
+      strategyRating: rating,
+      readinessLabel: rating?.readinessLabel || null,
+    });
+  }
+
+  private mapFrameworkDecision(result: StrategySignalOutput): { decision: StrategyDecision; action: DecisionAction; frameworkAction: string } {
+    if (result.decision === 'ENTRY_CANDIDATE' || result.decision === 'SIGNAL') return { decision: 'TRADE_CANDIDATE', action: 'CONSIDER_ENTRY', frameworkAction: 'CONSIDER_ENTRY' };
+    if (result.decision === 'WATCH') return { decision: 'WATCH', action: 'WAIT_FOR_CONFIRMATION', frameworkAction: 'WAIT_FOR_CONFIRMATION' };
+    if (result.decision === 'WAIT') return { decision: 'WAIT', action: 'WAIT_FOR_PULLBACK', frameworkAction: 'WAIT_FOR_PULLBACK' };
+    if (result.decision === 'AVOID') return { decision: 'AVOID', action: 'AVOID_NEW_ENTRY', frameworkAction: 'AVOID_NEW_ENTRY' };
+    if (result.decision === 'INSUFFICIENT_DATA') return { decision: 'INSUFFICIENT_DATA', action: 'NO_ACTION', frameworkAction: 'NO_ACTION' };
+    if (result.decision === 'EXIT_CANDIDATE') return { decision: 'EXIT_CANDIDATE', action: 'REVIEW_EXIT', frameworkAction: 'REVIEW_EXIT' };
+    if (result.decision === 'REDUCE_RISK') return { decision: 'REDUCE_RISK', action: 'REDUCE_EXPOSURE', frameworkAction: 'REDUCE_EXPOSURE' };
+    return { decision: 'HOLD', action: 'HOLD_POSITION', frameworkAction: 'HOLD_POSITION' };
+  }
+
+  private async latestStrategyRating(strategyCode: string, region: string, assetType: string): Promise<StrategyDecisionDto['strategyRating']> {
+    const summaries = await this.strategyFrameworkService.performance(strategyCode, { region, assetType }).catch(() => []);
+    const latest = summaries[0];
+    return latest ? {
+      ratingScore: latest.ratingScore,
+      ratingGrade: latest.ratingGrade,
+      readinessLabel: latest.readinessLabel,
+    } : null;
   }
 
   private evaluateTrendMomentum(ctx: any): StrategyDecisionDto {
@@ -390,7 +571,8 @@ export class StrategyDecisionEngineService {
 
     // 6. Sector Wind Confluence (Weight: 15)
     let sectorWindScore = 0;
-    const sectorContext = ctx.sectors.find((s: any) => s.sector === ctx.instrument.sector);
+    const sectors = Array.isArray(ctx.sectors) ? ctx.sectors : [];
+    const sectorContext = sectors.find((s: any) => s.sector === ctx.instrument.sector);
     if (sectorContext) {
       if (sectorContext.relativeStrengthScore >= 60) {
         sectorWindScore = 15;
@@ -615,7 +797,8 @@ export class StrategyDecisionEngineService {
     reasons: string[],
     blockers: string[],
     warnings: string[],
-    dataGaps: string[]
+    dataGaps: string[],
+    frameworkMetadata: Partial<Pick<StrategyDecisionDto, 'strategyVersion' | 'frameworkBacked' | 'frameworkDecision' | 'frameworkAction' | 'entryRulesPassed' | 'exitRulesTriggered' | 'noiseFiltersTriggered' | 'strategyRating' | 'readinessLabel'>> = {}
   ): StrategyDecisionDto {
     const invalidationRules = [
       'Market gate closes (CLOSED status).',
@@ -668,6 +851,7 @@ export class StrategyDecisionEngineService {
       blockers,
       warnings,
       dataGaps,
+      ...frameworkMetadata,
       modelVersion: MODEL_VERSION,
       generatedAt: new Date().toISOString(),
       entryZone,
@@ -728,5 +912,33 @@ export class StrategyDecisionEngineService {
     if (losses === 0) return 100;
     const rs = (gains / period) / (losses / period);
     return 100 - (100 / (1 + rs));
+  }
+
+  private toPricePoints(prices: any[]) {
+    return prices.map((price) => ({
+      date: typeof price.date === 'string' ? price.date : new Date(price.date).toISOString(),
+      open: this.optionalNumber(price.open),
+      high: this.optionalNumber(price.high),
+      low: this.optionalNumber(price.low),
+      close: Number(price.close),
+      adjusted_close: Number(price.adjusted_close ?? price.close),
+      volume: this.optionalNumber(price.volume),
+    })).filter((price) => Number.isFinite(price.adjusted_close)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }
+
+  private volatility(values: number[]) {
+    const returns = values.slice(1).map((value, index) => value > 0 ? (values[index] - value) / value : 0);
+    if (returns.length < 2) return null;
+    const avg = this.average(returns) ?? 0;
+    return Math.sqrt(returns.reduce((sum, value) => sum + Math.pow(value - avg, 2), 0) / (returns.length - 1)) * Math.sqrt(252);
+  }
+
+  private average(values: number[]) {
+    return values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+  }
+
+  private optionalNumber(value: unknown) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : null;
   }
 }

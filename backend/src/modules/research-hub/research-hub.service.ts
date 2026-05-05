@@ -2,13 +2,18 @@ import { StrategyDecisionEngineService } from '../strategy-decision-engine';
 import { MarketContextIntelligenceService } from '../market-context-intelligence';
 import { SignalGenerationEngineService } from '../signal-generation-engine';
 import { SmartMoneyIntelligenceService } from '../smart-money-intelligence';
+import { StrategyFrameworkService } from '../strategy-framework';
+import type { StrategyDecisionDto, StrategyQuery } from '../strategy-decision-engine';
 import type { 
   ResearchOverview, 
   MarketReadiness, 
   ResearchPriorities, 
   ConfirmationSummary, 
   NextAction,
-  ResearchWhatChanged
+  ResearchWhatChanged,
+  ResearchPriorityCandidate,
+  ResearchBacktestSummary,
+  StrategyProofSummary
 } from './research-hub.types';
 
 export class ResearchHubService {
@@ -16,40 +21,43 @@ export class ResearchHubService {
     private readonly strategyService = new StrategyDecisionEngineService(),
     private readonly contextService = new MarketContextIntelligenceService(),
     private readonly signalService = new SignalGenerationEngineService(),
-    private readonly smartMoneyService = new SmartMoneyIntelligenceService()
+    private readonly smartMoneyService = new SmartMoneyIntelligenceService(),
+    private readonly strategyFrameworkService = new StrategyFrameworkService()
   ) {}
 
-  async overview(): Promise<ResearchOverview> {
+  async overview(query: { region?: string; assetType?: string } = {}): Promise<ResearchOverview> {
     const dataGaps: string[] = [];
+    const region = query.region || 'IN';
+    const assetType = query.assetType || 'STOCK';
 
     // Aggregate data from all core research modules with individual error handling
     const [gate, context, strategyCandidates, strategyExits, signals, smartMoneyRes] = await Promise.all([
-      this.strategyService.marketGate().catch(err => {
+      this.strategyService.marketGate(region).catch(err => {
         console.error('Market gate error:', err);
         dataGaps.push('Market gate status unavailable');
         return null;
       }),
-      this.contextService.summary().catch(err => {
+      this.contextService.summary({ region }).catch(err => {
         console.error('Market context error:', err);
         dataGaps.push('Market context intelligence unavailable');
         return null;
       }),
-      this.strategyService.candidates({ limit: 10, offset: 0 }).catch(err => {
+      this.fetchStrategyDecisionProofPool({ region, assetType }).catch(err => {
         console.error('Strategy candidates error:', err);
         dataGaps.push('Strategy candidates unavailable');
-        return { results: [], total: 0 };
+        return [];
       }),
-      this.strategyService.exits().catch(err => {
+      this.strategyService.exits(undefined, region).catch(err => {
         console.error('Strategy exits error:', err);
         dataGaps.push('Strategy exit candidates unavailable');
         return [];
       }),
-      this.signalService.topSignals({ limit: 50 }).catch(err => {
+      this.signalService.topSignals({ limit: 25, region, assetType }).catch(err => {
         console.error('Top signals error:', err);
         dataGaps.push('Signal generation engine data unavailable');
         return { signals: [], total: 0 };
       }),
-      this.smartMoneyService.top({ limit: 50, range: '3M' }).catch(err => {
+      this.smartMoneyService.top({ limit: 25, range: '3M', region }).catch(err => {
         console.error('Smart money error:', err);
         dataGaps.push('Smart money intelligence data unavailable');
         return { results: [], total: 0 };
@@ -69,13 +77,12 @@ export class ResearchHubService {
       dataStatus: gate?.dataStatus || 'MISSING',
     };
 
+    const enriched = await this.enrichCandidates(strategyCandidates, region, assetType, dataGaps);
+    const enrichedExits = await this.enrichCandidates(strategyExits || [], region, assetType, dataGaps, true);
+
     // 2. Research Priorities
-    const priorities: ResearchPriorities = {
-      tradeCandidates: (strategyCandidates.results || []).filter(c => c.decision === 'TRADE_CANDIDATE').slice(0, 5),
-      watchCandidates: (strategyCandidates.results || []).filter(c => c.decision === 'WATCH').slice(0, 5),
-      avoidCandidates: (strategyCandidates.results || []).filter(c => c.decision === 'AVOID').slice(0, 5),
-      exitCandidates: (strategyExits || []).slice(0, 5),
-    };
+    const priorities = this.bucketPriorities(enriched, enrichedExits, marketReadiness);
+    const strategyProofSummary = this.buildStrategyProofSummary([...priorities.tradeCandidates, ...priorities.watchCandidates, ...priorities.avoidCandidates], marketReadiness);
 
     // 3. Confirmation Summary
     const bullishSignals = signals.signals.filter(s => s.direction === 'BULLISH');
@@ -126,11 +133,12 @@ export class ResearchHubService {
     };
 
     // 5. Next Actions
-    const nextActions: NextAction[] = this.generateNextActions(marketReadiness, priorities, dataGaps);
+    const nextActions: NextAction[] = this.generateNextActions(marketReadiness, priorities, dataGaps, strategyProofSummary);
 
     return {
       marketReadiness,
       researchPriorities: priorities,
+      strategyProofSummary,
       confirmationSummary,
       whatChanged,
       nextActions,
@@ -143,7 +151,7 @@ export class ResearchHubService {
     if (!gate || gate.marketGate === 'UNKNOWN') return 'Market environment is currently unknown.';
     if (gate.marketGate === 'OPEN') return 'Environment is healthy: high-conviction setups allowed.';
     if (gate.marketGate === 'SELECTIVE') return 'Conditions are mixed: exercise high selectivity.';
-    if (gate.marketGate === 'CLOSED') return 'Environment is defensive: focus on managing existing risk.';
+    if (gate.marketGate === 'CLOSED') return 'No new long candidates. Review exits and watchlist only.';
     return 'Market conditions are being evaluated.';
   }
 
@@ -155,7 +163,147 @@ export class ResearchHubService {
     return notes;
   }
 
-  private generateNextActions(readiness: MarketReadiness, priorities: ResearchPriorities, gaps: string[]): NextAction[] {
+  private async fetchStrategyDecisionProofPool(query: StrategyQuery): Promise<StrategyDecisionDto[]> {
+    const decisions: StrategyQuery['decision'][] = ['TRADE_CANDIDATE', 'WATCH', 'WAIT', 'AVOID'];
+    const responses = await Promise.all(decisions.map((decision) => this.strategyService.candidates({ ...query, decision, limit: 25, offset: 0 }).catch(() => ({ results: [] }))));
+    const seen = new Set<string>();
+    return responses.flatMap((response) => response.results || []).filter((candidate) => {
+      const key = candidate.id || `${candidate.instrumentId}-${candidate.strategy}-${candidate.decision}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  private async enrichCandidates(candidates: StrategyDecisionDto[], region: string, assetType: string, dataGaps: string[], isExit = false): Promise<ResearchPriorityCandidate[]> {
+    const uniqueStrategies = [...new Set(candidates.map((candidate) => candidate.strategy).filter(Boolean))];
+    const performanceByStrategy = new Map<string, ResearchBacktestSummary | null>();
+    await Promise.all(uniqueStrategies.map(async (strategy) => {
+      const summaries = await this.strategyFrameworkService.performance(strategy, { region, assetType }).catch(() => {
+        dataGaps.push(`Strategy performance summary unavailable for ${strategy}`);
+        return [];
+      });
+      performanceByStrategy.set(strategy, this.toBacktestSummary(summaries[0]));
+    }));
+
+    return candidates.slice(0, 50).map((input) => {
+      const candidate = {
+        ...input,
+        reasons: input.reasons || [],
+        blockers: input.blockers || [],
+        warnings: input.warnings || [],
+        dataGaps: input.dataGaps || [],
+      };
+      const backtestSummary = performanceByStrategy.get(candidate.strategy) ?? null;
+      const readinessLabel = this.safeReadiness(candidate.readinessLabel || candidate.strategyRating?.readinessLabel || backtestSummary?.ratingGrade);
+      const proofWarnings: string[] = [];
+      if (!candidate.frameworkBacked) proofWarnings.push('Strategy Framework-backed decision is missing.');
+      if (!backtestSummary) proofWarnings.push('No backtest summary available for this strategy/timeframe/region.');
+      if (candidate.dataGaps.length > 0) proofWarnings.push(`${candidate.dataGaps.length} data gap(s) need review.`);
+      if (candidate.blockers.length > 0) proofWarnings.push(`${candidate.blockers.length} blocker(s) active.`);
+
+      return {
+        ...candidate,
+        strategyCode: candidate.strategy,
+        readinessLabel,
+        backtestSummary,
+        proofWarnings,
+        primaryNextAction: this.primaryNextAction(candidate, backtestSummary, isExit),
+        targetRoute: `/strategy?instrumentId=${candidate.instrumentId || ''}`,
+        strategyRoute: `/strategies?strategyCode=${candidate.strategy}`,
+        backtestRoute: candidate.strategy ? `/backtests?mode=registered&strategyCode=${candidate.strategy}&timeframe=${backtestSummary?.timeframe || '3Y'}&region=${region}&assetType=${assetType}` : null,
+        stockRoute: candidate.instrumentId ? `/stocks/${candidate.instrumentId}` : null,
+      };
+    });
+  }
+
+  private bucketPriorities(candidates: ResearchPriorityCandidate[], exits: ResearchPriorityCandidate[], readiness: MarketReadiness): ResearchPriorities {
+    const sorted = [...candidates].sort((a, b) => this.priorityScore(b, readiness) - this.priorityScore(a, readiness));
+    const tradeCandidates = readiness.marketGate === 'CLOSED'
+      ? []
+      : sorted.filter((candidate) => this.isTradeCandidate(candidate, readiness)).slice(0, 5);
+    const usedTrade = new Set(tradeCandidates.map((candidate) => candidate.id || `${candidate.instrumentId}-${candidate.strategy}`));
+    const watchCandidates = sorted
+      .filter((candidate) => !usedTrade.has(candidate.id || `${candidate.instrumentId}-${candidate.strategy}`))
+      .filter((candidate) => this.isWatchCandidate(candidate, readiness))
+      .slice(0, 5);
+    const usedWatch = new Set(watchCandidates.map((candidate) => candidate.id || `${candidate.instrumentId}-${candidate.strategy}`));
+    const avoidCandidates = sorted
+      .filter((candidate) => !usedTrade.has(candidate.id || `${candidate.instrumentId}-${candidate.strategy}`) && !usedWatch.has(candidate.id || `${candidate.instrumentId}-${candidate.strategy}`))
+      .filter((candidate) => candidate.decision === 'AVOID' || candidate.blockers.length > 0 || readiness.marketGate === 'CLOSED' || candidate.readinessLabel === 'NOT_AUTOMATION_READY')
+      .slice(0, 5);
+
+    return {
+      tradeCandidates,
+      watchCandidates,
+      avoidCandidates,
+      exitCandidates: exits.sort((a, b) => b.decisionScore - a.decisionScore).slice(0, 5),
+    };
+  }
+
+  private isTradeCandidate(candidate: ResearchPriorityCandidate, readiness: MarketReadiness) {
+    return Boolean(candidate.frameworkBacked)
+      && candidate.decision === 'TRADE_CANDIDATE'
+      && candidate.action === 'CONSIDER_ENTRY'
+      && readiness.marketGate !== 'CLOSED'
+      && candidate.marketGate !== 'CLOSED'
+      && candidate.blockers.length === 0
+      && candidate.confidence !== 'LOW'
+      && candidate.dataGaps.length <= 1
+      && Boolean(candidate.backtestSummary)
+      && !['WEAK', 'UNPROVEN'].includes(candidate.backtestSummary?.ratingGrade || '')
+      && candidate.readinessLabel !== 'NOT_AUTOMATION_READY';
+  }
+
+  private isWatchCandidate(candidate: ResearchPriorityCandidate, readiness: MarketReadiness) {
+    if (candidate.decision === 'WATCH' || candidate.decision === 'WAIT') return true;
+    if (!candidate.frameworkBacked || !candidate.backtestSummary) return true;
+    if (readiness.marketGate === 'SELECTIVE' || readiness.marketGate === 'UNKNOWN') return true;
+    return candidate.dataGaps.length > 0 || candidate.readinessLabel === 'RESEARCH_ONLY' || candidate.backtestSummary.ratingGrade === 'UNPROVEN';
+  }
+
+  private priorityScore(candidate: ResearchPriorityCandidate, readiness: MarketReadiness) {
+    const marketScore = readiness.marketGate === 'OPEN' && candidate.marketGate === 'OPEN' ? 100 : candidate.marketGate === 'SELECTIVE' ? 70 : candidate.marketGate === 'UNKNOWN' ? 25 : 0;
+    return marketScore
+      + this.ratingRank(candidate.backtestSummary?.ratingGrade || candidate.strategyRating?.ratingGrade) * 20
+      + this.readinessRank(candidate.readinessLabel) * 10
+      + candidate.decisionScore
+      + (candidate.confidence === 'HIGH' ? 15 : candidate.confidence === 'MEDIUM' ? 8 : 0)
+      - candidate.blockers.length * 40
+      - candidate.dataGaps.length * 10
+      - candidate.warnings.length * 5
+      + (candidate.reasons.some((reason) => reason.toLowerCase().includes('smart-money') || reason.toLowerCase().includes('accumulation')) ? 8 : 0)
+      + (candidate.reasons.some((reason) => reason.toLowerCase().includes('sector') || reason.toLowerCase().includes('market')) ? 5 : 0);
+  }
+
+  private buildStrategyProofSummary(candidates: ResearchPriorityCandidate[], readiness: MarketReadiness): StrategyProofSummary {
+    const grouped = new Map<string, ResearchPriorityCandidate[]>();
+    for (const candidate of candidates.filter((item) => item.frameworkBacked)) {
+      grouped.set(candidate.strategy, [...(grouped.get(candidate.strategy) || []), candidate]);
+    }
+    const strategiesProducingCandidates = [...grouped.entries()].map(([strategy, items]) => {
+      const best = [...items].sort((a, b) => this.priorityScore(b, readiness) - this.priorityScore(a, readiness))[0];
+      return {
+        strategy,
+        strategyVersion: best.strategyVersion,
+        candidateCount: items.length,
+        bestRating: best.backtestSummary?.ratingGrade || best.strategyRating?.ratingGrade || 'UNPROVEN',
+        readinessLabel: this.safeReadiness(best.readinessLabel),
+        topCandidateSymbol: best.symbol,
+      };
+    }).slice(0, 5);
+    const missingBacktestCount = candidates.filter((candidate) => candidate.frameworkBacked && !candidate.backtestSummary).length;
+    return {
+      strategiesProducingCandidates,
+      provenCandidateCount: candidates.filter((candidate) => ['EXCELLENT', 'GOOD', 'AVERAGE'].includes(candidate.backtestSummary?.ratingGrade || '')).length,
+      unprovenCandidateCount: candidates.filter((candidate) => !candidate.backtestSummary || ['UNPROVEN', 'WEAK'].includes(candidate.backtestSummary.ratingGrade)).length,
+      blockedByMarketGateCount: candidates.filter((candidate) => candidate.marketGate === 'CLOSED' || readiness.marketGate === 'CLOSED').length,
+      missingBacktestCount,
+      notes: missingBacktestCount > 0 ? ['Some framework-backed candidates need backtest summaries before promotion.'] : [],
+    };
+  }
+
+  private generateNextActions(readiness: MarketReadiness, priorities: ResearchPriorities, gaps: string[], proof: StrategyProofSummary): NextAction[] {
     const actions: NextAction[] = [];
 
     if (gaps.length > 0) {
@@ -168,13 +316,13 @@ export class ResearchHubService {
 
     if (readiness.marketGate === 'CLOSED') {
       actions.push({
-        label: 'Review Defensive Exits',
+        label: priorities.exitCandidates.length > 0 ? `No new long trades; review ${priorities.exitCandidates.length} exit candidates` : 'No new long trades; review watchlist only',
         priority: 'HIGH',
         targetRoute: '/research/strategy'
       });
     } else if (priorities.tradeCandidates.length > 0) {
       actions.push({
-        label: `Review ${priorities.tradeCandidates.length} Trade Candidates`,
+        label: `Review ${priorities.tradeCandidates.length} framework-backed candidates`,
         priority: 'HIGH',
         targetRoute: '/research/strategy'
       });
@@ -183,6 +331,14 @@ export class ResearchHubService {
         label: 'Run Strategy Evaluation',
         priority: 'MEDIUM',
         targetRoute: '/research/strategy'
+      });
+    }
+
+    if (proof.missingBacktestCount > 0) {
+      actions.push({
+        label: 'Generate missing strategy performance summaries',
+        priority: 'MEDIUM',
+        targetRoute: '/strategies'
       });
     }
 
@@ -195,6 +351,44 @@ export class ResearchHubService {
     }
 
     return actions;
+  }
+
+  private toBacktestSummary(summary: any): ResearchBacktestSummary | null {
+    if (!summary) return null;
+    return {
+      timeframe: summary.timeframe,
+      cagr: summary.cagr ?? null,
+      maxDrawdown: summary.maxDrawdown ?? null,
+      sharpe: summary.sharpe ?? null,
+      winRate: summary.winRate ?? null,
+      profitFactor: summary.profitFactor ?? null,
+      tradeCount: summary.tradeCount ?? 0,
+      ratingGrade: summary.ratingGrade || 'UNPROVEN',
+      availabilityStatus: summary.tradeCount > 0 ? 'AVAILABLE' : 'INSUFFICIENT_HISTORY',
+      generatedAt: summary.generatedAt,
+    };
+  }
+
+  private primaryNextAction(candidate: StrategyDecisionDto, backtestSummary: ResearchBacktestSummary | null, isExit: boolean) {
+    if (isExit) return 'Review risk level in Strategy Decision';
+    if (candidate.blockers.length > 0) return 'Review blockers before action';
+    if (!backtestSummary) return `Run backtest for ${candidate.strategy}`;
+    if (candidate.decision === 'TRADE_CANDIDATE') return 'Review Strategy Decision proof';
+    if (candidate.decision === 'WATCH' || candidate.decision === 'WAIT') return 'Wait for confirmation';
+    return 'Review data gaps and warnings';
+  }
+
+  private ratingRank(value?: string | null) {
+    return { EXCELLENT: 5, GOOD: 4, AVERAGE: 3, UNPROVEN: 2, WEAK: 1 }[String(value || 'UNPROVEN')] ?? 0;
+  }
+
+  private readinessRank(value?: string | null) {
+    return { PAPER_TEST_CANDIDATE: 4, WATCHLIST_CANDIDATE: 3, RESEARCH_ONLY: 2, NOT_AUTOMATION_READY: 1 }[this.safeReadiness(value)] ?? 0;
+  }
+
+  private safeReadiness(value?: string | null) {
+    if (value === 'PAPER_TEST_CANDIDATE' || value === 'WATCHLIST_CANDIDATE' || value === 'NOT_AUTOMATION_READY') return value;
+    return 'RESEARCH_ONLY';
   }
 
   async health() {

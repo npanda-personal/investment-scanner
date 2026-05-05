@@ -62,6 +62,7 @@ export interface ScoreBreakdown {
   pullbackQuality?: number;
   portfolioRisk?: number;
   total: number;
+  frameworkScore?: number;
 }
 
 export interface TradePlanPreview {
@@ -101,6 +102,19 @@ export interface StrategyDecisionDto {
   dataGaps: string[];
   modelVersion: string;
   generatedAt: string;
+  strategyVersion?: string;
+  frameworkBacked?: boolean;
+  frameworkDecision?: string;
+  frameworkAction?: string;
+  entryRulesPassed?: string[];
+  exitRulesTriggered?: string[];
+  noiseFiltersTriggered?: string[];
+  strategyRating?: {
+    ratingScore: number;
+    ratingGrade: string;
+    readinessLabel?: string;
+  } | null;
+  readinessLabel?: string | null;
 }
 
 export interface StrategyEvaluateRequest {

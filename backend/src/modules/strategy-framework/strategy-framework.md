@@ -92,6 +92,8 @@ Definitions include code, name, description, category, style, timeframe, asset t
 
 The MVP uses typed JSON rule declarations plus TypeScript evaluators, not a scripting language.
 
+Strategy Decision Engine consumes this public evaluator for `TREND_MOMENTUM`, `PULLBACK_IN_UPTREND`, and `DEFENSIVE_EXIT`, adapting framework output back into the existing Strategy Decision API response shape.
+
 ### Rule Models
 Entry, exit, noise, risk, and market gate rules are declared as typed JSON with `code`, `label`, `kind`, `input`, optional `threshold`, and optional `weight`. Evaluators are deterministic and return reasons, blockers, warnings, data gaps, passed entry rules, triggered exit rules, and triggered noise filters.
 

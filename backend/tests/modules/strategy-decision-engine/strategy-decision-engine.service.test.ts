@@ -1,5 +1,16 @@
 /// <reference types="@types/jest" />
 import { StrategyDecisionEngineService } from '../../../src/modules/strategy-decision-engine';
+import { StrategyFrameworkRegistry } from '../../../src/modules/strategy-framework';
+
+const makePrices = (days = 260, start = '2025-01-01', first = 50, slope = 1) => {
+  const startDate = new Date(start);
+  return Array.from({ length: days }, (_item, index) => {
+    const date = new Date(startDate);
+    date.setDate(startDate.getDate() + index);
+    const close = first + index * slope;
+    return { date: date.toISOString(), close, adjusted_close: close, volume: 100000 + index };
+  });
+};
 
 describe('StrategyDecisionEngineService', () => {
   let service: StrategyDecisionEngineService;
@@ -172,3 +183,218 @@ describe('StrategyDecisionEngineService', () => {
     });
     });
     });
+
+  describe('Strategy Framework migration', () => {
+    const createFrameworkBackedService = (overrides: any = {}) => {
+      const marketData = {
+        getInstrument: jest.fn().mockResolvedValue({
+          id: 'stock-1',
+          symbol: 'ABC',
+          sector: 'Tech',
+          country: 'IN',
+          exchange: 'NSE',
+          currency: 'INR',
+          asset_type: 'STOCK',
+        }),
+        listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: makePrices() }),
+        listInstruments: jest.fn().mockResolvedValue({ instruments: [] }),
+        ...overrides.marketData,
+      };
+      const context = {
+        summary: jest.fn().mockResolvedValue({
+          dataStatus: 'COMPLETE',
+          topSectors: [{ sector: 'Tech', leadershipStatus: 'LEADING', relativeStrengthScore: 70 }],
+          weakSectors: [],
+          regime: { regime: 'RISK_ON' },
+        }),
+        regime: jest.fn().mockResolvedValue({ regime: 'RISK_ON', score: 80 }),
+        breadth: jest.fn().mockResolvedValue({ percentAboveSma50: 0.7 }),
+        ...overrides.context,
+      };
+      const signal = {
+        latestForInstrument: jest.fn().mockResolvedValue({ score: 86, direction: 'BULLISH' }),
+        topSignals: jest.fn().mockResolvedValue({ signals: [] }),
+        ...overrides.signal,
+      };
+      const calibration = {
+        latestForInstrument: jest.fn().mockResolvedValue({ calibratedScore: 88, calibratedDirection: 'BULLISH', calibratedConfidence: 'HIGH' }),
+        ...overrides.calibration,
+      };
+      const quality = {
+        diagnostics: jest.fn().mockResolvedValue({
+          eligibleForSignals: true,
+          eligibleForBacktesting: true,
+          signalReadinessStatus: 'READY',
+          coverageStatus: 'GOOD',
+          liquidityStatus: 'LIQUID',
+          signalReadinessScore: 90,
+        }),
+        ...overrides.quality,
+      };
+      const smartMoney = {
+        stock: jest.fn().mockResolvedValue({ status: 'ACCUMULATION', smartMoneyScore: 75 }),
+        ...overrides.smartMoney,
+      };
+      const frameworkService = {
+        performance: jest.fn().mockResolvedValue([{
+          ratingScore: 66,
+          ratingGrade: 'GOOD',
+          readinessLabel: 'PAPER_TEST_CANDIDATE',
+        }]),
+      };
+      return new StrategyDecisionEngineService(
+        {} as any,
+        marketData as any,
+        context as any,
+        signal as any,
+        calibration as any,
+        quality as any,
+        smartMoney as any,
+        { getPortfolioDetail: jest.fn().mockResolvedValue(null) } as any,
+        {} as any,
+        new StrategyFrameworkRegistry(),
+        frameworkService as any
+      );
+    };
+
+    it('uses Strategy Framework evaluator for TREND_MOMENTUM and preserves old fields', async () => {
+      const svc = createFrameworkBackedService();
+      const result = await svc.evaluateInstrumentStrategy('stock-1', 'TREND_MOMENTUM', {
+        marketCondition: 'HEALTHY',
+        marketGate: 'OPEN',
+        allowedActions: ['NEW_LONG_TRADES_ALLOWED'],
+        marketScore: 80,
+        reasons: [],
+        blockers: [],
+        dataStatus: 'COMPLETE',
+        updatedAt: new Date().toISOString(),
+      });
+
+      expect(result?.frameworkBacked).toBe(true);
+      expect(result?.strategyVersion).toBe('1.0.0');
+      expect(result?.strategy).toBe('TREND_MOMENTUM');
+      expect(result?.action).toBeDefined();
+      expect(result?.decisionScore).toBeGreaterThan(0);
+      expect(result?.entryRulesPassed?.length).toBeGreaterThan(0);
+    });
+
+    it('uses Strategy Framework evaluator for PULLBACK_IN_UPTREND', async () => {
+      const svc = createFrameworkBackedService({
+        marketData: { listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: makePrices(260, '2025-01-01', 90, 0.04) }) },
+        signal: { latestForInstrument: jest.fn().mockResolvedValue({ score: 70, direction: 'NEUTRAL' }) },
+      });
+      const result = await svc.evaluateInstrumentStrategy('stock-1', 'PULLBACK_IN_UPTREND', {
+        marketCondition: 'HEALTHY',
+        marketGate: 'OPEN',
+        allowedActions: ['NEW_LONG_TRADES_ALLOWED'],
+        marketScore: 80,
+        reasons: [],
+        blockers: [],
+        dataStatus: 'COMPLETE',
+        updatedAt: new Date().toISOString(),
+      });
+
+      expect(result?.frameworkBacked).toBe(true);
+      expect(result?.strategy).toBe('PULLBACK_IN_UPTREND');
+      expect(result?.frameworkDecision).toBeDefined();
+    });
+
+    it('uses Strategy Framework evaluator for DEFENSIVE_EXIT', async () => {
+      const svc = createFrameworkBackedService({
+        signal: { latestForInstrument: jest.fn().mockResolvedValue({ score: 25, direction: 'BEARISH' }) },
+        calibration: { latestForInstrument: jest.fn().mockResolvedValue({ calibratedScore: 25, calibratedDirection: 'BEARISH', calibratedConfidence: 'HIGH' }) },
+        smartMoney: { stock: jest.fn().mockResolvedValue({ status: 'DISTRIBUTION', smartMoneyScore: 20 }) },
+      });
+      const result = await svc.evaluateInstrumentStrategy('stock-1', 'DEFENSIVE_EXIT', {
+        marketCondition: 'BAD',
+        marketGate: 'CLOSED',
+        allowedActions: ['MANAGE_EXISTING_POSITIONS_ONLY'],
+        marketScore: 20,
+        reasons: [],
+        blockers: [],
+        dataStatus: 'COMPLETE',
+        updatedAt: new Date().toISOString(),
+      });
+
+      expect(result?.frameworkBacked).toBe(true);
+      expect(result?.strategy).toBe('DEFENSIVE_EXIT');
+      expect(['EXIT_CANDIDATE', 'REDUCE_RISK', 'HOLD', 'WATCH']).toContain(result?.decision);
+    });
+
+    it('blocks new long candidates when market gate is CLOSED', async () => {
+      const svc = createFrameworkBackedService();
+      const result = await svc.evaluateInstrumentStrategy('stock-1', 'TREND_MOMENTUM', {
+        marketCondition: 'BAD',
+        marketGate: 'CLOSED',
+        allowedActions: ['MANAGE_EXISTING_POSITIONS_ONLY'],
+        marketScore: 20,
+        reasons: [],
+        blockers: [],
+        dataStatus: 'COMPLETE',
+        updatedAt: new Date().toISOString(),
+      });
+
+      expect(result?.decision).not.toBe('TRADE_CANDIDATE');
+      expect(result?.blockers.join(' ')).toContain('Market gate');
+    });
+
+    it('adds a warning for SELECTIVE market gate', async () => {
+      const svc = createFrameworkBackedService();
+      const result = await svc.evaluateInstrumentStrategy('stock-1', 'TREND_MOMENTUM', {
+        marketCondition: 'MIXED',
+        marketGate: 'SELECTIVE',
+        allowedActions: ['ONLY_HIGH_QUALITY_SETUPS'],
+        marketScore: 50,
+        reasons: [],
+        blockers: [],
+        dataStatus: 'COMPLETE',
+        updatedAt: new Date().toISOString(),
+      });
+
+      expect(result?.warnings.join(' ')).toContain('Market is selective');
+    });
+
+    it('treats UNKNOWN market gate as a data gap and avoids strong candidates', async () => {
+      const svc = createFrameworkBackedService();
+      const result = await svc.evaluateInstrumentStrategy('stock-1', 'TREND_MOMENTUM', {
+        marketCondition: 'UNKNOWN',
+        marketGate: 'UNKNOWN',
+        allowedActions: ['MANAGE_EXISTING_POSITIONS_ONLY'],
+        marketScore: 0,
+        reasons: [],
+        blockers: [],
+        dataStatus: 'MISSING',
+        updatedAt: new Date().toISOString(),
+      });
+
+      expect(result?.decision).not.toBe('TRADE_CANDIDATE');
+      expect(result?.dataGaps.join(' ')).toContain('Market gate is unknown');
+    });
+
+    it('does not throw when optional context is missing', async () => {
+      const svc = createFrameworkBackedService({
+        context: { summary: jest.fn().mockRejectedValue(new Error('no context')) },
+        quality: { diagnostics: jest.fn().mockResolvedValue(null) },
+        smartMoney: { stock: jest.fn().mockResolvedValue(null) },
+        signal: { latestForInstrument: jest.fn().mockResolvedValue(null) },
+      });
+
+      await expect(svc.evaluateInstrumentStrategy('stock-1', 'TREND_MOMENTUM', {
+        marketCondition: 'UNKNOWN',
+        marketGate: 'UNKNOWN',
+        allowedActions: ['MANAGE_EXISTING_POSITIONS_ONLY'],
+        marketScore: 0,
+        reasons: [],
+        blockers: [],
+        dataStatus: 'MISSING',
+        updatedAt: new Date().toISOString(),
+      })).resolves.toEqual(expect.objectContaining({
+        frameworkBacked: true,
+        dataGaps: expect.arrayContaining([
+          'Raw signal is missing.',
+          'Data quality evaluation is missing.',
+          'Smart-money context is missing.',
+        ]),
+      }));
+    });
+  });

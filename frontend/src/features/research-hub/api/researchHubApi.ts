@@ -20,10 +20,51 @@ export interface MarketReadiness {
 }
 
 export interface ResearchPriorities {
-  tradeCandidates: StrategyDecisionDto[];
-  watchCandidates: StrategyDecisionDto[];
-  avoidCandidates: StrategyDecisionDto[];
-  exitCandidates: StrategyDecisionDto[];
+  tradeCandidates: ResearchPriorityCandidate[];
+  watchCandidates: ResearchPriorityCandidate[];
+  avoidCandidates: ResearchPriorityCandidate[];
+  exitCandidates: ResearchPriorityCandidate[];
+}
+
+export interface ResearchBacktestSummary {
+  timeframe: string;
+  cagr: number | null;
+  maxDrawdown: number | null;
+  sharpe: number | null;
+  winRate: number | null;
+  profitFactor: number | null;
+  tradeCount: number;
+  ratingGrade: string;
+  availabilityStatus: string;
+  generatedAt: string;
+}
+
+export interface ResearchPriorityCandidate extends StrategyDecisionDto {
+  companyName?: string | null;
+  strategyCode?: string;
+  backtestSummary?: ResearchBacktestSummary | null;
+  primaryNextAction: string;
+  targetRoute: string;
+  strategyRoute: string;
+  backtestRoute?: string | null;
+  stockRoute?: string | null;
+  proofWarnings: string[];
+}
+
+export interface StrategyProofSummary {
+  strategiesProducingCandidates: Array<{
+    strategy: string;
+    strategyVersion?: string;
+    candidateCount: number;
+    bestRating: string;
+    readinessLabel: string;
+    topCandidateSymbol?: string;
+  }>;
+  provenCandidateCount: number;
+  unprovenCandidateCount: number;
+  blockedByMarketGateCount: number;
+  missingBacktestCount: number;
+  notes: string[];
 }
 
 export interface ConfirmationSummary {
@@ -57,6 +98,7 @@ export interface ResearchWhatChanged {
 export interface ResearchOverview {
   marketReadiness: MarketReadiness;
   researchPriorities: ResearchPriorities;
+  strategyProofSummary: StrategyProofSummary;
   confirmationSummary: ConfirmationSummary;
   whatChanged: ResearchWhatChanged;
   nextActions: NextAction[];

@@ -38,8 +38,7 @@ import { Link } from 'react-router-dom';
 import { useResearchOverview } from '../hooks/useResearchOverview';
 import { PageHeader } from '@/shared/components';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
-import type { StrategyDecisionDto } from '@/features/strategy-decision-engine';
-import type { ResearchOverview, NextAction } from '../api/researchHubApi';
+import type { ResearchOverview, NextAction, ResearchPriorityCandidate } from '../api/researchHubApi';
 
 const ResearchOverviewPage: React.FC = () => {
   const { scope } = useMarketScope();
@@ -78,6 +77,14 @@ const ResearchOverviewPage: React.FC = () => {
       watchCandidates: [],
       avoidCandidates: [],
       exitCandidates: []
+    },
+    strategyProofSummary = {
+      strategiesProducingCandidates: [],
+      provenCandidateCount: 0,
+      unprovenCandidateCount: 0,
+      blockedByMarketGateCount: 0,
+      missingBacktestCount: 0,
+      notes: []
     },
     confirmationSummary = {
       signalSummary: { topBullishCount: 0, topBearishCount: 0, reliabilityAvailable: false, notes: [] },
@@ -119,6 +126,13 @@ const ResearchOverviewPage: React.FC = () => {
         {/* 3. Confirmation & What Changed Panel */}
         <Grid item xs={12} md={4}>
           <Stack spacing={4}>
+            <Box>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <GppGoodOutlined color="primary" /> Strategy Proof
+              </Typography>
+              <StrategyProofPanel summary={strategyProofSummary} />
+            </Box>
+
             <Box>
               <Typography variant="h6" sx={{ mb: 2, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
                 <GppGoodOutlined color="success" /> Confirmation Layers
@@ -230,10 +244,10 @@ const ResearchPriorityBoard: React.FC<{ priorities: ResearchOverview['researchPr
   return (
     <Grid container spacing={3}>
       <Grid item xs={12} sm={6}>
-        <PriorityCard title="Trade Candidates" items={priorities?.tradeCandidates || []} type="buy" emptyMsg="No high-conviction trade candidates." />
+        <PriorityCard title="Strategy-Backed Candidates" items={priorities?.tradeCandidates || []} type="candidate" emptyMsg="No framework-backed trade candidates with enough proof." />
       </Grid>
       <Grid item xs={12} sm={6}>
-        <PriorityCard title="Defensive Exits" items={priorities?.exitCandidates || []} type="sell" emptyMsg="No active exit candidates found." />
+        <PriorityCard title="Exit / Reduce Risk" items={priorities?.exitCandidates || []} type="exit" emptyMsg="No active exit candidates found." />
       </Grid>
       <Grid item xs={12} sm={6}>
         <PriorityCard title="Watch / Wait" items={priorities?.watchCandidates || []} type="watch" emptyMsg="No candidates in the watch zone." />
@@ -245,10 +259,10 @@ const ResearchPriorityBoard: React.FC<{ priorities: ResearchOverview['researchPr
   );
 };
 
-const PriorityCard: React.FC<{ title: string; items: StrategyDecisionDto[]; type: 'buy' | 'sell' | 'watch' | 'avoid', emptyMsg: string }> = ({ title, items = [], type, emptyMsg }) => {
+const PriorityCard: React.FC<{ title: string; items: ResearchPriorityCandidate[]; type: 'candidate' | 'exit' | 'watch' | 'avoid', emptyMsg: string }> = ({ title, items = [], type, emptyMsg }) => {
   const getHeaderColor = () => {
-    if (type === 'buy') return 'primary.main';
-    if (type === 'sell') return 'error.main';
+    if (type === 'candidate') return 'primary.main';
+    if (type === 'exit') return 'error.main';
     if (type === 'watch') return 'info.main';
     return 'warning.main';
   };
@@ -274,24 +288,39 @@ const PriorityCard: React.FC<{ title: string; items: StrategyDecisionDto[]; type
                   disablePadding
                   sx={{ '&:hover': { bgcolor: 'action.hover' } }}
                   secondaryAction={
-                    <IconButton edge="end" size="small" component={Link} to={`/stocks/${item.instrumentId}`}>
+                    <IconButton edge="end" size="small" component={Link} to={item.stockRoute || `/stocks/${item.instrumentId}`}>
                       <ArrowForwardOutlined fontSize="small" />
                     </IconButton>
                   }
                 >
-                  <ListItemButton component={Link} to={`/stocks/${item.instrumentId}`} sx={{ py: 1.5, px: 2 }}>
+                  <ListItemButton component={Link} to={item.targetRoute || `/strategy?instrumentId=${item.instrumentId}`} sx={{ py: 1.5, px: 2 }}>
                     <ListItemIcon sx={{ minWidth: 40 }}>
-                      {type === 'buy' ? <FlashOnOutlined color="primary" /> : type === 'sell' ? <ShieldOutlined color="error" /> : <SearchOutlined />}
+                      {type === 'candidate' ? <FlashOnOutlined color="primary" /> : type === 'exit' ? <ShieldOutlined color="error" /> : <SearchOutlined />}
                     </ListItemIcon>
                     <ListItemText 
                       primary={
-                        <Stack direction="row" spacing={1} alignItems="center">
+                        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                           <Typography variant="body1" fontWeight={700}>{item.symbol}</Typography>
                           <Typography variant="caption" sx={{ px: 0.5, borderRadius: 0.5, bgcolor: 'action.selected' }}>{item.decisionScore}</Typography>
+                          <Chip size="small" label={item.backtestSummary?.ratingGrade || item.strategyRating?.ratingGrade || 'UNPROVEN'} />
+                          <Chip size="small" label={safeReadiness(item.readinessLabel)} />
                         </Stack>
                       }
-                      secondary={item?.reasons?.[0] || item?.strategy}
-                      secondaryTypographyProps={{ noWrap: true, variant: 'caption' }}
+                      secondary={
+                        <Box>
+                          <Typography variant="caption" display="block">
+                            {item.strategy}{item.strategyVersion ? ` v${item.strategyVersion}` : ''} · {item.confidence}
+                          </Typography>
+                          {item.backtestSummary && (
+                            <Typography variant="caption" display="block">
+                              {item.backtestSummary.timeframe}: CAGR {fmtPercent(item.backtestSummary.cagr)}, DD {fmtPercent(item.backtestSummary.maxDrawdown)}, Sharpe {fmtNumber(item.backtestSummary.sharpe)}
+                            </Typography>
+                          )}
+                          <Typography variant="caption" display="block" color={item.proofWarnings?.length ? 'warning.main' : 'text.secondary'}>
+                            {item.proofWarnings?.[0] || item.reasons?.[0] || item.primaryNextAction}
+                          </Typography>
+                        </Box>
+                      }
                     />
                   </ListItemButton>
                 </ListItem>
@@ -373,6 +402,49 @@ const ConfirmationPanel: React.FC<{ summary: ResearchOverview['confirmationSumma
   );
 };
 
+const StrategyProofPanel: React.FC<{ summary: ResearchOverview['strategyProofSummary'] }> = ({ summary }) => {
+  return (
+    <Card variant="outlined">
+      <CardContent>
+        <Grid container spacing={1} sx={{ mb: 2 }}>
+          <Grid item xs={6}><ProofMetric label="Proven" value={summary.provenCandidateCount} /></Grid>
+          <Grid item xs={6}><ProofMetric label="Unproven" value={summary.unprovenCandidateCount} /></Grid>
+          <Grid item xs={6}><ProofMetric label="Missing Backtests" value={summary.missingBacktestCount} /></Grid>
+          <Grid item xs={6}><ProofMetric label="Market Blocked" value={summary.blockedByMarketGateCount} /></Grid>
+        </Grid>
+        {summary.strategiesProducingCandidates.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">No framework-backed strategies are producing candidates yet.</Typography>
+        ) : (
+          <Stack spacing={1}>
+            {summary.strategiesProducingCandidates.map((item) => (
+              <Paper key={item.strategy} variant="outlined" sx={{ p: 1 }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1}>
+                  <Box>
+                    <Typography variant="body2" fontWeight={700}>{item.strategy}</Typography>
+                    <Typography variant="caption" color="text.secondary">{item.candidateCount} candidate(s){item.topCandidateSymbol ? ` · top ${item.topCandidateSymbol}` : ''}</Typography>
+                  </Box>
+                  <Stack direction="row" spacing={0.5}>
+                    <Chip size="small" label={item.bestRating} />
+                    <Chip size="small" label={safeReadiness(item.readinessLabel)} />
+                  </Stack>
+                </Stack>
+              </Paper>
+            ))}
+          </Stack>
+        )}
+        {summary.notes.length > 0 && <Alert severity="warning" sx={{ mt: 2 }}>{summary.notes[0]}</Alert>}
+      </CardContent>
+    </Card>
+  );
+};
+
+const ProofMetric: React.FC<{ label: string; value: number }> = ({ label, value }) => (
+  <Box>
+    <Typography variant="caption" color="text.secondary">{label}</Typography>
+    <Typography variant="h6" fontWeight={700}>{value}</Typography>
+  </Box>
+);
+
 const WhatChangedPanel: React.FC<{ whatChanged: ResearchOverview['whatChanged'] }> = ({ whatChanged }) => {
   return (
     <Card variant="outlined" sx={{ bgcolor: 'background.paper' }}>
@@ -442,3 +514,16 @@ const ResearchModuleDrilldowns: React.FC = () => {
 };
 
 export default ResearchOverviewPage;
+
+function safeReadiness(label?: string | null) {
+  if (label === 'PAPER_TEST_CANDIDATE' || label === 'WATCHLIST_CANDIDATE' || label === 'NOT_AUTOMATION_READY') return label;
+  return 'RESEARCH_ONLY';
+}
+
+function fmtPercent(value: number | null | undefined) {
+  return typeof value === 'number' ? `${(value * 100).toFixed(1)}%` : 'N/A';
+}
+
+function fmtNumber(value: number | null | undefined) {
+  return typeof value === 'number' ? value.toFixed(2) : 'N/A';
+}

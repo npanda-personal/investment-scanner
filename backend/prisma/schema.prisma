@@ -690,6 +690,15 @@ model StrategyDecisionResult {
   blockers         Json
   warnings         Json
   dataGaps         Json
+  strategyVersion  String?
+  frameworkBacked  Boolean  @default(false)
+  frameworkDecision String?
+  frameworkAction  String?
+  entryRulesPassed Json?
+  exitRulesTriggered Json?
+  noiseFiltersTriggered Json?
+  strategyRating   Json?
+  readinessLabel   String?
   modelVersion     String   @default("strategy-decision-v1")
   generatedAt      DateTime @default(now())
   generatedDate    DateTime // Normalized to UTC midnight for idempotency

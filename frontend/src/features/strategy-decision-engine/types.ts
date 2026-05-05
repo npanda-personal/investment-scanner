@@ -94,6 +94,19 @@ export interface StrategyDecisionDto {
   dataGaps: string[];
   modelVersion: string;
   generatedAt: string;
+  strategyVersion?: string;
+  frameworkBacked?: boolean;
+  frameworkDecision?: string;
+  frameworkAction?: string;
+  entryRulesPassed?: string[];
+  exitRulesTriggered?: string[];
+  noiseFiltersTriggered?: string[];
+  strategyRating?: {
+    ratingScore: number;
+    ratingGrade: string;
+    readinessLabel?: string;
+  } | null;
+  readinessLabel?: string | null;
 }
 
 export interface StrategyModel {

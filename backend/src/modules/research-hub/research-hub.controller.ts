@@ -4,9 +4,12 @@ import { ResearchHubService } from './research-hub.service';
 export class ResearchHubController {
   constructor(private readonly service = new ResearchHubService()) {}
 
-  overview = async (_req: Request, res: Response) => {
+  overview = async (req: Request, res: Response) => {
     try {
-      const data = await this.service.overview();
+      const data = await this.service.overview({
+        region: typeof req.query.region === 'string' ? req.query.region : undefined,
+        assetType: typeof req.query.assetType === 'string' ? req.query.assetType : undefined,
+      });
       return res.json(data);
     } catch (error) {
       console.error('Research Hub overview error:', error);

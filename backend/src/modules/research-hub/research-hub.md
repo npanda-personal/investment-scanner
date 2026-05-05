@@ -1,16 +1,16 @@
 # Research Hub Module
 
-The Research Hub acts as the **Research Command Center** and triage layer for the investment scanner. It provides a prioritized, decision-oriented overview that guides the user through the daily research workflow.
+The Research Hub acts as the **Research Command Center** and triage layer for the investment scanner. It provides a prioritized, strategy-proof-driven overview that guides the user through the daily research workflow.
 
 ## Core Mandate
 
 1.  **Is today a good environment to look for trades?** (Market Readiness)
-2.  **What should I look at first?** (Research Priorities)
-3.  **Are my ideas confirmed by other data?** (Confirmation Layers)
+2.  **Which Strategy Framework-backed candidates deserve review first?** (Research Priorities)
+3.  **Are strategy candidates confirmed or contradicted by other data?** (Confirmation Layers)
 4.  **What changed since my last review?** (What Changed)
 5.  **Where do I go next?** (Next Actions)
 
-The Research Hub does not duplicate the full detail of child modules; it triages candidates for further investigation in those modules.
+The Research Hub does not duplicate the full detail of child modules; it triages candidates for further investigation in those modules. It does not run backtests, generate signals, or run full-universe strategy evaluation on overview load.
 
 ## Global Market Scope Integration
 
@@ -20,12 +20,15 @@ The Research Hub is fully integrated with the application's global market scope.
 
 ## Architecture
 
-The module aggregates data from four primary research pillars:
+The module aggregates persisted or summary data from primary research pillars:
 
 -   **Signal Generation Engine**: Raw scoring and technical/fundamental signals.
--   **Strategy Decision Engine**: Validated trade setups, entry zones, and exit candidates.
+-   **Strategy Decision Engine**: Framework-backed candidates, blockers, warnings, data gaps, and exit candidates.
+-   **Strategy Framework**: Strategy versions, performance summaries, ratings, and conservative readiness labels.
 -   **Smart Money Intelligence**: Price-volume accumulation/distribution analysis.
 -   **Market Context Intelligence**: Market regime, breadth, and sector rotation.
+
+Raw bullish signals are confirmation context only. They are not promoted into `tradeCandidates` unless a valid Strategy Decision result exists.
 
 ## API Reference
 
@@ -51,6 +54,14 @@ Returns a consolidated decision-oriented response.
     "watchCandidates": [],
     "avoidCandidates": [],
     "exitCandidates": []
+  },
+  "strategyProofSummary": {
+    "strategiesProducingCandidates": [],
+    "provenCandidateCount": 0,
+    "unprovenCandidateCount": 0,
+    "blockedByMarketGateCount": 0,
+    "missingBacktestCount": 0,
+    "notes": []
   },
   "confirmationSummary": {
     "signalSummary": {
@@ -95,11 +106,49 @@ Returns a consolidated decision-oriented response.
 -   **Bounded Responses**: Lists are capped at 5-10 items to ensure fast response times and clear focus.
 -   **Partial Success**: The endpoint uses individual `catch` blocks for child module integrations. If one module fails (e.g., timeout or database error), the Research Hub returns a partial response with a entry in `dataGaps` rather than failing the entire request.
 -   **No Heavy Calculations**: The overview relies on persisted snapshots or indexed data. It does not trigger full-universe evaluations on load.
+-   **No Backtest Execution**: Backtest evidence comes from existing `StrategyPerformanceSummary` rows through Strategy Framework.
+
+## Strategy-Proof Candidate Rules
+
+`tradeCandidates` require:
+
+- `frameworkBacked = true`
+- valid `strategy` and `strategyVersion` where available
+- market gate not `CLOSED`
+- no hard blockers
+- confidence not `LOW`
+- low data-gap count
+- existing backtest summary with acceptable rating/readiness
+
+If no strategy-backed candidates exist, `tradeCandidates` is empty and next actions include “Run Strategy Evaluation.” Raw signals remain in `confirmationSummary`.
+
+Candidates without backtest summaries are placed in `watchCandidates` with the warning “No backtest summary available for this strategy/timeframe/region.”
+
+## No-Trade Behavior
+
+When market gate is `CLOSED`:
+
+- headline says “No new long candidates. Review exits and watchlist only.”
+- `tradeCandidates` is empty
+- next actions focus on defensive exits, watchlist review, and waiting for market improvement
+- raw bullish signals are not shown as trade priorities
+
+## Conservative Readiness
+
+Research Hub never displays live-trading readiness labels. Any stored live-trading placeholder is mapped to `RESEARCH_ONLY`.
 
 ## User Workflow
 
 1.  **Review the Hero Banner**: Confirm if new trades are allowed today.
-2.  **Triage Priorities**: Look at the Trade Candidates. Use the "Primary Next Action" button to drill into the Strategy Engine for trade plans.
-3.  **Check Confirmations**: See if Smart Money or Sector Winds align with your trade ideas.
+2.  **Triage Priorities**: Look at framework-backed candidates first. Use links to Strategy Decision, Strategy Framework, Backtesting Lab, or the stock workspace.
+3.  **Check Confirmations**: See if Smart Money or Sector Winds align with strategy-backed candidates.
 4.  **Manage Risk**: Review Exit Candidates and Avoid lists.
 5.  **Drill Down**: Use the Drilldown Analysis buttons for deep dives into specific research modules.
+
+## Verification
+
+- `npm run build` in `backend`
+- `npm test -- research-hub --runInBand` in `backend`
+- `npm test -- strategy-decision-engine --runInBand` in `backend`
+- `npm test -- strategy-framework --runInBand` in `backend`
+- `npm run build` in `frontend`

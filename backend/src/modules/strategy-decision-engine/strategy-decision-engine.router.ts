@@ -13,9 +13,9 @@ export const createStrategyDecisionEngineRouter = (
   router.get('/watchlist/:watchlistId', controller.watchlist);
   router.get('/portfolio/:portfolioId', controller.portfolio);
   router.get('/model', controller.model);
+  router.get('/health', controller.health);
   router.get('/history/:instrumentId', controller.history);
   router.get('/:instrumentId', controller.latestForInstrument);
-  router.get('/health', controller.health);
 
   return router;
 };

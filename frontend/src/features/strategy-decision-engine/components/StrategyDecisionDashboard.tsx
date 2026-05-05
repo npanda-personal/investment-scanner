@@ -164,7 +164,7 @@ const StrategyDecisionDashboard: React.FC = () => {
   const candidateColumns: DataTableColumn<StrategyDecisionDto>[] = [
     { id: 'symbol', label: 'Symbol', render: (d) => <Link to={`/research/stocks/${d.instrumentId}`}>{d.symbol}</Link> },
     { id: 'country', label: 'Region', render: (d) => <Typography variant="body2">{d.country || 'N/A'}</Typography> },
-    { id: 'strategy', label: 'Strategy', render: (d) => d.strategy },
+    { id: 'strategy', label: 'Strategy', render: (d) => <Box><Typography variant="body2">{d.strategy}</Typography>{d.frameworkBacked && <Typography variant="caption" color="text.secondary">Framework {d.strategyVersion || ''}</Typography>}</Box> },
     { id: 'decision', label: 'Decision', render: (d) => <StatusBadge label={d.decision} /> },
     { id: 'decisionScore', label: 'Score', align: 'right', render: (d) => d.decisionScore },
     { id: 'confidence', label: 'Confidence', render: (d) => d.confidence },
@@ -480,6 +480,11 @@ const StrategyDecisionDashboard: React.FC = () => {
                   <Typography variant="caption" color="textSecondary">
                     {lookupResult.country} | {lookupResult.exchange} | Generated: {new Date(lookupResult.generatedAt).toLocaleString()}
                   </Typography>
+                  {lookupResult.frameworkBacked && (
+                    <Typography variant="caption" display="block" color="primary">
+                      Strategy Framework-backed {lookupResult.strategyVersion ? `v${lookupResult.strategyVersion}` : ''}
+                    </Typography>
+                  )}
                 </Box>
                 <Box sx={{ textAlign: 'right' }}>
                   <StatusBadge label={lookupResult.decision} />
