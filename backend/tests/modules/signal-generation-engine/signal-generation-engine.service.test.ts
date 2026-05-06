@@ -1,5 +1,6 @@
 /// <reference types="@types/jest" />
 import { SignalGenerationEngineService } from '../../../src/modules/signal-generation-engine';
+import { StrategyFrameworkRegistry } from '../../../src/modules/strategy-framework';
 
 const price = (index: number, adjusted_close: number, volume = 100) => ({
   date: new Date(2026, 3, 28 - index).toISOString(),
@@ -245,5 +246,160 @@ describe('SignalGenerationEngineService', () => {
     expect(result.generated).toBe(2);
     expect(result.dataQuality).toMatchObject({ beforeFilter: 3, afterFilter: 2, excludedByDataQuality: 1, missingQualityEvaluationCount: 1 });
     expect(result.warnings[0]).toContain('missing data quality');
+  });
+
+  it('adds Strategy Framework matches when requested', async () => {
+    const repository = {
+      latestSignals: jest.fn().mockResolvedValue({
+        signals: [{
+          id: 'signal-1',
+          instrument_id: 'stock-1',
+          symbol: 'ABC',
+          company_name: 'ABC Co',
+          sector: 'Technology',
+          country: 'IN',
+          currentPrice: null,
+          previousClose: null,
+          dailyChange: null,
+          dailyChangePercent: null,
+          currency: null,
+          priceTimestamp: null,
+          score: 85,
+          direction: 'BULLISH',
+          confidence: 'HIGH',
+          triggered_signals: [{ code: 'PRICE_ABOVE_SMA50', label: 'price is above SMA50', category: 'TECHNICAL' }],
+          negative_signals: [],
+          explanation: 'Bullish because price is above SMA50.',
+          generated_at: '2026-04-28T00:00:00.000Z',
+          source: 'signal-generation-engine',
+          data_status: 'COMPLETE',
+        }],
+        total: 1,
+      }),
+    };
+    const prices = Array.from({ length: 260 }, (_, index) => price(index, 200 - index * 0.2, 1000));
+    const marketDataService = {
+      getInstrumentsByIds: jest.fn().mockResolvedValue([{ id: 'stock-1', symbol: 'ABC', region: 'IN', asset_type: 'STOCK', currency: 'INR' }]),
+      getLatestPricesBySymbols: jest.fn().mockResolvedValue([{ symbol: 'ABC', adjusted_close: 200, date: '2026-04-28T00:00:00.000Z' }]),
+      listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices }),
+    };
+    const frameworkService = {
+      performance: jest.fn().mockResolvedValue([{ ratingGrade: 'GOOD', readinessLabel: 'PAPER_TEST_CANDIDATE' }]),
+    };
+    const service = new SignalGenerationEngineService(repository as any, marketDataService as any, {} as any, {} as any, new StrategyFrameworkRegistry(), frameworkService as any);
+
+    const result = await service.topSignals({ limit: 5, includeStrategyMatches: true, strategyCode: 'TREND_MOMENTUM' });
+
+    expect(result.signals[0].strategyMatches?.[0]).toMatchObject({
+      strategyCode: 'TREND_MOMENTUM',
+      strategyName: expect.any(String),
+      strategyVersion: '1.0.0',
+      ratingGrade: 'GOOD',
+      readinessLabel: 'PAPER_TEST_CANDIDATE',
+    });
+    expect(result.signals[0].strategyMatches?.[0].entryRulesPassed.length).toBeGreaterThan(0);
+  });
+
+  it('returns blocked strategies with data gaps instead of failing matching', async () => {
+    const service = new SignalGenerationEngineService({} as any, {
+      getInstrumentsByIds: jest.fn().mockResolvedValue([{ id: 'stock-1', symbol: 'ABC', region: 'IN', asset_type: 'STOCK' }]),
+      getLatestPricesBySymbols: jest.fn().mockResolvedValue([]),
+      listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: [] }),
+    } as any, {} as any);
+
+    const signal = await service.enrichSignal({
+      instrument_id: 'stock-1',
+      symbol: 'ABC',
+      company_name: 'ABC Co',
+      sector: null,
+      country: 'IN',
+      currentPrice: null,
+      previousClose: null,
+      dailyChange: null,
+      dailyChangePercent: null,
+      currency: null,
+      priceTimestamp: null,
+      score: 80,
+      direction: 'BULLISH',
+      confidence: 'HIGH',
+      triggered_signals: [],
+      negative_signals: [],
+      explanation: 'Bullish because raw signal is strong.',
+      generated_at: '2026-04-28T00:00:00.000Z',
+      source: 'signal-generation-engine',
+      data_status: 'MISSING',
+    } as any);
+
+    const enriched = await service.enrichSignals([signal], { includeStrategyMatches: true, strategyCode: 'TREND_MOMENTUM' });
+    expect(enriched[0].blockedStrategies?.[0]).toEqual(expect.objectContaining({
+      strategyCode: 'TREND_MOMENTUM',
+      reason: expect.any(String),
+    }));
+    expect(enriched[0].blockedStrategies?.[0].dataGaps.length).toBeGreaterThan(0);
+  });
+
+  it('filters only strategy eligible signals after bounded enrichment', async () => {
+    const repository = {
+      latestSignals: jest.fn().mockResolvedValue({
+        signals: [
+          {
+            instrument_id: 'match',
+            symbol: 'MATCH',
+            company_name: null,
+            sector: null,
+            country: 'IN',
+            currentPrice: null,
+            previousClose: null,
+            dailyChange: null,
+            dailyChangePercent: null,
+            currency: null,
+            priceTimestamp: null,
+            score: 85,
+            direction: 'BULLISH',
+            confidence: 'HIGH',
+            triggered_signals: [],
+            negative_signals: [],
+            explanation: 'Bullish.',
+            generated_at: '2026-04-28T00:00:00.000Z',
+            source: 'signal-generation-engine',
+            data_status: 'COMPLETE',
+          },
+          {
+            instrument_id: 'blocked',
+            symbol: 'BLOCK',
+            company_name: null,
+            sector: null,
+            country: 'IN',
+            currentPrice: null,
+            previousClose: null,
+            dailyChange: null,
+            dailyChangePercent: null,
+            currency: null,
+            priceTimestamp: null,
+            score: 85,
+            direction: 'BULLISH',
+            confidence: 'HIGH',
+            triggered_signals: [],
+            negative_signals: [],
+            explanation: 'Bullish.',
+            generated_at: '2026-04-28T00:00:00.000Z',
+            source: 'signal-generation-engine',
+            data_status: 'MISSING',
+          },
+        ],
+        total: 2,
+      }),
+    };
+    const prices = Array.from({ length: 260 }, (_, index) => price(index, 200 - index * 0.2, 1000));
+    const marketDataService = {
+      getInstrumentsByIds: jest.fn().mockResolvedValue([{ id: 'match', symbol: 'MATCH', region: 'IN' }, { id: 'blocked', symbol: 'BLOCK', region: 'IN' }]),
+      getLatestPricesBySymbols: jest.fn().mockResolvedValue([{ symbol: 'MATCH', adjusted_close: 200 }, { symbol: 'BLOCK', adjusted_close: 200 }]),
+      listPricesByInstrumentId: jest.fn((instrumentId) => Promise.resolve({ prices: instrumentId === 'match' ? prices : [] })),
+    };
+    const service = new SignalGenerationEngineService(repository as any, marketDataService as any, {} as any);
+
+    const result = await service.topSignals({ limit: 10, onlyStrategyEligible: true, strategyCode: 'TREND_MOMENTUM' });
+
+    expect(result.signals.map((signal) => signal.instrument_id)).toEqual(['match']);
   });
 });

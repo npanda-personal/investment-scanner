@@ -1,5 +1,5 @@
 import type { MarketDataStatus } from '../market-data-foundation';
-import type { StrategyMatchSummary } from '../strategy-framework/strategy-framework.types';
+import type { StrategyDecision, StrategyDirection, StrategyRatingGrade, StrategyReadinessLabel } from '../strategy-framework';
 
 export type SignalDirection = 'BULLISH' | 'NEUTRAL' | 'BEARISH';
 export type SignalConfidence = 'LOW' | 'MEDIUM' | 'HIGH';
@@ -35,8 +35,33 @@ export interface SignalResultDto {
   source: string;
   data_status: MarketDataStatus;
   warnings?: string[];
-  strategyMatches?: StrategyMatchSummary[];
-  blockedStrategies?: StrategyMatchSummary[];
+  strategyMatches?: SignalStrategyMatchSummary[];
+  blockedStrategies?: SignalBlockedStrategySummary[];
+}
+
+export interface SignalStrategyMatchSummary {
+  strategyCode: string;
+  strategyName?: string;
+  strategyVersion: string;
+  decision: StrategyDecision;
+  direction: StrategyDirection;
+  score: number;
+  confidence: SignalConfidence;
+  reasons: string[];
+  entryRulesPassed: string[];
+  readinessLabel?: StrategyReadinessLabel | null;
+  ratingGrade?: StrategyRatingGrade | null;
+}
+
+export interface SignalBlockedStrategySummary {
+  strategyCode: string;
+  strategyName?: string;
+  strategyVersion: string;
+  blockers: string[];
+  warnings: string[];
+  dataGaps: string[];
+  noiseFiltersTriggered: string[];
+  reason: string;
 }
 
 export interface PaginatedSignalResponse {
@@ -86,6 +111,9 @@ export interface SignalQuery {
   includeStrategyMatches?: boolean;
   onlyStrategyEligible?: boolean;
   excludeNoiseFiltered?: boolean;
+  hasStrategyMatch?: boolean;
+  hasBlockedStrategies?: boolean;
+  frameworkBackedDecisionAvailable?: boolean;
 }
 
 export interface SignalHistoryQuery extends SignalQuery {

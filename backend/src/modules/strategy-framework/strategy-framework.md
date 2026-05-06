@@ -1,5 +1,9 @@
 # Strategy Framework
 
+## Signal Generation Integration
+
+Signal Generation consumes Strategy Framework evaluators for optional strategy matching enrichment. It should use registered definitions/evaluators instead of duplicating rule logic, and it should present matches as confirmation context rather than trade decisions.
+
 ## Audit Report
 
 ### Strategy rules are hardcoded inside Strategy Decision Engine

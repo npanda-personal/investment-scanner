@@ -31,6 +31,33 @@ export interface SignalResult {
   source: string;
   data_status: string;
   warnings?: string[];
+  strategyMatches?: SignalStrategyMatch[];
+  blockedStrategies?: SignalBlockedStrategy[];
+}
+
+export interface SignalStrategyMatch {
+  strategyCode: string;
+  strategyName?: string;
+  strategyVersion: string;
+  decision: string;
+  direction: string;
+  score: number;
+  confidence: SignalConfidence;
+  reasons: string[];
+  entryRulesPassed: string[];
+  readinessLabel?: string | null;
+  ratingGrade?: string | null;
+}
+
+export interface SignalBlockedStrategy {
+  strategyCode: string;
+  strategyName?: string;
+  strategyVersion: string;
+  blockers: string[];
+  warnings: string[];
+  dataGaps: string[];
+  noiseFiltersTriggered: string[];
+  reason: string;
 }
 
 export interface SignalQuery {
@@ -47,6 +74,13 @@ export interface SignalQuery {
   signalType?: string;
   confidence?: SignalConfidence;
   search?: string;
+  strategyCode?: string;
+  includeStrategyMatches?: boolean;
+  onlyStrategyEligible?: boolean;
+  excludeNoiseFiltered?: boolean;
+  hasStrategyMatch?: boolean;
+  hasBlockedStrategies?: boolean;
+  frameworkBackedDecisionAvailable?: boolean;
 }
 
 export interface PaginatedSignalResponse {
@@ -70,6 +104,10 @@ export interface SignalRunRequest {
   minSignalReadinessScore?: number;
   includeLimited?: boolean;
   missingQualityBehavior?: 'WARN_AND_PROCESS' | 'SKIP';
+  strategyCode?: string;
+  includeStrategyMatches?: boolean;
+  onlyStrategyEligible?: boolean;
+  excludeNoiseFiltered?: boolean;
 }
 
 export interface SignalRunResponse {
@@ -87,4 +125,3 @@ export interface SignalRunResponse {
   results: SignalResult[];
   generated_at: string;
 }
-

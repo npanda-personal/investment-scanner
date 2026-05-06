@@ -1,12 +1,15 @@
 import React from 'react';
-import { Alert, Box, Button, IconButton, Snackbar, Tooltip, Typography } from '@mui/material';
+import { Alert, Box, Button, Chip, IconButton, Snackbar, Tooltip, Typography } from '@mui/material';
 import { 
   InfoOutlined, 
   WarningAmberOutlined, 
   VisibilityOutlined, 
   PlaylistAddOutlined, 
   AccountBalanceWalletOutlined, 
-  NotificationsNoneOutlined 
+  NotificationsNoneOutlined,
+  AccountTreeOutlined,
+  FactCheckOutlined,
+  InsightsOutlined,
 } from '@mui/icons-material';
 import { Link, useNavigate } from 'react-router-dom';
 import { AddSignalToPortfolioDialog } from './AddSignalToPortfolioDialog';
@@ -62,6 +65,32 @@ const reasonSummary = (signal: SignalResult) => {
   return top.slice(0, 2).map((reason) => reason.label).join('; ') || 'Insufficient data';
 };
 
+const StrategyMatchDetails = ({ signal }: { signal: SignalResult }) => (
+  <Box sx={{ p: 1, maxWidth: 420 }}>
+    {(signal.strategyMatches || []).map((match) => (
+      <Box key={`${match.strategyCode}-${match.strategyVersion}`} sx={{ mb: 1 }}>
+        <Typography variant="subtitle2" fontWeight={700}>{match.strategyName || match.strategyCode} v{match.strategyVersion}</Typography>
+        <Typography variant="caption" display="block">Score {match.score} · {match.confidence} · {match.ratingGrade || 'UNPROVEN'} · {match.readinessLabel || 'RESEARCH_ONLY'}</Typography>
+        {match.reasons.slice(0, 3).map((reason, index) => <Typography key={index} variant="caption" display="block">- {reason}</Typography>)}
+      </Box>
+    ))}
+    {(signal.strategyMatches || []).length === 0 && <Typography variant="caption">No registered strategy match for this raw signal.</Typography>}
+  </Box>
+);
+
+const BlockedStrategyDetails = ({ signal }: { signal: SignalResult }) => (
+  <Box sx={{ p: 1, maxWidth: 420 }}>
+    {(signal.blockedStrategies || []).map((blocked) => (
+      <Box key={`${blocked.strategyCode}-${blocked.strategyVersion}`} sx={{ mb: 1 }}>
+        <Typography variant="subtitle2" fontWeight={700}>{blocked.strategyName || blocked.strategyCode} v{blocked.strategyVersion}</Typography>
+        <Typography variant="caption" display="block">{blocked.reason}</Typography>
+        {[...blocked.blockers, ...blocked.dataGaps, ...blocked.warnings].slice(0, 4).map((item, index) => <Typography key={index} variant="caption" display="block">- {item}</Typography>)}
+      </Box>
+    ))}
+    {(signal.blockedStrategies || []).length === 0 && <Typography variant="caption">No blocked Strategy Framework matches.</Typography>}
+  </Box>
+);
+
 type SignalTableProps = {
   signals: SignalResult[];
   totalCount?: number;
@@ -86,8 +115,8 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
   const columns: DataTableColumn<SignalResult>[] = [
     { id: 'symbol', label: 'Symbol', sortable: true, render: (signal) => <Button size="small" onClick={(event) => { event.stopPropagation(); navigate(`/stocks/${signal.instrument_id}`); }}>{signal.symbol}</Button> },
     { id: 'company', label: 'Company', render: (signal) => signal.company_name || 'N/A' },
-    { id: 'score', label: 'Score', sortable: true, align: 'right', render: (signal) => signal.score },
-    { id: 'direction', label: 'Direction', sortable: true, render: (signal) => <StatusBadge label={signal.direction} /> },
+    { id: 'score', label: 'Raw Score', sortable: true, align: 'right', render: (signal) => signal.score },
+    { id: 'direction', label: 'Raw Direction', sortable: true, render: (signal) => <StatusBadge label={signal.direction} /> },
     { id: 'confidence', label: 'Confidence', sortable: true, render: (signal) => <StatusBadge label={signal.confidence} /> },
     { id: 'currentPrice', label: 'Price', sortable: true, align: 'right', render: (signal) => formatMoney(signal.currentPrice, signal.currency) },
     {
@@ -103,7 +132,7 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
     },
     { 
       id: 'reasons', 
-      label: 'Summary', 
+      label: 'Top Reason', 
       render: (signal) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Typography variant="body2" sx={{ maxWidth: 300, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -121,6 +150,41 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
         </Box>
       ) 
     },
+    {
+      id: 'strategyMatches',
+      label: 'Strategy Matches',
+      render: (signal) => {
+        const matches = signal.strategyMatches || [];
+        return (
+          <Tooltip title={<StrategyMatchDetails signal={signal} />} arrow>
+            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', maxWidth: 220 }}>
+              {matches.length > 0 ? matches.slice(0, 2).map((match) => (
+                <Chip key={match.strategyCode} size="small" color="success" variant="outlined" label={match.strategyCode} />
+              )) : <Chip size="small" variant="outlined" label="No match" />}
+              {matches.length > 2 && <Chip size="small" label={`+${matches.length - 2}`} />}
+            </Box>
+          </Tooltip>
+        );
+      },
+    },
+    {
+      id: 'blockedStrategies',
+      label: 'Blocked Strategies',
+      render: (signal) => {
+        const blocked = signal.blockedStrategies || [];
+        return (
+          <Tooltip title={<BlockedStrategyDetails signal={signal} />} arrow>
+            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', maxWidth: 180 }}>
+              {blocked.length > 0 ? (
+                <Chip size="small" color="warning" variant="outlined" label={`${blocked.length} blocked`} />
+              ) : (
+                <Chip size="small" variant="outlined" label="None" />
+              )}
+            </Box>
+          </Tooltip>
+        );
+      },
+    },
     { id: 'generatedAt', label: 'Generated', sortable: true, render: (signal) => new Date(signal.generated_at).toLocaleString() },
     {
       id: 'actions',
@@ -132,6 +196,25 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
               <VisibilityOutlined fontSize="small" />
             </IconButton>
           </Tooltip>
+          <Tooltip title="View Strategy Decision" arrow>
+            <IconButton size="small" onClick={() => navigate(`/strategy?instrumentId=${signal.instrument_id}`)}>
+              <FactCheckOutlined fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          {signal.strategyMatches?.[0] && (
+            <>
+              <Tooltip title="View Strategy" arrow>
+                <IconButton size="small" onClick={() => navigate(`/strategies?strategyCode=${signal.strategyMatches?.[0]?.strategyCode}`)}>
+                  <AccountTreeOutlined fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="View Backtest" arrow>
+                <IconButton size="small" onClick={() => navigate(`/backtests?mode=registered&strategyCode=${signal.strategyMatches?.[0]?.strategyCode}&timeframe=3Y`)}>
+                  <InsightsOutlined fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </>
+          )}
           <Tooltip title="Add to Watchlist" arrow>
             <IconButton size="small" onClick={() => setWatchlistSignal(signal)}>
               <PlaylistAddOutlined fontSize="small" />
@@ -202,4 +285,3 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
     </>
   );
 }
-

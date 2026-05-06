@@ -3,6 +3,7 @@ import { StockResearchWorkbenchService } from '../stock-research-workbench';
 import { DataQualityEngineService } from '../data-quality-engine';
 import { StrategyFrameworkEvaluator } from '../strategy-framework/strategy-framework.evaluator';
 import { StrategyFrameworkRegistry } from '../strategy-framework/strategy-framework.registry';
+import type { StrategyContext, StrategyPerformanceSummaryDto, StrategySignalOutput } from '../strategy-framework/strategy-framework.types';
 import { SignalGenerationEngineRepository } from './signal-generation-engine.repository';
 import type {
   PaginatedSignalResponse,
@@ -15,6 +16,8 @@ import type {
   SignalResultDto,
   SignalRunRequest,
   SignalRunResponse,
+  SignalBlockedStrategySummary,
+  SignalStrategyMatchSummary,
 } from './signal-generation-engine.types';
 
 const TECHNICAL_WEIGHT = 0.4;
@@ -27,7 +30,8 @@ export class SignalGenerationEngineService {
     private readonly marketDataService = new MarketDataFoundationService(),
     private readonly researchService = new StockResearchWorkbenchService(),
     private readonly dataQualityService = new DataQualityEngineService(),
-    private readonly strategyRegistry = new StrategyFrameworkRegistry()
+    private readonly strategyRegistry = new StrategyFrameworkRegistry(),
+    private readonly strategyFrameworkService?: { performance(code: string, query: { region?: string; assetType?: string }): Promise<StrategyPerformanceSummaryDto[]> }
   ) {}
 
   async topSignals(query: SignalQuery): Promise<PaginatedSignalResponse> {
@@ -213,15 +217,19 @@ export class SignalGenerationEngineService {
     };
 
     if (options.includeStrategyMatches || options.strategyCode || options.onlyStrategyEligible || options.excludeNoiseFiltered) {
-      result = this.attachStrategyMatches(result, prices, instrument, options);
-      if (options.onlyStrategyEligible && (!result.strategyMatches || result.strategyMatches.length === 0)) return null;
-      if (options.excludeNoiseFiltered && result.blockedStrategies && result.blockedStrategies.length > 0 && (!result.strategyMatches || result.strategyMatches.length === 0)) return null;
+      result = await this.attachStrategyMatches(result, prices, instrument, options);
+      if (!this.signalPassesStrategyFilters(result, options)) return null;
     }
 
-    return this.repository.createSignalResult(result);
+    const saved = await this.repository.createSignalResult(result);
+    return {
+      ...saved,
+      strategyMatches: result.strategyMatches,
+      blockedStrategies: result.blockedStrategies,
+    };
   }
 
-  async enrichSignals(signals: SignalResultDto[], options: Pick<SignalQuery, 'strategyCode' | 'includeStrategyMatches' | 'onlyStrategyEligible' | 'excludeNoiseFiltered'> = {}): Promise<SignalResultDto[]> {
+  async enrichSignals(signals: SignalResultDto[], options: Pick<SignalQuery, 'strategyCode' | 'includeStrategyMatches' | 'onlyStrategyEligible' | 'excludeNoiseFiltered' | 'hasStrategyMatch' | 'hasBlockedStrategies' | 'frameworkBackedDecisionAvailable'> = {}): Promise<SignalResultDto[]> {
     if (signals.length === 0) return [];
     
     try {
@@ -236,6 +244,8 @@ export class SignalGenerationEngineService {
 
       const instrumentMap = new Map(instruments.map((i: any) => [i.id, i]));
       const priceMap = new Map(latestPrices.map((p: any) => [p.symbol, p]));
+      const includeStrategyContext = this.shouldAttachStrategyMatches(options);
+      const ratingCache = new Map<string, Promise<StrategyPerformanceSummaryDto | null>>();
 
       const enriched = await Promise.all(signals.map(async (signal) => {
         const instrument = instrumentMap.get(signal.instrument_id);
@@ -262,15 +272,12 @@ export class SignalGenerationEngineService {
           currency: instrument?.currency ?? signal.currency ?? null,
           priceTimestamp: (latest as any)?.date ? new Date((latest as any).date).toISOString() : null,
         };
-        return (options.includeStrategyMatches || options.strategyCode || options.onlyStrategyEligible || options.excludeNoiseFiltered)
-          ? this.attachStrategyMatches(result, [], instrument, options)
-          : result;
+        if (!includeStrategyContext) return result;
+        const history = await this.marketDataService.listPricesByInstrumentId(signal.instrument_id, 500).catch(() => null);
+        const prices = this.toPricePoints(history?.prices || []);
+        return this.attachStrategyMatches(result, prices, instrument, options, ratingCache);
       }));
-      return enriched.filter((signal) => {
-        if (options.onlyStrategyEligible && (!signal.strategyMatches || signal.strategyMatches.length === 0)) return false;
-        if (options.excludeNoiseFiltered && signal.blockedStrategies && signal.blockedStrategies.length > 0 && (!signal.strategyMatches || signal.strategyMatches.length === 0)) return false;
-        return true;
-      });
+      return enriched.filter((signal) => this.signalPassesStrategyFilters(signal, options));
     } catch (error) {
       console.error('Signal enrichment failed:', error);
       return signals.map(signal => ({
@@ -280,7 +287,7 @@ export class SignalGenerationEngineService {
         dailyChange: null,
         dailyChangePercent: null,
         priceTimestamp: null,
-      }));
+      })).filter((signal) => this.signalPassesStrategyFilters(signal, options));
     }
   }
 
@@ -432,17 +439,77 @@ export class SignalGenerationEngineService {
     return { score: this.categoryScore(signals.length, negativeSignals.length), signals, negativeSignals };
   }
 
-  private attachStrategyMatches(
+  private shouldAttachStrategyMatches(options: Pick<SignalQuery, 'strategyCode' | 'includeStrategyMatches' | 'onlyStrategyEligible' | 'excludeNoiseFiltered' | 'hasStrategyMatch' | 'hasBlockedStrategies' | 'frameworkBackedDecisionAvailable'>) {
+    return Boolean(
+      options.includeStrategyMatches ||
+      options.strategyCode ||
+      options.onlyStrategyEligible ||
+      options.excludeNoiseFiltered ||
+      options.hasStrategyMatch ||
+      options.hasBlockedStrategies ||
+      options.frameworkBackedDecisionAvailable
+    );
+  }
+
+  private signalPassesStrategyFilters(
+    signal: SignalResultDto,
+    options: Pick<SignalQuery, 'onlyStrategyEligible' | 'excludeNoiseFiltered' | 'hasStrategyMatch' | 'hasBlockedStrategies' | 'frameworkBackedDecisionAvailable'>
+  ) {
+    const matchCount = signal.strategyMatches?.length || 0;
+    const blocked = signal.blockedStrategies || [];
+    if (options.onlyStrategyEligible && matchCount === 0) return false;
+    if (options.hasStrategyMatch && matchCount === 0) return false;
+    if (options.hasBlockedStrategies && blocked.length === 0) return false;
+    if (options.frameworkBackedDecisionAvailable && matchCount === 0) return false;
+    if (options.excludeNoiseFiltered && matchCount === 0 && blocked.length > 0 && blocked.every((item) => item.noiseFiltersTriggered.length > 0)) return false;
+    return true;
+  }
+
+  private async attachStrategyMatches(
     signal: SignalResultDto,
     prices: SignalPricePoint[],
     instrument: any,
-    options: Pick<SignalRunRequest, 'strategyCode' | 'includeStrategyMatches' | 'onlyStrategyEligible' | 'excludeNoiseFiltered'>
-  ): SignalResultDto {
-    const strategies = options.strategyCode && options.strategyCode !== 'ALL'
-      ? [this.strategyRegistry.get(options.strategyCode)].filter(Boolean)
-      : this.strategyRegistry.active();
+    options: Pick<SignalRunRequest, 'strategyCode' | 'includeStrategyMatches' | 'onlyStrategyEligible' | 'excludeNoiseFiltered'>,
+    ratingCache = new Map<string, Promise<StrategyPerformanceSummaryDto | null>>()
+  ): Promise<SignalResultDto> {
+    const strategies = this.strategiesForMatch(options.strategyCode);
+    const context = this.strategyContextForSignal(signal, prices, instrument);
+    const strategyMatches: SignalStrategyMatchSummary[] = [];
+    const blockedStrategies: SignalBlockedStrategySummary[] = [];
+
+    for (const strategy of strategies) {
+      try {
+        const result = new StrategyFrameworkEvaluator(strategy).evaluateSignalCandidate(context);
+        const rating = await this.latestStrategyPerformance(strategy.code, context.region || 'IN', context.assetType || 'STOCK', ratingCache);
+        if (result.eligibleForSignalGeneration && result.blockers.length === 0) strategyMatches.push(this.summarizeMatch(result, strategy.name, rating));
+        else blockedStrategies.push(this.summarizeBlocked(result, strategy.name));
+      } catch (error: any) {
+        blockedStrategies.push({
+          strategyCode: strategy?.code || options.strategyCode || 'UNKNOWN',
+          strategyName: strategy?.name,
+          strategyVersion: strategy?.version || 'UNKNOWN',
+          blockers: ['Strategy Framework matching failed.'],
+          warnings: [],
+          dataGaps: [error?.message || 'Strategy Framework evaluation unavailable.'],
+          noiseFiltersTriggered: [],
+          reason: 'Strategy Framework matching failed.',
+        });
+      }
+    }
+
+    return { ...signal, strategyMatches, blockedStrategies };
+  }
+
+  private strategiesForMatch(strategyCode?: string) {
+    if (strategyCode && strategyCode !== 'ALL') {
+      return [this.strategyRegistry.get(strategyCode)].filter(Boolean) as any[];
+    }
+    return this.strategyRegistry.active();
+  }
+
+  private strategyContextForSignal(signal: SignalResultDto, prices: SignalPricePoint[], instrument: any): StrategyContext {
     const closes = prices.map((price) => price.adjusted_close);
-    const context = {
+    return {
       instrumentId: signal.instrument_id,
       symbol: signal.symbol,
       companyName: signal.company_name,
@@ -472,23 +539,55 @@ export class SignalGenerationEngineService {
       },
       marketGate: 'UNKNOWN',
     };
-    const results = strategies.map((strategy: any) => new StrategyFrameworkEvaluator(strategy).evaluateSignalCandidate(context));
-    const summarize = (result: any) => ({
+  }
+
+  private summarizeMatch(result: StrategySignalOutput, strategyName: string, rating: StrategyPerformanceSummaryDto | null): SignalStrategyMatchSummary {
+    return {
       strategyCode: result.strategyCode,
+      strategyName,
       strategyVersion: result.strategyVersion,
       decision: result.decision,
       direction: result.direction,
       score: result.score,
       confidence: result.confidence,
       reasons: result.reasons,
-      blockers: result.blockers,
-      noiseFiltersTriggered: result.noiseFiltersTriggered,
-    });
-    return {
-      ...signal,
-      strategyMatches: results.filter((result) => result.eligibleForSignalGeneration && result.blockers.length === 0).map(summarize),
-      blockedStrategies: results.filter((result) => result.blockers.length > 0 || result.decision === 'INSUFFICIENT_DATA' || result.decision === 'AVOID').map(summarize),
+      entryRulesPassed: result.entryRulesPassed,
+      readinessLabel: rating?.readinessLabel ?? null,
+      ratingGrade: rating?.ratingGrade ?? null,
     };
+  }
+
+  private summarizeBlocked(result: StrategySignalOutput, strategyName: string): SignalBlockedStrategySummary {
+    const reason = result.blockers[0] || result.noiseFiltersTriggered[0] || result.dataGaps[0] || result.warnings[0] || 'Strategy conditions were not met.';
+    return {
+      strategyCode: result.strategyCode,
+      strategyName,
+      strategyVersion: result.strategyVersion,
+      blockers: result.blockers,
+      warnings: result.warnings,
+      dataGaps: result.dataGaps,
+      noiseFiltersTriggered: result.noiseFiltersTriggered,
+      reason,
+    };
+  }
+
+  private latestStrategyPerformance(
+    strategyCode: string,
+    region: string,
+    assetType: string,
+    cache: Map<string, Promise<StrategyPerformanceSummaryDto | null>>
+  ) {
+    const key = `${strategyCode}|${region}|${assetType}`;
+    if (!cache.has(key)) {
+      cache.set(key, this.getStrategyFrameworkPerformanceService().performance(strategyCode, { region, assetType }).then((summaries) => summaries[0] || null).catch(() => null));
+    }
+    return cache.get(key)!;
+  }
+
+  private getStrategyFrameworkPerformanceService() {
+    if (this.strategyFrameworkService) return this.strategyFrameworkService;
+    const { StrategyFrameworkService } = require('../strategy-framework/strategy-framework.service') as typeof import('../strategy-framework/strategy-framework.service');
+    return new StrategyFrameworkService();
   }
 
   sma(prices: SignalPricePoint[], period: number): number | null {

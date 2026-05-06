@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Box, Button, Checkbox, FormControlLabel, MenuItem, Paper, Tab, Tabs, TextField } from '@mui/material';
+import { Alert, Box, Button, Checkbox, FormControlLabel, MenuItem, Paper, Tab, Tabs, TextField, Typography } from '@mui/material';
 import { fetchSignalScreener, fetchTopSignals, runSignals } from '../api/signalGenerationEngineService';
 import type { SignalConfidence, SignalDirection, SignalResult } from '../types';
 import { MarketRegimeWidget } from '@/features/market-context-intelligence';
@@ -36,8 +36,13 @@ const SignalsDashboardPage: React.FC = () => {
   const [confidence, setConfidence] = useState<SignalConfidence | ''>('');
   const [signalType, setSignalType] = useState('');
   const [search, setSearch] = useState('');
+  const [strategyCode, setStrategyCode] = useState('');
+  const [onlyStrategyEligible, setOnlyStrategyEligible] = useState(false);
+  const [excludeNoiseFiltered, setExcludeNoiseFiltered] = useState(false);
+  const [hasBlockedStrategies, setHasBlockedStrategies] = useState(false);
   const [runLimit, setRunLimit] = useState('25');
   const [useDataQualityFilter, setUseDataQualityFilter] = useState(false);
+  const [runIncludeStrategyMatches, setRunIncludeStrategyMatches] = useState(false);
   const [runMessage, setRunMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
@@ -50,7 +55,14 @@ const SignalsDashboardPage: React.FC = () => {
     const offset = pageByTab[activeTab] * limit;
 
     let fetchPromise;
-    const baseParams = { limit, offset, sortBy, sortDirection, region: scope.region, assetType: scope.assetType };
+    const strategyParams = {
+      includeStrategyMatches: true,
+      strategyCode: strategyCode || undefined,
+      onlyStrategyEligible: onlyStrategyEligible || undefined,
+      excludeNoiseFiltered: excludeNoiseFiltered || undefined,
+      hasBlockedStrategies: hasBlockedStrategies || undefined,
+    };
+    const baseParams = { limit, offset, sortBy, sortDirection, region: scope.region, assetType: scope.assetType, ...strategyParams };
 
     switch (activeTab) {
       case 'bullish': fetchPromise = fetchTopSignals({ ...baseParams, direction: 'BULLISH' }); break;
@@ -79,7 +91,7 @@ const SignalsDashboardPage: React.FC = () => {
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, [activeTab, pageByTab[activeTab], pageSizeByTab[activeTab], sortBy, sortDirection, direction, minScore, sector, country, confidence, signalType, search, scope.region, scope.assetType]);
+  useEffect(load, [activeTab, pageByTab[activeTab], pageSizeByTab[activeTab], sortBy, sortDirection, direction, minScore, sector, country, confidence, signalType, search, strategyCode, onlyStrategyEligible, excludeNoiseFiltered, hasBlockedStrategies, scope.region, scope.assetType]);
 
   useEffect(() => {
     // Reset pages when scope changes
@@ -95,7 +107,11 @@ const SignalsDashboardPage: React.FC = () => {
       useDataQualityFilter, 
       minSignalReadinessScore: 70,
       region: scope.region,
-      assetType: scope.assetType 
+      assetType: scope.assetType,
+      includeStrategyMatches: runIncludeStrategyMatches,
+      strategyCode: strategyCode || undefined,
+      onlyStrategyEligible: onlyStrategyEligible || undefined,
+      excludeNoiseFiltered: excludeNoiseFiltered || undefined,
     })
       .then((result) => {
         const dq = result.dataQuality;
@@ -112,7 +128,7 @@ const SignalsDashboardPage: React.FC = () => {
     <Box sx={{ p: 3, maxWidth: 1500, mx: 'auto' }}>
       <PageHeader
         title="Signal Generation Engine"
-        subtitle="Daily explainable bullish, neutral, and bearish stock signals."
+        subtitle="Raw bullish, neutral, and bearish confirmation inputs with Strategy Framework match context."
         primaryAction={<Button variant="contained" onClick={runManualSignals} disabled={running}>{running ? 'Running...' : 'Run Signals'}</Button>}
         secondaryActions={
           <>
@@ -120,6 +136,10 @@ const SignalsDashboardPage: React.FC = () => {
           <FormControlLabel
             control={<Checkbox checked={useDataQualityFilter} onChange={(event) => setUseDataQualityFilter(event.target.checked)} />}
             label="Use data quality filter"
+          />
+          <FormControlLabel
+            control={<Checkbox checked={runIncludeStrategyMatches} onChange={(event) => setRunIncludeStrategyMatches(event.target.checked)} />}
+            label="Attach strategy matches"
           />
           <Button component={Link} to="/signals/quality" variant="outlined">View Signal Quality Lab</Button>
           <Button component={Link} to="/strategy" variant="outlined" startIcon={<FactCheckOutlined />}>View Strategy Decisions</Button>
@@ -129,12 +149,17 @@ const SignalsDashboardPage: React.FC = () => {
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {runMessage && <Alert severity="info" sx={{ mb: 2 }}>{runMessage}</Alert>}
+      <Alert severity="info" sx={{ mb: 2 }}>
+        <Typography variant="body2">
+          Raw signals are confirmation inputs. Use Strategy Decision for candidate review and risk context.
+        </Typography>
+      </Alert>
 
       <MarketRegimeWidget />
 
       {activeTab === 'screener' && (
         <Box sx={{ mb: 3 }}>
-          <FilterBar onReset={() => { setDirection(''); setMinScore('60'); setSector(''); setCountry(''); setConfidence(''); setSignalType(''); setSearch(''); }}>
+          <FilterBar onReset={() => { setDirection(''); setMinScore('60'); setSector(''); setCountry(''); setConfidence(''); setSignalType(''); setSearch(''); setStrategyCode(''); setOnlyStrategyEligible(false); setExcludeNoiseFiltered(false); setHasBlockedStrategies(false); }}>
             <TextField label="Search" value={search} onChange={(event) => setSearch(event.target.value)} />
             <TextField select label="Direction" value={direction} onChange={(event) => setDirection(event.target.value as SignalDirection | '')}>
               <MenuItem value="">Any</MenuItem>
@@ -152,6 +177,15 @@ const SignalsDashboardPage: React.FC = () => {
             <TextField label="Signal type" value={signalType} onChange={(event) => setSignalType(event.target.value)} />
             <TextField label="Sector" value={sector} onChange={(event) => setSector(event.target.value)} />
             <TextField label="Country" value={country} onChange={(event) => setCountry(event.target.value)} />
+            <TextField select label="Strategy" value={strategyCode} onChange={(event) => setStrategyCode(event.target.value)}>
+              <MenuItem value="">Any</MenuItem>
+              <MenuItem value="TREND_MOMENTUM">Trend Momentum</MenuItem>
+              <MenuItem value="PULLBACK_IN_UPTREND">Pullback In Uptrend</MenuItem>
+              <MenuItem value="DEFENSIVE_EXIT">Defensive Exit</MenuItem>
+            </TextField>
+            <FormControlLabel control={<Checkbox checked={onlyStrategyEligible} onChange={(event) => setOnlyStrategyEligible(event.target.checked)} />} label="Only strategy-eligible" />
+            <FormControlLabel control={<Checkbox checked={excludeNoiseFiltered} onChange={(event) => setExcludeNoiseFiltered(event.target.checked)} />} label="Exclude noise-filtered" />
+            <FormControlLabel control={<Checkbox checked={hasBlockedStrategies} onChange={(event) => setHasBlockedStrategies(event.target.checked)} />} label="Has blocked strategies" />
           </FilterBar>
         </Box>
       )}

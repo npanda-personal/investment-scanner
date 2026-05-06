@@ -40,6 +40,9 @@ export function parseSignalQuery(query: Record<string, unknown>): SignalQuery {
     includeStrategyMatches: first(query.includeStrategyMatches) === 'true' || first(query.includeStrategyMatches) === true,
     onlyStrategyEligible: first(query.onlyStrategyEligible) === 'true' || first(query.onlyStrategyEligible) === true,
     excludeNoiseFiltered: first(query.excludeNoiseFiltered) === 'true' || first(query.excludeNoiseFiltered) === true,
+    hasStrategyMatch: first(query.hasStrategyMatch) === 'true' || first(query.hasStrategyMatch) === true,
+    hasBlockedStrategies: first(query.hasBlockedStrategies) === 'true' || first(query.hasBlockedStrategies) === true,
+    frameworkBackedDecisionAvailable: first(query.frameworkBackedDecisionAvailable) === 'true' || first(query.frameworkBackedDecisionAvailable) === true,
   };
 }
 

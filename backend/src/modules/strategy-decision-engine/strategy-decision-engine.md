@@ -58,6 +58,8 @@ Additive compatibility fields:
 
 Research Hub consumes these additive fields to build strategy-proof-driven priority buckets. Framework-backed decisions with missing proof are kept as watch candidates rather than promoted as top trade candidates.
 
+Signal Generation links to Strategy Decision using `/strategy?instrumentId=...` so raw signals can be reviewed through the candidate/risk language owned by this module.
+
 ### Missing Data Behavior
 
 The context builder treats related module data as optional. Missing market context, sector context, smart-money context, raw signals, calibration, data quality, or price history produces `dataGaps`, warnings, blockers, or conservative decisions. Missing optional context must not produce a 500 response.

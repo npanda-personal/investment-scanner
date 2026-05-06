@@ -37,8 +37,33 @@ Supported request/query flags:
 - `includeStrategyMatches`
 - `onlyStrategyEligible`
 - `excludeNoiseFiltered`
+- `hasStrategyMatch`
+- `hasBlockedStrategies`
+- `frameworkBackedDecisionAvailable`
 
-When enabled, signal results may include `strategyMatches[]` and `blockedStrategies[]` explaining which registered strategies matched or were blocked by noise filters/data gaps.
+When enabled, signal results may include `strategyMatches[]` and `blockedStrategies[]` explaining which registered strategies matched or were blocked by noise filters/data gaps. These arrays are derived on demand and are not part of raw `SignalResult` persistence.
+
+`strategyMatches[]` includes `strategyCode`, `strategyName`, `strategyVersion`, `decision`, `score`, `confidence`, `reasons`, `entryRulesPassed`, `readinessLabel`, and `ratingGrade`.
+
+`blockedStrategies[]` includes `strategyCode`, `strategyName`, `strategyVersion`, `blockers`, `warnings`, `dataGaps`, `noiseFiltersTriggered`, and a compact `reason`.
+
+Filtering behavior:
+- `onlyStrategyEligible=true`: keeps signals with at least one Strategy Framework match.
+- `excludeNoiseFiltered=true`: removes signals where all considered strategies were blocked by noise filters.
+- `hasStrategyMatch=true`: keeps signals with at least one match.
+- `hasBlockedStrategies=true`: keeps signals with at least one blocked strategy.
+- `strategyCode=CODE`: evaluates only that registered strategy for enrichment/filtering.
+
+Performance boundaries:
+- Default signal endpoints remain lightweight unless strategy matching flags are present.
+- Strategy matching runs only for returned rows.
+- Matching fetches bounded price history for those rows and uses Strategy Framework evaluators instead of duplicating strategy rules.
+- Individual Strategy Framework matching failures produce a blocked strategy entry instead of failing the whole signal response.
+
+Product language:
+- Raw signal score/direction is a confirmation input.
+- Strategy Decision remains the candidate review surface.
+- Signal UI should not label raw signals as trade decisions.
 
 ## Frontend Structure
 - `SignalsDashboardPage`: Subscribes to `useMarketScope()`. Automatically refetches signals when the header region changes.
