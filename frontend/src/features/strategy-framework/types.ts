@@ -1,5 +1,5 @@
 export type StrategyStatus = 'DRAFT' | 'ACTIVE' | 'DISABLED' | 'DEPRECATED';
-export type StrategyAutomationStatus = 'NOT_ELIGIBLE' | 'WATCHLIST_ONLY' | 'PAPER_TRADING_ELIGIBLE' | 'LIVE_TRADING_ELIGIBLE_FUTURE';
+export type StrategyAutomationStatus = 'NOT_ELIGIBLE' | 'WATCHLIST_ONLY' | 'PAPER_TRADING_ELIGIBLE';
 export type StrategyReadinessLabel = 'RESEARCH_ONLY' | 'WATCHLIST_CANDIDATE' | 'PAPER_TEST_CANDIDATE' | 'NOT_AUTOMATION_READY';
 export type StrategyRatingGrade = 'EXCELLENT' | 'GOOD' | 'AVERAGE' | 'WEAK' | 'UNPROVEN';
 export type StrategyTimeframe = '1Y' | '3Y' | '5Y' | '10Y' | '15Y';
@@ -31,12 +31,20 @@ export interface StrategyPerformanceSummary {
   profitFactor: number | null;
   tradeCount: number;
   averageHoldingDays: number | null;
+  benchmarkTotalReturn?: number | null;
+  benchmarkCagr?: number | null;
+  excessReturn?: number | null;
+  excessCagr?: number | null;
+  endOfTestExitPercent?: number | null;
+  dataCoveragePercent?: number | null;
   exposurePercent: number | null;
   ratingScore: number;
   ratingGrade: StrategyRatingGrade;
   automationEligibility: StrategyAutomationStatus;
   readinessLabel: StrategyReadinessLabel;
   ratingReasons?: string[];
+  ratingWarnings?: string[];
+  ratingCapsApplied?: string[];
   backtestRunId?: string | null;
   generatedAt: string;
 }

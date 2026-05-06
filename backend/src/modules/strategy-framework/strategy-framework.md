@@ -115,7 +115,25 @@ Strategy Framework does not duplicate the detailed backtest experience. Its cata
 `/backtests?mode=registered&strategyCode=TREND_MOMENTUM&timeframe=3Y`
 
 ### Strategy Rating Model
-Ratings use CAGR, max drawdown, Sharpe, win rate, profit factor, trade count, sample sufficiency, and data coverage. Grades are `EXCELLENT`, `GOOD`, `AVERAGE`, `WEAK`, and `UNPROVEN`. Insufficient history or too few trades caps the rating at `UNPROVEN`.
+Ratings use CAGR, max drawdown, Sharpe, win rate, profit factor, trade count, sample sufficiency, data coverage, benchmark excess CAGR, average holding period, exposure, and end-of-test exit concentration. Grades are `EXCELLENT`, `GOOD`, `AVERAGE`, `WEAK`, and `UNPROVEN`.
+
+Ratings return:
+
+- `ratingReasons[]`
+- `ratingWarnings[]`
+- `ratingCapsApplied[]`
+
+Caps:
+
+- too few trades or unavailable CAGR/Sharpe: `UNPROVEN`
+- draft strategy: `UNPROVEN`
+- poor data coverage: `UNPROVEN`
+- partial data coverage: `WEAK`
+- high/severe drawdown: `AVERAGE` or `WEAK`
+- material benchmark underperformance: `WEAK`
+- dominant end-of-test exits: `WEAK`
+
+This keeps optimistic backtests from ranking aggressively when evidence is weak.
 
 ### Automation Eligibility
 User-facing readiness labels are conservative: `RESEARCH_ONLY`, `WATCHLIST_CANDIDATE`, `PAPER_TEST_CANDIDATE`, and `NOT_AUTOMATION_READY`. The UI must not display live-trading readiness. Existing stored `LIVE_TRADING_ELIGIBLE_FUTURE` values are mapped away in UI/readiness display and should be cleaned in a future data migration.
@@ -145,6 +163,25 @@ Active: `TREND_MOMENTUM`, `PULLBACK_IN_UPTREND`, `BREAKOUT_CONFIRMATION`, `SMART
 
 Draft: `QUALITY_TREND`, `MEAN_REVERSION_PULLBACK`.
 
+## Strategy Quality Audit - 2026-05-06
+
+| Strategy | Finding | Severity | Expected behavior | Fix |
+| --- | --- | --- | --- | --- |
+| `TREND_MOMENTUM` | Exit relied mostly on SMA50/end of test. | HIGH | Trend strategy should have a bounded hold and protective trailing stop. | Added default max holding and trailing-stop risk rules. |
+| `PULLBACK_IN_UPTREND` | Pullback failure risk was not explicit. | HIGH | Pullback should fail fast when the setup breaks. | Added default stop-loss approximation and max holding rule. |
+| `BREAKOUT_CONFIRMATION` | Failed breakout risk was under-specified. | HIGH | Breakouts need stop-loss, trailing stop, and extension filter. | Added default stop/trailing/max-hold risk rules. |
+| `SMART_MONEY_ACCUMULATION` | Current data is price-volume only; external smart-money inputs are unavailable. | MEDIUM | Missing institutional/insider proof should reduce confidence. | Added warning risk rule and conservative stop/max-hold defaults. |
+| `SECTOR_LEADER_MOMENTUM` | Sector context can be missing historically. | MEDIUM | Missing sector leadership should produce data gaps. | Existing evaluator reports gaps; rating now penalizes coverage. |
+| `DEFENSIVE_EXIT` | Not an entry strategy. | MEDIUM | Should be treated as exit/reduce-risk review only. | Documented; default registered config remains bounded. |
+| `RISK_OFF_AVOIDANCE` | Gate strategy can be misread as an entry strategy. | MEDIUM | Should block entries, not rank as proven trade logic. | Evaluator marks gates not eligible for registered backtest. |
+| `LOW_QUALITY_DATA_REJECTION` | Filter strategy can look like a trade strategy. | MEDIUM | Should remain a filter and not duplicate DQE scoring. | Uses public Data Quality Engine filter; no repository imports. |
+| `QUALITY_TREND` | Fundamentals are partial/free-local. | HIGH | Strategy should not rank as proven. | Remains `DRAFT`; rating caps drafts at `UNPROVEN`. |
+| `MEAN_REVERSION_PULLBACK` | Falling-knife handling is not historically proven. | HIGH | Strategy should remain conservative. | Remains `DRAFT`; rating caps drafts at `UNPROVEN`. |
+
+## Default Risk Rules
+
+Registered strategies may declare conservative risk defaults in `parameters` and `riskRules`. Current examples include max holding days, stop-loss percent, and trailing-stop percent. These defaults are not optimized parameters; they are guardrails to make results harder to fool.
+
 ### Migration Plan
 1. Add Strategy Framework registry, evaluator, persistence, and UI.
 2. Keep old Signal Generation, Strategy Decision, and Backtesting APIs working.
@@ -156,6 +193,7 @@ Draft: `QUALITY_TREND`, `MEAN_REVERSION_PULLBACK`.
 ### Known Limitations
 - Sector/country context is available where snapshots exist; missing context returns data gaps.
 - Backtest registered strategies use historical price-derived context and local data quality proxies, not full historical calibrated signals.
+- Benchmark fields are consumed from Backtesting Lab summaries when present; historical persisted rows may not have warning/cap fields until rerun.
 - Backtesting Lab is the detailed surface; Strategy Framework intentionally shows only compact summaries and deep links.
 - Conservative readiness labels are available now. Historical rows with live-trading placeholder eligibility need a follow-up cleanup if present.
 - Signal reliability engine is not a separate active backend module in this repo; noise hooks are declared and ready for a future/public reliability export.

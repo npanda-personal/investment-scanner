@@ -97,6 +97,11 @@ export class StrategyFrameworkEvaluator implements StrategyEvaluator {
       fixedAmountPerTrade: input.fixedAmountPerTrade,
       maxPositions: input.maxPositions ?? 10,
       transactionCostPercent: input.transactionCostPercent ?? 0.001,
+      slippagePercent: input.slippagePercent ?? 0,
+      maxHoldingDays: input.maxHoldingDays ?? numericParameter(this.definition.parameters.maxHoldingDays),
+      stopLossPercent: input.stopLossPercent ?? numericParameter(this.definition.parameters.stopLossPercent),
+      trailingStopPercent: input.trailingStopPercent ?? numericParameter(this.definition.parameters.trailingStopPercent),
+      takeProfitPercent: input.takeProfitPercent ?? numericParameter(this.definition.parameters.takeProfitPercent),
       useDataQualityFilter: true,
       minSignalReadinessScore: 65,
       excludeNotReady: true,
@@ -105,13 +110,16 @@ export class StrategyFrameworkEvaluator implements StrategyEvaluator {
     } as BacktestStrategyConfig;
   }
 
-  static rate(summary: Omit<StrategyPerformanceSummaryDto, 'ratingScore' | 'ratingGrade' | 'automationEligibility' | 'readinessLabel' | 'ratingReasons'> & { dataCoverageScore?: number }): Pick<StrategyPerformanceSummaryDto, 'ratingScore' | 'ratingGrade' | 'automationEligibility' | 'readinessLabel' | 'ratingReasons'> {
+  static rate(summary: Omit<StrategyPerformanceSummaryDto, 'ratingScore' | 'ratingGrade' | 'automationEligibility' | 'readinessLabel' | 'ratingReasons' | 'ratingWarnings' | 'ratingCapsApplied'> & { dataCoverageScore?: number; strategyStatus?: string }): Pick<StrategyPerformanceSummaryDto, 'ratingScore' | 'ratingGrade' | 'automationEligibility' | 'readinessLabel' | 'ratingReasons' | 'ratingWarnings' | 'ratingCapsApplied'> {
     const ratingReasons: string[] = [];
+    const ratingWarnings: string[] = [];
+    const ratingCapsApplied: string[] = [];
     if (summary.tradeCount < 10 || summary.cagr === null || summary.sharpe === null) {
       if (summary.tradeCount < 10) ratingReasons.push('Too few completed trades for a proven rating.');
       if (summary.cagr === null) ratingReasons.push('CAGR is unavailable.');
       if (summary.sharpe === null) ratingReasons.push('Sharpe is unavailable.');
-      return { ratingScore: 20, ratingGrade: 'UNPROVEN', automationEligibility: 'NOT_ELIGIBLE', readinessLabel: 'RESEARCH_ONLY', ratingReasons };
+      ratingCapsApplied.push('UNPROVEN_SAMPLE_OR_METRICS');
+      return { ratingScore: 20, ratingGrade: 'UNPROVEN', automationEligibility: 'NOT_ELIGIBLE', readinessLabel: 'RESEARCH_ONLY', ratingReasons, ratingWarnings, ratingCapsApplied };
     }
 
     let score = 0;
@@ -125,11 +133,67 @@ export class StrategyFrameworkEvaluator implements StrategyEvaluator {
     if (summary.maxDrawdown <= -0.35) {
       score -= 15;
       ratingReasons.push('High drawdown penalized the rating.');
+      ratingWarnings.push('Max drawdown exceeded the severe threshold.');
     }
     if (summary.tradeCount < 30) ratingReasons.push('Sample size is moderate; rating remains conservative.');
-    if (((summary as any).dataCoverageScore ?? 1) < 0.8) ratingReasons.push('Partial data coverage reduced confidence.');
+    const coverage = summary.dataCoveragePercent ?? ((summary as any).dataCoverageScore ?? 1);
+    if (coverage < 0.8) {
+      ratingReasons.push('Partial data coverage reduced confidence.');
+      ratingWarnings.push('Data coverage is below the preferred threshold.');
+    }
+    if ((summary.excessCagr ?? 0) < -0.02) {
+      score -= 12;
+      ratingReasons.push('Strategy materially underperformed the benchmark baseline.');
+      ratingWarnings.push('Benchmark underperformance capped confidence.');
+    }
+    if ((summary.endOfTestExitPercent ?? 0) >= 0.4) {
+      score -= 10;
+      ratingReasons.push('Many trades exited only at end of test, suggesting weak exit rules.');
+      ratingWarnings.push('End-of-test exits are too dominant.');
+    }
+    if ((summary.averageHoldingDays ?? 0) > 252) {
+      score -= 8;
+      ratingReasons.push('Average holding period is high for a daily swing strategy.');
+    }
+    if ((summary.exposurePercent ?? 0.5) < 0.05) {
+      score -= 5;
+      ratingWarnings.push('Low exposure suggests the strategy may be inactive.');
+    }
     const ratingScore = Math.round(clamp(score, 0, 100));
-    const ratingGrade: StrategyRatingGrade = ratingScore >= 80 ? 'EXCELLENT' : ratingScore >= 65 ? 'GOOD' : ratingScore >= 45 ? 'AVERAGE' : ratingScore >= 25 ? 'WEAK' : 'UNPROVEN';
+    let ratingGrade: StrategyRatingGrade = ratingScore >= 80 ? 'EXCELLENT' : ratingScore >= 65 ? 'GOOD' : ratingScore >= 45 ? 'AVERAGE' : ratingScore >= 25 ? 'WEAK' : 'UNPROVEN';
+    if (summary.strategyStatus === 'DRAFT') {
+      ratingGrade = capGrade(ratingGrade, 'UNPROVEN');
+      ratingCapsApplied.push('DRAFT_STRATEGY_UNPROVEN');
+    }
+    if (summary.tradeCount < 20) {
+      ratingGrade = capGrade(ratingGrade, 'UNPROVEN');
+      ratingCapsApplied.push('LOW_TRADE_COUNT_UNPROVEN');
+    } else if (summary.tradeCount < 30) {
+      ratingGrade = capGrade(ratingGrade, 'AVERAGE');
+      ratingCapsApplied.push('MODERATE_TRADE_COUNT_AVERAGE');
+    }
+    if (coverage < 0.5) {
+      ratingGrade = capGrade(ratingGrade, 'UNPROVEN');
+      ratingCapsApplied.push('POOR_DATA_COVERAGE_UNPROVEN');
+    } else if (coverage < 0.8) {
+      ratingGrade = capGrade(ratingGrade, 'WEAK');
+      ratingCapsApplied.push('PARTIAL_DATA_COVERAGE_WEAK');
+    }
+    if (summary.maxDrawdown <= -0.45) {
+      ratingGrade = capGrade(ratingGrade, 'WEAK');
+      ratingCapsApplied.push('SEVERE_DRAWDOWN_WEAK');
+    } else if (summary.maxDrawdown <= -0.3) {
+      ratingGrade = capGrade(ratingGrade, 'AVERAGE');
+      ratingCapsApplied.push('HIGH_DRAWDOWN_AVERAGE');
+    }
+    if ((summary.excessCagr ?? 0) < -0.05) {
+      ratingGrade = capGrade(ratingGrade, 'WEAK');
+      ratingCapsApplied.push('BENCHMARK_UNDERPERFORMANCE_WEAK');
+    }
+    if ((summary.endOfTestExitPercent ?? 0) >= 0.6) {
+      ratingGrade = capGrade(ratingGrade, 'WEAK');
+      ratingCapsApplied.push('END_OF_TEST_EXIT_DOMINANCE_WEAK');
+    }
     const automationEligibility = ratingGrade === 'EXCELLENT' || ratingGrade === 'GOOD'
         ? 'PAPER_TRADING_ELIGIBLE'
         : ratingGrade === 'AVERAGE'
@@ -143,7 +207,7 @@ export class StrategyFrameworkEvaluator implements StrategyEvaluator {
           ? 'RESEARCH_ONLY'
           : 'NOT_AUTOMATION_READY';
     if (ratingReasons.length === 0) ratingReasons.push('Rating combines return, drawdown, Sharpe, win rate, profit factor, sample size, and data coverage.');
-    return { ratingScore, ratingGrade, automationEligibility, readinessLabel, ratingReasons };
+    return { ratingScore, ratingGrade, automationEligibility, readinessLabel, ratingReasons, ratingWarnings, ratingCapsApplied };
   }
 
   private scoreTrendMomentum(context: StrategyContext, state: MutableState) {
@@ -339,4 +403,16 @@ interface MutableState {
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
+}
+
+function numericParameter(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function capGrade(current: StrategyRatingGrade, cap: StrategyRatingGrade): StrategyRatingGrade {
+  return ratingRank(current) > ratingRank(cap) ? cap : current;
+}
+
+function ratingRank(grade: StrategyRatingGrade): number {
+  return { UNPROVEN: 0, WEAK: 1, AVERAGE: 2, GOOD: 3, EXCELLENT: 4 }[grade];
 }

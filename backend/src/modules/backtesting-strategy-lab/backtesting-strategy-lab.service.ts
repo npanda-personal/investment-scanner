@@ -17,7 +17,16 @@ import type {
 } from './backtesting-strategy-lab.types';
 import { validateConfig, validateStrategyInput } from './backtesting-strategy-lab.validation';
 
-interface Position { instrumentId: string; symbol: string; entryDate: string; entryPrice: number; quantity: number; entryBarIndex: number; cost: number; entryReasons?: string[] }
+interface Position { instrumentId: string; symbol: string; entryDate: string; entryPrice: number; quantity: number; entryBarIndex: number; cost: number; entryReasons?: string[]; highestClose: number }
+
+const EXIT_REASONS = {
+  END_OF_TEST: 'END_OF_TEST',
+  STOP_LOSS: 'STOP_LOSS',
+  TRAILING_STOP: 'TRAILING_STOP',
+  TAKE_PROFIT: 'TAKE_PROFIT',
+  MAX_HOLDING_PERIOD: 'MAX_HOLDING_PERIOD',
+  STRATEGY_EXIT: 'STRATEGY_EXIT',
+} as const;
 
 export class BacktestingStrategyLabService {
   constructor(
@@ -89,6 +98,8 @@ export class BacktestingStrategyLabService {
             ratingGrade: summary.ratingGrade,
             readinessLabel: this.safeReadiness(summary.readinessLabel),
             ratingReasons: summary.ratingReasons || [],
+            ratingWarnings: summary.ratingWarnings || [],
+            ratingCapsApplied: summary.ratingCapsApplied || [],
             performanceSummaryId: summary.id,
           },
         });
@@ -155,11 +166,13 @@ export class BacktestingStrategyLabService {
         if (barIndex < 0) continue;
         const bar = history.bars[barIndex];
         const position = positions.get(history.instrumentId);
-        if (position && this.shouldExit(config, history.bars, barIndex, position)) {
+        if (position) position.highestClose = Math.max(position.highestClose, bar.close);
+        const exit = position ? this.exitDecision(config, history.bars, barIndex, position) : null;
+        if (position && exit?.exit) {
           const registeredExit = this.evaluateRegisteredStrategy(config, history.bars, barIndex, true);
           const exitReasons = registeredExit?.reasons || [];
-          const trade = this.closePosition(config, position, bar, exitReasons[0] || registeredExit?.blockers?.[0] || 'Exit rule', exitReasons);
-          cash += position.quantity * bar.close - Math.abs(position.quantity * bar.close * config.transactionCostPercent);
+          const trade = this.closePosition(config, position, bar, exit.reason, exitReasons);
+          cash += this.exitCash(config, position.quantity, trade.exitPrice);
           trades.push(trade);
           positions.delete(history.instrumentId);
         }
@@ -176,9 +189,10 @@ export class BacktestingStrategyLabService {
         const transactionCost = costAdjustedAmount * config.transactionCostPercent;
         const tradeAmount = costAdjustedAmount - transactionCost;
         if (tradeAmount <= 0 || cash < costAdjustedAmount) continue;
-        const quantity = tradeAmount / bar.close;
+        const entryPrice = this.applyEntrySlippage(bar.close, config);
+        const quantity = tradeAmount / entryPrice;
         cash -= costAdjustedAmount;
-        positions.set(history.instrumentId, { instrumentId: history.instrumentId, symbol: history.symbol, entryDate: date, entryPrice: bar.close, quantity, entryBarIndex: barIndex, cost: transactionCost, entryReasons: entry.reasons });
+        positions.set(history.instrumentId, { instrumentId: history.instrumentId, symbol: history.symbol, entryDate: date, entryPrice, quantity, entryBarIndex: barIndex, cost: transactionCost, entryReasons: entry.reasons, highestClose: bar.close });
       }
       const investedValue = [...positions.values()].reduce((sum, position) => {
         const history = histories.get(position.instrumentId);
@@ -194,13 +208,32 @@ export class BacktestingStrategyLabService {
     for (const position of positions.values()) {
       const history = histories.get(position.instrumentId);
       const bar = this.barAtOrBefore(history?.bars || [], lastDate);
-      if (bar) trades.push(this.closePosition(config, position, bar, 'End of test'));
+      if (bar) {
+        const trade = this.closePosition(config, position, bar, EXIT_REASONS.END_OF_TEST);
+        cash += this.exitCash(config, position.quantity, trade.exitPrice);
+        trades.push(trade);
+      }
     }
+    if (curve.length > 0 && positions.size > 0) {
+      peak = Math.max(peak, cash);
+      curve[curve.length - 1] = {
+        ...curve[curve.length - 1],
+        equity: cash,
+        cash,
+        investedValue: 0,
+        drawdownPercent: peak > 0 ? (cash - peak) / peak : 0,
+      };
+    }
+    const baseMetrics = this.metrics(config.initialCapital, curve, trades, config);
+    const benchmarkComparison = this.benchmarkComparison(config, histories, dates, baseMetrics);
     return {
       metrics: {
-        ...this.metrics(config.initialCapital, curve, trades, config),
+        ...baseMetrics,
         dataQualityMetadata: filterResult.metadata,
         dataCoverage,
+        dataCoveragePercent: this.coverageScore(dataCoverage),
+        benchmarkComparison,
+        realismWarnings: this.realismWarnings(trades, benchmarkComparison, dataCoverage, baseMetrics),
         availabilityStatus: this.availabilityStatus(config, histories.size, insufficientHistoryCount, missingPriceHistoryCount),
       },
       trades,
@@ -223,15 +256,24 @@ export class BacktestingStrategyLabService {
   }
 
   shouldExit(config: BacktestStrategyConfig, bars: HistoricalBar[], index: number, position: Position): boolean {
+    return this.exitDecision(config, bars, index, position).exit;
+  }
+
+  private exitDecision(config: BacktestStrategyConfig, bars: HistoricalBar[], index: number, position: Position): { exit: boolean; reason: string } {
+    const close = bars[index].close;
+    if (typeof config.stopLossPercent === 'number' && close <= position.entryPrice * (1 - config.stopLossPercent)) return { exit: true, reason: EXIT_REASONS.STOP_LOSS };
+    if (typeof config.trailingStopPercent === 'number' && close <= position.highestClose * (1 - config.trailingStopPercent)) return { exit: true, reason: EXIT_REASONS.TRAILING_STOP };
+    if (typeof config.takeProfitPercent === 'number' && close >= position.entryPrice * (1 + config.takeProfitPercent)) return { exit: true, reason: EXIT_REASONS.TAKE_PROFIT };
+    if (typeof config.maxHoldingDays === 'number' && index - position.entryBarIndex >= config.maxHoldingDays) return { exit: true, reason: EXIT_REASONS.MAX_HOLDING_PERIOD };
     if (config.strategyCode) {
       const registered = this.evaluateRegisteredStrategy(config, bars, index, true);
-      if (registered && ['EXIT_CANDIDATE', 'REDUCE_RISK', 'AVOID'].includes(registered.decision)) return true;
+      if (registered && ['EXIT_CANDIDATE', 'REDUCE_RISK', 'AVOID'].includes(registered.decision)) return { exit: true, reason: EXIT_REASONS.STRATEGY_EXIT };
     }
     const signal = this.signalProxy(bars, index);
-    if (config.exitRule.type === 'SIGNAL_SCORE_BELOW') return signal.score < Number(config.exitRule.threshold);
-    if (config.exitRule.type === 'SIGNAL_DIRECTION_BEARISH') return signal.direction === 'BEARISH';
-    if (config.exitRule.type === 'PRICE_BELOW_SMA50') return !this.priceAboveSma(bars, index, 50);
-    return index - position.entryBarIndex >= Number(config.exitRule.holdingDays);
+    if (config.exitRule.type === 'SIGNAL_SCORE_BELOW') return { exit: signal.score < Number(config.exitRule.threshold), reason: EXIT_REASONS.STRATEGY_EXIT };
+    if (config.exitRule.type === 'SIGNAL_DIRECTION_BEARISH') return { exit: signal.direction === 'BEARISH', reason: EXIT_REASONS.STRATEGY_EXIT };
+    if (config.exitRule.type === 'PRICE_BELOW_SMA50') return { exit: !this.priceAboveSma(bars, index, 50), reason: EXIT_REASONS.STRATEGY_EXIT };
+    return { exit: index - position.entryBarIndex >= Number(config.exitRule.holdingDays), reason: EXIT_REASONS.MAX_HOLDING_PERIOD };
   }
 
   metrics(initialCapital: number, curve: EquityCurvePoint[], trades: BacktestTrade[], config?: BacktestStrategyConfig): BacktestMetrics {
@@ -255,8 +297,11 @@ export class BacktestingStrategyLabService {
       profitFactor: losses.length > 0 ? wins.reduce((sum, trade) => sum + trade.netPnL, 0) / Math.abs(losses.reduce((sum, trade) => sum + trade.netPnL, 0)) : null,
       numberOfTrades: trades.length,
       averageHoldingDays: trades.length > 0 ? trades.reduce((sum, trade) => sum + trade.holdingDays, 0) / trades.length : null,
+      medianHoldingDays: this.median(trades.map((trade) => trade.holdingDays)),
+      longestHoldingDays: trades.length > 0 ? Math.max(...trades.map((trade) => trade.holdingDays)) : null,
       bestTrade: trades.length > 0 ? Math.max(...trades.map((trade) => trade.returnPercent)) : null,
       worstTrade: trades.length > 0 ? Math.min(...trades.map((trade) => trade.returnPercent)) : null,
+      exitDiagnostics: this.exitDiagnostics(trades),
     };
   }
 
@@ -355,6 +400,11 @@ export class BacktestingStrategyLabService {
         initialCapital: config.initialCapital,
         maxPositions: config.maxPositions,
         transactionCostPercent: config.transactionCostPercent,
+        slippagePercent: config.slippagePercent,
+        maxHoldingDays: config.maxHoldingDays,
+        stopLossPercent: config.stopLossPercent,
+        trailingStopPercent: config.trailingStopPercent,
+        takeProfitPercent: config.takeProfitPercent,
         positionSizeType: config.positionSizeType,
         fixedAmountPerTrade: config.fixedAmountPerTrade,
       });
@@ -446,8 +496,9 @@ export class BacktestingStrategyLabService {
   }
 
   private closePosition(config: BacktestStrategyConfig, position: Position, bar: HistoricalBar, exitReason: string, exitReasons: string[] = []): BacktestTrade {
-    const gross = position.quantity * (bar.close - position.entryPrice);
-    const exitCost = position.quantity * bar.close * config.transactionCostPercent;
+    const exitPrice = this.applyExitSlippage(bar.close, config);
+    const gross = position.quantity * (exitPrice - position.entryPrice);
+    const exitCost = position.quantity * exitPrice * config.transactionCostPercent;
     const net = gross - position.cost - exitCost;
     return {
       instrumentId: position.instrumentId,
@@ -455,11 +506,11 @@ export class BacktestingStrategyLabService {
       entryDate: position.entryDate,
       entryPrice: position.entryPrice,
       exitDate: bar.date,
-      exitPrice: bar.close,
+      exitPrice,
       quantity: position.quantity,
       grossPnL: gross,
       netPnL: net,
-      returnPercent: (bar.close - position.entryPrice) / position.entryPrice - config.transactionCostPercent * 2,
+      returnPercent: (exitPrice - position.entryPrice) / position.entryPrice - config.transactionCostPercent * 2,
       holdingDays: Math.max(1, Math.round((new Date(bar.date).getTime() - new Date(position.entryDate).getTime()) / (24 * 60 * 60 * 1000))),
       exitReason,
       entryReason: position.entryReasons?.[0],
@@ -503,6 +554,81 @@ export class BacktestingStrategyLabService {
   private average(values: number[]) {
     if (values.length === 0) return null;
     return values.reduce((sum, value) => sum + value, 0) / values.length;
+  }
+
+  private applyEntrySlippage(price: number, config: BacktestStrategyConfig) {
+    return price * (1 + (config.slippagePercent ?? 0));
+  }
+
+  private applyExitSlippage(price: number, config: BacktestStrategyConfig) {
+    return price * (1 - (config.slippagePercent ?? 0));
+  }
+
+  private exitCash(config: BacktestStrategyConfig, quantity: number, exitPrice: number) {
+    return quantity * exitPrice - Math.abs(quantity * exitPrice * config.transactionCostPercent);
+  }
+
+  private exitDiagnostics(trades: BacktestTrade[]): NonNullable<BacktestMetrics['exitDiagnostics']> {
+    const count = (reason: string) => trades.filter((trade) => trade.exitReason === reason).length;
+    const endOfTestExitCount = count(EXIT_REASONS.END_OF_TEST);
+    return {
+      endOfTestExitCount,
+      endOfTestExitPercent: trades.length > 0 ? endOfTestExitCount / trades.length : 0,
+      stopLossExitCount: count(EXIT_REASONS.STOP_LOSS),
+      trailingStopExitCount: count(EXIT_REASONS.TRAILING_STOP),
+      takeProfitExitCount: count(EXIT_REASONS.TAKE_PROFIT),
+      strategyExitCount: count(EXIT_REASONS.STRATEGY_EXIT),
+      maxHoldExitCount: count(EXIT_REASONS.MAX_HOLDING_PERIOD),
+      averageHoldingDays: trades.length > 0 ? trades.reduce((sum, trade) => sum + trade.holdingDays, 0) / trades.length : null,
+      medianHoldingDays: this.median(trades.map((trade) => trade.holdingDays)),
+      longestHoldingDays: trades.length > 0 ? Math.max(...trades.map((trade) => trade.holdingDays)) : null,
+    };
+  }
+
+  private benchmarkComparison(config: BacktestStrategyConfig, histories: Map<string, { instrumentId: string; symbol: string; bars: HistoricalBar[] }>, dates: string[], metrics: BacktestMetrics): NonNullable<BacktestMetrics['benchmarkComparison']> {
+    if (histories.size === 0 || dates.length < 2) {
+      return { benchmarkName: null, benchmarkTotalReturn: null, benchmarkCagr: null, excessReturn: null, excessCagr: null, benchmarkDataStatus: 'UNAVAILABLE', dataGap: 'Benchmark unavailable for selected region' };
+    }
+    const firstDate = dates[0];
+    const lastDate = dates[dates.length - 1];
+    const returns = [...histories.values()].map((history) => {
+      const first = history.bars.find((bar) => bar.date >= firstDate) ?? history.bars[0];
+      const last = this.barAtOrBefore(history.bars, lastDate) ?? history.bars.at(-1);
+      return first && last && first.close > 0 ? (last.close - first.close) / first.close : null;
+    }).filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+    if (returns.length === 0) {
+      return { benchmarkName: null, benchmarkTotalReturn: null, benchmarkCagr: null, excessReturn: null, excessCagr: null, benchmarkDataStatus: 'UNAVAILABLE', dataGap: 'Benchmark unavailable for selected region' };
+    }
+    const benchmarkTotalReturn = returns.reduce((sum, value) => sum + value, 0) / returns.length;
+    const years = (new Date(config.endDate).getTime() - new Date(config.startDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+    const benchmarkCagr = years > 0 ? Math.pow(1 + benchmarkTotalReturn, 1 / years) - 1 : null;
+    return {
+      benchmarkName: `${config.region || 'GLOBAL'} equal-weight universe baseline`,
+      benchmarkTotalReturn,
+      benchmarkCagr,
+      excessReturn: metrics.totalReturn - benchmarkTotalReturn,
+      excessCagr: metrics.cagr !== null && benchmarkCagr !== null ? metrics.cagr - benchmarkCagr : null,
+      benchmarkDataStatus: 'FALLBACK_EQUAL_WEIGHT',
+    };
+  }
+
+  private realismWarnings(trades: BacktestTrade[], benchmark: NonNullable<BacktestMetrics['benchmarkComparison']>, coverage: BacktestMetrics['dataCoverage'], metrics: BacktestMetrics) {
+    const warnings: string[] = [];
+    const diagnostics = this.exitDiagnostics(trades);
+    if (diagnostics.endOfTestExitPercent >= 0.4) warnings.push(`${Math.round(diagnostics.endOfTestExitPercent * 100)}% of exits occurred at end of test; exit rules may be too weak.`);
+    if (trades.length > 0 && trades.length < 10) warnings.push(`Only ${trades.length} trades were generated; sample size is insufficient.`);
+    if (coverage && this.coverageScore(coverage) < 0.8) warnings.push('Data coverage is below the preferred threshold.');
+    if (benchmark.excessCagr !== null && benchmark.excessCagr < 0) warnings.push('Strategy underperformed benchmark over this timeframe.');
+    if (metrics.maxDrawdown <= -0.3) warnings.push('Max drawdown exceeded rating threshold.');
+    if (benchmark.benchmarkDataStatus === 'UNAVAILABLE' && benchmark.dataGap) warnings.push(benchmark.dataGap);
+    return warnings;
+  }
+
+  private median(values: number[]) {
+    if (values.length === 0) return null;
+    const sorted = [...values].sort((a, b) => a - b);
+    const middle = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
   }
 
   private throwIfErrors(errors: string[]) {

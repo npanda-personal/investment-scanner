@@ -35,6 +35,11 @@ export interface BacktestStrategyConfig {
   fixedAmountPerTrade?: number;
   maxPositions: number;
   transactionCostPercent: number;
+  slippagePercent?: number;
+  maxHoldingDays?: number;
+  stopLossPercent?: number;
+  trailingStopPercent?: number;
+  takeProfitPercent?: number;
   useDataQualityFilter?: boolean;
   minSignalReadinessScore?: number;
   excludeNotReady?: boolean;
@@ -101,8 +106,33 @@ export interface BacktestMetrics {
   profitFactor: number | null;
   numberOfTrades: number;
   averageHoldingDays: number | null;
+  medianHoldingDays?: number | null;
+  longestHoldingDays?: number | null;
   bestTrade: number | null;
   worstTrade: number | null;
+  exitDiagnostics?: {
+    endOfTestExitCount: number;
+    endOfTestExitPercent: number;
+    stopLossExitCount: number;
+    trailingStopExitCount: number;
+    takeProfitExitCount: number;
+    strategyExitCount: number;
+    maxHoldExitCount: number;
+    averageHoldingDays: number | null;
+    medianHoldingDays: number | null;
+    longestHoldingDays: number | null;
+  };
+  dataCoveragePercent?: number;
+  benchmarkComparison?: {
+    benchmarkName: string | null;
+    benchmarkTotalReturn: number | null;
+    benchmarkCagr: number | null;
+    excessReturn: number | null;
+    excessCagr: number | null;
+    benchmarkDataStatus: 'AVAILABLE' | 'FALLBACK_EQUAL_WEIGHT' | 'UNAVAILABLE';
+    dataGap?: string;
+  };
+  realismWarnings?: string[];
   dataQualityMetadata?: {
     universeBeforeDataQualityFilter: number;
     universeAfterDataQualityFilter: number;
@@ -116,6 +146,8 @@ export interface BacktestMetrics {
     ratingGrade: string;
     readinessLabel: StrategyReadinessLabel;
     ratingReasons: string[];
+    ratingWarnings?: string[];
+    ratingCapsApplied?: string[];
     performanceSummaryId?: string;
   } | null;
   dataCoverage?: {

@@ -107,4 +107,70 @@ describe('Strategy Framework evaluator', () => {
     expect(rating.automationEligibility).not.toBe('LIVE_TRADING_ELIGIBLE_FUTURE');
     expect(rating.readinessLabel).toBe('PAPER_TEST_CANDIDATE');
   });
+
+  it('caps ratings for high drawdown, benchmark underperformance, and weak exits', () => {
+    const rating = StrategyFrameworkEvaluator.rate({
+      strategyCode: 'TREND_MOMENTUM',
+      strategyVersion: '1.0.0',
+      timeframe: '3Y',
+      region: 'IN',
+      assetType: 'STOCK',
+      universeKey: 'ALL_ELIGIBLE',
+      startingCapital: 100000,
+      endingCapital: 140000,
+      totalReturn: 0.4,
+      cagr: 0.12,
+      maxDrawdown: -0.48,
+      volatility: 0.2,
+      sharpe: 0.8,
+      winRate: 0.55,
+      profitFactor: 1.4,
+      tradeCount: 50,
+      averageHoldingDays: 40,
+      exposurePercent: 0.5,
+      generatedAt: new Date().toISOString(),
+      dataCoveragePercent: 1,
+      excessCagr: -0.06,
+      endOfTestExitPercent: 0.7,
+    });
+
+    expect(['WEAK', 'UNPROVEN']).toContain(rating.ratingGrade);
+    expect(rating.ratingWarnings?.length).toBeGreaterThan(0);
+    expect(rating.ratingCapsApplied).toEqual(expect.arrayContaining(['SEVERE_DRAWDOWN_WEAK', 'BENCHMARK_UNDERPERFORMANCE_WEAK', 'END_OF_TEST_EXIT_DOMINANCE_WEAK']));
+  });
+
+  it('caps poor data coverage and draft strategies', () => {
+    const rating = StrategyFrameworkEvaluator.rate({
+      strategyCode: 'QUALITY_TREND',
+      strategyVersion: '1.0.0',
+      timeframe: '5Y',
+      region: 'IN',
+      assetType: 'STOCK',
+      universeKey: 'ALL_ELIGIBLE',
+      startingCapital: 100000,
+      endingCapital: 180000,
+      totalReturn: 0.8,
+      cagr: 0.12,
+      maxDrawdown: -0.12,
+      volatility: 0.12,
+      sharpe: 1.2,
+      winRate: 0.6,
+      profitFactor: 2,
+      tradeCount: 80,
+      averageHoldingDays: 30,
+      exposurePercent: 0.5,
+      generatedAt: new Date().toISOString(),
+      dataCoveragePercent: 0.4,
+      strategyStatus: 'DRAFT',
+    });
+
+    expect(rating.ratingGrade).toBe('UNPROVEN');
+    expect(rating.readinessLabel).toBe('RESEARCH_ONLY');
+    expect(rating.ratingCapsApplied).toEqual(expect.arrayContaining(['DRAFT_STRATEGY_UNPROVEN', 'POOR_DATA_COVERAGE_UNPROVEN']));
+  });
+
+  it('registered strategies expose default risk rules', () => {
+    expect(registry.get('TREND_MOMENTUM')?.riskRules.some((rule) => rule.input === 'maxHoldingDays')).toBe(true);
+    expect(registry.get('BREAKOUT_CONFIRMATION')?.riskRules.some((rule) => rule.input === 'stopLossPercent')).toBe(true);
+  });
 });

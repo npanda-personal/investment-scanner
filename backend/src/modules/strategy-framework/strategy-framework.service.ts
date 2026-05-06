@@ -128,12 +128,22 @@ export class StrategyFrameworkService {
       profitFactor: number | null;
       numberOfTrades: number;
       averageHoldingDays: number | null;
+      exitDiagnostics?: {
+        endOfTestExitPercent: number;
+      };
+      benchmarkComparison?: {
+        benchmarkTotalReturn: number | null;
+        benchmarkCagr: number | null;
+        excessReturn: number | null;
+        excessCagr: number | null;
+      };
+      dataCoveragePercent?: number;
     };
     exposurePercent?: number | null;
     dataCoverageScore?: number;
   }): Promise<StrategyPerformanceSummaryDto> {
     const strategy = this.requireStrategy(input.strategyCode);
-    const base: Omit<StrategyPerformanceSummaryDto, 'ratingScore' | 'ratingGrade' | 'automationEligibility' | 'readinessLabel' | 'ratingReasons'> & { dataCoverageScore?: number } = {
+    const base: Omit<StrategyPerformanceSummaryDto, 'ratingScore' | 'ratingGrade' | 'automationEligibility' | 'readinessLabel' | 'ratingReasons' | 'ratingWarnings' | 'ratingCapsApplied'> & { dataCoverageScore?: number; strategyStatus?: string } = {
       strategyCode: strategy.code,
       strategyVersion: input.strategyVersion || strategy.version,
       timeframe: input.timeframe,
@@ -152,9 +162,16 @@ export class StrategyFrameworkService {
       tradeCount: input.metrics.numberOfTrades,
       averageHoldingDays: input.metrics.averageHoldingDays,
       exposurePercent: input.exposurePercent ?? null,
+      benchmarkTotalReturn: input.metrics.benchmarkComparison?.benchmarkTotalReturn,
+      benchmarkCagr: input.metrics.benchmarkComparison?.benchmarkCagr,
+      excessReturn: input.metrics.benchmarkComparison?.excessReturn,
+      excessCagr: input.metrics.benchmarkComparison?.excessCagr,
+      endOfTestExitPercent: input.metrics.exitDiagnostics?.endOfTestExitPercent,
+      dataCoveragePercent: input.metrics.dataCoveragePercent,
       backtestRunId: input.backtestRunId ?? null,
       generatedAt: new Date().toISOString(),
       dataCoverageScore: input.dataCoverageScore,
+      strategyStatus: strategy.status,
     };
     const rated = StrategyFrameworkEvaluator.rate(base);
     return this.repository.upsertPerformance({ ...base, ...rated });

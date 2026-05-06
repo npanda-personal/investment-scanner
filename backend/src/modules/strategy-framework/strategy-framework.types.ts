@@ -2,7 +2,7 @@ import type { BacktestStrategyConfig } from '../backtesting-strategy-lab';
 import type { SignalConfidence, SignalDirection, SignalItem, SignalPricePoint, SignalResultDto } from '../signal-generation-engine';
 
 export type StrategyStatus = 'DRAFT' | 'ACTIVE' | 'DISABLED' | 'DEPRECATED';
-export type StrategyAutomationStatus = 'NOT_ELIGIBLE' | 'WATCHLIST_ONLY' | 'PAPER_TRADING_ELIGIBLE' | 'LIVE_TRADING_ELIGIBLE_FUTURE';
+export type StrategyAutomationStatus = 'NOT_ELIGIBLE' | 'WATCHLIST_ONLY' | 'PAPER_TRADING_ELIGIBLE';
 export type StrategyReadinessLabel = 'RESEARCH_ONLY' | 'WATCHLIST_CANDIDATE' | 'PAPER_TEST_CANDIDATE' | 'NOT_AUTOMATION_READY';
 export type StrategyRatingGrade = 'EXCELLENT' | 'GOOD' | 'AVERAGE' | 'WEAK' | 'UNPROVEN';
 export type StrategyDecision = 'SIGNAL' | 'ENTRY_CANDIDATE' | 'WAIT' | 'WATCH' | 'AVOID' | 'EXIT_CANDIDATE' | 'REDUCE_RISK' | 'HOLD' | 'INSUFFICIENT_DATA';
@@ -148,6 +148,11 @@ export interface RegisteredBacktestInput {
   initialCapital?: number;
   maxPositions?: number;
   transactionCostPercent?: number;
+  slippagePercent?: number;
+  maxHoldingDays?: number;
+  stopLossPercent?: number;
+  trailingStopPercent?: number;
+  takeProfitPercent?: number;
   positionSizeType?: 'EQUAL_WEIGHT' | 'FIXED_AMOUNT';
   fixedAmountPerTrade?: number;
 }
@@ -171,12 +176,22 @@ export interface StrategyPerformanceSummaryDto {
   profitFactor: number | null;
   tradeCount: number;
   averageHoldingDays: number | null;
+  medianHoldingDays?: number | null;
+  longestHoldingDays?: number | null;
   exposurePercent: number | null;
+  benchmarkTotalReturn?: number | null;
+  benchmarkCagr?: number | null;
+  excessReturn?: number | null;
+  excessCagr?: number | null;
+  endOfTestExitPercent?: number | null;
+  dataCoveragePercent?: number | null;
   ratingScore: number;
   ratingGrade: StrategyRatingGrade;
   automationEligibility: StrategyAutomationStatus;
   readinessLabel: StrategyReadinessLabel;
   ratingReasons?: string[];
+  ratingWarnings?: string[];
+  ratingCapsApplied?: string[];
   backtestRunId?: string | null;
   generatedAt: string;
   createdAt?: string;

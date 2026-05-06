@@ -136,7 +136,7 @@ const StrategyFrameworkPage: React.FC = () => {
             { id: 'code', label: 'Strategy', sortable: true, render: (row) => <Stack spacing={0.5}><Typography fontWeight={700}>{row.name}</Typography><Typography variant="caption">{row.code}</Typography></Stack> },
             { id: 'status', label: 'Status', render: (row) => <Chip size="small" label={row.status} color={row.status === 'ACTIVE' ? 'success' : row.status === 'DRAFT' ? 'warning' : 'default'} /> },
             { id: 'style', label: 'Style', render: (row) => row.style },
-            { id: 'rating', label: 'Latest rating', render: (row) => ratingChip(row.latestPerformance?.ratingGrade) },
+            { id: 'rating', label: 'Latest rating', render: (row) => <Stack direction="row" spacing={1} alignItems="center">{ratingChip(row.latestPerformance?.ratingGrade)}{hasWarnings(row.latestPerformance) && <Chip size="small" label="Warnings" color="warning" />}</Stack> },
             { id: 'readiness', label: 'Readiness', render: (row) => readinessChip(row.latestPerformance?.readinessLabel) },
             { id: 'action', label: 'Actions', render: (row) => <Stack direction="row" spacing={1}><Button startIcon={<VisibilityIcon />} size="small" onClick={() => { setSelectedCode(row.code); setTab(1); }}>View</Button><Button startIcon={<ScienceIcon />} size="small" href={labLink(row.code, '3Y', scope.region, scope.assetType)}>Backtest in Lab</Button></Stack> },
           ]}
@@ -170,6 +170,7 @@ const StrategyFrameworkPage: React.FC = () => {
               { id: 'strategyCode', label: 'Strategy', sortable: true, render: (row) => row.strategyCode },
               { id: 'ratingScore', label: 'Rating', sortable: true, render: (row) => <Stack direction="row" spacing={1}>{ratingChip(row.ratingGrade)}<Typography>{row.ratingScore}</Typography></Stack> },
               { id: 'cagr', label: 'CAGR', sortable: true, render: (row) => percent(row.cagr) },
+              { id: 'excessCagr', label: 'Excess CAGR', sortable: true, render: (row) => percent(row.excessCagr) },
               { id: 'maxDrawdown', label: 'Worst drawdown', sortable: true, render: (row) => percent(row.maxDrawdown) },
               { id: 'tradeCount', label: 'Trades', sortable: true, render: (row) => row.tradeCount },
               { id: 'readinessLabel', label: 'Readiness', render: (row) => readinessChip(row.readinessLabel) },
@@ -247,6 +248,7 @@ function StrategyDetail({ strategy, selectedCode, onStrategyChange, strategies, 
           <RuleSection title="Entry Rules" rules={strategy.entryRules} />
           <RuleSection title="Exit Rules" rules={strategy.exitRules} />
           <RuleSection title="Noise Filters" rules={strategy.noiseFilters} />
+          <RuleSection title="Default Risk Rules" rules={strategy.riskRules} />
           <RuleSection title="Required Data" rules={strategy.requiredInputs.map((input) => ({ code: input, label: input, kind: 'REQUIRES', input }))} />
         </Stack>
       </Paper>
@@ -267,10 +269,12 @@ function PerformanceMatrix({ summaries, selectedCode, region, assetType }: { sum
         { id: 'availability', label: 'Availability', render: (row) => row.summary ? <Chip size="small" label="AVAILABLE" color="success" /> : <Chip size="small" label="NOT_RUN" /> },
         { id: 'cagr', label: 'CAGR', render: (row) => percent(row.summary?.cagr) },
         { id: 'totalReturn', label: 'Total return', render: (row) => percent(row.summary?.totalReturn) },
+        { id: 'benchmark', label: 'Benchmark', render: (row) => percent(row.summary?.benchmarkCagr) },
+        { id: 'excess', label: 'Excess', render: (row) => percent(row.summary?.excessCagr) },
         { id: 'maxDrawdown', label: 'Max drawdown', render: (row) => percent(row.summary?.maxDrawdown) },
         { id: 'sharpe', label: 'Sharpe', render: (row) => value(row.summary?.sharpe) },
         { id: 'trades', label: 'Trades', render: (row) => row.summary?.tradeCount ?? 0 },
-        { id: 'rating', label: 'Rating', render: (row) => ratingChip(row.summary?.ratingGrade) },
+        { id: 'rating', label: 'Rating', render: (row) => <Stack direction="row" spacing={1} alignItems="center">{ratingChip(row.summary?.ratingGrade)}{hasWarnings(row.summary) && <Chip size="small" label="Warnings" color="warning" />}</Stack> },
         { id: 'readiness', label: 'Readiness', render: (row) => readinessChip(row.summary?.readinessLabel) },
         { id: 'action', label: 'Action', render: (row) => <Button size="small" href={labLink(selectedCode, row.timeframe, region, assetType)}>Backtest in Lab</Button> },
       ]}
@@ -310,6 +314,10 @@ function percent(value: number | null | undefined) {
 
 function value(input: number | null | undefined) {
   return typeof input === 'number' ? input.toFixed(2) : 'N/A';
+}
+
+function hasWarnings(summary?: StrategyPerformanceSummary | null) {
+  return Boolean(summary?.ratingWarnings?.length || summary?.ratingCapsApplied?.length || (summary?.endOfTestExitPercent ?? 0) >= 0.4);
 }
 
 export default StrategyFrameworkPage;

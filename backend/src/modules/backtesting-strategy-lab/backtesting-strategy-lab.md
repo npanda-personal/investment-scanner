@@ -173,6 +173,9 @@ Returned metrics:
 - availability status: `AVAILABLE`, `PARTIAL`, `INSUFFICIENT_HISTORY`, `NOT_RUN`, or `ERROR`
 - data coverage: instruments considered, enough history, excluded for history, excluded for data quality, missing history, insufficient history, warnings
 - registered strategy rating/readiness when applicable
+- benchmark comparison: benchmark name/status, total return, CAGR, excess return, and excess CAGR
+- exit diagnostics: end-of-test, stop-loss, trailing-stop, take-profit, strategy-exit, and max-hold counts
+- realism warnings for weak exits, small samples, data coverage, drawdown, and benchmark underperformance
 
 After a registered strategy run completes, the service upserts `StrategyPerformanceSummary` through Strategy Framework using the natural key `strategyCode + strategyVersion + timeframe + region + assetType + universeKey`.
 
@@ -201,6 +204,37 @@ The UI includes:
 - trade log with bounded display
 - rating, readiness, availability, and data coverage diagnostics for registered runs
 - optional data-quality filter controls and universe before/after metadata in results
+- realistic assumptions controls for cost, slippage, max hold, stop loss, trailing stop, and take profit
+- benchmark, rating explanation, caps, warnings, and exit diagnostics panels
+
+## Strategy Quality Audit - 2026-05-06
+
+| Finding | Severity | Affected files | Current behavior | Expected behavior | Recommended fix | Safe now |
+| --- | --- | --- | --- | --- | --- | --- |
+| Weak forced exits | HIGH | `backtesting-strategy-lab.service.ts` | Positions could remain open until end of test. | Risk exits prevent unrealistic indefinite holds. | Add max holding, stop loss, trailing stop, and take profit exits. | Yes |
+| Slippage absent | MEDIUM | `backtesting-strategy-lab.types.ts`, validation, service, UI | Fills used close prices plus transaction costs. | Optional slippage worsens entry and exit fills. | Add `slippagePercent` defaulting to `0`. | Yes |
+| End-of-test exits opaque | HIGH | service, UI | End closures were not aggregated. | Diagnostics quantify weak exits. | Add exit reason breakdown and warnings. | Yes |
+| Benchmark missing | HIGH | service, metrics, UI | No baseline comparison. | Compare against regional index or honest fallback. | Added equal-weight universe fallback; index lookup remains future work. | Partial |
+| Data coverage underused | MEDIUM | service, rating inputs | Coverage existed but did not drive enough warnings. | Coverage should affect diagnostics and rating caps. | Add `dataCoveragePercent` and warnings. | Yes |
+
+## Realistic Assumptions
+
+Backtest configs support:
+
+- `transactionCostPercent`: applied on both entry and exit.
+- `slippagePercent`: optional, defaults to `0`, capped at `5%`; entry price is worsened upward and exit price downward.
+- `maxHoldingDays`: optional forced exit with `exitReason = MAX_HOLDING_PERIOD`.
+- `stopLossPercent`: optional forced exit with `exitReason = STOP_LOSS`.
+- `trailingStopPercent`: optional forced exit with `exitReason = TRAILING_STOP`, based on highest close since entry.
+- `takeProfitPercent`: optional forced exit with `exitReason = TAKE_PROFIT`.
+
+Registered strategy backtests may inherit conservative Strategy Framework default risk rules. Custom Rules remains available for research, but Registered Strategy mode is the preferred repeatable strategy path.
+
+## Benchmark Comparison
+
+Backtest metrics return `benchmarkName`, `benchmarkTotalReturn`, `benchmarkCagr`, `excessReturn`, `excessCagr`, and `benchmarkDataStatus`.
+
+Current behavior uses an honest equal-weight buy-and-hold baseline over the resolved universe when a local regional index is unavailable. If benchmark data cannot be calculated, the run succeeds and returns the data gap `Benchmark unavailable for selected region`.
 
 ## Known Limitations
 
@@ -208,7 +242,8 @@ The UI includes:
 - Subscription Billing gates backtest runs by monthly plan limits and records successful run usage.
 
 - Daily close only.
-- No intraday fills or slippage model.
+- No intraday fills.
+- Regional index benchmark lookup is not implemented yet; current benchmark is an equal-weight resolved-universe fallback.
 - No broker/order execution.
 - No tax lots.
 - No portfolio optimization.

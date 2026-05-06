@@ -38,6 +38,11 @@ export function validateConfig(config?: BacktestStrategyConfig): string[] {
   if (!Number.isFinite(config.initialCapital) || config.initialCapital <= 0) errors.push('initial capital must be greater than 0');
   if (!Number.isFinite(config.maxPositions) || config.maxPositions <= 0 || config.maxPositions > 100) errors.push('max positions must be 1-100');
   if (!Number.isFinite(config.transactionCostPercent) || config.transactionCostPercent < 0 || config.transactionCostPercent > 0.1) errors.push('transaction cost must be 0-10%');
+  if (config.slippagePercent !== undefined && (!Number.isFinite(config.slippagePercent) || config.slippagePercent < 0 || config.slippagePercent > 0.05)) errors.push('slippage must be 0-5%');
+  if (config.maxHoldingDays !== undefined && (!Number.isFinite(config.maxHoldingDays) || config.maxHoldingDays <= 0 || config.maxHoldingDays > 5000)) errors.push('max holding days must be 1-5000');
+  if (config.stopLossPercent !== undefined && (!Number.isFinite(config.stopLossPercent) || config.stopLossPercent <= 0 || config.stopLossPercent > 0.95)) errors.push('stop loss must be greater than 0 and at most 95%');
+  if (config.trailingStopPercent !== undefined && (!Number.isFinite(config.trailingStopPercent) || config.trailingStopPercent <= 0 || config.trailingStopPercent > 0.95)) errors.push('trailing stop must be greater than 0 and at most 95%');
+  if (config.takeProfitPercent !== undefined && (!Number.isFinite(config.takeProfitPercent) || config.takeProfitPercent <= 0 || config.takeProfitPercent > 10)) errors.push('take profit must be greater than 0 and at most 1000%');
   if (config.minSignalReadinessScore !== undefined && (!Number.isFinite(config.minSignalReadinessScore) || config.minSignalReadinessScore < 0 || config.minSignalReadinessScore > 100)) errors.push('minimum signal readiness score must be 0-100');
   if (!POSITION_SIZES.includes(config.positionSizeType)) errors.push('position sizing is invalid');
   if (config.positionSizeType === 'FIXED_AMOUNT' && (!Number.isFinite(config.fixedAmountPerTrade) || Number(config.fixedAmountPerTrade) <= 0)) errors.push('fixed amount per trade must be greater than 0');

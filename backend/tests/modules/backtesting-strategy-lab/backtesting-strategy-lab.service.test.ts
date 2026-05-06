@@ -17,6 +17,15 @@ const makePrices = (symbol: string, start = '2024-01-01', days = 260, slope = 1)
   });
 };
 
+const makePatternPrices = (symbol: string, closes: number[], start = '2024-01-01') => {
+  const startDate = new Date(start);
+  return closes.map((close, index) => {
+    const date = new Date(startDate);
+    date.setDate(startDate.getDate() + index);
+    return { date: date.toISOString(), close, adjusted_close: close, symbol };
+  });
+};
+
 const config: BacktestStrategyConfig = {
   universe: { type: 'SYMBOLS', symbols: ['AAA', 'BBB'] },
   entryRule: { type: 'PRICE_ABOVE_SMA50' },
@@ -115,6 +124,70 @@ describe('BacktestingStrategyLabService', () => {
     const run = await service.run({ config: { ...config, universe: { type: 'SYMBOLS', symbols: ['AAA'] }, transactionCostPercent: 0.01 } });
 
     expect(run.trades.some((trade) => trade.netPnL < trade.grossPnL)).toBe(true);
+  });
+
+  it('applies transaction costs on entry and exit', async () => {
+    const { service } = createService();
+
+    const run = await service.run({ config: { ...config, universe: { type: 'SYMBOLS', symbols: ['AAA'] }, transactionCostPercent: 0.01 } });
+    const trade = run.trades[0];
+    const expectedExitCost = trade.quantity * trade.exitPrice * 0.01;
+
+    expect(trade.netPnL).toBeCloseTo(trade.grossPnL - 1000 - expectedExitCost, 1);
+  });
+
+  it('worsens entry and exit prices with slippage', async () => {
+    const { service } = createService();
+
+    const run = await service.run({ config: { ...config, universe: { type: 'SYMBOLS', symbols: ['AAA'] }, transactionCostPercent: 0, slippagePercent: 0.01 } });
+    const trade = run.trades[0];
+
+    expect(trade.entryPrice).toBeGreaterThan(99);
+    expect(trade.exitPrice).toBeLessThan(110);
+    expect(trade.exitPrice).toBeCloseTo(107.91, 1);
+  });
+
+  it('records stop loss exits', async () => {
+    const closes = [...Array.from({ length: 70 }, (_item, index) => 50 + index), 90, 88, 86];
+    const { service } = createService({ marketDataService: { listPricesByInstrumentId: jest.fn(async () => ({ prices: makePatternPrices('AAA', closes) })) } });
+
+    const run = await service.run({ config: { ...config, universe: { type: 'SYMBOLS', symbols: ['AAA'] }, exitRule: { type: 'FIXED_HOLDING_PERIOD', holdingDays: 500 }, stopLossPercent: 0.05 } });
+
+    expect(run.trades.some((trade) => trade.exitReason === 'STOP_LOSS')).toBe(true);
+    expect(run.metrics?.exitDiagnostics?.stopLossExitCount).toBeGreaterThan(0);
+  });
+
+  it('records trailing stop exits', async () => {
+    const closes = [...Array.from({ length: 80 }, (_item, index) => 50 + index), 120, 112, 108];
+    const { service } = createService({ marketDataService: { listPricesByInstrumentId: jest.fn(async () => ({ prices: makePatternPrices('AAA', closes) })) } });
+
+    const run = await service.run({ config: { ...config, universe: { type: 'SYMBOLS', symbols: ['AAA'] }, exitRule: { type: 'FIXED_HOLDING_PERIOD', holdingDays: 500 }, trailingStopPercent: 0.08 } });
+
+    expect(run.trades.some((trade) => trade.exitReason === 'TRAILING_STOP')).toBe(true);
+  });
+
+  it('records take profit and max holding period exits', async () => {
+    const { service } = createService();
+
+    const takeProfitRun = await service.run({ config: { ...config, universe: { type: 'SYMBOLS', symbols: ['AAA'] }, exitRule: { type: 'FIXED_HOLDING_PERIOD', holdingDays: 500 }, takeProfitPercent: 0.05 } });
+    const maxHoldRun = await service.run({ config: { ...config, universe: { type: 'SYMBOLS', symbols: ['AAA'] }, exitRule: { type: 'FIXED_HOLDING_PERIOD', holdingDays: 500 }, maxHoldingDays: 5 } });
+
+    expect(takeProfitRun.trades.some((trade) => trade.exitReason === 'TAKE_PROFIT')).toBe(true);
+    expect(maxHoldRun.trades.some((trade) => trade.exitReason === 'MAX_HOLDING_PERIOD')).toBe(true);
+  });
+
+  it('counts end-of-test exits and returns benchmark gaps without failing', async () => {
+    const { service } = createService({
+      marketDataService: {
+        listPricesByInstrumentId: jest.fn(async () => ({ prices: [] })),
+      },
+    });
+
+    const run = await service.run({ config: { ...config, universe: { type: 'SYMBOLS', symbols: ['AAA'] } } });
+
+    expect(run.status).toBe('COMPLETED');
+    expect(run.metrics?.benchmarkComparison?.benchmarkDataStatus).toBe('UNAVAILABLE');
+    expect(run.metrics?.benchmarkComparison?.dataGap).toContain('Benchmark unavailable');
   });
 
   it('calculates max drawdown, CAGR, volatility, and Sharpe', () => {

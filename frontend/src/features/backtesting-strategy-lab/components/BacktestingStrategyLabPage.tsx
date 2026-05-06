@@ -64,6 +64,11 @@ const defaultConfig: BacktestStrategyConfig = {
   fixedAmountPerTrade: 10000,
   maxPositions: 10,
   transactionCostPercent: 0.001,
+  slippagePercent: 0,
+  maxHoldingDays: 180,
+  stopLossPercent: 0.08,
+  trailingStopPercent: 0.12,
+  takeProfitPercent: undefined,
   useDataQualityFilter: false,
   minSignalReadinessScore: 70,
   excludeNotReady: true,
@@ -110,6 +115,11 @@ export default function BacktestingStrategyLabPage() {
   const [registeredCapital, setRegisteredCapital] = useState(100000);
   const [registeredMaxPositions, setRegisteredMaxPositions] = useState(10);
   const [registeredCost, setRegisteredCost] = useState(0.001);
+  const [registeredSlippage, setRegisteredSlippage] = useState(0.0005);
+  const [registeredMaxHoldingDays, setRegisteredMaxHoldingDays] = useState(180);
+  const [registeredStopLoss, setRegisteredStopLoss] = useState(0.08);
+  const [registeredTrailingStop, setRegisteredTrailingStop] = useState(0.12);
+  const [registeredTakeProfit, setRegisteredTakeProfit] = useState(0);
 
   const canUseSymbols = config.universe.type === 'SYMBOLS';
   const latestRun = selectedRun ?? runs[0] ?? null;
@@ -173,6 +183,11 @@ export default function BacktestingStrategyLabPage() {
     positionSizeType: 'EQUAL_WEIGHT',
     maxPositions: registeredMaxPositions,
     transactionCostPercent: registeredCost,
+    slippagePercent: registeredSlippage,
+    maxHoldingDays: registeredMaxHoldingDays || undefined,
+    stopLossPercent: registeredStopLoss || undefined,
+    trailingStopPercent: registeredTrailingStop || undefined,
+    takeProfitPercent: registeredTakeProfit || undefined,
     useDataQualityFilter: true,
     minSignalReadinessScore: 65,
     excludeNotReady: true,
@@ -245,7 +260,23 @@ export default function BacktestingStrategyLabPage() {
                   <TextField label="Initial capital" type="number" value={registeredCapital} onChange={(event) => setRegisteredCapital(Number(event.target.value))} size="small" fullWidth />
                   <TextField label="Max positions" type="number" value={registeredMaxPositions} onChange={(event) => setRegisteredMaxPositions(Number(event.target.value))} size="small" fullWidth />
                 </Stack>
-                <TextField label="Transaction cost" type="number" value={registeredCost} onChange={(event) => setRegisteredCost(Number(event.target.value))} size="small" />
+                <Paper variant="outlined" sx={{ p: 1.5 }}>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>Realistic Assumptions</Typography>
+                  <Stack spacing={1}>
+                    <Stack direction="row" spacing={1}>
+                      <TextField label="Cost %" type="number" value={registeredCost * 100} onChange={(event) => setRegisteredCost(Number(event.target.value) / 100)} size="small" fullWidth />
+                      <TextField label="Slippage %" type="number" value={registeredSlippage * 100} onChange={(event) => setRegisteredSlippage(Number(event.target.value) / 100)} size="small" fullWidth />
+                    </Stack>
+                    <Stack direction="row" spacing={1}>
+                      <TextField label="Max hold days" type="number" value={registeredMaxHoldingDays} onChange={(event) => setRegisteredMaxHoldingDays(Number(event.target.value))} size="small" fullWidth />
+                      <TextField label="Stop loss %" type="number" value={registeredStopLoss * 100} onChange={(event) => setRegisteredStopLoss(Number(event.target.value) / 100)} size="small" fullWidth />
+                    </Stack>
+                    <Stack direction="row" spacing={1}>
+                      <TextField label="Trailing stop %" type="number" value={registeredTrailingStop * 100} onChange={(event) => setRegisteredTrailingStop(Number(event.target.value) / 100)} size="small" fullWidth />
+                      <TextField label="Take profit %" type="number" value={registeredTakeProfit ? registeredTakeProfit * 100 : 0} onChange={(event) => setRegisteredTakeProfit(Number(event.target.value) / 100)} size="small" fullWidth />
+                    </Stack>
+                  </Stack>
+                </Paper>
                 <Button startIcon={<PlayArrowIcon />} variant="contained" onClick={() => void runConfig(registeredConfig())} disabled={running || !registeredCode}>Run Registered Backtest</Button>
               </Stack>
             )}
@@ -295,6 +326,20 @@ export default function BacktestingStrategyLabPage() {
                 <TextField label="Max positions" type="number" value={config.maxPositions} onChange={(event) => updateConfig({ maxPositions: Number(event.target.value) })} size="small" fullWidth />
                 <TextField label="Cost %" type="number" value={config.transactionCostPercent * 100} onChange={(event) => updateConfig({ transactionCostPercent: Number(event.target.value) / 100 })} size="small" fullWidth />
               </Stack>
+              <Paper variant="outlined" sx={{ p: 1.5 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>Realistic Assumptions</Typography>
+                <Stack spacing={1}>
+                  <Stack direction="row" spacing={1}>
+                    <TextField label="Slippage %" type="number" value={(config.slippagePercent ?? 0) * 100} onChange={(event) => updateConfig({ slippagePercent: Number(event.target.value) / 100 })} size="small" fullWidth />
+                    <TextField label="Max hold days" type="number" value={config.maxHoldingDays ?? ''} onChange={(event) => updateConfig({ maxHoldingDays: Number(event.target.value) || undefined })} size="small" fullWidth />
+                  </Stack>
+                  <Stack direction="row" spacing={1}>
+                    <TextField label="Stop loss %" type="number" value={(config.stopLossPercent ?? 0) * 100} onChange={(event) => updateConfig({ stopLossPercent: Number(event.target.value) / 100 || undefined })} size="small" fullWidth />
+                    <TextField label="Trailing stop %" type="number" value={(config.trailingStopPercent ?? 0) * 100} onChange={(event) => updateConfig({ trailingStopPercent: Number(event.target.value) / 100 || undefined })} size="small" fullWidth />
+                  </Stack>
+                  <TextField label="Take profit %" type="number" value={(config.takeProfitPercent ?? 0) * 100} onChange={(event) => updateConfig({ takeProfitPercent: Number(event.target.value) / 100 || undefined })} size="small" />
+                </Stack>
+              </Paper>
               <FormControlLabel
                 control={<Checkbox checked={Boolean(config.useDataQualityFilter)} onChange={(event) => updateConfig({ useDataQualityFilter: event.target.checked })} />}
                 label="Use data quality filter"
@@ -421,6 +466,8 @@ function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: 
             </Stack>
           </Stack>
           {metrics?.frameworkRating?.ratingReasons?.length ? <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>{metrics.frameworkRating.ratingReasons.join(' ')}</Typography> : null}
+          {metrics?.frameworkRating?.ratingWarnings?.length ? <Alert severity="warning" sx={{ mt: 1 }}>{metrics.frameworkRating.ratingWarnings.join(' ')}</Alert> : null}
+          {metrics?.frameworkRating?.ratingCapsApplied?.length ? <Typography variant="caption" color="text.secondary">Caps applied: {metrics.frameworkRating.ratingCapsApplied.join(', ')}</Typography> : null}
         </Paper>
       )}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 1.5 }}>
@@ -433,8 +480,22 @@ function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: 
         <MetricCard label="Trades" value={String(metrics?.numberOfTrades ?? 0)} />
         <MetricCard label="Profit Factor" value={fmtNumber(metrics?.profitFactor)} />
         <MetricCard label="Avg Hold" value={metrics?.averageHoldingDays ? `${metrics.averageHoldingDays.toFixed(0)} days` : 'N/A'} />
-        <MetricCard label="Exposure" value="N/A" />
+        <MetricCard label="Longest Hold" value={metrics?.longestHoldingDays ? `${metrics.longestHoldingDays.toFixed(0)} days` : 'N/A'} />
       </Box>
+      {metrics?.benchmarkComparison && (
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="h6" sx={{ mb: 1 }}>Benchmark Comparison</Typography>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} flexWrap="wrap">
+            <Chip size="small" label={metrics.benchmarkComparison.benchmarkDataStatus} />
+            <Chip size="small" label={metrics.benchmarkComparison.benchmarkName || 'Benchmark unavailable'} />
+            <Chip size="small" label={`Strategy CAGR ${fmtPercent(metrics.cagr)}`} />
+            <Chip size="small" label={`Benchmark CAGR ${fmtPercent(metrics.benchmarkComparison.benchmarkCagr)}`} />
+            <Chip size="small" label={`Excess CAGR ${fmtPercent(metrics.benchmarkComparison.excessCagr)}`} color={(metrics.benchmarkComparison.excessCagr ?? 0) < 0 ? 'warning' : 'success'} />
+          </Stack>
+          {metrics.benchmarkComparison.dataGap && <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>{metrics.benchmarkComparison.dataGap}</Typography>}
+        </Paper>
+      )}
+      {metrics?.realismWarnings?.length ? <Alert severity="warning">{metrics.realismWarnings.join(' ')}</Alert> : null}
       <Paper sx={{ p: 2 }}>
         <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
           <Typography variant="h6">Equity Curve</Typography>
@@ -466,6 +527,21 @@ function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: 
           excluded for history {metrics.dataCoverage.instrumentsExcludedForHistory}, data quality {metrics.dataCoverage.instrumentsExcludedForDataQuality}.
           {metrics.dataCoverage.warnings.length ? ` ${metrics.dataCoverage.warnings.join(' ')}` : ''}
         </Alert>
+      )}
+      {metrics?.exitDiagnostics && (
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="h6" sx={{ mb: 1 }}>Exit Diagnostics</Typography>
+          <Stack direction="row" spacing={1} flexWrap="wrap">
+            <Chip size="small" label={`Strategy exits ${metrics.exitDiagnostics.strategyExitCount}`} />
+            <Chip size="small" label={`Stop loss ${metrics.exitDiagnostics.stopLossExitCount}`} />
+            <Chip size="small" label={`Trailing stop ${metrics.exitDiagnostics.trailingStopExitCount}`} />
+            <Chip size="small" label={`Take profit ${metrics.exitDiagnostics.takeProfitExitCount}`} />
+            <Chip size="small" label={`Max hold ${metrics.exitDiagnostics.maxHoldExitCount}`} />
+            <Chip size="small" label={`End of test ${fmtPercent(metrics.exitDiagnostics.endOfTestExitPercent)}`} color={metrics.exitDiagnostics.endOfTestExitPercent >= 0.4 ? 'warning' : 'default'} />
+            <Chip size="small" label={`Median hold ${metrics.exitDiagnostics.medianHoldingDays?.toFixed(0) ?? 'N/A'}d`} />
+            <Chip size="small" label={`Longest hold ${metrics.exitDiagnostics.longestHoldingDays?.toFixed(0) ?? 'N/A'}d`} />
+          </Stack>
+        </Paper>
       )}
       <Paper sx={{ p: 2 }}>
         <Typography variant="h6" sx={{ mb: 1 }}>Trade Log</Typography>
