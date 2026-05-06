@@ -10,6 +10,8 @@ All context summaries are region-specific:
 ### Persistence
 Snapshots are stored per region in the `MarketContextSnapshot` database model. This allows for historical analysis of specific market conditions (e.g., "Breadth of India stocks in May 2026").
 
+Downstream batch modules that need bounded reads can use the public `latestPersistedSummary(region)` service method. Unlike `summary()`, it returns only the latest persisted snapshot and does not run market-context generation when a snapshot is missing.
+
 ## API Reference
 
 | Endpoint | Purpose | Region Support |

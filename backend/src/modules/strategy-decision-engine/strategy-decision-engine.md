@@ -14,6 +14,7 @@ The `marketGate` endpoint accepts a `region` parameter. This ensures the "OPEN/C
 ### Candidates & Evaluation
 - `GET /api/v1/strategy/candidates`: Supports `region` and `assetType` query parameters.
 - `POST /api/v1/strategy/evaluate`: Respects the provided `region` for universe resolution and market gate checks.
+- Evaluation is batch-oriented. Callers should use `batchSize` plus `offset`; the backend evaluates only the requested page, returns `nextOffset`, and uses bounded worker-style concurrency inside the request.
 
 ## API Reference
 
@@ -77,6 +78,16 @@ Conservative defaults:
 ### Persistence
 
 `StrategyDecisionResult` remains daily-idempotent by `instrumentId + strategy + modelVersion + generatedDate`. Framework-backed metadata is stored additively on the same row, so same-day re-evaluation updates rather than duplicates the decision.
+
+Persisted decision rows include the existing API-compatible `scoreBreakdown` JSON payload. `entryZone` is serialized before persistence and parsed back for API responses, matching the current Prisma column shape while preserving the frontend response contract.
+
+### Evaluation Performance
+
+`POST /api/v1/strategy/evaluate` does not run full-universe work. For the default latest-signal universe it reads the requested page through Signal Generation Engine public APIs (`latestSignalUniverse` and count), then processes instruments with bounded concurrency. When `strategy = ALL`, instrument context is built once per instrument and reused across the framework-backed strategies instead of refetching prices, data quality, smart-money, and market context per strategy.
+
+The service also reuses request-local Strategy Framework performance/rating lookups by `strategyCode + region + assetType`. This keeps repeated framework-backed decisions from issuing duplicate rating queries during the same batch.
+
+Evaluation uses persisted-only child context where available: latest raw signals from the latest-signal universe, latest persisted market-context snapshot, latest persisted calibration, latest persisted data-quality evaluation, and latest persisted smart-money snapshot. Missing persisted context is surfaced as `dataGaps`; Strategy Decision Evaluate should not trigger market-context generation, calibration runs, data-quality evaluations, smart-money snapshot calculation, backtests, or signal generation during a batch.
 
 ### Temporary Logic
 

@@ -8,6 +8,7 @@ import { PortfolioManagementService } from '../portfolio-management';
 import { WatchlistManagementService } from '../watchlist-management';
 import { StrategyFrameworkEvaluator, StrategyFrameworkRegistry, StrategyFrameworkService } from '../strategy-framework';
 import type { StrategyContext, StrategySignalOutput } from '../strategy-framework';
+import type { SignalResultDto } from '../signal-generation-engine';
 import { StrategyDecisionEngineRepository } from './strategy-decision-engine.repository';
 import type {
   AllowedAction,
@@ -26,6 +27,7 @@ import type {
 } from './strategy-decision-engine.types';
 
 const MODEL_VERSION = 'strategy-decision-v1';
+const EVALUATION_WORKER_CONCURRENCY = 5;
 
 export class StrategyDecisionEngineService {
   constructor(
@@ -43,11 +45,18 @@ export class StrategyDecisionEngineService {
   ) {}
 
   async marketGate(region?: string): Promise<MarketGateResponse> {
-    const [summary, regime, breadth] = await Promise.all([
-      this.contextService.summary({ region }).catch(() => null),
-      this.contextService.regime().catch(() => null),
-      this.contextService.breadth().catch(() => null),
-    ]);
+    const persistedOnly = typeof (this.contextService as any).latestPersistedSummary === 'function';
+    const summary = persistedOnly
+      ? await this.latestPersistedMarketSummary(region)
+      : await this.contextService.summary({ region }).catch(() => null);
+    const [regime, breadth] = summary?.regime && summary?.breadth
+      ? [summary.regime, summary.breadth]
+      : persistedOnly
+        ? [null, null]
+        : await Promise.all([
+            this.contextService.regime(region).catch(() => null),
+            this.contextService.breadth(region).catch(() => null),
+          ]);
 
     const reasons: string[] = [];
     const blockers: string[] = [];
@@ -106,38 +115,42 @@ export class StrategyDecisionEngineService {
 
   async evaluate(request: StrategyEvaluateRequest): Promise<StrategyEvaluateResponse> {
     const started = Date.now();
-    const allInstrumentIds = await this.resolveUniverse(request);
-    
     const batchSize = request.batchSize || 25;
     const offset = request.offset || 0;
-    const instrumentIds = allInstrumentIds.slice(offset, offset + batchSize);
+    const universe = await this.resolveEvaluationUniverse(request, batchSize, offset);
+    const instrumentIds = universe.instrumentIds;
     
     const results: StrategyDecisionDto[] = [];
-    const gate = await this.marketGate(request.region);
+    const [gate, marketSummary] = await Promise.all([
+      this.marketGate(request.region),
+      this.latestPersistedMarketSummary(request.region),
+    ]);
+    const instruments = await this.getEvaluationInstruments(instrumentIds);
+    const instrumentsById = new Map(instruments.map((instrument: any) => [instrument.id, instrument]));
+    const strategyRatings = new Map<string, Promise<StrategyDecisionDto['strategyRating']>>();
     let failedCount = 0;
 
-    // Controlled concurrency: Process 5 instruments at a time
-    const concurrency = 5;
-    for (let i = 0; i < instrumentIds.length; i += concurrency) {
-      const chunk = instrumentIds.slice(i, i + concurrency);
+    for (let i = 0; i < instrumentIds.length; i += EVALUATION_WORKER_CONCURRENCY) {
+      const chunk = instrumentIds.slice(i, i + EVALUATION_WORKER_CONCURRENCY);
       const chunkResults = await Promise.all(chunk.map(async (instrumentId) => {
         try {
-          let strategies: StrategyName[] = [];
-          if (request.strategy === 'ALL') {
-            strategies = ['TREND_MOMENTUM', 'PULLBACK_IN_UPTREND'];
-            if (request.portfolioId) strategies.push('DEFENSIVE_EXIT');
-          } else {
-            strategies = [request.strategy];
-          }
-
+          const strategies = this.strategiesForRequest(request);
+          const rawSignal = universe.rawSignalsByInstrumentId.get(instrumentId);
           const instrumentResults: StrategyDecisionDto[] = [];
-          for (const strategy of strategies) {
-            const decision = await this.evaluateInstrumentStrategy(instrumentId, strategy, gate, request.portfolioId);
+          const decisions = await this.evaluateInstrumentStrategies(instrumentId, strategies, gate, {
+            portfolioId: request.portfolioId,
+            region: request.region,
+            marketSummary,
+            rawSignal,
+            instrument: instrumentsById.get(instrumentId),
+            strategyRatings,
+          });
+          await Promise.all(decisions.map(async (decision) => {
             if (decision) {
               const persisted = await this.repository.create(decision);
               instrumentResults.push(persisted);
             }
-          }
+          }));
           return instrumentResults;
         } catch (error: any) {
           console.error(`Evaluation failed for ${instrumentId}:`, error);
@@ -150,7 +163,7 @@ export class StrategyDecisionEngineService {
       results.push(...chunkResultsFlattened);
     }
 
-    const totalCount = allInstrumentIds.length;
+    const totalCount = universe.totalCount;
     const nextOffset = offset + batchSize < totalCount ? offset + batchSize : null;
 
     return {
@@ -256,7 +269,7 @@ export class StrategyDecisionEngineService {
     gate: MarketGateResponse,
     portfolioId?: string
   ): Promise<StrategyDecisionDto | null> {
-    const context = await this.buildDecisionContext(instrumentId, gate, portfolioId);
+    const context = await this.buildDecisionContext(instrumentId, gate, { portfolioId });
     if (!context?.instrument) return null;
 
     const frameworkDecision = await this.evaluateWithStrategyFramework(strategyName, context).catch(() => null);
@@ -282,16 +295,65 @@ export class StrategyDecisionEngineService {
     return null;
   }
 
-  private async buildDecisionContext(instrumentId: string, gate: MarketGateResponse, portfolioId?: string): Promise<any | null> {
+  private async evaluateInstrumentStrategies(
+    instrumentId: string,
+    strategies: StrategyName[],
+    gate: MarketGateResponse,
+    options: {
+      portfolioId?: string;
+      region?: string;
+      marketSummary?: any;
+      rawSignal?: SignalResultDto;
+      instrument?: any;
+      strategyRatings?: Map<string, Promise<StrategyDecisionDto['strategyRating']>>;
+    } = {}
+  ): Promise<StrategyDecisionDto[]> {
+    const context = await this.buildDecisionContext(instrumentId, gate, options);
+    if (!context?.instrument) return [];
+    const decisions: StrategyDecisionDto[] = [];
+    for (const strategy of strategies) {
+      const decision = await this.evaluateStrategyWithContext(strategy, context, options.strategyRatings);
+      if (decision) decisions.push(decision);
+    }
+    return decisions;
+  }
+
+  private async evaluateStrategyWithContext(
+    strategyName: StrategyName,
+    context: any,
+    strategyRatings?: Map<string, Promise<StrategyDecisionDto['strategyRating']>>
+  ): Promise<StrategyDecisionDto | null> {
+    const frameworkDecision = await this.evaluateWithStrategyFramework(strategyName, context, strategyRatings).catch(() => null);
+    if (frameworkDecision) return frameworkDecision;
+
+    if (strategyName === 'TREND_MOMENTUM') return this.evaluateTrendMomentum(context);
+    if (strategyName === 'PULLBACK_IN_UPTREND') return this.evaluatePullback(context);
+    if (strategyName === 'DEFENSIVE_EXIT') return this.evaluateDefensiveExit(context);
+    
+    return null;
+  }
+
+  private async buildDecisionContext(
+    instrumentId: string,
+    gate: MarketGateResponse,
+    options: {
+      portfolioId?: string;
+      region?: string;
+      marketSummary?: any;
+      rawSignal?: SignalResultDto;
+      instrument?: any;
+      portfolio?: any;
+    } = {}
+  ): Promise<any | null> {
     const [instrument, pricesRes, rawSignal, calibrated, quality, smartMoney, marketSummary, portfolio] = await Promise.all([
-      this.marketDataService.getInstrument(instrumentId).catch(() => null),
-      this.marketDataService.listPricesByInstrumentId(instrumentId, 500).catch(() => ({ prices: [] })),
-      this.signalService.latestForInstrument(instrumentId).catch(() => null),
-      this.calibrationService.latestForInstrument(instrumentId).catch(() => null),
-      this.dataQualityService.diagnostics(instrumentId).catch(() => null),
-      this.smartMoneyService.stock(instrumentId, '3M').catch(() => null),
-      this.contextService.summary({ region: gate.marketGate === 'UNKNOWN' ? undefined : undefined }).catch(() => null),
-      portfolioId ? this.portfolioService.getPortfolioDetail(portfolioId).catch(() => null) : Promise.resolve(null),
+      options.instrument ? Promise.resolve(options.instrument) : this.marketDataService.getInstrument(instrumentId, { region: options.region }).catch(() => null),
+      this.marketDataService.listPricesByInstrumentId(instrumentId, 500, undefined, undefined, { region: options.region }).catch(() => ({ prices: [] })),
+      options.rawSignal ? Promise.resolve(options.rawSignal) : this.signalService.latestForInstrument(instrumentId).catch(() => null),
+      this.latestPersistedCalibration(instrumentId),
+      this.latestPersistedDataQuality(instrumentId),
+      this.latestPersistedSmartMoney(instrumentId),
+      options.marketSummary !== undefined ? Promise.resolve(options.marketSummary) : this.contextService.summary({ region: options.region }).catch(() => null),
+      options.portfolio ? Promise.resolve(options.portfolio) : options.portfolioId ? this.portfolioService.getPortfolioDetail(options.portfolioId).catch(() => null) : Promise.resolve(null),
     ]);
 
     if (!instrument) return null;
@@ -330,7 +392,7 @@ export class StrategyDecisionEngineService {
       quality,
       smartMoney,
       gate,
-      portfolioId,
+      portfolioId: options.portfolioId,
       holding,
       sectors: sectorContexts,
       sectorContext,
@@ -339,7 +401,11 @@ export class StrategyDecisionEngineService {
     };
   }
 
-  private async evaluateWithStrategyFramework(strategyName: StrategyName, ctx: any): Promise<StrategyDecisionDto | null> {
+  private async evaluateWithStrategyFramework(
+    strategyName: StrategyName,
+    ctx: any,
+    strategyRatings?: Map<string, Promise<StrategyDecisionDto['strategyRating']>>
+  ): Promise<StrategyDecisionDto | null> {
     const definition = this.strategyRegistry.get(strategyName);
     if (!definition) return null;
     const strategyContext = this.toStrategyFrameworkContext(ctx);
@@ -347,7 +413,7 @@ export class StrategyDecisionEngineService {
     const frameworkResult = strategyName === 'DEFENSIVE_EXIT'
       ? evaluator.evaluateExit(strategyContext)
       : evaluator.evaluateEntry(strategyContext);
-    const rating = await this.latestStrategyRating(definition.code, strategyContext.region || 'IN', strategyContext.assetType || 'STOCK');
+    const rating = await this.latestStrategyRating(definition.code, strategyContext.region || 'IN', strategyContext.assetType || 'STOCK', strategyRatings);
     return this.adaptFrameworkResult(ctx, frameworkResult, rating);
   }
 
@@ -473,14 +539,64 @@ export class StrategyDecisionEngineService {
     return { decision: 'HOLD', action: 'HOLD_POSITION', frameworkAction: 'HOLD_POSITION' };
   }
 
-  private async latestStrategyRating(strategyCode: string, region: string, assetType: string): Promise<StrategyDecisionDto['strategyRating']> {
-    const summaries = await this.strategyFrameworkService.performance(strategyCode, { region, assetType }).catch(() => []);
+  private async latestStrategyRating(
+    strategyCode: string,
+    region: string,
+    assetType: string,
+    cache?: Map<string, Promise<StrategyDecisionDto['strategyRating']>>
+  ): Promise<StrategyDecisionDto['strategyRating']> {
+    const key = `${strategyCode}|${region}|${assetType}`;
+    if (cache?.has(key)) return cache.get(key)!;
+    const promise = this.strategyFrameworkService.performance(strategyCode, { region, assetType }).catch(() => []).then((summaries) => {
     const latest = summaries[0];
     return latest ? {
       ratingScore: latest.ratingScore,
       ratingGrade: latest.ratingGrade,
       readinessLabel: latest.readinessLabel,
     } : null;
+    });
+    cache?.set(key, promise);
+    return promise;
+  }
+
+  private latestPersistedCalibration(instrumentId: string) {
+    const service = this.calibrationService as any;
+    if (typeof service.latestPersistedForInstrument === 'function') {
+      return service.latestPersistedForInstrument(instrumentId).catch(() => null);
+    }
+    return service.latestForInstrument(instrumentId).catch(() => null);
+  }
+
+  private latestPersistedDataQuality(instrumentId: string) {
+    const service = this.dataQualityService as any;
+    if (typeof service.getLatestEvaluationForInstrument === 'function') {
+      return service.getLatestEvaluationForInstrument(instrumentId).catch(() => null);
+    }
+    return service.diagnostics(instrumentId).catch(() => null);
+  }
+
+  private latestPersistedSmartMoney(instrumentId: string) {
+    const service = this.smartMoneyService as any;
+    if (typeof service.latestPersistedStock === 'function') {
+      return service.latestPersistedStock(instrumentId, '3M').catch(() => null);
+    }
+    return service.stock(instrumentId, '3M').catch(() => null);
+  }
+
+  private latestPersistedMarketSummary(region?: string) {
+    const service = this.contextService as any;
+    if (typeof service.latestPersistedSummary === 'function') {
+      return service.latestPersistedSummary(region).catch(() => null);
+    }
+    return service.summary({ region }).catch(() => null);
+  }
+
+  private getEvaluationInstruments(instrumentIds: string[]) {
+    const service = this.marketDataService as any;
+    if (typeof service.getInstrumentsByIds === 'function') {
+      return service.getInstrumentsByIds(instrumentIds).catch(() => []);
+    }
+    return Promise.resolve([]);
   }
 
   private evaluateTrendMomentum(ctx: any): StrategyDecisionDto {
@@ -875,24 +991,44 @@ export class StrategyDecisionEngineService {
     return confidence;
   }
 
-  private async resolveUniverse(request: StrategyEvaluateRequest): Promise<string[]> {
-    if (request.instrumentId) return [request.instrumentId];
+  private strategiesForRequest(request: StrategyEvaluateRequest): StrategyName[] {
+    if (request.strategy !== 'ALL') return [request.strategy];
+    const strategies: StrategyName[] = ['TREND_MOMENTUM', 'PULLBACK_IN_UPTREND'];
+    if (request.portfolioId) strategies.push('DEFENSIVE_EXIT');
+    return strategies;
+  }
+
+  private async resolveEvaluationUniverse(
+    request: StrategyEvaluateRequest,
+    batchSize: number,
+    offset: number
+  ): Promise<{ instrumentIds: string[]; totalCount: number; rawSignalsByInstrumentId: Map<string, SignalResultDto> }> {
+    if (request.instrumentId) return { instrumentIds: [request.instrumentId], totalCount: 1, rawSignalsByInstrumentId: new Map() };
     if (request.symbol) {
       const res = await this.marketDataService.listInstruments({ search: request.symbol, pageSize: 1, region: request.region });
       const match = res.instruments.find(i => i.symbol === request.symbol);
-      return match ? [match.id] : [];
+      return { instrumentIds: match ? [match.id] : [], totalCount: match ? 1 : 0, rawSignalsByInstrumentId: new Map() };
     }
     if (request.portfolioId) {
       const detail = await this.portfolioService.getPortfolioDetail(request.portfolioId);
-      return detail?.holdings.map(h => h.instrumentId) || [];
+      const ids = detail?.holdings.map(h => h.instrumentId) || [];
+      return { instrumentIds: ids.slice(offset, offset + batchSize), totalCount: ids.length, rawSignalsByInstrumentId: new Map() };
     }
     if (request.watchlistId) {
       const detail = await this.watchlistService.detail(request.watchlistId);
-      return detail?.items.map(i => i.instrumentId) || [];
+      const ids = detail?.items.map(i => i.instrumentId) || [];
+      return { instrumentIds: ids.slice(offset, offset + batchSize), totalCount: ids.length, rawSignalsByInstrumentId: new Map() };
     }
-    // Default: Top signals universe
-    const signals = await this.signalService.topSignals({ limit: 50, region: request.region, assetType: request.assetType });
-    return signals.signals.map(s => s.instrument_id);
+    const signalQuery = { limit: batchSize, offset, region: request.region, assetType: request.assetType };
+    const [signals, totalCount] = await Promise.all([
+      this.signalService.latestSignalUniverse(signalQuery),
+      this.signalService.latestSignalUniverseCount(signalQuery),
+    ]);
+    return {
+      instrumentIds: signals.map((signal) => signal.instrument_id),
+      totalCount,
+      rawSignalsByInstrumentId: new Map(signals.map((signal) => [signal.instrument_id, signal])),
+    };
   }
 
   private calculateSma(prices: number[], period: number): number | null {

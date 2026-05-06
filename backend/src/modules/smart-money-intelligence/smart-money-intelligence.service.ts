@@ -100,7 +100,12 @@ export class SmartMoneyIntelligenceService {
         await this.repository.saveSnapshot(summary);
     }
     
-    return summary;
+      return summary;
+    }
+
+  async latestPersistedStock(instrumentId: string, range: SmartMoneyRange = '3M'): Promise<SmartMoneyStockSummary | null> {
+    if (!instrumentId) throw new Error('instrumentId is required');
+    return this.repository.latestStockSnapshot(instrumentId, range);
   }
 
   async top(query: SmartMoneyListQuery) {

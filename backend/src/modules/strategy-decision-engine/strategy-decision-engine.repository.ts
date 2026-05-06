@@ -8,10 +8,12 @@ export class StrategyDecisionEngineRepository {
 
   async create(data: StrategyDecisionDto): Promise<StrategyDecisionDto> {
     const generatedDate = this.normalizeUtcDay(data.generatedAt);
+    const instrumentId = data.instrumentId || 'GLOBAL';
+    const entryZone = this.serializeEntryZone(data.entryZone);
     const record = await this.db.strategyDecisionResult.upsert({
       where: {
         instrumentId_strategy_modelVersion_generatedDate: {
-          instrumentId: data.instrumentId || 'GLOBAL',
+          instrumentId,
           strategy: data.strategy,
           modelVersion: data.modelVersion,
           generatedDate,
@@ -25,7 +27,7 @@ export class StrategyDecisionEngineRepository {
         confidence: data.confidence,
         marketCondition: data.marketCondition,
         marketGate: data.marketGate,
-        entryZone: (data.entryZone as any) || Prisma.JsonNull,
+        entryZone,
         riskPlan: (data.riskPlan as any) || Prisma.JsonNull,
         reasons: data.reasons as any,
         blockers: data.blockers as any,
@@ -45,7 +47,6 @@ export class StrategyDecisionEngineRepository {
         exchange: data.exchange || null,
       },
       create: {
-        instrumentId: data.instrumentId || 'GLOBAL',
         portfolioId: data.portfolioId,
         holdingId: data.holdingId,
         symbol: data.symbol,
@@ -59,7 +60,7 @@ export class StrategyDecisionEngineRepository {
         confidence: data.confidence,
         marketCondition: data.marketCondition,
         marketGate: data.marketGate,
-        entryZone: (data.entryZone as any) || Prisma.JsonNull,
+        entryZone,
         riskPlan: (data.riskPlan as any) || Prisma.JsonNull,
         reasons: data.reasons as any,
         blockers: data.blockers as any,
@@ -77,6 +78,7 @@ export class StrategyDecisionEngineRepository {
         modelVersion: data.modelVersion,
         generatedAt: new Date(data.generatedAt),
         generatedDate,
+        ...(data.instrumentId ? { stock: { connect: { id: data.instrumentId } } } : {}),
       },
     });
     return this.toDto(record);
@@ -168,7 +170,7 @@ export class StrategyDecisionEngineRepository {
       confidence: record.confidence as any,
       marketCondition: record.marketCondition as any,
       marketGate: record.marketGate as any,
-      entryZone: record.entryZone || undefined,
+      entryZone: this.parseEntryZone(record.entryZone),
       riskPlan: record.riskPlan || undefined,
       reasons: record.reasons as string[],
       blockers: record.blockers as string[],
@@ -192,5 +194,19 @@ export class StrategyDecisionEngineRepository {
     const date = value instanceof Date ? new Date(value) : new Date(value);
     date.setUTCHours(0, 0, 0, 0);
     return date;
+  }
+
+  private serializeEntryZone(value: StrategyDecisionDto['entryZone']): string | null {
+    return value ? JSON.stringify(value) : null;
+  }
+
+  private parseEntryZone(value: unknown): StrategyDecisionDto['entryZone'] | undefined {
+    if (!value) return undefined;
+    if (typeof value !== 'string') return value as StrategyDecisionDto['entryZone'];
+    try {
+      return JSON.parse(value) as StrategyDecisionDto['entryZone'];
+    } catch {
+      return undefined;
+    }
   }
 }

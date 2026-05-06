@@ -686,6 +686,7 @@ model StrategyDecisionResult {
   marketGate       String
   entryZone        String?
   riskPlan         Json?
+  scoreBreakdown   Json?
   reasons          Json
   blockers         Json
   warnings         Json

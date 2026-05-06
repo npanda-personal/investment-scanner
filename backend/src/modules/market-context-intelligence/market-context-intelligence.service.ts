@@ -56,6 +56,10 @@ export class MarketContextIntelligenceService {
     return (await this.repository.latestSnapshot(query.region))!;
   }
 
+  async latestPersistedSummary(region?: string): Promise<MarketContextSummary | null> {
+    return this.repository.latestSnapshot(region);
+  }
+
   async regime(region?: string) {
     const s = await this.summary({ region });
     return s.regime;

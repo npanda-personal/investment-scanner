@@ -158,6 +158,8 @@ Uses public module exports:
 
 Raw-vs-calibrated comparison responses include a `dataQuality` object when a latest evaluation exists. The frontend displays this as a data-quality caution panel alongside boosts and penalties.
 
+Downstream strategy triage modules that need fast, bounded reads should use the public `latestPersistedForInstrument` service method. It returns only already persisted calibration context and does not trigger on-demand calibration.
+
 ## Performance And UX Behavior
 
 - Calibration top/model/health endpoints are lightweight and bounded for initial page load.

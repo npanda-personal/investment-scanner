@@ -37,6 +37,10 @@ export class SignalCalibrationEngineService {
     return raw ? this.calibrateAndPersist(raw) : null;
   }
 
+  async latestPersistedForInstrument(instrumentId: string): Promise<SignalCalibrationResultDto | null> {
+    return this.repository.latestForInstrument(instrumentId);
+  }
+
   async compare(instrumentId: string): Promise<CalibrationComparison | null> {
     const raw = await this.signalService.latestForInstrument(instrumentId);
     if (!raw) return null;

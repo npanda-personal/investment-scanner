@@ -25,5 +25,9 @@ Query parameters `region` and `assetType` are supported in all list and aggregat
 ## Sector Aggregation
 Sector summaries are calculated per region to provide accurate localized tailwinds and distribution warnings.
 
+## Downstream Reads
+
+`stock()` may calculate and persist an on-demand snapshot when today's snapshot is missing. Downstream batch triage modules that need fast, bounded reads should use the public `latestPersistedStock()` service method so missing smart-money context becomes a data gap instead of triggering price-volume calculation during their request.
+
 ## Frontend
 - `SmartMoneyIntelligencePage`: Subscribes to `useMarketScope()`. Automatically refetches all candidates and sector data when the header region changes.

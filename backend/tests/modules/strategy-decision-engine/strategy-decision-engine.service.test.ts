@@ -397,4 +397,88 @@ describe('StrategyDecisionEngineService', () => {
         ]),
       }));
     });
+
+    it('evaluates ALL with one context build per instrument and raw signal universe reuse', async () => {
+      const repository = {
+        create: jest.fn(async (decision) => ({ ...decision, id: `${decision.instrumentId}-${decision.strategy}` })),
+      };
+      const prices = makePrices();
+      const marketData = {
+        getInstrument: jest.fn(async (instrumentId: string) => ({
+          id: instrumentId,
+          symbol: `${instrumentId}.NS`,
+          sector: 'Tech',
+          country: 'IN',
+          exchange: 'NSE',
+          currency: 'INR',
+          asset_type: 'STOCK',
+        })),
+        listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices }),
+      };
+      const context = {
+        summary: jest.fn().mockResolvedValue({
+          dataStatus: 'COMPLETE',
+          topSectors: [{ sector: 'Tech', leadershipStatus: 'LEADING', relativeStrengthScore: 70 }],
+          weakSectors: [],
+          regime: { regime: 'RISK_ON' },
+        }),
+        regime: jest.fn().mockResolvedValue({ regime: 'RISK_ON', score: 80 }),
+        breadth: jest.fn().mockResolvedValue({ percentAboveSma50: 0.7 }),
+      };
+      const signal = {
+        latestSignalUniverse: jest.fn().mockResolvedValue([
+          { instrument_id: 'stock-1', symbol: 'AAA.NS', score: 86, direction: 'BULLISH', confidence: 'HIGH', triggered_signals: [], negative_signals: [], generated_at: new Date().toISOString(), source: 'test', data_status: 'COMPLETE' },
+          { instrument_id: 'stock-2', symbol: 'BBB.NS', score: 80, direction: 'BULLISH', confidence: 'HIGH', triggered_signals: [], negative_signals: [], generated_at: new Date().toISOString(), source: 'test', data_status: 'COMPLETE' },
+        ]),
+        latestSignalUniverseCount: jest.fn().mockResolvedValue(2),
+        latestForInstrument: jest.fn(),
+        topSignals: jest.fn(),
+      };
+      const calibration = {
+        latestForInstrument: jest.fn().mockResolvedValue({ calibratedScore: 88, calibratedDirection: 'BULLISH', calibratedConfidence: 'HIGH' }),
+      };
+      const quality = {
+        diagnostics: jest.fn().mockResolvedValue({
+          eligibleForSignals: true,
+          eligibleForBacktesting: true,
+          signalReadinessStatus: 'READY',
+          coverageStatus: 'GOOD',
+          liquidityStatus: 'LIQUID',
+          signalReadinessScore: 90,
+        }),
+      };
+      const smartMoney = {
+        stock: jest.fn().mockResolvedValue({ status: 'ACCUMULATION', smartMoneyScore: 75 }),
+      };
+      const frameworkService = {
+        performance: jest.fn().mockResolvedValue([{ ratingScore: 66, ratingGrade: 'GOOD', readinessLabel: 'PAPER_TEST_CANDIDATE' }]),
+      };
+      const svc = new StrategyDecisionEngineService(
+        repository as any,
+        marketData as any,
+        context as any,
+        signal as any,
+        calibration as any,
+        quality as any,
+        smartMoney as any,
+        {} as any,
+        {} as any,
+        new StrategyFrameworkRegistry(),
+        frameworkService as any
+      );
+
+      const result = await svc.evaluate({ strategy: 'ALL', batchSize: 2, offset: 0, region: 'IN', assetType: 'STOCK' });
+
+      expect(result.failedCount).toBe(0);
+      expect(result.processedCount).toBe(2);
+      expect(result.generatedCount).toBe(4);
+      expect(signal.topSignals).not.toHaveBeenCalled();
+      expect(signal.latestForInstrument).not.toHaveBeenCalled();
+      expect(marketData.getInstrument).toHaveBeenCalledTimes(2);
+      expect(marketData.listPricesByInstrumentId).toHaveBeenCalledTimes(2);
+      expect(quality.diagnostics).toHaveBeenCalledTimes(2);
+      expect(smartMoney.stock).toHaveBeenCalledTimes(2);
+      expect(repository.create).toHaveBeenCalledTimes(4);
+      expect(frameworkService.performance).toHaveBeenCalledTimes(2);
+    });
   });
