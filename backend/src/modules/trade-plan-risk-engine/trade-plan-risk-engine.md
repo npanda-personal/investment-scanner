@@ -34,7 +34,16 @@ It does NOT own:
 - **Target**: Defaults to 2R (2x risk multiple).
 - **Position Sizing**: Scales risk percent against the portfolio total value or capital base.
 
+## API Endpoints
+- `GET /api/v1/trade-plans/health`
+- `GET /api/v1/trade-plans/model`
+- `GET /api/v1/trade-plans/candidates` (Supports `region`, `limit`, `offset`, `sortBy`, `sortDirection`)
+- `GET /api/v1/trade-plans/:instrumentId`
+- `POST /api/v1/trade-plans/generate`
+- `POST /api/v1/trade-plans/generate/batch`
+
 ## Integration
+- **Frontend Dashboard:** Available at `/trade-plans`. Integrates with the shared `DataTable` to provide pagination and sorting (e.g., on the Status column).
 - Can be triggered manually via `/api/v1/trade-plans/generate`.
 - Reads `StrategyDecisionResult` from the database.
 - Consumes `MarketDataFoundation` for the latest price and historical SMA approximation.

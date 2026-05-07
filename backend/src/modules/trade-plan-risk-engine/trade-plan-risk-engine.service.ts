@@ -69,9 +69,9 @@ export class TradePlanRiskEngineService {
       result.strategyVersion = decision.strategyVersion || '1.0.0';
       result.strategyDecisionId = decision.id;
 
-      if (!['CANDIDATE', 'WATCH'].includes(decision.decision)) {
+      if (!['TRADE_CANDIDATE', 'WATCH'].includes(decision.decision)) {
         result.planStatus = 'BLOCKED';
-        result.blockers.push(`Strategy Decision is ${decision.decision}, expected CANDIDATE or WATCH.`);
+        result.blockers.push(`Strategy Decision is ${decision.decision}, expected TRADE_CANDIDATE or WATCH.`);
       }
 
       if (decision.marketGateStatus === 'CLOSED') {

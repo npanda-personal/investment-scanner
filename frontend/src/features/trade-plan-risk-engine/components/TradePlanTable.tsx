@@ -47,6 +47,7 @@ export const TradePlanTable: React.FC<TradePlanTableProps> = ({
     { 
       id: 'riskGrade', 
       label: 'Risk Grade', 
+      sortable: true,
       render: (p) => (
         <Chip 
           label={p.riskGrade} 
