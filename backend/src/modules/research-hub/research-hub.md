@@ -152,3 +152,7 @@ Research Hub never displays live-trading readiness labels. Any stored live-tradi
 - `npm test -- strategy-decision-engine --runInBand` in `backend`
 - `npm test -- strategy-framework --runInBand` in `backend`
 - `npm run build` in `frontend`
+
+## Trade Plan Risk Engine Integration
+
+The Research Hub now includes a "Trade Plan" action button on candidate priority cards, allowing users to jump directly to the Trade Plan Risk Engine to generate executable trade plans based on strategy-backed candidates.

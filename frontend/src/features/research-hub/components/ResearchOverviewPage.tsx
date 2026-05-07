@@ -288,9 +288,14 @@ const PriorityCard: React.FC<{ title: string; items: ResearchPriorityCandidate[]
                   disablePadding
                   sx={{ '&:hover': { bgcolor: 'action.hover' } }}
                   secondaryAction={
-                    <IconButton edge="end" size="small" component={Link} to={item.stockRoute || `/stocks/${item.instrumentId}`}>
-                      <ArrowForwardOutlined fontSize="small" />
-                    </IconButton>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      {type === 'candidate' && (
+                        <Button size="small" variant="outlined" component={Link} to={`/trade-plans`}>Trade Plan</Button>
+                      )}
+                      <IconButton edge="end" size="small" component={Link} to={item.stockRoute || `/stocks/${item.instrumentId}`}>
+                        <ArrowForwardOutlined fontSize="small" />
+                      </IconButton>
+                    </Stack>
                   }
                 >
                   <ListItemButton component={Link} to={item.targetRoute || `/strategy?instrumentId=${item.instrumentId}`} sx={{ py: 1.5, px: 2 }}>

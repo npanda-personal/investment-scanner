@@ -1,0 +1,174 @@
+import React, { useEffect, useState } from 'react';
+import { Box, Typography, Button, CircularProgress, Alert, Paper, Grid, Divider, List, ListItem, ListItemText, ListItemIcon } from '@mui/material';
+import { useParams } from 'react-router-dom';
+import { TradePlanApi } from '../api';
+import { TradePlanResultDto } from '../types';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+
+export const TradePlanDetail: React.FC = () => {
+  const { instrumentId } = useParams<{ instrumentId: string }>();
+  const [plan, setPlan] = useState<TradePlanResultDto | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+
+  const fetchPlan = async () => {
+    if (!instrumentId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await TradePlanApi.getLatestForInstrument(instrumentId);
+      setPlan(data);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load plan');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGenerate = async () => {
+    if (!instrumentId || !plan?.symbol) return;
+    setGenerating(true);
+    try {
+      // Basic generate request without portfolio or specific config.
+      const data = await TradePlanApi.generatePlan({
+         instrumentId,
+         symbol: plan.symbol || instrumentId, // Will fail if symbol is not known. Usually instrumentId is symbol in MVP or symbol is passed via state.
+         capitalBase: 10000, // default fallback for now
+      });
+      setPlan(data);
+    } catch (err: any) {
+      setError(err.message || 'Failed to generate plan');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPlan();
+  }, [instrumentId]);
+
+  if (loading) return <CircularProgress />;
+  if (error) return <Alert severity="error">{error}</Alert>;
+
+  if (!plan) {
+     return (
+        <Box>
+            <Typography variant="h6">No active plan found for this instrument.</Typography>
+            <Button variant="contained" sx={{ mt: 2 }} onClick={handleGenerate} disabled={generating}>
+               {generating ? 'Generating...' : 'Generate Trade Plan'}
+            </Button>
+        </Box>
+     );
+  }
+
+  return (
+    <Box>
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="h4">Trade Plan: {plan.symbol}</Typography>
+        <Button variant="outlined" onClick={handleGenerate} disabled={generating}>
+            {generating ? 'Regenerating...' : 'Regenerate Plan'}
+        </Button>
+      </Box>
+
+      {plan.planStatus === 'BLOCKED' && (
+         <Alert severity="error" sx={{ mb: 3 }} icon={<ErrorOutlineIcon />}>
+            <strong>Plan Blocked:</strong> This plan does not meet risk requirements or is invalid.
+         </Alert>
+      )}
+
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 2, height: '100%' }}>
+            <Typography variant="h6" gutterBottom>Execution Plan</Typography>
+            <Divider sx={{ mb: 2 }} />
+            
+            <Box sx={{ mb: 2 }}>
+                <Typography color="text.secondary" variant="body2">Entry Zone</Typography>
+                <Typography variant="h6">
+                   {plan.entryZone ? `${plan.entryZone.preferredEntryMin.toFixed(2)} - ${plan.entryZone.preferredEntryMax.toFixed(2)}` : 'N/A'}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">{plan.entryZone?.rationale}</Typography>
+            </Box>
+
+            <Box sx={{ mb: 2 }}>
+                <Typography color="text.secondary" variant="body2">Stop Loss</Typography>
+                <Typography variant="h6" color="error.main">
+                   {plan.stopLoss ? plan.stopLoss.price.toFixed(2) : 'N/A'}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">{plan.stopLoss?.rationale}</Typography>
+            </Box>
+
+            <Box sx={{ mb: 2 }}>
+                <Typography color="text.secondary" variant="body2">Target</Typography>
+                <Typography variant="h6" color="success.main">
+                   {plan.target ? plan.target.price.toFixed(2) : 'N/A'}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">{plan.target?.rationale}</Typography>
+            </Box>
+
+            <Box sx={{ mb: 2 }}>
+                <Typography color="text.secondary" variant="body2">Reward/Risk Ratio</Typography>
+                <Typography variant="h6">
+                   {plan.rewardRiskRatio.toFixed(2)}R
+                </Typography>
+            </Box>
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 2, height: '100%' }}>
+            <Typography variant="h6" gutterBottom>Position Sizing</Typography>
+            <Divider sx={{ mb: 2 }} />
+            {plan.positionSizing ? (
+                <>
+                  <Typography variant="body1">Suggested Quantity: <strong>{plan.positionSizing.suggestedQuantity} shares</strong></Typography>
+                  <Typography variant="body1">Estimated Value: ${plan.positionSizing.estimatedPositionValue.toFixed(2)}</Typography>
+                  <Typography variant="body1">Max Risk Amount: ${plan.positionSizing.maxRiskAmount.toFixed(2)}</Typography>
+                  <Typography variant="body1" color="text.secondary">Based on capital base of ${plan.positionSizing.capitalBase.toFixed(2)} and {plan.positionSizing.riskPercent}% risk.</Typography>
+                </>
+            ) : (
+                <Typography color="text.secondary">Position sizing not available (requires capital base or portfolio configuration).</Typography>
+            )}
+            
+            <Typography variant="h6" sx={{ mt: 4, mb: 1 }}>Invalidation Rules</Typography>
+            <Divider sx={{ mb: 1 }} />
+            <List dense>
+               {plan.invalidationRules.map((rule, i) => (
+                  <ListItem key={i} disablePadding>
+                     <ListItemIcon sx={{ minWidth: 32 }}><CheckCircleOutlineIcon fontSize="small" color="primary" /></ListItemIcon>
+                     <ListItemText primary={rule} />
+                  </ListItem>
+               ))}
+            </List>
+          </Paper>
+        </Grid>
+
+        {(plan.warnings.length > 0 || plan.blockers.length > 0) && (
+            <Grid item xs={12}>
+                <Paper sx={{ p: 2 }}>
+                    <Typography variant="h6" color="error.main" gutterBottom>Warnings & Blockers</Typography>
+                    <Divider sx={{ mb: 2 }} />
+                    <List dense>
+                    {plan.blockers.map((b, i) => (
+                        <ListItem key={`b-${i}`} disablePadding>
+                            <ListItemIcon sx={{ minWidth: 32 }}><ErrorOutlineIcon fontSize="small" color="error" /></ListItemIcon>
+                            <ListItemText primary={b} primaryTypographyProps={{ color: 'error.main' }} />
+                        </ListItem>
+                    ))}
+                    {plan.warnings.map((w, i) => (
+                        <ListItem key={`w-${i}`} disablePadding>
+                            <ListItemIcon sx={{ minWidth: 32 }}><WarningAmberIcon fontSize="small" color="warning" /></ListItemIcon>
+                            <ListItemText primary={w} />
+                        </ListItem>
+                    ))}
+                    </List>
+                </Paper>
+            </Grid>
+        )}
+      </Grid>
+    </Box>
+  );
+};

@@ -108,3 +108,7 @@ The previous private evaluators remain in the service as fallback only when a fr
 - `npm test -- strategy-framework --runInBand` in `backend`
 - `npm test -- research-hub --runInBand` in `backend`
 - `npm run build` in `frontend`
+
+## Trade Plan Risk Engine Integration
+
+Strategy Decision outputs can now be used to generate Trade Plans via the Trade Plan Risk Engine. Links to "View Trade Plan" have been added to the Strategy Decision Dashboard to easily navigate to the generated plans.

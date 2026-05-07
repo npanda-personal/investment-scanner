@@ -69,6 +69,7 @@ const navGroups = [
     group: 'Portfolio',
     items: [
       { path: '/portfolios', label: 'Portfolios', icon: <AccountBalanceWalletIcon /> },
+      { path: '/trade-plans', label: 'Trade Plans', icon: <FactCheckIcon /> },
       { path: '/watchlists', label: 'Watchlists', icon: <StarBorderIcon /> },
       { path: '/alerts', label: 'Alerts', icon: <NotificationsNoneIcon /> },
     ],

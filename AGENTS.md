@@ -55,6 +55,7 @@ Current modules include:
 - signal-calibration-engine
 - data-quality-engine
 - strategy-decision-engine
+- trade-plan-risk-engine
 
 # Important Current State
 

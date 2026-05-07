@@ -170,6 +170,7 @@ const StrategyDecisionDashboard: React.FC = () => {
     { id: 'confidence', label: 'Confidence', render: (d) => d.confidence },
     { id: 'entryZone', label: 'Entry Zone', render: (d) => d.entryZone ? `${d.entryZone.preferredEntryMin} - ${d.entryZone.preferredEntryMax}` : 'N/A' },
     { id: 'generatedAt', label: 'Generated', render: (d) => new Date(d.generatedAt).toLocaleDateString() },
+    { id: 'actions', label: 'Actions', render: () => <Button size="small" component={Link} to={`/trade-plans`}>Trade Plan</Button> },
   ];
 
   return (

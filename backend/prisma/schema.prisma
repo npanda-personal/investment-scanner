@@ -778,6 +778,40 @@ model StrategyPerformanceSummary {
   @@map("strategy_performance_summaries")
 }
 
+model TradePlanResult {
+  id                 String   @id @default(cuid())
+  instrumentId       String
+  strategyDecisionId String?
+  portfolioId        String?
+  symbol             String
+  strategy           String
+  strategyVersion    String
+  planStatus         String
+  riskGrade          String
+  entryZone          Json?
+  stopLoss           Json?
+  target             Json?
+  rewardRiskRatio    Float
+  positionSizing     Json?
+  portfolioImpact    Json?
+  invalidationRules  Json?
+  warnings           Json?
+  blockers           Json?
+  dataGaps           Json?
+  modelVersion       String
+  generatedAt        DateTime @default(now())
+  generatedDate      DateTime
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([instrumentId, strategy, modelVersion, generatedDate])
+  @@index([instrumentId])
+  @@index([strategyDecisionId])
+  @@index([portfolioId])
+  @@map("trade_plan_results")
+}
+
+
 
 
 

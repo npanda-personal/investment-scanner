@@ -23,6 +23,7 @@ import { dataQualityEngineRouter } from '../modules/data-quality-engine';
 import { strategyDecisionEngineRouter } from '../modules/strategy-decision-engine';
 import { researchHubRouter } from '../modules/research-hub';
 import { strategyFrameworkRouter } from '../modules/strategy-framework';
+import { tradePlanRiskModule } from '../modules/trade-plan-risk-engine';
 
 export interface ApiModule {
   path: string;
@@ -51,6 +52,7 @@ export const apiModules: ApiModule[] = [
   { path: '/api/v1', router: dataQualityEngineRouter },
   { path: '/api/v1/strategy', router: strategyDecisionEngineRouter },
   { path: '/api/v1/research', router: researchHubRouter },
+  { path: tradePlanRiskModule.routePrefix, router: tradePlanRiskModule.router },
   { path: '/api/market-data-foundation', router: marketDataFoundationRouter },
 ];
 
