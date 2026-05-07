@@ -195,7 +195,7 @@ export class StrategyFrameworkEvaluator implements StrategyEvaluator {
       ratingCapsApplied.push('END_OF_TEST_EXIT_DOMINANCE_WEAK');
     }
     const automationEligibility = ratingGrade === 'EXCELLENT' || ratingGrade === 'GOOD'
-        ? 'PAPER_TRADING_ELIGIBLE'
+        ? 'PAPER_TEST_CANDIDATE'
         : ratingGrade === 'AVERAGE'
           ? 'WATCHLIST_ONLY'
           : 'NOT_ELIGIBLE';

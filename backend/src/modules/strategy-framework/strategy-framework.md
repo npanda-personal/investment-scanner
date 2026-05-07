@@ -140,7 +140,7 @@ Caps:
 This keeps optimistic backtests from ranking aggressively when evidence is weak.
 
 ### Automation Eligibility
-User-facing readiness labels are conservative: `RESEARCH_ONLY`, `WATCHLIST_CANDIDATE`, `PAPER_TEST_CANDIDATE`, and `NOT_AUTOMATION_READY`. The UI must not display live-trading readiness. Existing stored `LIVE_TRADING_ELIGIBLE_FUTURE` values are mapped away in UI/readiness display and should be cleaned in a future data migration.
+User-facing readiness labels are conservative: `RESEARCH_ONLY`, `WATCHLIST_CANDIDATE`, `PAPER_TEST_CANDIDATE`, and `NOT_AUTOMATION_READY`. The API model exposes `PAPER_TEST_CANDIDATE` instead of paper-trading eligibility wording. Existing stored historical eligibility values are mapped away in API/readiness display and should be cleaned in a future data migration.
 
 ### Versioning
 Each strategy has a semantic `version`. Performance summaries are unique by strategy code, version, timeframe, region, asset type, and universe key.

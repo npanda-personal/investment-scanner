@@ -1,9 +1,10 @@
 import { TradePlanRiskEngineRepository } from './trade-plan-risk-engine.repository';
-import type { GenerateTradePlanRequest, TradePlanResultDto, TradePlanModelRules, EntryZone, StopLoss, Target, BatchGenerateTradePlanRequest, TradePlanListQuery, Quality } from './trade-plan-risk-engine.types';
+import type { GenerateTradePlanRequest, TradePlanResultDto, TradePlanModelRules, EntryZone, StopLoss, Target, BatchGenerateTradePlanRequest, TradePlanListQuery, Quality, PaperReadinessInput, PaperReadinessStatus } from './trade-plan-risk-engine.types';
 import { StrategyDecisionEngineService } from '../strategy-decision-engine';
 import { MarketDataFoundationService } from '../market-data-foundation/market-data-foundation.service';
 import { PortfolioManagementService } from '../portfolio-management';
 import { DataQualityEngineService } from '../data-quality-engine';
+import { StrategyFrameworkService } from '../strategy-framework';
 
 export class TradePlanRiskEngineService {
   private repository = new TradePlanRiskEngineRepository();
@@ -11,6 +12,7 @@ export class TradePlanRiskEngineService {
   private marketDataService = new MarketDataFoundationService();
   private portfolioService = new PortfolioManagementService();
   private dataQualityService = new DataQualityEngineService();
+  private strategyFrameworkService = new StrategyFrameworkService();
 
   getModelRules(): TradePlanModelRules {
     return {
@@ -20,7 +22,110 @@ export class TradePlanRiskEngineService {
       defaultRewardRiskTarget: 2,
       maxSinglePositionExposurePercent: 10,
       maxSectorExposurePercent: 30,
+      paperReadinessCriteria: {
+        allowedPlanStatuses: ['VALID'],
+        allowedRiskGrades: ['LOW', 'MEDIUM'],
+        minimumRewardRiskRatio: 1.5,
+        maximumDataGaps: 1,
+        allowedDecisionConfidence: ['MEDIUM', 'HIGH'],
+        blockedMarketGate: 'CLOSED',
+        allowedAssetTypes: ['STOCK'],
+        blockedStrategyRatings: ['WEAK', 'UNPROVEN', 'POOR'],
+        blockedReadinessLabels: ['NOT_AUTOMATION_READY'],
+      },
+      safetyConstraints: [
+        'Readiness classification is research support only and does not create paper trades.',
+        'No broker execution, order placement, live trading, or autonomous trading is enabled.',
+        'Allowed action language: review, plan, simulate, and paper review candidate.',
+        'Targets using REWARD_RISK_MULTIPLE are modeled risk multiples, not predicted prices.',
+      ],
     };
+  }
+
+  classifyPaperReadiness(input: PaperReadinessInput): {
+    paperReadinessStatus: PaperReadinessStatus;
+    paperReadinessReasons: string[];
+    paperReadinessBlockers: string[];
+  } {
+    const rules = this.getModelRules().paperReadinessCriteria;
+    const { plan, decisionProof, dataQualityProof, scope } = input;
+    const reasons: string[] = [];
+    const blockers: string[] = [];
+
+    const addBlocker = (message: string) => {
+      if (!blockers.includes(message)) blockers.push(message);
+    };
+    const addReason = (message: string) => {
+      if (!reasons.includes(message)) reasons.push(message);
+    };
+
+    if (plan.planStatus !== 'VALID') addBlocker(`Plan status is ${plan.planStatus}; VALID is required.`);
+    else addReason('Trade plan status is VALID.');
+
+    if (!['LOW', 'MEDIUM'].includes(plan.riskGrade)) addBlocker(`Risk grade is ${plan.riskGrade}; LOW or MEDIUM is required.`);
+    else addReason(`Risk grade is ${plan.riskGrade}.`);
+
+    if (!plan.entryZone) addBlocker('Entry zone is missing.');
+    if (!plan.stopLoss) addBlocker('Stop loss is missing.');
+    if (!plan.target) addBlocker('Target is missing.');
+    if (!plan.positionSizing) addBlocker('Position sizing is missing.');
+    if (plan.invalidationRules.length === 0) addBlocker('Invalidation rules are missing.');
+    if (plan.blockers.length > 0) addBlocker('Trade plan has active blockers.');
+    if (plan.rewardRiskRatio < rules.minimumRewardRiskRatio) addBlocker(`Reward/risk ratio is below ${rules.minimumRewardRiskRatio}.`);
+    else addReason(`Reward/risk ratio is ${plan.rewardRiskRatio}.`);
+
+    if (!decisionProof) {
+      addBlocker('Strategy decision proof is missing.');
+    } else {
+      if (!decisionProof.frameworkBacked) addBlocker('Strategy Framework-backed proof is missing.');
+      else addReason('Strategy Framework-backed proof is present.');
+      if (!decisionProof.strategyCode) addBlocker('Strategy code is missing.');
+      if (!decisionProof.strategyVersion) addBlocker('Strategy version is missing.');
+      if (rules.blockedStrategyRatings.includes(String(decisionProof.strategyRatingGrade || 'UNPROVEN'))) {
+        addBlocker(`Strategy rating is ${decisionProof.strategyRatingGrade || 'UNPROVEN'}.`);
+      }
+      if (rules.blockedReadinessLabels.includes(String(decisionProof.readinessLabel || ''))) {
+        addBlocker(`Strategy readiness label is ${decisionProof.readinessLabel}.`);
+      }
+      if (!decisionProof.backtestSummaryAvailable) addBlocker('Backtest summary is missing for the selected scope/timeframe.');
+      else addReason('Backtest summary is available.');
+      if (!['TRADE_CANDIDATE', 'ENTRY_CANDIDATE'].includes(String(decisionProof.decision || ''))) {
+        addBlocker(`Strategy decision is ${decisionProof.decision || 'UNKNOWN'}.`);
+      }
+      if (decisionProof.marketGate === rules.blockedMarketGate) addBlocker('Market gate is CLOSED.');
+      if (!rules.allowedDecisionConfidence.includes(String(decisionProof.confidence || 'LOW'))) {
+        addBlocker(`Decision confidence is ${decisionProof.confidence || 'LOW'}.`);
+      }
+      if ((decisionProof.reasons || []).length === 0) addBlocker('Strategy decision reasons are missing.');
+      if ((decisionProof.blockers || []).length > 0) addBlocker('Strategy decision has active blockers.');
+      if ((decisionProof.dataGaps || []).length > rules.maximumDataGaps) addBlocker('Strategy decision has too many data gaps.');
+    }
+
+    if (!dataQualityProof) {
+      addBlocker('Data quality proof is missing.');
+    } else {
+      if (!dataQualityProof.latestPricePresent) addBlocker('Latest price is missing.');
+      else addReason('Latest price is present.');
+      if (!dataQualityProof.priceHistorySufficient) addBlocker('Price history is insufficient.');
+      if (dataQualityProof.coverageStatus === 'UNUSABLE') addBlocker('Data quality is UNUSABLE.');
+      if (dataQualityProof.liquidityStatus === 'ILLIQUID') addBlocker('Liquidity is ILLIQUID.');
+      if (dataQualityProof.stalePriceWarningHandled === false) addBlocker('Stale price warning is not resolved.');
+    }
+
+    if (scope?.assetType && !rules.allowedAssetTypes.includes(scope.assetType)) addBlocker(`Asset type ${scope.assetType} is not supported for paper review readiness.`);
+    if (!scope?.region) addBlocker('Region scope is missing.');
+
+    let paperReadinessStatus: PaperReadinessStatus = 'READY_FOR_PAPER_REVIEW';
+    if (blockers.some((item) => item.toLowerCase().includes('missing') || item.toLowerCase().includes('insufficient'))) {
+      paperReadinessStatus = 'INSUFFICIENT_DATA';
+    }
+    if (blockers.length > 0 && paperReadinessStatus !== 'INSUFFICIENT_DATA') {
+      paperReadinessStatus = blockers.some((item) => item.includes('UNPROVEN') || item.includes('rating') || item.includes('confidence') || item.includes('data gaps'))
+        ? 'WATCH_ONLY'
+        : 'BLOCKED';
+    }
+
+    return { paperReadinessStatus, paperReadinessReasons: reasons, paperReadinessBlockers: blockers };
   }
 
   async generatePlan(request: GenerateTradePlanRequest): Promise<TradePlanResultDto> {
@@ -68,7 +173,8 @@ export class TradePlanRiskEngineService {
         result.planStatus = 'INSUFFICIENT_DATA';
         result.blockers.push('No Strategy Decision found for instrument.');
         result.dataGaps.push('strategy_decision');
-        return await this.repository.upsert(result);
+        Object.assign(result, this.classifyPaperReadiness({ plan: result, scope: { region: request.region || 'IN', assetType: request.assetType || 'STOCK' } }));
+        return this.persistWithReadiness(result);
       }
 
       result.strategy = decision.strategy;
@@ -122,7 +228,13 @@ export class TradePlanRiskEngineService {
         result.planStatus = 'INSUFFICIENT_DATA';
         result.blockers.push('Missing latest price.');
         result.dataGaps.push('latest_price');
-        return await this.repository.upsert(result);
+        Object.assign(result, this.classifyPaperReadiness({
+          plan: result,
+          decisionProof: this.decisionToProof(decision, null),
+          dataQualityProof: { latestPricePresent: false, priceHistorySufficient: false },
+          scope: { region: request.region || 'IN', assetType: request.assetType || 'STOCK' },
+        }));
+        return this.persistWithReadiness(result);
       }
 
       const currentPrice = Number(latestPriceResult.latest.close);
@@ -134,7 +246,13 @@ export class TradePlanRiskEngineService {
         result.planStatus = 'INSUFFICIENT_DATA';
         result.blockers.push('Insufficient historical price data (< 10 bars).');
         result.dataGaps.push('price_history');
-        return await this.repository.upsert(result);
+        Object.assign(result, this.classifyPaperReadiness({
+          plan: result,
+          decisionProof: this.decisionToProof(decision, null),
+          dataQualityProof: { latestPricePresent: true, priceHistorySufficient: false },
+          scope: { region: request.region || 'IN', assetType: request.assetType || 'STOCK' },
+        }));
+        return this.persistWithReadiness(result);
       }
       
       let sma50 = null;
@@ -337,7 +455,9 @@ export class TradePlanRiskEngineService {
       let targetPrice = entryPrice + (riskPerShare * tRr);
       let targetQuality: Quality = 'FALLBACK';
       let targetMethod: Target['method'] = 'REWARD_RISK_MULTIPLE';
-      let targetRationale = `Target set to default ${tRr}R multiple of risk.`;
+      let targetRationale = tRr === rules.defaultRewardRiskTarget
+        ? 'Target is modeled at 2R by default.'
+        : `Target is modeled at ${tRr}R as a reward/risk multiple.`;
 
       // Target Realism checks
       if (volatility > 0) {
@@ -487,11 +607,26 @@ export class TradePlanRiskEngineService {
          result.invalidationRules.push('Plan is currently blocked. Consider review later.');
       }
 
-      return await this.repository.upsert(result);
+      const backtestSummary = await this.latestBacktestSummary(result.strategy, request.region || 'IN', request.assetType || 'STOCK');
+      Object.assign(result, this.classifyPaperReadiness({
+        plan: result,
+        decisionProof: this.decisionToProof(decision, backtestSummary),
+        dataQualityProof: {
+          latestPricePresent: true,
+          priceHistorySufficient: prices.length >= 50,
+          coverageStatus: dataQuality?.coverageStatus ?? null,
+          liquidityStatus: dataQuality?.liquidityStatus ?? null,
+          stalePriceWarningHandled: !(dataQuality?.dataGaps || []).some((gap: string) => gap.toLowerCase().includes('stale')),
+        },
+        scope: { region: request.region || 'IN', assetType: request.assetType || 'STOCK' },
+      }));
+
+      return this.persistWithReadiness(result);
     } catch (e: any) {
       result.planStatus = 'BLOCKED';
       result.blockers.push(`Error generating plan: ${e.message}`);
-      return await this.repository.upsert(result);
+      Object.assign(result, this.classifyPaperReadiness({ plan: result, scope: { region: request.region || 'IN', assetType: request.assetType || 'STOCK' } }));
+      return this.persistWithReadiness(result);
     }
   }
 
@@ -540,14 +675,87 @@ export class TradePlanRiskEngineService {
   }
 
   async latestForInstrument(instrumentId: string, strategy?: string, portfolioId?: string) {
-     return this.repository.latestForInstrument(instrumentId, strategy, portfolioId);
+     const plan = await this.repository.latestForInstrument(instrumentId, strategy, portfolioId);
+     if (!plan) return null;
+     return (await this.enrichPaperReadiness([plan], { region: 'IN', assetType: 'STOCK' }))[0];
   }
 
   async list(query: TradePlanListQuery) {
-     return this.repository.list(query);
+     if (query.paperReadyOnly) {
+       const limit = query.limit || 50;
+       const offset = query.offset || 0;
+       const base = await this.repository.list({ ...query, limit: 1000, offset: 0 });
+       const enriched = await this.enrichPaperReadiness(base.results, query);
+       const filtered = enriched.filter((plan) => plan.paperReadinessStatus === 'READY_FOR_PAPER_REVIEW');
+       return { results: filtered.slice(offset, offset + limit), total: filtered.length };
+     }
+     const result = await this.repository.list(query);
+     return { ...result, results: await this.enrichPaperReadiness(result.results, query) };
   }
 
   async getHealthStats() {
      return this.repository.getHealthStats();
+  }
+
+  private async enrichPaperReadiness(plans: TradePlanResultDto[], query: TradePlanListQuery): Promise<TradePlanResultDto[]> {
+    return Promise.all(plans.map(async (plan) => {
+      const decision = await this.latestDecisionForPlan(plan).catch(() => null);
+      const backtestSummary = await this.latestBacktestSummary(plan.strategy, query.region || 'IN', query.assetType || 'STOCK').catch(() => null);
+      const quality = await this.dataQualityService.getLatestEvaluationForInstrument(plan.instrumentId).catch(() => null);
+      return {
+        ...plan,
+        ...this.classifyPaperReadiness({
+          plan,
+          decisionProof: this.decisionToProof(decision, backtestSummary),
+          dataQualityProof: {
+            latestPricePresent: Boolean(plan.entryZone?.referencePrice),
+            priceHistorySufficient: quality ? quality.eligibleForSignals || quality.eligibleForBacktesting : plan.dataGaps.every((gap) => !gap.includes('price_history')),
+            coverageStatus: quality?.coverageStatus ?? null,
+            liquidityStatus: quality?.liquidityStatus ?? null,
+            stalePriceWarningHandled: quality ? !quality.dataGaps.some((gap) => gap.toLowerCase().includes('stale')) : true,
+          },
+          scope: { region: query.region || 'IN', assetType: query.assetType || 'STOCK' },
+        }),
+      };
+    }));
+  }
+
+  private async latestDecisionForPlan(plan: TradePlanResultDto) {
+    const history = await this.strategyDecisionService.history(plan.instrumentId);
+    return history.find((decision: any) => decision.id === plan.strategyDecisionId) || history.find((decision: any) => decision.strategy === plan.strategy) || null;
+  }
+
+  private async latestBacktestSummary(strategy: string, region: string, assetType: string) {
+    const summaries = await this.strategyFrameworkService.performance(strategy, { region, assetType }).catch(() => []);
+    return summaries[0] || null;
+  }
+
+  private decisionToProof(decision: any, backtestSummary: any) {
+    if (!decision) return null;
+    const ratingGrade = decision.strategyRating?.ratingGrade || backtestSummary?.ratingGrade || null;
+    return {
+      frameworkBacked: decision.frameworkBacked,
+      strategyCode: decision.strategy,
+      strategyVersion: decision.strategyVersion,
+      strategyRatingGrade: ratingGrade,
+      readinessLabel: decision.readinessLabel || decision.strategyRating?.readinessLabel || backtestSummary?.readinessLabel || null,
+      backtestSummaryAvailable: Boolean(backtestSummary),
+      decision: decision.decision,
+      marketGate: decision.marketGate || decision.marketGateStatus,
+      confidence: decision.confidence,
+      reasons: decision.reasons || [],
+      blockers: decision.blockers || [],
+      dataGaps: decision.dataGaps || [],
+    };
+  }
+
+  private async persistWithReadiness(result: TradePlanResultDto): Promise<TradePlanResultDto> {
+    const saved = await this.repository.upsert(result);
+    return {
+      ...saved,
+      paperReadinessStatus: result.paperReadinessStatus,
+      paperReadinessReasons: result.paperReadinessReasons,
+      paperReadinessBlockers: result.paperReadinessBlockers,
+    };
   }
 }

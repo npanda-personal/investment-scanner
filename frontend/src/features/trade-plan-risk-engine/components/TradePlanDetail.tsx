@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, Button, CircularProgress, Alert, Paper, Grid, Divider, List, ListItem, ListItemText, ListItemIcon } from '@mui/material';
+import { Box, Typography, Button, CircularProgress, Alert, Paper, Grid, Divider, List, ListItem, ListItemText, ListItemIcon, Chip, Stack } from '@mui/material';
 import { useParams } from 'react-router-dom';
 import { TradePlanApi } from '../api';
 import { TradePlanResultDto } from '../types';
@@ -79,10 +79,17 @@ export const TradePlanDetail: React.FC = () => {
          </Alert>
       )}
 
+      <Alert severity={plan.paperReadinessStatus === 'READY_FOR_PAPER_REVIEW' ? 'success' : plan.paperReadinessStatus === 'WATCH_ONLY' ? 'warning' : 'info'} sx={{ mb: 3 }}>
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+          <strong>{plan.paperReadinessStatus === 'READY_FOR_PAPER_REVIEW' ? 'Paper Review Candidate' : plan.paperReadinessStatus || 'Readiness not classified'}</strong>
+          {plan.paperReadinessBlockers?.slice(0, 2).map((blocker) => <Chip key={blocker} size="small" label={blocker} />)}
+        </Stack>
+      </Alert>
+
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 2, height: '100%' }}>
-            <Typography variant="h6" gutterBottom>Execution Plan</Typography>
+            <Typography variant="h6" gutterBottom>Plan Levels</Typography>
             <Divider sx={{ mb: 2 }} />
             
             <Box sx={{ mb: 2 }}>
@@ -109,6 +116,7 @@ export const TradePlanDetail: React.FC = () => {
                    {plan.target ? plan.target.price.toFixed(2) : 'N/A'}
                    {plan.target?.quality && <Typography component="span" variant="caption" sx={{ ml: 1, px: 1, py: 0.5, bgcolor: 'action.hover', borderRadius: 1 }}>{plan.target.quality}</Typography>}
                 </Typography>
+                {plan.target?.method === 'REWARD_RISK_MULTIPLE' && <Chip size="small" label="Default 2R target" sx={{ mb: 0.5 }} />}
                 <Typography variant="body2" color="text.secondary">{plan.target?.rationale}</Typography>
             </Box>
 
@@ -127,7 +135,7 @@ export const TradePlanDetail: React.FC = () => {
             <Divider sx={{ mb: 2 }} />
             {plan.positionSizing ? (
                 <>
-                  <Typography variant="body1">Suggested Quantity: <strong>{plan.positionSizing.suggestedQuantity} shares</strong></Typography>
+                  <Typography variant="body1">Review Quantity: <strong>{plan.positionSizing.suggestedQuantity} shares</strong></Typography>
                   <Typography variant="body1">Estimated Value: ${plan.positionSizing.estimatedPositionValue.toFixed(2)}</Typography>
                   <Typography variant="body1">Max Risk Amount: ${plan.positionSizing.maxRiskAmount.toFixed(2)}</Typography>
                   <Typography variant="body1" color="text.secondary">Based on capital base of ${plan.positionSizing.capitalBase.toFixed(2)} and {plan.positionSizing.riskPercent}% risk.</Typography>
@@ -135,7 +143,7 @@ export const TradePlanDetail: React.FC = () => {
                   {plan.portfolioImpact ? (
                     <Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
                       <Typography variant="subtitle2" gutterBottom>Portfolio Impact</Typography>
-                      <Typography variant="body2">Estimated Exposure After Trade: {plan.portfolioImpact.singlePositionExposureAfterTrade?.toFixed(2)}%</Typography>
+                      <Typography variant="body2">Estimated Exposure If Reviewed: {plan.portfolioImpact.singlePositionExposureAfterTrade?.toFixed(2)}%</Typography>
                       {plan.portfolioImpact.warnings.map((w, i) => (
                         <Typography key={i} variant="body2" color="warning.main" sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
                           <WarningAmberIcon fontSize="small" sx={{ mr: 1 }}/> {w}
@@ -163,12 +171,18 @@ export const TradePlanDetail: React.FC = () => {
           </Paper>
         </Grid>
 
-        {(plan.warnings.length > 0 || plan.blockers.length > 0 || plan.dataGaps.length > 0) && (
+        {((plan.paperReadinessBlockers?.length || 0) > 0 || plan.warnings.length > 0 || plan.blockers.length > 0 || plan.dataGaps.length > 0) && (
             <Grid item xs={12}>
                 <Paper sx={{ p: 2 }}>
                     <Typography variant="h6" color="error.main" gutterBottom>Warnings, Blockers & Gaps</Typography>
                     <Divider sx={{ mb: 2 }} />
                     <List dense>
+                    {plan.paperReadinessBlockers?.map((b, i) => (
+                        <ListItem key={`prb-${i}`} disablePadding>
+                            <ListItemIcon sx={{ minWidth: 32 }}><ErrorOutlineIcon fontSize="small" color="error" /></ListItemIcon>
+                            <ListItemText primary={`Paper readiness: ${b}`} primaryTypographyProps={{ color: 'error.main' }} />
+                        </ListItem>
+                    ))}
                     {plan.blockers.map((b, i) => (
                         <ListItem key={`b-${i}`} disablePadding>
                             <ListItemIcon sx={{ minWidth: 32 }}><ErrorOutlineIcon fontSize="small" color="error" /></ListItemIcon>

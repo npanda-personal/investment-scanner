@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, Button, Alert, Tab, Tabs } from '@mui/material';
+import { Box, Typography, Button, Alert, Tab, Tabs, FormControlLabel, Switch } from '@mui/material';
 import { TradePlanApi } from '../api';
 import { TradePlanTable } from './TradePlanTable';
 import { TradePlanResultDto } from '../types';
@@ -14,6 +14,7 @@ export const TradePlanDashboard: React.FC = () => {
   const [batchGenerating, setBatchGenerating] = useState(false);
   const [batchSummary, setBatchSummary] = useState<string | null>(null);
   const [tab, setTab] = useState(0);
+  const [paperReadyOnly, setPaperReadyOnly] = useState(false);
   
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
@@ -26,11 +27,13 @@ export const TradePlanDashboard: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const params: Record<string, string | number> = { 
+      const params: Record<string, string | number | boolean> = { 
         region: scope.region,
+        assetType: scope.assetType,
         limit: pageSize,
         offset: page * pageSize,
       };
+      if (paperReadyOnly) params.paperReadyOnly = true;
       if (sortBy) params.sortBy = sortBy;
       if (sortDirection) params.sortDirection = sortDirection;
 
@@ -48,7 +51,7 @@ export const TradePlanDashboard: React.FC = () => {
     setBatchGenerating(true);
     setBatchSummary(null);
     try {
-      const result = await TradePlanApi.batchGenerate({ region: scope.region, batchSize: 25 });
+      const result = await TradePlanApi.batchGenerate({ region: scope.region, assetType: scope.assetType, batchSize: 25 });
       setBatchSummary(`Batch complete: ${result.generatedCount} generated, ${result.failedCount || 0} failed.`);
       setPage(0);
       await fetchPlans();
@@ -61,7 +64,7 @@ export const TradePlanDashboard: React.FC = () => {
 
   useEffect(() => {
     fetchPlans();
-  }, [scope.region, page, pageSize, sortBy, sortDirection]);
+  }, [scope.region, scope.assetType, page, pageSize, sortBy, sortDirection, paperReadyOnly]);
 
   return (
     <Box sx={{ py: 3 }}>
@@ -74,6 +77,13 @@ export const TradePlanDashboard: React.FC = () => {
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {batchSummary && <Alert severity="success" sx={{ mb: 2 }}>{batchSummary}</Alert>}
+
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+        <FormControlLabel
+          control={<Switch checked={paperReadyOnly} onChange={(event) => { setPaperReadyOnly(event.target.checked); setPage(0); }} />}
+          label="Paper-ready only"
+        />
+      </Box>
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
         <Tabs value={tab} onChange={(_e, v) => setTab(v)}>

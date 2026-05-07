@@ -244,7 +244,7 @@ const ResearchPriorityBoard: React.FC<{ priorities: ResearchOverview['researchPr
   return (
     <Grid container spacing={3}>
       <Grid item xs={12} sm={6}>
-        <PriorityCard title="Strategy-Backed Candidates" items={priorities?.tradeCandidates || []} type="candidate" emptyMsg="No framework-backed trade candidates with enough proof." />
+        <PriorityCard title="Paper Review Candidates" items={priorities?.tradeCandidates || []} type="candidate" emptyMsg="No framework-backed review candidates with enough proof." />
       </Grid>
       <Grid item xs={12} sm={6}>
         <PriorityCard title="Exit / Reduce Risk" items={priorities?.exitCandidates || []} type="exit" emptyMsg="No active exit candidates found." />
@@ -290,7 +290,7 @@ const PriorityCard: React.FC<{ title: string; items: ResearchPriorityCandidate[]
                   secondaryAction={
                     <Stack direction="row" spacing={1} alignItems="center">
                       {type === 'candidate' && (
-                        <Button size="small" variant="outlined" component={Link} to={`/trade-plans`}>Trade Plan</Button>
+                        <Button size="small" variant="outlined" component={Link} to={`/trade-plans`}>Plan Review</Button>
                       )}
                       <IconButton edge="end" size="small" component={Link} to={item.stockRoute || `/stocks/${item.instrumentId}`}>
                         <ArrowForwardOutlined fontSize="small" />

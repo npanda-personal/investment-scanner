@@ -57,9 +57,21 @@ export const TradePlanTable: React.FC<TradePlanTableProps> = ({
         />
       )
     },
+    {
+      id: 'paperReadinessStatus',
+      label: 'Paper Readiness',
+      render: (p) => (
+        <Chip
+          label={p.paperReadinessStatus === 'READY_FOR_PAPER_REVIEW' ? 'Paper Review Candidate' : p.paperReadinessStatus || 'Not Classified'}
+          color={p.paperReadinessStatus === 'READY_FOR_PAPER_REVIEW' ? 'success' : p.paperReadinessStatus === 'WATCH_ONLY' ? 'warning' : 'default'}
+          size="small"
+          variant="outlined"
+        />
+      )
+    },
     { id: 'entryZone', label: 'Entry Zone', render: (p) => p.entryZone ? `${p.entryZone.preferredEntryMin.toFixed(2)} - ${p.entryZone.preferredEntryMax.toFixed(2)}` : '-' },
     { id: 'stopLoss', label: 'Stop Loss', render: (p) => p.stopLoss ? p.stopLoss.price.toFixed(2) : '-' },
-    { id: 'target', label: 'Target', render: (p) => p.target ? p.target.price.toFixed(2) : '-' },
+    { id: 'target', label: 'Target', render: (p) => p.target ? `${p.target.price.toFixed(2)}${p.target.method === 'REWARD_RISK_MULTIPLE' ? ' (Default 2R target)' : ''}` : '-' },
     { id: 'rewardRiskRatio', label: 'R/R', render: (p) => <strong>{p.rewardRiskRatio.toFixed(2)}</strong> },
     { id: 'actions', label: 'Actions', align: 'right', render: (p) => <Button size="small" component={Link} to={`/trade-plans/${p.instrumentId}`}>View</Button> },
   ];

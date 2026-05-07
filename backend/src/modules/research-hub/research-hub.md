@@ -155,4 +155,4 @@ Research Hub never displays live-trading readiness labels. Any stored live-tradi
 
 ## Trade Plan Risk Engine Integration
 
-The Research Hub now includes a "Trade Plan" action button on candidate priority cards, allowing users to jump directly to the Trade Plan Risk Engine to generate executable trade plans based on strategy-backed candidates.
+The Research Hub includes a plan-review action on candidate priority cards, allowing users to jump to the Trade Plan Risk Engine for review planning based on strategy-backed candidates. It must not present plan readiness as execution readiness. Acceptable labels include "Paper Review Candidate" and "Plan Ready for Review".

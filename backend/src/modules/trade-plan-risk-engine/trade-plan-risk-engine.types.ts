@@ -1,6 +1,7 @@
 export type PlanStatus = 'VALID' | 'WATCH' | 'BLOCKED' | 'INSUFFICIENT_DATA';
 export type RiskGrade = 'LOW' | 'MEDIUM' | 'HIGH' | 'UNDEFINED';
 export type Quality = 'STRONG' | 'ACCEPTABLE' | 'WEAK' | 'FALLBACK' | 'UNKNOWN';
+export type PaperReadinessStatus = 'READY_FOR_PAPER_REVIEW' | 'WATCH_ONLY' | 'BLOCKED' | 'INSUFFICIENT_DATA';
 
 export interface EntryZone {
   type: 'BREAKOUT' | 'PULLBACK' | 'CURRENT_PRICE' | 'UNKNOWN';
@@ -64,6 +65,9 @@ export interface TradePlanResultDto {
   warnings: string[];
   blockers: string[];
   dataGaps: string[];
+  paperReadinessStatus?: PaperReadinessStatus;
+  paperReadinessReasons?: string[];
+  paperReadinessBlockers?: string[];
   generatedAt: string;
   generatedDate?: string;
   modelVersion: string;
@@ -74,6 +78,8 @@ export interface GenerateTradePlanRequest {
   symbol: string;
   strategyDecisionId?: string;
   portfolioId?: string;
+  region?: string;
+  assetType?: string;
   riskPercent?: number;
   capitalBase?: number;
   targetRewardRisk?: number;
@@ -94,6 +100,7 @@ export interface TradePlanListQuery {
   planStatus?: string;
   riskGrade?: string;
   minRewardRisk?: number;
+  paperReadyOnly?: boolean;
   portfolioId?: string;
   limit?: number;
   offset?: number;
@@ -108,4 +115,51 @@ export interface TradePlanModelRules {
   defaultRewardRiskTarget: number;
   maxSinglePositionExposurePercent: number;
   maxSectorExposurePercent: number;
+  paperReadinessCriteria: {
+    allowedPlanStatuses: PlanStatus[];
+    allowedRiskGrades: RiskGrade[];
+    minimumRewardRiskRatio: number;
+    maximumDataGaps: number;
+    allowedDecisionConfidence: string[];
+    blockedMarketGate: string;
+    allowedAssetTypes: string[];
+    blockedStrategyRatings: string[];
+    blockedReadinessLabels: string[];
+  };
+  safetyConstraints: string[];
+}
+
+export interface PaperReadinessDecisionProof {
+  frameworkBacked?: boolean | null;
+  strategyCode?: string | null;
+  strategyVersion?: string | null;
+  strategyRatingGrade?: string | null;
+  readinessLabel?: string | null;
+  backtestSummaryAvailable?: boolean | null;
+  decision?: string | null;
+  marketGate?: string | null;
+  confidence?: string | null;
+  reasons?: string[];
+  blockers?: string[];
+  dataGaps?: string[];
+}
+
+export interface PaperReadinessDataQualityProof {
+  latestPricePresent?: boolean | null;
+  priceHistorySufficient?: boolean | null;
+  coverageStatus?: string | null;
+  liquidityStatus?: string | null;
+  stalePriceWarningHandled?: boolean | null;
+}
+
+export interface PaperReadinessScopeProof {
+  region?: string | null;
+  assetType?: string | null;
+}
+
+export interface PaperReadinessInput {
+  plan: TradePlanResultDto;
+  decisionProof?: PaperReadinessDecisionProof | null;
+  dataQualityProof?: PaperReadinessDataQualityProof | null;
+  scope?: PaperReadinessScopeProof | null;
 }

@@ -184,13 +184,13 @@ export class StrategyFrameworkService {
   model(): StrategyModelResponse {
     return {
       statuses: ['DRAFT', 'ACTIVE', 'DISABLED', 'DEPRECATED'],
-      automationStatuses: ['NOT_ELIGIBLE', 'WATCHLIST_ONLY', 'PAPER_TRADING_ELIGIBLE'],
+      automationStatuses: ['NOT_ELIGIBLE', 'WATCHLIST_ONLY', 'PAPER_TEST_CANDIDATE'],
       timeframes: STRATEGY_TIMEFRAMES,
       decisions: ['SIGNAL', 'ENTRY_CANDIDATE', 'WAIT', 'WATCH', 'AVOID', 'EXIT_CANDIDATE', 'REDUCE_RISK', 'HOLD', 'INSUFFICIENT_DATA'],
       ratingMethodology: [
         'UNPROVEN when history, trades, CAGR, or Sharpe are insufficient.',
         'Scores combine CAGR, max drawdown, Sharpe, win rate, profit factor, trade count, and coverage.',
-        'Automation eligibility never enables live trading in the MVP.',
+        'Readiness labels support research review only and never enable real-money automation.',
       ],
       ruleModel: [
         'Typed JSON rule declarations describe entry, exit, noise, risk, and market gates.',

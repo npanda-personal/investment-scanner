@@ -12,7 +12,7 @@ export const TradePlanApi = {
     return res.data;
   },
 
-  async listCandidates(params?: Record<string, string | number>) {
+  async listCandidates(params?: Record<string, string | number | boolean>) {
     const res = await axios.get<{ results: TradePlanResultDto[]; total: number }>('/api/v1/trade-plans/candidates', { params });
     return res.data;
   },

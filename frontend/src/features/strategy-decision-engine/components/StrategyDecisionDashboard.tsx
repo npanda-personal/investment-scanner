@@ -199,7 +199,7 @@ const StrategyDecisionDashboard: React.FC = () => {
       />
 
       <Alert severity="info" sx={{ mb: 3 }}>
-        <strong>Research Support Only:</strong> This engine provides rule-based analysis to support your research. This is NOT financial advice, NOT a recommendation to buy or sell, and NOT an automated trading system.
+        <strong>Research Support Only:</strong> This engine provides rule-based analysis to support your research. This is NOT financial advice, NOT a transaction recommendation, and NOT an automated trading system.
       </Alert>
 
       {error && <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>{error}</Alert>}

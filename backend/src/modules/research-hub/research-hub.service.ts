@@ -151,7 +151,7 @@ export class ResearchHubService {
     if (!gate || gate.marketGate === 'UNKNOWN') return 'Market environment is currently unknown.';
     if (gate.marketGate === 'OPEN') return 'Environment is healthy: high-conviction setups allowed.';
     if (gate.marketGate === 'SELECTIVE') return 'Conditions are mixed: exercise high selectivity.';
-    if (gate.marketGate === 'CLOSED') return 'No new long candidates. Review exits and watchlist only.';
+    if (gate.marketGate === 'CLOSED') return 'No new long candidates are available for review. Review exits and watchlist only.';
     return 'Market conditions are being evaluated.';
   }
 
@@ -316,7 +316,7 @@ export class ResearchHubService {
 
     if (readiness.marketGate === 'CLOSED') {
       actions.push({
-        label: priorities.exitCandidates.length > 0 ? `No new long trades; review ${priorities.exitCandidates.length} exit candidates` : 'No new long trades; review watchlist only',
+        label: priorities.exitCandidates.length > 0 ? `New long candidates restricted; review ${priorities.exitCandidates.length} exit candidates` : 'New long candidates restricted; review watchlist only',
         priority: 'HIGH',
         targetRoute: '/research/strategy'
       });

@@ -211,7 +211,7 @@ export class StrategyFrameworkRepository {
       exposurePercent: row.exposurePercent,
       ratingScore: row.ratingScore,
       ratingGrade: row.ratingGrade,
-      automationEligibility: row.automationEligibility,
+      automationEligibility: automationFromStored(row.automationEligibility),
       readinessLabel: row.readinessLabel || readinessFromAutomation(row.automationEligibility),
       ratingReasons: Array.isArray(row.ratingReasons) ? row.ratingReasons : [],
       backtestRunId: row.backtestRunId,
@@ -230,4 +230,10 @@ function readinessFromAutomation(value: string): StrategyPerformanceSummaryDto['
   if (value === 'PAPER_TRADING_ELIGIBLE' || value === 'LIVE_TRADING_ELIGIBLE_FUTURE') return 'PAPER_TEST_CANDIDATE';
   if (value === 'WATCHLIST_ONLY') return 'WATCHLIST_CANDIDATE';
   return 'RESEARCH_ONLY';
+}
+
+function automationFromStored(value: string): StrategyPerformanceSummaryDto['automationEligibility'] {
+  if (value === 'PAPER_TRADING_ELIGIBLE' || value === 'LIVE_TRADING_ELIGIBLE_FUTURE' || value === 'PAPER_TEST_CANDIDATE') return 'PAPER_TEST_CANDIDATE';
+  if (value === 'WATCHLIST_ONLY') return 'WATCHLIST_ONLY';
+  return 'NOT_ELIGIBLE';
 }

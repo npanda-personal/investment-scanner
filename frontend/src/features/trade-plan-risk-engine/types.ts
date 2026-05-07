@@ -1,6 +1,7 @@
 export type PlanStatus = 'VALID' | 'WATCH' | 'BLOCKED' | 'INSUFFICIENT_DATA';
 export type RiskGrade = 'LOW' | 'MEDIUM' | 'HIGH' | 'UNDEFINED';
 export type Quality = 'STRONG' | 'ACCEPTABLE' | 'WEAK' | 'FALLBACK' | 'UNKNOWN';
+export type PaperReadinessStatus = 'READY_FOR_PAPER_REVIEW' | 'WATCH_ONLY' | 'BLOCKED' | 'INSUFFICIENT_DATA';
 
 export interface EntryZone {
   type: string;
@@ -64,6 +65,9 @@ export interface TradePlanResultDto {
   warnings: string[];
   blockers: string[];
   dataGaps: string[];
+  paperReadinessStatus?: PaperReadinessStatus;
+  paperReadinessReasons?: string[];
+  paperReadinessBlockers?: string[];
   generatedAt: string;
   modelVersion: string;
 }
@@ -73,6 +77,8 @@ export interface GenerateTradePlanRequest {
   symbol: string;
   strategyDecisionId?: string;
   portfolioId?: string;
+  region?: string;
+  assetType?: string;
   riskPercent?: number;
   capitalBase?: number;
   targetRewardRisk?: number;

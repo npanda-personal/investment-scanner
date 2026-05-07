@@ -118,7 +118,7 @@ const StrategyFrameworkPage: React.FC = () => {
         subtitle="Reusable deterministic strategy registry for signals, decisions, and backtests."
         badges={<Stack direction="row" spacing={1}>{[`${strategies.length} configured`, scope.region, scope.assetType].map((item) => <Chip key={item} size="small" label={item} />)}</Stack>}
       />
-      <Alert severity="info" sx={{ mb: 2 }}>Research support only, not financial advice. No live trading or broker execution is enabled.</Alert>
+      <Alert severity="info" sx={{ mb: 2 }}>Research support only, not financial advice. No real-money automation is enabled.</Alert>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       <Paper variant="outlined" sx={{ mb: 2 }}>
         <Tabs value={tab} onChange={(_event, value) => setTab(value)} variant="scrollable" scrollButtons="auto">
