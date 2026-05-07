@@ -1,3 +1,16 @@
+CREATE TABLE IF NOT EXISTS "app_users" (
+  "id" TEXT NOT NULL,
+  "email" TEXT,
+  "displayName" TEXT,
+  "passwordHash" TEXT,
+  "lastLoginAt" TIMESTAMP(3),
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "app_users_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "app_users_email_key" ON "app_users"("email");
+
 CREATE TABLE IF NOT EXISTS "notification_preferences" (
   "id" TEXT NOT NULL,
   "userId" TEXT NOT NULL,

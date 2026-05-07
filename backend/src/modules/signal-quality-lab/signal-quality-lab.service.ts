@@ -12,6 +12,8 @@ import type {
   QualityMetricGroup,
   QualityQuery,
   DataQualityFilterSummary,
+  EvaluationDiagnostics,
+  HorizonAvailabilitySummary,
   QualityRecalculateRequest,
   QualityRecalculateResponse,
   QualitySummary,
@@ -31,6 +33,7 @@ const FLIP_THRESHOLD = 3;
 const FAILED_BULLISH_10D = -0.03;
 const FAILED_BEARISH_10D = 0.03;
 const STALE_SIGNAL_DAYS = 7;
+const PRICE_LOOKUP_CONCURRENCY = 8;
 
 export class SignalQualityLabService {
   constructor(
@@ -48,14 +51,18 @@ export class SignalQualityLabService {
 
   async outcomes(instrumentId: string, query: QualityQuery): Promise<SignalOutcomeSet[]> {
     const signals = await this.signalService.signalHistory({ ...query, instrumentId });
-    return this.outcomesForSignals(signals);
+    return this.outcomesForSignals(signals, query);
   }
 
   async dashboard(query: QualityQuery) {
-    const signals = await this.loadSignals(query);
-    const outcomes = await this.outcomesForSignals(signals);
+    const rawSignals = await this.signalService.signalHistory(query);
+    const signals = await this.applyDataQualityFilters(rawSignals, query);
+    const outcomes = await this.outcomesForSignals(signals, query);
+    const dataQualityFilterSummary = await this.dataQualityFilterSummaryFrom(rawSignals, signals, query);
+    const diagnostics = await this.evaluationDiagnostics(rawSignals, signals, outcomes, query, dataQualityFilterSummary);
+    const horizonAvailability = this.horizonAvailability(outcomes);
     
-    const evaluated = outcomes.filter((item) => item.outcomes.some((outcome) => outcome.available));
+    const evaluated = this.evaluatedForHorizon(outcomes, query.horizon);
     const byType = this.signalTypePerformance(signals, outcomes, query.horizon).filter((item) => item.sampleSize >= query.minSampleSize);
     const bySector = this.groupMetrics(outcomes, query.horizon, (item) => item.sector || 'Unknown').filter((item) => item.sampleSize >= query.minSampleSize);
     const noisy = this.detectNoisySignals(signals, outcomes);
@@ -75,7 +82,11 @@ export class SignalQualityLabService {
       noisySignalCount: noisy.length,
       dataStatus: signals.length === 0 ? 'MISSING' : evaluated.length < signals.length ? 'PARTIAL' : 'COMPLETE',
       generatedAt: new Date().toISOString(),
-      dataQualityFilterSummary: await this.dataQualityFilterSummary(query),
+      dataQualityFilterSummary,
+      evaluationDiagnostics: diagnostics,
+      horizonAvailability,
+      recommendedAction: diagnostics.recommendedAction,
+      warnings: diagnostics.warnings,
     };
 
     const regimeBySignal = new Map<string, string>();
@@ -98,9 +109,13 @@ export class SignalQualityLabService {
   }
 
   async summary(query: QualityQuery): Promise<QualitySummary> {
-    const signals = await this.loadSignals(query);
-    const outcomes = await this.outcomesForSignals(signals);
-    const evaluated = outcomes.filter((item) => item.outcomes.some((outcome) => outcome.available));
+    const rawSignals = await this.signalService.signalHistory(query);
+    const signals = await this.applyDataQualityFilters(rawSignals, query);
+    const outcomes = await this.outcomesForSignals(signals, query);
+    const dataQualityFilterSummary = await this.dataQualityFilterSummaryFrom(rawSignals, signals, query);
+    const diagnostics = await this.evaluationDiagnostics(rawSignals, signals, outcomes, query, dataQualityFilterSummary);
+    const horizonAvailability = this.horizonAvailability(outcomes);
+    const evaluated = this.evaluatedForHorizon(outcomes, query.horizon);
     const byType = this.signalTypePerformance(signals, outcomes, query.horizon).filter((item) => item.sampleSize >= query.minSampleSize);
     const bySector = this.groupMetrics(outcomes, query.horizon, (item) => item.sector || 'Unknown').filter((item) => item.sampleSize >= query.minSampleSize);
     const noisy = this.detectNoisySignals(signals, outcomes);
@@ -119,28 +134,32 @@ export class SignalQualityLabService {
       noisySignalCount: noisy.length,
       dataStatus: signals.length === 0 ? 'MISSING' : evaluated.length < signals.length ? 'PARTIAL' : 'COMPLETE',
       generatedAt: new Date().toISOString(),
-      dataQualityFilterSummary: await this.dataQualityFilterSummary(query),
+      dataQualityFilterSummary,
+      evaluationDiagnostics: diagnostics,
+      horizonAvailability,
+      recommendedAction: diagnostics.recommendedAction,
+      warnings: diagnostics.warnings,
     };
   }
 
   async byType(query: QualityQuery): Promise<SignalTypePerformance[]> {
     const signals = await this.loadSignals(query);
-    return this.signalTypePerformance(signals, await this.outcomesForSignals(signals), query.horizon).filter((item) => item.sampleSize >= query.minSampleSize);
+    return this.signalTypePerformance(signals, await this.outcomesForSignals(signals, query), query.horizon).filter((item) => item.sampleSize >= query.minSampleSize);
   }
 
   async bySector(query: QualityQuery): Promise<QualityMetricGroup[]> {
-    return this.groupMetrics(await this.outcomesForSignals(await this.loadSignals(query)), query.horizon, (item) => item.sector || 'Unknown')
+    return this.groupMetrics(await this.outcomesForSignals(await this.loadSignals(query), query), query.horizon, (item) => item.sector || 'Unknown')
       .filter((item) => item.sampleSize >= query.minSampleSize);
   }
 
   async byScoreBucket(query: QualityQuery): Promise<QualityMetricGroup[]> {
-    return this.groupMetrics(await this.outcomesForSignals(await this.loadSignals(query)), query.horizon, (item) => this.scoreBucket(item.score))
+    return this.groupMetrics(await this.outcomesForSignals(await this.loadSignals(query), query), query.horizon, (item) => this.scoreBucket(item.score))
       .filter((item) => item.sampleSize >= query.minSampleSize);
   }
 
   async byDataQuality(query: QualityQuery): Promise<QualityMetricGroup[]> {
     const signals = await this.loadSignals(query);
-    const outcomes = await this.outcomesForSignals(signals);
+    const outcomes = await this.outcomesForSignals(signals, query);
     const evaluations = await this.dataQualityService.getEvaluationsForInstruments(signals.map((signal) => signal.instrument_id)).catch(() => []);
     const byId = new Map(evaluations.map((evaluation) => [evaluation.instrumentId, evaluation]));
     const groups = [
@@ -153,7 +172,7 @@ export class SignalQualityLabService {
 
   async byRegime(query: QualityQuery): Promise<QualityMetricGroup[]> {
     const signals = await this.loadSignals(query);
-    const outcomes = await this.outcomesForSignals(signals);
+    const outcomes = await this.outcomesForSignals(signals, query);
     const regimeBySignal = new Map<string, string>();
     await Promise.all(signals.map(async (signal) => {
       const regime = await this.historicalContextService.regimeForDate(new Date(signal.generated_at)).catch(() => null);
@@ -165,7 +184,7 @@ export class SignalQualityLabService {
 
   async noisy(query: QualityQuery): Promise<NoisySignalItem[]> {
     const signals = await this.loadSignals(query);
-    return this.detectNoisySignals(signals, await this.outcomesForSignals(signals));
+    return this.detectNoisySignals(signals, await this.outcomesForSignals(signals, query));
   }
 
   async recalculate(input: QualityRecalculateRequest): Promise<QualityRecalculateResponse> {
@@ -182,6 +201,17 @@ export class SignalQualityLabService {
       }),
     ]);
     const processedCount = signals.length;
+    const selectedHorizon: QualityHorizon = input.horizon || '20D';
+    const outcomes = await this.outcomesForSignals(signals, {
+      horizon: selectedHorizon,
+      limit: batchSize,
+      minSampleSize: 0,
+      region: input.region,
+      assetType: input.assetType,
+    });
+    const evaluatedInBatch = this.evaluatedForHorizon(outcomes, selectedHorizon).length;
+    const missingPriceHistoryInBatch = outcomes.filter((outcome) => !outcome.priceHistoryAvailable).length;
+    const insufficientFuturePriceInBatch = outcomes.length - evaluatedInBatch - missingPriceHistoryInBatch;
     const nextOffset = offset + processedCount;
     return {
       processedCount,
@@ -193,6 +223,11 @@ export class SignalQualityLabService {
       inserted: 0,
       updated: 0,
       skipped: processedCount,
+      evaluatedInBatch,
+      insufficientFuturePriceInBatch,
+      missingPriceHistoryInBatch,
+      outcomesPersisted: false,
+      message: 'Outcomes are calculated on demand; recalculation refreshed diagnostics only.',
       warnings: ['Signal Quality Lab outcomes are calculated on demand; no cached rows were persisted.'],
       durationMs: Date.now() - started,
     };
@@ -216,6 +251,14 @@ export class SignalQualityLabService {
       return { totalSignalsBeforeFilter: before.length, totalSignalsAfterFilter: before.length, excludedByDataQuality: 0, missingQualityEvaluationCount: 0, filterApplied: false };
     }
     const after = await this.applyDataQualityFilters(before, query);
+    return this.dataQualityFilterSummaryFrom(before, after, query);
+  }
+
+  private async dataQualityFilterSummaryFrom(before: SignalResultDto[], after: SignalResultDto[], query: QualityQuery): Promise<DataQualityFilterSummary> {
+    const filterApplied = this.qualityFilterApplied(query);
+    if (!filterApplied) {
+      return { totalSignalsBeforeFilter: before.length, totalSignalsAfterFilter: after.length, excludedByDataQuality: 0, missingQualityEvaluationCount: 0, filterApplied: false };
+    }
     const evaluations = await this.dataQualityService.getEvaluationsForInstruments(before.map((signal) => signal.instrument_id)).catch(() => []);
     return {
       totalSignalsBeforeFilter: before.length,
@@ -247,23 +290,57 @@ export class SignalQualityLabService {
     return Boolean(query.readinessStatus || query.coverageStatus || query.liquidityStatus || query.minReadinessScore !== undefined || query.onlySignalReady || query.excludePoorQuality);
   }
 
-  async outcomesForSignals(signals: SignalResultDto[]): Promise<SignalOutcomeSet[]> {
-    const cache = new Map<string, PricePoint[]>();
-    const result: SignalOutcomeSet[] = [];
-    for (const signal of signals) {
-      let prices = cache.get(signal.instrument_id);
-      if (!prices) {
-        prices = await this.prices(signal.instrument_id);
-        cache.set(signal.instrument_id, prices);
-      }
-      result.push(this.calculateOutcome(signal, prices));
+  async outcomesForSignals(signals: SignalResultDto[], query?: Partial<QualityQuery>): Promise<SignalOutcomeSet[]> {
+    const pricesByKey = await this.pricesForSignals(signals, query);
+    return signals.map((signal) => {
+      const cacheKey = this.priceCacheKey(signal.instrument_id, query);
+      return this.calculateOutcome(signal, pricesByKey.get(cacheKey) || []);
+    });
+  }
+
+  private async pricesForSignals(signals: SignalResultDto[], query?: Partial<QualityQuery>): Promise<Map<string, PricePoint[]>> {
+    const bulkPrices = await this.bulkPricesForSignals(signals, query);
+    if (bulkPrices) return bulkPrices;
+
+    const uniqueSignals = [...new Map(signals.map((signal) => [this.priceCacheKey(signal.instrument_id, query), signal])).values()];
+    const entries = await this.mapConcurrent(uniqueSignals, PRICE_LOOKUP_CONCURRENCY, async (signal) => {
+      const cacheKey = this.priceCacheKey(signal.instrument_id, query);
+      const prices = await this.prices(signal.instrument_id, query);
+      return [cacheKey, prices] as const;
+    });
+    return new Map(entries);
+  }
+
+  private async bulkPricesForSignals(signals: SignalResultDto[], query?: Partial<QualityQuery>): Promise<Map<string, PricePoint[]> | null> {
+    const bulkLoader = (this.marketDataService as any).listForwardPriceWindowsByInstrumentIds;
+    if (typeof bulkLoader !== 'function' || signals.length === 0) return null;
+
+    const earliestGeneratedAt = signals
+      .map((signal) => this.utcTradingDay(new Date(signal.generated_at)).getTime())
+      .filter(Number.isFinite)
+      .reduce((earliest, value) => Math.min(earliest, value), Number.POSITIVE_INFINITY);
+    if (!Number.isFinite(earliestGeneratedAt)) return null;
+
+    const instrumentIds = [...new Set(signals.map((signal) => signal.instrument_id).filter(Boolean))];
+    const response = await bulkLoader.call(
+      this.marketDataService,
+      instrumentIds,
+      new Date(earliestGeneratedAt),
+      { region: query?.region, assetType: query?.assetType }
+    ).catch(() => null);
+    if (!response) return null;
+
+    const result = new Map<string, PricePoint[]>();
+    for (const instrumentId of instrumentIds) {
+      const rawPrices = response instanceof Map ? response.get(instrumentId) : response[instrumentId];
+      result.set(this.priceCacheKey(instrumentId, query), this.normalizePrices(rawPrices || []));
     }
     return result;
   }
 
   calculateOutcome(signal: SignalResultDto, prices: PricePoint[]): SignalOutcomeSet {
-    const generatedAt = new Date(signal.generated_at);
-    const startIndex = prices.findIndex((price) => new Date(price.date).getTime() >= generatedAt.getTime());
+    const generatedAt = this.utcTradingDay(new Date(signal.generated_at));
+    const startIndex = prices.findIndex((price) => this.utcTradingDay(new Date(price.date)).getTime() >= generatedAt.getTime());
     const start = startIndex >= 0 ? prices[startIndex] : null;
     const window = startIndex >= 0 ? prices.slice(startIndex, startIndex + 61) : [];
     const outcomes = (Object.keys(HORIZON_DAYS) as QualityHorizon[]).map((horizon) =>
@@ -281,6 +358,10 @@ export class SignalQualityLabService {
       country: signal.country,
       generatedAt: signal.generated_at,
       outcomes,
+      priceHistoryAvailable: prices.length > 0,
+      startPriceDate: start?.date ?? null,
+      latestAvailablePriceDate: prices.length > 0 ? prices[prices.length - 1].date : null,
+      futureRowsAvailable: startIndex >= 0 ? Math.max(0, window.length - 1) : 0,
       maxFavorableMovePercent: pathReturns.length > 0 ? Math.max(...pathReturns) : null,
       maxAdverseMovePercent: pathReturns.length > 0 ? Math.min(...pathReturns) : null,
       maxDrawdownPercent: this.maxDrawdown(window),
@@ -354,12 +435,41 @@ export class SignalQualityLabService {
     return items;
   }
 
-  private async prices(instrumentId: string): Promise<PricePoint[]> {
-    const response = await this.marketDataService.listPricesByInstrumentId(instrumentId, 6000);
-    return (response?.prices || [])
+  private async prices(instrumentId: string, query?: Partial<QualityQuery>): Promise<PricePoint[]> {
+    const response = await this.marketDataService.listPricesByInstrumentId(
+      instrumentId,
+      6000,
+      undefined,
+      undefined,
+      { region: query?.region, assetType: query?.assetType }
+    );
+    return this.normalizePrices(response?.prices || []);
+  }
+
+  private normalizePrices(prices: any[]): PricePoint[] {
+    return prices
       .map((price: any) => ({ date: new Date(price.date).toISOString(), adjustedClose: Number(price.adjusted_close ?? price.close) }))
       .filter((price) => Number.isFinite(price.adjustedClose))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }
+
+  private priceCacheKey(instrumentId: string, query?: Partial<QualityQuery>): string {
+    return `${instrumentId}:${query?.region || 'GLOBAL'}:${query?.assetType || 'STOCK'}`;
+  }
+
+  private async mapConcurrent<T, R>(items: T[], concurrency: number, worker: (item: T) => Promise<R>): Promise<R[]> {
+    if (items.length === 0) return [];
+    const results = new Array<R>(items.length);
+    let nextIndex = 0;
+    const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+      while (nextIndex < items.length) {
+        const currentIndex = nextIndex;
+        nextIndex += 1;
+        results[currentIndex] = await worker(items[currentIndex]);
+      }
+    });
+    await Promise.all(workers);
+    return results;
   }
 
   private forwardOutcome(horizon: QualityHorizon, start: PricePoint | null, window: PricePoint[]): ForwardOutcome {
@@ -380,18 +490,30 @@ export class SignalQualityLabService {
   private metric(group: string, horizon: QualityHorizon, items: SignalOutcomeSet[]): QualityMetricGroup {
     const available = items.map((item) => ({ item, outcome: item.outcomes.find((outcome) => outcome.horizon === horizon) })).filter((entry) => entry.outcome?.available && entry.outcome.forwardReturnPercent !== null);
     const returns = available.map((entry) => entry.outcome!.forwardReturnPercent!);
+    const missingPrice = items.filter((item) => !item.priceHistoryAvailable).length;
+    const unevaluatedCount = items.length - returns.length;
+    const status = this.groupStatus(items.length, returns.length, missingPrice, horizon);
+    const reason = this.groupReason(items.length, returns.length, missingPrice, horizon);
     return {
       group,
+      name: group,
       horizon,
+      rawSignalCount: items.length,
       sampleSize: returns.length,
+      samples: returns.length,
+      unevaluatedCount,
       winRate: this.winRate(items, horizon),
       averageForwardReturn: this.average(returns),
+      averageReturn: this.average(returns),
       medianForwardReturn: this.median(returns),
+      medianReturn: this.median(returns),
       averageMaxDrawdown: this.average(items.map((item) => item.maxDrawdownPercent).filter((value): value is number => value !== null)),
       bestReturn: returns.length > 0 ? Math.max(...returns) : null,
       worstReturn: returns.length > 0 ? Math.min(...returns) : null,
       positiveCount: returns.filter((value) => value > 0).length,
       negativeCount: returns.filter((value) => value < 0).length,
+      status,
+      reason,
     };
   }
 
@@ -420,6 +542,121 @@ export class SignalQualityLabService {
 
   private historyItem(signal: SignalResultDto): SignalHistoryItem {
     return { ...signal, signalResultId: signal.id || '', researchUrl: `/research/stocks/${signal.instrument_id}` };
+  }
+
+  private evaluatedForHorizon(outcomes: SignalOutcomeSet[], horizon: QualityHorizon): SignalOutcomeSet[] {
+    return outcomes.filter((item) => {
+      const outcome = item.outcomes.find((entry) => entry.horizon === horizon);
+      return Boolean(outcome?.available && outcome.forwardReturnPercent !== null);
+    });
+  }
+
+  private horizonAvailability(outcomes: SignalOutcomeSet[]): HorizonAvailabilitySummary {
+    return (Object.keys(HORIZON_DAYS) as QualityHorizon[]).reduce((summary, horizon) => {
+      const evaluated = this.evaluatedForHorizon(outcomes, horizon).length;
+      const missingPriceHistory = outcomes.filter((item) => !item.priceHistoryAvailable).length;
+      summary[horizon] = {
+        eligible: outcomes.length - missingPriceHistory,
+        evaluated,
+        insufficientFuturePrice: outcomes.length - missingPriceHistory - evaluated,
+      };
+      return summary;
+    }, {} as HorizonAvailabilitySummary);
+  }
+
+  private async evaluationDiagnostics(
+    rawSignals: SignalResultDto[],
+    filteredSignals: SignalResultDto[],
+    outcomes: SignalOutcomeSet[],
+    query: QualityQuery,
+    dataQualityFilterSummary: DataQualityFilterSummary
+  ): Promise<EvaluationDiagnostics> {
+    const evaluatedSignals = this.evaluatedForHorizon(outcomes, query.horizon).length;
+    const missingPriceHistoryCount = outcomes.filter((item) => !item.priceHistoryAvailable).length;
+    const insufficientFuturePriceCount = Math.max(0, filteredSignals.length - evaluatedSignals - missingPriceHistoryCount);
+    const signalDates = filteredSignals.map((signal) => new Date(signal.generated_at)).filter((date) => Number.isFinite(date.getTime()));
+    const latestPriceDates = outcomes.map((item) => item.latestAvailablePriceDate).filter((date): date is string => Boolean(date));
+    const latestAvailablePriceDate = latestPriceDates.length > 0
+      ? new Date(Math.max(...latestPriceDates.map((date) => new Date(date).getTime()))).toISOString()
+      : null;
+    const newestUnevaluated = outcomes
+      .filter((item) => item.priceHistoryAvailable && !item.outcomes.find((outcome) => outcome.horizon === query.horizon)?.available)
+      .map((item) => new Date(item.generatedAt).getTime())
+      .filter(Number.isFinite);
+    const nextEvaluableDate = newestUnevaluated.length > 0
+      ? new Date(Math.min(...newestUnevaluated) + HORIZON_DAYS[query.horizon] * 86400000).toISOString()
+      : null;
+    const [excludedByDirectionCount, excludedByDateFilterCount] = await Promise.all([
+      query.direction ? this.countDelta(query, { direction: undefined }) : Promise.resolve(0),
+      query.from || query.to ? this.countDelta(query, { from: undefined, to: undefined }) : Promise.resolve(0),
+    ]);
+    const warnings = this.diagnosticWarnings(filteredSignals.length, evaluatedSignals, insufficientFuturePriceCount, missingPriceHistoryCount, dataQualityFilterSummary);
+    return {
+      totalSignals: rawSignals.length,
+      signalsAfterFilters: filteredSignals.length,
+      evaluatedSignals,
+      unevaluatedSignals: filteredSignals.length - evaluatedSignals,
+      insufficientFuturePriceCount,
+      missingPriceHistoryCount,
+      missingInstrumentCount: 0,
+      excludedByDataQualityCount: dataQualityFilterSummary.excludedByDataQuality,
+      excludedByDateFilterCount,
+      excludedByDirectionCount,
+      selectedHorizon: query.horizon,
+      earliestSignalDate: signalDates.length > 0 ? new Date(Math.min(...signalDates.map((date) => date.getTime()))).toISOString() : null,
+      latestSignalDate: signalDates.length > 0 ? new Date(Math.max(...signalDates.map((date) => date.getTime()))).toISOString() : null,
+      latestAvailablePriceDate,
+      minimumRequiredFutureRows: HORIZON_DAYS[query.horizon],
+      nextEvaluableDate,
+      recommendedAction: this.recommendedAction(filteredSignals.length, evaluatedSignals, insufficientFuturePriceCount, missingPriceHistoryCount, dataQualityFilterSummary),
+      warnings,
+    };
+  }
+
+  private async countDelta(query: QualityQuery, override: Partial<QualityQuery>): Promise<number> {
+    const withoutFilter = await this.signalService.signalHistoryCount({ ...query, ...override });
+    const withFilter = await this.signalService.signalHistoryCount(query);
+    return Math.max(0, withoutFilter - withFilter);
+  }
+
+  private recommendedAction(total: number, evaluated: number, insufficient: number, missing: number, dataQuality: DataQualityFilterSummary): string {
+    if (total === 0 && dataQuality.filterApplied && dataQuality.excludedByDataQuality > 0) return '0 signals remain after data-quality filters. Reset filters or use a less restrictive readiness filter.';
+    if (total === 0) return 'Run Signal Generation for the selected market scope, then return after price data exists.';
+    if (evaluated > 0) return 'Review evaluated historical forward returns and keep market data current.';
+    if (missing >= total) return 'Sync historical market data for these instruments before measuring outcomes.';
+    if (insufficient > 0) return 'Try a shorter horizon such as 1D or 5D, sync latest market data, or wait until enough future trading days exist.';
+    return 'Check whether signal dates, filters, and market scope match available price history.';
+  }
+
+  private diagnosticWarnings(total: number, evaluated: number, insufficient: number, missing: number, dataQuality: DataQualityFilterSummary): string[] {
+    const warnings: string[] = [];
+    if (total > 0 && evaluated === 0) warnings.push('No evaluated outcomes are available for the selected horizon.');
+    if (insufficient > 0) warnings.push('Some signals do not yet have enough future trading rows for the selected horizon.');
+    if (missing > 0) warnings.push('Some signals have no available price history in Market Data Foundation.');
+    if (dataQuality.filterApplied && dataQuality.totalSignalsAfterFilter === 0) warnings.push('0 signals remain after data-quality filters.');
+    return warnings;
+  }
+
+  private groupStatus(rawCount: number, evaluatedCount: number, missingPriceCount: number, horizon: QualityHorizon): QualityMetricGroup['status'] {
+    if (rawCount === 0) return 'FILTERED_OUT';
+    if (evaluatedCount === 0 && missingPriceCount >= rawCount) return 'MISSING_PRICE_DATA';
+    if (evaluatedCount === 0) return 'INSUFFICIENT_FUTURE_DATA';
+    if (evaluatedCount < 5 || evaluatedCount < HORIZON_DAYS[horizon]) return 'SMALL_SAMPLE';
+    return 'EVALUATED';
+  }
+
+  private groupReason(rawCount: number, evaluatedCount: number, missingPriceCount: number, horizon: QualityHorizon): string | null {
+    if (rawCount === 0) return 'Filtered out by the selected query.';
+    if (evaluatedCount === 0 && missingPriceCount >= rawCount) return 'Missing price history for this group.';
+    if (evaluatedCount === 0) return `No evaluated outcomes for the selected ${horizon} horizon.`;
+    if (evaluatedCount < 5) return 'Small evaluated sample; interpret as historical measurement only.';
+    return null;
+  }
+
+  private utcTradingDay(value: Date): Date {
+    const date = new Date(value);
+    date.setUTCHours(0, 0, 0, 0);
+    return date;
   }
 
   private scoreBucket(score: number): string {

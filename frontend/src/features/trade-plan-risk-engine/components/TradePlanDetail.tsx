@@ -7,6 +7,10 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 
+const fmtPercent = (value: number | null | undefined) => value === null || value === undefined ? 'N/A' : `${(value * 100).toFixed(1)}%`;
+const fmtNumber = (value: number | null | undefined) => value === null || value === undefined ? 'N/A' : value.toFixed(2);
+const fmtDate = (value: string | null | undefined) => value ? new Date(value).toLocaleString() : 'N/A';
+
 export const TradePlanDetail: React.FC = () => {
   const { instrumentId } = useParams<{ instrumentId: string }>();
   const [plan, setPlan] = useState<TradePlanResultDto | null>(null);
@@ -205,6 +209,60 @@ export const TradePlanDetail: React.FC = () => {
                 </Paper>
             </Grid>
         )}
+
+        <Grid item xs={12}>
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>Proof Snapshot</Typography>
+            <Divider sx={{ mb: 2 }} />
+            {!plan.strategyProofSnapshot && (
+              <Alert severity="warning" sx={{ mb: 2 }}>Plan is not paper-review ready because proof snapshot is missing.</Alert>
+            )}
+            {plan.strategyProofSnapshot?.proofWarnings?.some((item) => item.includes('Backtest summary missing')) && (
+              <Alert severity="warning" sx={{ mb: 2 }}>Backtest summary missing for selected timeframe.</Alert>
+            )}
+            {!plan.dataQualitySnapshot || plan.dataQualitySnapshot.status === 'MISSING' ? (
+              <Alert severity="warning" sx={{ mb: 2 }}>Data quality snapshot missing.</Alert>
+            ) : null}
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={3}>
+                <Typography variant="subtitle2">Strategy Proof</Typography>
+                <Typography variant="body2">Rating: {plan.strategyProofSnapshot?.strategyRating || plan.strategyRating || 'UNPROVEN'}</Typography>
+                <Typography variant="body2">Label: {plan.strategyProofSnapshot?.readinessLabel || plan.readinessLabel || 'RESEARCH_ONLY'}</Typography>
+                <Typography variant="body2">Proof: {plan.strategyProofSnapshot?.proofStatus || 'MISSING'}</Typography>
+                <Typography variant="body2">Timeframe: {plan.backtestTimeframe || 'N/A'}</Typography>
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <Typography variant="subtitle2">Backtest Summary</Typography>
+                <Typography variant="body2">CAGR: {fmtPercent(plan.backtestSummary?.cagr)}</Typography>
+                <Typography variant="body2">Drawdown: {fmtPercent(plan.backtestSummary?.maxDrawdown)}</Typography>
+                <Typography variant="body2">Sharpe: {fmtNumber(plan.backtestSummary?.sharpe)}</Typography>
+                <Typography variant="body2">Trades: {plan.backtestSummary?.tradeCount ?? 'N/A'}</Typography>
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <Typography variant="subtitle2">Decision Snapshot</Typography>
+                <Typography variant="body2">Decision: {plan.strategyDecisionSnapshot?.decision || 'N/A'}</Typography>
+                <Typography variant="body2">Confidence: {plan.strategyDecisionSnapshot?.confidence || 'N/A'}</Typography>
+                <Typography variant="body2">Market Gate: {plan.strategyDecisionSnapshot?.marketGate || 'N/A'}</Typography>
+                <Typography variant="body2">Score: {plan.strategyDecisionSnapshot?.decisionScore ?? 'N/A'}</Typography>
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <Typography variant="subtitle2">Market & Quality</Typography>
+                <Typography variant="body2">Latest Price: {plan.marketDataSnapshot?.latestPrice ?? plan.latestPrice ?? 'N/A'}</Typography>
+                <Typography variant="body2">Price Time: {fmtDate(plan.marketDataSnapshot?.latestPriceTimestamp || plan.latestPriceTimestamp)}</Typography>
+                <Typography variant="body2">Coverage: {plan.dataQualitySnapshot?.coverageStatus || 'MISSING'}</Typography>
+                <Typography variant="body2">Liquidity: {plan.dataQualitySnapshot?.liquidityStatus || 'MISSING'}</Typography>
+              </Grid>
+            </Grid>
+            {(plan.paperReadinessReasons?.length || 0) > 0 && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2">Paper Readiness Reasons</Typography>
+                <Stack direction="row" spacing={1} flexWrap="wrap">
+                  {plan.paperReadinessReasons?.map((reason) => <Chip key={reason} size="small" label={reason} />)}
+                </Stack>
+              </Box>
+            )}
+          </Paper>
+        </Grid>
       </Grid>
     </Box>
   );

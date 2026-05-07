@@ -1,5 +1,5 @@
 import { TradePlanRiskEngineRepository } from './trade-plan-risk-engine.repository';
-import type { GenerateTradePlanRequest, TradePlanResultDto, TradePlanModelRules, EntryZone, StopLoss, Target, BatchGenerateTradePlanRequest, TradePlanListQuery, Quality, PaperReadinessInput, PaperReadinessStatus } from './trade-plan-risk-engine.types';
+import type { GenerateTradePlanRequest, TradePlanResultDto, TradePlanModelRules, EntryZone, StopLoss, Target, BatchGenerateTradePlanRequest, BatchGenerateTradePlanResponse, TradePlanListQuery, Quality, PaperReadinessInput, PaperReadinessStatus, BacktestSummarySnapshot, DataQualitySnapshot, MarketDataSnapshot, StrategyDecisionSnapshot, StrategyProofSnapshot, BatchGenerateFailure } from './trade-plan-risk-engine.types';
 import { StrategyDecisionEngineService } from '../strategy-decision-engine';
 import { MarketDataFoundationService } from '../market-data-foundation/market-data-foundation.service';
 import { PortfolioManagementService } from '../portfolio-management';
@@ -107,6 +107,7 @@ export class TradePlanRiskEngineService {
       if (!dataQualityProof.latestPricePresent) addBlocker('Latest price is missing.');
       else addReason('Latest price is present.');
       if (!dataQualityProof.priceHistorySufficient) addBlocker('Price history is insufficient.');
+      if (!dataQualityProof.coverageStatus || !dataQualityProof.liquidityStatus) addBlocker('Data quality snapshot is missing.');
       if (dataQualityProof.coverageStatus === 'UNUSABLE') addBlocker('Data quality is UNUSABLE.');
       if (dataQualityProof.liquidityStatus === 'ILLIQUID') addBlocker('Liquidity is ILLIQUID.');
       if (dataQualityProof.stalePriceWarningHandled === false) addBlocker('Stale price warning is not resolved.');
@@ -131,10 +132,14 @@ export class TradePlanRiskEngineService {
   async generatePlan(request: GenerateTradePlanRequest): Promise<TradePlanResultDto> {
     const { instrumentId, symbol, strategyDecisionId, portfolioId, riskPercent, capitalBase, targetRewardRisk } = request;
     const rules = this.getModelRules();
+    const region = request.region || 'IN';
+    const assetType = request.assetType || 'STOCK';
 
     const result: TradePlanResultDto = {
       instrumentId,
       symbol,
+      region,
+      assetType,
       strategy: 'UNKNOWN',
       strategyVersion: '1.0.0',
       strategyDecisionId: strategyDecisionId || null,
@@ -173,8 +178,7 @@ export class TradePlanRiskEngineService {
         result.planStatus = 'INSUFFICIENT_DATA';
         result.blockers.push('No Strategy Decision found for instrument.');
         result.dataGaps.push('strategy_decision');
-        Object.assign(result, this.classifyPaperReadiness({ plan: result, scope: { region: request.region || 'IN', assetType: request.assetType || 'STOCK' } }));
-        return this.persistWithReadiness(result);
+        return this.finalizeAndPersist(result, { request, decision: null, latestPriceResult: null, pricesDto: null, prices: [], dataQuality: null, backtestSummary: null });
       }
 
       result.strategy = decision.strategy;
@@ -223,36 +227,24 @@ export class TradePlanRiskEngineService {
       }
 
       // 2. Fetch Market Data & Data Quality
-      const latestPriceResult = await this.marketDataService.latestPriceByInstrumentId(instrumentId, {});
+      const latestPriceResult = await this.marketDataService.latestPriceByInstrumentId(instrumentId, { region, assetType });
       if (!latestPriceResult || !latestPriceResult.latest || !latestPriceResult.latest.close) {
         result.planStatus = 'INSUFFICIENT_DATA';
         result.blockers.push('Missing latest price.');
         result.dataGaps.push('latest_price');
-        Object.assign(result, this.classifyPaperReadiness({
-          plan: result,
-          decisionProof: this.decisionToProof(decision, null),
-          dataQualityProof: { latestPricePresent: false, priceHistorySufficient: false },
-          scope: { region: request.region || 'IN', assetType: request.assetType || 'STOCK' },
-        }));
-        return this.persistWithReadiness(result);
+        return this.finalizeAndPersist(result, { request, decision, latestPriceResult, pricesDto: null, prices: [], dataQuality: null, backtestSummary: null });
       }
 
       const currentPrice = Number(latestPriceResult.latest.close);
       
       const limit = 200;
-      const pricesDto = await this.marketDataService.listPricesByInstrumentId(instrumentId, limit, undefined, undefined, {});
+      const pricesDto = await this.marketDataService.listPricesByInstrumentId(instrumentId, limit, undefined, undefined, { region, assetType });
       const prices = pricesDto?.prices || [];
       if (prices.length < 10) {
         result.planStatus = 'INSUFFICIENT_DATA';
         result.blockers.push('Insufficient historical price data (< 10 bars).');
         result.dataGaps.push('price_history');
-        Object.assign(result, this.classifyPaperReadiness({
-          plan: result,
-          decisionProof: this.decisionToProof(decision, null),
-          dataQualityProof: { latestPricePresent: true, priceHistorySufficient: false },
-          scope: { region: request.region || 'IN', assetType: request.assetType || 'STOCK' },
-        }));
-        return this.persistWithReadiness(result);
+        return this.finalizeAndPersist(result, { request, decision, latestPriceResult, pricesDto, prices, dataQuality: null, backtestSummary: null });
       }
       
       let sma50 = null;
@@ -607,35 +599,22 @@ export class TradePlanRiskEngineService {
          result.invalidationRules.push('Plan is currently blocked. Consider review later.');
       }
 
-      const backtestSummary = await this.latestBacktestSummary(result.strategy, request.region || 'IN', request.assetType || 'STOCK');
-      Object.assign(result, this.classifyPaperReadiness({
-        plan: result,
-        decisionProof: this.decisionToProof(decision, backtestSummary),
-        dataQualityProof: {
-          latestPricePresent: true,
-          priceHistorySufficient: prices.length >= 50,
-          coverageStatus: dataQuality?.coverageStatus ?? null,
-          liquidityStatus: dataQuality?.liquidityStatus ?? null,
-          stalePriceWarningHandled: !(dataQuality?.dataGaps || []).some((gap: string) => gap.toLowerCase().includes('stale')),
-        },
-        scope: { region: request.region || 'IN', assetType: request.assetType || 'STOCK' },
-      }));
-
-      return this.persistWithReadiness(result);
+      const backtestSummary = await this.latestBacktestSummary(result.strategy, region, assetType, request.backtestTimeframe);
+      return this.finalizeAndPersist(result, { request, decision, latestPriceResult, pricesDto, prices, dataQuality, backtestSummary });
     } catch (e: any) {
       result.planStatus = 'BLOCKED';
       result.blockers.push(`Error generating plan: ${e.message}`);
-      Object.assign(result, this.classifyPaperReadiness({ plan: result, scope: { region: request.region || 'IN', assetType: request.assetType || 'STOCK' } }));
-      return this.persistWithReadiness(result);
+      return this.finalizeAndPersist(result, { request, decision: null, latestPriceResult: null, pricesDto: null, prices: [], dataQuality: null, backtestSummary: null });
     }
   }
 
-  async batchGenerate(request: BatchGenerateTradePlanRequest): Promise<{ count: number, generatedCount: number, failedCount: number, plans: TradePlanResultDto[] }> {
-    const { batchSize = 25, offset = 0, region } = request;
-    const query = { limit: batchSize, offset, region, decision: 'TRADE_CANDIDATE' };
+  async batchGenerate(request: BatchGenerateTradePlanRequest): Promise<BatchGenerateTradePlanResponse> {
+    const { batchSize = 25, offset = 0, region, assetType } = request;
+    const query = { limit: batchSize, offset, region, assetType, decision: 'TRADE_CANDIDATE' };
     const candidates = await this.strategyDecisionService.candidates(query as any);
     
     const plans: TradePlanResultDto[] = [];
+    const failures: BatchGenerateFailure[] = [];
     let generatedCount = 0;
     let failedCount = 0;
 
@@ -655,84 +634,245 @@ export class TradePlanRiskEngineService {
           instrumentId: candidate.instrumentId!,
           symbol: candidate.symbol!,
           strategyDecisionId: candidate.id,
+          region: request.region,
+          assetType: request.assetType,
+          backtestTimeframe: request.backtestTimeframe,
         };
         if (!req.instrumentId || !req.symbol) throw new Error('Missing instrumentId or symbol');
         return this.generatePlan(req);
       });
 
       const results = await Promise.allSettled(promises);
-      for (const result of results) {
+      for (const [index, result] of results.entries()) {
+        const candidate = chunk[index];
         if (result.status === 'fulfilled') {
           plans.push(result.value);
           generatedCount++;
         } else {
           failedCount++;
+          failures.push({
+            strategyDecisionId: candidate.id,
+            instrumentId: candidate.instrumentId,
+            symbol: candidate.symbol,
+            reason: result.reason?.message || 'Trade plan generation failed.',
+          });
         }
       }
     }
 
-    return { count: plans.length, generatedCount, failedCount, plans };
+    const totalCount = candidates.total ?? candidates.results.length;
+    const nextOffset = offset + batchSize < totalCount ? offset + batchSize : null;
+
+    return {
+      count: plans.length,
+      generatedCount,
+      failedCount,
+      candidateCount: candidates.results.length,
+      totalCount,
+      batchSize,
+      offset,
+      nextOffset,
+      hasMore: nextOffset !== null,
+      plans,
+      failures,
+    };
   }
 
   async latestForInstrument(instrumentId: string, strategy?: string, portfolioId?: string) {
-     const plan = await this.repository.latestForInstrument(instrumentId, strategy, portfolioId);
-     if (!plan) return null;
-     return (await this.enrichPaperReadiness([plan], { region: 'IN', assetType: 'STOCK' }))[0];
+     return this.repository.latestForInstrument(instrumentId, strategy, portfolioId);
   }
 
   async list(query: TradePlanListQuery) {
-     if (query.paperReadyOnly) {
-       const limit = query.limit || 50;
-       const offset = query.offset || 0;
-       const base = await this.repository.list({ ...query, limit: 1000, offset: 0 });
-       const enriched = await this.enrichPaperReadiness(base.results, query);
-       const filtered = enriched.filter((plan) => plan.paperReadinessStatus === 'READY_FOR_PAPER_REVIEW');
-       return { results: filtered.slice(offset, offset + limit), total: filtered.length };
-     }
-     const result = await this.repository.list(query);
-     return { ...result, results: await this.enrichPaperReadiness(result.results, query) };
+     return this.repository.list(query);
   }
 
   async getHealthStats() {
      return this.repository.getHealthStats();
   }
 
-  private async enrichPaperReadiness(plans: TradePlanResultDto[], query: TradePlanListQuery): Promise<TradePlanResultDto[]> {
-    return Promise.all(plans.map(async (plan) => {
-      const decision = await this.latestDecisionForPlan(plan).catch(() => null);
-      const backtestSummary = await this.latestBacktestSummary(plan.strategy, query.region || 'IN', query.assetType || 'STOCK').catch(() => null);
-      const quality = await this.dataQualityService.getLatestEvaluationForInstrument(plan.instrumentId).catch(() => null);
-      return {
-        ...plan,
-        ...this.classifyPaperReadiness({
-          plan,
-          decisionProof: this.decisionToProof(decision, backtestSummary),
-          dataQualityProof: {
-            latestPricePresent: Boolean(plan.entryZone?.referencePrice),
-            priceHistorySufficient: quality ? quality.eligibleForSignals || quality.eligibleForBacktesting : plan.dataGaps.every((gap) => !gap.includes('price_history')),
-            coverageStatus: quality?.coverageStatus ?? null,
-            liquidityStatus: quality?.liquidityStatus ?? null,
-            stalePriceWarningHandled: quality ? !quality.dataGaps.some((gap) => gap.toLowerCase().includes('stale')) : true,
-          },
-          scope: { region: query.region || 'IN', assetType: query.assetType || 'STOCK' },
-        }),
-      };
-    }));
-  }
-
-  private async latestDecisionForPlan(plan: TradePlanResultDto) {
-    const history = await this.strategyDecisionService.history(plan.instrumentId);
-    return history.find((decision: any) => decision.id === plan.strategyDecisionId) || history.find((decision: any) => decision.strategy === plan.strategy) || null;
-  }
-
-  private async latestBacktestSummary(strategy: string, region: string, assetType: string) {
-    const summaries = await this.strategyFrameworkService.performance(strategy, { region, assetType }).catch(() => []);
+  private async latestBacktestSummary(strategy: string, region: string, assetType: string, timeframe?: string) {
+    const summaries = await this.strategyFrameworkService.performance(strategy, { region, assetType, timeframe: timeframe as any }).catch(() => []);
     return summaries[0] || null;
+  }
+
+  private async finalizeAndPersist(
+    result: TradePlanResultDto,
+    context: {
+      request: GenerateTradePlanRequest;
+      decision: any | null;
+      latestPriceResult: any | null;
+      pricesDto: any | null;
+      prices: any[];
+      dataQuality: any | null;
+      backtestSummary: any | null;
+    }
+  ): Promise<TradePlanResultDto> {
+    const region = context.request.region || result.region || 'IN';
+    const assetType = context.request.assetType || result.assetType || 'STOCK';
+    const backtestSummary = context.backtestSummary || (
+      result.strategy !== 'UNKNOWN'
+        ? await this.latestBacktestSummary(result.strategy, region, assetType, context.request.backtestTimeframe)
+        : null
+    );
+
+    const instrumentPromise = typeof (this.marketDataService as any).getInstrument === 'function'
+      ? Promise.resolve((this.marketDataService as any).getInstrument(result.instrumentId, { region, assetType })).catch(() => null)
+      : Promise.resolve(null);
+    const latestStoredPromise = typeof (this.marketDataService as any).latestStoredCandleInfo === 'function'
+      ? Promise.resolve((this.marketDataService as any).latestStoredCandleInfo(region, assetType)).catch(() => null)
+      : Promise.resolve(null);
+    const [instrument, latestStoredInfo] = await Promise.all([
+      instrumentPromise,
+      latestStoredPromise,
+    ]);
+
+    const backtestSnapshot = this.toBacktestSummarySnapshot(backtestSummary);
+    const proofSnapshot = this.toStrategyProofSnapshot(result, context.decision, backtestSnapshot);
+    const decisionSnapshot = this.toStrategyDecisionSnapshot(result, context.decision);
+    const marketSnapshot = this.toMarketDataSnapshot(result, context.latestPriceResult, context.pricesDto, context.prices, instrument, latestStoredInfo, region, assetType);
+    const dataQualitySnapshot = this.toDataQualitySnapshot(context.dataQuality);
+
+    result.region = region;
+    result.assetType = assetType;
+    result.strategyRating = proofSnapshot.strategyRating;
+    result.readinessLabel = proofSnapshot.readinessLabel;
+    result.backtestTimeframe = proofSnapshot.backtestTimeframe;
+    result.backtestSummary = backtestSnapshot;
+    result.strategyProofSnapshot = proofSnapshot;
+    result.strategyDecisionSnapshot = decisionSnapshot;
+    result.latestPrice = marketSnapshot.latestPrice;
+    result.latestPriceTimestamp = marketSnapshot.latestPriceTimestamp;
+    result.marketDataSnapshot = marketSnapshot;
+    result.dataQualitySnapshot = dataQualitySnapshot;
+    result.proofGeneratedAt = new Date().toISOString();
+    result.snapshotVersion = 'trade-plan-proof-snapshot-v1';
+
+    Object.assign(result, this.classifyPaperReadiness({
+      plan: result,
+      decisionProof: this.decisionToProof(context.decision, backtestSnapshot),
+      dataQualityProof: {
+        latestPricePresent: marketSnapshot.latestPrice !== null,
+        priceHistorySufficient: context.prices.length >= 50,
+        coverageStatus: dataQualitySnapshot.coverageStatus ?? null,
+        liquidityStatus: dataQualitySnapshot.liquidityStatus ?? null,
+        stalePriceWarningHandled: !dataQualitySnapshot.blockers.some((item) => item.toLowerCase().includes('stale')),
+      },
+      scope: { region, assetType },
+    }));
+
+    return this.persistWithReadiness(result);
+  }
+
+  private toBacktestSummarySnapshot(summary: any): BacktestSummarySnapshot | null {
+    if (!summary) return null;
+    return {
+      timeframe: summary.timeframe ?? null,
+      cagr: summary.cagr ?? null,
+      maxDrawdown: summary.maxDrawdown ?? null,
+      sharpe: summary.sharpe ?? null,
+      winRate: summary.winRate ?? null,
+      profitFactor: summary.profitFactor ?? null,
+      tradeCount: summary.tradeCount ?? 0,
+      ratingGrade: summary.ratingGrade || 'UNPROVEN',
+      availabilityStatus: summary.tradeCount > 0 ? 'AVAILABLE' : 'INSUFFICIENT_HISTORY',
+      generatedAt: summary.generatedAt ?? null,
+    };
+  }
+
+  private toStrategyProofSnapshot(result: TradePlanResultDto, decision: any | null, backtestSummary: BacktestSummarySnapshot | null): StrategyProofSnapshot {
+    const rating = this.ratingFromDecision(decision) || backtestSummary?.ratingGrade || null;
+    const readinessLabel = decision?.readinessLabel || decision?.strategyRating?.readinessLabel || null;
+    const proofWarnings: string[] = [];
+    if (!decision?.frameworkBacked) proofWarnings.push('Strategy Framework-backed decision is missing.');
+    if (!backtestSummary) proofWarnings.push('Backtest summary missing for selected timeframe.');
+    if (rating === 'UNPROVEN' || rating === 'WEAK') proofWarnings.push(`Strategy rating is ${rating}.`);
+    return {
+      strategyCode: result.strategy,
+      strategyVersion: result.strategyVersion,
+      strategyRating: rating,
+      readinessLabel,
+      frameworkBacked: Boolean(decision?.frameworkBacked),
+      backtestTimeframe: backtestSummary?.timeframe ?? null,
+      backtestSummary,
+      proofStatus: !backtestSummary ? 'MISSING' : rating === 'UNPROVEN' ? 'UNPROVEN' : proofWarnings.length > 0 ? 'PARTIAL' : 'AVAILABLE',
+      proofWarnings,
+    };
+  }
+
+  private toStrategyDecisionSnapshot(result: TradePlanResultDto, decision: any | null): StrategyDecisionSnapshot {
+    return {
+      strategyDecisionId: result.strategyDecisionId || decision?.id || null,
+      decision: decision?.decision ?? null,
+      action: decision?.action ?? null,
+      decisionScore: typeof decision?.decisionScore === 'number' ? decision.decisionScore : null,
+      confidence: decision?.confidence ?? null,
+      marketGate: decision?.marketGate || decision?.marketGateStatus || null,
+      marketCondition: decision?.marketCondition ?? null,
+      frameworkBacked: typeof decision?.frameworkBacked === 'boolean' ? decision.frameworkBacked : null,
+      reasons: decision?.reasons || [],
+      blockers: decision?.blockers || [],
+      warnings: decision?.warnings || [],
+      dataGaps: decision?.dataGaps || [],
+      generatedAt: decision?.generatedAt ?? null,
+    };
+  }
+
+  private toMarketDataSnapshot(
+    result: TradePlanResultDto,
+    latestPriceResult: any | null,
+    pricesDto: any | null,
+    prices: any[],
+    instrument: any | null,
+    latestStoredInfo: any | null,
+    region: string,
+    assetType: string
+  ): MarketDataSnapshot {
+    const latest = latestPriceResult?.latest || null;
+    const latestDate = this.toIso(latest?.date);
+    const storedDate = this.toIso(latestStoredInfo?.latestStoredTradingDate || prices[0]?.date);
+    return {
+      instrumentId: result.instrumentId,
+      symbol: latestPriceResult?.symbol || pricesDto?.symbol || result.symbol,
+      latestPrice: latest?.close !== undefined && latest?.close !== null ? Number(latest.close) : null,
+      latestPriceTimestamp: latestDate,
+      latestCompletedTradingDate: this.toIso(latestStoredInfo?.latestCompletedTradingDate || latest?.date),
+      latestStoredTradingDate: storedDate,
+      currency: instrument?.currency || null,
+      exchange: instrument?.exchange || null,
+      region,
+      assetType,
+      dataStatus: latestPriceResult?.data_status || pricesDto?.data_status || null,
+      source: latestPriceResult?.source || latest?.source || pricesDto?.source || null,
+    };
+  }
+
+  private toDataQualitySnapshot(dataQuality: any | null): DataQualitySnapshot {
+    if (!dataQuality) {
+      return {
+        status: 'MISSING',
+        warnings: ['No data quality evaluation found.'],
+        blockers: ['Data quality snapshot is missing.'],
+        generatedAt: null,
+      };
+    }
+    return {
+      status: 'AVAILABLE',
+      coverageStatus: dataQuality.coverageStatus ?? null,
+      signalReadinessStatus: dataQuality.signalReadinessStatus ?? null,
+      liquidityStatus: dataQuality.liquidityStatus ?? null,
+      coverageScore: dataQuality.coverageScore ?? null,
+      signalReadinessScore: dataQuality.signalReadinessScore ?? null,
+      liquidityScore: dataQuality.liquidityScore ?? null,
+      eligibleForSignals: dataQuality.eligibleForSignals ?? null,
+      warnings: dataQuality.warnings || [],
+      blockers: dataQuality.readinessBlockers || [],
+      generatedAt: dataQuality.lastEvaluatedAt ?? dataQuality.generatedAt ?? null,
+    };
   }
 
   private decisionToProof(decision: any, backtestSummary: any) {
     if (!decision) return null;
-    const ratingGrade = decision.strategyRating?.ratingGrade || backtestSummary?.ratingGrade || null;
+    const ratingGrade = this.ratingFromDecision(decision) || backtestSummary?.ratingGrade || null;
     return {
       frameworkBacked: decision.frameworkBacked,
       strategyCode: decision.strategy,
@@ -757,5 +897,17 @@ export class TradePlanRiskEngineService {
       paperReadinessReasons: result.paperReadinessReasons,
       paperReadinessBlockers: result.paperReadinessBlockers,
     };
+  }
+
+  private ratingFromDecision(decision: any | null) {
+    if (!decision) return null;
+    if (typeof decision.strategyRating === 'string') return decision.strategyRating;
+    return decision.strategyRating?.ratingGrade || null;
+  }
+
+  private toIso(value: unknown): string | null {
+    if (!value) return null;
+    const date = value instanceof Date ? value : new Date(value as any);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
   }
 }

@@ -267,6 +267,10 @@ export class MarketDataFoundationService {
     return this.repository.listPrices(symbol, limit, startDate, endDate);
   }
 
+  async listForwardPriceWindowsByInstrumentIds(instrumentIds: string[], startDate: Date, options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
+    return this.repository.listForwardPriceWindowsByInstrumentIds(instrumentIds, startDate, options);
+  }
+
   async listPricesByInstrumentId(instrumentId: string, limit = 250, startDate?: Date, endDate?: Date, options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
     const stock = await this.repository.findStockByIdInScope(instrumentId, options);
     if (!stock) {

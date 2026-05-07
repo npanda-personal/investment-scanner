@@ -69,6 +69,8 @@ export const TradePlanTable: React.FC<TradePlanTableProps> = ({
         />
       )
     },
+    { id: 'strategyRating', label: 'Strategy Rating', sortable: true, render: (p) => <Chip size="small" label={p.strategyRating || 'UNPROVEN'} variant="outlined" /> },
+    { id: 'backtestTimeframe', label: 'Proof Timeframe', render: (p) => p.backtestTimeframe || '-' },
     { id: 'entryZone', label: 'Entry Zone', render: (p) => p.entryZone ? `${p.entryZone.preferredEntryMin.toFixed(2)} - ${p.entryZone.preferredEntryMax.toFixed(2)}` : '-' },
     { id: 'stopLoss', label: 'Stop Loss', render: (p) => p.stopLoss ? p.stopLoss.price.toFixed(2) : '-' },
     { id: 'target', label: 'Target', render: (p) => p.target ? `${p.target.price.toFixed(2)}${p.target.method === 'REWARD_RISK_MULTIPLE' ? ' (Default 2R target)' : ''}` : '-' },

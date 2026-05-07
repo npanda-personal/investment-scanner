@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { fetchSignalQualityDashboard } from '../api/signalQualityLabService';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 import type { NoisySignalItem, QualityFilters, QualityHorizon, QualityMetricGroup, QualitySummary, SignalTypePerformance } from '../types';
 
 export function useSignalQualityLab(horizon: QualityHorizon, filters: QualityFilters = {}) {
+  const { scope } = useMarketScope();
   const [summary, setSummary] = useState<QualitySummary | null>(null);
   const [byType, setByType] = useState<SignalTypePerformance[]>([]);
   const [bySector, setBySector] = useState<QualityMetricGroup[]>([]);
@@ -16,7 +18,7 @@ export function useSignalQualityLab(horizon: QualityHorizon, filters: QualityFil
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchSignalQualityDashboard(horizon, filters);
+      const data = await fetchSignalQualityDashboard(horizon, filters, { region: scope.region, assetType: scope.assetType });
       setSummary(data.summary);
       setByType(data.byType);
       setBySector(data.bySector);
@@ -28,7 +30,7 @@ export function useSignalQualityLab(horizon: QualityHorizon, filters: QualityFil
     } finally {
       setLoading(false);
     }
-  }, [horizon, filters.readinessStatus, filters.coverageStatus, filters.liquidityStatus, filters.onlySignalReady, filters.excludePoorQuality]);
+  }, [horizon, filters.readinessStatus, filters.coverageStatus, filters.liquidityStatus, filters.onlySignalReady, filters.excludePoorQuality, scope.region, scope.assetType]);
 
   useEffect(() => {
     void reload();

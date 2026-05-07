@@ -140,10 +140,113 @@ describe('signal quality lab service', () => {
       inserted: 0,
       updated: 0,
       skipped: 1,
+      evaluatedInBatch: 1,
+      outcomesPersisted: false,
       nextOffset: 1,
       hasMore: true,
     });
     expect(result.warnings[0]).toContain('on demand');
+  });
+
+  it('diagnoses raw signals with no future prices instead of returning misleading empties', async () => {
+    const service = new SignalQualityLabService(
+      {} as any,
+      {
+        signalHistory: jest.fn().mockResolvedValue([baseSignal({ id: 'fresh', generated_at: '2026-01-10T15:30:00.000Z' })]),
+        signalHistoryCount: jest.fn().mockResolvedValue(1),
+      } as any,
+      {
+        listPricesByInstrumentId: jest.fn().mockResolvedValue({
+          prices: [{ date: '2026-01-10T00:00:00.000Z', adjusted_close: 100 }],
+        }),
+      } as any,
+      { regimeForDate: jest.fn().mockResolvedValue('RISK_ON') } as any
+    );
+    const dashboard = await service.dashboard({ horizon: '20D', limit: 10, minSampleSize: 0 });
+    expect(dashboard.summary).toMatchObject({
+      totalSignals: 1,
+      evaluatedSignals: 0,
+      dataStatus: 'PARTIAL',
+    });
+    expect(dashboard.summary.evaluationDiagnostics).toMatchObject({
+      insufficientFuturePriceCount: 1,
+      minimumRequiredFutureRows: 20,
+      selectedHorizon: '20D',
+    });
+    expect(dashboard.bySector[0]).toMatchObject({
+      rawSignalCount: 1,
+      sampleSize: 0,
+      status: 'INSUFFICIENT_FUTURE_DATA',
+    });
+  });
+
+  it('evaluates the same signal at 1D when enough rows exist', async () => {
+    const service = serviceWithSignals([baseSignal({ id: 's1', generated_at: '2026-01-02T15:30:00.000Z' })]);
+    const summary = await service.summary({ horizon: '1D', limit: 10, minSampleSize: 0 });
+    expect(summary.evaluatedSignals).toBe(1);
+    expect(summary.horizonAvailability['1D']).toMatchObject({ eligible: 1, evaluated: 1, insufficientFuturePrice: 0 });
+  });
+
+  it('uses bulk forward price windows for multi-instrument batches when available', async () => {
+    const bulkLoader = jest.fn().mockResolvedValue(new Map([
+      ['stock-1', prices.map((price) => ({ date: price.date, adjusted_close: price.adjustedClose }))],
+      ['stock-2', prices.map((price) => ({ date: price.date, adjusted_close: price.adjustedClose }))],
+    ]));
+    const service = new SignalQualityLabService(
+      {} as any,
+      {
+        signalHistory: jest.fn().mockResolvedValue([]),
+        signalHistoryCount: jest.fn().mockResolvedValue(0),
+      } as any,
+      {
+        listForwardPriceWindowsByInstrumentIds: bulkLoader,
+        listPricesByInstrumentId: jest.fn(),
+      } as any,
+      { regimeForDate: jest.fn().mockResolvedValue(null) } as any
+    );
+    const outcomes = await service.outcomesForSignals([
+      baseSignal({ id: 's1', instrument_id: 'stock-1' }),
+      baseSignal({ id: 's2', instrument_id: 'stock-2' }),
+    ], { horizon: '5D', limit: 10, minSampleSize: 0, region: 'IN', assetType: 'STOCK' });
+    expect(outcomes).toHaveLength(2);
+    expect(bulkLoader).toHaveBeenCalledTimes(1);
+    expect((service as any).marketDataService.listPricesByInstrumentId).not.toHaveBeenCalled();
+  });
+
+  it('increments missing price history diagnostics safely', async () => {
+    const service = new SignalQualityLabService(
+      {} as any,
+      {
+        signalHistory: jest.fn().mockResolvedValue([baseSignal({ id: 'missing-prices' })]),
+        signalHistoryCount: jest.fn().mockResolvedValue(1),
+      } as any,
+      { listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: [] }) } as any,
+      { regimeForDate: jest.fn().mockResolvedValue(null) } as any
+    );
+    const summary = await service.summary({ horizon: '5D', limit: 10, minSampleSize: 0 });
+    expect(summary.evaluationDiagnostics.missingPriceHistoryCount).toBe(1);
+    expect(summary.recommendedAction).toContain('Sync historical market data');
+  });
+
+  it('diagnoses data-quality filters that exclude all signals', async () => {
+    const signal = baseSignal({ id: 'limited', instrument_id: 'limited' });
+    const service = new SignalQualityLabService(
+      {} as any,
+      {
+        signalHistory: jest.fn().mockResolvedValue([signal]),
+        signalHistoryCount: jest.fn().mockResolvedValue(1),
+      } as any,
+      { listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: [] }) } as any,
+      { regimeForDate: jest.fn().mockResolvedValue(null) } as any,
+      {
+        getEvaluationsForInstruments: jest.fn().mockResolvedValue([
+          { instrumentId: 'limited', signalReadinessStatus: 'LIMITED', coverageStatus: 'PARTIAL', liquidityStatus: 'THIN', signalReadinessScore: 50, eligibleForSignals: false },
+        ]),
+      } as any
+    );
+    const summary = await service.summary({ horizon: '5D', limit: 10, minSampleSize: 0, readinessStatus: 'READY' });
+    expect(summary.evaluationDiagnostics).toMatchObject({ signalsAfterFilters: 0, excludedByDataQualityCount: 1 });
+    expect(summary.warnings).toContain('0 signals remain after data-quality filters.');
   });
 
   it('detects failed bullish, failed bearish, low confidence, stale, and flip noise', () => {

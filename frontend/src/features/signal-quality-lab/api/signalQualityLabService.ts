@@ -14,10 +14,10 @@ import type {
 
 const API_BASE = '/api/v1/signals';
 
-const params = (horizon: QualityHorizon, filters: QualityFilters = {}) => ({ horizon, limit: 150, minSampleSize: 0, ...filters });
+const params = (horizon: QualityHorizon, filters: QualityFilters = {}, scope: { region?: string; assetType?: string } = {}) => ({ horizon, limit: 150, minSampleSize: 0, region: scope.region, assetType: scope.assetType, ...filters });
 
-export async function fetchSignalQualityDashboard(horizon: QualityHorizon, filters: QualityFilters = {}) {
-  const response = await axios.get<{ summary: QualitySummary; byType: SignalTypePerformance[]; bySector: QualityMetricGroup[]; byRegime: QualityMetricGroup[]; byDataQuality: QualityMetricGroup[]; noisy: NoisySignalItem[] }>(`${API_BASE}/quality/dashboard`, { params: params(horizon, filters) });
+export async function fetchSignalQualityDashboard(horizon: QualityHorizon, filters: QualityFilters = {}, scope: { region?: string; assetType?: string } = {}) {
+  const response = await axios.get<{ summary: QualitySummary; byType: SignalTypePerformance[]; bySector: QualityMetricGroup[]; byRegime: QualityMetricGroup[]; byDataQuality: QualityMetricGroup[]; noisy: NoisySignalItem[] }>(`${API_BASE}/quality/dashboard`, { params: params(horizon, filters, scope) });
   return response.data;
 }
 

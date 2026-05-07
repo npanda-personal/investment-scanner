@@ -38,6 +38,21 @@ Current decision-to-plan flow status:
 | Trade Plan & Risk Engine | PASS | Final readiness classifier added. | LOW | Plans now expose `paperReadinessStatus`, `paperReadinessReasons`, and `paperReadinessBlockers`; `paperReadyOnly=true` filters candidates. | Final pre-trade planning layer owns readiness classification. | Provides one safe upstream contract without creating paper trades. | Keep classifier here until a future paper module consumes it. | Yes |
 | Research Hub | PARTIAL | Research priorities do not yet call Trade Plan readiness directly. | MEDIUM | Research Hub shows strategy proof and links users to plan review; wording avoids execution framing. | Hub may show "Paper Review Candidate" only as review context. | Prevents execution-like interpretation. | Future integration can read Trade Plan readiness through public API. | No |
 
+### Persistence Audit
+
+| Finding | Affected files | Severity | Current behavior | Expected behavior | Why it matters | Recommended fix | Safe now |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Region was not persisted | `schema.prisma`, repository, service | HIGH | Region was accepted in query/generation but not stored on `TradePlanResult`. | Every generated plan stores `region`. | Future paper review must respect market scope without re-querying upstream modules. | Added `region` column and DTO field. | Yes |
+| Asset type was not persisted | `schema.prisma`, repository, service | HIGH | Asset scope was not stored. | Every generated plan stores `assetType`. | Future paper review is currently limited to `STOCK`. | Added `assetType` column and persisted from request/default scope. | Yes |
+| Backtest timeframe was not persisted | repository, service, types | HIGH | Readiness looked up latest performance live. | Store selected/proven `backtestTimeframe` and compact summary. | Future consumers need auditable historical proof. | Added `backtestTimeframe`, `backtestSummary`, and proof snapshot. | Yes |
+| Strategy proof/rating/readiness snapshot was missing | repository, service, types | HIGH | Rating and readiness were reconstructed during listing. | Store proof snapshot at generation time. | Prevents eligibility drift from live upstream changes. | Added `strategyProofSnapshot`, `strategyRating`, `readinessLabel`. | Yes |
+| Latest price metadata was missing | repository, service, types | HIGH | Plan levels implied price but did not persist latest price timestamp/source. | Store latest price, timestamp, source/status, scope, currency/exchange. | Future review must know which price was used. | Added `latestPrice`, `latestPriceTimestamp`, `marketDataSnapshot`. | Yes |
+| Data quality state was missing | repository, service, types | HIGH | Listing refreshed Data Quality Engine live. | Store available or missing data-quality snapshot. | Future review must not recompute readiness from DQE internals. | Added `dataQualitySnapshot`. | Yes |
+| Strategy Decision state was missing | repository, service, types | HIGH | Plan stored only decision id. | Store decision/action/score/confidence/market gate/reasons/blockers snapshot. | Future review needs the decision state used when the plan was generated. | Added `strategyDecisionSnapshot`. | Yes |
+| Paper readiness was not persisted | repository, service, types | HIGH | Previous response enriched readiness outside persistence. | Persist status, reasons, and blockers on the row. | Enables candidate filtering without live graph reconstruction. | Added readiness columns and repository mapping. | Yes |
+| Candidate filtering recomputed readiness | service, repository | MEDIUM | `paperReadyOnly` loaded a broad set and reclassified. | Use persisted readiness/scope/proof fields. | Keeps listing fast and auditable. | Repository now filters persisted fields directly. | Yes |
+| Daily idempotency ignored scope and portfolio | schema, repository | HIGH | Unique key was `instrumentId + strategy + modelVersion + generatedDate`. | Include `region`, `assetType`, and portfolio identity. | Prevents one scope or portfolio from overwriting another. | Unique key now uses `instrumentId`, `strategy`, `modelVersion`, `generatedDate`, `region`, `assetType`, and `portfolioKey`. | Yes |
+
 ### Paper Readiness Contract
 
 `paperReadinessStatus` is a classification only. It does not create paper trades and does not enable broker execution, order placement, live trading, or autonomous trading.
@@ -55,6 +70,38 @@ Readiness thresholds:
 - Data quality: latest price present, sufficient price history, coverage not `UNUSABLE`, liquidity not `ILLIQUID`, and stale price warnings handled.
 - Scope: region must be provided from global market scope and `assetType` must be `STOCK`.
 - Safety: actions are review, plan, simulate, and paper review candidate only.
+
+## Persisted Proof Snapshot Contract
+
+Each generated `TradePlanResult` persists these additive fields:
+
+- Scope: `region`, `assetType`
+- Strategy proof: `strategyRating`, `readinessLabel`, `backtestTimeframe`, `backtestSummary`, `strategyProofSnapshot`
+- Strategy decision: `strategyDecisionSnapshot`
+- Market data: `latestPrice`, `latestPriceTimestamp`, `marketDataSnapshot`
+- Data quality: `dataQualitySnapshot`
+- Readiness: `paperReadinessStatus`, `paperReadinessReasons`, `paperReadinessBlockers`
+- Metadata: `proofGeneratedAt`, `snapshotVersion`
+
+`strategyProofSnapshot` stores strategy code/version, rating, readiness label, whether the decision was Strategy Framework-backed, selected backtest timeframe, compact backtest metrics, `proofStatus`, and proof warnings.
+
+`strategyDecisionSnapshot` stores decision id, decision/action, score, confidence, market gate/condition, framework flag, reasons, blockers, warnings, data gaps, and the decision generation timestamp.
+
+`marketDataSnapshot` stores instrument id, symbol, latest price, latest price timestamp, latest completed/stored trading dates when available, currency, exchange, region, asset type, source, and data status.
+
+`dataQualitySnapshot` stores coverage, signal-readiness, liquidity, scores, eligibility, warnings, blockers, and generation timestamp. If no data-quality evaluation exists, it stores `status: "MISSING"` with a warning and blocker.
+
+`paperReadinessStatus`, reasons, and blockers are persisted at generation time and are the source of truth for candidate listing filters.
+
+Future Paper Trading module rule: consume Trade Plan & Risk Engine public output and persisted snapshots only. It must not reach into upstream repositories or reconstruct eligibility from Strategy Decision, Strategy Framework, Market Data, or Data Quality internals.
+
+## Idempotency
+
+Generated plans are idempotent per UTC generated date using:
+
+`instrumentId + strategy + modelVersion + generatedDate + region + assetType + portfolioKey`
+
+`portfolioKey` is `portfolioId` when present and `NO_PORTFOLIO` otherwise. This avoids nullable-unique ambiguity for no-portfolio plans and lets same-day generation update the existing row/snapshots for the same instrument, strategy, scope, and portfolio context.
 
 ### Plan Status
 - `VALID`: Requires R/R >= 1.5, good data quality, market gate open, robust stop/target methods.
@@ -79,13 +126,13 @@ Readiness thresholds:
 ## API Endpoints
 - `GET /api/v1/trade-plans/health`
 - `GET /api/v1/trade-plans/model` (Includes model rules, paper readiness criteria, thresholds, and safety constraints)
-- `GET /api/v1/trade-plans/candidates` (Supports `region`, `assetType`, `strategyCode`, `planStatus`, `riskGrade`, `minRewardRisk`, `paperReadyOnly`, `portfolioId`, `limit`, `offset`, `sortBy`, `sortDirection`)
+- `GET /api/v1/trade-plans/candidates` (Supports `region`, `assetType`, `strategyCode`, `planStatus`, `riskGrade`, `minRewardRisk`, `paperReadyOnly`, `paperReadinessStatus`, `backtestTimeframe`, `strategyRating`, `readinessLabel`, `portfolioId`, `limit`, `offset`, `sortBy`, `sortDirection`)
 - `GET /api/v1/trade-plans/:instrumentId`
 - `POST /api/v1/trade-plans/generate`
-- `POST /api/v1/trade-plans/generate/batch` (Uses parallel concurrency for high-performance generation)
+- `POST /api/v1/trade-plans/generate/batch` (Uses bounded backend worker concurrency within each request and returns `candidateCount`, `totalCount`, `nextOffset`, `hasMore`, and per-candidate `failures` for frontend multi-batch orchestration)
 
 ## Integration
-- **Frontend Dashboard:** Available at `/trade-plans`. Integrates with the shared `DataTable` to provide pagination and sorting (e.g., on the Status and Risk Grade columns).
+- **Frontend Dashboard:** Available at `/trade-plans`. Integrates with the shared `DataTable` to provide pagination and sorting (e.g., on the Status and Risk Grade columns). Batch generation starts with one discovery batch, then runs remaining offsets with a small frontend worker pool.
 - Can be triggered manually via `/api/v1/trade-plans/generate`.
 - Reads `StrategyDecisionResult` from the database.
 - Consumes `MarketDataFoundation` for the latest price and historical SMA approximation.
@@ -93,6 +140,12 @@ Readiness thresholds:
 - Consumes `DataQualityEngine` for signal readiness and liquidity blocking.
 
 ## Verification
+- Prisma Client: `npx prisma generate` from `backend`
 - Backend build: `npm run build` from `backend`
 - Backend focused tests: `npm test -- --runTestsByPath tests/trade-plan-risk-engine.paper-readiness.test.ts` from `backend`
 - Frontend build: `npm run build` from `frontend`
+
+Known limitations:
+- Existing rows need migration/backfill if historical plans should receive snapshots. New generated plans store snapshots.
+- Region/asset scope is persisted from the request/default scope. Existing rows without scope are not treated as paper-review ready until regenerated/backfilled.
+- Backtest proof uses the requested `backtestTimeframe` when supplied; otherwise it stores the first available Strategy Framework performance summary for the strategy/scope.

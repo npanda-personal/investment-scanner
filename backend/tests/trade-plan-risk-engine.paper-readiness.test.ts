@@ -131,43 +131,14 @@ describe('TradePlanRiskEngineService paper readiness classification', () => {
 });
 
 describe('TradePlanRiskEngineService paperReadyOnly candidate filter', () => {
-  it('returns only eligible plans', async () => {
+  it('delegates paperReadyOnly to persisted readiness filters', async () => {
     const service = new TradePlanRiskEngineService() as any;
     service.repository = {
       list: jest.fn().mockResolvedValue({
         results: [
-          basePlan({ id: 'ready-plan' }),
-          basePlan({ id: 'high-risk-plan', riskGrade: 'HIGH' }),
+          basePlan({ id: 'ready-plan', paperReadinessStatus: 'READY_FOR_PAPER_REVIEW' }),
         ],
-        total: 2,
-      }),
-    };
-    service.strategyDecisionService = {
-      history: jest.fn().mockResolvedValue([{
-        id: 'decision-1',
-        strategy: 'TREND_MOMENTUM',
-        strategyVersion: '1.0.0',
-        frameworkBacked: true,
-        strategyRating: { ratingGrade: 'GOOD', readinessLabel: 'PAPER_TEST_CANDIDATE' },
-        readinessLabel: 'PAPER_TEST_CANDIDATE',
-        decision: 'TRADE_CANDIDATE',
-        marketGate: 'OPEN',
-        confidence: 'HIGH',
-        reasons: ['Framework rules passed.'],
-        blockers: [],
-        dataGaps: [],
-      }]),
-    };
-    service.strategyFrameworkService = {
-      performance: jest.fn().mockResolvedValue([{ ratingGrade: 'GOOD', readinessLabel: 'PAPER_TEST_CANDIDATE' }]),
-    };
-    service.dataQualityService = {
-      getLatestEvaluationForInstrument: jest.fn().mockResolvedValue({
-        eligibleForSignals: true,
-        eligibleForBacktesting: true,
-        coverageStatus: 'GOOD',
-        liquidityStatus: 'LIQUID',
-        dataGaps: [],
+        total: 1,
       }),
     };
 
@@ -176,5 +147,10 @@ describe('TradePlanRiskEngineService paperReadyOnly candidate filter', () => {
     expect(result.total).toBe(1);
     expect(result.results[0].id).toBe('ready-plan');
     expect(result.results[0].paperReadinessStatus).toBe('READY_FOR_PAPER_REVIEW');
+    expect(service.repository.list).toHaveBeenCalledWith(expect.objectContaining({
+      paperReadyOnly: true,
+      region: 'IN',
+      assetType: 'STOCK',
+    }));
   });
 });

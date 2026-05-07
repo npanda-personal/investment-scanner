@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { TradePlanResultDto, GenerateTradePlanRequest, BatchGenerateTradePlanRequest } from '../types';
+import { TradePlanResultDto, GenerateTradePlanRequest, BatchGenerateTradePlanRequest, BatchGenerateTradePlanResponse } from '../types';
 
 export const TradePlanApi = {
   async getHealth() {
@@ -40,7 +40,7 @@ export const TradePlanApi = {
 
   async batchGenerate(request: BatchGenerateTradePlanRequest) {
     try {
-      const res = await axios.post<{ count: number; generatedCount: number; failedCount: number; plans: TradePlanResultDto[] }>('/api/v1/trade-plans/generate/batch', request);
+      const res = await axios.post<BatchGenerateTradePlanResponse>('/api/v1/trade-plans/generate/batch', request);
       return res.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.error || 'Failed to batch generate plans');

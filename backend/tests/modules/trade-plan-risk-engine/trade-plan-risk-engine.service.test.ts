@@ -32,6 +32,46 @@ describe('TradePlanRiskEngineService', () => {
     (service as any).marketDataService = mockMarketDataService;
     (service as any).portfolioService = mockPortfolioService;
     (service as any).repository = mockRepository;
+    (service as any).dataQualityService = {
+      diagnostics: jest.fn().mockResolvedValue({
+        coverageStatus: 'GOOD',
+        signalReadinessStatus: 'READY',
+        liquidityStatus: 'LIQUID',
+        coverageScore: 95,
+        signalReadinessScore: 90,
+        liquidityScore: 80,
+        eligibleForSignals: true,
+        warnings: [],
+        readinessBlockers: [],
+        dataGaps: [],
+        lastEvaluatedAt: '2026-05-07T00:00:00.000Z',
+      }),
+      getLatestEvaluationForInstrument: jest.fn(),
+    };
+    (service as any).strategyFrameworkService = {
+      performance: jest.fn().mockResolvedValue([{
+        timeframe: '3Y',
+        cagr: 0.12,
+        maxDrawdown: -0.15,
+        sharpe: 1.1,
+        winRate: 0.58,
+        profitFactor: 1.4,
+        tradeCount: 42,
+        ratingGrade: 'GOOD',
+        readinessLabel: 'PAPER_TEST_CANDIDATE',
+        generatedAt: '2026-05-07T00:00:00.000Z',
+      }]),
+    };
+    mockMarketDataService.getInstrument.mockResolvedValue({
+      id: 'INST-1',
+      symbol: 'TEST',
+      currency: 'INR',
+      exchange: 'NSE',
+    } as any);
+    (mockMarketDataService as any).latestStoredCandleInfo.mockResolvedValue({
+      latestCompletedTradingDate: '2026-05-06T00:00:00.000Z',
+      latestStoredTradingDate: '2026-05-06T00:00:00.000Z',
+    });
 
     mockRepository.upsert.mockImplementation(async (data: any) => data);
   });
@@ -102,12 +142,12 @@ describe('TradePlanRiskEngineService', () => {
 
       const plan = await service.generatePlan({ instrumentId: 'INST-1', symbol: 'TEST' });
       
-      expect(plan.stopLoss?.price).toBe(90);
+      expect(plan.stopLoss?.price).toBe(89.1);
       expect(plan.stopLoss?.method).toBe('RECENT_SWING_LOW');
       
-      // Target should be Entry + (Risk * 2) = 100 + (10 * 2) = 120
-      expect(plan.target?.price).toBe(120);
-      expect(plan.rewardRiskRatio).toBe(2.0); // (120 - 100) / 10 = 2
+      expect(plan.target?.price).toBeCloseTo(121.8, 2);
+      expect(plan.rewardRiskRatio).toBe(2.0);
+      expect(plan.target?.rationale).toBe('Target is modeled at 2R by default.');
     });
 
     it('blocks plan if reward/risk < 1', async () => {
@@ -142,7 +182,8 @@ describe('TradePlanRiskEngineService', () => {
     it('uses fixed fallback stop loss if no other structure exists', async () => {
       mockStrategyService.latestForInstrument.mockResolvedValue(defaultDecision as any);
       mockMarketDataService.latestPriceByInstrumentId.mockResolvedValue({ latest: { close: 100 } } as any);
-      mockMarketDataService.listPricesByInstrumentId.mockResolvedValue({ prices: [] } as any); // No history
+      const prices = Array(10).fill({ close: 100, low: 100, high: 100 });
+      mockMarketDataService.listPricesByInstrumentId.mockResolvedValue({ prices } as any);
 
       const plan = await service.generatePlan({ instrumentId: 'INST-1', symbol: 'TEST' });
       
@@ -164,8 +205,58 @@ describe('TradePlanRiskEngineService', () => {
       const plan = await service.generatePlan({ instrumentId: 'INST-1', symbol: 'TEST', capitalBase: 10000, riskPercent: 1 });
       
       expect(plan.positionSizing).toBeDefined();
-      expect(plan.positionSizing?.suggestedQuantity).toBe(10);
+      expect(plan.positionSizing?.suggestedQuantity).toBe(9);
       expect(plan.positionSizing?.maxRiskAmount).toBe(100);
+    });
+
+    it('persists scope and proof snapshots on generated plans', async () => {
+      mockStrategyService.latestForInstrument.mockResolvedValue({
+        ...defaultDecision,
+        action: 'CONSIDER_ENTRY',
+        decisionScore: 91,
+        confidence: 'HIGH',
+        marketGate: 'OPEN',
+        marketCondition: 'HEALTHY',
+        frameworkBacked: true,
+        strategyVersion: '1.2.0',
+        strategyRating: { ratingGrade: 'GOOD', readinessLabel: 'PAPER_TEST_CANDIDATE' },
+        readinessLabel: 'PAPER_TEST_CANDIDATE',
+        reasons: ['Framework proof passed.'],
+        blockers: [],
+        warnings: [],
+        dataGaps: [],
+        generatedAt: '2026-05-07T01:00:00.000Z',
+      } as any);
+      mockMarketDataService.latestPriceByInstrumentId.mockResolvedValue({
+        symbol: 'TEST',
+        latest: { close: 100, date: '2026-05-06T00:00:00.000Z', source: 'database', data_status: 'COMPLETE' },
+        source: 'database',
+        data_status: 'COMPLETE',
+      } as any);
+      const prices = Array(60).fill(null).map((_, i) => ({ close: 100, low: 90 + i * 0.1, high: 101, date: `2026-04-${String((i % 28) + 1).padStart(2, '0')}T00:00:00.000Z` }));
+      mockMarketDataService.listPricesByInstrumentId.mockResolvedValue({ symbol: 'TEST', data_status: 'COMPLETE', prices } as any);
+
+      const plan = await service.generatePlan({ instrumentId: 'INST-1', symbol: 'TEST', region: 'IN', assetType: 'STOCK', backtestTimeframe: '3Y' });
+
+      expect(plan.region).toBe('IN');
+      expect(plan.assetType).toBe('STOCK');
+      expect(plan.backtestTimeframe).toBe('3Y');
+      expect(plan.strategyRating).toBe('GOOD');
+      expect(plan.strategyProofSnapshot?.proofStatus).toBe('AVAILABLE');
+      expect(plan.strategyDecisionSnapshot?.decision).toBe('TRADE_CANDIDATE');
+      expect(plan.marketDataSnapshot?.latestPriceTimestamp).toBe('2026-05-06T00:00:00.000Z');
+      expect(plan.dataQualitySnapshot?.coverageStatus).toBe('GOOD');
+      expect(plan.paperReadinessStatus).toBeDefined();
+      expect(plan.snapshotVersion).toBe('trade-plan-proof-snapshot-v1');
+      expect(mockRepository.upsert).toHaveBeenCalledWith(expect.objectContaining({
+        region: 'IN',
+        assetType: 'STOCK',
+        strategyProofSnapshot: expect.any(Object),
+        strategyDecisionSnapshot: expect.any(Object),
+        marketDataSnapshot: expect.any(Object),
+        dataQualitySnapshot: expect.any(Object),
+        paperReadinessStatus: expect.any(String),
+      }));
     });
 
     it('adds a warning for portfolio concentration', async () => {
@@ -273,7 +364,40 @@ describe('TradePlanRiskEngineService', () => {
       
       expect(res.count).toBe(2);
       expect(res.plans.length).toBe(2);
+      expect(res.candidateCount).toBe(2);
+      expect(res.totalCount).toBe(2);
+      expect(res.hasMore).toBe(false);
+      expect(res.failures).toEqual([]);
       expect(generateSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('returns failure details when a candidate cannot be generated', async () => {
+      mockStrategyService.candidates.mockResolvedValue({
+        results: [
+          { id: 'dec-1', instrumentId: 'INST-1', symbol: 'TEST1' },
+          { id: 'dec-2', instrumentId: 'INST-2', symbol: 'TEST2' },
+        ],
+        total: 50,
+      } as any);
+
+      jest.spyOn(service, 'generatePlan')
+        .mockResolvedValueOnce({ symbol: 'TEST1' } as any)
+        .mockRejectedValueOnce(new Error('Scoped upsert failed'));
+
+      const res = await service.batchGenerate({ batchSize: 25, offset: 0, region: 'IN' });
+
+      expect(res.generatedCount).toBe(1);
+      expect(res.failedCount).toBe(1);
+      expect(res.nextOffset).toBe(25);
+      expect(res.hasMore).toBe(true);
+      expect(res.failures).toEqual([
+        {
+          strategyDecisionId: 'dec-2',
+          instrumentId: 'INST-2',
+          symbol: 'TEST2',
+          reason: 'Scoped upsert failed',
+        },
+      ]);
     });
   });
 });

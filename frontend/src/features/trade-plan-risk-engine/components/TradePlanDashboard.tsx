@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, Button, Alert, Tab, Tabs, FormControlLabel, Switch } from '@mui/material';
+import { Box, Typography, Button, Alert, Tab, Tabs, FormControlLabel, Switch, FormControl, InputLabel, MenuItem, Select, Stack } from '@mui/material';
 import { TradePlanApi } from '../api';
 import { TradePlanTable } from './TradePlanTable';
 import { TradePlanResultDto } from '../types';
@@ -15,6 +15,10 @@ export const TradePlanDashboard: React.FC = () => {
   const [batchSummary, setBatchSummary] = useState<string | null>(null);
   const [tab, setTab] = useState(0);
   const [paperReadyOnly, setPaperReadyOnly] = useState(false);
+  const [paperReadinessStatus, setPaperReadinessStatus] = useState('');
+  const [backtestTimeframe, setBacktestTimeframe] = useState('');
+  const [strategyRating, setStrategyRating] = useState('');
+  const [readinessLabel, setReadinessLabel] = useState('');
   
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
@@ -34,6 +38,10 @@ export const TradePlanDashboard: React.FC = () => {
         offset: page * pageSize,
       };
       if (paperReadyOnly) params.paperReadyOnly = true;
+      if (paperReadinessStatus) params.paperReadinessStatus = paperReadinessStatus;
+      if (backtestTimeframe) params.backtestTimeframe = backtestTimeframe;
+      if (strategyRating) params.strategyRating = strategyRating;
+      if (readinessLabel) params.readinessLabel = readinessLabel;
       if (sortBy) params.sortBy = sortBy;
       if (sortDirection) params.sortDirection = sortDirection;
 
@@ -51,8 +59,36 @@ export const TradePlanDashboard: React.FC = () => {
     setBatchGenerating(true);
     setBatchSummary(null);
     try {
-      const result = await TradePlanApi.batchGenerate({ region: scope.region, assetType: scope.assetType, batchSize: 25 });
-      setBatchSummary(`Batch complete: ${result.generatedCount} generated, ${result.failedCount || 0} failed.`);
+      const batchSize = 25;
+      const workerCount = 3;
+      const first = await TradePlanApi.batchGenerate({ region: scope.region, assetType: scope.assetType, batchSize, offset: 0 });
+      const totals = {
+        generated: first.generatedCount,
+        failed: first.failedCount || 0,
+        processed: first.candidateCount || first.count || 0,
+        requests: 1,
+      };
+
+      const offsets: number[] = [];
+      for (let offset = batchSize; offset < (first.totalCount || 0); offset += batchSize) {
+        offsets.push(offset);
+      }
+
+      let nextOffsetIndex = 0;
+      const runWorker = async () => {
+        while (nextOffsetIndex < offsets.length) {
+          const offset = offsets[nextOffsetIndex];
+          nextOffsetIndex += 1;
+          const result = await TradePlanApi.batchGenerate({ region: scope.region, assetType: scope.assetType, batchSize, offset });
+          totals.generated += result.generatedCount;
+          totals.failed += result.failedCount || 0;
+          totals.processed += result.candidateCount || result.count || 0;
+          totals.requests += 1;
+        }
+      };
+
+      await Promise.all(Array.from({ length: Math.min(workerCount, offsets.length) }, () => runWorker()));
+      setBatchSummary(`Batch complete: ${totals.generated} generated, ${totals.failed} failed across ${totals.processed} candidates using ${totals.requests} requests.`);
       setPage(0);
       await fetchPlans();
     } catch (err: any) {
@@ -64,7 +100,7 @@ export const TradePlanDashboard: React.FC = () => {
 
   useEffect(() => {
     fetchPlans();
-  }, [scope.region, scope.assetType, page, pageSize, sortBy, sortDirection, paperReadyOnly]);
+  }, [scope.region, scope.assetType, page, pageSize, sortBy, sortDirection, paperReadyOnly, paperReadinessStatus, backtestTimeframe, strategyRating, readinessLabel]);
 
   return (
     <Box sx={{ py: 3 }}>
@@ -78,12 +114,43 @@ export const TradePlanDashboard: React.FC = () => {
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {batchSummary && <Alert severity="success" sx={{ mb: 2 }}>{batchSummary}</Alert>}
 
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+      <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="flex-end" sx={{ mb: 2 }}>
         <FormControlLabel
           control={<Switch checked={paperReadyOnly} onChange={(event) => { setPaperReadyOnly(event.target.checked); setPage(0); }} />}
           label="Paper-ready only"
         />
-      </Box>
+        <FormControl size="small" sx={{ minWidth: 190 }}>
+          <InputLabel>Readiness</InputLabel>
+          <Select label="Readiness" value={paperReadinessStatus} onChange={(event) => { setPaperReadinessStatus(event.target.value); setPage(0); }}>
+            <MenuItem value="">All</MenuItem>
+            <MenuItem value="READY_FOR_PAPER_REVIEW">Paper Review Candidate</MenuItem>
+            <MenuItem value="WATCH_ONLY">Watch Only</MenuItem>
+            <MenuItem value="BLOCKED">Blocked</MenuItem>
+            <MenuItem value="INSUFFICIENT_DATA">Insufficient Data</MenuItem>
+          </Select>
+        </FormControl>
+        <FormControl size="small" sx={{ minWidth: 150 }}>
+          <InputLabel>Timeframe</InputLabel>
+          <Select label="Timeframe" value={backtestTimeframe} onChange={(event) => { setBacktestTimeframe(event.target.value); setPage(0); }}>
+            <MenuItem value="">All</MenuItem>
+            {['1Y', '3Y', '5Y', '10Y', '15Y'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <FormControl size="small" sx={{ minWidth: 150 }}>
+          <InputLabel>Rating</InputLabel>
+          <Select label="Rating" value={strategyRating} onChange={(event) => { setStrategyRating(event.target.value); setPage(0); }}>
+            <MenuItem value="">All</MenuItem>
+            {['EXCELLENT', 'GOOD', 'AVERAGE', 'WEAK', 'UNPROVEN'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <FormControl size="small" sx={{ minWidth: 190 }}>
+          <InputLabel>Proof Label</InputLabel>
+          <Select label="Proof Label" value={readinessLabel} onChange={(event) => { setReadinessLabel(event.target.value); setPage(0); }}>
+            <MenuItem value="">All</MenuItem>
+            {['PAPER_TEST_CANDIDATE', 'WATCHLIST_CANDIDATE', 'RESEARCH_ONLY', 'NOT_AUTOMATION_READY'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
+          </Select>
+        </FormControl>
+      </Stack>
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
         <Tabs value={tab} onChange={(_e, v) => setTab(v)}>

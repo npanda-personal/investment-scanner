@@ -27,6 +27,8 @@ Mounted under `/api/v1`:
 Supported query params:
 
 - `horizon`: `1D`, `5D`, `10D`, `20D`, `60D`
+- `region`: market scope region, default `IN`
+- `assetType`: market scope asset type, default `STOCK`
 - `direction`: `BULLISH`, `NEUTRAL`, `BEARISH`
 - `sector`
 - `country`
@@ -75,10 +77,15 @@ Response fields:
 - `inserted`
 - `updated`
 - `skipped`
+- `evaluatedInBatch`
+- `insufficientFuturePriceInBatch`
+- `missingPriceHistoryInBatch`
+- `outcomesPersisted`
+- `message`
 - `warnings`
 - `durationMs`
 
-Outcomes are still calculated on demand in this MVP, so the endpoint pages through signal records, reports progress metadata, and returns `inserted = 0`, `updated = 0`, and `skipped = processedCount`. Malformed or unsupported future cached-outcome work should return warnings without turning completed batches into a full failure.
+Outcomes are still calculated on demand in this MVP, so the endpoint pages through signal records, reports progress metadata, and returns `inserted = 0`, `updated = 0`, `skipped = processedCount`, `outcomesPersisted = false`, and the message `Outcomes are calculated on demand; recalculation refreshed diagnostics only.` Malformed or unsupported future cached-outcome work should return warnings without turning completed batches into a full failure.
 
 Frontend behavior:
 
@@ -93,12 +100,54 @@ Outcomes are calculated on demand from Market Data Foundation historical adjuste
 
 For each signal:
 
-1. Find the first available price on or after `generatedAt`.
-2. Calculate forward returns after 1, 5, 10, 20, and 60 trading rows.
-3. Mark a horizon unavailable when there is not enough future price data.
-4. Calculate max favorable move, max adverse move, and max drawdown inside the 60-row forward window when available.
+1. Normalize `generatedAt` to a UTC trading date.
+2. Find the first available price on or after that generated trading date by Market Data Foundation `instrumentId`.
+3. Use adjusted close when available and close as the fallback.
+4. Calculate forward returns after 1, 5, 10, 20, and 60 trading rows.
+5. Mark a horizon unavailable when there is not enough future price data.
+6. Calculate max favorable move, max adverse move, and max drawdown inside the 60-row forward window when available.
 
 No `SignalOutcome` table is persisted in this MVP.
+
+## Evaluation Diagnostics
+
+Dashboard, summary, grouped, and noisy-signal responses include evaluation diagnostics so zero-sample screens explain themselves.
+
+`evaluationDiagnostics` reports:
+
+- raw signal count for the selected query
+- signal count after data-quality filters
+- evaluated and unevaluated counts for the selected horizon
+- insufficient future price count
+- missing price history count
+- selected horizon and minimum required future rows
+- earliest/latest signal date
+- latest available price date
+- next evaluable date when it can be inferred
+- excluded counts for data quality, date, and direction filters
+- recommended action and warnings
+
+`horizonAvailability` reports `eligible`, `evaluated`, and `insufficientFuturePrice` for `1D`, `5D`, `10D`, `20D`, and `60D`. A fresh 20D signal can remain unevaluated while 1D or 5D is already measurable.
+
+Raw signals and evaluated outcomes are intentionally separate:
+
+- `totalSignals` counts Signal Generation Engine records in scope.
+- `evaluatedSignals` counts only records with a forward return available for the selected horizon.
+- `unevaluatedSignals` includes signals with missing price history or not enough future trading rows.
+
+When `totalSignals > 0` and `evaluatedSignals = 0`, APIs return `dataStatus = PARTIAL` with a recommended action such as trying a shorter horizon, syncing market data, waiting for more trading days, or checking signal dates against available prices.
+
+## Grouped Metrics
+
+Performance by type, sector, score bucket, regime, and data quality uses evaluated outcomes for return and win-rate calculations. Each row also includes:
+
+- `rawSignalCount`
+- `samples` / `sampleSize`
+- `unevaluatedCount`
+- `status`
+- `reason`
+
+Zero-sample groups are retained with reasons such as `No evaluated outcomes for the selected 20D horizon` or `Missing price history for this group` instead of being silently hidden.
 
 ## Win-Rate Definition
 
@@ -153,7 +202,15 @@ Route:
 
 - `/signals/quality`
 
-The dashboard shows quality summary cards, performance by signal type, performance by sector, regime context state, noisy signals, and instrument-level signal history/outcomes.
+The dashboard shows quality summary cards, horizon availability, diagnostic banners, performance by signal type, performance by sector, regime context state, noisy signals, and instrument-level signal history/outcomes.
+
+If evaluated outcomes are zero, the frontend shows:
+
+- a banner explaining why the selected horizon cannot be evaluated
+- horizon availability chips so users can switch to an evaluable horizon
+- cards for eligible, evaluated, unevaluated, missing price history, and insufficient future data
+- table-level raw counts, evaluated samples, unevaluated counts, status, and reason
+- active filter copy with a reset action when filters leave no evaluated data
 
 The dashboard links to `/signals/calibration`, where Signal Calibration Engine applies explainable score and confidence adjustments using these measured outcomes.
 
@@ -173,6 +230,7 @@ If snapshots are unavailable, the API returns the documented `MISSING_REGIME_CON
 ## Known Limitations
 
 - Outcomes need future prices after signal generation; fresh signals may be unevaluated.
+- Calendar-day next-evaluable dates are approximate; actual trading holidays/weekends depend on market calendars.
 - Regime grouping depends on historical context snapshots being generated near signal dates.
 - No signal calibration, strategy optimization, or trading recommendations.
 - No outcome persistence table yet.

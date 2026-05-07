@@ -8,6 +8,8 @@ export interface QualityQuery {
   direction?: SignalDirection;
   sector?: string;
   country?: string;
+  region?: string;
+  assetType?: string;
   from?: string;
   to?: string;
   limit: number;
@@ -31,6 +33,9 @@ export interface DataQualityFilterSummary {
 export interface QualityRecalculateRequest {
   batchSize: number;
   offset: number;
+  horizon?: QualityHorizon;
+  region?: string;
+  assetType?: string;
   from?: string;
   to?: string;
 }
@@ -45,6 +50,11 @@ export interface QualityRecalculateResponse {
   inserted: number;
   updated: number;
   skipped: number;
+  evaluatedInBatch: number;
+  insufficientFuturePriceInBatch: number;
+  missingPriceHistoryInBatch: number;
+  outcomesPersisted: boolean;
+  message: string;
   warnings: string[];
   durationMs: number;
 }
@@ -74,6 +84,10 @@ export interface SignalOutcomeSet {
   country: string | null;
   generatedAt: string;
   outcomes: ForwardOutcome[];
+  priceHistoryAvailable: boolean;
+  startPriceDate: string | null;
+  latestAvailablePriceDate: string | null;
+  futureRowsAvailable: number;
   maxFavorableMovePercent: number | null;
   maxAdverseMovePercent: number | null;
   maxDrawdownPercent: number | null;
@@ -82,16 +96,24 @@ export interface SignalOutcomeSet {
 
 export interface QualityMetricGroup {
   group: string;
+  name?: string;
   horizon: QualityHorizon;
+  rawSignalCount: number;
   sampleSize: number;
+  samples: number;
+  unevaluatedCount: number;
   winRate: number | null;
   averageForwardReturn: number | null;
+  averageReturn: number | null;
   medianForwardReturn: number | null;
+  medianReturn: number | null;
   averageMaxDrawdown: number | null;
   bestReturn: number | null;
   worstReturn: number | null;
   positiveCount: number;
   negativeCount: number;
+  status: 'EVALUATED' | 'INSUFFICIENT_FUTURE_DATA' | 'MISSING_PRICE_DATA' | 'FILTERED_OUT' | 'SMALL_SAMPLE';
+  reason: string | null;
 }
 
 export interface SignalTypePerformance extends QualityMetricGroup {
@@ -125,11 +147,44 @@ export interface QualitySummary {
   dataStatus: 'COMPLETE' | 'PARTIAL' | 'MISSING';
   generatedAt: string;
   dataQualityFilterSummary?: DataQualityFilterSummary;
+  evaluationDiagnostics: EvaluationDiagnostics;
+  horizonAvailability: HorizonAvailabilitySummary;
+  recommendedAction: string;
+  warnings: string[];
 }
 
 export interface PricePoint {
   date: string;
   adjustedClose: number;
+}
+
+export interface HorizonAvailabilityItem {
+  eligible: number;
+  evaluated: number;
+  insufficientFuturePrice: number;
+}
+
+export type HorizonAvailabilitySummary = Record<QualityHorizon, HorizonAvailabilityItem>;
+
+export interface EvaluationDiagnostics {
+  totalSignals: number;
+  signalsAfterFilters: number;
+  evaluatedSignals: number;
+  unevaluatedSignals: number;
+  insufficientFuturePriceCount: number;
+  missingPriceHistoryCount: number;
+  missingInstrumentCount: number;
+  excludedByDataQualityCount: number;
+  excludedByDateFilterCount: number;
+  excludedByDirectionCount: number;
+  selectedHorizon: QualityHorizon;
+  earliestSignalDate: string | null;
+  latestSignalDate: string | null;
+  latestAvailablePriceDate: string | null;
+  minimumRequiredFutureRows: number;
+  nextEvaluableDate: string | null;
+  recommendedAction: string;
+  warnings: string[];
 }
 
 export interface ParsedSignalType {

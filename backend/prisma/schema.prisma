@@ -783,9 +783,27 @@ model TradePlanResult {
   instrumentId       String
   strategyDecisionId String?
   portfolioId        String?
+  portfolioKey       String   @default("NO_PORTFOLIO")
   symbol             String
+  region             String?
+  assetType          String?
   strategy           String
   strategyVersion    String
+  strategyRating     String?
+  readinessLabel     String?
+  backtestTimeframe  String?
+  backtestSummary    Json?
+  strategyProofSnapshot Json?
+  strategyDecisionSnapshot Json?
+  latestPrice        Float?
+  latestPriceTimestamp DateTime?
+  marketDataSnapshot Json?
+  dataQualitySnapshot Json?
+  paperReadinessStatus String?
+  paperReadinessReasons Json?
+  paperReadinessBlockers Json?
+  proofGeneratedAt   DateTime?
+  snapshotVersion    String?
   planStatus         String
   riskGrade          String
   entryZone          Json?
@@ -804,10 +822,15 @@ model TradePlanResult {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  @@unique([instrumentId, strategy, modelVersion, generatedDate])
+  @@unique([instrumentId, strategy, modelVersion, generatedDate, region, assetType, portfolioKey], map: "trade_plan_results_scope_portfolio_day_key")
   @@index([instrumentId])
   @@index([strategyDecisionId])
   @@index([portfolioId])
+  @@index([region, assetType])
+  @@index([paperReadinessStatus])
+  @@index([strategyRating])
+  @@index([readinessLabel])
+  @@index([backtestTimeframe])
   @@map("trade_plan_results")
 }
 

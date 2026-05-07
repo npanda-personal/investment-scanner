@@ -1,3 +1,96 @@
+CREATE TABLE IF NOT EXISTS "price_ticks" (
+  "id" TEXT NOT NULL,
+  "symbol" TEXT NOT NULL,
+  "region" TEXT,
+  "exchange" TEXT,
+  "timestamp" TIMESTAMP(3) NOT NULL,
+  "open" DECIMAL NOT NULL,
+  "high" DECIMAL NOT NULL,
+  "low" DECIMAL NOT NULL,
+  "close" DECIMAL NOT NULL,
+  "adjustedClose" DECIMAL,
+  "volume" BIGINT,
+  "source" TEXT,
+  "ingestionTimestamp" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "lastUpdatedTimestamp" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "dataStatus" TEXT NOT NULL DEFAULT 'COMPLETE',
+  CONSTRAINT "price_ticks_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "price_ticks_symbol_timestamp_key"
+  ON "price_ticks"("symbol", "timestamp");
+
+CREATE INDEX IF NOT EXISTS "price_ticks_symbol_timestamp_idx"
+  ON "price_ticks"("symbol", "timestamp");
+
+CREATE INDEX IF NOT EXISTS "price_ticks_region_idx"
+  ON "price_ticks"("region");
+
+CREATE TABLE IF NOT EXISTS "latest_prices" (
+  "symbol" TEXT NOT NULL,
+  "region" TEXT,
+  "price" DECIMAL NOT NULL,
+  "timestamp" TIMESTAMP(3) NOT NULL,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "latest_prices_pkey" PRIMARY KEY ("symbol")
+);
+
+CREATE TABLE IF NOT EXISTS "stocks" (
+  "id" TEXT NOT NULL,
+  "symbol" TEXT NOT NULL,
+  "name" TEXT NOT NULL,
+  "region" TEXT NOT NULL,
+  "exchange" TEXT,
+  "country" TEXT,
+  "sector" TEXT,
+  "industry" TEXT,
+  "currency" TEXT,
+  "marketCap" DECIMAL,
+  "assetType" TEXT,
+  "isDelisted" BOOLEAN NOT NULL DEFAULT false,
+  "ipoDate" TIMESTAMP(3),
+  "isin" TEXT,
+  "source" TEXT NOT NULL DEFAULT 'database',
+  "dataStatus" TEXT NOT NULL DEFAULT 'PARTIAL',
+  "isActive" BOOLEAN NOT NULL DEFAULT true,
+  "lastSuccessfulDataLoadTimestamp" TIMESTAMP(3),
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "stocks_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "stocks_symbol_key"
+  ON "stocks"("symbol");
+
+CREATE TABLE IF NOT EXISTS "market_data_sync_states" (
+  "id" TEXT NOT NULL,
+  "region" TEXT NOT NULL,
+  "assetType" TEXT NOT NULL,
+  "scopeType" TEXT NOT NULL DEFAULT 'CATALOG',
+  "scopeKey" TEXT NOT NULL DEFAULT 'DEFAULT',
+  "timeframe" TEXT NOT NULL DEFAULT '1D',
+  "tradingDate" TIMESTAMP(3) NOT NULL,
+  "status" TEXT NOT NULL,
+  "lastCheckedAt" TIMESTAMP(3),
+  "lastProviderFetchAt" TIMESTAMP(3),
+  "lastRunAt" TIMESTAMP(3),
+  "lastInsertedCount" INTEGER NOT NULL DEFAULT 0,
+  "lastUpdatedCount" INTEGER NOT NULL DEFAULT 0,
+  "lastNoOpCount" INTEGER NOT NULL DEFAULT 0,
+  "lastSkippedCount" INTEGER NOT NULL DEFAULT 0,
+  "lastWarningCount" INTEGER NOT NULL DEFAULT 0,
+  "lastSummary" JSONB,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "market_data_sync_states_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "market_data_sync_states_region_assetType_scopeType_scopeKey_timeframe_tradingDate_key"
+  ON "market_data_sync_states"("region", "assetType", "scopeType", "scopeKey", "timeframe", "tradingDate");
+
+CREATE INDEX IF NOT EXISTS "market_data_sync_states_region_assetType_scopeType_timeframe_status_idx"
+  ON "market_data_sync_states"("region", "assetType", "scopeType", "timeframe", "status");
+
 ALTER TABLE "price_ticks"
   ADD COLUMN IF NOT EXISTS "adjustedClose" DECIMAL,
   ADD COLUMN IF NOT EXISTS "ingestionTimestamp" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

@@ -228,6 +228,53 @@ export class MarketDataFoundationRepository {
     }));
   }
 
+  async listForwardPriceWindowsByInstrumentIds(
+    instrumentIds: string[],
+    startDate: Date,
+    options: Pick<PaginationOptions, 'region' | 'assetType'> = {}
+  ) {
+    const uniqueIds = [...new Set(instrumentIds.filter(Boolean))];
+    if (uniqueIds.length === 0) return new Map<string, any[]>();
+
+    const stocks = await this.prisma.stock.findMany({
+      where: { ...this.stockWhere(options), id: { in: uniqueIds } },
+      select: { id: true, symbol: true },
+    });
+    if (stocks.length === 0) return new Map<string, any[]>();
+
+    const symbolByInstrumentId = new Map(stocks.map((stock) => [stock.id, stock.symbol]));
+    const instrumentIdBySymbol = new Map(stocks.map((stock) => [stock.symbol, stock.id]));
+    const prices = await this.prisma.priceTick.findMany({
+      where: {
+        symbol: { in: stocks.map((stock) => stock.symbol) },
+        timestamp: { gte: startDate },
+      },
+      orderBy: [{ symbol: 'asc' }, { timestamp: 'asc' }],
+      select: {
+        symbol: true,
+        timestamp: true,
+        close: true,
+        adjustedClose: true,
+      },
+    });
+
+    const byInstrumentId = new Map(uniqueIds.map((id) => [id, [] as any[]]));
+    for (const price of prices) {
+      const instrumentId = instrumentIdBySymbol.get(price.symbol);
+      if (!instrumentId) continue;
+      byInstrumentId.get(instrumentId)?.push({
+        date: price.timestamp,
+        close: price.close.toString(),
+        adjusted_close: price.adjustedClose?.toString() ?? price.close.toString(),
+      });
+    }
+
+    for (const [instrumentId] of symbolByInstrumentId) {
+      if (!byInstrumentId.has(instrumentId)) byInstrumentId.set(instrumentId, []);
+    }
+    return byInstrumentId;
+  }
+
   async latestPrice(symbol: string) {
     const latestTick = await this.prisma.priceTick.findFirst({
       where: { symbol },

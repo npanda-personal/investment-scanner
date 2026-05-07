@@ -8,14 +8,18 @@ export class TradePlanRiskEngineRepository {
   async upsert(data: TradePlanResultDto): Promise<TradePlanResultDto> {
     const generatedDate = new Date();
     generatedDate.setUTCHours(0, 0, 0, 0);
+    const portfolioKey = data.portfolioId || 'NO_PORTFOLIO';
 
     const record = await this.db.tradePlanResult.upsert({
       where: {
-        instrumentId_strategy_modelVersion_generatedDate: {
+        instrumentId_strategy_modelVersion_generatedDate_region_assetType_portfolioKey: {
           instrumentId: data.instrumentId,
           strategy: data.strategy,
           modelVersion: data.modelVersion,
           generatedDate: generatedDate,
+          region: data.region || 'IN',
+          assetType: data.assetType || 'STOCK',
+          portfolioKey,
         },
       },
       create: {
@@ -23,8 +27,26 @@ export class TradePlanRiskEngineRepository {
         symbol: data.symbol,
         strategyDecisionId: data.strategyDecisionId,
         portfolioId: data.portfolioId,
+        portfolioKey,
+        region: data.region || 'IN',
+        assetType: data.assetType || 'STOCK',
         strategy: data.strategy,
         strategyVersion: data.strategyVersion,
+        strategyRating: data.strategyRating,
+        readinessLabel: data.readinessLabel,
+        backtestTimeframe: data.backtestTimeframe,
+        backtestSummary: data.backtestSummary ? data.backtestSummary as any : Prisma.DbNull,
+        strategyProofSnapshot: data.strategyProofSnapshot ? data.strategyProofSnapshot as any : Prisma.DbNull,
+        strategyDecisionSnapshot: data.strategyDecisionSnapshot ? data.strategyDecisionSnapshot as any : Prisma.DbNull,
+        latestPrice: data.latestPrice ?? null,
+        latestPriceTimestamp: data.latestPriceTimestamp ? new Date(data.latestPriceTimestamp) : null,
+        marketDataSnapshot: data.marketDataSnapshot ? data.marketDataSnapshot as any : Prisma.DbNull,
+        dataQualitySnapshot: data.dataQualitySnapshot ? data.dataQualitySnapshot as any : Prisma.DbNull,
+        paperReadinessStatus: data.paperReadinessStatus,
+        paperReadinessReasons: data.paperReadinessReasons as any,
+        paperReadinessBlockers: data.paperReadinessBlockers as any,
+        proofGeneratedAt: data.proofGeneratedAt ? new Date(data.proofGeneratedAt) : null,
+        snapshotVersion: data.snapshotVersion,
         planStatus: data.planStatus,
         riskGrade: data.riskGrade,
         entryZone: data.entryZone ? data.entryZone as any : Prisma.DbNull,
@@ -44,6 +66,24 @@ export class TradePlanRiskEngineRepository {
       update: {
         strategyDecisionId: data.strategyDecisionId,
         portfolioId: data.portfolioId,
+        portfolioKey,
+        region: data.region || 'IN',
+        assetType: data.assetType || 'STOCK',
+        strategyRating: data.strategyRating,
+        readinessLabel: data.readinessLabel,
+        backtestTimeframe: data.backtestTimeframe,
+        backtestSummary: data.backtestSummary ? data.backtestSummary as any : Prisma.DbNull,
+        strategyProofSnapshot: data.strategyProofSnapshot ? data.strategyProofSnapshot as any : Prisma.DbNull,
+        strategyDecisionSnapshot: data.strategyDecisionSnapshot ? data.strategyDecisionSnapshot as any : Prisma.DbNull,
+        latestPrice: data.latestPrice ?? null,
+        latestPriceTimestamp: data.latestPriceTimestamp ? new Date(data.latestPriceTimestamp) : null,
+        marketDataSnapshot: data.marketDataSnapshot ? data.marketDataSnapshot as any : Prisma.DbNull,
+        dataQualitySnapshot: data.dataQualitySnapshot ? data.dataQualitySnapshot as any : Prisma.DbNull,
+        paperReadinessStatus: data.paperReadinessStatus,
+        paperReadinessReasons: data.paperReadinessReasons as any,
+        paperReadinessBlockers: data.paperReadinessBlockers as any,
+        proofGeneratedAt: data.proofGeneratedAt ? new Date(data.proofGeneratedAt) : null,
+        snapshotVersion: data.snapshotVersion,
         planStatus: data.planStatus,
         riskGrade: data.riskGrade,
         entryZone: data.entryZone ? data.entryZone as any : Prisma.DbNull,
@@ -78,19 +118,25 @@ export class TradePlanRiskEngineRepository {
 
   async list(query: TradePlanListQuery): Promise<{ results: TradePlanResultDto[]; total: number }> {
     const where: Prisma.TradePlanResultWhereInput = {};
+    if (query.region) where.region = query.region;
+    if (query.assetType) where.assetType = query.assetType;
     if (query.strategyCode) where.strategy = query.strategyCode;
     if (query.planStatus) where.planStatus = query.planStatus;
     if (query.riskGrade) where.riskGrade = query.riskGrade;
+    if (query.paperReadyOnly) where.paperReadinessStatus = 'READY_FOR_PAPER_REVIEW';
+    if (query.paperReadinessStatus) where.paperReadinessStatus = query.paperReadinessStatus;
+    if (query.backtestTimeframe) where.backtestTimeframe = query.backtestTimeframe;
+    if (query.strategyRating) where.strategyRating = query.strategyRating;
+    if (query.readinessLabel) where.readinessLabel = query.readinessLabel;
     if (query.portfolioId) where.portfolioId = query.portfolioId;
     if (query.minRewardRisk !== undefined) where.rewardRiskRatio = { gte: query.minRewardRisk };
 
-    // Note: region and assetType are conceptually filtered at a higher level or by joining with instruments.
-    // For simplicity, we query the table directly here.
+    const sortBy = this.sortBy(query.sortBy);
 
     const total = await this.db.tradePlanResult.count({ where });
     const records = await this.db.tradePlanResult.findMany({
       where,
-      orderBy: { [query.sortBy || 'generatedAt']: query.sortDirection || 'desc' },
+      orderBy: { [sortBy]: query.sortDirection || 'desc' },
       take: query.limit || 50,
       skip: query.offset || 0,
     });
@@ -120,8 +166,20 @@ export class TradePlanRiskEngineRepository {
       symbol: record.symbol,
       strategyDecisionId: record.strategyDecisionId,
       portfolioId: record.portfolioId,
+      region: record.region,
+      assetType: record.assetType,
       strategy: record.strategy,
       strategyVersion: record.strategyVersion,
+      strategyRating: record.strategyRating,
+      readinessLabel: record.readinessLabel,
+      backtestTimeframe: record.backtestTimeframe,
+      backtestSummary: parseJson(record.backtestSummary) || null,
+      strategyProofSnapshot: parseJson(record.strategyProofSnapshot) || null,
+      strategyDecisionSnapshot: parseJson(record.strategyDecisionSnapshot) || null,
+      latestPrice: record.latestPrice,
+      latestPriceTimestamp: record.latestPriceTimestamp?.toISOString() || null,
+      marketDataSnapshot: parseJson(record.marketDataSnapshot) || null,
+      dataQualitySnapshot: parseJson(record.dataQualitySnapshot) || null,
       planStatus: record.planStatus as any,
       riskGrade: record.riskGrade as any,
       entryZone: parseJson(record.entryZone) || null,
@@ -134,9 +192,19 @@ export class TradePlanRiskEngineRepository {
       warnings: parseJson(record.warnings) || [],
       blockers: parseJson(record.blockers) || [],
       dataGaps: parseJson(record.dataGaps) || [],
+      paperReadinessStatus: record.paperReadinessStatus as any,
+      paperReadinessReasons: parseJson(record.paperReadinessReasons) || [],
+      paperReadinessBlockers: parseJson(record.paperReadinessBlockers) || [],
+      proofGeneratedAt: record.proofGeneratedAt?.toISOString() || null,
+      snapshotVersion: record.snapshotVersion,
       generatedAt: record.generatedAt.toISOString(),
       generatedDate: record.generatedDate?.toISOString(),
       modelVersion: record.modelVersion,
     };
+  }
+
+  private sortBy(value?: string) {
+    const allowed = new Set(['generatedAt', 'rewardRiskRatio', 'riskGrade', 'planStatus', 'paperReadinessStatus', 'strategyRating']);
+    return allowed.has(value || '') ? value! : 'generatedAt';
   }
 }
