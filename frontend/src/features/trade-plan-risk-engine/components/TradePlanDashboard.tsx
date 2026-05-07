@@ -12,6 +12,7 @@ export const TradePlanDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [batchGenerating, setBatchGenerating] = useState(false);
+  const [batchSummary, setBatchSummary] = useState<string | null>(null);
   const [tab, setTab] = useState(0);
   
   const [page, setPage] = useState(0);
@@ -45,8 +46,10 @@ export const TradePlanDashboard: React.FC = () => {
 
   const handleBatchGenerate = async () => {
     setBatchGenerating(true);
+    setBatchSummary(null);
     try {
-      await TradePlanApi.batchGenerate({ region: scope.region, batchSize: 25 });
+      const result = await TradePlanApi.batchGenerate({ region: scope.region, batchSize: 25 });
+      setBatchSummary(`Batch complete: ${result.generatedCount} generated, ${result.failedCount || 0} failed.`);
       setPage(0);
       await fetchPlans();
     } catch (err: any) {
@@ -70,6 +73,7 @@ export const TradePlanDashboard: React.FC = () => {
       </Box>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {batchSummary && <Alert severity="success" sx={{ mb: 2 }}>{batchSummary}</Alert>}
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
         <Tabs value={tab} onChange={(_e, v) => setTab(v)}>

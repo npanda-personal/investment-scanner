@@ -1,11 +1,13 @@
 export type PlanStatus = 'VALID' | 'WATCH' | 'BLOCKED' | 'INSUFFICIENT_DATA';
 export type RiskGrade = 'LOW' | 'MEDIUM' | 'HIGH' | 'UNDEFINED';
+export type Quality = 'STRONG' | 'ACCEPTABLE' | 'WEAK' | 'FALLBACK' | 'UNKNOWN';
 
 export interface EntryZone {
   type: string;
   referencePrice: number;
   preferredEntryMin: number;
   preferredEntryMax: number;
+  quality?: Quality;
   rationale: string;
 }
 
@@ -13,6 +15,7 @@ export interface StopLoss {
   price: number;
   percentBelowEntry: number;
   method: string;
+  quality?: Quality;
   rationale: string;
 }
 
@@ -20,6 +23,7 @@ export interface Target {
   price: number;
   expectedReturnPercent: number;
   method: string;
+  quality?: Quality;
   rationale: string;
 }
 

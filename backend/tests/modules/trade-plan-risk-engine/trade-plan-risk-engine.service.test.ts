@@ -203,6 +203,57 @@ describe('TradePlanRiskEngineService', () => {
       expect(plan.planStatus).toBe('BLOCKED');
       expect(plan.blockers).toContain('Market gate is CLOSED for long entries.');
     });
+
+    it('sets status to WATCH if price is extended above SMA50', async () => {
+      mockStrategyService.latestForInstrument.mockResolvedValue(defaultDecision as any);
+      mockMarketDataService.latestPriceByInstrumentId.mockResolvedValue({ latest: { close: 150 } } as any); // Much higher than SMA50 (~98)
+      mockMarketDataService.listPricesByInstrumentId.mockResolvedValue(defaultPricesDto as any);
+
+      const plan = await service.generatePlan({ instrumentId: 'INST-1', symbol: 'TEST' });
+      
+      expect(plan.planStatus).toBe('WATCH');
+      expect(plan.warnings).toContain('Price is extended beyond preferred entry zone (far above SMA50).');
+    });
+
+    it('sets risk grade to HIGH when strategy is unproven', async () => {
+      mockStrategyService.latestForInstrument.mockResolvedValue({
+        ...defaultDecision,
+        frameworkBacked: false,
+        strategyRating: 'UNPROVEN'
+      } as any);
+      mockMarketDataService.latestPriceByInstrumentId.mockResolvedValue(defaultPriceResult as any);
+      mockMarketDataService.listPricesByInstrumentId.mockResolvedValue(defaultPricesDto as any);
+
+      const plan = await service.generatePlan({ instrumentId: 'INST-1', symbol: 'TEST' });
+      
+      expect(plan.riskGrade).toBe('HIGH');
+      expect(plan.warnings).toContain('Strategy is not framework-backed (unproven).');
+    });
+
+    it('adds target realism warning if target requires unrealistic move relative to volatility', async () => {
+      mockStrategyService.latestForInstrument.mockResolvedValue(defaultDecision as any);
+      mockMarketDataService.latestPriceByInstrumentId.mockResolvedValue(defaultPriceResult as any);
+      
+      // Setup low volatility: tight price ranges
+      const lowVolPrices = Array(60).fill(null).map(() => ({ close: 100, high: 100.1, low: 99.9 }));
+      mockMarketDataService.listPricesByInstrumentId.mockResolvedValue({ prices: lowVolPrices } as any);
+
+      // Force target far away (e.g. 10R)
+      const plan = await service.generatePlan({ instrumentId: 'INST-1', symbol: 'TEST', targetRewardRisk: 10 });
+      
+      expect(plan.warnings).toContain('Target requires an unrealistic move relative to recent volatility.');
+      expect(plan.target?.quality).toBe('WEAK');
+    });
+
+    it('returns UNDEFINED risk grade when data is insufficient', async () => {
+      mockStrategyService.latestForInstrument.mockResolvedValue(defaultDecision as any);
+      mockMarketDataService.latestPriceByInstrumentId.mockResolvedValue(null as any); // Missing latest price
+
+      const plan = await service.generatePlan({ instrumentId: 'INST-1', symbol: 'TEST' });
+      
+      expect(plan.riskGrade).toBe('UNDEFINED');
+      expect(plan.planStatus).toBe('INSUFFICIENT_DATA');
+    });
   });
 
   describe('batchGenerate', () => {

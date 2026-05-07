@@ -40,7 +40,7 @@ export const TradePlanApi = {
 
   async batchGenerate(request: BatchGenerateTradePlanRequest) {
     try {
-      const res = await axios.post<{ count: number; plans: TradePlanResultDto[] }>('/api/v1/trade-plans/generate/batch', request);
+      const res = await axios.post<{ count: number; generatedCount: number; failedCount: number; plans: TradePlanResultDto[] }>('/api/v1/trade-plans/generate/batch', request);
       return res.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.error || 'Failed to batch generate plans');
