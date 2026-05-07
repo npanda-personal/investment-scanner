@@ -393,6 +393,59 @@ Frontend:
 - Persisted stock-data models must document whether they are append-only or idempotent/upserted. Idempotent models need a clear natural key, date/timestamp normalization where relevant, repository-level upsert/skip behavior, and database uniqueness where practical.
 - These integrations must not import backend repositories or frontend feature internals directly.
 
+# Batch Orchestration Standard
+
+- Backend endpoints must process bounded batches, not an entire universe, unless an explicit backend worker/job system owns that workflow.
+- Backend batch responses must return `totalCount`, `processedCount`, `batchSize`, `offset`/`cursor`, `nextOffset`/`nextCursor`, `hasMore`, count summaries, `warnings`, and `durationMs`.
+- Frontend owns orchestration across batches unless a backend worker/job system is explicitly implemented.
+- Frontend must loop until `hasMore=false` for user-triggered "run all" actions.
+- `region` and `assetType` must be passed to every batch request.
+- Batch size defaults should be safe, usually `25`.
+- Batch size max should usually be `100` unless documented by the owning module.
+- One item failure should not fail the entire batch when safe; increment the failed count and continue.
+- Backend response fields must be additive and backward-compatible.
+- All future modules must follow this standard.
+
+Example request:
+
+```json
+{
+  "batchSize": 25,
+  "offset": 0,
+  "region": "IN",
+  "assetType": "STOCK"
+}
+```
+
+Example response:
+
+```json
+{
+  "processedCount": 25,
+  "totalCount": 503,
+  "nextOffset": 25,
+  "hasMore": true
+}
+```
+
+# Batch Progress UI Standard
+
+- Every user-triggered batch operation must show progress.
+- Frontend must not fire one batch and stop when backend returns `hasMore=true`.
+- Use backend `processedCount`, `totalCount`, `nextOffset`, and `hasMore` to drive progress.
+- Use a determinate progress bar when `totalCount` is known.
+- Use indeterminate progress only before `totalCount` is known.
+- Disable run buttons while running.
+- Show spinner/loading state in the action button.
+- Prevent duplicate concurrent runs.
+- Show a final summary.
+- Show errors and partial completion.
+- Show warning count and details where practical.
+- Display and send `region` and `assetType` on every batch request.
+- Do not fake progress.
+- Do not process an entire universe in one backend request just to simplify progress.
+- Future modules must follow this pattern.
+
 # Product Language Standard
 
 The following terminology MUST be used for specific modules:

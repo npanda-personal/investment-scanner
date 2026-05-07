@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Box, Button, Checkbox, FormControlLabel, MenuItem, Paper, Tab, Tabs, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Checkbox, CircularProgress, FormControlLabel, MenuItem, Paper, Tab, Tabs, TextField, Typography } from '@mui/material';
 import { fetchSignalScreener, fetchTopSignals, runSignals } from '../api/signalGenerationEngineService';
-import type { SignalConfidence, SignalDirection, SignalResult } from '../types';
+import type { SignalConfidence, SignalDirection, SignalResult, SignalRunResponse } from '../types';
 import { MarketRegimeWidget } from '@/features/market-context-intelligence';
 import { Link } from 'react-router-dom';
 import { SignalTable } from './SignalTable';
-import { FilterBar, PageHeader, type SortDirection } from '@/shared/components';
+import { BatchProgressBar, FilterBar, PageHeader, type SortDirection } from '@/shared/components';
+import { useBatchRunner } from '@/shared/hooks';
 import { FactCheckOutlined } from '@mui/icons-material';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 
@@ -22,8 +23,10 @@ const tabs: Array<{ value: SignalTab; label: string }> = [
 
 const SignalsDashboardPage: React.FC = () => {
   const { scope } = useMarketScope();
+  const batchRunner = useBatchRunner<SignalRunResponse>();
   const [signals, setSignals] = useState<SignalResult[]>([]);
   const [totalCount, setTotalCount] = useState(0);
+  const [directionCounts, setDirectionCounts] = useState<Record<SignalDirection, number>>({ BULLISH: 0, NEUTRAL: 0, BEARISH: 0 });
   const [activeTab, setActiveTab] = useState<SignalTab>('bullish');
   const [pageByTab, setPageByTab] = useState<Record<SignalTab, number>>({ bullish: 0, bearish: 0, neutral: 0, momentum: 0, recent: 0, screener: 0 });
   const [pageSizeByTab, setPageSizeByTab] = useState<Record<SignalTab, number>>({ bullish: 25, bearish: 25, neutral: 25, momentum: 25, recent: 25, screener: 25 });
@@ -45,14 +48,15 @@ const SignalsDashboardPage: React.FC = () => {
   const [runIncludeStrategyMatches, setRunIncludeStrategyMatches] = useState(false);
   const [runMessage, setRunMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = () => {
+  const resetPages = () => setPageByTab({ bullish: 0, bearish: 0, neutral: 0, momentum: 0, recent: 0, screener: 0 });
+
+  const load = (forcedPage?: number) => {
     setLoading(true);
     setError(null);
     const limit = pageSizeByTab[activeTab];
-    const offset = pageByTab[activeTab] * limit;
+    const offset = (forcedPage ?? pageByTab[activeTab]) * limit;
 
     let fetchPromise;
     const strategyParams = {
@@ -85,7 +89,8 @@ const SignalsDashboardPage: React.FC = () => {
     fetchPromise
       .then((response) => {
         setSignals(response.signals);
-        setTotalCount(response.total);
+        setTotalCount(response.totalCount ?? response.total);
+        if (response.directionCounts) setDirectionCounts(response.directionCounts);
       })
       .catch((err: any) => setError(err.response?.data?.error || err.message || 'Failed to load signals'))
       .finally(() => setLoading(false));
@@ -95,33 +100,64 @@ const SignalsDashboardPage: React.FC = () => {
 
   useEffect(() => {
     // Reset pages when scope changes
-    setPageByTab({ bullish: 0, bearish: 0, neutral: 0, momentum: 0, recent: 0, screener: 0 });
+    resetPages();
   }, [scope.region, scope.assetType]);
 
-  const runManualSignals = () => {
-    setRunning(true);
+  useEffect(() => {
+    resetPages();
+  }, [direction, minScore, sector, country, confidence, signalType, search, strategyCode, onlyStrategyEligible, excludeNoiseFiltered, hasBlockedStrategies]);
+
+  const runManualSignals = async () => {
+    if (batchRunner.running) return;
     setError(null);
     setRunMessage(null);
-    runSignals({ 
-      limit: Number(runLimit) || 25, 
-      useDataQualityFilter, 
-      minSignalReadinessScore: 70,
-      region: scope.region,
-      assetType: scope.assetType,
-      includeStrategyMatches: runIncludeStrategyMatches,
-      strategyCode: strategyCode || undefined,
-      onlyStrategyEligible: onlyStrategyEligible || undefined,
-      excludeNoiseFiltered: excludeNoiseFiltered || undefined,
-    })
-      .then((result) => {
-        const dq = result.dataQuality;
-        setRunMessage(dq?.filterApplied
-          ? `Generated ${result.generated}; skipped ${result.skipped}. Data quality excluded ${dq.excludedByDataQuality}, missing evaluations ${dq.missingQualityEvaluationCount}.`
-          : `Generated ${result.generated}; skipped ${result.skipped}.`);
-        load();
-      })
-      .catch((err: any) => setError(err.response?.data?.error || err.message || 'Failed to run signals'))
-      .finally(() => setRunning(false));
+    batchRunner.reset();
+    const selectedBatchSize = Math.min(100, Math.max(1, Number(runLimit) || 25));
+    try {
+      const completedRun = await batchRunner.run({
+        batchSize: selectedBatchSize,
+        runBatch: ({ offset, batchSize }) => runSignals({
+          batchSize,
+          limit: batchSize,
+          offset,
+          useDataQualityFilter,
+          minSignalReadinessScore: 70,
+          region: scope.region,
+          assetType: scope.assetType,
+          includeStrategyMatches: runIncludeStrategyMatches,
+          strategyCode: strategyCode || undefined,
+          onlyStrategyEligible: onlyStrategyEligible || undefined,
+          excludeNoiseFiltered: excludeNoiseFiltered || undefined,
+        }),
+      });
+      setPageByTab({ bullish: 0, bearish: 0, neutral: 0, momentum: 0, recent: 0, screener: 0 });
+      const finalState = completedRun?.aggregate;
+      setRunMessage(
+        `Signal generation complete. Processed ${finalState?.processedCount ?? 0} instruments across ${finalState?.batchCount ?? 0} batches. ` +
+        `Generated ${finalState?.generatedCount ?? 0}, updated ${finalState?.updatedCount ?? 0}, skipped ${finalState?.skippedCount ?? 0}, failed ${finalState?.failedCount ?? 0}.`
+      );
+      load(0);
+    } catch (err: any) {
+      setError(err.response?.data?.error || err.message || 'Failed to run signals');
+    }
+  };
+
+  const tabLabel = (tab: { value: SignalTab; label: string }) => {
+    if (tab.value === 'bullish') return `${tab.label} (${directionCounts.BULLISH})`;
+    if (tab.value === 'bearish') return `${tab.label} (${directionCounts.BEARISH})`;
+    if (tab.value === 'neutral') return `${tab.label} (${directionCounts.NEUTRAL})`;
+    if (tab.value === 'recent') return `${tab.label} (${directionCounts.BULLISH + directionCounts.BEARISH + directionCounts.NEUTRAL})`;
+    return tab.label;
+  };
+
+  const emptyMessage = () => {
+    const selectedDirection = activeTab === 'bullish' ? 'BULLISH' : activeTab === 'bearish' ? 'BEARISH' : activeTab === 'neutral' ? 'NEUTRAL' : null;
+    const otherTotal = directionCounts.BULLISH + directionCounts.BEARISH + directionCounts.NEUTRAL - (selectedDirection ? directionCounts[selectedDirection] : 0);
+    if (selectedDirection && directionCounts[selectedDirection] === 0 && otherTotal > 0) {
+      return `No ${selectedDirection.toLowerCase()} signals found for ${scope.region} / ${scope.assetType}. Generated signals exist in other directions: Neutral ${directionCounts.NEUTRAL}, Bearish ${directionCounts.BEARISH}, Bullish ${directionCounts.BULLISH}.`;
+    }
+    if (batchRunner.complete) return 'Signal generation completed, but no rows match the current filters. Reset filters or check run diagnostics.';
+    return `No signals match this view for ${scope.region} / ${scope.assetType}.`;
   };
 
   return (
@@ -129,10 +165,10 @@ const SignalsDashboardPage: React.FC = () => {
       <PageHeader
         title="Signal Generation Engine"
         subtitle="Raw bullish, neutral, and bearish confirmation inputs with Strategy Framework match context."
-        primaryAction={<Button variant="contained" onClick={runManualSignals} disabled={running}>{running ? 'Running...' : 'Run Signals'}</Button>}
+        primaryAction={<Button variant="contained" onClick={runManualSignals} disabled={batchRunner.running} startIcon={batchRunner.running ? <CircularProgress size={16} color="inherit" /> : undefined}>{batchRunner.running ? 'Running...' : 'Run Signals'}</Button>}
         secondaryActions={
           <>
-          <TextField size="small" label="Run limit" value={runLimit} onChange={(event) => setRunLimit(event.target.value)} sx={{ width: 110 }} />
+          <TextField size="small" label="Batch size" value={runLimit} onChange={(event) => setRunLimit(event.target.value)} sx={{ width: 110 }} />
           <FormControlLabel
             control={<Checkbox checked={useDataQualityFilter} onChange={(event) => setUseDataQualityFilter(event.target.checked)} />}
             label="Use data quality filter"
@@ -149,6 +185,21 @@ const SignalsDashboardPage: React.FC = () => {
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {runMessage && <Alert severity="info" sx={{ mb: 2 }}>{runMessage}</Alert>}
+      <BatchProgressBar
+        running={batchRunner.running}
+        complete={batchRunner.complete}
+        label={`${batchRunner.complete ? 'Signal generation complete for' : 'Running signal generation for'} ${scope.region} / ${scope.assetType}`}
+        processedCount={batchRunner.processedCount}
+        totalCount={batchRunner.totalCount}
+        batchCount={batchRunner.batchCount}
+        estimatedBatchTotal={batchRunner.totalCount ? Math.ceil(batchRunner.totalCount / Math.min(100, Math.max(1, Number(runLimit) || 25))) : undefined}
+        generatedCount={batchRunner.generatedCount}
+        updatedCount={batchRunner.updatedCount}
+        skippedCount={batchRunner.skippedCount}
+        failedCount={batchRunner.failedCount}
+        warningsCount={batchRunner.warnings.length}
+        error={batchRunner.error}
+      />
       <Alert severity="info" sx={{ mb: 2 }}>
         <Typography variant="body2">
           Raw signals are confirmation inputs. Use Strategy Decision for candidate review and risk context.
@@ -191,8 +242,8 @@ const SignalsDashboardPage: React.FC = () => {
       )}
 
       <Paper sx={{ mb: 2 }}>
-        <Tabs value={activeTab} onChange={(_event, value) => setActiveTab(value)} variant="scrollable" scrollButtons="auto">
-          {tabs.map((tab) => <Tab key={tab.value} value={tab.value} label={tab.label} />)}
+        <Tabs value={activeTab} onChange={(_event, value) => { setActiveTab(value); setPageByTab({ ...pageByTab, [value]: 0 }); }} variant="scrollable" scrollButtons="auto">
+          {tabs.map((tab) => <Tab key={tab.value} value={tab.value} label={tabLabel(tab)} />)}
         </Tabs>
       </Paper>
 
@@ -214,6 +265,7 @@ const SignalsDashboardPage: React.FC = () => {
           setPageSizeByTab({ ...pageSizeByTab, [activeTab]: nextPageSize });
           setPageByTab({ ...pageByTab, [activeTab]: 0 });
         }}
+        emptyMessage={emptyMessage()}
       />
     </Box>
   );

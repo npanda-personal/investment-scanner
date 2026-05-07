@@ -35,22 +35,42 @@ export class SignalGenerationEngineService {
   ) {}
 
   async topSignals(query: SignalQuery): Promise<PaginatedSignalResponse> {
-    const { signals, total } = await this.repository.latestSignals(query);
+    const [{ signals, total }, directionCounts] = await Promise.all([
+      this.repository.latestSignals(query),
+      this.directionCountsFor(query),
+    ]);
+    const enriched = await this.enrichSignals(signals, query);
     return {
-      signals: await this.enrichSignals(signals, query),
+      signals: enriched,
+      items: enriched,
       total,
+      totalCount: total,
       limit: query.limit,
       offset: query.offset || 0,
+      hasMore: (query.offset || 0) + signals.length < total,
+      filtersApplied: this.filtersApplied(query),
+      scope: this.scopeFor(query),
+      directionCounts,
     };
   }
 
   async screener(query: SignalQuery): Promise<PaginatedSignalResponse> {
-    const { signals, total } = await this.repository.latestSignals(query);
+    const [{ signals, total }, directionCounts] = await Promise.all([
+      this.repository.latestSignals(query),
+      this.directionCountsFor(query),
+    ]);
+    const enriched = await this.enrichSignals(signals, query);
     return {
-      signals: await this.enrichSignals(signals, query),
+      signals: enriched,
+      items: enriched,
       total,
+      totalCount: total,
       limit: query.limit,
       offset: query.offset || 0,
+      hasMore: (query.offset || 0) + signals.length < total,
+      filtersApplied: this.filtersApplied(query),
+      scope: this.scopeFor(query),
+      directionCounts,
     };
   }
 
@@ -62,11 +82,15 @@ export class SignalGenerationEngineService {
   }
 
   async run(request: SignalRunRequest): Promise<SignalRunResponse> {
+    const startedAt = Date.now();
     const generatedAt = new Date().toISOString();
     const errors: string[] = [];
     const warnings: string[] = [];
     const results: SignalResultDto[] = [];
-    const resolvedInstrumentIds = await this.resolveRunUniverse(request);
+    const batchSize = request.instrumentId || request.symbol ? 1 : this.clampInt(request.batchSize ?? request.limit, 25, 1, 100);
+    const offset = request.instrumentId || request.symbol ? 0 : this.clampInt(request.offset, 0, 0, Number.MAX_SAFE_INTEGER);
+    const resolved = await this.resolveRunUniverse(request, batchSize, offset);
+    const resolvedInstrumentIds = resolved.instrumentIds;
     let instrumentIds = resolvedInstrumentIds;
     let dataQuality: SignalRunResponse['dataQuality'] = {
       filterApplied: Boolean(request.useDataQualityFilter),
@@ -108,15 +132,42 @@ export class SignalGenerationEngineService {
         errors.push(`${instrumentId}: ${error.message || 'signal generation failed'}`);
       }
     }
+    const processedCount = resolvedInstrumentIds.length;
+    const failedCount = errors.length;
+    const generatedCount = results.length;
+    const skippedCount = Math.max(0, processedCount - generatedCount - failedCount);
+    const nextOffset = offset + processedCount;
+    const hasMore = nextOffset < resolved.totalCount;
+    const directionCountsGenerated = results.reduce<Record<SignalDirection, number>>((acc, result) => {
+      acc[result.direction] += 1;
+      return acc;
+    }, { BULLISH: 0, NEUTRAL: 0, BEARISH: 0 });
 
     return {
-      generated: results.length,
-      skipped: Math.max(0, resolvedInstrumentIds.length - results.length - errors.length),
+      generated: generatedCount,
+      skipped: skippedCount,
       errors,
       warnings,
       dataQuality,
       results,
       generated_at: generatedAt,
+      processedCount,
+      totalCount: resolved.totalCount,
+      batchSize,
+      offset,
+      nextOffset: hasMore ? nextOffset : null,
+      hasMore,
+      generatedCount,
+      updatedCount: 0,
+      skippedCount,
+      failedCount,
+      strategyMatchedCount: request.includeStrategyMatches ? results.reduce((sum, result) => sum + (result.strategyMatches?.length || 0), 0) : undefined,
+      strategyBlockedCount: request.includeStrategyMatches ? results.reduce((sum, result) => sum + (result.blockedStrategies?.length || 0), 0) : undefined,
+      outOfScopeSkipped: 0,
+      directionCountsGenerated,
+      scope: this.scopeFor(request),
+      latestGeneratedAt: results[results.length - 1]?.generated_at ?? null,
+      durationMs: Date.now() - startedAt,
     };
   }
 
@@ -769,18 +820,65 @@ export class SignalGenerationEngineService {
     return `${direction.charAt(0)}${direction.slice(1).toLowerCase()} because ${this.joinReasons(reasons)}.`;
   }
 
-  private async resolveRunUniverse(request: SignalRunRequest): Promise<string[]> {
-    if (request.instrumentId) return [request.instrumentId];
+  private async resolveRunUniverse(request: SignalRunRequest, batchSize: number, offset: number): Promise<{ instrumentIds: string[]; totalCount: number }> {
+    if (request.instrumentId) return { instrumentIds: [request.instrumentId], totalCount: 1 };
     if (request.symbol) {
-      const instruments = await this.marketDataService.listInstruments({ search: request.symbol, pageSize: 25 });
+      const instruments = await this.marketDataService.listInstruments({ search: request.symbol, pageSize: 25, region: request.region, assetType: request.assetType });
       const match = instruments.instruments.find((instrument: any) => instrument.symbol === request.symbol);
-      return match ? [match.id] : [];
+      return { instrumentIds: match ? [match.id] : [], totalCount: match ? 1 : 0 };
     }
-    const instruments = await this.marketDataService.listInstruments({ page: 1, pageSize: request.limit ?? 50 });
-    return instruments.instruments
-      .filter((instrument: any) => !request.sector || instrument.sector === request.sector)
-      .filter((instrument: any) => !request.country || instrument.country === request.country)
-      .map((instrument: any) => instrument.id);
+    const page = Math.floor(offset / batchSize) + 1;
+    const instruments = await this.marketDataService.listInstruments({
+      page,
+      pageSize: batchSize,
+      region: request.region,
+      assetType: request.assetType,
+      sector: request.sector,
+      country: request.country,
+    });
+    return {
+      instrumentIds: instruments.instruments.map((instrument: any) => instrument.id),
+      totalCount: instruments.pagination?.total ?? instruments.instruments.length,
+    };
+  }
+
+  private scopeFor(input: Pick<SignalQuery | SignalRunRequest, 'region' | 'assetType'>) {
+    return {
+      region: input.region || 'GLOBAL',
+      assetType: input.assetType || 'STOCK',
+    };
+  }
+
+  private filtersApplied(query: SignalQuery): Record<string, unknown> {
+    return Object.fromEntries(Object.entries({
+      direction: query.direction,
+      confidence: query.confidence,
+      minScore: query.minScore,
+      sector: query.sector,
+      country: query.country,
+      region: query.region,
+      assetType: query.assetType,
+      signalType: query.signalType,
+      search: query.search,
+      strategyCode: query.strategyCode,
+      onlyStrategyEligible: query.onlyStrategyEligible,
+      excludeNoiseFiltered: query.excludeNoiseFiltered,
+      hasStrategyMatch: query.hasStrategyMatch,
+      hasBlockedStrategies: query.hasBlockedStrategies,
+    }).filter(([, value]) => value !== undefined && value !== ''));
+  }
+
+  private async directionCountsFor(query: SignalQuery): Promise<Record<SignalDirection, number>> {
+    if (typeof (this.repository as any).directionCounts !== 'function') {
+      return { BULLISH: 0, NEUTRAL: 0, BEARISH: 0 };
+    }
+    return (this.repository as any).directionCounts(query);
+  }
+
+  private clampInt(value: unknown, fallback: number, min: number, max: number) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return fallback;
+    return Math.min(max, Math.max(min, Math.floor(numeric)));
   }
 
   private categoryScore(positive: number, negative: number): number {

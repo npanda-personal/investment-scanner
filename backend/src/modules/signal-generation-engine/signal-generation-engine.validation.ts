@@ -48,10 +48,14 @@ export function parseSignalQuery(query: Record<string, unknown>): SignalQuery {
 
 export function parseRunRequest(body: any): SignalRunRequest {
   const limitValue = Number(body?.limit);
+  const batchSizeValue = Number(body?.batchSize ?? body?.limit);
+  const offsetValue = Number(body?.offset ?? body?.cursor);
   return {
     instrumentId: typeof body?.instrumentId === 'string' ? body.instrumentId.trim() || undefined : undefined,
     symbol: typeof body?.symbol === 'string' ? body.symbol.trim().toUpperCase() || undefined : undefined,
-    limit: Number.isFinite(limitValue) ? Math.min(250, Math.max(1, Math.floor(limitValue))) : undefined,
+    limit: Number.isFinite(limitValue) ? Math.min(100, Math.max(1, Math.floor(limitValue))) : undefined,
+    batchSize: Number.isFinite(batchSizeValue) ? Math.min(100, Math.max(1, Math.floor(batchSizeValue))) : undefined,
+    offset: Number.isFinite(offsetValue) ? Math.max(0, Math.floor(offsetValue)) : 0,
     direction: normalizeDirection(body?.direction),
     sector: typeof body?.sector === 'string' ? body.sector.trim() || undefined : undefined,
     country: typeof body?.country === 'string' ? body.country.trim() || undefined : undefined,
@@ -67,6 +71,7 @@ export function parseRunRequest(body: any): SignalRunRequest {
     includeStrategyMatches: body?.includeStrategyMatches === true,
     onlyStrategyEligible: body?.onlyStrategyEligible === true,
     excludeNoiseFiltered: body?.excludeNoiseFiltered === true,
+    force: body?.force === true,
   };
 }
 

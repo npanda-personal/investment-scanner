@@ -66,9 +66,18 @@ export interface SignalBlockedStrategySummary {
 
 export interface PaginatedSignalResponse {
   signals: SignalResultDto[];
+  items?: SignalResultDto[];
   total: number;
+  totalCount?: number;
   limit: number;
   offset: number;
+  hasMore?: boolean;
+  filtersApplied?: Record<string, unknown>;
+  scope?: {
+    region: string;
+    assetType: string;
+  };
+  directionCounts?: Record<SignalDirection, number>;
   warnings?: string[];
 }
 
@@ -76,6 +85,8 @@ export interface SignalRunRequest {
   instrumentId?: string;
   symbol?: string;
   limit?: number;
+  batchSize?: number;
+  offset?: number;
   direction?: SignalDirection;
   sector?: string;
   country?: string;
@@ -91,6 +102,7 @@ export interface SignalRunRequest {
   includeStrategyMatches?: boolean;
   onlyStrategyEligible?: boolean;
   excludeNoiseFiltered?: boolean;
+  force?: boolean;
 }
 
 export interface SignalQuery {
@@ -136,6 +148,26 @@ export interface SignalRunResponse {
   };
   results: SignalResultDto[];
   generated_at: string;
+  processedCount?: number;
+  totalCount?: number;
+  batchSize?: number;
+  offset?: number;
+  nextOffset?: number | null;
+  hasMore?: boolean;
+  generatedCount?: number;
+  updatedCount?: number;
+  skippedCount?: number;
+  failedCount?: number;
+  strategyMatchedCount?: number;
+  strategyBlockedCount?: number;
+  outOfScopeSkipped?: number;
+  directionCountsGenerated?: Record<SignalDirection, number>;
+  scope?: {
+    region: string;
+    assetType: string;
+  };
+  latestGeneratedAt?: string | null;
+  durationMs?: number;
 }
 
 export interface SignalPricePoint {

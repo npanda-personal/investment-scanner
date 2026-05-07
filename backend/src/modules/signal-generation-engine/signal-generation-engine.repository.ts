@@ -59,7 +59,7 @@ export class SignalGenerationEngineRepository {
   }
 
   async latestSignals(query: SignalQuery): Promise<{ signals: SignalResultDto[], total: number }> {
-    const where = this.buildWhere(query);
+    const where = this.buildWhere({ ...query, direction: undefined, confidence: undefined, minScore: undefined, signalType: undefined });
     
     // We want the latest signal per instrument that matches the criteria.
     // To use distinct in Prisma, we must order by the distinct field first.
@@ -73,6 +73,11 @@ export class SignalGenerationEngineRepository {
     });
 
     let finalResults = results.map(item => this.toDto(item));
+
+    finalResults = finalResults
+      .filter((result) => !query.direction || result.direction === query.direction)
+      .filter((result) => !query.confidence || result.confidence === query.confidence)
+      .filter((result) => query.minScore === undefined || result.score >= query.minScore);
 
     // Post-filtering for signalType if present (since it's inside JSON)
     if (query.signalType) {
@@ -105,6 +110,19 @@ export class SignalGenerationEngineRepository {
       signals: finalResults.slice(offset, offset + limit),
       total,
     };
+  }
+
+  async directionCounts(query: SignalQuery): Promise<Record<'BULLISH' | 'NEUTRAL' | 'BEARISH', number>> {
+    const { signals } = await this.latestSignals({
+      ...query,
+      direction: undefined,
+      limit: 5000,
+      offset: 0,
+    });
+    return signals.reduce<Record<'BULLISH' | 'NEUTRAL' | 'BEARISH', number>>((acc, signal) => {
+      acc[signal.direction] += 1;
+      return acc;
+    }, { BULLISH: 0, NEUTRAL: 0, BEARISH: 0 });
   }
 
   async latestSignalUniverse(query: SignalQuery): Promise<SignalResultDto[]> {
@@ -210,7 +228,19 @@ export class SignalGenerationEngineRepository {
     const stockFilters: Prisma.StockWhereInput[] = [];
     const regionFilter = resolveMarketRegionFilter(region);
     if (Object.keys(regionFilter).length > 0) stockFilters.push(regionFilter);
-    if (assetType) stockFilters.push({ assetType });
+    const normalizedAssetType = assetType?.trim().toUpperCase();
+    if (normalizedAssetType) {
+      if (normalizedAssetType === 'STOCK' || normalizedAssetType === 'EQUITY') {
+        stockFilters.push({
+          OR: [
+            { assetType: { in: ['STOCK', 'EQUITY'], mode: 'insensitive' } },
+            { assetType: null },
+          ],
+        });
+      } else {
+        stockFilters.push({ assetType: { equals: normalizedAssetType, mode: 'insensitive' } });
+      }
+    }
     return stockFilters.length > 0 ? { stock: { AND: stockFilters } } : {};
   }
 

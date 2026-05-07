@@ -20,6 +20,7 @@ describe('signal generation validation', () => {
 
   it('parses run request and validates instrument id', () => {
     expect(parseRunRequest({ symbol: 'aapl', limit: 0 })).toMatchObject({ symbol: 'AAPL', limit: 1 });
+    expect(parseRunRequest({ batchSize: 999, offset: '25', force: true })).toMatchObject({ batchSize: 100, offset: 25, force: true });
     expect(validateInstrumentId('')).toBe('instrumentId is required');
   });
 });

@@ -248,6 +248,119 @@ describe('SignalGenerationEngineService', () => {
     expect(result.warnings[0]).toContain('missing data quality');
   });
 
+  it('runs one bounded batch and returns progress metadata', async () => {
+    const marketDataService = {
+      listInstruments: jest.fn().mockResolvedValue({
+        instruments: [{ id: 'stock-3' }, { id: 'stock-4' }],
+        pagination: { total: 5 },
+      }),
+    };
+    const service = new SignalGenerationEngineService({} as any, marketDataService as any, {} as any);
+    jest.spyOn(service, 'generateForInstrument').mockImplementation(async (instrumentId) => ({
+      instrument_id: instrumentId,
+      symbol: instrumentId.toUpperCase(),
+      company_name: null,
+      sector: null,
+      country: 'IN',
+      currentPrice: null,
+      previousClose: null,
+      dailyChange: null,
+      dailyChangePercent: null,
+      currency: null,
+      priceTimestamp: null,
+      score: instrumentId === 'stock-3' ? 75 : 45,
+      direction: instrumentId === 'stock-3' ? 'BULLISH' : 'NEUTRAL',
+      confidence: 'LOW',
+      triggered_signals: [],
+      negative_signals: [],
+      explanation: 'Neutral because data is limited.',
+      generated_at: new Date().toISOString(),
+      source: 'signal-generation-engine',
+      data_status: 'PARTIAL',
+    } as any));
+
+    const result = await service.run({ batchSize: 2, offset: 2, region: 'IN', assetType: 'STOCK' });
+
+    expect(marketDataService.listInstruments).toHaveBeenCalledWith(expect.objectContaining({
+      page: 2,
+      pageSize: 2,
+      region: 'IN',
+      assetType: 'STOCK',
+    }));
+    expect(result).toMatchObject({
+      processedCount: 2,
+      totalCount: 5,
+      batchSize: 2,
+      offset: 2,
+      nextOffset: 4,
+      hasMore: true,
+      generatedCount: 2,
+      skippedCount: 0,
+      failedCount: 0,
+      scope: { region: 'IN', assetType: 'STOCK' },
+    });
+    expect(result.directionCountsGenerated).toEqual({ BULLISH: 1, NEUTRAL: 1, BEARISH: 0 });
+  });
+
+  it('marks the last bounded batch as complete', async () => {
+    const marketDataService = {
+      listInstruments: jest.fn().mockResolvedValue({
+        instruments: [{ id: 'stock-5' }],
+        pagination: { total: 5 },
+      }),
+    };
+    const service = new SignalGenerationEngineService({} as any, marketDataService as any, {} as any);
+    jest.spyOn(service, 'generateForInstrument').mockResolvedValue(null);
+
+    const result = await service.run({ batchSize: 2, offset: 4, region: 'IN', assetType: 'STOCK' });
+
+    expect(result.processedCount).toBe(1);
+    expect(result.nextOffset).toBeNull();
+    expect(result.hasMore).toBe(false);
+    expect(result.skippedCount).toBe(1);
+  });
+
+  it('continues a batch when one instrument fails', async () => {
+    const marketDataService = {
+      listInstruments: jest.fn().mockResolvedValue({
+        instruments: [{ id: 'ok' }, { id: 'bad' }],
+        pagination: { total: 2 },
+      }),
+    };
+    const service = new SignalGenerationEngineService({} as any, marketDataService as any, {} as any);
+    jest.spyOn(service, 'generateForInstrument').mockImplementation(async (instrumentId) => {
+      if (instrumentId === 'bad') throw new Error('missing prices');
+      return {
+        instrument_id: 'ok',
+        symbol: 'OK',
+        company_name: null,
+        sector: null,
+        country: 'IN',
+        currentPrice: null,
+        previousClose: null,
+        dailyChange: null,
+        dailyChangePercent: null,
+        currency: null,
+        priceTimestamp: null,
+        score: 75,
+        direction: 'BULLISH',
+        confidence: 'LOW',
+        triggered_signals: [],
+        negative_signals: [],
+        explanation: 'Bullish.',
+        generated_at: new Date().toISOString(),
+        source: 'signal-generation-engine',
+        data_status: 'PARTIAL',
+      } as any;
+    });
+
+    const result = await service.run({ batchSize: 2, offset: 0, region: 'IN', assetType: 'STOCK' });
+
+    expect(result.generatedCount).toBe(1);
+    expect(result.failedCount).toBe(1);
+    expect(result.errors[0]).toContain('bad: missing prices');
+  });
+
   it('adds Strategy Framework matches when requested', async () => {
     const repository = {
       latestSignals: jest.fn().mockResolvedValue({

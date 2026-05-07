@@ -102,9 +102,10 @@ type SignalTableProps = {
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
   onSortChange: (sortBy: string, direction: SortDirection) => void;
+  emptyMessage?: string;
 };
 
-export function SignalTable({ signals, totalCount, loading, page, pageSize, sortBy, sortDirection, onPageChange, onPageSizeChange, onSortChange }: SignalTableProps) {
+export function SignalTable({ signals, totalCount, loading, page, pageSize, sortBy, sortDirection, onPageChange, onPageSizeChange, onSortChange, emptyMessage }: SignalTableProps) {
   const navigate = useNavigate();
   const [portfolioSignal, setPortfolioSignal] = React.useState<SignalResult | null>(null);
   const [watchlistSignal, setWatchlistSignal] = React.useState<SignalResult | null>(null);
@@ -242,7 +243,7 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
         rows={signals}
         getRowId={(signal) => signal.id || `${signal.instrument_id}-${signal.generated_at}`}
         loading={loading}
-        emptyMessage="No signals match this view."
+        emptyMessage={emptyMessage || 'No signals match this view.'}
         page={page}
         pageSize={pageSize}
         totalCount={totalCount ?? signals.length}
