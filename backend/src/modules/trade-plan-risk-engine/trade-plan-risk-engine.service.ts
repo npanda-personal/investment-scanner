@@ -1,6 +1,7 @@
 import { TradePlanRiskEngineRepository } from './trade-plan-risk-engine.repository';
-import type { GenerateTradePlanRequest, TradePlanResultDto, TradePlanModelRules, EntryZone, StopLoss, Target, BatchGenerateTradePlanRequest, BatchGenerateTradePlanResponse, TradePlanListQuery, Quality, PaperReadinessInput, PaperReadinessStatus, BacktestSummarySnapshot, DataQualitySnapshot, MarketDataSnapshot, StrategyDecisionSnapshot, StrategyProofSnapshot, BatchGenerateFailure } from './trade-plan-risk-engine.types';
+import type { GenerateTradePlanRequest, TradePlanResultDto, TradePlanModelRules, EntryZone, StopLoss, Target, BatchGenerateTradePlanRequest, BatchGenerateTradePlanResponse, TradePlanListQuery, Quality, PaperReadinessInput, PaperReadinessStatus, BacktestSummarySnapshot, DataQualitySnapshot, MarketDataSnapshot, StrategyDecisionSnapshot, StrategyProofSnapshot, BatchGenerateFailure, TradePlanFunnelQuery } from './trade-plan-risk-engine.types';
 import { StrategyDecisionEngineService } from '../strategy-decision-engine';
+import { SignalGenerationEngineService } from '../signal-generation-engine';
 import { MarketDataFoundationService } from '../market-data-foundation/market-data-foundation.service';
 import { PortfolioManagementService } from '../portfolio-management';
 import { DataQualityEngineService } from '../data-quality-engine';
@@ -9,6 +10,7 @@ import { StrategyFrameworkService } from '../strategy-framework';
 export class TradePlanRiskEngineService {
   private repository = new TradePlanRiskEngineRepository();
   private strategyDecisionService = new StrategyDecisionEngineService();
+  private signalService = new SignalGenerationEngineService();
   private marketDataService = new MarketDataFoundationService();
   private portfolioService = new PortfolioManagementService();
   private dataQualityService = new DataQualityEngineService();
@@ -610,7 +612,7 @@ export class TradePlanRiskEngineService {
 
   async batchGenerate(request: BatchGenerateTradePlanRequest): Promise<BatchGenerateTradePlanResponse> {
     const { batchSize = 25, offset = 0, region, assetType } = request;
-    const query = { limit: batchSize, offset, region, assetType, decision: 'TRADE_CANDIDATE' };
+    const query = { limit: batchSize, offset, region, assetType, strategy: request.strategyCode, decision: 'TRADE_CANDIDATE' };
     const candidates = await this.strategyDecisionService.candidates(query as any);
     
     const plans: TradePlanResultDto[] = [];
@@ -662,12 +664,21 @@ export class TradePlanRiskEngineService {
 
     const totalCount = candidates.total ?? candidates.results.length;
     const nextOffset = offset + batchSize < totalCount ? offset + batchSize : null;
+    const paperReadinessSummary = this.countBy(plans, (plan) => plan.paperReadinessStatus || 'UNCLASSIFIED');
+    const topBlockers = this.topCounts(plans.flatMap((plan) => this.paperBlockerCategories(plan)));
 
     return {
       count: plans.length,
       generatedCount,
       failedCount,
       candidateCount: candidates.results.length,
+      rawCandidateCount: candidates.total ?? candidates.results.length,
+      eligibleCandidateCount: candidates.results.length,
+      skippedCount: 0,
+      skipReasonCounts: {},
+      paperReadinessSummary,
+      topBlockers,
+      backtestTimeframe: request.backtestTimeframe || null,
       totalCount,
       batchSize,
       offset,
@@ -678,12 +689,199 @@ export class TradePlanRiskEngineService {
     };
   }
 
+  async funnelDiagnostics(query: TradePlanFunnelQuery) {
+    const region = query.region || 'IN';
+    const assetType = query.assetType || 'STOCK';
+    const scopeQuery = { ...query, region, assetType };
+    const [rawSignals, decisionsResult, plans] = await Promise.all([
+      this.signalService.funnelDiagnostics(scopeQuery),
+      this.strategyDecisionService.funnelDiagnostics(scopeQuery),
+      this.repository.funnelPlans(scopeQuery),
+    ]);
+    const decisions = decisionsResult.results;
+    const decisionCounts = this.countBy(decisions, (decision: any) => decision.decision || 'UNKNOWN');
+    const byStrategy = this.topCounts(decisions.map((decision: any) => decision.strategy || 'UNKNOWN'));
+    const frameworkBacked = decisions.filter((decision: any) => Boolean(decision.frameworkBacked)).length;
+    const eligibleDecisions = decisions.filter((decision: any) => this.isEligibleForEntryPlan(decision));
+    const skipReasons = decisions.flatMap((decision: any) => this.planDiscoverySkipReasons(decision));
+    const skipReasonCounts = this.topCounts(skipReasons).reduce<Record<string, number>>((acc, item) => {
+      acc[item.reason] = item.count;
+      return acc;
+    }, {});
+    const planStatusCounts = this.countBy(plans, (plan) => plan.planStatus);
+    const riskCounts = this.countBy(plans, (plan) => plan.riskGrade);
+    const paperCounts = this.countBy(plans, (plan) => plan.paperReadinessStatus || 'UNCLASSIFIED');
+    const blockerCounts = this.topCounts(plans.flatMap((plan) => this.paperBlockerCategories(plan)));
+    const reasonCounts = this.topCounts(plans.flatMap((plan) => plan.paperReadinessReasons || []));
+    const timeframeCounts = this.topCounts(plans.map((plan) => plan.backtestTimeframe || 'MISSING'));
+    const recommendations = this.buildFunnelRecommendations(plans, blockerCounts, timeframeCounts);
+
+    return {
+      region,
+      assetType,
+      generatedAt: new Date().toISOString(),
+      rawSignals: {
+        total: rawSignals.total,
+        bullish: rawSignals.bullish,
+        bearish: rawSignals.bearish,
+        neutral: rawSignals.neutral,
+        byDirection: rawSignals.byDirection,
+      },
+      strategyMatches: {
+        totalWithMatch: decisions.filter((decision: any) => Boolean(decision.frameworkBacked)).length,
+        totalWithoutMatch: Math.max(0, rawSignals.total - frameworkBacked),
+        byStrategy,
+      },
+      strategyDecisions: {
+        total: decisions.length,
+        tradeCandidates: (decisionCounts.TRADE_CANDIDATE || 0) + (decisionCounts.ENTRY_CANDIDATE || 0),
+        watch: decisionCounts.WATCH || 0,
+        avoid: decisionCounts.AVOID || 0,
+        exitCandidates: decisionCounts.EXIT_CANDIDATE || 0,
+        reduceRisk: decisionCounts.REDUCE_RISK || 0,
+        hold: decisionCounts.HOLD || 0,
+        insufficientData: decisionCounts.INSUFFICIENT_DATA || 0,
+        frameworkBacked,
+        notFrameworkBacked: decisions.length - frameworkBacked,
+      },
+      tradePlanCandidateDiscovery: {
+        discoveredCandidates: decisions.length,
+        eligibleForPlanGeneration: eligibleDecisions.length,
+        skippedBeforeGeneration: skipReasons.length,
+        skipReasonCounts,
+        skipReasons: this.topCounts(skipReasons),
+      },
+      generatedPlans: {
+        total: plans.length,
+        valid: planStatusCounts.VALID || 0,
+        watch: planStatusCounts.WATCH || 0,
+        blocked: planStatusCounts.BLOCKED || 0,
+        insufficientData: planStatusCounts.INSUFFICIENT_DATA || 0,
+        byStrategy: this.topCounts(plans.map((plan) => plan.strategy || 'UNKNOWN')),
+        byRiskGrade: this.toCountItems(riskCounts),
+        byPlanStatus: this.toCountItems(planStatusCounts),
+      },
+      paperReadiness: {
+        readyForPaperReview: paperCounts.READY_FOR_PAPER_REVIEW || 0,
+        watchOnly: paperCounts.WATCH_ONLY || 0,
+        blocked: paperCounts.BLOCKED || 0,
+        insufficientData: paperCounts.INSUFFICIENT_DATA || 0,
+        blockerCounts,
+        topBlockers: blockerCounts.slice(0, 5),
+        reasonCounts,
+      },
+      proof: {
+        byBacktestTimeframe: timeframeCounts,
+        byStrategyRating: this.topCounts(plans.map((plan) => plan.strategyRating || 'UNPROVEN')),
+        missingBacktestSummaryCount: plans.filter((plan) => !plan.backtestSummary).length,
+        weakOrUnprovenRatingCount: plans.filter((plan) => ['WEAK', 'UNPROVEN', 'POOR'].includes(String(plan.strategyRating || 'UNPROVEN'))).length,
+      },
+      dataQuality: {
+        missingSnapshotCount: plans.filter((plan) => !plan.dataQualitySnapshot || plan.dataQualitySnapshot.status === 'MISSING').length,
+        unusableCount: plans.filter((plan) => plan.dataQualitySnapshot?.coverageStatus === 'UNUSABLE').length,
+        illiquidCount: plans.filter((plan) => plan.dataQualitySnapshot?.liquidityStatus === 'ILLIQUID').length,
+        unknownLiquidityCount: plans.filter((plan) => plan.dataQualitySnapshot?.liquidityStatus === 'UNKNOWN').length,
+      },
+      recommendations,
+    };
+  }
+
   async latestForInstrument(instrumentId: string, strategy?: string, portfolioId?: string) {
      return this.repository.latestForInstrument(instrumentId, strategy, portfolioId);
   }
 
   async list(query: TradePlanListQuery) {
      return this.repository.list(query);
+  }
+
+  private isEligibleForEntryPlan(decision: any) {
+    return ['TRADE_CANDIDATE', 'ENTRY_CANDIDATE'].includes(String(decision.decision || ''))
+      && decision.strategy !== 'DEFENSIVE_EXIT'
+      && decision.instrumentId
+      && decision.symbol;
+  }
+
+  private planDiscoverySkipReasons(decision: any): string[] {
+    const reasons: string[] = [];
+    const decisionValue = String(decision.decision || 'UNKNOWN');
+    if (!['TRADE_CANDIDATE', 'ENTRY_CANDIDATE'].includes(decisionValue)) {
+      if (decisionValue === 'WATCH') reasons.push('WATCH decisions are not batch-generated unless explicitly allowed.');
+      else if (['EXIT_CANDIDATE', 'REDUCE_RISK', 'HOLD'].includes(decisionValue)) reasons.push('Exit or risk-reduction decisions are excluded from long entry plans.');
+      else reasons.push(`Decision ${decisionValue} is not eligible for long entry plans.`);
+    }
+    if (decision.strategy === 'DEFENSIVE_EXIT') reasons.push('Defensive exit strategy is excluded from long entry plan generation.');
+    if (!decision.instrumentId) reasons.push('Strategy Decision is missing instrumentId.');
+    if (!decision.symbol) reasons.push('Strategy Decision is missing symbol.');
+    return reasons;
+  }
+
+  private paperBlockerCategories(plan: TradePlanResultDto): string[] {
+    const categories = new Set<string>();
+    for (const blocker of plan.paperReadinessBlockers || []) {
+      const text = blocker.toLowerCase();
+      if (text.includes('strategy rating is weak')) categories.add('WEAK strategy rating');
+      else if (text.includes('strategy rating is unproven')) categories.add('UNPROVEN strategy rating');
+      else if (text.includes('backtest summary is missing')) categories.add('missing backtest summary');
+      else if (text.includes('data quality snapshot is missing')) categories.add('missing data quality snapshot');
+      else if (text.includes('market gate is closed')) categories.add('market gate closed');
+      else if (text.includes('plan status is')) categories.add('plan status not valid');
+      else if (text.includes('risk grade is high')) categories.add('risk grade HIGH');
+      else if (text.includes('reward/risk ratio')) categories.add('reward/risk below threshold');
+      else if (text.includes('latest price is missing')) categories.add('missing latest price');
+      else if (text.includes('stale price')) categories.add('stale latest price');
+      else if (text.includes('price history is insufficient')) categories.add('insufficient price history');
+      else if (text.includes('strategy decision proof is missing')) categories.add('missing strategy decision proof');
+      else if (text.includes('framework-backed proof is missing')) categories.add('not framework-backed');
+      else categories.add(blocker);
+    }
+    if (['WEAK', 'UNPROVEN', 'POOR'].includes(String(plan.strategyRating || ''))) categories.add(`${plan.strategyRating} strategy rating`);
+    if (plan.riskGrade === 'HIGH') categories.add('risk grade HIGH');
+    if (plan.planStatus !== 'VALID') categories.add('plan status not valid');
+    if (!plan.backtestSummary) categories.add('missing backtest summary');
+    if (!plan.dataQualitySnapshot || plan.dataQualitySnapshot.status === 'MISSING') categories.add('missing data quality snapshot');
+    if (plan.dataQualitySnapshot?.liquidityStatus === 'ILLIQUID') categories.add('liquidity is ILLIQUID');
+    if (plan.dataQualitySnapshot?.liquidityStatus === 'UNKNOWN') categories.add('liquidity is UNKNOWN');
+    if (plan.backtestTimeframe === '10Y') categories.add('using 10Y proof timeframe');
+    return Array.from(categories);
+  }
+
+  private buildFunnelRecommendations(plans: TradePlanResultDto[], blockers: Array<{ reason: string; count: number }>, timeframes: Array<{ reason: string; count: number }>) {
+    const recommendations: string[] = [];
+    if (plans.length > 0 && plans.every((plan) => plan.paperReadinessStatus !== 'READY_FOR_PAPER_REVIEW')) {
+      recommendations.push('No action required if weak proof and high risk dominate; rules are correctly blocking weak candidates.');
+    }
+    if (blockers.some((item) => item.reason.includes('WEAK strategy rating') || item.reason.includes('UNPROVEN strategy rating'))) {
+      recommendations.push('Review weak or unproven Strategy Framework ratings before considering paper review.');
+    }
+    if (blockers.some((item) => item.reason === 'missing backtest summary')) {
+      recommendations.push('Run backtests for strategies with missing proof summaries.');
+    }
+    if (timeframes.some((item) => item.reason === '10Y')) {
+      recommendations.push('Current plans use 10Y proof. Consider regenerating with 3Y or 5Y if 10Y history is insufficient.');
+    }
+    if (blockers.some((item) => item.reason === 'missing data quality snapshot')) {
+      recommendations.push('Run Data Quality Engine evaluations for plans with missing data quality snapshots.');
+    }
+    return recommendations;
+  }
+
+  private countBy<T>(items: T[], keyFn: (item: T) => string): Record<string, number> {
+    return items.reduce<Record<string, number>>((acc, item) => {
+      const key = keyFn(item) || 'UNKNOWN';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+  }
+
+  private topCounts(items: string[]): Array<{ reason: string; count: number }> {
+    return this.toCountItems(this.countBy(items, (item) => item || 'UNKNOWN'));
+  }
+
+  private toCountItems(counts: Record<string, number>): Array<{ reason: string; count: number }> {
+    return Object.entries(counts)
+      .map(([reason, count]) => ({ reason, key: reason, count }))
+      .sort((a, b) => b.count - a.count)
+      .map(({ reason, count }) => ({ reason, count }));
   }
 
   async getHealthStats() {

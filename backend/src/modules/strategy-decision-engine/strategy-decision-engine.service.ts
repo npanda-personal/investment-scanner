@@ -186,6 +186,10 @@ export class StrategyDecisionEngineService {
     return this.repository.candidates(query);
   }
 
+  async funnelDiagnostics(query: { region?: string; assetType?: string; strategyCode?: string; generatedDate?: string; from?: string; to?: string }) {
+    return this.repository.funnelDiagnostics(query);
+  }
+
   async exits(portfolioId?: string, region?: string) {
     return this.repository.exits(portfolioId, region);
   }

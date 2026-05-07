@@ -126,13 +126,74 @@ Generated plans are idempotent per UTC generated date using:
 ## API Endpoints
 - `GET /api/v1/trade-plans/health`
 - `GET /api/v1/trade-plans/model` (Includes model rules, paper readiness criteria, thresholds, and safety constraints)
+- `GET /api/v1/trade-plans/funnel` (Explains Raw Signals -> Strategy Decisions -> eligible plan candidates -> generated plans -> paper readiness for `region`, `assetType`, optional `strategyCode`, `generatedDate`, `from`, `to`, and `backtestTimeframe`)
 - `GET /api/v1/trade-plans/candidates` (Supports `region`, `assetType`, `strategyCode`, `planStatus`, `riskGrade`, `minRewardRisk`, `paperReadyOnly`, `paperReadinessStatus`, `backtestTimeframe`, `strategyRating`, `readinessLabel`, `portfolioId`, `limit`, `offset`, `sortBy`, `sortDirection`)
 - `GET /api/v1/trade-plans/:instrumentId`
 - `POST /api/v1/trade-plans/generate`
-- `POST /api/v1/trade-plans/generate/batch` (Uses bounded backend worker concurrency within each request and returns `candidateCount`, `totalCount`, `nextOffset`, `hasMore`, and per-candidate `failures` for frontend multi-batch orchestration)
+- `POST /api/v1/trade-plans/generate/batch` (Uses bounded backend worker concurrency within each request and returns `candidateCount`, `rawCandidateCount`, `eligibleCandidateCount`, `generatedCount`, `skippedCount`, `paperReadinessSummary`, `topBlockers`, `totalCount`, `nextOffset`, `hasMore`, and per-candidate `failures` for frontend multi-batch orchestration)
+
+## Generation Funnel Diagnostics
+
+Trade Plan counts are expected to differ from Signal counts. Raw bullish or bearish signals are context only; batch Trade Plan generation does not generate plans directly from raw signals. The generation path is:
+
+`Raw Signals -> Strategy Framework matches/context -> Strategy Decisions -> eligible entry candidates -> generated Trade Plans -> readiness classification -> Paper Ready`
+
+The funnel endpoint returns:
+
+- Raw signal counts by direction for the selected `region` and `assetType`.
+- Strategy Decision counts by decision status, framework-backed status, and strategy.
+- Candidate discovery counts, including skipped candidates and skip reasons before generation.
+- Generated plan counts by plan status, risk grade, strategy, and paper readiness.
+- Paper readiness blocker/reason aggregation from persisted plan snapshots.
+- Proof diagnostics by backtest timeframe and strategy rating.
+- Data quality diagnostics for missing snapshots, unusable coverage, illiquidity, and unknown liquidity.
+- Recommendations that explain whether caution is expected or data/proof should be regenerated.
+
+Eligible long entry plan decisions:
+
+- `TRADE_CANDIDATE`
+- `ENTRY_CANDIDATE`
+
+`WATCH` decisions are excluded from batch generation unless a future request explicitly enables watch-plan generation. They may still produce a `WATCH` plan when an explicit instrument/strategy generation request is made and the service determines the setup is reviewable but cautious.
+
+Not eligible for long entry plan batch generation:
+
+- `AVOID`
+- `EXIT_CANDIDATE`
+- `REDUCE_RISK`
+- `HOLD`
+- `INSUFFICIENT_DATA`
+- `DEFENSIVE_EXIT` strategy decisions
+
+Exit candidates may later receive a separate exit-review plan flow, but they are not mixed into long entry plan generation.
+
+Common paper readiness blocker categories include:
+
+- Weak or unproven strategy rating
+- Missing backtest summary
+- Missing data quality snapshot
+- Market gate closed
+- Plan status not valid
+- Risk grade HIGH
+- Reward/risk below threshold
+- Missing or stale latest price
+- Insufficient price history
+- Missing Strategy Decision proof
+- Not framework-backed
+- Illiquid or unknown liquidity
+
+Proof timeframe behavior:
+
+- `backtestTimeframe` may be supplied to `POST /generate` and `POST /generate/batch`.
+- Supported values are currently `1Y`, `3Y`, `5Y`, `10Y`, and `15Y` by convention.
+- Existing persisted plans are not changed automatically when a new timeframe is selected.
+- The funnel endpoint reports how many plans use each timeframe and recommends trying `3Y` or `5Y` when current plans are dominated by `10Y` proof and history is insufficient.
+- Default behavior remains the existing service behavior when no timeframe is supplied.
 
 ## Integration
 - **Frontend Dashboard:** Available at `/trade-plans`. Integrates with the shared `DataTable` to provide pagination and sorting (e.g., on the Status and Risk Grade columns). Batch generation starts with one discovery batch, then runs remaining offsets with a small frontend worker pool.
+- **Frontend Funnel Panel:** Shows raw bullish signals, Strategy Decision count, eligible plan candidates, generated plans, paper-ready count, blocked/watch/insufficient count, top blockers, skipped candidate reasons, recommendations, and a zero-paper-ready explanation.
+- **Batch Proof Selector:** The dashboard can send `backtestTimeframe` (`1Y`, `3Y`, `5Y`, `10Y`, `15Y`) during batch generation and includes the selected proof timeframe in completion messaging.
 - Can be triggered manually via `/api/v1/trade-plans/generate`.
 - Reads `StrategyDecisionResult` from the database.
 - Consumes `MarketDataFoundation` for the latest price and historical SMA approximation.
@@ -142,7 +203,8 @@ Generated plans are idempotent per UTC generated date using:
 ## Verification
 - Prisma Client: `npx prisma generate` from `backend`
 - Backend build: `npm run build` from `backend`
-- Backend focused tests: `npm test -- --runTestsByPath tests/trade-plan-risk-engine.paper-readiness.test.ts` from `backend`
+- Backend focused tests: `npm test -- --runInBand --runTestsByPath tests/modules/trade-plan-risk-engine/trade-plan-risk-engine.service.test.ts tests/modules/trade-plan-risk-engine/trade-plan-risk-engine.repository.test.ts` from `backend`
+- Backend scope helper tests: `npm test -- --runInBand --runTestsByPath tests/modules/signal-generation-engine/signal-generation-engine.repository.test.ts tests/modules/strategy-decision-engine/strategy-decision-engine.repository.test.ts` from `backend`
 - Frontend build: `npm run build` from `frontend`
 
 Known limitations:

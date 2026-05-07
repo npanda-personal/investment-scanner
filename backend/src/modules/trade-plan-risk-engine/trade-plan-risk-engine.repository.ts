@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import prisma from '../../db/prisma';
-import type { TradePlanResultDto, TradePlanListQuery } from './trade-plan-risk-engine.types';
+import type { TradePlanResultDto, TradePlanListQuery, TradePlanFunnelQuery } from './trade-plan-risk-engine.types';
 
 export class TradePlanRiskEngineRepository {
   private db = prisma;
@@ -117,19 +117,7 @@ export class TradePlanRiskEngineRepository {
   }
 
   async list(query: TradePlanListQuery): Promise<{ results: TradePlanResultDto[]; total: number }> {
-    const where: Prisma.TradePlanResultWhereInput = {};
-    if (query.region) where.region = query.region;
-    if (query.assetType) where.assetType = query.assetType;
-    if (query.strategyCode) where.strategy = query.strategyCode;
-    if (query.planStatus) where.planStatus = query.planStatus;
-    if (query.riskGrade) where.riskGrade = query.riskGrade;
-    if (query.paperReadyOnly) where.paperReadinessStatus = 'READY_FOR_PAPER_REVIEW';
-    if (query.paperReadinessStatus) where.paperReadinessStatus = query.paperReadinessStatus;
-    if (query.backtestTimeframe) where.backtestTimeframe = query.backtestTimeframe;
-    if (query.strategyRating) where.strategyRating = query.strategyRating;
-    if (query.readinessLabel) where.readinessLabel = query.readinessLabel;
-    if (query.portfolioId) where.portfolioId = query.portfolioId;
-    if (query.minRewardRisk !== undefined) where.rewardRiskRatio = { gte: query.minRewardRisk };
+    const where = this.buildListWhere(query);
 
     const sortBy = this.sortBy(query.sortBy);
 
@@ -142,6 +130,24 @@ export class TradePlanRiskEngineRepository {
     });
 
     return { results: records.map((r: any) => this.toDto(r)), total };
+  }
+
+  async funnelPlans(query: TradePlanFunnelQuery): Promise<TradePlanResultDto[]> {
+    const where = this.buildListWhere(query);
+    if (query.generatedDate) where.generatedDate = this.normalizeUtcDay(query.generatedDate);
+    if (query.from || query.to) {
+      where.generatedAt = {
+        gte: query.from ? new Date(query.from) : undefined,
+        lte: query.to ? new Date(query.to) : undefined,
+      };
+    }
+
+    const records = await this.db.tradePlanResult.findMany({
+      where,
+      orderBy: { generatedAt: 'desc' },
+      take: 5000,
+    });
+    return records.map((record: any) => this.toDto(record));
   }
 
   async getHealthStats() {
@@ -206,5 +212,28 @@ export class TradePlanRiskEngineRepository {
   private sortBy(value?: string) {
     const allowed = new Set(['generatedAt', 'rewardRiskRatio', 'riskGrade', 'planStatus', 'paperReadinessStatus', 'strategyRating']);
     return allowed.has(value || '') ? value! : 'generatedAt';
+  }
+
+  private buildListWhere(query: TradePlanListQuery | TradePlanFunnelQuery): Prisma.TradePlanResultWhereInput {
+    const where: Prisma.TradePlanResultWhereInput = {};
+    if (query.region) where.region = query.region;
+    if (query.assetType) where.assetType = query.assetType;
+    if (query.strategyCode) where.strategy = query.strategyCode;
+    if ('planStatus' in query && query.planStatus) where.planStatus = query.planStatus;
+    if ('riskGrade' in query && query.riskGrade) where.riskGrade = query.riskGrade;
+    if ('paperReadyOnly' in query && query.paperReadyOnly) where.paperReadinessStatus = 'READY_FOR_PAPER_REVIEW';
+    if ('paperReadinessStatus' in query && query.paperReadinessStatus) where.paperReadinessStatus = query.paperReadinessStatus;
+    if (query.backtestTimeframe) where.backtestTimeframe = query.backtestTimeframe;
+    if ('strategyRating' in query && query.strategyRating) where.strategyRating = query.strategyRating;
+    if ('readinessLabel' in query && query.readinessLabel) where.readinessLabel = query.readinessLabel;
+    if ('portfolioId' in query && query.portfolioId) where.portfolioId = query.portfolioId;
+    if ('minRewardRisk' in query && query.minRewardRisk !== undefined) where.rewardRiskRatio = { gte: query.minRewardRisk };
+    return where;
+  }
+
+  private normalizeUtcDay(value: string | Date): Date {
+    const date = value instanceof Date ? new Date(value) : new Date(value);
+    date.setUTCHours(0, 0, 0, 0);
+    return date;
   }
 }

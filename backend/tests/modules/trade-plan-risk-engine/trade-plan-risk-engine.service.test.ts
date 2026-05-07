@@ -3,12 +3,14 @@ import { StrategyDecisionEngineService } from '../../../src/modules/strategy-dec
 import { MarketDataFoundationService } from '../../../src/modules/market-data-foundation/market-data-foundation.service';
 import { PortfolioManagementService } from '../../../src/modules/portfolio-management';
 import { TradePlanRiskEngineRepository } from '../../../src/modules/trade-plan-risk-engine/trade-plan-risk-engine.repository';
+import { SignalGenerationEngineService } from '../../../src/modules/signal-generation-engine';
 
 // Mock dependencies
 jest.mock('../../../src/modules/strategy-decision-engine');
 jest.mock('../../../src/modules/market-data-foundation/market-data-foundation.service');
 jest.mock('../../../src/modules/portfolio-management');
 jest.mock('../../../src/modules/trade-plan-risk-engine/trade-plan-risk-engine.repository');
+jest.mock('../../../src/modules/signal-generation-engine');
 
 describe('TradePlanRiskEngineService', () => {
   let service: TradePlanRiskEngineService;
@@ -17,6 +19,7 @@ describe('TradePlanRiskEngineService', () => {
   let mockMarketDataService: jest.Mocked<MarketDataFoundationService>;
   let mockPortfolioService: jest.Mocked<PortfolioManagementService>;
   let mockRepository: jest.Mocked<TradePlanRiskEngineRepository>;
+  let mockSignalService: jest.Mocked<SignalGenerationEngineService>;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -25,6 +28,7 @@ describe('TradePlanRiskEngineService', () => {
     mockMarketDataService = new MarketDataFoundationService() as any;
     mockPortfolioService = new PortfolioManagementService() as any;
     mockRepository = new TradePlanRiskEngineRepository() as any;
+    mockSignalService = new SignalGenerationEngineService() as any;
 
     service = new TradePlanRiskEngineService();
     // Inject mocks
@@ -32,6 +36,7 @@ describe('TradePlanRiskEngineService', () => {
     (service as any).marketDataService = mockMarketDataService;
     (service as any).portfolioService = mockPortfolioService;
     (service as any).repository = mockRepository;
+    (service as any).signalService = mockSignalService;
     (service as any).dataQualityService = {
       diagnostics: jest.fn().mockResolvedValue({
         coverageStatus: 'GOOD',
@@ -398,6 +403,91 @@ describe('TradePlanRiskEngineService', () => {
           reason: 'Scoped upsert failed',
         },
       ]);
+    });
+
+    it('returns candidate discovery and paper readiness diagnostics', async () => {
+      mockStrategyService.candidates.mockResolvedValue({
+        results: [
+          { id: 'dec-1', instrumentId: 'INST-1', symbol: 'TEST1' },
+        ],
+        total: 1,
+      } as any);
+
+      jest.spyOn(service, 'generatePlan').mockResolvedValue({
+        symbol: 'TEST1',
+        paperReadinessStatus: 'WATCH_ONLY',
+        paperReadinessBlockers: ['Strategy rating is WEAK.', 'Risk grade is HIGH; LOW or MEDIUM is required.'],
+        strategyRating: 'WEAK',
+        riskGrade: 'HIGH',
+        planStatus: 'WATCH',
+      } as any);
+
+      const res = await service.batchGenerate({ batchSize: 25, offset: 0, region: 'IN', assetType: 'STOCK', backtestTimeframe: '10Y' });
+
+      expect(res.rawCandidateCount).toBe(1);
+      expect(res.eligibleCandidateCount).toBe(1);
+      expect(res.paperReadinessSummary?.WATCH_ONLY).toBe(1);
+      expect(res.topBlockers).toEqual(expect.arrayContaining([
+        { reason: 'WEAK strategy rating', count: 1 },
+        { reason: 'risk grade HIGH', count: 1 },
+      ]));
+      expect(res.backtestTimeframe).toBe('10Y');
+    });
+  });
+
+  describe('funnelDiagnostics', () => {
+    it('explains signals, decisions, generated plans, paper blockers, and scope', async () => {
+      mockSignalService.funnelDiagnostics.mockResolvedValue({
+        total: 3,
+        bullish: 2,
+        bearish: 1,
+        neutral: 0,
+        byDirection: { BULLISH: 2, BEARISH: 1 },
+      } as any);
+      mockStrategyService.funnelDiagnostics.mockResolvedValue({
+        results: [
+          { id: 'dec-1', instrumentId: 'INST-1', symbol: 'TEST1', strategy: 'TREND_MOMENTUM', decision: 'TRADE_CANDIDATE', frameworkBacked: true },
+          { id: 'dec-2', instrumentId: 'INST-2', symbol: 'TEST2', strategy: 'TREND_MOMENTUM', decision: 'WATCH', frameworkBacked: true },
+          { id: 'dec-3', instrumentId: 'INST-3', symbol: 'TEST3', strategy: 'DEFENSIVE_EXIT', decision: 'EXIT_CANDIDATE', frameworkBacked: false },
+        ],
+        total: 3,
+      } as any);
+      (mockRepository as any).funnelPlans.mockResolvedValue([
+        {
+          strategy: 'TREND_MOMENTUM',
+          planStatus: 'WATCH',
+          riskGrade: 'HIGH',
+          paperReadinessStatus: 'WATCH_ONLY',
+          paperReadinessBlockers: ['Strategy rating is WEAK.', 'Risk grade is HIGH; LOW or MEDIUM is required.'],
+          paperReadinessReasons: [],
+          strategyRating: 'WEAK',
+          backtestTimeframe: '10Y',
+          backtestSummary: { timeframe: '10Y' },
+          dataQualitySnapshot: { status: 'AVAILABLE', liquidityStatus: 'UNKNOWN' },
+        },
+      ]);
+
+      const result = await service.funnelDiagnostics({ region: 'IN', assetType: 'STOCK' });
+
+      expect(mockSignalService.funnelDiagnostics).toHaveBeenCalledWith(expect.objectContaining({ region: 'IN', assetType: 'STOCK' }));
+      expect(mockStrategyService.funnelDiagnostics).toHaveBeenCalledWith(expect.objectContaining({ region: 'IN', assetType: 'STOCK' }));
+      expect(result.rawSignals.bullish).toBe(2);
+      expect(result.strategyDecisions.tradeCandidates).toBe(1);
+      expect(result.tradePlanCandidateDiscovery.eligibleForPlanGeneration).toBe(1);
+      expect(result.tradePlanCandidateDiscovery.skipReasonCounts).toEqual(expect.objectContaining({
+        'WATCH decisions are not batch-generated unless explicitly allowed.': 1,
+        'Exit or risk-reduction decisions are excluded from long entry plans.': 1,
+      }));
+      expect(result.generatedPlans.total).toBe(1);
+      expect(result.paperReadiness.watchOnly).toBe(1);
+      expect(result.paperReadiness.blockerCounts).toEqual(expect.arrayContaining([
+        { reason: 'WEAK strategy rating', count: 1 },
+        { reason: 'risk grade HIGH', count: 1 },
+        { reason: 'using 10Y proof timeframe', count: 1 },
+      ]));
+      expect(result.proof.byBacktestTimeframe).toEqual([{ reason: '10Y', count: 1 }]);
+      expect(result.dataQuality.unknownLiquidityCount).toBe(1);
+      expect(result.recommendations).toContain('Current plans use 10Y proof. Consider regenerating with 3Y or 5Y if 10Y history is insufficient.');
     });
   });
 });

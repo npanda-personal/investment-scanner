@@ -192,6 +192,13 @@ export interface BatchGenerateTradePlanResponse {
   generatedCount: number;
   failedCount: number;
   candidateCount: number;
+  rawCandidateCount?: number;
+  eligibleCandidateCount?: number;
+  skippedCount?: number;
+  skipReasonCounts?: Record<string, number>;
+  paperReadinessSummary?: Record<string, number>;
+  topBlockers?: Array<{ reason: string; count: number }>;
+  backtestTimeframe?: string | null;
   totalCount: number;
   batchSize: number;
   offset: number;
@@ -199,6 +206,21 @@ export interface BatchGenerateTradePlanResponse {
   hasMore: boolean;
   plans: TradePlanResultDto[];
   failures: BatchGenerateFailure[];
+}
+
+export interface TradePlanFunnelQuery {
+  region?: string;
+  assetType?: string;
+  strategyCode?: string;
+  generatedDate?: string;
+  from?: string;
+  to?: string;
+  backtestTimeframe?: string;
+}
+
+export interface CountItem {
+  key: string;
+  count: number;
 }
 
 export interface TradePlanListQuery {

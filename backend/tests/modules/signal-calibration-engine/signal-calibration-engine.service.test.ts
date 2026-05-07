@@ -28,6 +28,15 @@ const context = (overrides: Partial<CalibrationContext> = {}): CalibrationContex
   dataQuality: { hasLatestPrice: true, priceHistoryDays: 260, hasFundamentals: true },
   noisyIssueTypes: [],
   dataGaps: [],
+  horizon: '20D',
+  horizonAvailability: {
+    '1D': { eligible: 220, evaluated: 220, insufficientFuturePrice: 0 },
+    '5D': { eligible: 220, evaluated: 220, insufficientFuturePrice: 0 },
+    '10D': { eligible: 220, evaluated: 220, insufficientFuturePrice: 0 },
+    '20D': { eligible: 220, evaluated: 220, insufficientFuturePrice: 0 },
+    '60D': { eligible: 220, evaluated: 220, insufficientFuturePrice: 0 },
+  },
+  evaluationDiagnostics: { evaluatedSignals: 220 },
   ...overrides,
 });
 
@@ -35,6 +44,7 @@ function service(overrides: Record<string, any> = {}) {
   const repository = {
     create: jest.fn(async (result) => ({ ...result, id: 'calibration-1' })),
     latestForInstrument: jest.fn().mockResolvedValue(null),
+    instrumentInScope: jest.fn().mockResolvedValue({ id: 'stock-1', region: 'US', exchange: 'NASDAQ', assetType: 'STOCK' }),
     top: jest.fn().mockResolvedValue([]),
     count: jest.fn().mockResolvedValue({ total: 0, latestGeneratedAt: null }),
     ...overrides.repository,
@@ -52,6 +62,17 @@ function service(overrides: Record<string, any> = {}) {
     byScoreBucket: jest.fn().mockResolvedValue([{ group: '70-84', winRate: 0.62, averageForwardReturn: 0.03, sampleSize: 25 }]),
     bySector: jest.fn().mockResolvedValue([{ group: 'Technology', winRate: 0.61, averageForwardReturn: 0.02, sampleSize: 20 }]),
     noisy: jest.fn().mockResolvedValue([]),
+    summary: jest.fn().mockResolvedValue({
+      dataStatus: 'PARTIAL',
+      evaluationDiagnostics: { evaluatedSignals: 220 },
+      horizonAvailability: {
+        '1D': { eligible: 220, evaluated: 220, insufficientFuturePrice: 0 },
+        '5D': { eligible: 220, evaluated: 220, insufficientFuturePrice: 0 },
+        '10D': { eligible: 220, evaluated: 220, insufficientFuturePrice: 0 },
+        '20D': { eligible: 220, evaluated: 220, insufficientFuturePrice: 0 },
+        '60D': { eligible: 220, evaluated: 220, insufficientFuturePrice: 0 },
+      },
+    }),
     ...overrides.qualityService,
   };
   const contextService = {
@@ -64,10 +85,15 @@ function service(overrides: Record<string, any> = {}) {
     }),
     ...overrides.contextService,
   };
+  const dataQualityService = {
+    getLatestEvaluationForInstrument: jest.fn().mockResolvedValue(null),
+    ...overrides.dataQualityService,
+  };
   return {
     repository,
     signalService,
-    instance: new SignalCalibrationEngineService(repository as any, signalService as any, qualityService as any, contextService as any),
+    qualityService,
+    instance: new SignalCalibrationEngineService(repository as any, signalService as any, qualityService as any, contextService as any, dataQualityService as any),
   };
 }
 
@@ -136,11 +162,64 @@ describe('signal calibration engine service', () => {
     const comparison = await setup.instance.compare('stock-1');
     expect(comparison?.rawSignal.symbol).toBe('AAPL');
     expect(comparison?.calibratedSignal.symbol).toBe('AAPL');
+    expect(setup.qualityService.summary).toHaveBeenCalledWith(expect.objectContaining({ horizon: '20D' }));
   });
 
   it('returns model and health metadata', async () => {
-    expect(service().instance.model()).toMatchObject({ calibrationModelVersion: 'signal-calibration-v1', totalDeltaCap: 25 });
+    expect(service().instance.model()).toMatchObject({ calibrationModelVersion: 'signal-calibration-v2', totalDeltaCap: 25, minOverallSamples: 50, minGroupSamples: 20 });
     await expect(service().instance.health()).resolves.toMatchObject({ module: 'signal-calibration-engine', dataStatus: 'MISSING' });
+  });
+
+  it('marks 5D with zero evaluated samples as insufficient and skips adjustments', () => {
+    const result = service().instance.calibrate(rawSignal(), context({
+      horizon: '5D',
+      horizonAvailability: {
+        '1D': { eligible: 150, evaluated: 27, insufficientFuturePrice: 123 },
+        '5D': { eligible: 150, evaluated: 0, insufficientFuturePrice: 150 },
+        '10D': { eligible: 150, evaluated: 0, insufficientFuturePrice: 150 },
+        '20D': { eligible: 150, evaluated: 0, insufficientFuturePrice: 150 },
+        '60D': { eligible: 150, evaluated: 0, insufficientFuturePrice: 150 },
+      },
+      evaluationDiagnostics: { evaluatedSignals: 0 },
+    }));
+    expect(result.calibratedConfidence).toBe('INSUFFICIENT_SAMPLE');
+    expect(result.evidenceStatus).toBe('INSUFFICIENT');
+    expect(result.calibrationApplied).toBe(false);
+    expect(result.calibratedScore).toBe(result.rawScore);
+  });
+
+  it('treats 1D with 27 evaluated samples as insufficient sample evidence', () => {
+    const result = service().instance.calibrate(rawSignal(), context({
+      horizon: '1D',
+      horizonAvailability: {
+        '1D': { eligible: 150, evaluated: 27, insufficientFuturePrice: 123 },
+        '5D': { eligible: 150, evaluated: 0, insufficientFuturePrice: 150 },
+        '10D': { eligible: 150, evaluated: 0, insufficientFuturePrice: 150 },
+        '20D': { eligible: 150, evaluated: 0, insufficientFuturePrice: 150 },
+        '60D': { eligible: 150, evaluated: 0, insufficientFuturePrice: 150 },
+      },
+      evaluationDiagnostics: { evaluatedSignals: 27 },
+    }));
+    expect(result.calibratedConfidence).toBe('INSUFFICIENT_SAMPLE');
+    expect(result.evidenceStatus).toBe('INSUFFICIENT');
+    expect(result.scoreDelta).toBe(0);
+  });
+
+  it('caps low, medium, and high confidence adjustments', () => {
+    const low = service().instance.calibrate(rawSignal(), context({ evaluationDiagnostics: { evaluatedSignals: 60 } }));
+    const medium = service().instance.calibrate(rawSignal(), context({ evaluationDiagnostics: { evaluatedSignals: 120 } }));
+    const high = service().instance.calibrate(rawSignal(), context({ evaluationDiagnostics: { evaluatedSignals: 220 } }));
+    expect(Math.abs(low.boosts[0].delta)).toBeLessThanOrEqual(3);
+    expect(Math.abs(medium.boosts[0].delta)).toBeLessThanOrEqual(6);
+    expect(Math.abs(high.boosts[0].delta)).toBeLessThanOrEqual(10);
+  });
+
+  it('keeps Signal Quality failures as warnings instead of failing the run', async () => {
+    const setup = service({ qualityService: { summary: jest.fn().mockRejectedValue(new Error('quality offline')) } });
+    const result = await setup.instance.run({ batchSize: 1, offset: 0, region: 'IN', assetType: 'STOCK' });
+    expect(result.failedCount).toBe(0);
+    expect(result.warnings.join(' ')).toContain('Signal Quality diagnostics unavailable');
+    expect(result.results[0].calibratedConfidence).toBe('INSUFFICIENT_SAMPLE');
   });
 
   it('runs calibration for one latest-signal batch with progress metadata', async () => {

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { TradePlanRiskEngineService } from './trade-plan-risk-engine.service';
-import { parseGenerateRequest, parseBatchGenerateRequest, parseListQuery } from './trade-plan-risk-engine.validation';
+import { parseGenerateRequest, parseBatchGenerateRequest, parseListQuery, parseFunnelQuery } from './trade-plan-risk-engine.validation';
 
 export class TradePlanRiskEngineController {
   private service = new TradePlanRiskEngineService();
@@ -20,6 +20,16 @@ export class TradePlanRiskEngineController {
       return res.json(rules);
     } catch (error: any) {
       return res.status(500).json({ error: error.message });
+    }
+  };
+
+  getFunnelDiagnostics = async (req: Request, res: Response) => {
+    try {
+      const query = parseFunnelQuery(req.query);
+      const result = await this.service.funnelDiagnostics(query);
+      return res.json(result);
+    } catch (error: any) {
+      return res.status(400).json({ error: error.message });
     }
   };
 

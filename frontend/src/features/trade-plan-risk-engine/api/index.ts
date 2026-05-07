@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { TradePlanResultDto, GenerateTradePlanRequest, BatchGenerateTradePlanRequest, BatchGenerateTradePlanResponse } from '../types';
+import { TradePlanResultDto, GenerateTradePlanRequest, BatchGenerateTradePlanRequest, BatchGenerateTradePlanResponse, TradePlanFunnelDiagnostics } from '../types';
 
 export const TradePlanApi = {
   async getHealth() {
@@ -14,6 +14,11 @@ export const TradePlanApi = {
 
   async listCandidates(params?: Record<string, string | number | boolean>) {
     const res = await axios.get<{ results: TradePlanResultDto[]; total: number }>('/api/v1/trade-plans/candidates', { params });
+    return res.data;
+  },
+
+  async getFunnel(params?: Record<string, string | number | boolean>) {
+    const res = await axios.get<TradePlanFunnelDiagnostics>('/api/v1/trade-plans/funnel', { params });
     return res.data;
   },
 

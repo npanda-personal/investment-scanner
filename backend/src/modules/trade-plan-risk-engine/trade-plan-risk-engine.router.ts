@@ -9,6 +9,7 @@ export const createTradePlanRiskEngineRouter = (controller = new TradePlanRiskEn
 
   router.get('/health', controller.getHealth);
   router.get('/model', controller.getModelRules);
+  router.get('/funnel', controller.getFunnelDiagnostics);
   router.get('/candidates', controller.listCandidates);
   router.get('/:instrumentId', controller.getLatestForInstrument);
   router.post('/generate', controller.generatePlan);

@@ -48,4 +48,48 @@ describe('SignalCalibrationEngineRepository', () => {
     }));
     expect(saved).toMatchObject({ id: 'calibration-1', signalResultId: 'signal-1', calibratedScore: 78 });
   });
+
+  it('paginates scoped calibration rows and attaches market metadata', async () => {
+    const stockFindMany = jest
+      .fn()
+      .mockResolvedValueOnce([{ id: 'stock-in-1' }])
+      .mockResolvedValueOnce([{ id: 'stock-in-1', exchange: 'NSE', region: 'IN', assetType: 'STOCK', country: 'India', name: 'India Co' }]);
+    const count = jest.fn().mockResolvedValue(1);
+    const findMany = jest.fn().mockResolvedValue([{
+      id: 'calibration-1',
+      ...calibration,
+      instrumentId: 'stock-in-1',
+      symbol: 'INDIA',
+      country: null,
+      generatedAt: new Date(calibration.generatedAt),
+    }]);
+    const repository = new SignalCalibrationEngineRepository({
+      stock: { findMany: stockFindMany },
+      signalCalibrationResult: { count, findMany },
+    } as any);
+
+    const page = await repository.top({ region: 'IN', assetType: 'STOCK', limit: 25, offset: 0, sortBy: 'calibratedScore', sortDirection: 'desc' });
+
+    expect(count).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ instrumentId: { in: ['stock-in-1'] } }),
+    }));
+    expect(page).toMatchObject({ totalCount: 1, limit: 25, offset: 0, hasMore: false });
+    expect(page.items[0]).toMatchObject({ instrumentId: 'stock-in-1', region: 'IN', exchange: 'NSE', assetType: 'STOCK' });
+  });
+
+  it('supports delta sorting and calibration confidence filtering', async () => {
+    const count = jest.fn().mockResolvedValue(0);
+    const findMany = jest.fn().mockResolvedValue([]);
+    const repository = new SignalCalibrationEngineRepository({
+      stock: { findMany: jest.fn().mockResolvedValue([]) },
+      signalCalibrationResult: { count, findMany },
+    } as any);
+
+    await repository.top({ region: 'GLOBAL', assetType: undefined, limit: 10, offset: 0, sortBy: 'scoreDelta', sortDirection: 'asc', calibrationConfidence: 'LOW' });
+
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ calibratedConfidence: 'LOW' }),
+      orderBy: [{ scoreDelta: 'asc' }, { id: 'asc' }],
+    }));
+  });
 });

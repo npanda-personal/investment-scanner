@@ -1,7 +1,16 @@
 import { Prisma } from '@prisma/client';
 import prisma from '../../db/prisma';
 import type { StrategyDecisionDto, StrategyQuery } from './strategy-decision-engine.types';
-import { resolveRelatedMarketRegionFilter } from '../../shared/utils/market-scope';
+import { resolveMarketRegionFilter } from '../../shared/utils/market-scope';
+
+export interface StrategyDecisionFunnelDiagnosticsQuery {
+  region?: string;
+  assetType?: string;
+  strategyCode?: string;
+  generatedDate?: string;
+  from?: string;
+  to?: string;
+}
 
 export class StrategyDecisionEngineRepository {
   constructor(private readonly db = prisma) {}
@@ -102,10 +111,8 @@ export class StrategyDecisionEngineRepository {
   }
 
   async candidates(query: StrategyQuery): Promise<{ results: StrategyDecisionDto[]; total: number }> {
-    const regionFilter = resolveRelatedMarketRegionFilter(query.region);
-    
     const where: Prisma.StrategyDecisionResultWhereInput = {
-      ...regionFilter,
+      ...this.buildScopeWhere(query.region, query.assetType),
       strategy: query.strategy,
       decision: query.decision,
       decisionScore: query.minScore ? { gte: query.minScore } : undefined,
@@ -127,11 +134,28 @@ export class StrategyDecisionEngineRepository {
     };
   }
 
+  async funnelDiagnostics(query: StrategyDecisionFunnelDiagnosticsQuery): Promise<{ results: StrategyDecisionDto[]; total: number }> {
+    const where: Prisma.StrategyDecisionResultWhereInput = {
+      ...this.buildScopeWhere(query.region, query.assetType),
+      strategy: query.strategyCode,
+      generatedDate: query.generatedDate ? this.normalizeUtcDay(query.generatedDate) : undefined,
+      generatedAt: query.from || query.to ? {
+        gte: query.from ? new Date(query.from) : undefined,
+        lte: query.to ? new Date(query.to) : undefined,
+      } : undefined,
+    };
+    const records = await this.db.strategyDecisionResult.findMany({
+      where,
+      orderBy: { generatedAt: 'desc' },
+      take: 5000,
+    });
+    return { results: records.map((record) => this.toDto(record)), total: records.length };
+  }
+
   async exits(portfolioId?: string, region?: string): Promise<StrategyDecisionDto[]> {
-    const regionFilter = resolveRelatedMarketRegionFilter(region);
     const records = await this.db.strategyDecisionResult.findMany({
       where: {
-        ...regionFilter,
+        ...this.buildScopeWhere(region),
         portfolioId,
         strategy: 'DEFENSIVE_EXIT',
         decision: { in: ['EXIT_CANDIDATE', 'REDUCE_RISK'] },
@@ -194,6 +218,14 @@ export class StrategyDecisionEngineRepository {
     const date = value instanceof Date ? new Date(value) : new Date(value);
     date.setUTCHours(0, 0, 0, 0);
     return date;
+  }
+
+  private buildScopeWhere(region?: string, assetType?: string): Prisma.StrategyDecisionResultWhereInput {
+    const stockFilters: Prisma.StockWhereInput[] = [];
+    const regionFilter = resolveMarketRegionFilter(region);
+    if (Object.keys(regionFilter).length > 0) stockFilters.push(regionFilter);
+    if (assetType) stockFilters.push({ assetType });
+    return stockFilters.length > 0 ? { stock: { AND: stockFilters } } : {};
   }
 
   private serializeEntryZone(value: StrategyDecisionDto['entryZone']): string | null {

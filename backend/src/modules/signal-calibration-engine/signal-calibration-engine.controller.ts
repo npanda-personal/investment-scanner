@@ -19,13 +19,16 @@ export class SignalCalibrationEngineController {
   };
 
   top = async (req: Request, res: Response) => {
-    try { return res.json({ results: await this.service.top(parseCalibrationQuery(req.query)) }); }
+    try { return res.json(await this.service.top(parseCalibrationQuery(req.query))); }
     catch (error) { return this.error(res, error, 'Failed to load top calibrated signals'); }
   };
 
   compare = async (req: Request, res: Response) => {
     try {
-      const result = await this.service.compare(requireInstrumentId(req.params.instrumentId));
+      const region = typeof req.query.region === 'string' ? req.query.region : undefined;
+      const assetType = typeof req.query.assetType === 'string' ? req.query.assetType : undefined;
+      const horizon = typeof req.query.horizon === 'string' ? req.query.horizon : undefined;
+      const result = await this.service.compare(requireInstrumentId(req.params.instrumentId), region, assetType, horizon);
       if (!result) return res.status(404).json({ error: 'Signal comparison not available' });
       return res.json(result);
     } catch (error) { return this.error(res, error, 'Failed to compare raw and calibrated signals', 400); }

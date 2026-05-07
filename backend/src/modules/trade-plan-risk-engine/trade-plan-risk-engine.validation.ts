@@ -1,4 +1,4 @@
-import type { GenerateTradePlanRequest, BatchGenerateTradePlanRequest, TradePlanListQuery } from './trade-plan-risk-engine.types';
+import type { GenerateTradePlanRequest, BatchGenerateTradePlanRequest, TradePlanListQuery, TradePlanFunnelQuery } from './trade-plan-risk-engine.types';
 
 export function parseGenerateRequest(body: unknown): GenerateTradePlanRequest {
   const req = body as any;
@@ -50,5 +50,17 @@ export function parseListQuery(query: any): TradePlanListQuery {
     offset: typeof query.offset === 'string' && !isNaN(Number(query.offset)) ? Number(query.offset) : 0,
     sortBy: typeof query.sortBy === 'string' ? query.sortBy : 'generatedAt',
     sortDirection: query.sortDirection === 'asc' ? 'asc' : 'desc',
+  };
+}
+
+export function parseFunnelQuery(query: any): TradePlanFunnelQuery {
+  return {
+    region: typeof query.region === 'string' ? query.region : undefined,
+    assetType: typeof query.assetType === 'string' ? query.assetType : undefined,
+    strategyCode: typeof query.strategyCode === 'string' ? query.strategyCode : undefined,
+    generatedDate: typeof query.generatedDate === 'string' ? query.generatedDate : undefined,
+    from: typeof query.from === 'string' ? query.from : undefined,
+    to: typeof query.to === 'string' ? query.to : undefined,
+    backtestTimeframe: typeof query.backtestTimeframe === 'string' ? query.backtestTimeframe : undefined,
   };
 }

@@ -1,7 +1,15 @@
 import { Prisma } from '@prisma/client';
 import prisma from '../../db/prisma';
 import type { SignalHistoryQuery, SignalQuery, SignalResultDto } from './signal-generation-engine.types';
-import { resolveRelatedMarketRegionFilter } from '../../shared/utils/market-scope';
+import { resolveMarketRegionFilter } from '../../shared/utils/market-scope';
+
+export interface SignalFunnelDiagnosticsQuery {
+  region?: string;
+  assetType?: string;
+  generatedDate?: string;
+  from?: string;
+  to?: string;
+}
 
 export class SignalGenerationEngineRepository {
   constructor(private readonly db = prisma) {}
@@ -118,6 +126,34 @@ export class SignalGenerationEngineRepository {
     return groups.length;
   }
 
+  async funnelDiagnostics(query: SignalFunnelDiagnosticsQuery) {
+    const results = await this.db.signalResult.findMany({
+      where: this.buildWhere({
+        limit: 5000,
+        region: query.region,
+        assetType: query.assetType,
+        from: query.from,
+        to: query.to,
+        generatedDate: query.generatedDate,
+      } as SignalQuery & SignalFunnelDiagnosticsQuery),
+      orderBy: [{ instrumentId: 'asc' }, { generatedAt: 'desc' }],
+      distinct: ['instrumentId'],
+    });
+
+    const byDirection = results.reduce<Record<string, number>>((acc, item) => {
+      acc[item.direction] = (acc[item.direction] || 0) + 1;
+      return acc;
+    }, {});
+
+    return {
+      total: results.length,
+      bullish: byDirection.BULLISH || 0,
+      bearish: byDirection.BEARISH || 0,
+      neutral: byDirection.NEUTRAL || 0,
+      byDirection,
+    };
+  }
+
   async signalHistory(query: SignalHistoryQuery): Promise<SignalResultDto[]> {
     const results = await this.db.signalResult.findMany({
       where: {
@@ -148,14 +184,19 @@ export class SignalGenerationEngineRepository {
     });
   }
 
-  private buildWhere(query: SignalQuery): Prisma.SignalResultWhereInput {
-    const regionFilter = resolveRelatedMarketRegionFilter(query.region);
+  private buildWhere(query: SignalQuery & SignalFunnelDiagnosticsQuery): Prisma.SignalResultWhereInput {
+    const generatedDate = query.generatedDate ? this.normalizeUtcDay(new Date(query.generatedDate)) : undefined;
     
     return {
-      ...regionFilter,
+      ...this.relatedMarketScopeFilter(query.region, query.assetType),
       direction: query.direction,
       confidence: query.confidence,
       score: query.minScore !== undefined ? { gte: query.minScore } : undefined,
+      generatedDate,
+      generatedAt: query.from || query.to ? {
+        gte: query.from ? new Date(query.from) : undefined,
+        lte: query.to ? new Date(query.to) : undefined,
+      } : undefined,
       sector: query.sector ? { contains: query.sector, mode: 'insensitive' } : undefined,
       country: query.country ? { contains: query.country, mode: 'insensitive' } : undefined,
       OR: query.search ? [
@@ -163,6 +204,14 @@ export class SignalGenerationEngineRepository {
         { companyName: { contains: query.search, mode: 'insensitive' } },
       ] : undefined,
     };
+  }
+
+  private relatedMarketScopeFilter(region?: string, assetType?: string): Prisma.SignalResultWhereInput {
+    const stockFilters: Prisma.StockWhereInput[] = [];
+    const regionFilter = resolveMarketRegionFilter(region);
+    if (Object.keys(regionFilter).length > 0) stockFilters.push(regionFilter);
+    if (assetType) stockFilters.push({ assetType });
+    return stockFilters.length > 0 ? { stock: { AND: stockFilters } } : {};
   }
 
   private hasSignal(result: SignalResultDto, signalType: string): boolean {
@@ -205,4 +254,3 @@ export class SignalGenerationEngineRepository {
     };
   }
 }
-

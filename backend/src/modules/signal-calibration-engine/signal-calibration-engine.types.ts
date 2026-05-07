@@ -3,12 +3,27 @@ import type { DataQualityEvaluationDto } from '../data-quality-engine';
 
 export type CalibrationDataStatus = 'COMPLETE' | 'PARTIAL' | 'MISSING' | 'ERROR';
 export type CalibrationAdjustmentType = 'SIGNAL_TYPE' | 'SCORE_BUCKET' | 'REGIME' | 'SECTOR' | 'SMART_MONEY' | 'DATA_QUALITY' | 'NOISE';
+export type CalibrationConfidenceLevel = SignalConfidence | 'INSUFFICIENT_SAMPLE';
+export type CalibrationEvidenceStatus = 'SUFFICIENT' | 'LOW_SAMPLE' | 'INSUFFICIENT' | 'MISSING';
 
 export interface CalibrationAdjustment {
   type: CalibrationAdjustmentType;
   label: string;
   delta: number;
   evidence?: Record<string, unknown>;
+}
+
+export interface CalibrationEvidence {
+  horizon: string;
+  overallEvaluatedSamples: number;
+  groupEvaluatedSamples: number;
+  minimumOverallSamples: number;
+  minimumGroupSamples: number;
+  horizonAvailability: Record<string, { eligible: number; evaluated: number; insufficientFuturePrice: number }>;
+  dataStatus: string;
+  evidenceStatus: CalibrationEvidenceStatus;
+  evidenceReasons: string[];
+  evidenceWarnings: string[];
 }
 
 export interface SignalCalibrationResultDto {
@@ -19,13 +34,16 @@ export interface SignalCalibrationResultDto {
   companyName: string | null;
   sector: string | null;
   country: string | null;
+  exchange?: string | null;
+  region?: string | null;
+  assetType?: string | null;
   rawScore: number;
   calibratedScore: number;
   scoreDelta: number;
   rawDirection: SignalDirection;
   calibratedDirection: SignalDirection;
   rawConfidence: SignalConfidence;
-  calibratedConfidence: SignalConfidence;
+  calibratedConfidence: CalibrationConfidenceLevel;
   boosts: CalibrationAdjustment[];
   penalties: CalibrationAdjustment[];
   calibrationReasons: string[];
@@ -40,6 +58,15 @@ export interface SignalCalibrationResultDto {
     'warnings' | 'readinessBlockers'
   > | null;
   researchUrl: string;
+
+  calibrationApplied?: boolean;
+  adjustmentCapApplied?: number;
+  sampleSizePenaltyApplied?: boolean;
+  calibrationEvidence?: CalibrationEvidence | null;
+  overallEvaluatedSamples?: number;
+  groupEvaluatedSamples?: number;
+  evidenceStatus?: CalibrationEvidenceStatus;
+  warningsCount?: number;
 }
 
 export interface CalibrationRunRequest {
@@ -51,14 +78,41 @@ export interface CalibrationRunRequest {
   direction?: SignalDirection;
   sector?: string;
   country?: string;
+  region?: string;
+  assetType?: string;
+  horizon?: string;
 }
 
 export interface CalibrationQuery {
   direction?: SignalDirection;
   minScore?: number;
   limit: number;
+  offset?: number;
   sector?: string;
   country?: string;
+  region?: string;
+  assetType?: string;
+  sortBy?: string;
+  sortDirection?: 'asc' | 'desc';
+  confidence?: SignalConfidence;
+  calibrationConfidence?: string;
+  evidenceStatus?: string;
+  search?: string;
+  horizon?: string;
+  minRawScore?: number;
+  minCalibratedScore?: number;
+  minAbsDelta?: number;
+  hasDataGaps?: boolean;
+}
+
+export interface PaginatedCalibrationResponse {
+  items: SignalCalibrationResultDto[];
+  totalCount: number;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+  sortBy: string;
+  sortDirection: 'asc' | 'desc';
 }
 
 export interface CalibrationRunResponse {
@@ -76,6 +130,7 @@ export interface CalibrationRunResponse {
   calibratedCount: number;
   skippedCount: number;
   failedCount: number;
+  outOfScopeSkipped?: number;
   warnings: string[];
   durationMs: number;
 }
@@ -88,10 +143,28 @@ export interface CalibrationComparison {
 export interface CalibrationModelInfo {
   calibrationModelVersion: string;
   qualityMetricWindow: string;
+  supportedHorizons: string[];
+  defaultHorizon: string;
   minSampleSize: number;
+  minOverallSamples: number;
+  minGroupSamples: number;
   perAdjustmentDeltaCap: number;
   totalDeltaCap: number;
+  confidenceThresholds: {
+    HIGH: { overall: number; group: number };
+    MEDIUM: { overall: number; group: number };
+    LOW: { overall: number; group: number };
+  };
+  adjustmentCaps: {
+    HIGH: number;
+    MEDIUM: number;
+    LOW: number;
+    INSUFFICIENT_SAMPLE: number;
+  };
   rules: string[];
+  sampleSafetyRules: string[];
+  fallbackBehavior: string;
+  safeLanguageRules: string[];
 }
 
 export interface CalibrationContext {
@@ -105,6 +178,9 @@ export interface CalibrationContext {
   dataQualityEvaluation?: DataQualityEvaluationDto | null;
   noisyIssueTypes: string[];
   dataGaps: string[];
+  horizonAvailability?: Record<string, { eligible: number; evaluated: number; insufficientFuturePrice: number }> | null;
+  evaluationDiagnostics?: any | null;
+  horizon: string;
 }
 
 export interface SignalLikeForCalibration {

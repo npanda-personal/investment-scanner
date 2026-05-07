@@ -1,10 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, Button, Alert, Tab, Tabs, FormControlLabel, Switch, FormControl, InputLabel, MenuItem, Select, Stack } from '@mui/material';
+import { Box, Typography, Button, Alert, Tab, Tabs, FormControlLabel, Switch, FormControl, InputLabel, MenuItem, Select, Stack, Grid, Paper, Chip, List, ListItem, ListItemText, CircularProgress } from '@mui/material';
 import { TradePlanApi } from '../api';
 import { TradePlanTable } from './TradePlanTable';
-import { TradePlanResultDto } from '../types';
+import { CountItem, TradePlanFunnelDiagnostics, TradePlanResultDto } from '../types';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { SortDirection } from '@/shared/components/DataTable';
+
+const mergeCountItems = (left: CountItem[], right: CountItem[]): CountItem[] => {
+  const counts = new Map<string, number>();
+  [...left, ...right].forEach((item) => counts.set(item.reason, (counts.get(item.reason) || 0) + item.count));
+  return Array.from(counts.entries())
+    .map(([reason, count]) => ({ reason, count }))
+    .sort((a, b) => b.count - a.count);
+};
 
 export const TradePlanDashboard: React.FC = () => {
   const [plans, setPlans] = useState<TradePlanResultDto[]>([]);
@@ -13,10 +21,13 @@ export const TradePlanDashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [batchGenerating, setBatchGenerating] = useState(false);
   const [batchSummary, setBatchSummary] = useState<string | null>(null);
+  const [funnel, setFunnel] = useState<TradePlanFunnelDiagnostics | null>(null);
+  const [funnelLoading, setFunnelLoading] = useState(false);
   const [tab, setTab] = useState(0);
   const [paperReadyOnly, setPaperReadyOnly] = useState(false);
   const [paperReadinessStatus, setPaperReadinessStatus] = useState('');
   const [backtestTimeframe, setBacktestTimeframe] = useState('');
+  const [generateTimeframe, setGenerateTimeframe] = useState('10Y');
   const [strategyRating, setStrategyRating] = useState('');
   const [readinessLabel, setReadinessLabel] = useState('');
   
@@ -55,17 +66,39 @@ export const TradePlanDashboard: React.FC = () => {
     }
   };
 
+  const fetchFunnel = async () => {
+    setFunnelLoading(true);
+    try {
+      const params: Record<string, string | number | boolean> = {
+        region: scope.region,
+        assetType: scope.assetType,
+      };
+      if (backtestTimeframe) params.backtestTimeframe = backtestTimeframe;
+      const data = await TradePlanApi.getFunnel(params);
+      setFunnel(data);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load trade plan funnel');
+    } finally {
+      setFunnelLoading(false);
+    }
+  };
+
   const handleBatchGenerate = async () => {
     setBatchGenerating(true);
     setBatchSummary(null);
     try {
       const batchSize = 25;
       const workerCount = 3;
-      const first = await TradePlanApi.batchGenerate({ region: scope.region, assetType: scope.assetType, batchSize, offset: 0 });
+      const first = await TradePlanApi.batchGenerate({ region: scope.region, assetType: scope.assetType, batchSize, offset: 0, backtestTimeframe: generateTimeframe });
       const totals = {
         generated: first.generatedCount,
         failed: first.failedCount || 0,
         processed: first.candidateCount || first.count || 0,
+        discovered: first.rawCandidateCount || first.totalCount || 0,
+        eligible: first.eligibleCandidateCount || first.candidateCount || 0,
+        skipped: first.skippedCount || 0,
+        paperReady: first.paperReadinessSummary?.READY_FOR_PAPER_REVIEW || 0,
+        topBlockers: first.topBlockers || [] as CountItem[],
         requests: 1,
       };
 
@@ -79,18 +112,25 @@ export const TradePlanDashboard: React.FC = () => {
         while (nextOffsetIndex < offsets.length) {
           const offset = offsets[nextOffsetIndex];
           nextOffsetIndex += 1;
-          const result = await TradePlanApi.batchGenerate({ region: scope.region, assetType: scope.assetType, batchSize, offset });
+          const result = await TradePlanApi.batchGenerate({ region: scope.region, assetType: scope.assetType, batchSize, offset, backtestTimeframe: generateTimeframe });
           totals.generated += result.generatedCount;
           totals.failed += result.failedCount || 0;
           totals.processed += result.candidateCount || result.count || 0;
+          totals.discovered = Math.max(totals.discovered, result.rawCandidateCount || result.totalCount || 0);
+          totals.eligible += result.eligibleCandidateCount || result.candidateCount || 0;
+          totals.skipped += result.skippedCount || 0;
+          totals.paperReady += result.paperReadinessSummary?.READY_FOR_PAPER_REVIEW || 0;
+          totals.topBlockers = mergeCountItems(totals.topBlockers, result.topBlockers || []);
           totals.requests += 1;
         }
       };
 
       await Promise.all(Array.from({ length: Math.min(workerCount, offsets.length) }, () => runWorker()));
-      setBatchSummary(`Batch complete: ${totals.generated} generated, ${totals.failed} failed across ${totals.processed} candidates using ${totals.requests} requests.`);
+      const blockerText = totals.topBlockers.slice(0, 3).map((item) => `${item.count} ${item.reason}`).join(', ') || 'none';
+      setBatchSummary(`Batch complete: ${totals.generated} plans generated from ${totals.eligible} eligible Strategy Decision candidates (${totals.discovered} discovered, ${totals.skipped} skipped). ${totals.paperReady} are paper-ready. Proof timeframe: ${generateTimeframe}. Top blockers: ${blockerText}. Failed: ${totals.failed}.`);
       setPage(0);
       await fetchPlans();
+      await fetchFunnel();
     } catch (err: any) {
       setError(err.message || 'Failed to batch generate plans');
     } finally {
@@ -102,17 +142,98 @@ export const TradePlanDashboard: React.FC = () => {
     fetchPlans();
   }, [scope.region, scope.assetType, page, pageSize, sortBy, sortDirection, paperReadyOnly, paperReadinessStatus, backtestTimeframe, strategyRating, readinessLabel]);
 
+  useEffect(() => {
+    fetchFunnel();
+  }, [scope.region, scope.assetType, backtestTimeframe]);
+
+  const metricCards = funnel ? [
+    { label: 'Raw Bullish Signals', value: funnel.rawSignals.bullish },
+    { label: 'Strategy Decisions', value: funnel.strategyDecisions.total },
+    { label: 'Eligible Plan Candidates', value: funnel.tradePlanCandidateDiscovery.eligibleForPlanGeneration },
+    { label: 'Generated Plans', value: funnel.generatedPlans.total },
+    { label: 'Paper Ready', value: funnel.paperReadiness.readyForPaperReview },
+    { label: 'Blocked / Watch / Insufficient', value: funnel.generatedPlans.blocked + funnel.generatedPlans.watch + funnel.generatedPlans.insufficientData },
+  ] : [];
+
   return (
     <Box sx={{ py: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4">Trade Plans</Typography>
-        <Button variant="contained" onClick={handleBatchGenerate} disabled={batchGenerating}>
-          {batchGenerating ? 'Generating...' : 'Batch Generate Plans'}
-        </Button>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'stretch', sm: 'center' }}>
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>Proof</InputLabel>
+            <Select label="Proof" value={generateTimeframe} onChange={(event) => setGenerateTimeframe(event.target.value)}>
+              {['1Y', '3Y', '5Y', '10Y', '15Y'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
+            </Select>
+          </FormControl>
+          <Button variant="contained" onClick={handleBatchGenerate} disabled={batchGenerating}>
+            {batchGenerating ? 'Generating...' : 'Batch Generate Plans'}
+          </Button>
+        </Stack>
       </Box>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {batchSummary && <Alert severity="success" sx={{ mb: 2 }}>{batchSummary}</Alert>}
+      {funnel && funnel.generatedPlans.total > 0 && funnel.paperReadiness.readyForPaperReview === 0 && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          No plans are paper-ready yet. This is usually caused by weak strategy proof, high risk grade, missing backtest summary, or insufficient data. Review the blocker breakdown below.
+        </Alert>
+      )}
+
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+          <Typography variant="h6">Generation Funnel</Typography>
+          <Chip size="small" label={`${scope.region}/${scope.assetType}`} />
+          {funnelLoading && <CircularProgress size={18} />}
+        </Stack>
+        <Grid container spacing={2}>
+          {metricCards.map((card) => (
+            <Grid item xs={6} md={2} key={card.label}>
+              <Box>
+                <Typography variant="body2" color="text.secondary">{card.label}</Typography>
+                <Typography variant="h5">{card.value}</Typography>
+              </Box>
+            </Grid>
+          ))}
+        </Grid>
+        {funnel && (
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12} md={4}>
+              <Typography variant="subtitle2">Top Paper Readiness Blockers</Typography>
+              <List dense disablePadding>
+                {funnel.paperReadiness.topBlockers.slice(0, 5).map((item) => (
+                  <ListItem key={item.reason} disablePadding>
+                    <ListItemText primary={`${item.count} ${item.reason}`} />
+                  </ListItem>
+                ))}
+                {funnel.paperReadiness.topBlockers.length === 0 && <ListItem disablePadding><ListItemText primary="No blockers found." /></ListItem>}
+              </List>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Typography variant="subtitle2">Skipped Before Generation</Typography>
+              <List dense disablePadding>
+                {funnel.tradePlanCandidateDiscovery.skipReasons.slice(0, 5).map((item) => (
+                  <ListItem key={item.reason} disablePadding>
+                    <ListItemText primary={`${item.count} ${item.reason}`} />
+                  </ListItem>
+                ))}
+                {funnel.tradePlanCandidateDiscovery.skipReasons.length === 0 && <ListItem disablePadding><ListItemText primary="No skipped candidates in the current filter." /></ListItem>}
+              </List>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Typography variant="subtitle2">Recommendations</Typography>
+              <List dense disablePadding>
+                {funnel.recommendations.slice(0, 5).map((item) => (
+                  <ListItem key={item} disablePadding>
+                    <ListItemText primary={item} />
+                  </ListItem>
+                ))}
+                {funnel.recommendations.length === 0 && <ListItem disablePadding><ListItemText primary="No action required from current diagnostics." /></ListItem>}
+              </List>
+            </Grid>
+          </Grid>
+        )}
+      </Paper>
 
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="flex-end" sx={{ mb: 2 }}>
         <FormControlLabel

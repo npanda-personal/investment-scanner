@@ -74,7 +74,7 @@ export interface StrategyContext {
   calibratedSignal?: {
     calibratedScore: number;
     calibratedDirection: SignalDirection;
-    calibratedConfidence: SignalConfidence;
+    calibratedConfidence: SignalConfidence | 'INSUFFICIENT_SAMPLE';
   } | null;
   reliability?: {
     status?: string | null;

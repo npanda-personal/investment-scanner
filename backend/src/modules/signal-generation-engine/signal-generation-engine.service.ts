@@ -140,6 +140,10 @@ export class SignalGenerationEngineService {
     return this.repository.signalHistoryCount(query);
   }
 
+  async funnelDiagnostics(query: { region?: string; assetType?: string; generatedDate?: string; from?: string; to?: string }) {
+    return this.repository.funnelDiagnostics(query);
+  }
+
   async latestSignalUniverse(query: SignalQuery) {
     return this.repository.latestSignalUniverse(query);
   }

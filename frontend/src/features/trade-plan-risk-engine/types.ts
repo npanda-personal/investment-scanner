@@ -190,6 +190,13 @@ export interface BatchGenerateTradePlanResponse {
   generatedCount: number;
   failedCount: number;
   candidateCount: number;
+  rawCandidateCount?: number;
+  eligibleCandidateCount?: number;
+  skippedCount?: number;
+  skipReasonCounts?: Record<string, number>;
+  paperReadinessSummary?: Record<string, number>;
+  topBlockers?: Array<{ reason: string; count: number }>;
+  backtestTimeframe?: string | null;
   totalCount: number;
   batchSize: number;
   offset: number;
@@ -197,4 +204,78 @@ export interface BatchGenerateTradePlanResponse {
   hasMore: boolean;
   plans: TradePlanResultDto[];
   failures: BatchGenerateFailure[];
+}
+
+export interface CountItem {
+  reason: string;
+  count: number;
+}
+
+export interface TradePlanFunnelDiagnostics {
+  region: string;
+  assetType: string;
+  generatedAt: string;
+  rawSignals: {
+    total: number;
+    bullish: number;
+    bearish: number;
+    neutral: number;
+    byDirection: Record<string, number>;
+  };
+  strategyMatches: {
+    totalWithMatch: number;
+    totalWithoutMatch: number;
+    byStrategy: CountItem[];
+  };
+  strategyDecisions: {
+    total: number;
+    tradeCandidates: number;
+    watch: number;
+    avoid: number;
+    exitCandidates: number;
+    reduceRisk: number;
+    hold: number;
+    insufficientData: number;
+    frameworkBacked: number;
+    notFrameworkBacked: number;
+  };
+  tradePlanCandidateDiscovery: {
+    discoveredCandidates: number;
+    eligibleForPlanGeneration: number;
+    skippedBeforeGeneration: number;
+    skipReasonCounts: Record<string, number>;
+    skipReasons: CountItem[];
+  };
+  generatedPlans: {
+    total: number;
+    valid: number;
+    watch: number;
+    blocked: number;
+    insufficientData: number;
+    byStrategy: CountItem[];
+    byRiskGrade: CountItem[];
+    byPlanStatus: CountItem[];
+  };
+  paperReadiness: {
+    readyForPaperReview: number;
+    watchOnly: number;
+    blocked: number;
+    insufficientData: number;
+    blockerCounts: CountItem[];
+    topBlockers: CountItem[];
+    reasonCounts: CountItem[];
+  };
+  proof: {
+    byBacktestTimeframe: CountItem[];
+    byStrategyRating: CountItem[];
+    missingBacktestSummaryCount: number;
+    weakOrUnprovenRatingCount: number;
+  };
+  dataQuality: {
+    missingSnapshotCount: number;
+    unusableCount: number;
+    illiquidCount: number;
+    unknownLiquidityCount: number;
+  };
+  recommendations: string[];
 }
