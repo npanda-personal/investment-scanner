@@ -9,7 +9,7 @@ type FilterBarProps = {
 
 export function FilterBar({ children, onReset, showReset = true }: FilterBarProps) {
   return (
-    <Paper sx={{ p: 2, overflow: 'hidden' }}>
+    <Paper sx={{ p: 2, overflow: 'visible', maxWidth: '100%' }}>
       <Stack
         direction="row"
         spacing={1.5}
@@ -17,12 +17,16 @@ export function FilterBar({ children, onReset, showReset = true }: FilterBarProp
         flexWrap="wrap"
         alignItems="center"
         sx={{
+          maxWidth: '100%',
           '& .MuiTextField-root': {
-            flex: '1 1 150px',
+            flex: '1 1 160px',
             minWidth: 0,
+            maxWidth: '100%',
           },
           '& .MuiButton-root': {
-            flex: { xs: '1 1 140px', sm: '0 0 auto' },
+            flex: { xs: '1 1 160px', sm: '0 1 auto' },
+            minWidth: 0,
+            whiteSpace: 'nowrap',
           },
         }}
       >

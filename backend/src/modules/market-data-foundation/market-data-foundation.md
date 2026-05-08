@@ -130,7 +130,7 @@ Most list endpoints support standard `PaginationOptions`:
 - `sector` and `industry`: Case-insensitive partial text filters.
 - `search`: Case-insensitive partial text across symbol and company name.
 - `exchange`, `currency`, `assetType`, `instrumentSegment`, and `dataStatus`: Exact normalized filters. `currency=INR` also includes Indian NSE/BSE rows with missing persisted currency because local catalog rules deterministically infer `INR` for those instruments.
-- `catalogSource`: Exact normalized source filter such as `NSE_EQUITY_SECURITIES`, `NSE_EQUITY_DERIVATIVES_UNDERLYINGS`, `NSE_INDEX_SEED`, `NSE_ETF_SECURITIES`, `BROKER_SCRIP_MASTER`, or `UNKNOWN`.
+- `catalogSource`: Exact normalized source filter such as `NSE_EQUITY_SECURITIES`, `NSE_EQUITY_DERIVATIVES_UNDERLYINGS`, `NSE_INDEX_SECURITIES`, `BSE_INDEX_SECURITIES`, `NSE_INDEX_SEED`, `NSE_ETF_SECURITIES`, `BROKER_SCRIP_MASTER`, or `UNKNOWN`.
 - `providerSupportStatus`: Exact normalized provider validation filter: `SUPPORTED`, `UNSUPPORTED`, `UNKNOWN`, or `VALIDATION_FAILED`.
 - `derivativesEligible`: Boolean filter for instruments found in an F&O underlying source. This does not mean an actual futures contract exists.
 
@@ -169,7 +169,9 @@ Supported catalog source values:
 | --- | --- |
 | `NSE_EQUITY_SECURITIES` | Imports NSE cash-equity style rows as `.NS`, `STOCK / CASH`, `IN`, `NSE`, `India`, `INR`. Default URL: `https://nsearchives.nseindia.com/content/equities/sec_list.csv`. |
 | `NSE_EQUITY_DERIVATIVES_UNDERLYINGS` | Marks stock/index underlyings as `derivativesEligible=true`. It does not create futures contracts. No stable default URL is bundled; configure `MARKET_DATA_CATALOG_NSE_FO_UNDERLYINGS_URL` or use Manual CSV. |
-| `NSE_INDEX_SEED` | Imports a built-in Indian index seed list: `^NSEI`, `^NSEBANK`, and `^BSESN` as `INDEX / INDEX`. No URL is required. |
+| `NSE_INDEX_SECURITIES` | Imports NSE index catalog rows from the public NSE all-indices JSON endpoint as `INDEX / INDEX`. Default URL: `https://www.nseindia.com/api/allIndices`. Known Yahoo symbols such as `^NSEI`, `^NSEBANK`, and common sector index symbols are attached when mapped; other rows remain catalog-visible with `providerSupportStatus=UNKNOWN` until validation. |
+| `BSE_INDEX_SECURITIES` | Imports BSE index catalog rows from the public BSE mobile index-watch page as `INDEX / INDEX`. Default URL: `https://m.bseindia.com/IndicesView_New.aspx`. Known Yahoo symbols such as `^BSESN` are attached when mapped; other rows remain catalog-visible until provider validation. |
+| `NSE_INDEX_SEED` | Imports a small built-in fallback Indian index seed list: `^NSEI`, `^NSEBANK`, and `^BSESN` as `INDEX / INDEX`. No URL is required. Use `NSE_INDEX_SECURITIES` and `BSE_INDEX_SECURITIES` for broader index catalogs. |
 | `NSE_ETF_SECURITIES` | Imports ETF security rows as `ETF / ETF` when the source row is clearly ETF-like. Default URL: `https://nsearchives.nseindia.com/content/equities/eq_etfseclist.csv`. |
 | `BSE_EQUITY_SECURITIES` | Reserved for BSE security-master style imports. |
 | `BROKER_SCRIP_MASTER` | Optional fallback discovery source only, not primary truth. |
@@ -180,7 +182,7 @@ Supported catalog source values:
 The import endpoint is `POST /api/v1/market-data/catalog/import`. It supports two import modes:
 
 - `MANUAL_CSV`: existing fallback mode. The request supplies `csvText`.
-- `CONFIGURED_URL`: the backend resolves the default or env-configured source URL, downloads the CSV to a controlled temp folder, imports the bounded batch, and deletes the temp file.
+- `CONFIGURED_URL`: the backend resolves the default or env-configured source URL, downloads the configured CSV/JSON/HTML text to a controlled temp folder, imports the bounded batch, and deletes the temp file.
 - `INTERNAL_SEED`: used by `NSE_INDEX_SEED`; no CSV or URL is required.
 
 Requests accept `catalogSource`, `importMode`, optional `csvText`, optional `validateProvider`, and bounded `batchSize`/`offset`. Responses include `sourceRows`, `processedCount`, `totalCount`, `nextOffset`, `hasMore`, inserted/updated/no-op/invalid counts, provider validation counts, warnings, duration, and URL-download metadata when applicable. Imports are idempotent on current `Stock.symbol`, preserve non-null metadata, and only update changed fields.
@@ -195,6 +197,8 @@ Configured source URLs are controlled by environment variables. No arbitrary run
 | --- | --- |
 | `MARKET_DATA_CATALOG_NSE_EQUITY_URL` | Override for NSE cash-equity CSV. Default: `https://nsearchives.nseindia.com/content/equities/sec_list.csv`. |
 | `MARKET_DATA_CATALOG_NSE_ETF_URL` | Override for NSE ETF CSV. Default: `https://nsearchives.nseindia.com/content/equities/eq_etfseclist.csv`. |
+| `MARKET_DATA_CATALOG_NSE_INDICES_URL` | Override for NSE all-indices JSON. Default: `https://www.nseindia.com/api/allIndices`. |
+| `MARKET_DATA_CATALOG_BSE_INDICES_URL` | Override for BSE index-watch HTML. Default: `https://m.bseindia.com/IndicesView_New.aspx`. |
 | `MARKET_DATA_CATALOG_NSE_FO_UNDERLYINGS_URL` | NSE F&O underlyings CSV. No default is bundled; Manual CSV remains available. |
 | `MARKET_DATA_CATALOG_BSE_EQUITY_URL` | Future BSE equity/security-master CSV. |
 | `MARKET_DATA_CATALOG_BROKER_SCRIP_MASTER_URL` | Optional fallback discovery source. Disabled in config by default. |
@@ -210,11 +214,11 @@ Security controls:
 - `localhost`, loopback, link-local, private IPv4 ranges, and common local IPv6 ranges are rejected.
 - Downloads are timeout-limited and size-limited.
 - Files are written only to the configured temp directory with generated safe filenames.
-- Downloaded content is parsed as CSV text only and is never executed.
+- Downloaded content is parsed as source-specific CSV, JSON, or HTML text only and is never executed.
 - Temp files are deleted after import or parser failure unless `MARKET_DATA_CATALOG_KEEP_TEMP_FILES=true`.
 - Logs include source, mode, file size, row counts, counts, and cleanup status, not full CSV contents.
 
-The first implementation downloads/parses the configured CSV per import request. Responses still return `hasMore` and `nextOffset`; callers can use bounded batches, but repeated offset requests may re-download the source file. A short-lived import-session cache can be added later if large source files make that necessary.
+The first implementation downloads/parses the configured source per import request. Responses still return `hasMore` and `nextOffset`; callers can use bounded batches, but repeated offset requests may re-download the source file. A short-lived import-session cache can be added later if large source files make that necessary.
 
 ### Symbol Conventions And Backfill
 
@@ -231,6 +235,7 @@ Normalization helpers follow these rules:
 - Existing `ABB.NS` becomes `sourceSymbol=ABB`, `providerSymbol=ABB.NS`.
 - BSE base `ABC` becomes `sourceSymbol=ABC`, `providerSymbol=ABC.BO`.
 - Index provider symbols such as `^NSEI` are preserved.
+- Invalid legacy provider suffixes on obvious NSE/BSE rows are corrected during DTO mapping and backfill; for example `RELIANCE.NL` on an NSE row becomes `providerSymbol=RELIANCE.NS`, while the UI displays the base symbol `RELIANCE`.
 
 `POST /api/v1/market-data/catalog/backfill-metadata` safely backfills existing rows in bounded batches. It accepts `region`, optional `assetType`, `batchSize`/`limit`, `offset`, and `validateProvider`. Without validation it infers only deterministic fields for obvious NSE/BSE rows: `IN`, `India`, `INR`, exchange, `STOCK / CASH`, `sourceSymbol`, `displaySymbol`, `providerSymbol`, and legacy catalog provenance. It preserves existing non-null sector, industry, and market cap. Provider support remains `UNKNOWN` unless `validateProvider=true`.
 
@@ -242,6 +247,8 @@ F&O underlyings are deliberately not actual futures contracts. Underlying import
 Actual futures are expiry-specific. They must come from a real contracts source containing contract rows and expiry metadata, then validate provider support before becoming sync-ready. This module does not fake or synthesize futures contracts from underlyings.
 
 F&O underlying matching compares base and provider symbols, so `ABB` from an underlying source can update a stored `ABB.NS` row, and `ABB.NS` can also match a base `ABB` row. Matched stock/index underlyings set `derivativesEligible=true`; they do not become `FUTURE / FUTURES`.
+
+The service also includes a conservative built-in NSE F&O stock-underlying seed so obvious current F&O stocks such as `RELIANCE` render as F&O eligible during catalog import/backfill even before a separate F&O underlying file is imported. A source import remains the preferred way to keep the full list current.
 
 Provider validation is optional and batch-bounded. When enabled, the module runs a lightweight Yahoo chart check for each imported or backfilled provider symbol in the current batch and records `SUPPORTED` or `UNSUPPORTED` with the provider error/message. OHLCV sync selection skips `UNSUPPORTED` rows so unsupported symbols stay visible in the catalog but are not repeatedly ingested.
 
@@ -408,8 +415,11 @@ Natural keys for stock-data records owned by this module:
 ## Frontend Structure
 
 - `MarketDataFoundationPage`: Integrated with `useMarketScope()`. Automatically filters by the globally selected region.
-  - Shows Asset Type, Segment/Class, Provider Symbol, F&O Eligible, Provider Support, Catalog Source, sector/industry, market cap, metadata completeness, and server-side filters for asset type, segment/class, provider support, catalog source, derivatives eligibility, exchange, currency, sector, industry, and status. The default list request includes region but no asset type so the page can show all instrument classes.
+  - Splits the operational surface into Catalog, Import & Backfill, and Data Health tabs so import controls, diagnostics, and table exploration do not compete in one crowded view.
+  - Shows a scan-focused catalog table with Symbol, Company, Provider Symbol, Exchange, Asset Type, Segment/Class, F&O Eligible, Provider Support, Data Health, Last Updated, and Actions. Lower-frequency metadata such as sector, industry, market cap, source symbols, catalog source, and provider errors is available in a row detail drawer.
+  - Provides preset chips for common catalog workflows such as Stocks, F&O Eligible, Needs Validation, Unsupported, Indices, and ETFs. The main filter bar stays intentionally compact with search, exchange, asset type, segment/class, currency, and F&O eligibility; diagnostic filters remain backend-supported and can be applied by presets.
   - Provides a bounded Catalog Import panel for NSE equity securities, F&O underlyings, index seed rows, ETF rows, and fallback broker/public scrip-master CSVs. Index seed import does not require CSV text.
+  - Catalog import and metadata backfill run client-orchestrated bounded batches until `hasMore=false`, disable competing actions while running, and show determinate progress from backend `processedCount`/`totalCount`.
   - The filter bar uses a wrapping responsive layout so Refresh and Reset stay inside the page container. Table horizontal scrolling is limited to the table area.
   - Changing any local filter resets to page 1. Reset clears only local filters and preserves the global market scope. Empty states name the active filters so no-result states such as `FUTURE / FUTURES` are explicit.
   - Status cards show scoped instrument health before local filters; the table match chip shows the locally filtered count.

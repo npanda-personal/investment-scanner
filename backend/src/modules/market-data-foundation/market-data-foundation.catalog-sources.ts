@@ -13,7 +13,7 @@ export interface CatalogSourceConfig {
   region: string;
   assetType?: string;
   segmentClass?: string;
-  fileType: 'CSV';
+  fileType: 'CSV' | 'JSON' | 'HTML';
   parserType: string;
   expectedColumnGroups?: string[][];
   providerSymbolSuffix?: string;
@@ -65,6 +65,8 @@ export const getCatalogSourceConfigs = (): CatalogSourceConfig[] => {
   };
   const nseEquity = sourceUrl(process.env.MARKET_DATA_CATALOG_NSE_EQUITY_URL, 'https://nsearchives.nseindia.com/content/equities/sec_list.csv');
   const nseEtf = sourceUrl(process.env.MARKET_DATA_CATALOG_NSE_ETF_URL, 'https://nsearchives.nseindia.com/content/equities/eq_etfseclist.csv');
+  const nseIndices = sourceUrl(process.env.MARKET_DATA_CATALOG_NSE_INDICES_URL, 'https://www.nseindia.com/api/allIndices');
+  const bseIndices = sourceUrl(process.env.MARKET_DATA_CATALOG_BSE_INDICES_URL, 'https://m.bseindia.com/IndicesView_New.aspx');
   const nseFo = sourceUrl(process.env.MARKET_DATA_CATALOG_NSE_FO_UNDERLYINGS_URL);
   const bseEquity = sourceUrl(process.env.MARKET_DATA_CATALOG_BSE_EQUITY_URL);
   const broker = sourceUrl(process.env.MARKET_DATA_CATALOG_BROKER_SCRIP_MASTER_URL);
@@ -119,6 +121,48 @@ export const getCatalogSourceConfigs = (): CatalogSourceConfig[] => {
       supportsInternalSeed: false,
     },
     {
+      catalogSource: 'NSE_INDEX_SECURITIES',
+      displayName: 'NSE Indices',
+      url: nseIndices.url,
+      urlSource: nseIndices.urlSource,
+      enabled: true,
+      region: 'IN',
+      assetType: 'INDEX',
+      segmentClass: 'INDEX',
+      fileType: 'JSON',
+      parserType: 'NSE_ALL_INDICES_JSON',
+      exchange: 'NSE_INDEX',
+      country: 'India',
+      currency: 'INR',
+      maxDownloadBytes: download.defaultMaxDownloadBytes,
+      timeoutMs: download.defaultTimeoutMs,
+      setupHint: 'Uses the built-in public NSE all-indices JSON endpoint by default. Override with MARKET_DATA_CATALOG_NSE_INDICES_URL if needed.',
+      supportsManualCsv: false,
+      supportsConfiguredUrl: true,
+      supportsInternalSeed: false,
+    },
+    {
+      catalogSource: 'BSE_INDEX_SECURITIES',
+      displayName: 'BSE Indices',
+      url: bseIndices.url,
+      urlSource: bseIndices.urlSource,
+      enabled: true,
+      region: 'IN',
+      assetType: 'INDEX',
+      segmentClass: 'INDEX',
+      fileType: 'HTML',
+      parserType: 'BSE_INDICES_HTML',
+      exchange: 'BSE_INDEX',
+      country: 'India',
+      currency: 'INR',
+      maxDownloadBytes: download.defaultMaxDownloadBytes,
+      timeoutMs: download.defaultTimeoutMs,
+      setupHint: 'Uses the built-in public BSE mobile index-watch page by default. Override with MARKET_DATA_CATALOG_BSE_INDICES_URL if needed.',
+      supportsManualCsv: false,
+      supportsConfiguredUrl: true,
+      supportsInternalSeed: false,
+    },
+    {
       catalogSource: 'NSE_INDEX_SEED',
       displayName: 'NSE/BSE Index Seed',
       urlSource: 'INTERNAL_SEED',
@@ -133,7 +177,7 @@ export const getCatalogSourceConfigs = (): CatalogSourceConfig[] => {
       currency: 'INR',
       maxDownloadBytes: download.defaultMaxDownloadBytes,
       timeoutMs: download.defaultTimeoutMs,
-      setupHint: 'Uses the built-in index seed list: NIFTY 50, NIFTY BANK, and SENSEX. No URL is required.',
+      setupHint: 'Uses a small built-in fallback seed list: NIFTY 50, NIFTY BANK, and SENSEX. For broader catalogs, import NSE Indices and BSE Indices.',
       supportsManualCsv: false,
       supportsConfiguredUrl: false,
       supportsInternalSeed: true,

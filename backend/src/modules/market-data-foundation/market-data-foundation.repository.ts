@@ -17,6 +17,7 @@ import type {
 import { partitionHistoricalPrices } from './market-data-foundation.validation';
 import type { YahooFinanceIngestionService } from './market-data-foundation.provider';
 import { resolveMarketRegionFilter } from '../../shared/utils/market-scope';
+import { knownNseFnoStockUnderlyingSymbols } from './market-data-foundation.fno-underlyings';
 
 export class MarketDataFoundationRepository {
   constructor(public readonly prisma: PrismaClient = defaultPrisma) {}
@@ -74,7 +75,10 @@ export class MarketDataFoundationRepository {
       where.providerSupportStatus = { equals: providerSupportStatus.trim().toUpperCase(), mode: 'insensitive' };
     }
     if (derivativesEligible !== undefined) {
-      where.derivativesEligible = derivativesEligible;
+      where.AND = [
+        ...this.asAndArray(where.AND),
+        this.derivativesEligibleWhere(derivativesEligible),
+      ];
     }
     if (search) {
       where.AND = [
@@ -968,7 +972,7 @@ export class MarketDataFoundationRepository {
     this.assignIfChanged(next, 'catalogSource', this.keepExistingIfBlank(data.catalogSource, existing.catalogSource), existing.catalogSource);
     this.assignIfChanged(next, 'providerSupportStatus', this.keepExistingIfBlank(data.providerSupportStatus, existing.providerSupportStatus), existing.providerSupportStatus);
     this.assignIfChanged(next, 'providerError', data.providerError === undefined ? existing.providerError : data.providerError, existing.providerError);
-    this.assignIfChanged(next, 'derivativesEligible', data.derivativesEligible ?? existing.derivativesEligible, existing.derivativesEligible);
+    this.assignIfChanged(next, 'derivativesEligible', Boolean(existing.derivativesEligible) || Boolean(data.derivativesEligible), existing.derivativesEligible);
     this.assignIfChanged(next, 'underlyingSymbol', this.keepExistingIfBlank(data.underlyingSymbol, existing.underlyingSymbol), existing.underlyingSymbol);
     this.assignIfChanged(next, 'contractMonth', this.keepExistingIfBlank(data.contractMonth, existing.contractMonth), existing.contractMonth);
     this.assignIfChanged(next, 'lotSize', data.lotSize ?? existing.lotSize, existing.lotSize);
@@ -1105,6 +1109,36 @@ export class MarketDataFoundationRepository {
       };
     }
     return { currency: { equals: normalized, mode: 'insensitive' } };
+  }
+
+  private derivativesEligibleWhere(eligible: boolean): Prisma.StockWhereInput {
+    const known = knownNseFnoStockUnderlyingSymbols();
+    const derivedEligible: Prisma.StockWhereInput = {
+      OR: [
+        { symbol: { in: known.map((symbol) => `${symbol}.NS`), mode: 'insensitive' } },
+        { providerSymbol: { in: known.map((symbol) => `${symbol}.NS`), mode: 'insensitive' } },
+        { sourceSymbol: { in: known, mode: 'insensitive' } },
+        { displaySymbol: { in: known, mode: 'insensitive' } },
+      ],
+    };
+    if (eligible) {
+      return {
+        OR: [
+          { derivativesEligible: true },
+          derivedEligible,
+        ],
+      };
+    }
+    return {
+      AND: [
+        {
+          OR: [
+            { derivativesEligible: false },
+          ],
+        },
+        { NOT: derivedEligible },
+      ],
+    };
   }
 
   private keepExistingIfBlank<T>(next: T | null | undefined, current: T | null): T | null {

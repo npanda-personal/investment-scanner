@@ -456,6 +456,20 @@ describe('MarketDataFoundationService syncV1', () => {
         importModes: ['CONFIGURED_URL', 'MANUAL_CSV'],
       }),
       expect.objectContaining({
+        catalogSource: 'NSE_INDEX_SECURITIES',
+        displayName: 'NSE Indices',
+        urlConfigured: true,
+        urlSource: 'DEFAULT',
+        importModes: ['CONFIGURED_URL'],
+      }),
+      expect.objectContaining({
+        catalogSource: 'BSE_INDEX_SECURITIES',
+        displayName: 'BSE Indices',
+        urlConfigured: true,
+        urlSource: 'DEFAULT',
+        importModes: ['CONFIGURED_URL'],
+      }),
+      expect.objectContaining({
         catalogSource: 'NSE_INDEX_SEED',
         displayName: 'NSE/BSE Index Seed',
         urlConfigured: false,
@@ -468,10 +482,12 @@ describe('MarketDataFoundationService syncV1', () => {
     process.env = originalEnv;
   });
 
-  it('ships default configured URLs for NSE equity and ETF sources', () => {
+  it('ships default configured URLs for NSE equity, ETF, and index sources', () => {
     const originalEnv = { ...process.env };
     delete process.env.MARKET_DATA_CATALOG_NSE_EQUITY_URL;
     delete process.env.MARKET_DATA_CATALOG_NSE_ETF_URL;
+    delete process.env.MARKET_DATA_CATALOG_NSE_INDICES_URL;
+    delete process.env.MARKET_DATA_CATALOG_BSE_INDICES_URL;
     const service = new MarketDataFoundationService({} as any, {} as any);
 
     expect(service.listCatalogSources().sources).toEqual(expect.arrayContaining([
@@ -487,8 +503,122 @@ describe('MarketDataFoundationService syncV1', () => {
         urlSource: 'DEFAULT',
         supportsConfiguredUrl: true,
       }),
+      expect.objectContaining({
+        catalogSource: 'NSE_INDEX_SECURITIES',
+        urlConfigured: true,
+        urlSource: 'DEFAULT',
+        supportsConfiguredUrl: true,
+        fileType: 'JSON',
+      }),
+      expect.objectContaining({
+        catalogSource: 'BSE_INDEX_SECURITIES',
+        urlConfigured: true,
+        urlSource: 'DEFAULT',
+        supportsConfiguredUrl: true,
+        fileType: 'HTML',
+      }),
     ]));
 
+    process.env = originalEnv;
+  });
+
+  it('imports NSE all-indices JSON from configured URL as INDEX rows', async () => {
+    const originalEnv = { ...process.env };
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mdf-nse-index-'));
+    const payload = JSON.stringify({
+      data: [
+        { index: 'NIFTY 50' },
+        { index: 'NIFTY IT' },
+        { index: 'NIFTY NEXT 50' },
+      ],
+    });
+    const bytes = Buffer.from(payload);
+    const upsertCatalogInstrument = jest.fn().mockResolvedValue({ action: 'inserted', stock: {} });
+    (global.fetch as jest.Mock | undefined) = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => String(bytes.length) },
+      arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+    });
+    process.env.MARKET_DATA_CATALOG_NSE_INDICES_URL = 'https://example.com/all-indices.json';
+    process.env.MARKET_DATA_CATALOG_TEMP_DIR = tempDir;
+    const service = new MarketDataFoundationService({ upsertCatalogInstrument } as any, {} as any);
+
+    const result = await service.importCatalog({
+      catalogSource: 'NSE_INDEX_SECURITIES',
+      importMode: 'CONFIGURED_URL',
+    });
+
+    expect(upsertCatalogInstrument).toHaveBeenCalledWith(expect.objectContaining({
+      symbol: '^NSEI',
+      providerSymbol: '^NSEI',
+      sourceSymbol: 'NIFTY 50',
+      assetType: 'INDEX',
+      instrumentSegment: 'INDEX',
+      catalogSource: 'NSE_INDEX_SECURITIES',
+    }));
+    expect(upsertCatalogInstrument).toHaveBeenCalledWith(expect.objectContaining({
+      symbol: '^CNXIT',
+      providerSymbol: '^CNXIT',
+      sourceSymbol: 'NIFTY IT',
+    }));
+    expect(upsertCatalogInstrument).toHaveBeenCalledWith(expect.objectContaining({
+      symbol: 'NSE_INDEX_NIFTY_NEXT_50',
+      providerSymbol: null,
+      sourceSymbol: 'NIFTY NEXT 50',
+    }));
+    expect(result).toMatchObject({
+      sourceRows: 3,
+      inserted: 3,
+      downloaded: true,
+      tempFileDeleted: true,
+    });
+    expect(fs.readdirSync(tempDir)).toHaveLength(0);
+    process.env = originalEnv;
+  });
+
+  it('imports BSE index-watch HTML from configured URL as INDEX rows', async () => {
+    const originalEnv = { ...process.env };
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mdf-bse-index-'));
+    const html = '<table><tr><td>BSE SENSEX</td><td>81000</td></tr><tr><td>BSE 100</td><td>27000</td></tr><tr><td>Current</td><td>1</td></tr></table>';
+    const bytes = Buffer.from(html);
+    const upsertCatalogInstrument = jest.fn().mockResolvedValue({ action: 'inserted', stock: {} });
+    (global.fetch as jest.Mock | undefined) = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => String(bytes.length) },
+      arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+    });
+    process.env.MARKET_DATA_CATALOG_BSE_INDICES_URL = 'https://example.com/bse-indices.html';
+    process.env.MARKET_DATA_CATALOG_TEMP_DIR = tempDir;
+    const service = new MarketDataFoundationService({ upsertCatalogInstrument } as any, {} as any);
+
+    const result = await service.importCatalog({
+      catalogSource: 'BSE_INDEX_SECURITIES',
+      importMode: 'CONFIGURED_URL',
+    });
+
+    expect(upsertCatalogInstrument).toHaveBeenCalledWith(expect.objectContaining({
+      symbol: '^BSESN',
+      providerSymbol: '^BSESN',
+      sourceSymbol: 'BSE SENSEX',
+      exchange: 'BSE_INDEX',
+      assetType: 'INDEX',
+      instrumentSegment: 'INDEX',
+      catalogSource: 'BSE_INDEX_SECURITIES',
+    }));
+    expect(upsertCatalogInstrument).toHaveBeenCalledWith(expect.objectContaining({
+      symbol: 'BSE_INDEX_BSE_100',
+      providerSymbol: null,
+      sourceSymbol: 'BSE 100',
+    }));
+    expect(result).toMatchObject({
+      sourceRows: 2,
+      inserted: 2,
+      downloaded: true,
+      tempFileDeleted: true,
+    });
+    expect(fs.readdirSync(tempDir)).toHaveLength(0);
     process.env = originalEnv;
   });
 
@@ -505,11 +635,50 @@ describe('MarketDataFoundationService syncV1', () => {
       providerSymbol: 'ABB.NS',
       displaySymbol: 'ABB',
     });
+    expect(service.normalizeCatalogSymbol({ symbol: 'RELIANCE.NS', providerSymbol: 'RELIANCE.NL', exchange: 'NSE' })).toEqual({
+      sourceSymbol: 'RELIANCE',
+      providerSymbol: 'RELIANCE.NS',
+      displaySymbol: 'RELIANCE',
+    });
     expect(service.normalizeCatalogSymbol({ symbol: 'ABC', exchange: 'BSE' })).toEqual({
       sourceSymbol: 'ABC',
       providerSymbol: 'ABC.BO',
       displaySymbol: 'ABC',
     });
+  });
+
+  it('backfills known NSE F&O stock underlyings as eligible and corrects invalid provider suffixes', async () => {
+    const upsertCatalogInstrument = jest.fn().mockResolvedValue({ action: 'updated', stock: {} });
+    const repository = {
+      listStocksForCatalogBackfill: jest.fn().mockResolvedValue({
+        total: 1,
+        stocks: [{
+          id: 'stock-1',
+          symbol: 'RELIANCE.NS',
+          providerSymbol: 'RELIANCE.NL',
+          name: 'Reliance Industries Limited',
+          region: 'IN',
+          exchange: 'NSE',
+          assetType: 'STOCK',
+          derivativesEligible: false,
+          source: 'database',
+          dataStatus: 'PARTIAL',
+          isActive: true,
+        }],
+      }),
+      upsertCatalogInstrument,
+    };
+    const service = new MarketDataFoundationService(repository as any, { validateProviderSymbol: jest.fn() } as any);
+
+    await service.backfillCatalogMetadata({ region: 'IN', batchSize: 25, validateProvider: false });
+
+    expect(upsertCatalogInstrument).toHaveBeenCalledWith(expect.objectContaining({
+      symbol: 'RELIANCE.NS',
+      sourceSymbol: 'RELIANCE',
+      providerSymbol: 'RELIANCE.NS',
+      displaySymbol: 'RELIANCE',
+      derivativesEligible: true,
+    }));
   });
 
   it('backfills old NSE rows to STOCK/CASH India metadata without provider validation', async () => {

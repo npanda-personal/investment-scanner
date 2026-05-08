@@ -6,11 +6,16 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Divider,
+  Drawer,
   IconButton,
   InputAdornment,
+  LinearProgress,
   MenuItem,
   Paper,
   Stack,
+  Tab,
+  Tabs,
   TextField,
   Tooltip,
   Typography,
@@ -46,6 +51,34 @@ const formatCatalogSource = (value?: string | null) => {
   if (value === 'LEGACY_NIFTY500') return 'Legacy NIFTY 500';
   return value;
 };
+const formatDisplaySymbol = (instrument: V1Instrument) =>
+  (instrument.display_symbol || instrument.source_symbol || instrument.symbol).replace(/\.(NS|BO|BS)$/i, '');
+const subtleCellText = {
+  fontSize: 13,
+  color: 'text.primary',
+  whiteSpace: 'nowrap',
+};
+
+type BatchProgressState = {
+  label: string;
+  processed: number;
+  total: number | null;
+};
+
+type CatalogTab = 'catalog' | 'import' | 'health';
+
+type FilterPreset = {
+  id: string;
+  label: string;
+  description: string;
+  value: 'all' | 'stocks' | 'fno' | 'needsValidation' | 'unsupported' | 'indices' | 'etfs';
+  apply: () => void;
+};
+
+const formatBatchProgressLabel = (progress: BatchProgressState) => {
+  const total = progress.total && progress.total > 0 ? progress.total : null;
+  return `${progress.label}: ${progress.processed}${total ? ` / ${total}` : ''}`;
+};
 const fallbackCatalogSources: CatalogSourceInfo[] = [
   {
     catalogSource: 'NSE_EQUITY_SECURITIES',
@@ -66,6 +99,42 @@ const fallbackCatalogSources: CatalogSourceInfo[] = [
     lastImportedAt: null,
   },
   {
+    catalogSource: 'NSE_INDEX_SECURITIES',
+    displayName: 'NSE Indices',
+    enabled: true,
+    region: 'IN',
+    assetType: 'INDEX',
+    segmentClass: 'INDEX',
+    fileType: 'JSON',
+    parserType: 'NSE_ALL_INDICES_JSON',
+    importModes: ['CONFIGURED_URL'],
+    urlConfigured: true,
+    urlSource: 'DEFAULT',
+    setupHint: 'Uses the built-in public NSE all-indices JSON endpoint by default.',
+    supportsManualCsv: false,
+    supportsConfiguredUrl: true,
+    supportsInternalSeed: false,
+    lastImportedAt: null,
+  },
+  {
+    catalogSource: 'BSE_INDEX_SECURITIES',
+    displayName: 'BSE Indices',
+    enabled: true,
+    region: 'IN',
+    assetType: 'INDEX',
+    segmentClass: 'INDEX',
+    fileType: 'HTML',
+    parserType: 'BSE_INDICES_HTML',
+    importModes: ['CONFIGURED_URL'],
+    urlConfigured: true,
+    urlSource: 'DEFAULT',
+    setupHint: 'Uses the built-in public BSE mobile index-watch page by default.',
+    supportsManualCsv: false,
+    supportsConfiguredUrl: true,
+    supportsInternalSeed: false,
+    lastImportedAt: null,
+  },
+  {
     catalogSource: 'NSE_INDEX_SEED',
     displayName: 'NSE/BSE Index Seed',
     enabled: true,
@@ -77,7 +146,7 @@ const fallbackCatalogSources: CatalogSourceInfo[] = [
     importModes: ['INTERNAL_SEED'],
     urlConfigured: false,
     urlSource: 'INTERNAL_SEED',
-    setupHint: 'Uses the built-in index seed list. No URL is required.',
+    setupHint: 'Uses the small built-in fallback index seed. For broader catalogs, import NSE Indices and BSE Indices.',
     supportsManualCsv: false,
     supportsConfiguredUrl: false,
     supportsInternalSeed: true,
@@ -141,6 +210,8 @@ const MarketDataFoundationPage: React.FC = () => {
   const navigate = useNavigate();
   const { scope } = useMarketScope();
   const [instruments, setInstruments] = useState<V1Instrument[]>([]);
+  const [activeTab, setActiveTab] = useState<CatalogTab>('catalog');
+  const [selectedInstrument, setSelectedInstrument] = useState<V1Instrument | null>(null);
   const [search, setSearch] = useState('');
   const [exchange, setExchange] = useState('');
   const [assetType, setAssetType] = useState('');
@@ -169,7 +240,7 @@ const MarketDataFoundationPage: React.FC = () => {
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [catalogImportProgress, setCatalogImportProgress] = useState<string | null>(null);
+  const [batchProgress, setBatchProgress] = useState<BatchProgressState | null>(null);
   const normalizedMarket = normalizeMarketForApi(scope.region);
 
   const loadInstruments = useCallback(async () => {
@@ -286,7 +357,7 @@ const MarketDataFoundationPage: React.FC = () => {
     setImportingCatalog(true);
     setError(null);
     setSuccess(null);
-    setCatalogImportProgress(null);
+    setBatchProgress(null);
     try {
       const aggregate = {
         inserted: 0,
@@ -325,7 +396,11 @@ const MarketDataFoundationPage: React.FC = () => {
         aggregate.total = result.totalCount ?? result.sourceRows ?? aggregate.total;
         aggregate.downloadedBytes += result.fileSizeBytes ?? 0;
         aggregate.tempCleanupFailed = aggregate.tempCleanupFailed || result.tempFileDeleted === false && result.downloaded === true;
-        setCatalogImportProgress(`Imported ${Math.min(aggregate.processed, aggregate.total || aggregate.processed)} / ${aggregate.total || '...'} rows`);
+        setBatchProgress({
+          label: 'Importing catalog',
+          processed: Math.min(aggregate.processed, aggregate.total || aggregate.processed),
+          total: aggregate.total || null,
+        });
         hasMore = result.hasMore === true && result.nextOffset !== null && result.nextOffset !== undefined;
         offset = result.nextOffset ?? 0;
       }
@@ -336,7 +411,7 @@ const MarketDataFoundationPage: React.FC = () => {
       setError(err.response?.data?.message || err.message || 'Catalog import failed');
     } finally {
       setImportingCatalog(false);
-      setCatalogImportProgress(null);
+      setBatchProgress(null);
     }
   };
 
@@ -353,24 +428,55 @@ const MarketDataFoundationPage: React.FC = () => {
     setBackfillingCatalog(true);
     setError(null);
     setSuccess(null);
+    setBatchProgress(null);
     try {
-      const result = await backfillCatalogMetadata({
-        region: scope.region,
-        assetType: assetType.trim() || undefined,
-        batchSize: 100,
-        offset: 0,
-        validateProvider,
-      });
-      if (!result.success) {
-        setError(result.message || 'Catalog metadata backfill failed');
-      } else {
-        setSuccess(`Backfill processed ${result.processedCount}/${result.totalCount}: ${result.updated} updated, ${result.noOp} no-op, ${result.skipped} skipped, ${result.providerUnsupported} unsupported.${result.hasMore ? ` More rows available at offset ${result.nextOffset}.` : ''}`);
-        await loadInstruments();
+      const aggregate = {
+        processed: 0,
+        total: 0,
+        updated: 0,
+        noOp: 0,
+        skipped: 0,
+        validated: 0,
+        providerUnsupported: 0,
+        warningCount: 0,
+      };
+      let offset = 0;
+      let hasMore = true;
+      const batchSize = 100;
+      while (hasMore) {
+        const result = await backfillCatalogMetadata({
+          region: scope.region,
+          assetType: assetType.trim() || undefined,
+          batchSize,
+          offset,
+          validateProvider,
+        });
+        if (!result.success) {
+          throw new Error(result.message || 'Catalog metadata backfill failed');
+        }
+        aggregate.processed += result.processedCount ?? 0;
+        aggregate.total = result.totalCount ?? aggregate.total;
+        aggregate.updated += result.updated ?? 0;
+        aggregate.noOp += result.noOp ?? 0;
+        aggregate.skipped += result.skipped ?? 0;
+        aggregate.validated += result.validated ?? 0;
+        aggregate.providerUnsupported += result.providerUnsupported ?? 0;
+        aggregate.warningCount += result.warnings?.length ?? 0;
+        setBatchProgress({
+          label: 'Backfilling metadata',
+          processed: Math.min(aggregate.processed, aggregate.total || aggregate.processed),
+          total: aggregate.total || null,
+        });
+        hasMore = result.hasMore === true && result.nextOffset !== null && result.nextOffset !== undefined;
+        offset = result.nextOffset ?? 0;
       }
+      setSuccess(`Backfill processed ${aggregate.processed}/${aggregate.total || aggregate.processed}: ${aggregate.updated} updated, ${aggregate.noOp} no-op, ${aggregate.skipped} skipped, ${aggregate.providerUnsupported} unsupported.${aggregate.warningCount ? ` ${aggregate.warningCount} warnings.` : ''}`);
+      await loadInstruments();
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Catalog metadata backfill failed');
     } finally {
       setBackfillingCatalog(false);
+      setBatchProgress(null);
     }
   };
 
@@ -379,41 +485,44 @@ const MarketDataFoundationPage: React.FC = () => {
       id: 'symbol',
       label: 'Symbol',
       sortable: true,
-      render: (instrument) => <Typography fontWeight={700}>{instrument.symbol}</Typography>,
+      render: (instrument) => (
+        <Tooltip title={instrument.symbol !== formatDisplaySymbol(instrument) ? `Stored symbol: ${instrument.symbol}` : ''} arrow>
+          <Typography fontWeight={700} fontSize={13}>{formatDisplaySymbol(instrument)}</Typography>
+        </Tooltip>
+      ),
     },
     { id: 'name', label: 'Company', sortable: true, render: (instrument) => instrument.company_name },
     { id: 'providerSymbol', label: 'Provider Symbol', render: (instrument) => instrument.provider_symbol || instrument.symbol },
-    { id: 'exchange', label: 'Exchange', sortable: true, render: (instrument) => <StatusBadge label={instrument.exchange || 'UNKNOWN'} /> },
-    { id: 'assetType', label: 'Asset Type', sortable: true, render: (instrument) => <StatusBadge label={formatAssetType(instrument.asset_type)} /> },
-    { id: 'instrumentSegment', label: 'Segment/Class', render: (instrument) => <StatusBadge label={instrument.instrument_segment || 'UNKNOWN'} /> },
-    { id: 'derivativesEligible', label: 'F&O Eligible', render: (instrument) => <StatusBadge label={instrument.derivatives_eligible ? 'YES' : 'NO'} /> },
+    { id: 'exchange', label: 'Exchange', sortable: true, render: (instrument) => <Typography sx={subtleCellText}>{instrument.exchange || 'UNKNOWN'}</Typography> },
+    { id: 'assetType', label: 'Asset Type', sortable: true, render: (instrument) => <Typography sx={subtleCellText}>{formatAssetType(instrument.asset_type)}</Typography> },
+    { id: 'instrumentSegment', label: 'Segment/Class', render: (instrument) => <Typography sx={subtleCellText}>{instrument.instrument_segment || 'UNKNOWN'}</Typography> },
+    { id: 'derivativesEligible', label: 'F&O Eligible', render: (instrument) => <Typography sx={subtleCellText}>{instrument.derivatives_eligible ? 'YES' : 'NO'}</Typography> },
     {
       id: 'providerSupport',
       label: 'Provider Support',
       render: (instrument) => (
         <Tooltip title={(instrument.provider_support_status || 'UNKNOWN') === 'UNKNOWN' ? 'Provider support has not been validated yet.' : instrument.provider_error || ''} arrow>
-          <span><StatusBadge label={instrument.provider_support_status || 'UNKNOWN'} /></span>
+          <Typography component="span" sx={{ ...subtleCellText, color: (instrument.provider_support_status || 'UNKNOWN') === 'UNSUPPORTED' ? 'error.main' : 'text.primary' }}>
+            {instrument.provider_support_status || 'UNKNOWN'}
+          </Typography>
         </Tooltip>
       ),
     },
-    { id: 'catalogSource', label: 'Catalog Source', render: (instrument) => formatCatalogSource(instrument.catalog_source) },
-    { id: 'currency', label: 'Currency', sortable: true, render: (instrument) => instrument.currency },
-    { id: 'sector', label: 'Sector', sortable: true, render: (instrument) => instrument.sector || 'Missing' },
-    { id: 'industry', label: 'Industry', sortable: true, render: (instrument) => instrument.industry || 'Missing' },
-    { id: 'marketCap', label: 'Market Cap', sortable: true, align: 'right', render: (instrument) => formatMarketCap(instrument.market_cap) },
     {
-      id: 'metadata',
-      label: 'Metadata',
+      id: 'dataHealth',
+      label: 'Data Health',
       render: (instrument) => {
         const missing = instrument.missing_metadata_fields || [];
         return (
-          <Tooltip title={missing.length > 0 ? `Missing: ${missing.join(', ')}` : 'Metadata complete'} arrow>
-            <Chip size="small" label={`${instrument.metadata_completeness_score ?? 0}%`} color={missing.length > 0 ? 'warning' : 'success'} variant="outlined" />
-          </Tooltip>
+          <Stack direction="row" spacing={0.5} useFlexGap flexWrap="wrap">
+            <Tooltip title={missing.length > 0 ? `Missing: ${missing.join(', ')}` : 'Metadata complete'} arrow>
+              <Chip size="small" label={`${instrument.metadata_completeness_score ?? 0}%`} color={missing.length > 0 ? 'warning' : 'success'} variant="outlined" />
+            </Tooltip>
+            <StatusBadge label={instrument.data_status} />
+          </Stack>
         );
       },
     },
-    { id: 'dataStatus', label: 'Status', render: (instrument) => <StatusBadge label={instrument.data_status} /> },
     { id: 'lastSuccessfulDataLoadTimestamp', label: 'Last Updated', sortable: true, render: (instrument) => formatTimestamp(instrument.last_updated_timestamp) },
     {
       id: 'actions',
@@ -458,23 +567,68 @@ const MarketDataFoundationPage: React.FC = () => {
     setPage(0);
   };
 
+  const applyPreset = (preset: 'all' | 'stocks' | 'fno' | 'needsValidation' | 'unsupported' | 'indices' | 'etfs') => {
+    resetFilters();
+    if (preset === 'stocks') {
+      setAssetType('STOCK');
+      setInstrumentSegment('CASH');
+    }
+    if (preset === 'fno') {
+      setAssetType('STOCK');
+      setInstrumentSegment('CASH');
+      setDerivativesEligible('true');
+    }
+    if (preset === 'needsValidation') {
+      setProviderSupportStatus('UNKNOWN');
+    }
+    if (preset === 'unsupported') {
+      setProviderSupportStatus('UNSUPPORTED');
+    }
+    if (preset === 'indices') {
+      setAssetType('INDEX');
+      setInstrumentSegment('INDEX');
+    }
+    if (preset === 'etfs') {
+      setAssetType('ETF');
+      setInstrumentSegment('ETF');
+    }
+    setPage(0);
+  };
+
+  const filterPresets: FilterPreset[] = [
+    { id: 'all', value: 'all', label: 'All', description: 'All instruments in the current market scope.', apply: () => applyPreset('all') },
+    { id: 'stocks', value: 'stocks', label: 'Stocks', description: 'Indian cash equity rows.', apply: () => applyPreset('stocks') },
+    { id: 'fno', value: 'fno', label: 'F&O Eligible', description: 'Cash stocks that are known F&O underlyings.', apply: () => applyPreset('fno') },
+    { id: 'indices', value: 'indices', label: 'Indices', description: 'Index catalog rows.', apply: () => applyPreset('indices') },
+    { id: 'etfs', value: 'etfs', label: 'ETFs', description: 'ETF catalog rows.', apply: () => applyPreset('etfs') },
+    { id: 'needsValidation', value: 'needsValidation', label: 'Needs Validation', description: 'Provider support has not been validated.', apply: () => applyPreset('needsValidation') },
+    { id: 'unsupported', value: 'unsupported', label: 'Unsupported', description: 'Provider validation failed or is unsupported.', apply: () => applyPreset('unsupported') },
+  ];
+
+  const activePresetValue = (() => {
+    if (!assetType && !instrumentSegment && !providerSupportStatus && !derivativesEligible) return 'all';
+    if (assetType === 'STOCK' && instrumentSegment === 'CASH' && derivativesEligible === 'true') return 'fno';
+    if (assetType === 'STOCK' && instrumentSegment === 'CASH' && !derivativesEligible && !providerSupportStatus) return 'stocks';
+    if (providerSupportStatus === 'UNKNOWN' && !assetType && !instrumentSegment && !derivativesEligible) return 'needsValidation';
+    if (providerSupportStatus === 'UNSUPPORTED' && !assetType && !instrumentSegment && !derivativesEligible) return 'unsupported';
+    if (assetType === 'INDEX' && instrumentSegment === 'INDEX') return 'indices';
+    if (assetType === 'ETF' && instrumentSegment === 'ETF') return 'etfs';
+    return false;
+  })();
+
   const activeFilters = [
     search.trim() ? `Search = ${search.trim()}` : null,
     exchange.trim() ? `Exchange = ${exchange.trim().toUpperCase()}` : null,
     assetType.trim() ? `Asset Type = ${assetType.trim().toUpperCase()}` : null,
     instrumentSegment.trim() ? `Segment = ${instrumentSegment.trim().toUpperCase()}` : null,
     currency.trim() ? `Currency = ${currency.trim().toUpperCase()}` : null,
-    sector.trim() ? `Sector contains "${sector.trim()}"` : null,
-    industry.trim() ? `Industry contains "${industry.trim()}"` : null,
-    dataStatus.trim() ? `Status = ${dataStatus.trim().toUpperCase()}` : null,
-    catalogSource.trim() ? `Catalog Source = ${catalogSource.trim().toUpperCase()}` : null,
-    providerSupportStatus.trim() ? `Provider Support = ${providerSupportStatus.trim().toUpperCase()}` : null,
+    providerSupportStatus.trim() ? `Provider = ${providerSupportStatus.trim().toUpperCase()}` : null,
     derivativesEligible ? `F&O Eligible = ${derivativesEligible === 'true' ? 'YES' : 'NO'}` : null,
   ].filter((item): item is string => Boolean(item));
   const hasLocalFilters = activeFilters.length > 0;
   const availableCatalogSources = catalogSources.length > 0 ? catalogSources : fallbackCatalogSources;
   const selectedCatalogSource = availableCatalogSources.find((source) => source.catalogSource === importSource);
-  const importAvailable = importMode === 'MANUAL_CSV'
+  const importAvailable = importMode === 'MANUAL_CSV' && catalogCsv.trim().length > 0
     || (importMode === 'CONFIGURED_URL' && selectedCatalogSource?.supportsConfiguredUrl === true)
     || (importMode === 'INTERNAL_SEED' && selectedCatalogSource?.supportsInternalSeed === true);
   const scopeLabel = `${scope.region === 'GLOBAL' ? 'Global / All' : scope.region} / All asset types`;
@@ -483,7 +637,7 @@ const MarketDataFoundationPage: React.FC = () => {
     : `No instruments found for ${scopeLabel}.`;
 
   return (
-    <Box sx={{ p: 3, maxWidth: 1400, mx: 'auto' }}>
+    <Box sx={{ p: 3, maxWidth: 1400, width: '100%', minWidth: 0, boxSizing: 'border-box', mx: 'auto', overflowX: 'hidden' }}>
       <PageHeader
         title="Market Data Foundation"
         subtitle="Explore instruments, prices, fundamentals, corporate actions, and manual data sync status."
@@ -509,7 +663,18 @@ const MarketDataFoundationPage: React.FC = () => {
         }
       />
 
-      <MarketDataStatusPanel region={scope.region} />
+      <Paper variant="outlined" sx={{ mb: 2 }}>
+        <Tabs
+          value={activeTab}
+          onChange={(_event, nextTab: CatalogTab) => setActiveTab(nextTab)}
+          variant="scrollable"
+          allowScrollButtonsMobile
+        >
+          <Tab value="catalog" label="Catalog" />
+          <Tab value="import" label="Import & Backfill" />
+          <Tab value="health" label="Data Health" />
+        </Tabs>
+      </Paper>
 
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Typography variant="body2" color="text.secondary">
@@ -518,28 +683,86 @@ const MarketDataFoundationPage: React.FC = () => {
         </Typography>
       </Paper>
 
-      <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
+      {batchProgress && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          <Stack spacing={1}>
+            <Typography variant="body2">{formatBatchProgressLabel(batchProgress)}</Typography>
+            <LinearProgress
+              variant={batchProgress.total && batchProgress.total > 0 ? 'determinate' : 'indeterminate'}
+              value={batchProgress.total && batchProgress.total > 0 ? Math.min(100, (batchProgress.processed / batchProgress.total) * 100) : undefined}
+            />
+          </Stack>
+        </Alert>
+      )}
+      {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>{success}</Alert>}
+
+      {activeTab === 'health' && (
+        <MarketDataStatusPanel region={scope.region} />
+      )}
+
+      {activeTab === 'import' && (
+      <Paper
+        variant="outlined"
+        sx={{
+          p: 2,
+          mb: 2,
+          width: { xs: 'calc(100vw - 48px)', sm: 'calc(100vw - 96px)', md: '100%' },
+          maxWidth: '100%',
+          boxSizing: 'border-box',
+          overflow: 'visible',
+        }}
+      >
         <Stack spacing={1.5}>
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'center' }}>
-            <TextField select size="small" label="Import Mode" value={importMode} onChange={(event) => setImportMode(event.target.value as 'CONFIGURED_URL' | 'MANUAL_CSV' | 'INTERNAL_SEED')} sx={{ minWidth: 180 }}>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(3, minmax(180px, 1fr)) auto' },
+              gap: 1.5,
+              alignItems: 'center',
+              maxWidth: '100%',
+              '& .MuiTextField-root': { minWidth: 0 },
+            }}
+          >
+            <TextField select size="small" label="Import Mode" value={importMode} onChange={(event) => setImportMode(event.target.value as 'CONFIGURED_URL' | 'MANUAL_CSV' | 'INTERNAL_SEED')}>
               {(!selectedCatalogSource || selectedCatalogSource.supportsConfiguredUrl) && <MenuItem value="CONFIGURED_URL">Configured URL</MenuItem>}
               {selectedCatalogSource?.supportsInternalSeed && <MenuItem value="INTERNAL_SEED">Internal Seed</MenuItem>}
               {(!selectedCatalogSource || selectedCatalogSource.supportsManualCsv) && <MenuItem value="MANUAL_CSV">Manual CSV</MenuItem>}
             </TextField>
-            <TextField select size="small" label="Catalog Source" value={importSource} onChange={(event) => handleImportSourceChange(event.target.value)} sx={{ minWidth: 260 }}>
+            <TextField select size="small" label="Catalog Source" value={importSource} onChange={(event) => handleImportSourceChange(event.target.value)}>
               {availableCatalogSources.map((item) => <MenuItem key={item.catalogSource} value={item.catalogSource}>{item.displayName || item.catalogSource}</MenuItem>)}
             </TextField>
-            <TextField select size="small" label="Provider Validation" value={validateProvider ? 'true' : 'false'} onChange={(event) => setValidateProvider(event.target.value === 'true')} sx={{ minWidth: 180 }}>
+            <TextField select size="small" label="Provider Validation" value={validateProvider ? 'true' : 'false'} onChange={(event) => setValidateProvider(event.target.value === 'true')}>
               <MenuItem value="false">Skip validation</MenuItem>
               <MenuItem value="true">Validate batch</MenuItem>
             </TextField>
-            <Button variant="outlined" startIcon={importingCatalog ? <CircularProgress size={18} /> : <SyncIcon />} onClick={handleCatalogImport} disabled={importingCatalog || !importAvailable}>
-              {importingCatalog ? 'Importing...' : 'Import Catalog'}
-            </Button>
-            <Button variant="outlined" startIcon={backfillingCatalog ? <CircularProgress size={18} /> : <SyncIcon />} onClick={handleCatalogBackfill} disabled={backfillingCatalog}>
-              {backfillingCatalog ? 'Backfilling...' : 'Backfill Metadata'}
-            </Button>
-          </Stack>
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              spacing={1}
+              useFlexGap
+              flexWrap="wrap"
+              sx={{ justifySelf: { xs: 'stretch', lg: 'end' }, minWidth: 0 }}
+            >
+              <Button
+                variant="outlined"
+                startIcon={importingCatalog ? <CircularProgress size={18} /> : <SyncIcon />}
+                onClick={handleCatalogImport}
+                disabled={importingCatalog || backfillingCatalog || !importAvailable}
+                sx={{ flex: { xs: '1 1 auto', sm: '0 1 auto' }, whiteSpace: 'nowrap' }}
+              >
+                {importingCatalog ? 'Importing...' : 'Import Catalog'}
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={backfillingCatalog ? <CircularProgress size={18} /> : <SyncIcon />}
+                onClick={handleCatalogBackfill}
+                disabled={backfillingCatalog || importingCatalog}
+                sx={{ flex: { xs: '1 1 auto', sm: '0 1 auto' }, whiteSpace: 'nowrap' }}
+              >
+                {backfillingCatalog ? 'Backfilling...' : 'Backfill Metadata'}
+              </Button>
+            </Stack>
+          </Box>
           {selectedCatalogSource && (
             <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
               <Chip size="small" label={selectedCatalogSource.region} />
@@ -547,6 +770,8 @@ const MarketDataFoundationPage: React.FC = () => {
               {selectedCatalogSource.segmentClass && <Chip size="small" label={selectedCatalogSource.segmentClass} />}
               {selectedCatalogSource.supportsInternalSeed ? (
                 <Chip size="small" color="success" label="Uses built-in seed list" />
+              ) : importMode === 'MANUAL_CSV' && !selectedCatalogSource.urlConfigured ? (
+                <Chip size="small" color="warning" label="Manual CSV required" />
               ) : (
                 <Chip size="small" color={selectedCatalogSource.urlConfigured ? 'success' : 'warning'} label={`URL configured: ${selectedCatalogSource.urlConfigured ? 'Yes' : 'No'}`} />
               )}
@@ -555,6 +780,9 @@ const MarketDataFoundationPage: React.FC = () => {
           )}
           {importMode === 'CONFIGURED_URL' && selectedCatalogSource && !selectedCatalogSource.urlConfigured && (
             <Alert severity="warning">{selectedCatalogSource.setupHint || 'No configured URL for this source. Use Manual CSV or configure the source URL.'}</Alert>
+          )}
+          {importMode === 'MANUAL_CSV' && selectedCatalogSource && !selectedCatalogSource.urlConfigured && selectedCatalogSource.setupHint && (
+            <Alert severity="info">{selectedCatalogSource.setupHint}</Alert>
           )}
           {importMode === 'INTERNAL_SEED' && selectedCatalogSource && (
             <Alert severity="info">{selectedCatalogSource.setupHint || 'Uses a built-in seed list. No URL is required.'}</Alert>
@@ -572,8 +800,56 @@ const MarketDataFoundationPage: React.FC = () => {
           )}
         </Stack>
       </Paper>
+      )}
 
-      <Box sx={{ mb: 2 }}>
+      {activeTab === 'catalog' && (
+        <>
+      <Box sx={{ mb: 2, width: { xs: 'calc(100vw - 48px)', sm: 'calc(100vw - 96px)', md: '100%' }, maxWidth: '100%', boxSizing: 'border-box' }}>
+        <Paper
+          variant="outlined"
+          sx={{
+            mb: 1.5,
+            px: 1,
+            bgcolor: 'background.paper',
+            borderColor: 'divider',
+            overflow: 'hidden',
+          }}
+        >
+          <Stack direction={{ xs: 'column', md: 'row' }} alignItems={{ xs: 'stretch', md: 'center' }} spacing={{ xs: 0.5, md: 1 }}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ px: 1, pt: { xs: 1, md: 0 }, flexShrink: 0, textTransform: 'uppercase', letterSpacing: 0.6 }}
+            >
+              Catalog Views
+            </Typography>
+            <Tabs
+              value={activePresetValue}
+              onChange={(_event, nextValue) => {
+                const preset = filterPresets.find((item) => item.value === nextValue);
+                preset?.apply();
+              }}
+              variant="scrollable"
+              scrollButtons="auto"
+              allowScrollButtonsMobile
+              sx={{
+                minHeight: 48,
+                '& .MuiTabs-indicator': { height: 3, borderRadius: 3 },
+                '& .MuiTab-root': {
+                  minHeight: 48,
+                  px: 2,
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  fontSize: 13,
+                },
+              }}
+            >
+              {filterPresets.map((preset) => (
+                <Tab key={preset.id} value={preset.value} label={preset.label} title={preset.description} />
+              ))}
+            </Tabs>
+          </Stack>
+        </Paper>
         <FilterBar onReset={resetFilters} showReset={hasLocalFilters}>
           <TextField
             sx={{ flexBasis: { xs: '100%', md: 320 }, flexGrow: { md: 2 } }}
@@ -602,20 +878,6 @@ const MarketDataFoundationPage: React.FC = () => {
             {['CASH', 'FUTURES', 'INDEX', 'ETF', 'CURRENCY', 'COMMODITY', 'CRYPTO', 'FUND', 'OTHER', 'UNKNOWN'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
           </TextField>
           <TextField size="small" label="Currency" value={currency} onChange={(event) => { setCurrency(event.target.value.toUpperCase()); setPage(0); }} />
-          <TextField size="small" label="Sector" value={sector} onChange={(event) => { setSector(event.target.value); setPage(0); }} />
-          <TextField size="small" label="Industry" value={industry} onChange={(event) => { setIndustry(event.target.value); setPage(0); }} />
-          <TextField select size="small" label="Status" value={dataStatus} onChange={(event) => { setDataStatus(event.target.value); setPage(0); }}>
-            <MenuItem value="">All</MenuItem>
-            {['COMPLETE', 'PARTIAL', 'DELAYED', 'MISSING', 'ERROR'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
-          </TextField>
-          <TextField select size="small" label="Provider Support" value={providerSupportStatus} onChange={(event) => { setProviderSupportStatus(event.target.value); setPage(0); }}>
-            <MenuItem value="">All</MenuItem>
-            {['SUPPORTED', 'UNSUPPORTED', 'UNKNOWN', 'VALIDATION_FAILED'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
-          </TextField>
-          <TextField select size="small" label="Catalog Source" value={catalogSource} onChange={(event) => { setCatalogSource(event.target.value); setPage(0); }}>
-            <MenuItem value="">All</MenuItem>
-            {['MANUAL', 'LEGACY_NIFTY500', 'LEGACY_DATABASE', 'NSE_EQUITY_SECURITIES', 'NSE_EQUITY_DERIVATIVES_UNDERLYINGS', 'NSE_INDEX_SEED', 'NSE_ETF_SECURITIES', 'BSE_EQUITY_SECURITIES', 'BROKER_SCRIP_MASTER', 'UNKNOWN'].map((item) => <MenuItem key={item} value={item}>{formatCatalogSource(item)}</MenuItem>)}
-          </TextField>
           <TextField select size="small" label="F&O Eligible" value={derivativesEligible} onChange={(event) => { setDerivativesEligible(event.target.value); setPage(0); }}>
             <MenuItem value="">All</MenuItem>
             <MenuItem value="true">Yes</MenuItem>
@@ -639,10 +901,6 @@ const MarketDataFoundationPage: React.FC = () => {
         </Stack>
       )}
 
-      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
-      {catalogImportProgress && <Alert severity="info" sx={{ mb: 2 }}>{catalogImportProgress}</Alert>}
-      {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>{success}</Alert>}
-
       <DataTable
         columns={columns}
         rows={instruments}
@@ -659,13 +917,84 @@ const MarketDataFoundationPage: React.FC = () => {
           setSortDirection(nextDirection);
           setPage(0);
         }}
-        onRowClick={(instrument) => navigate(`/stocks/${instrument.id}`)}
+        onRowClick={(instrument) => setSelectedInstrument(instrument)}
         onPageChange={setPage}
         onPageSizeChange={(nextPageSize) => {
           setPageSize(nextPageSize);
           setPage(0);
         }}
-      />
+        />
+        </>
+      )}
+
+      <Drawer
+        anchor="right"
+        open={Boolean(selectedInstrument)}
+        onClose={() => setSelectedInstrument(null)}
+        PaperProps={{ sx: { width: { xs: '100%', sm: 480 }, maxWidth: '100%', p: 3 } }}
+      >
+        {selectedInstrument && (
+          <Stack spacing={2}>
+            <Box>
+              <Typography variant="overline" color="text.secondary">Instrument</Typography>
+              <Typography variant="h5" fontWeight={700}>{formatDisplaySymbol(selectedInstrument)}</Typography>
+              <Typography variant="body2" color="text.secondary">{selectedInstrument.company_name}</Typography>
+            </Box>
+            <Divider />
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+              <StatusBadge label={formatAssetType(selectedInstrument.asset_type)} />
+              <StatusBadge label={selectedInstrument.instrument_segment || 'UNKNOWN'} />
+              <StatusBadge label={selectedInstrument.derivatives_eligible ? 'F&O YES' : 'F&O NO'} />
+              <StatusBadge label={selectedInstrument.provider_support_status || 'UNKNOWN'} />
+            </Stack>
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>Identity</Typography>
+              <Stack spacing={0.75}>
+                <Typography variant="body2"><strong>Stored symbol:</strong> {selectedInstrument.symbol}</Typography>
+                <Typography variant="body2"><strong>Display symbol:</strong> {selectedInstrument.display_symbol || formatDisplaySymbol(selectedInstrument)}</Typography>
+                <Typography variant="body2"><strong>Source symbol:</strong> {selectedInstrument.source_symbol || 'Missing'}</Typography>
+                <Typography variant="body2"><strong>Provider symbol:</strong> {selectedInstrument.provider_symbol || 'Missing'}</Typography>
+              </Stack>
+            </Box>
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>Catalog</Typography>
+              <Stack spacing={0.75}>
+                <Typography variant="body2"><strong>Exchange:</strong> {selectedInstrument.exchange || 'Missing'}</Typography>
+                <Typography variant="body2"><strong>Region:</strong> {selectedInstrument.region || 'Missing'}</Typography>
+                <Typography variant="body2"><strong>Country:</strong> {selectedInstrument.country || 'Missing'}</Typography>
+                <Typography variant="body2"><strong>Currency:</strong> {selectedInstrument.currency || 'Missing'}</Typography>
+                <Typography variant="body2"><strong>Catalog source:</strong> {formatCatalogSource(selectedInstrument.catalog_source)}</Typography>
+              </Stack>
+            </Box>
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>Metadata</Typography>
+              <Stack spacing={0.75}>
+                <Typography variant="body2"><strong>Sector:</strong> {selectedInstrument.sector || 'Missing'}</Typography>
+                <Typography variant="body2"><strong>Industry:</strong> {selectedInstrument.industry || 'Missing'}</Typography>
+                <Typography variant="body2"><strong>Market cap:</strong> {formatMarketCap(selectedInstrument.market_cap)}</Typography>
+                <Typography variant="body2"><strong>Completeness:</strong> {selectedInstrument.metadata_completeness_score ?? 0}%</Typography>
+                <Typography variant="body2"><strong>Missing fields:</strong> {selectedInstrument.missing_metadata_fields?.length ? selectedInstrument.missing_metadata_fields.join(', ') : 'None'}</Typography>
+              </Stack>
+            </Box>
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>Provider & Data</Typography>
+              <Stack spacing={0.75}>
+                <Typography variant="body2"><strong>Provider support:</strong> {selectedInstrument.provider_support_status || 'UNKNOWN'}</Typography>
+                <Typography variant="body2"><strong>Provider error:</strong> {selectedInstrument.provider_error || 'None'}</Typography>
+                <Typography variant="body2"><strong>Data status:</strong> {selectedInstrument.data_status}</Typography>
+                <Typography variant="body2"><strong>Last updated:</strong> {formatTimestamp(selectedInstrument.last_updated_timestamp)}</Typography>
+              </Stack>
+            </Box>
+            <Divider />
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+              <Button variant="outlined" onClick={() => navigate(`/stocks/${selectedInstrument.id}`)}>Open Workspace</Button>
+              <Button variant="contained" onClick={() => void handleSync(selectedInstrument)} disabled={syncingId === selectedInstrument.id}>
+                {syncingId === selectedInstrument.id ? 'Syncing...' : 'Sync Prices'}
+              </Button>
+            </Stack>
+          </Stack>
+        )}
+      </Drawer>
     </Box>
   );
 };

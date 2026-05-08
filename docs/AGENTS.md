@@ -177,6 +177,8 @@ frontend/src/shared/components
 
 Avoid deep imports into another feature’s internal files.
 
+- Follow reusable UX/UI guidance in `docs/ux-ui-best-practices.md` for table-heavy screens, filters, batch workflows, responsive layouts, and diagnostic states.
+
 # Architecture Rules
 
 ## Layering
@@ -371,6 +373,8 @@ Frontend:
 - Signal cards may open feature-owned action dialogs through public frontend exports, such as Portfolio Management and Watchlist Management.
 - Signal cards may open Alerts & Monitoring rule dialogs through public frontend exports.
 - Stock Research Workbench may expose action buttons that consume public frontend feature exports, such as adding an instrument to a watchlist.
+- Crowded operational screens should split major jobs into tabs or sidebars, keep the main table focused on scan-friendly columns, and move lower-frequency metadata or provider diagnostics into a detail drawer or detail page.
+- Main filter bars should stay compact and use preset chips for common workflows. Advanced or diagnostic filters should be hidden behind advanced controls, saved views, or presets unless they are part of the page's primary job.
 - Alert/status badges should use existing MUI `Chip` severity colors unless a shared design-system component is introduced later.
 - Shared table-heavy UX should use `frontend/src/shared/components/DataTable` for pagination, sorting, loading, error, and empty states where practical.
 - Shared page chrome should use `frontend/src/shared/components/PageHeader` for aligned titles, subtitles, back navigation, badges, and right-aligned actions.
@@ -445,6 +449,14 @@ Example response:
 - Do not fake progress.
 - Do not process an entire universe in one backend request just to simplify progress.
 - Future modules must follow this pattern.
+
+# Responsive Filter And Batch Action Layout Standard
+
+- Filter bars and batch action panels must stay inside the page content container at every supported viewport width.
+- Filters should wrap using a responsive flex/grid layout with sensible minimum widths; table horizontal scrolling is acceptable only for the table itself, not for the filter or action controls.
+- Refresh, Reset, Import, Sync, Backfill, and similar action buttons must remain visible and clickable, wrapping below filters when needed instead of overflowing or being clipped.
+- Long-running action panels should keep controls, status chips, warnings, and progress messages in the same visual container so users can understand what is running and why.
+- Shared table-heavy screens should prefer the shared `FilterBar` and `DataTable` components where practical, and feature-owned custom filter/action bars should follow the same wrapping and progress behavior.
 
 # Product Language Standard
 

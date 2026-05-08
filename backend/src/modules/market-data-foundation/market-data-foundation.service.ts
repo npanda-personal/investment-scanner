@@ -27,6 +27,227 @@ import type {
 } from './market-data-foundation.types';
 import { validateInstrumentInput } from './market-data-foundation.validation';
 import { shouldRunMarketDataSync, tradingDateForRegion } from './market-data-foundation.market-session';
+import { isKnownNseFnoStockUnderlying } from './market-data-foundation.fno-underlyings';
+
+const KNOWN_NSE_FNO_STOCK_UNDERLYINGS = new Set([
+  '360ONE',
+  'ABB',
+  'ABCAPITAL',
+  'ABFRL',
+  'ADANIENSOL',
+  'ADANIENT',
+  'ADANIGREEN',
+  'ADANIPORTS',
+  'ALKEM',
+  'AMBER',
+  'AMBUJACEM',
+  'ANGELONE',
+  'APLAPOLLO',
+  'APOLLOHOSP',
+  'ASHOKLEY',
+  'ASIANPAINT',
+  'ASTRAL',
+  'ATGL',
+  'AUBANK',
+  'AUROPHARMA',
+  'AXISBANK',
+  'BAJAJ-AUTO',
+  'BAJAJFINSV',
+  'BAJFINANCE',
+  'BALKRISIND',
+  'BANDHANBNK',
+  'BANKBARODA',
+  'BANKINDIA',
+  'BDL',
+  'BEL',
+  'BHARATFORG',
+  'BHARTIARTL',
+  'BHEL',
+  'BIOCON',
+  'BLUESTARCO',
+  'BOSCHLTD',
+  'BPCL',
+  'BRITANNIA',
+  'BSE',
+  'CAMS',
+  'CANBK',
+  'CDSL',
+  'CGPOWER',
+  'CHAMBLFERT',
+  'CHOLAFIN',
+  'CIPLA',
+  'COALINDIA',
+  'COFORGE',
+  'COLPAL',
+  'CONCOR',
+  'CROMPTON',
+  'CUMMINSIND',
+  'CYIENT',
+  'DABUR',
+  'DALBHARAT',
+  'DELHIVERY',
+  'DIVISLAB',
+  'DIXON',
+  'DLF',
+  'DMART',
+  'DRREDDY',
+  'EICHERMOT',
+  'ETERNAL',
+  'EXIDEIND',
+  'FEDERALBNK',
+  'FORTIS',
+  'GAIL',
+  'GLENMARK',
+  'GMRINFRA',
+  'GODREJCP',
+  'GODREJPROP',
+  'GRANULES',
+  'GRASIM',
+  'HAL',
+  'HAVELLS',
+  'HCLTECH',
+  'HDFCAMC',
+  'HDFCBANK',
+  'HDFCLIFE',
+  'HEROMOTOCO',
+  'HFCL',
+  'HINDALCO',
+  'HINDCOPPER',
+  'HINDPETRO',
+  'HINDUNILVR',
+  'HINDZINC',
+  'HUDCO',
+  'ICICIBANK',
+  'ICICIGI',
+  'ICICIPRULI',
+  'IDEA',
+  'IDFCFIRSTB',
+  'IEX',
+  'IGL',
+  'IIFL',
+  'INDHOTEL',
+  'INDIANB',
+  'INDIGO',
+  'INDUSINDBK',
+  'INDUSTOWER',
+  'INFY',
+  'INOXWIND',
+  'IOC',
+  'IRB',
+  'IRCTC',
+  'IREDA',
+  'IRFC',
+  'ITC',
+  'JINDALSTEL',
+  'JIOFIN',
+  'JSL',
+  'JSWENERGY',
+  'JSWSTEEL',
+  'JUBLFOOD',
+  'KALYANKJIL',
+  'KAYNES',
+  'KEI',
+  'KFINTECH',
+  'KOTAKBANK',
+  'KPITTECH',
+  'LAURUSLABS',
+  'LICHSGFIN',
+  'LICI',
+  'LODHA',
+  'LT',
+  'LTF',
+  'LTIM',
+  'LUPIN',
+  'M&M',
+  'M&MFIN',
+  'MANAPPURAM',
+  'MANKIND',
+  'MARICO',
+  'MARUTI',
+  'MAXHEALTH',
+  'MAZDOCK',
+  'MCX',
+  'MFSL',
+  'MOTHERSON',
+  'MPHASIS',
+  'MUTHOOTFIN',
+  'NATIONALUM',
+  'NAUKRI',
+  'NBCC',
+  'NCC',
+  'NESTLEIND',
+  'NHPC',
+  'NMDC',
+  'NTPC',
+  'NYKAA',
+  'OBEROIRLTY',
+  'OFSS',
+  'OIL',
+  'ONGC',
+  'PAGEIND',
+  'PATANJALI',
+  'PAYTM',
+  'PERSISTENT',
+  'PETRONET',
+  'PFC',
+  'PGEL',
+  'PHOENIXLTD',
+  'PIDILITIND',
+  'PIIND',
+  'PNB',
+  'PNBHOUSING',
+  'POLICYBZR',
+  'POLYCAB',
+  'POONAWALLA',
+  'POWERGRID',
+  'PRESTIGE',
+  'RBLBANK',
+  'RECLTD',
+  'RELIANCE',
+  'SAIL',
+  'SBICARD',
+  'SBILIFE',
+  'SBIN',
+  'SHREECEM',
+  'SHRIRAMFIN',
+  'SIEMENS',
+  'SJVN',
+  'SOLARINDS',
+  'SONACOMS',
+  'SRF',
+  'SUNPHARMA',
+  'SUPREMEIND',
+  'SUZLON',
+  'SYNGENE',
+  'TATACHEM',
+  'TATACOMM',
+  'TATACONSUM',
+  'TATAELXSI',
+  'TATAMOTORS',
+  'TATAPOWER',
+  'TATASTEEL',
+  'TATATECH',
+  'TCS',
+  'TECHM',
+  'TIINDIA',
+  'TITAGARH',
+  'TITAN',
+  'TORNTPHARM',
+  'TORNTPOWER',
+  'TRENT',
+  'TVSMOTOR',
+  'ULTRACEMCO',
+  'UNIONBANK',
+  'UNITDSPR',
+  'UNOMINDA',
+  'UPL',
+  'VBL',
+  'VEDL',
+  'VOLTAS',
+  'WIPRO',
+  'YESBANK',
+  'ZYDUSLIFE',
+]);
 
 export class MarketDataFoundationService {
   private static lastIngestionAt = 0;
@@ -76,7 +297,7 @@ export class MarketDataFoundationService {
   }
 
   baseSymbolFromProviderSymbol(symbol: string): string {
-    return symbol.trim().toUpperCase().replace(/\.(NS|BO)$/i, '');
+    return symbol.trim().toUpperCase().replace(/\.(NS|BO|BS|NL)$/i, '');
   }
 
   providerSymbolForExchange(sourceSymbol: string, exchange?: string | null): string {
@@ -93,7 +314,12 @@ export class MarketDataFoundationService {
     const rawSymbol = (row.sourceSymbol || row.providerSymbol || row.symbol || '').trim().toUpperCase();
     const exchange = row.exchange?.trim().toUpperCase() || (source?.startsWith('BSE') ? 'BSE' : source?.startsWith('NSE') ? 'NSE' : undefined);
     const baseSymbol = this.baseSymbolFromProviderSymbol(rawSymbol);
-    const providerSymbol = row.providerSymbol?.trim().toUpperCase() || this.providerSymbolForExchange(baseSymbol, exchange);
+    const existingProviderSymbol = row.providerSymbol?.trim().toUpperCase();
+    const shouldRebuildProviderSymbol = Boolean(exchange && ['NSE', 'BSE', 'NSE_EQ', 'NSE_EQUITY'].includes(exchange))
+      && (!existingProviderSymbol || !new RegExp(exchange === 'BSE' ? '\\.BO$' : '\\.NS$', 'i').test(existingProviderSymbol));
+    const providerSymbol = shouldRebuildProviderSymbol
+      ? this.providerSymbolForExchange(baseSymbol, exchange)
+      : existingProviderSymbol || this.providerSymbolForExchange(baseSymbol, exchange);
     return {
       sourceSymbol: baseSymbol,
       providerSymbol,
@@ -1322,6 +1548,14 @@ export class MarketDataFoundationService {
     const segment = this.deriveInstrumentSegment(assetType, stock.symbol);
     const currency = overrides?.currency || stock.currency || this.defaultCurrencyForInstrument(stock.symbol, stock.exchange, stock.region);
     const country = stock.country || this.defaultCountryForInstrument(stock.symbol, stock.exchange, stock.region);
+    const symbolParts = this.normalizeCatalogSymbol({
+      symbol: stock.symbol,
+      sourceSymbol: stock.sourceSymbol,
+      providerSymbol: stock.providerSymbol,
+      displaySymbol: stock.displaySymbol,
+      exchange: stock.exchange,
+    });
+    const derivativesEligible = Boolean(stock.derivativesEligible) || (assetType === 'STOCK' && this.isKnownNseDerivativesEligibleStock(symbolParts.sourceSymbol));
     const missingFields = this.missingMetadataFields({
       companyName: overrides?.company_name || stock.name,
       exchange: overrides?.exchange || stock.exchange,
@@ -1336,9 +1570,9 @@ export class MarketDataFoundationService {
     return {
       id: stock.id,
       symbol: stock.symbol,
-      display_symbol: stock.displaySymbol || stock.symbol,
-      provider_symbol: stock.providerSymbol || stock.symbol,
-      source_symbol: stock.sourceSymbol || null,
+      display_symbol: symbolParts.displaySymbol || stock.symbol,
+      provider_symbol: symbolParts.providerSymbol || stock.symbol,
+      source_symbol: symbolParts.sourceSymbol || null,
       company_name: overrides?.company_name || stock.name,
       exchange: overrides?.exchange || stock.exchange || null,
       country,
@@ -1349,7 +1583,7 @@ export class MarketDataFoundationService {
       market_cap: stock.marketCap !== null && stock.marketCap !== undefined ? Number(stock.marketCap) : null,
       asset_type: assetType,
       instrument_segment: stock.instrumentSegment || segment,
-      derivatives_eligible: stock.derivativesEligible ?? false,
+      derivatives_eligible: derivativesEligible,
       provider_support_status: stock.providerSupportStatus || 'UNKNOWN',
       catalog_source: stock.catalogSource || stock.source || 'UNKNOWN',
       provider_error: stock.providerError || null,
@@ -1449,13 +1683,21 @@ export class MarketDataFoundationService {
     this.validateConfiguredCatalogUrl(source.url);
     const downloadConfig = getCatalogDownloadConfig();
     await fs.mkdir(downloadConfig.tempDir, { recursive: true });
-    const tempFilePath = path.join(downloadConfig.tempDir, `${catalogSource.toLowerCase().replace(/[^a-z0-9_-]/g, '-')}-${Date.now()}.csv`);
+    const extension = source.fileType === 'JSON' ? 'json' : source.fileType === 'HTML' ? 'html' : 'csv';
+    const tempFilePath = path.join(downloadConfig.tempDir, `${catalogSource.toLowerCase().replace(/[^a-z0-9_-]/g, '-')}-${Date.now()}.${extension}`);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), source.timeoutMs);
     let fileSizeBytes = 0;
 
     try {
-      const response = await fetch(source.url, { signal: controller.signal });
+      const response = await fetch(source.url, {
+        signal: controller.signal,
+        headers: {
+          accept: 'text/csv, application/json, text/html, */*',
+          'accept-language': 'en-US,en;q=0.9',
+          'user-agent': 'investment-scanner-market-data-foundation/1.0',
+        },
+      });
       if (!response.ok) {
         throw new Error(`Download failed for ${catalogSource}: HTTP ${response.status}`);
       }
@@ -1540,12 +1782,13 @@ export class MarketDataFoundationService {
 
   private validateCsvColumns(source: string, csvText: string) {
     if (source === 'NSE_INDEX_SEED') return;
+    const config = getCatalogSourceConfig(source);
+    if (config?.fileType && config.fileType !== 'CSV') return;
     const firstLine = csvText.replace(/^\uFEFF/, '').split(/\r?\n/).find((line) => line.trim().length > 0);
     if (!firstLine) {
       throw new Error(`CSV format did not match expected ${source} columns: file is empty.`);
     }
     const headers = new Set(this.splitCsvLine(firstLine).map((header) => header.trim().toUpperCase()));
-    const config = getCatalogSourceConfig(source);
     const expectedColumnGroups = config?.expectedColumnGroups;
     if (!expectedColumnGroups?.length) return;
     const missingGroups = expectedColumnGroups.filter((group) => !group.some((column) => headers.has(column)));
@@ -1556,6 +1799,8 @@ export class MarketDataFoundationService {
 
   private catalogRowsForSource(source: string, csvText: string, warnings: string[]): CreateStockRequest[] {
     if (source === 'NSE_INDEX_SEED') return this.indianIndexSeedRows();
+    if (source === 'NSE_INDEX_SECURITIES') return this.parseNseIndicesJson(csvText, warnings);
+    if (source === 'BSE_INDEX_SECURITIES') return this.parseBseIndicesHtml(csvText, warnings);
     const rows = this.parseCsv(csvText);
     if (rows.length === 0) {
       warnings.push(`${source}: no CSV rows supplied.`);
@@ -1598,7 +1843,7 @@ export class MarketDataFoundationService {
       sourceSymbol: normalized.sourceSymbol,
       catalogSource: stock.catalogSource || this.legacyCatalogSourceForStock(stock),
       providerSupportStatus: stock.providerSupportStatus || 'UNKNOWN',
-      derivativesEligible: stock.derivativesEligible ?? false,
+      derivativesEligible: Boolean(stock.derivativesEligible) || this.isKnownNseDerivativesEligibleStock(normalized.sourceSymbol),
       source: stock.source || 'database',
       dataStatus: stock.dataStatus || 'PARTIAL',
       isActive: stock.isActive ?? true,
@@ -1647,7 +1892,7 @@ export class MarketDataFoundationService {
       currency: 'INR',
       assetType: isEtf ? 'ETF' : 'STOCK',
       instrumentSegment: isEtf ? 'ETF' : 'CASH',
-      derivativesEligible: false,
+      derivativesEligible: this.isKnownNseDerivativesEligibleStock(normalized.sourceSymbol),
       catalogSource: isEtf ? 'NSE_ETF_SECURITIES' : source,
       providerSupportStatus: 'UNKNOWN',
       isActive: true,
@@ -1725,6 +1970,170 @@ export class MarketDataFoundationService {
     }));
   }
 
+  private parseNseIndicesJson(jsonText: string, warnings: string[]): CreateStockRequest[] {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonText);
+    } catch (error) {
+      throw new Error(`JSON format did not match expected NSE_INDEX_SECURITIES payload: ${error instanceof Error ? error.message : 'invalid JSON'}.`);
+    }
+
+    const arrays = this.collectObjectArrays(parsed);
+    const records = arrays
+      .filter((items) => items.some((item) => this.readObjectString(item, ['index', 'indexName', 'index_name', 'name', 'Index Name'])))
+      .sort((a, b) => b.length - a.length)[0] || [];
+
+    if (records.length === 0) {
+      warnings.push('NSE_INDEX_SECURITIES: no index records found in JSON payload.');
+      return [];
+    }
+
+    return this.uniqueIndexRows(records.map((record) => {
+      const name = this.cleanIndexName(this.readObjectString(record, ['index', 'indexName', 'index_name', 'name', 'Index Name']));
+      if (!name) return null;
+      return this.mapIndexCatalogRow(name, 'NSE_INDEX_SECURITIES', 'NSE_INDEX');
+    }));
+  }
+
+  private parseBseIndicesHtml(htmlText: string, warnings: string[]): CreateStockRequest[] {
+    const text = this.decodeHtmlEntities(htmlText)
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]+>/g, '\n');
+    const candidates = text
+      .split(/\r?\n/)
+      .map((line) => this.cleanIndexName(line))
+      .filter((line) => this.isLikelyBseIndexName(line));
+
+    const rows = this.uniqueIndexRows(candidates.map((name) => this.mapIndexCatalogRow(name, 'BSE_INDEX_SECURITIES', 'BSE_INDEX')));
+    if (rows.length === 0) warnings.push('BSE_INDEX_SECURITIES: no index names found in HTML payload.');
+    return rows;
+  }
+
+  private collectObjectArrays(value: unknown): Array<Array<Record<string, unknown>>> {
+    if (Array.isArray(value)) {
+      const objectItems = value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object' && !Array.isArray(item));
+      const childArrays = value.flatMap((item) => this.collectObjectArrays(item));
+      return objectItems.length > 0 ? [objectItems, ...childArrays] : childArrays;
+    }
+    if (value && typeof value === 'object') {
+      return Object.values(value as Record<string, unknown>).flatMap((item) => this.collectObjectArrays(item));
+    }
+    return [];
+  }
+
+  private readObjectString(record: Record<string, unknown>, keys: string[]): string {
+    const normalized = new Map(Object.entries(record).map(([key, value]) => [key.trim().toUpperCase(), value]));
+    for (const key of keys) {
+      const value = normalized.get(key.trim().toUpperCase());
+      if (typeof value === 'string' && value.trim()) return value.trim();
+      if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+    }
+    return '';
+  }
+
+  private mapIndexCatalogRow(name: string, catalogSource: CatalogSource, exchange: 'NSE_INDEX' | 'BSE_INDEX'): CreateStockRequest | null {
+    const displayName = this.cleanIndexName(name);
+    if (!displayName) return null;
+    const upperName = displayName.toUpperCase();
+    const providerSymbol = this.providerSymbolForKnownIndianIndex(upperName);
+    const fallbackSymbol = `${exchange}_${this.slugForCatalogSymbol(upperName)}`;
+    const symbol = providerSymbol || fallbackSymbol;
+    return {
+      symbol,
+      sourceSymbol: upperName,
+      providerSymbol: providerSymbol || null,
+      displaySymbol: displayName,
+      name: displayName,
+      region: 'IN',
+      exchange,
+      country: 'India',
+      currency: 'INR',
+      assetType: 'INDEX',
+      instrumentSegment: 'INDEX',
+      derivativesEligible: this.isDerivativesEligibleIndexName(upperName),
+      catalogSource,
+      providerSupportStatus: 'UNKNOWN',
+      isActive: true,
+      source: catalogSource,
+      dataStatus: 'PARTIAL',
+    };
+  }
+
+  private uniqueIndexRows(rows: Array<CreateStockRequest | null>): CreateStockRequest[] {
+    const seen = new Set<string>();
+    const unique: CreateStockRequest[] = [];
+    for (const row of rows) {
+      if (!row) continue;
+      const key = `${row.exchange}:${row.sourceSymbol || row.name}`.toUpperCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push(row);
+    }
+    return unique;
+  }
+
+  private cleanIndexName(value: string): string {
+    return value
+      .replace(/\s+/g, ' ')
+      .replace(/\s+-\s+$/, '')
+      .trim();
+  }
+
+  private isLikelyBseIndexName(value: string): boolean {
+    const upper = value.toUpperCase();
+    if (!upper || upper.length < 5) return false;
+    if (/^(INDEX|CURRENT|CHANGE|% CHANGE|CATEGORY|BROAD|SECTORAL|INVESTMENT STRATEGY|AS ON|COPYRIGHT|DESKTOP SITE)$/.test(upper)) return false;
+    if (/^[+-]?\d[\d,.]*%?$/.test(upper)) return false;
+    if (upper.includes('BSE LTD')) return false;
+    return upper === 'SENSEX' || upper.startsWith('BSE ') || upper.startsWith('S&P BSE ');
+  }
+
+  private providerSymbolForKnownIndianIndex(upperName: string): string | null {
+    const aliases: Record<string, string> = {
+      'NIFTY 50': '^NSEI',
+      'NIFTY BANK': '^NSEBANK',
+      'NIFTY IT': '^CNXIT',
+      'NIFTY AUTO': '^CNXAUTO',
+      'NIFTY FMCG': '^CNXFMCG',
+      'NIFTY PHARMA': '^CNXPHARMA',
+      'NIFTY METAL': '^CNXMETAL',
+      'NIFTY REALTY': '^CNXREALTY',
+      'NIFTY ENERGY': '^CNXENERGY',
+      'NIFTY MEDIA': '^CNXMEDIA',
+      'NIFTY PSU BANK': '^CNXPSUBANK',
+      'NIFTY INFRA': '^CNXINFRA',
+      'NIFTY MIDCAP 50': '^NSEMDCP50',
+      'SENSEX': '^BSESN',
+      'BSE SENSEX': '^BSESN',
+      'S&P BSE SENSEX': '^BSESN',
+    };
+    return aliases[upperName] || null;
+  }
+
+  private isDerivativesEligibleIndexName(upperName: string): boolean {
+    return ['NIFTY 50', 'NIFTY BANK', 'NIFTY FINANCIAL SERVICES', 'NIFTY MIDCAP SELECT', 'NIFTY NEXT 50', 'SENSEX', 'BSE SENSEX', 'S&P BSE SENSEX'].includes(upperName);
+  }
+
+  private isKnownNseDerivativesEligibleStock(symbol?: string | null): boolean {
+    const normalized = this.baseSymbolFromProviderSymbol(String(symbol || '').replace(/\s+/g, '').toUpperCase());
+    return isKnownNseFnoStockUnderlying(symbol) || KNOWN_NSE_FNO_STOCK_UNDERLYINGS.has(normalized);
+  }
+
+  private slugForCatalogSymbol(value: string): string {
+    return value.toUpperCase().replace(/&/g, ' AND ').replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80) || 'UNKNOWN';
+  }
+
+  private decodeHtmlEntities(value: string): string {
+    return value
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;/gi, "'");
+  }
+
   private parseCsv(csvText: string): Record<string, string>[] {
     const lines = csvText.replace(/^\uFEFF/, '').split(/\r?\n/).filter((line) => line.trim().length > 0);
     if (lines.length < 2) return [];
@@ -1779,6 +2188,8 @@ export class MarketDataFoundationService {
       'LEGACY_DATABASE',
       'NSE_EQUITY_SECURITIES',
       'NSE_EQUITY_DERIVATIVES_UNDERLYINGS',
+      'NSE_INDEX_SECURITIES',
+      'BSE_INDEX_SECURITIES',
       'NSE_INDEX_SEED',
       'NSE_ETF_SECURITIES',
       'BSE_EQUITY_SECURITIES',

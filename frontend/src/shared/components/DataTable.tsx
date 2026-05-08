@@ -64,9 +64,24 @@ export function DataTable<T>({
   const colSpan = Math.max(columns.length, 1);
 
   return (
-    <Paper variant="outlined">
-      <TableContainer sx={{ maxHeight: 720 }}>
-        <Table stickyHeader size="small">
+    <Paper variant="outlined" sx={{ maxWidth: '100%', overflow: 'hidden' }}>
+      <TableContainer sx={{ maxHeight: 720, maxWidth: '100%', overflowX: 'auto' }}>
+        <Table
+          stickyHeader
+          size="small"
+          sx={{
+            minWidth: 900,
+            '& .MuiTableCell-root': {
+              fontSize: 13,
+              lineHeight: 1.35,
+            },
+            '& .MuiTableHead-root .MuiTableCell-root': {
+              fontSize: 12,
+              fontWeight: 700,
+              textTransform: 'none',
+            },
+          }}
+        >
           <TableHead>
             <TableRow>
               {columns.map((column) => (
@@ -113,7 +128,7 @@ export function DataTable<T>({
                 sx={{ cursor: onRowClick ? 'pointer' : 'default' }}
               >
                 {columns.map((column) => (
-                  <TableCell key={column.id} align={column.align}>{column.render(row)}</TableCell>
+                  <TableCell key={column.id} align={column.align} sx={{ py: 1.1 }}>{column.render(row)}</TableCell>
                 ))}
               </TableRow>
             ))}

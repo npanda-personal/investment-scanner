@@ -336,14 +336,36 @@ describe('MarketDataFoundationRepository', () => {
       where: expect.objectContaining({
         catalogSource: { equals: 'NSE_EQUITY_SECURITIES', mode: 'insensitive' },
         providerSupportStatus: { equals: 'SUPPORTED', mode: 'insensitive' },
-        derivativesEligible: true,
+        AND: expect.arrayContaining([
+          expect.objectContaining({
+            OR: expect.arrayContaining([
+              { derivativesEligible: true },
+              expect.objectContaining({
+                OR: expect.arrayContaining([
+                  expect.objectContaining({ symbol: expect.objectContaining({ in: expect.arrayContaining(['RELIANCE.NS']) }) }),
+                ]),
+              }),
+            ]),
+          }),
+        ]),
       }),
     }));
     expect(prisma.stock.count).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
         catalogSource: { equals: 'NSE_EQUITY_SECURITIES', mode: 'insensitive' },
         providerSupportStatus: { equals: 'SUPPORTED', mode: 'insensitive' },
-        derivativesEligible: true,
+        AND: expect.arrayContaining([
+          expect.objectContaining({
+            OR: expect.arrayContaining([
+              { derivativesEligible: true },
+              expect.objectContaining({
+                OR: expect.arrayContaining([
+                  expect.objectContaining({ symbol: expect.objectContaining({ in: expect.arrayContaining(['RELIANCE.NS']) }) }),
+                ]),
+              }),
+            ]),
+          }),
+        ]),
       }),
     }));
   });
