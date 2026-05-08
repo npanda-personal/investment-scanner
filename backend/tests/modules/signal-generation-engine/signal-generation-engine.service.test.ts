@@ -12,6 +12,20 @@ const price = (index: number, adjusted_close: number, volume = 100) => ({
   volume,
 });
 
+const freshPrice = (index: number, adjusted_close: number, volume = 100) => {
+  const date = new Date();
+  date.setDate(date.getDate() - index);
+  return {
+    date: date.toISOString(),
+    open: adjusted_close,
+    high: adjusted_close + 1,
+    low: adjusted_close - 1,
+    close: adjusted_close,
+    adjusted_close,
+    volume,
+  };
+};
+
 describe('SignalGenerationEngineService', () => {
   it('calculates SMA values', () => {
     const service = new SignalGenerationEngineService({} as any, {} as any, {} as any);
@@ -244,7 +258,15 @@ describe('SignalGenerationEngineService', () => {
     const result = await service.run({ limit: 3, useDataQualityFilter: true });
 
     expect(result.generated).toBe(2);
-    expect(result.dataQuality).toMatchObject({ beforeFilter: 3, afterFilter: 2, excludedByDataQuality: 1, missingQualityEvaluationCount: 1 });
+    expect(result.dataQuality).toMatchObject({
+      beforeFilter: 3,
+      afterFilter: 2,
+      excludedByDataQuality: 1,
+      missingQualityEvaluationCount: 1,
+      eligibleInstrumentCount: 2,
+      attemptedGenerationCount: 2,
+    });
+    expect(result).toMatchObject({ eligibleInstrumentCount: 2, attemptedGenerationCount: 2, skippedCount: 1 });
     expect(result.warnings[0]).toContain('missing data quality');
   });
 
@@ -361,6 +383,71 @@ describe('SignalGenerationEngineService', () => {
     expect(result.errors[0]).toContain('bad: missing prices');
   });
 
+  it('separates created, updated, and no-op write counts in a run summary', async () => {
+    const marketDataService = {
+      listInstruments: jest.fn().mockResolvedValue({
+        instruments: [{ id: 'created' }, { id: 'updated' }, { id: 'noop' }],
+        pagination: { total: 3 },
+      }),
+    };
+    const service = new SignalGenerationEngineService({} as any, marketDataService as any, {} as any);
+    jest.spyOn(service, 'generateForInstrument').mockImplementation(async (instrumentId) => ({
+      instrument_id: instrumentId,
+      symbol: instrumentId.toUpperCase(),
+      company_name: null,
+      sector: null,
+      country: 'IN',
+      currentPrice: null,
+      previousClose: null,
+      dailyChange: null,
+      dailyChangePercent: null,
+      currency: null,
+      priceTimestamp: null,
+      score: 50,
+      direction: 'NEUTRAL',
+      confidence: 'LOW',
+      triggered_signals: [],
+      negative_signals: [],
+      explanation: 'Neutral.',
+      generated_at: new Date().toISOString(),
+      source: 'signal-generation-engine',
+      data_status: 'PARTIAL',
+      writeStatus: instrumentId === 'created' ? 'CREATED' : instrumentId === 'updated' ? 'UPDATED' : 'NO_OP',
+    } as any));
+
+    const result = await service.run({ batchSize: 3, offset: 0, region: 'IN', assetType: 'STOCK' });
+
+    expect(result.generatedCount).toBe(1);
+    expect(result.updatedCount).toBe(1);
+    expect(result.noOpCount).toBe(1);
+    expect(result.skippedCount).toBe(0);
+  });
+
+  it('allows strong bearish evidence to receive high confidence when data is fresh and sufficient', () => {
+    const service = new SignalGenerationEngineService({} as any, {} as any, {} as any);
+    const prices = Array.from({ length: 220 }, (_, index) => freshPrice(index, 200 - index));
+
+    expect((service as any).confidenceFor(prices, { eps: -1 }, 8)).toBe('HIGH');
+  });
+
+  it('adds a stale price warning and confidence penalty without crashing', async () => {
+    const repository = {
+      createSignalResult: jest.fn(async (result) => ({ ...result, id: 'signal-1' })),
+    };
+    const stalePrices = Array.from({ length: 260 }, (_, index) => price(index, 100 + index * 0.1));
+    const marketDataService = {
+      getInstrument: jest.fn().mockResolvedValue({ id: 'stock-1', symbol: 'STALE', company_name: 'Stale Co', currency: 'INR' }),
+      listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: stalePrices }),
+      fundamentalsByInstrumentId: jest.fn().mockResolvedValue({ records: [{ eps: 1, net_income: 1, market_cap: 1000 }] }),
+    };
+    const service = new SignalGenerationEngineService(repository as any, marketDataService as any, { workbench: jest.fn().mockResolvedValue({ valuation: {}, relative_strength: {} }) } as any);
+
+    const result = await service.generateForInstrument('stock-1');
+
+    expect(result?.warnings?.[0]).toContain('Market data is stale');
+    expect(result?.confidence).not.toBe('HIGH');
+  });
+
   it('adds Strategy Framework matches when requested', async () => {
     const repository = {
       latestSignals: jest.fn().mockResolvedValue({
@@ -392,7 +479,7 @@ describe('SignalGenerationEngineService', () => {
     };
     const prices = Array.from({ length: 260 }, (_, index) => price(index, 200 - index * 0.2, 1000));
     const marketDataService = {
-      getInstrumentsByIds: jest.fn().mockResolvedValue([{ id: 'stock-1', symbol: 'ABC', region: 'IN', asset_type: 'STOCK', currency: 'INR' }]),
+      getInstrumentsByIds: jest.fn().mockResolvedValue([{ id: 'stock-1', symbol: 'ABC', country: 'India', asset_type: 'STOCK', currency: 'INR' }]),
       getLatestPricesBySymbols: jest.fn().mockResolvedValue([{ symbol: 'ABC', adjusted_close: 200, date: '2026-04-28T00:00:00.000Z' }]),
       listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices }),
     };
@@ -411,6 +498,7 @@ describe('SignalGenerationEngineService', () => {
       readinessLabel: 'PAPER_TEST_CANDIDATE',
     });
     expect(result.signals[0].strategyMatches?.[0].entryRulesPassed.length).toBeGreaterThan(0);
+    expect(frameworkService.performance).toHaveBeenCalledWith('TREND_MOMENTUM', { region: 'IN', assetType: 'STOCK' });
   });
 
   it('returns blocked strategies with data gaps instead of failing matching', async () => {

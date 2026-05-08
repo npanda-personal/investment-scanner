@@ -37,6 +37,14 @@ export interface SignalResultDto {
   warnings?: string[];
   strategyMatches?: SignalStrategyMatchSummary[];
   blockedStrategies?: SignalBlockedStrategySummary[];
+  writeStatus?: SignalWriteStatus;
+}
+
+export type SignalWriteStatus = 'CREATED' | 'UPDATED' | 'NO_OP';
+
+export interface SignalWriteResult {
+  result: SignalResultDto;
+  status: SignalWriteStatus;
 }
 
 export interface SignalStrategyMatchSummary {
@@ -145,6 +153,8 @@ export interface SignalRunResponse {
     afterFilter: number;
     excludedByDataQuality: number;
     missingQualityEvaluationCount: number;
+    eligibleInstrumentCount?: number;
+    attemptedGenerationCount?: number;
   };
   results: SignalResultDto[];
   generated_at: string;
@@ -156,6 +166,7 @@ export interface SignalRunResponse {
   hasMore?: boolean;
   generatedCount?: number;
   updatedCount?: number;
+  noOpCount?: number;
   skippedCount?: number;
   failedCount?: number;
   strategyMatchedCount?: number;
@@ -168,6 +179,8 @@ export interface SignalRunResponse {
   };
   latestGeneratedAt?: string | null;
   durationMs?: number;
+  eligibleInstrumentCount?: number;
+  attemptedGenerationCount?: number;
 }
 
 export interface SignalPricePoint {

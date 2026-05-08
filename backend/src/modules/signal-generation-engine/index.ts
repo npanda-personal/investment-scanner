@@ -9,6 +9,7 @@ export { SignalGenerationEngineRepository } from './signal-generation-engine.rep
 export { SignalGenerationEngineService } from './signal-generation-engine.service';
 export {
   normalizeDirection,
+  normalizeSignalSortBy,
   parseRunRequest,
   parseSignalQuery,
   validateInstrumentId,
@@ -23,4 +24,6 @@ export type {
   SignalResultDto,
   SignalRunRequest,
   SignalRunResponse,
+  SignalWriteResult,
+  SignalWriteStatus,
 } from './signal-generation-engine.types';

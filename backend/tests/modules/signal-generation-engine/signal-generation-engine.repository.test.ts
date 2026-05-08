@@ -62,6 +62,61 @@ describe('SignalGenerationEngineRepository', () => {
     expect(saved).toMatchObject({ id: 'signal-1', instrument_id: 'stock-1', score: 75 });
   });
 
+  it('reports same-day write status without changing the compatible create method', async () => {
+    const existing = {
+      id: 'signal-1',
+      instrumentId: 'stock-1',
+      symbol: 'AAPL',
+      companyName: 'Apple',
+      sector: 'Technology',
+      country: 'US',
+      score: 70,
+      direction: 'BULLISH',
+      confidence: 'HIGH',
+      triggeredSignals: [],
+      negativeSignals: [],
+      explanation: 'Old.',
+      generatedAt: new Date(signal.generated_at),
+      modelVersion: 'signal-engine-v1',
+      source: 'signal-generation-engine',
+      dataStatus: 'COMPLETE',
+    };
+    const findUnique = jest.fn().mockResolvedValue(existing);
+    const upsert = jest.fn().mockResolvedValue({ ...existing, score: 75, explanation: signal.explanation, triggeredSignals: signal.triggered_signals });
+    const repository = new SignalGenerationEngineRepository({ signalResult: { findUnique, upsert } } as any);
+
+    const write = await repository.createSignalResultWithStatus(signal);
+    const compatible = await repository.createSignalResult(signal);
+
+    expect(write.status).toBe('UPDATED');
+    expect(write.result.score).toBe(75);
+    expect(compatible.score).toBe(75);
+  });
+
+  it('reports no-op write status when same-day values are unchanged', async () => {
+    const existing = {
+      id: 'signal-1',
+      instrumentId: 'stock-1',
+      symbol: 'AAPL',
+      companyName: 'Apple',
+      sector: 'Technology',
+      country: 'US',
+      score: 75,
+      direction: 'BULLISH',
+      confidence: 'HIGH',
+      triggeredSignals: signal.triggered_signals,
+      negativeSignals: [],
+      explanation: signal.explanation,
+      generatedAt: new Date(signal.generated_at),
+      modelVersion: 'signal-engine-v1',
+      source: 'signal-generation-engine',
+      dataStatus: 'COMPLETE',
+    };
+    const repository = new SignalGenerationEngineRepository({ signalResult: { findUnique: jest.fn().mockResolvedValue(existing), upsert: jest.fn().mockResolvedValue(existing) } } as any);
+
+    await expect(repository.createSignalResultWithStatus(signal)).resolves.toMatchObject({ status: 'NO_OP' });
+  });
+
   it('applies searchable, partial, and confidence filters to latest signals', async () => {
     const findMany = jest.fn().mockResolvedValue([{
       id: 'signal-1',
@@ -163,5 +218,34 @@ describe('SignalGenerationEngineRepository', () => {
     expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.not.objectContaining({ direction: 'BULLISH' }),
     }));
+  });
+
+  it('uses a safe sort allowlist and falls back for invalid sort fields', async () => {
+    const rows = [
+      { ...signal, id: 's1', instrumentId: 'stock-1', symbol: 'ZZZ', score: 10, generatedAt: new Date(signal.generated_at), triggeredSignals: [], negativeSignals: [], dataStatus: 'COMPLETE' },
+      { ...signal, id: 's2', instrumentId: 'stock-2', symbol: 'AAA', score: 90, generatedAt: new Date(signal.generated_at), triggeredSignals: [], negativeSignals: [], dataStatus: 'COMPLETE' },
+    ];
+    const repository = new SignalGenerationEngineRepository({ signalResult: { findMany: jest.fn().mockResolvedValue(rows) } } as any);
+
+    await expect(repository.latestSignals({ limit: 25, sortBy: 'symbol', sortDirection: 'asc' })).resolves.toMatchObject({
+      signals: [{ symbol: 'AAA' }, { symbol: 'ZZZ' }],
+      total: 2,
+    });
+    await expect(repository.latestSignals({ limit: 25, sortBy: 'notAllowed', sortDirection: 'desc' })).resolves.toMatchObject({
+      signals: [{ symbol: 'AAA' }, { symbol: 'ZZZ' }],
+      total: 2,
+    });
+  });
+
+  it('applies latest-row semantics to latestSignalUniverse and counts', async () => {
+    const findMany = jest.fn().mockResolvedValue([
+      { ...signal, id: 'latest-1', instrumentId: 'stock-1', symbol: 'AAPL', direction: 'NEUTRAL', score: 55, generatedAt: new Date('2026-04-30T00:00:00.000Z'), triggeredSignals: [], negativeSignals: [], dataStatus: 'COMPLETE' },
+      { ...signal, id: 'latest-2', instrumentId: 'stock-2', symbol: 'MSFT', direction: 'BULLISH', score: 80, generatedAt: new Date('2026-04-30T00:00:00.000Z'), triggeredSignals: [], negativeSignals: [], dataStatus: 'COMPLETE' },
+    ]);
+    const repository = new SignalGenerationEngineRepository({ signalResult: { findMany } } as any);
+
+    await expect(repository.latestSignalUniverse({ limit: 25, direction: 'BULLISH' })).resolves.toMatchObject([{ symbol: 'MSFT' }]);
+    await expect(repository.latestSignalUniverseCount({ direction: 'BULLISH', offset: 0 })).resolves.toBe(1);
+    expect(findMany.mock.calls[0][0].where.direction).toBeUndefined();
   });
 });

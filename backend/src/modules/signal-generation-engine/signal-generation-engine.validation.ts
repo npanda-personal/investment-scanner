@@ -1,7 +1,9 @@
 import type { SignalConfidence, SignalDirection, SignalQuery, SignalRunRequest } from './signal-generation-engine.types';
+import { normalizeMarketRegion } from '../../shared/utils/market-scope';
 
 const DIRECTIONS: SignalDirection[] = ['BULLISH', 'NEUTRAL', 'BEARISH'];
 const CONFIDENCES: SignalConfidence[] = ['LOW', 'MEDIUM', 'HIGH'];
+const SORT_FIELDS = ['score', 'symbol', 'companyName', 'generatedAt', 'direction', 'confidence', 'dailyChangePercent'];
 
 const first = (value: unknown): unknown => Array.isArray(value) ? value[0] : value;
 
@@ -15,11 +17,25 @@ export function normalizeConfidence(value: unknown): SignalConfidence | undefine
   return CONFIDENCES.includes(normalized as SignalConfidence) ? normalized as SignalConfidence : undefined;
 }
 
+export function normalizeSignalSortBy(value: unknown): string | undefined {
+  const normalized = String(first(value) || '').trim();
+  return SORT_FIELDS.includes(normalized) ? normalized : undefined;
+}
+
+const normalizeRegionText = (value: unknown): string | undefined => {
+  if (typeof first(value) !== 'string') return undefined;
+  const raw = String(first(value)).trim().toUpperCase();
+  if (!raw) return undefined;
+  return normalizeMarketRegion(raw) || 'GLOBAL';
+};
+
+const normalizeAssetTypeText = (value: unknown): string | undefined =>
+  typeof first(value) === 'string' ? String(first(value)).trim().toUpperCase() || undefined : undefined;
+
 export function parseSignalQuery(query: Record<string, unknown>): SignalQuery {
   const minScoreValue = Number(first(query.minScore));
   const limitValue = Number(first(query.limit));
   const offsetValue = Number(first(query.offset));
-  const sortBy = String(first(query.sortBy) || '').trim() || undefined;
   const sortDirection = String(first(query.sortDirection) || '').toLowerCase();
 
   return {
@@ -27,12 +43,12 @@ export function parseSignalQuery(query: Record<string, unknown>): SignalQuery {
     minScore: Number.isFinite(minScoreValue) ? Math.min(100, Math.max(0, minScoreValue)) : undefined,
     limit: Number.isFinite(limitValue) ? Math.min(100, Math.max(1, Math.floor(limitValue))) : 25,
     offset: Number.isFinite(offsetValue) ? Math.max(0, Math.floor(offsetValue)) : undefined,
-    sortBy: sortBy,
+    sortBy: normalizeSignalSortBy(query.sortBy),
     sortDirection: sortDirection === 'asc' || sortDirection === 'desc' ? sortDirection : undefined,
     sector: typeof first(query.sector) === 'string' ? String(first(query.sector)).trim() || undefined : undefined,
     country: typeof first(query.country) === 'string' ? String(first(query.country)).trim() || undefined : undefined,
-    region: typeof first(query.region) === 'string' ? String(first(query.region)).trim() || undefined : undefined,
-    assetType: typeof first(query.assetType) === 'string' ? String(first(query.assetType)).trim() || undefined : undefined,
+    region: normalizeRegionText(query.region),
+    assetType: normalizeAssetTypeText(query.assetType),
     signalType: typeof first(query.signalType) === 'string' ? String(first(query.signalType)).trim() || undefined : undefined,
     confidence: normalizeConfidence(query.confidence),
     search: typeof first(query.search) === 'string' ? String(first(query.search)).trim() || undefined : undefined,
@@ -59,8 +75,8 @@ export function parseRunRequest(body: any): SignalRunRequest {
     direction: normalizeDirection(body?.direction),
     sector: typeof body?.sector === 'string' ? body.sector.trim() || undefined : undefined,
     country: typeof body?.country === 'string' ? body.country.trim() || undefined : undefined,
-    region: typeof body?.region === 'string' ? body.region.trim() || undefined : undefined,
-    assetType: typeof body?.assetType === 'string' ? body.assetType.trim() || undefined : undefined,
+    region: normalizeRegionText(body?.region),
+    assetType: normalizeAssetTypeText(body?.assetType),
     useDataQualityFilter: body?.useDataQualityFilter === true,
     minSignalReadinessScore: Number.isFinite(Number(body?.minSignalReadinessScore)) ? Math.min(100, Math.max(0, Number(body.minSignalReadinessScore))) : undefined,
     allowedReadinessStatuses: Array.isArray(body?.allowedReadinessStatuses) ? body.allowedReadinessStatuses : undefined,

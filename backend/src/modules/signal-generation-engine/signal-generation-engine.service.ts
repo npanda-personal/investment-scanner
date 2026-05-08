@@ -4,6 +4,7 @@ import { DataQualityEngineService } from '../data-quality-engine';
 import { StrategyFrameworkEvaluator } from '../strategy-framework/strategy-framework.evaluator';
 import { StrategyFrameworkRegistry } from '../strategy-framework/strategy-framework.registry';
 import type { StrategyContext, StrategyPerformanceSummaryDto, StrategySignalOutput } from '../strategy-framework/strategy-framework.types';
+import { normalizeMarketRegion } from '../../shared/utils/market-scope';
 import { SignalGenerationEngineRepository } from './signal-generation-engine.repository';
 import type {
   PaginatedSignalResponse,
@@ -98,6 +99,8 @@ export class SignalGenerationEngineService {
       afterFilter: resolvedInstrumentIds.length,
       excludedByDataQuality: 0,
       missingQualityEvaluationCount: 0,
+      eligibleInstrumentCount: resolvedInstrumentIds.length,
+      attemptedGenerationCount: resolvedInstrumentIds.length,
     };
 
     if (request.useDataQualityFilter) {
@@ -120,6 +123,8 @@ export class SignalGenerationEngineService {
           afterFilter: instrumentIds.length,
           excludedByDataQuality: filtered.excludedInstrumentIds.length,
           missingQualityEvaluationCount: filtered.missingQualityEvaluationCount,
+          eligibleInstrumentCount: instrumentIds.length,
+          attemptedGenerationCount: instrumentIds.length,
         };
       }
     }
@@ -134,8 +139,12 @@ export class SignalGenerationEngineService {
     }
     const processedCount = resolvedInstrumentIds.length;
     const failedCount = errors.length;
-    const generatedCount = results.length;
-    const skippedCount = Math.max(0, processedCount - generatedCount - failedCount);
+    const attemptedGenerationCount = instrumentIds.length;
+    const generatedCount = results.filter((result) => result.writeStatus === 'CREATED' || !result.writeStatus).length;
+    const updatedCount = results.filter((result) => result.writeStatus === 'UPDATED').length;
+    const noOpCount = results.filter((result) => result.writeStatus === 'NO_OP').length;
+    const nullResultCount = Math.max(0, attemptedGenerationCount - results.length - failedCount);
+    const skippedCount = Math.max(0, processedCount - attemptedGenerationCount) + nullResultCount;
     const nextOffset = offset + processedCount;
     const hasMore = nextOffset < resolved.totalCount;
     const directionCountsGenerated = results.reduce<Record<SignalDirection, number>>((acc, result) => {
@@ -158,7 +167,8 @@ export class SignalGenerationEngineService {
       nextOffset: hasMore ? nextOffset : null,
       hasMore,
       generatedCount,
-      updatedCount: 0,
+      updatedCount,
+      noOpCount,
       skippedCount,
       failedCount,
       strategyMatchedCount: request.includeStrategyMatches ? results.reduce((sum, result) => sum + (result.strategyMatches?.length || 0), 0) : undefined,
@@ -168,6 +178,8 @@ export class SignalGenerationEngineService {
       scope: this.scopeFor(request),
       latestGeneratedAt: results[results.length - 1]?.generated_at ?? null,
       durationMs: Date.now() - startedAt,
+      eligibleInstrumentCount: instrumentIds.length,
+      attemptedGenerationCount,
     };
   }
 
@@ -276,9 +288,10 @@ export class SignalGenerationEngineService {
       if (!this.signalPassesStrategyFilters(result, options)) return null;
     }
 
-    const saved = await this.repository.createSignalResult(result);
+    const saved = await this.persistSignalResult(result);
     return {
-      ...saved,
+      ...saved.result,
+      writeStatus: saved.status,
       strategyMatches: result.strategyMatches,
       blockedStrategies: result.blockedStrategies,
     };
@@ -569,7 +582,7 @@ export class SignalGenerationEngineService {
       symbol: signal.symbol,
       companyName: signal.company_name,
       assetType: instrument?.assetType || instrument?.asset_type || 'STOCK',
-      region: instrument?.region || signal.country || 'IN',
+      region: this.canonicalRegion(instrument?.region || signal.country),
       exchange: instrument?.exchange ?? null,
       sector: signal.sector,
       country: signal.country,
@@ -847,6 +860,20 @@ export class SignalGenerationEngineService {
       region: input.region || 'GLOBAL',
       assetType: input.assetType || 'STOCK',
     };
+  }
+
+  private async persistSignalResult(result: SignalResultDto) {
+    if (typeof (this.repository as any).createSignalResultWithStatus === 'function') {
+      return (this.repository as any).createSignalResultWithStatus(result);
+    }
+    return {
+      result: await this.repository.createSignalResult(result),
+      status: 'CREATED' as const,
+    };
+  }
+
+  private canonicalRegion(value?: string | null) {
+    return normalizeMarketRegion(value) || 'IN';
   }
 
   private filtersApplied(query: SignalQuery): Record<string, unknown> {
