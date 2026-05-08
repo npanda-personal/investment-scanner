@@ -1,6 +1,10 @@
+import fs from 'fs/promises';
+import net from 'net';
+import path from 'path';
 import { MarketDataFoundationRepository } from './market-data-foundation.repository';
 import { YahooFinanceIngestionService } from './market-data-foundation.provider';
 import { enqueueIngestionJob } from './market-data-foundation.queue';
+import { getCatalogDownloadConfig, getCatalogSourceConfig, getCatalogSourceConfigs } from './market-data-foundation.catalog-sources';
 import type {
   CreateStockRequest,
   HistoricalPrice,
@@ -8,6 +12,11 @@ import type {
   MarketDataSyncSkipReason,
   ScheduledRegionSyncSummary,
   PaginationOptions,
+  CatalogBackfillRequest,
+  CatalogBackfillSummary,
+  CatalogImportRequest,
+  CatalogImportSummary,
+  CatalogSource,
   SearchResult,
   SyncSummary,
   UpdateStockRequest,
@@ -66,6 +75,32 @@ export class MarketDataFoundationService {
     return this.repository.findStockById(id);
   }
 
+  baseSymbolFromProviderSymbol(symbol: string): string {
+    return symbol.trim().toUpperCase().replace(/\.(NS|BO)$/i, '');
+  }
+
+  providerSymbolForExchange(sourceSymbol: string, exchange?: string | null): string {
+    const symbol = sourceSymbol.trim().toUpperCase();
+    if (!symbol || symbol.startsWith('^')) return symbol;
+    if (/\.(NS|BO)$/i.test(symbol)) return symbol;
+    const normalizedExchange = exchange?.trim().toUpperCase();
+    if (normalizedExchange === 'BSE') return `${symbol}.BO`;
+    if (normalizedExchange === 'NSE' || normalizedExchange === 'NSE_EQ' || normalizedExchange === 'NSE_EQUITY') return `${symbol}.NS`;
+    return symbol;
+  }
+
+  normalizeCatalogSymbol(row: { symbol?: string | null; sourceSymbol?: string | null; providerSymbol?: string | null; displaySymbol?: string | null; exchange?: string | null }, source?: string) {
+    const rawSymbol = (row.sourceSymbol || row.providerSymbol || row.symbol || '').trim().toUpperCase();
+    const exchange = row.exchange?.trim().toUpperCase() || (source?.startsWith('BSE') ? 'BSE' : source?.startsWith('NSE') ? 'NSE' : undefined);
+    const baseSymbol = this.baseSymbolFromProviderSymbol(rawSymbol);
+    const providerSymbol = row.providerSymbol?.trim().toUpperCase() || this.providerSymbolForExchange(baseSymbol, exchange);
+    return {
+      sourceSymbol: baseSymbol,
+      providerSymbol,
+      displaySymbol: row.displaySymbol?.trim().toUpperCase() || baseSymbol,
+    };
+  }
+
   async create(data: CreateStockRequest, triggerIngestion = true) {
     const existing = await this.repository.findStockBySymbol(data.symbol);
     if (existing) {
@@ -98,6 +133,9 @@ export class MarketDataFoundationService {
       sector: options.sector,
       industry: options.industry,
       dataStatus: options.dataStatus,
+      catalogSource: options.catalogSource,
+      providerSupportStatus: options.providerSupportStatus,
+      derivativesEligible: options.derivativesEligible,
       search: options.search,
     });
 
@@ -110,6 +148,209 @@ export class MarketDataFoundationService {
   async getInstrument(id: string, options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
     const stock = await this.repository.findStockByIdInScope(id, options);
     return stock ? this.toV1Instrument(stock) : null;
+  }
+
+  async importCatalog(request: CatalogImportRequest): Promise<CatalogImportSummary> {
+    const started = Date.now();
+    const catalogSource = this.normalizeCatalogSource(request.catalogSource);
+    const sourceConfig = getCatalogSourceConfig(catalogSource);
+    const importMode = request.importMode || (sourceConfig?.supportsInternalSeed ? 'INTERNAL_SEED' : request.csvText ? 'MANUAL_CSV' : 'MANUAL_CSV');
+    const batchSize = Math.min(Math.max(Number(request.batchSize) || 100, 1), 250);
+    const offset = Math.max(Number(request.offset) || 0, 0);
+    const warnings: string[] = [];
+    let csvText = request.csvText || '';
+    let downloadInfo: Awaited<ReturnType<MarketDataFoundationService['downloadConfiguredCatalogCsv']>> | null = null;
+    try {
+      if (importMode === 'CONFIGURED_URL') {
+        downloadInfo = await this.downloadConfiguredCatalogCsv(catalogSource);
+        csvText = downloadInfo.csvText;
+      } else if (importMode === 'INTERNAL_SEED') {
+        if (!sourceConfig?.supportsInternalSeed) {
+          throw new Error(`Catalog source ${catalogSource} does not support internal seed import.`);
+        }
+        csvText = '';
+      }
+      this.validateCsvColumns(catalogSource, csvText);
+      let rows = this.catalogRowsForSource(catalogSource, csvText, warnings);
+      const sourceRows = rows.length;
+      rows = rows.slice(offset, offset + batchSize);
+
+      const summary: CatalogImportSummary = {
+        catalogSource,
+        importMode,
+        downloaded: importMode === 'CONFIGURED_URL',
+        downloadUrlName: downloadInfo?.sourceName,
+        fileSizeBytes: downloadInfo?.fileSizeBytes,
+        tempFileDeleted: downloadInfo?.tempFileDeleted,
+        tempFileDeleteError: downloadInfo?.tempFileDeleteError,
+        sourceRows,
+        processedCount: rows.length,
+        totalCount: sourceRows,
+        batchSize,
+        offset,
+        nextOffset: offset + batchSize < sourceRows ? offset + batchSize : null,
+        hasMore: offset + batchSize < sourceRows,
+        inserted: 0,
+        updated: 0,
+        noOp: 0,
+        skipped: 0,
+        invalid: 0,
+        providerValidated: 0,
+        providerUnsupported: 0,
+        underlyingsRead: catalogSource === 'NSE_EQUITY_DERIVATIVES_UNDERLYINGS' ? sourceRows : undefined,
+        stockUnderlyingsMatched: catalogSource === 'NSE_EQUITY_DERIVATIVES_UNDERLYINGS' ? 0 : undefined,
+        indexUnderlyingsMatched: catalogSource === 'NSE_EQUITY_DERIVATIVES_UNDERLYINGS' ? 0 : undefined,
+        newInstrumentsCreated: catalogSource === 'NSE_EQUITY_DERIVATIVES_UNDERLYINGS' ? 0 : undefined,
+        unmatchedUnderlyings: catalogSource === 'NSE_EQUITY_DERIVATIVES_UNDERLYINGS' ? 0 : undefined,
+        warnings,
+        durationMs: 0,
+      };
+
+      for (const row of rows) {
+        if (!row.symbol || !row.name) {
+          summary.invalid += 1;
+          continue;
+        }
+
+        const result = await this.repository.upsertCatalogInstrument(row);
+        if (result.action === 'inserted') summary.inserted += 1;
+        if (result.action === 'updated') summary.updated += 1;
+        if (result.action === 'noOp') summary.noOp += 1;
+
+        if (catalogSource === 'NSE_EQUITY_DERIVATIVES_UNDERLYINGS') {
+          if (row.assetType === 'INDEX') summary.indexUnderlyingsMatched! += result.action === 'inserted' ? 0 : 1;
+          if (row.assetType === 'STOCK') summary.stockUnderlyingsMatched! += result.action === 'inserted' ? 0 : 1;
+          if (result.action === 'inserted') summary.newInstrumentsCreated! += 1;
+        }
+
+        if (request.validateProvider && row.providerSymbol) {
+          const validation = await this.marketDataProvider.validateProviderSymbol(row.providerSymbol);
+          summary.providerValidated += 1;
+          if (!validation.supported) summary.providerUnsupported += 1;
+          await this.repository.updateProviderSupportStatus(
+            row.symbol,
+            validation.supported ? 'SUPPORTED' : 'UNSUPPORTED',
+            validation.message
+          );
+        }
+      }
+
+      if (downloadInfo) {
+        await this.cleanupCatalogTempFile(downloadInfo);
+        summary.tempFileDeleted = downloadInfo.tempFileDeleted;
+        summary.tempFileDeleteError = downloadInfo.tempFileDeleteError;
+      }
+      summary.insertedCount = summary.inserted;
+      summary.updatedCount = summary.updated;
+      summary.noOpCount = summary.noOp;
+      summary.invalidCount = summary.invalid;
+      summary.providerValidatedCount = summary.providerValidated;
+      summary.providerUnsupportedCount = summary.providerUnsupported;
+      summary.durationMs = Date.now() - started;
+      console.log('[MarketDataFoundation] catalog import summary', {
+        catalogSource,
+        importMode,
+        fileSizeBytes: summary.fileSizeBytes,
+        sourceRows: summary.sourceRows,
+        processedCount: summary.processedCount,
+        inserted: summary.inserted,
+        updated: summary.updated,
+        noOp: summary.noOp,
+        invalid: summary.invalid,
+        providerValidated: summary.providerValidated,
+        providerUnsupported: summary.providerUnsupported,
+        tempFileDeleted: summary.tempFileDeleted,
+      });
+      return summary;
+    } catch (error) {
+      if (downloadInfo && downloadInfo.tempFileDeleted === false) {
+        await this.cleanupCatalogTempFile(downloadInfo).catch(() => undefined);
+      }
+      throw error;
+    }
+  }
+
+  listCatalogSources() {
+    return {
+      sources: getCatalogSourceConfigs().map((source) => ({
+        catalogSource: source.catalogSource,
+        displayName: source.displayName,
+        enabled: source.enabled,
+        region: source.region,
+        assetType: source.assetType,
+        segmentClass: source.segmentClass,
+        fileType: source.fileType,
+        parserType: source.parserType,
+        importModes: [
+          ...(source.supportsConfiguredUrl ? ['CONFIGURED_URL'] : []),
+          ...(source.supportsInternalSeed ? ['INTERNAL_SEED'] : []),
+          ...(source.supportsManualCsv ? ['MANUAL_CSV'] : []),
+        ],
+        urlConfigured: Boolean(source.url),
+        urlSource: source.urlSource,
+        setupHint: source.setupHint,
+        supportsManualCsv: source.supportsManualCsv,
+        supportsConfiguredUrl: source.supportsConfiguredUrl,
+        supportsInternalSeed: source.supportsInternalSeed,
+        lastImportedAt: null,
+      })),
+    };
+  }
+
+  async backfillCatalogMetadata(request: CatalogBackfillRequest = {}): Promise<CatalogBackfillSummary> {
+    const started = Date.now();
+    const batchSize = Math.min(Math.max(Number(request.batchSize ?? request.limit) || 100, 1), 250);
+    const offset = Math.max(Number(request.offset) || 0, 0);
+    const { stocks, total } = await this.repository.listStocksForCatalogBackfill({
+      region: request.region || 'IN',
+      assetType: request.assetType,
+      offset,
+      batchSize,
+    });
+    const summary: CatalogBackfillSummary = {
+      processedCount: 0,
+      totalCount: total,
+      batchSize,
+      offset,
+      nextOffset: null,
+      hasMore: false,
+      updated: 0,
+      noOp: 0,
+      skipped: 0,
+      validated: 0,
+      providerUnsupported: 0,
+      warnings: [],
+      durationMs: 0,
+    };
+
+    for (const stock of stocks) {
+      const normalized = this.catalogBackfillRow(stock);
+      if (!normalized) {
+        summary.skipped += 1;
+        continue;
+      }
+      const result = await this.repository.upsertCatalogInstrument(normalized);
+      summary.processedCount += 1;
+      if (result.action === 'updated') summary.updated += 1;
+      if (result.action === 'noOp') summary.noOp += 1;
+
+      if (request.validateProvider && normalized.providerSymbol) {
+        const validation = await this.marketDataProvider.validateProviderSymbol(normalized.providerSymbol);
+        summary.validated += 1;
+        if (!validation.supported) summary.providerUnsupported += 1;
+        await this.repository.updateProviderSupportStatus(
+          normalized.symbol,
+          validation.supported ? 'SUPPORTED' : 'UNSUPPORTED',
+          validation.message
+        );
+      }
+    }
+
+    const nextOffset = offset + batchSize;
+    summary.hasMore = nextOffset < total;
+    summary.nextOffset = summary.hasMore ? nextOffset : null;
+    summary.durationMs = Date.now() - started;
+    return summary;
   }
 
   async getInstrumentsByIds(ids: string[]) {
@@ -593,6 +834,7 @@ export class MarketDataFoundationService {
     const stock = await this.repository.findStockBySymbol(symbol);
     const region = options.region || stock?.region || this.marketDataProvider.inferRegion(symbol).region || 'GLOBAL';
     const assetType = options.assetType || stock?.assetType || 'STOCK';
+    const providerSymbol = stock?.providerSymbol || symbol;
     const now = endDate || new Date();
     const tradingDate = tradingDateForRegion(region, now) || now.toISOString().slice(0, 10);
 
@@ -650,7 +892,7 @@ export class MarketDataFoundationService {
 
     console.log(`  Fetching data from ${effectiveStartDate.toISOString().split('T')[0]} to ${effectiveEndDate.toISOString().split('T')[0]}`);
 
-    const prices = await this.fetchHistorical(symbol, effectiveStartDate, effectiveEndDate);
+    const prices = await this.fetchHistorical(providerSymbol, effectiveStartDate, effectiveEndDate);
 
     if (prices.length === 0) {
       console.log(`  No new price data available for ${symbol}`);
@@ -671,7 +913,8 @@ export class MarketDataFoundationService {
       return emptySummary;
     }
 
-    const syncSummary = await this.storeHistorical(prices);
+    const pricesForStorage = prices.map((price) => ({ ...price, symbol }));
+    const syncSummary = await this.storeHistorical(pricesForStorage);
     await this.repository.updateStockLoadTimestampBySymbol(symbol);
     await this.repository.upsertSyncState({
       region,
@@ -727,7 +970,7 @@ export class MarketDataFoundationService {
     let pricesStored = false;
     let syncSummary: SyncSummary | undefined;
     try {
-      const masterData = await this.marketDataProvider.fetchCompanyMasterData(stock.symbol).catch(() => null);
+      const masterData = await this.marketDataProvider.fetchCompanyMasterData(stock.providerSymbol || stock.symbol).catch(() => null);
       if (masterData) {
         const normalizedAssetType = this.normalizeAssetType(request.asset_type || masterData.assetType || stock.assetType);
         const exchange = request.exchange || masterData.exchange || stock.exchange || undefined;
@@ -1093,7 +1336,9 @@ export class MarketDataFoundationService {
     return {
       id: stock.id,
       symbol: stock.symbol,
-      display_symbol: stock.symbol,
+      display_symbol: stock.displaySymbol || stock.symbol,
+      provider_symbol: stock.providerSymbol || stock.symbol,
+      source_symbol: stock.sourceSymbol || null,
       company_name: overrides?.company_name || stock.name,
       exchange: overrides?.exchange || stock.exchange || null,
       country,
@@ -1103,7 +1348,16 @@ export class MarketDataFoundationService {
       currency,
       market_cap: stock.marketCap !== null && stock.marketCap !== undefined ? Number(stock.marketCap) : null,
       asset_type: assetType,
-      instrument_segment: segment,
+      instrument_segment: stock.instrumentSegment || segment,
+      derivatives_eligible: stock.derivativesEligible ?? false,
+      provider_support_status: stock.providerSupportStatus || 'UNKNOWN',
+      catalog_source: stock.catalogSource || stock.source || 'UNKNOWN',
+      provider_error: stock.providerError || null,
+      underlying_symbol: stock.underlyingSymbol || null,
+      expiry_date: stock.expiryDate instanceof Date ? stock.expiryDate.toISOString() : stock.expiryDate ? new Date(stock.expiryDate).toISOString() : null,
+      contract_month: stock.contractMonth || null,
+      lot_size: stock.lotSize ?? null,
+      contract_status: stock.contractStatus || null,
       metadata_completeness_score: this.metadataCompletenessScore(missingFields),
       missing_metadata_fields: missingFields,
       is_active: stock.isActive ?? true,
@@ -1179,6 +1433,359 @@ export class MarketDataFoundationService {
   private metadataCompletenessScore(missingFields: string[]): number {
     const total = 9;
     return Math.max(0, Math.round(((total - missingFields.length) / total) * 100));
+  }
+
+  private async downloadConfiguredCatalogCsv(catalogSource: string) {
+    const source = getCatalogSourceConfig(catalogSource);
+    if (!source) {
+      throw new Error(`Unknown catalog source: ${catalogSource}`);
+    }
+    if (!source.enabled) {
+      throw new Error(`Catalog source ${catalogSource} is disabled.`);
+    }
+    if (!source.url) {
+      throw new Error(`No configured URL for catalog source ${catalogSource}. ${source.setupHint || 'Use Manual CSV or configure an environment URL.'}`);
+    }
+    this.validateConfiguredCatalogUrl(source.url);
+    const downloadConfig = getCatalogDownloadConfig();
+    await fs.mkdir(downloadConfig.tempDir, { recursive: true });
+    const tempFilePath = path.join(downloadConfig.tempDir, `${catalogSource.toLowerCase().replace(/[^a-z0-9_-]/g, '-')}-${Date.now()}.csv`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), source.timeoutMs);
+    let fileSizeBytes = 0;
+
+    try {
+      const response = await fetch(source.url, { signal: controller.signal });
+      if (!response.ok) {
+        throw new Error(`Download failed for ${catalogSource}: HTTP ${response.status}`);
+      }
+      const contentLength = response.headers.get('content-length');
+      if (contentLength && Number(contentLength) > source.maxDownloadBytes) {
+        throw new Error(`Downloaded catalog file exceeds max size for ${catalogSource}.`);
+      }
+      const buffer = Buffer.from(await response.arrayBuffer());
+      fileSizeBytes = buffer.length;
+      if (fileSizeBytes > source.maxDownloadBytes) {
+        throw new Error(`Downloaded catalog file exceeds max size for ${catalogSource}.`);
+      }
+      await fs.writeFile(tempFilePath, buffer);
+      const csvText = buffer.toString('utf8');
+      return {
+        sourceName: source.displayName,
+        tempFilePath,
+        keepTempFiles: downloadConfig.keepTempFiles,
+        csvText,
+        fileSizeBytes,
+        tempFileDeleted: false,
+        tempFileDeleteError: undefined as string | undefined,
+      };
+    } catch (error) {
+      await fs.unlink(tempFilePath).catch(() => undefined);
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error(`Download timed out for catalog source ${catalogSource}.`);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  private async cleanupCatalogTempFile(downloadInfo: { tempFilePath: string; keepTempFiles: boolean; tempFileDeleted: boolean; tempFileDeleteError?: string }) {
+    if (downloadInfo.keepTempFiles) {
+      downloadInfo.tempFileDeleted = false;
+      return;
+    }
+    try {
+      await fs.unlink(downloadInfo.tempFilePath);
+      downloadInfo.tempFileDeleted = true;
+      downloadInfo.tempFileDeleteError = undefined;
+    } catch (error) {
+      downloadInfo.tempFileDeleted = false;
+      downloadInfo.tempFileDeleteError = error instanceof Error ? error.message : 'Temp file cleanup failed';
+      console.error('[MarketDataFoundation] catalog temp cleanup failed', {
+        tempFilePath: downloadInfo.tempFilePath,
+        error: downloadInfo.tempFileDeleteError,
+      });
+    }
+  }
+
+  private validateConfiguredCatalogUrl(value: string) {
+    const url = new URL(value);
+    if (url.protocol !== 'https:') {
+      throw new Error('Configured catalog URL must use https.');
+    }
+    const hostname = url.hostname.toLowerCase();
+    if (this.isBlockedCatalogHostname(hostname)) {
+      throw new Error('Configured catalog URL host is not allowed.');
+    }
+  }
+
+  private isBlockedCatalogHostname(hostname: string): boolean {
+    if (hostname === 'localhost' || hostname.endsWith('.localhost')) return true;
+    const ipVersion = net.isIP(hostname);
+    if (ipVersion === 4) {
+      const parts = hostname.split('.').map((part) => Number(part));
+      return parts[0] === 10
+        || parts[0] === 127
+        || (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31)
+        || (parts[0] === 192 && parts[1] === 168)
+        || (parts[0] === 169 && parts[1] === 254)
+        || parts[0] === 0;
+    }
+    if (ipVersion === 6) {
+      return hostname === '::1' || hostname.startsWith('fc') || hostname.startsWith('fd') || hostname.startsWith('fe80');
+    }
+    return false;
+  }
+
+  private validateCsvColumns(source: string, csvText: string) {
+    if (source === 'NSE_INDEX_SEED') return;
+    const firstLine = csvText.replace(/^\uFEFF/, '').split(/\r?\n/).find((line) => line.trim().length > 0);
+    if (!firstLine) {
+      throw new Error(`CSV format did not match expected ${source} columns: file is empty.`);
+    }
+    const headers = new Set(this.splitCsvLine(firstLine).map((header) => header.trim().toUpperCase()));
+    const config = getCatalogSourceConfig(source);
+    const expectedColumnGroups = config?.expectedColumnGroups;
+    if (!expectedColumnGroups?.length) return;
+    const missingGroups = expectedColumnGroups.filter((group) => !group.some((column) => headers.has(column)));
+    if (missingGroups.length > 0) {
+      throw new Error(`CSV format did not match expected ${source} columns. Missing one of: ${missingGroups.map((group) => group.join(' / ')).join('; ')}.`);
+    }
+  }
+
+  private catalogRowsForSource(source: string, csvText: string, warnings: string[]): CreateStockRequest[] {
+    if (source === 'NSE_INDEX_SEED') return this.indianIndexSeedRows();
+    const rows = this.parseCsv(csvText);
+    if (rows.length === 0) {
+      warnings.push(`${source}: no CSV rows supplied.`);
+      return [];
+    }
+    if (source === 'NSE_EQUITY_DERIVATIVES_UNDERLYINGS') return rows.map((row) => this.mapNseUnderlyingRow(row)).filter(Boolean) as CreateStockRequest[];
+    return rows.map((row) => this.mapNseSecurityRow(row, source)).filter(Boolean) as CreateStockRequest[];
+  }
+
+  private catalogBackfillRow(stock: any): CreateStockRequest | null {
+    const symbol = String(stock.symbol || '').trim().toUpperCase();
+    if (!symbol) return null;
+    const inferredExchange = stock.exchange?.trim().toUpperCase()
+      || (symbol.endsWith('.NS') ? 'NSE' : symbol.endsWith('.BO') ? 'BSE' : null);
+    const inferredRegion = stock.region || (inferredExchange === 'NSE' || inferredExchange === 'BSE' ? 'IN' : null);
+    if (inferredRegion !== 'IN' && inferredExchange !== 'NSE' && inferredExchange !== 'BSE') return null;
+
+    const normalized = this.normalizeCatalogSymbol({
+      symbol,
+      sourceSymbol: stock.sourceSymbol,
+      providerSymbol: stock.providerSymbol,
+      displaySymbol: stock.displaySymbol,
+      exchange: inferredExchange,
+    }, inferredExchange === 'BSE' ? 'BSE_EQUITY_SECURITIES' : 'NSE_EQUITY_SECURITIES');
+    const assetType = this.normalizeInstrumentAssetType(stock.assetType || 'STOCK', symbol, stock.name);
+    const segment = stock.instrumentSegment || this.deriveInstrumentSegment(assetType, symbol);
+    const isEquityCash = segment === 'CASH' || assetType === 'STOCK';
+
+    return {
+      symbol,
+      name: stock.name || normalized.displaySymbol,
+      region: 'IN',
+      exchange: inferredExchange || (symbol.endsWith('.BO') ? 'BSE' : 'NSE'),
+      country: 'India',
+      currency: 'INR',
+      assetType: isEquityCash ? 'STOCK' : assetType,
+      instrumentSegment: isEquityCash ? 'CASH' : segment,
+      displaySymbol: normalized.displaySymbol,
+      providerSymbol: normalized.providerSymbol,
+      sourceSymbol: normalized.sourceSymbol,
+      catalogSource: stock.catalogSource || this.legacyCatalogSourceForStock(stock),
+      providerSupportStatus: stock.providerSupportStatus || 'UNKNOWN',
+      derivativesEligible: stock.derivativesEligible ?? false,
+      source: stock.source || 'database',
+      dataStatus: stock.dataStatus || 'PARTIAL',
+      isActive: stock.isActive ?? true,
+    };
+  }
+
+  private legacyCatalogSourceForStock(stock: any): CatalogSource {
+    const source = String(stock.source || '').toUpperCase();
+    if (source.includes('NIFTY')) return 'LEGACY_NIFTY500';
+    if (source === 'DATABASE' || !source) return 'LEGACY_DATABASE';
+    return 'MANUAL';
+  }
+
+  private mapNseSecurityRow(row: Record<string, string>, source: string): CreateStockRequest | null {
+    const sourceSymbol = this.readCsv(row, ['SYMBOL', 'SM_SYMBOL', 'TRADING SYMBOL', 'TRADINGSYMBOL']);
+    const name = this.readCsv(row, [
+      'NAME OF COMPANY',
+      'NAME',
+      'COMPANY NAME',
+      'SECURITY NAME',
+      'SECURITYNAME',
+      'SM_NAME',
+      'NAME OF ETF',
+      'NAME OF THE ETF',
+      'ETF NAME',
+      'SCHEME NAME',
+    ]);
+    const isin = this.readCsv(row, ['ISIN', 'ISIN NUMBER', 'ISINNUMBER']);
+    const listingDate = this.readCsv(row, ['DATE OF LISTING', 'DATEOFLISTING']);
+    const series = this.readCsv(row, ['SERIES', 'SM_SERIES', 'INSTRUMENT TYPE', 'INSTRUMENT']).toUpperCase();
+    if (!sourceSymbol || !name) return null;
+    const sourceSymbolUpper = this.baseSymbolFromProviderSymbol(sourceSymbol);
+    const normalized = this.normalizeCatalogSymbol({ sourceSymbol: sourceSymbolUpper, exchange: 'NSE' }, source);
+    const isEtf = source === 'NSE_ETF_SECURITIES' || series.includes('ETF') || /\bETF\b|BEES|NIFTY.*ETF/i.test(name);
+    const isCashEquity = isEtf || !series || ['EQ', 'BE', 'BZ', 'SM', 'ST'].includes(series);
+    if (!isCashEquity) return null;
+    return {
+      symbol: normalized.providerSymbol,
+      sourceSymbol: normalized.sourceSymbol,
+      providerSymbol: normalized.providerSymbol,
+      displaySymbol: normalized.displaySymbol,
+      name: name.trim(),
+      region: 'IN',
+      exchange: 'NSE',
+      country: 'India',
+      currency: 'INR',
+      assetType: isEtf ? 'ETF' : 'STOCK',
+      instrumentSegment: isEtf ? 'ETF' : 'CASH',
+      derivativesEligible: false,
+      catalogSource: isEtf ? 'NSE_ETF_SECURITIES' : source,
+      providerSupportStatus: 'UNKNOWN',
+      isActive: true,
+      isin: isin || null,
+      ipoDate: this.parseCatalogDate(listingDate),
+      source: source,
+      dataStatus: 'PARTIAL',
+    };
+  }
+
+  private mapNseUnderlyingRow(row: Record<string, string>): CreateStockRequest | null {
+    const raw = this.readCsv(row, ['SYMBOL', 'UNDERLYING', 'UNDERLYING SYMBOL', 'NAME', 'UNDERLYING_NAME']);
+    if (!raw) return null;
+    const sourceSymbol = this.baseSymbolFromProviderSymbol(raw).replace(/\s+/g, ' ');
+    const isIndex = /NIFTY|SENSEX|BANKNIFTY|FINNIFTY|MIDCPNIFTY/.test(sourceSymbol);
+    const indexSeed = this.indianIndexSeedRows().find((item) => item.sourceSymbol === sourceSymbol || item.displaySymbol === sourceSymbol);
+    if (isIndex) {
+      const symbol = indexSeed?.symbol || sourceSymbol.replace(/\s+/g, '');
+      return {
+        symbol,
+        sourceSymbol,
+        providerSymbol: indexSeed?.providerSymbol || symbol,
+        displaySymbol: sourceSymbol,
+        name: indexSeed?.name || sourceSymbol,
+        region: 'IN',
+        exchange: sourceSymbol.includes('SENSEX') ? 'BSE_INDEX' : 'NSE_INDEX',
+        country: 'India',
+        currency: 'INR',
+        assetType: 'INDEX',
+        instrumentSegment: 'INDEX',
+        derivativesEligible: true,
+        catalogSource: 'NSE_EQUITY_DERIVATIVES_UNDERLYINGS',
+        providerSupportStatus: 'UNKNOWN',
+        isActive: true,
+        dataStatus: 'PARTIAL',
+      };
+    }
+    return {
+      symbol: this.providerSymbolForExchange(sourceSymbol, 'NSE'),
+      sourceSymbol,
+      providerSymbol: this.providerSymbolForExchange(sourceSymbol, 'NSE'),
+      displaySymbol: sourceSymbol,
+      name: sourceSymbol,
+      region: 'IN',
+      exchange: 'NSE',
+      country: 'India',
+      currency: 'INR',
+      assetType: 'STOCK',
+      instrumentSegment: 'CASH',
+      derivativesEligible: true,
+      catalogSource: 'NSE_EQUITY_DERIVATIVES_UNDERLYINGS',
+      providerSupportStatus: 'UNKNOWN',
+      isActive: true,
+      dataStatus: 'PARTIAL',
+    };
+  }
+
+  private indianIndexSeedRows(): CreateStockRequest[] {
+    return [
+      { symbol: '^NSEI', sourceSymbol: 'NIFTY 50', providerSymbol: '^NSEI', displaySymbol: 'NIFTY 50', name: 'NIFTY 50', exchange: 'NSE_INDEX' },
+      { symbol: '^NSEBANK', sourceSymbol: 'NIFTY BANK', providerSymbol: '^NSEBANK', displaySymbol: 'NIFTY BANK', name: 'NIFTY BANK', exchange: 'NSE_INDEX' },
+      { symbol: '^BSESN', sourceSymbol: 'SENSEX', providerSymbol: '^BSESN', displaySymbol: 'SENSEX', name: 'SENSEX', exchange: 'BSE_INDEX' },
+    ].map((item) => ({
+      ...item,
+      region: 'IN',
+      country: 'India',
+      currency: 'INR',
+      assetType: 'INDEX',
+      instrumentSegment: 'INDEX',
+      derivativesEligible: item.symbol !== '^BSESN',
+      catalogSource: 'NSE_INDEX_SEED',
+      providerSupportStatus: 'UNKNOWN',
+      isActive: true,
+      dataStatus: 'PARTIAL',
+    }));
+  }
+
+  private parseCsv(csvText: string): Record<string, string>[] {
+    const lines = csvText.replace(/^\uFEFF/, '').split(/\r?\n/).filter((line) => line.trim().length > 0);
+    if (lines.length < 2) return [];
+    const headers = this.splitCsvLine(lines[0]).map((header) => header.trim().toUpperCase());
+    return lines.slice(1).map((line) => {
+      const values = this.splitCsvLine(line);
+    return Object.fromEntries(headers.map((header, index) => [header, values[index]?.trim() || '']));
+    });
+  }
+
+  private parseCatalogDate(value: string): Date | null {
+    if (!value) return null;
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  private splitCsvLine(line: string): string[] {
+    const values: string[] = [];
+    let current = '';
+    let quoted = false;
+    for (let i = 0; i < line.length; i += 1) {
+      const char = line[i];
+      if (char === '"' && line[i + 1] === '"') {
+        current += '"';
+        i += 1;
+      } else if (char === '"') {
+        quoted = !quoted;
+      } else if (char === ',' && !quoted) {
+        values.push(current);
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    values.push(current);
+    return values;
+  }
+
+  private readCsv(row: Record<string, string>, keys: string[]): string {
+    for (const key of keys) {
+      const value = row[key.toUpperCase()];
+      if (value?.trim()) return value.trim();
+    }
+    return '';
+  }
+
+  private normalizeCatalogSource(value: string): CatalogSource {
+    const normalized = value?.trim().toUpperCase();
+    const allowed = new Set([
+      'MANUAL',
+      'LEGACY_NIFTY500',
+      'LEGACY_DATABASE',
+      'NSE_EQUITY_SECURITIES',
+      'NSE_EQUITY_DERIVATIVES_UNDERLYINGS',
+      'NSE_INDEX_SEED',
+      'NSE_ETF_SECURITIES',
+      'BSE_EQUITY_SECURITIES',
+      'BROKER_SCRIP_MASTER',
+      'UNKNOWN',
+    ]);
+    return (allowed.has(normalized) ? normalized : 'UNKNOWN') as CatalogSource;
   }
 
   private inferRegionFromInstrument(data: V1CreateInstrumentRequest): string {

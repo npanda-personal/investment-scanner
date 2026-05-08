@@ -1,6 +1,11 @@
 import axios from 'axios';
 import type {
   BackendPaginatedResponse,
+  CatalogBackfillRequest,
+  CatalogBackfillResponse,
+  CatalogImportRequest,
+  CatalogImportResponse,
+  CatalogSourceInfo,
   CreateStockRequest,
   BulkSyncResponse,
   MarketDataHealth,
@@ -28,6 +33,9 @@ const API_BASE = '/api';
 
 export type {
   CreateStockRequest,
+  CatalogSourceInfo,
+  CatalogImportRequest,
+  CatalogImportResponse,
   BulkSyncResponse,
   MarketDataHealth,
   MarketDataSchedulerStatus,
@@ -68,6 +76,9 @@ export async function fetchStocks(options: PaginationOptions = {}): Promise<Pagi
   if (options.sector) params.append('sector', options.sector);
   if (options.industry) params.append('industry', options.industry);
   if (options.dataStatus) params.append('dataStatus', options.dataStatus);
+  if (options.catalogSource) params.append('catalogSource', options.catalogSource);
+  if (options.providerSupportStatus) params.append('providerSupportStatus', options.providerSupportStatus);
+  if (options.derivativesEligible !== undefined) params.append('derivativesEligible', String(options.derivativesEligible));
   if (options.search) params.append('search', options.search);
 
   const response = await axios.get<BackendPaginatedResponse>(`${API_BASE}/market-data-foundation/stocks?${params.toString()}`);
@@ -181,6 +192,21 @@ export async function fetchMarketDataHealth(options: MarketScopedApiOptions = {}
 
 export async function fetchMarketDataSchedulerStatus(): Promise<MarketDataSchedulerStatus> {
   const response = await axios.get<MarketDataSchedulerStatus>(`${API_BASE}/v1/market-data/scheduler/status`);
+  return response.data;
+}
+
+export async function importCatalog(data: CatalogImportRequest): Promise<CatalogImportResponse> {
+  const response = await axios.post<CatalogImportResponse>(`${API_BASE}/v1/market-data/catalog/import`, data);
+  return response.data;
+}
+
+export async function fetchCatalogSources(): Promise<{ sources: CatalogSourceInfo[] }> {
+  const response = await axios.get<{ sources: CatalogSourceInfo[] }>(`${API_BASE}/v1/market-data/catalog/sources`);
+  return response.data;
+}
+
+export async function backfillCatalogMetadata(data: CatalogBackfillRequest): Promise<CatalogBackfillResponse> {
+  const response = await axios.post<CatalogBackfillResponse>(`${API_BASE}/v1/market-data/catalog/backfill-metadata`, data);
   return response.data;
 }
 

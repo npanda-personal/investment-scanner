@@ -26,7 +26,8 @@ Implemented:
 - Frontend instrument exploration, add instrument, instrument detail, status panel, and manual sync flows.
 - **Global Market Scope**: Support for `region` and `assetType` filtering in instrument list and search APIs.
 - **Metadata hardening**: Provider/company metadata updates preserve existing non-null values when a later provider response omits fields. Indian NSE/BSE symbols default to `India`, `IN`, and `INR` when the provider omits country/currency.
-- **Instrument classification**: API DTOs expose normalized `asset_type` plus derived `instrument_segment` without requiring a stock identity migration.
+- **Instrument classification**: API DTOs expose normalized `asset_type` plus `instrument_segment`. New catalog imports persist segment/source/provider-support metadata; older rows still get safe DTO-level derivation.
+- **Catalog-source ingestion**: Bounded imports can create/update instrument master rows from NSE security-master style CSVs, F&O underlying lists, ETF rows, and a small Indian index seed list. Yahoo Finance remains validation/enrichment/history only, not the master catalog.
 
 Partially implemented:
 
@@ -98,8 +99,9 @@ Legacy API URLs are preserved by mounting routers from this module in `backend/s
 Persisted models used by Market Data Foundation:
 
 - `Stock`
-  - Instrument/company master data: symbol, name, exchange, country, sector, industry, currency, market cap, asset type, active/delisted status, IPO date, ISIN, source, data status.
+  - Instrument/company master data: symbol, name, display symbol, provider symbol, source symbol, exchange, country, sector, industry, currency, market cap, asset type, instrument segment, catalog source, provider support status/error, derivatives eligibility, optional futures contract metadata, active/delisted status, IPO date, ISIN, source, data status.
   - `assetType` may contain legacy `EQUITY` rows. API responses normalize `EQUITY` to `STOCK`; repository filters treat `STOCK` and `EQUITY` as backward-compatible cash equity values.
+  - Catalog updates are additive and null-preserving. Existing sector, industry, country, currency, market cap, and classification values are not overwritten by null source/provider values.
 - `PriceTick`
   - Daily OHLCV bars, adjusted close when supplied, source, ingestion timestamp, last updated timestamp, data status.
 - `LatestPrice`
@@ -128,6 +130,9 @@ Most list endpoints support standard `PaginationOptions`:
 - `sector` and `industry`: Case-insensitive partial text filters.
 - `search`: Case-insensitive partial text across symbol and company name.
 - `exchange`, `currency`, `assetType`, `instrumentSegment`, and `dataStatus`: Exact normalized filters. `currency=INR` also includes Indian NSE/BSE rows with missing persisted currency because local catalog rules deterministically infer `INR` for those instruments.
+- `catalogSource`: Exact normalized source filter such as `NSE_EQUITY_SECURITIES`, `NSE_EQUITY_DERIVATIVES_UNDERLYINGS`, `NSE_INDEX_SEED`, `NSE_ETF_SECURITIES`, `BROKER_SCRIP_MASTER`, or `UNKNOWN`.
+- `providerSupportStatus`: Exact normalized provider validation filter: `SUPPORTED`, `UNSUPPORTED`, `UNKNOWN`, or `VALIDATION_FAILED`.
+- `derivativesEligible`: Boolean filter for instruments found in an F&O underlying source. This does not mean an actual futures contract exists.
 
 Unknown `sortBy` values fall back to `symbol` to prevent invalid Prisma order fields from breaking list requests.
 
@@ -150,9 +155,101 @@ Yahoo Finance remains the only provider. Market Data Foundation maps free provid
 
 Repository updates are null-preserving: an omitted/null provider field does not erase an existing non-null country, sector, industry, currency, market cap, asset type, ISIN, IPO date, or exchange. Missing metadata is surfaced through `missing_metadata_fields` and `metadata_completeness_score` in the v1 instrument DTO so the UI can show diagnostics instead of hiding gaps behind generic `N/A` values.
 
+### Catalog Source Strategy
+
+Market Data Foundation separates catalog discovery from provider ingestion:
+
+- Catalog sources create or update the instrument master.
+- Yahoo Finance validates provider support, enriches metadata when available, and ingests OHLCV history.
+- Yahoo Finance is not treated as a complete exchange/security master catalog.
+
+Supported catalog source values:
+
+| Source | Behavior |
+| --- | --- |
+| `NSE_EQUITY_SECURITIES` | Imports NSE cash-equity style rows as `.NS`, `STOCK / CASH`, `IN`, `NSE`, `India`, `INR`. Default URL: `https://nsearchives.nseindia.com/content/equities/sec_list.csv`. |
+| `NSE_EQUITY_DERIVATIVES_UNDERLYINGS` | Marks stock/index underlyings as `derivativesEligible=true`. It does not create futures contracts. No stable default URL is bundled; configure `MARKET_DATA_CATALOG_NSE_FO_UNDERLYINGS_URL` or use Manual CSV. |
+| `NSE_INDEX_SEED` | Imports a built-in Indian index seed list: `^NSEI`, `^NSEBANK`, and `^BSESN` as `INDEX / INDEX`. No URL is required. |
+| `NSE_ETF_SECURITIES` | Imports ETF security rows as `ETF / ETF` when the source row is clearly ETF-like. Default URL: `https://nsearchives.nseindia.com/content/equities/eq_etfseclist.csv`. |
+| `BSE_EQUITY_SECURITIES` | Reserved for BSE security-master style imports. |
+| `BROKER_SCRIP_MASTER` | Optional fallback discovery source only, not primary truth. |
+| `LEGACY_NIFTY500` | Backfilled provenance for older NIFTY 500 rows when the original source is known or source metadata hints at it. |
+| `LEGACY_DATABASE` | Backfilled provenance for older database rows with no source-master lineage. |
+| `MANUAL` / `UNKNOWN` | Manual or unclassified catalog provenance. |
+
+The import endpoint is `POST /api/v1/market-data/catalog/import`. It supports two import modes:
+
+- `MANUAL_CSV`: existing fallback mode. The request supplies `csvText`.
+- `CONFIGURED_URL`: the backend resolves the default or env-configured source URL, downloads the CSV to a controlled temp folder, imports the bounded batch, and deletes the temp file.
+- `INTERNAL_SEED`: used by `NSE_INDEX_SEED`; no CSV or URL is required.
+
+Requests accept `catalogSource`, `importMode`, optional `csvText`, optional `validateProvider`, and bounded `batchSize`/`offset`. Responses include `sourceRows`, `processedCount`, `totalCount`, `nextOffset`, `hasMore`, inserted/updated/no-op/invalid counts, provider validation counts, warnings, duration, and URL-download metadata when applicable. Imports are idempotent on current `Stock.symbol`, preserve non-null metadata, and only update changed fields.
+
+`GET /api/v1/market-data/catalog/sources` returns configured source metadata for the UI: source display name, enabled flag, region, asset type, segment/class, import modes, parser type, `urlConfigured`, `urlSource`, setup hint, and support flags for manual CSV, configured URL, and internal seed. Full configured URLs are not exposed in the response.
+
+### Configured URL Imports
+
+Configured source URLs are controlled by environment variables. No arbitrary runtime URL is fetched by default.
+
+| Variable | Purpose |
+| --- | --- |
+| `MARKET_DATA_CATALOG_NSE_EQUITY_URL` | Override for NSE cash-equity CSV. Default: `https://nsearchives.nseindia.com/content/equities/sec_list.csv`. |
+| `MARKET_DATA_CATALOG_NSE_ETF_URL` | Override for NSE ETF CSV. Default: `https://nsearchives.nseindia.com/content/equities/eq_etfseclist.csv`. |
+| `MARKET_DATA_CATALOG_NSE_FO_UNDERLYINGS_URL` | NSE F&O underlyings CSV. No default is bundled; Manual CSV remains available. |
+| `MARKET_DATA_CATALOG_BSE_EQUITY_URL` | Future BSE equity/security-master CSV. |
+| `MARKET_DATA_CATALOG_BROKER_SCRIP_MASTER_URL` | Optional fallback discovery source. Disabled in config by default. |
+| `MARKET_DATA_CATALOG_DOWNLOAD_TIMEOUT_MS` | Download timeout, default `15000`. |
+| `MARKET_DATA_CATALOG_MAX_DOWNLOAD_MB` | Max CSV download size, default `10`. |
+| `MARKET_DATA_CATALOG_TEMP_DIR` | Controlled temp directory, default `backend/tmp/catalog-imports`. |
+| `MARKET_DATA_CATALOG_KEEP_TEMP_FILES` | Debug-only retention flag, default `false`. |
+
+Security controls:
+
+- Only built-in configured source URLs are used.
+- URL protocol must be `https`.
+- `localhost`, loopback, link-local, private IPv4 ranges, and common local IPv6 ranges are rejected.
+- Downloads are timeout-limited and size-limited.
+- Files are written only to the configured temp directory with generated safe filenames.
+- Downloaded content is parsed as CSV text only and is never executed.
+- Temp files are deleted after import or parser failure unless `MARKET_DATA_CATALOG_KEEP_TEMP_FILES=true`.
+- Logs include source, mode, file size, row counts, counts, and cleanup status, not full CSV contents.
+
+The first implementation downloads/parses the configured CSV per import request. Responses still return `hasMore` and `nextOffset`; callers can use bounded batches, but repeated offset requests may re-download the source file. A short-lived import-session cache can be added later if large source files make that necessary.
+
+### Symbol Conventions And Backfill
+
+Current stored `Stock.symbol` is treated as the canonical application key and is not rewritten by catalog backfill. Most existing NSE rows already use the Yahoo-compatible provider convention, for example `ABB.NS`. New fields clarify the different symbol roles:
+
+- `symbol`: existing application/storage key. Price ticks remain keyed by this value.
+- `sourceSymbol`: exchange/security-master base symbol, for example `ABB`.
+- `providerSymbol`: Yahoo-compatible symbol used for provider fetches, for example `ABB.NS` or `ABC.BO`.
+- `displaySymbol`: user-facing short symbol, currently the base symbol for NSE/BSE equities.
+
+Normalization helpers follow these rules:
+
+- NSE base `ABB` becomes `sourceSymbol=ABB`, `providerSymbol=ABB.NS`.
+- Existing `ABB.NS` becomes `sourceSymbol=ABB`, `providerSymbol=ABB.NS`.
+- BSE base `ABC` becomes `sourceSymbol=ABC`, `providerSymbol=ABC.BO`.
+- Index provider symbols such as `^NSEI` are preserved.
+
+`POST /api/v1/market-data/catalog/backfill-metadata` safely backfills existing rows in bounded batches. It accepts `region`, optional `assetType`, `batchSize`/`limit`, `offset`, and `validateProvider`. Without validation it infers only deterministic fields for obvious NSE/BSE rows: `IN`, `India`, `INR`, exchange, `STOCK / CASH`, `sourceSymbol`, `displaySymbol`, `providerSymbol`, and legacy catalog provenance. It preserves existing non-null sector, industry, and market cap. Provider support remains `UNKNOWN` unless `validateProvider=true`.
+
+F&O underlyings are deliberately not actual futures contracts. Underlying import can set:
+
+- Stock underlying: `assetType=STOCK`, `instrumentSegment=CASH`, `derivativesEligible=true`.
+- Index underlying: `assetType=INDEX`, `instrumentSegment=INDEX`, `derivativesEligible=true`.
+
+Actual futures are expiry-specific. They must come from a real contracts source containing contract rows and expiry metadata, then validate provider support before becoming sync-ready. This module does not fake or synthesize futures contracts from underlyings.
+
+F&O underlying matching compares base and provider symbols, so `ABB` from an underlying source can update a stored `ABB.NS` row, and `ABB.NS` can also match a base `ABB` row. Matched stock/index underlyings set `derivativesEligible=true`; they do not become `FUTURE / FUTURES`.
+
+Provider validation is optional and batch-bounded. When enabled, the module runs a lightweight Yahoo chart check for each imported or backfilled provider symbol in the current batch and records `SUPPORTED` or `UNSUPPORTED` with the provider error/message. OHLCV sync selection skips `UNSUPPORTED` rows so unsupported symbols stay visible in the catalog but are not repeatedly ingested.
+
+OHLCV ingestion fetches from `providerSymbol` when present and falls back to `symbol` only when provider metadata is missing. Returned provider rows are remapped to the stored `symbol` before persistence, so existing `PriceTick` uniqueness and downstream reads remain backward-compatible.
+
 ### Instrument Classification
 
-The persisted schema does not yet include `instrumentSegment`; it is derived in the API response to avoid a broad identity migration. Current rules:
+Current rules:
 
 | Normalized `asset_type` | `instrument_segment` |
 | --- | --- |
@@ -167,7 +264,9 @@ The persisted schema does not yet include `instrumentSegment`; it is derived in 
 | `OTHER` | `OTHER` |
 | `UNKNOWN` | `UNKNOWN` |
 
-For the current India catalog scope, `.NS`, `.BO`, NSE, and BSE cash equity rows should render as `STOCK / CASH`. Future-like symbols such as `...FUT` render as `FUTURE / FUTURES` even when old catalog data stored them as `EQUITY`; this is a DTO/query compatibility rule until instrument segment is persisted.
+For the current India catalog scope, `.NS`, `.BO`, NSE, and BSE cash equity rows should render as `STOCK / CASH`. Future-like symbols such as `...FUT` render as `FUTURE / FUTURES` even when old catalog data stored them as `EQUITY`; this is retained as a DTO/query compatibility rule for old rows.
+
+`STOCK` sync remains stock/cash scoped. `INDEX`, `ETF`, and `FUTURE` rows are only included when that asset type or segment is explicitly selected. Unsupported provider symbols are excluded from OHLCV sync task selection.
 
 ### Canonical MVP Endpoints
 
@@ -175,6 +274,9 @@ For the current India catalog scope, `.NS`, `.BO`, NSE, and BSE cash equity rows
 | --- | --- | --- |
 | `GET /api/v1/market-data/health` | Market data health, instrument count, freshness, trust metadata | Implemented |
 | `GET /api/v1/market-data/scheduler/status` | Scheduler config, active run state, region session decisions, and latest sync summaries | Implemented |
+| `GET /api/v1/market-data/catalog/sources` | Lists configured catalog sources and URL availability without exposing full URLs | Implemented |
+| `POST /api/v1/market-data/catalog/import` | Bounded source-based catalog import and optional provider validation | Implemented |
+| `POST /api/v1/market-data/catalog/backfill-metadata` | Bounded metadata/provider-symbol backfill for existing catalog rows | Implemented |
 | `GET /api/v1/instruments` | List/search instruments with `region` support | Implemented |
 | `POST /api/v1/instruments` | Create instrument | Implemented |
 | `GET /api/v1/instruments/:id` | Get instrument detail | Implemented |
@@ -306,7 +408,8 @@ Natural keys for stock-data records owned by this module:
 ## Frontend Structure
 
 - `MarketDataFoundationPage`: Integrated with `useMarketScope()`. Automatically filters by the globally selected region.
-  - Shows Asset Type and Segment/Class columns, sector and industry columns, metadata completeness, and server-side filters for asset type, segment/class, exchange, currency, sector, industry, and status. The default list request includes region but no asset type so the page can show all instrument classes.
+  - Shows Asset Type, Segment/Class, Provider Symbol, F&O Eligible, Provider Support, Catalog Source, sector/industry, market cap, metadata completeness, and server-side filters for asset type, segment/class, provider support, catalog source, derivatives eligibility, exchange, currency, sector, industry, and status. The default list request includes region but no asset type so the page can show all instrument classes.
+  - Provides a bounded Catalog Import panel for NSE equity securities, F&O underlyings, index seed rows, ETF rows, and fallback broker/public scrip-master CSVs. Index seed import does not require CSV text.
   - The filter bar uses a wrapping responsive layout so Refresh and Reset stay inside the page container. Table horizontal scrolling is limited to the table area.
   - Changing any local filter resets to page 1. Reset clears only local filters and preserves the global market scope. Empty states name the active filters so no-result states such as `FUTURE / FUTURES` are explicit.
   - Status cards show scoped instrument health before local filters; the table match chip shows the locally filtered count.
@@ -327,7 +430,7 @@ Frontend routes are defined in `routes.tsx` and exported via `index.ts`.
 
 Verification commands:
 
-- `npx prisma generate` after Prisma schema changes. No Prisma change is required for derived `instrument_segment`.
+- `npx prisma generate` after Prisma schema changes.
 - `npm run build`
 - `npm test -- market-data --runInBand`
 

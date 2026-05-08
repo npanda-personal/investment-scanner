@@ -52,6 +52,9 @@ export const createMarketDataV1Router = (
 
   router.get('/market-data/scheduler/status', controller.schedulerStatus);
   router.get('/market-data/health', controller.health);
+  router.get('/market-data/catalog/sources', controller.listCatalogSources);
+  router.post('/market-data/catalog/import', controller.importCatalog);
+  router.post('/market-data/catalog/backfill-metadata', controller.backfillCatalogMetadata);
   router.get('/instruments', controller.listInstruments);
   router.post('/instruments', controller.createInstrument);
   router.get('/instruments/:id', controller.getInstrument);

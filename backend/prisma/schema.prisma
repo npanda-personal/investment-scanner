@@ -53,6 +53,19 @@ model Stock {
   currency                     String?
   marketCap                    Decimal?
   assetType                    String?
+  instrumentSegment            String?
+  displaySymbol                String?
+  providerSymbol               String?
+  sourceSymbol                 String?
+  catalogSource                String?
+  providerSupportStatus        String?
+  providerError                String?
+  derivativesEligible          Boolean  @default(false)
+  underlyingSymbol             String?
+  expiryDate                   DateTime?
+  contractMonth                String?
+  lotSize                      Int?
+  contractStatus               String?
   isDelisted                   Boolean  @default(false)
   ipoDate                      DateTime?
   isin                         String?

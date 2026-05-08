@@ -40,6 +40,9 @@ export class MarketDataFoundationController {
       const sector = req.query.sector as string | undefined;
       const industry = req.query.industry as string | undefined;
       const dataStatus = (req.query.dataStatus || req.query.status) as string | undefined;
+      const catalogSource = req.query.catalogSource as string | undefined;
+      const providerSupportStatus = req.query.providerSupportStatus as string | undefined;
+      const derivativesEligible = this.parseOptionalBoolean(req.query.derivativesEligible);
 
       if (page < 1) {
         return res.status(400).json({ error: 'Page must be at least 1' });
@@ -48,7 +51,7 @@ export class MarketDataFoundationController {
         return res.status(400).json({ error: 'PageSize must be between 1 and 100' });
       }
 
-      const result = await this.service.list({ page, pageSize, sortBy, sortOrder, region, country, exchange, assetType, instrumentSegment, currency, sector, industry, dataStatus, search });
+      const result = await this.service.list({ page, pageSize, sortBy, sortOrder, region, country, exchange, assetType, instrumentSegment, currency, sector, industry, dataStatus, catalogSource, providerSupportStatus, derivativesEligible, search });
       return res.json(result);
     } catch (error) {
       console.error('Error listing stocks:', error);
@@ -298,6 +301,15 @@ export class MarketDataFoundationController {
     }
   };
 
+  listCatalogSources = async (_req: Request, res: Response) => {
+    try {
+      return res.json(this.service.listCatalogSources());
+    } catch (error) {
+      console.error('Catalog source list error:', error);
+      return res.status(500).json({ error: 'Failed to list catalog sources' });
+    }
+  };
+
   listInstruments = async (req: Request, res: Response) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
@@ -314,7 +326,10 @@ export class MarketDataFoundationController {
       const sector = req.query.sector as string | undefined;
       const industry = req.query.industry as string | undefined;
       const dataStatus = (req.query.dataStatus || req.query.status) as string | undefined;
-      const result = await this.service.listInstruments({ page, pageSize, sortBy, sortOrder, region, country, exchange, assetType, instrumentSegment, currency, sector, industry, dataStatus, search });
+      const catalogSource = req.query.catalogSource as string | undefined;
+      const providerSupportStatus = req.query.providerSupportStatus as string | undefined;
+      const derivativesEligible = this.parseOptionalBoolean(req.query.derivativesEligible);
+      const result = await this.service.listInstruments({ page, pageSize, sortBy, sortOrder, region, country, exchange, assetType, instrumentSegment, currency, sector, industry, dataStatus, catalogSource, providerSupportStatus, derivativesEligible, search });
       return res.json(result);
     } catch (error) {
       console.error('Error listing instruments:', error);
@@ -425,10 +440,41 @@ export class MarketDataFoundationController {
     }
   };
 
+  importCatalog = async (req: Request, res: Response) => {
+    try {
+      const result = await this.service.importCatalog(req.body);
+      return res.json({ success: true, ...result });
+    } catch (error: any) {
+      console.error('Catalog import error:', error);
+      return res.status(500).json({
+        success: false,
+        message: error.message || 'Catalog import failed',
+      });
+    }
+  };
+
+  backfillCatalogMetadata = async (req: Request, res: Response) => {
+    try {
+      const result = await this.service.backfillCatalogMetadata(req.body || {});
+      return res.json({ success: true, ...result });
+    } catch (error: any) {
+      console.error('Catalog metadata backfill error:', error);
+      return res.status(500).json({
+        success: false,
+        message: error.message || 'Catalog metadata backfill failed',
+      });
+    }
+  };
+
   private parseBoolean(value: unknown): boolean {
     if (typeof value === 'boolean') return value;
     if (typeof value !== 'string') return false;
     return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase());
+  }
+
+  private parseOptionalBoolean(value: unknown): boolean | undefined {
+    if (value === undefined || value === null || value === '') return undefined;
+    return this.parseBoolean(value);
   }
 
   listFxRates = async (_req: Request, res: Response) => {

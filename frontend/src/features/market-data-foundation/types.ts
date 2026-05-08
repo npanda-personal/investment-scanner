@@ -15,6 +15,8 @@ export interface V1Instrument {
   symbol: string;
   company_name: string;
   display_symbol?: string;
+  provider_symbol?: string | null;
+  source_symbol?: string | null;
   exchange: string | null;
   country: string | null;
   region?: string | null;
@@ -24,6 +26,15 @@ export interface V1Instrument {
   market_cap: number | null;
   asset_type: string;
   instrument_segment: string;
+  derivatives_eligible?: boolean;
+  provider_support_status?: string | null;
+  catalog_source?: string | null;
+  provider_error?: string | null;
+  underlying_symbol?: string | null;
+  expiry_date?: string | null;
+  contract_month?: string | null;
+  lot_size?: number | null;
+  contract_status?: string | null;
   metadata_completeness_score?: number;
   missing_metadata_fields?: string[];
   is_active: boolean;
@@ -236,7 +247,103 @@ export interface PaginationOptions {
   sector?: string;
   industry?: string;
   dataStatus?: string;
+  catalogSource?: string;
+  providerSupportStatus?: string;
+  derivativesEligible?: boolean;
   search?: string;
+}
+
+export interface CatalogImportRequest {
+  catalogSource: string;
+  importMode?: 'MANUAL_CSV' | 'CONFIGURED_URL' | 'INTERNAL_SEED';
+  csvText?: string;
+  validateProvider?: boolean;
+  batchSize?: number;
+  offset?: number;
+}
+
+export interface CatalogImportResponse {
+  success: boolean;
+  catalogSource: string;
+  importMode?: 'MANUAL_CSV' | 'CONFIGURED_URL' | 'INTERNAL_SEED';
+  downloaded?: boolean;
+  downloadUrlName?: string;
+  fileSizeBytes?: number;
+  tempFileDeleted?: boolean;
+  tempFileDeleteError?: string;
+  processedCount?: number;
+  totalCount?: number;
+  batchSize?: number;
+  offset?: number;
+  nextOffset?: number | null;
+  hasMore?: boolean;
+  insertedCount?: number;
+  updatedCount?: number;
+  noOpCount?: number;
+  invalidCount?: number;
+  providerValidatedCount?: number;
+  providerUnsupportedCount?: number;
+  sourceRows: number;
+  inserted: number;
+  updated: number;
+  noOp: number;
+  skipped: number;
+  invalid: number;
+  providerValidated: number;
+  providerUnsupported: number;
+  underlyingsRead?: number;
+  stockUnderlyingsMatched?: number;
+  indexUnderlyingsMatched?: number;
+  newInstrumentsCreated?: number;
+  unmatchedUnderlyings?: number;
+  warnings: string[];
+  durationMs: number;
+  message?: string;
+}
+
+export interface CatalogSourceInfo {
+  catalogSource: string;
+  displayName: string;
+  enabled: boolean;
+  region: string;
+  assetType?: string;
+  segmentClass?: string;
+  fileType: string;
+  parserType: string;
+  importModes: string[];
+  urlConfigured: boolean;
+  urlSource: 'DEFAULT' | 'ENV' | 'NONE' | 'INTERNAL_SEED';
+  setupHint?: string;
+  supportsManualCsv: boolean;
+  supportsConfiguredUrl: boolean;
+  supportsInternalSeed: boolean;
+  lastImportedAt: string | null;
+}
+
+export interface CatalogBackfillRequest {
+  region?: string;
+  assetType?: string;
+  batchSize?: number;
+  offset?: number;
+  validateProvider?: boolean;
+}
+
+export interface CatalogBackfillResponse {
+  success: boolean;
+  processedCount: number;
+  totalCount: number;
+  batchSize: number;
+  offset: number;
+  nextOffset: number | null;
+  hasMore: boolean;
+  updated: number;
+  noOp: number;
+  skipped: number;
+  validated: number;
+  providerUnsupported: number;
+  warnings: string[];
+  durationMs: number;
+  message?: string;
 }
 
 export interface PaginatedResponse {

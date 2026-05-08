@@ -314,6 +314,184 @@ describe('MarketDataFoundationRepository', () => {
     }));
   });
 
+  it('applies catalog source, provider support, and derivatives eligible filters', async () => {
+    const prisma = {
+      stock: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await repository.listStocks({
+      page: 1,
+      pageSize: 25,
+      region: 'IN',
+      catalogSource: 'NSE_EQUITY_SECURITIES',
+      providerSupportStatus: 'SUPPORTED',
+      derivativesEligible: true,
+    });
+
+    expect(prisma.stock.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        catalogSource: { equals: 'NSE_EQUITY_SECURITIES', mode: 'insensitive' },
+        providerSupportStatus: { equals: 'SUPPORTED', mode: 'insensitive' },
+        derivativesEligible: true,
+      }),
+    }));
+    expect(prisma.stock.count).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        catalogSource: { equals: 'NSE_EQUITY_SECURITIES', mode: 'insensitive' },
+        providerSupportStatus: { equals: 'SUPPORTED', mode: 'insensitive' },
+        derivativesEligible: true,
+      }),
+    }));
+  });
+
+  it('excludes unsupported provider symbols from OHLCV sync task selection', async () => {
+    const prisma = {
+      stock: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await repository.listActiveStockSyncTasks({ region: 'IN', assetType: 'INDEX' }, 25);
+
+    expect(prisma.stock.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      take: 25,
+      where: expect.objectContaining({
+        isActive: true,
+        OR: [
+          { providerSupportStatus: null },
+          { providerSupportStatus: { in: ['SUPPORTED', 'UNKNOWN'], mode: 'insensitive' } },
+        ],
+      }),
+    }));
+  });
+
+  it('matches catalog upserts against existing provider-style and base symbols', async () => {
+    const update = jest.fn().mockImplementation(({ data }) => Promise.resolve(data));
+    const prisma = {
+      stock: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'stock-1',
+          symbol: 'ABB.NS',
+          name: 'ABB India',
+          region: 'IN',
+          exchange: 'NSE',
+          country: 'India',
+          currency: 'INR',
+          assetType: 'STOCK',
+          instrumentSegment: 'CASH',
+          derivativesEligible: false,
+          source: 'database',
+          dataStatus: 'PARTIAL',
+        }),
+        update,
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    const result = await repository.upsertCatalogInstrument({
+      symbol: 'ABB.NS',
+      sourceSymbol: 'ABB',
+      providerSymbol: 'ABB.NS',
+      displaySymbol: 'ABB',
+      name: 'ABB India',
+      region: 'IN',
+      exchange: 'NSE',
+      assetType: 'STOCK',
+      instrumentSegment: 'CASH',
+      derivativesEligible: true,
+      catalogSource: 'NSE_EQUITY_DERIVATIVES_UNDERLYINGS',
+    });
+
+    expect(prisma.stock.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        OR: expect.arrayContaining([
+          expect.objectContaining({ symbol: expect.objectContaining({ in: expect.arrayContaining(['ABB.NS', 'ABB']) }) }),
+          { providerSymbol: { equals: 'ABB.NS', mode: 'insensitive' } },
+          { sourceSymbol: { equals: 'ABB', mode: 'insensitive' } },
+        ]),
+      }),
+    }));
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'stock-1' },
+      data: expect.objectContaining({
+        derivativesEligible: true,
+        catalogSource: 'NSE_EQUITY_DERIVATIVES_UNDERLYINGS',
+      }),
+    }));
+    expect(result.action).toBe('updated');
+  });
+
+  it('falls back to exact NSE company name matching to backfill legacy rows', async () => {
+    const update = jest.fn().mockImplementation(({ data }) => Promise.resolve(data));
+    const prisma = {
+      stock: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'stock-legacy',
+          symbol: 'ABB',
+          name: 'ABB India Limited',
+          region: 'IN',
+          exchange: 'NSE',
+          country: null,
+          currency: null,
+          assetType: null,
+          instrumentSegment: null,
+          source: 'database',
+          dataStatus: 'PARTIAL',
+        }),
+        update,
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    const result = await repository.upsertCatalogInstrument({
+      symbol: 'ABB.NS',
+      sourceSymbol: 'ABB',
+      providerSymbol: 'ABB.NS',
+      displaySymbol: 'ABB',
+      name: 'ABB India Limited',
+      region: 'IN',
+      exchange: 'NSE',
+      country: 'India',
+      currency: 'INR',
+      assetType: 'STOCK',
+      instrumentSegment: 'CASH',
+      catalogSource: 'NSE_EQUITY_SECURITIES',
+    });
+
+    expect(prisma.stock.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        OR: expect.arrayContaining([
+          expect.objectContaining({
+            AND: expect.arrayContaining([
+              { name: { equals: 'ABB India Limited', mode: 'insensitive' } },
+              { region: 'IN' },
+              { OR: [{ exchange: { equals: 'NSE', mode: 'insensitive' } }, { exchange: null }] },
+            ]),
+          }),
+        ]),
+      }),
+    }));
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'stock-legacy' },
+      data: expect.objectContaining({
+        providerSymbol: 'ABB.NS',
+        sourceSymbol: 'ABB',
+        displaySymbol: 'ABB',
+        country: 'India',
+        currency: 'INR',
+        assetType: 'STOCK',
+        instrumentSegment: 'CASH',
+        catalogSource: 'NSE_EQUITY_SECURITIES',
+      }),
+    }));
+    expect(result.action).toBe('updated');
+  });
+
   it('does not rewrite identical daily candles', async () => {
     const upsert = jest.fn().mockResolvedValue({});
     const latestPriceUpsert = jest.fn().mockResolvedValue({});

@@ -188,6 +188,26 @@ export class YahooFinanceIngestionService {
     }
   }
 
+  async validateProviderSymbol(symbol: string): Promise<{ supported: boolean; message?: string }> {
+    try {
+      const result = await this.yahooFinance.chart(symbol, {
+        period1: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+        period2: new Date(),
+        interval: '1d',
+        return: 'array',
+      });
+      const quotes = Array.isArray(result?.quotes) ? result.quotes : [];
+      return quotes.length > 0
+        ? { supported: true }
+        : { supported: false, message: 'Provider returned no daily candles.' };
+    } catch (error) {
+      return {
+        supported: false,
+        message: error instanceof Error ? error.message : 'Provider validation failed.',
+      };
+    }
+  }
+
   async fetchCoreFundamentals(symbol: string): Promise<CoreFundamentals> {
     try {
       const summary = await this.yahooFinance.quoteSummary(symbol, {

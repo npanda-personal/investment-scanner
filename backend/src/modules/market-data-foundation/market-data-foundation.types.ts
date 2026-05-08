@@ -10,6 +10,20 @@ export interface HistoricalPrice {
 }
 
 export type MarketDataStatus = 'COMPLETE' | 'PARTIAL' | 'DELAYED' | 'MISSING' | 'ERROR';
+export type CatalogSource =
+  | 'MANUAL'
+  | 'LEGACY_NIFTY500'
+  | 'LEGACY_DATABASE'
+  | 'NSE_EQUITY_SECURITIES'
+  | 'NSE_EQUITY_DERIVATIVES_UNDERLYINGS'
+  | 'NSE_INDEX_SEED'
+  | 'NSE_ETF_SECURITIES'
+  | 'BSE_EQUITY_SECURITIES'
+  | 'BROKER_SCRIP_MASTER'
+  | 'UNKNOWN';
+
+export type ProviderSupportStatus = 'SUPPORTED' | 'UNSUPPORTED' | 'UNKNOWN' | 'VALIDATION_FAILED';
+export type InstrumentSegmentClass = 'CASH' | 'ETF' | 'INDEX' | 'FUTURES' | 'CURRENCY' | 'COMMODITY' | 'CRYPTO' | 'FUND' | 'OTHER' | 'UNKNOWN';
 
 export interface SyncSummary {
   rowsReceived: number;
@@ -173,6 +187,22 @@ export interface CreateStockRequest {
   currency?: string | null;
   marketCap?: number | null;
   assetType?: string | null;
+  instrumentSegment?: string | null;
+  displaySymbol?: string | null;
+  providerSymbol?: string | null;
+  sourceSymbol?: string | null;
+  catalogSource?: CatalogSource | string | null;
+  providerSupportStatus?: ProviderSupportStatus | string | null;
+  providerError?: string | null;
+  derivativesEligible?: boolean;
+  underlyingSymbol?: string | null;
+  expiryDate?: Date | null;
+  contractMonth?: string | null;
+  lotSize?: number | null;
+  contractStatus?: string | null;
+  source?: string;
+  dataStatus?: MarketDataStatus | string;
+  isActive?: boolean;
   isDelisted?: boolean;
   ipoDate?: Date | null;
   isin?: string | null;
@@ -197,6 +227,8 @@ export interface V1Instrument {
   symbol: string;
   company_name: string;
   display_symbol?: string;
+  provider_symbol?: string | null;
+  source_symbol?: string | null;
   exchange: string | null;
   country: string | null;
   region?: string | null;
@@ -206,6 +238,15 @@ export interface V1Instrument {
   market_cap: number | null;
   asset_type: string;
   instrument_segment: string;
+  derivatives_eligible?: boolean;
+  provider_support_status?: ProviderSupportStatus | string | null;
+  catalog_source?: CatalogSource | string | null;
+  provider_error?: string | null;
+  underlying_symbol?: string | null;
+  expiry_date?: string | null;
+  contract_month?: string | null;
+  lot_size?: number | null;
+  contract_status?: string | null;
   metadata_completeness_score?: number;
   missing_metadata_fields?: string[];
   is_active: boolean;
@@ -302,7 +343,81 @@ export interface PaginationOptions {
   sector?: string;
   industry?: string;
   dataStatus?: string;
+  catalogSource?: string;
+  providerSupportStatus?: string;
+  derivativesEligible?: boolean;
   search?: string;
+}
+
+export interface CatalogImportRequest {
+  catalogSource: CatalogSource | string;
+  importMode?: 'MANUAL_CSV' | 'CONFIGURED_URL' | 'INTERNAL_SEED';
+  csvText?: string;
+  validateProvider?: boolean;
+  batchSize?: number;
+  offset?: number;
+}
+
+export interface CatalogImportSummary {
+  catalogSource: string;
+  importMode?: 'MANUAL_CSV' | 'CONFIGURED_URL' | 'INTERNAL_SEED';
+  downloaded?: boolean;
+  downloadUrlName?: string;
+  fileSizeBytes?: number;
+  tempFileDeleted?: boolean;
+  tempFileDeleteError?: string;
+  processedCount?: number;
+  totalCount?: number;
+  batchSize?: number;
+  offset?: number;
+  nextOffset?: number | null;
+  hasMore?: boolean;
+  insertedCount?: number;
+  updatedCount?: number;
+  noOpCount?: number;
+  invalidCount?: number;
+  providerValidatedCount?: number;
+  providerUnsupportedCount?: number;
+  sourceRows: number;
+  inserted: number;
+  updated: number;
+  noOp: number;
+  skipped: number;
+  invalid: number;
+  providerValidated: number;
+  providerUnsupported: number;
+  underlyingsRead?: number;
+  stockUnderlyingsMatched?: number;
+  indexUnderlyingsMatched?: number;
+  newInstrumentsCreated?: number;
+  unmatchedUnderlyings?: number;
+  warnings: string[];
+  durationMs: number;
+}
+
+export interface CatalogBackfillRequest {
+  region?: string;
+  assetType?: string;
+  batchSize?: number;
+  limit?: number;
+  offset?: number;
+  validateProvider?: boolean;
+}
+
+export interface CatalogBackfillSummary {
+  processedCount: number;
+  totalCount: number;
+  batchSize: number;
+  offset: number;
+  nextOffset: number | null;
+  hasMore: boolean;
+  updated: number;
+  noOp: number;
+  skipped: number;
+  validated: number;
+  providerUnsupported: number;
+  warnings: string[];
+  durationMs: number;
 }
 
 export interface CoreFundamentals {

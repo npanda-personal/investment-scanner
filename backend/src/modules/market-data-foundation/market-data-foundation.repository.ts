@@ -36,6 +36,9 @@ export class MarketDataFoundationRepository {
       sector,
       industry,
       dataStatus,
+      catalogSource,
+      providerSupportStatus,
+      derivativesEligible,
       search,
     } = options;
     const skip = (page - 1) * pageSize;
@@ -63,6 +66,15 @@ export class MarketDataFoundationRepository {
     }
     if (dataStatus) {
       where.dataStatus = { equals: dataStatus.trim().toUpperCase(), mode: 'insensitive' };
+    }
+    if (catalogSource) {
+      where.catalogSource = { equals: catalogSource.trim().toUpperCase(), mode: 'insensitive' };
+    }
+    if (providerSupportStatus) {
+      where.providerSupportStatus = { equals: providerSupportStatus.trim().toUpperCase(), mode: 'insensitive' };
+    }
+    if (derivativesEligible !== undefined) {
+      where.derivativesEligible = derivativesEligible;
     }
     if (search) {
       where.AND = [
@@ -131,10 +143,25 @@ export class MarketDataFoundationRepository {
         currency: data.currency,
         marketCap: data.marketCap !== undefined && data.marketCap !== null ? new Prisma.Decimal(data.marketCap) : undefined,
         assetType: data.assetType,
+        instrumentSegment: data.instrumentSegment,
+        displaySymbol: data.displaySymbol,
+        providerSymbol: data.providerSymbol,
+        sourceSymbol: data.sourceSymbol,
+        catalogSource: data.catalogSource,
+        providerSupportStatus: data.providerSupportStatus,
+        providerError: data.providerError,
+        derivativesEligible: data.derivativesEligible ?? false,
+        underlyingSymbol: data.underlyingSymbol,
+        expiryDate: data.expiryDate,
+        contractMonth: data.contractMonth,
+        lotSize: data.lotSize,
+        contractStatus: data.contractStatus,
         isDelisted: data.isDelisted ?? false,
         ipoDate: data.ipoDate,
         isin: data.isin,
-        isActive: true,
+        source: data.source || data.catalogSource || 'database',
+        dataStatus: data.dataStatus || 'PARTIAL',
+        isActive: data.isActive ?? true,
         lastSuccessfulDataLoadTimestamp: null,
       },
     });
@@ -181,14 +208,91 @@ export class MarketDataFoundationRepository {
 
   listActiveStockSyncTasks(options: Pick<PaginationOptions, 'region' | 'assetType' | 'instrumentSegment'> = {}, take?: number) {
     return this.prisma.stock.findMany({
-      where: { ...this.stockWhere(options), isActive: true },
-      select: { id: true, symbol: true, lastSuccessfulDataLoadTimestamp: true },
+      where: {
+        ...this.stockWhere(options),
+        isActive: true,
+        OR: [
+          { providerSupportStatus: null },
+          { providerSupportStatus: { in: ['SUPPORTED', 'UNKNOWN'], mode: 'insensitive' } },
+        ],
+      },
+      select: { id: true, symbol: true, providerSymbol: true, lastSuccessfulDataLoadTimestamp: true },
       take,
       orderBy: [
         { lastSuccessfulDataLoadTimestamp: { sort: 'asc', nulls: 'first' } },
         { symbol: 'asc' },
       ],
     });
+  }
+
+  async upsertCatalogInstrument(data: CreateStockRequest): Promise<{ stock: any; action: 'inserted' | 'updated' | 'noOp' }> {
+    const matchingSymbols = [data.symbol, data.providerSymbol, data.sourceSymbol, data.displaySymbol]
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      .map((value) => value.trim().toUpperCase());
+    const normalizedExchange = data.exchange?.trim().toUpperCase();
+    const canMatchByName = data.name?.trim()
+      && data.region === 'IN'
+      && (normalizedExchange === 'NSE' || normalizedExchange === 'BSE')
+      && ['NSE_EQUITY_SECURITIES', 'NSE_ETF_SECURITIES', 'BSE_EQUITY_SECURITIES'].includes(String(data.catalogSource || '').toUpperCase());
+    const existing = await this.prisma.stock.findFirst({
+      where: {
+        OR: [
+          { symbol: { in: matchingSymbols, mode: 'insensitive' } },
+          data.providerSymbol ? { providerSymbol: { equals: data.providerSymbol, mode: 'insensitive' } } : undefined,
+          data.sourceSymbol ? { sourceSymbol: { equals: data.sourceSymbol, mode: 'insensitive' } } : undefined,
+          canMatchByName ? {
+            AND: [
+              { name: { equals: data.name.trim(), mode: 'insensitive' } },
+              { region: 'IN' },
+              { OR: [{ exchange: { equals: normalizedExchange, mode: 'insensitive' } }, { exchange: null }] },
+            ],
+          } : undefined,
+        ].filter(Boolean) as Prisma.StockWhereInput[],
+      },
+    });
+    if (!existing) {
+      const stock = await this.createStock({
+        ...data,
+        source: data.catalogSource || data.source || 'catalog',
+        dataStatus: data.dataStatus || 'PARTIAL',
+      } as any);
+      return { stock, action: 'inserted' };
+    }
+
+    const updateData = this.catalogUpdateData(existing, data);
+    if (Object.keys(updateData).length === 0) {
+      return { stock: existing, action: 'noOp' };
+    }
+
+    const stock = await this.prisma.stock.update({
+      where: { id: existing.id },
+      data: updateData,
+    });
+    return { stock, action: 'updated' };
+  }
+
+  async updateProviderSupportStatus(symbol: string, status: string, providerError?: string | null) {
+    return this.prisma.stock.update({
+      where: { symbol },
+      data: {
+        providerSupportStatus: status,
+        providerError: providerError || null,
+      },
+    });
+  }
+
+  async listStocksForCatalogBackfill(options: Pick<PaginationOptions, 'region' | 'assetType'> & { offset: number; batchSize: number }) {
+    const where = this.stockWhere({ region: options.region, assetType: options.assetType });
+    const [stocks, total] = await Promise.all([
+      this.prisma.stock.findMany({
+        where,
+        orderBy: { symbol: 'asc' },
+        skip: options.offset,
+        take: options.batchSize,
+      }),
+      this.prisma.stock.count({ where }),
+    ]);
+    return { stocks, total };
   }
 
   updateStockLoadTimestampById(id: string, timestamp = new Date()) {
@@ -646,6 +750,19 @@ export class MarketDataFoundationRepository {
         currency: this.keepExistingIfBlank(data.currency, current.currency),
         marketCap: nextMarketCap,
         assetType: this.keepExistingIfBlank(data.assetType, current.assetType),
+        instrumentSegment: this.keepExistingIfBlank(data.instrumentSegment, (current as any).instrumentSegment),
+        displaySymbol: this.keepExistingIfBlank(data.displaySymbol, (current as any).displaySymbol),
+        providerSymbol: this.keepExistingIfBlank(data.providerSymbol, (current as any).providerSymbol),
+        sourceSymbol: this.keepExistingIfBlank(data.sourceSymbol, (current as any).sourceSymbol),
+        catalogSource: this.keepExistingIfBlank(data.catalogSource, (current as any).catalogSource),
+        providerSupportStatus: this.keepExistingIfBlank(data.providerSupportStatus, (current as any).providerSupportStatus),
+        providerError: data.providerError === undefined ? (current as any).providerError : data.providerError,
+        derivativesEligible: data.derivativesEligible ?? (current as any).derivativesEligible,
+        underlyingSymbol: this.keepExistingIfBlank(data.underlyingSymbol, (current as any).underlyingSymbol),
+        expiryDate: data.expiryDate ?? (current as any).expiryDate,
+        contractMonth: this.keepExistingIfBlank(data.contractMonth, (current as any).contractMonth),
+        lotSize: data.lotSize ?? (current as any).lotSize,
+        contractStatus: this.keepExistingIfBlank(data.contractStatus, (current as any).contractStatus),
         isDelisted: data.isDelisted ?? current.isDelisted,
         ipoDate: data.ipoDate ?? current.ipoDate,
         isin: this.keepExistingIfBlank(data.isin, current.isin),
@@ -832,6 +949,48 @@ export class MarketDataFoundationRepository {
       lastWarningCount: row.lastWarningCount,
       lastSummary: row.lastSummary,
     };
+  }
+
+  private catalogUpdateData(existing: any, data: CreateStockRequest): Prisma.StockUpdateInput {
+    const next: Prisma.StockUpdateInput = {};
+    this.assignIfChanged(next, 'name', this.keepExistingRequiredIfBlank(data.name, existing.name), existing.name);
+    this.assignIfChanged(next, 'region', this.keepExistingRequiredIfBlank(data.region, existing.region), existing.region);
+    this.assignIfChanged(next, 'exchange', this.keepExistingIfBlank(data.exchange, existing.exchange), existing.exchange);
+    this.assignIfChanged(next, 'country', this.keepExistingIfBlank(data.country, existing.country), existing.country);
+    this.assignIfChanged(next, 'sector', this.keepExistingIfBlank(data.sector, existing.sector), existing.sector);
+    this.assignIfChanged(next, 'industry', this.keepExistingIfBlank(data.industry, existing.industry), existing.industry);
+    this.assignIfChanged(next, 'currency', this.keepExistingIfBlank(data.currency, existing.currency), existing.currency);
+    this.assignIfChanged(next, 'assetType', this.keepExistingIfBlank(data.assetType, existing.assetType), existing.assetType);
+    this.assignIfChanged(next, 'instrumentSegment', this.keepExistingIfBlank(data.instrumentSegment, existing.instrumentSegment), existing.instrumentSegment);
+    this.assignIfChanged(next, 'displaySymbol', this.keepExistingIfBlank(data.displaySymbol, existing.displaySymbol), existing.displaySymbol);
+    this.assignIfChanged(next, 'providerSymbol', this.keepExistingIfBlank(data.providerSymbol, existing.providerSymbol), existing.providerSymbol);
+    this.assignIfChanged(next, 'sourceSymbol', this.keepExistingIfBlank(data.sourceSymbol, existing.sourceSymbol), existing.sourceSymbol);
+    this.assignIfChanged(next, 'catalogSource', this.keepExistingIfBlank(data.catalogSource, existing.catalogSource), existing.catalogSource);
+    this.assignIfChanged(next, 'providerSupportStatus', this.keepExistingIfBlank(data.providerSupportStatus, existing.providerSupportStatus), existing.providerSupportStatus);
+    this.assignIfChanged(next, 'providerError', data.providerError === undefined ? existing.providerError : data.providerError, existing.providerError);
+    this.assignIfChanged(next, 'derivativesEligible', data.derivativesEligible ?? existing.derivativesEligible, existing.derivativesEligible);
+    this.assignIfChanged(next, 'underlyingSymbol', this.keepExistingIfBlank(data.underlyingSymbol, existing.underlyingSymbol), existing.underlyingSymbol);
+    this.assignIfChanged(next, 'contractMonth', this.keepExistingIfBlank(data.contractMonth, existing.contractMonth), existing.contractMonth);
+    this.assignIfChanged(next, 'lotSize', data.lotSize ?? existing.lotSize, existing.lotSize);
+    this.assignIfChanged(next, 'contractStatus', this.keepExistingIfBlank(data.contractStatus, existing.contractStatus), existing.contractStatus);
+    if (data.marketCap !== undefined && data.marketCap !== null && String(data.marketCap) !== String(existing.marketCap)) {
+      next.marketCap = new Prisma.Decimal(data.marketCap);
+    }
+    if (data.expiryDate && data.expiryDate.getTime() !== existing.expiryDate?.getTime?.()) {
+      next.expiryDate = data.expiryDate;
+    }
+    if (data.isDelisted !== undefined && data.isDelisted !== existing.isDelisted) next.isDelisted = data.isDelisted;
+    if (data.isActive !== undefined && data.isActive !== existing.isActive) next.isActive = data.isActive;
+    if (Object.keys(next).length > 0) {
+      next.source = data.catalogSource || existing.source || 'catalog';
+      next.dataStatus = data.dataStatus || existing.dataStatus || 'PARTIAL';
+    }
+    return next;
+  }
+
+  private assignIfChanged(target: Prisma.StockUpdateInput, key: string, next: unknown, current: unknown) {
+    if (next === undefined || next === null) return;
+    if (next !== current) (target as any)[key] = next;
   }
 
   private stockWhere(options: Pick<PaginationOptions, 'region' | 'assetType' | 'instrumentSegment'>): Prisma.StockWhereInput {

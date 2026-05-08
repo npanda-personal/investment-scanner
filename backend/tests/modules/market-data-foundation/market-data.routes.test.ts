@@ -9,6 +9,7 @@ import {
 const controller = {
   health: jest.fn(),
   schedulerStatus: jest.fn(),
+  listCatalogSources: jest.fn(),
   listInstruments: jest.fn(),
   createInstrument: jest.fn(),
   getInstrument: jest.fn(),
@@ -20,6 +21,8 @@ const controller = {
   getFxRate: jest.fn(),
   syncFxRates: jest.fn(),
   syncV1: jest.fn(),
+  importCatalog: jest.fn(),
+  backfillCatalogMetadata: jest.fn(),
   listStocks: jest.fn(),
   searchAssets: jest.fn(),
   yahooSearch: jest.fn(),
@@ -48,6 +51,7 @@ describe('market data routers', () => {
       expect.arrayContaining([
         'GET /market-data/health',
         'GET /market-data/scheduler/status',
+        'GET /market-data/catalog/sources',
         'GET /instruments',
         'POST /instruments',
         'GET /instruments/:id',
@@ -59,6 +63,8 @@ describe('market data routers', () => {
         'GET /fx-rates/:pair',
         'POST /fx-rates/sync',
         'POST /ingestion/sync',
+        'POST /market-data/catalog/import',
+        'POST /market-data/catalog/backfill-metadata',
       ])
     );
   });
