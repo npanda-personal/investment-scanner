@@ -17,7 +17,7 @@ const initialForm: V1CreateInstrumentRequest = {
   company_name: '',
   exchange: '',
   currency: 'USD',
-  asset_type: 'EQUITY',
+  asset_type: 'STOCK',
   isin: '',
 };
 
@@ -109,7 +109,7 @@ const AddInstrumentPage: React.FC = () => {
             value={form.asset_type}
             onChange={(event) => updateField('asset_type', event.target.value)}
           >
-            {['EQUITY', 'ETF', 'INDEX', 'FUND'].map((assetType) => (
+            {['STOCK', 'ETF', 'INDEX', 'FUTURE', 'FOREX', 'COMMODITY', 'CRYPTO', 'FUND', 'OTHER', 'UNKNOWN'].map((assetType) => (
               <MenuItem key={assetType} value={assetType}>{assetType}</MenuItem>
             ))}
           </TextField>

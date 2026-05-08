@@ -63,6 +63,7 @@ export async function fetchStocks(options: PaginationOptions = {}): Promise<Pagi
   if (options.country) params.append('country', options.country);
   if (options.exchange) params.append('exchange', options.exchange);
   if (options.assetType) params.append('assetType', options.assetType);
+  if (options.instrumentSegment) params.append('instrumentSegment', options.instrumentSegment);
   if (options.currency) params.append('currency', options.currency);
   if (options.sector) params.append('sector', options.sector);
   if (options.industry) params.append('industry', options.industry);
@@ -201,8 +202,12 @@ export async function createInstrument(data: V1CreateInstrumentRequest): Promise
   return response.data;
 }
 
-export async function fetchInstrument(id: string): Promise<V1Instrument> {
-  const response = await axios.get<V1Instrument>(`${API_BASE}/v1/instruments/${id}`);
+export async function fetchInstrument(id: string, options: MarketScopedApiOptions = {}): Promise<V1Instrument> {
+  const params = {
+    region: normalizeMarketForApi(options.region),
+    assetType: normalizeAssetTypeForMarketDataApi(options.assetType),
+  };
+  const response = await axios.get<V1Instrument>(`${API_BASE}/v1/instruments/${id}`, { params });
   return response.data;
 }
 

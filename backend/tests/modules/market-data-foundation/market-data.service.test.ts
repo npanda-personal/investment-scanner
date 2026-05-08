@@ -123,7 +123,8 @@ describe('MarketDataFoundationService syncV1', () => {
         symbol: 'AAPL',
         exchange: 'NASDAQ',
         currency: 'USD',
-        asset_type: 'EQUITY',
+        asset_type: 'STOCK',
+        instrument_segment: 'CASH',
       },
     });
   });

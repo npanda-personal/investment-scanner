@@ -115,6 +115,60 @@ describe('MarketDataFoundationRepository', () => {
     });
   });
 
+  it('falls back to symbol sort for unknown sort fields', async () => {
+    const prisma = {
+      stock: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await repository.listStocks({
+      page: 1,
+      pageSize: 10,
+      sortBy: 'notAColumn' as any,
+      sortOrder: 'desc',
+    });
+
+    expect(prisma.stock.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      orderBy: { symbol: 'desc' },
+    }));
+  });
+
+  it('maps CASH segment filtering to stock and legacy equity asset types', async () => {
+    const prisma = {
+      stock: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await repository.listStocks({
+      page: 1,
+      pageSize: 10,
+      region: 'IN',
+      assetType: 'STOCK',
+      instrumentSegment: 'CASH',
+    });
+
+    expect(prisma.stock.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        AND: expect.arrayContaining([
+          expect.objectContaining({
+            OR: expect.arrayContaining([
+              expect.objectContaining({ assetType: expect.objectContaining({ in: ['STOCK', 'EQUITY'] }) }),
+            ]),
+          }),
+          expect.objectContaining({
+            assetType: expect.objectContaining({ in: ['STOCK', 'EQUITY'] }),
+          }),
+        ]),
+      }),
+    }));
+  });
+
   it('does not rewrite identical daily candles', async () => {
     const upsert = jest.fn().mockResolvedValue({});
     const latestPriceUpsert = jest.fn().mockResolvedValue({});
@@ -271,5 +325,51 @@ describe('MarketDataFoundationRepository', () => {
       new Date('2026-01-02T00:00:00.000Z')
     );
     expect(prisma.fxRate.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves existing non-null metadata when provider update has nulls', async () => {
+    const update = jest.fn().mockImplementation(({ data }) => Promise.resolve(data));
+    const prisma = {
+      stock: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'stock-1',
+          name: 'Reliance Industries',
+          region: 'IN',
+          exchange: 'NSE',
+          country: 'India',
+          sector: 'Energy',
+          industry: 'Oil & Gas',
+          currency: 'INR',
+          marketCap: '1000',
+          assetType: 'STOCK',
+          isDelisted: false,
+          ipoDate: null,
+          isin: 'INE002A01018',
+        }),
+        update,
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await repository.updateCompanyMasterData('stock-1', {
+      name: 'Reliance Industries Limited',
+      country: null,
+      sector: null,
+      industry: null,
+      currency: null,
+      marketCap: null,
+      assetType: null,
+    });
+
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        name: 'Reliance Industries Limited',
+        country: 'India',
+        sector: 'Energy',
+        industry: 'Oil & Gas',
+        currency: 'INR',
+        assetType: 'STOCK',
+      }),
+    }));
   });
 });

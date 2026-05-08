@@ -38,6 +38,7 @@ import {
   type V1PricesResponse,
 } from '../api/marketDataFoundationService';
 import { PageHeader } from '@/shared/components';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 
 const formatDate = (value: string) => new Date(value).toLocaleDateString();
 const formatDateTime = (value: string) => new Date(value).toLocaleString();
@@ -50,6 +51,7 @@ const formatNumber = (value: number | string | null | undefined) => {
 const InstrumentDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { scope } = useMarketScope();
   const [instrument, setInstrument] = useState<V1Instrument | null>(null);
   const [latest, setLatest] = useState<V1LatestPriceResponse | null>(null);
   const [prices, setPrices] = useState<V1PricesResponse | null>(null);
@@ -66,11 +68,11 @@ const InstrumentDetailPage: React.FC = () => {
     setError(null);
     try {
       const [instrumentResult, latestResult, pricesResult, fundamentalsResult, actionsResult] = await Promise.all([
-        fetchInstrument(id),
-        fetchInstrumentLatestPrice(id),
-        fetchInstrumentPrices(id, 120),
-        fetchInstrumentFundamentals(id),
-        fetchInstrumentCorporateActions(id),
+        fetchInstrument(id, { region: scope.region, assetType: scope.assetType }),
+        fetchInstrumentLatestPrice(id, { region: scope.region, assetType: scope.assetType }),
+        fetchInstrumentPrices(id, 120, { region: scope.region, assetType: scope.assetType }),
+        fetchInstrumentFundamentals(id, { region: scope.region, assetType: scope.assetType }),
+        fetchInstrumentCorporateActions(id, { region: scope.region, assetType: scope.assetType }),
       ]);
       setInstrument(instrumentResult);
       setLatest(latestResult);
@@ -86,7 +88,7 @@ const InstrumentDetailPage: React.FC = () => {
 
   useEffect(() => {
     loadDetail();
-  }, [id]);
+  }, [id, scope.region, scope.assetType]);
 
   const chartData = useMemo(() => {
     return [...(prices?.prices || [])]
@@ -103,7 +105,7 @@ const InstrumentDetailPage: React.FC = () => {
     setError(null);
     setSuccess(null);
     try {
-      const result = await syncMarketData({ instrumentId: id });
+      const result = await syncMarketData({ instrumentId: id, region: scope.region, asset_type: scope.assetType });
       if (result.success) {
         setSuccess(result.message);
         await loadDetail();

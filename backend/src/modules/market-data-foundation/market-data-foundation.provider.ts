@@ -54,6 +54,39 @@ export class YahooFinanceIngestionService {
     return value instanceof Date ? value : new Date(value as any);
   }
 
+  private normalizeYahooAssetType(value: unknown, symbol: string): string {
+    const quoteType = typeof value === 'string' ? value.trim().toUpperCase() : '';
+    if (quoteType === 'EQUITY') return 'STOCK';
+    if (quoteType === 'ETF' || quoteType === 'INDEX' || quoteType === 'FUTURE' || quoteType === 'CRYPTO' || quoteType === 'FUND') return quoteType;
+    if (quoteType === 'CURRENCY' || quoteType === 'FX') return 'FOREX';
+    if (symbol.includes('=X')) return 'FOREX';
+    if (symbol.startsWith('^')) return 'INDEX';
+    if (symbol.endsWith('.NS') || symbol.endsWith('.BO')) return 'STOCK';
+    return quoteType || 'UNKNOWN';
+  }
+
+  private inferCountry(symbol: string, exchange?: string | null, providerCountry?: string | null): string | null {
+    if (providerCountry) return providerCountry;
+    const normalizedExchange = exchange?.trim().toUpperCase();
+    if (symbol.endsWith('.NS') || symbol.endsWith('.BO') || normalizedExchange === 'NSE' || normalizedExchange === 'BSE') return 'India';
+    const inferred = this.inferRegion(symbol).region;
+    if (inferred === 'US') return 'United States';
+    if (inferred === 'UK') return 'United Kingdom';
+    return inferred || null;
+  }
+
+  private inferCurrency(symbol: string, exchange?: string | null, providerCurrency?: string | null): string | null {
+    if (providerCurrency) return providerCurrency;
+    const normalizedExchange = exchange?.trim().toUpperCase();
+    if (symbol.endsWith('.NS') || symbol.endsWith('.BO') || normalizedExchange === 'NSE' || normalizedExchange === 'BSE') return 'INR';
+    const inferred = this.inferRegion(symbol).region;
+    if (inferred === 'UK') return 'GBP';
+    if (inferred === 'EU') return 'EUR';
+    if (inferred === 'CA') return 'CAD';
+    if (inferred === 'US') return 'USD';
+    return null;
+  }
+
   /**
    * Infer region and exchange from symbol (basic heuristic).
    * This can be extended with a proper mapping.
@@ -282,17 +315,18 @@ export class YahooFinanceIngestionService {
       const price = summary?.price || {};
       const profile = summary?.summaryProfile || {};
       const inferred = this.inferRegion(symbol);
+      const exchange = typeof price.exchangeName === 'string' ? price.exchangeName : inferred.exchange || null;
 
       return {
         symbol,
         companyName: typeof price.longName === 'string' ? price.longName : typeof price.shortName === 'string' ? price.shortName : null,
-        exchange: typeof price.exchangeName === 'string' ? price.exchangeName : inferred.exchange || null,
-        country: typeof profile.country === 'string' ? profile.country : inferred.region || null,
+        exchange,
+        country: this.inferCountry(symbol, exchange, typeof profile.country === 'string' ? profile.country : null),
         sector: typeof profile.sector === 'string' ? profile.sector : null,
         industry: typeof profile.industry === 'string' ? profile.industry : null,
-        currency: typeof price.currency === 'string' ? price.currency : null,
+        currency: this.inferCurrency(symbol, exchange, typeof price.currency === 'string' ? price.currency : null),
         marketCap: this.toNumber(price.marketCap),
-        assetType: typeof price.quoteType === 'string' ? price.quoteType : 'EQUITY',
+        assetType: this.normalizeYahooAssetType(price.quoteType, symbol),
         isDelisted: false,
         ipoDate: null,
         source: 'yahoo',
@@ -305,12 +339,12 @@ export class YahooFinanceIngestionService {
         symbol,
         companyName: null,
         exchange: inferred.exchange || null,
-        country: inferred.region || null,
+        country: this.inferCountry(symbol, inferred.exchange, null),
         sector: null,
         industry: null,
-        currency: null,
+        currency: this.inferCurrency(symbol, inferred.exchange, null),
         marketCap: null,
-        assetType: 'EQUITY',
+        assetType: this.normalizeYahooAssetType(null, symbol),
         isDelisted: null,
         ipoDate: null,
         source: 'yahoo',

@@ -25,6 +25,8 @@ Implemented:
 - Canonical `/api/v1` APIs plus existing compatibility routes.
 - Frontend instrument exploration, add instrument, instrument detail, status panel, and manual sync flows.
 - **Global Market Scope**: Support for `region` and `assetType` filtering in instrument list and search APIs.
+- **Metadata hardening**: Provider/company metadata updates preserve existing non-null values when a later provider response omits fields. Indian NSE/BSE symbols default to `India`, `IN`, and `INR` when the provider omits country/currency.
+- **Instrument classification**: API DTOs expose normalized `asset_type` plus derived `instrument_segment` without requiring a stock identity migration.
 
 Partially implemented:
 
@@ -97,6 +99,7 @@ Persisted models used by Market Data Foundation:
 
 - `Stock`
   - Instrument/company master data: symbol, name, exchange, country, sector, industry, currency, market cap, asset type, active/delisted status, IPO date, ISIN, source, data status.
+  - `assetType` may contain legacy `EQUITY` rows. API responses normalize `EQUITY` to `STOCK`; repository filters treat `STOCK` and `EQUITY` as backward-compatible cash equity values.
 - `PriceTick`
   - Daily OHLCV bars, adjusted close when supplied, source, ingestion timestamp, last updated timestamp, data status.
 - `LatestPrice`
@@ -121,6 +124,46 @@ Most list endpoints support standard `PaginationOptions`:
 - `sortOrder`: 'asc' or 'desc'
 - `region`: Global market region (IN, US, EU, GLOBAL). Mapped to exchanges and country metadata.
 - `assetType`: Asset class identifier (e.g., STOCK).
+- `instrumentSegment`: Derived class/segment filter. `CASH` maps to `STOCK` and legacy `EQUITY`; `FUTURES` maps to `FUTURE`; `CURRENCY` maps to `FOREX`.
+- `sector` and `industry`: Case-insensitive partial text filters.
+
+Unknown `sortBy` values fall back to `symbol` to prevent invalid Prisma order fields from breaking list requests.
+
+### Metadata Mapping Rules
+
+Yahoo Finance remains the only provider. Market Data Foundation maps free provider profile/price fields as follows:
+
+| DTO field | Source/fallback |
+| --- | --- |
+| `company_name` | Yahoo `price.longName`, then `price.shortName`, then existing stock name. |
+| `exchange` | Yahoo `price.exchangeName`, then symbol suffix inference. |
+| `country` | Yahoo `summaryProfile.country`; `.NS`/NSE and `.BO`/BSE fallback to `India`. |
+| `region` | Existing stock region or suffix/exchange inference. |
+| `currency` | Yahoo `price.currency`; `.NS`/NSE and `.BO`/BSE fallback to `INR`. |
+| `sector` / `industry` | Yahoo `summaryProfile`; not faked when unavailable. |
+| `market_cap` | Yahoo `price.marketCap`; not faked when unavailable. |
+| `asset_type` | Yahoo `quoteType`, normalized. `EQUITY` is returned as `STOCK`. |
+
+Repository updates are null-preserving: an omitted/null provider field does not erase an existing non-null country, sector, industry, currency, market cap, asset type, ISIN, IPO date, or exchange. Missing metadata is surfaced through `missing_metadata_fields` and `metadata_completeness_score` in the v1 instrument DTO so the UI can show diagnostics instead of hiding gaps behind generic `N/A` values.
+
+### Instrument Classification
+
+The persisted schema does not yet include `instrumentSegment`; it is derived in the API response to avoid a broad identity migration. Current rules:
+
+| Normalized `asset_type` | `instrument_segment` |
+| --- | --- |
+| `STOCK` | `CASH` |
+| `ETF` | `ETF` |
+| `INDEX` | `INDEX` |
+| `FUTURE` | `FUTURES` |
+| `FOREX` | `CURRENCY` |
+| `COMMODITY` | `COMMODITY` |
+| `CRYPTO` | `CRYPTO` |
+| `FUND` | `FUND` |
+| `OTHER` | `OTHER` |
+| `UNKNOWN` | `UNKNOWN` |
+
+For the current India stock scope, `.NS`, `.BO`, NSE, and BSE cash equity rows should render as `STOCK / CASH`. Indexes, futures, ETFs, forex, commodity, crypto, and funds are excluded from default `assetType=STOCK` scope unless explicitly filtered.
 
 ### Canonical MVP Endpoints
 
@@ -243,6 +286,8 @@ Implemented validations:
 - Instrument create requires `symbol`, `company_name`, `exchange`, `currency`, and `asset_type`.
 - Price timestamps normalized to UTC midnight for idempotent storage.
 - Regional mapping logic ensures `IN` filters for NSE/BSE and `India`.
+- Local search and catalog sync task selection respect the same region/asset scope filters used by list endpoints.
+- Scheduled batch selection prioritizes instruments with `null` or oldest `lastSuccessfulDataLoadTimestamp` before symbol order, so bounded scheduled runs do not repeatedly process only the first symbols alphabetically.
 
 ## Idempotent Persistence Rules
 
@@ -257,6 +302,7 @@ Natural keys for stock-data records owned by this module:
 ## Frontend Structure
 
 - `MarketDataFoundationPage`: Integrated with `useMarketScope()`. Automatically filters by the globally selected region.
+  - Shows Asset Type and Segment/Class columns, sector and industry columns, metadata completeness, and server-side filters for asset type, segment/class, exchange, currency, sector, and industry.
   - Sync Catalog success/no-new-data alerts include daily candle freshness details from `/api/v1/market-data/scheduler/status`, so users can see whether the latest completed candle is already synced.
 - `MarketDataStatusPanel`: Shows health, instrument count, last data timestamp, and a Daily Candle card with the latest completed/stored candle status.
 - `InstrumentSearchSelect`: Shared component for picking stocks. Defaults to the active region scope with an optional `global` override.
@@ -270,10 +316,11 @@ Frontend routes are defined in `routes.tsx` and exported via `index.ts`.
 - `backend/tests/modules/market-data-foundation/market-data.market-session.test.ts`: Verifies IN market-session skip/run decisions.
 - `backend/tests/modules/market-data-foundation/market-data.scheduler.test.ts`: Verifies scheduler skip, incremental mode, and overlap protection.
 - `backend/tests/modules/market-data-foundation/market-data.repository.test.ts`: Verifies smart daily-candle no-op/update persistence.
+- `backend/tests/modules/market-data-foundation/market-data.provider.test.ts`: Verifies provider mapping, malformed row handling, corporate actions, and Indian metadata fallbacks.
 
 Verification commands:
 
-- `npx prisma generate` after applying the `MarketDataSyncState` schema.
+- `npx prisma generate` after Prisma schema changes. No Prisma change is required for derived `instrument_segment`.
 - `npm run build`
 - `npm test -- market-data --runInBand`
 

@@ -73,4 +73,31 @@ describe('YahooFinanceIngestionService provider', () => {
       expect.objectContaining({ type: 'split', splitRatio: 4, value: '4:1' }),
     ]);
   });
+
+  it('maps Indian equity metadata with deterministic fallbacks', async () => {
+    const provider = new YahooFinanceIngestionService(undefined, 0);
+    (provider as any).yahooFinance = {
+      quoteSummary: jest.fn().mockResolvedValue({
+        price: {
+          longName: 'Reliance Industries Limited',
+          exchangeName: 'NSE',
+          quoteType: 'EQUITY',
+          marketCap: 123,
+        },
+        summaryProfile: {},
+      }),
+    };
+
+    const master = await provider.fetchCompanyMasterData('RELIANCE.NS');
+
+    expect(master).toMatchObject({
+      symbol: 'RELIANCE.NS',
+      companyName: 'Reliance Industries Limited',
+      exchange: 'NSE',
+      country: 'India',
+      currency: 'INR',
+      marketCap: 123,
+      assetType: 'STOCK',
+    });
+  });
 });

@@ -196,13 +196,18 @@ export interface V1Instrument {
   id: string;
   symbol: string;
   company_name: string;
+  display_symbol?: string;
   exchange: string | null;
   country: string | null;
+  region?: string | null;
   sector: string | null;
   industry: string | null;
   currency: string;
   market_cap: number | null;
   asset_type: string;
+  instrument_segment: string;
+  metadata_completeness_score?: number;
+  missing_metadata_fields?: string[];
   is_active: boolean;
   is_delisted: boolean;
   ipo_date: string | null;
@@ -286,12 +291,13 @@ export interface UpdateStockRequest {
 export interface PaginationOptions {
   page: number;
   pageSize: number;
-  sortBy?: 'symbol' | 'name' | 'marketCap' | 'country' | 'exchange' | 'sector' | 'currency' | 'assetType' | 'lastSuccessfulDataLoadTimestamp' | 'createdAt';
+  sortBy?: 'symbol' | 'name' | 'marketCap' | 'country' | 'exchange' | 'sector' | 'industry' | 'currency' | 'assetType' | 'lastSuccessfulDataLoadTimestamp' | 'createdAt';
   sortOrder?: 'asc' | 'desc';
   region?: string;
   country?: string;
   exchange?: string;
   assetType?: string;
+  instrumentSegment?: string;
   currency?: string;
   sector?: string;
   industry?: string;

@@ -31,6 +31,7 @@ export class MarketDataFoundationRepository {
       country,
       exchange,
       assetType,
+      instrumentSegment,
       currency,
       sector,
       industry,
@@ -39,7 +40,7 @@ export class MarketDataFoundationRepository {
     const skip = (page - 1) * pageSize;
     
     // Combine explicit region filter with other filters
-    const where: Prisma.StockWhereInput = this.stockWhere({ region, assetType });
+    const where: Prisma.StockWhereInput = this.stockWhere({ region, assetType, instrumentSegment });
 
     if (country) {
       where.country = { contains: country.trim(), mode: 'insensitive' };
@@ -71,7 +72,7 @@ export class MarketDataFoundationRepository {
     const [stocks, total] = await Promise.all([
       this.prisma.stock.findMany({
         where,
-        orderBy: { [sortBy]: sortOrder },
+        orderBy: { [this.safeStockSortBy(sortBy)]: sortOrder },
         skip,
         take: pageSize,
       }),
@@ -154,24 +155,32 @@ export class MarketDataFoundationRepository {
     });
   }
 
-  searchStocks(query: string, take = 10) {
+  searchStocks(query: string, take = 10, options: Pick<PaginationOptions, 'region' | 'assetType' | 'instrumentSegment'> = {}) {
     return this.prisma.stock.findMany({
       where: {
-        OR: [
-          { symbol: { contains: query, mode: 'insensitive' } },
-          { name: { contains: query, mode: 'insensitive' } },
+        AND: [
+          this.stockWhere(options),
+          {
+            OR: [
+              { symbol: { contains: query, mode: 'insensitive' } },
+              { name: { contains: query, mode: 'insensitive' } },
+            ],
+          },
         ],
       },
       take,
     });
   }
 
-  listActiveStockSyncTasks(options: Pick<PaginationOptions, 'region' | 'assetType'> = {}, take?: number) {
+  listActiveStockSyncTasks(options: Pick<PaginationOptions, 'region' | 'assetType' | 'instrumentSegment'> = {}, take?: number) {
     return this.prisma.stock.findMany({
       where: { ...this.stockWhere(options), isActive: true },
       select: { id: true, symbol: true, lastSuccessfulDataLoadTimestamp: true },
       take,
-      orderBy: { symbol: 'asc' },
+      orderBy: [
+        { lastSuccessfulDataLoadTimestamp: { sort: 'asc', nulls: 'first' } },
+        { symbol: 'asc' },
+      ],
     });
   }
 
@@ -610,20 +619,29 @@ export class MarketDataFoundationRepository {
   }
 
   async updateCompanyMasterData(stockId: string, data: Partial<CreateStockRequest>) {
+    const current = await this.prisma.stock.findUnique({ where: { id: stockId } });
+    if (!current) {
+      throw new Error('Stock not found');
+    }
+    const nextMarketCap = data.marketCap !== undefined && data.marketCap !== null
+      ? new Prisma.Decimal(data.marketCap)
+      : current.marketCap;
+
     return this.prisma.stock.update({
       where: { id: stockId },
       data: {
-        name: data.name,
-        exchange: data.exchange,
-        country: data.country,
-        sector: data.sector,
-        industry: data.industry,
-        currency: data.currency,
-        marketCap: data.marketCap !== undefined && data.marketCap !== null ? new Prisma.Decimal(data.marketCap) : undefined,
-        assetType: data.assetType,
-        isDelisted: data.isDelisted,
-        ipoDate: data.ipoDate,
-        isin: data.isin,
+        name: this.keepExistingRequiredIfBlank(data.name, current.name),
+        region: this.keepExistingRequiredIfBlank(data.region, current.region),
+        exchange: this.keepExistingIfBlank(data.exchange, current.exchange),
+        country: this.keepExistingIfBlank(data.country, current.country),
+        sector: this.keepExistingIfBlank(data.sector, current.sector),
+        industry: this.keepExistingIfBlank(data.industry, current.industry),
+        currency: this.keepExistingIfBlank(data.currency, current.currency),
+        marketCap: nextMarketCap,
+        assetType: this.keepExistingIfBlank(data.assetType, current.assetType),
+        isDelisted: data.isDelisted ?? current.isDelisted,
+        ipoDate: data.ipoDate ?? current.ipoDate,
+        isin: this.keepExistingIfBlank(data.isin, current.isin),
         source: 'yahoo',
         dataStatus: 'PARTIAL',
       },
@@ -809,7 +827,7 @@ export class MarketDataFoundationRepository {
     };
   }
 
-  private stockWhere(options: Pick<PaginationOptions, 'region' | 'assetType'>): Prisma.StockWhereInput {
+  private stockWhere(options: Pick<PaginationOptions, 'region' | 'assetType' | 'instrumentSegment'>): Prisma.StockWhereInput {
     const filters: Prisma.StockWhereInput[] = [];
     const regionFilter = resolveMarketRegionFilter(options.region);
     if (Object.keys(regionFilter).length > 0) filters.push(regionFilter);
@@ -819,15 +837,44 @@ export class MarketDataFoundationRepository {
       if (normalized === 'STOCK' || normalized === 'EQUITY') {
         filters.push({
           OR: [
-          { assetType: { in: ['STOCK', 'EQUITY'], mode: 'insensitive' } },
-          { assetType: null },
+            { assetType: { in: ['STOCK', 'EQUITY'], mode: 'insensitive' } },
+            { assetType: null },
           ],
         });
       } else {
         filters.push({ assetType: { contains: assetType, mode: 'insensitive' } });
       }
     }
+    const segmentAssetTypes = this.assetTypesForSegment(options.instrumentSegment);
+    if (segmentAssetTypes.length > 0) {
+      filters.push({ assetType: { in: segmentAssetTypes, mode: 'insensitive' } });
+    }
     return filters.length > 0 ? { AND: filters } : {};
+  }
+
+  private safeStockSortBy(sortBy?: string): string {
+    const allowed = new Set(['symbol', 'name', 'marketCap', 'country', 'exchange', 'sector', 'industry', 'currency', 'assetType', 'lastSuccessfulDataLoadTimestamp', 'createdAt']);
+    return allowed.has(sortBy || '') ? sortBy as any : 'symbol';
+  }
+
+  private assetTypesForSegment(segment?: string | null): string[] {
+    const normalized = segment?.trim().toUpperCase();
+    if (!normalized) return [];
+    if (normalized === 'CASH') return ['STOCK', 'EQUITY'];
+    if (normalized === 'FUTURES') return ['FUTURE'];
+    if (normalized === 'CURRENCY') return ['FOREX', 'FX', 'CURRENCY'];
+    if (['INDEX', 'ETF', 'COMMODITY', 'CRYPTO', 'FUND', 'OTHER', 'UNKNOWN'].includes(normalized)) return [normalized];
+    return [];
+  }
+
+  private keepExistingIfBlank<T>(next: T | null | undefined, current: T | null): T | null {
+    if (typeof next === 'string' && next.trim().length === 0) return current;
+    return next === null || next === undefined ? current : next;
+  }
+
+  private keepExistingRequiredIfBlank(next: string | null | undefined, current: string): string {
+    if (typeof next === 'string' && next.trim().length > 0) return next;
+    return current;
   }
 
   private asAndArray(value: Prisma.StockWhereInput['AND']): Prisma.StockWhereInput[] {

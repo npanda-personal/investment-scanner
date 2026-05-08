@@ -4,6 +4,7 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   CircularProgress,
   IconButton,
   InputAdornment,
@@ -34,6 +35,7 @@ import { normalizeMarketForApi } from '../api/marketScopeApi';
 
 const formatTimestamp = (timestamp: string) => new Date(timestamp).toLocaleString();
 const formatMarketCap = (value: number | null) => value === null ? 'N/A' : new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(value);
+const formatAssetType = (value: string) => value === 'EQUITY' ? 'STOCK' : value;
 
 const buildCandleStatusMessage = (status?: MarketDataSchedulerRegionStatus) => {
   if (!status) return '';
@@ -59,6 +61,7 @@ const MarketDataFoundationPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [exchange, setExchange] = useState('');
   const [assetType, setAssetType] = useState('');
+  const [instrumentSegment, setInstrumentSegment] = useState('');
   const [currency, setCurrency] = useState('');
   const [sector, setSector] = useState('');
   const [industry, setIndustry] = useState('');
@@ -94,6 +97,7 @@ const MarketDataFoundationPage: React.FC = () => {
         region: scope.region,
         exchange: exchange.trim() || undefined,
         assetType: assetType.trim() || scope.assetType,
+        instrumentSegment: instrumentSegment.trim() || undefined,
         currency: currency.trim() || undefined,
         sector: sector.trim() || undefined,
         industry: industry.trim() || undefined,
@@ -106,7 +110,7 @@ const MarketDataFoundationPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [assetType, currency, exchange, industry, page, pageSize, search, sector, sortBy, sortDirection, scope.region, scope.assetType, normalizedMarket]);
+  }, [assetType, currency, exchange, industry, instrumentSegment, page, pageSize, search, sector, sortBy, sortDirection, scope.region, scope.assetType, normalizedMarket]);
 
   useEffect(() => {
     loadInstruments();
@@ -174,9 +178,23 @@ const MarketDataFoundationPage: React.FC = () => {
     { id: 'exchange', label: 'Exchange', sortable: true, render: (instrument) => <StatusBadge label={instrument.exchange || 'UNKNOWN'} /> },
     { id: 'country', label: 'Country', sortable: true, render: (instrument) => instrument.country || 'N/A' },
     { id: 'currency', label: 'Currency', sortable: true, render: (instrument) => instrument.currency },
-    { id: 'assetType', label: 'Asset Type', sortable: true, render: (instrument) => instrument.asset_type },
-    { id: 'sector', label: 'Sector', sortable: true, render: (instrument) => instrument.sector || 'N/A' },
+    { id: 'assetType', label: 'Asset Type', sortable: true, render: (instrument) => <StatusBadge label={formatAssetType(instrument.asset_type)} /> },
+    { id: 'instrumentSegment', label: 'Segment/Class', render: (instrument) => <StatusBadge label={instrument.instrument_segment || 'UNKNOWN'} /> },
+    { id: 'sector', label: 'Sector', sortable: true, render: (instrument) => instrument.sector || 'Missing' },
+    { id: 'industry', label: 'Industry', sortable: true, render: (instrument) => instrument.industry || 'Missing' },
     { id: 'marketCap', label: 'Market Cap', sortable: true, align: 'right', render: (instrument) => formatMarketCap(instrument.market_cap) },
+    {
+      id: 'metadata',
+      label: 'Metadata',
+      render: (instrument) => {
+        const missing = instrument.missing_metadata_fields || [];
+        return (
+          <Tooltip title={missing.length > 0 ? `Missing: ${missing.join(', ')}` : 'Metadata complete'} arrow>
+            <Chip size="small" label={`${instrument.metadata_completeness_score ?? 0}%`} color={missing.length > 0 ? 'warning' : 'success'} variant="outlined" />
+          </Tooltip>
+        );
+      },
+    },
     { id: 'dataStatus', label: 'Status', render: (instrument) => <StatusBadge label={instrument.data_status} /> },
     { id: 'lastSuccessfulDataLoadTimestamp', label: 'Last Updated', sortable: true, render: (instrument) => formatTimestamp(instrument.last_updated_timestamp) },
     {
@@ -211,6 +229,7 @@ const MarketDataFoundationPage: React.FC = () => {
     setSearch('');
     setExchange('');
     setAssetType('');
+    setInstrumentSegment('');
     setCurrency('');
     setSector('');
     setIndustry('');
@@ -275,7 +294,11 @@ const MarketDataFoundationPage: React.FC = () => {
           <TextField size="small" label="Exchange" value={exchange} onChange={(event) => { setExchange(event.target.value); setPage(0); }} sx={{ minWidth: 140 }} />
           <TextField select size="small" label="Asset Type" value={assetType} onChange={(event) => { setAssetType(event.target.value); setPage(0); }} sx={{ minWidth: 150 }}>
             <MenuItem value="">All</MenuItem>
-            {['STOCK', 'EQUITY', 'ETF', 'INDEX', 'FX'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
+            {['STOCK', 'ETF', 'INDEX', 'FUTURE', 'FOREX', 'COMMODITY', 'CRYPTO', 'FUND', 'OTHER', 'UNKNOWN'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
+          </TextField>
+          <TextField select size="small" label="Segment/Class" value={instrumentSegment} onChange={(event) => { setInstrumentSegment(event.target.value); setPage(0); }} sx={{ minWidth: 160 }}>
+            <MenuItem value="">All</MenuItem>
+            {['CASH', 'FUTURES', 'INDEX', 'ETF', 'CURRENCY', 'COMMODITY', 'CRYPTO', 'FUND', 'OTHER', 'UNKNOWN'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
           </TextField>
           <TextField size="small" label="Currency" value={currency} onChange={(event) => { setCurrency(event.target.value.toUpperCase()); setPage(0); }} sx={{ minWidth: 120 }} />
           <TextField size="small" label="Sector" value={sector} onChange={(event) => { setSector(event.target.value); setPage(0); }} sx={{ minWidth: 180 }} />

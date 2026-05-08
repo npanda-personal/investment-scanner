@@ -93,6 +93,7 @@ export class MarketDataFoundationService {
       country: options.country,
       exchange: options.exchange,
       assetType: options.assetType,
+      instrumentSegment: options.instrumentSegment,
       currency: options.currency,
       sector: options.sector,
       industry: options.industry,
@@ -153,7 +154,7 @@ export class MarketDataFoundationService {
         industry: data.industry,
         currency: data.currency.trim().toUpperCase(),
         marketCap: data.market_cap,
-        assetType: data.asset_type.trim().toUpperCase(),
+        assetType: this.normalizeAssetType(data.asset_type),
         ipoDate: data.ipo_date ? new Date(data.ipo_date) : null,
         isin: data.isin,
       }, false);
@@ -197,8 +198,8 @@ export class MarketDataFoundationService {
     }
   }
 
-  async searchAssets(query: string): Promise<any[]> {
-    const localResults = await this.repository.searchStocks(query);
+  async searchAssets(query: string, options: Pick<PaginationOptions, 'region' | 'assetType' | 'instrumentSegment'> = {}): Promise<any[]> {
+    const localResults = await this.repository.searchStocks(query, 10, options);
 
     if (localResults.length > 0) {
       return localResults.map(stock => ({
@@ -713,8 +714,11 @@ export class MarketDataFoundationService {
         stock = await this.create({
           symbol,
           name: request.company_name || match?.name || symbol,
-          region: request.region || regionInfo.region || 'US',
+        region: request.region || regionInfo.region || 'US',
           exchange: request.exchange || match?.exchange || regionInfo.exchange || 'UNKNOWN',
+          country: this.defaultCountryForRegion(request.region || regionInfo.region),
+          currency: request.currency || this.defaultCurrencyForRegion(request.region || regionInfo.region),
+          assetType: this.normalizeAssetType(request.asset_type || match?.type || 'STOCK'),
         }, false);
       }
     }
@@ -724,15 +728,19 @@ export class MarketDataFoundationService {
     try {
       const masterData = await this.marketDataProvider.fetchCompanyMasterData(stock.symbol).catch(() => null);
       if (masterData) {
+        const normalizedAssetType = this.normalizeAssetType(request.asset_type || masterData.assetType || stock.assetType);
+        const exchange = request.exchange || masterData.exchange || stock.exchange || undefined;
+        const region = stock.region || request.region || this.marketDataProvider.inferRegion(stock.symbol).region;
         stock = await this.repository.updateCompanyMasterData(stock.id, {
           name: masterData.companyName || stock.name,
-          exchange: request.exchange || masterData.exchange || stock.exchange || undefined,
-          country: masterData.country,
+          region,
+          exchange,
+          country: masterData.country || this.defaultCountryForInstrument(stock.symbol, exchange, region),
           sector: masterData.sector,
           industry: masterData.industry,
-          currency: request.currency || masterData.currency,
+          currency: request.currency || masterData.currency || this.defaultCurrencyForInstrument(stock.symbol, exchange, region),
           marketCap: masterData.marketCap,
-          assetType: request.asset_type || masterData.assetType,
+          assetType: normalizedAssetType,
           isDelisted: masterData.isDelisted ?? false,
           ipoDate: masterData.ipoDate,
           isin: request.isin,
@@ -789,7 +797,7 @@ export class MarketDataFoundationService {
         company_name: stock.name,
         exchange: stock.exchange || request.exchange || 'UNKNOWN',
         currency: request.currency || this.defaultCurrencyForRegion(stock.region),
-        asset_type: request.asset_type || 'EQUITY',
+        asset_type: this.normalizeAssetType(request.asset_type || stock.assetType || 'STOCK'),
         isin: request.isin,
       }),
       message: syncSummary?.noNewData
@@ -1066,17 +1074,37 @@ export class MarketDataFoundationService {
   }
 
   private toV1Instrument(stock: any, overrides?: Partial<V1CreateInstrumentRequest>): V1Instrument {
+    const assetType = this.normalizeAssetType(overrides?.asset_type || stock.assetType || 'STOCK');
+    const segment = this.deriveInstrumentSegment(assetType, stock.symbol);
+    const currency = overrides?.currency || stock.currency || this.defaultCurrencyForInstrument(stock.symbol, stock.exchange, stock.region);
+    const country = stock.country || this.defaultCountryForInstrument(stock.symbol, stock.exchange, stock.region);
+    const missingFields = this.missingMetadataFields({
+      companyName: overrides?.company_name || stock.name,
+      exchange: overrides?.exchange || stock.exchange,
+      country,
+      currency,
+      sector: stock.sector,
+      industry: stock.industry,
+      marketCap: stock.marketCap,
+      assetType,
+      instrumentSegment: segment,
+    });
     return {
       id: stock.id,
       symbol: stock.symbol,
+      display_symbol: stock.symbol,
       company_name: overrides?.company_name || stock.name,
       exchange: overrides?.exchange || stock.exchange || null,
-      country: stock.country || null,
+      country,
+      region: stock.region || null,
       sector: stock.sector || null,
       industry: stock.industry || null,
-      currency: overrides?.currency || stock.currency || this.defaultCurrencyForRegion(stock.region),
+      currency,
       market_cap: stock.marketCap !== null && stock.marketCap !== undefined ? Number(stock.marketCap) : null,
-      asset_type: overrides?.asset_type || stock.assetType || 'EQUITY',
+      asset_type: assetType,
+      instrument_segment: segment,
+      metadata_completeness_score: this.metadataCompletenessScore(missingFields),
+      missing_metadata_fields: missingFields,
       is_active: stock.isActive ?? true,
       is_delisted: stock.isDelisted ?? false,
       ipo_date: stock.ipoDate instanceof Date ? stock.ipoDate.toISOString() : stock.ipoDate ? new Date(stock.ipoDate).toISOString() : null,
@@ -1094,6 +1122,54 @@ export class MarketDataFoundationService {
     if (region === 'EU') return 'EUR';
     if (region === 'CA') return 'CAD';
     return 'USD';
+  }
+
+  private defaultCountryForRegion(region?: string | null): string | null {
+    if (region === 'IN') return 'India';
+    if (region === 'US') return 'United States';
+    if (region === 'UK') return 'United Kingdom';
+    return null;
+  }
+
+  private defaultCountryForInstrument(symbol?: string | null, exchange?: string | null, region?: string | null): string | null {
+    const normalizedExchange = exchange?.trim().toUpperCase();
+    if (symbol?.endsWith('.NS') || symbol?.endsWith('.BO') || normalizedExchange === 'NSE' || normalizedExchange === 'BSE') return 'India';
+    return this.defaultCountryForRegion(region);
+  }
+
+  private defaultCurrencyForInstrument(symbol?: string | null, exchange?: string | null, region?: string | null): string {
+    const normalizedExchange = exchange?.trim().toUpperCase();
+    if (symbol?.endsWith('.NS') || symbol?.endsWith('.BO') || normalizedExchange === 'NSE' || normalizedExchange === 'BSE') return 'INR';
+    return this.defaultCurrencyForRegion(region);
+  }
+
+  private normalizeAssetType(value?: string | null): string {
+    const normalized = value?.trim().toUpperCase();
+    if (!normalized || normalized === 'EQUITY') return 'STOCK';
+    if (normalized === 'FX' || normalized === 'CURRENCY') return 'FOREX';
+    if (['STOCK', 'ETF', 'INDEX', 'FUTURE', 'FOREX', 'COMMODITY', 'CRYPTO', 'FUND', 'OTHER', 'UNKNOWN'].includes(normalized)) return normalized;
+    return 'UNKNOWN';
+  }
+
+  private deriveInstrumentSegment(assetType: string, symbol?: string | null): string {
+    const normalized = this.normalizeAssetType(assetType);
+    if (normalized === 'STOCK') return 'CASH';
+    if (normalized === 'FUTURE') return 'FUTURES';
+    if (normalized === 'FOREX') return 'CURRENCY';
+    if (['INDEX', 'ETF', 'COMMODITY', 'CRYPTO', 'FUND', 'OTHER', 'UNKNOWN'].includes(normalized)) return normalized;
+    if (symbol?.startsWith('^')) return 'INDEX';
+    return 'UNKNOWN';
+  }
+
+  private missingMetadataFields(input: Record<string, unknown>): string[] {
+    return Object.entries(input)
+      .filter(([, value]) => value === null || value === undefined || value === '')
+      .map(([key]) => key);
+  }
+
+  private metadataCompletenessScore(missingFields: string[]): number {
+    const total = 9;
+    return Math.max(0, Math.round(((total - missingFields.length) / total) * 100));
   }
 
   private inferRegionFromInstrument(data: V1CreateInstrumentRequest): string {
