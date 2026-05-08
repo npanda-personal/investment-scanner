@@ -123,11 +123,15 @@ Most list endpoints support standard `PaginationOptions`:
 - `sortBy`: Field to sort by
 - `sortOrder`: 'asc' or 'desc'
 - `region`: Global market region (IN, US, EU, GLOBAL). Mapped to exchanges and country metadata.
-- `assetType`: Asset class identifier (e.g., STOCK).
-- `instrumentSegment`: Derived class/segment filter. `CASH` maps to `STOCK` and legacy `EQUITY`; `FUTURES` maps to `FUTURE`; `CURRENCY` maps to `FOREX`.
+- `assetType`: Optional asset class identifier. The Market Data Foundation catalog page does not send a default asset type; selecting only `region=IN` returns all Indian instrument classes.
+- `instrumentSegment`: Derived class/segment filter. `CASH` maps to cash-like `STOCK`, legacy `EQUITY`, and null asset-type rows while excluding future-like symbols. `FUTURES` maps to persisted `FUTURE`/`FUTURES` and symbol/name patterns containing `FUT`/`future`; `CURRENCY` maps to `FOREX`.
 - `sector` and `industry`: Case-insensitive partial text filters.
+- `search`: Case-insensitive partial text across symbol and company name.
+- `exchange`, `currency`, `assetType`, `instrumentSegment`, and `dataStatus`: Exact normalized filters. `currency=INR` also includes Indian NSE/BSE rows with missing persisted currency because local catalog rules deterministically infer `INR` for those instruments.
 
 Unknown `sortBy` values fall back to `symbol` to prevent invalid Prisma order fields from breaking list requests.
+
+The list query and count query share the same Prisma `where` object, so pagination totals reflect active filters. Pagination is applied after filtering and sorting.
 
 ### Metadata Mapping Rules
 
@@ -163,7 +167,7 @@ The persisted schema does not yet include `instrumentSegment`; it is derived in 
 | `OTHER` | `OTHER` |
 | `UNKNOWN` | `UNKNOWN` |
 
-For the current India stock scope, `.NS`, `.BO`, NSE, and BSE cash equity rows should render as `STOCK / CASH`. Indexes, futures, ETFs, forex, commodity, crypto, and funds are excluded from default `assetType=STOCK` scope unless explicitly filtered.
+For the current India catalog scope, `.NS`, `.BO`, NSE, and BSE cash equity rows should render as `STOCK / CASH`. Future-like symbols such as `...FUT` render as `FUTURE / FUTURES` even when old catalog data stored them as `EQUITY`; this is a DTO/query compatibility rule until instrument segment is persisted.
 
 ### Canonical MVP Endpoints
 
@@ -302,7 +306,10 @@ Natural keys for stock-data records owned by this module:
 ## Frontend Structure
 
 - `MarketDataFoundationPage`: Integrated with `useMarketScope()`. Automatically filters by the globally selected region.
-  - Shows Asset Type and Segment/Class columns, sector and industry columns, metadata completeness, and server-side filters for asset type, segment/class, exchange, currency, sector, and industry.
+  - Shows Asset Type and Segment/Class columns, sector and industry columns, metadata completeness, and server-side filters for asset type, segment/class, exchange, currency, sector, industry, and status. The default list request includes region but no asset type so the page can show all instrument classes.
+  - The filter bar uses a wrapping responsive layout so Refresh and Reset stay inside the page container. Table horizontal scrolling is limited to the table area.
+  - Changing any local filter resets to page 1. Reset clears only local filters and preserves the global market scope. Empty states name the active filters so no-result states such as `FUTURE / FUTURES` are explicit.
+  - Status cards show scoped instrument health before local filters; the table match chip shows the locally filtered count.
   - Sync Catalog success/no-new-data alerts include daily candle freshness details from `/api/v1/market-data/scheduler/status`, so users can see whether the latest completed candle is already synced.
 - `MarketDataStatusPanel`: Shows health, instrument count, last data timestamp, and a Daily Candle card with the latest completed/stored candle status.
 - `InstrumentSearchSelect`: Shared component for picking stocks. Defaults to the active region scope with an optional `global` override.

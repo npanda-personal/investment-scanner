@@ -83,8 +83,11 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
         <Typography variant="caption" color="text.secondary">Trust: {status?.data_status || 'MISSING'}</Typography>
       </Paper>
       <Paper sx={{ p: 2 }}>
-        <Typography variant="overline" color="text.secondary">Instruments</Typography>
+        <Typography variant="overline" color="text.secondary">Scoped Instruments</Typography>
         <Typography variant="h6">{status?.instrumentCount ?? 0}</Typography>
+        <Typography variant="caption" color="text.secondary">
+          {status?.region || region || 'GLOBAL'} / {status?.assetType || assetType || 'ALL'}, before local filters
+        </Typography>
       </Paper>
       <Paper sx={{ p: 2 }}>
         <Typography variant="overline" color="text.secondary">Last Updated</Typography>

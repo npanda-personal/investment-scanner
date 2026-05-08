@@ -4,14 +4,30 @@ import { Button, Paper, Stack } from '@mui/material';
 type FilterBarProps = {
   children: ReactNode;
   onReset?: () => void;
+  showReset?: boolean;
 };
 
-export function FilterBar({ children, onReset }: FilterBarProps) {
+export function FilterBar({ children, onReset, showReset = true }: FilterBarProps) {
   return (
-    <Paper sx={{ p: 2 }}>
-      <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'center' }}>
+    <Paper sx={{ p: 2, overflow: 'hidden' }}>
+      <Stack
+        direction="row"
+        spacing={1.5}
+        useFlexGap
+        flexWrap="wrap"
+        alignItems="center"
+        sx={{
+          '& .MuiTextField-root': {
+            flex: '1 1 150px',
+            minWidth: 0,
+          },
+          '& .MuiButton-root': {
+            flex: { xs: '1 1 140px', sm: '0 0 auto' },
+          },
+        }}
+      >
         {children}
-        {onReset && <Button onClick={onReset} sx={{ ml: { md: 'auto' } }}>Reset</Button>}
+        {onReset && showReset && <Button onClick={onReset}>Reset</Button>}
       </Stack>
     </Paper>
   );

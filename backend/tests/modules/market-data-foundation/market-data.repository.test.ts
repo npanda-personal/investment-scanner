@@ -39,9 +39,18 @@ describe('MarketDataFoundationRepository', () => {
             ]),
           }),
           expect.objectContaining({
-            OR: expect.arrayContaining([
-              expect.objectContaining({ assetType: expect.objectContaining({ in: ['STOCK', 'EQUITY'] }) }),
-              { assetType: null },
+            AND: expect.arrayContaining([
+              expect.objectContaining({
+                OR: expect.arrayContaining([
+                  expect.objectContaining({ assetType: expect.objectContaining({ in: ['STOCK', 'EQUITY'] }) }),
+                  { assetType: null },
+                ]),
+              }),
+              expect.objectContaining({
+                NOT: expect.not.arrayContaining([
+                  expect.objectContaining({ assetType: expect.anything() }),
+                ]),
+              }),
             ]),
           }),
           expect.objectContaining({
@@ -52,12 +61,14 @@ describe('MarketDataFoundationRepository', () => {
           }),
         ]),
         country: { contains: 'US', mode: 'insensitive' },
-        exchange: { contains: 'NASDAQ', mode: 'insensitive' },
-        currency: { contains: 'USD', mode: 'insensitive' },
+        exchange: { equals: 'NASDAQ', mode: 'insensitive' },
         sector: { contains: 'tech', mode: 'insensitive' },
         industry: { contains: 'software', mode: 'insensitive' },
       }),
     }));
+    expect(prisma.stock.findMany.mock.calls[0][0].where.AND).toEqual(expect.arrayContaining([
+      expect.objectContaining({ currency: { equals: 'USD', mode: 'insensitive' } }),
+    ]));
   });
 
   it('stores historical prices with upsert summary and duplicate prevention', async () => {
@@ -136,7 +147,7 @@ describe('MarketDataFoundationRepository', () => {
     }));
   });
 
-  it('maps CASH segment filtering to stock and legacy equity asset types', async () => {
+  it('maps CASH segment filtering to cash stock, legacy equity, and null asset type rows', async () => {
     const prisma = {
       stock: {
         findMany: jest.fn().mockResolvedValue([]),
@@ -149,7 +160,6 @@ describe('MarketDataFoundationRepository', () => {
       page: 1,
       pageSize: 10,
       region: 'IN',
-      assetType: 'STOCK',
       instrumentSegment: 'CASH',
     });
 
@@ -157,12 +167,147 @@ describe('MarketDataFoundationRepository', () => {
       where: expect.objectContaining({
         AND: expect.arrayContaining([
           expect.objectContaining({
+            AND: expect.arrayContaining([
+              expect.objectContaining({
+                OR: expect.arrayContaining([
+                  expect.objectContaining({ assetType: expect.objectContaining({ in: ['STOCK', 'EQUITY'] }) }),
+                  { assetType: null },
+                ]),
+              }),
+              expect.objectContaining({ NOT: expect.any(Array) }),
+            ]),
+          }),
+        ]),
+      }),
+    }));
+  });
+
+  it('maps FUTURES segment filtering to explicit future rows and future-like symbols', async () => {
+    const prisma = {
+      stock: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await repository.listStocks({
+      page: 1,
+      pageSize: 10,
+      region: 'IN',
+      instrumentSegment: 'FUTURES',
+    });
+
+    expect(prisma.stock.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        AND: expect.arrayContaining([
+          expect.objectContaining({
             OR: expect.arrayContaining([
-              expect.objectContaining({ assetType: expect.objectContaining({ in: ['STOCK', 'EQUITY'] }) }),
+              expect.objectContaining({ assetType: expect.objectContaining({ in: ['FUTURE', 'FUTURES'] }) }),
+              { symbol: { contains: 'FUT', mode: 'insensitive' } },
+              { name: { contains: 'future', mode: 'insensitive' } },
+            ]),
+          }),
+        ]),
+      }),
+    }));
+  });
+
+  it('matches INR currency using stored currency or deterministic Indian fallbacks', async () => {
+    const prisma = {
+      stock: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await repository.listStocks({
+      page: 1,
+      pageSize: 25,
+      region: 'IN',
+      assetType: 'STOCK',
+      currency: 'INR',
+    });
+
+    const where = prisma.stock.findMany.mock.calls[0][0].where;
+    expect(where.AND).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        OR: expect.arrayContaining([
+          { currency: { equals: 'INR', mode: 'insensitive' } },
+          expect.objectContaining({
+            AND: expect.arrayContaining([
+              expect.objectContaining({
+                OR: expect.arrayContaining([
+                  { region: 'IN' },
+                  { exchange: { in: ['NSE', 'BSE'], mode: 'insensitive' } },
+                ]),
+              }),
+              expect.objectContaining({
+                OR: expect.arrayContaining([{ currency: null }, { currency: '' }]),
+              }),
+            ]),
+          }),
+        ]),
+      }),
+    ]));
+  });
+
+  it('applies exact status filter and partial sector and industry filters to list and count queries', async () => {
+    const prisma = {
+      stock: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await repository.listStocks({
+      page: 1,
+      pageSize: 25,
+      sector: 'fin',
+      industry: 'bank',
+      dataStatus: 'partial',
+    });
+
+    const expectedWhere = expect.objectContaining({
+      sector: { contains: 'fin', mode: 'insensitive' },
+      industry: { contains: 'bank', mode: 'insensitive' },
+      dataStatus: { equals: 'PARTIAL', mode: 'insensitive' },
+    });
+    expect(prisma.stock.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expectedWhere }));
+    expect(prisma.stock.count).toHaveBeenCalledWith(expect.objectContaining({ where: expectedWhere }));
+  });
+
+  it('scopes local search by region and asset type', async () => {
+    const prisma = {
+      stock: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await repository.searchStocks('reliance', 10, { region: 'IN', assetType: 'STOCK' });
+
+    expect(prisma.stock.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        AND: expect.arrayContaining([
+          expect.objectContaining({
+            AND: expect.arrayContaining([
+              expect.objectContaining({ OR: expect.arrayContaining([{ region: 'IN' }]) }),
+              expect.objectContaining({
+                AND: expect.arrayContaining([
+                  expect.objectContaining({ OR: expect.arrayContaining([expect.objectContaining({ assetType: expect.objectContaining({ in: ['STOCK', 'EQUITY'] }) })]) }),
+                  expect.objectContaining({ NOT: expect.any(Array) }),
+                ]),
+              }),
             ]),
           }),
           expect.objectContaining({
-            assetType: expect.objectContaining({ in: ['STOCK', 'EQUITY'] }),
+            OR: expect.arrayContaining([
+              expect.objectContaining({ symbol: expect.anything() }),
+              expect.objectContaining({ name: expect.anything() }),
+            ]),
           }),
         ]),
       }),

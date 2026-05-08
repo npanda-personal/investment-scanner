@@ -60,6 +60,7 @@ export class YahooFinanceIngestionService {
     if (quoteType === 'ETF' || quoteType === 'INDEX' || quoteType === 'FUTURE' || quoteType === 'CRYPTO' || quoteType === 'FUND') return quoteType;
     if (quoteType === 'CURRENCY' || quoteType === 'FX') return 'FOREX';
     if (symbol.includes('=X')) return 'FOREX';
+    if (symbol.toUpperCase().includes('FUT')) return 'FUTURE';
     if (symbol.startsWith('^')) return 'INDEX';
     if (symbol.endsWith('.NS') || symbol.endsWith('.BO')) return 'STOCK';
     return quoteType || 'UNKNOWN';

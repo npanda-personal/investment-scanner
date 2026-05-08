@@ -35,6 +35,7 @@ export class MarketDataFoundationRepository {
       currency,
       sector,
       industry,
+      dataStatus,
       search,
     } = options;
     const skip = (page - 1) * pageSize;
@@ -46,16 +47,22 @@ export class MarketDataFoundationRepository {
       where.country = { contains: country.trim(), mode: 'insensitive' };
     }
     if (exchange) {
-      where.exchange = { contains: exchange.trim(), mode: 'insensitive' };
+      where.exchange = { equals: exchange.trim().toUpperCase(), mode: 'insensitive' };
     }
     if (currency) {
-      where.currency = { contains: currency.trim(), mode: 'insensitive' };
+      where.AND = [
+        ...this.asAndArray(where.AND),
+        this.currencyWhere(currency),
+      ];
     }
     if (sector) {
       where.sector = { contains: sector.trim(), mode: 'insensitive' };
     }
     if (industry) {
       where.industry = { contains: industry.trim(), mode: 'insensitive' };
+    }
+    if (dataStatus) {
+      where.dataStatus = { equals: dataStatus.trim().toUpperCase(), mode: 'insensitive' };
     }
     if (search) {
       where.AND = [
@@ -833,22 +840,10 @@ export class MarketDataFoundationRepository {
     if (Object.keys(regionFilter).length > 0) filters.push(regionFilter);
     const assetType = options.assetType?.trim();
     if (assetType) {
-      const normalized = assetType.toUpperCase();
-      if (normalized === 'STOCK' || normalized === 'EQUITY') {
-        filters.push({
-          OR: [
-            { assetType: { in: ['STOCK', 'EQUITY'], mode: 'insensitive' } },
-            { assetType: null },
-          ],
-        });
-      } else {
-        filters.push({ assetType: { contains: assetType, mode: 'insensitive' } });
-      }
+      filters.push(this.assetTypeWhere(assetType));
     }
-    const segmentAssetTypes = this.assetTypesForSegment(options.instrumentSegment);
-    if (segmentAssetTypes.length > 0) {
-      filters.push({ assetType: { in: segmentAssetTypes, mode: 'insensitive' } });
-    }
+    const segmentWhere = this.segmentWhere(options.instrumentSegment);
+    if (segmentWhere) filters.push(segmentWhere);
     return filters.length > 0 ? { AND: filters } : {};
   }
 
@@ -857,14 +852,100 @@ export class MarketDataFoundationRepository {
     return allowed.has(sortBy || '') ? sortBy as any : 'symbol';
   }
 
-  private assetTypesForSegment(segment?: string | null): string[] {
+  private assetTypeWhere(assetType: string): Prisma.StockWhereInput {
+    const normalized = assetType.trim().toUpperCase();
+    if (normalized === 'STOCK' || normalized === 'EQUITY') {
+      return {
+        AND: [
+          {
+            OR: [
+              { assetType: { in: ['STOCK', 'EQUITY'], mode: 'insensitive' } },
+              { assetType: null },
+            ],
+          },
+          this.notFuturesSymbolWhere(),
+        ],
+      };
+    }
+    if (normalized === 'FUTURE' || normalized === 'FUTURES') return this.futuresWhere();
+    if (normalized === 'FOREX' || normalized === 'FX' || normalized === 'CURRENCY') {
+      return { assetType: { in: ['FOREX', 'FX', 'CURRENCY'], mode: 'insensitive' } };
+    }
+    return { assetType: { equals: normalized, mode: 'insensitive' } };
+  }
+
+  private segmentWhere(segment?: string | null): Prisma.StockWhereInput | null {
     const normalized = segment?.trim().toUpperCase();
-    if (!normalized) return [];
-    if (normalized === 'CASH') return ['STOCK', 'EQUITY'];
-    if (normalized === 'FUTURES') return ['FUTURE'];
-    if (normalized === 'CURRENCY') return ['FOREX', 'FX', 'CURRENCY'];
-    if (['INDEX', 'ETF', 'COMMODITY', 'CRYPTO', 'FUND', 'OTHER', 'UNKNOWN'].includes(normalized)) return [normalized];
-    return [];
+    if (!normalized) return null;
+    if (normalized === 'CASH') {
+      return {
+        AND: [
+          {
+            OR: [
+              { assetType: { in: ['STOCK', 'EQUITY'], mode: 'insensitive' } },
+              { assetType: null },
+            ],
+          },
+          this.notFuturesSymbolWhere(),
+        ],
+      };
+    }
+    if (normalized === 'FUTURES') return this.futuresWhere();
+    if (normalized === 'CURRENCY') return { assetType: { in: ['FOREX', 'FX', 'CURRENCY'], mode: 'insensitive' } };
+    if (['INDEX', 'ETF', 'COMMODITY', 'CRYPTO', 'FUND', 'OTHER', 'UNKNOWN'].includes(normalized)) {
+      return { assetType: { equals: normalized, mode: 'insensitive' } };
+    }
+    return { assetType: { equals: '__NO_MATCH__', mode: 'insensitive' } };
+  }
+
+  private futuresWhere(): Prisma.StockWhereInput {
+    return {
+      OR: [
+        { assetType: { in: ['FUTURE', 'FUTURES'], mode: 'insensitive' } },
+        { symbol: { contains: 'FUT', mode: 'insensitive' } },
+        { name: { contains: 'future', mode: 'insensitive' } },
+      ],
+    };
+  }
+
+  private notFuturesSymbolWhere(): Prisma.StockWhereInput {
+    return {
+      NOT: [
+        { symbol: { contains: 'FUT', mode: 'insensitive' } },
+        { name: { contains: 'future', mode: 'insensitive' } },
+      ],
+    };
+  }
+
+  private currencyWhere(currency: string): Prisma.StockWhereInput {
+    const normalized = currency.trim().toUpperCase();
+    if (normalized === 'INR') {
+      return {
+        OR: [
+          { currency: { equals: 'INR', mode: 'insensitive' } },
+          {
+            AND: [
+              {
+                OR: [
+                  { region: 'IN' },
+                  { country: { contains: 'India', mode: 'insensitive' } },
+                  { exchange: { in: ['NSE', 'BSE'], mode: 'insensitive' } },
+                  { symbol: { endsWith: '.NS', mode: 'insensitive' } },
+                  { symbol: { endsWith: '.BO', mode: 'insensitive' } },
+                ],
+              },
+              {
+                OR: [
+                  { currency: null },
+                  { currency: '' },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+    }
+    return { currency: { equals: normalized, mode: 'insensitive' } };
   }
 
   private keepExistingIfBlank<T>(next: T | null | undefined, current: T | null): T | null {

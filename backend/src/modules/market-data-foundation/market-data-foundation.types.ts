@@ -301,6 +301,7 @@ export interface PaginationOptions {
   currency?: string;
   sector?: string;
   industry?: string;
+  dataStatus?: string;
   search?: string;
 }
 

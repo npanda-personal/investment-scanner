@@ -203,6 +203,8 @@ export interface MarketDataHealth {
   last_updated_timestamp: string | null;
   data_status: string;
   timestamp: string;
+  region?: string;
+  assetType?: string;
 }
 
 export interface CreateStockRequest {
@@ -233,6 +235,7 @@ export interface PaginationOptions {
   currency?: string;
   sector?: string;
   industry?: string;
+  dataStatus?: string;
   search?: string;
 }
 

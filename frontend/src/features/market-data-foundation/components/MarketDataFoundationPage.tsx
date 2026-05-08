@@ -65,6 +65,7 @@ const MarketDataFoundationPage: React.FC = () => {
   const [currency, setCurrency] = useState('');
   const [sector, setSector] = useState('');
   const [industry, setIndustry] = useState('');
+  const [dataStatus, setDataStatus] = useState('');
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [sortBy, setSortBy] = useState('symbol');
@@ -96,11 +97,12 @@ const MarketDataFoundationPage: React.FC = () => {
         sortOrder: sortDirection,
         region: scope.region,
         exchange: exchange.trim() || undefined,
-        assetType: assetType.trim() || scope.assetType,
+        assetType: assetType.trim() || undefined,
         instrumentSegment: instrumentSegment.trim() || undefined,
         currency: currency.trim() || undefined,
         sector: sector.trim() || undefined,
         industry: industry.trim() || undefined,
+        dataStatus: dataStatus.trim() || undefined,
         search: search.trim() || undefined,
       });
       setInstruments(response.instruments);
@@ -110,7 +112,7 @@ const MarketDataFoundationPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [assetType, currency, exchange, industry, instrumentSegment, page, pageSize, search, sector, sortBy, sortDirection, scope.region, scope.assetType, normalizedMarket]);
+  }, [assetType, currency, dataStatus, exchange, industry, instrumentSegment, page, pageSize, search, sector, sortBy, sortDirection, scope.region, normalizedMarket]);
 
   useEffect(() => {
     loadInstruments();
@@ -126,7 +128,7 @@ const MarketDataFoundationPage: React.FC = () => {
     setError(null);
     setSuccess(null);
     try {
-      const result = await syncMarketData({ instrumentId: instrument.id, region: scope.region, asset_type: assetType.trim() || scope.assetType });
+      const result = await syncMarketData({ instrumentId: instrument.id, region: scope.region, asset_type: assetType.trim() || instrument.asset_type });
       if (!result.success) {
         setError(result.message);
       } else {
@@ -145,7 +147,7 @@ const MarketDataFoundationPage: React.FC = () => {
     setError(null);
     setSuccess(null);
     try {
-      const result = await syncAllStocks(4, 4, 3000, { region: scope.region, assetType: assetType.trim() || scope.assetType });
+      const result = await syncAllStocks(4, 4, 3000, { region: scope.region, assetType: assetType.trim() || undefined });
       if (!result.success) {
         setError(result.message || 'Catalog sync failed');
       } else {
@@ -233,8 +235,25 @@ const MarketDataFoundationPage: React.FC = () => {
     setCurrency('');
     setSector('');
     setIndustry('');
+    setDataStatus('');
     setPage(0);
   };
+
+  const activeFilters = [
+    search.trim() ? `Search = ${search.trim()}` : null,
+    exchange.trim() ? `Exchange = ${exchange.trim().toUpperCase()}` : null,
+    assetType.trim() ? `Asset Type = ${assetType.trim().toUpperCase()}` : null,
+    instrumentSegment.trim() ? `Segment = ${instrumentSegment.trim().toUpperCase()}` : null,
+    currency.trim() ? `Currency = ${currency.trim().toUpperCase()}` : null,
+    sector.trim() ? `Sector contains "${sector.trim()}"` : null,
+    industry.trim() ? `Industry contains "${industry.trim()}"` : null,
+    dataStatus.trim() ? `Status = ${dataStatus.trim().toUpperCase()}` : null,
+  ].filter((item): item is string => Boolean(item));
+  const hasLocalFilters = activeFilters.length > 0;
+  const scopeLabel = `${scope.region === 'GLOBAL' ? 'Global / All' : scope.region} / All asset types`;
+  const emptyMessage = hasLocalFilters
+    ? `No instruments match ${activeFilters.join(', ')} in ${scopeLabel}.`
+    : `No instruments found for ${scopeLabel}.`;
 
   return (
     <Box sx={{ p: 3, maxWidth: 1400, mx: 'auto' }}>
@@ -263,7 +282,7 @@ const MarketDataFoundationPage: React.FC = () => {
         }
       />
 
-      <MarketDataStatusPanel region={scope.region} assetType={assetType.trim() || scope.assetType} />
+      <MarketDataStatusPanel region={scope.region} />
 
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Typography variant="body2" color="text.secondary">
@@ -273,9 +292,9 @@ const MarketDataFoundationPage: React.FC = () => {
       </Paper>
 
       <Box sx={{ mb: 2 }}>
-        <FilterBar onReset={resetFilters}>
+        <FilterBar onReset={resetFilters} showReset={hasLocalFilters}>
           <TextField
-            sx={{ minWidth: { md: 320 }, flex: 1 }}
+            sx={{ flexBasis: { xs: '100%', md: 320 }, flexGrow: { md: 2 } }}
             size="small"
             label="Search by symbol or company"
             value={search}
@@ -291,29 +310,39 @@ const MarketDataFoundationPage: React.FC = () => {
               ),
             }}
           />
-          <TextField size="small" label="Exchange" value={exchange} onChange={(event) => { setExchange(event.target.value); setPage(0); }} sx={{ minWidth: 140 }} />
-          <TextField select size="small" label="Asset Type" value={assetType} onChange={(event) => { setAssetType(event.target.value); setPage(0); }} sx={{ minWidth: 150 }}>
+          <TextField size="small" label="Exchange" value={exchange} onChange={(event) => { setExchange(event.target.value.toUpperCase()); setPage(0); }} />
+          <TextField select size="small" label="Asset Type" value={assetType} onChange={(event) => { setAssetType(event.target.value); setPage(0); }}>
             <MenuItem value="">All</MenuItem>
             {['STOCK', 'ETF', 'INDEX', 'FUTURE', 'FOREX', 'COMMODITY', 'CRYPTO', 'FUND', 'OTHER', 'UNKNOWN'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
           </TextField>
-          <TextField select size="small" label="Segment/Class" value={instrumentSegment} onChange={(event) => { setInstrumentSegment(event.target.value); setPage(0); }} sx={{ minWidth: 160 }}>
+          <TextField select size="small" label="Segment/Class" value={instrumentSegment} onChange={(event) => { setInstrumentSegment(event.target.value); setPage(0); }}>
             <MenuItem value="">All</MenuItem>
             {['CASH', 'FUTURES', 'INDEX', 'ETF', 'CURRENCY', 'COMMODITY', 'CRYPTO', 'FUND', 'OTHER', 'UNKNOWN'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
           </TextField>
-          <TextField size="small" label="Currency" value={currency} onChange={(event) => { setCurrency(event.target.value.toUpperCase()); setPage(0); }} sx={{ minWidth: 120 }} />
-          <TextField size="small" label="Sector" value={sector} onChange={(event) => { setSector(event.target.value); setPage(0); }} sx={{ minWidth: 180 }} />
-          <TextField size="small" label="Industry" value={industry} onChange={(event) => { setIndustry(event.target.value); setPage(0); }} sx={{ minWidth: 180 }} />
+          <TextField size="small" label="Currency" value={currency} onChange={(event) => { setCurrency(event.target.value.toUpperCase()); setPage(0); }} />
+          <TextField size="small" label="Sector" value={sector} onChange={(event) => { setSector(event.target.value); setPage(0); }} />
+          <TextField size="small" label="Industry" value={industry} onChange={(event) => { setIndustry(event.target.value); setPage(0); }} />
+          <TextField select size="small" label="Status" value={dataStatus} onChange={(event) => { setDataStatus(event.target.value); setPage(0); }}>
+            <MenuItem value="">All</MenuItem>
+            {['COMPLETE', 'PARTIAL', 'DELAYED', 'MISSING', 'ERROR'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
+          </TextField>
           <Button
             variant="outlined"
             startIcon={loading ? <CircularProgress size={18} /> : <RefreshIcon />}
             onClick={loadInstruments}
             disabled={loading}
-            sx={{ minWidth: 120 }}
           >
             Refresh
           </Button>
         </FilterBar>
       </Box>
+
+      {hasLocalFilters && (
+        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mb: 2 }}>
+          {activeFilters.map((filter) => <Chip key={filter} size="small" label={filter} />)}
+          <Chip size="small" variant="outlined" label={`${total} matching ${total === 1 ? 'instrument' : 'instruments'}`} />
+        </Stack>
+      )}
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>{success}</Alert>}
@@ -323,7 +352,7 @@ const MarketDataFoundationPage: React.FC = () => {
         rows={instruments}
         getRowId={(instrument) => instrument.id}
         loading={loading}
-        emptyMessage="No instruments found for the selected market and filters."
+        emptyMessage={emptyMessage}
         page={page}
         pageSize={pageSize}
         totalCount={total}

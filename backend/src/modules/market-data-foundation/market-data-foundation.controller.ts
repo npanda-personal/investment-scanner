@@ -39,6 +39,7 @@ export class MarketDataFoundationController {
       const currency = req.query.currency as string | undefined;
       const sector = req.query.sector as string | undefined;
       const industry = req.query.industry as string | undefined;
+      const dataStatus = (req.query.dataStatus || req.query.status) as string | undefined;
 
       if (page < 1) {
         return res.status(400).json({ error: 'Page must be at least 1' });
@@ -47,7 +48,7 @@ export class MarketDataFoundationController {
         return res.status(400).json({ error: 'PageSize must be between 1 and 100' });
       }
 
-      const result = await this.service.list({ page, pageSize, sortBy, sortOrder, region, country, exchange, assetType, instrumentSegment, currency, sector, industry, search });
+      const result = await this.service.list({ page, pageSize, sortBy, sortOrder, region, country, exchange, assetType, instrumentSegment, currency, sector, industry, dataStatus, search });
       return res.json(result);
     } catch (error) {
       console.error('Error listing stocks:', error);
@@ -312,7 +313,8 @@ export class MarketDataFoundationController {
       const currency = req.query.currency as string | undefined;
       const sector = req.query.sector as string | undefined;
       const industry = req.query.industry as string | undefined;
-      const result = await this.service.listInstruments({ page, pageSize, sortBy, sortOrder, region, country, exchange, assetType, instrumentSegment, currency, sector, industry, search });
+      const dataStatus = (req.query.dataStatus || req.query.status) as string | undefined;
+      const result = await this.service.listInstruments({ page, pageSize, sortBy, sortOrder, region, country, exchange, assetType, instrumentSegment, currency, sector, industry, dataStatus, search });
       return res.json(result);
     } catch (error) {
       console.error('Error listing instruments:', error);

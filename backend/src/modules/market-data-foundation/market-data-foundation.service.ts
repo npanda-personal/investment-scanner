@@ -97,6 +97,7 @@ export class MarketDataFoundationService {
       currency: options.currency,
       sector: options.sector,
       industry: options.industry,
+      dataStatus: options.dataStatus,
       search: options.search,
     });
 
@@ -1074,7 +1075,7 @@ export class MarketDataFoundationService {
   }
 
   private toV1Instrument(stock: any, overrides?: Partial<V1CreateInstrumentRequest>): V1Instrument {
-    const assetType = this.normalizeAssetType(overrides?.asset_type || stock.assetType || 'STOCK');
+    const assetType = this.normalizeInstrumentAssetType(overrides?.asset_type || stock.assetType || 'STOCK', stock.symbol, stock.name);
     const segment = this.deriveInstrumentSegment(assetType, stock.symbol);
     const currency = overrides?.currency || stock.currency || this.defaultCurrencyForInstrument(stock.symbol, stock.exchange, stock.region);
     const country = stock.country || this.defaultCountryForInstrument(stock.symbol, stock.exchange, stock.region);
@@ -1149,6 +1150,14 @@ export class MarketDataFoundationService {
     if (normalized === 'FX' || normalized === 'CURRENCY') return 'FOREX';
     if (['STOCK', 'ETF', 'INDEX', 'FUTURE', 'FOREX', 'COMMODITY', 'CRYPTO', 'FUND', 'OTHER', 'UNKNOWN'].includes(normalized)) return normalized;
     return 'UNKNOWN';
+  }
+
+  private normalizeInstrumentAssetType(value?: string | null, symbol?: string | null, name?: string | null): string {
+    const normalizedSymbol = symbol?.trim().toUpperCase() || '';
+    const normalizedName = name?.trim().toUpperCase() || '';
+    if (normalizedSymbol.includes('FUT') || normalizedName.includes('FUTURE')) return 'FUTURE';
+    if (normalizedSymbol.startsWith('^')) return 'INDEX';
+    return this.normalizeAssetType(value);
   }
 
   private deriveInstrumentSegment(assetType: string, symbol?: string | null): string {

@@ -158,6 +158,67 @@ describe('MarketDataFoundationService syncV1', () => {
     });
   });
 
+  it('returns normalized classification and metadata completeness diagnostics', async () => {
+    const service = new MarketDataFoundationService({
+      listStocks: jest.fn().mockResolvedValue({
+        stocks: [
+          {
+            ...stock,
+            symbol: 'RELIANCE.NS',
+            name: 'Reliance Industries',
+            region: 'IN',
+            exchange: 'NSE',
+            country: null,
+            currency: null,
+            sector: null,
+            industry: null,
+            marketCap: null,
+            assetType: 'EQUITY',
+          },
+          {
+            ...stock,
+            id: 'index-1',
+            symbol: '^NSEI',
+            name: 'NIFTY 50',
+            assetType: 'INDEX',
+          },
+          {
+            ...stock,
+            id: 'future-1',
+            symbol: 'NIFTY26MAYFUT',
+            name: 'Nifty Future',
+            assetType: 'EQUITY',
+          },
+          {
+            ...stock,
+            id: 'etf-1',
+            symbol: 'NIFTYBEES.NS',
+            name: 'Nifty Bees',
+            assetType: 'ETF',
+          },
+        ],
+        pagination: { page: 1, pageSize: 25, total: 4, totalPages: 1 },
+      }),
+    } as any, {} as any);
+
+    const result = await service.listInstruments({ page: 1, pageSize: 25, region: 'IN', assetType: 'STOCK' });
+
+    expect(result.instruments[0]).toMatchObject({
+      asset_type: 'STOCK',
+      instrument_segment: 'CASH',
+      country: 'India',
+      currency: 'INR',
+      missing_metadata_fields: expect.arrayContaining(['sector', 'industry', 'marketCap']),
+      metadata_completeness_score: 67,
+    });
+    expect(result.instruments.map((item) => [item.asset_type, item.instrument_segment])).toEqual([
+      ['STOCK', 'CASH'],
+      ['INDEX', 'INDEX'],
+      ['FUTURE', 'FUTURES'],
+      ['ETF', 'ETF'],
+    ]);
+  });
+
   it('marks scheduled post-close no-op runs as final confirmed', async () => {
     const repository = {
       listActiveStockSyncTasks: jest.fn().mockResolvedValue([{ id: 'stock-1', symbol: 'AAPL', lastSuccessfulDataLoadTimestamp: null }]),

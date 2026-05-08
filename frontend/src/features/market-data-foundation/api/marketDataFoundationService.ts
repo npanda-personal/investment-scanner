@@ -67,6 +67,7 @@ export async function fetchStocks(options: PaginationOptions = {}): Promise<Pagi
   if (options.currency) params.append('currency', options.currency);
   if (options.sector) params.append('sector', options.sector);
   if (options.industry) params.append('industry', options.industry);
+  if (options.dataStatus) params.append('dataStatus', options.dataStatus);
   if (options.search) params.append('search', options.search);
 
   const response = await axios.get<BackendPaginatedResponse>(`${API_BASE}/market-data-foundation/stocks?${params.toString()}`);
