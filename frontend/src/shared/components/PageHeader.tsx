@@ -30,9 +30,11 @@ export function PageHeader({
       justifyContent="space-between"
       alignItems={{ xs: 'stretch', md: 'flex-start' }}
       spacing={2}
-      sx={{ mb: 3 }}
+      useFlexGap
+      flexWrap="wrap"
+      sx={{ mb: 3, maxWidth: '100%' }}
     >
-      <Stack spacing={1} sx={{ minWidth: 0 }}>
+      <Stack spacing={1} sx={{ minWidth: 0, flex: { xs: '0 1 auto', md: '1 1 420px' } }}>
         {backTo && (
           <Box>
             <Button
@@ -58,7 +60,29 @@ export function PageHeader({
         )}
       </Stack>
       {(primaryAction || secondaryActions) && (
-        <Stack direction="row" spacing={1} justifyContent={{ xs: 'flex-start', md: 'flex-end' }} flexWrap="wrap">
+        <Stack
+          direction="row"
+          spacing={1}
+          useFlexGap
+          justifyContent={{ xs: 'flex-start', md: 'flex-end' }}
+          alignItems="center"
+          flexWrap="wrap"
+          sx={{
+            maxWidth: '100%',
+            minWidth: 0,
+            flex: { xs: '0 1 auto', md: '1 1 320px' },
+            '& > *': {
+              minWidth: 0,
+            },
+            '& .MuiButton-root': {
+              maxWidth: '100%',
+              whiteSpace: 'normal',
+            },
+            '& .MuiTextField-root': {
+              maxWidth: '100%',
+            },
+          }}
+        >
           {secondaryActions}
           {primaryAction}
         </Stack>

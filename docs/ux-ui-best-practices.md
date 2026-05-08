@@ -9,6 +9,7 @@ These guidelines apply across the application. They are intentionally product-le
 - Keep high-frequency actions visible; move rare or diagnostic actions into secondary panels.
 - Use the shared `PageHeader` for title, short subtitle, and right-aligned primary actions where practical.
 - Keep scope and context visible near the top, especially market region, asset type, portfolio, watchlist, or selected entity.
+- Header action groups must wrap within the page container. Long action labels should wrap or move to the next row rather than creating page-level horizontal overflow.
 
 ## Tables And Dense Data
 
@@ -30,6 +31,8 @@ These guidelines apply across the application. They are intentionally product-le
 ## Batch Workflows
 
 - Long-running workflows should be bounded on the backend and orchestrated by the frontend unless a worker/job system owns the workflow.
+- When a bounded backend batch supports internal parallel workers, keep worker counts and provider-facing throttles server-owned unless they are a genuine expert-user decision for that page.
+- Prefer module-owned config constants for operational batch size and worker counts when values are not true user decisions. Use names that include the module name, such as `signal_generation_engine_workers_count`, so each page can evolve independently.
 - Show determinate progress when total count is known.
 - Disable duplicate run buttons while the operation is active.
 - Keep progress, warnings, and final summary in the same visual container as the action that started the work.
@@ -61,4 +64,3 @@ These guidelines apply across the application. They are intentionally product-le
 - Use practical research-support language.
 - Avoid financial advice wording such as "buy", "sell", "guaranteed", or "execute".
 - Prefer terms such as "candidate", "review", "watch", "risk level", "provider support", and "data health".
-

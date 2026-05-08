@@ -823,30 +823,17 @@ export class MarketDataFoundationService {
       records = await this.repository.listFundamentals(stock.id);
     }
 
-    return {
-      instrument_id: stock.id,
-      symbol: stock.symbol,
-      source: records[0]?.source || 'database',
-      ingestion_timestamp: records[0]?.ingestionTimestamp?.toISOString?.() ?? null,
-      last_updated_timestamp: records[0]?.lastUpdatedTimestamp?.toISOString?.() ?? null,
-      data_status: records.length > 0 ? records[0].dataStatus : 'MISSING',
-      records: records.map((record: any) => ({
-        revenue: record.revenue !== null ? Number(record.revenue) : null,
-        eps: record.eps !== null ? Number(record.eps) : null,
-        net_income: record.netIncome !== null ? Number(record.netIncome) : null,
-        pe_ratio: record.peRatio !== null ? Number(record.peRatio) : null,
-        dividend_yield: record.dividendYield !== null ? Number(record.dividendYield) : null,
-        shares_outstanding: record.sharesOutstanding !== null ? Number(record.sharesOutstanding) : null,
-        market_cap: record.marketCap !== null ? Number(record.marketCap) : null,
-        currency: record.currency,
-        period_type: record.periodType,
-        period_end_date: record.periodEndDate.toISOString(),
-        source: record.source,
-        ingestion_timestamp: record.ingestionTimestamp.toISOString(),
-        last_updated_timestamp: record.lastUpdatedTimestamp.toISOString(),
-        data_status: record.dataStatus,
-      })),
-    };
+    return this.formatFundamentalsResponse(stock, records);
+  }
+
+  async storedFundamentalsByInstrumentId(instrumentId: string, options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
+    const stock = await this.repository.findStockByIdInScope(instrumentId, options);
+    if (!stock) {
+      return null;
+    }
+
+    const records = await this.repository.listFundamentals(stock.id);
+    return this.formatFundamentalsResponse(stock, records);
   }
 
   async corporateActionsByInstrumentId(instrumentId: string, options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
@@ -2382,6 +2369,33 @@ export class MarketDataFoundationService {
   private readPositiveNumber(value: string | undefined, fallback: number): number {
     const parsed = Number(value);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  }
+
+  private formatFundamentalsResponse(stock: any, records: any[]) {
+    return {
+      instrument_id: stock.id,
+      symbol: stock.symbol,
+      source: records[0]?.source || 'database',
+      ingestion_timestamp: records[0]?.ingestionTimestamp?.toISOString?.() ?? null,
+      last_updated_timestamp: records[0]?.lastUpdatedTimestamp?.toISOString?.() ?? null,
+      data_status: records.length > 0 ? records[0].dataStatus : 'MISSING',
+      records: records.map((record: any) => ({
+        revenue: record.revenue !== null ? Number(record.revenue) : null,
+        eps: record.eps !== null ? Number(record.eps) : null,
+        net_income: record.netIncome !== null ? Number(record.netIncome) : null,
+        pe_ratio: record.peRatio !== null ? Number(record.peRatio) : null,
+        dividend_yield: record.dividendYield !== null ? Number(record.dividendYield) : null,
+        shares_outstanding: record.sharesOutstanding !== null ? Number(record.sharesOutstanding) : null,
+        market_cap: record.marketCap !== null ? Number(record.marketCap) : null,
+        currency: record.currency,
+        period_type: record.periodType,
+        period_end_date: record.periodEndDate.toISOString(),
+        source: record.source,
+        ingestion_timestamp: record.ingestionTimestamp.toISOString(),
+        last_updated_timestamp: record.lastUpdatedTimestamp.toISOString(),
+        data_status: record.dataStatus,
+      })),
+    };
   }
 
   private normalizePair(pair: string): string {

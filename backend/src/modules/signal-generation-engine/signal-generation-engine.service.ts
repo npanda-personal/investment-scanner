@@ -20,6 +20,12 @@ import type {
   SignalBlockedStrategySummary,
   SignalStrategyMatchSummary,
 } from './signal-generation-engine.types';
+import {
+  signal_generation_engine_batch_size,
+  signal_generation_engine_max_workers_count,
+  signal_generation_engine_provider_throttle_ms,
+  signal_generation_engine_workers_count,
+} from './signal-generation-engine.config';
 
 const TECHNICAL_WEIGHT = 0.4;
 const MOMENTUM_WEIGHT = 0.35;
@@ -87,9 +93,17 @@ export class SignalGenerationEngineService {
     const generatedAt = new Date().toISOString();
     const errors: string[] = [];
     const warnings: string[] = [];
-    const results: SignalResultDto[] = [];
-    const batchSize = request.instrumentId || request.symbol ? 1 : this.clampInt(request.batchSize ?? request.limit, 25, 1, 100);
+    const batchSize = request.instrumentId || request.symbol ? 1 : this.clampInt(request.batchSize ?? request.limit, signal_generation_engine_batch_size, 1, signal_generation_engine_batch_size);
     const offset = request.instrumentId || request.symbol ? 0 : this.clampInt(request.offset, 0, 0, Number.MAX_SAFE_INTEGER);
+    const maxConcurrency = request.instrumentId || request.symbol
+      ? 1
+      : this.clampInt(request.maxConcurrency ?? process.env.SIGNAL_GENERATION_ENGINE_WORKERS_COUNT, signal_generation_engine_workers_count, 1, signal_generation_engine_max_workers_count);
+    const providerThrottleMs = this.clampInt(
+      request.providerThrottleMs ?? process.env.SIGNAL_GENERATION_ENGINE_PROVIDER_THROTTLE_MS,
+      signal_generation_engine_provider_throttle_ms,
+      0,
+      2000
+    );
     const resolved = await this.resolveRunUniverse(request, batchSize, offset);
     const resolvedInstrumentIds = resolved.instrumentIds;
     let instrumentIds = resolvedInstrumentIds;
@@ -129,14 +143,16 @@ export class SignalGenerationEngineService {
       }
     }
 
-    for (const instrumentId of instrumentIds) {
-      try {
-        const result = await this.generateForInstrument(instrumentId, request);
-        if (result) results.push(result);
-      } catch (error: any) {
-        errors.push(`${instrumentId}: ${error.message || 'signal generation failed'}`);
-      }
-    }
+    const researchContextMode: NonNullable<SignalRunRequest['researchContextMode']> = request.instrumentId || request.symbol ? 'FULL' : 'LIGHTWEIGHT';
+    const generationRequest = { ...request, researchContextMode };
+    const effectiveProviderThrottleMs = researchContextMode === 'LIGHTWEIGHT' ? 0 : providerThrottleMs;
+    const generatedResults = await this.generateBatchWithConcurrency(instrumentIds, generationRequest, maxConcurrency, effectiveProviderThrottleMs);
+    const results = generatedResults
+      .map((item) => item.result)
+      .filter((result): result is SignalResultDto => Boolean(result));
+    errors.push(...generatedResults
+      .filter((item) => item.error)
+      .map((item) => `${item.instrumentId}: ${item.error}`));
     const processedCount = resolvedInstrumentIds.length;
     const failedCount = errors.length;
     const attemptedGenerationCount = instrumentIds.length;
@@ -163,6 +179,8 @@ export class SignalGenerationEngineService {
       processedCount,
       totalCount: resolved.totalCount,
       batchSize,
+      maxConcurrency,
+      providerThrottleMs: effectiveProviderThrottleMs,
       offset,
       nextOffset: hasMore ? nextOffset : null,
       hasMore,
@@ -215,12 +233,14 @@ export class SignalGenerationEngineService {
     return this.repository.latestSignalUniverseCount(query);
   }
 
-  async generateForInstrument(instrumentId: string, options: Pick<SignalRunRequest, 'strategyCode' | 'includeStrategyMatches' | 'onlyStrategyEligible' | 'excludeNoiseFiltered'> = {}): Promise<SignalResultDto | null> {
+  async generateForInstrument(instrumentId: string, options: Pick<SignalRunRequest, 'strategyCode' | 'includeStrategyMatches' | 'onlyStrategyEligible' | 'excludeNoiseFiltered' | 'researchContextMode' | 'region' | 'assetType'> = {}): Promise<SignalResultDto | null> {
+    const useFullResearchContext = options.researchContextMode !== 'LIGHTWEIGHT';
+    const marketScope = { region: options.region, assetType: options.assetType };
     const [instrument, pricesResponse, fundamentalsResponse, research] = await Promise.all([
-      this.marketDataService.getInstrument(instrumentId),
-      this.marketDataService.listPricesByInstrumentId(instrumentId, 5000),
-      this.marketDataService.fundamentalsByInstrumentId(instrumentId),
-      this.researchService.workbench(instrumentId, '3M'),
+      this.marketDataService.getInstrument(instrumentId, marketScope),
+      this.marketDataService.listPricesByInstrumentId(instrumentId, 5000, undefined, undefined, marketScope),
+      this.getFundamentalsForGeneration(instrumentId, marketScope, useFullResearchContext),
+      useFullResearchContext ? this.researchService.workbench(instrumentId, '3M') : Promise.resolve(null),
     ]);
 
     if (!instrument) return null;
@@ -862,6 +882,49 @@ export class SignalGenerationEngineService {
     };
   }
 
+  private async generateBatchWithConcurrency(
+    instrumentIds: string[],
+    request: SignalRunRequest,
+    maxConcurrency: number,
+    providerThrottleMs: number
+  ): Promise<Array<{ instrumentId: string; result: SignalResultDto | null; error?: string }>> {
+    const results: Array<{ instrumentId: string; result: SignalResultDto | null; error?: string }> = new Array(instrumentIds.length);
+    let nextIndex = 0;
+    let nextStartAt = Date.now();
+
+    const acquireStartSlot = async () => {
+      if (providerThrottleMs <= 0) return;
+      const now = Date.now();
+      const waitMs = Math.max(0, nextStartAt - now);
+      nextStartAt = Math.max(now, nextStartAt) + providerThrottleMs;
+      if (waitMs > 0) await this.sleep(waitMs);
+    };
+
+    const worker = async () => {
+      while (nextIndex < instrumentIds.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        const instrumentId = instrumentIds[index];
+        try {
+          await acquireStartSlot();
+          results[index] = { instrumentId, result: await this.generateForInstrument(instrumentId, request) };
+        } catch (error: any) {
+          results[index] = { instrumentId, result: null, error: error?.message || 'signal generation failed' };
+        }
+      }
+    };
+
+    await Promise.all(Array.from({ length: Math.min(maxConcurrency, instrumentIds.length) }, worker));
+    return results.filter(Boolean);
+  }
+
+  private getFundamentalsForGeneration(instrumentId: string, marketScope: Pick<SignalRunRequest, 'region' | 'assetType'>, useFullResearchContext: boolean) {
+    if (useFullResearchContext || typeof (this.marketDataService as any).storedFundamentalsByInstrumentId !== 'function') {
+      return this.marketDataService.fundamentalsByInstrumentId(instrumentId, marketScope);
+    }
+    return (this.marketDataService as any).storedFundamentalsByInstrumentId(instrumentId, marketScope);
+  }
+
   private async persistSignalResult(result: SignalResultDto) {
     if (typeof (this.repository as any).createSignalResultWithStatus === 'function') {
       return (this.repository as any).createSignalResultWithStatus(result);
@@ -906,6 +969,10 @@ export class SignalGenerationEngineService {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return fallback;
     return Math.min(max, Math.max(min, Math.floor(numeric)));
+  }
+
+  private sleep(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   private categoryScore(positive: number, negative: number): number {

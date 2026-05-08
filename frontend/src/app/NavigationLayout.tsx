@@ -58,7 +58,7 @@ const navGroups = [
     group: 'Research',
     items: [
       { path: '/research', label: 'Overview', icon: <DashboardIcon /> },
-      { path: '/signals', label: 'Signals', icon: <InsightsIcon /> },
+      { path: '/signals', label: 'Raw Signals', icon: <InsightsIcon /> },
       { path: '/strategies', label: 'Strategies', icon: <AccountTreeIcon /> },
       { path: '/strategy', label: 'Strategy', icon: <FactCheckIcon /> },
       { path: '/smart-money', label: 'Smart Money', icon: <AccountTreeIcon /> },

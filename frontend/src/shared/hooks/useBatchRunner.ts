@@ -59,6 +59,7 @@ const initialState: BatchRunnerState = {
 type RunOptions<T extends BatchRunnerResponse> = {
   batchSize: number;
   initialOffset?: number;
+  parallelism?: number;
   runBatch: (input: { offset: number; batchSize: number }) => Promise<T>;
 };
 
@@ -77,7 +78,7 @@ export function useBatchRunner<T extends BatchRunnerResponse = BatchRunnerRespon
     cancelRequested.current = true;
   }, []);
 
-  const run = useCallback(async ({ batchSize, initialOffset = 0, runBatch }: RunOptions<T>) => {
+  const run = useCallback(async ({ batchSize, initialOffset = 0, parallelism = 1, runBatch }: RunOptions<T>) => {
     if (runningRef.current) return null;
     runningRef.current = true;
     cancelRequested.current = false;
@@ -85,6 +86,7 @@ export function useBatchRunner<T extends BatchRunnerResponse = BatchRunnerRespon
 
     let offset = initialOffset;
     let finalSummary: T | null = null;
+    const batchRequestWorkers = Math.max(1, Math.floor(parallelism));
     const aggregate = {
       processedCount: 0,
       totalCount: null as number | null,
@@ -98,43 +100,79 @@ export function useBatchRunner<T extends BatchRunnerResponse = BatchRunnerRespon
       warnings: [] as string[],
     };
 
+    const recordBatchResult = (result: T, requestedOffset: number) => {
+      finalSummary = result;
+      const resultOffset = result.offset ?? requestedOffset;
+      const processedCount = result.processedCount ?? 0;
+      aggregate.processedCount += processedCount;
+      aggregate.totalCount = result.totalCount ?? aggregate.totalCount;
+      aggregate.batchCount += 1;
+      aggregate.generatedCount += result.generatedCount ?? 0;
+      aggregate.updatedCount += result.updatedCount ?? 0;
+      aggregate.insertedCount += result.insertedCount ?? 0;
+      aggregate.skippedCount += result.skippedCount ?? 0;
+      aggregate.failedCount += result.failedCount ?? 0;
+      aggregate.noOpCount += result.noOpCount ?? 0;
+      aggregate.warnings.push(...(result.warnings || []));
+
+      const processedForProgress = resultOffset + processedCount;
+      const isComplete = aggregate.totalCount !== null
+        ? aggregate.processedCount >= aggregate.totalCount
+        : !result.hasMore || result.nextOffset === null;
+
+      setState((previous) => ({
+        ...previous,
+        running: !isComplete,
+        complete: isComplete,
+        processedCount: aggregate.processedCount,
+        totalCount: aggregate.totalCount ?? previous.totalCount,
+        batchCount: aggregate.batchCount,
+        generatedCount: aggregate.generatedCount,
+        updatedCount: aggregate.updatedCount,
+        insertedCount: aggregate.insertedCount,
+        skippedCount: aggregate.skippedCount,
+        failedCount: aggregate.failedCount,
+        noOpCount: aggregate.noOpCount,
+        warnings: [...aggregate.warnings],
+        currentOffset: Math.max(previous.currentOffset, result.nextOffset ?? processedForProgress),
+        hasMore: !isComplete,
+        lastBatchSummary: result,
+        finalSummary: result,
+      }));
+    };
+
     try {
+      const firstResult = await runBatch({ offset, batchSize });
+      recordBatchResult(firstResult, offset);
+
+      if (!firstResult.hasMore || firstResult.nextOffset === null || firstResult.nextOffset === undefined || cancelRequested.current) {
+        return { finalSummary, aggregate };
+      }
+
+      if (batchRequestWorkers > 1 && firstResult.totalCount !== undefined) {
+        const offsets: number[] = [];
+        for (let nextOffset = firstResult.nextOffset; nextOffset < firstResult.totalCount; nextOffset += batchSize) {
+          offsets.push(nextOffset);
+        }
+        let nextOffsetIndex = 0;
+
+        const worker = async () => {
+          while (!cancelRequested.current && nextOffsetIndex < offsets.length) {
+            const workerOffset = offsets[nextOffsetIndex];
+            nextOffsetIndex += 1;
+            const result = await runBatch({ offset: workerOffset, batchSize });
+            recordBatchResult(result, workerOffset);
+          }
+        };
+
+        await Promise.all(Array.from({ length: Math.min(batchRequestWorkers, offsets.length) }, worker));
+        return { finalSummary, aggregate };
+      }
+
+      offset = firstResult.nextOffset;
       while (!cancelRequested.current) {
         const result = await runBatch({ offset, batchSize });
-        finalSummary = result;
-        const processedForProgress = result.offset !== undefined
-          ? result.offset + (result.processedCount ?? 0)
-          : offset + (result.processedCount ?? 0);
-        aggregate.processedCount = Math.max(aggregate.processedCount, processedForProgress);
-        aggregate.totalCount = result.totalCount ?? aggregate.totalCount;
-        aggregate.batchCount += 1;
-        aggregate.generatedCount += result.generatedCount ?? 0;
-        aggregate.updatedCount += result.updatedCount ?? 0;
-        aggregate.insertedCount += result.insertedCount ?? 0;
-        aggregate.skippedCount += result.skippedCount ?? 0;
-        aggregate.failedCount += result.failedCount ?? 0;
-        aggregate.noOpCount += result.noOpCount ?? 0;
-        aggregate.warnings.push(...(result.warnings || []));
-
-        setState((previous) => ({
-          ...previous,
-          running: Boolean(result.hasMore && result.nextOffset !== null),
-          complete: !result.hasMore || result.nextOffset === null,
-          processedCount: Math.max(previous.processedCount, processedForProgress),
-          totalCount: result.totalCount ?? previous.totalCount,
-          batchCount: previous.batchCount + 1,
-          generatedCount: previous.generatedCount + (result.generatedCount ?? 0),
-          updatedCount: previous.updatedCount + (result.updatedCount ?? 0),
-          insertedCount: previous.insertedCount + (result.insertedCount ?? 0),
-          skippedCount: previous.skippedCount + (result.skippedCount ?? 0),
-          failedCount: previous.failedCount + (result.failedCount ?? 0),
-          noOpCount: previous.noOpCount + (result.noOpCount ?? 0),
-          warnings: [...previous.warnings, ...(result.warnings || [])],
-          currentOffset: result.nextOffset ?? processedForProgress,
-          hasMore: Boolean(result.hasMore && result.nextOffset !== null),
-          lastBatchSummary: result,
-          finalSummary: result,
-        }));
+        recordBatchResult(result, offset);
 
         if (!result.hasMore || result.nextOffset === null || result.nextOffset === undefined) break;
         offset = result.nextOffset;

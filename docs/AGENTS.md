@@ -392,7 +392,7 @@ Frontend:
 - Historical Context Snapshots owns point-in-time persistence of market context, sector/country strength, smart-money context, and data-quality readiness. Current calculations remain owned by their source modules; snapshots enable historical grouping and lookup.
 - Signal Calibration Engine owns explainable calibrated score/confidence outputs and model-version metadata. It must preserve raw Signal Generation Engine scores and persist calibration separately.
 - Data Quality Engine owns data coverage, liquidity, and signal-readiness evaluations. It consumes Market Data Foundation through public exports and should expose batch-safe evaluation flows for downstream modules.
-- Long-running universe workflows should expose `batchSize` plus `offset`/cursor progress metadata and let the frontend run sequential batches, refresh visible data after each batch, and keep action buttons in a disabled loading state until complete.
+- Long-running universe workflows should expose `batchSize` plus `offset`/cursor progress metadata and let the frontend orchestrate bounded batches with one coordinated parallel-processing strategy, refresh visible data after completion, and keep action buttons in a disabled loading state until complete.
 - Downstream modules may consume Data Quality Engine public filtering helpers to skip or warn on low-readiness instruments, but they must not duplicate readiness, coverage, or liquidity scoring logic.
 - Persisted stock-data models must document whether they are append-only or idempotent/upserted. Idempotent models need a clear natural key, date/timestamp normalization where relevant, repository-level upsert/skip behavior, and database uniqueness where practical.
 - These integrations must not import backend repositories or frontend feature internals directly.
@@ -402,7 +402,8 @@ Frontend:
 - Backend endpoints must process bounded batches, not an entire universe, unless an explicit backend worker/job system owns that workflow.
 - Backend batch responses must return `totalCount`, `processedCount`, `batchSize`, `offset`/`cursor`, `nextOffset`/`nextCursor`, `hasMore`, count summaries, `warnings`, and `durationMs`.
 - Frontend owns orchestration across batches unless a backend worker/job system is explicitly implemented.
-- Frontend must loop until `hasMore=false` for user-triggered "run all" actions.
+- Frontend must continue until `hasMore=false` for user-triggered "run all" actions.
+- When using parallel processing, use a single coordinated strategy for the workflow: define module-owned worker/request-pool config, keep provider-facing throttles server-owned, avoid exposing raw concurrency controls to normal users, and ensure backend and frontend parallelism do not multiply into uncontrolled provider or database pressure.
 - `region` and `assetType` must be passed to every batch request.
 - Batch size defaults should be safe, usually `25`.
 - Batch size max should usually be `100` unless documented by the owning module.

@@ -1,5 +1,9 @@
 import type { SignalConfidence, SignalDirection, SignalQuery, SignalRunRequest } from './signal-generation-engine.types';
 import { normalizeMarketRegion } from '../../shared/utils/market-scope';
+import {
+  signal_generation_engine_batch_size,
+  signal_generation_engine_max_workers_count,
+} from './signal-generation-engine.config';
 
 const DIRECTIONS: SignalDirection[] = ['BULLISH', 'NEUTRAL', 'BEARISH'];
 const CONFIDENCES: SignalConfidence[] = ['LOW', 'MEDIUM', 'HIGH'];
@@ -66,12 +70,16 @@ export function parseRunRequest(body: any): SignalRunRequest {
   const limitValue = Number(body?.limit);
   const batchSizeValue = Number(body?.batchSize ?? body?.limit);
   const offsetValue = Number(body?.offset ?? body?.cursor);
+  const maxConcurrencyValue = Number(body?.maxConcurrency ?? body?.workerCount);
+  const providerThrottleMsValue = Number(body?.providerThrottleMs);
   return {
     instrumentId: typeof body?.instrumentId === 'string' ? body.instrumentId.trim() || undefined : undefined,
     symbol: typeof body?.symbol === 'string' ? body.symbol.trim().toUpperCase() || undefined : undefined,
-    limit: Number.isFinite(limitValue) ? Math.min(100, Math.max(1, Math.floor(limitValue))) : undefined,
-    batchSize: Number.isFinite(batchSizeValue) ? Math.min(100, Math.max(1, Math.floor(batchSizeValue))) : undefined,
+    limit: Number.isFinite(limitValue) ? Math.min(signal_generation_engine_batch_size, Math.max(1, Math.floor(limitValue))) : undefined,
+    batchSize: Number.isFinite(batchSizeValue) ? Math.min(signal_generation_engine_batch_size, Math.max(1, Math.floor(batchSizeValue))) : undefined,
     offset: Number.isFinite(offsetValue) ? Math.max(0, Math.floor(offsetValue)) : 0,
+    maxConcurrency: Number.isFinite(maxConcurrencyValue) ? Math.min(signal_generation_engine_max_workers_count, Math.max(1, Math.floor(maxConcurrencyValue))) : undefined,
+    providerThrottleMs: Number.isFinite(providerThrottleMsValue) ? Math.min(2000, Math.max(0, Math.floor(providerThrottleMsValue))) : undefined,
     direction: normalizeDirection(body?.direction),
     sector: typeof body?.sector === 'string' ? body.sector.trim() || undefined : undefined,
     country: typeof body?.country === 'string' ? body.country.trim() || undefined : undefined,

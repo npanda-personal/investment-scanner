@@ -124,6 +124,44 @@ describe('SignalGenerationEngineService', () => {
     expect(saved[0].explanation).toContain('Bullish because');
   });
 
+  it('skips heavyweight research workbench calls for lightweight batch context', async () => {
+    const repository = {
+      createSignalResult: jest.fn(async (result) => ({ ...result, id: 'signal-lightweight' })),
+    };
+    const prices = Array.from({ length: 260 }, (_, index) => freshPrice(index, 180 - index * 0.15, 1000));
+    const marketDataService = {
+      getInstrument: jest.fn().mockResolvedValue({
+        id: 'stock-1',
+        symbol: 'LITE',
+        company_name: 'Lite Co',
+        sector: 'Technology',
+        country: 'IN',
+        currency: 'INR',
+      }),
+      listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices }),
+      fundamentalsByInstrumentId: jest.fn().mockResolvedValue({
+        records: [],
+      }),
+      storedFundamentalsByInstrumentId: jest.fn().mockResolvedValue({
+        records: [{ eps: 3, net_income: 1000000, pe_ratio: 18, dividend_yield: 0.01, market_cap: 1000000000 }],
+      }),
+    };
+    const researchService = {
+      workbench: jest.fn().mockResolvedValue({
+        valuation: { peer_average_pe: 20 },
+        relative_strength: { relative_to_peer_average: 0.05 },
+      }),
+    };
+    const service = new SignalGenerationEngineService(repository as any, marketDataService as any, researchService as any);
+
+    const result = await service.generateForInstrument('stock-1', { researchContextMode: 'LIGHTWEIGHT' });
+
+    expect(result?.instrument_id).toBe('stock-1');
+    expect(marketDataService.storedFundamentalsByInstrumentId).toHaveBeenCalledWith('stock-1', { region: undefined, assetType: undefined });
+    expect(marketDataService.fundamentalsByInstrumentId).not.toHaveBeenCalled();
+    expect(researchService.workbench).not.toHaveBeenCalled();
+  });
+
   it('enriches top signal responses with current price context', async () => {
     const repository = {
       latestSignals: jest.fn().mockResolvedValue({
@@ -381,6 +419,53 @@ describe('SignalGenerationEngineService', () => {
     expect(result.generatedCount).toBe(1);
     expect(result.failedCount).toBe(1);
     expect(result.errors[0]).toContain('bad: missing prices');
+  });
+
+  it('processes instruments with bounded parallelism', async () => {
+    const marketDataService = {
+      listInstruments: jest.fn().mockResolvedValue({
+        instruments: [{ id: 'one' }, { id: 'two' }, { id: 'three' }, { id: 'four' }],
+        pagination: { total: 4 },
+      }),
+    };
+    const service = new SignalGenerationEngineService({} as any, marketDataService as any, {} as any);
+    let active = 0;
+    let maxActive = 0;
+    jest.spyOn(service, 'generateForInstrument').mockImplementation(async (instrumentId) => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      active -= 1;
+      return {
+        instrument_id: instrumentId,
+        symbol: instrumentId.toUpperCase(),
+        company_name: null,
+        sector: null,
+        country: 'IN',
+        currentPrice: null,
+        previousClose: null,
+        dailyChange: null,
+        dailyChangePercent: null,
+        currency: null,
+        priceTimestamp: null,
+        score: 50,
+        direction: 'NEUTRAL',
+        confidence: 'LOW',
+        triggered_signals: [],
+        negative_signals: [],
+        explanation: 'Neutral.',
+        generated_at: new Date().toISOString(),
+        source: 'signal-generation-engine',
+        data_status: 'PARTIAL',
+      } as any;
+    });
+
+    const result = await service.run({ batchSize: 4, maxConcurrency: 2, providerThrottleMs: 0, region: 'IN', assetType: 'STOCK' });
+
+    expect(result.maxConcurrency).toBe(2);
+    expect(result.providerThrottleMs).toBe(0);
+    expect(maxActive).toBeLessThanOrEqual(2);
+    expect(result.generatedCount).toBe(4);
   });
 
   it('separates created, updated, and no-op write counts in a run summary', async () => {

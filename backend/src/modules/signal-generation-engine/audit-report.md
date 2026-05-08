@@ -83,3 +83,51 @@
 - **Signal Impact:** Slight UX friction for power users.
 - **Recommended Fix:** Use standard selectors and better input validation.
 - **Safe to fix now:** YES
+
+### 4. Browser Audit: Unsupported Enriched-Field Sorting
+- **Affected File(s):** `SignalTable.tsx`
+- **Severity:** MEDIUM
+- **Why it matters:** Price and daily change are enriched after the backend selects and paginates persisted signal rows, so sortable headers for those columns appeared to work while the backend could not honor them accurately.
+- **Signal Impact:** Users could believe they were sorting by current price or daily move while still seeing score/date ordered data.
+- **Implemented Fix:** Removed the sortable affordance for Price and Daily columns until those values are persisted or backed by a dedicated query path.
+- **Safe to fix now:** DONE
+
+### 5. Browser Audit: Broken Stock Detail Navigation
+- **Affected File(s):** `SignalTable.tsx`
+- **Severity:** HIGH
+- **Why it matters:** Table row, symbol, and View Stock Details actions routed to `/stocks/:id`, but the registered stock research route is `/research/stocks/:id`.
+- **Signal Impact:** Primary inspection actions from signal rows led to an unmatched route instead of the stock workspace.
+- **Implemented Fix:** Updated signal table navigation to `/research/stocks/:id`.
+- **Safe to fix now:** DONE
+
+### 6. Browser Audit: Header Actions Overflow
+- **Affected File(s):** `PageHeader.tsx`, `SignalsDashboardPage.tsx`
+- **Severity:** MEDIUM
+- **Why it matters:** The Signals page primary and secondary actions clipped at tablet-width viewports, hiding part of "View Signal Quality Lab" and pushing content into page-level horizontal overflow.
+- **Signal Impact:** Users could miss key actions or have to horizontally scroll the whole page.
+- **Implemented Fix:** Made shared page header action groups wrap with bounded width and wrapping button labels.
+- **Safe to fix now:** DONE
+
+### 7. Performance Audit: User-Editable Batch/Worker Controls
+- **Affected File(s):** `SignalsDashboardPage.tsx`, `config.ts`, `signal-generation-engine.config.ts`
+- **Severity:** MEDIUM
+- **Why it matters:** Exposing batch size and worker count as raw UI inputs lets users accidentally choose values that create slow runs, high memory pressure, or excessive provider fallback traffic.
+- **Signal Impact:** Signal generation could be harmed by unusual per-run values instead of following tested module defaults.
+- **Implemented Fix:** Removed the batch/worker inputs from the dashboard. Defaults are now module-owned config constants: `signal_generation_engine_batch_size=100` and `signal_generation_engine_workers_count=4`, with backend clamps still protecting the API.
+- **Safe to fix now:** DONE
+
+### 8. Architecture Audit: Batch Generation Coupled to Heavy Research/Provider Work
+- **Affected File(s):** `signal-generation-engine.service.ts`
+- **Severity:** HIGH
+- **Why it matters:** Raw signal batch generation was calling the full Stock Research Workbench aggregate for every instrument and still allowed missing fundamentals to fall back to Yahoo. That aggregate is optimized for an investor-facing stock detail workflow and can fan out into peer comparison, corporate actions, latest price, fundamentals, and price-history lookups.
+- **Signal Impact:** Large universe runs performed unnecessary detail-page/provider work, making the worker pool less effective and causing each 100-instrument batch to sit behind provider-throttle timing.
+- **Implemented Fix:** Added a lightweight research context for batch generation. Batches now score from instrument, price, and stored fundamentals data without invoking the full workbench or fetching missing fundamentals from Yahoo per instrument; single-symbol/single-instrument generation still uses the full context for targeted review.
+- **Safe to fix now:** DONE
+
+### 9. Performance Audit: Sequential Frontend Batch Dispatch
+- **Affected File(s):** `useBatchRunner.ts`, `SignalsDashboardPage.tsx`, `config.ts`
+- **Severity:** HIGH
+- **Why it matters:** The dashboard waited for each bounded backend batch before starting the next offset, so full-universe generation serialized network and database work even after the backend supported bounded workers.
+- **Signal Impact:** Users saw many `/signals/run` requests finish one at a time, increasing total run duration unnecessarily.
+- **Implemented Fix:** Added a hidden module-owned frontend request pool, `signal_generation_engine_batch_request_workers_count`, so independent backend offsets can run concurrently after the first batch discovers `totalCount`.
+- **Safe to fix now:** DONE

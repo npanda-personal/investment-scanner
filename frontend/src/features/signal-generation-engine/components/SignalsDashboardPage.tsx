@@ -9,6 +9,11 @@ import { BatchProgressBar, FilterBar, PageHeader, type SortDirection } from '@/s
 import { useBatchRunner } from '@/shared/hooks';
 import { FactCheckOutlined } from '@mui/icons-material';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
+import {
+  signal_generation_engine_batch_size,
+  signal_generation_engine_batch_request_workers_count,
+  signal_generation_engine_workers_count,
+} from '../config';
 
 type SignalTab = 'bullish' | 'bearish' | 'neutral' | 'momentum' | 'recent' | 'screener';
 
@@ -43,7 +48,6 @@ const SignalsDashboardPage: React.FC = () => {
   const [onlyStrategyEligible, setOnlyStrategyEligible] = useState(false);
   const [excludeNoiseFiltered, setExcludeNoiseFiltered] = useState(false);
   const [hasBlockedStrategies, setHasBlockedStrategies] = useState(false);
-  const [runLimit, setRunLimit] = useState('25');
   const [useDataQualityFilter, setUseDataQualityFilter] = useState(false);
   const [runIncludeStrategyMatches, setRunIncludeStrategyMatches] = useState(false);
   const [runMessage, setRunMessage] = useState<string | null>(null);
@@ -112,14 +116,15 @@ const SignalsDashboardPage: React.FC = () => {
     setError(null);
     setRunMessage(null);
     batchRunner.reset();
-    const selectedBatchSize = Math.min(100, Math.max(1, Number(runLimit) || 25));
     try {
       const completedRun = await batchRunner.run({
-        batchSize: selectedBatchSize,
+        batchSize: signal_generation_engine_batch_size,
+        parallelism: signal_generation_engine_batch_request_workers_count,
         runBatch: ({ offset, batchSize }) => runSignals({
           batchSize,
           limit: batchSize,
           offset,
+          maxConcurrency: signal_generation_engine_workers_count,
           useDataQualityFilter,
           minSignalReadinessScore: 70,
           region: scope.region,
@@ -134,7 +139,7 @@ const SignalsDashboardPage: React.FC = () => {
       const finalState = completedRun?.aggregate;
       setRunMessage(
         `Signal generation complete. Processed ${finalState?.processedCount ?? 0} instruments across ${finalState?.batchCount ?? 0} batches. ` +
-        `Generated ${finalState?.generatedCount ?? 0}, updated ${finalState?.updatedCount ?? 0}, skipped ${finalState?.skippedCount ?? 0}, failed ${finalState?.failedCount ?? 0}.`
+        `Generated ${finalState?.generatedCount ?? 0}, updated ${finalState?.updatedCount ?? 0}, unchanged ${finalState?.noOpCount ?? 0}, skipped ${finalState?.skippedCount ?? 0}, failed ${finalState?.failedCount ?? 0}.`
       );
       load(0);
     } catch (err: any) {
@@ -165,10 +170,20 @@ const SignalsDashboardPage: React.FC = () => {
       <PageHeader
         title="Signal Generation Engine"
         subtitle="Raw bullish, neutral, and bearish confirmation inputs with Strategy Framework match context."
-        primaryAction={<Button variant="contained" onClick={runManualSignals} disabled={batchRunner.running} startIcon={batchRunner.running ? <CircularProgress size={16} color="inherit" /> : undefined}>{batchRunner.running ? 'Running...' : 'Run Signals'}</Button>}
-        secondaryActions={
-          <>
-          <TextField size="small" label="Batch size" value={runLimit} onChange={(event) => setRunLimit(event.target.value)} sx={{ width: 110 }} />
+      />
+
+      <Paper sx={{ p: 2, mb: 2, overflow: 'hidden' }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            gap: 1.5,
+            maxWidth: '100%',
+            '& .MuiFormControlLabel-root': { mr: 0 },
+            '& .MuiButton-root': { flex: { xs: '1 1 180px', md: '0 1 auto' }, minWidth: 0 },
+          }}
+        >
           <FormControlLabel
             control={<Checkbox checked={useDataQualityFilter} onChange={(event) => setUseDataQualityFilter(event.target.checked)} />}
             label="Use data quality filter"
@@ -177,11 +192,13 @@ const SignalsDashboardPage: React.FC = () => {
             control={<Checkbox checked={runIncludeStrategyMatches} onChange={(event) => setRunIncludeStrategyMatches(event.target.checked)} />}
             label="Attach strategy matches"
           />
+          <Button variant="contained" onClick={runManualSignals} disabled={batchRunner.running} startIcon={batchRunner.running ? <CircularProgress size={16} color="inherit" /> : undefined}>
+            {batchRunner.running ? 'Running...' : 'Run Signals'}
+          </Button>
           <Button component={Link} to="/signals/quality" variant="outlined">View Signal Quality Lab</Button>
           <Button component={Link} to="/strategy" variant="outlined" startIcon={<FactCheckOutlined />}>View Strategy Decisions</Button>
-          </>
-        }
-      />
+        </Box>
+      </Paper>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {runMessage && <Alert severity="info" sx={{ mb: 2 }}>{runMessage}</Alert>}
@@ -192,7 +209,7 @@ const SignalsDashboardPage: React.FC = () => {
         processedCount={batchRunner.processedCount}
         totalCount={batchRunner.totalCount}
         batchCount={batchRunner.batchCount}
-        estimatedBatchTotal={batchRunner.totalCount ? Math.ceil(batchRunner.totalCount / Math.min(100, Math.max(1, Number(runLimit) || 25))) : undefined}
+        estimatedBatchTotal={batchRunner.totalCount ? Math.ceil(batchRunner.totalCount / signal_generation_engine_batch_size) : undefined}
         generatedCount={batchRunner.generatedCount}
         updatedCount={batchRunner.updatedCount}
         skippedCount={batchRunner.skippedCount}

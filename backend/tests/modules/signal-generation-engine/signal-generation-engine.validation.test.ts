@@ -34,7 +34,13 @@ describe('signal generation validation', () => {
 
   it('parses run request and validates instrument id', () => {
     expect(parseRunRequest({ symbol: 'aapl', limit: 0, region: 'india', assetType: 'stock' })).toMatchObject({ symbol: 'AAPL', limit: 1, region: 'IN', assetType: 'STOCK' });
-    expect(parseRunRequest({ batchSize: 999, offset: '25', force: true })).toMatchObject({ batchSize: 100, offset: 25, force: true });
+    expect(parseRunRequest({ batchSize: 999, offset: '25', maxConcurrency: 99, providerThrottleMs: 9999, force: true })).toMatchObject({
+      batchSize: 100,
+      offset: 25,
+      maxConcurrency: 6,
+      providerThrottleMs: 2000,
+      force: true,
+    });
     expect(validateInstrumentId('')).toBe('instrumentId is required');
   });
 });

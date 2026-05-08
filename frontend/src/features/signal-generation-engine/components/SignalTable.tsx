@@ -114,16 +114,15 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
   const [successWatchlistId, setSuccessWatchlistId] = React.useState<string | null>(null);
 
   const columns: DataTableColumn<SignalResult>[] = [
-    { id: 'symbol', label: 'Symbol', sortable: true, render: (signal) => <Button size="small" onClick={(event) => { event.stopPropagation(); navigate(`/stocks/${signal.instrument_id}`); }}>{signal.symbol}</Button> },
+    { id: 'symbol', label: 'Symbol', sortable: true, render: (signal) => <Button size="small" onClick={(event) => { event.stopPropagation(); navigate(`/research/stocks/${signal.instrument_id}`); }}>{signal.symbol}</Button> },
     { id: 'company', label: 'Company', render: (signal) => signal.company_name || 'N/A' },
     { id: 'score', label: 'Raw Score', sortable: true, align: 'right', render: (signal) => signal.score },
     { id: 'direction', label: 'Raw Direction', sortable: true, render: (signal) => <StatusBadge label={signal.direction} /> },
     { id: 'confidence', label: 'Confidence', sortable: true, render: (signal) => <StatusBadge label={signal.confidence} /> },
-    { id: 'currentPrice', label: 'Price', sortable: true, align: 'right', render: (signal) => formatMoney(signal.currentPrice, signal.currency) },
+    { id: 'currentPrice', label: 'Price', align: 'right', render: (signal) => formatMoney(signal.currentPrice, signal.currency) },
     {
       id: 'dailyChangePercent',
       label: 'Daily',
-      sortable: true,
       align: 'right',
       render: (signal) => (
         <Typography color={signal.dailyChangePercent === null ? 'text.secondary' : signal.dailyChangePercent >= 0 ? 'success.main' : 'error.main'} variant="body2">
@@ -193,7 +192,7 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
       render: (signal) => (
         <Box sx={{ display: 'flex', gap: 0.5 }} onClick={(event) => event.stopPropagation()}>
           <Tooltip title="View Stock Details" arrow>
-            <IconButton size="small" onClick={() => navigate(`/stocks/${signal.instrument_id}`)}>
+            <IconButton size="small" onClick={() => navigate(`/research/stocks/${signal.instrument_id}`)}>
               <VisibilityOutlined fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -252,7 +251,7 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
         onSortChange={onSortChange}
         onPageChange={onPageChange}
         onPageSizeChange={onPageSizeChange}
-        onRowClick={(signal) => navigate(`/stocks/${signal.instrument_id}`)}
+        onRowClick={(signal) => navigate(`/research/stocks/${signal.instrument_id}`)}
       />
       {portfolioSignal && (
         <AddSignalToPortfolioDialog open signal={portfolioSignal} onClose={() => setPortfolioSignal(null)} onAdded={(portfolioId) => setSuccessPortfolioId(portfolioId)} />

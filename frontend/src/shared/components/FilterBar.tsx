@@ -19,14 +19,22 @@ export function FilterBar({ children, onReset, showReset = true }: FilterBarProp
         sx={{
           maxWidth: '100%',
           '& .MuiTextField-root': {
-            flex: '1 1 160px',
+            flex: '0 1 180px',
             minWidth: 0,
             maxWidth: '100%',
           },
-          '& .MuiButton-root': {
-            flex: { xs: '1 1 160px', sm: '0 1 auto' },
+          '& .MuiFormControlLabel-root': {
+            flex: { xs: '1 1 220px', md: '0 1 auto' },
             minWidth: 0,
-            whiteSpace: 'nowrap',
+            mr: 0,
+          },
+          '& .MuiFormControlLabel-label': {
+            whiteSpace: 'normal',
+          },
+          '& .MuiButton-root': {
+            flex: { xs: '1 1 160px', md: '0 1 auto' },
+            minWidth: { xs: 160, md: 0 },
+            whiteSpace: 'normal',
           },
         }}
       >

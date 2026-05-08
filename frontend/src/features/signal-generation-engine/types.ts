@@ -106,6 +106,8 @@ export interface SignalRunRequest {
   limit?: number;
   batchSize?: number;
   offset?: number;
+  maxConcurrency?: number;
+  providerThrottleMs?: number;
   direction?: SignalDirection;
   sector?: string;
   country?: string;
@@ -139,11 +141,14 @@ export interface SignalRunResponse {
   processedCount?: number;
   totalCount?: number;
   batchSize?: number;
+  maxConcurrency?: number;
+  providerThrottleMs?: number;
   offset?: number;
   nextOffset?: number | null;
   hasMore?: boolean;
   generatedCount?: number;
   updatedCount?: number;
+  noOpCount?: number;
   skippedCount?: number;
   failedCount?: number;
   strategyMatchedCount?: number;
