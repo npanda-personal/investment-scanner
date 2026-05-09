@@ -125,7 +125,7 @@ describe('StrategyDecisionEngineService', () => {
       };
       const result = (service as any).evaluateTrendMomentum(ctx);
       expect(result.decision).toBe('AVOID');
-      expect(result.blockers).toContain('Market gate is CLOSED; no new long trades.');
+      expect(result.blockers).toContain('Market gate is CLOSED; no new long candidates.');
     });
 
     it('should include score breakdown and cap confidence if data gaps exist', () => {
@@ -480,5 +480,43 @@ describe('StrategyDecisionEngineService', () => {
       expect(smartMoney.stock).toHaveBeenCalledTimes(2);
       expect(repository.create).toHaveBeenCalledTimes(4);
       expect(frameworkService.performance).toHaveBeenCalledTimes(2);
+    });
+
+    it('resolves symbol evaluation through scoped instrument search and provider/display aliases', async () => {
+      const marketData = {
+        listInstruments: jest.fn().mockResolvedValue({
+          instruments: [
+            { id: 'stock-1', symbol: 'RELIANCE.NS', display_symbol: 'RELIANCE', provider_symbol: 'RELIANCE.NS', source_symbol: 'RELIANCE' },
+          ],
+        }),
+      };
+      const svc = new StrategyDecisionEngineService(
+        {} as any,
+        marketData as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        new StrategyFrameworkRegistry(),
+        {} as any
+      );
+
+      const result = await (svc as any).resolveEvaluationUniverse(
+        { strategy: 'TREND_MOMENTUM', symbol: 'RELIANCE', region: 'IN', assetType: 'STOCK' },
+        100,
+        0
+      );
+
+      expect(marketData.listInstruments).toHaveBeenCalledWith(expect.objectContaining({
+        search: 'RELIANCE',
+        pageSize: 5,
+        region: 'IN',
+        assetType: 'STOCK',
+      }));
+      expect(result.instrumentIds).toEqual(['stock-1']);
+      expect(result.totalCount).toBe(1);
     });
   });

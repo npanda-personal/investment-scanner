@@ -47,14 +47,14 @@ export function PageHeader({
             </Button>
           </Box>
         )}
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-          <Typography variant="h4" fontWeight={700} sx={{ minWidth: 0 }}>
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ maxWidth: '100%', minWidth: 0 }}>
+          <Typography variant="h4" fontWeight={700} sx={{ flex: '1 1 100%', maxWidth: '100%', minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
             {title}
           </Typography>
           {badges}
         </Stack>
         {subtitle && (
-          <Typography color="text.secondary" sx={{ maxWidth: 860 }}>
+          <Typography color="text.secondary" sx={{ maxWidth: 860, minWidth: 0, overflowWrap: 'anywhere' }}>
             {subtitle}
           </Typography>
         )}

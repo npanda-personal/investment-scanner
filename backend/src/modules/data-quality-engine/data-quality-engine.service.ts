@@ -7,6 +7,7 @@ import type {
   DataQualityEvaluationDto,
   DataQualityFilterOptions,
   DataQualityFilterResult,
+  DataQualityListResponse,
   DataQualityQuery,
   LiquidityStatus,
   PriceForQuality,
@@ -28,16 +29,30 @@ export class DataQualityEngineService {
     return this.repository.summary(total, query);
   }
 
-  list(query: DataQualityQuery) {
-    return this.repository.list(query);
+  async list(query: DataQualityQuery): Promise<DataQualityListResponse> {
+    const [items, total] = await Promise.all([
+      this.repository.list(query),
+      this.repository.count(query),
+    ]);
+    const nextOffset = query.offset + items.length;
+    return {
+      items,
+      pagination: {
+        total,
+        limit: query.limit,
+        offset: query.offset,
+        nextOffset: nextOffset < total ? nextOffset : null,
+        hasMore: nextOffset < total,
+      },
+    };
   }
 
   async signalReadiness(query: DataQualityQuery) {
-    return this.repository.list({ ...query, readinessStatus: query.readinessStatus ?? 'READY' });
+    return this.list({ ...query, readinessStatus: query.readinessStatus ?? 'READY' });
   }
 
   async liquidity(query: DataQualityQuery) {
-    return this.repository.list(query);
+    return this.list(query);
   }
 
   async diagnostics(instrumentId: string): Promise<DataQualityEvaluationDto | null> {

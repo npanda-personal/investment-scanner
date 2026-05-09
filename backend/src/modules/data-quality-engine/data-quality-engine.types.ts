@@ -4,6 +4,7 @@ export type LiquidityStatus = 'LIQUID' | 'THIN' | 'ILLIQUID' | 'UNKNOWN';
 export type DataQualityStatus = CoverageStatus | SignalReadinessStatus | LiquidityStatus;
 
 export interface DataQualityQuery {
+  search?: string;
   status?: CoverageStatus;
   readinessStatus?: SignalReadinessStatus;
   liquidityStatus?: LiquidityStatus;
@@ -11,6 +12,10 @@ export interface DataQualityQuery {
   country?: string;
   region?: string;
   assetType?: string;
+  eligibleForSignals?: boolean;
+  eligibleForBacktesting?: boolean;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
   minCoverageScore?: number;
   minReadinessScore?: number;
   limit: number;
@@ -70,6 +75,17 @@ export interface DataQualitySummary {
   missingVolumeCount: number;
   latestEvaluationAt: string | null;
   dataStatus: 'COMPLETE' | 'PARTIAL' | 'MISSING';
+}
+
+export interface DataQualityListResponse {
+  items: DataQualityEvaluationDto[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+    nextOffset: number | null;
+    hasMore: boolean;
+  };
 }
 
 export interface DataQualityEvaluateResponse {

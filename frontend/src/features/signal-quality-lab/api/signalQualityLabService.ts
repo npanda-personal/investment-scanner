@@ -14,7 +14,7 @@ import type {
 
 const API_BASE = '/api/v1/signals';
 
-const params = (horizon: QualityHorizon, filters: QualityFilters = {}, scope: { region?: string; assetType?: string } = {}) => ({ horizon, limit: 150, minSampleSize: 0, region: scope.region, assetType: scope.assetType, ...filters });
+const params = (horizon: QualityHorizon, filters: QualityFilters = {}, scope: { region?: string; assetType?: string } = {}) => ({ horizon, limit: 5000, minSampleSize: 0, region: scope.region, assetType: scope.assetType, ...filters });
 
 export async function fetchSignalQualityDashboard(horizon: QualityHorizon, filters: QualityFilters = {}, scope: { region?: string; assetType?: string } = {}) {
   const response = await axios.get<{ summary: QualitySummary; byType: SignalTypePerformance[]; bySector: QualityMetricGroup[]; byRegime: QualityMetricGroup[]; byDataQuality: QualityMetricGroup[]; noisy: NoisySignalItem[] }>(`${API_BASE}/quality/dashboard`, { params: params(horizon, filters, scope) });
@@ -51,17 +51,38 @@ export async function fetchNoisySignals(horizon: QualityHorizon, filters: Qualit
   return response.data.items;
 }
 
-export async function fetchSignalHistory(instrumentId: string): Promise<SignalHistoryItem[]> {
-  const response = await axios.get<{ items: SignalHistoryItem[] }>(`${API_BASE}/${instrumentId}/history`, { params: { limit: 100 } });
+export async function fetchSignalHistory(
+  instrumentId: string,
+  horizon: QualityHorizon,
+  filters: QualityFilters = {},
+  scope: { region?: string; assetType?: string } = {}
+): Promise<SignalHistoryItem[]> {
+  const response = await axios.get<{ items: SignalHistoryItem[] }>(`${API_BASE}/${instrumentId}/history`, { params: { ...params(horizon, filters, scope), limit: 100 } });
   return response.data.items;
 }
 
-export async function fetchSignalOutcomes(instrumentId: string): Promise<SignalOutcomeSet[]> {
-  const response = await axios.get<{ items: SignalOutcomeSet[] }>(`${API_BASE}/${instrumentId}/outcomes`, { params: { limit: 100 } });
+export async function fetchSignalOutcomes(
+  instrumentId: string,
+  horizon: QualityHorizon,
+  filters: QualityFilters = {},
+  scope: { region?: string; assetType?: string } = {}
+): Promise<SignalOutcomeSet[]> {
+  const response = await axios.get<{ items: SignalOutcomeSet[] }>(`${API_BASE}/${instrumentId}/outcomes`, { params: { ...params(horizon, filters, scope), limit: 100 } });
   return response.data.items;
 }
 
 export async function recalculateSignalQuality(input: QualityRecalculateRequest = {}): Promise<QualityRecalculateResponse> {
   const response = await axios.post<QualityRecalculateResponse>(`${API_BASE}/quality/recalculate`, input);
-  return response.data;
+  const evaluatedCount = response.data.evaluatedCount ?? response.data.evaluatedInBatch ?? 0;
+  const missingPriceHistoryCount = response.data.missingPriceHistoryCount ?? response.data.missingPriceHistoryInBatch ?? 0;
+  return {
+    ...response.data,
+    insertedCount: response.data.insertedCount ?? response.data.inserted ?? 0,
+    updatedCount: response.data.updatedCount ?? response.data.updated ?? 0,
+    skippedCount: response.data.skippedCount ?? response.data.skipped ?? 0,
+    failedCount: response.data.failedCount ?? 0,
+    evaluatedCount,
+    unevaluatedCount: response.data.unevaluatedCount ?? response.data.unevaluatedInBatch ?? Math.max(0, (response.data.processedCount ?? 0) - evaluatedCount - missingPriceHistoryCount),
+    missingPriceHistoryCount,
+  };
 }

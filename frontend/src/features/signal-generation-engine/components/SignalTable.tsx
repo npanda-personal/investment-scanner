@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, Box, Button, Chip, IconButton, Snackbar, Tooltip, Typography } from '@mui/material';
+import { Alert, Box, Button, Chip, Divider, Drawer, IconButton, Snackbar, Stack, Tooltip, Typography } from '@mui/material';
 import { 
   InfoOutlined, 
   WarningAmberOutlined, 
@@ -102,11 +102,13 @@ type SignalTableProps = {
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
   onSortChange: (sortBy: string, direction: SortDirection) => void;
+  strategyContextLoaded?: boolean;
   emptyMessage?: string;
 };
 
-export function SignalTable({ signals, totalCount, loading, page, pageSize, sortBy, sortDirection, onPageChange, onPageSizeChange, onSortChange, emptyMessage }: SignalTableProps) {
+export function SignalTable({ signals, totalCount, loading, page, pageSize, sortBy, sortDirection, onPageChange, onPageSizeChange, onSortChange, strategyContextLoaded = false, emptyMessage }: SignalTableProps) {
   const navigate = useNavigate();
+  const [selectedSignal, setSelectedSignal] = React.useState<SignalResult | null>(null);
   const [portfolioSignal, setPortfolioSignal] = React.useState<SignalResult | null>(null);
   const [watchlistSignal, setWatchlistSignal] = React.useState<SignalResult | null>(null);
   const [alertSignal, setAlertSignal] = React.useState<SignalResult | null>(null);
@@ -158,7 +160,7 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
         return (
           <Tooltip title={<StrategyMatchDetails signal={signal} />} arrow>
             <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', maxWidth: 220 }}>
-              {matches.length > 0 ? matches.slice(0, 2).map((match) => (
+              {!strategyContextLoaded ? <Typography variant="body2" color="text.secondary">Not loaded</Typography> : matches.length > 0 ? matches.slice(0, 2).map((match) => (
                 <Chip key={match.strategyCode} size="small" color="success" variant="outlined" label={match.strategyCode} />
               )) : <Chip size="small" variant="outlined" label="No match" />}
               {matches.length > 2 && <Chip size="small" label={`+${matches.length - 2}`} />}
@@ -175,7 +177,9 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
         return (
           <Tooltip title={<BlockedStrategyDetails signal={signal} />} arrow>
             <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', maxWidth: 180 }}>
-              {blocked.length > 0 ? (
+              {!strategyContextLoaded ? (
+                <Typography variant="body2" color="text.secondary">Not loaded</Typography>
+              ) : blocked.length > 0 ? (
                 <Chip size="small" color="warning" variant="outlined" label={`${blocked.length} blocked`} />
               ) : (
                 <Chip size="small" variant="outlined" label="None" />
@@ -251,8 +255,93 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
         onSortChange={onSortChange}
         onPageChange={onPageChange}
         onPageSizeChange={onPageSizeChange}
-        onRowClick={(signal) => navigate(`/research/stocks/${signal.instrument_id}`)}
+        onRowClick={(signal) => setSelectedSignal(signal)}
       />
+      <Drawer
+        anchor="right"
+        open={Boolean(selectedSignal)}
+        onClose={() => setSelectedSignal(null)}
+        PaperProps={{ sx: { width: { xs: '100%', sm: 560 }, maxWidth: '100%', p: 3 } }}
+      >
+        {selectedSignal && (
+          <Stack spacing={2}>
+            <Box>
+              <Typography variant="overline" color="text.secondary">Raw Signal Diagnostics</Typography>
+              <Typography variant="h5" fontWeight={700}>{selectedSignal.symbol}</Typography>
+              <Typography variant="body2" color="text.secondary">{selectedSignal.company_name || 'Unknown company'}</Typography>
+            </Box>
+
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+              <StatusBadge label={selectedSignal.direction} />
+              <StatusBadge label={selectedSignal.confidence} />
+              <StatusBadge label={selectedSignal.data_status} />
+              <Chip size="small" variant="outlined" label={`Score ${selectedSignal.score}`} />
+            </Stack>
+
+            <Typography variant="body2">{selectedSignal.explanation}</Typography>
+
+            <Divider />
+
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>Triggered Factors</Typography>
+              {selectedSignal.triggered_signals.length ? selectedSignal.triggered_signals.map((item) => (
+                <Typography key={`${item.category}-${item.code}`} variant="body2" color="text.secondary">- {item.label} ({item.category})</Typography>
+              )) : <Typography variant="body2" color="text.secondary">No triggered factors.</Typography>}
+            </Box>
+
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>Negative Factors</Typography>
+              {selectedSignal.negative_signals.length ? selectedSignal.negative_signals.map((item) => (
+                <Typography key={`${item.category}-${item.code}`} variant="body2" color="text.secondary">- {item.label} ({item.category})</Typography>
+              )) : <Typography variant="body2" color="text.secondary">No negative factors.</Typography>}
+            </Box>
+
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>Warnings</Typography>
+              {selectedSignal.warnings?.length ? selectedSignal.warnings.map((item) => (
+                <Typography key={item} variant="body2" color="text.secondary">- {item}</Typography>
+              )) : <Typography variant="body2" color="text.secondary">No warnings.</Typography>}
+            </Box>
+
+            <Divider />
+
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>Strategy Context</Typography>
+              {!strategyContextLoaded ? (
+                <Typography variant="body2" color="text.secondary">Strategy context is not loaded for this table view. Enable "Show strategy context" to inspect matches and blockers.</Typography>
+              ) : (
+                <Stack spacing={1.5}>
+                  <Box>
+                    <Typography variant="body2" fontWeight={700}>Matches</Typography>
+                    {selectedSignal.strategyMatches?.length ? selectedSignal.strategyMatches.map((match) => (
+                      <Box key={`${match.strategyCode}-${match.strategyVersion}`} sx={{ mt: 0.75 }}>
+                        <Typography variant="body2">{match.strategyCode} v{match.strategyVersion} | {match.decision} | Score {match.score}</Typography>
+                        {match.reasons.slice(0, 4).map((reason) => <Typography key={reason} variant="caption" display="block" color="text.secondary">- {reason}</Typography>)}
+                      </Box>
+                    )) : <Typography variant="body2" color="text.secondary">No Strategy Framework match for this raw signal.</Typography>}
+                  </Box>
+                  <Box>
+                    <Typography variant="body2" fontWeight={700}>Blocked Strategies</Typography>
+                    {selectedSignal.blockedStrategies?.length ? selectedSignal.blockedStrategies.map((blocked) => (
+                      <Box key={`${blocked.strategyCode}-${blocked.strategyVersion}`} sx={{ mt: 0.75 }}>
+                        <Typography variant="body2">{blocked.strategyCode} v{blocked.strategyVersion}</Typography>
+                        <Typography variant="caption" display="block" color="text.secondary">{blocked.reason}</Typography>
+                      </Box>
+                    )) : <Typography variant="body2" color="text.secondary">No blocked Strategy Framework matches.</Typography>}
+                  </Box>
+                </Stack>
+              )}
+            </Box>
+
+            <Divider />
+
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+              <Button variant="outlined" onClick={() => navigate(`/research/stocks/${selectedSignal.instrument_id}`)}>Open Research</Button>
+              <Button variant="contained" onClick={() => navigate(`/strategy?instrumentId=${selectedSignal.instrument_id}`)}>Review Strategy Decision</Button>
+            </Stack>
+          </Stack>
+        )}
+      </Drawer>
       {portfolioSignal && (
         <AddSignalToPortfolioDialog open signal={portfolioSignal} onClose={() => setPortfolioSignal(null)} onAdded={(portfolioId) => setSuccessPortfolioId(portfolioId)} />
       )}

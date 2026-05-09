@@ -217,6 +217,16 @@ The UI includes:
 | Benchmark missing | HIGH | service, metrics, UI | No baseline comparison. | Compare against regional index or honest fallback. | Added equal-weight universe fallback; index lookup remains future work. | Partial |
 | Data coverage underused | MEDIUM | service, rating inputs | Coverage existed but did not drive enough warnings. | Coverage should affect diagnostics and rating caps. | Add `dataCoveragePercent` and warnings. | Yes |
 
+## Backtesting Scope Audit - 2026-05-09
+
+| Finding | Severity | Affected files | Current behavior | Expected behavior | Fix |
+| --- | --- | --- | --- | --- | --- |
+| Symbol universe lookup could ignore market scope. | HIGH | service, frontend config | Symbol backtests searched instruments without `region`/`assetType`, so a scoped IN/STOCK run could resolve the wrong instrument when symbols overlap or search results are broad. | Symbol resolution must pass the global scope and prefer exact source/provider/display symbol matches. | Symbol lookup now sends `region` and `assetType` and matches exact symbol/display/provider/source candidates before falling back. |
+| Custom Rules UI placed scope inside `universe`. | HIGH | frontend config | Backend ignored nested `universe.region`/`universe.assetType`, so custom `ALL` runs were not reliably scoped. | Scope must be top-level on `BacktestStrategyConfig`. | Custom runs now send top-level `region` and `assetType`; backend also preserves legacy nested values as fallback. |
+| `ALL` universe cap was not visible in results. | MEDIUM | service, UI | The module intentionally capped `ALL` to the first 50 instruments, but users could read results as if the whole market was tested. | Bounded runtime safety should be explicit in diagnostics. | Data coverage now returns `universeTotalAvailable`, `universeCapped`, `universeCap`, and warning text when capped. |
+| Saved run results could appear outside current scope. | MEDIUM | frontend results | An old/legacy saved run could remain selected while the header showed the current IN/STOCK scope. | Visible default results should match the active market scope. | The UI now defaults to saved runs whose config matches the current region/asset type and prompts for a new scoped run when none exist. |
+| INR scope displayed USD currency. | LOW | frontend results | IN backtests displayed capital and P&L with USD formatting. | Money display should be region-aware. | UI now formats IN runs as INR and US/global runs as USD. |
+
 ## Realistic Assumptions
 
 Backtest configs support:
@@ -248,7 +258,7 @@ Current behavior uses an honest equal-weight buy-and-hold baseline over the reso
 - No tax lots.
 - No portfolio optimization.
 - No historical SignalResult archive; signal rules use a price-derived proxy.
-- Universe `ALL` is capped to the first available instruments for MVP runtime safety.
+- Universe `ALL` is capped to the first 50 available instruments for MVP runtime safety. Results expose `universeCapped`, `universeCap`, and `universeTotalAvailable` so users do not mistake a bounded run for a full-universe simulation.
 - Currency conversion is not applied across instruments.
 - Registered strategy historical context is price-derived and does not reconstruct every historical market-context or smart-money snapshot yet.
 - Readiness labels are research/paper-test oriented only; no live-trading readiness is displayed.

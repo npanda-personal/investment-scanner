@@ -190,8 +190,8 @@ export class StrategyDecisionEngineService {
     return this.repository.funnelDiagnostics(query);
   }
 
-  async exits(portfolioId?: string, region?: string) {
-    return this.repository.exits(portfolioId, region);
+  async exits(portfolioId?: string, region?: string, assetType?: string) {
+    return this.repository.exits(portfolioId, region, assetType);
   }
 
   async watchlist(watchlistId: string) {
@@ -481,7 +481,7 @@ export class StrategyDecisionEngineService {
     const blockers = [...result.blockers];
 
     if (ctx.gate.marketGate === 'CLOSED' && result.strategyCode !== 'DEFENSIVE_EXIT') {
-      if (!blockers.some((item) => item.includes('Market gate'))) blockers.push('Market gate is closed; no new long trades.');
+      if (!blockers.some((item) => item.includes('Market gate'))) blockers.push('Market gate is closed; no new long candidates.');
       mapped.decision = 'AVOID';
       mapped.action = 'AVOID_NEW_ENTRY';
     } else if (ctx.gate.marketGate === 'SELECTIVE' && result.strategyCode !== 'DEFENSIVE_EXIT') {
@@ -624,7 +624,7 @@ export class StrategyDecisionEngineService {
       warnings.push('Market gate is SELECTIVE; requiring higher quality.');
     } else if (ctx.gate.marketGate === 'CLOSED') {
       marketContextScore = 0;
-      blockers.push('Market gate is CLOSED; no new long trades.');
+      blockers.push('Market gate is CLOSED; no new long candidates.');
     } else {
       marketContextScore = 5;
       dataGaps.push('Market gate status is UNKNOWN.');
@@ -1009,8 +1009,28 @@ export class StrategyDecisionEngineService {
   ): Promise<{ instrumentIds: string[]; totalCount: number; rawSignalsByInstrumentId: Map<string, SignalResultDto> }> {
     if (request.instrumentId) return { instrumentIds: [request.instrumentId], totalCount: 1, rawSignalsByInstrumentId: new Map() };
     if (request.symbol) {
-      const res = await this.marketDataService.listInstruments({ search: request.symbol, pageSize: 1, region: request.region });
-      const match = res.instruments.find(i => i.symbol === request.symbol);
+      const res = await this.marketDataService.listInstruments({
+        search: request.symbol,
+        pageSize: 5,
+        region: request.region,
+        assetType: request.assetType,
+      });
+      const requested = request.symbol.toUpperCase();
+      const match = res.instruments.find((i) => {
+        const instrument = i as any;
+        const candidates = [
+          instrument.symbol,
+          instrument.display_symbol,
+          instrument.displaySymbol,
+          instrument.provider_symbol,
+          instrument.providerSymbol,
+          instrument.source_symbol,
+          instrument.sourceSymbol,
+        ]
+          .filter(Boolean)
+          .map((value) => String(value).toUpperCase());
+        return candidates.includes(requested);
+      }) || res.instruments[0];
       return { instrumentIds: match ? [match.id] : [], totalCount: match ? 1 : 0, rawSignalsByInstrumentId: new Map() };
     }
     if (request.portfolioId) {

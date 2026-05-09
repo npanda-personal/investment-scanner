@@ -170,7 +170,33 @@ The immediate bottleneck is:
 
 # 3. Next Phase Roadmap — Intelligence & Accuracy First
 
-This is the recommended next build sequence.
+This is the recommended capability sequence. Execution should still be dependency-first: harden the least-dependent upstream modules before fixing modules that rely on their outputs. In practice, Market Data Foundation and Data Quality Engine should be verified before raw Signal Generation; raw Signal Generation should be verified before Signal Quality, Calibration, Strategy Decision, Research Hub, and Trade Plans.
+
+---
+
+## Phase A0 — Foundation And Raw Signal Hardening
+
+### Priority
+
+Current execution priority.
+
+### Objective
+
+Make the upstream chain reliable before measuring or calibrating outcomes:
+
+```text
+Market Data Foundation -> Data Quality Engine -> Signal Generation Engine
+```
+
+### Why This Comes First
+
+Signal Quality and Calibration are only meaningful if the catalog, price history, data-readiness gates, and raw signal rows are already region-scoped, batch-safe, idempotent, and understandable in the UI.
+
+### Done When
+
+- Market Data Foundation provides clean region/asset-scoped instruments and prices.
+- Data Quality Engine exposes coverage, liquidity, and signal-readiness diagnostics.
+- Signal Generation Engine runs bounded batches, respects data-quality gates, stores idempotent raw signals, and keeps strategy/candidate language separate.
 
 ---
 
@@ -1072,13 +1098,13 @@ Support team and enterprise workflows later.
 
 ## Do Now
 
-1. Signal Quality Lab
-2. Signal Calibration Engine
-3. Data Coverage & Quality Expansion
-4. Earnings & Events Intelligence
-5. Risk Engine & Exposure Analytics
-6. Advanced Screener / Discovery Engine
-7. Research Evidence / Thesis Engine
+1. Finish dependency-first hardening of Market Data Foundation, Data Quality Engine, and Signal Generation Engine.
+2. Signal Quality Lab.
+3. Signal Calibration Engine.
+4. Earnings & Events Intelligence.
+5. Risk Engine & Exposure Analytics.
+6. Advanced Screener / Discovery Engine.
+7. Research Evidence / Thesis Engine.
 
 ## Do Next Phase
 
@@ -1105,11 +1131,13 @@ Support team and enterprise workflows later.
 
 # 6. Strict Product Owner Recommendation
 
-The next implementation should be:
+The next implementation should follow the dependency chain, not only feature ambition:
 
-## Epic 15 — Signal Quality Lab
+```text
+Market Data Foundation -> Data Quality Engine -> Signal Generation Engine -> Signal Quality Lab -> Signal Calibration Engine
+```
 
-Do not build more investor-facing features until the platform can answer:
+Do not build more investor-facing decision features until the platform can answer:
 
 - Which signals worked?
 - Which signals failed?

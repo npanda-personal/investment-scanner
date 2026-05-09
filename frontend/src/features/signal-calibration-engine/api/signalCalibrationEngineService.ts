@@ -10,7 +10,13 @@ export async function fetchTopCalibratedSignals(params: Record<string, any> = {}
 
 export async function runSignalCalibration(input: Record<string, any>): Promise<CalibrationRunResponse> {
   const response = await axios.post<CalibrationRunResponse>(`${API_BASE}/run`, input);
-  return response.data;
+  return {
+    ...response.data,
+    calibratedCount: response.data.calibratedCount ?? 0,
+    passthroughCount: response.data.passthroughCount ?? Math.max(0, (response.data.generated ?? 0) - (response.data.calibratedCount ?? 0)),
+    skippedCount: response.data.skippedCount ?? response.data.skipped ?? 0,
+    failedCount: response.data.failedCount ?? response.data.errors?.length ?? 0,
+  };
 }
 
 export async function fetchCalibrationComparison(instrumentId: string, region?: string, assetType?: string, horizon?: string): Promise<CalibrationComparison> {
@@ -27,4 +33,3 @@ export async function fetchCalibrationHealth(): Promise<any> {
   const response = await axios.get(`${API_BASE}/health`);
   return response.data;
 }
-

@@ -11,7 +11,7 @@ export class DataQualityEngineController {
   };
 
   instruments = async (req: Request, res: Response) => {
-    try { return res.json({ items: await this.service.list(parseDataQualityQuery(req.query)) }); }
+    try { return res.json(await this.service.list(parseDataQualityQuery(req.query))); }
     catch (error) { return this.error(res, error, 'Failed to list data quality evaluations'); }
   };
 
@@ -28,12 +28,12 @@ export class DataQualityEngineController {
   };
 
   signalReadiness = async (req: Request, res: Response) => {
-    try { return res.json({ items: await this.service.signalReadiness(parseDataQualityQuery(req.query)) }); }
+    try { return res.json(await this.service.signalReadiness(parseDataQualityQuery(req.query))); }
     catch (error) { return this.error(res, error, 'Failed to load signal readiness'); }
   };
 
   liquidity = async (req: Request, res: Response) => {
-    try { return res.json({ items: await this.service.liquidity(parseDataQualityQuery(req.query)) }); }
+    try { return res.json(await this.service.liquidity(parseDataQualityQuery(req.query))); }
     catch (error) { return this.error(res, error, 'Failed to load liquidity evaluations'); }
   };
 

@@ -82,4 +82,57 @@ describe('StrategyDecisionEngineRepository', () => {
     expect(result.entryZone?.type).toBe('BREAKOUT');
     expect(result.scoreBreakdown?.total).toBe(70);
   });
+
+  it('uses safe sort fallback and includes legacy EQUITY rows for STOCK scope', async () => {
+    const generatedAt = new Date('2026-05-06T18:53:36.829Z');
+    const count = jest.fn().mockResolvedValue(1);
+    const findMany = jest.fn().mockResolvedValue([{
+      id: 'decision-1',
+      ...makeDecision(),
+      entryZone: JSON.stringify(makeDecision().entryZone),
+      generatedAt,
+    }]);
+    const repository = new StrategyDecisionEngineRepository({
+      strategyDecisionResult: { count, findMany },
+    } as any);
+
+    const result = await repository.candidates({
+      region: 'IN',
+      assetType: 'STOCK',
+      sortBy: 'notAColumn',
+      sortDirection: 'asc',
+    });
+    const countCall = count.mock.calls[0][0];
+    const findCall = findMany.mock.calls[0][0];
+
+    expect(result.total).toBe(1);
+    expect(findCall.orderBy).toEqual({ generatedAt: 'desc' });
+    expect(countCall.where.stock.AND).toEqual(expect.arrayContaining([
+      expect.objectContaining({ assetType: { in: ['STOCK', 'EQUITY'] } }),
+    ]));
+  });
+
+  it('applies asset scope to exit-risk decisions', async () => {
+    const generatedAt = new Date('2026-05-06T18:53:36.829Z');
+    const findMany = jest.fn().mockResolvedValue([{
+      id: 'decision-1',
+      ...makeDecision(),
+      strategy: 'DEFENSIVE_EXIT',
+      decision: 'REDUCE_RISK',
+      entryZone: null,
+      generatedAt,
+    }]);
+    const repository = new StrategyDecisionEngineRepository({
+      strategyDecisionResult: { findMany },
+    } as any);
+
+    await repository.exits(undefined, 'IN', 'STOCK');
+    const findCall = findMany.mock.calls[0][0];
+
+    expect(findCall.where.stock.AND).toEqual(expect.arrayContaining([
+      expect.objectContaining({ assetType: { in: ['STOCK', 'EQUITY'] } }),
+    ]));
+    expect(findCall.where.strategy).toBe('DEFENSIVE_EXIT');
+    expect(findCall.where.decision).toEqual({ in: ['EXIT_CANDIDATE', 'REDUCE_RISK'] });
+  });
 });

@@ -774,11 +774,19 @@ model StrategyPerformanceSummary {
   tradeCount            Int
   averageHoldingDays    Float?
   exposurePercent       Float?
+  benchmarkTotalReturn  Float?
+  benchmarkCagr         Float?
+  excessReturn          Float?
+  excessCagr            Float?
+  endOfTestExitPercent  Float?
+  dataCoveragePercent   Float?
   ratingScore           Int
   ratingGrade           String
   automationEligibility String
   readinessLabel        String   @default("RESEARCH_ONLY")
   ratingReasons         Json?
+  ratingWarnings        Json?
+  ratingCapsApplied     Json?
   backtestRunId         String?
   generatedAt           DateTime @default(now())
   createdAt             DateTime @default(now())

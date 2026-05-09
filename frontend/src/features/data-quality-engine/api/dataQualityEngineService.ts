@@ -1,18 +1,18 @@
 import axios from 'axios';
-import type { DataQualityEvaluateResponse, DataQualityEvaluation, DataQualityFilters, DataQualitySummary } from '../types';
+import type { DataQualityEvaluateResponse, DataQualityEvaluation, DataQualityFilters, DataQualityListResponse, DataQualitySummary } from '../types';
 
 const API_BASE = '/api/v1/data-quality';
 
-export async function fetchDataQualitySummary(params: { region?: string } = {}): Promise<DataQualitySummary> {
+export async function fetchDataQualitySummary(params: { region?: string; assetType?: string } = {}): Promise<DataQualitySummary> {
   const response = await axios.get<DataQualitySummary>(`${API_BASE}/summary`, { params });
   return response.data;
 }
 
-export async function fetchDataQualityEvaluations(filters: DataQualityFilters = {}): Promise<DataQualityEvaluation[]> {
-  const response = await axios.get<{ items: DataQualityEvaluation[] }>(`${API_BASE}/instruments`, {
-    params: { ...filters, limit: 100 },
+export async function fetchDataQualityEvaluations(filters: DataQualityFilters = {}): Promise<DataQualityListResponse> {
+  const response = await axios.get<DataQualityListResponse>(`${API_BASE}/instruments`, {
+    params: filters,
   });
-  return response.data.items;
+  return response.data;
 }
 
 export async function fetchDataQualityDiagnostics(instrumentId: string): Promise<DataQualityEvaluation> {

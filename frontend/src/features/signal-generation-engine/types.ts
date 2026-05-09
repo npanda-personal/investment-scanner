@@ -135,6 +135,8 @@ export interface SignalRunResponse {
     afterFilter: number;
     excludedByDataQuality: number;
     missingQualityEvaluationCount: number;
+    eligibleInstrumentCount?: number;
+    attemptedGenerationCount?: number;
   };
   results: SignalResult[];
   generated_at: string;
@@ -161,4 +163,6 @@ export interface SignalRunResponse {
   };
   latestGeneratedAt?: string | null;
   durationMs?: number;
+  eligibleInstrumentCount?: number;
+  attemptedGenerationCount?: number;
 }

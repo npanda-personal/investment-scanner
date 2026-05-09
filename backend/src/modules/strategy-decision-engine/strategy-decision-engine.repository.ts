@@ -123,7 +123,7 @@ export class StrategyDecisionEngineRepository {
     const total = await this.db.strategyDecisionResult.count({ where });
     const records = await this.db.strategyDecisionResult.findMany({
       where,
-      orderBy: query.sortBy ? { [query.sortBy]: query.sortDirection || 'desc' } : { generatedAt: 'desc' },
+      orderBy: this.resolveOrderBy(query.sortBy, query.sortDirection),
       take: query.limit || 25,
       skip: query.offset || 0,
     });
@@ -152,10 +152,10 @@ export class StrategyDecisionEngineRepository {
     return { results: records.map((record) => this.toDto(record)), total: records.length };
   }
 
-  async exits(portfolioId?: string, region?: string): Promise<StrategyDecisionDto[]> {
+  async exits(portfolioId?: string, region?: string, assetType?: string): Promise<StrategyDecisionDto[]> {
     const records = await this.db.strategyDecisionResult.findMany({
       where: {
-        ...this.buildScopeWhere(region),
+        ...this.buildScopeWhere(region, assetType),
         portfolioId,
         strategy: 'DEFENSIVE_EXIT',
         decision: { in: ['EXIT_CANDIDATE', 'REDUCE_RISK'] },
@@ -224,8 +224,20 @@ export class StrategyDecisionEngineRepository {
     const stockFilters: Prisma.StockWhereInput[] = [];
     const regionFilter = resolveMarketRegionFilter(region);
     if (Object.keys(regionFilter).length > 0) stockFilters.push(regionFilter);
-    if (assetType) stockFilters.push({ assetType });
+    if (assetType) stockFilters.push(this.buildAssetTypeFilter(assetType));
     return stockFilters.length > 0 ? { stock: { AND: stockFilters } } : {};
+  }
+
+  private buildAssetTypeFilter(assetType: string): Prisma.StockWhereInput {
+    const normalized = assetType.trim().toUpperCase();
+    if (normalized === 'STOCK') return { assetType: { in: ['STOCK', 'EQUITY'] } };
+    return { assetType: normalized };
+  }
+
+  private resolveOrderBy(sortBy?: string, sortDirection?: 'asc' | 'desc'): Prisma.StrategyDecisionResultOrderByWithRelationInput {
+    const direction = sortDirection === 'asc' ? 'asc' : 'desc';
+    const allowedSorts = new Set(['generatedAt', 'decisionScore', 'strategy', 'decision', 'confidence', 'marketGate', 'symbol']);
+    return allowedSorts.has(sortBy || '') ? { [sortBy as string]: direction } : { generatedAt: 'desc' };
   }
 
   private serializeEntryZone(value: StrategyDecisionDto['entryZone']): string | null {

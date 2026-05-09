@@ -128,6 +128,7 @@ export interface CalibrationRunResponse {
   nextOffset: number | null;
   hasMore: boolean;
   calibratedCount: number;
+  passthroughCount: number;
   skippedCount: number;
   failedCount: number;
   outOfScopeSkipped?: number;

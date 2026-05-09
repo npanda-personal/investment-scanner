@@ -13,6 +13,12 @@ type BatchProgressBarProps = {
   skippedCount?: number;
   failedCount?: number;
   noOpCount?: number;
+  evaluatedCount?: number;
+  unevaluatedCount?: number;
+  missingPriceHistoryCount?: number;
+  calibratedCount?: number;
+  passthroughCount?: number;
+  outOfScopeSkipped?: number;
   warningsCount?: number;
   error?: string | null;
   complete?: boolean;
@@ -33,6 +39,12 @@ export function BatchProgressBar({
   skippedCount,
   failedCount,
   noOpCount,
+  evaluatedCount,
+  unevaluatedCount,
+  missingPriceHistoryCount,
+  calibratedCount,
+  passthroughCount,
+  outOfScopeSkipped,
   warningsCount,
   error,
   complete,
@@ -48,6 +60,12 @@ export function BatchProgressBar({
     skippedCount !== undefined ? `Skipped ${skippedCount}` : null,
     failedCount !== undefined ? `Failed ${failedCount}` : null,
     noOpCount !== undefined ? `No-op ${noOpCount}` : null,
+    evaluatedCount !== undefined ? `Evaluated ${evaluatedCount}` : null,
+    unevaluatedCount !== undefined ? `Not yet evaluable ${unevaluatedCount}` : null,
+    missingPriceHistoryCount !== undefined ? `Missing price history ${missingPriceHistoryCount}` : null,
+    calibratedCount !== undefined ? `Applied ${calibratedCount}` : null,
+    passthroughCount !== undefined ? `Passthrough ${passthroughCount}` : null,
+    outOfScopeSkipped !== undefined ? `Out of scope ${outOfScopeSkipped}` : null,
   ].filter(Boolean).join(', ');
 
   return (

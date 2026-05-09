@@ -116,6 +116,9 @@ export interface BacktestMetrics {
   } | null;
   dataCoverage?: {
     instrumentsConsidered: number;
+    universeTotalAvailable?: number;
+    universeCapped?: boolean;
+    universeCap?: number;
     instrumentsWithEnoughHistory: number;
     instrumentsExcludedForHistory: number;
     instrumentsExcludedForDataQuality: number;

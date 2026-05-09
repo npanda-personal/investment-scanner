@@ -218,6 +218,8 @@ describe('signal calibration engine service', () => {
     const setup = service({ qualityService: { summary: jest.fn().mockRejectedValue(new Error('quality offline')) } });
     const result = await setup.instance.run({ batchSize: 1, offset: 0, region: 'IN', assetType: 'STOCK' });
     expect(result.failedCount).toBe(0);
+    expect(result.passthroughCount).toBe(1);
+    expect(result.skippedCount).toBe(0);
     expect(result.warnings.join(' ')).toContain('Signal Quality diagnostics unavailable');
     expect(result.results[0].calibratedConfidence).toBe('INSUFFICIENT_SAMPLE');
   });
@@ -239,8 +241,28 @@ describe('signal calibration engine service', () => {
       nextOffset: 4,
       hasMore: true,
       calibratedCount: 2,
+      passthroughCount: 0,
+      skippedCount: 0,
       failedCount: 0,
     });
+  });
+
+  it('loads Signal Quality grouping metrics once per batch instead of once per signal', async () => {
+    const setup = service({
+      signalService: {
+        latestSignalUniverse: jest.fn().mockResolvedValue([
+          rawSignal({ instrument_id: 'stock-1' }),
+          rawSignal({ instrument_id: 'stock-2', symbol: 'MSFT' }),
+          rawSignal({ instrument_id: 'stock-3', symbol: 'GOOG' }),
+        ]),
+        latestSignalUniverseCount: jest.fn().mockResolvedValue(3),
+      },
+    });
+    await setup.instance.run({ batchSize: 3, offset: 0, region: 'IN', assetType: 'STOCK' });
+    expect(setup.qualityService.byType).toHaveBeenCalledTimes(1);
+    expect(setup.qualityService.byScoreBucket).toHaveBeenCalledTimes(1);
+    expect(setup.qualityService.bySector).toHaveBeenCalledTimes(1);
+    expect(setup.qualityService.noisy).toHaveBeenCalledTimes(1);
   });
 
   it('keeps single instrument calibration behavior working', async () => {
@@ -266,5 +288,34 @@ describe('signal calibration engine service', () => {
     const result = await setup.instance.run({ batchSize: 2, offset: 0 });
     expect(result).toMatchObject({ processedCount: 2, calibratedCount: 1, failedCount: 1, hasMore: false });
     expect(result.warnings[0]).toContain('write failed');
+  });
+
+  it('does not persist comparison for instruments outside requested market scope', async () => {
+    const setup = service({
+      repository: {
+        instrumentInScope: jest.fn().mockResolvedValue(null),
+      },
+    });
+    const result = await setup.instance.compare('stock-1', 'IN', 'STOCK', '20D');
+    expect(result).toBeNull();
+    expect(setup.repository.create).not.toHaveBeenCalled();
+  });
+
+  it('counts single-instrument out-of-scope calibration as skipped, not passthrough', async () => {
+    const setup = service({
+      repository: {
+        instrumentInScope: jest.fn().mockResolvedValue(null),
+      },
+    });
+    const result = await setup.instance.run({ instrumentId: 'stock-1', region: 'IN', assetType: 'STOCK' });
+    expect(result).toMatchObject({
+      processedCount: 1,
+      calibratedCount: 0,
+      passthroughCount: 0,
+      skippedCount: 1,
+      outOfScopeSkipped: 1,
+      failedCount: 0,
+    });
+    expect(setup.repository.create).not.toHaveBeenCalled();
   });
 });

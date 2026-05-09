@@ -7,6 +7,7 @@ const first = (value: unknown) => Array.isArray(value) ? value[0] : value;
 
 export function parseDataQualityQuery(query: Record<string, unknown>): DataQualityQuery {
   return {
+    search: parseString(first(query.search)),
     status: parseEnum(first(query.status), COVERAGE_STATUSES),
     readinessStatus: parseEnum(first(query.readinessStatus), READINESS_STATUSES),
     liquidityStatus: parseEnum(first(query.liquidityStatus), LIQUIDITY_STATUSES),
@@ -14,6 +15,10 @@ export function parseDataQualityQuery(query: Record<string, unknown>): DataQuali
     country: parseString(first(query.country)),
     region: parseString(first(query.region)),
     assetType: parseString(first(query.assetType)),
+    eligibleForSignals: parseBoolean(first(query.eligibleForSignals)),
+    eligibleForBacktesting: parseBoolean(first(query.eligibleForBacktesting)),
+    sortBy: parseString(first(query.sortBy)),
+    sortOrder: parseSortOrder(first(query.sortOrder)),
     minCoverageScore: clampNumber(first(query.minCoverageScore), undefined, 0, 100),
     minReadinessScore: clampNumber(first(query.minReadinessScore), undefined, 0, 100),
     limit: clampInt(first(query.limit), 100, 1, 500),
@@ -45,6 +50,19 @@ function parseEnum<T extends string>(value: unknown, allowed: T[]): T | undefine
 
 function parseString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function parseBoolean(value: unknown): boolean | undefined {
+  if (value === true || value === false) return value;
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'true' || normalized === '1' || normalized === 'yes') return true;
+  if (normalized === 'false' || normalized === '0' || normalized === 'no') return false;
+  return undefined;
+}
+
+function parseSortOrder(value: unknown): 'asc' | 'desc' | undefined {
+  const normalized = String(value || '').trim().toLowerCase();
+  return normalized === 'asc' || normalized === 'desc' ? normalized : undefined;
 }
 
 function clampInt(value: unknown, fallback: number, min: number, max: number): number {

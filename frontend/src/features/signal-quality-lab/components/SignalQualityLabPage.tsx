@@ -11,11 +11,13 @@ import {
   MenuItem,
   Paper,
   Stack,
+  Tab,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableRow,
+  Tabs,
   TextField,
   Tooltip,
   Typography,
@@ -26,13 +28,16 @@ import {
 import { Link } from 'react-router-dom';
 import { fetchSignalHistory, fetchSignalOutcomes, recalculateSignalQuality } from '../api/signalQualityLabService';
 import { useSignalQualityLab } from '../hooks';
-import { InstrumentSearchSelect, PageHeader } from '@/shared/components';
+import { BatchProgressBar, FilterBar, InstrumentSearchSelect, PageHeader } from '@/shared/components';
+import { useBatchRunner } from '@/shared/hooks';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import type { V1Instrument } from '@/features/market-data-foundation';
 import type { QualityFilters, QualityHorizon, QualityMetricGroup, SignalHistoryItem, SignalOutcomeSet, SignalTypePerformance } from '../types';
+import { signal_quality_lab_batch_request_workers_count, signal_quality_lab_batch_size } from '../config';
 
 const horizons: QualityHorizon[] = ['1D', '5D', '10D', '20D', '60D'];
-const DEFAULT_BATCH_SIZE = 25;
+const qualityTabs = ['overview', 'performance', 'noise', 'instrument'] as const;
+type QualityTab = typeof qualityTabs[number];
 const percent = (value: number | null | undefined) => value === null || value === undefined ? 'N/A' : `${(value * 100).toFixed(2)}%`;
 const number = (value: number | null | undefined) => value === null || value === undefined ? 'N/A' : value.toLocaleString();
 const activeFilterLabels = (filters: QualityFilters) => [
@@ -97,15 +102,16 @@ const MetricTable: React.FC<{ title: string; rows: (QualityMetricGroup | SignalT
 
 const SignalQualityLabPage: React.FC = () => {
   const [horizon, setHorizon] = useState<QualityHorizon>('20D');
+  const [activeTab, setActiveTab] = useState<QualityTab>('overview');
   const [filters, setFilters] = useState<QualityFilters>({});
   const [selectedInstrument, setSelectedInstrument] = useState<V1Instrument | null>(null);
   const [history, setHistory] = useState<SignalHistoryItem[]>([]);
   const [outcomes, setOutcomes] = useState<SignalOutcomeSet[]>([]);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
-  const [recalculating, setRecalculating] = useState(false);
   const { scope } = useMarketScope();
   const { summary, byType, bySector, byRegime, byDataQuality, noisy, loading, error, reload } = useSignalQualityLab(horizon, filters);
+  const batchRunner = useBatchRunner();
   const diagnostics = summary?.evaluationDiagnostics;
   const availability = summary?.horizonAvailability;
   const activeFilters = activeFilterLabels(filters);
@@ -114,8 +120,8 @@ const SignalQualityLabPage: React.FC = () => {
     setFormError(null);
     try {
       const [nextHistory, nextOutcomes] = await Promise.all([
-        fetchSignalHistory(selectedInstrument?.id || ''),
-        fetchSignalOutcomes(selectedInstrument?.id || ''),
+        fetchSignalHistory(selectedInstrument?.id || '', horizon, filters, { region: scope.region, assetType: scope.assetType }),
+        fetchSignalOutcomes(selectedInstrument?.id || '', horizon, filters, { region: scope.region, assetType: scope.assetType }),
       ]);
       setHistory(nextHistory);
       setOutcomes(nextOutcomes);
@@ -127,30 +133,22 @@ const SignalQualityLabPage: React.FC = () => {
   const recalculate = async () => {
     setFormError(null);
     setActionMessage(null);
-    setRecalculating(true);
-    let offset = 0;
-    let batch = 0;
-    let processedTotal = 0;
     try {
-      while (true) {
-        const result = await recalculateSignalQuality({ batchSize: DEFAULT_BATCH_SIZE, offset, horizon, region: scope.region, assetType: scope.assetType });
-        batch += 1;
-        processedTotal = result.offset + result.processedCount;
-        setActionMessage(
-          `Batch ${batch} complete. Processed ${Math.min(processedTotal, result.totalCount)} / ${result.totalCount} signal records. ` +
-          `Evaluated ${result.evaluatedInBatch}, insufficient future price ${result.insufficientFuturePriceInBatch}, missing price history ${result.missingPriceHistoryInBatch}. ${result.message}`
-        );
+      const result = await batchRunner.run({
+        batchSize: signal_quality_lab_batch_size,
+        parallelism: signal_quality_lab_batch_request_workers_count,
+        runBatch: async ({ offset, batchSize }) => {
+          const response = await recalculateSignalQuality({ batchSize, offset, horizon, region: scope.region, assetType: scope.assetType });
+          await reload();
+          return response;
+        },
+      });
+      if (result) {
         await reload();
-        if (!result.hasMore || result.nextOffset === null) {
-          setActionMessage(`Signal quality recalculation complete. Processed ${Math.min(processedTotal, result.totalCount)} / ${result.totalCount} signal records. Outcomes are calculated on demand.`);
-          break;
-        }
-        offset = result.nextOffset;
+        setActionMessage(`Signal quality refresh complete. Processed ${result.aggregate.processedCount} / ${result.aggregate.totalCount ?? result.aggregate.processedCount} signal records. Evaluated ${result.aggregate.evaluatedCount}, not yet evaluable ${result.aggregate.unevaluatedCount}, missing price history ${result.aggregate.missingPriceHistoryCount}. Outcomes are calculated on demand and not persisted.`);
       }
     } catch (err: any) {
       setFormError(err.response?.data?.error || err.message || 'Signal quality recalculation failed');
-    } finally {
-      setRecalculating(false);
     }
   };
 
@@ -167,10 +165,10 @@ const SignalQualityLabPage: React.FC = () => {
           <Button
             variant="outlined"
             onClick={recalculate}
-            disabled={recalculating}
-            startIcon={recalculating ? <CircularProgress size={16} /> : undefined}
+            disabled={batchRunner.running}
+            startIcon={batchRunner.running ? <CircularProgress size={16} /> : undefined}
           >
-            {recalculating ? 'Recalculating' : 'Recalculate'}
+            {batchRunner.running ? 'Recalculating' : 'Recalculate'}
           </Button>
         }
         secondaryActions={
@@ -185,6 +183,20 @@ const SignalQualityLabPage: React.FC = () => {
 
       {(error || formError) && <Alert severity="error" sx={{ mb: 2 }}>{error || formError}</Alert>}
       {actionMessage && <Alert severity="info" sx={{ mb: 2 }}>{actionMessage}</Alert>}
+      <BatchProgressBar
+        running={batchRunner.running}
+        complete={batchRunner.complete}
+        error={batchRunner.error}
+        label="Signal quality recalculation"
+        processedCount={batchRunner.processedCount}
+        totalCount={batchRunner.totalCount}
+        batchCount={batchRunner.batchCount}
+        estimatedBatchTotal={batchRunner.totalCount ? Math.ceil(batchRunner.totalCount / signal_quality_lab_batch_size) : undefined}
+        evaluatedCount={batchRunner.evaluatedCount}
+        unevaluatedCount={batchRunner.unevaluatedCount}
+        missingPriceHistoryCount={batchRunner.missingPriceHistoryCount}
+        warningsCount={batchRunner.warnings.length}
+      />
       {summary?.dataQualityFilterSummary?.filterApplied && (
         <Alert severity="info" sx={{ mb: 2 }}>
           Data quality filter applied: {summary.dataQualityFilterSummary.totalSignalsAfterFilter} / {summary.dataQualityFilterSummary.totalSignalsBeforeFilter} signals included,
@@ -213,8 +225,8 @@ const SignalQualityLabPage: React.FC = () => {
         </Alert>
       )}
 
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
+      <Box sx={{ mb: 3 }}>
+        <FilterBar onReset={() => setFilters({})} showReset={activeFilters.length > 0}>
           <TextField select size="small" label="Readiness" value={filters.readinessStatus || ''} onChange={(event) => setFilters({ ...filters, readinessStatus: event.target.value as any })} sx={{ minWidth: 150 }}>
             <MenuItem value="">All</MenuItem>
             {['READY', 'LIMITED', 'NOT_READY'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
@@ -229,17 +241,31 @@ const SignalQualityLabPage: React.FC = () => {
           </TextField>
           <FormControlLabel control={<Checkbox checked={Boolean(filters.onlySignalReady)} onChange={(event) => setFilters({ ...filters, onlySignalReady: event.target.checked })} />} label="Only signal-ready" />
           <FormControlLabel control={<Checkbox checked={Boolean(filters.excludePoorQuality)} onChange={(event) => setFilters({ ...filters, excludePoorQuality: event.target.checked })} />} label="Exclude poor quality" />
-        </Stack>
+        </FilterBar>
+      </Box>
+
+      <Paper variant="outlined" sx={{ mb: 3 }}>
+        <Tabs
+          value={activeTab}
+          onChange={(_event, value) => setActiveTab(value)}
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{ px: 1, minHeight: 44, '& .MuiTab-root': { minHeight: 44, fontSize: 13, textTransform: 'none' } }}
+        >
+          <Tab value="overview" label="Overview" />
+          <Tab value="performance" label="Performance" />
+          <Tab value="noise" label={`Noise (${noisy.length})`} />
+          <Tab value="instrument" label="Instrument history" />
+        </Tabs>
       </Paper>
 
-      {summary && (
+      {activeTab === 'overview' && summary && (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2, mb: 3 }}>
           <MetricCard label="Total Signals" value={number(summary.totalSignals)} />
           <MetricCard label="Eligible Signals" value={number(diagnostics?.signalsAfterFilters)} />
           <MetricCard label="Evaluated Signals" value={number(summary.evaluatedSignals)} />
-          <MetricCard label="Unevaluated Signals" value={number(summary.unevaluatedSignals)} tone={summary.unevaluatedSignals > 0 ? 'warning' : undefined} />
+          <MetricCard label="Not Yet Evaluable" value={number(summary.unevaluatedSignals)} tone={summary.unevaluatedSignals > 0 ? 'warning' : undefined} />
           <MetricCard label="Missing Price History" value={number(diagnostics?.missingPriceHistoryCount)} tone={diagnostics?.missingPriceHistoryCount ? 'error' : undefined} />
-          <MetricCard label="Insufficient Future Data" value={number(diagnostics?.insufficientFuturePriceCount)} tone={diagnostics?.insufficientFuturePriceCount ? 'warning' : undefined} />
           <MetricCard label="Bullish Win Rate" value={percent(summary.overallBullishWinRate)} tone="success" />
           <MetricCard label="Bearish Win Rate" value={percent(summary.overallBearishWinRate)} tone="warning" />
           <MetricCard label="Average 5D Return" value={percent(summary.average5DReturn)} />
@@ -249,7 +275,7 @@ const SignalQualityLabPage: React.FC = () => {
         </Box>
       )}
 
-      {availability && (
+      {activeTab === 'performance' && availability && (
         <Paper sx={{ p: 2, mb: 3 }}>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'center' }}>
             <Typography variant="subtitle1" fontWeight={700}>Horizon Availability</Typography>
@@ -269,11 +295,15 @@ const SignalQualityLabPage: React.FC = () => {
         </Paper>
       )}
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '1fr 1fr' }, gap: 3, mb: 3 }}>
-        <MetricTable title="Performance by Signal Type" rows={byType} nameKey="signalType" />
-        <MetricTable title="Performance by Sector" rows={bySector} />
-        <MetricTable title="Performance by Regime" rows={byRegime} />
-        <MetricTable title="Performance by Data Quality" rows={byDataQuality} />
+      {activeTab === 'performance' && (
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '1fr 1fr' }, gap: 3, mb: 3 }}>
+          <MetricTable title="Performance by Signal Type" rows={byType} nameKey="signalType" />
+          <MetricTable title="Performance by Sector" rows={bySector} />
+          <MetricTable title="Performance by Regime" rows={byRegime} />
+          <MetricTable title="Performance by Data Quality" rows={byDataQuality} />
+        </Box>
+      )}
+      {activeTab === 'noise' && (
         <Paper sx={{ p: 2, overflowX: 'auto' }}>
           <Typography variant="h6" sx={{ mb: 2 }}>Noisy Signals</Typography>
           {noisy.length === 0 ? (
@@ -300,9 +330,9 @@ const SignalQualityLabPage: React.FC = () => {
             </Stack>
           )}
         </Paper>
-      </Box>
+      )}
 
-      <Paper sx={{ p: 2 }}>
+      {activeTab === 'instrument' && <Paper sx={{ p: 2 }}>
           <Typography variant="h6" sx={{ mb: 2 }}>Instrument Signal History</Typography>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ mb: 2 }}>
           <Box sx={{ flex: 1 }}>
@@ -311,7 +341,7 @@ const SignalQualityLabPage: React.FC = () => {
           <Button variant="contained" onClick={loadInstrument} disabled={!selectedInstrument}>Load</Button>
         </Stack>
         {history.length === 0 ? (
-          <Typography color="text.secondary">Enter a Market Data Foundation instrument ID to review signal history and forward outcomes.</Typography>
+          <Typography color="text.secondary">Select an instrument to review scoped signal history and forward outcomes.</Typography>
         ) : (
           <Table size="small">
             <TableHead>
@@ -351,7 +381,7 @@ const SignalQualityLabPage: React.FC = () => {
             </TableBody>
           </Table>
         )}
-      </Paper>
+      </Paper>}
     </Box>
   );
 };

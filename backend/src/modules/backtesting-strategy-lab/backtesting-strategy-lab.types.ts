@@ -25,6 +25,8 @@ export interface BacktestStrategyConfig {
     instrumentIds?: string[];
     symbols?: string[];
     watchlistId?: string;
+    region?: string;
+    assetType?: string;
   };
   entryRule: StrategyRule<EntryRuleType>;
   exitRule: StrategyRule<ExitRuleType>;
@@ -152,6 +154,9 @@ export interface BacktestMetrics {
   } | null;
   dataCoverage?: {
     instrumentsConsidered: number;
+    universeTotalAvailable?: number;
+    universeCapped?: boolean;
+    universeCap?: number;
     instrumentsWithEnoughHistory: number;
     instrumentsExcludedForHistory: number;
     instrumentsExcludedForDataQuality: number;

@@ -63,6 +63,7 @@ export interface DataQualityEvaluateResponse {
 }
 
 export interface DataQualityFilters {
+  search?: string;
   status?: CoverageStatus | '';
   readinessStatus?: SignalReadinessStatus | '';
   liquidityStatus?: LiquidityStatus | '';
@@ -70,4 +71,23 @@ export interface DataQualityFilters {
   country?: string;
   region?: string;
   assetType?: string;
+  eligibleForSignals?: boolean;
+  eligibleForBacktesting?: boolean;
+  minCoverageScore?: number;
+  minReadinessScore?: number;
+  limit?: number;
+  offset?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface DataQualityListResponse {
+  items: DataQualityEvaluation[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+    nextOffset: number | null;
+    hasMore: boolean;
+  };
 }

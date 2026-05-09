@@ -42,7 +42,8 @@ export class StrategyDecisionEngineController {
     try {
       const portfolioId = req.query.portfolioId as string;
       const region = req.query.region as string | undefined;
-      const response = await this.service.exits(portfolioId, region);
+      const assetType = req.query.assetType as string | undefined;
+      const response = await this.service.exits(portfolioId, region, assetType);
       return res.json(response);
     } catch (error: any) {
       console.error('Exits controller error:', error);

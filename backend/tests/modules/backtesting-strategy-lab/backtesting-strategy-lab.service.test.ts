@@ -248,6 +248,47 @@ describe('BacktestingStrategyLabService', () => {
     });
   });
 
+  it('resolves symbol universes with region and asset type and prefers exact source/provider matches', async () => {
+    const listInstruments = jest.fn().mockResolvedValue({
+      instruments: [
+        { id: 'stock-1', symbol: 'RCOM.NS', sourceSymbol: 'RCOM', providerSymbol: 'RCOM.NS' },
+        { id: 'stock-2', symbol: 'RELIANCE.NS', sourceSymbol: 'RELIANCE', providerSymbol: 'RELIANCE.NS' },
+      ],
+    });
+    const listPricesByInstrumentId = jest.fn(async (instrumentId: string) => ({ prices: makePrices(instrumentId === 'stock-2' ? 'RELIANCE.NS' : 'RCOM.NS') }));
+    const { service } = createService({ marketDataService: { listInstruments, listPricesByInstrumentId } });
+
+    const run = await service.run({
+      config: {
+        ...config,
+        region: 'IN',
+        assetType: 'STOCK',
+        universe: { type: 'SYMBOLS', symbols: ['RELIANCE'] },
+      },
+    });
+
+    expect(listInstruments).toHaveBeenCalledWith(expect.objectContaining({ search: 'RELIANCE', region: 'IN', assetType: 'STOCK' }));
+    expect(listPricesByInstrumentId).toHaveBeenCalledWith('stock-2', 5000, expect.any(Date), expect.any(Date));
+    expect(run.trades.every((trade) => trade.instrumentId === 'stock-2')).toBe(true);
+  });
+
+  it('applies default market scope to custom ALL universe resolution and exposes bounded-universe metadata', async () => {
+    const listInstruments = jest.fn().mockResolvedValue({
+      instruments: [{ id: 'stock-1', symbol: 'AAA' }],
+      pagination: { total: 250 },
+    });
+    const { service } = createService({ marketDataService: { listInstruments } });
+
+    const run = await service.run({ config: { ...config, universe: { type: 'ALL' } } });
+
+    expect(listInstruments).toHaveBeenCalledWith(expect.objectContaining({ region: 'IN', assetType: 'STOCK', pageSize: 50 }));
+    expect(run.config.region).toBe('IN');
+    expect(run.config.assetType).toBe('STOCK');
+    expect(run.metrics?.dataCoverage?.universeCapped).toBe(true);
+    expect(run.metrics?.dataCoverage?.universeTotalAvailable).toBe(250);
+    expect(run.metrics?.dataCoverage?.warnings.join(' ')).toContain('Universe ALL was capped');
+  });
+
   it('runs registered strategy configs and syncs Strategy Framework performance', async () => {
     const { service, repository, strategyFrameworkService } = createService();
 

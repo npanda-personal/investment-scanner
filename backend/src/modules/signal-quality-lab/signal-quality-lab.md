@@ -34,7 +34,7 @@ Supported query params:
 - `country`
 - `from`
 - `to`
-- `limit`
+- `limit`, default `1000`, clamped to `5000` so the dashboard measures enough historical signals while staying bounded
 - `minSampleSize`
 - `readinessStatus`
 - `coverageStatus`
@@ -51,7 +51,7 @@ Signal Quality Lab can restrict measured outcomes to instruments with matching D
 
 Supported filters include readiness status, coverage status, liquidity status, minimum readiness score, signal-ready-only, and excluding poor/unusable coverage.
 
-The summary response includes `dataQualityFilterSummary` with before/after counts, exclusions, missing evaluation count, and whether a filter was applied. Missing data-quality evaluations are not excluded by default, so older signal history remains measurable unless callers opt into stricter filters elsewhere.
+The summary response includes `dataQualityFilterSummary` with before/after counts, exclusions, missing evaluation count, and whether a filter was applied. Missing data-quality evaluations are not excluded by default, so older signal history remains measurable. When a caller explicitly asks for a strict readiness, coverage, liquidity, minimum readiness score, or `onlySignalReady` filter, missing evaluations do not match that filter. `excludePoorQuality` alone does not exclude unknown/missing evaluations.
 
 The frontend exposes these filters and adds a Performance by Data Quality section.
 
@@ -61,10 +61,11 @@ The frontend exposes these filters and adds a Performance by Data Quality sectio
 
 Request body or query params:
 
-- `batchSize`: default `25`, clamped from `1` to `100`
+- `batchSize`: default `25` on the backend, clamped from `1` to `100`; the frontend uses module config `signal_quality_lab_batch_size = 100`
 - `offset` or `cursor`: default `0`
 - `from` optional signal generated-at lower bound
 - `to` optional signal generated-at upper bound
+- `region` and `assetType`, forwarded to Signal Generation history queries and Market Data Foundation price lookups
 
 Response fields:
 
@@ -77,20 +78,30 @@ Response fields:
 - `inserted`
 - `updated`
 - `skipped`
+- `insertedCount`
+- `updatedCount`
+- `skippedCount`
+- `failedCount`
 - `evaluatedInBatch`
+- `evaluatedCount`
+- `unevaluatedInBatch`
+- `unevaluatedCount`
 - `insufficientFuturePriceInBatch`
 - `missingPriceHistoryInBatch`
+- `missingPriceHistoryCount`
 - `outcomesPersisted`
 - `message`
 - `warnings`
 - `durationMs`
 
-Outcomes are still calculated on demand in this MVP, so the endpoint pages through signal records, reports progress metadata, and returns `inserted = 0`, `updated = 0`, `skipped = processedCount`, `outcomesPersisted = false`, and the message `Outcomes are calculated on demand; recalculation refreshed diagnostics only.` Malformed or unsupported future cached-outcome work should return warnings without turning completed batches into a full failure.
+Outcomes are still calculated on demand in this MVP, so the endpoint pages through signal records, reports progress metadata, and returns `inserted = 0`, `updated = 0`, `skipped = 0`, `outcomesPersisted = false`, and evaluated/not-yet-evaluable/missing-price-history counts for the selected horizon. Do not label non-persisted on-demand records as skipped; skipped is reserved for records that were intentionally not processed. Malformed or unsupported future cached-outcome work should return warnings without turning completed batches into a full failure.
 
 Frontend behavior:
 
-- The `/signals/quality` Recalculate button runs batches sequentially.
+- The `/signals/quality` Recalculate button uses the shared batch runner and module-owned frontend config.
+- The frontend sends `region` and `assetType` on every batch request.
 - The button shows a spinner and remains disabled while the loop is active.
+- Progress uses the shared `BatchProgressBar` and reports processed, evaluated, not-yet-evaluable, missing-price-history, warning, batch, and completion counts.
 - After every successful batch, the dashboard refetches summary, type, sector, regime, and noisy-signal data.
 - If one batch fails, the loop stops and leaves already completed batches intact.
 
@@ -133,7 +144,8 @@ Raw signals and evaluated outcomes are intentionally separate:
 
 - `totalSignals` counts Signal Generation Engine records in scope.
 - `evaluatedSignals` counts only records with a forward return available for the selected horizon.
-- `unevaluatedSignals` includes signals with missing price history or not enough future trading rows.
+- `unevaluatedSignals` counts signals that have price history but not enough future trading rows for the selected horizon.
+- `missingPriceHistoryCount` counts signals whose instruments have no usable price history in the lookup window and is intentionally separate from `unevaluatedSignals`.
 
 When `totalSignals > 0` and `evaluatedSignals = 0`, APIs return `dataStatus = PARTIAL` with a recommended action such as trying a shorter horizon, syncing market data, waiting for more trading days, or checking signal dates against available prices.
 
@@ -202,13 +214,20 @@ Route:
 
 - `/signals/quality`
 
-The dashboard shows quality summary cards, horizon availability, diagnostic banners, performance by signal type, performance by sector, regime context state, noisy signals, and instrument-level signal history/outcomes.
+The dashboard uses tabs to keep the page scannable:
+
+- Overview: quality summary cards and evaluation diagnostics.
+- Performance: horizon availability plus signal type, sector, regime, and data-quality grouped metrics.
+- Noise: churning/failed/stale signal diagnostics.
+- Instrument history: scoped instrument selector with signal history and forward outcomes.
+
+Instrument history and outcome requests also send the current `region`, `assetType`, horizon, and quality filters.
 
 If evaluated outcomes are zero, the frontend shows:
 
 - a banner explaining why the selected horizon cannot be evaluated
-- horizon availability chips so users can switch to an evaluable horizon
-- cards for eligible, evaluated, unevaluated, missing price history, and insufficient future data
+- horizon availability chips in the Performance tab so users can switch to an evaluable horizon while inspecting performance tables
+- cards for eligible, evaluated, not-yet-evaluable, and missing price history counts
 - table-level raw counts, evaluated samples, unevaluated counts, status, and reason
 - active filter copy with a reset action when filters leave no evaluated data
 
@@ -217,6 +236,7 @@ The dashboard links to `/signals/calibration`, where Signal Calibration Engine a
 ## Performance And UX Behavior
 
 - Dashboard API calls are bounded by a conservative default `limit` so the page can load quickly on local datasets.
+- Dashboard and grouped analytics intentionally expand the analysis window to a bounded 5,000 signals so quality metrics do not only reflect the most recent same-day signal page.
 - Recalculation is never triggered on page load. The frontend runs manual recalculation in batches and refreshes visible quality data after each batch.
 - Instrument history uses a searchable instrument selector rather than raw IDs.
 - Empty states distinguish no raw signal data from insufficient future price data or no data after filters.

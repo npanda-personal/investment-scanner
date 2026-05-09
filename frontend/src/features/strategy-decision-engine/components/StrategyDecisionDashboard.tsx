@@ -28,9 +28,51 @@ import {
 } from '@mui/icons-material';
 import { fetchMarketGate, evaluateStrategy, fetchCandidates, fetchExits, fetchLatestDecision, fetchModel, fetchHistory } from '../api/strategyDecisionApi';
 import type { MarketGateResponse, StrategyDecisionDto, StrategyModel } from '../types';
-import { PageHeader, StatusBadge, DataTable, InstrumentSearchSelect, type DataTableColumn } from '@/shared/components';
+import { PageHeader, StatusBadge, DataTable, type DataTableColumn } from '@/shared/components';
+import { InstrumentSearchSelect } from '@/shared/components/EntitySearchSelect';
 import { Link } from 'react-router-dom';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
+
+const STRATEGY_DECISION_BATCH_SIZE = 100;
+
+const titleCase = (value: string) =>
+  value
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+const formatDecision = (value: string) => {
+  if (value === 'TRADE_CANDIDATE') return 'Review Candidate';
+  if (value === 'EXIT_CANDIDATE') return 'Exit Review';
+  if (value === 'REDUCE_RISK') return 'Reduce Risk';
+  if (value === 'INSUFFICIENT_DATA') return 'Insufficient Data';
+  return titleCase(value);
+};
+
+const formatAction = (value: string) => {
+  if (value === 'CONSIDER_ENTRY') return 'Consider Review';
+  if (value === 'AVOID_NEW_ENTRY') return 'Avoid New Review';
+  if (value === 'WAIT_FOR_CONFIRMATION') return 'Wait For Confirmation';
+  if (value === 'WAIT_FOR_PULLBACK') return 'Wait For Pullback';
+  if (value === 'REVIEW_EXIT') return 'Review Exit Risk';
+  if (value === 'REDUCE_EXPOSURE') return 'Reduce Exposure Risk';
+  return titleCase(value);
+};
+
+const formatAllowedAction = (value: string) => {
+  if (value === 'NEW_LONG_TRADES_ALLOWED') return 'New long candidates may be reviewed';
+  if (value === 'ONLY_HIGH_QUALITY_SETUPS') return 'Only high-quality setups should be reviewed';
+  if (value === 'MANAGE_EXISTING_POSITIONS_ONLY') return 'Manage existing positions only';
+  if (value === 'NO_NEW_LONG_TRADES') return 'No new long candidates';
+  return titleCase(value);
+};
+
+const symbolLinkSx = {
+  color: 'primary.main',
+  fontWeight: 600,
+  textDecoration: 'none',
+  '&:hover': { textDecoration: 'underline' },
+};
 
 const StrategyDecisionDashboard: React.FC = () => {
   const { scope } = useMarketScope();
@@ -45,6 +87,7 @@ const StrategyDecisionDashboard: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [evaluationSummary, setEvaluationSummary] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lookupInstrument, setLookupInstrument] = useState<any | null>(null);
 
@@ -56,14 +99,12 @@ const StrategyDecisionDashboard: React.FC = () => {
 
   // Evaluation form state
   const [evalStrategy, setEvalStrategy] = useState<string>('ALL');
-  const [evalUniverse, setEvalUniverse] = useState<string>('TOP_SIGNALS');
-
   const loadData = async () => {
     setLoading(true);
     try {
       const selectedRegion = countryFilter === 'SCOPE' ? scope.region : (countryFilter === 'ALL' ? undefined : countryFilter);
       
-      const [gateRes, candRes, waitRes, exitRes, modelRes] = await Promise.all([
+      const [gateRes, candRes, waitRes, watchRes, exitRes, modelRes] = await Promise.all([
         fetchMarketGate({ region: scope.region }),
         fetchCandidates({ 
           limit: pageSize, 
@@ -78,13 +119,19 @@ const StrategyDecisionDashboard: React.FC = () => {
           region: selectedRegion,
           assetType: scope.assetType
         }),
-        fetchExits({ region: scope.region }),
+        fetchCandidates({
+          limit: 50,
+          decision: 'WATCH',
+          region: selectedRegion,
+          assetType: scope.assetType
+        }),
+        fetchExits({ region: scope.region, assetType: scope.assetType }),
         fetchModel(),
       ]);
       setGate(gateRes);
       setCandidates(candRes.results);
       setTotalCount(candRes.total);
-      setWaitWatch([...waitRes.results]); // Could also fetch WATCH decision
+      setWaitWatch([...watchRes.results, ...waitRes.results]);
       setExits(exitRes);
       setModel(modelRes);
     } catch (err: any) {
@@ -100,16 +147,23 @@ const StrategyDecisionDashboard: React.FC = () => {
 
   useEffect(() => {
     setPage(0);
-  }, [scope.region, scope.assetType]);
+  }, [scope.region, scope.assetType, countryFilter]);
 
   const runEvaluate = async () => {
     setRunning(true);
     setProgress(0);
+    setEvaluationSummary(null);
     setError(null);
     try {
       let offset = 0;
-      const batchSize = 10;
+      const batchSize = STRATEGY_DECISION_BATCH_SIZE;
       let hasMore = true;
+      let processedCount = 0;
+      let generatedCount = 0;
+      let failedCount = 0;
+      let warningCount = 0;
+      let totalCount = 0;
+      let batches = 0;
 
       while (hasMore) {
         const response = await evaluateStrategy({ 
@@ -118,20 +172,25 @@ const StrategyDecisionDashboard: React.FC = () => {
           offset,
           region: scope.region,
           assetType: scope.assetType,
-          portfolioId: evalUniverse === 'PORTFOLIO' ? 'DEFAULT' : undefined // Placeholder
         });
-        
-        offset = response.nextOffset || 0;
+
+        batches += 1;
+        processedCount += response.processedCount;
+        generatedCount += response.generatedCount;
+        failedCount += response.failedCount;
+        warningCount += response.warnings.length;
+        totalCount = response.totalCount;
+        offset = response.nextOffset ?? offset + response.processedCount;
         hasMore = response.hasMore;
         
-        const currentProgress = response.totalCount > 0 ? (offset / response.totalCount) * 100 : 100;
+        const currentProgress = response.totalCount > 0 ? (Math.min(offset, response.totalCount) / response.totalCount) * 100 : 100;
         setProgress(hasMore ? currentProgress : 100);
-        
-        // Refresh local data to show new results in tables immediately
-        await loadData();
+        setEvaluationSummary(`Processed ${processedCount} / ${response.totalCount}. Generated ${generatedCount}, failed ${failedCount}, warnings ${warningCount}.`);
         
         if (!hasMore) break;
       }
+      setEvaluationSummary(`Complete. Processed ${processedCount} / ${totalCount} in ${batches} batch${batches === 1 ? '' : 'es'}. Generated ${generatedCount}, failed ${failedCount}, warnings ${warningCount}.`);
+      await loadData();
     } catch (err: any) {
       setError(err.message || 'Evaluation failed');
     } finally {
@@ -162,15 +221,15 @@ const StrategyDecisionDashboard: React.FC = () => {
   };
 
   const candidateColumns: DataTableColumn<StrategyDecisionDto>[] = [
-    { id: 'symbol', label: 'Symbol', render: (d) => <Link to={`/research/stocks/${d.instrumentId}`}>{d.symbol}</Link> },
+    { id: 'symbol', label: 'Symbol', render: (d) => <Box component={Link} to={`/research/stocks/${d.instrumentId}`} sx={symbolLinkSx}>{d.symbol}</Box> },
     { id: 'country', label: 'Region', render: (d) => <Typography variant="body2">{d.country || 'N/A'}</Typography> },
     { id: 'strategy', label: 'Strategy', render: (d) => <Box><Typography variant="body2">{d.strategy}</Typography>{d.frameworkBacked && <Typography variant="caption" color="text.secondary">Framework {d.strategyVersion || ''}</Typography>}</Box> },
-    { id: 'decision', label: 'Decision', render: (d) => <StatusBadge label={d.decision} /> },
+    { id: 'decision', label: 'Decision', render: (d) => <StatusBadge label={formatDecision(d.decision)} /> },
     { id: 'decisionScore', label: 'Score', align: 'right', render: (d) => d.decisionScore },
     { id: 'confidence', label: 'Confidence', render: (d) => d.confidence },
     { id: 'entryZone', label: 'Entry Zone', render: (d) => d.entryZone ? `${d.entryZone.preferredEntryMin} - ${d.entryZone.preferredEntryMax}` : 'N/A' },
     { id: 'generatedAt', label: 'Generated', render: (d) => new Date(d.generatedAt).toLocaleDateString() },
-    { id: 'actions', label: 'Actions', render: () => <Button size="small" component={Link} to={`/trade-plans`}>Trade Plan</Button> },
+    { id: 'actions', label: 'Actions', render: () => <Button size="small" component={Link} to={`/trade-plans`}>Risk Plan</Button> },
   ];
 
   return (
@@ -185,7 +244,7 @@ const StrategyDecisionDashboard: React.FC = () => {
       )}
       <PageHeader
         title="Strategy Decision Engine"
-        subtitle="Rule-based trade candidates, exit alerts, and market state awareness."
+        subtitle="Strategy-backed review candidates, exit-risk alerts, and market state awareness."
         primaryAction={
           <Button
             variant="contained"
@@ -207,7 +266,7 @@ const StrategyDecisionDashboard: React.FC = () => {
       <Paper sx={{ mb: 3, display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
         <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} variant="scrollable" scrollButtons="auto" sx={{ flexGrow: 1 }}>
           <Tab label="Market Gate" />
-          <Tab label="Trade Candidates" />
+          <Tab label="Review Candidates" />
           <Tab label="Wait / Watch" />
           <Tab label="Exits / Risks" />
           <Tab label="Rules & Model" />
@@ -246,7 +305,7 @@ const StrategyDecisionDashboard: React.FC = () => {
               
               {gate.marketGate === 'CLOSED' && (
                 <Alert severity="warning" icon={<LockOutlined />} sx={{ my: 2 }}>
-                  New long trades are currently blocked by the market gate.
+                  New long candidates are currently blocked by the market gate.
                 </Alert>
               )}
 
@@ -255,7 +314,7 @@ const StrategyDecisionDashboard: React.FC = () => {
                 {gate.allowedActions.map((a, i) => (
                   <ListItem key={i}>
                     <ListItemIcon><CheckCircleOutline color="success" /></ListItemIcon>
-                    <ListItemText primary={a.replace(/_/g, ' ')} />
+                    <ListItemText primary={formatAllowedAction(a)} />
                   </ListItem>
                 ))}
               </List>
@@ -295,7 +354,7 @@ const StrategyDecisionDashboard: React.FC = () => {
           rows={candidates}
           getRowId={(row) => row.id || `${row.instrumentId}-${row.strategy}`}
           loading={loading}
-          emptyMessage="No trade candidates found. Try running evaluation or checking market gate."
+          emptyMessage="No review candidates found for the current scope. Try running evaluation or checking the market gate."
           page={page}
           pageSize={pageSize}
           totalCount={totalCount}
@@ -307,15 +366,15 @@ const StrategyDecisionDashboard: React.FC = () => {
       {activeTab === 2 && (
         <DataTable<StrategyDecisionDto>
           columns={[
-            { id: 'symbol', label: 'Symbol', render: (d) => <Link to={`/research/stocks/${d.instrumentId}`}>{d.symbol}</Link> },
-            { id: 'decision', label: 'Status', render: (d) => <StatusBadge label={d.decision} /> },
-            { id: 'action', label: 'Requirement', render: (d) => d.action.replace(/_/g, ' ') },
+            { id: 'symbol', label: 'Symbol', render: (d) => <Box component={Link} to={`/research/stocks/${d.instrumentId}`} sx={symbolLinkSx}>{d.symbol}</Box> },
+            { id: 'decision', label: 'Status', render: (d) => <StatusBadge label={formatDecision(d.decision)} /> },
+            { id: 'action', label: 'Requirement', render: (d) => formatAction(d.action) },
             { id: 'reasons', label: 'Reason', render: (d) => d.reasons[0] || 'Pending setup' },
           ]}
           rows={waitWatch}
           getRowId={(row) => row.id || `${row.instrumentId}-${row.strategy}`}
           loading={loading}
-          emptyMessage="No stocks currently in wait or watch status."
+          emptyMessage="No instruments currently in wait or watch status for the current scope."
           page={0}
           pageSize={50}
           totalCount={waitWatch.length}
@@ -327,9 +386,9 @@ const StrategyDecisionDashboard: React.FC = () => {
       {activeTab === 3 && (
         <DataTable<StrategyDecisionDto>
           columns={[
-            { id: 'symbol', label: 'Symbol', render: (d) => d.symbol },
-            { id: 'decision', label: 'Risk Level', render: (d) => <StatusBadge label={d.decision} /> },
-            { id: 'action', label: 'Suggestion', render: (d) => d.action.replace(/_/g, ' ') },
+            { id: 'symbol', label: 'Symbol', render: (d) => <Box component={Link} to={`/research/stocks/${d.instrumentId}`} sx={symbolLinkSx}>{d.symbol}</Box> },
+            { id: 'decision', label: 'Risk Level', render: (d) => <StatusBadge label={formatDecision(d.decision)} /> },
+            { id: 'action', label: 'Review Action', render: (d) => formatAction(d.action) },
             { id: 'decisionScore', label: 'Risk Score', render: (d) => d.decisionScore },
             { id: 'reasons', label: 'Reasons', render: (d) => d.reasons.slice(0, 2).join('; ') },
           ]}
@@ -395,7 +454,7 @@ const StrategyDecisionDashboard: React.FC = () => {
               <Box sx={{ mt: 4, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>Language & Safety Standards</Typography>
                 {model.languageSafetyRules.map((rule, i) => (
-                  <Typography key={i} variant="caption" display="block">• {rule}</Typography>
+                  <Typography key={i} variant="caption" display="block">- {rule}</Typography>
                 ))}
               </Box>
             </Paper>
@@ -407,7 +466,7 @@ const StrategyDecisionDashboard: React.FC = () => {
         <Paper sx={{ p: 3 }}>
           <Typography variant="h6" gutterBottom>Evaluate Strategies</Typography>
           <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
-            Run the decision engine across a universe of stocks to find new trade candidates or review risks.
+            Run the decision engine across the current latest-signal universe for {scope.region} / {scope.assetType}. Backend work stays bounded at {STRATEGY_DECISION_BATCH_SIZE} instruments per request.
           </Typography>
           
           <Grid container spacing={3} sx={{ maxWidth: 600 }}>
@@ -419,26 +478,17 @@ const StrategyDecisionDashboard: React.FC = () => {
                 value={evalStrategy}
                 onChange={(e) => setEvalStrategy(e.target.value)}
               >
-                <MenuItem value="ALL">All Trading Strategies</MenuItem>
+                <MenuItem value="ALL">All Review Strategies</MenuItem>
                 <MenuItem value="TREND_MOMENTUM">Trend Momentum Only</MenuItem>
                 <MenuItem value="PULLBACK_IN_UPTREND">Pullback in Uptrend Only</MenuItem>
-                <MenuItem value="DEFENSIVE_EXIT">Defensive Exit (Portfolio)</MenuItem>
+                <MenuItem value="DEFENSIVE_EXIT">Defensive Exit Risk</MenuItem>
               </TextField>
             </Grid>
-            <Grid item xs={12}>
-              <TextField
-                select
-                fullWidth
-                label="Target Universe"
-                value={evalUniverse}
-                onChange={(e) => setEvalUniverse(e.target.value)}
-              >
-                <MenuItem value="TOP_SIGNALS">Current Top Signals</MenuItem>
-                <MenuItem value="ALL_ELIGIBLE">All Eligible Instruments</MenuItem>
-                <MenuItem value="WATCHLIST">A Watchlist</MenuItem>
-                <MenuItem value="PORTFOLIO">Current Portfolio</MenuItem>
-              </TextField>
-            </Grid>
+            {evaluationSummary && (
+              <Grid item xs={12}>
+                <Alert severity={running ? 'info' : 'success'}>{evaluationSummary}</Alert>
+              </Grid>
+            )}
             <Grid item xs={12}>
               <Button
                 variant="contained"
@@ -448,7 +498,7 @@ const StrategyDecisionDashboard: React.FC = () => {
                 disabled={running}
                 fullWidth
               >
-                {running ? `Processing (${Math.round(progress)}%)...` : 'Start Evaluation Batch'}
+                {running ? `Processing (${Math.round(progress)}%)...` : 'Start Evaluation'}
               </Button>
             </Grid>
           </Grid>
@@ -488,7 +538,7 @@ const StrategyDecisionDashboard: React.FC = () => {
                   )}
                 </Box>
                 <Box sx={{ textAlign: 'right' }}>
-                  <StatusBadge label={lookupResult.decision} />
+                  <StatusBadge label={formatDecision(lookupResult.decision)} />
                   <Typography variant="caption" display="block" color="textSecondary">Confidence: {lookupResult.confidence}</Typography>
                 </Box>
               </Box>
@@ -497,7 +547,7 @@ const StrategyDecisionDashboard: React.FC = () => {
               <Grid container spacing={4}>
                 <Grid item xs={12} md={6}>
                   <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>Strategy Assessment</Typography>
-                  <Typography variant="h6" color="primary" sx={{ my: 1 }}>{lookupResult.action.replace(/_/g, ' ')}</Typography>
+                  <Typography variant="h6" color="primary" sx={{ my: 1 }}>{formatAction(lookupResult.action)}</Typography>
                   
                   <Box sx={{ my: 2 }}>
                     <Typography variant="subtitle2" color="textSecondary">Decision Score</Typography>
@@ -577,13 +627,13 @@ const StrategyDecisionDashboard: React.FC = () => {
                       <Box sx={{ mt: 2 }}>
                         <Typography variant="caption" color="textSecondary" sx={{ fontWeight: 'bold' }}>Invalidation Rules:</Typography>
                         {lookupResult.riskPlan.invalidationRules?.map((rule, i) => (
-                          <Typography key={i} variant="caption" display="block">• {rule}</Typography>
+                          <Typography key={i} variant="caption" display="block">- {rule}</Typography>
                         ))}
                       </Box>
                       <Box sx={{ mt: 1 }}>
                         <Typography variant="caption" color="textSecondary" sx={{ fontWeight: 'bold' }}>Exit Rules:</Typography>
                         {lookupResult.riskPlan.exitRules?.map((rule, i) => (
-                          <Typography key={i} variant="caption" display="block">• {rule}</Typography>
+                          <Typography key={i} variant="caption" display="block">- {rule}</Typography>
                         ))}
                       </Box>
                     </Box>
@@ -606,7 +656,7 @@ const StrategyDecisionDashboard: React.FC = () => {
                 columns={[
                   { id: 'generatedAt', label: 'Date', render: (d) => new Date(d.generatedAt).toLocaleDateString() },
                   { id: 'strategy', label: 'Strategy', render: (d) => d.strategy },
-                  { id: 'decision', label: 'Decision', render: (d) => <StatusBadge label={d.decision} /> },
+                  { id: 'decision', label: 'Decision', render: (d) => <StatusBadge label={formatDecision(d.decision)} /> },
                   { id: 'decisionScore', label: 'Score', align: 'right', render: (d) => d.decisionScore },
                   { id: 'confidence', label: 'Confidence', render: (d) => d.confidence },
                 ]}

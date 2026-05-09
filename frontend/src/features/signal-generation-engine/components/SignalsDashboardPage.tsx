@@ -48,7 +48,8 @@ const SignalsDashboardPage: React.FC = () => {
   const [onlyStrategyEligible, setOnlyStrategyEligible] = useState(false);
   const [excludeNoiseFiltered, setExcludeNoiseFiltered] = useState(false);
   const [hasBlockedStrategies, setHasBlockedStrategies] = useState(false);
-  const [useDataQualityFilter, setUseDataQualityFilter] = useState(false);
+  const [showStrategyContext, setShowStrategyContext] = useState(false);
+  const [useDataQualityFilter, setUseDataQualityFilter] = useState(true);
   const [runIncludeStrategyMatches, setRunIncludeStrategyMatches] = useState(false);
   const [runMessage, setRunMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,8 +64,9 @@ const SignalsDashboardPage: React.FC = () => {
     const offset = (forcedPage ?? pageByTab[activeTab]) * limit;
 
     let fetchPromise;
+    const shouldLoadStrategyContext = showStrategyContext || Boolean(strategyCode) || onlyStrategyEligible || excludeNoiseFiltered || hasBlockedStrategies;
     const strategyParams = {
-      includeStrategyMatches: true,
+      includeStrategyMatches: shouldLoadStrategyContext || undefined,
       strategyCode: strategyCode || undefined,
       onlyStrategyEligible: onlyStrategyEligible || undefined,
       excludeNoiseFiltered: excludeNoiseFiltered || undefined,
@@ -100,7 +102,7 @@ const SignalsDashboardPage: React.FC = () => {
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, [activeTab, pageByTab[activeTab], pageSizeByTab[activeTab], sortBy, sortDirection, direction, minScore, sector, country, confidence, signalType, search, strategyCode, onlyStrategyEligible, excludeNoiseFiltered, hasBlockedStrategies, scope.region, scope.assetType]);
+  useEffect(load, [activeTab, pageByTab[activeTab], pageSizeByTab[activeTab], sortBy, sortDirection, direction, minScore, sector, country, confidence, signalType, search, strategyCode, onlyStrategyEligible, excludeNoiseFiltered, hasBlockedStrategies, showStrategyContext, scope.region, scope.assetType]);
 
   useEffect(() => {
     // Reset pages when scope changes
@@ -109,7 +111,7 @@ const SignalsDashboardPage: React.FC = () => {
 
   useEffect(() => {
     resetPages();
-  }, [direction, minScore, sector, country, confidence, signalType, search, strategyCode, onlyStrategyEligible, excludeNoiseFiltered, hasBlockedStrategies]);
+  }, [direction, minScore, sector, country, confidence, signalType, search, strategyCode, onlyStrategyEligible, excludeNoiseFiltered, hasBlockedStrategies, showStrategyContext]);
 
   const runManualSignals = async () => {
     if (batchRunner.running) return;
@@ -166,7 +168,7 @@ const SignalsDashboardPage: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 3, maxWidth: 1500, mx: 'auto' }}>
+    <Box sx={{ p: 3, width: '100%', maxWidth: 1500, mx: 'auto', boxSizing: 'border-box', overflowX: 'hidden' }}>
       <PageHeader
         title="Signal Generation Engine"
         subtitle="Raw bullish, neutral, and bearish confirmation inputs with Strategy Framework match context."
@@ -180,7 +182,8 @@ const SignalsDashboardPage: React.FC = () => {
             alignItems: 'center',
             gap: 1.5,
             maxWidth: '100%',
-            '& .MuiFormControlLabel-root': { mr: 0 },
+            '& .MuiFormControlLabel-root': { flex: { xs: '1 1 220px', md: '0 1 auto' }, minWidth: 0, mr: 0 },
+            '& .MuiFormControlLabel-label': { whiteSpace: 'normal' },
             '& .MuiButton-root': { flex: { xs: '1 1 180px', md: '0 1 auto' }, minWidth: 0 },
           }}
         >
@@ -191,6 +194,10 @@ const SignalsDashboardPage: React.FC = () => {
           <FormControlLabel
             control={<Checkbox checked={runIncludeStrategyMatches} onChange={(event) => setRunIncludeStrategyMatches(event.target.checked)} />}
             label="Attach strategy matches"
+          />
+          <FormControlLabel
+            control={<Checkbox checked={showStrategyContext} onChange={(event) => setShowStrategyContext(event.target.checked)} />}
+            label="Show strategy context"
           />
           <Button variant="contained" onClick={runManualSignals} disabled={batchRunner.running} startIcon={batchRunner.running ? <CircularProgress size={16} color="inherit" /> : undefined}>
             {batchRunner.running ? 'Running...' : 'Run Signals'}
@@ -227,7 +234,7 @@ const SignalsDashboardPage: React.FC = () => {
 
       {activeTab === 'screener' && (
         <Box sx={{ mb: 3 }}>
-          <FilterBar onReset={() => { setDirection(''); setMinScore('60'); setSector(''); setCountry(''); setConfidence(''); setSignalType(''); setSearch(''); setStrategyCode(''); setOnlyStrategyEligible(false); setExcludeNoiseFiltered(false); setHasBlockedStrategies(false); }}>
+          <FilterBar onReset={() => { setDirection(''); setMinScore('60'); setSector(''); setCountry(''); setConfidence(''); setSignalType(''); setSearch(''); setStrategyCode(''); setOnlyStrategyEligible(false); setExcludeNoiseFiltered(false); setHasBlockedStrategies(false); setShowStrategyContext(false); }}>
             <TextField label="Search" value={search} onChange={(event) => setSearch(event.target.value)} />
             <TextField select label="Direction" value={direction} onChange={(event) => setDirection(event.target.value as SignalDirection | '')}>
               <MenuItem value="">Any</MenuItem>
@@ -282,6 +289,7 @@ const SignalsDashboardPage: React.FC = () => {
           setPageSizeByTab({ ...pageSizeByTab, [activeTab]: nextPageSize });
           setPageByTab({ ...pageByTab, [activeTab]: 0 });
         }}
+        strategyContextLoaded={showStrategyContext || Boolean(strategyCode) || onlyStrategyEligible || excludeNoiseFiltered || hasBlockedStrategies}
         emptyMessage={emptyMessage()}
       />
     </Box>

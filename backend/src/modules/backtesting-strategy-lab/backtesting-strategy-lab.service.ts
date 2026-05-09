@@ -18,6 +18,12 @@ import type {
 import { validateConfig, validateStrategyInput } from './backtesting-strategy-lab.validation';
 
 interface Position { instrumentId: string; symbol: string; entryDate: string; entryPrice: number; quantity: number; entryBarIndex: number; cost: number; entryReasons?: string[]; highestClose: number }
+interface ResolvedUniverse {
+  instruments: Array<{ instrumentId: string; symbol: string }>;
+  totalAvailable?: number;
+  capped?: boolean;
+  cap?: number;
+}
 
 const EXIT_REASONS = {
   END_OF_TEST: 'END_OF_TEST',
@@ -125,7 +131,8 @@ export class BacktestingStrategyLabService {
   }
 
   async simulate(config: BacktestStrategyConfig): Promise<{ metrics: BacktestMetrics; trades: BacktestTrade[]; equityCurve: EquityCurvePoint[] }> {
-    const resolvedUniverse = await this.resolveUniverse(config);
+    const universe = await this.resolveUniverse(config);
+    const resolvedUniverse = universe.instruments;
     const filterResult = await this.applyDataQualityFilter(resolvedUniverse, config);
     const instruments = filterResult.instruments;
     const histories = new Map<string, { instrumentId: string; symbol: string; bars: HistoricalBar[] }>();
@@ -144,6 +151,9 @@ export class BacktestingStrategyLabService {
     }
     const dataCoverage = {
       instrumentsConsidered: resolvedUniverse.length,
+      universeTotalAvailable: universe.totalAvailable,
+      universeCapped: universe.capped,
+      universeCap: universe.cap,
       instrumentsWithEnoughHistory: histories.size,
       instrumentsExcludedForHistory: missingPriceHistoryCount + insufficientHistoryCount,
       instrumentsExcludedForDataQuality: filterResult.metadata.excludedForDataQuality,
@@ -153,6 +163,7 @@ export class BacktestingStrategyLabService {
     };
     if (histories.size === 0) dataCoverage.warnings.push('No instruments had enough price history for the requested timeframe.');
     if (filterResult.metadata.excludedForDataQuality > 0) dataCoverage.warnings.push('Some instruments were excluded by Data Quality Engine readiness filters.');
+    if (universe.capped && universe.totalAvailable && universe.cap) dataCoverage.warnings.push(`Universe ALL was capped to ${universe.cap} of ${universe.totalAvailable} instruments for bounded runtime safety.`);
     const dates = [...new Set([...histories.values()].flatMap((item) => item.bars.map((bar) => bar.date)))].sort();
     let cash = config.initialCapital;
     let peak = config.initialCapital;
@@ -305,22 +316,40 @@ export class BacktestingStrategyLabService {
     };
   }
 
-  private async resolveUniverse(config: BacktestStrategyConfig): Promise<Array<{ instrumentId: string; symbol: string }>> {
-    if (config.universe.type === 'INSTRUMENTS') return (config.universe.instrumentIds || []).map((instrumentId) => ({ instrumentId, symbol: instrumentId }));
+  private async resolveUniverse(config: BacktestStrategyConfig): Promise<ResolvedUniverse> {
+    if (config.universe.type === 'INSTRUMENTS') return { instruments: (config.universe.instrumentIds || []).map((instrumentId) => ({ instrumentId, symbol: instrumentId })) };
     if (config.universe.type === 'SYMBOLS') {
       const found = await Promise.all((config.universe.symbols || []).map(async (symbol) => {
-        const result = await this.marketDataService.listInstruments({ search: symbol, pageSize: 10 });
-        const match = result.instruments.find((instrument: any) => instrument.symbol === symbol || instrument.symbol === symbol.toUpperCase());
+        const target = symbol.toUpperCase();
+        const result = await this.marketDataService.listInstruments({
+          search: symbol,
+          pageSize: 10,
+          region: config.region,
+          assetType: config.assetType,
+        });
+        const match = result.instruments.find((instrument: any) => {
+          const candidates = [instrument.symbol, instrument.display_symbol, instrument.displaySymbol, instrument.provider_symbol, instrument.providerSymbol, instrument.source_symbol, instrument.sourceSymbol]
+            .filter(Boolean)
+            .map((value: string) => value.toUpperCase());
+          return candidates.includes(target);
+        }) ?? result.instruments[0];
         return match ? { instrumentId: match.id, symbol: match.symbol } : null;
       }));
-      return found.filter((item): item is { instrumentId: string; symbol: string } => Boolean(item));
+      return { instruments: found.filter((item): item is { instrumentId: string; symbol: string } => Boolean(item)) };
     }
     if (config.universe.type === 'WATCHLIST' && config.universe.watchlistId) {
       const detail = await this.watchlistService.detail(config.universe.watchlistId);
-      return (detail?.items || []).map((item: any) => ({ instrumentId: item.instrumentId, symbol: item.symbol }));
+      return { instruments: (detail?.items || []).map((item: any) => ({ instrumentId: item.instrumentId, symbol: item.symbol })) };
     }
-    const result = await this.marketDataService.listInstruments({ page: 1, pageSize: 50, region: config.region, assetType: config.assetType });
-    return result.instruments.map((instrument: any) => ({ instrumentId: instrument.id, symbol: instrument.symbol }));
+    const cap = 50;
+    const result = await this.marketDataService.listInstruments({ page: 1, pageSize: cap, region: config.region, assetType: config.assetType });
+    const totalAvailable = Number(result.pagination?.total ?? result.instruments.length);
+    return {
+      instruments: result.instruments.map((instrument: any) => ({ instrumentId: instrument.id, symbol: instrument.symbol })),
+      totalAvailable,
+      capped: totalAvailable > result.instruments.length,
+      cap,
+    };
   }
 
   private evaluateRegisteredStrategy(config: BacktestStrategyConfig, bars: HistoricalBar[], index: number, exit = false) {
@@ -409,7 +438,12 @@ export class BacktestingStrategyLabService {
         fixedAmountPerTrade: config.fixedAmountPerTrade,
       });
     }
-    return { ...config, mode: config.strategyCode ? 'REGISTERED_STRATEGY' : config.mode || 'CUSTOM_RULES' };
+    return {
+      ...config,
+      mode: config.strategyCode ? 'REGISTERED_STRATEGY' : config.mode || 'CUSTOM_RULES',
+      region: config.region || config.universe.region || 'IN',
+      assetType: config.assetType || config.universe.assetType || 'STOCK',
+    };
   }
 
   private isRegisteredConfig(config: BacktestStrategyConfig) {

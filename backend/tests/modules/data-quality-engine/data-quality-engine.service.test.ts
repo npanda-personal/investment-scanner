@@ -83,8 +83,26 @@ describe('data quality engine service', () => {
       },
     });
     const result = await setup.instance.evaluate({ batchSize: 1, offset: 1 });
-    expect(setup.marketDataService.listInstruments).toHaveBeenCalledWith({ page: 2, pageSize: 1 });
+    expect(setup.marketDataService.listInstruments).toHaveBeenCalledWith({ page: 2, pageSize: 1, region: undefined, assetType: undefined });
     expect(result).toMatchObject({ processedCount: 1, totalCount: 3, batchSize: 1, offset: 1, nextOffset: 2, hasMore: true, evaluatedCount: 1 });
+  });
+
+  it('returns paginated list metadata', async () => {
+    const setup = service({
+      repository: {
+        list: jest.fn().mockResolvedValue([{ instrumentId: 'stock-1' }]),
+        count: jest.fn().mockResolvedValue(3),
+      },
+    });
+
+    const result = await setup.instance.list({ limit: 1, offset: 1, region: 'IN', assetType: 'STOCK' });
+
+    expect(setup.repository.list).toHaveBeenCalledWith({ limit: 1, offset: 1, region: 'IN', assetType: 'STOCK' });
+    expect(setup.repository.count).toHaveBeenCalledWith({ limit: 1, offset: 1, region: 'IN', assetType: 'STOCK' });
+    expect(result).toMatchObject({
+      items: [{ instrumentId: 'stock-1' }],
+      pagination: { total: 3, limit: 1, offset: 1, nextOffset: 2, hasMore: true },
+    });
   });
 
   it('continues batch evaluation when one instrument fails', async () => {

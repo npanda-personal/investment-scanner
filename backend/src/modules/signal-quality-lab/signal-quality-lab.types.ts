@@ -50,9 +50,17 @@ export interface QualityRecalculateResponse {
   inserted: number;
   updated: number;
   skipped: number;
+  insertedCount: number;
+  updatedCount: number;
+  skippedCount: number;
+  failedCount: number;
   evaluatedInBatch: number;
+  evaluatedCount: number;
+  unevaluatedInBatch: number;
+  unevaluatedCount: number;
   insufficientFuturePriceInBatch: number;
   missingPriceHistoryInBatch: number;
+  missingPriceHistoryCount: number;
   outcomesPersisted: boolean;
   message: string;
   warnings: string[];

@@ -33,7 +33,7 @@ Batch generation uses `researchContextMode=LIGHTWEIGHT`. It reads the instrument
 
 The frontend dispatches bounded backend batches through a small module-owned request pool, `signal_generation_engine_batch_request_workers_count`, after the first response returns `totalCount`. This overlaps independent offsets while backend workers still bound per-batch CPU/database work. The request pool is intentionally hidden from users and should remain small.
 
-The dashboard does not expose batch size or worker controls to users. To adjust local operational defaults, edit:
+The dashboard does not expose batch size or worker controls to users. It enables the Data Quality filter by default for manual full-scope generation so low-readiness rows are gated when evaluations exist, while missing evaluations can still warn and process according to backend request settings. To adjust local operational defaults, edit:
 - `frontend/src/features/signal-generation-engine/config.ts`
 - `backend/src/modules/signal-generation-engine/signal-generation-engine.config.ts`
 
@@ -99,7 +99,7 @@ Filtering behavior:
 - `strategyCode=CODE`: evaluates only that registered strategy for enrichment/filtering.
 
 Performance boundaries:
-- Default signal endpoints remain lightweight unless strategy matching flags are present.
+- Default signal endpoints remain lightweight unless strategy matching flags are present. The dashboard exposes "Show strategy context" as an explicit opt-in; otherwise Strategy Framework columns show that context is not loaded rather than implying no strategy match exists.
 - Strategy matching runs only for returned rows.
 - Matching fetches bounded price history for those rows and uses Strategy Framework evaluators instead of duplicating strategy rules.
 - Individual Strategy Framework matching failures produce a blocked strategy entry instead of failing the whole signal response.
@@ -110,8 +110,10 @@ Product language:
 - Signal UI should not label raw signals as trade decisions.
 
 ## Frontend Structure
-- `SignalsDashboardPage`: Subscribes to `useMarketScope()`. Automatically refetches signals when the header region changes.
-- `Manual Run`: Generation runs default to the active market scope.
+- `SignalsDashboardPage`: Subscribes to `useMarketScope()`. Automatically refetches signals when the header region or asset type changes.
+- `Manual Run`: Generation runs default to the active market scope, bounded module-owned batch settings, and the Data Quality filter enabled.
+- `Strategy Context`: Strategy matching and blocked-strategy diagnostics are loaded only when explicitly requested or when strategy filters require them.
+- `SignalTable`: Row click opens a raw-signal diagnostics drawer with score, direction, confidence, triggered/negative factors, warnings, and strategy context when loaded. Explicit buttons handle navigation to Research and Strategy Decision so table inspection does not unexpectedly route away.
 
 ## Tests
 - `backend/tests/modules/signal-generation-engine/signal-generation-engine.repository.test.ts`: Verifies idempotent upsert, write status, latest-row filtering, direction counts, asset scope compatibility, and sort allowlisting.

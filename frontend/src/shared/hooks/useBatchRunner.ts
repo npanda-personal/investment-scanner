@@ -13,6 +13,13 @@ export type BatchRunnerResponse = {
   skippedCount?: number;
   failedCount?: number;
   noOpCount?: number;
+  evaluatedCount?: number;
+  unevaluatedCount?: number;
+  missingPriceHistoryCount?: number;
+  missingPriceHistoryInBatch?: number;
+  calibratedCount?: number;
+  passthroughCount?: number;
+  outOfScopeSkipped?: number;
   warnings?: string[];
 };
 
@@ -29,6 +36,12 @@ export type BatchRunnerState<T extends BatchRunnerResponse = BatchRunnerResponse
   skippedCount: number;
   failedCount: number;
   noOpCount: number;
+  evaluatedCount: number;
+  unevaluatedCount: number;
+  missingPriceHistoryCount: number;
+  calibratedCount: number;
+  passthroughCount: number;
+  outOfScopeSkipped: number;
   warnings: string[];
   currentOffset: number;
   hasMore: boolean;
@@ -49,6 +62,12 @@ const initialState: BatchRunnerState = {
   skippedCount: 0,
   failedCount: 0,
   noOpCount: 0,
+  evaluatedCount: 0,
+  unevaluatedCount: 0,
+  missingPriceHistoryCount: 0,
+  calibratedCount: 0,
+  passthroughCount: 0,
+  outOfScopeSkipped: 0,
   warnings: [],
   currentOffset: 0,
   hasMore: false,
@@ -97,6 +116,12 @@ export function useBatchRunner<T extends BatchRunnerResponse = BatchRunnerRespon
       skippedCount: 0,
       failedCount: 0,
       noOpCount: 0,
+      evaluatedCount: 0,
+      unevaluatedCount: 0,
+      missingPriceHistoryCount: 0,
+      calibratedCount: 0,
+      passthroughCount: 0,
+      outOfScopeSkipped: 0,
       warnings: [] as string[],
     };
 
@@ -113,6 +138,12 @@ export function useBatchRunner<T extends BatchRunnerResponse = BatchRunnerRespon
       aggregate.skippedCount += result.skippedCount ?? 0;
       aggregate.failedCount += result.failedCount ?? 0;
       aggregate.noOpCount += result.noOpCount ?? 0;
+      aggregate.evaluatedCount += result.evaluatedCount ?? 0;
+      aggregate.unevaluatedCount += result.unevaluatedCount ?? 0;
+      aggregate.missingPriceHistoryCount += result.missingPriceHistoryCount ?? result.missingPriceHistoryInBatch ?? 0;
+      aggregate.calibratedCount += result.calibratedCount ?? 0;
+      aggregate.passthroughCount += result.passthroughCount ?? 0;
+      aggregate.outOfScopeSkipped += result.outOfScopeSkipped ?? 0;
       aggregate.warnings.push(...(result.warnings || []));
 
       const processedForProgress = resultOffset + processedCount;
@@ -133,6 +164,12 @@ export function useBatchRunner<T extends BatchRunnerResponse = BatchRunnerRespon
         skippedCount: aggregate.skippedCount,
         failedCount: aggregate.failedCount,
         noOpCount: aggregate.noOpCount,
+        evaluatedCount: aggregate.evaluatedCount,
+        unevaluatedCount: aggregate.unevaluatedCount,
+        missingPriceHistoryCount: aggregate.missingPriceHistoryCount,
+        calibratedCount: aggregate.calibratedCount,
+        passthroughCount: aggregate.passthroughCount,
+        outOfScopeSkipped: aggregate.outOfScopeSkipped,
         warnings: [...aggregate.warnings],
         currentOffset: Math.max(previous.currentOffset, result.nextOffset ?? processedForProgress),
         hasMore: !isComplete,

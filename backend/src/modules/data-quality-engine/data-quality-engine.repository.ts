@@ -31,7 +31,7 @@ export class DataQualityEngineRepository {
   async list(query: DataQualityQuery): Promise<DataQualityEvaluationDto[]> {
     const rows = await this.db.dataQualityEvaluation.findMany({
       where: this.where(query),
-      orderBy: [{ coverageScore: 'asc' }, { evaluatedAt: 'desc' }],
+      orderBy: this.orderBy(query),
       take: query.limit,
       skip: query.offset,
     });
@@ -80,18 +80,54 @@ export class DataQualityEngineRepository {
   }
 
   private where(query: Partial<DataQualityQuery>): any {
-    const regionFilter = resolveRelatedMarketRegionFilter(query.region);
+    const regionStockFilter = resolveRelatedMarketRegionFilter(query.region).stock as Prisma.StockWhereInput | undefined;
+    const assetStockFilter = this.assetTypeWhere(query.assetType);
+    const stockFilters = [regionStockFilter, assetStockFilter].filter((item): item is Prisma.StockWhereInput => Boolean(item && Object.keys(item).length > 0));
+    const stockFilter: Prisma.StockWhereInput = stockFilters.length > 1 ? { AND: stockFilters } : stockFilters[0] || {};
     
     return {
-      ...regionFilter,
+      stock: Object.keys(stockFilter).length > 0 ? stockFilter : undefined,
+      OR: query.search ? [
+        { symbol: { contains: query.search, mode: 'insensitive' } },
+        { companyName: { contains: query.search, mode: 'insensitive' } },
+      ] : undefined,
       coverageStatus: query.status,
       signalReadinessStatus: query.readinessStatus,
       liquidityStatus: query.liquidityStatus,
-      sector: query.sector ? { equals: query.sector, mode: 'insensitive' } : undefined,
-      country: query.country ? { equals: query.country, mode: 'insensitive' } : undefined,
+      sector: query.sector ? { contains: query.sector, mode: 'insensitive' } : undefined,
+      country: query.country ? { contains: query.country, mode: 'insensitive' } : undefined,
+      eligibleForSignals: query.eligibleForSignals,
+      eligibleForBacktesting: query.eligibleForBacktesting,
       coverageScore: query.minCoverageScore !== undefined ? { gte: query.minCoverageScore } : undefined,
       signalReadinessScore: query.minReadinessScore !== undefined ? { gte: query.minReadinessScore } : undefined,
     };
+  }
+
+  private orderBy(query: Partial<DataQualityQuery>): Prisma.DataQualityEvaluationOrderByWithRelationInput[] {
+    const direction = query.sortOrder === 'asc' ? 'asc' : 'desc';
+    const allowed: Record<string, Prisma.DataQualityEvaluationOrderByWithRelationInput> = {
+      symbol: { symbol: direction },
+      companyName: { companyName: direction },
+      coverageScore: { coverageScore: direction },
+      signalReadinessScore: { signalReadinessScore: direction },
+      liquidityScore: { liquidityScore: direction },
+      evaluatedAt: { evaluatedAt: direction },
+    };
+    return [allowed[query.sortBy || ''] || { signalReadinessScore: 'asc' }, { evaluatedAt: 'desc' }];
+  }
+
+  private assetTypeWhere(assetType?: string): Prisma.StockWhereInput {
+    const normalized = String(assetType || '').trim().toUpperCase();
+    if (!normalized) return {};
+    if (normalized === 'STOCK') {
+      return {
+        OR: [
+          { assetType: { in: ['STOCK', 'EQUITY'], mode: 'insensitive' } },
+          { assetType: null },
+        ],
+      };
+    }
+    return { assetType: { equals: normalized, mode: 'insensitive' } };
   }
 
   private toWrite(evaluation: DataQualityEvaluationDto) {

@@ -6,6 +6,30 @@ import type { StrategyDecisionDto, MarketGateResponse } from '../types';
 import { StatusBadge } from '@/shared/components';
 import { Link } from 'react-router-dom';
 
+const titleCase = (value: string) =>
+  value
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+const formatDecision = (value: string) => {
+  if (value === 'TRADE_CANDIDATE') return 'Review Candidate';
+  if (value === 'EXIT_CANDIDATE') return 'Exit Review';
+  if (value === 'REDUCE_RISK') return 'Reduce Risk';
+  if (value === 'INSUFFICIENT_DATA') return 'Insufficient Data';
+  return titleCase(value);
+};
+
+const formatAction = (value: string) => {
+  if (value === 'CONSIDER_ENTRY') return 'Consider Review';
+  if (value === 'AVOID_NEW_ENTRY') return 'Avoid New Review';
+  if (value === 'WAIT_FOR_CONFIRMATION') return 'Wait For Confirmation';
+  if (value === 'WAIT_FOR_PULLBACK') return 'Wait For Pullback';
+  if (value === 'REVIEW_EXIT') return 'Review Exit Risk';
+  if (value === 'REDUCE_EXPOSURE') return 'Reduce Exposure Risk';
+  return titleCase(value);
+};
+
 interface StrategyDecisionWidgetProps {
   instrumentId: string;
 }
@@ -40,7 +64,7 @@ const StrategyDecisionWidget: React.FC<StrategyDecisionWidgetProps> = ({ instrum
           <FactCheckOutlined color="primary" />
           <Typography variant="h6">Strategy Decision</Typography>
         </Box>
-        {decision && <StatusBadge label={decision.decision} />}
+        {decision && <StatusBadge label={formatDecision(decision.decision)} />}
       </Box>
 
       {gate && (
@@ -53,7 +77,7 @@ const StrategyDecisionWidget: React.FC<StrategyDecisionWidgetProps> = ({ instrum
       {decision ? (
         <Box>
           <Typography variant="body1" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-            {decision.action.replace(/_/g, ' ')}
+            {formatAction(decision.action)}
           </Typography>
           <Typography variant="caption" color="textSecondary" display="block" sx={{ mb: 1 }}>
             Strategy: {decision.strategy} | Region: {decision.country || 'N/A'} | Exchange: {decision.exchange || 'N/A'} | Score: {decision.decisionScore}/100

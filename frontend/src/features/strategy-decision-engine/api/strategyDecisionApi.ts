@@ -26,7 +26,7 @@ export const fetchCandidates = async (query: StrategyQuery): Promise<StrategyCan
   return response.data;
 };
 
-export const fetchExits = async (params: { portfolioId?: string; region?: string } = {}): Promise<StrategyDecisionDto[]> => {
+export const fetchExits = async (params: { portfolioId?: string; region?: string; assetType?: string } = {}): Promise<StrategyDecisionDto[]> => {
   const response = await axios.get<StrategyDecisionDto[]>(`${API_BASE}/exits`, { params });
   return response.data;
 };

@@ -37,6 +37,7 @@ These guidelines apply across the application. They are intentionally product-le
 - Disable duplicate run buttons while the operation is active.
 - Keep progress, warnings, and final summary in the same visual container as the action that started the work.
 - After each batch or final completion, refresh the visible data if the operation changes what the user is looking at.
+- Keep progress count labels semantically distinct. For example, do not roll missing prerequisites, skipped records, failed records, and "not yet evaluable" records into one generic skipped/unevaluated count.
 
 ## Status And Diagnostics
 

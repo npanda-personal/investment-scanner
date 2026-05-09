@@ -52,17 +52,18 @@ Response fields include the previous compatibility fields plus progress metadata
 - `nextOffset`
 - `hasMore`
 - `calibratedCount`
+- `passthroughCount`
 - `skippedCount`
 - `failedCount`
 - `outOfScopeSkipped`
 - `warnings`
 - `durationMs`
 
-Individual instrument failures are counted in `failedCount` and returned in `warnings`/`errors`; the rest of the batch continues. If Signal Quality diagnostics are unavailable or too sparse, the run succeeds with passthrough/skipped results and warnings instead of failing the batch.
+Individual instrument failures are counted in `failedCount` and returned in `warnings`/`errors`; the rest of the batch continues. If Signal Quality diagnostics are unavailable or too sparse, the run succeeds with `passthroughCount` results that preserve the raw score and explain the missing evidence. `skippedCount` is reserved for records that were not calibrated at all, such as a single requested instrument outside the selected market scope.
 
 ## Global Market Scope & Pagination
 
-The `/signals/calibration/top`, `/signals/calibration/run`, and `/signals/calibration/compare/:instrumentId` endpoints respect Global Market Scope (`region` and `assetType`). The backend filters calibration rows through `Stock` metadata using the shared market-scope helper, so `region=IN&assetType=STOCK` excludes US/EU rows when their stock metadata is out of scope.
+The `/signals/calibration/top`, `/signals/calibration/run`, and `/signals/calibration/compare/:instrumentId` endpoints respect Global Market Scope (`region` and `assetType`). The backend filters calibration rows through `Stock` metadata using the shared market-scope helper, so `region=IN&assetType=STOCK` excludes US/EU rows when their stock metadata is out of scope. Scoped single-instrument compare/run requests do not persist calibration for instruments outside the requested scope; they return a not-found/skip result instead.
 
 The `/signals/calibration/top` endpoint returns a `PaginatedCalibrationResponse` with `items`, `totalCount`, `limit`, `offset`, `hasMore`, `sortBy`, and `sortDirection`.
 
@@ -201,7 +202,9 @@ Downstream strategy triage modules that need fast, bounded reads should use the 
 ## Performance And UX Behavior
 
 - Calibration top/model/health endpoints are lightweight and bounded for initial page load.
-- Full calibration runs are manual and batch-based; the UI keeps the run button disabled with progress text until all batches finish.
+- Full calibration runs are manual and batch-based; the UI uses the shared batch runner with module-owned `signal_calibration_engine_batch_size = 100` and `signal_calibration_engine_batch_request_workers_count = 4`, keeps the run button disabled, and shows determinate progress until all batches finish.
+- Batch progress keeps applied calibrations, passthrough raw-score preservations, skipped records, out-of-scope skips, failures, and warnings as separate counters.
+- Batch runs load Signal Quality grouping metrics once per batch and reuse them across signals. Per-instrument lookups are still used for historical context snapshots and latest Data Quality Engine evaluation.
 - Raw-vs-calibrated comparison is fetched only after a user selects one instrument from the searchable selector.
 
 ## Known Limitations

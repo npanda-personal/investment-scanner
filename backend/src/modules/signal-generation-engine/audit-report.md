@@ -131,3 +131,27 @@
 - **Signal Impact:** Users saw many `/signals/run` requests finish one at a time, increasing total run duration unnecessarily.
 - **Implemented Fix:** Added a hidden module-owned frontend request pool, `signal_generation_engine_batch_request_workers_count`, so independent backend offsets can run concurrently after the first batch discovers `totalCount`.
 - **Safe to fix now:** DONE
+
+### 10. Performance Audit: Strategy Context Loaded On Every Table Request
+- **Affected File(s):** `SignalsDashboardPage.tsx`, `SignalTable.tsx`, `signal-generation-engine.md`
+- **Severity:** MEDIUM
+- **Why it matters:** The dashboard requested `includeStrategyMatches=true` for every list view even when users were only scanning raw signals. That forced Strategy Framework enrichment, extra price-history reads, and strategy-performance lookups into the default table path.
+- **Signal Impact:** Raw signal browsing became heavier than necessary and the table could show "No match" when the user had not intentionally asked to load strategy context.
+- **Implemented Fix:** Made strategy context opt-in with a "Show strategy context" control. Strategy filters still load context automatically when required, and the table now shows "Not loaded" when context is intentionally skipped.
+- **Safe to fix now:** DONE
+
+### 11. Architecture Audit: Strategy Framework Barrel Export Cycle
+- **Affected File(s):** `signal-generation-engine.service.ts`
+- **Severity:** MEDIUM
+- **Why it matters:** Strategy Framework exports evaluator/registry through its public index, but importing that barrel here loads Strategy Framework service/router/module side effects, which currently pull Market Context back into Signal Generation and create a circular constructor failure in tests.
+- **Signal Impact:** A naive public-barrel import breaks Signal Generation tests and can make runtime module load order fragile.
+- **Recommended Fix:** Split Strategy Framework public exports into a side-effect-light contract/evaluator entrypoint, or make its module index avoid eager router/service imports. Until then, keep the existing direct evaluator/registry imports and do not import another module's repository directly.
+- **Safe to fix now:** NO, because it requires a broader Strategy Framework export cleanup outside this module pass.
+
+### 12. UX Audit: Row Click Navigated Away Instead Of Inspecting Signal Evidence
+- **Affected File(s):** `SignalTable.tsx`, `signal-generation-engine.md`
+- **Severity:** MEDIUM
+- **Why it matters:** The shared table UX standard says row click should inspect dense comparison rows, while explicit buttons should handle navigation. Signal rows previously navigated directly to stock research, which made it hard to inspect full triggered/negative evidence without leaving the page.
+- **Signal Impact:** Users could not quickly audit why a raw score was bullish, neutral, or bearish from the signal table itself.
+- **Implemented Fix:** Row click now opens a raw-signal diagnostics drawer with score, direction, confidence, triggered factors, negative factors, warnings, and optional strategy context. Research and Strategy Decision remain explicit actions.
+- **Safe to fix now:** DONE

@@ -1,6 +1,6 @@
 import { HistoricalContextSnapshotsService } from '../historical-context-snapshots';
 import { SignalGenerationEngineService, type SignalResultDto } from '../signal-generation-engine';
-import { SignalQualityLabService, type QualityHorizon, type QualityMetricGroup, type SignalTypePerformance } from '../signal-quality-lab';
+import { SignalQualityLabService, type NoisySignalItem, type QualityHorizon, type QualityMetricGroup, type SignalTypePerformance } from '../signal-quality-lab';
 import { DataQualityEngineService } from '../data-quality-engine';
 import { SignalCalibrationEngineRepository } from './signal-calibration-engine.repository';
 import type {
@@ -40,6 +40,13 @@ const CAPS = {
 
 const TOTAL_DELTA_CAP = 25;
 
+type BatchQualityMetrics = {
+  byType: SignalTypePerformance[];
+  byScore: QualityMetricGroup[];
+  bySector: QualityMetricGroup[];
+  noisy: NoisySignalItem[];
+};
+
 export class SignalCalibrationEngineService {
   constructor(
     private readonly repository = new SignalCalibrationEngineRepository(),
@@ -66,13 +73,12 @@ export class SignalCalibrationEngineService {
     const horizon = this.parseHorizon(horizonInput);
     const summary = await this.qualityService.summary({ horizon, limit: 1, minSampleSize: 0, region, assetType, sector: raw.sector || undefined, country: raw.country || undefined }).catch(() => null);
     const stock = await this.repository.instrumentInScope(instrumentId, region, assetType);
-    const calibratedSignal = await this.calibrateAndPersist(raw, horizon, summary, { region, assetType });
-
     if (!stock && region && region !== 'GLOBAL') {
-      const warning = `Selected instrument is outside the requested market scope (${region} / ${assetType || 'ALL'}).`;
-      calibratedSignal.dataGaps.push(warning);
-      if (calibratedSignal.calibrationEvidence) calibratedSignal.calibrationEvidence.evidenceWarnings.push(warning);
-    } else if (stock) {
+      return null;
+    }
+
+    const calibratedSignal = await this.calibrateAndPersist(raw, horizon, summary, { region, assetType });
+    if (stock) {
       calibratedSignal.region = stock.region ?? null;
       calibratedSignal.exchange = stock.exchange ?? null;
       calibratedSignal.assetType = stock.assetType ?? null;
@@ -85,6 +91,7 @@ export class SignalCalibrationEngineService {
     const started = Date.now();
     const generatedAt = new Date().toISOString();
     const errors: string[] = [];
+    const warnings: string[] = [];
     const totalCount = await this.resolveTotalCount(request);
     const batchSize = request.instrumentId || request.symbol ? 1 : this.clampInt(request.batchSize ?? request.limit, 25, 1, 100);
     const offset = request.instrumentId || request.symbol ? 0 : this.clampInt(request.offset, 0, 0, Number.MAX_SAFE_INTEGER);
@@ -96,10 +103,16 @@ export class SignalCalibrationEngineService {
     const summaryQuery = { horizon, limit: 1, minSampleSize: 0, sector: request.sector, country: request.country, region: request.region, assetType: request.assetType };
     const qualityWarning = 'Signal Quality diagnostics unavailable; using raw score because calibration evidence is missing.';
     const globalSummary = await this.qualityService.summary(summaryQuery).catch(() => null);
+    const batchQualityMetrics = await this.batchQualityMetrics(summaryQuery);
 
     for (const signal of signals) {
       try {
-        const calibrated = await this.calibrateAndPersist(signal, horizon, globalSummary, { region: request.region, assetType: request.assetType });
+        if (await this.outsideRequestedScope(signal.instrument_id, request)) {
+          outOfScopeSkipped += 1;
+          warnings.push(`${signal.instrument_id}: outside requested market scope (${request.region} / ${request.assetType || 'ALL'}).`);
+          continue;
+        }
+        const calibrated = await this.calibrateAndPersist(signal, horizon, globalSummary, { region: request.region, assetType: request.assetType }, batchQualityMetrics);
         if (!globalSummary) {
           calibrated.dataGaps.push(qualityWarning);
           calibrated.calibrationEvidence?.evidenceWarnings.push(qualityWarning);
@@ -112,6 +125,7 @@ export class SignalCalibrationEngineService {
     
     const processedCount = signals.length;
     const nextOffset = offset + processedCount;
+    const passthroughCount = results.filter((result) => !result.calibrationApplied).length;
     const skipped = Math.max(0, signals.length - results.length - errors.length);
     return {
       generated: results.length,
@@ -126,10 +140,11 @@ export class SignalCalibrationEngineService {
       nextOffset: nextOffset < totalCount ? nextOffset : null,
       hasMore: nextOffset < totalCount,
       calibratedCount: results.filter((result) => result.calibrationApplied).length,
-      skippedCount: skipped + results.filter((result) => !result.calibrationApplied).length,
+      passthroughCount,
+      skippedCount: skipped,
       failedCount: errors.length,
       outOfScopeSkipped,
-      warnings: [...(globalSummary ? [] : [qualityWarning]), ...errors],
+      warnings: [...(globalSummary ? [] : [qualityWarning]), ...warnings, ...errors],
       durationMs: Date.now() - started,
     };
   }
@@ -348,11 +363,17 @@ export class SignalCalibrationEngineService {
     };
   }
 
-  private async calibrateAndPersist(signal: SignalResultDto, horizon: QualityHorizon = DEFAULT_HORIZON, globalSummary: any = null, scope: { region?: string; assetType?: string } = {}): Promise<SignalCalibrationResultDto> {
-    return this.repository.create(this.calibrate(signal, await this.context(signal, horizon, globalSummary, scope)));
+  private async calibrateAndPersist(
+    signal: SignalResultDto,
+    horizon: QualityHorizon = DEFAULT_HORIZON,
+    globalSummary: any = null,
+    scope: { region?: string; assetType?: string } = {},
+    batchQualityMetrics?: BatchQualityMetrics
+  ): Promise<SignalCalibrationResultDto> {
+    return this.repository.create(this.calibrate(signal, await this.context(signal, horizon, globalSummary, scope, batchQualityMetrics)));
   }
 
-  private async context(signal: SignalResultDto, horizon: QualityHorizon, globalSummary: any, scope: { region?: string; assetType?: string }): Promise<CalibrationContext> {
+  private async context(signal: SignalResultDto, horizon: QualityHorizon, globalSummary: any, scope: { region?: string; assetType?: string }, batchQualityMetrics?: BatchQualityMetrics): Promise<CalibrationContext> {
     const query = {
       horizon,
       limit: 1000,
@@ -363,10 +384,10 @@ export class SignalCalibrationEngineService {
       assetType: scope.assetType,
     };
     const [byType, byScore, bySector, noisy, lookup, dataQualityEvaluation] = await Promise.all([
-      this.qualityService.byType(query).catch(() => []),
-      this.qualityService.byScoreBucket(query).catch(() => []),
-      this.qualityService.bySector(query).catch(() => []),
-      this.qualityService.noisy({ ...query, limit: 250 }).catch(() => []),
+      batchQualityMetrics ? Promise.resolve(batchQualityMetrics.byType) : this.qualityService.byType(query).catch(() => []),
+      batchQualityMetrics ? Promise.resolve(batchQualityMetrics.byScore) : this.qualityService.byScoreBucket(query).catch(() => []),
+      batchQualityMetrics ? Promise.resolve(batchQualityMetrics.bySector) : this.qualityService.bySector(query).catch(() => []),
+      batchQualityMetrics ? Promise.resolve(batchQualityMetrics.noisy) : this.qualityService.noisy({ ...query, limit: 250 }).catch(() => []),
       this.contextService.lookup(new Date(signal.generated_at), 7, { instrumentId: signal.instrument_id, sector: signal.sector || undefined, country: signal.country || undefined }).catch(() => null),
       this.dataQualityService.getLatestEvaluationForInstrument(signal.instrument_id).catch(() => null),
     ]);
@@ -387,6 +408,21 @@ export class SignalCalibrationEngineService {
       horizonAvailability: globalSummary?.horizonAvailability || null,
       evaluationDiagnostics: globalSummary?.evaluationDiagnostics || null,
       horizon,
+    };
+  }
+
+  private async batchQualityMetrics(query: { horizon: QualityHorizon; limit: number; minSampleSize: number; sector?: string; country?: string; region?: string; assetType?: string }): Promise<BatchQualityMetrics> {
+    const [byType, byScore, bySector, noisy] = await Promise.all([
+      this.qualityService.byType(query).catch(() => []),
+      this.qualityService.byScoreBucket(query).catch(() => []),
+      this.qualityService.bySector(query).catch(() => []),
+      this.qualityService.noisy({ ...query, limit: 5000 }).catch(() => []),
+    ]);
+    return {
+      byType: byType as SignalTypePerformance[],
+      byScore: byScore as QualityMetricGroup[],
+      bySector: bySector as QualityMetricGroup[],
+      noisy: noisy as NoisySignalItem[],
     };
   }
 
@@ -482,6 +518,13 @@ export class SignalCalibrationEngineService {
       region: request.region,
       assetType: request.assetType,
     });
+  }
+
+  private async outsideRequestedScope(instrumentId: string, request: CalibrationRunRequest): Promise<boolean> {
+    if (!request.region || request.region === 'GLOBAL') return false;
+    if (!request.instrumentId && !request.symbol) return false;
+    const stock = await this.repository.instrumentInScope(instrumentId, request.region, request.assetType);
+    return !stock;
   }
 
   private metricAdjustment(metric: { winRate: number | null; averageForwardReturn: number | null; sampleSize: number } | null, type: CalibrationAdjustment['type'], label: string, add: (adjustment: CalibrationAdjustment, groupSize?: number) => void) {

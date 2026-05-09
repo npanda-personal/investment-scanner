@@ -45,8 +45,7 @@ import {
 import { useBacktestingStrategyLab } from '../hooks';
 import type { BacktestRun, BacktestStrategyConfig, EntryRuleType, ExitRuleType, PositionSizeType, UniverseType } from '../types';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
-import { fetchStrategies } from '@/features/strategy-framework/api/strategyFrameworkApi';
-import type { StrategyDefinition, StrategyTimeframe } from '@/features/strategy-framework';
+import { fetchStrategies, type StrategyDefinition, type StrategyTimeframe } from '@/features/strategy-framework';
 
 const today = new Date().toISOString().slice(0, 10);
 const defaultStart = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -76,13 +75,14 @@ const defaultConfig: BacktestStrategyConfig = {
   excludeMissingQuality: false,
 };
 
-const fmtMoney = (value: number | null | undefined) => value === null || value === undefined
+const fmtMoney = (value: number | null | undefined, region = 'GLOBAL') => value === null || value === undefined
   ? 'N/A'
-  : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
+  : new Intl.NumberFormat(region === 'IN' ? 'en-IN' : 'en-US', { style: 'currency', currency: region === 'IN' ? 'INR' : 'USD', maximumFractionDigits: 0 }).format(value);
 const fmtPercent = (value: number | null | undefined) => value === null || value === undefined
   ? 'N/A'
   : `${(value * 100).toFixed(1)}%`;
 const fmtNumber = (value: number | null | undefined) => value === null || value === undefined ? 'N/A' : value.toFixed(2);
+const compactMoneyTick = (value: number, region = 'GLOBAL') => `${region === 'IN' ? '₹' : '$'}${Math.round(value / 1000)}k`;
 
 export default function BacktestingStrategyLabPage() {
   const { scope } = useMarketScope();
@@ -104,7 +104,7 @@ export default function BacktestingStrategyLabPage() {
   } = useBacktestingStrategyLab();
   const [name, setName] = useState('SMA Trend Strategy');
   const [description, setDescription] = useState('Daily close MVP strategy using trend and signal proxy rules.');
-  const [symbolsText, setSymbolsText] = useState('AAPL,MSFT,SPY');
+  const [symbolsText, setSymbolsText] = useState('RELIANCE,TCS,INFY');
   const [config, setConfig] = useState<BacktestStrategyConfig>(defaultConfig);
   const [mode, setMode] = useState<'registered' | 'custom' | 'runs'>(searchParams.get('mode') === 'custom' ? 'custom' : 'registered');
   const [frameworkStrategies, setFrameworkStrategies] = useState<StrategyDefinition[]>([]);
@@ -122,7 +122,9 @@ export default function BacktestingStrategyLabPage() {
   const [registeredTakeProfit, setRegisteredTakeProfit] = useState(0);
 
   const canUseSymbols = config.universe.type === 'SYMBOLS';
-  const latestRun = selectedRun ?? runs[0] ?? null;
+  const runMatchesScope = (run: BacktestRun) => run.config.region === scope.region && run.config.assetType === scope.assetType;
+  const scopedRuns = useMemo(() => runs.filter(runMatchesScope), [runs, scope.region, scope.assetType]);
+  const latestRun = selectedRun && runMatchesScope(selectedRun) ? selectedRun : scopedRuns[0] ?? null;
   const selectedFrameworkStrategy = frameworkStrategies.find((strategy) => strategy.code === registeredCode) ?? frameworkStrategies[0] ?? null;
 
   useEffect(() => {
@@ -156,10 +158,10 @@ export default function BacktestingStrategyLabPage() {
   const normalizedConfig = (): BacktestStrategyConfig => ({
     ...config,
     mode: 'CUSTOM_RULES',
+    region: scope.region,
+    assetType: scope.assetType,
     universe: {
       ...config.universe,
-      region: config.universe.type === 'ALL' ? scope.region : undefined,
-      assetType: config.universe.type === 'ALL' ? scope.assetType : undefined,
       symbols: canUseSymbols ? symbolsText.split(',').map((item) => item.trim().toUpperCase()).filter(Boolean) : config.universe.symbols,
     },
   });
@@ -214,7 +216,7 @@ export default function BacktestingStrategyLabPage() {
           <Typography variant="h4" fontWeight={700}>Backtesting & Strategy Lab</Typography>
           <Stack direction="row" spacing={1} alignItems="center">
             <Typography color="text.secondary">Historical daily-close simulations. Results are not predictions.</Typography>
-            <Chip label={`Scope: ${scope.region}`} size="small" variant="outlined" color="info" />
+            <Chip label={`Scope: ${scope.region} / ${scope.assetType}`} size="small" variant="outlined" color="info" />
           </Stack>
         </Box>
         <Button variant="contained" startIcon={<PlayArrowIcon />} onClick={() => void runConfig(mode === 'registered' ? registeredConfig() : normalizedConfig())} disabled={running || (mode === 'registered' && !registeredCode)}>
@@ -251,7 +253,7 @@ export default function BacktestingStrategyLabPage() {
                 <FormControl size="small">
                   <InputLabel>Universe</InputLabel>
                   <Select label="Universe" value={registeredUniverse} onChange={(event) => setRegisteredUniverse(event.target.value as UniverseType)}>
-                    <MenuItem value="ALL">All eligible instruments</MenuItem>
+                    <MenuItem value="ALL">All eligible instruments (bounded)</MenuItem>
                     <MenuItem value="SYMBOLS">Symbols</MenuItem>
                   </Select>
                 </FormControl>
@@ -291,7 +293,7 @@ export default function BacktestingStrategyLabPage() {
               <FormControl size="small">
                 <InputLabel>Universe</InputLabel>
                 <Select label="Universe" value={config.universe.type} onChange={handleUniverseChange}>
-                  <MenuItem value="ALL">All available instruments</MenuItem>
+                  <MenuItem value="ALL">All available instruments (bounded)</MenuItem>
                   <MenuItem value="SYMBOLS">Selected symbols</MenuItem>
                 </Select>
               </FormControl>
@@ -398,9 +400,9 @@ export default function BacktestingStrategyLabPage() {
           <ResultsPanel run={latestRun} chartData={chartData} />
           <Paper sx={{ p: 2 }}>
             <Typography variant="h6" sx={{ mb: 1 }}>Saved Runs</Typography>
-            {runs.length === 0 ? <Typography color="text.secondary">No runs yet. Configure a strategy and run the first simulation.</Typography> : (
+            {scopedRuns.length === 0 ? <Typography color="text.secondary">No runs yet for {scope.region} / {scope.assetType}. Configure a strategy and run the first simulation.</Typography> : (
               <Stack spacing={1}>
-                {runs.slice(0, 8).map((run) => (
+                {scopedRuns.slice(0, 8).map((run) => (
                   <Paper key={run.id} variant="outlined" sx={{ p: 1.25 }}>
                     <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" gap={1}>
                       <Stack direction="row" spacing={1} alignItems="center">
@@ -471,7 +473,7 @@ function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: 
         </Paper>
       )}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 1.5 }}>
-        <MetricCard label="Ending Capital" value={fmtMoney((run.config.initialCapital || 0) * (1 + (metrics?.totalReturn || 0)))} />
+        <MetricCard label="Ending Capital" value={fmtMoney((run.config.initialCapital || 0) * (1 + (metrics?.totalReturn || 0)), run.config.region)} />
         <MetricCard label="Total Return" value={fmtPercent(metrics?.totalReturn)} />
         <MetricCard label="CAGR" value={fmtPercent(metrics?.cagr)} />
         <MetricCard label="Max Drawdown" value={fmtPercent(metrics?.maxDrawdown)} />
@@ -506,9 +508,9 @@ function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: 
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="date" minTickGap={32} />
-              <YAxis yAxisId="left" tickFormatter={(value) => `$${Math.round(Number(value) / 1000)}k`} />
+              <YAxis yAxisId="left" tickFormatter={(value) => compactMoneyTick(Number(value), run.config.region)} />
               <YAxis yAxisId="right" orientation="right" tickFormatter={(value) => `${value}%`} />
-              <ChartTooltip formatter={(value, name) => name === 'drawdownLabel' ? [`${value}%`, 'Drawdown'] : [fmtMoney(Number(value)), 'Equity']} />
+              <ChartTooltip formatter={(value, name) => name === 'drawdownLabel' ? [`${value}%`, 'Drawdown'] : [fmtMoney(Number(value), run.config.region), 'Equity']} />
               <Line yAxisId="left" type="monotone" dataKey="equityLabel" stroke="#1976d2" dot={false} strokeWidth={2} />
               <Line yAxisId="right" type="monotone" dataKey="drawdownLabel" stroke="#d32f2f" dot={false} strokeWidth={1.5} />
             </LineChart>
@@ -525,6 +527,7 @@ function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: 
         <Alert severity={metrics.dataCoverage.warnings.length ? 'warning' : 'info'}>
           Data coverage: {metrics.dataCoverage.instrumentsWithEnoughHistory} / {metrics.dataCoverage.instrumentsConsidered} instruments had enough history;
           excluded for history {metrics.dataCoverage.instrumentsExcludedForHistory}, data quality {metrics.dataCoverage.instrumentsExcludedForDataQuality}.
+          {metrics.dataCoverage.universeCapped && metrics.dataCoverage.universeTotalAvailable ? ` Bounded universe: ${metrics.dataCoverage.universeCap} of ${metrics.dataCoverage.universeTotalAvailable} instruments considered.` : ''}
           {metrics.dataCoverage.warnings.length ? ` ${metrics.dataCoverage.warnings.join(' ')}` : ''}
         </Alert>
       )}
@@ -565,7 +568,7 @@ function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: 
                     <TableCell>{trade.entryDate} @ {trade.entryPrice.toFixed(2)}</TableCell>
                     <TableCell>{trade.exitDate} @ {trade.exitPrice.toFixed(2)}</TableCell>
                     <TableCell align="right" sx={{ color: trade.returnPercent >= 0 ? 'success.main' : 'error.main' }}>{fmtPercent(trade.returnPercent)}</TableCell>
-                    <TableCell align="right">{fmtMoney(trade.netPnL)}</TableCell>
+                    <TableCell align="right">{fmtMoney(trade.netPnL, run.config.region)}</TableCell>
                     <TableCell>{[trade.entryReason, trade.exitReason].filter(Boolean).join(' / ')}</TableCell>
                   </TableRow>
                 ))}

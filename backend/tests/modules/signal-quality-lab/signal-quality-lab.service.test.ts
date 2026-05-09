@@ -139,13 +139,39 @@ describe('signal quality lab service', () => {
       offset: 0,
       inserted: 0,
       updated: 0,
-      skipped: 1,
+      skipped: 0,
+      insertedCount: 0,
+      updatedCount: 0,
+      skippedCount: 0,
+      failedCount: 0,
       evaluatedInBatch: 1,
+      evaluatedCount: 1,
+      unevaluatedInBatch: 0,
+      unevaluatedCount: 0,
+      missingPriceHistoryCount: 0,
       outcomesPersisted: false,
       nextOffset: 1,
       hasMore: true,
     });
-    expect(result.warnings[0]).toContain('on demand');
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('passes market scope to recalculation signal paging', async () => {
+    const signalHistory = jest.fn().mockResolvedValue([baseSignal({ id: 's1' })]);
+    const signalHistoryCount = jest.fn().mockResolvedValue(1);
+    const service = new SignalQualityLabService(
+      {} as any,
+      { signalHistory, signalHistoryCount } as any,
+      {
+        listPricesByInstrumentId: jest.fn().mockResolvedValue({
+          prices: prices.map((price) => ({ date: price.date, adjusted_close: price.adjustedClose })),
+        }),
+      } as any,
+      { regimeForDate: jest.fn().mockResolvedValue(null) } as any
+    );
+    await service.recalculate({ batchSize: 100, offset: 0, region: 'IN', assetType: 'STOCK' });
+    expect(signalHistoryCount).toHaveBeenCalledWith(expect.objectContaining({ region: 'IN', assetType: 'STOCK' }));
+    expect(signalHistory).toHaveBeenCalledWith(expect.objectContaining({ region: 'IN', assetType: 'STOCK' }));
   });
 
   it('diagnoses raw signals with no future prices instead of returning misleading empties', async () => {
@@ -166,6 +192,7 @@ describe('signal quality lab service', () => {
     expect(dashboard.summary).toMatchObject({
       totalSignals: 1,
       evaluatedSignals: 0,
+      unevaluatedSignals: 1,
       dataStatus: 'PARTIAL',
     });
     expect(dashboard.summary.evaluationDiagnostics).toMatchObject({
@@ -185,6 +212,28 @@ describe('signal quality lab service', () => {
     const summary = await service.summary({ horizon: '1D', limit: 10, minSampleSize: 0 });
     expect(summary.evaluatedSignals).toBe(1);
     expect(summary.horizonAvailability['1D']).toMatchObject({ eligible: 1, evaluated: 1, insufficientFuturePrice: 0 });
+  });
+
+  it('uses a bounded historical analysis window instead of only the small visible page limit', async () => {
+    const signals = Array.from({ length: 200 }).map((_, index) => baseSignal({ id: `s${index}`, instrument_id: `stock-${index}` }));
+    const signalHistory = jest.fn().mockImplementation((query) => signals.slice(query.offset ?? 0, (query.offset ?? 0) + query.limit));
+    const service = new SignalQualityLabService(
+      {} as any,
+      {
+        signalHistory,
+        signalHistoryCount: jest.fn().mockResolvedValue(signals.length),
+      } as any,
+      {
+        listForwardPriceWindowsByInstrumentIds: jest.fn().mockImplementation(async (instrumentIds: string[]) => new Map(
+          instrumentIds.map((id) => [id, prices.map((price) => ({ date: price.date, adjusted_close: price.adjustedClose }))])
+        )),
+      } as any,
+      { regimeForDate: jest.fn().mockResolvedValue(null) } as any
+    );
+    const summary = await service.summary({ horizon: '1D', limit: 10, minSampleSize: 0 });
+    expect(signalHistory).toHaveBeenCalledWith(expect.objectContaining({ limit: 5000 }));
+    expect(summary.totalSignals).toBe(200);
+    expect(summary.evaluatedSignals).toBe(200);
   });
 
   it('uses bulk forward price windows for multi-instrument batches when available', async () => {
@@ -225,7 +274,31 @@ describe('signal quality lab service', () => {
     );
     const summary = await service.summary({ horizon: '5D', limit: 10, minSampleSize: 0 });
     expect(summary.evaluationDiagnostics.missingPriceHistoryCount).toBe(1);
+    expect(summary.unevaluatedSignals).toBe(0);
+    expect(summary.evaluationDiagnostics.unevaluatedSignals).toBe(0);
     expect(summary.recommendedAction).toContain('Sync historical market data');
+  });
+
+  it('separates missing price history from unevaluated batch progress', async () => {
+    const service = new SignalQualityLabService(
+      {} as any,
+      {
+        signalHistory: jest.fn().mockResolvedValue([baseSignal({ id: 'missing-prices' })]),
+        signalHistoryCount: jest.fn().mockResolvedValue(1),
+      } as any,
+      { listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: [] }) } as any,
+      { regimeForDate: jest.fn().mockResolvedValue(null) } as any
+    );
+    const result = await service.recalculate({ batchSize: 1, offset: 0, horizon: '5D' });
+    expect(result).toMatchObject({
+      processedCount: 1,
+      evaluatedCount: 0,
+      unevaluatedCount: 0,
+      unevaluatedInBatch: 0,
+      missingPriceHistoryInBatch: 1,
+      missingPriceHistoryCount: 1,
+      insufficientFuturePriceInBatch: 0,
+    });
   });
 
   it('diagnoses data-quality filters that exclude all signals', async () => {
@@ -247,6 +320,28 @@ describe('signal quality lab service', () => {
     const summary = await service.summary({ horizon: '5D', limit: 10, minSampleSize: 0, readinessStatus: 'READY' });
     expect(summary.evaluationDiagnostics).toMatchObject({ signalsAfterFilters: 0, excludedByDataQualityCount: 1 });
     expect(summary.warnings).toContain('0 signals remain after data-quality filters.');
+  });
+
+  it('excludes missing data-quality evaluations when strict readiness filters are selected', async () => {
+    const signal = baseSignal({ id: 'missing-evaluation', instrument_id: 'missing-evaluation' });
+    const service = new SignalQualityLabService(
+      {} as any,
+      {
+        signalHistory: jest.fn().mockResolvedValue([signal]),
+        signalHistoryCount: jest.fn().mockResolvedValue(1),
+      } as any,
+      { listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: [] }) } as any,
+      { regimeForDate: jest.fn().mockResolvedValue(null) } as any,
+      { getEvaluationsForInstruments: jest.fn().mockResolvedValue([]) } as any
+    );
+    const summary = await service.summary({ horizon: '5D', limit: 10, minSampleSize: 0, onlySignalReady: true });
+    expect(summary.totalSignals).toBe(0);
+    expect(summary.dataQualityFilterSummary).toMatchObject({
+      totalSignalsBeforeFilter: 1,
+      totalSignalsAfterFilter: 0,
+      excludedByDataQuality: 1,
+      missingQualityEvaluationCount: 1,
+    });
   });
 
   it('detects failed bullish, failed bearish, low confidence, stale, and flip noise', () => {

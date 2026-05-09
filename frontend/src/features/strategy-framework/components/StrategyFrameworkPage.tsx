@@ -5,6 +5,7 @@ import {
   Box,
   Button,
   Chip,
+  CircularProgress,
   Divider,
   FormControl,
   Grid,
@@ -42,6 +43,7 @@ const StrategyFrameworkPage: React.FC = () => {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [running, setRunning] = React.useState(false);
+  const [evaluationError, setEvaluationError] = React.useState<string | null>(null);
   const [instrument, setInstrument] = React.useState<V1Instrument | null>(null);
   const [evaluation, setEvaluation] = React.useState<StrategyEvaluationResult[]>([]);
   const [sortBy, setSortBy] = React.useState('ratingScore');
@@ -86,6 +88,11 @@ const StrategyFrameworkPage: React.FC = () => {
       });
   }, [selectedCode, timeframe, scope.region, scope.assetType]);
 
+  React.useEffect(() => {
+    setEvaluation([]);
+    setEvaluationError(null);
+  }, [instrument?.id, selectedCode, scope.region, scope.assetType]);
+
   const sortedRankings = React.useMemo(() => {
     return [...rankings].sort((a, b) => {
       const left = Number((a as any)[sortBy] ?? 0);
@@ -97,6 +104,7 @@ const StrategyFrameworkPage: React.FC = () => {
   const runEvaluation = async () => {
     if (!instrument) return;
     setRunning(true);
+    setEvaluationError(null);
     try {
       const result = await evaluateStrategy({
         strategyCode: selectedCode || 'ALL',
@@ -105,7 +113,10 @@ const StrategyFrameworkPage: React.FC = () => {
         assetType: scope.assetType,
       });
       setEvaluation(result.results);
-      setTab(5);
+      setTab(4);
+    } catch (err: any) {
+      setEvaluation([]);
+      setEvaluationError(err?.response?.data?.error || 'Strategy evaluation failed.');
     } finally {
       setRunning(false);
     }
@@ -197,10 +208,21 @@ const StrategyFrameworkPage: React.FC = () => {
             <Grid container spacing={2} alignItems="center">
               <Grid item xs={12} md={6}><InstrumentSearchSelect value={instrument} onChange={setInstrument} /></Grid>
               <Grid item xs={12} md={4}><ToolbarStrategySelect strategies={strategies} selectedCode={selectedCode} onStrategyChange={setSelectedCode} /></Grid>
-              <Grid item xs={12} md={2}><Button fullWidth variant="contained" startIcon={<FactCheckIcon />} disabled={!instrument || running} onClick={runEvaluation}>Evaluate</Button></Grid>
+              <Grid item xs={12} md={2}>
+                <Button
+                  fullWidth
+                  variant="contained"
+                  startIcon={running ? <CircularProgress color="inherit" size={16} /> : <FactCheckIcon />}
+                  disabled={!instrument || running}
+                  onClick={runEvaluation}
+                >
+                  {running ? 'Evaluating' : 'Evaluate'}
+                </Button>
+              </Grid>
             </Grid>
           </Paper>
-          <EvaluationList results={evaluation} />
+          {evaluationError && <Alert severity="error">{evaluationError}</Alert>}
+          <EvaluationList results={evaluation} instrument={instrument} />
         </Stack>
       )}
     </Box>
@@ -290,9 +312,32 @@ function PerformanceMatrix({ summaries, selectedCode, region, assetType }: { sum
   );
 }
 
-function EvaluationList({ results }: { results: StrategyEvaluationResult[] }) {
+function EvaluationList({ results, instrument }: { results: StrategyEvaluationResult[]; instrument: V1Instrument | null }) {
   if (results.length === 0) return <Alert severity="info">Select a stock and run evaluation to see matches, blockers, and data gaps.</Alert>;
-  return <Stack spacing={2}>{results.map((result) => <Paper key={result.strategyCode} variant="outlined" sx={{ p: 2 }}><Stack spacing={1}><Stack direction="row" spacing={1} alignItems="center"><Typography fontWeight={700}>{result.strategyCode}</Typography><Chip size="small" label={result.decision} color={result.blockers.length ? 'warning' : 'success'} /><Chip size="small" label={`${result.score}/100`} /></Stack><Typography variant="body2">{result.reasons.slice(0, 3).join(' ') || 'No positive rules passed.'}</Typography>{result.blockers.length > 0 && <Alert severity="warning">{result.blockers.join(' ')}</Alert>}{result.dataGaps.length > 0 && <Typography variant="caption" color="text.secondary">Data gaps: {result.dataGaps.join('; ')}</Typography>}</Stack></Paper>)}</Stack>;
+  const matched = results.filter((result) => result.blockers.length === 0 && !['WAIT', 'INSUFFICIENT_DATA', 'AVOID'].includes(result.decision)).length;
+  const blocked = results.filter((result) => result.blockers.length > 0 || result.decision === 'INSUFFICIENT_DATA' || result.decision === 'AVOID').length;
+  return (
+    <Stack spacing={2}>
+      <Alert severity="info">
+        {instrument?.symbol || 'Selected instrument'} evaluated against {results.length} strategies: {matched} match{matched === 1 ? '' : 'es'}, {blocked} blocked or missing data.
+      </Alert>
+      {results.map((result) => (
+        <Paper key={result.strategyCode} variant="outlined" sx={{ p: 2 }}>
+          <Stack spacing={1}>
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+              <Typography fontWeight={700}>{result.strategyCode}</Typography>
+              <Chip size="small" label={result.decision} color={result.blockers.length ? 'warning' : result.decision === 'WAIT' ? 'default' : 'success'} />
+              <Chip size="small" label={`${result.score}/100`} />
+              {result.marketGateStatus && <Chip size="small" label={`Market: ${result.marketGateStatus}`} variant="outlined" />}
+            </Stack>
+            <Typography variant="body2">{result.reasons.slice(0, 3).join(' ') || 'No positive rules passed.'}</Typography>
+            {result.blockers.length > 0 && <Alert severity="warning">{result.blockers.join(' ')}</Alert>}
+            {result.dataGaps.length > 0 && <Typography variant="caption" color="text.secondary">Data gaps: {result.dataGaps.join('; ')}</Typography>}
+          </Stack>
+        </Paper>
+      ))}
+    </Stack>
+  );
 }
 
 function ratingChip(grade?: string | null) {

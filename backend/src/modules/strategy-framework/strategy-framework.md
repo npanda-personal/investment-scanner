@@ -182,6 +182,42 @@ Draft: `QUALITY_TREND`, `MEAN_REVERSION_PULLBACK`.
 | `QUALITY_TREND` | Fundamentals are partial/free-local. | HIGH | Strategy should not rank as proven. | Remains `DRAFT`; rating caps drafts at `UNPROVEN`. |
 | `MEAN_REVERSION_PULLBACK` | Falling-knife handling is not historically proven. | HIGH | Strategy should remain conservative. | Remains `DRAFT`; rating caps drafts at `UNPROVEN`. |
 
+## Strategy Framework Audit - 2026-05-09
+
+| Finding | Severity | Affected area | Current behavior | Expected behavior | Fix |
+| --- | --- | --- | --- | --- | --- |
+| Performance diagnostics were calculated but not persisted. | HIGH | `StrategyPerformanceSummary`, repository | Benchmark comparison, data coverage, end-of-test exit percentage, rating warnings, and rating caps could be lost after a registered backtest. | Rankings and performance views should explain why a strategy is capped or weak. | Added additive nullable persistence fields and repository mapping for diagnostic fields. |
+| Stock evaluation UI switched to an invalid tab. | HIGH | Strategy Framework frontend | Running evaluation set the tab index past the configured tabs, hiding the results. | Evaluation should remain on the Evaluate Stock tab and show results, blockers, and data gaps. | Evaluation now stays on the correct tab, shows loading/error state, and summarizes matched versus blocked strategies. |
+| Stale evaluation results could remain visible after changing scope, instrument, or strategy. | MEDIUM | Strategy Framework frontend | A previous evaluation could be shown for a new selected stock or market scope. | Changing the evaluated context should clear stale results until the user evaluates again. | Evaluation results and errors reset when instrument, strategy, region, or asset type changes. |
+
+## Performance Diagnostic Persistence
+
+`StrategyPerformanceSummary` is idempotent by `strategyCode + strategyVersion + timeframe + region + assetType + universeKey`.
+
+The compact summary now persists the diagnostic fields produced by registered backtests:
+
+- `benchmarkTotalReturn`
+- `benchmarkCagr`
+- `excessReturn`
+- `excessCagr`
+- `endOfTestExitPercent`
+- `dataCoveragePercent`
+- `ratingWarnings`
+- `ratingCapsApplied`
+
+These fields let Strategy Framework explain conservative ratings without duplicating Backtesting Strategy Lab internals. Backtesting Lab remains the owner of detailed run history, equity curves, drawdowns, and trade logs.
+
+## Evaluation UI Behavior
+
+The `/strategies` Evaluate Stock tab evaluates the selected instrument against either the selected strategy or all strategies. It shows:
+
+- matched strategy count
+- blocked/missing-data count
+- decision, score, and market gate per strategy
+- blockers and data gaps
+
+Changing the instrument, selected strategy, region, or asset type clears stale evaluation results. Evaluation remains research support only and does not create orders or trading actions.
+
 ## Default Risk Rules
 
 Registered strategies may declare conservative risk defaults in `parameters` and `riskRules`. Current examples include max holding days, stop-loss percent, and trailing-stop percent. These defaults are not optimized parameters; they are guardrails to make results harder to fool.

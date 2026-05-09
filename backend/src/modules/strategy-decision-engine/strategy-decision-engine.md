@@ -1,6 +1,6 @@
 # Strategy Decision Engine
 
-The Strategy Decision Engine converts data from all research modules into actionable trade and exit decisions. It is fully integrated with the **Global Market Scope**.
+The Strategy Decision Engine converts data from research modules into strategy-backed review candidates, watch states, avoid states, and exit-risk review decisions. It is fully integrated with the **Global Market Scope** and remains research support only.
 
 ## Global Market Scope Integration
 
@@ -21,7 +21,7 @@ The `marketGate` endpoint accepts a `region` parameter. This ensures the "OPEN/C
 | Endpoint | Purpose | Region Support |
 | --- | --- | --- |
 | `GET /api/v1/strategy/market-gate` | Region-aware market tradeability | Supported |
-| `GET /api/v1/strategy/candidates` | Trade candidates per region | Supported |
+| `GET /api/v1/strategy/candidates` | Review candidates per region | Supported |
 | `POST /api/v1/strategy/evaluate` | Batch evaluation for a specific region | Supported |
 
 ## Scoring Methodology
@@ -56,7 +56,7 @@ Additive compatibility fields:
 - `strategyRating`
 - `readinessLabel`
 
-Research Hub consumes these additive fields to build strategy-proof-driven priority buckets. Framework-backed decisions with missing proof are kept as watch candidates rather than promoted as top trade candidates.
+Research Hub consumes these additive fields to build strategy-proof-driven priority buckets. Framework-backed decisions with missing proof are kept as watch candidates rather than promoted as top review candidates.
 
 Signal Generation links to Strategy Decision using `/strategy?instrumentId=...` so raw signals can be reviewed through the candidate/risk language owned by this module.
 
@@ -73,7 +73,7 @@ Conservative defaults:
 
 ### Market Gate Strictness
 
-- `CLOSED`: long-entry strategies return `AVOID` and include the blocker “Market gate is closed; no new long trades.”
+- `CLOSED`: long-entry strategies return `AVOID` and include the blocker "Market gate is closed; no new long candidates."
 - `SELECTIVE`: long-entry strategies include “Market is selective; only high-quality setups should be reviewed.” Strong candidates require a higher framework score.
 - `UNKNOWN`: long-entry strategies add a data gap and avoid strong candidate output.
 
@@ -99,6 +99,16 @@ The previous private evaluators remain in the service as fallback only when a fr
 - `StrategyDecisionDashboard`: Subscribes to `useMarketScope()`. Automatically refetches candidates when the region changes.
 - Supports a local `Region Override` for specific comparisons.
 - Shows framework-backed strategy version metadata where available without changing the existing dashboard layout.
+- Uses review-candidate/risk-level language in the UI while preserving existing API enum values such as `TRADE_CANDIDATE` for backward compatibility.
+- The Evaluate tab runs the current latest-signal universe in bounded batches of up to 100 instruments per backend request, updates progress after each batch, and refreshes visible tables once the full run completes.
+- Placeholder watchlist/all-eligible/portfolio universe choices are intentionally not shown until real selectors are wired, avoiding dead-end controls.
+
+## Query Hardening
+
+- Candidate reads use an allowlist for `sortBy`; unknown fields fall back to `generatedAt desc` instead of reaching Prisma with arbitrary keys.
+- `assetType=STOCK` includes legacy `EQUITY` stock rows for compatibility while newer Market Data Foundation rows normalize to `STOCK`.
+- Exit-risk reads accept the same `region` and `assetType` scope as candidate reads.
+- Symbol-triggered evaluation sends `region` and `assetType` to Market Data Foundation and matches symbol, display symbol, provider symbol, or source symbol aliases.
 
 ## Verification
 

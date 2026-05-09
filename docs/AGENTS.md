@@ -198,6 +198,8 @@ Use only public exports:
 - backend/src/modules/{module-name}/index.ts
 - frontend/src/features/{feature-name}/index.ts
 
+Public module indexes should stay side-effect-light where practical. If a barrel import triggers router/service construction cycles, document the limitation and prefer a small public contract/evaluator export cleanup before forcing downstream modules through a fragile barrel.
+
 # Ownership Rules
 
 Each module owns its own:
@@ -341,6 +343,14 @@ Always provide summary:
 
 # Decision Heuristics
 
+## Pick Next Work By Dependency Order
+
+When multiple modules need hardening, prefer least-dependent upstream modules first. For intelligence workflows, validate the chain in order:
+
+Market Data Foundation -> Data Quality Engine -> Signal Generation Engine -> Signal Quality/Calibration -> Strategy Decision/Research/Trade Plans.
+
+Do not prioritize a downstream module just because it is more visible if it depends on upstream data or scoring that has not been verified yet.
+
 ## Extend Existing Module If:
 
 - same business capability
@@ -446,6 +456,7 @@ Example response:
 - Show a final summary.
 - Show errors and partial completion.
 - Show warning count and details where practical.
+- Keep progress counters semantically separate: missing prerequisites, skipped records, failed records, no-ops, and not-yet-evaluable records must not be merged into one misleading skipped/unevaluated number.
 - Display and send `region` and `assetType` on every batch request.
 - Do not fake progress.
 - Do not process an entire universe in one backend request just to simplify progress.
