@@ -12,6 +12,8 @@ Snapshots are stored per region in the `MarketContextSnapshot` database model. T
 
 Downstream batch modules that need bounded reads can use the public `latestPersistedSummary(region)` service method. Unlike `summary()`, it returns only the latest persisted snapshot and does not run market-context generation when a snapshot is missing.
 
+All controller endpoints must pass the requested `region` into the service. Generated snapshots must be persisted with that same region, not `GLOBAL`, otherwise downstream modules such as Strategy Decision will correctly treat the scoped market gate as missing/unknown and block long candidates.
+
 ## API Reference
 
 | Endpoint | Purpose | Region Support |

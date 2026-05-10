@@ -133,3 +133,5 @@ backend/.env
 # Frontend
 frontend/dist/
 frontend/.env
+frontend/test-results/
+frontend/playwright-report/

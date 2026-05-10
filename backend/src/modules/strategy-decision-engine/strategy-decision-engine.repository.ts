@@ -10,6 +10,9 @@ export interface StrategyDecisionFunnelDiagnosticsQuery {
   generatedDate?: string;
   from?: string;
   to?: string;
+  frameworkBacked?: boolean;
+  includeLegacy?: boolean;
+  includeHistory?: boolean;
 }
 
 export class StrategyDecisionEngineRepository {
@@ -117,12 +120,22 @@ export class StrategyDecisionEngineRepository {
       decision: query.decision,
       decisionScore: query.minScore ? { gte: query.minScore } : undefined,
       confidence: query.confidence,
+      frameworkBacked: query.frameworkBacked ?? (query.includeLegacy ? undefined : true),
+      readinessLabel: query.readinessLabels?.length ? { in: query.readinessLabels } : undefined,
+      OR: query.strategyRatingGrades?.length ? query.strategyRatingGrades.map((ratingGrade) => ({
+        strategyRating: {
+          path: ['ratingGrade'],
+          equals: ratingGrade,
+        } as any,
+      })) : undefined,
       country: query.country,
     };
+    const scopedWhere = await this.applyLatestGeneratedDateScope(where, query.includeHistory);
+    if (!scopedWhere) return { results: [], total: 0 };
 
-    const total = await this.db.strategyDecisionResult.count({ where });
+    const total = await this.db.strategyDecisionResult.count({ where: scopedWhere });
     const records = await this.db.strategyDecisionResult.findMany({
-      where,
+      where: scopedWhere,
       orderBy: this.resolveOrderBy(query.sortBy, query.sortDirection),
       take: query.limit || 25,
       skip: query.offset || 0,
@@ -138,18 +151,24 @@ export class StrategyDecisionEngineRepository {
     const where: Prisma.StrategyDecisionResultWhereInput = {
       ...this.buildScopeWhere(query.region, query.assetType),
       strategy: query.strategyCode,
+      frameworkBacked: query.frameworkBacked ?? (query.includeLegacy ? undefined : true),
       generatedDate: query.generatedDate ? this.normalizeUtcDay(query.generatedDate) : undefined,
       generatedAt: query.from || query.to ? {
         gte: query.from ? new Date(query.from) : undefined,
         lte: query.to ? new Date(query.to) : undefined,
       } : undefined,
     };
-    const records = await this.db.strategyDecisionResult.findMany({
-      where,
-      orderBy: { generatedAt: 'desc' },
-      take: 5000,
-    });
-    return { results: records.map((record) => this.toDto(record)), total: records.length };
+    const scopedWhere = await this.applyLatestGeneratedDateScope(where, query.includeHistory || Boolean(query.generatedDate || query.from || query.to));
+    if (!scopedWhere) return { results: [], total: 0 };
+    const [total, records] = await Promise.all([
+      this.db.strategyDecisionResult.count({ where: scopedWhere }),
+      this.db.strategyDecisionResult.findMany({
+        where: scopedWhere,
+        orderBy: { generatedAt: 'desc' },
+        take: 5000,
+      }),
+    ]);
+    return { results: records.map((record) => this.toDto(record)), total };
   }
 
   async exits(portfolioId?: string, region?: string, assetType?: string): Promise<StrategyDecisionDto[]> {
@@ -175,6 +194,19 @@ export class StrategyDecisionEngineRepository {
       select: { generatedAt: true },
     });
     return record?.generatedAt || null;
+  }
+
+  private async applyLatestGeneratedDateScope(
+    where: Prisma.StrategyDecisionResultWhereInput,
+    includeHistory?: boolean
+  ): Promise<Prisma.StrategyDecisionResultWhereInput | null> {
+    if (includeHistory || where.generatedDate || where.generatedAt) return where;
+    const latest = await this.db.strategyDecisionResult.findFirst({
+      where,
+      orderBy: { generatedDate: 'desc' },
+      select: { generatedDate: true },
+    });
+    return latest?.generatedDate ? { ...where, generatedDate: latest.generatedDate } : null;
   }
 
   private toDto(record: any): StrategyDecisionDto {
@@ -236,7 +268,7 @@ export class StrategyDecisionEngineRepository {
 
   private resolveOrderBy(sortBy?: string, sortDirection?: 'asc' | 'desc'): Prisma.StrategyDecisionResultOrderByWithRelationInput {
     const direction = sortDirection === 'asc' ? 'asc' : 'desc';
-    const allowedSorts = new Set(['generatedAt', 'decisionScore', 'strategy', 'decision', 'confidence', 'marketGate', 'symbol']);
+    const allowedSorts = new Set(['generatedAt', 'decisionScore', 'strategy', 'decision', 'confidence', 'marketGate', 'symbol', 'frameworkBacked', 'readinessLabel']);
     return allowedSorts.has(sortBy || '') ? { [sortBy as string]: direction } : { generatedAt: 'desc' };
   }
 

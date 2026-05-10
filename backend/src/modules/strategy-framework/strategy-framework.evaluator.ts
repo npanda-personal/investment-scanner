@@ -344,7 +344,7 @@ export class StrategyFrameworkEvaluator implements StrategyEvaluator {
       noiseFiltersTriggered: state.noiseFiltersTriggered,
       marketGateStatus: context.marketGate ?? null,
       eligibleForSignalGeneration: ['ENTRY_CANDIDATE', 'WATCH', 'SIGNAL'].includes(decision) && state.blockers.length === 0,
-      eligibleForBacktest: !hasMissingCore && this.definition.category !== 'GATE',
+      eligibleForBacktest: !hasMissingCore && this.definition.status === 'ACTIVE' && this.definition.category === 'ENTRY',
       eligibleForAutomationFuture: false,
     };
   }

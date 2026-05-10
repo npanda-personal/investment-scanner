@@ -321,6 +321,45 @@ describe('StrategyDecisionEngineService', () => {
       expect(['EXIT_CANDIDATE', 'REDUCE_RISK', 'HOLD', 'WATCH']).toContain(result?.decision);
     });
 
+    it('uses Strategy Framework evaluator for additional active review strategies', async () => {
+      const svc = createFrameworkBackedService();
+      const result = await svc.evaluateInstrumentStrategy('stock-1', 'SMART_MONEY_ACCUMULATION', {
+        marketCondition: 'HEALTHY',
+        marketGate: 'OPEN',
+        allowedActions: ['NEW_LONG_TRADES_ALLOWED'],
+        marketScore: 80,
+        reasons: [],
+        blockers: [],
+        dataStatus: 'COMPLETE',
+        updatedAt: new Date().toISOString(),
+      });
+
+      expect(result?.frameworkBacked).toBe(true);
+      expect(result?.strategy).toBe('SMART_MONEY_ACCUMULATION');
+      expect(result?.entryRulesPassed).toEqual(expect.arrayContaining(['ACCUMULATION']));
+      expect(result?.decisionScore).toBeGreaterThan(0);
+    });
+
+    it('exposes active entry and exit registry strategies in the decision model', async () => {
+      const svc = createFrameworkBackedService();
+      const model = await svc.model();
+      const evaluatableCodes = model.strategies
+        .filter((strategy: any) => strategy.evaluationSupported)
+        .map((strategy: any) => strategy.code);
+
+      expect(evaluatableCodes).toEqual(expect.arrayContaining([
+        'TREND_MOMENTUM',
+        'PULLBACK_IN_UPTREND',
+        'BREAKOUT_CONFIRMATION',
+        'SMART_MONEY_ACCUMULATION',
+        'SECTOR_LEADER_MOMENTUM',
+        'DEFENSIVE_EXIT',
+      ]));
+      expect(evaluatableCodes).not.toContain('RISK_OFF_AVOIDANCE');
+      expect(evaluatableCodes).not.toContain('LOW_QUALITY_DATA_REJECTION');
+      expect(evaluatableCodes).not.toContain('QUALITY_TREND');
+    });
+
     it('blocks new long candidates when market gate is CLOSED', async () => {
       const svc = createFrameworkBackedService();
       const result = await svc.evaluateInstrumentStrategy('stock-1', 'TREND_MOMENTUM', {
@@ -467,19 +506,23 @@ describe('StrategyDecisionEngineService', () => {
         frameworkService as any
       );
 
+      const reviewStrategyCount = new StrategyFrameworkRegistry()
+        .active()
+        .filter((strategy) => ['ENTRY', 'EXIT'].includes(strategy.category))
+        .length;
       const result = await svc.evaluate({ strategy: 'ALL', batchSize: 2, offset: 0, region: 'IN', assetType: 'STOCK' });
 
       expect(result.failedCount).toBe(0);
       expect(result.processedCount).toBe(2);
-      expect(result.generatedCount).toBe(4);
+      expect(result.generatedCount).toBe(2 * reviewStrategyCount);
       expect(signal.topSignals).not.toHaveBeenCalled();
       expect(signal.latestForInstrument).not.toHaveBeenCalled();
       expect(marketData.getInstrument).toHaveBeenCalledTimes(2);
       expect(marketData.listPricesByInstrumentId).toHaveBeenCalledTimes(2);
       expect(quality.diagnostics).toHaveBeenCalledTimes(2);
       expect(smartMoney.stock).toHaveBeenCalledTimes(2);
-      expect(repository.create).toHaveBeenCalledTimes(4);
-      expect(frameworkService.performance).toHaveBeenCalledTimes(2);
+      expect(repository.create).toHaveBeenCalledTimes(2 * reviewStrategyCount);
+      expect(frameworkService.performance).toHaveBeenCalledTimes(reviewStrategyCount);
     });
 
     it('resolves symbol evaluation through scoped instrument search and provider/display aliases', async () => {

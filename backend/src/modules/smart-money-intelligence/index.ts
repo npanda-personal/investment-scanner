@@ -8,7 +8,7 @@ export { SmartMoneyIntelligenceController } from './smart-money-intelligence.con
 export { SmartMoneyIntelligenceProvider } from './smart-money-intelligence.provider';
 export { SmartMoneyIntelligenceRepository } from './smart-money-intelligence.repository';
 export { SmartMoneyIntelligenceService } from './smart-money-intelligence.service';
-export { getParam, parseLimit, parseOptionalText, parseRange, SMART_MONEY_RANGES } from './smart-money-intelligence.validation';
+export { getParam, parseLimit, parseOffset, parseOptionalText, parseRange, SMART_MONEY_RANGES } from './smart-money-intelligence.validation';
 export type {
   InsiderOwnershipSummary,
   SectorSmartMoneyStatus,
@@ -19,6 +19,7 @@ export type {
   SmartMoneyListQuery,
   SmartMoneyPriceBar,
   SmartMoneyRange,
+  SmartMoneyRunResponse,
   SmartMoneySignal,
   SmartMoneySignalDirection,
   SmartMoneyStatus,

@@ -128,10 +128,11 @@ export default function BacktestingStrategyLabPage() {
   const selectedFrameworkStrategy = frameworkStrategies.find((strategy) => strategy.code === registeredCode) ?? frameworkStrategies[0] ?? null;
 
   useEffect(() => {
-    fetchStrategies({ region: searchParams.get('region') || scope.region, assetType: searchParams.get('assetType') || scope.assetType, status: 'ACTIVE' })
+    fetchStrategies({ region: searchParams.get('region') || scope.region, assetType: searchParams.get('assetType') || scope.assetType, status: 'ACTIVE', category: 'ENTRY' })
       .then((items) => {
-        setFrameworkStrategies(items);
-        if (!items.some((item) => item.code === registeredCode)) setRegisteredCode(items[0]?.code || '');
+        const entryStrategies = items.filter((item) => item.status === 'ACTIVE' && item.category === 'ENTRY');
+        setFrameworkStrategies(entryStrategies);
+        if (!entryStrategies.some((item) => item.code === registeredCode)) setRegisteredCode(entryStrategies[0]?.code || '');
       })
       .catch(() => undefined);
   }, [scope.region, scope.assetType, searchParams, registeredCode]);
@@ -219,7 +220,7 @@ export default function BacktestingStrategyLabPage() {
             <Chip label={`Scope: ${scope.region} / ${scope.assetType}`} size="small" variant="outlined" color="info" />
           </Stack>
         </Box>
-        <Button variant="contained" startIcon={<PlayArrowIcon />} onClick={() => void runConfig(mode === 'registered' ? registeredConfig() : normalizedConfig())} disabled={running || (mode === 'registered' && !registeredCode)}>
+        <Button data-testid="run-backtest-primary" variant="contained" startIcon={<PlayArrowIcon />} onClick={() => void runConfig(mode === 'registered' ? registeredConfig() : normalizedConfig())} disabled={running || (mode === 'registered' && !registeredCode)}>
           {running ? 'Running...' : mode === 'registered' ? 'Run Registered Backtest' : 'Run Backtest'}
         </Button>
       </Stack>
@@ -237,12 +238,16 @@ export default function BacktestingStrategyLabPage() {
             {mode === 'registered' && (
               <Stack spacing={2}>
                 <Typography variant="h6">Registered Strategy</Typography>
+                <Alert severity="info">
+                  Registered backtests currently run active entry strategies. Exit, gate, and filter rules support decisions, but need separate simulation semantics before they are treated as standalone backtests.
+                </Alert>
                 <FormControl size="small">
                   <InputLabel>Strategy</InputLabel>
-                  <Select label="Strategy" value={registeredCode} onChange={(event) => setRegisteredCode(event.target.value)}>
+                  <Select data-testid="registered-strategy-select" label="Strategy" value={registeredCode} onChange={(event) => setRegisteredCode(event.target.value)}>
                     {frameworkStrategies.map((strategy) => <MenuItem key={strategy.code} value={strategy.code}>{strategy.name}</MenuItem>)}
                   </Select>
                 </FormControl>
+                {frameworkStrategies.length === 0 && <Alert severity="warning">No active entry strategies are available for {scope.region} / {scope.assetType}.</Alert>}
                 {selectedFrameworkStrategy && <Typography variant="body2" color="text.secondary">{selectedFrameworkStrategy.description}</Typography>}
                 <FormControl size="small">
                   <InputLabel>Timeframe</InputLabel>
@@ -279,7 +284,7 @@ export default function BacktestingStrategyLabPage() {
                     </Stack>
                   </Stack>
                 </Paper>
-                <Button startIcon={<PlayArrowIcon />} variant="contained" onClick={() => void runConfig(registeredConfig())} disabled={running || !registeredCode}>Run Registered Backtest</Button>
+                <Button data-testid="run-registered-backtest-panel" startIcon={<PlayArrowIcon />} variant="contained" onClick={() => void runConfig(registeredConfig())} disabled={running || !registeredCode}>Run Registered Backtest</Button>
               </Stack>
             )}
             {mode === 'custom' && (

@@ -179,6 +179,13 @@ export interface BacktestRunDto {
   error: string | null;
 }
 
+export interface BacktestRunListQuery {
+  region?: string;
+  assetType?: string;
+  limit?: number;
+  offset?: number;
+}
+
 export interface RunBacktestRequest {
   strategyId?: string | null;
   config?: BacktestStrategyConfig;

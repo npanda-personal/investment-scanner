@@ -46,6 +46,7 @@ export function parseListQuery(query: any): TradePlanListQuery {
     strategyRating: typeof query.strategyRating === 'string' ? query.strategyRating : undefined,
     readinessLabel: typeof query.readinessLabel === 'string' ? query.readinessLabel : undefined,
     portfolioId: typeof query.portfolioId === 'string' ? query.portfolioId : undefined,
+    includeLegacy: query.includeLegacy === 'true' || query.includeLegacy === true,
     limit: typeof query.limit === 'string' && !isNaN(Number(query.limit)) ? Number(query.limit) : 50,
     offset: typeof query.offset === 'string' && !isNaN(Number(query.offset)) ? Number(query.offset) : 0,
     sortBy: typeof query.sortBy === 'string' ? query.sortBy : 'generatedAt',
@@ -62,5 +63,6 @@ export function parseFunnelQuery(query: any): TradePlanFunnelQuery {
     from: typeof query.from === 'string' ? query.from : undefined,
     to: typeof query.to === 'string' ? query.to : undefined,
     backtestTimeframe: typeof query.backtestTimeframe === 'string' ? query.backtestTimeframe : undefined,
+    includeLegacy: query.includeLegacy === 'true' || query.includeLegacy === true,
   };
 }

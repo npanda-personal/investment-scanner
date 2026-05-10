@@ -12,6 +12,7 @@ interface TradePlanTableProps {
   totalCount: number;
   sortBy?: string;
   sortDirection?: SortDirection;
+  emptyMessage?: string;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
   onSortChange: (sortBy: string, sortDirection: SortDirection) => void;
@@ -25,6 +26,7 @@ export const TradePlanTable: React.FC<TradePlanTableProps> = ({
   totalCount,
   sortBy,
   sortDirection,
+  emptyMessage,
   onPageChange,
   onPageSizeChange,
   onSortChange,
@@ -92,7 +94,7 @@ export const TradePlanTable: React.FC<TradePlanTableProps> = ({
       onPageChange={onPageChange}
       onPageSizeChange={onPageSizeChange}
       onSortChange={onSortChange}
-      emptyMessage="No trade plans generated yet."
+      emptyMessage={emptyMessage || 'No trade plans generated yet.'}
     />
   );
 };

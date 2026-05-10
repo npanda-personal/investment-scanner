@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import prisma from '../../db/prisma';
 import type { SmartMoneyListQuery, SmartMoneyRange, SmartMoneyStockSummary, SectorSmartMoneySummary } from './smart-money-intelligence.types';
-import { resolveRelatedMarketRegionFilter } from '../../shared/utils/market-scope';
+import { resolveMarketRegionFilter } from '../../shared/utils/market-scope';
 
 export class SmartMoneyIntelligenceRepository {
   constructor(private readonly db: PrismaClient = prisma) {}
@@ -10,10 +10,10 @@ export class SmartMoneyIntelligenceRepository {
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
 
-    const regionFilter = resolveRelatedMarketRegionFilter(query.region);
+    const stockFilters = this.stockScopeFilters(query.region, query.assetType);
 
     const where: any = {
-      ...regionFilter,
+      ...(stockFilters.length > 0 ? { stock: { AND: stockFilters } } : {}),
       snapshotDate: today,
       range: query.range,
       ...(query.sector && { sector: query.sector }),
@@ -61,12 +61,17 @@ export class SmartMoneyIntelligenceRepository {
     return this.mapSnapshotToSummary(row);
   }
 
-  async latestSectorSnapshots(range: SmartMoneyRange): Promise<SectorSmartMoneySummary[]> {
+  async latestSectorSnapshots(range: SmartMoneyRange, query: Pick<SmartMoneyListQuery, 'region' | 'assetType'> = {}): Promise<SectorSmartMoneySummary[]> {
      const today = new Date();
      today.setUTCHours(0, 0, 0, 0);
+     const stockFilters = this.stockScopeFilters(query.region, query.assetType);
 
      const rows = await this.db.smartMoneyContextSnapshot.findMany({
-       where: { snapshotDate: today, range }
+       where: {
+         ...(stockFilters.length > 0 ? { stock: { AND: stockFilters } } : {}),
+         snapshotDate: today,
+         range,
+       }
      });
 
      // We aggregate on the fly from the daily snapshots.
@@ -153,6 +158,29 @@ export class SmartMoneyIntelligenceRepository {
         insiderOwnership: summary.insiderOwnership as any,
       }
     });
+  }
+
+  private assetTypeFilter(assetType?: string): any | null {
+    const normalized = assetType?.trim().toUpperCase();
+    if (!normalized) return null;
+    if (normalized === 'STOCK' || normalized === 'EQUITY') {
+      return {
+        OR: [
+          { assetType: { in: ['STOCK', 'EQUITY'], mode: 'insensitive' } },
+          { assetType: null },
+        ],
+      };
+    }
+    return { assetType: { equals: normalized, mode: 'insensitive' } };
+  }
+
+  private stockScopeFilters(region?: string, assetType?: string): any[] {
+    const stockFilters: any[] = [];
+    const regionFilter = resolveMarketRegionFilter(region);
+    if (Object.keys(regionFilter).length > 0) stockFilters.push(regionFilter);
+    const assetTypeFilter = this.assetTypeFilter(assetType);
+    if (assetTypeFilter) stockFilters.push(assetTypeFilter);
+    return stockFilters;
   }
 
   private mapSnapshotToSummary(row: any): SmartMoneyStockSummary {

@@ -86,6 +86,7 @@ describe('StrategyDecisionEngineRepository', () => {
   it('uses safe sort fallback and includes legacy EQUITY rows for STOCK scope', async () => {
     const generatedAt = new Date('2026-05-06T18:53:36.829Z');
     const count = jest.fn().mockResolvedValue(1);
+    const findFirst = jest.fn().mockResolvedValue({ generatedDate: new Date('2026-05-06T00:00:00.000Z') });
     const findMany = jest.fn().mockResolvedValue([{
       id: 'decision-1',
       ...makeDecision(),
@@ -93,7 +94,7 @@ describe('StrategyDecisionEngineRepository', () => {
       generatedAt,
     }]);
     const repository = new StrategyDecisionEngineRepository({
-      strategyDecisionResult: { count, findMany },
+      strategyDecisionResult: { count, findFirst, findMany },
     } as any);
 
     const result = await repository.candidates({
@@ -106,10 +107,75 @@ describe('StrategyDecisionEngineRepository', () => {
     const findCall = findMany.mock.calls[0][0];
 
     expect(result.total).toBe(1);
+    expect(findFirst.mock.calls[0][0].where.frameworkBacked).toBe(true);
     expect(findCall.orderBy).toEqual({ generatedAt: 'desc' });
+    expect(findCall.where.frameworkBacked).toBe(true);
+    expect(findCall.where.generatedDate).toEqual(new Date('2026-05-06T00:00:00.000Z'));
     expect(countCall.where.stock.AND).toEqual(expect.arrayContaining([
       expect.objectContaining({ assetType: { in: ['STOCK', 'EQUITY'] } }),
     ]));
+  });
+
+  it('only includes legacy decisions when explicitly requested', async () => {
+    const count = jest.fn().mockResolvedValue(1);
+    const findFirst = jest.fn().mockResolvedValue({ generatedDate: new Date('2026-05-06T00:00:00.000Z') });
+    const findMany = jest.fn().mockResolvedValue([]);
+    const repository = new StrategyDecisionEngineRepository({
+      strategyDecisionResult: { count, findFirst, findMany },
+    } as any);
+
+    await repository.candidates({
+      region: 'IN',
+      assetType: 'STOCK',
+      includeLegacy: true,
+    });
+    const findCall = findMany.mock.calls[0][0];
+
+    expect(findCall.where.frameworkBacked).toBeUndefined();
+    expect(findCall.where.generatedDate).toEqual(new Date('2026-05-06T00:00:00.000Z'));
+  });
+
+  it('applies candidate quality filters for framework-backed readiness validation', async () => {
+    const generatedAt = new Date('2026-05-06T18:53:36.829Z');
+    const count = jest.fn().mockResolvedValue(1);
+    const findFirst = jest.fn().mockResolvedValue({ generatedDate: new Date('2026-05-06T00:00:00.000Z') });
+    const findMany = jest.fn().mockResolvedValue([{
+      id: 'decision-1',
+      ...makeDecision(),
+      decision: 'TRADE_CANDIDATE',
+      readinessLabel: 'PAPER_TEST_CANDIDATE',
+      strategyRating: {
+        ratingScore: 78,
+        ratingGrade: 'GOOD',
+        readinessLabel: 'PAPER_TEST_CANDIDATE',
+      },
+      entryZone: JSON.stringify(makeDecision().entryZone),
+      generatedAt,
+    }]);
+    const repository = new StrategyDecisionEngineRepository({
+      strategyDecisionResult: { count, findFirst, findMany },
+    } as any);
+
+    await repository.candidates({
+      region: 'IN',
+      assetType: 'STOCK',
+      decision: 'TRADE_CANDIDATE',
+      frameworkBacked: true,
+      strategyRatingGrades: ['GOOD', 'EXCELLENT'],
+      readinessLabels: ['PAPER_TEST_CANDIDATE', 'WATCHLIST_CANDIDATE'],
+      sortBy: 'readinessLabel',
+      sortDirection: 'asc',
+    });
+    const findCall = findMany.mock.calls[0][0];
+
+    expect(findCall.where.decision).toBe('TRADE_CANDIDATE');
+    expect(findCall.where.frameworkBacked).toBe(true);
+    expect(findCall.where.readinessLabel).toEqual({ in: ['PAPER_TEST_CANDIDATE', 'WATCHLIST_CANDIDATE'] });
+    expect(findCall.where.OR).toEqual([
+      { strategyRating: { path: ['ratingGrade'], equals: 'GOOD' } },
+      { strategyRating: { path: ['ratingGrade'], equals: 'EXCELLENT' } },
+    ]);
+    expect(findCall.orderBy).toEqual({ readinessLabel: 'asc' });
   });
 
   it('applies asset scope to exit-risk decisions', async () => {
@@ -134,5 +200,47 @@ describe('StrategyDecisionEngineRepository', () => {
     ]));
     expect(findCall.where.strategy).toBe('DEFENSIVE_EXIT');
     expect(findCall.where.decision).toEqual({ in: ['EXIT_CANDIDATE', 'REDUCE_RISK'] });
+  });
+
+  it('returns full funnel total separately from the bounded diagnostics sample', async () => {
+    const generatedAt = new Date('2026-05-06T18:53:36.829Z');
+    const count = jest.fn().mockResolvedValue(3200);
+    const findFirst = jest.fn().mockResolvedValue({ generatedDate: new Date('2026-05-06T00:00:00.000Z') });
+    const findMany = jest.fn().mockResolvedValue([{
+      id: 'decision-1',
+      ...makeDecision(),
+      decision: 'TRADE_CANDIDATE',
+      entryZone: JSON.stringify(makeDecision().entryZone),
+      generatedAt,
+    }]);
+    const repository = new StrategyDecisionEngineRepository({
+      strategyDecisionResult: { count, findFirst, findMany },
+    } as any);
+
+    const result = await repository.funnelDiagnostics({ region: 'IN', assetType: 'STOCK' });
+    const findCall = findMany.mock.calls[0][0];
+
+    expect(result.total).toBe(3200);
+    expect(result.results).toHaveLength(1);
+    expect(findCall.take).toBe(5000);
+    expect(findCall.where.frameworkBacked).toBe(true);
+    expect(findCall.where.generatedDate).toEqual(new Date('2026-05-06T00:00:00.000Z'));
+    expect(findCall.where.stock.AND).toEqual(expect.arrayContaining([
+      expect.objectContaining({ assetType: { in: ['STOCK', 'EQUITY'] } }),
+    ]));
+  });
+
+  it('allows legacy rows in funnel diagnostics only when explicitly requested', async () => {
+    const count = jest.fn().mockResolvedValue(1);
+    const findFirst = jest.fn().mockResolvedValue({ generatedDate: new Date('2026-05-06T00:00:00.000Z') });
+    const findMany = jest.fn().mockResolvedValue([]);
+    const repository = new StrategyDecisionEngineRepository({
+      strategyDecisionResult: { count, findFirst, findMany },
+    } as any);
+
+    await repository.funnelDiagnostics({ region: 'IN', assetType: 'STOCK', includeLegacy: true });
+    const findCall = findMany.mock.calls[0][0];
+
+    expect(findCall.where.frameworkBacked).toBeUndefined();
   });
 });

@@ -16,7 +16,7 @@ const record = (overrides: Record<string, any> = {}) => ({
   readinessLabel: 'PAPER_TEST_CANDIDATE',
   backtestTimeframe: '3Y',
   backtestSummary: { timeframe: '3Y', ratingGrade: 'GOOD' },
-  strategyProofSnapshot: { proofStatus: 'AVAILABLE' },
+  strategyProofSnapshot: { proofStatus: 'AVAILABLE', frameworkBacked: true },
   strategyDecisionSnapshot: { decision: 'TRADE_CANDIDATE' },
   latestPrice: 100,
   latestPriceTimestamp: new Date('2026-05-06T00:00:00.000Z'),
@@ -145,6 +145,7 @@ describe('TradePlanRiskEngineRepository snapshot persistence', () => {
       backtestTimeframe: '3Y',
       strategyRating: 'GOOD',
       readinessLabel: 'PAPER_TEST_CANDIDATE',
+      strategyProofSnapshot: { path: ['frameworkBacked'], equals: true },
     }) });
     expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
       orderBy: { paperReadinessStatus: 'desc' },
@@ -152,8 +153,62 @@ describe('TradePlanRiskEngineRepository snapshot persistence', () => {
     expect(result.results[0]).toEqual(expect.objectContaining({
       region: 'IN',
       assetType: 'STOCK',
-      strategyProofSnapshot: { proofStatus: 'AVAILABLE' },
+      strategyProofSnapshot: { proofStatus: 'AVAILABLE', frameworkBacked: true },
       paperReadinessStatus: 'READY_FOR_PAPER_REVIEW',
     }));
+  });
+
+  it('can include legacy non-framework-backed plans only when explicitly requested', async () => {
+    const repository = new TradePlanRiskEngineRepository() as any;
+    const count = jest.fn().mockResolvedValue(1);
+    const findMany = jest.fn().mockResolvedValue([record({ strategyProofSnapshot: { proofStatus: 'LEGACY', frameworkBacked: false } })]);
+    repository.db = { tradePlanResult: { count, findMany } };
+
+    await repository.list({ region: 'IN', assetType: 'STOCK', includeLegacy: true });
+
+    expect(count).toHaveBeenCalledWith({
+      where: expect.not.objectContaining({
+        strategyProofSnapshot: expect.anything(),
+      }),
+    });
+  });
+
+  it('filters latest plan lookup by market scope when supplied', async () => {
+    const repository = new TradePlanRiskEngineRepository() as any;
+    const findFirst = jest.fn().mockResolvedValue(record({ region: 'IN', assetType: 'STOCK' }));
+    repository.db = { tradePlanResult: { findFirst } };
+
+    await repository.latestForInstrument('INST-1', 'TREND_MOMENTUM', undefined, { region: 'IN', assetType: 'STOCK' });
+
+    expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        instrumentId: 'INST-1',
+        strategy: 'TREND_MOMENTUM',
+        region: 'IN',
+        assetType: 'STOCK',
+        strategyProofSnapshot: { path: ['frameworkBacked'], equals: true },
+      },
+      orderBy: { generatedAt: 'desc' },
+    }));
+  });
+
+  it('uses the latest generated date for funnel diagnostics by default', async () => {
+    const repository = new TradePlanRiskEngineRepository() as any;
+    const latestGeneratedDate = new Date('2026-05-10T00:00:00.000Z');
+    const findFirst = jest.fn().mockResolvedValue({ generatedDate: latestGeneratedDate });
+    const findMany = jest.fn().mockResolvedValue([record({ generatedDate: latestGeneratedDate })]);
+    repository.db = { tradePlanResult: { findFirst, findMany } };
+
+    const result = await repository.funnelPlans({ region: 'IN', assetType: 'STOCK' });
+
+    expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { region: 'IN', assetType: 'STOCK', strategyProofSnapshot: { path: ['frameworkBacked'], equals: true } },
+      orderBy: { generatedDate: 'desc' },
+      select: { generatedDate: true },
+    }));
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { region: 'IN', assetType: 'STOCK', strategyProofSnapshot: { path: ['frameworkBacked'], equals: true }, generatedDate: latestGeneratedDate },
+    }));
+    expect(result).toHaveLength(1);
   });
 });

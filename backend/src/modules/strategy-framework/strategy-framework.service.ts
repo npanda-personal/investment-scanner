@@ -86,7 +86,7 @@ export class StrategyFrameworkService {
   }
 
   async runBacktest(input: RegisteredBacktestInput, userId = 'default-user') {
-    const strategy = this.requireStrategy(input.strategyCode);
+    const strategy = this.requireStandaloneBacktestStrategy(input.strategyCode);
     const config = new StrategyFrameworkEvaluator(strategy).getBacktestConfig(input);
     const { BacktestingStrategyLabService } = require('../backtesting-strategy-lab') as typeof import('../backtesting-strategy-lab');
     const backtestingService = new BacktestingStrategyLabService();
@@ -213,7 +213,7 @@ export class StrategyFrameworkService {
   }
 
   strategyToBacktestConfig(input: RegisteredBacktestInput) {
-    return new StrategyFrameworkEvaluator(this.requireStrategy(input.strategyCode)).getBacktestConfig(input);
+    return new StrategyFrameworkEvaluator(this.requireStandaloneBacktestStrategy(input.strategyCode)).getBacktestConfig(input);
   }
 
   private async buildContext(request: StrategyEvaluateRequest): Promise<StrategyContext> {
@@ -279,6 +279,17 @@ export class StrategyFrameworkService {
   private requireStrategy(code: string): StrategyDefinition {
     const strategy = this.registry.get(code);
     if (!strategy) throw new Error(`Strategy ${code} is not registered`);
+    return strategy;
+  }
+
+  private requireStandaloneBacktestStrategy(code: string): StrategyDefinition {
+    const strategy = this.requireStrategy(code);
+    if (strategy.status !== 'ACTIVE') {
+      throw new Error(`Strategy ${strategy.code} is ${strategy.status} and cannot be run as a registered backtest.`);
+    }
+    if (strategy.category !== 'ENTRY') {
+      throw new Error(`Strategy ${strategy.code} is a ${strategy.category} rule. Registered backtests currently support active ENTRY strategies only.`);
+    }
     return strategy;
   }
 

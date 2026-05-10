@@ -12,6 +12,12 @@ export function parseLimit(value: unknown, fallback = 10): number {
   return Math.min(100, Math.max(1, Math.floor(parsed)));
 }
 
+export function parseOffset(value: unknown): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.floor(parsed));
+}
+
 export function parseRange(value: unknown): SmartMoneyRange {
   return SMART_MONEY_RANGES.includes(value as SmartMoneyRange) ? value as SmartMoneyRange : '3M';
 }

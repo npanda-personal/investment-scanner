@@ -31,13 +31,13 @@ export class ResearchHubService {
     const assetType = query.assetType || 'STOCK';
 
     // Aggregate data from all core research modules with individual error handling
-    const [gate, context, strategyCandidates, strategyExits, signals, smartMoneyRes] = await Promise.all([
+    const [gate, context, strategyCandidates, strategyExits, signalDiagnostics, smartMoneyRes] = await Promise.all([
       this.strategyService.marketGate(region).catch(err => {
         console.error('Market gate error:', err);
         dataGaps.push('Market gate status unavailable');
         return null;
       }),
-      this.contextService.summary({ region }).catch(err => {
+      this.latestPersistedMarketContext(region).catch(err => {
         console.error('Market context error:', err);
         dataGaps.push('Market context intelligence unavailable');
         return null;
@@ -47,17 +47,17 @@ export class ResearchHubService {
         dataGaps.push('Strategy candidates unavailable');
         return [];
       }),
-      this.strategyService.exits(undefined, region).catch(err => {
+      this.strategyService.exits(undefined, region, assetType).catch(err => {
         console.error('Strategy exits error:', err);
         dataGaps.push('Strategy exit candidates unavailable');
         return [];
       }),
-      this.signalService.topSignals({ limit: 25, region, assetType }).catch(err => {
+      this.signalService.funnelDiagnostics({ region, assetType }).catch(err => {
         console.error('Top signals error:', err);
         dataGaps.push('Signal generation engine data unavailable');
-        return { signals: [], total: 0 };
+        return { total: 0, bullish: 0, bearish: 0, neutral: 0, byDirection: {} };
       }),
-      this.smartMoneyService.top({ limit: 25, range: '3M', region }).catch(err => {
+      this.smartMoneyService.top({ limit: 25, range: '3M', region, assetType }).catch(err => {
         console.error('Smart money error:', err);
         dataGaps.push('Smart money intelligence data unavailable');
         return { results: [], total: 0 };
@@ -85,8 +85,10 @@ export class ResearchHubService {
     const strategyProofSummary = this.buildStrategyProofSummary([...priorities.tradeCandidates, ...priorities.watchCandidates, ...priorities.avoidCandidates], marketReadiness);
 
     // 3. Confirmation Summary
-    const bullishSignals = signals.signals.filter(s => s.direction === 'BULLISH');
-    const bearishSignals = signals.signals.filter(s => s.direction === 'BEARISH');
+    const signalDirectionCounts = (signalDiagnostics.byDirection || {}) as Record<string, number>;
+    const bullishSignalCount = Number(signalDiagnostics.bullish || signalDirectionCounts.BULLISH || 0);
+    const bearishSignalCount = Number(signalDiagnostics.bearish || signalDirectionCounts.BEARISH || 0);
+    const totalSignalCount = Number(signalDiagnostics.total || bullishSignalCount + bearishSignalCount + Number(signalDiagnostics.neutral || signalDirectionCounts.NEUTRAL || 0));
     
     // Cross-reference strategy candidates with smart money
     const topConfirmations: string[] = [];
@@ -103,10 +105,10 @@ export class ResearchHubService {
 
     const confirmationSummary: ConfirmationSummary = {
       signalSummary: {
-        topBullishCount: bullishSignals.length,
-        topBearishCount: bearishSignals.length,
-        reliabilityAvailable: signals.signals.some(s => s.confidence === 'HIGH'),
-        notes: this.generateSignalNotes(bullishSignals.length, bearishSignals.length),
+        topBullishCount: bullishSignalCount,
+        topBearishCount: bearishSignalCount,
+        reliabilityAvailable: totalSignalCount > 0,
+        notes: this.generateSignalNotes(bullishSignalCount, bearishSignalCount),
       },
       smartMoneySummary: {
         accumulationCount: smartMoney.filter(s => s.status === 'ACCUMULATION').length,
@@ -115,8 +117,8 @@ export class ResearchHubService {
         topContradictions,
       },
       marketContextSummary: {
-        leadingSectors: context?.topSectors?.map(s => s.sector) || [],
-        weakSectors: context?.weakSectors?.map(s => s.sector) || [],
+        leadingSectors: (context?.topSectors || []).map((s: any) => s.sector),
+        weakSectors: (context?.weakSectors || []).map((s: any) => s.sector),
         breadthStatus: context?.breadth?.percentAboveSma50 != null 
           ? `${(context.breadth.percentAboveSma50 * 100).toFixed(0)}% above SMA50` 
           : 'Breadth unavailable',
@@ -161,6 +163,14 @@ export class ResearchHubService {
     else if (bearish > bullish * 2) notes.push('Significant bearish signal dominance; exercise caution.');
     else notes.push('Bullish and bearish signals are roughly balanced.');
     return notes;
+  }
+
+  private async latestPersistedMarketContext(region: string): Promise<any | null> {
+    const service = this.contextService as any;
+    if (typeof service.latestPersistedSummary === 'function') {
+      return service.latestPersistedSummary(region);
+    }
+    return service.summary({ region });
   }
 
   private async fetchStrategyDecisionProofPool(query: StrategyQuery): Promise<StrategyDecisionDto[]> {
@@ -310,7 +320,7 @@ export class ResearchHubService {
       actions.push({
         label: 'Run Data Quality & Universe Sync',
         priority: 'HIGH',
-        targetRoute: '/research/data-quality'
+        targetRoute: '/data-quality'
       });
     }
 
@@ -318,19 +328,19 @@ export class ResearchHubService {
       actions.push({
         label: priorities.exitCandidates.length > 0 ? `New long candidates restricted; review ${priorities.exitCandidates.length} exit candidates` : 'New long candidates restricted; review watchlist only',
         priority: 'HIGH',
-        targetRoute: '/research/strategy'
+        targetRoute: '/strategy'
       });
     } else if (priorities.tradeCandidates.length > 0) {
       actions.push({
         label: `Review ${priorities.tradeCandidates.length} framework-backed candidates`,
         priority: 'HIGH',
-        targetRoute: '/research/strategy'
+        targetRoute: '/strategy'
       });
     } else {
       actions.push({
         label: 'Run Strategy Evaluation',
         priority: 'MEDIUM',
-        targetRoute: '/research/strategy'
+        targetRoute: '/strategy'
       });
     }
 
@@ -346,7 +356,7 @@ export class ResearchHubService {
       actions.push({
         label: 'Monitor Watchlist Candidates',
         priority: 'LOW',
-        targetRoute: '/research/strategy'
+        targetRoute: '/strategy'
       });
     }
 

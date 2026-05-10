@@ -38,7 +38,9 @@ export class TradePlanRiskEngineController {
       const instrumentId = String(req.params.instrumentId);
       const strategyCode = typeof req.query.strategyCode === 'string' ? req.query.strategyCode : undefined;
       const portfolioId = typeof req.query.portfolioId === 'string' ? req.query.portfolioId : undefined;
-      const plan = await this.service.latestForInstrument(instrumentId, strategyCode, portfolioId);
+      const region = typeof req.query.region === 'string' ? req.query.region : undefined;
+      const assetType = typeof req.query.assetType === 'string' ? req.query.assetType : undefined;
+      const plan = await this.service.latestForInstrument(instrumentId, strategyCode, portfolioId, { region, assetType });
       
       if (!plan) {
          // Auto-generate if missing

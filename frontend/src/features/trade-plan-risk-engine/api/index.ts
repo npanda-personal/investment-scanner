@@ -22,10 +22,10 @@ export const TradePlanApi = {
     return res.data;
   },
 
-  async getLatestForInstrument(instrumentId: string, strategyCode?: string) {
+  async getLatestForInstrument(instrumentId: string, params?: Record<string, string | number | boolean>) {
     try {
       const res = await axios.get<TradePlanResultDto>(`/api/v1/trade-plans/${instrumentId}`, {
-        params: { strategyCode }
+        params
       });
       return res.data;
     } catch (error: any) {

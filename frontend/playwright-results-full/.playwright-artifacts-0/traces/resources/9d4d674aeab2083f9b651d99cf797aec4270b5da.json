@@ -1,0 +1,1 @@
+{"batchSize":100,"limit":100,"offset":0,"maxConcurrency":4,"useDataQualityFilter":true,"minSignalReadinessScore":70,"region":"IN","assetType":"STOCK","includeStrategyMatches":false}

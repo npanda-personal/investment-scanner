@@ -40,6 +40,8 @@ Mounted under `/api/v1`:
 | `GET /backtests/runs/:id` | Get one run |
 | `DELETE /backtests/runs/:id` | Delete a run |
 
+`GET /backtests/runs` accepts optional `region`, `assetType`, `limit`, and `offset` query parameters. When scope is supplied, the endpoint returns only runs whose persisted config explicitly matches that scope. Legacy runs with missing scope are not included in scoped responses, because they cannot be proven to belong to the active market.
+
 ## Persistence
 
 Prisma models:
@@ -88,6 +90,8 @@ Registered Strategy Framework configs include:
 - `universe`: `ALL`, `SYMBOLS`, `INSTRUMENTS`, or `WATCHLIST`
 
 When registered mode or `strategyCode` is present, entry/exit checks use the registered Strategy Framework evaluator. Custom rule-only configs remain supported for compatibility but are no longer the primary strategy source.
+
+Registered backtests currently accept only active Strategy Framework definitions with `category = ENTRY`. `EXIT`, `GATE`, `FILTER`, and `DRAFT` definitions are intentionally blocked as standalone registered backtests because they need different simulation semantics. They may still support Strategy Decision, data quality gating, and future portfolio/exit-risk simulations.
 
 Supported entry rules:
 
@@ -192,12 +196,14 @@ Route:
 The UI includes:
 
 - Registered Strategy setup as the default mode
+- Registered Strategy selector shows active `ENTRY` strategies only
 - Custom Rules setup as a secondary/experimental mode
 - URL deep-link support: `/backtests?mode=registered&strategyCode=TREND_MOMENTUM&timeframe=3Y`
 - save strategy action
 - run ad hoc strategy action
 - saved strategy list
 - saved run list
+- saved run list requests the active global market scope and hides unknown-scope legacy runs from scoped views
 - saved runs labeled as registered strategy runs or custom rule backtests
 - performance metric cards
 - equity and drawdown chart
@@ -261,6 +267,7 @@ Current behavior uses an honest equal-weight buy-and-hold baseline over the reso
 - Universe `ALL` is capped to the first 50 available instruments for MVP runtime safety. Results expose `universeCapped`, `universeCap`, and `universeTotalAvailable` so users do not mistake a bounded run for a full-universe simulation.
 - Currency conversion is not applied across instruments.
 - Registered strategy historical context is price-derived and does not reconstruct every historical market-context or smart-money snapshot yet.
+- Registered backtests currently run active entry strategies only. Exit-risk, gate, and filter definitions need dedicated simulation semantics before they can produce meaningful standalone proof.
 - Readiness labels are research/paper-test oriented only; no live-trading readiness is displayed.
 
 ## Verification

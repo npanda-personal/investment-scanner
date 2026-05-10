@@ -112,8 +112,14 @@ export interface StrategyDecisionDto {
 export interface StrategyModel {
   modelVersion: string;
   strategies: {
+    code: string;
     name: string;
     description: string;
+    category?: string;
+    style?: string;
+    status?: string;
+    version?: string;
+    evaluationSupported?: boolean;
     thresholds: Record<string, number>;
     weights: Record<string, number>;
   }[];
@@ -153,6 +159,11 @@ export interface StrategyQuery {
   decision?: StrategyDecision;
   minScore?: number;
   confidence?: DecisionConfidence;
+  frameworkBacked?: boolean;
+  includeLegacy?: boolean;
+  includeHistory?: boolean;
+  strategyRatingGrades?: string;
+  readinessLabels?: string;
   sector?: string;
   country?: string;
   region?: string;

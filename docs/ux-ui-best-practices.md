@@ -9,6 +9,7 @@ These guidelines apply across the application. They are intentionally product-le
 - Keep high-frequency actions visible; move rare or diagnostic actions into secondary panels.
 - Use the shared `PageHeader` for title, short subtitle, and right-aligned primary actions where practical.
 - Keep scope and context visible near the top, especially market region, asset type, portfolio, watchlist, or selected entity.
+- Do not duplicate global scope controls inside module tables. If a page is already governed by the global market header, show the active scope as read-only context and let the header own region/asset changes.
 - Header action groups must wrap within the page container. Long action labels should wrap or move to the next row rather than creating page-level horizontal overflow.
 
 ## Tables And Dense Data
@@ -59,6 +60,27 @@ These guidelines apply across the application. They are intentionally product-le
 - Buttons must remain visible and clickable at smaller widths.
 - Tables may scroll horizontally inside their own container.
 - Avoid page-level horizontal overflow.
+
+## UI Verification
+
+- UI-facing changes must include repeatable smoke coverage when practical.
+- Use the local Playwright suite in `frontend/tests/ui` for authenticated page-load, navigation, common error-state, filter/action, and route-regression checks.
+- Add or update smoke cases for the exact user-visible issue fixed, especially broken routes, stale labels, overflowing controls, dead-end disabled actions, batch progress regressions, or missing primary headings.
+- Smoke tests must exercise meaningful module behavior, not only headings. Assert critical buttons, filters, tabs, table columns, route targets, progress states, and domain-specific empty states.
+- Data-bearing pages must either show scoped data or a clear explanation of why data is absent. Generic `No records found` is not enough when the absence could mean stale snapshots, missing provider support, neutral-only results, failed auth, or an unrun batch job.
+- Do not rely only on backend/unit tests when the change affects visible UI behavior.
+- Keep UI verification free and local. Do not add paid hosted browser testing, paid visual regression tools, or paid monitoring services.
+- Organize UI tests by module, matching the source structure. Use one spec per feature/module in `frontend/tests/ui` and shared helpers in `frontend/tests/ui/support`; avoid one large all-modules spec file.
+- Run authenticated smoke tests deterministically when they share the local test user. Use a single Playwright worker unless worker-isolated users/storage state are added. Keep protected-route navigation/auth setup in shared UI test helpers so module specs stay focused on module behavior.
+- Verify real bulk data-load and calculation flows manually in the browser when their visible behavior changes. Keep the regular UI smoke suite focused on non-destructive coverage: controls, disabled/progress/summary states, request parameters, filter/range behavior, and empty states. Avoid running large catalog imports, full provider syncs, or full-universe calculations in every UI test run.
+
+Required sequence for UI fixes:
+
+1. Add or update the UI test that should catch the issue.
+2. Run the UI test and confirm it fails or covers the target behavior.
+3. Implement the UI/API fix.
+4. Run relevant backend tests for changed backend behavior.
+5. Rerun the UI test suite and confirm it passes.
 
 ## Product Language
 

@@ -12,6 +12,7 @@ import type {
   SmartMoneyStockSummary,
   SectorSmartMoneyStatus,
   SmartMoneyDataStatus,
+  SmartMoneyRunResponse,
 } from './smart-money-intelligence.types';
 
 interface InstrumentLike {
@@ -22,6 +23,9 @@ interface InstrumentLike {
 }
 
 const RANGE_LIMITS: Record<SmartMoneyRange, number> = { '1M': 35, '3M': 90, '6M': 180 };
+const SMART_MONEY_REFRESH_RANGES: SmartMoneyRange[] = ['1M', '3M', '6M'];
+const SMART_MONEY_DEFAULT_REGION = 'IN';
+const SMART_MONEY_DEFAULT_ASSET_TYPE = 'STOCK';
 
 export class SmartMoneyIntelligenceService {
   constructor(
@@ -45,41 +49,70 @@ export class SmartMoneyIntelligenceService {
     };
   }
 
-  async run(batchSize: number = 20): Promise<{ generated: number, skipped: number, errors: string[] }> {
-    // Process all active instruments to generate daily snapshots
-    const response = await this.marketDataService.listInstruments({ page: 1, pageSize: 5000 });
+  async run(batchSize: number = 100, query: { region?: string; assetType?: string; offset?: number } = {}): Promise<SmartMoneyRunResponse> {
+    const startedAt = Date.now();
+    const offset = Math.max(0, Math.floor(Number(query.offset) || 0));
+    const pageSize = Math.min(100, Math.max(1, Math.floor(Number(batchSize) || 100)));
+    const page = Math.floor(offset / pageSize) + 1;
+    const region = query.region || SMART_MONEY_DEFAULT_REGION;
+    const assetType = query.assetType || SMART_MONEY_DEFAULT_ASSET_TYPE;
+    const response = await this.marketDataService.listInstruments({ page, pageSize, region, assetType });
     const instruments = response.instruments || [];
-    
+    const totalCount = Number(response.pagination?.total ?? instruments.length);
+
     let generated = 0;
     let skipped = 0;
     const errors: string[] = [];
+    const byRange: Record<SmartMoneyRange, { generated: number; skipped: number }> = {
+      '1M': { generated: 0, skipped: 0 },
+      '3M': { generated: 0, skipped: 0 },
+      '6M': { generated: 0, skipped: 0 },
+    };
 
-    // Parallel batch processing
-    for (let i = 0; i < instruments.length; i += batchSize) {
-      const chunk = instruments.slice(i, i + batchSize);
-      
-      await Promise.all(chunk.map(async (instrument: any) => {
-        try {
-          // Process 3M range by default for the snapshot
-          const range: SmartMoneyRange = '3M';
-          const bars = await this.loadBars(instrument.id, range).catch(() => []);
-          const ownership = this.missingOwnership(); // Placeholder until provider is configured
-          
+    await Promise.all(instruments.map(async (instrument: any) => {
+      try {
+        const fullRangeBars = await this.loadBars(instrument.id, '6M').catch(() => []);
+        const ownership = this.missingOwnership(); // Placeholder until provider is configured
+
+        for (const range of SMART_MONEY_REFRESH_RANGES) {
+          const bars = fullRangeBars.slice(-RANGE_LIMITS[range]);
           const summary = this.calculateStockSummary(instrument, bars, ownership, range);
-          
+
           if (summary.status !== 'INSUFFICIENT_DATA') {
             await this.repository.saveSnapshot(summary);
             generated++;
+            byRange[range].generated++;
           } else {
             skipped++;
+            byRange[range].skipped++;
           }
-        } catch (err: any) {
-          errors.push(`Failed for ${instrument.id}: ${err.message}`);
         }
-      }));
-    }
+      } catch (err: any) {
+        errors.push(`Failed for ${instrument.id}: ${err.message}`);
+      }
+    }));
 
-    return { generated, skipped, errors };
+    const processedCount = instruments.length;
+    const nextOffset = offset + processedCount < totalCount ? offset + processedCount : null;
+
+    return {
+      generated,
+      skipped,
+      errors,
+      byRange,
+      processedCount,
+      totalCount,
+      batchSize: pageSize,
+      offset,
+      nextOffset,
+      hasMore: nextOffset !== null,
+      generatedCount: generated,
+      skippedCount: skipped,
+      failedCount: errors.length,
+      warnings: errors,
+      durationMs: Date.now() - startedAt,
+      scope: { region, assetType },
+    };
   }
 
   async stock(instrumentId: string, range: SmartMoneyRange = '3M'): Promise<SmartMoneyStockSummary | null> {
@@ -116,8 +149,8 @@ export class SmartMoneyIntelligenceService {
     return this.repository.latestSnapshots(query, true);
   }
 
-  async sectors(range: SmartMoneyRange = '3M'): Promise<SectorSmartMoneySummary[]> {
-    return this.repository.latestSectorSnapshots(range);
+  async sectors(range: SmartMoneyRange = '3M', query: { region?: string; assetType?: string } = {}): Promise<SectorSmartMoneySummary[]> {
+    return this.repository.latestSectorSnapshots(range, query);
   }
 
   calculateStockSummary(
@@ -155,7 +188,10 @@ export class SmartMoneyIntelligenceService {
     const previous = bars[bars.length - 2];
     const avgVolume20 = this.averageVolume(bars.slice(-21, -1));
     const dailyChangePercent = previous?.close > 0 ? (latest.close - previous.close) / previous.close : null;
-    const signals = this.detectSignals(bars, avgVolume20);
+    const signals = [
+      ...this.detectSignals(bars, avgVolume20),
+      ...this.detectRangeSignals(bars, range),
+    ];
     const accumulationStrength = signals.filter((signal) => signal.direction === 'ACCUMULATION').reduce((sum, signal) => sum + signal.strength, 0);
     const distributionStrength = signals.filter((signal) => signal.direction === 'DISTRIBUTION').reduce((sum, signal) => sum + signal.strength, 0);
     const score = this.calculateScore(accumulationStrength, distributionStrength);
@@ -230,8 +266,93 @@ export class SmartMoneyIntelligenceService {
     return signals;
   }
 
+  detectRangeSignals(bars: SmartMoneyPriceBar[], range: SmartMoneyRange): SmartMoneySignal[] {
+    const signals: SmartMoneySignal[] = [];
+    if (bars.length < 30) return signals;
+
+    const first = bars[0];
+    const latest = bars[bars.length - 1];
+    if (!first?.close || !latest?.close || first.close <= 0) return signals;
+
+    const rangeReturn = (latest.close - first.close) / first.close;
+    const rangeVolume = this.averageVolume(bars);
+    let upVolume = 0;
+    let downVolume = 0;
+    let upDays = 0;
+    let downDays = 0;
+    let highVolumeUpDays = 0;
+    let highVolumeDownDays = 0;
+
+    for (let index = 1; index < bars.length; index += 1) {
+      const current = bars[index];
+      const previous = bars[index - 1];
+      const volume = Number.isFinite(current.volume) ? current.volume as number : 0;
+      const change = current.close - previous.close;
+      if (change > 0) {
+        upDays += 1;
+        upVolume += volume;
+        if (rangeVolume && volume >= rangeVolume * 1.1) highVolumeUpDays += 1;
+      } else if (change < 0) {
+        downDays += 1;
+        downVolume += volume;
+        if (rangeVolume && volume >= rangeVolume * 1.1) highVolumeDownDays += 1;
+      }
+    }
+
+    const directionalVolume = upVolume + downVolume;
+    const upVolumeShare = directionalVolume > 0 ? upVolume / directionalVolume : 0.5;
+    const downVolumeShare = directionalVolume > 0 ? downVolume / directionalVolume : 0.5;
+    const dayCount = Math.max(1, upDays + downDays);
+    const upDayShare = upDays / dayCount;
+    const downDayShare = downDays / dayCount;
+
+    if (upVolumeShare >= 0.58 && upDayShare >= 0.52 && rangeReturn >= 0.02) {
+      const strength = Math.min(30, Math.round(12 + (upVolumeShare - 0.58) * 60 + Math.min(0.2, rangeReturn) * 60));
+      signals.push({
+        type: `RANGE_ACCUMULATION_${range}`,
+        label: `${range} accumulation pressure`,
+        direction: 'ACCUMULATION',
+        strength,
+        details: `${range} window has ${(upVolumeShare * 100).toFixed(0)}% of directional volume on up days and ${(rangeReturn * 100).toFixed(1)}% price change.`,
+      });
+    }
+
+    if (downVolumeShare >= 0.58 && downDayShare >= 0.52 && rangeReturn <= -0.02) {
+      const strength = Math.min(30, Math.round(12 + (downVolumeShare - 0.58) * 60 + Math.min(0.2, Math.abs(rangeReturn)) * 60));
+      signals.push({
+        type: `RANGE_DISTRIBUTION_${range}`,
+        label: `${range} distribution pressure`,
+        direction: 'DISTRIBUTION',
+        strength,
+        details: `${range} window has ${(downVolumeShare * 100).toFixed(0)}% of directional volume on down days and ${(rangeReturn * 100).toFixed(1)}% price change.`,
+      });
+    }
+
+    if (highVolumeUpDays >= highVolumeDownDays + 3 && rangeReturn > 0) {
+      signals.push({
+        type: `RANGE_HIGH_VOLUME_UP_DAYS_${range}`,
+        label: `${range} high-volume up-day skew`,
+        direction: 'ACCUMULATION',
+        strength: Math.min(15, 8 + Math.min(7, highVolumeUpDays - highVolumeDownDays)),
+        details: `${range} window has ${highVolumeUpDays} high-volume up days versus ${highVolumeDownDays} high-volume down days.`,
+      });
+    }
+
+    if (highVolumeDownDays >= highVolumeUpDays + 3 && rangeReturn < 0) {
+      signals.push({
+        type: `RANGE_HIGH_VOLUME_DOWN_DAYS_${range}`,
+        label: `${range} high-volume down-day skew`,
+        direction: 'DISTRIBUTION',
+        strength: Math.min(15, 8 + Math.min(7, highVolumeDownDays - highVolumeUpDays)),
+        details: `${range} window has ${highVolumeDownDays} high-volume down days versus ${highVolumeUpDays} high-volume up days.`,
+      });
+    }
+
+    return signals;
+  }
+
   calculateScore(accumulationStrength: number, distributionStrength: number): number {
-    return Math.max(0, Math.min(100, Math.round(50 + accumulationStrength * 0.7 - distributionStrength * 0.7)));
+    return Math.max(0, Math.min(100, Math.round(50 + accumulationStrength * 0.5 - distributionStrength * 0.5)));
   }
 
   aggregateSectors(summaries: SmartMoneyStockSummary[]): SectorSmartMoneySummary[] {

@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Typography, Button, CircularProgress, Alert, Paper, Grid, Divider, List, ListItem, ListItemText, ListItemIcon, Chip, Stack } from '@mui/material';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { TradePlanApi } from '../api';
 import { TradePlanResultDto } from '../types';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
@@ -17,13 +18,14 @@ export const TradePlanDetail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const { scope } = useMarketScope();
 
   const fetchPlan = async () => {
     if (!instrumentId) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await TradePlanApi.getLatestForInstrument(instrumentId);
+      const data = await TradePlanApi.getLatestForInstrument(instrumentId, { region: scope.region, assetType: scope.assetType });
       setPlan(data);
     } catch (err: any) {
       setError(err.message || 'Failed to load plan');
@@ -40,7 +42,8 @@ export const TradePlanDetail: React.FC = () => {
       const data = await TradePlanApi.generatePlan({
          instrumentId,
          symbol: plan.symbol || instrumentId, // Will fail if symbol is not known. Usually instrumentId is symbol in MVP or symbol is passed via state.
-         capitalBase: 10000, // default fallback for now
+         region: scope.region,
+         assetType: scope.assetType,
       });
       setPlan(data);
     } catch (err: any) {
@@ -52,7 +55,7 @@ export const TradePlanDetail: React.FC = () => {
 
   useEffect(() => {
     fetchPlan();
-  }, [instrumentId]);
+  }, [instrumentId, scope.region, scope.assetType]);
 
   if (loading) return <CircularProgress />;
   if (error) return <Alert severity="error">{error}</Alert>;
@@ -61,8 +64,11 @@ export const TradePlanDetail: React.FC = () => {
      return (
         <Box>
             <Typography variant="h6">No active plan found for this instrument.</Typography>
-            <Button variant="contained" sx={{ mt: 2 }} onClick={handleGenerate} disabled={generating}>
-               {generating ? 'Generating...' : 'Generate Trade Plan'}
+            <Alert severity="info" sx={{ mt: 2 }}>
+              No scoped plan exists for {scope.region}/{scope.assetType}. Open a row from Latest Plans or run batch generation after Strategy Decision has eligible review candidates.
+            </Alert>
+            <Button variant="contained" sx={{ mt: 2 }} component={Link} to="/trade-plans">
+               Back to Trade Plans
             </Button>
         </Box>
      );

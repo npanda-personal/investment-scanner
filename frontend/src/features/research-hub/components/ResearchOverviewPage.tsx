@@ -244,7 +244,7 @@ const ResearchPriorityBoard: React.FC<{ priorities: ResearchOverview['researchPr
   return (
     <Grid container spacing={3}>
       <Grid item xs={12} sm={6}>
-        <PriorityCard title="Paper Review Candidates" items={priorities?.tradeCandidates || []} type="candidate" emptyMsg="No framework-backed review candidates with enough proof." />
+        <PriorityCard title="Review Candidates" items={priorities?.tradeCandidates || []} type="candidate" emptyMsg="No framework-backed review candidates with enough proof." />
       </Grid>
       <Grid item xs={12} sm={6}>
         <PriorityCard title="Exit / Reduce Risk" items={priorities?.exitCandidates || []} type="exit" emptyMsg="No active exit candidates found." />
@@ -314,7 +314,7 @@ const PriorityCard: React.FC<{ title: string; items: ResearchPriorityCandidate[]
                       secondary={
                         <Box>
                           <Typography variant="caption" display="block">
-                            {item.strategy}{item.strategyVersion ? ` v${item.strategyVersion}` : ''} · {item.confidence}
+                            {item.strategy}{item.strategyVersion ? ` v${item.strategyVersion}` : ''} - {item.confidence}
                           </Typography>
                           {item.backtestSummary && (
                             <Typography variant="caption" display="block">
@@ -326,6 +326,8 @@ const PriorityCard: React.FC<{ title: string; items: ResearchPriorityCandidate[]
                           </Typography>
                         </Box>
                       }
+                      primaryTypographyProps={{ component: 'div' }}
+                      secondaryTypographyProps={{ component: 'div' }}
                     />
                   </ListItemButton>
                 </ListItem>
@@ -358,6 +360,7 @@ const ConfirmationPanel: React.FC<{ summary: ResearchOverview['confirmationSumma
                   <Typography variant="caption" display="block" sx={{ mt: 1 }}>{summary?.signalSummary?.notes?.[0]}</Typography>
                 </Box>
               }
+              secondaryTypographyProps={{ component: 'div' }}
             />
           </ListItem>
           <Divider />
@@ -383,6 +386,7 @@ const ConfirmationPanel: React.FC<{ summary: ResearchOverview['confirmationSumma
                   )}
                 </Box>
               }
+              secondaryTypographyProps={{ component: 'div' }}
             />
           </ListItem>
           <Divider />
@@ -399,6 +403,7 @@ const ConfirmationPanel: React.FC<{ summary: ResearchOverview['confirmationSumma
                   <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>{summary?.marketContextSummary?.breadthStatus}</Typography>
                 </Box>
               }
+              secondaryTypographyProps={{ component: 'div' }}
             />
           </ListItem>
         </List>
@@ -426,7 +431,7 @@ const StrategyProofPanel: React.FC<{ summary: ResearchOverview['strategyProofSum
                 <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1}>
                   <Box>
                     <Typography variant="body2" fontWeight={700}>{item.strategy}</Typography>
-                    <Typography variant="caption" color="text.secondary">{item.candidateCount} candidate(s){item.topCandidateSymbol ? ` · top ${item.topCandidateSymbol}` : ''}</Typography>
+                    <Typography variant="caption" color="text.secondary">{item.candidateCount} candidate(s){item.topCandidateSymbol ? ` - top ${item.topCandidateSymbol}` : ''}</Typography>
                   </Box>
                   <Stack direction="row" spacing={0.5}>
                     <Chip size="small" label={item.bestRating} />
@@ -457,7 +462,7 @@ const WhatChangedPanel: React.FC<{ whatChanged: ResearchOverview['whatChanged'] 
         {(whatChanged?.newTradeCandidates?.length || 0) > 0 ? (
           <Box>
             <Typography variant="caption" fontWeight={700} color="primary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
-              <FlashOnOutlined fontSize="inherit" /> NEW TRADE CANDIDATES
+              <FlashOnOutlined fontSize="inherit" /> NEW REVIEW CANDIDATES
             </Typography>
             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
               {whatChanged.newTradeCandidates.map(symbol => (
@@ -484,10 +489,10 @@ const WhatChangedPanel: React.FC<{ whatChanged: ResearchOverview['whatChanged'] 
 
 const ResearchModuleDrilldowns: React.FC = () => {
   const modules = [
-    { label: 'Strategy Engine', icon: <FlashOnOutlined />, route: '/research/strategy', desc: 'Decision board' },
-    { label: 'Signals', icon: <TimelineOutlined />, route: '/research/signals', desc: 'Raw score' },
-    { label: 'Smart Money', icon: <GppGoodOutlined />, route: '/research/smart-money', desc: 'Accumulation' },
-    { label: 'Market Context', icon: <TrendingUpOutlined />, route: '/research/market-context', desc: 'Regime' },
+    { label: 'Strategy Engine', icon: <FlashOnOutlined />, route: '/strategy', desc: 'Decision board' },
+    { label: 'Signals', icon: <TimelineOutlined />, route: '/signals', desc: 'Signal pulse' },
+    { label: 'Smart Money', icon: <GppGoodOutlined />, route: '/smart-money', desc: 'Accumulation' },
+    { label: 'Market Context', icon: <TrendingUpOutlined />, route: '/market-context', desc: 'Regime' },
   ];
 
   return (

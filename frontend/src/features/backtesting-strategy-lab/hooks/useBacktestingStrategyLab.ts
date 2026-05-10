@@ -9,8 +9,10 @@ import {
   runBacktestStrategy,
 } from '../api/backtestingStrategyLabService';
 import type { BacktestRun, BacktestStrategy, BacktestStrategyConfig } from '../types';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 
 export function useBacktestingStrategyLab() {
+  const { scope } = useMarketScope();
   const [strategies, setStrategies] = useState<BacktestStrategy[]>([]);
   const [runs, setRuns] = useState<BacktestRun[]>([]);
   const [selectedRun, setSelectedRun] = useState<BacktestRun | null>(null);
@@ -22,16 +24,19 @@ export function useBacktestingStrategyLab() {
     setLoading(true);
     setError(null);
     try {
-      const [strategyData, runData] = await Promise.all([fetchBacktestStrategies(), fetchBacktestRuns()]);
+      const [strategyData, runData] = await Promise.all([
+        fetchBacktestStrategies(),
+        fetchBacktestRuns({ region: scope.region, assetType: scope.assetType }),
+      ]);
       setStrategies(strategyData);
       setRuns(runData);
-      setSelectedRun((current) => current ?? runData[0] ?? null);
+      setSelectedRun((current) => current && runData.some((run) => run.id === current.id) ? current : runData[0] ?? null);
     } catch (err: any) {
       setError(err.response?.data?.error || err.message || 'Failed to load backtests');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [scope.region, scope.assetType]);
 
   useEffect(() => { void reload(); }, [reload]);
 

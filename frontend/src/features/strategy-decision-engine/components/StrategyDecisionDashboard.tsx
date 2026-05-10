@@ -8,6 +8,7 @@ import {
   Alert,
   Grid,
   Button,
+  Chip,
   CircularProgress,
   List,
   ListItem,
@@ -17,6 +18,7 @@ import {
   MenuItem,
   TextField,
   LinearProgress,
+  Stack,
 } from '@mui/material';
 import {
   LockOutlined,
@@ -35,6 +37,31 @@ import { useMarketScope } from '@/contexts/MarketScopeContext';
 
 const STRATEGY_DECISION_BATCH_SIZE = 100;
 
+type CandidatePresetKey = 'TRADE_CANDIDATE' | 'FRAMEWORK_BACKED' | 'GOOD_EXCELLENT' | 'PAPER_OR_WATCHLIST';
+
+const CANDIDATE_PRESETS: Record<CandidatePresetKey, { label: string; helper: string; query: Record<string, any> }> = {
+  TRADE_CANDIDATE: {
+    label: 'Trade candidates',
+    helper: 'Decision = TRADE_CANDIDATE',
+    query: { decision: 'TRADE_CANDIDATE' },
+  },
+  FRAMEWORK_BACKED: {
+    label: 'Framework-backed',
+    helper: 'Decision = TRADE_CANDIDATE and frameworkBacked = true',
+    query: { decision: 'TRADE_CANDIDATE', frameworkBacked: true },
+  },
+  GOOD_EXCELLENT: {
+    label: 'Good / Excellent',
+    helper: 'Strategy rating is GOOD or EXCELLENT',
+    query: { decision: 'TRADE_CANDIDATE', strategyRatingGrades: 'GOOD,EXCELLENT' },
+  },
+  PAPER_OR_WATCHLIST: {
+    label: 'Paper / Watchlist ready',
+    helper: 'Readiness is PAPER_TEST_CANDIDATE or WATCHLIST_CANDIDATE',
+    query: { decision: 'TRADE_CANDIDATE', readinessLabels: 'PAPER_TEST_CANDIDATE,WATCHLIST_CANDIDATE' },
+  },
+};
+
 const titleCase = (value: string) =>
   value
     .replace(/_/g, ' ')
@@ -48,6 +75,8 @@ const formatDecision = (value: string) => {
   if (value === 'INSUFFICIENT_DATA') return 'Insufficient Data';
   return titleCase(value);
 };
+
+const formatRawEnum = (value?: string | null) => value || 'UNKNOWN';
 
 const formatAction = (value: string) => {
   if (value === 'CONSIDER_ENTRY') return 'Consider Review';
@@ -95,34 +124,38 @@ const StrategyDecisionDashboard: React.FC = () => {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [totalCount, setTotalCount] = useState(0);
-  const [countryFilter, setCountryFilter] = useState<string>('SCOPE');
+  const [candidatePreset, setCandidatePreset] = useState<CandidatePresetKey>('TRADE_CANDIDATE');
+  const [sortBy, setSortBy] = useState('decisionScore');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   // Evaluation form state
   const [evalStrategy, setEvalStrategy] = useState<string>('ALL');
   const loadData = async () => {
     setLoading(true);
     try {
-      const selectedRegion = countryFilter === 'SCOPE' ? scope.region : (countryFilter === 'ALL' ? undefined : countryFilter);
+      const candidateQuery = CANDIDATE_PRESETS[candidatePreset].query;
       
       const [gateRes, candRes, waitRes, watchRes, exitRes, modelRes] = await Promise.all([
         fetchMarketGate({ region: scope.region }),
         fetchCandidates({ 
           limit: pageSize, 
           offset: page * pageSize, 
-          decision: 'TRADE_CANDIDATE',
-          region: selectedRegion,
-          assetType: scope.assetType
+          ...candidateQuery,
+          region: scope.region,
+          assetType: scope.assetType,
+          sortBy,
+          sortDirection,
         }),
         fetchCandidates({ 
           limit: 50, 
           decision: 'WAIT',
-          region: selectedRegion,
+          region: scope.region,
           assetType: scope.assetType
         }),
         fetchCandidates({
           limit: 50,
           decision: 'WATCH',
-          region: selectedRegion,
+          region: scope.region,
           assetType: scope.assetType
         }),
         fetchExits({ region: scope.region, assetType: scope.assetType }),
@@ -143,11 +176,11 @@ const StrategyDecisionDashboard: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, [page, pageSize, activeTab, countryFilter, scope.region, scope.assetType]);
+  }, [page, pageSize, activeTab, candidatePreset, sortBy, sortDirection, scope.region, scope.assetType]);
 
   useEffect(() => {
     setPage(0);
-  }, [scope.region, scope.assetType, countryFilter]);
+  }, [scope.region, scope.assetType, candidatePreset, sortBy, sortDirection]);
 
   const runEvaluate = async () => {
     setRunning(true);
@@ -221,16 +254,23 @@ const StrategyDecisionDashboard: React.FC = () => {
   };
 
   const candidateColumns: DataTableColumn<StrategyDecisionDto>[] = [
-    { id: 'symbol', label: 'Symbol', render: (d) => <Box component={Link} to={`/research/stocks/${d.instrumentId}`} sx={symbolLinkSx}>{d.symbol}</Box> },
-    { id: 'country', label: 'Region', render: (d) => <Typography variant="body2">{d.country || 'N/A'}</Typography> },
-    { id: 'strategy', label: 'Strategy', render: (d) => <Box><Typography variant="body2">{d.strategy}</Typography>{d.frameworkBacked && <Typography variant="caption" color="text.secondary">Framework {d.strategyVersion || ''}</Typography>}</Box> },
-    { id: 'decision', label: 'Decision', render: (d) => <StatusBadge label={formatDecision(d.decision)} /> },
-    { id: 'decisionScore', label: 'Score', align: 'right', render: (d) => d.decisionScore },
-    { id: 'confidence', label: 'Confidence', render: (d) => d.confidence },
+    { id: 'symbol', label: 'Symbol', sortable: true, render: (d) => <Box component={Link} to={`/research/stocks/${d.instrumentId}`} sx={symbolLinkSx}>{d.symbol}</Box> },
+    { id: 'strategy', label: 'Strategy', sortable: true, render: (d) => <Box><Typography variant="body2">{d.strategy}</Typography>{d.strategyVersion && <Typography variant="caption" color="text.secondary">v{d.strategyVersion}</Typography>}</Box> },
+    { id: 'decision', label: 'Decision', sortable: true, render: (d) => <Box><StatusBadge label={formatDecision(d.decision)} /><Typography variant="caption" display="block" color="text.secondary">{d.decision}</Typography></Box> },
+    { id: 'frameworkBacked', label: 'Framework', sortable: true, render: (d) => <Typography variant="body2" color={d.frameworkBacked ? 'success.main' : 'text.secondary'}>{d.frameworkBacked ? 'Framework-backed' : 'Legacy'}</Typography> },
+    { id: 'strategyRating', label: 'Rating', render: (d) => <Typography variant="body2">{formatRawEnum(d.strategyRating?.ratingGrade)}</Typography> },
+    { id: 'readinessLabel', label: 'Readiness', sortable: true, render: (d) => <Typography variant="body2">{formatRawEnum(d.readinessLabel || d.strategyRating?.readinessLabel)}</Typography> },
+    { id: 'decisionScore', label: 'Score', align: 'right', sortable: true, render: (d) => d.decisionScore },
+    { id: 'confidence', label: 'Confidence', sortable: true, render: (d) => d.confidence },
     { id: 'entryZone', label: 'Entry Zone', render: (d) => d.entryZone ? `${d.entryZone.preferredEntryMin} - ${d.entryZone.preferredEntryMax}` : 'N/A' },
-    { id: 'generatedAt', label: 'Generated', render: (d) => new Date(d.generatedAt).toLocaleDateString() },
+    { id: 'generatedAt', label: 'Generated', sortable: true, render: (d) => new Date(d.generatedAt).toLocaleDateString() },
     { id: 'actions', label: 'Actions', render: () => <Button size="small" component={Link} to={`/trade-plans`}>Risk Plan</Button> },
   ];
+
+  const evaluatableStrategies = model?.strategies.filter((strategy) => strategy.evaluationSupported) ?? [];
+  const allReviewLabel = evaluatableStrategies.length > 0
+    ? `All Review Strategies (${evaluatableStrategies.length})`
+    : 'All Review Strategies';
 
   return (
     <Box sx={{ p: 3, maxWidth: 1600, mx: 'auto' }}>
@@ -275,21 +315,9 @@ const StrategyDecisionDashboard: React.FC = () => {
         </Tabs>
         
         {(activeTab === 1 || activeTab === 2) && (
-          <Box sx={{ px: 2, py: 1 }}>
-            <TextField
-              select
-              size="small"
-              label="Region Override"
-              value={countryFilter}
-              onChange={(e) => setCountryFilter(e.target.value)}
-              sx={{ minWidth: 160 }}
-            >
-              <MenuItem value="SCOPE">Default (Global Scope)</MenuItem>
-              <MenuItem value="ALL">All Regions</MenuItem>
-              <MenuItem value="IN">India</MenuItem>
-              <MenuItem value="US">USA</MenuItem>
-            </TextField>
-          </Box>
+          <Typography variant="caption" color="text.secondary" sx={{ px: 2, py: 1 }}>
+            Current scope: {scope.region} / {scope.assetType}
+          </Typography>
         )}
       </Paper>
 
@@ -349,18 +377,46 @@ const StrategyDecisionDashboard: React.FC = () => {
       )}
 
       {activeTab === 1 && (
-        <DataTable<StrategyDecisionDto>
-          columns={candidateColumns}
-          rows={candidates}
-          getRowId={(row) => row.id || `${row.instrumentId}-${row.strategy}`}
-          loading={loading}
-          emptyMessage="No review candidates found for the current scope. Try running evaluation or checking the market gate."
-          page={page}
-          pageSize={pageSize}
-          totalCount={totalCount}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-        />
+        <Box>
+          <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
+              {Object.entries(CANDIDATE_PRESETS).map(([key, preset]) => (
+                <Chip
+                  key={key}
+                  label={preset.label}
+                  clickable
+                  color={candidatePreset === key ? 'primary' : 'default'}
+                  variant={candidatePreset === key ? 'filled' : 'outlined'}
+                  onClick={() => setCandidatePreset(key as CandidatePresetKey)}
+                />
+              ))}
+            </Stack>
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+              {CANDIDATE_PRESETS[candidatePreset].helper}. Region comes from the global header scope.
+            </Typography>
+          </Paper>
+          <DataTable<StrategyDecisionDto>
+            columns={candidateColumns}
+            rows={candidates}
+            getRowId={(row) => row.id || `${row.instrumentId}-${row.strategy}`}
+            loading={loading}
+            emptyMessage={`No ${CANDIDATE_PRESETS[candidatePreset].label.toLowerCase()} found for ${scope.region} / ${scope.assetType}. Try running evaluation, refreshing upstream strategy proof, or choosing a broader candidate preset.`}
+            page={page}
+            pageSize={pageSize}
+            totalCount={totalCount}
+            sortBy={sortBy}
+            sortDirection={sortDirection}
+            onSortChange={(nextSortBy, nextSortDirection) => {
+              setSortBy(nextSortBy);
+              setSortDirection(nextSortDirection);
+            }}
+            onPageChange={setPage}
+            onPageSizeChange={(nextPageSize) => {
+              setPageSize(nextPageSize);
+              setPage(0);
+            }}
+          />
+        </Box>
       )}
 
       {activeTab === 2 && (
@@ -426,7 +482,13 @@ const StrategyDecisionDashboard: React.FC = () => {
 
               {model.strategies.map((s, idx) => (
                 <Box key={idx} sx={{ mt: 4 }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>{idx + 1}. {s.name}</Typography>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                    {idx + 1}. {s.name}
+                    {s.code ? ` (${s.code})` : ''}
+                  </Typography>
+                  <Typography variant="caption" color={s.evaluationSupported ? 'success.main' : 'text.secondary'} display="block" sx={{ mb: 1 }}>
+                    {s.status || 'UNKNOWN'} / {s.category || 'UNKNOWN'}{s.evaluationSupported ? ' / available for Strategy Decision evaluation' : ' / not shown in the Strategy Decision evaluation list'}
+                  </Typography>
                   <Typography variant="body2" color="textSecondary" paragraph>{s.description}</Typography>
                   
                   <Grid container spacing={3}>
@@ -478,10 +540,13 @@ const StrategyDecisionDashboard: React.FC = () => {
                 value={evalStrategy}
                 onChange={(e) => setEvalStrategy(e.target.value)}
               >
-                <MenuItem value="ALL">All Review Strategies</MenuItem>
-                <MenuItem value="TREND_MOMENTUM">Trend Momentum Only</MenuItem>
-                <MenuItem value="PULLBACK_IN_UPTREND">Pullback in Uptrend Only</MenuItem>
-                <MenuItem value="DEFENSIVE_EXIT">Defensive Exit Risk</MenuItem>
+                <MenuItem value="ALL">{allReviewLabel}</MenuItem>
+                {evaluatableStrategies.map((strategy) => (
+                  <MenuItem key={strategy.code} value={strategy.code}>
+                    {strategy.name || titleCase(strategy.code)}
+                    {strategy.category ? ` (${titleCase(strategy.category)})` : ''}
+                  </MenuItem>
+                ))}
               </TextField>
             </Grid>
             {evaluationSummary && (

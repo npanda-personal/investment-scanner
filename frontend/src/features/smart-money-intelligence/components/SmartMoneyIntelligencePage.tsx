@@ -56,19 +56,17 @@ export default function SmartMoneyIntelligencePage() {
     sectors,
     selectedStock,
     loading,
+    refreshingSnapshots,
+    refreshProgress,
     detailLoading,
     error,
     setError,
     loadStock,
+    refreshSnapshots,
   } = useSmartMoneyIntelligence();
 
   const handleRun = async () => {
-    try {
-      await fetch('/api/v1/smart-money/run', { method: 'POST' });
-      window.location.reload();
-    } catch (e) {
-      setError('Failed to trigger run');
-    }
+    await refreshSnapshots();
   };
 
   const columns: DataTableColumn<SmartMoneyStockSummary>[] = [
@@ -131,7 +129,7 @@ export default function SmartMoneyIntelligencePage() {
       <PageHeader
         title="Smart Money Intelligence"
         subtitle="Price-volume accumulation, distribution warnings, and sector flow context."
-        primaryAction={<Button variant="contained" onClick={handleRun}>Refresh Snapshots</Button>}
+        primaryAction={<Button variant="contained" onClick={handleRun} disabled={refreshingSnapshots}>{refreshingSnapshots ? 'Refreshing...' : 'Refresh Snapshots'}</Button>}
       />
 
       <FilterBar onReset={() => { setSector(''); setRange('3M'); }}>
@@ -159,6 +157,29 @@ export default function SmartMoneyIntelligencePage() {
       </FilterBar>
 
       {error && <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>{error}</Alert>}
+      {(refreshingSnapshots || refreshProgress) && (
+        <Paper variant="outlined" sx={{ p: 2, mt: 2 }}>
+          <Stack spacing={1}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={1}>
+              <Typography variant="subtitle2">
+                Smart money snapshot refresh
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Processed {(refreshProgress?.offset ?? 0) + (refreshProgress?.processedCount ?? 0)} / {refreshProgress?.totalCount ?? 0}
+              </Typography>
+            </Stack>
+            <LinearProgress
+              variant={refreshProgress?.totalCount ? 'determinate' : 'indeterminate'}
+              value={refreshProgress?.totalCount ? Math.min(100, ((refreshProgress.offset ?? 0) + (refreshProgress.processedCount ?? 0)) / refreshProgress.totalCount * 100) : undefined}
+            />
+            {refreshProgress && (
+              <Typography variant="body2" color="text.secondary">
+                Generated {refreshProgress.generatedCount ?? refreshProgress.generated}, skipped {refreshProgress.skippedCount ?? refreshProgress.skipped}, failed {refreshProgress.failedCount ?? refreshProgress.errors?.length ?? 0}
+              </Typography>
+            )}
+          </Stack>
+        </Paper>
+      )}
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1.2fr 0.8fr' }, gap: 3, mt: 3 }}>
         <Stack spacing={3}>
@@ -172,6 +193,7 @@ export default function SmartMoneyIntelligencePage() {
               page={topPage}
               pageSize={topPageSize}
               totalCount={topTotal}
+              emptyMessage="No accumulation candidates for the current scope/range. Refresh snapshots if data is stale, or review Sector Smart Money View for neutral-only snapshots."
               onPageChange={setTopPage}
               onPageSizeChange={setTopPageSize}
               onRowClick={(row) => void loadStock(row.instrumentId)}
@@ -187,6 +209,7 @@ export default function SmartMoneyIntelligencePage() {
               page={distPage}
               pageSize={distPageSize}
               totalCount={distTotal}
+              emptyMessage="No distribution warnings for the current scope/range. Refresh snapshots if data is stale, or review Sector Smart Money View for neutral-only snapshots."
               onPageChange={setDistPage}
               onPageSizeChange={setDistPageSize}
               onRowClick={(row) => void loadStock(row.instrumentId)}

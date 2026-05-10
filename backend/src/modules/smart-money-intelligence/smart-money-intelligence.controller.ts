@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { SmartMoneyIntelligenceService } from './smart-money-intelligence.service';
-import { getParam, parseLimit, parseOptionalText, parseRange } from './smart-money-intelligence.validation';
+import { getParam, parseLimit, parseOffset, parseOptionalText, parseRange } from './smart-money-intelligence.validation';
 
 export class SmartMoneyIntelligenceController {
   constructor(private readonly service = new SmartMoneyIntelligenceService()) {}
@@ -10,17 +10,26 @@ export class SmartMoneyIntelligenceController {
   );
 
   sectors = async (req: Request, res: Response) => this.respond(res, () =>
-    this.service.sectors(parseRange(req.query.range))
+    this.service.sectors(parseRange(req.query.range), {
+      region: parseOptionalText(req.query.region),
+      assetType: parseOptionalText(req.query.assetType),
+    })
   );
 
   run = async (req: Request, res: Response) => this.respond(res, () =>
-    this.service.run(Number(req.body.batchSize) || 20)
+    this.service.run(parseLimit(req.body.batchSize, 100), {
+      region: parseOptionalText(req.body.region),
+      assetType: parseOptionalText(req.body.assetType),
+      offset: parseOffset(req.body.offset ?? req.body.cursor),
+    })
   );
 
   top = async (req: Request, res: Response) => this.respond(res, () =>
     this.service.top({
       limit: parseLimit(req.query.limit),
       sector: parseOptionalText(req.query.sector),
+      region: parseOptionalText(req.query.region),
+      assetType: parseOptionalText(req.query.assetType),
       range: parseRange(req.query.range),
     })
   );
@@ -29,6 +38,8 @@ export class SmartMoneyIntelligenceController {
     this.service.distribution({
       limit: parseLimit(req.query.limit),
       sector: parseOptionalText(req.query.sector),
+      region: parseOptionalText(req.query.region),
+      assetType: parseOptionalText(req.query.assetType),
       range: parseRange(req.query.range),
     })
   );

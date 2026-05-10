@@ -16,7 +16,8 @@ The Research Hub does not duplicate the full detail of child modules; it triages
 
 The Research Hub is fully integrated with the application's global market scope.
 - **Region Filtering**: The `/api/v1/research/overview` endpoint accepts a `region` parameter. When provided, it ensures the Market Readiness (Gate/Regime), Research Priorities (Candidates/Exits), and Confirmations (Smart Money/Sectors) are all calculated for that specific market.
-- **Cross-Pillar Consistency**: The triage logic automatically passes the selected region down to all underlying pillars (Strategy, Signals, Smart Money, Context).
+- **Asset-Type Filtering**: The endpoint accepts an `assetType` parameter. Strategy candidates, exit candidates, signal confirmation, smart-money confirmation, and strategy performance evidence are scoped with the selected asset type. `STOCK` includes legacy `EQUITY` compatibility in downstream modules that support it.
+- **Cross-Pillar Consistency**: The triage logic automatically passes the selected region and asset type down to underlying pillars that expose scope-aware APIs.
 
 ## Architecture
 
@@ -28,7 +29,7 @@ The module aggregates persisted or summary data from primary research pillars:
 -   **Smart Money Intelligence**: Price-volume accumulation/distribution analysis.
 -   **Market Context Intelligence**: Market regime, breadth, and sector rotation.
 
-Raw bullish signals are confirmation context only. They are not promoted into `tradeCandidates` unless a valid Strategy Decision result exists.
+Raw bullish signals are confirmation context only. They are not promoted into `tradeCandidates` unless a valid Strategy Decision result exists. The API keeps the legacy field name `tradeCandidates` for compatibility, but the UI presents these as review candidates.
 
 ## API Reference
 
@@ -91,9 +92,9 @@ Returns a consolidated decision-oriented response.
   },
   "nextActions": [
     {
-      "label": "Review 5 Trade Candidates",
+      "label": "Review 5 framework-backed candidates",
       "priority": "HIGH",
-      "targetRoute": "/research/strategy"
+      "targetRoute": "/strategy"
     }
   ],
   "generatedAt": "2026-05-04T12:00:00Z",
@@ -105,8 +106,9 @@ Returns a consolidated decision-oriented response.
 
 -   **Bounded Responses**: Lists are capped at 5-10 items to ensure fast response times and clear focus.
 -   **Partial Success**: The endpoint uses individual `catch` blocks for child module integrations. If one module fails (e.g., timeout or database error), the Research Hub returns a partial response with a entry in `dataGaps` rather than failing the entire request.
--   **No Heavy Calculations**: The overview relies on persisted snapshots or indexed data. It does not trigger full-universe evaluations on load.
+-   **No Heavy Calculations**: The overview relies on persisted snapshots or indexed data. It uses persisted-only Market Context snapshots and does not trigger context generation, full-universe evaluations, backtests, signal generation, or provider fetches on load.
 -   **No Backtest Execution**: Backtest evidence comes from existing `StrategyPerformanceSummary` rows through Strategy Framework.
+-   **Lightweight Signal Confirmation**: The overview reads Signal Generation funnel diagnostics for bullish/bearish counts. It does not load/enrich top signal rows during normal page load, because enrichment performs extra market-data lookups that belong on the Signals page.
 
 ## Strategy-Proof Candidate Rules
 
@@ -131,7 +133,7 @@ When market gate is `CLOSED`:
 - headline says “No new long candidates. Review exits and watchlist only.”
 - `tradeCandidates` is empty
 - next actions focus on defensive exits, watchlist review, and waiting for market improvement
-- raw bullish signals are not shown as trade priorities
+- raw bullish signals are not shown as review priorities
 
 ## Conservative Readiness
 
@@ -139,7 +141,7 @@ Research Hub never displays live-trading readiness labels. Any stored live-tradi
 
 ## User Workflow
 
-1.  **Review the Hero Banner**: Confirm if new trades are allowed today.
+1.  **Review the Hero Banner**: Confirm whether the current market gate allows new long research candidates.
 2.  **Triage Priorities**: Look at framework-backed candidates first. Use links to Strategy Decision, Strategy Framework, Backtesting Lab, or the stock workspace.
 3.  **Check Confirmations**: See if Smart Money or Sector Winds align with strategy-backed candidates.
 4.  **Manage Risk**: Review Exit Candidates and Avoid lists.
@@ -152,6 +154,7 @@ Research Hub never displays live-trading readiness labels. Any stored live-tradi
 - `npm test -- strategy-decision-engine --runInBand` in `backend`
 - `npm test -- strategy-framework --runInBand` in `backend`
 - `npm run build` in `frontend`
+- `npm run test:ui -- research-hub.spec.ts` in `frontend`
 
 ## Trade Plan Risk Engine Integration
 

@@ -1,4 +1,4 @@
-import type { BacktestStrategyConfig, CreateBacktestStrategyRequest, UpdateBacktestStrategyRequest } from './backtesting-strategy-lab.types';
+import type { BacktestRunListQuery, BacktestStrategyConfig, CreateBacktestStrategyRequest, UpdateBacktestStrategyRequest } from './backtesting-strategy-lab.types';
 
 const ENTRY_RULES = ['SIGNAL_SCORE_ABOVE', 'SIGNAL_DIRECTION_BULLISH', 'PRICE_ABOVE_SMA50', 'SMA50_ABOVE_SMA200'];
 const EXIT_RULES = ['SIGNAL_SCORE_BELOW', 'SIGNAL_DIRECTION_BEARISH', 'PRICE_BELOW_SMA50', 'FIXED_HOLDING_PERIOD'];
@@ -54,4 +54,18 @@ export function validateConfig(config?: BacktestStrategyConfig): string[] {
 
 export function getParam(value: string | string[] | undefined): string {
   return Array.isArray(value) ? value[0] : value || '';
+}
+
+const first = (value: unknown) => Array.isArray(value) ? value[0] : value;
+const text = (value: unknown) => typeof first(value) === 'string' ? String(first(value)).trim() || undefined : undefined;
+
+export function parseRunListQuery(query: Record<string, unknown>): BacktestRunListQuery {
+  const limit = Number(text(query.limit));
+  const offset = Number(text(query.offset));
+  return {
+    region: text(query.region)?.toUpperCase(),
+    assetType: text(query.assetType)?.toUpperCase(),
+    limit: Number.isFinite(limit) ? Math.min(100, Math.max(1, Math.floor(limit))) : 100,
+    offset: Number.isFinite(offset) ? Math.max(0, Math.floor(offset)) : 0,
+  };
 }

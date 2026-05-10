@@ -44,7 +44,7 @@ export class MarketContextIntelligenceService {
       dataStatus: items.length >= 30 ? 'PARTIAL' : items.length > 0 ? 'PARTIAL' : 'MISSING',
     };
 
-    await this.repository.saveSnapshot(summary);
+    await this.repository.saveSnapshot(summary, region || 'GLOBAL');
     return { status: 'success' };
   }
 

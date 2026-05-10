@@ -86,7 +86,7 @@ const createService = (overrides: any = {}) => {
     ...overrides.dataQualityService,
   };
   const strategyFrameworkService = {
-    getDefinition: jest.fn().mockReturnValue({ code: 'LOW_QUALITY_DATA_REJECTION', name: 'Low Quality Data Rejection', version: '1.0.0' }),
+    getDefinition: jest.fn().mockReturnValue({ code: 'TREND_MOMENTUM', name: 'Trend Momentum', version: '1.0.0' }),
     persistBacktestPerformance: jest.fn().mockResolvedValue({
       id: 'summary-1',
       ratingScore: 20,
@@ -289,6 +289,41 @@ describe('BacktestingStrategyLabService', () => {
     expect(run.metrics?.dataCoverage?.warnings.join(' ')).toContain('Universe ALL was capped');
   });
 
+  it('filters saved runs by explicit region and asset type scope', async () => {
+    const scopedRun = {
+      id: 'run-in',
+      strategyId: null,
+      config: { ...config, region: 'IN', assetType: 'STOCK' },
+      status: 'COMPLETED',
+      startedAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+      metrics: null,
+      equityCurve: [],
+      trades: [],
+      error: null,
+    };
+    const legacyUnknownRun = {
+      ...scopedRun,
+      id: 'run-legacy',
+      config,
+      trades: [{ symbol: 'ABN.AS' }],
+    };
+    const usRun = {
+      ...scopedRun,
+      id: 'run-us',
+      config: { ...config, region: 'US', assetType: 'STOCK' },
+    };
+    const { service } = createService({
+      repository: {
+        listRuns: jest.fn().mockResolvedValue([legacyUnknownRun, usRun, scopedRun]),
+      },
+    });
+
+    const runs = await service.listRuns('default-user', { region: 'IN', assetType: 'STOCK', limit: 100, offset: 0 });
+
+    expect(runs.map((run) => run.id)).toEqual(['run-in']);
+  });
+
   it('runs registered strategy configs and syncs Strategy Framework performance', async () => {
     const { service, repository, strategyFrameworkService } = createService();
 
@@ -296,7 +331,7 @@ describe('BacktestingStrategyLabService', () => {
       config: {
         ...config,
         mode: 'REGISTERED_STRATEGY',
-        strategyCode: 'LOW_QUALITY_DATA_REJECTION',
+        strategyCode: 'TREND_MOMENTUM',
         strategyVersion: '1.0.0',
         timeframe: '1Y',
         region: 'IN',
@@ -306,13 +341,41 @@ describe('BacktestingStrategyLabService', () => {
     });
 
     expect(run.status).toBe('COMPLETED');
-    expect(strategyFrameworkService.getDefinition).toHaveBeenCalledWith('LOW_QUALITY_DATA_REJECTION');
     expect(strategyFrameworkService.persistBacktestPerformance).toHaveBeenCalledWith(expect.objectContaining({
-      strategyCode: 'LOW_QUALITY_DATA_REJECTION',
+      strategyCode: 'TREND_MOMENTUM',
       timeframe: '1Y',
       universeKey: 'SYMBOLS:AAA,BBB',
     }));
     expect(repository.updateRunMetrics).toHaveBeenCalled();
+  });
+
+  it('rejects non-entry Strategy Framework definitions as registered backtests', async () => {
+    const { service, repository, strategyFrameworkService } = createService();
+
+    await expect(service.run({
+      config: {
+        ...config,
+        mode: 'REGISTERED_STRATEGY',
+        strategyCode: 'RISK_OFF_AVOIDANCE',
+        timeframe: '1Y',
+      },
+    })).rejects.toThrow('Registered backtests currently support active ENTRY strategies only');
+
+    expect(repository.createRun).not.toHaveBeenCalled();
+    expect(strategyFrameworkService.persistBacktestPerformance).not.toHaveBeenCalled();
+  });
+
+  it('rejects draft Strategy Framework definitions as registered backtests', async () => {
+    const { service } = createService();
+
+    await expect(service.run({
+      config: {
+        ...config,
+        mode: 'REGISTERED_STRATEGY',
+        strategyCode: 'QUALITY_TREND',
+        timeframe: '1Y',
+      },
+    })).rejects.toThrow('is not active');
   });
 
   it('returns insufficient history honestly for registered timeframes', async () => {
@@ -326,7 +389,7 @@ describe('BacktestingStrategyLabService', () => {
       config: {
         ...config,
         mode: 'REGISTERED_STRATEGY',
-        strategyCode: 'LOW_QUALITY_DATA_REJECTION',
+        strategyCode: 'TREND_MOMENTUM',
         timeframe: '1Y',
         useDataQualityFilter: true,
       },

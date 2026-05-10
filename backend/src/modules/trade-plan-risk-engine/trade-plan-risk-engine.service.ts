@@ -18,6 +18,7 @@ export class TradePlanRiskEngineService {
 
   getModelRules(): TradePlanModelRules {
     return {
+      defaultCapitalBase: 100000,
       defaultRiskPercent: 1,
       minRiskPercent: 0.25,
       maxRiskPercent: 5,
@@ -496,68 +497,67 @@ export class TradePlanRiskEngineService {
       }
 
       // 7. Position Sizing & Portfolio Impact
-      if (portfolioId || capitalBase) {
-         let effectiveCapital = capitalBase || 0;
-         let portfolioData: any = null;
+      let effectiveCapital = capitalBase ?? rules.defaultCapitalBase;
+      const usesDefaultCapitalBase = !portfolioId && (capitalBase === undefined || capitalBase === null);
+      let portfolioData: any = null;
 
-         if (portfolioId) {
-            portfolioData = await this.portfolioService.getPortfolioDetail(portfolioId, 'default-user').catch(()=>null);
-            if (portfolioData) {
-               effectiveCapital = Number(portfolioData.totalValue) || effectiveCapital;
-            } else {
-               result.warnings.push('Selected portfolio could not be loaded.');
-            }
+      if (portfolioId) {
+         portfolioData = await this.portfolioService.getPortfolioDetail(portfolioId, 'default-user').catch(()=>null);
+         if (portfolioData) {
+            effectiveCapital = Number(portfolioData.totalValue) || effectiveCapital;
+         } else {
+            result.warnings.push('Selected portfolio could not be loaded.');
+         }
+      }
+
+      if (effectiveCapital > 0 && riskPerShare > 0) {
+         const rPercent = riskPercent || rules.defaultRiskPercent;
+         const maxRiskAmt = effectiveCapital * (rPercent / 100);
+         const qty = Math.floor(maxRiskAmt / riskPerShare);
+         const estimatedPosValue = qty * entryPrice;
+         const posValuePct = (estimatedPosValue / effectiveCapital) * 100;
+         
+         if (qty < 1) {
+            result.planStatus = 'BLOCKED';
+            result.blockers.push('Suggested quantity is < 1 based on capital and risk constraints.');
          }
 
-         if (effectiveCapital > 0 && riskPerShare > 0) {
-            const rPercent = riskPercent || rules.defaultRiskPercent;
-            const maxRiskAmt = effectiveCapital * (rPercent / 100);
-            const qty = Math.floor(maxRiskAmt / riskPerShare);
-            const estimatedPosValue = qty * entryPrice;
-            const posValuePct = (estimatedPosValue / effectiveCapital) * 100;
-            
-            if (qty < 1) {
-               result.planStatus = 'BLOCKED';
-               result.blockers.push('Suggested quantity is < 1 based on capital and risk constraints.');
-            }
+         result.positionSizing = {
+            portfolioId: portfolioId || null,
+            capitalBase: effectiveCapital,
+            riskPercent: rPercent,
+            maxRiskAmount: maxRiskAmt,
+            suggestedQuantity: qty,
+            estimatedPositionValue: estimatedPosValue,
+            positionValuePercent: posValuePct,
+            notes: usesDefaultCapitalBase
+              ? ['Sizing uses the default planning capital base because no portfolio or capital base was supplied.']
+              : [],
+         };
 
-            result.positionSizing = {
-               portfolioId: portfolioId || null,
-               capitalBase: effectiveCapital,
-               riskPercent: rPercent,
-               maxRiskAmount: maxRiskAmt,
-               suggestedQuantity: qty,
-               estimatedPositionValue: estimatedPosValue,
-               positionValuePercent: posValuePct,
-               notes: [],
+         if (portfolioData) {
+            let singleExp = posValuePct;
+            result.portfolioImpact = {
+               sectorExposureAfterTrade: null,
+               singlePositionExposureAfterTrade: singleExp,
+               warnings: [],
             };
 
-            if (portfolioData) {
-               let singleExp = posValuePct;
-               result.portfolioImpact = {
-                  sectorExposureAfterTrade: null,
-                  singlePositionExposureAfterTrade: singleExp,
-                  warnings: [],
-               };
-
-               const existingHolding = portfolioData.holdings?.find((h: any) => h.instrumentId === instrumentId);
-               if (existingHolding) {
-                  result.portfolioImpact.warnings.push('Instrument already held in portfolio. Averaging rules apply.');
-                  singleExp += Number(existingHolding.allocationPercent || 0);
-                  result.portfolioImpact.singlePositionExposureAfterTrade = singleExp;
-               }
-
-               if (singleExp > rules.maxSinglePositionExposurePercent) {
-                  result.portfolioImpact.warnings.push(`Position size exceeds max single position exposure limit of ${rules.maxSinglePositionExposurePercent}%.`);
-                  result.warnings.push('Portfolio concentration warning.');
-                  forceRiskHigh = true;
-               }
+            const existingHolding = portfolioData.holdings?.find((h: any) => h.instrumentId === instrumentId);
+            if (existingHolding) {
+               result.portfolioImpact.warnings.push('Instrument already held in portfolio. Averaging rules apply.');
+               singleExp += Number(existingHolding.allocationPercent || 0);
+               result.portfolioImpact.singlePositionExposureAfterTrade = singleExp;
             }
-         } else {
-            result.dataGaps.push('position_sizing_params');
+
+            if (singleExp > rules.maxSinglePositionExposurePercent) {
+               result.portfolioImpact.warnings.push(`Position size exceeds max single position exposure limit of ${rules.maxSinglePositionExposurePercent}%.`);
+               result.warnings.push('Portfolio concentration warning.');
+               forceRiskHigh = true;
+            }
          }
       } else {
-         result.dataGaps.push('capital_base_for_sizing');
+         result.dataGaps.push('position_sizing_params');
       }
 
       // Resolve Status
@@ -669,6 +669,7 @@ export class TradePlanRiskEngineService {
 
     return {
       count: plans.length,
+      processedCount: candidates.results.length,
       generatedCount,
       failedCount,
       candidateCount: candidates.results.length,
@@ -693,16 +694,29 @@ export class TradePlanRiskEngineService {
     const region = query.region || 'IN';
     const assetType = query.assetType || 'STOCK';
     const scopeQuery = { ...query, region, assetType };
-    const [rawSignals, decisionsResult, plans] = await Promise.all([
+    const candidateQuery = {
+      limit: 1,
+      offset: 0,
+      region,
+      assetType,
+      strategy: query.strategyCode,
+      decision: 'TRADE_CANDIDATE',
+    };
+    const [rawSignals, decisionsResult, entryCandidates, plans] = await Promise.all([
       this.signalService.funnelDiagnostics(scopeQuery),
       this.strategyDecisionService.funnelDiagnostics(scopeQuery),
+      this.strategyDecisionService.candidates(candidateQuery as any),
       this.repository.funnelPlans(scopeQuery),
     ]);
     const decisions = decisionsResult.results;
+    const decisionTotal = decisionsResult.total ?? decisions.length;
     const decisionCounts = this.countBy(decisions, (decision: any) => decision.decision || 'UNKNOWN');
     const byStrategy = this.topCounts(decisions.map((decision: any) => decision.strategy || 'UNKNOWN'));
-    const frameworkBacked = decisions.filter((decision: any) => Boolean(decision.frameworkBacked)).length;
-    const eligibleDecisions = decisions.filter((decision: any) => this.isEligibleForEntryPlan(decision));
+    const includesLegacy = Boolean((scopeQuery as any).includeLegacy);
+    const sampledFrameworkBacked = decisions.filter((decision: any) => Boolean(decision.frameworkBacked)).length;
+    const frameworkBacked = includesLegacy ? sampledFrameworkBacked : decisionTotal;
+    const notFrameworkBacked = includesLegacy ? Math.max(0, decisionTotal - sampledFrameworkBacked) : 0;
+    const eligibleCandidateTotal = entryCandidates.total ?? entryCandidates.results.length;
     const skipReasons = decisions.flatMap((decision: any) => this.planDiscoverySkipReasons(decision));
     const skipReasonCounts = this.topCounts(skipReasons).reduce<Record<string, number>>((acc, item) => {
       acc[item.reason] = item.count;
@@ -728,13 +742,13 @@ export class TradePlanRiskEngineService {
         byDirection: rawSignals.byDirection,
       },
       strategyMatches: {
-        totalWithMatch: decisions.filter((decision: any) => Boolean(decision.frameworkBacked)).length,
+        totalWithMatch: frameworkBacked,
         totalWithoutMatch: Math.max(0, rawSignals.total - frameworkBacked),
         byStrategy,
       },
       strategyDecisions: {
-        total: decisions.length,
-        tradeCandidates: (decisionCounts.TRADE_CANDIDATE || 0) + (decisionCounts.ENTRY_CANDIDATE || 0),
+        total: decisionTotal,
+        tradeCandidates: eligibleCandidateTotal,
         watch: decisionCounts.WATCH || 0,
         avoid: decisionCounts.AVOID || 0,
         exitCandidates: decisionCounts.EXIT_CANDIDATE || 0,
@@ -742,12 +756,12 @@ export class TradePlanRiskEngineService {
         hold: decisionCounts.HOLD || 0,
         insufficientData: decisionCounts.INSUFFICIENT_DATA || 0,
         frameworkBacked,
-        notFrameworkBacked: decisions.length - frameworkBacked,
+        notFrameworkBacked,
       },
       tradePlanCandidateDiscovery: {
-        discoveredCandidates: decisions.length,
-        eligibleForPlanGeneration: eligibleDecisions.length,
-        skippedBeforeGeneration: skipReasons.length,
+        discoveredCandidates: decisionTotal,
+        eligibleForPlanGeneration: eligibleCandidateTotal,
+        skippedBeforeGeneration: Math.max(decisionTotal - eligibleCandidateTotal, skipReasons.length),
         skipReasonCounts,
         skipReasons: this.topCounts(skipReasons),
       },
@@ -786,19 +800,12 @@ export class TradePlanRiskEngineService {
     };
   }
 
-  async latestForInstrument(instrumentId: string, strategy?: string, portfolioId?: string) {
-     return this.repository.latestForInstrument(instrumentId, strategy, portfolioId);
+  async latestForInstrument(instrumentId: string, strategy?: string, portfolioId?: string, scope: { region?: string; assetType?: string } = {}) {
+     return this.repository.latestForInstrument(instrumentId, strategy, portfolioId, scope);
   }
 
   async list(query: TradePlanListQuery) {
      return this.repository.list(query);
-  }
-
-  private isEligibleForEntryPlan(decision: any) {
-    return ['TRADE_CANDIDATE', 'ENTRY_CANDIDATE'].includes(String(decision.decision || ''))
-      && decision.strategy !== 'DEFENSIVE_EXIT'
-      && decision.instrumentId
-      && decision.symbol;
   }
 
   private planDiscoverySkipReasons(decision: any): string[] {
@@ -925,7 +932,7 @@ export class TradePlanRiskEngineService {
     ]);
 
     const backtestSnapshot = this.toBacktestSummarySnapshot(backtestSummary);
-    const proofSnapshot = this.toStrategyProofSnapshot(result, context.decision, backtestSnapshot);
+    const proofSnapshot = this.toStrategyProofSnapshot(result, context.decision, backtestSnapshot, context.request.backtestTimeframe || null);
     const decisionSnapshot = this.toStrategyDecisionSnapshot(result, context.decision);
     const marketSnapshot = this.toMarketDataSnapshot(result, context.latestPriceResult, context.pricesDto, context.prices, instrument, latestStoredInfo, region, assetType);
     const dataQualitySnapshot = this.toDataQualitySnapshot(context.dataQuality);
@@ -977,7 +984,12 @@ export class TradePlanRiskEngineService {
     };
   }
 
-  private toStrategyProofSnapshot(result: TradePlanResultDto, decision: any | null, backtestSummary: BacktestSummarySnapshot | null): StrategyProofSnapshot {
+  private toStrategyProofSnapshot(
+    result: TradePlanResultDto,
+    decision: any | null,
+    backtestSummary: BacktestSummarySnapshot | null,
+    requestedTimeframe: string | null
+  ): StrategyProofSnapshot {
     const rating = this.ratingFromDecision(decision) || backtestSummary?.ratingGrade || null;
     const readinessLabel = decision?.readinessLabel || decision?.strategyRating?.readinessLabel || null;
     const proofWarnings: string[] = [];
@@ -990,7 +1002,7 @@ export class TradePlanRiskEngineService {
       strategyRating: rating,
       readinessLabel,
       frameworkBacked: Boolean(decision?.frameworkBacked),
-      backtestTimeframe: backtestSummary?.timeframe ?? null,
+      backtestTimeframe: backtestSummary?.timeframe ?? requestedTimeframe,
       backtestSummary,
       proofStatus: !backtestSummary ? 'MISSING' : rating === 'UNPROVEN' ? 'UNPROVEN' : proofWarnings.length > 0 ? 'PARTIAL' : 'AVAILABLE',
       proofWarnings,
@@ -1074,7 +1086,7 @@ export class TradePlanRiskEngineService {
     return {
       frameworkBacked: decision.frameworkBacked,
       strategyCode: decision.strategy,
-      strategyVersion: decision.strategyVersion,
+      strategyVersion: decision.strategyVersion || '1.0.0',
       strategyRatingGrade: ratingGrade,
       readinessLabel: decision.readinessLabel || decision.strategyRating?.readinessLabel || backtestSummary?.readinessLabel || null,
       backtestSummaryAvailable: Boolean(backtestSummary),

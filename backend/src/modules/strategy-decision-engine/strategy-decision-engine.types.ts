@@ -19,7 +19,7 @@ export interface MarketGateResponse {
   updatedAt: string;
 }
 
-export type StrategyName = 'TREND_MOMENTUM' | 'PULLBACK_IN_UPTREND' | 'DEFENSIVE_EXIT';
+export type StrategyName = string;
 
 export type StrategyDecision =
   | 'TRADE_CANDIDATE'
@@ -149,6 +149,11 @@ export interface StrategyQuery {
   decision?: StrategyDecision;
   minScore?: number;
   confidence?: DecisionConfidence;
+  frameworkBacked?: boolean;
+  includeLegacy?: boolean;
+  includeHistory?: boolean;
+  strategyRatingGrades?: string[];
+  readinessLabels?: string[];
   sector?: string;
   country?: string;
   region?: string;

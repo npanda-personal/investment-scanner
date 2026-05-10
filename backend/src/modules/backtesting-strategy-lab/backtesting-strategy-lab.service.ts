@@ -7,6 +7,7 @@ import { BacktestingStrategyLabRepository } from './backtesting-strategy-lab.rep
 import type {
   BacktestMetrics,
   BacktestRunDto,
+  BacktestRunListQuery,
   BacktestStrategyConfig,
   BacktestTrade,
   CreateBacktestStrategyRequest,
@@ -48,19 +49,28 @@ export class BacktestingStrategyLabService {
   listStrategies(userId = 'default-user') { return this.repository.listStrategies(userId); }
   getStrategy(id: string, userId = 'default-user') { return this.repository.getStrategy(id, userId); }
   deleteStrategy(id: string, userId = 'default-user') { return this.repository.deleteStrategy(id, userId); }
-  listRuns(userId = 'default-user') { return this.repository.listRuns(userId); }
+  async listRuns(userId = 'default-user', query: BacktestRunListQuery = {}) {
+    const runs = await this.repository.listRuns(userId);
+    const filtered = runs.filter((run) => this.runMatchesScope(run, query));
+    const offset = query.offset ?? 0;
+    const limit = query.limit ?? 100;
+    return filtered.slice(offset, offset + limit);
+  }
   getRun(id: string, userId = 'default-user') { return this.repository.getRun(id, userId); }
   deleteRun(id: string, userId = 'default-user') { return this.repository.deleteRun(id, userId); }
 
   async createStrategy(input: CreateBacktestStrategyRequest, userId = 'default-user') {
     this.throwIfErrors(validateStrategyInput(input));
+    if (this.isRegisteredConfig(input.config)) this.assertBacktestableRegisteredStrategy(input.config.strategyCode!);
     return this.repository.createStrategy(input, userId);
   }
 
   async updateStrategy(id: string, input: UpdateBacktestStrategyRequest, userId = 'default-user') {
     const existing = await this.repository.getStrategy(id, userId);
     if (!existing) throw new Error('Strategy not found');
-    this.throwIfErrors(validateStrategyInput({ ...existing, ...input, config: input.config ?? existing.config }, false));
+    const merged = { ...existing, ...input, config: input.config ?? existing.config };
+    this.throwIfErrors(validateStrategyInput(merged, false));
+    if (this.isRegisteredConfig(merged.config)) this.assertBacktestableRegisteredStrategy(merged.config.strategyCode!);
     return this.repository.updateStrategy(id, input, userId);
   }
 
@@ -70,7 +80,7 @@ export class BacktestingStrategyLabService {
     if (request.strategyId && !strategy) throw new Error('Strategy not found');
     const config = this.normalizeConfig(request.config ?? strategy?.config);
     this.throwIfErrors(validateConfig(config));
-    if (this.isRegisteredConfig(config!)) this.strategyFrameworkService.getDefinition(config!.strategyCode!);
+    if (this.isRegisteredConfig(config!)) this.assertBacktestableRegisteredStrategy(config!.strategyCode!);
     try {
       const result = await this.simulate(config!);
       let run = await this.repository.createRun({
@@ -98,7 +108,7 @@ export class BacktestingStrategyLabService {
         });
         run = await this.repository.updateRunMetrics(run.id, {
           ...run.metrics,
-          frameworkStrategyName: this.strategyFrameworkService.getDefinition(config!.strategyCode!).name,
+          frameworkStrategyName: this.strategyRegistry.get(config!.strategyCode!)?.name ?? config!.strategyCode!,
           frameworkRating: {
             ratingScore: summary.ratingScore,
             ratingGrade: summary.ratingGrade,
@@ -420,6 +430,7 @@ export class BacktestingStrategyLabService {
   private normalizeConfig(config?: BacktestStrategyConfig): BacktestStrategyConfig | undefined {
     if (!config) return undefined;
     if (this.isRegisteredConfig(config) && (!config.startDate || !config.endDate || !config.entryRule || !config.exitRule)) {
+      this.assertBacktestableRegisteredStrategy(config.strategyCode!);
       return this.strategyFrameworkService.strategyToBacktestConfig({
         strategyCode: config.strategyCode!,
         timeframe: config.timeframe || '1Y',
@@ -448,6 +459,26 @@ export class BacktestingStrategyLabService {
 
   private isRegisteredConfig(config: BacktestStrategyConfig) {
     return config.mode === 'REGISTERED_STRATEGY' || Boolean(config.strategyCode);
+  }
+
+  private runMatchesScope(run: BacktestRunDto, query: BacktestRunListQuery) {
+    if (!query.region && !query.assetType) return true;
+    const config = run.config || {} as BacktestStrategyConfig;
+    const region = String(config.region || config.universe?.region || '').toUpperCase();
+    const assetType = String(config.assetType || config.universe?.assetType || '').toUpperCase();
+    if (query.region && region !== query.region.toUpperCase()) return false;
+    if (query.assetType && assetType !== query.assetType.toUpperCase()) return false;
+    return true;
+  }
+
+  private assertBacktestableRegisteredStrategy(strategyCode: string) {
+    const strategy = this.strategyRegistry.get(strategyCode);
+    if (!strategy) throw new Error(`Strategy ${strategyCode} is not registered`);
+    if (strategy.status !== 'ACTIVE') throw new Error(`Strategy ${strategyCode} is not active and cannot be backtested as a registered strategy`);
+    if (strategy.category !== 'ENTRY') {
+      throw new Error(`Strategy ${strategyCode} is a ${strategy.category} rule. Registered backtests currently support active ENTRY strategies only.`);
+    }
+    return strategy;
   }
 
   private minimumBarsForTimeframe(timeframe?: BacktestStrategyConfig['timeframe']) {

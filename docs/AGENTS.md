@@ -85,6 +85,33 @@ Create a new module only when the capability deserves separate ownership.
 6. Run build/tests/typecheck when available.
 7. Summarize all changes.
 
+# Mandatory Module Hardening Sequence
+
+When a task asks to harden, polish, audit, verify, or continue work on a module, use this sequence by default so the product owner does not need to repeat it every time:
+
+1. Read `docs/AGENTS.md`, `docs/architecture.md`, relevant module `{module}.md` files, and applicable docs under `docs/`.
+2. Audit the current backend, frontend, data model, API contracts, tests, docs, and browser-visible behavior before editing.
+3. Identify concrete correctness, completeness, performance, batching, scope, UX, and data-flow issues. Fix only verified issues unless the user explicitly asks for broader design work.
+4. Write or update backend semantic tests for changed calculations, filtering, persistence, batching, idempotency, and data-shape behavior.
+5. Write or update module-owned UI tests under `frontend/tests/ui` for changed user-visible workflows. Do not rely on heading-only checks.
+6. Implement the smallest safe backend/frontend changes inside module boundaries, using public exports for cross-module consumption.
+7. Run the relevant backend test suite, frontend UI test suite, backend build, and frontend build when practical.
+8. Manually verify changed UI and data-flow behavior in the browser, especially for authenticated routes and real local data correctness.
+9. If a regression cannot be fully automated yet, update `frontend/tests/regression-todo.md` with the repeatable manual steps and record evidence in the task summary.
+10. Update module docs and shared docs when routes, response shapes, workflow rules, batching behavior, UX conventions, or architectural lessons change.
+
+Do not claim a module is verified only because the page loads. Verification must include data correctness, scope correctness, batch behavior, visible empty/error states, and the connection to upstream/downstream modules where applicable.
+
+For every data-bearing module UI/API change, perform an authenticated live-data validation pass after the automated tests. This is mandatory even when UI tests use mocked responses. The pass must check the real local API/browser data for:
+
+- scoped totals and row counts,
+- critical field completeness for the workflow being changed,
+- filter/preset accuracy, including zero-result presets,
+- obvious stale or legacy rows that make the UI misleading,
+- upstream/downstream handoff assumptions.
+
+Record the result in the task summary. If the live data fails the expected invariant, either fix the data-flow issue in the same task or explicitly report the remaining blocker. Do not treat "columns are visible" as data correctness.
+
 # Global Market Scope
 
 The application uses a global market region/asset context to filter data across all modules.
@@ -295,10 +322,40 @@ After changes, run what exists:
 - typecheck
 - unit tests
 - integration tests
+- UI smoke tests for changed frontend flows when configured
 
 If tests do not exist:
 
 - add focused tests near changed logic when practical
+
+Frontend module changes that affect shared navigation, page loading, filters, batch controls, tables, progress states, or user-visible module workflows MUST update and run the Playwright smoke suite in `frontend/tests/ui` when practical. These tests must not stop at page headings. They must assert the actual user-visible behavior touched by the change: primary controls, important filters/tabs, table columns, progress/disabled states, route targets, clear empty states, and any specific regression fixed in the change.
+
+UI smoke testing is mandatory for UI-facing changes unless there is a clear blocker, such as missing browser binaries, unavailable local services, or test-account setup failure. If blocked, document the blocker in the final response and still run build/unit tests. Do not silently substitute backend tests for UI verification.
+
+The UI smoke suite must stay local-first and free/open-source. Use Playwright locally; do not add paid hosted browser testing, paid visual regression services, or paid monitoring tools unless explicitly approved.
+
+UI tests must be organized like the application modules. Keep feature/module scenarios in separate files under `frontend/tests/ui`, such as `market-data-foundation.spec.ts` or `research-hub.spec.ts`, and place shared login fixtures, route helpers, and common assertions in `frontend/tests/ui/support`. Avoid growing a single catch-all smoke spec; test ownership should mirror source ownership so regressions are easy to find and maintain.
+
+Authenticated UI smoke tests that share the local test user should run deterministically. Prefer one Playwright worker unless the suite is explicitly redesigned around isolated users/storage state per worker. Keep protected-route navigation/auth setup in shared UI test helpers so module specs stay focused on module behavior.
+
+For data-bearing pages, a passing UI smoke test must prove one of these outcomes:
+
+- expected scoped data is visible, or
+- a domain-specific empty state explains why data is absent and what action refreshes or fixes it.
+
+Generic "page loaded" checks and generic `No records found` empty states are not sufficient for module-hardening work.
+
+Mandatory UI-facing workflow:
+
+1. Write or update UI tests for the affected user workflow first.
+2. Execute the UI tests and use failures to expose real UI/API issues.
+3. Implement the fix.
+4. Run the relevant backend test suite for backend/API changes.
+5. Run the UI test suite again as the final verification.
+
+Do not claim UI behavior is verified until the UI suite has passed after the fix.
+
+Bulk data-load and calculation workflows, such as catalog imports, market-data sync, data-quality evaluation, signal generation, and smart-money snapshot refresh, must be manually verified in the browser when the change affects their visible behavior. Do not run destructive, very large, provider-heavy, or long-running bulk operations inside the regular UI smoke suite. Instead, cover their controls, disabled/progress/summary states, request parameters, empty states, and non-bulk interactions in Playwright, then record the manual browser verification for the real bulk run.
 
 # Safety Rules
 
@@ -405,6 +462,7 @@ Frontend:
 - Long-running universe workflows should expose `batchSize` plus `offset`/cursor progress metadata and let the frontend orchestrate bounded batches with one coordinated parallel-processing strategy, refresh visible data after completion, and keep action buttons in a disabled loading state until complete.
 - Downstream modules may consume Data Quality Engine public filtering helpers to skip or warn on low-readiness instruments, but they must not duplicate readiness, coverage, or liquidity scoring logic.
 - Persisted stock-data models must document whether they are append-only or idempotent/upserted. Idempotent models need a clear natural key, date/timestamp normalization where relevant, repository-level upsert/skip behavior, and database uniqueness where practical.
+- Persisted historical result lists, such as backtests, strategy decisions, signals, calibration, and research snapshots, must respect the active `region` and `assetType` when those query parameters are supplied. Records with missing/unknown scope should not be shown in scoped views unless the module can safely infer the scope from owned data.
 - These integrations must not import backend repositories or frontend feature internals directly.
 
 # Batch Orchestration Standard
@@ -495,4 +553,6 @@ Not theoretical perfection.
 
 - Strategy Framework owns reusable strategy definitions, versions, typed rule declarations, deterministic evaluators, performance summaries, ratings, and future automation eligibility flags.
 - Signal Generation, Strategy Decision, Backtesting, Alerts, and future automation modules should consume Strategy Framework through public exports/APIs instead of duplicating strategy rules.
+- Consumers must respect Strategy Framework categories. `ENTRY` strategies can be evaluated as entry/review candidates and registered backtests; `EXIT`, `GATE`, and `FILTER` definitions need module-specific semantics and must not be treated as standalone entry backtests just because they are active.
+- Strategy Framework UI/API surfaces must make category and status boundaries explicit. Only active `ENTRY` strategies may expose enabled standalone registered-backtest actions; support rules and drafts should stay visible for diagnostics with disabled/explained backtest actions.
 - Strategy Framework is research support only and must not enable live trading, broker execution, order placement, or autonomous real-money automation.

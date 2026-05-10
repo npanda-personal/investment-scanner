@@ -52,6 +52,20 @@ Backend endpoints process bounded batches. Frontend orchestration loops through 
 
 The app uses a global market scope, currently defaulting to `IN / STOCK`. Pages that list or select instruments should respect this scope unless explicitly overridden.
 
+### 10. UI verification is local and mandatory
+
+UI-facing module changes must be covered by local smoke tests when practical. The project standard is the free/open-source Playwright suite in `frontend/tests/ui`. Smoke tests should verify authenticated page load, primary headings/actions, filters/tabs, table columns, route correctness, common error states, meaningful empty states, and the specific UI regression fixed by the change.
+
+UI smoke tests should mirror module ownership. Keep scenarios in module-named spec files under `frontend/tests/ui` and centralize only reusable setup/assertions under `frontend/tests/ui/support`. Do not let the suite collapse into one catch-all smoke file.
+
+Authenticated smoke suites that use the shared local test account should run with one Playwright worker unless worker-isolated test users/storage state are introduced. Protected-route navigation/auth setup should stay in shared UI test helpers so module specs focus on module behavior. A slower deterministic suite is preferable to parallel auth/session flakes.
+
+For data-bearing modules, smoke tests must prove more than "the page renders." They should assert that scoped data is visible when expected, or that a domain-specific empty state explains missing/stale data and the refresh/evaluation action available to the user.
+
+Large data-load and calculation workflows should not be executed as part of every UI smoke run. For workflows such as catalog import, OHLCV sync, data-quality evaluation, signal generation, and smart-money snapshot refresh, use Playwright to cover the controls, request parameters, progress/disabled/final states, and empty-state behavior, and use manual browser verification for the real bulk run when the change affects user-visible data.
+
+Do not add paid hosted browser testing, paid visual regression tools, paid UI libraries, paid market-data providers, or paid AI services. This project remains local-first and non-commercial unless explicitly changed by the product owner.
+
 ---
 
 ## Module Overview
@@ -370,6 +384,8 @@ Provide the reusable strategy registry and evaluator that becomes the source of 
 
 Strategy Framework defines strategies; Backtesting Lab simulates them; Strategy Decision uses them; Research Hub prioritizes them.
 
+Strategy categories are part of the contract. Active `ENTRY` definitions can be presented as standalone candidate strategies and registered backtests. `EXIT`, `GATE`, `FILTER`, and `DRAFT` definitions are support semantics and should remain visible as rules/diagnostics, but they must not expose enabled standalone backtest actions until a module implements the matching simulation semantics.
+
 ---
 
 ## 7. Backtesting Strategy Lab
@@ -414,7 +430,7 @@ Run detailed historical simulations for registered strategies and custom rule ex
 
 ### Notes
 
-Registered Strategy mode should be the primary path. Custom Rules remain secondary/experimental.
+Registered Strategy mode should be the primary path. Custom Rules remain secondary/experimental. Registered backtests expose active `ENTRY` Strategy Framework definitions as standalone simulations; `EXIT`, `GATE`, `FILTER`, and `DRAFT` definitions require dedicated portfolio/exit-risk or gating semantics before their outputs can be treated as strategy proof.
 
 ---
 
@@ -1054,3 +1070,22 @@ No module currently owns live broker execution, order placement, or autonomous t
 12. Alerts/Notifications
 13. AI Copilot
 14. Future Paper Trading Simulator
+
+For frontend-affecting changes in any module above, also run:
+
+```text
+cd frontend
+npm run test:ui
+```
+
+If the UI suite cannot run, record the blocker explicitly and do not treat backend-only tests as a substitute for UI verification.
+
+For UI-facing fixes, use this order:
+
+1. write/update the UI test,
+2. execute the UI test,
+3. fix the issue exposed by the test,
+4. run relevant backend tests,
+5. rerun the UI test suite.
+
+The final verification for visible behavior is the UI suite passing after the fix.

@@ -27,8 +27,8 @@ export async function runBacktestStrategy(id: string): Promise<BacktestRun> {
   return response.data;
 }
 
-export async function fetchBacktestRuns(): Promise<BacktestRun[]> {
-  const response = await axios.get<BacktestRun[]>(`${API_BASE}/runs`);
+export async function fetchBacktestRuns(params: { region?: string; assetType?: string; limit?: number; offset?: number } = {}): Promise<BacktestRun[]> {
+  const response = await axios.get<BacktestRun[]>(`${API_BASE}/runs`, { params });
   return response.data;
 }
 

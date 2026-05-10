@@ -114,6 +114,10 @@ Signal Generation remains owner of raw bullish/bearish/neutral signal primitives
 ### Backtesting Integration
 Backtesting Strategy Lab owns detailed simulation internals, run history, equity curves, drawdowns, and trade logs. Strategy Framework owns definitions, versions, ratings, readiness labels, and compact performance summaries. Registered strategy backtests use `mode: REGISTERED_STRATEGY`, `strategyCode`, `strategyVersion`, `timeframe`, `region`, `assetType`, and a universe key. Backtesting Lab calls the Strategy Framework evaluator for entry/exit decisions and then syncs the compact summary back to Strategy Framework.
 
+Backtesting currently treats active `ENTRY` definitions as standalone registered strategies. `EXIT`, `GATE`, `FILTER`, and `DRAFT` definitions remain useful framework concepts, but they are not exposed as standalone registered backtests until dedicated simulation semantics exist.
+
+Strategy Framework also enforces this boundary before it creates a registered backtest config. Calling the framework backtest API or `strategyToBacktestConfig` for a non-active or non-`ENTRY` definition returns a validation error instead of relying on Backtesting Lab to reject it later. Evaluator output now sets `eligibleForBacktest=true` only for active entry definitions with the required core inputs present.
+
 Strategy Framework does not duplicate the detailed backtest experience. Its catalog, detail, rankings, and performance matrix link into Backtesting Lab with URLs such as:
 
 `/backtests?mode=registered&strategyCode=TREND_MOMENTUM&timeframe=3Y`
@@ -161,6 +165,8 @@ Endpoints under `/api/v1`:
 
 ### Frontend UX
 `/strategies` provides tabs for catalog, detail, performance, rankings, and stock evaluation. The performance tab shows a compact 1Y/3Y/5Y/10Y/15Y matrix and links to Backtesting Lab for detailed simulation. Backtests are manual only and run in Backtesting Lab.
+
+The catalog separates definitions by category: Entry, Exit, Gates, Filters, and Drafts. Only active entry strategy rows show an enabled Backtesting Lab action. Support rules and draft definitions remain visible for transparency, but their backtest actions are disabled with an explanation.
 
 ### Built-In Strategies
 Active: `TREND_MOMENTUM`, `PULLBACK_IN_UPTREND`, `BREAKOUT_CONFIRMATION`, `SMART_MONEY_ACCUMULATION`, `SECTOR_LEADER_MOMENTUM`, `DEFENSIVE_EXIT`, `RISK_OFF_AVOIDANCE`, `LOW_QUALITY_DATA_REJECTION`.

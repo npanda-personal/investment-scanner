@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, Button, Alert, Tab, Tabs, FormControlLabel, Switch, FormControl, InputLabel, MenuItem, Select, Stack, Grid, Paper, Chip, List, ListItem, ListItemText, CircularProgress } from '@mui/material';
+import { Box, Typography, Button, Alert, Tab, Tabs, FormControlLabel, Switch, FormControl, InputLabel, MenuItem, Select, Stack, Grid, Paper, Chip, List, ListItem, ListItemText, CircularProgress, LinearProgress } from '@mui/material';
 import { TradePlanApi } from '../api';
 import { TradePlanTable } from './TradePlanTable';
 import { CountItem, TradePlanFunnelDiagnostics, TradePlanResultDto } from '../types';
@@ -21,13 +21,21 @@ export const TradePlanDashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [batchGenerating, setBatchGenerating] = useState(false);
   const [batchSummary, setBatchSummary] = useState<string | null>(null);
+  const [batchProgress, setBatchProgress] = useState<{
+    processed: number;
+    total: number;
+    generated: number;
+    failed: number;
+    requests: number;
+    timeframe: string;
+  } | null>(null);
   const [funnel, setFunnel] = useState<TradePlanFunnelDiagnostics | null>(null);
   const [funnelLoading, setFunnelLoading] = useState(false);
   const [tab, setTab] = useState(0);
   const [paperReadyOnly, setPaperReadyOnly] = useState(false);
   const [paperReadinessStatus, setPaperReadinessStatus] = useState('');
   const [backtestTimeframe, setBacktestTimeframe] = useState('');
-  const [generateTimeframe, setGenerateTimeframe] = useState('10Y');
+  const [generateTimeframe, setGenerateTimeframe] = useState('3Y');
   const [strategyRating, setStrategyRating] = useState('');
   const [readinessLabel, setReadinessLabel] = useState('');
   
@@ -86,6 +94,14 @@ export const TradePlanDashboard: React.FC = () => {
   const handleBatchGenerate = async () => {
     setBatchGenerating(true);
     setBatchSummary(null);
+    setBatchProgress({
+      processed: 0,
+      total: 0,
+      generated: 0,
+      failed: 0,
+      requests: 0,
+      timeframe: generateTimeframe,
+    });
     try {
       const batchSize = 25;
       const workerCount = 3;
@@ -101,6 +117,15 @@ export const TradePlanDashboard: React.FC = () => {
         topBlockers: first.topBlockers || [] as CountItem[],
         requests: 1,
       };
+      const updateProgress = () => setBatchProgress({
+        processed: totals.processed,
+        total: totals.discovered,
+        generated: totals.generated,
+        failed: totals.failed,
+        requests: totals.requests,
+        timeframe: generateTimeframe,
+      });
+      updateProgress();
 
       const offsets: number[] = [];
       for (let offset = batchSize; offset < (first.totalCount || 0); offset += batchSize) {
@@ -122,6 +147,7 @@ export const TradePlanDashboard: React.FC = () => {
           totals.paperReady += result.paperReadinessSummary?.READY_FOR_PAPER_REVIEW || 0;
           totals.topBlockers = mergeCountItems(totals.topBlockers, result.topBlockers || []);
           totals.requests += 1;
+          updateProgress();
         }
       };
 
@@ -135,6 +161,7 @@ export const TradePlanDashboard: React.FC = () => {
       setError(err.message || 'Failed to batch generate plans');
     } finally {
       setBatchGenerating(false);
+      setBatchProgress(null);
     }
   };
 
@@ -152,7 +179,7 @@ export const TradePlanDashboard: React.FC = () => {
     { label: 'Eligible Plan Candidates', value: funnel.tradePlanCandidateDiscovery.eligibleForPlanGeneration },
     { label: 'Generated Plans', value: funnel.generatedPlans.total },
     { label: 'Paper Ready', value: funnel.paperReadiness.readyForPaperReview },
-    { label: 'Blocked / Watch / Insufficient', value: funnel.generatedPlans.blocked + funnel.generatedPlans.watch + funnel.generatedPlans.insufficientData },
+    { label: 'Blocked / Watch / Insufficient', value: funnel.paperReadiness.blocked + funnel.paperReadiness.watchOnly + funnel.paperReadiness.insufficientData },
   ] : [];
 
   return (
@@ -160,25 +187,43 @@ export const TradePlanDashboard: React.FC = () => {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4">Trade Plans</Typography>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'stretch', sm: 'center' }}>
-          <FormControl size="small" sx={{ minWidth: 150 }}>
-            <InputLabel>Proof</InputLabel>
-            <Select label="Proof" value={generateTimeframe} onChange={(event) => setGenerateTimeframe(event.target.value)}>
+          <FormControl size="small" sx={{ minWidth: 190 }}>
+            <InputLabel>Backtest Proof</InputLabel>
+            <Select label="Backtest Proof" value={generateTimeframe} onChange={(event) => setGenerateTimeframe(event.target.value)}>
               {['1Y', '3Y', '5Y', '10Y', '15Y'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
             </Select>
           </FormControl>
           <Button variant="contained" onClick={handleBatchGenerate} disabled={batchGenerating}>
-            {batchGenerating ? 'Generating...' : 'Batch Generate Plans'}
+            {batchGenerating ? 'Generating...' : 'Generate Plans'}
           </Button>
         </Stack>
       </Box>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {batchProgress && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          <Stack spacing={1}>
+            <Typography variant="body2">
+              {batchProgress.total > 0
+                ? `Generating plans: ${Math.min(batchProgress.processed, batchProgress.total)} / ${batchProgress.total} candidates processed across ${batchProgress.requests} batch${batchProgress.requests === 1 ? '' : 'es'}. Generated ${batchProgress.generated}, failed ${batchProgress.failed}. Proof timeframe: ${batchProgress.timeframe}.`
+                : `Generating plans: discovering eligible Strategy Decision candidates. Proof timeframe: ${batchProgress.timeframe}.`}
+            </Typography>
+            <LinearProgress
+              variant={batchProgress.total > 0 ? 'determinate' : 'indeterminate'}
+              value={batchProgress.total > 0 ? Math.min(100, (batchProgress.processed / batchProgress.total) * 100) : undefined}
+            />
+          </Stack>
+        </Alert>
+      )}
       {batchSummary && <Alert severity="success" sx={{ mb: 2 }}>{batchSummary}</Alert>}
       {funnel && funnel.generatedPlans.total > 0 && funnel.paperReadiness.readyForPaperReview === 0 && (
         <Alert severity="info" sx={{ mb: 2 }}>
           No plans are paper-ready yet. This is usually caused by weak strategy proof, high risk grade, missing backtest summary, or insufficient data. Review the blocker breakdown below.
         </Alert>
       )}
+      <Alert severity="info" sx={{ mb: 2 }}>
+        Backtest proof timeframe affects proof, rating, and paper-readiness checks. Entry, stop, target, and position sizing are current-market risk levels from the latest price and recent daily candles, so they can remain the same across proof timeframes.
+      </Alert>
 
       <Paper sx={{ p: 2, mb: 2 }}>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
@@ -250,9 +295,9 @@ export const TradePlanDashboard: React.FC = () => {
             <MenuItem value="INSUFFICIENT_DATA">Insufficient Data</MenuItem>
           </Select>
         </FormControl>
-        <FormControl size="small" sx={{ minWidth: 150 }}>
-          <InputLabel>Timeframe</InputLabel>
-          <Select label="Timeframe" value={backtestTimeframe} onChange={(event) => { setBacktestTimeframe(event.target.value); setPage(0); }}>
+        <FormControl size="small" sx={{ minWidth: 190 }}>
+          <InputLabel>Backtest Proof</InputLabel>
+          <Select label="Backtest Proof" value={backtestTimeframe} onChange={(event) => { setBacktestTimeframe(event.target.value); setPage(0); }}>
             <MenuItem value="">All</MenuItem>
             {['1Y', '3Y', '5Y', '10Y', '15Y'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
           </Select>
@@ -299,6 +344,7 @@ export const TradePlanDashboard: React.FC = () => {
                 setSortDirection(newSortDir);
                 setPage(0);
               }}
+              emptyMessage={`No trade plans found for ${scope.region}/${scope.assetType}. Run Generate Plans after Strategy Decision has review candidates, or loosen the readiness/proof filters.`}
             />
          </Box>
       )}

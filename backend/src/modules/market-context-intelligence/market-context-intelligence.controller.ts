@@ -4,16 +4,20 @@ import { MarketContextIntelligenceService } from './market-context-intelligence.
 export class MarketContextIntelligenceController {
   constructor(private readonly service = new MarketContextIntelligenceService()) {}
 
-  summary = async (_req: Request, res: Response) => this.respond(res, () => this.service.summary());
+  summary = async (req: Request, res: Response) => this.respond(res, () => this.service.summary({ region: this.region(req) }));
 
-  run = async (_req: Request, res: Response) => this.respond(res, () => this.service.run());
+  run = async (req: Request, res: Response) => this.respond(res, () => this.service.run(this.region(req)));
 
-  regime = async (_req: Request, res: Response) => this.respond(res, () => this.service.regime());
-  sectors = async (_req: Request, res: Response) => this.respond(res, () => this.service.sectors());
-  breadth = async (_req: Request, res: Response) => this.respond(res, () => this.service.breadth());
-  countries = async (_req: Request, res: Response) => this.respond(res, () => this.service.countries());
+  regime = async (req: Request, res: Response) => this.respond(res, () => this.service.regime(this.region(req)));
+  sectors = async (req: Request, res: Response) => this.respond(res, () => this.service.sectors(this.region(req)));
+  breadth = async (req: Request, res: Response) => this.respond(res, () => this.service.breadth(this.region(req)));
+  countries = async (req: Request, res: Response) => this.respond(res, () => this.service.countries(this.region(req)));
   macro = async (_req: Request, res: Response) => this.respond(res, () => this.service.macro());
-  refresh = async (_req: Request, res: Response) => this.respond(res, () => this.service.summary());
+  refresh = async (req: Request, res: Response) => this.respond(res, () => this.service.summary({ region: this.region(req) }));
+
+  private region(req: Request): string | undefined {
+    return typeof req.query.region === 'string' ? req.query.region.trim() || undefined : undefined;
+  }
 
   private async respond(res: Response, fn: () => Promise<unknown> | unknown) {
     try {

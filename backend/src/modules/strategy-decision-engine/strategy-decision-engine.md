@@ -15,6 +15,8 @@ The `marketGate` endpoint accepts a `region` parameter. This ensures the "OPEN/C
 - `GET /api/v1/strategy/candidates`: Supports `region` and `assetType` query parameters.
 - `POST /api/v1/strategy/evaluate`: Respects the provided `region` for universe resolution and market gate checks.
 - Evaluation is batch-oriented. Callers should use `batchSize` plus `offset`; the backend evaluates only the requested page, returns `nextOffset`, and uses bounded worker-style concurrency inside the request.
+- Candidate and funnel reads default to the latest scoped `generatedDate` so current dashboards do not mix old daily decisions with the latest evaluation state. Historical rows remain available only when callers explicitly use `includeHistory=true`.
+- Funnel diagnostics return the full scoped, latest-date, proof-safe decision count separately from the bounded latest-row sample used for status and skip-reason diagnostics. Legacy non-framework-backed rows are excluded unless `includeLegacy=true` is explicitly supplied. Downstream modules that need actionable candidate totals should use the candidate query count, not infer eligibility from the bounded diagnostics sample.
 
 ## API Reference
 
@@ -29,10 +31,19 @@ The `marketGate` endpoint accepts a `region` parameter. This ensures the "OPEN/C
 
 ## Strategy Framework Migration Note
 
-This module preserves its existing decision API and persisted `StrategyDecisionResult` behavior. The overlapping strategies are now evaluated through Strategy Framework public exports:
+This module preserves its existing decision API and persisted `StrategyDecisionResult` behavior. Strategy Framework is the source of truth for Strategy Decision's selectable review strategies.
+
+`GET /api/v1/strategy/model` returns all registered Strategy Framework definitions and marks the subset available for Strategy Decision evaluation with `evaluationSupported=true`.
+
+The default `strategy=ALL` evaluation expands to active Strategy Framework definitions whose category is `ENTRY` or `EXIT`. It intentionally excludes `GATE`, `FILTER`, and `DRAFT` definitions because those are support rules or experimental strategies, not standalone Strategy Decision review strategies.
+
+Current active review strategies include:
 
 - `TREND_MOMENTUM`
 - `PULLBACK_IN_UPTREND`
+- `BREAKOUT_CONFIRMATION`
+- `SMART_MONEY_ACCUMULATION`
+- `SECTOR_LEADER_MOMENTUM`
 - `DEFENSIVE_EXIT`
 
 Strategy Framework is the source of truth for reusable strategy metadata, versions, rule declarations, deterministic evaluator behavior, backtest integration, ratings, and conservative readiness labels. Strategy Decision Engine adapts framework evaluator output into the existing `/api/v1/strategy/*` response shape.
@@ -71,6 +82,8 @@ Conservative defaults:
 - missing data quality does not become ready
 - unknown market gate lowers confidence and blocks strong long candidates
 
+Market context must exist as a persisted snapshot for the requested `region`. If only a `GLOBAL` snapshot exists while the current scope is `IN`, Strategy Decision treats the scoped gate as missing/unknown and will not promote long-entry candidates.
+
 ### Market Gate Strictness
 
 - `CLOSED`: long-entry strategies return `AVOID` and include the blocker "Market gate is closed; no new long candidates."
@@ -93,19 +106,23 @@ Evaluation uses persisted-only child context where available: latest raw signals
 
 ### Temporary Logic
 
-The previous private evaluators remain in the service as fallback only when a framework definition/evaluation cannot be loaded. They are not the primary path for the migrated overlapping strategies.
+The previous private evaluators remain in the service as fallback only when a framework definition/evaluation cannot be loaded for legacy strategy codes. They are not the primary path for active Strategy Framework review strategies.
 
 ## Frontend
 - `StrategyDecisionDashboard`: Subscribes to `useMarketScope()`. Automatically refetches candidates when the region changes.
-- Supports a local `Region Override` for specific comparisons.
+- Uses the global market header scope for region and asset type. The candidate table must not add a second local region selector; scoped comparisons belong in the global header or a future dedicated comparison workflow.
 - Shows framework-backed strategy version metadata where available without changing the existing dashboard layout.
+- The Review Candidates table exposes the validation fields needed before downstream plan generation: raw decision enum, framework-backed status, Strategy Framework rating grade, and readiness label.
+- Common candidate validation workflows use compact preset chips: `TRADE_CANDIDATE`, framework-backed candidates, `GOOD`/`EXCELLENT` ratings, and `PAPER_TEST_CANDIDATE`/`WATCHLIST_CANDIDATE` readiness. Advanced diagnostics should stay out of the main table toolbar unless promoted to a primary workflow.
 - Uses review-candidate/risk-level language in the UI while preserving existing API enum values such as `TRADE_CANDIDATE` for backward compatibility.
-- The Evaluate tab runs the current latest-signal universe in bounded batches of up to 100 instruments per backend request, updates progress after each batch, and refreshes visible tables once the full run completes.
+- The Evaluate tab reads strategy options from `/api/v1/strategy/model`, shows only `evaluationSupported=true` strategies plus `ALL`, runs the current latest-signal universe in bounded batches of up to 100 instruments per backend request, updates progress after each batch, and refreshes visible tables once the full run completes.
 - Placeholder watchlist/all-eligible/portfolio universe choices are intentionally not shown until real selectors are wired, avoiding dead-end controls.
 
 ## Query Hardening
 
 - Candidate reads use an allowlist for `sortBy`; unknown fields fall back to `generatedAt desc` instead of reaching Prisma with arbitrary keys.
+- Candidate reads support additive validation filters for `frameworkBacked`, `strategyRatingGrades`, and `readinessLabels`. Rating-grade filters inspect the persisted Strategy Framework rating snapshot JSON; unsupported values simply return no matches instead of failing the request.
+- Candidate reads are current and proof-safe by default: they scope to the latest generated decision date and exclude legacy non-framework-backed rows unless `includeLegacy=true` is explicitly supplied. Historical rows remain in the database for auditability, but they must not drive current review candidates, Research Hub priority buckets, or Trade Plan candidate discovery by default.
 - `assetType=STOCK` includes legacy `EQUITY` stock rows for compatibility while newer Market Data Foundation rows normalize to `STOCK`.
 - Exit-risk reads accept the same `region` and `assetType` scope as candidate reads.
 - Symbol-triggered evaluation sends `region` and `assetType` to Market Data Foundation and matches symbol, display symbol, provider symbol, or source symbol aliases.

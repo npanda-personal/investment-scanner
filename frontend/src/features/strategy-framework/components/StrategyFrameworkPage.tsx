@@ -16,6 +16,7 @@ import {
   Stack,
   Tab,
   Tabs,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
@@ -29,6 +30,7 @@ import { evaluateStrategy, fetchStrategies, fetchStrategy, fetchStrategyPerforma
 import type { StrategyDefinition, StrategyEvaluationResult, StrategyPerformanceSummary, StrategyTimeframe } from '../types';
 
 const timeframes: StrategyTimeframe[] = ['1Y', '3Y', '5Y', '10Y', '15Y'];
+const categoryFilters = ['ALL', 'ENTRY', 'EXIT', 'GATE', 'FILTER', 'DRAFT'] as const;
 
 const StrategyFrameworkPage: React.FC = () => {
   const { scope } = useMarketScope();
@@ -48,6 +50,7 @@ const StrategyFrameworkPage: React.FC = () => {
   const [evaluation, setEvaluation] = React.useState<StrategyEvaluationResult[]>([]);
   const [sortBy, setSortBy] = React.useState('ratingScore');
   const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('desc');
+  const [categoryFilter, setCategoryFilter] = React.useState<typeof categoryFilters[number]>('ALL');
 
   React.useEffect(() => {
     const linkedCode = searchParams.get('strategyCode');
@@ -101,6 +104,12 @@ const StrategyFrameworkPage: React.FC = () => {
     });
   }, [rankings, sortBy, sortDirection]);
 
+  const visibleStrategies = React.useMemo(() => {
+    if (categoryFilter === 'ALL') return strategies;
+    if (categoryFilter === 'DRAFT') return strategies.filter((strategy) => strategy.status === 'DRAFT');
+    return strategies.filter((strategy) => strategy.category === categoryFilter && strategy.status !== 'DRAFT');
+  }, [strategies, categoryFilter]);
+
   const runEvaluation = async () => {
     if (!instrument) return;
     setRunning(true);
@@ -130,6 +139,7 @@ const StrategyFrameworkPage: React.FC = () => {
         badges={<Stack direction="row" spacing={1}>{[`${strategies.length} configured`, scope.region, scope.assetType].map((item) => <Chip key={item} size="small" label={item} />)}</Stack>}
       />
       <Alert severity="info" sx={{ mb: 2 }}>Research support only, not financial advice. No real-money automation is enabled.</Alert>
+      <Alert severity="info" sx={{ mb: 2 }}>Active ENTRY strategies are standalone candidates for registered backtests. EXIT, GATE, FILTER, and DRAFT definitions support decisions and diagnostics until dedicated simulation semantics exist.</Alert>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       <Paper variant="outlined" sx={{ mb: 2 }}>
         <Tabs value={tab} onChange={(_event, value) => setTab(value)} variant="scrollable" scrollButtons="auto">
@@ -142,34 +152,51 @@ const StrategyFrameworkPage: React.FC = () => {
       </Paper>
 
       {tab === 0 && (
-        <DataTable
-          columns={[
-            { id: 'code', label: 'Strategy', sortable: true, render: (row) => <Stack spacing={0.5}><Typography fontWeight={700}>{row.name}</Typography><Typography variant="caption">{row.code}</Typography></Stack> },
-            { id: 'status', label: 'Status', render: (row) => <Chip size="small" label={row.status} color={row.status === 'ACTIVE' ? 'success' : row.status === 'DRAFT' ? 'warning' : 'default'} /> },
-            { id: 'style', label: 'Style', render: (row) => row.style },
-            { id: 'rating', label: 'Latest rating', render: (row) => <Stack direction="row" spacing={1} alignItems="center">{ratingChip(row.latestPerformance?.ratingGrade)}{hasWarnings(row.latestPerformance) && <Chip size="small" label="Warnings" color="warning" />}</Stack> },
-            { id: 'readiness', label: 'Readiness', render: (row) => readinessChip(row.latestPerformance?.readinessLabel) },
-            { id: 'action', label: 'Actions', render: (row) => <Stack direction="row" spacing={1}><Button startIcon={<VisibilityIcon />} size="small" onClick={() => { setSelectedCode(row.code); setTab(1); }}>View</Button><Button startIcon={<ScienceIcon />} size="small" href={labLink(row.code, '3Y', scope.region, scope.assetType)}>Backtest in Lab</Button></Stack> },
-          ]}
-          rows={strategies}
-          getRowId={(row) => row.code}
-          loading={loading}
-          error={error}
-          emptyMessage="No configured strategies found."
-          page={0}
-          pageSize={10}
-          totalCount={strategies.length}
-          onPageChange={() => undefined}
-          onPageSizeChange={() => undefined}
-        />
+        <Stack spacing={2}>
+          <Paper variant="outlined" sx={{ p: 1.5 }}>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              {categoryFilters.map((filter) => (
+                <Chip
+                  key={filter}
+                  label={categoryFilterLabel(filter, strategies)}
+                  color={categoryFilter === filter ? 'primary' : 'default'}
+                  variant={categoryFilter === filter ? 'filled' : 'outlined'}
+                  onClick={() => setCategoryFilter(filter)}
+                  data-testid={`strategy-category-${filter.toLowerCase()}`}
+                />
+              ))}
+            </Stack>
+          </Paper>
+          <DataTable
+            columns={[
+              { id: 'code', label: 'Strategy', sortable: true, render: (row) => <Stack spacing={0.5}><Typography fontWeight={700}>{row.name}</Typography><Typography variant="caption">{row.code}</Typography></Stack> },
+              { id: 'category', label: 'Category', render: (row) => categoryChip(row.category) },
+              { id: 'status', label: 'Status', render: (row) => <Chip size="small" label={row.status} color={row.status === 'ACTIVE' ? 'success' : row.status === 'DRAFT' ? 'warning' : 'default'} /> },
+              { id: 'style', label: 'Style', render: (row) => row.style },
+              { id: 'rating', label: 'Latest rating', render: (row) => <Stack direction="row" spacing={1} alignItems="center">{ratingChip(row.latestPerformance?.ratingGrade)}{hasWarnings(row.latestPerformance) && <Chip size="small" label="Warnings" color="warning" />}</Stack> },
+              { id: 'readiness', label: 'Readiness', render: (row) => readinessChip(row.latestPerformance?.readinessLabel) },
+              { id: 'action', label: 'Actions', render: (row) => <StrategyActions strategy={row} region={scope.region} assetType={scope.assetType} onView={() => { setSelectedCode(row.code); setTab(1); }} /> },
+            ]}
+            rows={visibleStrategies}
+            getRowId={(row) => row.code}
+            loading={loading}
+            error={error}
+            emptyMessage={`No ${categoryFilter === 'ALL' ? '' : categoryFilter.toLowerCase()} strategies found for the current scope.`}
+            page={0}
+            pageSize={10}
+            totalCount={visibleStrategies.length}
+            onPageChange={() => undefined}
+            onPageSizeChange={() => undefined}
+          />
+        </Stack>
       )}
 
-      {tab === 1 && selected && <StrategyDetail strategy={selected} selectedCode={selectedCode} onStrategyChange={setSelectedCode} strategies={strategies} region={scope.region} assetType={scope.assetType} />}
+      {tab === 1 && selected && <StrategyDetail strategy={selected} onStrategyChange={setSelectedCode} strategies={strategies} region={scope.region} assetType={scope.assetType} />}
 
       {tab === 2 && (
         <Stack spacing={2}>
           <ToolbarSelector strategies={strategies} selectedCode={selectedCode} onStrategyChange={setSelectedCode} timeframe={timeframe} onTimeframeChange={setTimeframe} />
-          <PerformanceMatrix summaries={performance} selectedCode={selectedCode} region={scope.region} assetType={scope.assetType} />
+          <PerformanceMatrix summaries={performance} selected={selected} region={scope.region} assetType={scope.assetType} />
         </Stack>
       )}
 
@@ -248,21 +275,21 @@ function ToolbarStrategySelect({ strategies, selectedCode, onStrategyChange }: {
     <FormControl size="small" sx={{ minWidth: 260 }}>
       <InputLabel>Strategy</InputLabel>
       <Select label="Strategy" value={selectedCode} onChange={(event) => onStrategyChange(event.target.value)}>
-        {strategies.map((strategy) => <MenuItem key={strategy.code} value={strategy.code}>{strategy.name}</MenuItem>)}
+        {strategies.map((strategy) => <MenuItem key={strategy.code} value={strategy.code}>{strategy.name} ({strategy.category}{strategy.status === 'DRAFT' ? ', draft' : ''})</MenuItem>)}
       </Select>
     </FormControl>
   );
 }
 
-function StrategyDetail({ strategy, selectedCode, onStrategyChange, strategies, region, assetType }: { strategy: StrategyDefinition; selectedCode: string; onStrategyChange: (value: string) => void; strategies: StrategyDefinition[]; region: string; assetType: string }) {
+function StrategyDetail({ strategy, onStrategyChange, strategies, region, assetType }: { strategy: StrategyDefinition; onStrategyChange: (value: string) => void; strategies: StrategyDefinition[]; region: string; assetType: string }) {
   return (
     <Stack spacing={2}>
-      <ToolbarStrategySelect strategies={strategies} selectedCode={selectedCode} onStrategyChange={onStrategyChange} />
+      <ToolbarStrategySelect strategies={strategies} selectedCode={strategy.code} onStrategyChange={onStrategyChange} />
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Stack spacing={1}>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between">
             <Stack direction="row" spacing={1} alignItems="center"><Typography variant="h6">{strategy.name}</Typography><Chip size="small" label={strategy.status} /></Stack>
-            <Button startIcon={<ScienceIcon />} variant="contained" href={labLink(strategy.code, '3Y', region, assetType)}>Backtest in Lab</Button>
+            <BacktestButton strategy={strategy} region={region} assetType={assetType} variant="contained" />
           </Stack>
           <Typography color="text.secondary">{strategy.description}</Typography>
           <Stack direction="row" spacing={1} flexWrap="wrap">{[strategy.category, strategy.style, strategy.timeframe, ...strategy.supportedRegions, ...strategy.assetTypes].map((item) => <Chip key={item} size="small" label={item} />)}</Stack>
@@ -282,7 +309,7 @@ function RuleSection({ title, rules }: { title: string; rules: Array<{ code: str
   return <Box><Typography variant="subtitle2" gutterBottom>{title}</Typography><Stack spacing={0.5}>{rules.length ? rules.map((rule) => <Typography key={rule.code} variant="body2">- {rule.label}</Typography>) : <Typography variant="body2" color="text.secondary">None configured.</Typography>}</Stack></Box>;
 }
 
-function PerformanceMatrix({ summaries, selectedCode, region, assetType }: { summaries: StrategyPerformanceSummary[]; selectedCode: string; region: string; assetType: string }) {
+function PerformanceMatrix({ summaries, selected, region, assetType }: { summaries: StrategyPerformanceSummary[]; selected: StrategyDefinition | null; region: string; assetType: string }) {
   const byTimeframe = new Map(summaries.map((summary) => [summary.timeframe, summary]));
   return (
     <DataTable
@@ -298,7 +325,7 @@ function PerformanceMatrix({ summaries, selectedCode, region, assetType }: { sum
         { id: 'trades', label: 'Trades', render: (row) => row.summary?.tradeCount ?? 0 },
         { id: 'rating', label: 'Rating', render: (row) => <Stack direction="row" spacing={1} alignItems="center">{ratingChip(row.summary?.ratingGrade)}{hasWarnings(row.summary) && <Chip size="small" label="Warnings" color="warning" />}</Stack> },
         { id: 'readiness', label: 'Readiness', render: (row) => readinessChip(row.summary?.readinessLabel) },
-        { id: 'action', label: 'Action', render: (row) => <Button size="small" href={labLink(selectedCode, row.timeframe, region, assetType)}>Backtest in Lab</Button> },
+        { id: 'action', label: 'Action', render: (row) => selected ? <BacktestButton strategy={selected} region={region} assetType={assetType} timeframe={row.timeframe} /> : <Button size="small" disabled>Backtest in Lab</Button> },
       ]}
       rows={timeframes.map((item) => ({ timeframe: item, summary: byTimeframe.get(item) }))}
       getRowId={(row) => row.timeframe}
@@ -342,6 +369,57 @@ function EvaluationList({ results, instrument }: { results: StrategyEvaluationRe
 
 function ratingChip(grade?: string | null) {
   return <Chip size="small" label={grade || 'UNPROVEN'} color={grade === 'EXCELLENT' ? 'success' : grade === 'GOOD' ? 'primary' : grade === 'WEAK' ? 'warning' : 'default'} />;
+}
+
+function StrategyActions({ strategy, region, assetType, onView }: { strategy: StrategyDefinition; region: string; assetType: string; onView: () => void }) {
+  return (
+    <Stack direction="row" spacing={1}>
+      <Button startIcon={<VisibilityIcon />} size="small" onClick={onView}>View</Button>
+      <BacktestButton strategy={strategy} region={region} assetType={assetType} />
+    </Stack>
+  );
+}
+
+function BacktestButton({ strategy, region, assetType, timeframe = '3Y', variant = 'text' }: { strategy: StrategyDefinition; region: string; assetType: string; timeframe?: StrategyTimeframe; variant?: 'text' | 'contained' }) {
+  const allowed = canRunStandaloneBacktest(strategy);
+  const button = (
+    <span>
+      <Button
+        startIcon={<ScienceIcon />}
+        size="small"
+        variant={variant}
+        disabled={!allowed}
+        href={allowed ? labLink(strategy.code, timeframe, region, assetType) : undefined}
+      >
+        Backtest in Lab
+      </Button>
+    </span>
+  );
+  return allowed ? button : <Tooltip title={backtestUnavailableReason(strategy)}>{button}</Tooltip>;
+}
+
+function canRunStandaloneBacktest(strategy: StrategyDefinition) {
+  return strategy.status === 'ACTIVE' && strategy.category === 'ENTRY';
+}
+
+function backtestUnavailableReason(strategy: StrategyDefinition) {
+  if (strategy.status !== 'ACTIVE') return `${strategy.name} is ${strategy.status.toLowerCase()} and is not available for registered backtests.`;
+  return `${strategy.name} is a ${strategy.category.toLowerCase()} rule. Registered backtests currently support active entry strategies only.`;
+}
+
+function categoryChip(category: string) {
+  const color = category === 'ENTRY' ? 'primary' : category === 'EXIT' ? 'warning' : category === 'GATE' ? 'secondary' : 'default';
+  return <Chip size="small" label={category} color={color as any} variant={category === 'FILTER' ? 'outlined' : 'filled'} />;
+}
+
+function categoryFilterLabel(filter: typeof categoryFilters[number], strategies: StrategyDefinition[]) {
+  const count = filter === 'ALL'
+    ? strategies.length
+    : filter === 'DRAFT'
+      ? strategies.filter((strategy) => strategy.status === 'DRAFT').length
+      : strategies.filter((strategy) => strategy.category === filter && strategy.status !== 'DRAFT').length;
+  const label = filter === 'ALL' ? 'All' : filter === 'ENTRY' ? 'Entry' : filter === 'EXIT' ? 'Exit' : filter === 'GATE' ? 'Gates' : filter === 'FILTER' ? 'Filters' : 'Drafts';
+  return `${label} (${count})`;
 }
 
 function readinessChip(label?: string | null) {

@@ -103,10 +103,18 @@ export class TradePlanRiskEngineRepository {
     return this.toDto(record);
   }
 
-  async latestForInstrument(instrumentId: string, strategy?: string, portfolioId?: string): Promise<TradePlanResultDto | null> {
+  async latestForInstrument(
+    instrumentId: string,
+    strategy?: string,
+    portfolioId?: string,
+    scope: { region?: string; assetType?: string } = {}
+  ): Promise<TradePlanResultDto | null> {
     const where: Prisma.TradePlanResultWhereInput = { instrumentId };
     if (strategy) where.strategy = strategy;
     if (portfolioId) where.portfolioId = portfolioId;
+    if (scope.region) where.region = scope.region;
+    if (scope.assetType) where.assetType = scope.assetType;
+    (where as any).strategyProofSnapshot = { path: ['frameworkBacked'], equals: true };
 
     const record = await this.db.tradePlanResult.findFirst({
       where,
@@ -140,6 +148,14 @@ export class TradePlanRiskEngineRepository {
         gte: query.from ? new Date(query.from) : undefined,
         lte: query.to ? new Date(query.to) : undefined,
       };
+    }
+    if (!query.generatedDate && !query.from && !query.to) {
+      const latest = await this.db.tradePlanResult.findFirst({
+        where: { ...where },
+        orderBy: { generatedDate: 'desc' },
+        select: { generatedDate: true },
+      });
+      if (latest?.generatedDate) where.generatedDate = latest.generatedDate;
     }
 
     const records = await this.db.tradePlanResult.findMany({
@@ -228,6 +244,9 @@ export class TradePlanRiskEngineRepository {
     if ('readinessLabel' in query && query.readinessLabel) where.readinessLabel = query.readinessLabel;
     if ('portfolioId' in query && query.portfolioId) where.portfolioId = query.portfolioId;
     if ('minRewardRisk' in query && query.minRewardRisk !== undefined) where.rewardRiskRatio = { gte: query.minRewardRisk };
+    if (!query.includeLegacy) {
+      (where as any).strategyProofSnapshot = { path: ['frameworkBacked'], equals: true };
+    }
     return where;
   }
 

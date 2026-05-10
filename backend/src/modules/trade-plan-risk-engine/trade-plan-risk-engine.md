@@ -52,6 +52,7 @@ Current decision-to-plan flow status:
 | Paper readiness was not persisted | repository, service, types | HIGH | Previous response enriched readiness outside persistence. | Persist status, reasons, and blockers on the row. | Enables candidate filtering without live graph reconstruction. | Added readiness columns and repository mapping. | Yes |
 | Candidate filtering recomputed readiness | service, repository | MEDIUM | `paperReadyOnly` loaded a broad set and reclassified. | Use persisted readiness/scope/proof fields. | Keeps listing fast and auditable. | Repository now filters persisted fields directly. | Yes |
 | Daily idempotency ignored scope and portfolio | schema, repository | HIGH | Unique key was `instrumentId + strategy + modelVersion + generatedDate`. | Include `region`, `assetType`, and portfolio identity. | Prevents one scope or portfolio from overwriting another. | Unique key now uses `instrumentId`, `strategy`, `modelVersion`, `generatedDate`, `region`, `assetType`, and `portfolioKey`. | Yes |
+| Legacy non-framework-backed plans polluted current views | repository, service | HIGH | Plans generated from old non-framework Strategy Decision rows could appear in current Trade Plan tables and blocker counts. | Current Trade Plan reads should show only Strategy Framework-backed proof by default; legacy rows should remain available only for audit. | Prevents stale legacy decisions from looking like valid current review-plan candidates. | Default list/detail/funnel reads now require `strategyProofSnapshot.frameworkBacked = true`; use `includeLegacy=true` for audit diagnostics. | Yes |
 
 ### Paper Readiness Contract
 
@@ -70,6 +71,10 @@ Readiness thresholds:
 - Data quality: latest price present, sufficient price history, coverage not `UNUSABLE`, liquidity not `ILLIQUID`, and stale price warnings handled.
 - Scope: region must be provided from global market scope and `assetType` must be `STOCK`.
 - Safety: actions are review, plan, simulate, and paper review candidate only.
+
+Batch-generated plans do not require a portfolio selection. When neither `portfolioId` nor `capitalBase` is supplied, the service uses the model `defaultCapitalBase` of `100000` only to estimate review quantity, max risk amount, and exposure percentage. This is a planning assumption, not a portfolio value and not execution sizing. Plans generated this way include a position-sizing note so paper-readiness is not blocked solely because the batch request omitted portfolio details.
+
+Legacy Strategy Decision rows may not contain `strategyVersion`. Trade Plan snapshots continue to default the strategy version to `1.0.0` for the generated plan and readiness proof so otherwise valid framework-backed decisions are not blocked by a missing legacy version field.
 
 ## Persisted Proof Snapshot Contract
 
@@ -120,17 +125,17 @@ Generated plans are idempotent per UTC generated date using:
 - **Stop Loss**: Prioritizes robust 10-day swing lows or SMA50 support. Falls back to ATR or fixed percentages (which flags `FALLBACK` quality and `HIGH` risk). Guards against stops being too tight (< 1%) or above entry.
 - **Target**: Defaults to 2R but flags `WEAK` if the expected move requires an unrealistic leap relative to recent volatility. Target <= Entry for longs results in `BLOCKED`.
 - **Target Transparency**: 2R targets expose `target.method = REWARD_RISK_MULTIPLE`, `target.rationale = "Target is modeled at 2R by default."`, and target quality. This is modeled risk geometry, not a predicted price.
-- **Position Sizing**: Safely scales based on `capitalBase` or actual connected portfolio value. Blocks quantities < 1. Exposes single-position portfolio concentration checks against a default 10% maximum.
+- **Position Sizing**: Safely scales based on `capitalBase`, actual connected portfolio value, or the model default planning capital base of `100000` when neither is supplied. Blocks quantities < 1. Exposes single-position portfolio concentration checks against a default 10% maximum.
 - **Data Quality Integration**: Consumes `DataQualityEngineService`. Blocks on `UNUSABLE` coverage or `ILLIQUID` status.
 
 ## API Endpoints
 - `GET /api/v1/trade-plans/health`
 - `GET /api/v1/trade-plans/model` (Includes model rules, paper readiness criteria, thresholds, and safety constraints)
-- `GET /api/v1/trade-plans/funnel` (Explains Raw Signals -> Strategy Decisions -> eligible plan candidates -> generated plans -> paper readiness for `region`, `assetType`, optional `strategyCode`, `generatedDate`, `from`, `to`, and `backtestTimeframe`)
-- `GET /api/v1/trade-plans/candidates` (Supports `region`, `assetType`, `strategyCode`, `planStatus`, `riskGrade`, `minRewardRisk`, `paperReadyOnly`, `paperReadinessStatus`, `backtestTimeframe`, `strategyRating`, `readinessLabel`, `portfolioId`, `limit`, `offset`, `sortBy`, `sortDirection`)
-- `GET /api/v1/trade-plans/:instrumentId`
+- `GET /api/v1/trade-plans/funnel` (Explains Raw Signals -> Strategy Decisions -> eligible plan candidates -> generated plans -> paper readiness for `region`, `assetType`, optional `strategyCode`, `generatedDate`, `from`, `to`, `backtestTimeframe`, and `includeLegacy`)
+- `GET /api/v1/trade-plans/candidates` (Supports `region`, `assetType`, `strategyCode`, `planStatus`, `riskGrade`, `minRewardRisk`, `paperReadyOnly`, `paperReadinessStatus`, `backtestTimeframe`, `strategyRating`, `readinessLabel`, `portfolioId`, `includeLegacy`, `limit`, `offset`, `sortBy`, `sortDirection`)
+- `GET /api/v1/trade-plans/:instrumentId` (Supports `region`, `assetType`, `strategyCode`, and `portfolioId`; scoped requests must not return a plan from a different market scope)
 - `POST /api/v1/trade-plans/generate`
-- `POST /api/v1/trade-plans/generate/batch` (Uses bounded backend worker concurrency within each request and returns `candidateCount`, `rawCandidateCount`, `eligibleCandidateCount`, `generatedCount`, `skippedCount`, `paperReadinessSummary`, `topBlockers`, `totalCount`, `nextOffset`, `hasMore`, and per-candidate `failures` for frontend multi-batch orchestration)
+- `POST /api/v1/trade-plans/generate/batch` (Uses bounded backend worker concurrency within each request and returns `processedCount`, `candidateCount`, `rawCandidateCount`, `eligibleCandidateCount`, `generatedCount`, `skippedCount`, `paperReadinessSummary`, `topBlockers`, `totalCount`, `nextOffset`, `hasMore`, and per-candidate `failures` for frontend multi-batch orchestration)
 
 ## Generation Funnel Diagnostics
 
@@ -142,8 +147,10 @@ The funnel endpoint returns:
 
 - Raw signal counts by direction for the selected `region` and `assetType`.
 - Strategy Decision counts by decision status, framework-backed status, and strategy.
-- Candidate discovery counts, including skipped candidates and skip reasons before generation.
-- Generated plan counts by plan status, risk grade, strategy, and paper readiness.
+- Candidate discovery counts, including skipped candidates and skip reasons before generation. The eligible-plan count is sourced from the same Strategy Decision candidate query used by batch generation, while the skip-reason breakdown is a bounded diagnostic sample.
+- `strategyDecisions.tradeCandidates` is also sourced from the exact Strategy Decision candidate query used by batch generation, not from the bounded diagnostic sample. This prevents the funnel from showing one sampled candidate while the generator correctly finds many.
+- Generated plan counts by plan status, risk grade, strategy, and paper readiness. When no date range is supplied, funnel diagnostics use the latest generated UTC date for the selected scope so stale older plan rows do not dominate current blocker counts.
+- Generated plan lists, latest-plan detail reads, and funnel generated-plan counts are proof-safe by default. Rows whose persisted `strategyProofSnapshot.frameworkBacked` is not `true` are hidden unless `includeLegacy=true` is explicitly supplied. Legacy rows are kept for auditability and are not deleted.
 - Paper readiness blocker/reason aggregation from persisted plan snapshots.
 - Proof diagnostics by backtest timeframe and strategy rating.
 - Data quality diagnostics for missing snapshots, unusable coverage, illiquidity, and unknown liquidity.
@@ -188,12 +195,15 @@ Proof timeframe behavior:
 - Supported values are currently `1Y`, `3Y`, `5Y`, `10Y`, and `15Y` by convention.
 - Existing persisted plans are not changed automatically when a new timeframe is selected.
 - The funnel endpoint reports how many plans use each timeframe and recommends trying `3Y` or `5Y` when current plans are dominated by `10Y` proof and history is insufficient.
+- Generated plans persist the requested proof timeframe even when the matching Strategy Framework performance summary is missing, so missing-proof diagnostics still show which timeframe was requested. Once the matching backtest summary exists, regenerating plans stores the actual proof summary for that timeframe.
 - Default behavior remains the existing service behavior when no timeframe is supplied.
 
 ## Integration
 - **Frontend Dashboard:** Available at `/trade-plans`. Integrates with the shared `DataTable` to provide pagination and sorting (e.g., on the Status and Risk Grade columns). Batch generation starts with one discovery batch, then runs remaining offsets with a small frontend worker pool.
+- **Scoped Detail Reads:** `/trade-plans/:instrumentId` passes the global `region` and `assetType` to avoid showing wrong-scope persisted plans.
 - **Frontend Funnel Panel:** Shows raw bullish signals, Strategy Decision count, eligible plan candidates, generated plans, paper-ready count, blocked/watch/insufficient count, top blockers, skipped candidate reasons, recommendations, and a zero-paper-ready explanation.
-- **Batch Proof Selector:** The dashboard can send `backtestTimeframe` (`1Y`, `3Y`, `5Y`, `10Y`, `15Y`) during batch generation and includes the selected proof timeframe in completion messaging.
+- **Batch Progress UI:** Batch generation disables the run button, shows processed/total candidates, generated and failed counts, request count, and selected proof timeframe while requests are running. The final summary separates discovered, eligible, skipped, paper-ready, failed, and top blocker counts.
+- **Batch Proof Selector:** The dashboard can send `backtestTimeframe` (`1Y`, `3Y`, `5Y`, `10Y`, `15Y`) during batch generation and includes the selected proof timeframe in completion messaging. The default generation proof is `3Y` because the current local IN/STOCK universe often lacks clean 10-year history.
 - Can be triggered manually via `/api/v1/trade-plans/generate`.
 - Reads `StrategyDecisionResult` from the database.
 - Consumes `MarketDataFoundation` for the latest price and historical SMA approximation.
@@ -206,6 +216,7 @@ Proof timeframe behavior:
 - Backend focused tests: `npm test -- --runInBand --runTestsByPath tests/modules/trade-plan-risk-engine/trade-plan-risk-engine.service.test.ts tests/modules/trade-plan-risk-engine/trade-plan-risk-engine.repository.test.ts` from `backend`
 - Backend scope helper tests: `npm test -- --runInBand --runTestsByPath tests/modules/signal-generation-engine/signal-generation-engine.repository.test.ts tests/modules/strategy-decision-engine/strategy-decision-engine.repository.test.ts` from `backend`
 - Frontend build: `npm run build` from `frontend`
+- Frontend focused UI smoke: `npm run test:ui -- trade-plan-risk-engine.spec.ts --output=playwright-results-trade-plan` from `frontend`
 
 Known limitations:
 - Existing rows need migration/backfill if historical plans should receive snapshots. New generated plans store snapshots.

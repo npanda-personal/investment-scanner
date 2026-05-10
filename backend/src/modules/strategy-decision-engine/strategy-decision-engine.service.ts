@@ -28,6 +28,7 @@ import type {
 
 const MODEL_VERSION = 'strategy-decision-v1';
 const EVALUATION_WORKER_CONCURRENCY = 5;
+const REVIEW_STRATEGY_CATEGORIES = new Set(['ENTRY', 'EXIT']);
 
 export class StrategyDecisionEngineService {
   constructor(
@@ -186,7 +187,7 @@ export class StrategyDecisionEngineService {
     return this.repository.candidates(query);
   }
 
-  async funnelDiagnostics(query: { region?: string; assetType?: string; strategyCode?: string; generatedDate?: string; from?: string; to?: string }) {
+  async funnelDiagnostics(query: { region?: string; assetType?: string; strategyCode?: string; generatedDate?: string; from?: string; to?: string; frameworkBacked?: boolean; includeLegacy?: boolean; includeHistory?: boolean }) {
     return this.repository.funnelDiagnostics(query);
   }
 
@@ -211,46 +212,29 @@ export class StrategyDecisionEngineService {
   }
 
   async model() {
+    const strategies = this.strategyRegistry.list();
     return {
       modelVersion: MODEL_VERSION,
-      strategies: [
-        {
-          name: 'TREND_MOMENTUM',
-          description: 'High-confidence momentum plays in strong markets.',
-          thresholds: { tradeCandidate: 80, watch: 60, wait: 40 },
-          weights: {
-            marketContext: 20,
-            signalStrength: 30,
-            trendTechnical: 20,
-            dataQuality: 15,
-            sectorSmartMoney: 15
-          }
+      strategies: strategies.map((strategy) => ({
+        code: strategy.code,
+        name: strategy.name,
+        description: strategy.description,
+        category: strategy.category,
+        style: strategy.style,
+        status: strategy.status,
+        version: strategy.version,
+        evaluationSupported: this.isReviewStrategy(strategy),
+        thresholds: {
+          tradeCandidate: Number(strategy.parameters.minScore ?? 70),
+          watch: 50,
+          wait: 40,
         },
-        {
-          name: 'PULLBACK_IN_UPTREND',
-          description: 'Entry candidates near SMA50 support in confirmed uptrends.',
-          thresholds: { tradeCandidate: 75, watch: 50 },
-          weights: {
-            marketContext: 20,
-            trendTechnical: 25,
-            pullbackQuality: 20,
-            dataQuality: 20,
-            sectorSmartMoney: 15
-          }
-        },
-        {
-          name: 'DEFENSIVE_EXIT',
-          description: 'Identifies high-risk holdings for review.',
-          thresholds: { exitCandidate: 75, reduceRisk: 45, watch: 25 },
-          weights: {
-            bearishSignalReliability: 30,
-            trendBreakdown: 25,
-            marketSectorWeakness: 20,
-            portfolioRisk: 15,
-            smartMoneyDataWarnings: 10
-          }
-        },
-      ],
+        weights: Object.fromEntries([
+          ...strategy.entryRules,
+          ...strategy.exitRules,
+          ...strategy.noiseFilters,
+        ].filter((rule) => typeof rule.weight === 'number').map((rule) => [rule.code, rule.weight as number])),
+      })),
       marketGateRules: {
         HEALTHY: 'Risk-On regime and breadth > 60%',
         MIXED: 'Breadth 30-60%',
@@ -414,7 +398,7 @@ export class StrategyDecisionEngineService {
     if (!definition) return null;
     const strategyContext = this.toStrategyFrameworkContext(ctx);
     const evaluator = new StrategyFrameworkEvaluator(definition);
-    const frameworkResult = strategyName === 'DEFENSIVE_EXIT'
+    const frameworkResult = definition.category === 'EXIT'
       ? evaluator.evaluateExit(strategyContext)
       : evaluator.evaluateEntry(strategyContext);
     const rating = await this.latestStrategyRating(definition.code, strategyContext.region || 'IN', strategyContext.assetType || 'STOCK', strategyRatings);
@@ -935,17 +919,17 @@ export class StrategyDecisionEngineService {
 
     const latestPrice = ctx.latestPrice;
     const sma50 = ctx.sma50;
+    const entryZoneType = this.entryZoneTypeForStrategy(strategy);
     
-    // Trade Plan Preview Generation
-    const entryZone = strategy !== 'DEFENSIVE_EXIT' && sma50 ? {
-      type: (strategy === 'TREND_MOMENTUM' ? 'BREAKOUT' : 'PULLBACK') as EntryZoneType,
+    const entryZone = entryZoneType && sma50 ? {
+      type: entryZoneType,
       referencePrice: sma50,
       preferredEntryMin: Number((sma50 * 0.99).toFixed(2)),
       preferredEntryMax: Number((sma50 * 1.02).toFixed(2)),
-      rationale: strategy === 'TREND_MOMENTUM' ? 'Enter on strength above SMA50 support.' : 'Enter on successful test of SMA50 support.'
+      rationale: entryZoneType === 'BREAKOUT' ? 'Review on strength above SMA50 support.' : 'Review on successful test of SMA50 support.'
     } : undefined;
 
-    const riskPlan = strategy !== 'DEFENSIVE_EXIT' && sma50 ? {
+    const riskPlan = entryZoneType && sma50 ? {
       stopLoss: (sma50 * 0.96).toFixed(2),
       targetPrice: (latestPrice * 1.15).toFixed(2),
       rewardRiskRatio: 3.5,
@@ -997,9 +981,21 @@ export class StrategyDecisionEngineService {
 
   private strategiesForRequest(request: StrategyEvaluateRequest): StrategyName[] {
     if (request.strategy !== 'ALL') return [request.strategy];
-    const strategies: StrategyName[] = ['TREND_MOMENTUM', 'PULLBACK_IN_UPTREND'];
-    if (request.portfolioId) strategies.push('DEFENSIVE_EXIT');
-    return strategies;
+    return this.reviewStrategyDefinitions().map((strategy) => strategy.code);
+  }
+
+  private reviewStrategyDefinitions() {
+    return this.strategyRegistry.active().filter((strategy) => this.isReviewStrategy(strategy));
+  }
+
+  private isReviewStrategy(strategy: { status: string; category: string }) {
+    return strategy.status === 'ACTIVE' && REVIEW_STRATEGY_CATEGORIES.has(strategy.category);
+  }
+
+  private entryZoneTypeForStrategy(strategy: StrategyName): EntryZoneType | null {
+    if (['TREND_MOMENTUM', 'BREAKOUT_CONFIRMATION'].includes(strategy)) return 'BREAKOUT';
+    if (['PULLBACK_IN_UPTREND', 'MEAN_REVERSION_PULLBACK'].includes(strategy)) return 'PULLBACK';
+    return null;
   }
 
   private async resolveEvaluationUniverse(

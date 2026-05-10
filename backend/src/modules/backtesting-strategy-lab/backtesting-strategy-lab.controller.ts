@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { BacktestingStrategyLabService } from './backtesting-strategy-lab.service';
-import { getParam } from './backtesting-strategy-lab.validation';
+import { getParam, parseRunListQuery } from './backtesting-strategy-lab.validation';
 
 const currentUserId = (req: Request) => (req as any).user?.id || 'default-user';
 
@@ -18,7 +18,7 @@ export class BacktestingStrategyLabController {
 
   run = async (req: Request, res: Response) => this.respond(res, () => this.service.run(req.body, currentUserId(req)), 201);
   runStrategy = async (req: Request, res: Response) => this.respond(res, () => this.service.runStrategy(getParam(req.params.id), currentUserId(req)), 201);
-  listRuns = async (req: Request, res: Response) => this.respond(res, () => this.service.listRuns(currentUserId(req)));
+  listRuns = async (req: Request, res: Response) => this.respond(res, () => this.service.listRuns(currentUserId(req), parseRunListQuery(req.query)));
   getRun = async (req: Request, res: Response) => this.respondMaybeFound(res, () => this.service.getRun(getParam(req.params.id), currentUserId(req)));
   deleteRun = async (req: Request, res: Response) => this.respond(res, async () => {
     await this.service.deleteRun(getParam(req.params.id), currentUserId(req));

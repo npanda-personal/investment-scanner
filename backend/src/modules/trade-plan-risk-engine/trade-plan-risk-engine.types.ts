@@ -189,6 +189,7 @@ export interface BatchGenerateFailure {
 
 export interface BatchGenerateTradePlanResponse {
   count: number;
+  processedCount?: number;
   generatedCount: number;
   failedCount: number;
   candidateCount: number;
@@ -216,6 +217,7 @@ export interface TradePlanFunnelQuery {
   from?: string;
   to?: string;
   backtestTimeframe?: string;
+  includeLegacy?: boolean;
 }
 
 export interface CountItem {
@@ -236,6 +238,7 @@ export interface TradePlanListQuery {
   strategyRating?: string;
   readinessLabel?: string;
   portfolioId?: string;
+  includeLegacy?: boolean;
   limit?: number;
   offset?: number;
   sortBy?: string;
@@ -243,6 +246,7 @@ export interface TradePlanListQuery {
 }
 
 export interface TradePlanModelRules {
+  defaultCapitalBase: number;
   defaultRiskPercent: number;
   minRiskPercent: number;
   maxRiskPercent: number;

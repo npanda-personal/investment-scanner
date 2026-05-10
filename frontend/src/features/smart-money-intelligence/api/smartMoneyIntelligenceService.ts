@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { PaginatedSmartMoneyListResponse, SectorSmartMoneySummary, SmartMoneyHealth, SmartMoneyRange, SmartMoneyStockSummary } from '../types';
+import type { PaginatedSmartMoneyListResponse, SectorSmartMoneySummary, SmartMoneyHealth, SmartMoneyRange, SmartMoneyRunResponse, SmartMoneyStockSummary } from '../types';
 
 const API_BASE = '/api/v1/smart-money';
 
@@ -18,8 +18,13 @@ export async function fetchSmartMoneyDistribution(limit = 10, offset = 0, range:
   return response.data;
 }
 
-export async function fetchSmartMoneySectors(range: SmartMoneyRange = '3M', region?: string): Promise<SectorSmartMoneySummary[]> {
-  const response = await axios.get<SectorSmartMoneySummary[]>(`${API_BASE}/sectors`, { params: { range, region } });
+export async function fetchSmartMoneySectors(range: SmartMoneyRange = '3M', region?: string, assetType?: string): Promise<SectorSmartMoneySummary[]> {
+  const response = await axios.get<SectorSmartMoneySummary[]>(`${API_BASE}/sectors`, { params: { range, region, assetType } });
+  return response.data;
+}
+
+export async function runSmartMoneySnapshots(params: { batchSize?: number; offset?: number; region?: string; assetType?: string } = {}): Promise<SmartMoneyRunResponse> {
+  const response = await axios.post<SmartMoneyRunResponse>(`${API_BASE}/run`, params);
   return response.data;
 }
 

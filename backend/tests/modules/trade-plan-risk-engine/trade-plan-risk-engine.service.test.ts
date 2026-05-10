@@ -84,6 +84,7 @@ describe('TradePlanRiskEngineService', () => {
   describe('getModelRules', () => {
     it('should return default model thresholds', () => {
       const rules = service.getModelRules();
+      expect(rules.defaultCapitalBase).toBe(100000);
       expect(rules.defaultRiskPercent).toBe(1);
       expect(rules.defaultRewardRiskTarget).toBe(2);
       expect(rules.maxSinglePositionExposurePercent).toBe(10);
@@ -214,6 +215,50 @@ describe('TradePlanRiskEngineService', () => {
       expect(plan.positionSizing?.maxRiskAmount).toBe(100);
     });
 
+    it('uses the default planning capital base for batch-style generation without portfolio input', async () => {
+      mockStrategyService.latestForInstrument.mockResolvedValue({
+        ...defaultDecision,
+        action: 'CONSIDER_ENTRY',
+        decisionScore: 91,
+        confidence: 'HIGH',
+        marketGateStatus: 'OPEN',
+        marketCondition: 'HEALTHY',
+        frameworkBacked: true,
+        strategyVersion: undefined,
+        strategyRating: { ratingGrade: 'GOOD', readinessLabel: 'PAPER_TEST_CANDIDATE' },
+        readinessLabel: 'PAPER_TEST_CANDIDATE',
+        reasons: ['Framework-backed trend proof passed.'],
+        blockers: [],
+        warnings: [],
+        dataGaps: [],
+        generatedAt: '2026-05-07T01:00:00.000Z',
+      } as any);
+      mockMarketDataService.latestPriceByInstrumentId.mockResolvedValue({
+        symbol: 'TEST',
+        latest: { close: 100, date: '2026-05-06T00:00:00.000Z', source: 'database', data_status: 'COMPLETE' },
+        source: 'database',
+        data_status: 'COMPLETE',
+      } as any);
+      const prices = Array(60).fill(null).map((_, i) => ({
+        close: 100,
+        low: i === 0 ? 90 : 95,
+        high: 105,
+        date: `2026-04-${String((i % 28) + 1).padStart(2, '0')}T00:00:00.000Z`,
+      }));
+      mockMarketDataService.listPricesByInstrumentId.mockResolvedValue({ symbol: 'TEST', data_status: 'COMPLETE', prices } as any);
+
+      const plan = await service.generatePlan({ instrumentId: 'INST-1', symbol: 'TEST', region: 'IN', assetType: 'STOCK', backtestTimeframe: '3Y' });
+
+      expect(plan.positionSizing?.capitalBase).toBe(100000);
+      expect(plan.positionSizing?.suggestedQuantity).toBeGreaterThan(0);
+      expect(plan.positionSizing?.notes).toContain('Sizing uses the default planning capital base because no portfolio or capital base was supplied.');
+      expect(plan.dataGaps).not.toContain('capital_base_for_sizing');
+      expect(plan.strategyProofSnapshot?.strategyVersion).toBe('1.0.0');
+      expect(plan.paperReadinessBlockers).not.toContain('Position sizing is missing.');
+      expect(plan.paperReadinessBlockers).not.toContain('Strategy version is missing.');
+      expect(plan.paperReadinessStatus).toBe('READY_FOR_PAPER_REVIEW');
+    });
+
     it('persists scope and proof snapshots on generated plans', async () => {
       mockStrategyService.latestForInstrument.mockResolvedValue({
         ...defaultDecision,
@@ -262,6 +307,43 @@ describe('TradePlanRiskEngineService', () => {
         dataQualitySnapshot: expect.any(Object),
         paperReadinessStatus: expect.any(String),
       }));
+    });
+
+    it('persists requested proof timeframe even when no backtest summary exists yet', async () => {
+      (service as any).strategyFrameworkService.performance.mockResolvedValue([]);
+      mockStrategyService.latestForInstrument.mockResolvedValue({
+        ...defaultDecision,
+        action: 'CONSIDER_ENTRY',
+        decisionScore: 91,
+        confidence: 'HIGH',
+        marketGate: 'OPEN',
+        marketCondition: 'HEALTHY',
+        frameworkBacked: true,
+        strategyVersion: '1.2.0',
+        strategyRating: { ratingGrade: 'GOOD', readinessLabel: 'PAPER_TEST_CANDIDATE' },
+        readinessLabel: 'PAPER_TEST_CANDIDATE',
+        reasons: ['Framework proof passed.'],
+        blockers: [],
+        warnings: [],
+        dataGaps: [],
+        generatedAt: '2026-05-07T01:00:00.000Z',
+      } as any);
+      mockMarketDataService.latestPriceByInstrumentId.mockResolvedValue({
+        symbol: 'TEST',
+        latest: { close: 100, date: '2026-05-06T00:00:00.000Z', source: 'database', data_status: 'COMPLETE' },
+        source: 'database',
+        data_status: 'COMPLETE',
+      } as any);
+      const prices = Array(60).fill(null).map((_, i) => ({ close: 100, low: 90 + i * 0.1, high: 101, date: `2026-04-${String((i % 28) + 1).padStart(2, '0')}T00:00:00.000Z` }));
+      mockMarketDataService.listPricesByInstrumentId.mockResolvedValue({ symbol: 'TEST', data_status: 'COMPLETE', prices } as any);
+
+      const plan = await service.generatePlan({ instrumentId: 'INST-1', symbol: 'TEST', region: 'IN', assetType: 'STOCK', backtestTimeframe: '3Y' });
+
+      expect(plan.backtestTimeframe).toBe('3Y');
+      expect(plan.strategyProofSnapshot?.backtestTimeframe).toBe('3Y');
+      expect(plan.strategyProofSnapshot?.proofStatus).toBe('MISSING');
+      expect(plan.paperReadinessBlockers).toContain('Backtest summary is missing for the selected scope/timeframe.');
+      expect(plan.paperReadinessStatus).toBe('INSUFFICIENT_DATA');
     });
 
     it('adds a warning for portfolio concentration', async () => {
@@ -370,10 +452,18 @@ describe('TradePlanRiskEngineService', () => {
       expect(res.count).toBe(2);
       expect(res.plans.length).toBe(2);
       expect(res.candidateCount).toBe(2);
+      expect(res.processedCount).toBe(2);
       expect(res.totalCount).toBe(2);
       expect(res.hasMore).toBe(false);
       expect(res.failures).toEqual([]);
       expect(generateSpy).toHaveBeenCalledTimes(2);
+      expect(mockStrategyService.candidates).toHaveBeenCalledWith(expect.objectContaining({
+        limit: 25,
+        offset: 0,
+        region: 'IN',
+        assetType: undefined,
+        decision: 'TRADE_CANDIDATE',
+      }));
     });
 
     it('returns failure details when a candidate cannot be generated', async () => {
@@ -452,6 +542,10 @@ describe('TradePlanRiskEngineService', () => {
         ],
         total: 3,
       } as any);
+      mockStrategyService.candidates.mockResolvedValue({
+        results: [{ id: 'dec-1', instrumentId: 'INST-1', symbol: 'TEST1', strategy: 'TREND_MOMENTUM', decision: 'TRADE_CANDIDATE', frameworkBacked: true }],
+        total: 1,
+      } as any);
       (mockRepository as any).funnelPlans.mockResolvedValue([
         {
           strategy: 'TREND_MOMENTUM',
@@ -471,8 +565,12 @@ describe('TradePlanRiskEngineService', () => {
 
       expect(mockSignalService.funnelDiagnostics).toHaveBeenCalledWith(expect.objectContaining({ region: 'IN', assetType: 'STOCK' }));
       expect(mockStrategyService.funnelDiagnostics).toHaveBeenCalledWith(expect.objectContaining({ region: 'IN', assetType: 'STOCK' }));
+      expect(mockStrategyService.candidates).toHaveBeenCalledWith(expect.objectContaining({ region: 'IN', assetType: 'STOCK', decision: 'TRADE_CANDIDATE', limit: 1, offset: 0 }));
       expect(result.rawSignals.bullish).toBe(2);
       expect(result.strategyDecisions.tradeCandidates).toBe(1);
+      expect(result.strategyMatches.totalWithMatch).toBe(3);
+      expect(result.strategyDecisions.frameworkBacked).toBe(3);
+      expect(result.strategyDecisions.notFrameworkBacked).toBe(0);
       expect(result.tradePlanCandidateDiscovery.eligibleForPlanGeneration).toBe(1);
       expect(result.tradePlanCandidateDiscovery.skipReasonCounts).toEqual(expect.objectContaining({
         'WATCH decisions are not batch-generated unless explicitly allowed.': 1,
@@ -488,6 +586,59 @@ describe('TradePlanRiskEngineService', () => {
       expect(result.proof.byBacktestTimeframe).toEqual([{ reason: '10Y', count: 1 }]);
       expect(result.dataQuality.unknownLiquidityCount).toBe(1);
       expect(result.recommendations).toContain('Current plans use 10Y proof. Consider regenerating with 3Y or 5Y if 10Y history is insufficient.');
+    });
+
+    it('reports exact trade candidate totals instead of bounded diagnostics sample counts', async () => {
+      mockSignalService.funnelDiagnostics.mockResolvedValue({
+        total: 100,
+        bullish: 20,
+        bearish: 5,
+        neutral: 75,
+        byDirection: { BULLISH: 20, BEARISH: 5, NEUTRAL: 75 },
+      } as any);
+      mockStrategyService.funnelDiagnostics.mockResolvedValue({
+        results: [
+          { id: 'dec-1', instrumentId: 'INST-1', symbol: 'TEST1', strategy: 'TREND_MOMENTUM', decision: 'TRADE_CANDIDATE', frameworkBacked: true },
+          { id: 'dec-2', instrumentId: 'INST-2', symbol: 'TEST2', strategy: 'TREND_MOMENTUM', decision: 'WATCH', frameworkBacked: true },
+        ],
+        total: 5000,
+      } as any);
+      mockStrategyService.candidates.mockResolvedValue({
+        results: [{ id: 'dec-1', instrumentId: 'INST-1', symbol: 'TEST1', strategy: 'TREND_MOMENTUM', decision: 'TRADE_CANDIDATE', frameworkBacked: true }],
+        total: 87,
+      } as any);
+      (mockRepository as any).funnelPlans.mockResolvedValue([]);
+
+      const result = await service.funnelDiagnostics({ region: 'IN', assetType: 'STOCK' });
+
+      expect(result.strategyDecisions.tradeCandidates).toBe(87);
+      expect(result.tradePlanCandidateDiscovery.eligibleForPlanGeneration).toBe(87);
+    });
+
+    it('reports non-framework-backed decisions only when legacy diagnostics are explicitly included', async () => {
+      mockSignalService.funnelDiagnostics.mockResolvedValue({
+        total: 4,
+        bullish: 4,
+        bearish: 0,
+        neutral: 0,
+        byDirection: { BULLISH: 4 },
+      } as any);
+      mockStrategyService.funnelDiagnostics.mockResolvedValue({
+        results: [
+          { id: 'dec-1', instrumentId: 'INST-1', symbol: 'TEST1', strategy: 'TREND_MOMENTUM', decision: 'TRADE_CANDIDATE', frameworkBacked: true },
+          { id: 'dec-2', instrumentId: 'INST-2', symbol: 'TEST2', strategy: 'LEGACY_STRATEGY', decision: 'TRADE_CANDIDATE', frameworkBacked: false },
+        ],
+        total: 4,
+      } as any);
+      mockStrategyService.candidates.mockResolvedValue({ results: [], total: 0 } as any);
+      (mockRepository as any).funnelPlans.mockResolvedValue([]);
+
+      const result = await service.funnelDiagnostics({ region: 'IN', assetType: 'STOCK', includeLegacy: true } as any);
+
+      expect(mockStrategyService.funnelDiagnostics).toHaveBeenCalledWith(expect.objectContaining({ includeLegacy: true }));
+      expect(result.strategyDecisions.frameworkBacked).toBe(1);
+      expect(result.strategyDecisions.notFrameworkBacked).toBe(3);
+      expect(result.strategyMatches.totalWithMatch).toBe(1);
     });
   });
 });

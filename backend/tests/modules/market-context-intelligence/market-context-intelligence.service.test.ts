@@ -84,4 +84,58 @@ describe('MarketContextIntelligenceService', () => {
     expect(summary).toHaveProperty('breadth');
     expect(summary.explanation.length).toBeGreaterThan(0);
   });
+
+  it('persists generated snapshots using the requested region', async () => {
+    const marketDataService = {
+      listInstruments: jest.fn().mockResolvedValue({ instruments: [{ id: 'stock-1', symbol: 'AAA', sector: 'Technology', country: 'India' }] }),
+      listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: instrument().prices.map((close: number) => ({ adjusted_close: close })) }),
+    };
+    const signalService = { topSignals: jest.fn().mockResolvedValue({ signals: [{ instrument_id: 'stock-1', direction: 'BULLISH', score: 80 }] }) };
+    const repository = {
+      saveSnapshot: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new MarketContextIntelligenceService(repository as any, marketDataService as any, signalService as any);
+
+    await service.run('IN');
+
+    expect(marketDataService.listInstruments).toHaveBeenCalledWith({ page: 1, pageSize: 500, region: 'IN' });
+    expect(signalService.topSignals).toHaveBeenCalledWith({ limit: 100, region: 'IN' });
+    expect(repository.saveSnapshot).toHaveBeenCalledWith(expect.objectContaining({
+      regime: expect.any(Object),
+      breadth: expect.any(Object),
+    }), 'IN');
+  });
+
+  it('summary loads the requested region and re-reads that region after generation', async () => {
+    const summary = {
+      regime: { regime: 'RISK_ON', score: 80, explanation: '', dataStatus: 'COMPLETE', updatedAt: '' },
+      topSectors: [],
+      weakSectors: [],
+      breadth: { percentAboveSma50: 0.8, percentAboveSma200: 0.8, advanceDeclineRatio: 1.5, newHigh52WeekCount: 10, newLow52WeekCount: 2, bullishSignalCount: 10, bearishSignalCount: 2, instrumentCount: 100, dataStatus: 'COMPLETE' },
+      countryStrength: [],
+      macro: { macroStatus: 'UNKNOWN', dataStatus: 'MISSING', explanation: 'Macro providers are not configured yet.', interestRateProxy: null, inflationProxy: null, usdStrengthProxy: null, commodityProxy: null },
+      explanation: ['Test'],
+      updatedAt: '2026-01-01',
+      dataStatus: 'COMPLETE'
+    };
+    const repository = {
+      latestSnapshot: jest.fn()
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(summary),
+      saveSnapshot: jest.fn().mockResolvedValue(undefined),
+    };
+    const marketDataService = {
+      listInstruments: jest.fn().mockResolvedValue({ instruments: [{ id: 'stock-1', symbol: 'AAA', sector: 'Technology', country: 'India' }] }),
+      listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: instrument().prices.map((close: number) => ({ adjusted_close: close })) }),
+    };
+    const signalService = { topSignals: jest.fn().mockResolvedValue({ signals: [] }) };
+    const service = new MarketContextIntelligenceService(repository as any, marketDataService as any, signalService as any);
+
+    const result = await service.summary({ region: 'IN' });
+
+    expect(repository.latestSnapshot).toHaveBeenNthCalledWith(1, 'IN');
+    expect(repository.latestSnapshot).toHaveBeenNthCalledWith(2, 'IN');
+    expect(repository.saveSnapshot).toHaveBeenCalledWith(expect.any(Object), 'IN');
+    expect(result).toBe(summary);
+  });
 });

@@ -3,7 +3,7 @@ import type { StrategyBacktestResponse, StrategyDefinition, StrategyEvaluateResp
 
 const API_BASE = '/api/v1/strategies';
 
-export async function fetchStrategies(params: { region?: string; assetType?: string; status?: string } = {}): Promise<StrategyDefinition[]> {
+export async function fetchStrategies(params: { region?: string; assetType?: string; status?: string; category?: string } = {}): Promise<StrategyDefinition[]> {
   const response = await axios.get<StrategyDefinition[]>(API_BASE, { params });
   return response.data;
 }

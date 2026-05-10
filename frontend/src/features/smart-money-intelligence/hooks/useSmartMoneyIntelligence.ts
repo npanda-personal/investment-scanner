@@ -5,8 +5,9 @@ import {
   fetchSmartMoneySectors,
   fetchSmartMoneyStock,
   fetchSmartMoneyTop,
+  runSmartMoneySnapshots,
 } from '../api/smartMoneyIntelligenceService';
-import type { SectorSmartMoneySummary, SmartMoneyHealth, SmartMoneyRange, SmartMoneyStockSummary } from '../types';
+import type { SectorSmartMoneySummary, SmartMoneyHealth, SmartMoneyRange, SmartMoneyRunResponse, SmartMoneyStockSummary } from '../types';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 
 export function useSmartMoneyIntelligence() {
@@ -33,6 +34,8 @@ export function useSmartMoneyIntelligence() {
   const [topLoading, setTopLoading] = useState(false);
   const [distLoading, setDistLoading] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [refreshingSnapshots, setRefreshingSnapshots] = useState(false);
+  const [refreshProgress, setRefreshProgress] = useState<SmartMoneyRunResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Initial load for health and sectors
@@ -42,7 +45,7 @@ export function useSmartMoneyIntelligence() {
     try {
       const [healthData, sectorData] = await Promise.all([
         fetchSmartMoneyHealth(),
-        fetchSmartMoneySectors(range, scope.region),
+        fetchSmartMoneySectors(range, scope.region, scope.assetType),
       ]);
       setHealth(healthData);
       setSectors(sectorData);
@@ -51,7 +54,7 @@ export function useSmartMoneyIntelligence() {
     } finally {
       setLoading(false);
     }
-  }, [range, scope.region]);
+  }, [range, scope.region, scope.assetType]);
 
   const loadTop = useCallback(async () => {
     setTopLoading(true);
@@ -85,10 +88,10 @@ export function useSmartMoneyIntelligence() {
   useEffect(() => { void loadDist(); }, [loadDist]);
 
   useEffect(() => {
-    // Reset pagination on region change
     setTopPage(0);
     setDistPage(0);
-  }, [scope.region, scope.assetType]);
+    setSelectedStock(null);
+  }, [range, sector, scope.region, scope.assetType]);
 
   const loadStock = async (instrumentId: string) => {
     setDetailLoading(true);
@@ -99,6 +102,27 @@ export function useSmartMoneyIntelligence() {
       setError(err.response?.data?.error || err.message || 'Failed to load stock smart money detail');
     } finally {
       setDetailLoading(false);
+    }
+  };
+
+  const refreshSnapshots = async () => {
+    setRefreshingSnapshots(true);
+    setRefreshProgress(null);
+    setError(null);
+    try {
+      const batchSize = 100;
+      let offset = 0;
+      let lastResult: SmartMoneyRunResponse | null = null;
+      do {
+        lastResult = await runSmartMoneySnapshots({ batchSize, offset, region: scope.region, assetType: scope.assetType });
+        setRefreshProgress(lastResult);
+        offset = lastResult.nextOffset ?? offset + (lastResult.processedCount || 0);
+      } while (lastResult.hasMore && lastResult.nextOffset !== null);
+      await Promise.all([loadInitial(), loadTop(), loadDist()]);
+    } catch (err: any) {
+      setError(err.response?.data?.error || err.message || 'Failed to refresh smart money snapshots');
+    } finally {
+      setRefreshingSnapshots(false);
     }
   };
 
@@ -122,10 +146,13 @@ export function useSmartMoneyIntelligence() {
     sectors,
     selectedStock,
     loading,
+    refreshingSnapshots,
+    refreshProgress,
     detailLoading,
     error,
     setError,
     loadInitial,
     loadStock,
+    refreshSnapshots,
   };
 }

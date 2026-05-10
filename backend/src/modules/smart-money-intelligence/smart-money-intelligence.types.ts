@@ -83,3 +83,25 @@ export interface SmartMoneyListQuery {
   assetType?: string;
   range: SmartMoneyRange;
 }
+
+export interface SmartMoneyRunResponse {
+  generated: number;
+  skipped: number;
+  errors: string[];
+  byRange: Record<SmartMoneyRange, { generated: number; skipped: number }>;
+  processedCount: number;
+  totalCount: number;
+  batchSize: number;
+  offset: number;
+  nextOffset: number | null;
+  hasMore: boolean;
+  generatedCount: number;
+  skippedCount: number;
+  failedCount: number;
+  warnings: string[];
+  durationMs: number;
+  scope: {
+    region: string;
+    assetType: string;
+  };
+}
