@@ -6,8 +6,10 @@ import {
   fetchSnapshotCoverage,
 } from '../api/historicalContextSnapshotsService';
 import type { CountryContextSnapshot, MarketContextSnapshot, SectorContextSnapshot, SnapshotCoverage } from '../types';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 
 export function useHistoricalContextSnapshots() {
+  const { scope } = useMarketScope();
   const [coverage, setCoverage] = useState<SnapshotCoverage | null>(null);
   const [market, setMarket] = useState<MarketContextSnapshot[]>([]);
   const [sectors, setSectors] = useState<SectorContextSnapshot[]>([]);
@@ -20,10 +22,10 @@ export function useHistoricalContextSnapshots() {
     setError(null);
     try {
       const [nextCoverage, nextMarket, nextSectors, nextCountries] = await Promise.all([
-        fetchSnapshotCoverage(),
-        fetchMarketSnapshots(),
-        fetchSectorSnapshots(),
-        fetchCountrySnapshots(),
+        fetchSnapshotCoverage({ region: scope.region, assetType: scope.assetType }),
+        fetchMarketSnapshots({ region: scope.region, assetType: scope.assetType }),
+        fetchSectorSnapshots({ region: scope.region, assetType: scope.assetType }),
+        fetchCountrySnapshots({ region: scope.region, assetType: scope.assetType }),
       ]);
       setCoverage(nextCoverage);
       setMarket(nextMarket);
@@ -34,7 +36,7 @@ export function useHistoricalContextSnapshots() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [scope.region, scope.assetType]);
 
   useEffect(() => {
     void reload();

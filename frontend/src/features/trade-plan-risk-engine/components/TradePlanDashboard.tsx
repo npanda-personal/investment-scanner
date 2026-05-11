@@ -153,7 +153,7 @@ export const TradePlanDashboard: React.FC = () => {
 
       await Promise.all(Array.from({ length: Math.min(workerCount, offsets.length) }, () => runWorker()));
       const blockerText = totals.topBlockers.slice(0, 3).map((item) => `${item.count} ${item.reason}`).join(', ') || 'none';
-      setBatchSummary(`Batch complete: ${totals.generated} plans generated from ${totals.eligible} eligible Strategy Decision candidates (${totals.discovered} discovered, ${totals.skipped} skipped). ${totals.paperReady} are paper-ready. Proof timeframe: ${generateTimeframe}. Top blockers: ${blockerText}. Failed: ${totals.failed}.`);
+      setBatchSummary(`Batch complete: ${totals.generated} plans generated from ${totals.eligible} eligible Strategy Decision review candidates (${totals.discovered} discovered, ${totals.skipped} skipped). ${totals.paperReady} are paper-ready. Proof timeframe: ${generateTimeframe}. Top blockers: ${blockerText}. Failed: ${totals.failed}.`);
       setPage(0);
       await fetchPlans();
       await fetchFunnel();
@@ -176,7 +176,7 @@ export const TradePlanDashboard: React.FC = () => {
   const metricCards = funnel ? [
     { label: 'Raw Bullish Signals', value: funnel.rawSignals.bullish },
     { label: 'Strategy Decisions', value: funnel.strategyDecisions.total },
-    { label: 'Eligible Plan Candidates', value: funnel.tradePlanCandidateDiscovery.eligibleForPlanGeneration },
+    { label: 'Eligible Review Candidates', value: funnel.tradePlanCandidateDiscovery.eligibleForPlanGeneration },
     { label: 'Generated Plans', value: funnel.generatedPlans.total },
     { label: 'Paper Ready', value: funnel.paperReadiness.readyForPaperReview },
     { label: 'Blocked / Watch / Insufficient', value: funnel.paperReadiness.blocked + funnel.paperReadiness.watchOnly + funnel.paperReadiness.insufficientData },
@@ -205,8 +205,8 @@ export const TradePlanDashboard: React.FC = () => {
           <Stack spacing={1}>
             <Typography variant="body2">
               {batchProgress.total > 0
-                ? `Generating plans: ${Math.min(batchProgress.processed, batchProgress.total)} / ${batchProgress.total} candidates processed across ${batchProgress.requests} batch${batchProgress.requests === 1 ? '' : 'es'}. Generated ${batchProgress.generated}, failed ${batchProgress.failed}. Proof timeframe: ${batchProgress.timeframe}.`
-                : `Generating plans: discovering eligible Strategy Decision candidates. Proof timeframe: ${batchProgress.timeframe}.`}
+                ? `Generating plans: ${Math.min(batchProgress.processed, batchProgress.total)} / ${batchProgress.total} review candidates processed across ${batchProgress.requests} batch${batchProgress.requests === 1 ? '' : 'es'}. Generated ${batchProgress.generated}, failed ${batchProgress.failed}. Proof timeframe: ${batchProgress.timeframe}.`
+                : `Generating plans: discovering eligible Strategy Decision review candidates. Proof timeframe: ${batchProgress.timeframe}.`}
             </Typography>
             <LinearProgress
               variant={batchProgress.total > 0 ? 'determinate' : 'indeterminate'}
@@ -262,7 +262,7 @@ export const TradePlanDashboard: React.FC = () => {
                     <ListItemText primary={`${item.count} ${item.reason}`} />
                   </ListItem>
                 ))}
-                {funnel.tradePlanCandidateDiscovery.skipReasons.length === 0 && <ListItem disablePadding><ListItemText primary="No skipped candidates in the current filter." /></ListItem>}
+                {funnel.tradePlanCandidateDiscovery.skipReasons.length === 0 && <ListItem disablePadding><ListItemText primary="No skipped review candidates in the current filter." /></ListItem>}
               </List>
             </Grid>
             <Grid item xs={12} md={4}>

@@ -11,6 +11,15 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 const fmtPercent = (value: number | null | undefined) => value === null || value === undefined ? 'N/A' : `${(value * 100).toFixed(1)}%`;
 const fmtNumber = (value: number | null | undefined) => value === null || value === undefined ? 'N/A' : value.toFixed(2);
 const fmtDate = (value: string | null | undefined) => value ? new Date(value).toLocaleString() : 'N/A';
+const currencyCode = (plan: TradePlanResultDto | null) => plan?.marketDataSnapshot?.currency || (plan?.region === 'IN' ? 'INR' : 'USD');
+const fmtMoney = (plan: TradePlanResultDto | null, value: number | null | undefined) =>
+  value === null || value === undefined ? 'N/A' : `${currencyCode(plan)} ${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const excludeRepeatedMessages = (items: string[], seen: Set<string>) =>
+  items.filter((item) => {
+    if (seen.has(item)) return false;
+    seen.add(item);
+    return true;
+  });
 
 export const TradePlanDetail: React.FC = () => {
   const { instrumentId } = useParams<{ instrumentId: string }>();
@@ -74,6 +83,16 @@ export const TradePlanDetail: React.FC = () => {
      );
   }
 
+  const hasActiveReadinessBlockers = (plan.paperReadinessBlockers?.length || 0) > 0 || plan.blockers.length > 0 || plan.planStatus === 'BLOCKED';
+  const showPaperReadinessReasons = plan.paperReadinessStatus === 'READY_FOR_PAPER_REVIEW'
+    && !hasActiveReadinessBlockers
+    && (plan.paperReadinessReasons?.length || 0) > 0;
+  const displayedWarningMessages = new Set<string>();
+  const displayedPaperReadinessBlockers = excludeRepeatedMessages(plan.paperReadinessBlockers || [], displayedWarningMessages);
+  const displayedPlanBlockers = excludeRepeatedMessages(plan.blockers, displayedWarningMessages);
+  const displayedWarnings = excludeRepeatedMessages(plan.warnings, displayedWarningMessages);
+  const displayedDataGaps = excludeRepeatedMessages(plan.dataGaps, displayedWarningMessages);
+
   return (
     <Box>
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -105,7 +124,7 @@ export const TradePlanDetail: React.FC = () => {
             <Box sx={{ mb: 2 }}>
                 <Typography color="text.secondary" variant="body2">Entry Zone</Typography>
                 <Typography variant="h6">
-                   {plan.entryZone ? `${plan.entryZone.preferredEntryMin.toFixed(2)} - ${plan.entryZone.preferredEntryMax.toFixed(2)}` : 'N/A'}
+                   {plan.entryZone ? `${fmtMoney(plan, plan.entryZone.preferredEntryMin)} - ${fmtMoney(plan, plan.entryZone.preferredEntryMax)}` : 'N/A'}
                    {plan.entryZone?.quality && <Typography component="span" variant="caption" sx={{ ml: 1, px: 1, py: 0.5, bgcolor: 'action.hover', borderRadius: 1 }}>{plan.entryZone.quality}</Typography>}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">{plan.entryZone?.rationale}</Typography>
@@ -114,7 +133,7 @@ export const TradePlanDetail: React.FC = () => {
             <Box sx={{ mb: 2 }}>
                 <Typography color="text.secondary" variant="body2">Stop Loss</Typography>
                 <Typography variant="h6" color="error.main">
-                   {plan.stopLoss ? plan.stopLoss.price.toFixed(2) : 'N/A'}
+                   {plan.stopLoss ? fmtMoney(plan, plan.stopLoss.price) : 'N/A'}
                    {plan.stopLoss?.quality && <Typography component="span" variant="caption" sx={{ ml: 1, px: 1, py: 0.5, bgcolor: 'action.hover', borderRadius: 1 }}>{plan.stopLoss.quality}</Typography>}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">{plan.stopLoss?.rationale}</Typography>
@@ -123,7 +142,7 @@ export const TradePlanDetail: React.FC = () => {
             <Box sx={{ mb: 2 }}>
                 <Typography color="text.secondary" variant="body2">Target</Typography>
                 <Typography variant="h6" color="success.main">
-                   {plan.target ? plan.target.price.toFixed(2) : 'N/A'}
+                   {plan.target ? fmtMoney(plan, plan.target.price) : 'N/A'}
                    {plan.target?.quality && <Typography component="span" variant="caption" sx={{ ml: 1, px: 1, py: 0.5, bgcolor: 'action.hover', borderRadius: 1 }}>{plan.target.quality}</Typography>}
                 </Typography>
                 {plan.target?.method === 'REWARD_RISK_MULTIPLE' && <Chip size="small" label="Default 2R target" sx={{ mb: 0.5 }} />}
@@ -146,9 +165,9 @@ export const TradePlanDetail: React.FC = () => {
             {plan.positionSizing ? (
                 <>
                   <Typography variant="body1">Review Quantity: <strong>{plan.positionSizing.suggestedQuantity} shares</strong></Typography>
-                  <Typography variant="body1">Estimated Value: ${plan.positionSizing.estimatedPositionValue.toFixed(2)}</Typography>
-                  <Typography variant="body1">Max Risk Amount: ${plan.positionSizing.maxRiskAmount.toFixed(2)}</Typography>
-                  <Typography variant="body1" color="text.secondary">Based on capital base of ${plan.positionSizing.capitalBase.toFixed(2)} and {plan.positionSizing.riskPercent}% risk.</Typography>
+                  <Typography variant="body1">Estimated Value: {fmtMoney(plan, plan.positionSizing.estimatedPositionValue)}</Typography>
+                  <Typography variant="body1">Max Risk Amount: {fmtMoney(plan, plan.positionSizing.maxRiskAmount)}</Typography>
+                  <Typography variant="body1" color="text.secondary">Based on capital base of {fmtMoney(plan, plan.positionSizing.capitalBase)} and {plan.positionSizing.riskPercent}% risk.</Typography>
                   
                   {plan.portfolioImpact ? (
                     <Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
@@ -181,31 +200,31 @@ export const TradePlanDetail: React.FC = () => {
           </Paper>
         </Grid>
 
-        {((plan.paperReadinessBlockers?.length || 0) > 0 || plan.warnings.length > 0 || plan.blockers.length > 0 || plan.dataGaps.length > 0) && (
+        {(displayedPaperReadinessBlockers.length > 0 || displayedWarnings.length > 0 || displayedPlanBlockers.length > 0 || displayedDataGaps.length > 0) && (
             <Grid item xs={12}>
                 <Paper sx={{ p: 2 }}>
                     <Typography variant="h6" color="error.main" gutterBottom>Warnings, Blockers & Gaps</Typography>
                     <Divider sx={{ mb: 2 }} />
                     <List dense>
-                    {plan.paperReadinessBlockers?.map((b, i) => (
+                    {displayedPaperReadinessBlockers.map((b, i) => (
                         <ListItem key={`prb-${i}`} disablePadding>
                             <ListItemIcon sx={{ minWidth: 32 }}><ErrorOutlineIcon fontSize="small" color="error" /></ListItemIcon>
                             <ListItemText primary={`Paper readiness: ${b}`} primaryTypographyProps={{ color: 'error.main' }} />
                         </ListItem>
                     ))}
-                    {plan.blockers.map((b, i) => (
+                    {displayedPlanBlockers.map((b, i) => (
                         <ListItem key={`b-${i}`} disablePadding>
                             <ListItemIcon sx={{ minWidth: 32 }}><ErrorOutlineIcon fontSize="small" color="error" /></ListItemIcon>
                             <ListItemText primary={b} primaryTypographyProps={{ color: 'error.main' }} />
                         </ListItem>
                     ))}
-                    {plan.warnings.map((w, i) => (
+                    {displayedWarnings.map((w, i) => (
                         <ListItem key={`w-${i}`} disablePadding>
                             <ListItemIcon sx={{ minWidth: 32 }}><WarningAmberIcon fontSize="small" color="warning" /></ListItemIcon>
                             <ListItemText primary={w} />
                         </ListItem>
                     ))}
-                    {plan.dataGaps.map((g, i) => (
+                    {displayedDataGaps.map((g, i) => (
                         <ListItem key={`g-${i}`} disablePadding>
                             <ListItemIcon sx={{ minWidth: 32 }}><WarningAmberIcon fontSize="small" color="disabled" /></ListItemIcon>
                             <ListItemText primary={`Missing data: ${g}`} primaryTypographyProps={{ color: 'text.secondary' }} />
@@ -253,13 +272,13 @@ export const TradePlanDetail: React.FC = () => {
               </Grid>
               <Grid item xs={12} md={3}>
                 <Typography variant="subtitle2">Market & Quality</Typography>
-                <Typography variant="body2">Latest Price: {plan.marketDataSnapshot?.latestPrice ?? plan.latestPrice ?? 'N/A'}</Typography>
+                <Typography variant="body2">Latest Price: {fmtMoney(plan, plan.marketDataSnapshot?.latestPrice ?? plan.latestPrice)}</Typography>
                 <Typography variant="body2">Price Time: {fmtDate(plan.marketDataSnapshot?.latestPriceTimestamp || plan.latestPriceTimestamp)}</Typography>
                 <Typography variant="body2">Coverage: {plan.dataQualitySnapshot?.coverageStatus || 'MISSING'}</Typography>
                 <Typography variant="body2">Liquidity: {plan.dataQualitySnapshot?.liquidityStatus || 'MISSING'}</Typography>
               </Grid>
             </Grid>
-            {(plan.paperReadinessReasons?.length || 0) > 0 && (
+            {showPaperReadinessReasons && (
               <Box sx={{ mt: 2 }}>
                 <Typography variant="subtitle2">Paper Readiness Reasons</Typography>
                 <Stack direction="row" spacing={1} flexWrap="wrap">

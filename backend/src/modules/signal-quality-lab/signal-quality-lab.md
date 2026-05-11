@@ -237,6 +237,7 @@ The dashboard links to `/signals/calibration`, where Signal Calibration Engine a
 
 - Dashboard API calls are bounded by a conservative default `limit` so the page can load quickly on local datasets.
 - Dashboard and grouped analytics intentionally expand the analysis window to a bounded 5,000 signals so quality metrics do not only reflect the most recent same-day signal page.
+- The frontend dashboard request uses a 20-second timeout and aborts stale requests when horizon, filters, or market scope changes. Direct entry and hard reload render the page shell immediately, then settle into measured content, a domain-specific insufficient-data state, or a Signal Quality-specific retryable error.
 - Recalculation is never triggered on page load. The frontend runs manual recalculation in batches and refreshes visible quality data after each batch.
 - Instrument history uses a searchable instrument selector rather than raw IDs.
 - Empty states distinguish no raw signal data from insufficient future price data or no data after filters.
@@ -246,6 +247,8 @@ The dashboard links to `/signals/calibration`, where Signal Calibration Engine a
 Regime grouping uses `historical-context-snapshots` when persisted market snapshots are available. Each signal's `generatedAt` date is mapped to the nearest market context snapshot on or before that date within the default snapshot lookup window.
 
 If snapshots are unavailable, the API returns the documented `MISSING_REGIME_CONTEXT` grouping.
+
+Dashboard and regime grouping batch historical regime lookups by unique generated trading date and market scope. If a regime lookup fails, Signal Quality returns partial dashboard diagnostics with a warning and falls back to `MISSING_REGIME_CONTEXT` for that date instead of failing or hanging the whole dashboard.
 
 ## Known Limitations
 
@@ -266,3 +269,4 @@ Run from `backend`:
 Run from `frontend`:
 
 - `npm.cmd run build`
+- `npm.cmd run test:ui -- signal-quality-lab.spec.ts --workers=1`

@@ -101,6 +101,57 @@ describe('signal quality lab service', () => {
     expect(rows[0]).toMatchObject({ group: 'RISK_ON', sampleSize: 1 });
   });
 
+  it('looks up historical regime once per generated date and scope for dashboard loads', async () => {
+    const regimeForDate = jest.fn().mockResolvedValue('RISK_ON');
+    const signals = [
+      baseSignal({ id: 's1', instrument_id: 'stock-1', generated_at: '2026-01-02T09:30:00.000Z' }),
+      baseSignal({ id: 's2', instrument_id: 'stock-2', generated_at: '2026-01-02T15:30:00.000Z' }),
+      baseSignal({ id: 's3', instrument_id: 'stock-3', generated_at: '2026-01-02T20:00:00.000Z' }),
+    ];
+    const service = new SignalQualityLabService(
+      {} as any,
+      {
+        signalHistory: jest.fn().mockResolvedValue(signals),
+        signalHistoryCount: jest.fn().mockResolvedValue(signals.length),
+      } as any,
+      {
+        listForwardPriceWindowsByInstrumentIds: jest.fn().mockImplementation(async (instrumentIds: string[]) => new Map(
+          instrumentIds.map((id) => [id, prices.map((price) => ({ date: price.date, adjusted_close: price.adjustedClose }))])
+        )),
+      } as any,
+      { regimeForDate } as any,
+      { getEvaluationsForInstruments: jest.fn().mockResolvedValue([]) } as any
+    );
+
+    const dashboard = await service.dashboard({ horizon: '5D', limit: 10, minSampleSize: 0, region: 'IN', assetType: 'STOCK' });
+
+    expect(regimeForDate).toHaveBeenCalledTimes(1);
+    expect(regimeForDate).toHaveBeenCalledWith(expect.any(Date), { region: 'IN', assetType: 'STOCK' });
+    expect(dashboard.byRegime[0]).toMatchObject({ group: 'RISK_ON', sampleSize: 3 });
+  });
+
+  it('returns dashboard diagnostics when historical regime lookup fails', async () => {
+    const service = new SignalQualityLabService(
+      {} as any,
+      {
+        signalHistory: jest.fn().mockResolvedValue([baseSignal({ id: 's1' })]),
+        signalHistoryCount: jest.fn().mockResolvedValue(1),
+      } as any,
+      {
+        listPricesByInstrumentId: jest.fn().mockResolvedValue({
+          prices: prices.map((price) => ({ date: price.date, adjusted_close: price.adjustedClose })),
+        }),
+      } as any,
+      { regimeForDate: jest.fn().mockRejectedValue(new Error('snapshot timeout')) } as any,
+      { getEvaluationsForInstruments: jest.fn().mockResolvedValue([]) } as any
+    );
+
+    const dashboard = await service.dashboard({ horizon: '5D', limit: 10, minSampleSize: 0, region: 'IN', assetType: 'STOCK' });
+
+    expect(dashboard.byRegime[0]).toMatchObject({ group: 'MISSING_REGIME_CONTEXT', sampleSize: 1 });
+    expect(dashboard.summary.warnings).toContain('Historical regime lookup failed for 2026-01-02: snapshot timeout');
+  });
+
   it('filters metrics by data quality readiness and groups by data quality', async () => {
     const signals = [baseSignal({ id: 's1', instrument_id: 'ready' }), baseSignal({ id: 's2', instrument_id: 'limited' })];
     const service = new SignalQualityLabService(

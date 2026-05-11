@@ -61,6 +61,8 @@ Prisma models:
   - `trades`
   - `error`
 
+Saved runs are normalized on read before being returned to the UI. If a legacy persisted trade stored stale `netPnL` or `returnPercent`, the service repairs the display row from entry price, exit price, quantity, transaction cost, slippage-adjusted prices already stored on the row, and committed entry capital. Legacy invalid aggregate runs that stored cost inputs as percent points, for example `0.1` meaning `0.1%`, are display-repaired with the corrected decimal cost. If a legacy run has aggregate capital/return metrics that cannot be reconciled safely, the run is marked with `availabilityStatus = ERROR`, `calculationAudit.aggregateStatus = LEGACY_INVALID`, and an explicit warning instead of showing the stale ending capital or total return as trusted proof.
+
 Migration:
 
 - `202604280006_backtesting_strategy_lab`
@@ -147,6 +149,7 @@ The MVP engine:
 - prevents buying when cash is insufficient
 - enforces max open positions
 - applies transaction costs on entry and exit
+- stores the committed entry capital for each position so per-trade returns are based on net P&L over committed capital, not just raw price movement
 - closes open positions at the end of the test
 
 The current signal rules use a historical proxy derived from available prices:
@@ -181,6 +184,10 @@ Returned metrics:
 - exit diagnostics: end-of-test, stop-loss, trailing-stop, take-profit, strategy-exit, and max-hold counts
 - realism warnings for weak exits, small samples, data coverage, drawdown, and benchmark underperformance
 
+Per-trade `returnPercent` is calculated as `netPnL / committedCapital`, where `committedCapital` is the cash allocated at entry including entry transaction cost. This keeps trade-level returns aligned with the cash-based total return and prevents entry/exit costs from being double-modeled as a raw price-return subtraction.
+
+Persisted-run responses include a `calculationAudit` when read-time normalization changes display behavior. `tradeReturnFormula = NET_PNL_OVER_COMMITTED_ENTRY_CAPITAL` documents the active formula; `repairedTradeReturnCount` counts stale trade rows corrected on read; `aggregateStatus = LEGACY_INVALID` means historical aggregate metrics were withheld because the saved capital curve cannot be reconciled.
+
 After a registered strategy run completes, the service upserts `StrategyPerformanceSummary` through Strategy Framework using the natural key `strategyCode + strategyVersion + timeframe + region + assetType + universeKey`.
 
 ## Frontend
@@ -212,6 +219,7 @@ The UI includes:
 - optional data-quality filter controls and universe before/after metadata in results
 - realistic assumptions controls for cost, slippage, max hold, stop loss, trailing stop, and take profit
 - benchmark, rating explanation, caps, warnings, and exit diagnostics panels
+- legacy-invalid saved runs show a clear warning and withhold ending capital/total return instead of rendering unreconciled stale aggregate proof
 
 ## Strategy Quality Audit - 2026-05-06
 
@@ -276,5 +284,6 @@ Expected verification commands:
 
 - `npx prisma generate`
 - `npm run build` in `backend`
-- `npm test -- backtesting-strategy-lab --runInBand` in `backend`
+- `npm test -- --runInBand --runTestsByPath tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.test.ts` in `backend`
 - `npm run build` in `frontend`
+- `npm run test:ui -- backtesting-strategy-lab.spec.ts --workers=1` in `frontend`

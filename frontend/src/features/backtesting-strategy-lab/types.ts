@@ -126,6 +126,12 @@ export interface BacktestMetrics {
     insufficientHistoryCount: number;
     warnings: string[];
   };
+  calculationAudit?: {
+    tradeReturnFormula: 'NET_PNL_OVER_COMMITTED_ENTRY_CAPITAL';
+    repairedTradeReturnCount: number;
+    aggregateStatus: 'OK' | 'LEGACY_INVALID';
+    warnings: string[];
+  };
 }
 
 export interface BacktestTrade {
@@ -144,6 +150,8 @@ export interface BacktestTrade {
   entryReason?: string;
   entryReasons?: string[];
   exitReasons?: string[];
+  committedCapital?: number;
+  calculationStatus?: 'PERSISTED' | 'REPAIRED_FROM_PNL';
 }
 
 export interface EquityCurvePoint {

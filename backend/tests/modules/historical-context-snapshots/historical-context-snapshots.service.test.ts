@@ -65,16 +65,28 @@ const marketData = {
 };
 
 describe('historical context snapshots service', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   it('generates market, sector, country, smart-money, and data-quality snapshots', async () => {
     const repository = repo();
     const service = new HistoricalContextSnapshotsService(repository as any, marketContext as any, smartMoney as any, marketData as any);
-    const result = await service.generate(snapshotDate, 5);
+    const result = await service.generate(snapshotDate, 5, { region: 'IN', assetType: 'STOCK' });
     expect(result.market.inserted).toBe(1);
+    expect(result.region).toBe('IN');
+    expect(result.assetType).toBe('STOCK');
     expect(result.sectors.inserted).toBe(2);
     expect(result.countries.updated).toBe(1);
     expect(result.smartMoney.inserted).toBe(1);
     expect(result.dataQuality.inserted).toBe(1);
-    expect(repository.upsertMarket).toHaveBeenCalledWith(expect.objectContaining({ snapshotDate, regime: 'RISK_ON' }));
+    expect(marketContext.summary).toHaveBeenCalledWith({ region: 'IN' });
+    expect(marketData.listInstruments).toHaveBeenCalledWith(expect.objectContaining({ region: 'IN', assetType: 'STOCK' }));
+    expect(marketData.listPricesByInstrumentId).toHaveBeenCalledWith('stock-1', 500, undefined, undefined, { region: 'IN', assetType: 'STOCK' });
+    expect(marketData.latestPriceByInstrumentId).toHaveBeenCalledWith('stock-1', { region: 'IN', assetType: 'STOCK' });
+    expect(repository.upsertMarket).toHaveBeenCalledWith(expect.objectContaining({ snapshotDate, region: 'IN', regime: 'RISK_ON' }));
+    expect(repository.upsertSector).toHaveBeenCalledWith(expect.objectContaining({ snapshotDate, region: 'IN' }));
+    expect(repository.upsertCountry).toHaveBeenCalledWith(expect.objectContaining({ snapshotDate, region: 'IN' }));
   });
 
   it('handles partial generation failures with warnings', async () => {
@@ -86,17 +98,60 @@ describe('historical context snapshots service', () => {
     expect(result.warnings[0]).toContain('market context summary failed');
   });
 
+  it('skips Unknown sector leadership during generation and records a metadata-gap warning', async () => {
+    const repository = repo();
+    const contextWithUnknownSector = {
+      summary: jest.fn().mockResolvedValue({
+        ...(await marketContext.summary()),
+        topSectors: [
+          { sector: 'Unknown', return1M: 0.03, return3M: 0.1, return6M: 0.2, relativeStrengthScore: 72, instrumentCount: 72, bullishSignalCount: 6, bearishSignalCount: 1, leadershipStatus: 'LEADING' },
+          { sector: 'Financials', return1M: 0.02, return3M: 0.07, return6M: 0.11, relativeStrengthScore: 80, instrumentCount: 12, bullishSignalCount: 7, bearishSignalCount: 1, leadershipStatus: 'LEADING' },
+        ],
+        weakSectors: [],
+      }),
+    };
+    const service = new HistoricalContextSnapshotsService(repository as any, contextWithUnknownSector as any, smartMoney as any, marketData as any);
+
+    const result = await service.generate(snapshotDate, 5, { region: 'IN', assetType: 'STOCK' });
+
+    expect(result.sectors).toMatchObject({ inserted: 1, skipped: 1 });
+    expect(repository.upsertSector).toHaveBeenCalledTimes(1);
+    expect(repository.upsertSector).toHaveBeenCalledWith(expect.objectContaining({ sector: 'Financials' }));
+    expect(result.warnings).toContain('Sector Unknown is a metadata gap and is not ranked as sector leadership evidence.');
+  });
+
   it('returns lookup gaps and data status', async () => {
     const repository = repo();
     const service = new HistoricalContextSnapshotsService(repository as any, marketContext as any, smartMoney as any, marketData as any);
-    const result = await service.lookup(snapshotDate, 7, { sector: 'Technology', instrumentId: 'stock-1' });
+    const result = await service.lookup(snapshotDate, 7, { sector: 'Technology', instrumentId: 'stock-1', region: 'IN', assetType: 'STOCK' });
     expect(result.dataStatus).toBe('PARTIAL');
+    expect(repository.lookup).toHaveBeenCalledWith(snapshotDate, 7, expect.objectContaining({ region: 'IN', assetType: 'STOCK' }));
     expect(result.gaps).toEqual(expect.arrayContaining(['sector context snapshot missing', 'smart-money context snapshot missing']));
+  });
+
+  it('returns metadata-gap explanation for Unknown sector lookup instead of a ranked sector', async () => {
+    const repository = repo({
+      lookup: jest.fn().mockResolvedValue({
+        market: { regime: 'RISK_ON', snapshotDate },
+        sector: null,
+        country: null,
+        smartMoney: null,
+        dataQuality: null,
+      }),
+    });
+    const service = new HistoricalContextSnapshotsService(repository as any, marketContext as any, smartMoney as any, marketData as any);
+
+    const result = await service.lookup(snapshotDate, 7, { sector: 'Unknown', region: 'IN', assetType: 'STOCK' });
+
+    expect(result.sector).toBeNull();
+    expect(repository.lookup).toHaveBeenCalledWith(snapshotDate, 7, expect.objectContaining({ sector: undefined }));
+    expect(result.gaps).toContain('Sector Unknown is a metadata gap and is not ranked as sector leadership evidence.');
   });
 
   it('returns coverage warnings when empty', async () => {
     const repository = repo({ coverage: jest.fn().mockResolvedValue({ marketSnapshots: 0, sectorSnapshots: 0, countrySnapshots: 0, smartMoneySnapshots: 0, dataQualitySnapshots: 0, latestSnapshotDate: null }) });
     const service = new HistoricalContextSnapshotsService(repository as any, marketContext as any, smartMoney as any, marketData as any);
-    await expect(service.coverage()).resolves.toMatchObject({ warnings: ['No market context snapshots have been generated yet.'] });
+    await expect(service.coverage({ region: 'IN', assetType: 'STOCK' })).resolves.toMatchObject({ warnings: ['No market context snapshots have been generated yet.'] });
+    expect(repository.coverage).toHaveBeenCalledWith({ region: 'IN', assetType: 'STOCK' });
   });
 });

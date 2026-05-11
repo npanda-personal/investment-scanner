@@ -3,6 +3,8 @@ export type SnapshotDataStatus = 'COMPLETE' | 'PARTIAL' | 'MISSING' | 'ERROR';
 export interface GenerateSnapshotsRequest {
   snapshotDate?: string;
   limit?: number;
+  region?: string;
+  assetType?: string;
 }
 
 export interface SnapshotQuery {
@@ -12,11 +14,15 @@ export interface SnapshotQuery {
   sector?: string;
   country?: string;
   instrumentId?: string;
+  region?: string;
+  assetType?: string;
   limit: number;
 }
 
 export interface SnapshotGenerateSummary {
   snapshotDate: string;
+  region: string;
+  assetType: string;
   market: SnapshotCount;
   sectors: SnapshotCount;
   countries: SnapshotCount;
@@ -34,6 +40,7 @@ export interface SnapshotCount {
 export interface SnapshotCoverage {
   marketSnapshots: number;
   sectorSnapshots: number;
+  sectorMetadataGapSnapshots?: number;
   countrySnapshots: number;
   smartMoneySnapshots: number;
   dataQualitySnapshots: number;

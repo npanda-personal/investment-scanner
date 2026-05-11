@@ -21,9 +21,14 @@ import { useHistoricalContextSnapshots } from '../hooks';
 import type { SnapshotLookupResult } from '../types';
 import { InstrumentSearchSelect, PageHeader } from '@/shared/components';
 import type { V1Instrument } from '@/features/market-data-foundation';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 
 const today = () => new Date().toISOString().slice(0, 10);
 const pct = (value: number | null | undefined) => value === null || value === undefined ? 'N/A' : `${(value * 100).toFixed(1)}%`;
+const knownSector = (value: string | null | undefined) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  return normalized.length > 0 && normalized !== 'unknown' && normalized !== 'n/a' && normalized !== 'na' && normalized !== 'null';
+};
 
 const CoverageCard: React.FC<{ label: string; value: number | string }> = ({ label, value }) => (
   <Paper sx={{ p: 2 }}>
@@ -34,6 +39,7 @@ const CoverageCard: React.FC<{ label: string; value: number | string }> = ({ lab
 
 const HistoricalContextSnapshotsPage: React.FC = () => {
   const { coverage, market, sectors, countries, loading, error, reload } = useHistoricalContextSnapshots();
+  const { scope } = useMarketScope();
   const [snapshotDate, setSnapshotDate] = useState(today());
   const [limit, setLimit] = useState('50');
   const [lookupDate, setLookupDate] = useState(today());
@@ -43,13 +49,15 @@ const HistoricalContextSnapshotsPage: React.FC = () => {
   const [lookup, setLookup] = useState<SnapshotLookupResult | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const rankedSectors = sectors.filter((item) => knownSector(item.sector));
+  const hiddenMetadataGapSectors = sectors.length - rankedSectors.length;
 
   const runGenerate = async () => {
     setMessage(null);
     setFormError(null);
     try {
-      const result = await generateSnapshots({ snapshotDate, limit: Number(limit) || 50 });
-      setMessage(`Generated ${result.snapshotDate}: market ${result.market.inserted + result.market.updated}, sectors ${result.sectors.inserted + result.sectors.updated}, countries ${result.countries.inserted + result.countries.updated}, smart money ${result.smartMoney.inserted + result.smartMoney.updated}. ${result.warnings.length ? `Warnings: ${result.warnings.slice(0, 3).join('; ')}` : ''}`);
+      const result = await generateSnapshots({ snapshotDate, limit: Number(limit) || 50, region: scope.region, assetType: scope.assetType });
+      setMessage(`Generated ${result.snapshotDate} for ${result.region}/${result.assetType}: market ${result.market.inserted + result.market.updated}, sectors ${result.sectors.inserted + result.sectors.updated}, countries ${result.countries.inserted + result.countries.updated}, smart money ${result.smartMoney.inserted + result.smartMoney.updated}. ${result.warnings.length ? `Warnings: ${result.warnings.slice(0, 3).join('; ')}` : ''}`);
       await reload();
     } catch (err: any) {
       setFormError(err.response?.data?.error || err.message || 'Failed to generate snapshots');
@@ -64,6 +72,8 @@ const HistoricalContextSnapshotsPage: React.FC = () => {
         instrumentId: selectedInstrument?.id || undefined,
         sector: sector || undefined,
         country: country || undefined,
+        region: scope.region,
+        assetType: scope.assetType,
       }));
     } catch (err: any) {
       setFormError(err.response?.data?.error || err.message || 'Failed to lookup snapshots');
@@ -78,7 +88,7 @@ const HistoricalContextSnapshotsPage: React.FC = () => {
     <Box sx={{ p: 3, maxWidth: 1500, mx: 'auto' }}>
       <PageHeader
         title="Historical Context Snapshots"
-        subtitle="Persist market regime, breadth, sector, country, smart-money, and data-quality context for historical signal evaluation."
+        subtitle={`Persist scoped market regime, breadth, sector, country, smart-money, and data-quality context for ${scope.region} / ${scope.assetType}.`}
         primaryAction={<Button component={Link} to="/signals/quality" variant="outlined">Open Signal Quality Lab</Button>}
       />
 
@@ -97,6 +107,7 @@ const HistoricalContextSnapshotsPage: React.FC = () => {
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 3, mb: 3 }}>
         <Paper sx={{ p: 2 }}>
           <Typography variant="h6" sx={{ mb: 2 }}>Generate Snapshot</Typography>
+          <Chip size="small" label={`${scope.region}/${scope.assetType}`} sx={{ mb: 2 }} />
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
             <TextField label="Snapshot date" type="date" value={snapshotDate} onChange={(event) => setSnapshotDate(event.target.value)} size="small" />
             <TextField label="Smart-money limit" value={limit} onChange={(event) => setLimit(event.target.value)} size="small" />
@@ -139,17 +150,18 @@ const HistoricalContextSnapshotsPage: React.FC = () => {
           <Typography variant="h6" sx={{ mb: 2 }}>Market Regime Snapshots</Typography>
           {market.length === 0 ? <Typography color="text.secondary">No market snapshots yet.</Typography> : (
             <Table size="small">
-              <TableHead><TableRow><TableCell>Date</TableCell><TableCell>Regime</TableCell><TableCell>Score</TableCell><TableCell>SMA50</TableCell></TableRow></TableHead>
-              <TableBody>{market.map((item) => <TableRow key={item.id}><TableCell>{new Date(item.snapshotDate).toLocaleDateString()}</TableCell><TableCell>{item.regime}</TableCell><TableCell>{item.regimeScore}</TableCell><TableCell>{pct(item.breadthPercentAboveSma50)}</TableCell></TableRow>)}</TableBody>
+              <TableHead><TableRow><TableCell>Date</TableCell><TableCell>Region</TableCell><TableCell>Regime</TableCell><TableCell>Score</TableCell><TableCell>SMA50</TableCell></TableRow></TableHead>
+              <TableBody>{market.map((item) => <TableRow key={item.id}><TableCell>{new Date(item.snapshotDate).toLocaleDateString()}</TableCell><TableCell>{item.region || scope.region}</TableCell><TableCell>{item.regime}</TableCell><TableCell>{item.regimeScore}</TableCell><TableCell>{pct(item.breadthPercentAboveSma50)}</TableCell></TableRow>)}</TableBody>
             </Table>
           )}
         </Paper>
         <Paper sx={{ p: 2, overflowX: 'auto' }}>
           <Typography variant="h6" sx={{ mb: 2 }}>Sector Snapshots</Typography>
-          {sectors.length === 0 ? <Typography color="text.secondary">No sector snapshots yet.</Typography> : (
+          {hiddenMetadataGapSectors > 0 && <Alert severity="info" sx={{ mb: 2 }}>{hiddenMetadataGapSectors} sector metadata-gap row{hiddenMetadataGapSectors === 1 ? '' : 's'} hidden from ranked sector evidence.</Alert>}
+          {rankedSectors.length === 0 ? <Typography color="text.secondary">No ranked sector snapshots yet. Unknown or missing sector metadata is tracked as a data-quality gap, not sector leadership.</Typography> : (
             <Table size="small">
-              <TableHead><TableRow><TableCell>Date</TableCell><TableCell>Sector</TableCell><TableCell>Status</TableCell><TableCell>Score</TableCell></TableRow></TableHead>
-              <TableBody>{sectors.slice(0, 12).map((item) => <TableRow key={item.id}><TableCell>{new Date(item.snapshotDate).toLocaleDateString()}</TableCell><TableCell>{item.sector}</TableCell><TableCell>{item.leadershipStatus}</TableCell><TableCell>{item.relativeStrengthScore}</TableCell></TableRow>)}</TableBody>
+              <TableHead><TableRow><TableCell>Date</TableCell><TableCell>Region</TableCell><TableCell>Sector</TableCell><TableCell>Status</TableCell><TableCell>Score</TableCell></TableRow></TableHead>
+              <TableBody>{rankedSectors.slice(0, 12).map((item) => <TableRow key={item.id}><TableCell>{new Date(item.snapshotDate).toLocaleDateString()}</TableCell><TableCell>{item.region || scope.region}</TableCell><TableCell>{item.sector}</TableCell><TableCell>{item.leadershipStatus}</TableCell><TableCell>{item.relativeStrengthScore}</TableCell></TableRow>)}</TableBody>
             </Table>
           )}
         </Paper>
@@ -157,8 +169,8 @@ const HistoricalContextSnapshotsPage: React.FC = () => {
           <Typography variant="h6" sx={{ mb: 2 }}>Country Snapshots</Typography>
           {countries.length === 0 ? <Typography color="text.secondary">No country snapshots yet.</Typography> : (
             <Table size="small">
-              <TableHead><TableRow><TableCell>Date</TableCell><TableCell>Country</TableCell><TableCell>Score</TableCell><TableCell>Status</TableCell></TableRow></TableHead>
-              <TableBody>{countries.slice(0, 12).map((item) => <TableRow key={item.id}><TableCell>{new Date(item.snapshotDate).toLocaleDateString()}</TableCell><TableCell>{item.country}</TableCell><TableCell>{item.relativeStrengthScore}</TableCell><TableCell>{item.dataStatus}</TableCell></TableRow>)}</TableBody>
+              <TableHead><TableRow><TableCell>Date</TableCell><TableCell>Region</TableCell><TableCell>Country</TableCell><TableCell>Score</TableCell><TableCell>Status</TableCell></TableRow></TableHead>
+              <TableBody>{countries.slice(0, 12).map((item) => <TableRow key={item.id}><TableCell>{new Date(item.snapshotDate).toLocaleDateString()}</TableCell><TableCell>{item.region || scope.region}</TableCell><TableCell>{item.country}</TableCell><TableCell>{item.relativeStrengthScore}</TableCell><TableCell>{item.dataStatus}</TableCell></TableRow>)}</TableBody>
             </Table>
           )}
         </Paper>

@@ -5,7 +5,7 @@
 The application is a local-first market data analytics and investment research platform. Its goal is to turn raw market data into a structured research workflow:
 
 ```text
-Market Data → Data Quality → Signals → Signal Quality → Calibration → Strategy Framework → Backtesting → Strategy Decision → Research Hub → Trade Plans → Future Paper/Algo Trading
+Market Data → Data Quality → Signals → Signal Quality → Calibration → Strategy Framework → Backtesting → Strategy Decision → Today Trade Review / Research Hub → Trade Plans → Future Paper/Algo Trading
 ```
 
 The system is intentionally modular. Each module owns one business capability, exposes public services/APIs, and should not import another module's repository directly. Downstream modules consume upstream outputs through public module exports or API contracts.
@@ -20,6 +20,8 @@ This application is **research support only**. It does not provide financial adv
 
 Every intelligence module depends on clean, region-scoped, duplicate-free market data. If Market Data Foundation is wrong, signals, backtests, strategies, trade plans, and research outputs become unreliable.
 
+Persisted provider data must be safe to read as well as safe to ingest. When a natural key or idempotency rule is corrected, the owning module must also handle already-visible duplicates through an idempotent cleanup, read-time dedupe, or explicit legacy marker.
+
 ### 2. Raw signals are not trade decisions
 
 The Signal Generation Engine classifies instruments as raw `BULLISH`, `NEUTRAL`, or `BEARISH`. These are confirmation inputs only. A raw bullish signal does not mean a trade should be taken.
@@ -31,6 +33,8 @@ Strategy Framework is the source of truth for reusable strategy definitions, ver
 ### 4. Backtesting proves strategies
 
 Backtesting Strategy Lab owns detailed historical simulation. Strategy Framework owns compact performance summaries and ratings. A strategy should not be trusted just because it produces candidates; it must have evidence.
+
+Backtest trade returns must reconcile to cash P&L over committed entry capital. If old saved runs contain stale trade percentages or unreconciled aggregate capital, the read path must repair the trade display from source inputs or mark the aggregate proof as legacy invalid.
 
 ### 5. Strategy Decision is the decision layer
 
@@ -44,6 +48,12 @@ Research Hub should prioritize strategy-proof-driven candidates and next actions
 
 Trade Plan & Risk Management Engine converts strategy-backed decisions into reviewable plans with entry zone, stop, target, reward/risk, position sizing, data gaps, and paper-readiness status. It does not create trades.
 
+### 7a. Today Trade Review is the daily shortlist publisher
+
+Today Trade Review composes persisted Strategy Decision, Strategy Framework proof, Data Quality, Market Context, Signal/Calibration support, Smart Money, and Trade Plan snapshots into one daily before-market research-support shortlist. It owns daily run orchestration, candidate ranking, candidate state mapping, and persisted TodayReviewRun/TodayReviewCandidate snapshots. It does not own raw signal generation, proof calculation, trade-plan geometry, market-data ingestion, or live/paper execution.
+
+Raw signals alone must never create a promoted Today Review candidate. Promoted long review candidates require Strategy Framework proof, acceptable data quality, an acceptable market gate, and valid trade-plan geometry. Hard blockers override score and positive reasons, and the persisted Today Review candidate snapshots the conservative state used at publication time.
+
 ### 8. Batch work must be bounded
 
 Backend endpoints process bounded batches. Frontend orchestration loops through batches using `offset/cursor`, `nextOffset/nextCursor`, and `hasMore`. User-triggered batch operations should show progress.
@@ -51,6 +61,14 @@ Backend endpoints process bounded batches. Frontend orchestration loops through 
 ### 9. Region and asset scope are global
 
 The app uses a global market scope, currently defaulting to `IN / STOCK`. Pages that list or select instruments should respect this scope unless explicitly overridden.
+
+Scoped historical/persisted reads must propagate the same scope to generation, coverage, lookup, and list APIs. A persisted row from `GLOBAL`, `US`, or another asset class must not satisfy an `IN / STOCK` lookup unless the owning module explicitly documents that fallback.
+
+Visible persisted rows are part of the product contract. Fixes that only affect future generated rows are incomplete when rejected examples already exist in the browser; the module must repair, recompute, dedupe, hide, or clearly mark stale persisted/displayed rows within its ownership boundary.
+
+### 9a. Candidate taxonomy is product language, API names are compatibility
+
+Strategy Decision may keep API enum/field names such as `TRADE_CANDIDATE` and `tradeCandidates` for compatibility, but user-facing Strategy Decision, Research Hub, and Trade Plan surfaces should call these review candidates. Raw bullish signals remain confirmation inputs and must not be promoted into review candidates without Strategy Decision proof.
 
 ### 10. UI verification is local and mandatory
 
@@ -80,6 +98,7 @@ Do not add paid hosted browser testing, paid visual regression tools, paid UI li
 | Strategy | Strategy Framework | Reusable strategy registry, evaluator, rules, ratings, and readiness labels |
 | Intelligence Lab | Backtesting Strategy Lab | Detailed historical simulation for registered strategies and custom rules |
 | Research | Strategy Decision Engine | Convert strategy/context inputs into candidate/watch/avoid/exit decisions |
+| Research | Today Trade Review | Persisted before-market shortlist built from proof, context, data quality, and trade-plan snapshots |
 | Research | Research Hub | Strategy-proof-driven command center and daily research triage layer |
 | Research | Smart Money Intelligence | Price-volume accumulation/distribution context and confirmation/contradiction layer |
 | Research | Market Context Intelligence | Market regime, breadth, sector/country context, market gate support |

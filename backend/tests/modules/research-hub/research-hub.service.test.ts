@@ -219,7 +219,7 @@ describe('ResearchHubService', () => {
       expect(result.researchPriorities.watchCandidates.length + result.researchPriorities.avoidCandidates.length).toBeGreaterThan(0);
     });
 
-    it('returns no new long trade candidates when market gate is CLOSED', async () => {
+    it('returns no new long review candidates when market gate is CLOSED', async () => {
       strategyService.marketGate.mockResolvedValue({ marketGate: 'CLOSED', marketCondition: 'BAD', reasons: [], blockers: ['Market blocked'], allowedActions: ['MANAGE_EXISTING_POSITIONS_ONLY'], dataStatus: 'COMPLETE' } as any);
       contextService.summary.mockResolvedValue({ topSectors: [], weakSectors: [], breadth: {}, explanation: [] } as any);
       strategyService.candidates.mockResolvedValue({ results: [
@@ -232,7 +232,7 @@ describe('ResearchHubService', () => {
 
       const result = await service.overview();
 
-      expect(result.marketReadiness.headline).toContain('No new long candidates');
+      expect(result.marketReadiness.headline).toContain('No new long review candidates');
       expect(result.researchPriorities.tradeCandidates).toHaveLength(0);
       expect(result.strategyProofSummary.blockedByMarketGateCount).toBeGreaterThan(0);
     });

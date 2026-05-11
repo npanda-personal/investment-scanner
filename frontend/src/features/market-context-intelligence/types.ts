@@ -24,6 +24,8 @@ export interface SectorRotationItem {
 export interface MarketBreadth {
   percentAboveSma50: number | null;
   percentAboveSma200: number | null;
+  sma50SampleCount?: number;
+  sma200SampleCount?: number;
   advanceDeclineRatio: number | null;
   newHigh52WeekCount: number;
   newLow52WeekCount: number;

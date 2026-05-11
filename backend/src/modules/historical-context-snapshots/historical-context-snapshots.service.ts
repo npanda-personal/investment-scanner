@@ -4,6 +4,7 @@ import { SmartMoneyIntelligenceService } from '../smart-money-intelligence';
 import { HistoricalContextSnapshotsRepository } from './historical-context-snapshots.repository';
 import type { SnapshotCount, SnapshotGenerateSummary, SnapshotLookupResult, SnapshotQuery } from './historical-context-snapshots.types';
 import { normalizeSnapshotDate } from './historical-context-snapshots.validation';
+import { isKnownSector, unknownSectorExplanation } from '../../shared/utils/sector-metadata';
 
 export class HistoricalContextSnapshotsService {
   constructor(
@@ -13,7 +14,9 @@ export class HistoricalContextSnapshotsService {
     private readonly marketDataService = new MarketDataFoundationService()
   ) {}
 
-  async generate(snapshotDate = normalizeSnapshotDate(), limit = 50): Promise<SnapshotGenerateSummary> {
+  async generate(snapshotDate = normalizeSnapshotDate(), limit = 50, scope: { region?: string; assetType?: string } = {}): Promise<SnapshotGenerateSummary> {
+    const region = (scope.region || 'IN').toUpperCase();
+    const assetType = (scope.assetType || 'STOCK').toUpperCase();
     const warnings: string[] = [];
     const market = this.repository.emptyCount();
     const sectors = this.repository.emptyCount();
@@ -21,10 +24,11 @@ export class HistoricalContextSnapshotsService {
     const smartMoney = this.repository.emptyCount();
     const dataQuality = this.repository.emptyCount();
 
-    const summary = await this.safe(() => this.marketContextService.summary(), 'market context summary failed', warnings);
+    const summary = await this.safe(() => this.marketContextService.summary({ region }), 'market context summary failed', warnings);
     if (summary) {
       this.bump(market, await this.repository.upsertMarket({
         snapshotDate,
+        region,
         regime: summary.regime.regime,
         regimeScore: summary.regime.score,
         breadthPercentAboveSma50: summary.breadth.percentAboveSma50,
@@ -38,8 +42,14 @@ export class HistoricalContextSnapshotsService {
         dataStatus: summary.dataStatus,
       }));
       for (const item of [...summary.topSectors, ...summary.weakSectors]) {
+        if (!isKnownSector(item.sector)) {
+          sectors.skipped += 1;
+          warnings.push(unknownSectorExplanation(item.sector));
+          continue;
+        }
         this.bump(sectors, await this.repository.upsertSector({
           snapshotDate,
+          region,
           sector: item.sector,
           oneMonthReturn: item.return1M,
           threeMonthReturn: item.return3M,
@@ -56,6 +66,7 @@ export class HistoricalContextSnapshotsService {
       for (const item of summary.countryStrength) {
         this.bump(countries, await this.repository.upsertCountry({
           snapshotDate,
+          region,
           country: item.country,
           oneMonthReturn: item.return1M,
           threeMonthReturn: item.return3M,
@@ -71,13 +82,13 @@ export class HistoricalContextSnapshotsService {
       market.skipped += 1;
     }
 
-    const instruments = await this.safe(() => this.marketDataService.listInstruments({ page: 1, pageSize: limit }), 'instrument list failed', warnings);
+    const instruments = await this.safe(() => this.marketDataService.listInstruments({ page: 1, pageSize: limit, region, assetType }), 'instrument list failed', warnings);
     for (const instrument of instruments?.instruments || []) {
       const [smart, prices, latest, fundamentals] = await Promise.all([
         this.safe(() => this.smartMoneyService.stock(instrument.id), `${instrument.symbol} smart-money failed`, warnings),
-        this.safe(() => this.marketDataService.listPricesByInstrumentId(instrument.id, 500), `${instrument.symbol} prices failed`, warnings),
-        this.safe(() => this.marketDataService.latestPriceByInstrumentId(instrument.id), `${instrument.symbol} latest price failed`, warnings),
-        this.safe(() => this.marketDataService.fundamentalsByInstrumentId(instrument.id), `${instrument.symbol} fundamentals failed`, warnings),
+        this.safe(() => this.marketDataService.listPricesByInstrumentId(instrument.id, 500, undefined, undefined, { region, assetType }), `${instrument.symbol} prices failed`, warnings),
+        this.safe(() => this.marketDataService.latestPriceByInstrumentId(instrument.id, { region, assetType }), `${instrument.symbol} latest price failed`, warnings),
+        this.safe(() => this.marketDataService.fundamentalsByInstrumentId(instrument.id, { region, assetType }), `${instrument.symbol} fundamentals failed`, warnings),
       ]);
       if (smart) {
         this.bump(smartMoney, await this.repository.upsertSmartMoney({
@@ -120,11 +131,11 @@ export class HistoricalContextSnapshotsService {
       }));
     }
 
-    return { snapshotDate: snapshotDate.toISOString(), market, sectors, countries, smartMoney, dataQuality, warnings };
+    return { snapshotDate: snapshotDate.toISOString(), region, assetType, market, sectors, countries, smartMoney, dataQuality, warnings };
   }
 
-  summary() {
-    return this.coverage();
+  summary(query: Pick<SnapshotQuery, 'region' | 'assetType'> = {}) {
+    return this.coverage(query);
   }
 
   market(query: SnapshotQuery) { return this.repository.market(query); }
@@ -132,8 +143,8 @@ export class HistoricalContextSnapshotsService {
   countries(query: SnapshotQuery) { return this.repository.countries(query); }
   smartMoney(query: SnapshotQuery) { return this.repository.smartMoney(query); }
 
-  async coverage() {
-    const coverage = await this.repository.coverage();
+  async coverage(query: Pick<SnapshotQuery, 'region' | 'assetType'> = {}) {
+    const coverage = await this.repository.coverage(query);
     return {
       ...coverage,
       latestSnapshotDate: coverage.latestSnapshotDate ? coverage.latestSnapshotDate.toISOString() : null,
@@ -141,11 +152,16 @@ export class HistoricalContextSnapshotsService {
     };
   }
 
-  async lookup(date: Date, lookbackDays: number, filters: { instrumentId?: string; sector?: string; country?: string }): Promise<SnapshotLookupResult> {
-    const result = await this.repository.lookup(date, lookbackDays, filters);
+  async lookup(date: Date, lookbackDays: number, filters: { instrumentId?: string; sector?: string; country?: string; region?: string; assetType?: string }): Promise<SnapshotLookupResult> {
+    const sectorMetadataGap = filters.sector && !isKnownSector(filters.sector)
+      ? unknownSectorExplanation(filters.sector)
+      : null;
+    const lookupFilters = sectorMetadataGap ? { ...filters, sector: undefined } : filters;
+    const result = await this.repository.lookup(date, lookbackDays, lookupFilters);
     const gaps = [
       !result.market ? 'market context snapshot missing' : null,
-      filters.sector && !result.sector ? 'sector context snapshot missing' : null,
+      sectorMetadataGap,
+      filters.sector && !sectorMetadataGap && !result.sector ? 'sector context snapshot missing' : null,
       filters.country && !result.country ? 'country context snapshot missing' : null,
       filters.instrumentId && !result.smartMoney ? 'smart-money context snapshot missing' : null,
       filters.instrumentId && !result.dataQuality ? 'data-quality snapshot missing' : null,
@@ -157,8 +173,8 @@ export class HistoricalContextSnapshotsService {
     };
   }
 
-  async regimeForDate(date: Date): Promise<string | null> {
-    const lookup = await this.lookup(normalizeSnapshotDate(date), 7, {});
+  async regimeForDate(date: Date, scope: { region?: string; assetType?: string } = {}): Promise<string | null> {
+    const lookup = await this.lookup(normalizeSnapshotDate(date), 7, scope);
     return lookup.market?.regime ?? null;
   }
 

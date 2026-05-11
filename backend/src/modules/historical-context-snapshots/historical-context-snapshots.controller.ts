@@ -8,12 +8,12 @@ export class HistoricalContextSnapshotsController {
   generate = async (req: Request, res: Response) => {
     try {
       const input = parseGenerateRequest(req.body || {});
-      return res.status(201).json(await this.service.generate(input.snapshotDate, input.limit));
+      return res.status(201).json(await this.service.generate(input.snapshotDate, input.limit, { region: input.region, assetType: input.assetType }));
     } catch (error) { return this.error(res, error, 'Failed to generate context snapshots', 400); }
   };
 
-  summary = async (_req: Request, res: Response) => {
-    try { return res.json(await this.service.summary()); }
+  summary = async (req: Request, res: Response) => {
+    try { return res.json(await this.service.summary(parseSnapshotQuery(req.query))); }
     catch (error) { return this.error(res, error, 'Failed to load snapshot summary'); }
   };
 
@@ -37,8 +37,8 @@ export class HistoricalContextSnapshotsController {
     catch (error) { return this.error(res, error, 'Failed to load smart-money snapshots', 400); }
   };
 
-  coverage = async (_req: Request, res: Response) => {
-    try { return res.json(await this.service.coverage()); }
+  coverage = async (req: Request, res: Response) => {
+    try { return res.json(await this.service.coverage(parseSnapshotQuery(req.query))); }
     catch (error) { return this.error(res, error, 'Failed to load snapshot coverage'); }
   };
 

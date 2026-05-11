@@ -225,11 +225,11 @@ model CorporateAction {
   splitRatio           Decimal?
   currency             String?
   source               String
+  naturalKey           String   @unique
   ingestionTimestamp   DateTime @default(now())
   lastUpdatedTimestamp DateTime @updatedAt
   dataStatus           String   @default("COMPLETE")
 
-  @@unique([stockId, actionType, effectiveDate, source])
   @@index([stockId, effectiveDate])
   @@map("corporate_actions")
 }
@@ -853,6 +853,60 @@ model TradePlanResult {
   @@index([readinessLabel])
   @@index([backtestTimeframe])
   @@map("trade_plan_results")
+}
+
+model TodayReviewRun {
+  id              String   @id @default(cuid())
+  runDate         DateTime
+  region          String
+  assetType       String
+  status          String
+  dataThroughDate DateTime?
+  startedAt       DateTime @default(now())
+  finishedAt      DateTime?
+  warnings        Json
+  candidateCounts Json
+  sourceSnapshot  Json
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  candidates      TodayReviewCandidate[]
+
+  @@unique([runDate, region, assetType])
+  @@index([region, assetType, runDate])
+  @@map("today_review_runs")
+}
+
+model TodayReviewCandidate {
+  id                    String   @id @default(cuid())
+  runId                 String
+  run                   TodayReviewRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  instrumentId          String
+  symbol                String
+  companyName           String?
+  direction             String
+  state                 String
+  setupType             String?
+  strategyCode          String
+  strategyVersion       String?
+  rank                  Int
+  grade                 String
+  confidenceScore       Int
+  reasonSummary         String
+  blockers              Json
+  watchReasons          Json
+  dataQualitySnapshot   Json?
+  marketContextSnapshot Json?
+  strategyProofSnapshot Json?
+  tradePlanSnapshot     Json?
+  sourceSignalSnapshot  Json?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([runId, instrumentId, strategyCode, direction])
+  @@index([runId, rank])
+  @@index([instrumentId])
+  @@index([state])
+  @@map("today_review_candidates")
 }
 
 

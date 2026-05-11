@@ -10,6 +10,7 @@ These guidelines apply across the application. They are intentionally product-le
 - Use the shared `PageHeader` for title, short subtitle, and right-aligned primary actions where practical.
 - Keep scope and context visible near the top, especially market region, asset type, portfolio, watchlist, or selected entity.
 - Do not duplicate global scope controls inside module tables. If a page is already governed by the global market header, show the active scope as read-only context and let the header own region/asset changes.
+- Historical or persisted data pages should pass the global scope to list, coverage, generate, and lookup calls and show the scope in generated-data confirmations when the same date can exist for multiple markets.
 - Header action groups must wrap within the page container. Long action labels should wrap or move to the next row rather than creating page-level horizontal overflow.
 
 ## Tables And Dense Data
@@ -46,6 +47,15 @@ These guidelines apply across the application. They are intentionally product-le
 - Do not hide missing or unknown data behind generic `N/A` when the user needs to understand why data is incomplete.
 - Provide concise tooltips for unknown, unsupported, partial, or missing states.
 - Distinguish source truth from provider support. Catalog presence does not guarantee provider history support.
+- Use the persisted market/instrument currency for money values. If the row lacks a currency, use a documented scope fallback such as `INR` for `IN` and `USD` otherwise. Do not hardcode `$` on scoped market pages.
+- If persisted business math is stale or unreconciled, repair it on read when the source inputs are sufficient; otherwise clearly mark it as legacy invalid and withhold the stale metric. Do not keep showing unreconciled capital, return, readiness, or risk values because new records are now fixed.
+- For geometry-sensitive workflows, warnings and blocker text must name the relationship that failed, such as a long-plan stop sitting inside the entry zone. A `VALID` status must not coexist with a visible hard geometry violation.
+- Positive readiness/proof reason chips should render only when the item is actually ready and has no active hard blockers. If blockers exist, show blocker chips and keep proof facts in their own proof/snapshot section.
+- If the same hard blocker appears in multiple API-owned diagnostic arrays, the page should render that blocker once in the visible blocker list while preserving the richer API contract for downstream consumers.
+- Market breadth and context cards must label the denominator used for displayed percentages. A visible sample count of `0` must not sit beside non-zero breadth percentages unless the UI explicitly distinguishes the samples.
+- Metadata buckets such as `Unknown` can be shown as missing-metadata diagnostics, but should not be ranked as leading/weak sectors or equivalent business entities.
+- Deep-linked diagnostic pages must render their page shell immediately and settle into content, a domain-specific empty/insufficient-data state, or an actionable error with Retry. They must not remain indefinitely on a generic progress indicator.
+- Daily shortlist pages should make the composed answer visible before diagnostics. Show candidate state, entry/invalidation/reward, proof, data quality, market alignment, and blocker reasons as the primary scan fields; keep raw signal counts as supporting evidence only.
 
 ## Forms And Actions
 
@@ -66,6 +76,7 @@ These guidelines apply across the application. They are intentionally product-le
 - UI-facing changes must include repeatable smoke coverage when practical.
 - Use the local Playwright suite in `frontend/tests/ui` for authenticated page-load, navigation, common error-state, filter/action, and route-regression checks.
 - Add or update smoke cases for the exact user-visible issue fixed, especially broken routes, stale labels, overflowing controls, dead-end disabled actions, batch progress regressions, or missing primary headings.
+- When a bug was reported against a persisted record or exact route, UI and browser validation must cover that same route/example after the fix. A newly generated happy-path record is not enough evidence.
 - Smoke tests must exercise meaningful module behavior, not only headings. Assert critical buttons, filters, tabs, table columns, route targets, progress states, and domain-specific empty states.
 - Data-bearing pages must either show scoped data or a clear explanation of why data is absent. Generic `No records found` is not enough when the absence could mean stale snapshots, missing provider support, neutral-only results, failed auth, or an unrun batch job.
 - Do not rely only on backend/unit tests when the change affects visible UI behavior.
@@ -86,4 +97,6 @@ Required sequence for UI fixes:
 
 - Use practical research-support language.
 - Avoid financial advice wording such as "buy", "sell", "guaranteed", or "execute".
-- Prefer terms such as "candidate", "review", "watch", "risk level", "provider support", and "data health".
+- Prefer terms such as "review candidate", "watch", "risk level", "provider support", and "data health".
+- For Today Trade Review and other shortlist workflows, use product-safe states such as "long review candidate", "short review candidate", "exit-risk review", "watch only", "avoid", "blocked", "invalidation", "paper review", and "research support".
+- Preserve API enum or field names such as `TRADE_CANDIDATE` and `tradeCandidates` only where they are needed for diagnostics or developer-facing compatibility. User-facing Strategy Decision, Research Hub, and Trade Plan copy should describe these as review candidates.

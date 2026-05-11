@@ -153,7 +153,7 @@ export class ResearchHubService {
     if (!gate || gate.marketGate === 'UNKNOWN') return 'Market environment is currently unknown.';
     if (gate.marketGate === 'OPEN') return 'Environment is healthy: high-conviction setups allowed.';
     if (gate.marketGate === 'SELECTIVE') return 'Conditions are mixed: exercise high selectivity.';
-    if (gate.marketGate === 'CLOSED') return 'No new long candidates are available for review. Review exits and watchlist only.';
+    if (gate.marketGate === 'CLOSED') return 'No new long review candidates are available. Review exits and watchlist only.';
     return 'Market conditions are being evaluated.';
   }
 
@@ -309,7 +309,7 @@ export class ResearchHubService {
       unprovenCandidateCount: candidates.filter((candidate) => !candidate.backtestSummary || ['UNPROVEN', 'WEAK'].includes(candidate.backtestSummary.ratingGrade)).length,
       blockedByMarketGateCount: candidates.filter((candidate) => candidate.marketGate === 'CLOSED' || readiness.marketGate === 'CLOSED').length,
       missingBacktestCount,
-      notes: missingBacktestCount > 0 ? ['Some framework-backed candidates need backtest summaries before promotion.'] : [],
+      notes: missingBacktestCount > 0 ? ['Some framework-backed review candidates need backtest summaries before promotion.'] : [],
     };
   }
 
@@ -326,13 +326,13 @@ export class ResearchHubService {
 
     if (readiness.marketGate === 'CLOSED') {
       actions.push({
-        label: priorities.exitCandidates.length > 0 ? `New long candidates restricted; review ${priorities.exitCandidates.length} exit candidates` : 'New long candidates restricted; review watchlist only',
+        label: priorities.exitCandidates.length > 0 ? `New long review candidates restricted; review ${priorities.exitCandidates.length} exit candidates` : 'New long review candidates restricted; review watchlist only',
         priority: 'HIGH',
         targetRoute: '/strategy'
       });
     } else if (priorities.tradeCandidates.length > 0) {
       actions.push({
-        label: `Review ${priorities.tradeCandidates.length} framework-backed candidates`,
+        label: `Review ${priorities.tradeCandidates.length} framework-backed review candidates`,
         priority: 'HIGH',
         targetRoute: '/strategy'
       });
@@ -354,7 +354,7 @@ export class ResearchHubService {
 
     if (priorities.watchCandidates.length > 0) {
       actions.push({
-        label: 'Monitor Watchlist Candidates',
+        label: 'Monitor Watchlist Review Candidates',
         priority: 'LOW',
         targetRoute: '/strategy'
       });

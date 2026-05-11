@@ -1,5 +1,6 @@
 import { MarketDataFoundationService } from '../market-data-foundation';
 import { SignalGenerationEngineService } from '../signal-generation-engine';
+import { isKnownSector } from '../../shared/utils/sector-metadata';
 import { MarketContextIntelligenceRepository } from './market-context-intelligence.repository';
 import type {
   ContextInstrument,
@@ -35,7 +36,7 @@ export class MarketContextIntelligenceService {
     const summary: MarketContextSummary = {
       regime,
       topSectors: sectors.slice(0, 5),
-      weakSectors: sectors.slice(-5).reverse(),
+      weakSectors: this.weakSectorSlice(sectors),
       breadth,
       countryStrength: countries.slice(0, 8),
       macro,
@@ -118,7 +119,7 @@ export class MarketContextIntelligenceService {
   }
 
   rankSectors(items: ContextInstrument[]): SectorRotationItem[] {
-    return this.groupRank(items, (item) => item.sector || 'Unknown').map((group) => ({
+    return this.groupRank(items.filter((item) => this.hasKnownMetadata(item.sector)), (item) => item.sector!.trim()).map((group) => ({
       sector: group.key,
       return1M: group.return1M,
       return3M: group.return3M,
@@ -145,15 +146,19 @@ export class MarketContextIntelligenceService {
 
   calculateBreadth(items: ContextInstrument[]): MarketBreadth {
     const valid = items.filter((item) => item.latest !== null && item.prices.length > 1);
-    const above50 = valid.filter((item) => this.sma(item.prices, 50) !== null && item.latest! > this.sma(item.prices, 50)!).length;
-    const above200 = valid.filter((item) => this.sma(item.prices, 200) !== null && item.latest! > this.sma(item.prices, 200)!).length;
+    const sma50Sample = valid.filter((item) => this.sma(item.prices, 50) !== null);
+    const sma200Sample = valid.filter((item) => this.sma(item.prices, 200) !== null);
+    const above50 = sma50Sample.filter((item) => item.latest! > this.sma(item.prices, 50)!).length;
+    const above200 = sma200Sample.filter((item) => item.latest! > this.sma(item.prices, 200)!).length;
     const advancers = valid.filter((item) => item.previous !== null && item.latest! > item.previous!).length;
     const decliners = valid.filter((item) => item.previous !== null && item.latest! < item.previous!).length;
     const high52 = valid.filter((item) => item.latest! >= Math.max(...item.prices.slice(0, 252)) * 0.99).length;
     const low52 = valid.filter((item) => item.latest! <= Math.min(...item.prices.slice(0, 252)) * 1.01).length;
     return {
-      percentAboveSma50: valid.length > 0 ? above50 / valid.length : null,
-      percentAboveSma200: valid.length > 0 ? above200 / valid.length : null,
+      percentAboveSma50: sma50Sample.length > 0 ? above50 / sma50Sample.length : null,
+      percentAboveSma200: sma200Sample.length > 0 ? above200 / sma200Sample.length : null,
+      sma50SampleCount: sma50Sample.length,
+      sma200SampleCount: sma200Sample.length,
       advanceDeclineRatio: decliners > 0 ? advancers / decliners : advancers > 0 ? advancers : null,
       newHigh52WeekCount: high52,
       newLow52WeekCount: low52,
@@ -225,9 +230,18 @@ export class MarketContextIntelligenceService {
     }).sort((a, b) => b.score - a.score);
   }
 
+  private hasKnownMetadata(value: string | null | undefined) {
+    return isKnownSector(value);
+  }
+
+  private weakSectorSlice(sectors: SectorRotationItem[]) {
+    if (sectors.length <= 1) return [];
+    return sectors.slice(-Math.min(5, sectors.length - 1)).reverse();
+  }
+
   private takeaways(regime: MarketRegimeSummary, sectors: SectorRotationItem[], breadth: MarketBreadth, macro: MacroSnapshot): string[] {
     const top = sectors[0];
-    const weak = sectors[sectors.length - 1];
+    const weak = sectors.length > 1 ? sectors[sectors.length - 1] : null;
     return [
       regime.explanation,
       top && weak ? `${top.sector} is leading while ${weak.sector} is lagging.` : 'Sector rotation is unavailable until more sector data exists.',

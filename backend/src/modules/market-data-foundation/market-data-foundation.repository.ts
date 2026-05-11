@@ -828,18 +828,42 @@ export class MarketDataFoundationRepository {
   }
 
   async upsertCorporateActions(stockId: string, actions: CorporateAction[]) {
-    const operations = actions.map((action) => {
+    const normalizedActions = new Map<string, CorporateAction & { normalizedEffectiveDate: Date; normalizedSource: string; naturalKey: string }>();
+    for (const action of actions) {
       const effectiveDate = this.normalizeUtcDay(action.date);
+      const source = action.source || 'unknown';
+      const key = this.corporateActionNaturalKeyFromParts({
+        stockId,
+        actionType: action.type,
+        effectiveDate,
+        source,
+        amount: action.amount,
+        splitRatio: action.splitRatio,
+      });
+      const existing = normalizedActions.get(key);
+      normalizedActions.set(key, {
+        ...existing,
+        ...action,
+        source,
+        amount: action.amount ?? existing?.amount ?? null,
+        splitRatio: action.splitRatio ?? existing?.splitRatio ?? null,
+        currency: action.currency ?? existing?.currency ?? null,
+        declaredDate: action.declaredDate ?? existing?.declaredDate,
+        paymentDate: action.paymentDate ?? existing?.paymentDate,
+        normalizedEffectiveDate: effectiveDate,
+        normalizedSource: source,
+        naturalKey: key,
+      });
+    }
+
+    const operations = [...normalizedActions.values()].map((action) => {
+      const effectiveDate = action.normalizedEffectiveDate;
       return (this.prisma as any).corporateAction.upsert({
         where: {
-          stockId_actionType_effectiveDate_source: {
-            stockId,
-            actionType: action.type,
-            effectiveDate,
-            source: action.source,
-          },
+          naturalKey: action.naturalKey,
         },
         update: {
+          naturalKey: action.naturalKey,
           declaredDate: action.declaredDate ? new Date(action.declaredDate) : null,
           paymentDate: action.paymentDate ? new Date(action.paymentDate) : null,
           amount: action.amount !== undefined && action.amount !== null ? new Prisma.Decimal(action.amount) : null,
@@ -851,12 +875,13 @@ export class MarketDataFoundationRepository {
           stockId,
           actionType: action.type,
           effectiveDate,
+          naturalKey: action.naturalKey,
           declaredDate: action.declaredDate ? new Date(action.declaredDate) : null,
           paymentDate: action.paymentDate ? new Date(action.paymentDate) : null,
           amount: action.amount !== undefined && action.amount !== null ? new Prisma.Decimal(action.amount) : null,
           splitRatio: action.splitRatio !== undefined && action.splitRatio !== null ? new Prisma.Decimal(action.splitRatio) : null,
           currency: action.currency ?? null,
-          source: action.source,
+          source: action.normalizedSource,
           dataStatus: 'COMPLETE',
         },
       });
@@ -866,10 +891,30 @@ export class MarketDataFoundationRepository {
   }
 
   async listCorporateActions(stockId: string) {
-    return (this.prisma as any).corporateAction.findMany({
+    const rows = await (this.prisma as any).corporateAction.findMany({
       where: { stockId },
       orderBy: { effectiveDate: 'desc' },
     });
+    return this.dedupeCorporateActionRows(rows);
+  }
+
+  async dedupeCorporateActions(stockId: string): Promise<{ deletedCount: number; remainingCount: number }> {
+    const rows = await (this.prisma as any).corporateAction.findMany({
+      where: { stockId },
+      orderBy: { effectiveDate: 'desc' },
+    });
+    const grouped = this.groupCorporateActionRows(rows);
+    const deleteIds: string[] = [];
+    for (const group of grouped.values()) {
+      if (group.length <= 1) continue;
+      const [keeper, ...duplicates] = this.sortCorporateActionKeepers(group);
+      void keeper;
+      deleteIds.push(...duplicates.map((row) => row.id).filter(Boolean));
+    }
+    if (deleteIds.length > 0) {
+      await (this.prisma as any).corporateAction.deleteMany({ where: { id: { in: deleteIds } } });
+    }
+    return { deletedCount: deleteIds.length, remainingCount: rows.length - deleteIds.length };
   }
 
   async upsertFxRate(input: FxRateInput) {
@@ -909,6 +954,63 @@ export class MarketDataFoundationRepository {
     const date = value instanceof Date ? new Date(value) : new Date(value);
     date.setUTCHours(0, 0, 0, 0);
     return date;
+  }
+
+  private dedupeCorporateActionRows(rows: any[]) {
+    return [...this.groupCorporateActionRows(rows).values()]
+      .map((group) => this.sortCorporateActionKeepers(group)[0])
+      .sort((a, b) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime());
+  }
+
+  private groupCorporateActionRows(rows: any[]) {
+    const groups = new Map<string, any[]>();
+    for (const row of rows) {
+      const key = this.corporateActionNaturalKey(row);
+      groups.set(key, [...(groups.get(key) || []), row]);
+    }
+    return groups;
+  }
+
+  private corporateActionNaturalKey(row: any) {
+    const effectiveDate = this.normalizeUtcDay(row.effectiveDate || row.date).toISOString().slice(0, 10);
+    return this.corporateActionNaturalKeyFromParts({
+      stockId: row.stockId,
+      actionType: row.actionType || row.type,
+      effectiveDate,
+      source: row.source,
+      amount: row.amount,
+      splitRatio: row.splitRatio,
+    });
+  }
+
+  private corporateActionNaturalKeyFromParts(row: { stockId: string; actionType: string; effectiveDate: Date | string; source?: string | null; amount?: unknown; splitRatio?: unknown }) {
+    const effectiveDate = row.effectiveDate instanceof Date
+      ? this.normalizeUtcDay(row.effectiveDate).toISOString().slice(0, 10)
+      : String(row.effectiveDate).slice(0, 10);
+    return [
+      row.stockId,
+      String(row.actionType || '').toLowerCase(),
+      effectiveDate,
+      String(row.source || 'unknown').toLowerCase(),
+      this.decimalKey(row.amount),
+      this.decimalKey(row.splitRatio),
+    ].join('|');
+  }
+
+  private sortCorporateActionKeepers(rows: any[]) {
+    return [...rows].sort((a, b) => {
+      const aMidnight = new Date(a.effectiveDate).toISOString().endsWith('T00:00:00.000Z') ? 1 : 0;
+      const bMidnight = new Date(b.effectiveDate).toISOString().endsWith('T00:00:00.000Z') ? 1 : 0;
+      if (aMidnight !== bMidnight) return bMidnight - aMidnight;
+      return new Date(b.lastUpdatedTimestamp || b.ingestionTimestamp || b.effectiveDate).getTime()
+        - new Date(a.lastUpdatedTimestamp || a.ingestionTimestamp || a.effectiveDate).getTime();
+    });
+  }
+
+  private decimalKey(value: unknown) {
+    if (value === null || value === undefined) return 'null';
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric.toFixed(8).replace(/\.?0+$/, '') : String(value);
   }
 
   private sameDailyCandle(existing: any, price: HistoricalPrice): boolean {

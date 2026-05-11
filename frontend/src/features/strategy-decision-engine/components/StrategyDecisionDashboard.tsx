@@ -41,23 +41,23 @@ type CandidatePresetKey = 'TRADE_CANDIDATE' | 'FRAMEWORK_BACKED' | 'GOOD_EXCELLE
 
 const CANDIDATE_PRESETS: Record<CandidatePresetKey, { label: string; helper: string; query: Record<string, any> }> = {
   TRADE_CANDIDATE: {
-    label: 'Trade candidates',
-    helper: 'Decision = TRADE_CANDIDATE',
+    label: 'Review candidates',
+    helper: 'Decision enum = TRADE_CANDIDATE; displayed as review candidates',
     query: { decision: 'TRADE_CANDIDATE' },
   },
   FRAMEWORK_BACKED: {
-    label: 'Framework-backed',
-    helper: 'Decision = TRADE_CANDIDATE and frameworkBacked = true',
+    label: 'Framework-backed review',
+    helper: 'Review candidates with frameworkBacked = true',
     query: { decision: 'TRADE_CANDIDATE', frameworkBacked: true },
   },
   GOOD_EXCELLENT: {
-    label: 'Good / Excellent',
-    helper: 'Strategy rating is GOOD or EXCELLENT',
+    label: 'Good / Excellent proof',
+    helper: 'Review candidates with GOOD or EXCELLENT Strategy Framework proof',
     query: { decision: 'TRADE_CANDIDATE', strategyRatingGrades: 'GOOD,EXCELLENT' },
   },
   PAPER_OR_WATCHLIST: {
-    label: 'Paper / Watchlist ready',
-    helper: 'Readiness is PAPER_TEST_CANDIDATE or WATCHLIST_CANDIDATE',
+    label: 'Paper / Watchlist proof',
+    helper: 'Review candidates with PAPER_TEST_CANDIDATE or WATCHLIST_CANDIDATE proof labels',
     query: { decision: 'TRADE_CANDIDATE', readinessLabels: 'PAPER_TEST_CANDIDATE,WATCHLIST_CANDIDATE' },
   },
 };

@@ -78,7 +78,7 @@ test.describe('Strategy Decision Engine UI', () => {
 
     await expect(page.getByLabel('Region Override')).toHaveCount(0);
     await expect(page.getByText('Current scope: IN / STOCK')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Trade candidates' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Review candidates' })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Decision' })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Framework' })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Rating' })).toBeVisible();

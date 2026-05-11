@@ -6,6 +6,7 @@ import { MarketDataFoundationService } from '../market-data-foundation/market-da
 import { PortfolioManagementService } from '../portfolio-management';
 import { DataQualityEngineService } from '../data-quality-engine';
 import { StrategyFrameworkService } from '../strategy-framework';
+import { applyLongPlanGeometryGuards, canonicalizeTradePlanReadiness } from './trade-plan-risk-engine.geometry';
 
 export class TradePlanRiskEngineService {
   private repository = new TradePlanRiskEngineRepository();
@@ -366,6 +367,7 @@ export class TradePlanRiskEngineService {
         entryZone.quality = 'ACCEPTABLE';
         entryZone.rationale = decision.entryZone.rationale || entryZone.rationale;
       }
+      entryZone = this.normalizeEntryZone(entryZone, currentPrice, result);
       result.entryZone = entryZone;
 
       // 4. Stop Loss
@@ -377,9 +379,7 @@ export class TradePlanRiskEngineService {
          rationale: '',
       };
       
-      const entryPrice = currentPrice > entryZone.preferredEntryMax ? currentPrice : 
-                         currentPrice < entryZone.preferredEntryMin ? currentPrice : 
-                         (entryZone.preferredEntryMin + entryZone.preferredEntryMax) / 2;
+      const entryPrice = this.planningEntryPrice(currentPrice, entryZone);
 
       let recentSwingLow = currentPrice;
       if (prices.length >= 10) {
@@ -438,6 +438,7 @@ export class TradePlanRiskEngineService {
       }
       
       result.stopLoss = stopLoss;
+      applyLongPlanGeometryGuards(result, { currentPrice, plannedEntry: entryPrice });
 
       // 5. Target
       const riskPerShare = entryPrice - stopLoss.price;
@@ -602,11 +603,11 @@ export class TradePlanRiskEngineService {
       }
 
       const backtestSummary = await this.latestBacktestSummary(result.strategy, region, assetType, request.backtestTimeframe);
-      return this.finalizeAndPersist(result, { request, decision, latestPriceResult, pricesDto, prices, dataQuality, backtestSummary });
+      return this.finalizeAndPersist(canonicalizeTradePlanReadiness(result), { request, decision, latestPriceResult, pricesDto, prices, dataQuality, backtestSummary });
     } catch (e: any) {
       result.planStatus = 'BLOCKED';
       result.blockers.push(`Error generating plan: ${e.message}`);
-      return this.finalizeAndPersist(result, { request, decision: null, latestPriceResult: null, pricesDto: null, prices: [], dataQuality: null, backtestSummary: null });
+      return this.finalizeAndPersist(canonicalizeTradePlanReadiness(result), { request, decision: null, latestPriceResult: null, pricesDto: null, prices: [], dataQuality: null, backtestSummary: null });
     }
   }
 
@@ -964,6 +965,7 @@ export class TradePlanRiskEngineService {
       },
       scope: { region, assetType },
     }));
+    canonicalizeTradePlanReadiness(result);
 
     return this.persistWithReadiness(result);
   }
@@ -1113,6 +1115,40 @@ export class TradePlanRiskEngineService {
     if (!decision) return null;
     if (typeof decision.strategyRating === 'string') return decision.strategyRating;
     return decision.strategyRating?.ratingGrade || null;
+  }
+
+  private normalizeEntryZone(entryZone: EntryZone, currentPrice: number, result: TradePlanResultDto): EntryZone {
+    let min = Number(entryZone.preferredEntryMin);
+    let max = Number(entryZone.preferredEntryMax);
+    if (!Number.isFinite(min) || !Number.isFinite(max)) {
+      result.warnings.push('Entry zone was incomplete; current price was used as the fallback entry zone.');
+      min = currentPrice * 0.99;
+      max = currentPrice * 1.01;
+    }
+    if (min > max) {
+      result.warnings.push('Entry zone min/max were inverted and have been normalized.');
+      [min, max] = [max, min];
+    }
+    const rawReference = Number(entryZone.referencePrice);
+    const reference = Number.isFinite(rawReference)
+      ? Math.min(Math.max(rawReference, min), max)
+      : currentPrice < min
+        ? min
+        : currentPrice > max
+          ? max
+          : currentPrice;
+    return {
+      ...entryZone,
+      referencePrice: reference,
+      preferredEntryMin: min,
+      preferredEntryMax: max,
+    };
+  }
+
+  private planningEntryPrice(currentPrice: number, entryZone: EntryZone): number {
+    if (currentPrice < entryZone.preferredEntryMin) return entryZone.preferredEntryMin;
+    if (currentPrice > entryZone.preferredEntryMax) return currentPrice;
+    return currentPrice;
   }
 
   private toIso(value: unknown): string | null {

@@ -136,6 +136,110 @@ describe('BacktestingStrategyLabService', () => {
     expect(trade.netPnL).toBeCloseTo(trade.grossPnL - 1000 - expectedExitCost, 1);
   });
 
+  it('calculates trade return from net P&L over committed capital', async () => {
+    const closes = [...Array(50).fill(100), 110, 120];
+    const { service } = createService({
+      marketDataService: {
+        listPricesByInstrumentId: jest.fn(async () => ({ prices: makePatternPrices('AAA', closes) })),
+      },
+    });
+
+    const run = await service.run({
+      config: {
+        ...config,
+        universe: { type: 'SYMBOLS', symbols: ['AAA'] },
+        exitRule: { type: 'FIXED_HOLDING_PERIOD', holdingDays: 500 },
+        transactionCostPercent: 0.01,
+      },
+    });
+    const trade = run.trades[0];
+    const expectedEntryCost = 1000;
+    const expectedExitCost = trade.quantity * trade.exitPrice * 0.01;
+    const expectedNet = trade.grossPnL - expectedEntryCost - expectedExitCost;
+    const expectedReturn = expectedNet / config.initialCapital;
+
+    expect(run.trades).toHaveLength(1);
+    expect(trade.netPnL).toBeCloseTo(expectedNet, 2);
+    expect(trade.returnPercent).toBeCloseTo(expectedReturn, 6);
+    expect(run.metrics?.totalReturn).toBeCloseTo(expectedReturn, 6);
+  });
+
+  it('repairs stale saved-run trade returns and quarantines legacy invalid aggregate metrics', async () => {
+    const productOwnerStaleTrade = (
+      symbol: string,
+      entryPrice: number,
+      exitPrice: number,
+      quantity: number,
+      staleNetPnL: number,
+      staleReturnPercent: number,
+    ) => {
+      const grossPnL = quantity * (exitPrice - entryPrice);
+      return {
+        instrumentId: symbol,
+        symbol,
+        entryDate: '2026-04-01',
+        entryPrice,
+        exitDate: '2026-04-02',
+        exitPrice,
+        quantity,
+        grossPnL,
+        netPnL: staleNetPnL,
+        returnPercent: staleReturnPercent,
+        holdingDays: 1,
+        exitReason: 'STRATEGY_EXIT',
+      };
+    };
+    const trades = [
+      productOwnerStaleTrade('AAKASH.NS', 10.25, 10.05000019073486, 878.0487804878048, -2058.048629760742, -0.2195121765136719),
+      productOwnerStaleTrade('ABMINTLLTD.NS', 58.40000152587891, 56.15000152587891, 150.5855292337097, -2161.488003403313, -0.2385273962536277),
+      productOwnerStaleTrade('3MINDIA.NS', 31977.650390625, 31714.349609375, 0.2674063801494305, -1868.584444548344, -0.2082339001782068),
+    ];
+    const { service } = createService({
+      repository: {
+        listRuns: jest.fn().mockResolvedValue([{
+          id: 'legacy-run',
+          strategyId: null,
+          config: { ...config, region: 'IN', assetType: 'STOCK', transactionCostPercent: 0.1 },
+          status: 'COMPLETED',
+          startedAt: '2026-05-10T00:00:00.000Z',
+          completedAt: '2026-05-10T00:01:00.000Z',
+          metrics: {
+            totalReturn: -0.99992,
+            cagr: -1,
+            maxDrawdown: -0.99992,
+            volatility: null,
+            sharpeRatio: null,
+            winRate: null,
+            averageWin: null,
+            averageLoss: null,
+            profitFactor: null,
+            numberOfTrades: 614,
+            averageHoldingDays: null,
+            bestTrade: -0.208,
+            worstTrade: -0.239,
+          },
+          equityCurve: [{ date: '2026-05-10', equity: 8, cash: 8, investedValue: 0, drawdownPercent: -0.99992 }],
+          trades,
+          error: null,
+        }]),
+      },
+    });
+
+    const [run] = await service.listRuns('default-user');
+
+    const aakash = run.trades.find((trade) => trade.symbol === 'AAKASH.NS');
+    expect(run.trades.find((trade) => trade.symbol === 'AAKASH.NS')?.returnPercent).toBeCloseTo(-0.0215, 3);
+    expect(run.trades.find((trade) => trade.symbol === 'ABMINTLLTD.NS')?.returnPercent).toBeCloseTo(-0.0404, 3);
+    expect(run.trades.find((trade) => trade.symbol === '3MINDIA.NS')?.returnPercent).toBeCloseTo(-0.0102, 3);
+    expect(aakash?.netPnL).toBeCloseTo(-193.44, 1);
+    expect(aakash?.committedCapital).toBeCloseTo(9009.01, 1);
+    expect(run.metrics?.calculationAudit?.repairedTradeReturnCount).toBe(3);
+    expect(run.metrics?.calculationAudit?.aggregateStatus).toBe('LEGACY_INVALID');
+    expect(run.metrics?.availabilityStatus).toBe('ERROR');
+    expect(run.metrics?.totalReturn).toBe(-0.99992);
+    expect(run.metrics?.realismWarnings?.join(' ')).toContain('legacy invalid math path');
+  });
+
   it('worsens entry and exit prices with slippage', async () => {
     const { service } = createService();
 

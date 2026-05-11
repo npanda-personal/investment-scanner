@@ -68,6 +68,8 @@ Readiness thresholds:
 - Strategy proof: `frameworkBacked = true`, strategy code/version present, rating not `WEAK` or `UNPROVEN`, readiness label not `NOT_AUTOMATION_READY`, and a backtest summary is available.
 - Strategy decision: decision must be `TRADE_CANDIDATE` or equivalent entry candidate, market gate must not be `CLOSED`, confidence must be `MEDIUM` or `HIGH`, reasons must exist, and hard blockers must be absent.
 - Trade plan: `planStatus = VALID`, `riskGrade = LOW` or `MEDIUM`, entry zone/stop/target/position sizing/invalidation rules present, no hard blockers, and reward/risk must be at least `1.5`.
+- Long-plan geometry: stop loss must be below the planned entry assumption. When an entry zone exists, the stop must be below the relevant entry-zone floor/planned entry; a stop inside the zone or above the planned entry blocks the plan and paper readiness.
+- Canonical readiness: hard blockers are authoritative. If geometry or any other hard blocker sets `planStatus = BLOCKED`, the canonicalizer owns `riskGrade = HIGH`, `paperReadinessStatus = BLOCKED`, clears `paperReadinessReasons`, and records plan/blocker reasons in `paperReadinessBlockers`. Positive readiness reasons must not coexist with active blockers.
 - Data quality: latest price present, sufficient price history, coverage not `UNUSABLE`, liquidity not `ILLIQUID`, and stale price warnings handled.
 - Scope: region must be provided from global market scope and `assetType` must be `STOCK`.
 - Safety: actions are review, plan, simulate, and paper review candidate only.
@@ -94,9 +96,13 @@ Each generated `TradePlanResult` persists these additive fields:
 
 `marketDataSnapshot` stores instrument id, symbol, latest price, latest price timestamp, latest completed/stored trading dates when available, currency, exchange, region, asset type, source, and data status.
 
+Frontend money displays must use the persisted `marketDataSnapshot.currency` when present, with scoped fallback (`INR` for `IN`, otherwise `USD`). Entry, stop, target, position value, max risk, planning capital, and latest price should never be hardcoded to `$`.
+
 `dataQualitySnapshot` stores coverage, signal-readiness, liquidity, scores, eligibility, warnings, blockers, and generation timestamp. If no data-quality evaluation exists, it stores `status: "MISSING"` with a warning and blocker.
 
-`paperReadinessStatus`, reasons, and blockers are persisted at generation time and are the source of truth for candidate listing filters.
+`paperReadinessStatus`, reasons, and blockers are persisted at generation time. Candidate listing and funnel filters first run the same canonical geometry/readiness repair over the relevant stable scope, then apply persisted readiness/status/risk filters against repaired rows. This keeps `paperReadyOnly=true`, `paperReadinessStatus`, `planStatus`, `riskGrade`, totals, and funnel counts from selecting stale legacy rows whose stop/entry geometry is now blocked.
+
+Latest-plan detail reads, candidate lists, and funnel reads apply the same long-plan geometry guard and readiness canonicalizer used during generation. If a persisted legacy row has a stop inside or above the long entry zone, the read path returns `BLOCKED` / `HIGH` / `paperReadinessStatus = BLOCKED`, clears stale positive readiness reasons, records the geometry blocker, and persists that repaired status back to the row. Stop-loss rationale repair is idempotent; repeated reads do not append the geometry text repeatedly. `INSUFFICIENT_DATA` plans keep `paperReadinessStatus = INSUFFICIENT_DATA` and `riskGrade = UNDEFINED`; generic data-gap blockers are not collapsed into `BLOCKED`. The detail UI deduplicates identical blocker text across readiness and plan-blocker sections so the same hard blocker is not rendered twice while the API still exposes both canonical arrays. This prevents old generated plans from continuing to appear `VALID` or paper-ready after the rule is fixed.
 
 Future Paper Trading module rule: consume Trade Plan & Risk Engine public output and persisted snapshots only. It must not reach into upstream repositories or reconstruct eligibility from Strategy Decision, Strategy Framework, Market Data, or Data Quality internals.
 
@@ -111,7 +117,7 @@ Generated plans are idempotent per UTC generated date using:
 ### Plan Status
 - `VALID`: Requires R/R >= 1.5, good data quality, market gate open, robust stop/target methods.
 - `WATCH`: Strategy is unproven, price is extended above preferred entry, or R/R is between 1.0 and 1.5.
-- `BLOCKED`: R/R < 1.0, market gate CLOSED for long setups, unusable data quality, illiquid, or mathematically invalid target/stop geometry.
+- `BLOCKED`: R/R < 1.0, market gate CLOSED for long setups, unusable data quality, illiquid, or mathematically invalid target/stop geometry. For long plans, a stop inside or above the entry-zone floor/planned entry is a blocker.
 - `INSUFFICIENT_DATA`: Missing latest price or sufficient price history to compute technicals.
 
 ### Risk Grade
@@ -121,8 +127,8 @@ Generated plans are idempotent per UTC generated date using:
 - `UNDEFINED`: Insufficient data.
 
 ### Methodology
-- **Entry Zone**: Evaluates Breakout vs Pullback. Flags `WEAK` quality if price is already extended far above SMA50 or recent breakout zones.
-- **Stop Loss**: Prioritizes robust 10-day swing lows or SMA50 support. Falls back to ATR or fixed percentages (which flags `FALLBACK` quality and `HIGH` risk). Guards against stops being too tight (< 1%) or above entry.
+- **Entry Zone**: Evaluates Breakout vs Pullback. Flags `WEAK` quality if price is already extended far above SMA50 or recent breakout zones. Entry zones are normalized before stop/target/sizing. If current price is below the preferred zone, planning geometry uses the preferred entry floor and adds a waiting-for-entry warning; if current price is inside the zone, it uses current price; if price is above the zone, it uses current price so risk is not understated.
+- **Stop Loss**: Prioritizes robust 10-day swing lows or SMA50 support. Falls back to ATR or fixed percentages (which flags `FALLBACK` quality and `HIGH` risk). Guards against stops being too tight (< 1%), above entry, or inside/above the long entry zone. The blocker text is: `Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.`
 - **Target**: Defaults to 2R but flags `WEAK` if the expected move requires an unrealistic leap relative to recent volatility. Target <= Entry for longs results in `BLOCKED`.
 - **Target Transparency**: 2R targets expose `target.method = REWARD_RISK_MULTIPLE`, `target.rationale = "Target is modeled at 2R by default."`, and target quality. This is modeled risk geometry, not a predicted price.
 - **Position Sizing**: Safely scales based on `capitalBase`, actual connected portfolio value, or the model default planning capital base of `100000` when neither is supplied. Blocks quantities < 1. Exposes single-position portfolio concentration checks against a default 10% maximum.
@@ -147,7 +153,7 @@ The funnel endpoint returns:
 
 - Raw signal counts by direction for the selected `region` and `assetType`.
 - Strategy Decision counts by decision status, framework-backed status, and strategy.
-- Candidate discovery counts, including skipped candidates and skip reasons before generation. The eligible-plan count is sourced from the same Strategy Decision candidate query used by batch generation, while the skip-reason breakdown is a bounded diagnostic sample.
+- Candidate discovery counts, including skipped candidates and skip reasons before generation. The eligible-plan count is sourced from the same Strategy Decision review-candidate query used by batch generation, while the skip-reason breakdown is a bounded diagnostic sample.
 - `strategyDecisions.tradeCandidates` is also sourced from the exact Strategy Decision candidate query used by batch generation, not from the bounded diagnostic sample. This prevents the funnel from showing one sampled candidate while the generator correctly finds many.
 - Generated plan counts by plan status, risk grade, strategy, and paper readiness. When no date range is supplied, funnel diagnostics use the latest generated UTC date for the selected scope so stale older plan rows do not dominate current blocker counts.
 - Generated plan lists, latest-plan detail reads, and funnel generated-plan counts are proof-safe by default. Rows whose persisted `strategyProofSnapshot.frameworkBacked` is not `true` are hidden unless `includeLegacy=true` is explicitly supplied. Legacy rows are kept for auditability and are not deleted.
@@ -201,7 +207,9 @@ Proof timeframe behavior:
 ## Integration
 - **Frontend Dashboard:** Available at `/trade-plans`. Integrates with the shared `DataTable` to provide pagination and sorting (e.g., on the Status and Risk Grade columns). Batch generation starts with one discovery batch, then runs remaining offsets with a small frontend worker pool.
 - **Scoped Detail Reads:** `/trade-plans/:instrumentId` passes the global `region` and `assetType` to avoid showing wrong-scope persisted plans.
-- **Frontend Funnel Panel:** Shows raw bullish signals, Strategy Decision count, eligible plan candidates, generated plans, paper-ready count, blocked/watch/insufficient count, top blockers, skipped candidate reasons, recommendations, and a zero-paper-ready explanation.
+- **Persisted Geometry/Readiness Repair:** Detail, list, and funnel reads use the generation geometry guard and readiness canonicalizer, then update stale persisted status/risk/readiness/reasons/blockers when legacy rows are now blocked by stop/entry geometry. List filters and funnel counts are evaluated after repair so stale `READY_FOR_PAPER_REVIEW` rows cannot appear in paper-ready candidates.
+- **Frontend Funnel Panel:** Shows raw bullish signals, Strategy Decision count, eligible review candidates, generated plans, paper-ready count, blocked/watch/insufficient count, top blockers, skipped candidate reasons, recommendations, and a zero-paper-ready explanation.
+- **Candidate Taxonomy:** API fields retain `tradeCandidates` and `TRADE_CANDIDATE` for compatibility, but user-facing Trade Plan wording uses "eligible review candidates" and "paper review candidate" language.
 - **Batch Progress UI:** Batch generation disables the run button, shows processed/total candidates, generated and failed counts, request count, and selected proof timeframe while requests are running. The final summary separates discovered, eligible, skipped, paper-ready, failed, and top blocker counts.
 - **Batch Proof Selector:** The dashboard can send `backtestTimeframe` (`1Y`, `3Y`, `5Y`, `10Y`, `15Y`) during batch generation and includes the selected proof timeframe in completion messaging. The default generation proof is `3Y` because the current local IN/STOCK universe often lacks clean 10-year history.
 - Can be triggered manually via `/api/v1/trade-plans/generate`.
@@ -217,8 +225,9 @@ Proof timeframe behavior:
 - Backend scope helper tests: `npm test -- --runInBand --runTestsByPath tests/modules/signal-generation-engine/signal-generation-engine.repository.test.ts tests/modules/strategy-decision-engine/strategy-decision-engine.repository.test.ts` from `backend`
 - Frontend build: `npm run build` from `frontend`
 - Frontend focused UI smoke: `npm run test:ui -- trade-plan-risk-engine.spec.ts --output=playwright-results-trade-plan` from `frontend`
+- Connected taxonomy smoke: `npm run test:ui -- strategy-decision-engine.spec.ts research-hub.spec.ts trade-plan-risk-engine.spec.ts --workers=1` from `frontend`
 
 Known limitations:
-- Existing rows need migration/backfill if historical plans should receive snapshots. New generated plans store snapshots.
+- Existing rows need migration/backfill if historical plans should receive missing proof/data snapshots. Long stop/entry geometry and readiness status are repaired on detail, list, and funnel reads within the requested stable scope.
 - Region/asset scope is persisted from the request/default scope. Existing rows without scope are not treated as paper-review ready until regenerated/backfilled.
 - Backtest proof uses the requested `backtestTimeframe` when supplied; otherwise it stores the first available Strategy Framework performance summary for the strategy/scope.

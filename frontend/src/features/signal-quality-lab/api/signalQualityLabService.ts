@@ -13,11 +13,21 @@ import type {
 } from '../types';
 
 const API_BASE = '/api/v1/signals';
+export const SIGNAL_QUALITY_DASHBOARD_TIMEOUT_MS = 20_000;
 
 const params = (horizon: QualityHorizon, filters: QualityFilters = {}, scope: { region?: string; assetType?: string } = {}) => ({ horizon, limit: 5000, minSampleSize: 0, region: scope.region, assetType: scope.assetType, ...filters });
 
-export async function fetchSignalQualityDashboard(horizon: QualityHorizon, filters: QualityFilters = {}, scope: { region?: string; assetType?: string } = {}) {
-  const response = await axios.get<{ summary: QualitySummary; byType: SignalTypePerformance[]; bySector: QualityMetricGroup[]; byRegime: QualityMetricGroup[]; byDataQuality: QualityMetricGroup[]; noisy: NoisySignalItem[] }>(`${API_BASE}/quality/dashboard`, { params: params(horizon, filters, scope) });
+export async function fetchSignalQualityDashboard(
+  horizon: QualityHorizon,
+  filters: QualityFilters = {},
+  scope: { region?: string; assetType?: string } = {},
+  options: { signal?: AbortSignal; timeoutMs?: number } = {}
+) {
+  const response = await axios.get<{ summary: QualitySummary; byType: SignalTypePerformance[]; bySector: QualityMetricGroup[]; byRegime: QualityMetricGroup[]; byDataQuality: QualityMetricGroup[]; noisy: NoisySignalItem[] }>(`${API_BASE}/quality/dashboard`, {
+    params: params(horizon, filters, scope),
+    signal: options.signal,
+    timeout: options.timeoutMs ?? SIGNAL_QUALITY_DASHBOARD_TIMEOUT_MS,
+  });
   return response.data;
 }
 

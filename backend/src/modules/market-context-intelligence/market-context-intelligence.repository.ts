@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import prisma from '../../db/prisma';
+import { isKnownSector } from '../../shared/utils/sector-metadata';
 import type { 
   MarketContextSummary, 
   MarketRegimeSummary, 
@@ -32,19 +33,22 @@ export class MarketContextIntelligenceRepository {
       dataStatus: market.dataStatus as any,
     };
 
+    const breadthInstrumentCount = sectors.reduce((sum, sector) => sum + (sector.instrumentCount || 0), 0);
     const breadth: MarketBreadth = {
       percentAboveSma50: market.breadthPercentAboveSma50,
       percentAboveSma200: market.breadthPercentAboveSma200,
+      sma50SampleCount: market.breadthPercentAboveSma50 === null ? 0 : breadthInstrumentCount,
+      sma200SampleCount: market.breadthPercentAboveSma200 === null ? 0 : breadthInstrumentCount,
       advanceDeclineRatio: market.advanceDeclineRatio,
       newHigh52WeekCount: market.newHighCount || 0,
       newLow52WeekCount: market.newLowCount || 0,
       bullishSignalCount: 0,
       bearishSignalCount: 0,
-      instrumentCount: 0,
+      instrumentCount: breadthInstrumentCount,
       dataStatus: market.dataStatus as any,
     };
 
-    const mappedSectors: SectorRotationItem[] = sectors.map(s => ({
+    const mappedSectors: SectorRotationItem[] = sectors.filter((sector) => this.isKnownMetadata(sector.sector)).map(s => ({
       sector: s.sector,
       return1M: s.oneMonthReturn,
       return3M: s.threeMonthReturn,
@@ -79,7 +83,7 @@ export class MarketContextIntelligenceRepository {
     return {
       regime,
       topSectors: mappedSectors.slice(0, 5),
-      weakSectors: mappedSectors.slice(-5).reverse(),
+      weakSectors: this.weakSectorSlice(mappedSectors),
       breadth,
       countryStrength: mappedCountries.slice(0, 8),
       macro,
@@ -192,5 +196,14 @@ export class MarketContextIntelligenceRepository {
         })
       )
     ]);
+  }
+
+  private isKnownMetadata(value: string | null | undefined) {
+    return isKnownSector(value);
+  }
+
+  private weakSectorSlice(sectors: SectorRotationItem[]) {
+    if (sectors.length <= 1) return [];
+    return sectors.slice(-Math.min(5, sectors.length - 1)).reverse();
   }
 }

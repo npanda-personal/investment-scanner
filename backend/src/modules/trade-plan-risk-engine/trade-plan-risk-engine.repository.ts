@@ -1,9 +1,11 @@
 import { Prisma } from '@prisma/client';
 import prisma from '../../db/prisma';
 import type { TradePlanResultDto, TradePlanListQuery, TradePlanFunnelQuery } from './trade-plan-risk-engine.types';
+import { applyLongPlanGeometryGuards, canonicalizeTradePlanReadiness } from './trade-plan-risk-engine.geometry';
 
 export class TradePlanRiskEngineRepository {
   private db = prisma;
+  private readonly repairBatchSize = 500;
 
   async upsert(data: TradePlanResultDto): Promise<TradePlanResultDto> {
     const generatedDate = new Date();
@@ -121,10 +123,15 @@ export class TradePlanRiskEngineRepository {
       orderBy: { generatedAt: 'desc' },
     });
 
-    return record ? this.toDto(record) : null;
+    if (!record) return null;
+    const [dto] = await this.canonicalizeAndRepairRecords([record]);
+    return dto;
   }
 
   async list(query: TradePlanListQuery): Promise<{ results: TradePlanResultDto[]; total: number }> {
+    const repairScope = this.buildListWhere(query, { includeCanonicalFilters: false });
+    await this.repairCanonicalRowsInScope(repairScope);
+
     const where = this.buildListWhere(query);
 
     const sortBy = this.sortBy(query.sortBy);
@@ -137,11 +144,11 @@ export class TradePlanRiskEngineRepository {
       skip: query.offset || 0,
     });
 
-    return { results: records.map((r: any) => this.toDto(r)), total };
+    return { results: await this.canonicalizeAndRepairRecords(records), total };
   }
 
   async funnelPlans(query: TradePlanFunnelQuery): Promise<TradePlanResultDto[]> {
-    const where = this.buildListWhere(query);
+    const where = this.buildListWhere(query, { includeCanonicalFilters: false });
     if (query.generatedDate) where.generatedDate = this.normalizeUtcDay(query.generatedDate);
     if (query.from || query.to) {
       where.generatedAt = {
@@ -158,12 +165,14 @@ export class TradePlanRiskEngineRepository {
       if (latest?.generatedDate) where.generatedDate = latest.generatedDate;
     }
 
+    await this.repairCanonicalRowsInScope(where);
+
     const records = await this.db.tradePlanResult.findMany({
       where,
       orderBy: { generatedAt: 'desc' },
       take: 5000,
     });
-    return records.map((record: any) => this.toDto(record));
+    return this.canonicalizeAndRepairRecords(records);
   }
 
   async getHealthStats() {
@@ -182,7 +191,7 @@ export class TradePlanRiskEngineRepository {
       return val;
     };
 
-    return {
+    return canonicalizeTradePlanReadiness(applyLongPlanGeometryGuards({
       id: record.id,
       instrumentId: record.instrumentId,
       symbol: record.symbol,
@@ -222,7 +231,62 @@ export class TradePlanRiskEngineRepository {
       generatedAt: record.generatedAt.toISOString(),
       generatedDate: record.generatedDate?.toISOString(),
       modelVersion: record.modelVersion,
+    }));
+  }
+
+  private async canonicalizeAndRepairRecords(records: any[]): Promise<TradePlanResultDto[]> {
+    const results: TradePlanResultDto[] = [];
+    for (const record of records) {
+      const dto = this.toDto(record);
+      await this.persistCanonicalRepairIfChanged(record, dto);
+      results.push(dto);
+    }
+    return results;
+  }
+
+  private async repairCanonicalRowsInScope(where: Prisma.TradePlanResultWhereInput) {
+    let cursor: { id: string } | undefined;
+    for (;;) {
+      const records = await this.db.tradePlanResult.findMany({
+        where,
+        orderBy: { id: 'asc' },
+        take: this.repairBatchSize,
+        ...(cursor ? { cursor, skip: 1 } : {}),
+      });
+      if (records.length === 0) break;
+      await this.canonicalizeAndRepairRecords(records);
+      if (records.length < this.repairBatchSize) break;
+      cursor = { id: records[records.length - 1].id };
+    }
+  }
+
+  private async persistCanonicalRepairIfChanged(record: any, dto: TradePlanResultDto) {
+    const parseJson = (val: any) => {
+      if (typeof val === 'string') return JSON.parse(val);
+      return val;
     };
+    const changed = dto.planStatus !== record.planStatus
+      || dto.riskGrade !== record.riskGrade
+      || JSON.stringify(dto.blockers || []) !== JSON.stringify(parseJson(record.blockers) || [])
+      || JSON.stringify(dto.warnings || []) !== JSON.stringify(parseJson(record.warnings) || [])
+      || JSON.stringify(dto.stopLoss || null) !== JSON.stringify(parseJson(record.stopLoss) || null)
+      || dto.paperReadinessStatus !== record.paperReadinessStatus
+      || JSON.stringify(dto.paperReadinessReasons || []) !== JSON.stringify(parseJson(record.paperReadinessReasons) || [])
+      || JSON.stringify(dto.paperReadinessBlockers || []) !== JSON.stringify(parseJson(record.paperReadinessBlockers) || []);
+    if (!changed) return;
+    await this.db.tradePlanResult.update({
+      where: { id: record.id },
+      data: {
+        planStatus: dto.planStatus,
+        riskGrade: dto.riskGrade,
+        blockers: dto.blockers as any,
+        warnings: dto.warnings as any,
+        stopLoss: dto.stopLoss ? dto.stopLoss as any : Prisma.DbNull,
+        paperReadinessStatus: dto.paperReadinessStatus,
+        paperReadinessReasons: dto.paperReadinessReasons as any,
+        paperReadinessBlockers: dto.paperReadinessBlockers as any,
+      },
+    });
   }
 
   private sortBy(value?: string) {
@@ -230,15 +294,19 @@ export class TradePlanRiskEngineRepository {
     return allowed.has(value || '') ? value! : 'generatedAt';
   }
 
-  private buildListWhere(query: TradePlanListQuery | TradePlanFunnelQuery): Prisma.TradePlanResultWhereInput {
+  private buildListWhere(
+    query: TradePlanListQuery | TradePlanFunnelQuery,
+    options: { includeCanonicalFilters?: boolean } = {}
+  ): Prisma.TradePlanResultWhereInput {
+    const includeCanonicalFilters = options.includeCanonicalFilters !== false;
     const where: Prisma.TradePlanResultWhereInput = {};
     if (query.region) where.region = query.region;
     if (query.assetType) where.assetType = query.assetType;
     if (query.strategyCode) where.strategy = query.strategyCode;
-    if ('planStatus' in query && query.planStatus) where.planStatus = query.planStatus;
-    if ('riskGrade' in query && query.riskGrade) where.riskGrade = query.riskGrade;
-    if ('paperReadyOnly' in query && query.paperReadyOnly) where.paperReadinessStatus = 'READY_FOR_PAPER_REVIEW';
-    if ('paperReadinessStatus' in query && query.paperReadinessStatus) where.paperReadinessStatus = query.paperReadinessStatus;
+    if (includeCanonicalFilters && 'planStatus' in query && query.planStatus) where.planStatus = query.planStatus;
+    if (includeCanonicalFilters && 'riskGrade' in query && query.riskGrade) where.riskGrade = query.riskGrade;
+    if (includeCanonicalFilters && 'paperReadyOnly' in query && query.paperReadyOnly) where.paperReadinessStatus = 'READY_FOR_PAPER_REVIEW';
+    if (includeCanonicalFilters && 'paperReadinessStatus' in query && query.paperReadinessStatus) where.paperReadinessStatus = query.paperReadinessStatus;
     if (query.backtestTimeframe) where.backtestTimeframe = query.backtestTimeframe;
     if ('strategyRating' in query && query.strategyRating) where.strategyRating = query.strategyRating;
     if ('readinessLabel' in query && query.readinessLabel) where.readinessLabel = query.readinessLabel;

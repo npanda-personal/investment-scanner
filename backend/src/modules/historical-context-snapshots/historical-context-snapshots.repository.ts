@@ -1,4 +1,5 @@
 import prisma from '../../db/prisma';
+import { isKnownSector, unknownSectorFilterValues } from '../../shared/utils/sector-metadata';
 import type { SnapshotCount, SnapshotQuery } from './historical-context-snapshots.types';
 
 export class HistoricalContextSnapshotsRepository {
@@ -47,20 +48,22 @@ export class HistoricalContextSnapshotsRepository {
   }
 
   market(query: SnapshotQuery) {
-    return this.db.marketContextSnapshot.findMany({ where: this.dateWhere(query), orderBy: { snapshotDate: 'desc' }, take: query.limit });
+    return this.db.marketContextSnapshot.findMany({ where: { ...this.dateWhere(query), region: query.region }, orderBy: { snapshotDate: 'desc' }, take: query.limit });
   }
 
   sectors(query: SnapshotQuery) {
+    if (query.sector && !isKnownSector(query.sector)) return Promise.resolve([]);
+    const sectorFilter = query.sector || { notIn: unknownSectorFilterValues };
     return this.db.sectorContextSnapshot.findMany({
-      where: { ...this.dateWhere(query), sector: query.sector },
+      where: { ...this.dateWhere(query), region: query.region, sector: sectorFilter },
       orderBy: [{ snapshotDate: 'desc' }, { relativeStrengthScore: 'desc' }],
-      take: query.limit,
-    });
+      ...(query.sector ? { take: query.limit } : {}),
+    }).then((rows) => rows.filter((row: any) => isKnownSector(row.sector)).slice(0, query.limit));
   }
 
   countries(query: SnapshotQuery) {
     return this.db.countryContextSnapshot.findMany({
-      where: { ...this.dateWhere(query), country: query.country },
+      where: { ...this.dateWhere(query), region: query.region, country: query.country },
       orderBy: [{ snapshotDate: 'desc' }, { relativeStrengthScore: 'desc' }],
       take: query.limit,
     });
@@ -68,7 +71,7 @@ export class HistoricalContextSnapshotsRepository {
 
   smartMoney(query: SnapshotQuery) {
     return this.db.smartMoneyContextSnapshot.findMany({
-      where: { ...this.dateWhere(query), instrumentId: query.instrumentId, sector: query.sector },
+      where: { ...this.dateWhere(query), instrumentId: query.instrumentId, sector: query.sector, ...this.stockScopeWhere(query) },
       orderBy: [{ snapshotDate: 'desc' }, { smartMoneyScore: 'desc' }],
       take: query.limit,
     });
@@ -82,26 +85,38 @@ export class HistoricalContextSnapshotsRepository {
     });
   }
 
-  async coverage() {
-    const [marketSnapshots, sectorSnapshots, countrySnapshots, smartMoneySnapshots, dataQualitySnapshots, latest] = await Promise.all([
-      this.db.marketContextSnapshot.count(),
-      this.db.sectorContextSnapshot.count(),
-      this.db.countryContextSnapshot.count(),
-      this.db.smartMoneyContextSnapshot.count(),
+  async coverage(query: Pick<SnapshotQuery, 'region' | 'assetType'> = {}) {
+    const [marketSnapshots, sectorRows, countrySnapshots, smartMoneySnapshots, dataQualitySnapshots, latest] = await Promise.all([
+      this.db.marketContextSnapshot.count({ where: { region: query.region } }),
+      this.db.sectorContextSnapshot.findMany({ where: { region: query.region }, select: { sector: true } }),
+      this.db.countryContextSnapshot.count({ where: { region: query.region } }),
+      this.db.smartMoneyContextSnapshot.count({ where: this.stockScopeWhere(query) }),
       this.db.dataQualitySnapshot.count(),
-      this.db.marketContextSnapshot.findFirst({ orderBy: { snapshotDate: 'desc' } }),
+      this.db.marketContextSnapshot.findFirst({ where: { region: query.region }, orderBy: { snapshotDate: 'desc' } }),
     ]);
-    return { marketSnapshots, sectorSnapshots, countrySnapshots, smartMoneySnapshots, dataQualitySnapshots, latestSnapshotDate: latest?.snapshotDate ?? null };
+    const sectorSnapshots = sectorRows.filter((row: any) => isKnownSector(row.sector)).length;
+    return {
+      marketSnapshots,
+      sectorSnapshots,
+      sectorMetadataGapSnapshots: sectorRows.length - sectorSnapshots,
+      countrySnapshots,
+      smartMoneySnapshots,
+      dataQualitySnapshots,
+      latestSnapshotDate: latest?.snapshotDate ?? null,
+    };
   }
 
-  async lookup(date: Date, lookbackDays: number, filters: { instrumentId?: string; sector?: string; country?: string }) {
+  async lookup(date: Date, lookbackDays: number, filters: { instrumentId?: string; sector?: string; country?: string; region?: string; assetType?: string }) {
     const gte = new Date(date.getTime() - lookbackDays * 86400000);
     const dateFilter = { lte: date, gte };
+    const sectorLookup = filters.sector && isKnownSector(filters.sector)
+      ? this.db.sectorContextSnapshot.findFirst({ where: { snapshotDate: dateFilter, region: filters.region, sector: filters.sector }, orderBy: { snapshotDate: 'desc' } })
+      : Promise.resolve(null);
     const [market, sector, country, smartMoney, dataQuality] = await Promise.all([
-      this.db.marketContextSnapshot.findFirst({ where: { snapshotDate: dateFilter }, orderBy: { snapshotDate: 'desc' } }),
-      filters.sector ? this.db.sectorContextSnapshot.findFirst({ where: { snapshotDate: dateFilter, sector: filters.sector }, orderBy: { snapshotDate: 'desc' } }) : Promise.resolve(null),
-      filters.country ? this.db.countryContextSnapshot.findFirst({ where: { snapshotDate: dateFilter, country: filters.country }, orderBy: { snapshotDate: 'desc' } }) : Promise.resolve(null),
-      filters.instrumentId ? this.db.smartMoneyContextSnapshot.findFirst({ where: { snapshotDate: dateFilter, instrumentId: filters.instrumentId }, orderBy: { snapshotDate: 'desc' } }) : Promise.resolve(null),
+      this.db.marketContextSnapshot.findFirst({ where: { snapshotDate: dateFilter, region: filters.region }, orderBy: { snapshotDate: 'desc' } }),
+      sectorLookup,
+      filters.country ? this.db.countryContextSnapshot.findFirst({ where: { snapshotDate: dateFilter, region: filters.region, country: filters.country }, orderBy: { snapshotDate: 'desc' } }) : Promise.resolve(null),
+      filters.instrumentId ? this.db.smartMoneyContextSnapshot.findFirst({ where: { snapshotDate: dateFilter, instrumentId: filters.instrumentId, ...this.stockScopeWhere(filters) }, orderBy: { snapshotDate: 'desc' } }) : Promise.resolve(null),
       filters.instrumentId ? this.db.dataQualitySnapshot.findFirst({ where: { snapshotDate: dateFilter, instrumentId: filters.instrumentId }, orderBy: { snapshotDate: 'desc' } }) : Promise.resolve(null),
     ]);
     return { market, sector, country, smartMoney, dataQuality };
@@ -115,5 +130,15 @@ export class HistoricalContextSnapshotsRepository {
     if (query.date) return { snapshotDate: query.date };
     if (query.from || query.to) return { snapshotDate: { gte: query.from, lte: query.to } };
     return {};
+  }
+
+  private stockScopeWhere(query: { region?: string; assetType?: string }) {
+    if (!query.region && !query.assetType) return {};
+    const stock: Record<string, unknown> = {};
+    if (query.region) stock.region = query.region;
+    if (query.assetType) stock.assetType = query.assetType === 'STOCK' ? { in: ['STOCK', 'EQUITY'] } : query.assetType;
+    return {
+      stock: { is: stock },
+    };
   }
 }

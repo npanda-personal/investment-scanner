@@ -18,7 +18,7 @@ import type {
 } from './backtesting-strategy-lab.types';
 import { validateConfig, validateStrategyInput } from './backtesting-strategy-lab.validation';
 
-interface Position { instrumentId: string; symbol: string; entryDate: string; entryPrice: number; quantity: number; entryBarIndex: number; cost: number; entryReasons?: string[]; highestClose: number }
+interface Position { instrumentId: string; symbol: string; entryDate: string; entryPrice: number; quantity: number; entryBarIndex: number; cost: number; committedCapital: number; entryReasons?: string[]; highestClose: number }
 interface ResolvedUniverse {
   instruments: Array<{ instrumentId: string; symbol: string }>;
   totalAvailable?: number;
@@ -51,12 +51,15 @@ export class BacktestingStrategyLabService {
   deleteStrategy(id: string, userId = 'default-user') { return this.repository.deleteStrategy(id, userId); }
   async listRuns(userId = 'default-user', query: BacktestRunListQuery = {}) {
     const runs = await this.repository.listRuns(userId);
-    const filtered = runs.filter((run) => this.runMatchesScope(run, query));
+    const filtered = runs.map((run) => this.normalizePersistedRun(run)).filter((run) => this.runMatchesScope(run, query));
     const offset = query.offset ?? 0;
     const limit = query.limit ?? 100;
     return filtered.slice(offset, offset + limit);
   }
-  getRun(id: string, userId = 'default-user') { return this.repository.getRun(id, userId); }
+  async getRun(id: string, userId = 'default-user') {
+    const run = await this.repository.getRun(id, userId);
+    return run ? this.normalizePersistedRun(run) : null;
+  }
   deleteRun(id: string, userId = 'default-user') { return this.repository.deleteRun(id, userId); }
 
   async createStrategy(input: CreateBacktestStrategyRequest, userId = 'default-user') {
@@ -213,7 +216,7 @@ export class BacktestingStrategyLabService {
         const entryPrice = this.applyEntrySlippage(bar.close, config);
         const quantity = tradeAmount / entryPrice;
         cash -= costAdjustedAmount;
-        positions.set(history.instrumentId, { instrumentId: history.instrumentId, symbol: history.symbol, entryDate: date, entryPrice, quantity, entryBarIndex: barIndex, cost: transactionCost, entryReasons: entry.reasons, highestClose: bar.close });
+        positions.set(history.instrumentId, { instrumentId: history.instrumentId, symbol: history.symbol, entryDate: date, entryPrice, quantity, entryBarIndex: barIndex, cost: transactionCost, committedCapital: costAdjustedAmount, entryReasons: entry.reasons, highestClose: bar.close });
       }
       const investedValue = [...positions.values()].reduce((sum, position) => {
         const history = histories.get(position.instrumentId);
@@ -565,6 +568,7 @@ export class BacktestingStrategyLabService {
     const gross = position.quantity * (exitPrice - position.entryPrice);
     const exitCost = position.quantity * exitPrice * config.transactionCostPercent;
     const net = gross - position.cost - exitCost;
+    const committedCapital = position.committedCapital || (position.quantity * position.entryPrice + position.cost);
     return {
       instrumentId: position.instrumentId,
       symbol: position.symbol,
@@ -575,7 +579,7 @@ export class BacktestingStrategyLabService {
       quantity: position.quantity,
       grossPnL: gross,
       netPnL: net,
-      returnPercent: (exitPrice - position.entryPrice) / position.entryPrice - config.transactionCostPercent * 2,
+      returnPercent: committedCapital > 0 ? net / committedCapital : 0,
       holdingDays: Math.max(1, Math.round((new Date(bar.date).getTime() - new Date(position.entryDate).getTime()) / (24 * 60 * 60 * 1000))),
       exitReason,
       entryReason: position.entryReasons?.[0],
@@ -671,7 +675,7 @@ export class BacktestingStrategyLabService {
       benchmarkName: `${config.region || 'GLOBAL'} equal-weight universe baseline`,
       benchmarkTotalReturn,
       benchmarkCagr,
-      excessReturn: metrics.totalReturn - benchmarkTotalReturn,
+      excessReturn: (metrics.totalReturn ?? 0) - benchmarkTotalReturn,
       excessCagr: metrics.cagr !== null && benchmarkCagr !== null ? metrics.cagr - benchmarkCagr : null,
       benchmarkDataStatus: 'FALLBACK_EQUAL_WEIGHT',
     };
@@ -698,5 +702,111 @@ export class BacktestingStrategyLabService {
 
   private throwIfErrors(errors: string[]) {
     if (errors.length > 0) throw new Error(errors.join('; '));
+  }
+
+  private normalizePersistedRun(run: BacktestRunDto): BacktestRunDto {
+    if (!run.metrics || run.status !== 'COMPLETED') return run;
+    const config = run.config || {} as BacktestStrategyConfig;
+    const initialCapital = Number(config.initialCapital);
+    const latestEquity = this.latestEquity(run.equityCurve);
+    const persistedTotalReturn = Number(run.metrics.totalReturn);
+    const aggregateLooksInvalid = Number.isFinite(initialCapital)
+      && initialCapital > 0
+      && (run.trades || []).length > 0
+      && (
+        (Number.isFinite(latestEquity) && latestEquity < initialCapital * 0.001)
+        || (Number.isFinite(persistedTotalReturn) && persistedTotalReturn <= -0.999)
+      );
+    let repairedTradeReturnCount = 0;
+    const trades = (run.trades || []).map((trade) => {
+      const repaired = this.repairTradeReturnForDisplay(trade, config, aggregateLooksInvalid);
+      if (repaired.calculationStatus === 'REPAIRED_FROM_PNL') repairedTradeReturnCount += 1;
+      return repaired;
+    });
+    const aggregateWarnings = [...(run.metrics.calculationAudit?.warnings || [])];
+
+    if (repairedTradeReturnCount > 0) {
+      aggregateWarnings.push(`${repairedTradeReturnCount} persisted trade rows were repaired from entry, exit, quantity, costs, and committed entry capital.`);
+    }
+    if (aggregateLooksInvalid) {
+      aggregateWarnings.push('Persisted aggregate equity metrics were generated by a legacy invalid math path; trade rows are repaired but aggregate return is withheld.');
+    }
+
+    const metrics: BacktestMetrics = {
+      ...run.metrics,
+      numberOfTrades: trades.length,
+      bestTrade: trades.length > 0 ? Math.max(...trades.map((trade) => trade.returnPercent)) : null,
+      worstTrade: trades.length > 0 ? Math.min(...trades.map((trade) => trade.returnPercent)) : null,
+      realismWarnings: this.uniqueStrings([
+        ...(run.metrics.realismWarnings || []),
+        ...aggregateWarnings,
+      ]),
+      availabilityStatus: aggregateLooksInvalid ? 'ERROR' : run.metrics.availabilityStatus,
+      totalReturn: run.metrics.totalReturn,
+      cagr: aggregateLooksInvalid ? null : run.metrics.cagr,
+      calculationAudit: {
+        tradeReturnFormula: 'NET_PNL_OVER_COMMITTED_ENTRY_CAPITAL',
+        repairedTradeReturnCount,
+        aggregateStatus: aggregateLooksInvalid ? 'LEGACY_INVALID' : 'OK',
+        warnings: this.uniqueStrings(aggregateWarnings),
+      },
+    };
+
+    return { ...run, metrics, trades };
+  }
+
+  private repairTradeReturnForDisplay(trade: BacktestTrade, config: BacktestStrategyConfig, legacyInvalidAggregate = false): BacktestTrade {
+    const entryPrice = Number(trade.entryPrice);
+    const exitPrice = Number(trade.exitPrice);
+    const quantity = Number(trade.quantity);
+    if (![entryPrice, exitPrice, quantity].every(Number.isFinite) || entryPrice <= 0 || quantity <= 0) return trade;
+
+    const boundedCostPercent = this.displayTransactionCostPercent(config, legacyInvalidAggregate);
+    const entryNotional = entryPrice * quantity;
+    const persistedCommittedCapital = Number((trade as any).committedCapital);
+    const committedCapital = Number.isFinite(persistedCommittedCapital) && persistedCommittedCapital > 0
+      ? persistedCommittedCapital
+      : boundedCostPercent < 1
+        ? entryNotional / (1 - boundedCostPercent)
+        : entryNotional;
+    const grossPnL = Number.isFinite(Number(trade.grossPnL)) ? Number(trade.grossPnL) : quantity * (exitPrice - entryPrice);
+    const exitNotional = quantity * exitPrice;
+    const entryCost = Math.max(0, committedCapital - entryNotional);
+    const recomputedNetPnL = grossPnL - entryCost - exitNotional * boundedCostPercent;
+    const persistedNet = Number(trade.netPnL);
+    const netPnLNeedsRepair = !Number.isFinite(persistedNet)
+      || Math.abs(persistedNet - recomputedNetPnL) > Math.max(0.01, Math.abs(recomputedNetPnL) * 0.001);
+    const netPnL = netPnLNeedsRepair ? recomputedNetPnL : persistedNet;
+    if (!Number.isFinite(committedCapital) || committedCapital <= 0 || !Number.isFinite(netPnL)) return trade;
+
+    const repairedReturn = netPnL / committedCapital;
+    const persistedReturn = Number(trade.returnPercent);
+    const needsRepair = netPnLNeedsRepair || !Number.isFinite(persistedReturn) || Math.abs(persistedReturn - repairedReturn) > 0.0025;
+    return {
+      ...trade,
+      grossPnL,
+      netPnL,
+      committedCapital,
+      returnPercent: needsRepair ? repairedReturn : trade.returnPercent,
+      calculationStatus: needsRepair ? 'REPAIRED_FROM_PNL' : trade.calculationStatus || 'PERSISTED',
+    };
+  }
+
+  private displayTransactionCostPercent(config: BacktestStrategyConfig, legacyInvalidAggregate: boolean): number {
+    const costPercent = Number(config.transactionCostPercent ?? 0);
+    if (!Number.isFinite(costPercent) || costPercent < 0) return 0;
+    if (legacyInvalidAggregate && costPercent > 0.02 && costPercent <= 10) {
+      return costPercent / 100;
+    }
+    return costPercent < 1 ? costPercent : 0;
+  }
+
+  private latestEquity(curve: EquityCurvePoint[]): number {
+    const latest = curve.at(-1)?.equity;
+    return Number(latest);
+  }
+
+  private uniqueStrings(values: string[]) {
+    return [...new Set(values.filter(Boolean))];
   }
 }

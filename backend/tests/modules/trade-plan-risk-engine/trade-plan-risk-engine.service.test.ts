@@ -134,7 +134,25 @@ describe('TradePlanRiskEngineService', () => {
       const plan = await service.generatePlan({ instrumentId: 'INST-1', symbol: 'TEST' });
       
       expect(plan.planStatus).toBe('INSUFFICIENT_DATA');
+      expect(plan.riskGrade).toBe('UNDEFINED');
+      expect(plan.paperReadinessStatus).toBe('INSUFFICIENT_DATA');
+      expect(plan.paperReadinessReasons).toEqual([]);
       expect(plan.blockers).toContain('Missing latest price.');
+    });
+
+    it('keeps insufficient historical price data in the INSUFFICIENT_DATA readiness bucket', async () => {
+      mockStrategyService.latestForInstrument.mockResolvedValue(defaultDecision as any);
+      mockMarketDataService.latestPriceByInstrumentId.mockResolvedValue(defaultPriceResult as any);
+      mockMarketDataService.listPricesByInstrumentId.mockResolvedValue({ prices: Array(9).fill({ close: 100, low: 99, high: 101 }) } as any);
+
+      const plan = await service.generatePlan({ instrumentId: 'INST-1', symbol: 'TEST' });
+
+      expect(plan.planStatus).toBe('INSUFFICIENT_DATA');
+      expect(plan.riskGrade).toBe('UNDEFINED');
+      expect(plan.paperReadinessStatus).toBe('INSUFFICIENT_DATA');
+      expect(plan.paperReadinessReasons).toEqual([]);
+      expect(plan.blockers).toContain('Insufficient historical price data (< 10 bars).');
+      expect(plan.paperReadinessBlockers).toContain('Price history is insufficient.');
     });
 
     it('calculates reward/risk ratio and targets from 2R', async () => {
@@ -154,6 +172,88 @@ describe('TradePlanRiskEngineService', () => {
       expect(plan.target?.price).toBeCloseTo(121.8, 2);
       expect(plan.rewardRiskRatio).toBe(2.0);
       expect(plan.target?.rationale).toBe('Target is modeled at 2R by default.');
+    });
+
+    it('uses the planned entry zone floor when current price is below a breakout entry zone', async () => {
+      mockStrategyService.latestForInstrument.mockResolvedValue({
+        ...defaultDecision,
+        strategy: 'BREAKOUT_CONFIRMATION',
+        entryZone: {
+          preferredEntryMin: 110,
+          preferredEntryMax: 112,
+          rationale: 'Wait for confirmed breakout above resistance.',
+        },
+      } as any);
+      mockMarketDataService.latestPriceByInstrumentId.mockResolvedValue({ latest: { close: 100 } } as any);
+      const prices = Array(60).fill(null).map(() => ({ close: 100, low: 100, high: 112 }));
+      prices[0] = { close: 100, low: 95, high: 112 };
+      mockMarketDataService.listPricesByInstrumentId.mockResolvedValue({ prices } as any);
+
+      const plan = await service.generatePlan({ instrumentId: 'INST-1', symbol: 'TEST', capitalBase: 10000, riskPercent: 1 });
+
+      expect(plan.entryZone?.preferredEntryMin).toBe(110);
+      expect(plan.stopLoss?.price).toBeLessThan(plan.entryZone!.preferredEntryMin);
+      expect(plan.warnings).toContain('Current price is below the entry zone; sizing and target assume waiting for the entry-zone floor.');
+      expect(plan.blockers).not.toContain('Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.');
+      expect(plan.target?.price).toBeGreaterThan(plan.entryZone!.preferredEntryMax);
+      expect(plan.positionSizing?.estimatedPositionValue).toBe(plan.positionSizing!.suggestedQuantity * 110);
+      expect(plan.rewardRiskRatio).toBe(2);
+    });
+
+    it('blocks a long plan when the stop sits inside the entry zone', async () => {
+      mockStrategyService.latestForInstrument.mockResolvedValue({
+        ...defaultDecision,
+        strategy: 'PULLBACK_IN_UPTREND',
+      } as any);
+      mockMarketDataService.latestPriceByInstrumentId.mockResolvedValue({ latest: { close: 100 } } as any);
+      const prices = Array(60).fill(null).map(() => ({ close: 100, low: 100, high: 102 }));
+      prices[0] = { close: 100, low: 99, high: 102 };
+      mockMarketDataService.listPricesByInstrumentId.mockResolvedValue({ prices } as any);
+
+      const plan = await service.generatePlan({ instrumentId: 'INST-1', symbol: 'TEST' });
+
+      expect(plan.entryZone?.preferredEntryMin).toBe(98);
+      expect(plan.stopLoss?.price).toBeCloseTo(98.01, 2);
+      expect(plan.planStatus).toBe('BLOCKED');
+      expect(plan.riskGrade).toBe('HIGH');
+      expect(plan.paperReadinessStatus).toBe('BLOCKED');
+      expect(plan.paperReadinessReasons).toEqual([]);
+      expect(plan.blockers).toContain('Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.');
+      expect(plan.paperReadinessBlockers).toContain('Plan status is BLOCKED; VALID is required.');
+      expect(plan.paperReadinessBlockers).toContain('Trade plan has active blockers.');
+      expect(plan.paperReadinessBlockers).toContain('Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.');
+    });
+
+    it('blocks a long plan when the stop is above the entry-zone floor', async () => {
+      mockStrategyService.latestForInstrument.mockResolvedValue({
+        ...defaultDecision,
+        strategy: 'PULLBACK_IN_UPTREND',
+      } as any);
+      mockMarketDataService.latestPriceByInstrumentId.mockResolvedValue({ latest: { close: 101 } } as any);
+      const prices = Array(60).fill(null).map(() => ({ close: 100, low: 100, high: 102 }));
+      prices[0] = { close: 100, low: 99.5, high: 102 };
+      mockMarketDataService.listPricesByInstrumentId.mockResolvedValue({ prices } as any);
+
+      const plan = await service.generatePlan({ instrumentId: 'INST-1', symbol: 'TEST' });
+
+      expect(plan.entryZone?.preferredEntryMin).toBe(98);
+      expect(plan.stopLoss!.price).toBeGreaterThan(plan.entryZone!.preferredEntryMin);
+      expect(plan.planStatus).toBe('BLOCKED');
+      expect(plan.blockers).toContain('Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.');
+    });
+
+    it('keeps a valid long plan when the stop is below the planned entry', async () => {
+      mockStrategyService.latestForInstrument.mockResolvedValue(defaultDecision as any);
+      mockMarketDataService.latestPriceByInstrumentId.mockResolvedValue({ latest: { close: 100 } } as any);
+      const prices = Array(60).fill({ close: 100, low: 100, high: 105 });
+      prices[0] = { close: 100, low: 90, high: 105 };
+      mockMarketDataService.listPricesByInstrumentId.mockResolvedValue({ prices } as any);
+
+      const plan = await service.generatePlan({ instrumentId: 'INST-1', symbol: 'TEST' });
+
+      expect(plan.stopLoss!.price).toBeLessThan(plan.entryZone!.preferredEntryMin);
+      expect(plan.planStatus).toBe('VALID');
+      expect(plan.blockers).not.toContain('Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.');
     });
 
     it('blocks plan if reward/risk < 1', async () => {

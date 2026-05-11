@@ -414,7 +414,7 @@ export default function BacktestingStrategyLabPage() {
                         <Chip size="small" label={run.status} color={run.status === 'COMPLETED' ? 'success' : 'error'} />
                         <Chip size="small" label={run.config.mode === 'REGISTERED_STRATEGY' || run.config.strategyCode ? 'Saved Registered Strategy Run' : 'Custom Rule Backtest'} />
                         <Typography variant="body2">{new Date(run.startedAt).toLocaleString()}</Typography>
-                        <Typography variant="body2" color="text.secondary">{fmtPercent(run.metrics?.totalReturn)}</Typography>
+                        <Typography variant="body2" color="text.secondary">{run.metrics?.calculationAudit?.aggregateStatus === 'LEGACY_INVALID' ? 'Legacy invalid' : fmtPercent(run.metrics?.totalReturn)}</Typography>
                       </Stack>
                       <Stack direction="row" spacing={0.5}>
                         <Tooltip title="View Results" arrow>
@@ -456,6 +456,7 @@ function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: 
 
   const metrics = run.metrics;
   const isRegistered = run.config.mode === 'REGISTERED_STRATEGY' || Boolean(run.config.strategyCode);
+  const aggregateInvalid = metrics?.calculationAudit?.aggregateStatus === 'LEGACY_INVALID';
   return (
     <Stack spacing={2}>
       {isRegistered && (
@@ -477,9 +478,10 @@ function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: 
           {metrics?.frameworkRating?.ratingCapsApplied?.length ? <Typography variant="caption" color="text.secondary">Caps applied: {metrics.frameworkRating.ratingCapsApplied.join(', ')}</Typography> : null}
         </Paper>
       )}
+      {metrics?.calculationAudit?.warnings.length ? <Alert severity={aggregateInvalid ? 'error' : 'warning'}>{metrics.calculationAudit.warnings.join(' ')}</Alert> : null}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 1.5 }}>
-        <MetricCard label="Ending Capital" value={fmtMoney((run.config.initialCapital || 0) * (1 + (metrics?.totalReturn || 0)), run.config.region)} />
-        <MetricCard label="Total Return" value={fmtPercent(metrics?.totalReturn)} />
+        <MetricCard label="Ending Capital" value={aggregateInvalid ? 'Legacy invalid' : fmtMoney((run.config.initialCapital || 0) * (1 + (metrics?.totalReturn || 0)), run.config.region)} />
+        <MetricCard label="Total Return" value={aggregateInvalid ? 'Legacy invalid' : fmtPercent(metrics?.totalReturn)} />
         <MetricCard label="CAGR" value={fmtPercent(metrics?.cagr)} />
         <MetricCard label="Max Drawdown" value={fmtPercent(metrics?.maxDrawdown)} />
         <MetricCard label="Sharpe" value={fmtNumber(metrics?.sharpeRatio)} />

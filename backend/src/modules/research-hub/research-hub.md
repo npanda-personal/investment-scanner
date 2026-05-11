@@ -92,7 +92,7 @@ Returns a consolidated decision-oriented response.
   },
   "nextActions": [
     {
-      "label": "Review 5 framework-backed candidates",
+      "label": "Review 5 framework-backed review candidates",
       "priority": "HIGH",
       "targetRoute": "/strategy"
     }
@@ -112,7 +112,7 @@ Returns a consolidated decision-oriented response.
 
 ## Strategy-Proof Candidate Rules
 
-`tradeCandidates` require:
+`tradeCandidates` is the API-compatible field name. Product copy presents these rows as review candidates. Promotion into `tradeCandidates` requires:
 
 - `frameworkBacked = true`
 - valid `strategy` and `strategyVersion` where available
@@ -128,6 +128,8 @@ Candidates without backtest summaries are placed in `watchCandidates` with the w
 
 ## No-Trade Behavior
 
+Current UI/service wording should say "No new long review candidates are available. Review exits and watchlist only." API field names remain unchanged for compatibility.
+
 When market gate is `CLOSED`:
 
 - headline says “No new long candidates. Review exits and watchlist only.”
@@ -142,7 +144,7 @@ Research Hub never displays live-trading readiness labels. Any stored live-tradi
 ## User Workflow
 
 1.  **Review the Hero Banner**: Confirm whether the current market gate allows new long research candidates.
-2.  **Triage Priorities**: Look at framework-backed candidates first. Use links to Strategy Decision, Strategy Framework, Backtesting Lab, or the stock workspace.
+2.  **Triage Priorities**: Look at framework-backed review candidates first. Use links to Strategy Decision, Strategy Framework, Backtesting Lab, or the stock workspace.
 3.  **Check Confirmations**: See if Smart Money or Sector Winds align with strategy-backed candidates.
 4.  **Manage Risk**: Review Exit Candidates and Avoid lists.
 5.  **Drill Down**: Use the Drilldown Analysis buttons for deep dives into specific research modules.

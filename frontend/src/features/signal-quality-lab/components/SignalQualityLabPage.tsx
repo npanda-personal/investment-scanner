@@ -152,10 +152,6 @@ const SignalQualityLabPage: React.FC = () => {
     }
   };
 
-  if (loading && !summary) {
-    return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>;
-  }
-
   return (
     <Box sx={{ p: 3, maxWidth: 1500, mx: 'auto' }}>
       <PageHeader
@@ -181,7 +177,21 @@ const SignalQualityLabPage: React.FC = () => {
         }
       />
 
-      {(error || formError) && <Alert severity="error" sx={{ mb: 2 }}>{error || formError}</Alert>}
+      {loading && !summary && (
+        <Alert severity="info" sx={{ mb: 2 }} icon={<CircularProgress size={18} />}>
+          Loading Signal Quality dashboard for {scope.region}/{scope.assetType}. This page will settle into measured content, an insufficient-data state, or a retryable error.
+        </Alert>
+      )}
+      {error && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          action={<Button color="inherit" size="small" onClick={reload}>Retry</Button>}
+        >
+          {error}
+        </Alert>
+      )}
+      {formError && <Alert severity="error" sx={{ mb: 2 }}>{formError}</Alert>}
       {actionMessage && <Alert severity="info" sx={{ mb: 2 }}>{actionMessage}</Alert>}
       <BatchProgressBar
         running={batchRunner.running}
@@ -206,6 +216,12 @@ const SignalQualityLabPage: React.FC = () => {
       {summary && summary.totalSignals === 0 && (
         <Alert severity="info" sx={{ mb: 2 }}>
           No signal results are available for quality measurement yet. Run Signal Generation first, then rerun this page after enough future price data exists.
+        </Alert>
+      )}
+      {!loading && !summary && !error && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Signal Quality has no dashboard payload for the selected scope yet. Run Signal Generation or Retry after local data is refreshed.
+          <Button color="inherit" size="small" onClick={reload} sx={{ ml: 1 }}>Retry</Button>
         </Alert>
       )}
       {diagnostics && diagnostics.totalSignals > 0 && diagnostics.evaluatedSignals === 0 && (

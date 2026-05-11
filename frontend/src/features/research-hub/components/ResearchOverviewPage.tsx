@@ -423,7 +423,7 @@ const StrategyProofPanel: React.FC<{ summary: ResearchOverview['strategyProofSum
           <Grid item xs={6}><ProofMetric label="Market Blocked" value={summary.blockedByMarketGateCount} /></Grid>
         </Grid>
         {summary.strategiesProducingCandidates.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">No framework-backed strategies are producing candidates yet.</Typography>
+          <Typography variant="body2" color="text.secondary">No framework-backed strategies are producing review candidates yet.</Typography>
         ) : (
           <Stack spacing={1}>
             {summary.strategiesProducingCandidates.map((item) => (
@@ -431,7 +431,7 @@ const StrategyProofPanel: React.FC<{ summary: ResearchOverview['strategyProofSum
                 <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1}>
                   <Box>
                     <Typography variant="body2" fontWeight={700}>{item.strategy}</Typography>
-                    <Typography variant="caption" color="text.secondary">{item.candidateCount} candidate(s){item.topCandidateSymbol ? ` - top ${item.topCandidateSymbol}` : ''}</Typography>
+                    <Typography variant="caption" color="text.secondary">{item.candidateCount} review candidate(s){item.topCandidateSymbol ? ` - top ${item.topCandidateSymbol}` : ''}</Typography>
                   </Box>
                   <Stack direction="row" spacing={0.5}>
                     <Chip size="small" label={item.bestRating} />
@@ -471,7 +471,7 @@ const WhatChangedPanel: React.FC<{ whatChanged: ResearchOverview['whatChanged'] 
             </Stack>
           </Box>
         ) : (
-          <Typography variant="body2" color="text.secondary">No new candidates since the last evaluation.</Typography>
+          <Typography variant="body2" color="text.secondary">No new review candidates since the last evaluation.</Typography>
         )}
         
         {(whatChanged?.warnings?.length || 0) > 0 && (

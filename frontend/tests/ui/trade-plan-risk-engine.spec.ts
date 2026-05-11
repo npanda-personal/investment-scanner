@@ -40,7 +40,7 @@ test.describe('Trade Plan Risk Engine UI', () => {
 
     await expect(page.getByText('Generation Funnel')).toBeVisible();
     await expect(page.getByText('IN/STOCK', { exact: true })).toBeVisible();
-    await expect(page.getByText('Eligible Plan Candidates')).toBeVisible();
+    await expect(page.getByText('Eligible Review Candidates')).toBeVisible();
     await expect(page.getByText('Blocked / Watch / Insufficient')).toBeVisible();
     await expect(page.getByText('Blocked / Watch / Insufficient').locator('xpath=..').getByText('3', { exact: true })).toBeVisible();
     await expect(page.getByText('3 UNPROVEN strategy rating')).toBeVisible();
@@ -88,9 +88,9 @@ test.describe('Trade Plan Risk Engine UI', () => {
     await page.getByRole('button', { name: 'Generate Plans' }).click();
 
     await expect(page.getByRole('button', { name: 'Generating...' })).toBeVisible();
-    await expect(page.getByText('Generating plans: discovering eligible Strategy Decision candidates. Proof timeframe: 3Y.')).toBeVisible();
+    await expect(page.getByText('Generating plans: discovering eligible Strategy Decision review candidates. Proof timeframe: 3Y.')).toBeVisible();
     releaseFirstBatch?.();
-    await expect(page.getByText('Batch complete: 50 plans generated from 50 eligible Strategy Decision candidates (50 discovered, 0 skipped). 3 are paper-ready. Proof timeframe: 3Y. Top blockers: none. Failed: 0.')).toBeVisible();
+    await expect(page.getByText('Batch complete: 50 plans generated from 50 eligible Strategy Decision review candidates (50 discovered, 0 skipped). 3 are paper-ready. Proof timeframe: 3Y. Top blockers: none. Failed: 0.')).toBeVisible();
     expect(payloads).toEqual([
       expect.objectContaining({ region: 'IN', assetType: 'STOCK', batchSize: 25, offset: 0, backtestTimeframe: '3Y' }),
       expect.objectContaining({ region: 'IN', assetType: 'STOCK', batchSize: 25, offset: 25, backtestTimeframe: '3Y' }),
@@ -110,5 +110,103 @@ test.describe('Trade Plan Risk Engine UI', () => {
     await expect.poll(() => detailUrl?.searchParams.get('assetType')).toBe('STOCK');
     await expect(page.getByText('No scoped plan exists for IN/STOCK.')).toBeVisible();
     await expect(page.getByRole('link', { name: 'Back to Trade Plans' })).toBeVisible();
+  });
+
+  test('detail view formats plan money with persisted market currency', async ({ page }) => {
+    await page.route('**/api/v1/trade-plans/INST-2**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 'plan-2',
+          instrumentId: 'INST-2',
+          symbol: 'RELIANCE.NS',
+          strategy: 'TREND_MOMENTUM',
+          strategyVersion: '1.0.0',
+          region: 'IN',
+          assetType: 'STOCK',
+          planStatus: 'VALID',
+          riskGrade: 'MEDIUM',
+          entryZone: { type: 'CURRENT_PRICE', referencePrice: 2500, preferredEntryMin: 2475, preferredEntryMax: 2525, quality: 'ACCEPTABLE', rationale: 'Entry near current price.' },
+          stopLoss: { price: 2350, percentBelowEntry: 6, method: 'RECENT_SWING_LOW', quality: 'STRONG', rationale: 'Below recent support.' },
+          target: { price: 2800, expectedReturnPercent: 12, method: 'REWARD_RISK_MULTIPLE', quality: 'ACCEPTABLE', rationale: 'Target is modeled at 2R by default.' },
+          rewardRiskRatio: 2,
+          positionSizing: { portfolioId: null, capitalBase: 100000, riskPercent: 1, maxRiskAmount: 1000, suggestedQuantity: 6, estimatedPositionValue: 15000, positionValuePercent: 15, notes: [] },
+          portfolioImpact: null,
+          invalidationRules: ['Daily close below stop loss level of 2350.00.'],
+          warnings: [],
+          blockers: [],
+          dataGaps: [],
+          paperReadinessStatus: 'WATCH_ONLY',
+          paperReadinessBlockers: [],
+          paperReadinessReasons: [],
+          marketDataSnapshot: { instrumentId: 'INST-2', symbol: 'RELIANCE.NS', latestPrice: 2500, latestPriceTimestamp: '2026-05-10T00:00:00.000Z', latestCompletedTradingDate: '2026-05-10T00:00:00.000Z', latestStoredTradingDate: '2026-05-10T00:00:00.000Z', currency: 'INR', exchange: 'NSE', region: 'IN', assetType: 'STOCK', dataStatus: 'COMPLETE' },
+          dataQualitySnapshot: { status: 'AVAILABLE', coverageStatus: 'GOOD', signalReadinessStatus: 'READY', liquidityStatus: 'LIQUID', warnings: [], blockers: [], generatedAt: '2026-05-10T00:00:00.000Z' },
+          generatedAt: '2026-05-10T00:00:00.000Z',
+          modelVersion: 'trade-plan-risk-v1',
+        }),
+      });
+    });
+
+    await visitAuthenticated(page, '/trade-plans/INST-2');
+
+    await expect(page.getByText('INR 2,475.00 - INR 2,525.00')).toBeVisible();
+    await expect(page.getByText('INR 2,350.00')).toBeVisible();
+    await expect(page.getByText('Estimated Value: INR 15,000.00')).toBeVisible();
+    await expect(page.getByText('Latest Price: INR 2,500.00')).toBeVisible();
+    await expect(page.getByText('$')).toHaveCount(0);
+  });
+
+  test('detail view shows geometry blocker when stop sits inside long entry zone', async ({ page }) => {
+    await page.route('**/api/v1/trade-plans/cmo2xk6xa0010w5og9g9zg0am**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 'plan-powergrid',
+          instrumentId: 'cmo2xk6xa0010w5og9g9zg0am',
+          symbol: 'POWERGRID.NS',
+          strategy: 'PULLBACK_IN_UPTREND',
+          strategyVersion: '1.0.0',
+          region: 'IN',
+          assetType: 'STOCK',
+          planStatus: 'BLOCKED',
+          riskGrade: 'HIGH',
+          entryZone: { type: 'PULLBACK', referencePrice: 304.51, preferredEntryMin: 298.42, preferredEntryMax: 310.60, quality: 'STRONG', rationale: 'Preferred entry near SMA50 pullback support.' },
+          stopLoss: { price: 307.49, percentBelowEntry: 0.81, method: 'RECENT_SWING_LOW', quality: 'WEAK', rationale: 'Stop placed slightly below recent 10-day swing low. Geometry blocked: stop must sit below the long entry-zone floor.' },
+          target: { price: 326.86, expectedReturnPercent: 4.11, method: 'REWARD_RISK_MULTIPLE', quality: 'FALLBACK', rationale: 'Target is modeled at 2R by default.' },
+          rewardRiskRatio: 2,
+          positionSizing: { portfolioId: null, capitalBase: 100000, riskPercent: 1, maxRiskAmount: 1000, suggestedQuantity: 325, estimatedPositionValue: 100750, positionValuePercent: 100.75, notes: [] },
+          portfolioImpact: null,
+          invalidationRules: ['Plan is currently blocked. Consider review later.'],
+          warnings: [],
+          blockers: ['Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.'],
+          dataGaps: [],
+          paperReadinessStatus: 'BLOCKED',
+          paperReadinessBlockers: [
+            'Plan status is BLOCKED; VALID is required.',
+            'Trade plan has active blockers.',
+            'Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.',
+          ],
+          paperReadinessReasons: ['Trade plan status is VALID.', 'Risk grade is LOW.', 'Strategy Framework-backed proof is present.'],
+          marketDataSnapshot: { instrumentId: 'cmo2xk6xa0010w5og9g9zg0am', symbol: 'POWERGRID.NS', latestPrice: 310, latestPriceTimestamp: '2026-05-10T00:00:00.000Z', latestCompletedTradingDate: '2026-05-10T00:00:00.000Z', latestStoredTradingDate: '2026-05-10T00:00:00.000Z', currency: 'INR', exchange: 'NSE', region: 'IN', assetType: 'STOCK', dataStatus: 'COMPLETE' },
+          dataQualitySnapshot: { status: 'AVAILABLE', coverageStatus: 'GOOD', signalReadinessStatus: 'READY', liquidityStatus: 'LIQUID', warnings: [], blockers: [], generatedAt: '2026-05-10T00:00:00.000Z' },
+          generatedAt: '2026-05-10T00:00:00.000Z',
+          modelVersion: 'trade-plan-risk-v1',
+        }),
+      });
+    });
+
+    await visitAuthenticated(page, '/trade-plans/cmo2xk6xa0010w5og9g9zg0am');
+
+    await expect(page.getByText('Plan Blocked')).toBeVisible();
+    await expect(page.getByText('INR 298.42 - INR 310.60')).toBeVisible();
+    await expect(page.getByText('INR 307.49')).toBeVisible();
+    await expect(page.getByText('Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.')).toHaveCount(1);
+    await expect(page.getByText('Plan status is BLOCKED; VALID is required.', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Paper Readiness Reasons')).toHaveCount(0);
+    await expect(page.getByText('Trade plan status is VALID.')).toHaveCount(0);
+    await expect(page.getByText('Risk grade is LOW.')).toHaveCount(0);
+    await expect(page.getByText('Strategy Framework-backed proof is present.')).toHaveCount(0);
   });
 });

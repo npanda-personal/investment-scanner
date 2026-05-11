@@ -6,10 +6,12 @@ export function normalizeSnapshotDate(value?: string | Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
-export function parseGenerateRequest(input: GenerateSnapshotsRequest): { snapshotDate: Date; limit: number } {
+export function parseGenerateRequest(input: GenerateSnapshotsRequest): { snapshotDate: Date; limit: number; region: string; assetType: string } {
   return {
     snapshotDate: normalizeSnapshotDate(input.snapshotDate),
     limit: clampInt(input.limit, 50, 1, 250),
+    region: normalizeScopeCode(input.region, 'IN'),
+    assetType: normalizeScopeCode(input.assetType, 'STOCK'),
   };
 }
 
@@ -24,11 +26,13 @@ export function parseSnapshotQuery(query: any): SnapshotQuery {
     sector: stringOrUndefined(query.sector),
     country: stringOrUndefined(query.country),
     instrumentId: stringOrUndefined(query.instrumentId),
+    region: normalizeScopeCode(query.region, 'IN'),
+    assetType: normalizeScopeCode(query.assetType, 'STOCK'),
     limit: clampInt(query.limit, 100, 1, 1000),
   };
 }
 
-export function parseLookupQuery(query: any): { date: Date; lookbackDays: number; instrumentId?: string; sector?: string; country?: string } {
+export function parseLookupQuery(query: any): { date: Date; lookbackDays: number; instrumentId?: string; sector?: string; country?: string; region: string; assetType: string } {
   if (!validDate(query.date)) throw new Error('date is required');
   return {
     date: normalizeSnapshotDate(query.date),
@@ -36,6 +40,8 @@ export function parseLookupQuery(query: any): { date: Date; lookbackDays: number
     instrumentId: stringOrUndefined(query.instrumentId),
     sector: stringOrUndefined(query.sector),
     country: stringOrUndefined(query.country),
+    region: normalizeScopeCode(query.region, 'IN'),
+    assetType: normalizeScopeCode(query.assetType, 'STOCK'),
   };
 }
 
@@ -45,6 +51,11 @@ function validDate(value: unknown): boolean {
 
 function stringOrUndefined(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function normalizeScopeCode(value: unknown, fallback: string): string {
+  const text = stringOrUndefined(value);
+  return (text || fallback).toUpperCase();
 }
 
 function clampInt(value: unknown, fallback: number, min: number, max: number): number {

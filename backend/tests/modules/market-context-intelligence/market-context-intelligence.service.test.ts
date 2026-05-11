@@ -4,8 +4,8 @@ import { MarketContextIntelligenceService } from '../../../src/modules/market-co
 const instrument = (overrides: any = {}) => ({
   instrumentId: overrides.instrumentId || 'stock-1',
   symbol: overrides.symbol || 'AAA',
-  sector: overrides.sector || 'Technology',
-  country: overrides.country || 'US',
+  sector: overrides.sector === undefined ? 'Technology' : overrides.sector,
+  country: overrides.country === undefined ? 'US' : overrides.country,
   latest: overrides.latest ?? 120,
   previous: overrides.previous ?? 118,
   prices: overrides.prices || Array.from({ length: 260 }, (_, index) => 120 - index * 0.2),
@@ -33,14 +33,59 @@ describe('MarketContextIntelligenceService', () => {
     expect(['LEADING', 'IMPROVING']).toContain(sectors[0].leadershipStatus);
   });
 
+  it('excludes missing or Unknown sectors from leadership rankings', () => {
+    const service = new MarketContextIntelligenceService({} as any, {} as any);
+    const sectors = service.rankSectors([
+      instrument({ sector: 'Unknown', prices: Array.from({ length: 260 }, (_, index) => 160 - index) }),
+      instrument({ sector: null, prices: Array.from({ length: 260 }, (_, index) => 150 - index) }),
+      instrument({ sector: 'Financial Services', prices: Array.from({ length: 260 }, (_, index) => 120 - index * 0.2) }),
+    ]);
+
+    expect(sectors.map((sector) => sector.sector)).toEqual(['Financial Services']);
+    expect(sectors[0].leadershipStatus).toBeDefined();
+  });
+
+  it('does not classify the only named sector as both top and weak', async () => {
+    const marketDataService = {
+      listInstruments: jest.fn().mockResolvedValue({ instruments: [{ id: 'stock-1', symbol: 'AAA', sector: 'Financial Services', country: 'India' }] }),
+      listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: instrument().prices.map((close: number) => ({ adjusted_close: close })) }),
+    };
+    const signalService = { topSignals: jest.fn().mockResolvedValue({ signals: [] }) };
+    const repository = { saveSnapshot: jest.fn().mockResolvedValue(undefined) };
+    const service = new MarketContextIntelligenceService(repository as any, marketDataService as any, signalService as any);
+
+    await service.run('IN');
+
+    const savedSummary = repository.saveSnapshot.mock.calls[0][0];
+    expect(savedSummary.topSectors.map((sector: any) => sector.sector)).toEqual(['Financial Services']);
+    expect(savedSummary.weakSectors).toEqual([]);
+  });
+
   it('calculates breadth', () => {
     const service = new MarketContextIntelligenceService({} as any, {} as any);
     const breadth = service.calculateBreadth([instrument(), instrument({ signalDirection: 'BEARISH' })]);
 
     expect(breadth.instrumentCount).toBe(2);
+    expect(breadth.sma50SampleCount).toBe(2);
+    expect(breadth.sma200SampleCount).toBe(2);
     expect(breadth.percentAboveSma50).toBeGreaterThan(0);
     expect(breadth.bullishSignalCount).toBe(1);
     expect(breadth.bearishSignalCount).toBe(1);
+  });
+
+  it('uses indicator-specific breadth sample counts', () => {
+    const service = new MarketContextIntelligenceService({} as any, {} as any);
+    const fullHistory = instrument({ symbol: 'FULL', prices: Array.from({ length: 260 }, (_, index) => 120 - index * 0.2) });
+    const sma50Only = instrument({ symbol: 'SMA50', prices: Array.from({ length: 60 }, (_, index) => 100 - index * 0.1) });
+    const tooShort = instrument({ symbol: 'SHORT', prices: Array.from({ length: 10 }, (_, index) => 90 - index * 0.1) });
+
+    const breadth = service.calculateBreadth([fullHistory, sma50Only, tooShort]);
+
+    expect(breadth.instrumentCount).toBe(3);
+    expect(breadth.sma50SampleCount).toBe(2);
+    expect(breadth.sma200SampleCount).toBe(1);
+    expect(breadth.percentAboveSma50).not.toBeNull();
+    expect(breadth.percentAboveSma200).not.toBeNull();
   });
 
   it('ranks countries', () => {

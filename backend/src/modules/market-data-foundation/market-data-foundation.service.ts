@@ -842,10 +842,12 @@ export class MarketDataFoundationService {
       return null;
     }
 
+    await this.repository.dedupeCorporateActions(stock.id);
     let actions = await this.repository.listCorporateActions(stock.id);
     if (actions.length === 0) {
       const providerActions = await this.fetchCorporateActions(stock.symbol);
       await this.repository.upsertCorporateActions(stock.id, providerActions);
+      await this.repository.dedupeCorporateActions(stock.id);
       actions = await this.repository.listCorporateActions(stock.id);
     }
 

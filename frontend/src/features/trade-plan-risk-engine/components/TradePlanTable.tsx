@@ -31,6 +31,9 @@ export const TradePlanTable: React.FC<TradePlanTableProps> = ({
   onPageSizeChange,
   onSortChange,
 }) => {
+  const currencyCode = (plan: TradePlanResultDto) => plan.marketDataSnapshot?.currency || (plan.region === 'IN' ? 'INR' : 'USD');
+  const fmtMoney = (plan: TradePlanResultDto, value: number | null | undefined) =>
+    value === null || value === undefined ? '-' : `${currencyCode(plan)} ${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const columns: DataTableColumn<TradePlanResultDto>[] = [
     { id: 'symbol', label: 'Symbol', render: (p) => <strong>{p.symbol}</strong> },
     { id: 'strategy', label: 'Strategy', render: (p) => <Typography variant="body2">{p.strategy}</Typography> },
@@ -73,9 +76,9 @@ export const TradePlanTable: React.FC<TradePlanTableProps> = ({
     },
     { id: 'strategyRating', label: 'Strategy Rating', sortable: true, render: (p) => <Chip size="small" label={p.strategyRating || 'UNPROVEN'} variant="outlined" /> },
     { id: 'backtestTimeframe', label: 'Proof Timeframe', render: (p) => p.backtestTimeframe || '-' },
-    { id: 'entryZone', label: 'Entry Zone', render: (p) => p.entryZone ? `${p.entryZone.preferredEntryMin.toFixed(2)} - ${p.entryZone.preferredEntryMax.toFixed(2)}` : '-' },
-    { id: 'stopLoss', label: 'Stop Loss', render: (p) => p.stopLoss ? p.stopLoss.price.toFixed(2) : '-' },
-    { id: 'target', label: 'Target', render: (p) => p.target ? `${p.target.price.toFixed(2)}${p.target.method === 'REWARD_RISK_MULTIPLE' ? ' (Default 2R target)' : ''}` : '-' },
+    { id: 'entryZone', label: 'Entry Zone', render: (p) => p.entryZone ? `${fmtMoney(p, p.entryZone.preferredEntryMin)} - ${fmtMoney(p, p.entryZone.preferredEntryMax)}` : '-' },
+    { id: 'stopLoss', label: 'Stop Loss', render: (p) => p.stopLoss ? fmtMoney(p, p.stopLoss.price) : '-' },
+    { id: 'target', label: 'Target', render: (p) => p.target ? `${fmtMoney(p, p.target.price)}${p.target.method === 'REWARD_RISK_MULTIPLE' ? ' (Default 2R target)' : ''}` : '-' },
     { id: 'rewardRiskRatio', label: 'R/R', render: (p) => <strong>{p.rewardRiskRatio.toFixed(2)}</strong> },
     { id: 'actions', label: 'Actions', align: 'right', render: (p) => <Button size="small" component={Link} to={`/trade-plans/${p.instrumentId}`}>View</Button> },
   ];

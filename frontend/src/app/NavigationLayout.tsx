@@ -50,6 +50,7 @@ const navGroups = [
   {
     group: 'Overview',
     items: [
+      { path: '/today-review', label: 'Today’s Review', icon: <CalendarMonthIcon /> },
       { path: '/', label: 'Dashboard', icon: <DashboardIcon /> },
       { path: '/market-data-foundation', label: 'Market Data Foundation', icon: <InventoryIcon /> },
     ],

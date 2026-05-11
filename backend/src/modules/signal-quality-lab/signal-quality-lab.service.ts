@@ -93,12 +93,8 @@ export class SignalQualityLabService {
       warnings: diagnostics.warnings,
     };
 
-    const regimeBySignal = new Map<string, string>();
-    await Promise.all(signals.map(async (signal) => {
-      const regime = await this.historicalContextService.regimeForDate(new Date(signal.generated_at)).catch(() => null);
-      regimeBySignal.set(signal.id || signal.generated_at, regime || 'MISSING_REGIME_CONTEXT');
-    }));
-    const byRegime = this.groupMetrics(outcomes, analysisQuery.horizon, (item) => regimeBySignal.get(item.signalResultId) || 'MISSING_REGIME_CONTEXT')
+    const regimeLookup = await this.regimeMapForSignals(signals, analysisQuery);
+    const byRegime = this.groupMetrics(outcomes, analysisQuery.horizon, (item) => regimeLookup.regimeBySignal.get(item.signalResultId) || 'MISSING_REGIME_CONTEXT')
       .filter((item) => item.sampleSize >= analysisQuery.minSampleSize);
 
     const evaluations = await this.dataQualityService.getEvaluationsForInstruments(signals.map((signal) => signal.instrument_id)).catch(() => []);
@@ -109,6 +105,7 @@ export class SignalQualityLabService {
       ...this.groupMetrics(outcomes, query.horizon, (item) => `liquidity:${byId.get(item.instrumentId)?.liquidityStatus || 'MISSING'}`),
     ].filter((item) => item.sampleSize >= analysisQuery.minSampleSize);
 
+    summary.warnings = [...summary.warnings, ...regimeLookup.warnings];
     return { summary, byType, bySector, byRegime, byDataQuality, noisy };
   }
 
@@ -179,11 +176,7 @@ export class SignalQualityLabService {
   async byRegime(query: QualityQuery): Promise<QualityMetricGroup[]> {
     const signals = await this.loadSignals(query);
     const outcomes = await this.outcomesForSignals(signals, query);
-    const regimeBySignal = new Map<string, string>();
-    await Promise.all(signals.map(async (signal) => {
-      const regime = await this.historicalContextService.regimeForDate(new Date(signal.generated_at)).catch(() => null);
-      regimeBySignal.set(signal.id || signal.generated_at, regime || 'MISSING_REGIME_CONTEXT');
-    }));
+    const { regimeBySignal } = await this.regimeMapForSignals(signals, query);
     return this.groupMetrics(outcomes, query.horizon, (item) => regimeBySignal.get(item.signalResultId) || 'MISSING_REGIME_CONTEXT')
       .filter((item) => item.sampleSize >= query.minSampleSize);
   }
@@ -318,6 +311,34 @@ export class SignalQualityLabService {
 
   private qualityFilterApplied(query: QualityQuery): boolean {
     return Boolean(query.readinessStatus || query.coverageStatus || query.liquidityStatus || query.minReadinessScore !== undefined || query.onlySignalReady || query.excludePoorQuality);
+  }
+
+  private async regimeMapForSignals(signals: SignalResultDto[], query: Partial<QualityQuery>): Promise<{ regimeBySignal: Map<string, string>; warnings: string[] }> {
+    const warnings: string[] = [];
+    const dateByKey = new Map<string, Date>();
+    const signalDateKey = new Map<string, string>();
+    for (const signal of signals) {
+      const date = this.utcTradingDay(new Date(signal.generated_at));
+      const dateKey = date.toISOString().slice(0, 10);
+      dateByKey.set(dateKey, date);
+      signalDateKey.set(signal.id || signal.generated_at, dateKey);
+    }
+
+    const regimeEntries = await Promise.all([...dateByKey.entries()].map(async ([dateKey, date]) => {
+      try {
+        const regime = await this.historicalContextService.regimeForDate(date, { region: query.region, assetType: query.assetType });
+        return [dateKey, regime || 'MISSING_REGIME_CONTEXT'] as const;
+      } catch (error: any) {
+        warnings.push(`Historical regime lookup failed for ${dateKey}: ${error?.message || 'failed'}`);
+        return [dateKey, 'MISSING_REGIME_CONTEXT'] as const;
+      }
+    }));
+    const regimeByDate = new Map(regimeEntries);
+    const regimeBySignal = new Map<string, string>();
+    for (const [signalKey, dateKey] of signalDateKey.entries()) {
+      regimeBySignal.set(signalKey, regimeByDate.get(dateKey) || 'MISSING_REGIME_CONTEXT');
+    }
+    return { regimeBySignal, warnings };
   }
 
   async outcomesForSignals(signals: SignalResultDto[], query?: Partial<QualityQuery>): Promise<SignalOutcomeSet[]> {

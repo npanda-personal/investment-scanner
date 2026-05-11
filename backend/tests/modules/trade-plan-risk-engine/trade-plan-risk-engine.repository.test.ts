@@ -86,6 +86,55 @@ const dto = (overrides: Partial<TradePlanResultDto> = {}): TradePlanResultDto =>
   ...overrides,
 });
 
+const stalePowergridRecord = () => record({
+  id: 'plan-powergrid',
+  instrumentId: 'cmo2xk6xa0010w5og9g9zg0am',
+  symbol: 'POWERGRID.NS',
+  latestPrice: 310,
+  marketDataSnapshot: { latestPrice: 310 },
+  entryZone: {
+    type: 'PULLBACK',
+    referencePrice: 304.512001953125,
+    preferredEntryMin: 298.4217619140625,
+    preferredEntryMax: 310.6022419921875,
+    quality: 'STRONG',
+    rationale: 'Preferred entry near SMA50 pullback support.',
+  },
+  stopLoss: {
+    price: 307.4940060424805,
+    method: 'RECENT_SWING_LOW',
+    quality: 'STRONG',
+    rationale: 'Stop placed slightly below recent 10-day swing low.',
+    percentBelowEntry: 2.056380287793535,
+  },
+  blockers: [],
+  paperReadinessStatus: 'READY_FOR_PAPER_REVIEW',
+  paperReadinessReasons: ['Trade plan status is VALID.', 'Risk grade is LOW.', 'Strategy Framework-backed proof is present.'],
+  paperReadinessBlockers: [],
+  planStatus: 'VALID',
+  riskGrade: 'LOW',
+});
+
+const repairedPowergridRecord = () => record({
+  ...stalePowergridRecord(),
+  planStatus: 'BLOCKED',
+  riskGrade: 'HIGH',
+  blockers: ['Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.'],
+  paperReadinessStatus: 'BLOCKED',
+  paperReadinessReasons: [],
+  paperReadinessBlockers: [
+    'Plan status is BLOCKED; VALID is required.',
+    'Trade plan has active blockers.',
+    'Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.',
+  ],
+  stopLoss: {
+    ...(stalePowergridRecord().stopLoss as any),
+    quality: 'WEAK',
+    percentBelowEntry: ((310 - 307.4940060424805) / 310) * 100,
+    rationale: 'Stop placed slightly below recent 10-day swing low. Geometry blocked: stop must sit below the long entry-zone floor.',
+  },
+});
+
 describe('TradePlanRiskEngineRepository snapshot persistence', () => {
   it('upserts same-day plans by instrument, strategy, model, scope, and portfolio key', async () => {
     const repository = new TradePlanRiskEngineRepository() as any;
@@ -158,6 +207,74 @@ describe('TradePlanRiskEngineRepository snapshot persistence', () => {
     }));
   });
 
+  it('repairs stale geometry before paperReadyOnly list filters are counted and returned', async () => {
+    const repository = new TradePlanRiskEngineRepository() as any;
+    const stale = stalePowergridRecord();
+    const findMany = jest.fn()
+      .mockResolvedValueOnce([stale])
+      .mockResolvedValueOnce([]);
+    const count = jest.fn().mockResolvedValue(0);
+    const update = jest.fn().mockResolvedValue({});
+    repository.db = { tradePlanResult: { findMany, count, update } };
+
+    const result = await repository.list({
+      region: 'IN',
+      assetType: 'STOCK',
+      paperReadyOnly: true,
+      limit: 25,
+      offset: 0,
+    });
+
+    expect(findMany.mock.calls[0][0].where).toEqual(expect.objectContaining({
+      region: 'IN',
+      assetType: 'STOCK',
+      strategyProofSnapshot: { path: ['frameworkBacked'], equals: true },
+    }));
+    expect(findMany.mock.calls[0][0].where).not.toEqual(expect.objectContaining({
+      paperReadinessStatus: 'READY_FOR_PAPER_REVIEW',
+    }));
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'plan-powergrid' },
+      data: expect.objectContaining({
+        planStatus: 'BLOCKED',
+        riskGrade: 'HIGH',
+        paperReadinessStatus: 'BLOCKED',
+        paperReadinessReasons: [],
+      }),
+    }));
+    expect(findMany.mock.invocationCallOrder[0]).toBeLessThan(count.mock.invocationCallOrder[0]);
+    expect(count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        paperReadinessStatus: 'READY_FOR_PAPER_REVIEW',
+      }),
+    });
+    expect(result).toEqual({ results: [], total: 0 });
+  });
+
+  it('excludes stale geometry rows from READY_FOR_PAPER_REVIEW list filters after repair', async () => {
+    const repository = new TradePlanRiskEngineRepository() as any;
+    const findMany = jest.fn()
+      .mockResolvedValueOnce([stalePowergridRecord()])
+      .mockResolvedValueOnce([]);
+    const count = jest.fn().mockResolvedValue(0);
+    const update = jest.fn().mockResolvedValue({});
+    repository.db = { tradePlanResult: { findMany, count, update } };
+
+    const result = await repository.list({
+      region: 'IN',
+      assetType: 'STOCK',
+      paperReadinessStatus: 'READY_FOR_PAPER_REVIEW',
+      limit: 25,
+      offset: 0,
+    });
+
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ paperReadinessStatus: 'BLOCKED' }),
+    }));
+    expect(result.results).toEqual([]);
+    expect(result.total).toBe(0);
+  });
+
   it('can include legacy non-framework-backed plans only when explicitly requested', async () => {
     const repository = new TradePlanRiskEngineRepository() as any;
     const count = jest.fn().mockResolvedValue(1);
@@ -189,6 +306,190 @@ describe('TradePlanRiskEngineRepository snapshot persistence', () => {
         strategyProofSnapshot: { path: ['frameworkBacked'], equals: true },
       },
       orderBy: { generatedAt: 'desc' },
+    }));
+  });
+
+  it('repairs persisted stop geometry for latest plan reads', async () => {
+    const repository = new TradePlanRiskEngineRepository() as any;
+    const findFirst = jest.fn().mockResolvedValue(record({
+      instrumentId: 'cmo2xk6xa0010w5og9g9zg0am',
+      symbol: 'POWERGRID.NS',
+      latestPrice: 310,
+      marketDataSnapshot: { latestPrice: 310 },
+      entryZone: {
+        type: 'PULLBACK',
+        referencePrice: 304.512001953125,
+        preferredEntryMin: 298.4217619140625,
+        preferredEntryMax: 310.6022419921875,
+        quality: 'STRONG',
+        rationale: 'Preferred entry near SMA50 pullback support.',
+      },
+      stopLoss: {
+        price: 307.4940060424805,
+        method: 'RECENT_SWING_LOW',
+        quality: 'STRONG',
+        rationale: 'Stop placed slightly below recent 10-day swing low.',
+        percentBelowEntry: 2.056380287793535,
+      },
+      blockers: [],
+      paperReadinessStatus: 'READY_FOR_PAPER_REVIEW',
+      paperReadinessReasons: ['Trade plan status is VALID.', 'Risk grade is LOW.', 'Strategy Framework-backed proof is present.'],
+      paperReadinessBlockers: [],
+      planStatus: 'VALID',
+      riskGrade: 'LOW',
+    }));
+    const update = jest.fn().mockResolvedValue({});
+    repository.db = { tradePlanResult: { findFirst, update } };
+
+    const result = await repository.latestForInstrument('cmo2xk6xa0010w5og9g9zg0am', undefined, undefined, { region: 'IN', assetType: 'STOCK' });
+
+    expect(result?.planStatus).toBe('BLOCKED');
+    expect(result?.riskGrade).toBe('HIGH');
+    expect(result?.paperReadinessStatus).toBe('BLOCKED');
+    expect(result?.paperReadinessReasons).toEqual([]);
+    expect(result?.blockers).toContain('Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.');
+    expect(result?.paperReadinessBlockers).toContain('Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.');
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'plan-1' },
+      data: expect.objectContaining({
+        planStatus: 'BLOCKED',
+        riskGrade: 'HIGH',
+        paperReadinessStatus: 'BLOCKED',
+        paperReadinessReasons: [],
+      }),
+    }));
+  });
+
+  it('returns repaired funnel plans so stale geometry contributes to BLOCKED, not paper-ready', async () => {
+    const repository = new TradePlanRiskEngineRepository() as any;
+    const latestGeneratedDate = new Date('2026-05-10T00:00:00.000Z');
+    const findFirst = jest.fn().mockResolvedValue({ generatedDate: latestGeneratedDate });
+    const findMany = jest.fn()
+      .mockResolvedValueOnce([stalePowergridRecord()])
+      .mockResolvedValueOnce([repairedPowergridRecord()]);
+    const update = jest.fn().mockResolvedValue({});
+    repository.db = { tradePlanResult: { findFirst, findMany, update } };
+
+    const result = await repository.funnelPlans({ region: 'IN', assetType: 'STOCK' });
+
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        planStatus: 'BLOCKED',
+        riskGrade: 'HIGH',
+        paperReadinessStatus: 'BLOCKED',
+      }),
+    }));
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual(expect.objectContaining({
+      planStatus: 'BLOCKED',
+      riskGrade: 'HIGH',
+      paperReadinessStatus: 'BLOCKED',
+      paperReadinessReasons: [],
+    }));
+  });
+
+  it('repairs geometry idempotently without duplicating stop-loss rationale text', async () => {
+    const repository = new TradePlanRiskEngineRepository() as any;
+    const staleRecord = record({
+      latestPrice: 310,
+      marketDataSnapshot: { latestPrice: 310 },
+      entryZone: {
+        type: 'PULLBACK',
+        referencePrice: 304.512001953125,
+        preferredEntryMin: 298.4217619140625,
+        preferredEntryMax: 310.6022419921875,
+        quality: 'STRONG',
+        rationale: 'Preferred entry near SMA50 pullback support.',
+      },
+      stopLoss: {
+        price: 307.4940060424805,
+        method: 'RECENT_SWING_LOW',
+        quality: 'STRONG',
+        rationale: 'Stop placed slightly below recent 10-day swing low.',
+        percentBelowEntry: 2.056380287793535,
+      },
+      blockers: [],
+      paperReadinessReasons: ['Trade plan status is VALID.'],
+      paperReadinessBlockers: [],
+      planStatus: 'VALID',
+      riskGrade: 'LOW',
+    });
+    const repairedRecord = record({
+      ...staleRecord,
+      planStatus: 'BLOCKED',
+      riskGrade: 'HIGH',
+      blockers: ['Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.'],
+      paperReadinessStatus: 'BLOCKED',
+      paperReadinessReasons: [],
+      paperReadinessBlockers: [
+        'Plan status is BLOCKED; VALID is required.',
+        'Trade plan has active blockers.',
+        'Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.',
+      ],
+      stopLoss: {
+        ...(staleRecord.stopLoss as any),
+        quality: 'WEAK',
+        percentBelowEntry: ((310 - 307.4940060424805) / 310) * 100,
+        rationale: 'Stop placed slightly below recent 10-day swing low. Geometry blocked: stop must sit below the long entry-zone floor.',
+      },
+    });
+    const findFirst = jest.fn()
+      .mockResolvedValueOnce(staleRecord)
+      .mockResolvedValueOnce(repairedRecord);
+    const update = jest.fn().mockResolvedValue({});
+    repository.db = { tradePlanResult: { findFirst, update } };
+
+    const first = await repository.latestForInstrument('INST-1', undefined, undefined, { region: 'IN', assetType: 'STOCK' });
+    const second = await repository.latestForInstrument('INST-1', undefined, undefined, { region: 'IN', assetType: 'STOCK' });
+
+    expect(first?.stopLoss?.rationale.match(/Geometry blocked/g)).toHaveLength(1);
+    expect(second?.stopLoss?.rationale.match(/Geometry blocked/g)).toHaveLength(1);
+    expect(update).toHaveBeenCalledTimes(1);
+  });
+
+  it('collapses duplicate legacy geometry rationale text on read repair', async () => {
+    const repository = new TradePlanRiskEngineRepository() as any;
+    const findFirst = jest.fn().mockResolvedValue(record({
+      latestPrice: 310,
+      marketDataSnapshot: { latestPrice: 310 },
+      entryZone: {
+        type: 'PULLBACK',
+        referencePrice: 304.512001953125,
+        preferredEntryMin: 298.4217619140625,
+        preferredEntryMax: 310.6022419921875,
+        quality: 'STRONG',
+        rationale: 'Preferred entry near SMA50 pullback support.',
+      },
+      stopLoss: {
+        price: 307.4940060424805,
+        method: 'RECENT_SWING_LOW',
+        quality: 'WEAK',
+        rationale: 'Stop placed slightly below recent 10-day swing low. Geometry blocked: stop must sit below the long entry-zone floor. Geometry blocked: stop must sit below the long entry-zone floor.',
+        percentBelowEntry: ((310 - 307.4940060424805) / 310) * 100,
+      },
+      blockers: ['Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.'],
+      paperReadinessStatus: 'BLOCKED',
+      paperReadinessReasons: [],
+      paperReadinessBlockers: [
+        'Plan status is BLOCKED; VALID is required.',
+        'Trade plan has active blockers.',
+        'Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.',
+      ],
+      planStatus: 'BLOCKED',
+      riskGrade: 'HIGH',
+    }));
+    const update = jest.fn().mockResolvedValue({});
+    repository.db = { tradePlanResult: { findFirst, update } };
+
+    const result = await repository.latestForInstrument('INST-1', undefined, undefined, { region: 'IN', assetType: 'STOCK' });
+
+    expect(result?.stopLoss?.rationale.match(/Geometry blocked/g)).toHaveLength(1);
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        stopLoss: expect.objectContaining({
+          rationale: 'Stop placed slightly below recent 10-day swing low. Geometry blocked: stop must sit below the long entry-zone floor.',
+        }),
+      }),
     }));
   });
 

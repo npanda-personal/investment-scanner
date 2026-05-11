@@ -20,6 +20,7 @@ Implemented:
 - Detailed sync summary with true counts: `instrumentsInserted/Updated/Skipped`, `priceRowsInserted/Updated`, `fundamentalsInserted`, `corporateActionsUpdated`, etc.
 - Dedicated persisted fundamentals through `Fundamental` using a strict unique constraint `[stockId, periodType, source]` to guarantee idempotent snapshot updates.
 - Dedicated persisted corporate actions through `CorporateAction`.
+- Corporate action ingestion deduplicates same-batch provider duplicates by normalized stock/date/type/source and relevant amount/split-ratio fields before upsert. Corporate-action reads also collapse and clean up existing persisted duplicates so old provider duplicates do not remain visible on instrument detail pages.
 - Reverse split classification when the provider returns a split ratio below `1`.
 - Minimal persisted FX rates through `FxRate`.
 - Canonical `/api/v1` APIs plus existing compatibility routes.
@@ -109,7 +110,8 @@ Persisted models used by Market Data Foundation:
 - `Fundamental`
   - Historical/provider-period fundamentals: revenue, EPS, net income, PE ratio, dividend yield, shares outstanding, market cap, currency, period type, normalized period end date, source, metadata.
 - `CorporateAction`
-  - Dividends, splits, reverse splits, effective date, declared date, payment date, amount, split ratio, currency, source, metadata.
+  - Dividends, splits, reverse splits, effective date, declared date, payment date, amount, split ratio, currency, source, and `naturalKey`.
+  - `naturalKey` is a normalized logical identity: `stockId + type/actionType + UTC effective date + source + amount/split ratio`. It prevents same-date provider duplicates while preserving distinct same-day actions when the amount or split ratio differs.
 - `FxRate`
   - Latest FX rates with pair, base currency, quote currency, rate, source, and metadata.
 - `MarketDataSyncState`
@@ -411,6 +413,7 @@ Natural keys for stock-data records owned by this module:
 | `Stock` | `symbol` | Upsert; long-term risk documented. |
 | `PriceTick` | `symbol + normalized daily timestamp` | Idempotent updates. |
 | `MarketDataSyncState` | `region + assetType + tradingDate` | Idempotent upsert of scheduler state and final-candle confirmation. |
+| `CorporateAction` | persisted `naturalKey = stockId + type/actionType + normalized effective date + source + amount/split ratio` | Same-batch provider duplicates with the same natural key are collapsed before upsert. Existing persisted duplicates are deduplicated on read/cleanup, preferring normalized effective dates and latest metadata, and later non-null provider fields update the retained logical action. |
 
 ## Frontend Structure
 
@@ -436,6 +439,7 @@ Frontend routes are defined in `routes.tsx` and exported via `index.ts`.
 - `backend/tests/modules/market-data-foundation/market-data.market-session.test.ts`: Verifies IN market-session skip/run decisions.
 - `backend/tests/modules/market-data-foundation/market-data.scheduler.test.ts`: Verifies scheduler skip, incremental mode, and overlap protection.
 - `backend/tests/modules/market-data-foundation/market-data.repository.test.ts`: Verifies smart daily-candle no-op/update persistence.
+- `backend/tests/modules/market-data-foundation/market-data.repository.test.ts`: Verifies corporate-action natural-key deduplication before upsert, read-time dedupe for existing duplicate rows, and idempotent cleanup of older duplicate corporate actions.
 - `backend/tests/modules/market-data-foundation/market-data.provider.test.ts`: Verifies provider mapping, malformed row handling, corporate actions, and Indian metadata fallbacks.
 
 Verification commands:

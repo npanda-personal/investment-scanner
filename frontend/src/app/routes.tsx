@@ -22,6 +22,7 @@ import { strategyDecisionEngineRoutes } from '@/features/strategy-decision-engin
 import { researchHubRoutes } from '@/features/research-hub';
 import { strategyFrameworkRoutes } from '@/features/strategy-framework';
 import { tradePlanRiskEngineRoutes } from '@/features/trade-plan-risk-engine';
+import { todayTradeReviewRoutes } from '@/features/today-trade-review';
 
 export const appRoutes: RouteObject[] = [
   ...publicAuthIdentityRoutes,
@@ -34,6 +35,7 @@ export const appRoutes: RouteObject[] = [
         element: <NavigationLayout />,
         children: [
           { index: true, element: <HomePage /> },
+          ...todayTradeReviewRoutes,
           ...researchHubRoutes,
           ...tradePlanRiskEngineRoutes,
           ...marketDataFoundationRoutes,

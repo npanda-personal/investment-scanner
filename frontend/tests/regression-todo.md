@@ -103,6 +103,14 @@ Use these when testing the strategy, signals, calibration, decision, and backtes
 
 Use these when testing Research Hub or Smart Money Intelligence.
 
+0. Today Trade Review - manual
+   - Route: `/today-review`.
+   - Confirm the page opens under `IN / STOCK` and settles into content, no-run, partial-run, or actionable error state without a stuck generic progress indicator.
+   - If no run exists, use `Run Today's Review` manually and record run status, data-through date, long review count, blocked count, and warnings.
+   - Confirm raw signal counts are not the main answer; they should appear only as support evidence.
+   - Open one candidate detail and confirm entry zone, stop/invalidation, target/reward, reward/risk, strategy proof, market context, data quality, and blockers are visible.
+   - Confirm blocked candidates show blocker reasons and invalid trade-plan geometry does not appear as a promoted long review candidate.
+
 1. Research Hub - manual
    - Route: `/research`.
    - Confirm the overview request includes `region=IN&assetType=STOCK`.

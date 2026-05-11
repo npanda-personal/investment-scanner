@@ -168,7 +168,34 @@ The immediate bottleneck is:
 
 ---
 
-# 3. Next Phase Roadmap — Intelligence & Accuracy First
+# 3. Current Delivery Slice - Today Trade Review Phase 1
+
+## Objective
+
+Phase 1 introduces Today Trade Review as the primary before-market research-support shortlist for the default `IN / STOCK` cash-equity scope.
+
+It composes existing persisted module outputs into a daily snapshot:
+
+```text
+Market/Data Quality/Signals/Calibration/Smart Money/Market Context/Strategy Decision/Trade Plans -> TodayReviewRun -> TodayReviewCandidate
+```
+
+## Phase 1 Scope
+
+- Manual daily run at `/today-review`.
+- Persisted `TodayReviewRun` and `TodayReviewCandidate` snapshots.
+- Default scope `IN / STOCK`, with region/asset request parameters supported.
+- Candidate states: `LONG_REVIEW`, `SHORT_REVIEW`, `EXIT_RISK_REVIEW`, `WATCH_ONLY`, `BLOCKED`, `AVOID`, `INSUFFICIENT_DATA`, and `UNPROVEN`.
+- Transparent 0-100 ranking with hard blockers overriding score.
+- Candidate detail page that exposes proof, market context, data quality, trade-plan geometry, invalidation, target/reward, and support diagnostics.
+
+## Deferred Phases 2-5
+
+Later phases may add personalization, portfolio/watchlist overlays, richer scheduling, and automation-adjacent workflows. They are intentionally not part of Phase 1. Phase 1 remains research support only and does not introduce broker execution, live trading, or order workflows.
+
+---
+
+# 4. Next Phase Roadmap — Intelligence & Accuracy First
 
 This is the recommended capability sequence. Execution should still be dependency-first: harden the least-dependent upstream modules before fixing modules that rely on their outputs. In practice, Market Data Foundation and Data Quality Engine should be verified before raw Signal Generation; raw Signal Generation should be verified before Signal Quality, Calibration, Strategy Decision, Research Hub, and Trade Plans.
 

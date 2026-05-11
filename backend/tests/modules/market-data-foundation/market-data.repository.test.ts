@@ -666,10 +666,132 @@ describe('MarketDataFoundationRepository', () => {
 
     expect(prisma.fundamental.upsert).toHaveBeenCalledTimes(1);
     expect(prisma.corporateAction.upsert).toHaveBeenCalledTimes(1);
-    expect(prisma.corporateAction.upsert.mock.calls[0][0].where.stockId_actionType_effectiveDate_source.effectiveDate).toEqual(
-      new Date('2026-01-02T00:00:00.000Z')
-    );
+    expect(prisma.corporateAction.upsert.mock.calls[0][0].where.naturalKey).toBe('stock-1|dividend|2026-01-02|yahoo|0.25|null');
     expect(prisma.fxRate.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('deduplicates corporate actions by normalized natural key before upsert', async () => {
+    const prisma = {
+      corporateAction: { upsert: jest.fn().mockResolvedValue({ id: 'action-1' }) },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await repository.upsertCorporateActions('stock-1', [
+      { symbol: 'AAPL', type: 'dividend', date: '2026-01-02T18:15:00.000Z', value: 0.25, amount: 0.25, source: 'yahoo' },
+      { symbol: 'AAPL', type: 'dividend', date: '2026-01-02T02:00:00.000Z', value: 0.25, amount: 0.25, currency: 'USD', source: 'yahoo' },
+      { symbol: 'AAPL', type: 'dividend', date: '2026-01-02T02:00:00.000Z', value: 0.30, amount: 0.30, currency: 'USD', source: 'yahoo' },
+      { symbol: 'AAPL', type: 'split', date: '2026-01-02T02:00:00.000Z', value: '2:1', splitRatio: 2, source: 'yahoo' },
+    ]);
+
+    expect(prisma.corporateAction.upsert).toHaveBeenCalledTimes(3);
+    expect(prisma.corporateAction.upsert.mock.calls.map((call: any[]) => call[0].where.naturalKey)).toEqual([
+      'stock-1|dividend|2026-01-02|yahoo|0.25|null',
+      'stock-1|dividend|2026-01-02|yahoo|0.3|null',
+      'stock-1|split|2026-01-02|yahoo|null|2',
+    ]);
+    expect(prisma.corporateAction.upsert.mock.calls[0][0].update.amount.toString()).toBe('0.25');
+    expect(prisma.corporateAction.upsert.mock.calls[1][0].update.amount.toString()).toBe('0.3');
+  });
+
+  it('deduplicates existing corporate-action rows by normalized date and amount on read', async () => {
+    const prisma = {
+      corporateAction: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'old-dividend',
+            stockId: 'stock-1',
+            actionType: 'dividend',
+            effectiveDate: new Date('2026-04-27T03:45:00.000Z'),
+            amount: 6,
+            splitRatio: null,
+            source: 'yahoo',
+            lastUpdatedTimestamp: new Date('2026-04-28T00:00:00.000Z'),
+          },
+          {
+            id: 'normalized-dividend',
+            stockId: 'stock-1',
+            actionType: 'dividend',
+            effectiveDate: new Date('2026-04-27T00:00:00.000Z'),
+            amount: 6,
+            splitRatio: null,
+            source: 'yahoo',
+            lastUpdatedTimestamp: new Date('2026-05-07T00:00:00.000Z'),
+          },
+          {
+            id: 'split',
+            stockId: 'stock-1',
+            actionType: 'split',
+            effectiveDate: new Date('2023-03-02T03:45:00.000Z'),
+            amount: null,
+            splitRatio: 2,
+            source: 'yahoo',
+            lastUpdatedTimestamp: new Date('2026-04-28T00:00:00.000Z'),
+          },
+        ]),
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    const actions = await repository.listCorporateActions('stock-1');
+
+    expect(actions.map((action: any) => action.id)).toEqual(['normalized-dividend', 'split']);
+  });
+
+  it('cleans up existing duplicate corporate-action rows idempotently', async () => {
+    const deleteMany = jest.fn().mockResolvedValue({ count: 2 });
+    const prisma = {
+      corporateAction: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'old-dividend',
+            stockId: 'stock-1',
+            actionType: 'dividend',
+            effectiveDate: new Date('2026-04-27T03:45:00.000Z'),
+            amount: 6,
+            splitRatio: null,
+            source: 'yahoo',
+            ingestionTimestamp: new Date('2026-04-28T00:00:00.000Z'),
+          },
+          {
+            id: 'normalized-dividend',
+            stockId: 'stock-1',
+            actionType: 'dividend',
+            effectiveDate: new Date('2026-04-27T00:00:00.000Z'),
+            amount: 6,
+            splitRatio: null,
+            source: 'yahoo',
+            ingestionTimestamp: new Date('2026-05-03T00:00:00.000Z'),
+          },
+          {
+            id: 'old-split',
+            stockId: 'stock-1',
+            actionType: 'split',
+            effectiveDate: new Date('2023-03-02T03:45:00.000Z'),
+            amount: null,
+            splitRatio: 2,
+            source: 'yahoo',
+            ingestionTimestamp: new Date('2026-04-28T00:00:00.000Z'),
+          },
+          {
+            id: 'normalized-split',
+            stockId: 'stock-1',
+            actionType: 'split',
+            effectiveDate: new Date('2023-03-02T00:00:00.000Z'),
+            amount: null,
+            splitRatio: 2,
+            source: 'yahoo',
+            ingestionTimestamp: new Date('2026-05-03T00:00:00.000Z'),
+          },
+        ]),
+        deleteMany,
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    const summary = await repository.dedupeCorporateActions('stock-1');
+
+    expect(summary).toEqual({ deletedCount: 2, remainingCount: 2 });
+    expect(deleteMany).toHaveBeenCalledWith({ where: { id: { in: ['old-dividend', 'old-split'] } } });
   });
 
   it('preserves existing non-null metadata when provider update has nulls', async () => {

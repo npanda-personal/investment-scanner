@@ -6,6 +6,8 @@ export interface SnapshotCount {
 
 export interface SnapshotGenerateSummary {
   snapshotDate: string;
+  region: string;
+  assetType: string;
   market: SnapshotCount;
   sectors: SnapshotCount;
   countries: SnapshotCount;
@@ -27,6 +29,7 @@ export interface SnapshotCoverage {
 export interface MarketContextSnapshot {
   id: string;
   snapshotDate: string;
+  region?: string;
   regime: string;
   regimeScore: number;
   breadthPercentAboveSma50: number | null;
@@ -38,6 +41,7 @@ export interface MarketContextSnapshot {
 export interface SectorContextSnapshot {
   id: string;
   snapshotDate: string;
+  region?: string;
   sector: string;
   relativeStrengthScore: number;
   leadershipStatus: string;
@@ -48,6 +52,7 @@ export interface SectorContextSnapshot {
 export interface CountryContextSnapshot {
   id: string;
   snapshotDate: string;
+  region?: string;
   country: string;
   relativeStrengthScore: number;
   dataStatus: string;

@@ -12,6 +12,12 @@ const Metric: React.FC<{ label: string; value: string }> = ({ label, value }) =>
   </Paper>
 );
 
+const breadthSmaSamples = (summary: { breadth: { instrumentCount: number; sma50SampleCount?: number; sma200SampleCount?: number } }) => {
+  const sma50 = summary.breadth.sma50SampleCount ?? summary.breadth.instrumentCount;
+  const sma200 = summary.breadth.sma200SampleCount ?? summary.breadth.instrumentCount;
+  return `${sma50} / ${sma200}`;
+};
+
 export const MarketContextPage: React.FC = () => {
   const { summary, loading, error } = useMarketContext();
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>;
@@ -39,6 +45,9 @@ export const MarketContextPage: React.FC = () => {
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 3 }}>
         <Paper sx={{ p: 2 }}>
           <Typography variant="h6" sx={{ mb: 2 }}>Sector Rotation</Typography>
+          {summary.topSectors.length === 0 ? (
+            <Typography color="text.secondary">No named-sector leadership available.</Typography>
+          ) : (
           <Stack spacing={1.5}>
             {summary.topSectors.map((sector) => (
               <Box key={sector.sector}>
@@ -51,6 +60,7 @@ export const MarketContextPage: React.FC = () => {
               </Box>
             ))}
           </Stack>
+          )}
         </Paper>
 
         <Paper sx={{ p: 2 }}>
@@ -61,7 +71,8 @@ export const MarketContextPage: React.FC = () => {
             <Metric label="Advance/Decline" value={summary.breadth.advanceDeclineRatio?.toFixed(2) ?? 'N/A'} />
             <Metric label="52W High / Low" value={`${summary.breadth.newHigh52WeekCount} / ${summary.breadth.newLow52WeekCount}`} />
             <Metric label="Bullish / Bearish" value={`${summary.breadth.bullishSignalCount} / ${summary.breadth.bearishSignalCount}`} />
-            <Metric label="Sample" value={String(summary.breadth.instrumentCount)} />
+            <Metric label="Price Sample" value={String(summary.breadth.instrumentCount)} />
+            <Metric label="SMA Samples" value={breadthSmaSamples(summary)} />
           </Box>
         </Paper>
 
