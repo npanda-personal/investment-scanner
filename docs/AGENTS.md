@@ -57,6 +57,53 @@ Current modules include:
 - strategy-decision-engine
 - trade-plan-risk-engine
 
+# Parallel Team Operating Model
+
+Use `docs/codex-agent-team-plan/team-operating-model.md` as the default delivery model for planning and assigning work.
+Use `docs/codex-agent-team-plan/codex-agent-team.md` when work is split across multiple Codex agents.
+
+- Product Owner owns roadmap priority, requirements, acceptance criteria, user workflow intent, and investment-domain language. The Product Owner is the market, quant, and stock-analysis domain authority and can change roadmap direction or requirements when domain judgment changes.
+- Solution Architect owns architecture, API/data contracts, module boundaries, database impact, cross-module dependencies, scalability, and robustness. The Solution Architect can change solution design when needed, but must preserve the project's personal/local-first purpose and free/open-source or already-local tooling constraints.
+- Senior Fullstack Lead owns integration quality, shared patterns, code review, standards, and unblock decisions. This role is not the default implementer for every feature.
+- Module Fullstack Developers own complete vertical module slices: backend, frontend, tests, and module docs for their assigned lane.
+- QA owns acceptance scenarios, regression coverage, live-data verification, and release readiness.
+
+Default parallel lanes:
+
+- Lane 1: Market Data / Data Quality
+- Lane 2: Strategy / Signals / Risk
+- Lane 3: Portfolio / Watchlists / Alerts / UX
+
+When work is independent, assign it by lane and module so implementation can proceed in parallel. Shared files, cross-module contracts, route registration, Prisma schema changes, global market-scope behavior, shared UI components, auth, and subscription gates require Solution Architect or Senior Fullstack Lead review before merge.
+
+Nothing in the roadmap, requirements, module priorities, or existing workflow assumptions is frozen. Always follow the latest Product Owner direction when it conflicts with older docs, and update the affected docs as part of the change. Do not introduce paid libraries, paid tools, paid service providers, paid market-data sources, paid AI services, paid hosted testing, or paid infrastructure. The personal/local-first and free-tool constraints are non-negotiable.
+
+For multi-agent Codex work, the main Codex session acts as Senior Fullstack Lead / Orchestrator. It must assign disjoint write scopes, reserve files/modules to single owners, keep shared files under explicit ownership, collect agent handoffs, and integrate final changes. No two agents may edit the same file, module, test spec, migration, route registry, generated type, or shared component in the same implementation pass. Lane agents may work independently inside assigned module boundaries, but they must not edit shared route registries, shared UI, shared backend utilities, Prisma schema, package manifests, or CI files unless the orchestrator explicitly assigns those files.
+
+Product Owner and Solution Architect agents must always run in deep-thinking decision mode. When the Codex agent runtime supports reasoning-effort settings, use high or highest available reasoning effort for those two roles. The requirement flow is Product Owner to Product Owner: PO requirement -> product brief -> Orchestrator Intake -> architecture contract -> QA verification plan -> orchestrator work packet -> lane implementation -> orchestrator integration -> QA evidence -> post-QA Lead validation -> post-QA Architect signoff after Lead validation -> PO acceptance -> GitHub check-in or revised requirement. After QA signs off, the Senior Fullstack Lead / Orchestrator must validate that Architect asks and integration expectations were met. Then the Solution Architect must sign off again that business rules, architecture contracts, solution quality, and local/free-tool constraints still hold before Product Owner verification.
+
+Use an agile priority pipeline, not a waterfall roadmap-first process. At startup, the Product Owner Agent must create the first Top 5 Priority Requirements and hand them to the Orchestrator for intake immediately. The Architect pulls each item after Orchestrator intake marks it `Ready for Architecture`. While Architect, QA, Orchestrator, and lane agents move those five items through the flow, the Product Owner Agent works on the broader roadmap and next priority batch. Do not wait for all five items to be architected before starting the first item that reaches `Ready for Implementation`. No role should be idle when it can pull the next eligible item, refine the next batch, prepare verification, inspect modules, or resolve blockers.
+
+Use `docs/codex-agent-team-plan/active-work-board.md` as the live source of truth for current Top 5 items, next priority candidates, work state, operating mode, owner, lane/module, reserved write scope, blockers, and GitHub check-in evidence. At first-run kickoff, the Orchestrator loads baseline docs and repo state, Product Owner creates Top 5 briefs, Orchestrator performs intake and moves complete items to `Ready for Architecture`, Architect starts contracts in priority order, QA starts early scenarios, developers stay in discovery until work packets and reservations exist, and the Orchestrator moves the first non-conflicting item to `Ready for Implementation` only after the work packet, QA plan, WIP check, and single-writer reservations are complete.
+
+When Product Owner changes priority, scope, or acceptance criteria, update the active work board before downstream work continues. Items not yet in implementation return to the earliest affected gate. Items in implementation pause new edits until the Orchestrator decides whether to continue, revise, return to architecture, or cancel. Cancelled or unaccepted work must not be committed or pushed unless Product Owner explicitly accepts a scoped partial result.
+
+Each lane developer agent has a WIP limit of one active implementation task. A developer must carry that task end to end through implementation, tests/docs updates, structured handoff, and QA/orchestrator follow-up before pulling the next implementation task. Do not split one developer across multiple active implementation items.
+
+At every review gate, rejection reasons must be clear, specific, and assigned back to the responsible role on the same work item. A rejected implementation item remains the developer's active WIP for the next correction iteration before any new task is pulled. Clarification follows this chain: Developer -> Senior Fullstack Lead / Orchestrator -> Solution Architect -> Product Owner. The final clarification must be written back into the work packet, architecture contract, acceptance criteria, module docs, decision record, or blocker register.
+
+Every agent handoff must be complete enough for the next role to act without guessing: work item, state, mode, owner, lane/module, exact files changed or inspected, behavior/docs/contracts changed, checks run or skipped, assumptions, risks, blockers, shared-file requests, next gate, and evidence notes. Incomplete handoffs are rejected back to the responsible role in Revision or Clarification mode.
+
+Blockers and conflicts must be routed before lower-priority work. Developer blockers go to the Lead/Orchestrator, shared-file conflicts pause competing edits until the Orchestrator assigns one owner, architecture blockers go to Architect, product/domain blockers go to Product Owner, and unresolved blockers are recorded in `docs/codex-agent-team-plan/blocker-register.md` with owner, next action, review date, and parallel work available before the owner pulls unrelated work.
+
+Use documented Codex-agent operating modes from `docs/codex-agent-team-plan/codex-agent-team.md`: Discovery, Product Planning, Orchestrator Intake, Architecture Planning, Implementation, QA Verification, Lead Validation, Architect Signoff, PO Acceptance, GitHub Check-In, Clarification, and Revision. Work packets and handoffs must record current mode, mode owner, allowed actions, forbidden actions, next mode, and whether clarification or revision mode is active.
+
+No accepted requirement is considered released until the Senior Fullstack Lead / Orchestrator stages only that requirement's scoped files, commits them, pushes the commit to `origin` on the active branch, and records branch name, commit SHA, pushed remote, committed files, scoped-staging confirmation, unsafe/unaccepted-file exclusion confirmation, rollback notes, and CI status/link when available. Do not commit unrelated local changes, rejected work, unaccepted requirements, secrets, `.env` files, database dumps, or generated artifacts unless explicitly part of the accepted requirement.
+
+When the Product Owner introduces a new module, do not assign it directly to a developer. The Product Owner Agent must define the business capability and why separate ownership may be needed as a product brief. The Orchestrator must perform intake, record the board row, and move the item to `Ready for Architecture`. The Solution Architect Agent must decide whether to create a new module or extend an existing one, assign the ownership lane, and record the architecture contract. QA must create the verification plan before implementation. The Orchestrator creates the new-module work packet, reserves backend/frontend module paths, docs, tests, route registration, and shared files, confirms WIP availability, and moves the item to `Ready for Implementation` before one available lane developer implements the first vertical slice end to end.
+
+Every Codex agent must load and follow the relevant guideline sources before making decisions, implementing, verifying, or signing off. Baseline sources are `docs/AGENTS.md`, `docs/instructions.md`, `docs/codex-agent-team-plan/team-operating-model.md`, `docs/codex-agent-team-plan/codex-agent-team.md`, and `docs/codex-agent-team-plan/sdlc-operating-model.md`. Role and task-specific sources include `docs/architecture.md`, `docs/roadmap.md`, `docs/ux-ui-best-practices.md`, `docs/module-verification-register.md`, and relevant module `{module}.md` files. Work packets must list guidelines loaded, and handoffs must call out skipped guidelines, conflicts, or unresolved ambiguity. Use `docs/codex-agent-team-plan/decision-record-template.md` for material decisions, `docs/codex-agent-team-plan/release-checklist.md` for release candidates, `docs/codex-agent-team-plan/technical-debt-register.md` for known debt, `docs/codex-agent-team-plan/blocker-register.md` for blockers, and `docs/codex-agent-team-plan/retrospective-template.md` after Top 5 batches or major release candidates.
+
 # Important Current State
 
 Legacy code has already been cleaned up and removed.
@@ -65,7 +112,7 @@ Do NOT assume legacy folders still exist.
 
 Do NOT create compatibility shims for removed legacy code unless explicitly requested.
 
-This project now uses modular architecture as the primary source of truth. :contentReference[oaicite:0]{index=0}
+This project now uses modular architecture as the primary source of truth.
 
 # Golden Rule
 
@@ -332,7 +379,7 @@ Frontend module changes that affect shared navigation, page loading, filters, ba
 
 UI smoke testing is mandatory for UI-facing changes unless there is a clear blocker, such as missing browser binaries, unavailable local services, or test-account setup failure. If blocked, document the blocker in the final response and still run build/unit tests. Do not silently substitute backend tests for UI verification.
 
-The UI smoke suite must stay local-first and free/open-source. Use Playwright locally; do not add paid hosted browser testing, paid visual regression services, or paid monitoring tools unless explicitly approved.
+The UI smoke suite must stay local-first and free/open-source. Use Playwright locally; do not add paid hosted browser testing, paid visual regression services, or paid monitoring tools.
 
 UI tests must be organized like the application modules. Keep feature/module scenarios in separate files under `frontend/tests/ui`, such as `market-data-foundation.spec.ts` or `research-hub.spec.ts`, and place shared login fixtures, route helpers, and common assertions in `frontend/tests/ui/support`. Avoid growing a single catch-all smoke spec; test ownership should mirror source ownership so regressions are easy to find and maintain.
 
@@ -454,7 +501,7 @@ Frontend:
 - Copilot summaries must be deterministic and cost-free by default, show source modules and data gaps, and include the research-support disclaimer instead of direct financial advice.
 - Subscription gates must stay centralized in `subscription-billing`; feature modules may call the public service but must not duplicate plan-limit logic.
 - Authenticated user context is provided by `auth-identity` through `requireAuth`; user-owned modules must filter by current user and may read legacy `userId = null` rows during migration.
-- Notification delivery should remain free/local-friendly by default. Use notification preferences and delivery records from `notifications-delivery`; paid/external delivery providers must be optional, env-driven, and disabled unless explicitly configured.
+- Notification delivery must remain free/local-friendly by default. Use notification preferences and delivery records from `notifications-delivery`; paid delivery providers are not allowed. Any external free provider must be optional, env-driven, and disabled unless explicitly configured.
 - Signal Quality Lab owns historical signal outcome measurement and quality dashboards. It must not change Signal Generation Engine scoring logic; consume signal results through public exports and calculate outcomes from Market Data Foundation price data.
 - Historical Context Snapshots owns point-in-time persistence of market context, sector/country strength, smart-money context, and data-quality readiness. Current calculations remain owned by their source modules; snapshots enable historical grouping and lookup.
 - Signal Calibration Engine owns explainable calibrated score/confidence outputs and model-version metadata. It must preserve raw Signal Generation Engine scores and persist calibration separately.

@@ -90,7 +90,7 @@ For data-bearing modules, smoke tests must prove more than "the page renders." T
 
 Large data-load and calculation workflows should not be executed as part of every UI smoke run. For workflows such as catalog import, OHLCV sync, data-quality evaluation, signal generation, and smart-money snapshot refresh, use Playwright to cover the controls, request parameters, progress/disabled/final states, and empty-state behavior, and use manual browser verification for the real bulk run when the change affects user-visible data.
 
-Do not add paid hosted browser testing, paid visual regression tools, paid UI libraries, paid market-data providers, or paid AI services. This project remains local-first and non-commercial unless explicitly changed by the product owner.
+Do not add paid hosted browser testing, paid visual regression tools, paid UI libraries, paid market-data providers, paid AI services, or paid hosted infrastructure. This project remains personal/local-first and non-commercial.
 
 ---
 

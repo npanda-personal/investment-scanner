@@ -114,6 +114,16 @@ investment-scanner/
 └── scripts/          # Deployment & maintenance scripts
 ```
 
+## Team Operating Model
+
+Development work should be assigned by independent module lanes so backend, frontend, tests, and docs for a product capability can move in parallel. See [`docs/codex-agent-team-plan/team-operating-model.md`](docs/codex-agent-team-plan/team-operating-model.md) for the Product Owner, Solution Architect, Senior Fullstack Lead, Module Fullstack Developer, and QA workflow.
+
+For Codex-agent execution, see [`docs/codex-agent-team-plan/codex-agent-team.md`](docs/codex-agent-team-plan/codex-agent-team.md). It defines the orchestrator, role agents, lane agents, operating modes, work packets, handoffs, shared-file rules, and the agile Top 5 priority pipeline for parallel agent work.
+
+For active Codex-agent execution, use [`docs/codex-agent-team-plan/active-work-board.md`](docs/codex-agent-team-plan/active-work-board.md) as the live tracker for Top 5 items, owners, modes, reserved files, blockers, and GitHub check-in evidence.
+
+For SDLC governance, see [`docs/codex-agent-team-plan/sdlc-operating-model.md`](docs/codex-agent-team-plan/sdlc-operating-model.md). It covers work states, gates, decision records, release/rollback, testing, data/security governance, blockers, technical debt, and retrospectives.
+
 ## License
 
 All code is released under the MIT License. Third‑party services and APIs may have their own terms of use.
