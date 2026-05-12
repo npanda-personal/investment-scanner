@@ -9,6 +9,7 @@ import {
   fetchLatestMarketDataRepairRun,
   fetchMarketDataHealth,
   fetchMarketDataRepairPlan,
+  fetchTrustedReviewUniverseHealth,
   fetchMarketDataUniverseHealth,
   fetchMarketDataSchedulerStatus,
   fetchManualMetadataTemplate,
@@ -23,6 +24,7 @@ import {
   type MarketDataRepairRunResponse,
   type MarketDataRepairSummary,
   type MarketDataUniverseHealth,
+  type TrustedReviewUniverseHealth,
   type MarketDataSchedulerRegionStatus,
 } from '../api/marketDataFoundationService';
 import { normalizeMarketForApi } from '../api/marketScopeApi';
@@ -79,6 +81,7 @@ interface MarketDataStatusPanelProps {
 const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, assetType }) => {
   const [status, setStatus] = useState<MarketDataHealth | null>(null);
   const [universeHealth, setUniverseHealth] = useState<MarketDataUniverseHealth | null>(null);
+  const [trustedReviewUniverse, setTrustedReviewUniverse] = useState<TrustedReviewUniverseHealth | null>(null);
   const [repairPlan, setRepairPlan] = useState<MarketDataRepairPlan | null>(null);
   const [repairSummary, setRepairSummary] = useState<MarketDataRepairSummary | null>(null);
   const [repairRunResult, setRepairRunResult] = useState<MarketDataRepairRunResponse | null>(null);
@@ -104,14 +107,16 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
     Promise.all([
       fetchMarketDataHealth({ region, assetType }),
       fetchMarketDataUniverseHealth({ region, assetType }),
+      fetchTrustedReviewUniverseHealth({ region, assetType }),
       fetchMarketDataRepairPlan({ region, assetType }),
       fetchLatestMarketDataRepairRun({ region, assetType }).catch(() => null),
       fetchMarketDataSchedulerStatus().catch(() => null),
     ])
-      .then(([result, universeResult, repairPlanResult, latestRepairRunResult, schedulerStatus]) => {
+      .then(([result, universeResult, trustedReviewResult, repairPlanResult, latestRepairRunResult, schedulerStatus]) => {
         if (!mounted) return;
         setStatus(result);
         setUniverseHealth(universeResult);
+        setTrustedReviewUniverse(trustedReviewResult);
         setRepairPlan(repairPlanResult);
         setLatestRepairRun(latestRepairRunResult);
         const normalizedRegion = normalizeMarketForApi(region);
@@ -359,6 +364,49 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
             <Typography key={blocker.code} variant="caption" color="text.secondary">
               {blocker.code}: {formatCount(typeof blocker.count === 'number' ? blocker.count : 0)}; required {blocker.required}; next {blocker.nextAction || 'none'}.
             </Typography>
+          ))}
+        </Stack>
+      </Box>
+
+      <Box sx={{ border: '1px solid', borderColor: trustedReviewUniverse?.status === 'READY' ? 'success.main' : trustedReviewUniverse?.status === 'LIMITED' ? 'warning.main' : 'divider', borderRadius: 1, p: 2 }}>
+        <Stack spacing={1.5}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} justifyContent="space-between">
+            <Box>
+              <Typography variant="subtitle1" fontWeight={700}>Trusted Review Universe</Typography>
+              <Typography variant="body2" color="text.secondary">
+                User-facing price-action subset for Today&apos;s Review. Full catalog health can remain strict while this subset is used for limited research support.
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+              <Chip
+                label={`Status: ${trustedReviewUniverse?.status || 'UNKNOWN'}`}
+                color={trustedReviewUniverse?.status === 'READY' ? 'success' : trustedReviewUniverse?.status === 'LIMITED' ? 'warning' : 'default'}
+              />
+              <Chip label={`Mode: ${trustedReviewUniverse?.mode || 'NO_REVIEW'}`} variant="outlined" />
+            </Stack>
+          </Stack>
+          <Alert severity="info">
+            Missing metadata is shown as context gap, not a hard blocker for price-action review.
+          </Alert>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 1 }}>
+            <Typography variant="caption">Catalog count: {formatCount(trustedReviewUniverse?.catalogCount)}</Typography>
+            <Typography variant="caption">Provider-supported: {formatCount(trustedReviewUniverse?.providerSupportedCount)}</Typography>
+            <Typography variant="caption">Trusted review universe: {formatCount(trustedReviewUniverse?.trustedCount)}</Typography>
+            <Typography variant="caption">Target session: {trustedReviewUniverse?.targetTradingDate || 'unknown'}</Typography>
+            <Typography variant="caption">Required data-through: {trustedReviewUniverse?.requiredDataThroughDate || 'unknown'}</Typography>
+            <Typography variant="caption">Stored data-through: {trustedReviewUniverse?.storedDataThroughDate || trustedReviewUniverse?.dataThroughDate || 'none'}</Typography>
+            <Typography variant="caption">Provider unknown excluded: {formatCount(trustedReviewUniverse?.excludedCounts.providerUnknown)}</Typography>
+            <Typography variant="caption">Stale latest price excluded: {formatCount(trustedReviewUniverse?.excludedCounts.staleLatestPrice)}</Typography>
+            <Typography variant="caption">Under 120 bars excluded: {formatCount(trustedReviewUniverse?.excludedCounts.insufficientBarsUnder120)}</Typography>
+            <Typography variant="caption">Missing volume excluded: {formatCount(trustedReviewUniverse?.excludedCounts.missingRecentVolume)}</Typography>
+            <Typography variant="caption">Missing sector context gaps: {formatCount(trustedReviewUniverse?.contextGapCounts.missingSector)}</Typography>
+            <Typography variant="caption">Missing industry context gaps: {formatCount(trustedReviewUniverse?.contextGapCounts.missingIndustry)}</Typography>
+            <Typography variant="caption">Missing market cap context gaps: {formatCount(trustedReviewUniverse?.contextGapCounts.missingMarketCap)}</Typography>
+            <Typography variant="caption">Lite/full thresholds: {formatCount(trustedReviewUniverse?.minLiteCount)} / {formatCount(trustedReviewUniverse?.minFullCount)}</Typography>
+            <Typography variant="caption">Scan ordering: {trustedReviewUniverse?.scanPolicy?.scanOrdering || 'not published'}</Typography>
+          </Box>
+          {(trustedReviewUniverse?.warnings || []).slice(0, 3).map((warning) => (
+            <Typography key={warning} variant="caption" color="text.secondary">{warning}</Typography>
           ))}
         </Stack>
       </Box>

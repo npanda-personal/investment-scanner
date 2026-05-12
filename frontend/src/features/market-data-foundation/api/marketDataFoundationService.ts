@@ -17,6 +17,7 @@ import type {
   MarketDataManualMetadataTemplate,
   MarketDataUniverseHealth,
   MarketDataSchedulerStatus,
+  TrustedReviewUniverseHealth,
   PaginatedResponse,
   PaginationOptions,
   SyncResponse,
@@ -55,6 +56,7 @@ export type {
   MarketDataManualMetadataTemplate,
   MarketDataUniverseHealth,
   MarketDataSchedulerStatus,
+  TrustedReviewUniverseHealth,
   PaginatedResponse,
   PaginationOptions,
   SyncResponse,
@@ -213,6 +215,15 @@ export async function fetchMarketDataUniverseHealth(options: MarketScopedApiOpti
   };
   logMarketDataApi(options.region || 'IN', params.region, params, 'universe-health');
   const response = await axios.get<MarketDataUniverseHealth>(`${API_BASE}/v1/market-data/universe/health`, { params });
+  return response.data;
+}
+
+export async function fetchTrustedReviewUniverseHealth(options: MarketScopedApiOptions = {}): Promise<TrustedReviewUniverseHealth> {
+  const params = {
+    region: normalizeMarketForApi(options.region) || 'IN',
+    assetType: normalizeAssetTypeForMarketDataApi(options.assetType) || 'STOCK',
+  };
+  const response = await axios.get<TrustedReviewUniverseHealth>(`${API_BASE}/v1/market-data/review-universe`, { params });
   return response.data;
 }
 

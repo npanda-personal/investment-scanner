@@ -27,7 +27,7 @@ export function TodayReviewCandidateDetailPage() {
   if (loading) {
     return (
       <Stack spacing={3}>
-        <PageHeader title="Today’s Trade Review Candidate" backTo="/today-review" backLabel="Today’s Review" />
+        <PageHeader title="Today's Trade Review Candidate" backTo="/today-review" backLabel="Today's Review" />
         <Alert severity="info" icon={<CircularProgress size={18} />}>Loading candidate research snapshot.</Alert>
       </Stack>
     );
@@ -36,7 +36,7 @@ export function TodayReviewCandidateDetailPage() {
   if (error) {
     return (
       <Stack spacing={3}>
-        <PageHeader title="Today’s Trade Review Candidate" backTo="/today-review" backLabel="Today’s Review" />
+        <PageHeader title="Today's Trade Review Candidate" backTo="/today-review" backLabel="Today's Review" />
         <Alert severity="error" action={<Button color="inherit" size="small" onClick={() => void reload()}>Retry</Button>}>{error}</Alert>
       </Stack>
     );
@@ -45,7 +45,7 @@ export function TodayReviewCandidateDetailPage() {
   if (!candidate) {
     return (
       <Stack spacing={3}>
-        <PageHeader title="Today’s Trade Review Candidate" backTo="/today-review" backLabel="Today’s Review" />
+        <PageHeader title="Today's Trade Review Candidate" backTo="/today-review" backLabel="Today's Review" />
         <Alert severity="warning">Candidate snapshot was not found.</Alert>
       </Stack>
     );
@@ -63,7 +63,7 @@ export function TodayReviewCandidateDetailPage() {
         title={`${candidate.symbol} research support`}
         subtitle={candidate.companyName || 'Company unavailable'}
         backTo="/today-review"
-        backLabel="Today’s Review"
+        backLabel="Today's Review"
         badges={<Stack direction="row" spacing={1} flexWrap="wrap"><Chip label={stateLabel(candidate.state)} color={candidate.state === 'BLOCKED' ? 'error' : 'primary'} /><Chip label={`Grade ${candidate.grade}`} variant="outlined" /></Stack>}
         secondaryActions={<Button startIcon={<RefreshIcon />} onClick={() => void reload()}>Refresh</Button>}
       />
@@ -83,7 +83,7 @@ export function TodayReviewCandidateDetailPage() {
               <Fact label="Target 1 / Target 2 or reward range" value={formatTarget(plan)} />
               <Fact label="Reward/risk" value={formatRatio(plan?.rewardRiskRatio)} />
               <Fact label="Failure condition" value={candidate.blockers[0] || plan?.invalidationRules?.[0] || 'Evidence weakens or invalidation is reached.'} />
-              <Fact label="Do nothing unless" value={candidate.state === 'LONG_REVIEW' ? 'The entry zone, invalidation, proof, and data quality remain valid.' : 'Blockers or data gaps are resolved in a later review.'} />
+              <Fact label="Do nothing unless" value={plan?.doNothingUnless || (candidate.state === 'LONG_REVIEW' ? 'The entry zone, invalidation, proof, and data quality remain valid.' : 'Blockers or data gaps are resolved in a later review.')} />
             </Grid>
           </Stack>
         </CardContent>
@@ -100,7 +100,8 @@ export function TodayReviewCandidateDetailPage() {
           <FactStack items={[
             ['Strategy', proof?.strategyCode || candidate.strategyCode],
             ['Framework-backed', proof?.frameworkBacked ? 'Yes' : 'No'],
-            ['Proof rating', proof?.strategyRating?.ratingGrade || plan?.strategyRating || 'Unproven'],
+            ['Proof rating', proof?.strategyRating?.ratingGrade || proof?.evidenceLabel || plan?.strategyRating || 'Unproven'],
+            ['Sample size', formatNumber(proof?.sampleSize)],
             ['Readiness', proof?.readinessLabel || plan?.readinessLabel || 'Unavailable'],
             ['Decision', proof?.decision || 'Unavailable'],
           ]} />
@@ -119,7 +120,7 @@ export function TodayReviewCandidateDetailPage() {
             ['Coverage', dataQuality?.coverageStatus || 'Missing'],
             ['Signal readiness', dataQuality?.signalReadinessStatus || 'Missing'],
             ['Liquidity', dataQuality?.liquidityStatus || 'Missing'],
-            ['Sector', dataQuality?.sector || 'Unknown'],
+            ['Context gaps', Array.isArray(dataQuality?.contextGaps) ? dataQuality.contextGaps.join(', ') || 'None' : 'Unavailable'],
             ['Last evaluated', formatDateTime(dataQuality?.lastEvaluatedAt)],
           ]} />
         </Panel>
@@ -213,7 +214,8 @@ function formatStop(plan: any) {
 
 function formatTarget(plan: any) {
   if (!plan?.target) return 'Unavailable';
-  return `${formatCurrency(Number(plan.target.price))}; ${formatNumber(plan.target.expectedReturnPercent)}% modeled reward`;
+  const target2 = typeof plan.target.target2 === 'number' ? ` / ${formatCurrency(plan.target.target2)}` : '';
+  return `${formatCurrency(Number(plan.target.price))}${target2}; ${formatNumber(plan.target.expectedReturnPercent)}% modeled reward`;
 }
 
 function formatRatio(value?: number) {

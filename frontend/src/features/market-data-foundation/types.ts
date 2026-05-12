@@ -160,6 +160,50 @@ export interface MarketDataUniverseHealth {
   universeSignoff: MarketDataUniverseSignoff;
 }
 
+export interface TrustedReviewUniverseHealth {
+  scope: {
+    region: string;
+    assetType: string;
+  };
+  asOfDate: string;
+  targetTradingDate: string | null;
+  requiredDataThroughDate: string | null;
+  storedDataThroughDate: string | null;
+  catalogCount: number;
+  providerSupportedCount: number;
+  trustedCount: number;
+  status: 'READY' | 'LIMITED' | 'NOT_READY';
+  mode: 'FULL_REVIEW' | 'LIMITED_REVIEW' | 'NO_REVIEW';
+  minLiteCount: number;
+  minFullCount: number;
+  dataThroughDate: string | null;
+  scanPolicy?: {
+    scanLimit: number;
+    scanComplete: boolean;
+    scanOrdering: string;
+  };
+  excludedCounts: {
+    providerUnknown: number;
+    providerRetryFailed: number;
+    providerUnsupported: number;
+    inactiveOrDelisted: number;
+    noLatestPrice: number;
+    staleLatestPrice: number;
+    insufficientBarsUnder120: number;
+    insufficientBarsUnder252: number;
+    missingRecentVolume: number;
+    corporateActionBlocked: number;
+  };
+  contextGapCounts: {
+    missingSector: number;
+    missingIndustry: number;
+    missingMarketCap: number;
+    missingIsin: number;
+    missingListingDate: number;
+  };
+  warnings: string[];
+}
+
 export interface MarketDataRepairPlan {
   scope: {
     region: string;

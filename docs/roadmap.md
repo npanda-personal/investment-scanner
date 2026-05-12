@@ -1125,7 +1125,7 @@ Support team and enterprise workflows later.
 
 ## Do Now
 
-1. Finish dependency-first hardening of Market Data Foundation, Data Quality Engine, and Signal Generation Engine.
+1. Finish dependency-first hardening of Market Data Foundation, including strict Full Catalog Health for repair operations and Trusted Review Universe for limited Today Review value from usable OHLCV rows.
 2. Signal Quality Lab.
 3. Signal Calibration Engine.
 4. Earnings & Events Intelligence.

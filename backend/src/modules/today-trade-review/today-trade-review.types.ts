@@ -1,5 +1,6 @@
 import type { DataQualityEvaluationDto } from '../data-quality-engine';
 import type { MarketContextSummary } from '../market-context-intelligence';
+import type { TrustedReviewUniverseHealth, TrustedReviewUniverseInstrument } from '../market-data-foundation';
 import type { SignalCalibrationResultDto } from '../signal-calibration-engine';
 import type { SignalResultDto } from '../signal-generation-engine';
 import type { SmartMoneyStockSummary } from '../smart-money-intelligence';
@@ -19,6 +20,8 @@ export type TodayReviewCandidateState =
 export type TodayReviewDirection = 'LONG' | 'SHORT' | 'EXIT_RISK' | 'WATCH' | 'BLOCKED' | 'AVOID';
 export type TodayReviewGrade = 'A' | 'B' | 'C' | 'D' | 'UNPROVEN';
 export type TodayReviewTrustStatus = 'OK' | 'PARTIAL' | 'STALE' | 'FAILED';
+export type TodayReviewUniverseMode = 'FULL_REVIEW' | 'LIMITED_REVIEW' | 'NO_REVIEW';
+export type TodayReviewTrustedLoadStatus = 'COMPLETE' | 'CONFIGURED_PARTIAL' | 'LOAD_FAILED';
 
 export interface TodayReviewRunRequest {
   region?: string;
@@ -34,10 +37,34 @@ export interface TodayReviewQuery {
 
 export interface TodayReviewSourceSnapshot {
   marketData?: Record<string, unknown> | null;
+  reviewUniverse?: TrustedReviewUniverseHealth | null;
+  scanFunnel?: TodayReviewScanFunnel | null;
   marketGate?: Record<string, unknown> | null;
   marketContext?: MarketContextSummary | null;
   rawSignalUniverse?: Record<string, unknown> | null;
   generatedAt: string;
+}
+
+export interface TodayReviewScanFunnel {
+  trustedUniverseCount: number;
+  trustedInstrumentsScanned: number;
+  trustedInstrumentsSkipped: number;
+  scanLimit: number;
+  scanComplete: boolean;
+  scanOrdering: string;
+  trustedLoadStatus: TodayReviewTrustedLoadStatus;
+  membershipLoadFailureReason: string | null;
+  strategyCandidatesSeen: number;
+  strategyCandidatesEligible: number;
+  strategyCandidatesExcluded: number;
+  outsideTrustedUniverse: number;
+  setupsDetected: number;
+  promotedCandidates: number;
+  watchOnly: number;
+  unproven: number;
+  blocked: number;
+  noSetup: number;
+  topNoPromotionReasons: Record<string, number>;
 }
 
 export interface TodayReviewCandidateDto {
@@ -79,6 +106,11 @@ export interface TodayReviewRunDto {
   warnings: string[];
   candidateCounts: Record<string, number>;
   sourceSnapshot: TodayReviewSourceSnapshot | Record<string, unknown>;
+  reviewUniverseMode?: TodayReviewUniverseMode;
+  trustedUniverseCount?: number;
+  catalogCount?: number;
+  coverageWarnings?: string[];
+  scanFunnel?: TodayReviewScanFunnel | null;
   createdAt: string;
   updatedAt: string;
   candidates: TodayReviewCandidateDto[];
@@ -152,6 +184,8 @@ export interface TodayReviewUpstreamServices {
   };
   marketDataService: {
     latestStoredCandleInfo(region: string, assetType?: string, now?: Date): Promise<Record<string, unknown>>;
+    trustedReviewUniverseHealth?(options: { region?: string; assetType?: string }): Promise<TrustedReviewUniverseHealth>;
+    listTrustedReviewUniverseInstruments?(options: { region?: string; assetType?: string; limit?: number; offset?: number }): Promise<TrustedReviewUniverseInstrument[]>;
   };
   dataQualityService: {
     getLatestEvaluationForInstrument(instrumentId: string): Promise<DataQualityEvaluationDto | null>;

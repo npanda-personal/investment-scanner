@@ -151,6 +151,9 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
 
   private toRunDto(record: any): TodayReviewRunDto {
     const candidates = (record.candidates || []).map((candidate: any) => this.toCandidateDto(candidate));
+    const sourceSnapshot = this.jsonObject(record.sourceSnapshot);
+    const reviewUniverse = this.jsonObject(sourceSnapshot.reviewUniverse);
+    const scanFunnel = this.nullableJson(sourceSnapshot.scanFunnel) as any;
     return {
       id: record.id,
       runDate: record.runDate.toISOString(),
@@ -163,7 +166,12 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
       finishedAt: record.finishedAt ? record.finishedAt.toISOString() : null,
       warnings: this.jsonArray(record.warnings),
       candidateCounts: this.jsonObject(record.candidateCounts),
-      sourceSnapshot: this.jsonObject(record.sourceSnapshot),
+      sourceSnapshot,
+      reviewUniverseMode: reviewUniverse.mode,
+      trustedUniverseCount: reviewUniverse.trustedCount,
+      catalogCount: reviewUniverse.catalogCount,
+      coverageWarnings: Array.isArray(reviewUniverse.warnings) ? reviewUniverse.warnings.map(String) : [],
+      scanFunnel,
       createdAt: record.createdAt.toISOString(),
       updatedAt: record.updatedAt.toISOString(),
       candidates,

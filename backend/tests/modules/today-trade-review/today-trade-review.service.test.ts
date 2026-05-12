@@ -35,6 +35,8 @@ class MemoryTodayReviewRepository implements TodayReviewRepository {
 
   async completeRun(input: { runId: string; status: TodayReviewRunStatus; dataThroughDate: Date | null; finishedAt: Date; warnings: string[]; candidateCounts: Record<string, number>; sourceSnapshot: TodayReviewSourceSnapshot | Record<string, unknown>; candidates: TodayReviewCandidateDto[] }): Promise<TodayReviewRunDto> {
     const current = this.runs.get(input.runId)!;
+    const sourceSnapshot = input.sourceSnapshot as any;
+    const reviewUniverse = sourceSnapshot.reviewUniverse || {};
     const candidates = input.candidates.map((candidate, index) => {
       const persisted = {
         ...candidate,
@@ -55,6 +57,11 @@ class MemoryTodayReviewRepository implements TodayReviewRepository {
       warnings: input.warnings,
       candidateCounts: input.candidateCounts,
       sourceSnapshot: input.sourceSnapshot,
+      reviewUniverseMode: reviewUniverse.mode,
+      trustedUniverseCount: reviewUniverse.trustedCount,
+      catalogCount: reviewUniverse.catalogCount,
+      coverageWarnings: Array.isArray(reviewUniverse.warnings) ? reviewUniverse.warnings : [],
+      scanFunnel: sourceSnapshot.scanFunnel || null,
       updatedAt: input.finishedAt.toISOString(),
       candidates,
     };
@@ -170,6 +177,93 @@ const tradePlan = (overrides: Partial<TradePlanResultDto> = {}): TradePlanResult
   ...overrides,
 });
 
+const trustedHealth = (overrides: Record<string, any> = {}) => ({
+  scope: { region: 'IN', assetType: 'STOCK' },
+  asOfDate: '2026-05-11',
+  targetTradingDate: '2026-05-12',
+  requiredDataThroughDate: '2026-05-11',
+  storedDataThroughDate: '2026-05-10',
+  catalogCount: 2906,
+  providerSupportedCount: 585,
+  trustedCount: 120,
+  status: 'LIMITED',
+  mode: 'LIMITED_REVIEW',
+  minLiteCount: 100,
+  minFullCount: 300,
+  dataThroughDate: '2026-05-10',
+  scanPolicy: {
+    scanLimit: 120,
+    scanComplete: true,
+    scanOrdering: 'recentVolumeDesc_priceHistoryCompleteness_latestFreshness_symbol',
+  },
+  excludedCounts: {
+    providerUnknown: 2300,
+    providerRetryFailed: 2,
+    providerUnsupported: 0,
+    inactiveOrDelisted: 0,
+    noLatestPrice: 0,
+    staleLatestPrice: 0,
+    insufficientBarsUnder120: 0,
+    insufficientBarsUnder252: 120,
+    missingRecentVolume: 0,
+    corporateActionBlocked: 0,
+  },
+  contextGapCounts: {
+    missingSector: 120,
+    missingIndustry: 120,
+    missingMarketCap: 120,
+    missingIsin: 120,
+    missingListingDate: 120,
+  },
+  warnings: ['Limited review mode: candidates are generated only from stocks with current price, sufficient OHLCV history, and recent volume.', 'Missing metadata is shown as context gap, not a hard blocker for price-action review.'],
+  ...overrides,
+} as any);
+
+const liteHistory = (length = 160) => Array.from({ length }, (_, index) => {
+  const close = 50 + index * 0.4;
+  return {
+    date: new Date(Date.UTC(2026, 0, index + 1)).toISOString().slice(0, 10),
+    open: close - 0.15,
+    high: close + 0.2,
+    low: close - 0.5,
+    close,
+    adjustedClose: close,
+    volume: 1000,
+  };
+});
+
+const trustedInstrument = (overrides: Record<string, any> = {}) => ({
+  id: 'trusted-1',
+  symbol: 'TRUSTED.NS',
+  companyName: 'Trusted Ltd',
+  region: 'IN',
+  assetType: 'STOCK',
+  exchange: 'NSE',
+  providerSymbol: 'TRUSTED.NS',
+  latestPriceDate: '2026-05-10',
+  priceHistoryBars: 160,
+  rollingWindowBars: 160,
+  hasRecentVolume: true,
+  latestClose: 113.6,
+  latestVolume: 1000,
+  adjustedCloseAvailable: true,
+  usesAdjustedCloseFallback: false,
+  contextGaps: ['sector', 'industry', 'marketCap'],
+  warnings: ['Context gaps: sector, industry, marketCap.'],
+  priceHistory: liteHistory(),
+  ...overrides,
+} as any);
+
+const trustedDecisionInstrument = (overrides: Record<string, any> = {}) => trustedInstrument({
+  id: 'stock-1',
+  symbol: 'ALPHA.NS',
+  companyName: 'Alpha Ltd',
+  providerSymbol: 'ALPHA.NS',
+  priceHistory: liteHistory(20),
+  priceHistoryBars: 120,
+  ...overrides,
+});
+
 const services = (overrides: Partial<TodayReviewUpstreamServices> = {}): TodayReviewUpstreamServices => ({
   strategyDecisionService: {
     marketGate: jest.fn().mockResolvedValue({ marketGate: 'OPEN', marketCondition: 'HEALTHY' }),
@@ -182,6 +276,15 @@ const services = (overrides: Partial<TodayReviewUpstreamServices> = {}): TodayRe
   },
   marketDataService: {
     latestStoredCandleInfo: jest.fn().mockResolvedValue({ latestTradingDate: '2026-05-10', finalConfirmed: true }),
+    trustedReviewUniverseHealth: jest.fn().mockResolvedValue(trustedHealth({
+      trustedCount: 1,
+      status: 'READY',
+      mode: 'FULL_REVIEW',
+      warnings: [],
+      contextGapCounts: { missingSector: 0, missingIndustry: 0, missingMarketCap: 0, missingIsin: 0, missingListingDate: 0 },
+      scanPolicy: { scanLimit: 1, scanComplete: true, scanOrdering: 'recentVolumeDesc_priceHistoryCompleteness_latestFreshness_symbol' },
+    })),
+    listTrustedReviewUniverseInstruments: jest.fn().mockResolvedValue([trustedDecisionInstrument()]),
   },
   dataQualityService: {
     getLatestEvaluationForInstrument: jest.fn().mockResolvedValue(dataQuality()),
@@ -246,6 +349,361 @@ describe('TodayTradeReviewService', () => {
     expect(result.run?.sourceSnapshot).toEqual(expect.objectContaining({
       rawSignalUniverse: expect.objectContaining({ supportOnly: true, sampleCount: 1 }),
     }));
+  });
+
+  it('publishes zero candidates when Trusted Review Universe is unavailable', async () => {
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      marketDataService: {
+        latestStoredCandleInfo: jest.fn().mockResolvedValue({ latestTradingDate: '2026-05-10', finalConfirmed: true }),
+      },
+    }), () => fixedNow);
+
+    const result = await service.run();
+
+    expect(result.run?.candidates).toHaveLength(0);
+    expect(result.run?.sourceSnapshot).toEqual(expect.objectContaining({
+      reviewUniverse: expect.objectContaining({ mode: 'NO_REVIEW' }),
+      scanFunnel: expect.objectContaining({
+        strategyCandidatesSeen: 1,
+        outsideTrustedUniverse: 1,
+        trustedLoadStatus: 'LOAD_FAILED',
+        membershipLoadFailureReason: 'Trusted Review Universe unavailable or not ready; Today Review cannot publish candidates.',
+      }),
+    }));
+    expect(result.run?.warnings).toEqual(expect.arrayContaining([
+      'Trusted Review Universe unavailable or not ready; Today Review cannot publish candidates.',
+    ]));
+  });
+
+  it('publishes zero candidates when trusted instrument page 1 throws', async () => {
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      marketDataService: {
+        latestStoredCandleInfo: jest.fn().mockResolvedValue({ latestTradingDate: '2026-05-10', finalConfirmed: true }),
+        trustedReviewUniverseHealth: jest.fn().mockResolvedValue(trustedHealth({ trustedCount: 1, status: 'READY', mode: 'FULL_REVIEW', warnings: [] })),
+        listTrustedReviewUniverseInstruments: jest.fn().mockRejectedValue(new Error('provider down')),
+      },
+    }), () => fixedNow);
+
+    const result = await service.run();
+
+    expect(result.run?.candidates).toHaveLength(0);
+    expect(result.run?.sourceSnapshot).toEqual(expect.objectContaining({
+      reviewUniverse: expect.objectContaining({ mode: 'NO_REVIEW' }),
+      scanFunnel: expect.objectContaining({
+        trustedLoadStatus: 'LOAD_FAILED',
+        membershipLoadFailureReason: 'Trusted universe membership page failed at offset 0.',
+        strategyCandidatesSeen: 1,
+        outsideTrustedUniverse: 1,
+      }),
+    }));
+  });
+
+  it('publishes zero candidates when trusted instrument page 2 throws after page 1 succeeds', async () => {
+    const firstPage = Array.from({ length: 250 }, (_, index) => trustedInstrument({ id: `trusted-${index}`, symbol: `TRUSTED${index}.NS`, priceHistory: liteHistory(20) }));
+    const listTrusted = jest.fn()
+      .mockResolvedValueOnce(firstPage)
+      .mockRejectedValueOnce(new Error('page 2 failed'));
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      marketDataService: {
+        latestStoredCandleInfo: jest.fn().mockResolvedValue({ latestTradingDate: '2026-05-10', finalConfirmed: true }),
+        trustedReviewUniverseHealth: jest.fn().mockResolvedValue(trustedHealth({ trustedCount: 251, status: 'READY', mode: 'FULL_REVIEW', warnings: [] })),
+        listTrustedReviewUniverseInstruments: listTrusted,
+      },
+    }), () => fixedNow);
+
+    const result = await service.run();
+
+    expect(listTrusted).toHaveBeenCalledTimes(2);
+    expect(result.run?.candidates).toHaveLength(0);
+    expect(result.run?.scanFunnel).toEqual(expect.objectContaining({
+      trustedLoadStatus: 'LOAD_FAILED',
+      trustedInstrumentsScanned: 0,
+      membershipLoadFailureReason: 'Trusted universe membership page failed at offset 250.',
+      outsideTrustedUniverse: 1,
+    }));
+  });
+
+  it('publishes zero candidates when trusted instrument endpoint returns null', async () => {
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      marketDataService: {
+        latestStoredCandleInfo: jest.fn().mockResolvedValue({ latestTradingDate: '2026-05-10', finalConfirmed: true }),
+        trustedReviewUniverseHealth: jest.fn().mockResolvedValue(trustedHealth({ trustedCount: 1, status: 'READY', mode: 'FULL_REVIEW', warnings: [] })),
+        listTrustedReviewUniverseInstruments: jest.fn().mockResolvedValue(null as any),
+      },
+    }), () => fixedNow);
+
+    const result = await service.run();
+
+    expect(result.run?.candidates).toHaveLength(0);
+    expect(result.run?.scanFunnel).toEqual(expect.objectContaining({
+      trustedLoadStatus: 'LOAD_FAILED',
+      membershipLoadFailureReason: 'Trusted universe membership page returned no data at offset 0.',
+    }));
+  });
+
+  it('publishes zero candidates when trusted instrument endpoint returns an empty page before the scan limit', async () => {
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      marketDataService: {
+        latestStoredCandleInfo: jest.fn().mockResolvedValue({ latestTradingDate: '2026-05-10', finalConfirmed: true }),
+        trustedReviewUniverseHealth: jest.fn().mockResolvedValue(trustedHealth({ trustedCount: 1, status: 'READY', mode: 'FULL_REVIEW', warnings: [] })),
+        listTrustedReviewUniverseInstruments: jest.fn().mockResolvedValue([]),
+      },
+    }), () => fixedNow);
+
+    const result = await service.run();
+
+    expect(result.run?.candidates).toHaveLength(0);
+    expect(result.run?.scanFunnel).toEqual(expect.objectContaining({
+      trustedLoadStatus: 'LOAD_FAILED',
+      membershipLoadFailureReason: 'Trusted universe membership returned empty page before expected scan limit.',
+    }));
+  });
+
+  it('publishes zero candidates when trusted instrument endpoint returns fewer rows before scan completion', async () => {
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      marketDataService: {
+        latestStoredCandleInfo: jest.fn().mockResolvedValue({ latestTradingDate: '2026-05-10', finalConfirmed: true }),
+        trustedReviewUniverseHealth: jest.fn().mockResolvedValue(trustedHealth({ trustedCount: 3, status: 'READY', mode: 'FULL_REVIEW', warnings: [] })),
+        listTrustedReviewUniverseInstruments: jest.fn().mockResolvedValue([
+          trustedInstrument({ id: 'one', symbol: 'ONE.NS', priceHistory: liteHistory(20) }),
+          trustedInstrument({ id: 'two', symbol: 'TWO.NS', priceHistory: liteHistory(20) }),
+        ]),
+      },
+    }), () => fixedNow);
+
+    const result = await service.run();
+
+    expect(result.run?.candidates).toHaveLength(0);
+    expect(result.run?.scanFunnel).toEqual(expect.objectContaining({
+      trustedLoadStatus: 'LOAD_FAILED',
+      trustedInstrumentsScanned: 0,
+      membershipLoadFailureReason: 'Trusted universe membership returned fewer instruments than expected.',
+    }));
+  });
+
+  it('publishes zero candidates when Trusted Review Universe returns NO_REVIEW', async () => {
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      marketDataService: {
+        latestStoredCandleInfo: jest.fn().mockResolvedValue({ latestTradingDate: '2026-05-10', finalConfirmed: true }),
+        trustedReviewUniverseHealth: jest.fn().mockResolvedValue(trustedHealth({ trustedCount: 0, status: 'NOT_READY', mode: 'NO_REVIEW' })),
+        listTrustedReviewUniverseInstruments: jest.fn().mockResolvedValue([trustedDecisionInstrument()]),
+      },
+    }), () => fixedNow);
+
+    const result = await service.run();
+
+    expect(result.run?.candidates).toHaveLength(0);
+    expect(result.run?.sourceSnapshot).toEqual(expect.objectContaining({
+      reviewUniverse: expect.objectContaining({ mode: 'NO_REVIEW', trustedCount: 0 }),
+      scanFunnel: expect.objectContaining({ trustedInstrumentsScanned: 0, trustedLoadStatus: 'COMPLETE' }),
+    }));
+  });
+
+  it('excludes Strategy Decision candidates outside the trusted universe', async () => {
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      marketDataService: {
+        latestStoredCandleInfo: jest.fn().mockResolvedValue({ latestTradingDate: '2026-05-10', finalConfirmed: true }),
+        trustedReviewUniverseHealth: jest.fn().mockResolvedValue(trustedHealth({ trustedCount: 1, status: 'READY', mode: 'FULL_REVIEW', warnings: [] })),
+        listTrustedReviewUniverseInstruments: jest.fn().mockResolvedValue([trustedInstrument({ id: 'other-stock', symbol: 'OTHER.NS', priceHistory: liteHistory(20) })]),
+      },
+    }), () => fixedNow);
+
+    const result = await service.run();
+
+    expect(result.run?.candidates).toHaveLength(0);
+    expect(result.run?.scanFunnel).toEqual(expect.objectContaining({
+      strategyCandidatesSeen: 1,
+      strategyCandidatesEligible: 0,
+      strategyCandidatesExcluded: 1,
+      outsideTrustedUniverse: 1,
+    }));
+  });
+
+  it('allows Strategy Decision candidates inside the trusted universe to be considered', async () => {
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services(), () => fixedNow);
+
+    const result = await service.run();
+
+    expect(result.run?.scanFunnel).toEqual(expect.objectContaining({
+      strategyCandidatesSeen: 1,
+      strategyCandidatesEligible: 1,
+      outsideTrustedUniverse: 0,
+    }));
+    expect(result.groups.longReview[0]).toEqual(expect.objectContaining({
+      symbol: 'ALPHA.NS',
+      strategyCode: 'TREND_MOMENTUM',
+    }));
+  });
+
+  it('uses the trusted review universe even when full catalog signoff remains failed', async () => {
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      strategyDecisionService: {
+        marketGate: jest.fn().mockResolvedValue({ marketGate: 'OPEN' }),
+        candidates: jest.fn().mockResolvedValue({ results: [], total: 0 }),
+        exits: jest.fn().mockResolvedValue([]),
+      },
+      marketDataService: {
+        latestStoredCandleInfo: jest.fn().mockResolvedValue({ latestTradingDate: '2026-05-10', finalConfirmed: true }),
+        trustedReviewUniverseHealth: jest.fn().mockResolvedValue(trustedHealth({ trustedCount: 1, status: 'READY', mode: 'FULL_REVIEW', warnings: [] })),
+        listTrustedReviewUniverseInstruments: jest.fn().mockResolvedValue([trustedInstrument()]),
+      },
+    }), () => fixedNow);
+
+    const result = await service.run();
+
+    expect(result.run?.sourceSnapshot).toEqual(expect.objectContaining({
+      reviewUniverse: expect.objectContaining({ mode: 'FULL_REVIEW', trustedCount: 1 }),
+      scanFunnel: expect.objectContaining({ trustedInstrumentsScanned: 1, setupsDetected: 1 }),
+    }));
+    expect(result.groups.longReview[0]).toEqual(expect.objectContaining({
+      strategyCode: 'TODAY_REVIEW_LITE',
+      state: 'LONG_REVIEW',
+    }));
+  });
+
+  it('keeps missing metadata as context gaps instead of hard blockers for lite candidates', async () => {
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      strategyDecisionService: {
+        marketGate: jest.fn().mockResolvedValue({ marketGate: 'OPEN' }),
+        candidates: jest.fn().mockResolvedValue({ results: [], total: 0 }),
+        exits: jest.fn().mockResolvedValue([]),
+      },
+      marketDataService: {
+        latestStoredCandleInfo: jest.fn().mockResolvedValue({ latestTradingDate: '2026-05-10', finalConfirmed: true }),
+        trustedReviewUniverseHealth: jest.fn().mockResolvedValue(trustedHealth({ trustedCount: 1, status: 'READY', mode: 'FULL_REVIEW', warnings: [] })),
+        listTrustedReviewUniverseInstruments: jest.fn().mockResolvedValue([trustedInstrument({ contextGaps: ['sector', 'marketCap'] })]),
+      },
+    }), () => fixedNow);
+
+    const result = await service.run();
+    const candidate = result.groups.longReview[0];
+
+    expect(candidate.blockers).toEqual([]);
+    expect(candidate.dataQualitySnapshot).toEqual(expect.objectContaining({
+      contextGaps: ['sector', 'marketCap'],
+    }));
+    expect(candidate.confidenceScore).toBeGreaterThan(0);
+  });
+
+  it('records a complete lite scan when every trusted instrument is scanned', async () => {
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      strategyDecisionService: {
+        marketGate: jest.fn().mockResolvedValue({ marketGate: 'OPEN' }),
+        candidates: jest.fn().mockResolvedValue({ results: [], total: 0 }),
+        exits: jest.fn().mockResolvedValue([]),
+      },
+      marketDataService: {
+        latestStoredCandleInfo: jest.fn().mockResolvedValue({ latestTradingDate: '2026-05-10', finalConfirmed: true }),
+        trustedReviewUniverseHealth: jest.fn().mockResolvedValue(trustedHealth({ trustedCount: 2, status: 'READY', mode: 'FULL_REVIEW', warnings: [] })),
+        listTrustedReviewUniverseInstruments: jest.fn().mockResolvedValue([trustedInstrument({ id: 'one', symbol: 'ONE.NS' }), trustedInstrument({ id: 'two', symbol: 'TWO.NS' })]),
+      },
+    }), () => fixedNow);
+
+    const result = await service.run();
+
+    expect(result.run?.scanFunnel).toEqual(expect.objectContaining({
+      trustedUniverseCount: 2,
+      trustedInstrumentsScanned: 2,
+      trustedInstrumentsSkipped: 0,
+      scanComplete: true,
+      scanLimit: 2,
+      trustedLoadStatus: 'COMPLETE',
+      membershipLoadFailureReason: null,
+    }));
+  });
+
+  it('records a partial lite scan when the configured scan cap is lower than the trusted universe', async () => {
+    const originalLimit = process.env.TODAY_REVIEW_TRUSTED_SCAN_LIMIT;
+    process.env.TODAY_REVIEW_TRUSTED_SCAN_LIMIT = '1';
+    try {
+      const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+        strategyDecisionService: {
+          marketGate: jest.fn().mockResolvedValue({ marketGate: 'OPEN' }),
+          candidates: jest.fn().mockResolvedValue({ results: [], total: 0 }),
+          exits: jest.fn().mockResolvedValue([]),
+        },
+        marketDataService: {
+          latestStoredCandleInfo: jest.fn().mockResolvedValue({ latestTradingDate: '2026-05-10', finalConfirmed: true }),
+          trustedReviewUniverseHealth: jest.fn().mockResolvedValue(trustedHealth({ trustedCount: 2, status: 'READY', mode: 'FULL_REVIEW', warnings: [] })),
+          listTrustedReviewUniverseInstruments: jest.fn().mockResolvedValue([trustedInstrument({ id: 'one', symbol: 'ONE.NS' })]),
+        },
+      }), () => fixedNow);
+
+      const result = await service.run();
+
+      expect(result.run?.scanFunnel).toEqual(expect.objectContaining({
+        trustedUniverseCount: 2,
+        trustedInstrumentsScanned: 1,
+        trustedInstrumentsSkipped: 1,
+        scanComplete: false,
+        scanLimit: 1,
+        trustedLoadStatus: 'CONFIGURED_PARTIAL',
+      }));
+      expect(result.run?.warnings.join(' ')).toContain('Trusted universe scan is partial');
+      expect(result.groups.longReview[0]?.symbol).toBe('ONE.NS');
+    } finally {
+      if (originalLimit === undefined) delete process.env.TODAY_REVIEW_TRUSTED_SCAN_LIMIT;
+      else process.env.TODAY_REVIEW_TRUSTED_SCAN_LIMIT = originalLimit;
+    }
+  });
+
+  it('routes UNPROVEN lite evidence to Watch Only', async () => {
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      strategyDecisionService: {
+        marketGate: jest.fn().mockResolvedValue({ marketGate: 'OPEN' }),
+        candidates: jest.fn().mockResolvedValue({ results: [], total: 0 }),
+        exits: jest.fn().mockResolvedValue([]),
+      },
+      marketDataService: {
+        latestStoredCandleInfo: jest.fn().mockResolvedValue({ latestTradingDate: '2026-05-10', finalConfirmed: true }),
+        trustedReviewUniverseHealth: jest.fn().mockResolvedValue(trustedHealth({ trustedCount: 1, status: 'READY', mode: 'FULL_REVIEW', warnings: [] })),
+        listTrustedReviewUniverseInstruments: jest.fn().mockResolvedValue([trustedInstrument({ priceHistory: liteHistory(80), priceHistoryBars: 120 })]),
+      },
+    }), () => fixedNow);
+
+    const result = await service.run();
+
+    expect(result.groups.watchOnly[0]).toEqual(expect.objectContaining({
+      state: 'WATCH_ONLY',
+      strategyCode: 'TODAY_REVIEW_LITE',
+    }));
+    expect(result.groups.watchOnly[0].strategyProofSnapshot).toEqual(expect.objectContaining({
+      evidenceLabel: 'UNPROVEN',
+    }));
+  });
+
+  it('keeps invalid lite trade geometry blocked', async () => {
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      strategyDecisionService: {
+        marketGate: jest.fn().mockResolvedValue({ marketGate: 'OPEN' }),
+        candidates: jest.fn().mockResolvedValue({ results: [], total: 0 }),
+        exits: jest.fn().mockResolvedValue([]),
+      },
+      marketDataService: {
+        latestStoredCandleInfo: jest.fn().mockResolvedValue({ latestTradingDate: '2026-05-10', finalConfirmed: true }),
+        trustedReviewUniverseHealth: jest.fn().mockResolvedValue(trustedHealth({ trustedCount: 1, status: 'READY', mode: 'FULL_REVIEW', warnings: [] })),
+        listTrustedReviewUniverseInstruments: jest.fn().mockResolvedValue([trustedInstrument()]),
+      },
+    }), () => fixedNow);
+    jest.spyOn(service as any, 'liteTradePlan').mockReturnValue({
+      blockers: ['Invalid long review geometry: stop/invalidation is not below the entry floor.'],
+      rewardRiskRatio: 0,
+      planStatus: 'BLOCKED',
+      entryZone: { preferredEntryMin: 100, preferredEntryMax: 101 },
+      stopLoss: { price: 102 },
+      target: { price: 110 },
+      invalidationRules: [],
+      warnings: [],
+      dataGaps: [],
+    });
+
+    const result = await service.run();
+
+    expect(result.groups.blocked[0]).toEqual(expect.objectContaining({
+      state: 'BLOCKED',
+      confidenceScore: 0,
+    }));
+    expect(result.groups.blocked[0].blockers[0]).toContain('Invalid long review geometry');
   });
 
   it('forces hard trade-plan blockers to BLOCKED with a zero confidence score', async () => {

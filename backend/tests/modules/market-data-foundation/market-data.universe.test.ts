@@ -263,6 +263,140 @@ describe('Market Data Foundation universe readiness', () => {
     expect(result.counts.providerSupported).toBe(1);
     expect(result.counts.catalogOnly).toBe(0);
   });
+
+  it('includes supported current OHLCV rows in the trusted review universe even when metadata is missing', async () => {
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue([
+        { ...stockRow('lite-ready', 'LITE.NS', 'SUPPORTED'), sector: null, industry: null, marketCap: null, isin: null, ipoDate: null },
+      ]),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['LITE.NS', { ...readyPriceStats, priceHistoryBars: 120, rollingWindowBars: 120, latestPriceDate: '2099-01-01' }],
+      ])),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+
+    const result = await service.trustedReviewUniverseHealth({ region: 'IN', assetType: 'STOCK' });
+
+    expect(result.trustedCount).toBe(1);
+    expect(result.contextGapCounts).toMatchObject({
+      missingSector: 1,
+      missingIndustry: 1,
+      missingMarketCap: 1,
+      missingIsin: 1,
+      missingListingDate: 1,
+    });
+    expect(result.excludedCounts.insufficientBarsUnder120).toBe(0);
+    expect(result.warnings).toEqual(expect.arrayContaining(['Missing metadata is shown as context gap, not a hard blocker for price-action review.']));
+  });
+
+  it('publishes the pre-market target session with the previous completed EOD requirement', async () => {
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue([
+        stockRow('lite-ready', 'LITE.NS', 'SUPPORTED'),
+      ]),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['LITE.NS', { ...readyPriceStats, priceHistoryBars: 120, rollingWindowBars: 120, latestPriceDate: '2026-05-11' }],
+      ])),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+
+    const result = await service.trustedReviewUniverseHealth({
+      region: 'IN',
+      assetType: 'STOCK',
+      now: new Date('2026-05-12T02:00:00.000Z'),
+    } as any);
+
+    expect(result.targetTradingDate).toBe('2026-05-12');
+    expect(result.requiredDataThroughDate).toBe('2026-05-11');
+    expect(result.storedDataThroughDate).toBe('2026-05-11');
+    expect(result.trustedCount).toBe(1);
+  });
+
+  it('publishes post-close review for the next target session using today EOD as required data-through', async () => {
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue([
+        stockRow('lite-ready', 'LITE.NS', 'SUPPORTED'),
+      ]),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['LITE.NS', { ...readyPriceStats, priceHistoryBars: 120, rollingWindowBars: 120, latestPriceDate: '2026-05-12' }],
+      ])),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+
+    const result = await service.trustedReviewUniverseHealth({
+      region: 'IN',
+      assetType: 'STOCK',
+      now: new Date('2026-05-12T10:30:00.000Z'),
+    } as any);
+
+    expect(result.targetTradingDate).toBe('2026-05-13');
+    expect(result.requiredDataThroughDate).toBe('2026-05-12');
+    expect(result.storedDataThroughDate).toBe('2026-05-12');
+  });
+
+  it('excludes non-trusted provider and OHLCV states from the trusted review universe', async () => {
+    const rows = [
+      stockRow('unknown', 'UNKNOWN.NS', 'UNKNOWN'),
+      stockRow('retry', 'RETRY.NS', 'VALIDATION_FAILED'),
+      stockRow('unsupported', 'UNSUPPORTED.NS', 'UNSUPPORTED'),
+      stockRow('stale', 'STALE.NS', 'SUPPORTED'),
+      stockRow('noprice', 'NOPRICE.NS', 'SUPPORTED'),
+      stockRow('short', 'SHORT.NS', 'SUPPORTED'),
+      stockRow('novolume', 'NOVOLUME.NS', 'SUPPORTED'),
+    ];
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue(rows),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['UNKNOWN.NS', { priceHistoryBars: 0, latestPriceDate: null, latestVolume: null }],
+        ['RETRY.NS', { ...readyPriceStats, latestPriceDate: '2099-01-01' }],
+        ['UNSUPPORTED.NS', { ...readyPriceStats, latestPriceDate: '2099-01-01' }],
+        ['STALE.NS', { ...readyPriceStats, latestPriceDate: '2020-01-01' }],
+        ['NOPRICE.NS', { priceHistoryBars: 252, latestPriceDate: null, latestVolume: null }],
+        ['SHORT.NS', { ...readyPriceStats, priceHistoryBars: 119, latestPriceDate: '2099-01-01' }],
+        ['NOVOLUME.NS', { ...readyPriceStats, latestPriceDate: '2099-01-01', latestVolume: null }],
+      ])),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+
+    const result = await service.trustedReviewUniverseHealth({ region: 'IN', assetType: 'STOCK' });
+
+    expect(result.trustedCount).toBe(0);
+    expect(result.excludedCounts).toMatchObject({
+      providerUnknown: 1,
+      providerRetryFailed: 1,
+      providerUnsupported: 1,
+      staleLatestPrice: 1,
+      noLatestPrice: 1,
+      insufficientBarsUnder120: 1,
+      missingRecentVolume: 1,
+    });
+  });
+
+  it('reports LIMITED and READY trusted review statuses from configurable thresholds', async () => {
+    const makeRows = (count: number) => Array.from({ length: count }, (_, index) => stockRow(`ready-${index}`, `READY${index}.NS`, 'SUPPORTED'));
+    const makeStats = (rows: any[]) => new Map(rows.map((row) => [row.symbol, { ...readyPriceStats, priceHistoryBars: 120, rollingWindowBars: 120, latestPriceDate: '2099-01-01' }]));
+    const limitedRows = makeRows(100);
+    const readyRows = makeRows(300);
+    const limitedService = new MarketDataFoundationService({
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue(limitedRows),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(makeStats(limitedRows)),
+    } as any, {} as any);
+    const readyService = new MarketDataFoundationService({
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue(readyRows),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(makeStats(readyRows)),
+    } as any, {} as any);
+
+    await expect(limitedService.trustedReviewUniverseHealth({ region: 'IN', assetType: 'STOCK' })).resolves.toMatchObject({
+      trustedCount: 100,
+      status: 'LIMITED',
+      mode: 'LIMITED_REVIEW',
+    });
+    await expect(readyService.trustedReviewUniverseHealth({ region: 'IN', assetType: 'STOCK' })).resolves.toMatchObject({
+      trustedCount: 300,
+      status: 'READY',
+      mode: 'FULL_REVIEW',
+    });
+  });
 });
 
 function stockRow(id: string, symbol: string, providerSupportStatus: string) {

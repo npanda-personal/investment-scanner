@@ -20,6 +20,8 @@ export type UniverseState =
   | 'STALE_OR_INCOMPLETE'
   | 'DELISTED_OR_INACTIVE';
 export type UniverseTrustStatus = 'OK' | 'PARTIAL' | 'NOT_TRUSTWORTHY';
+export type TrustedReviewUniverseStatus = 'READY' | 'LIMITED' | 'NOT_READY';
+export type TrustedReviewUniverseMode = 'FULL_REVIEW' | 'LIMITED_REVIEW' | 'NO_REVIEW';
 export type CatalogSource =
   | 'MANUAL'
   | 'LEGACY_NIFTY500'
@@ -433,6 +435,87 @@ export interface MarketDataUniverseHealth {
   trustStatus: UniverseTrustStatus;
   trustReasons: string[];
   universeSignoff: MarketDataUniverseSignoff;
+}
+
+export interface TrustedReviewUniverseExcludedCounts {
+  providerUnknown: number;
+  providerRetryFailed: number;
+  providerUnsupported: number;
+  inactiveOrDelisted: number;
+  noLatestPrice: number;
+  staleLatestPrice: number;
+  insufficientBarsUnder120: number;
+  insufficientBarsUnder252: number;
+  missingRecentVolume: number;
+  corporateActionBlocked: number;
+}
+
+export interface TrustedReviewUniverseContextGapCounts {
+  missingSector: number;
+  missingIndustry: number;
+  missingMarketCap: number;
+  missingIsin: number;
+  missingListingDate: number;
+}
+
+export interface TrustedReviewUniverseScanPolicy {
+  scanLimit: number;
+  scanComplete: boolean;
+  scanOrdering: string;
+}
+
+export interface TrustedReviewUniverseHealth {
+  scope: {
+    region: string;
+    assetType: string;
+  };
+  asOfDate: string;
+  targetTradingDate: string | null;
+  requiredDataThroughDate: string | null;
+  storedDataThroughDate: string | null;
+  catalogCount: number;
+  providerSupportedCount: number;
+  trustedCount: number;
+  status: TrustedReviewUniverseStatus;
+  mode: TrustedReviewUniverseMode;
+  minLiteCount: number;
+  minFullCount: number;
+  dataThroughDate: string | null;
+  scanPolicy: TrustedReviewUniverseScanPolicy;
+  excludedCounts: TrustedReviewUniverseExcludedCounts;
+  contextGapCounts: TrustedReviewUniverseContextGapCounts;
+  warnings: string[];
+}
+
+export interface TrustedReviewUniversePriceRow {
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  adjustedClose: number | null;
+  volume: number | null;
+}
+
+export interface TrustedReviewUniverseInstrument {
+  id: string;
+  symbol: string;
+  companyName: string | null;
+  region: string;
+  assetType: string;
+  exchange: string | null;
+  providerSymbol: string | null;
+  latestPriceDate: string | null;
+  priceHistoryBars: number;
+  rollingWindowBars: number;
+  hasRecentVolume: boolean;
+  latestClose: number | null;
+  latestVolume: number | null;
+  adjustedCloseAvailable: boolean;
+  usesAdjustedCloseFallback: boolean;
+  contextGaps: string[];
+  warnings: string[];
+  priceHistory: TrustedReviewUniversePriceRow[];
 }
 
 export interface MarketDataRepairRequest {

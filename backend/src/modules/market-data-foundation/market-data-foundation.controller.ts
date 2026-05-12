@@ -302,6 +302,33 @@ export class MarketDataFoundationController {
     }
   };
 
+  trustedReviewUniverseHealth = async (req: Request, res: Response) => {
+    try {
+      const { region, assetType } = this.getMarketFilter(req);
+      return res.json(await this.service.trustedReviewUniverseHealth({ region, assetType }));
+    } catch (error) {
+      console.error('Trusted review universe health error:', error);
+      return res.status(500).json({ error: 'Trusted review universe health check failed' });
+    }
+  };
+
+  trustedReviewUniverseInstruments = async (req: Request, res: Response) => {
+    try {
+      const { region, assetType } = this.getMarketFilter(req);
+      return res.json({
+        instruments: await this.service.listTrustedReviewUniverseInstruments({
+          region,
+          assetType,
+          limit: this.numberParam(req, 'limit'),
+          offset: this.numberParam(req, 'offset'),
+        }),
+      });
+    } catch (error) {
+      console.error('Trusted review universe instrument list error:', error);
+      return res.status(500).json({ error: 'Trusted review universe instrument list failed' });
+    }
+  };
+
   repairPlan = async (req: Request, res: Response) => {
     try {
       const { region, assetType } = this.getMarketFilter(req);

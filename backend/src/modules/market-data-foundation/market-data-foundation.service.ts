@@ -27,6 +27,10 @@ import type {
   MarketDataUniverseHealth,
   MarketDataSyncSkipReason,
   InstrumentUniverseReadiness,
+  TrustedReviewUniverseHealth,
+  TrustedReviewUniverseInstrument,
+  TrustedReviewUniverseMode,
+  TrustedReviewUniverseStatus,
   ScheduledRegionSyncSummary,
   PaginationOptions,
   CatalogBackfillRequest,
@@ -43,13 +47,17 @@ import type {
   V1SyncResult,
 } from './market-data-foundation.types';
 import { validateInstrumentInput } from './market-data-foundation.validation';
-import { latestCompletedTradingDateForRegion, shouldRunMarketDataSync, tradingDateForRegion } from './market-data-foundation.market-session';
+import { getMarketSessionConfig, latestCompletedTradingDateForRegion, shouldRunMarketDataSync, tradingDateForRegion } from './market-data-foundation.market-session';
 import { isKnownNseFnoStockUnderlying } from './market-data-foundation.fno-underlyings';
 import {
   classifyInstrumentUniverseReadiness,
   normalizeProviderStatus,
   UNIVERSE_STATES,
 } from './market-data-foundation.universe';
+
+const TRUSTED_REVIEW_SCAN_ORDERING = 'recentVolumeDesc_priceHistoryCompleteness_latestFreshness_symbol';
+
+type TrustedReviewUniverseOptions = Pick<PaginationOptions, 'region' | 'assetType'> & { now?: Date };
 
 const KNOWN_NSE_FNO_STOCK_UNDERLYINGS = new Set([
   '360ONE',
@@ -446,6 +454,189 @@ export class MarketDataFoundationService {
     return {
       ...healthWithoutSignoff,
       universeSignoff: this.universeSignoffFromHealth(healthWithoutSignoff),
+    };
+  }
+
+  async trustedReviewUniverseHealth(options: TrustedReviewUniverseOptions = {}): Promise<TrustedReviewUniverseHealth> {
+    return (await this.trustedReviewUniverseEvaluation(options)).health;
+  }
+
+  async listTrustedReviewUniverseInstruments(
+    options: TrustedReviewUniverseOptions & { limit?: number; offset?: number } = {}
+  ): Promise<TrustedReviewUniverseInstrument[]> {
+    const limit = Math.max(1, Math.min(Number(options.limit) || 100, 500));
+    const offset = Math.max(Number(options.offset) || 0, 0);
+    const evaluation = await this.trustedReviewUniverseEvaluation(options);
+    const selected = evaluation.trustedStocks.slice(offset, offset + limit);
+    const historyBySymbol = typeof (this.repository as any).priceHistoryForSymbols === 'function'
+      ? await (this.repository as any).priceHistoryForSymbols(selected.map((item) => item.stock.symbol), { perSymbolLimit: 320 })
+      : new Map<string, never[]>();
+
+    return selected.map(({ stock, readiness, stats, contextGaps, warnings }) => ({
+      id: stock.id,
+      symbol: stock.symbol,
+      companyName: stock.name || null,
+      region: stock.region || evaluation.health.scope.region,
+      assetType: stock.assetType || evaluation.health.scope.assetType,
+      exchange: stock.exchange || null,
+      providerSymbol: stock.providerSymbol || stock.symbol || null,
+      latestPriceDate: readiness.latestPriceDate,
+      priceHistoryBars: readiness.priceHistoryBars,
+      rollingWindowBars: readiness.rollingWindowBars,
+      hasRecentVolume: readiness.hasRecentVolume,
+      latestClose: this.numericOrNull(stats?.latestClose),
+      latestVolume: this.numericOrNull(stats?.latestVolume),
+      adjustedCloseAvailable: !readiness.usesAdjustedCloseFallback,
+      usesAdjustedCloseFallback: readiness.usesAdjustedCloseFallback,
+      contextGaps,
+      warnings,
+      priceHistory: historyBySymbol.get(stock.symbol) || [],
+    }));
+  }
+
+  private async trustedReviewUniverseEvaluation(options: TrustedReviewUniverseOptions = {}) {
+    const scope = {
+      region: options.region?.trim().toUpperCase() || 'IN',
+      assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
+    };
+    const now = options.now instanceof Date && Number.isFinite(options.now.getTime()) ? options.now : new Date();
+    const stocks = await this.repository.listStocksForUniverseHealth(scope);
+    const { readinessBySymbol, statsBySymbol } = await this.universeReadinessAndStatsForStocks(stocks, scope);
+    const reviewDatePolicy = this.trustedReviewDatePolicy(scope.region, now);
+    const expectedLatestTradingDate = reviewDatePolicy.requiredDataThroughDate;
+    const minLiteCount = Math.max(this.readPositiveNumber(process.env.TRUSTED_REVIEW_MIN_LITE, 100), 1);
+    const minFullCount = Math.max(this.readPositiveNumber(process.env.TRUSTED_REVIEW_MIN_FULL, 300), minLiteCount);
+    const excludedCounts = this.emptyTrustedReviewExcludedCounts();
+    const contextGapCounts = this.emptyTrustedReviewContextGapCounts();
+    const trustedStocks: Array<{
+      stock: any;
+      readiness: InstrumentUniverseReadiness;
+      stats: any;
+      contextGaps: string[];
+      warnings: string[];
+    }> = [];
+    let providerSupportedCount = 0;
+    let dataThroughDate: string | null = null;
+    let storedDataThroughDate: string | null = null;
+
+    for (const stock of stocks) {
+      const readiness = readinessBySymbol.get(stock.symbol);
+      if (!readiness) continue;
+      const stats = statsBySymbol.get(stock.symbol) || null;
+      const isInactiveOrDelisted = stock.isActive === false || stock.isDelisted === true;
+      if (isInactiveOrDelisted) {
+        excludedCounts.inactiveOrDelisted += 1;
+        continue;
+      }
+
+      const providerStatus = normalizeProviderStatus(stock.providerSupportStatus);
+      if (providerStatus === 'UNKNOWN') {
+        excludedCounts.providerUnknown += 1;
+        continue;
+      }
+      if (providerStatus === 'VALIDATION_FAILED') {
+        excludedCounts.providerRetryFailed += 1;
+        continue;
+      }
+      if (providerStatus === 'UNSUPPORTED') {
+        excludedCounts.providerUnsupported += 1;
+        continue;
+      }
+
+      providerSupportedCount += 1;
+      if (!readiness.latestPriceDate) {
+        excludedCounts.noLatestPrice += 1;
+        continue;
+      }
+      if (!storedDataThroughDate || readiness.latestPriceDate > storedDataThroughDate) storedDataThroughDate = readiness.latestPriceDate;
+      if (!expectedLatestTradingDate || readiness.latestPriceDate < expectedLatestTradingDate) {
+        excludedCounts.staleLatestPrice += 1;
+        continue;
+      }
+      if (readiness.priceHistoryBars < 120) {
+        excludedCounts.insufficientBarsUnder120 += 1;
+        continue;
+      }
+      if (!readiness.hasRecentVolume) {
+        excludedCounts.missingRecentVolume += 1;
+        continue;
+      }
+      if (readiness.readinessBlockers.includes('CRITICAL_CORPORATE_ACTION_PRICE_WARNING')) {
+        excludedCounts.corporateActionBlocked += 1;
+        continue;
+      }
+      if (readiness.priceHistoryBars < 252) excludedCounts.insufficientBarsUnder252 += 1;
+
+      const contextGaps = this.trustedReviewContextGaps(stock);
+      for (const gap of contextGaps) {
+        if (gap === 'sector') contextGapCounts.missingSector += 1;
+        if (gap === 'industry') contextGapCounts.missingIndustry += 1;
+        if (gap === 'marketCap') contextGapCounts.missingMarketCap += 1;
+        if (gap === 'isin') contextGapCounts.missingIsin += 1;
+        if (gap === 'listingDate') contextGapCounts.missingListingDate += 1;
+      }
+      const warnings = [
+        ...readiness.readinessWarnings,
+        ...(readiness.usesAdjustedCloseFallback ? ['Adjusted close is missing for at least one recent candle; close fallback is used for lite review.'] : []),
+        ...(readiness.priceHistoryBars < 252 ? ['Less than 252 bars; lite review only.'] : []),
+        ...(contextGaps.length > 0 ? [`Context gaps: ${contextGaps.join(', ')}.`] : []),
+      ];
+      if (!dataThroughDate || readiness.latestPriceDate > dataThroughDate) dataThroughDate = readiness.latestPriceDate;
+      trustedStocks.push({ stock, readiness, stats, contextGaps, warnings });
+    }
+
+    trustedStocks.sort((left, right) => {
+      const volumeDiff = (this.numericOrNull(right.stats?.latestVolume) ?? 0) - (this.numericOrNull(left.stats?.latestVolume) ?? 0);
+      if (volumeDiff !== 0) return volumeDiff;
+      const historyDiff = (right.readiness.priceHistoryBars || 0) - (left.readiness.priceHistoryBars || 0);
+      if (historyDiff !== 0) return historyDiff;
+      const rightDate = right.readiness.latestPriceDate || '';
+      const leftDate = left.readiness.latestPriceDate || '';
+      if (rightDate !== leftDate) return rightDate.localeCompare(leftDate);
+      return String(left.stock.symbol || '').localeCompare(String(right.stock.symbol || ''));
+    });
+
+    const trustedCount = trustedStocks.length;
+    const status: TrustedReviewUniverseStatus = trustedCount >= minFullCount ? 'READY' : trustedCount >= minLiteCount ? 'LIMITED' : 'NOT_READY';
+    const mode: TrustedReviewUniverseMode = status === 'READY' ? 'FULL_REVIEW' : status === 'LIMITED' ? 'LIMITED_REVIEW' : 'NO_REVIEW';
+    const warnings: string[] = [];
+    if (mode === 'LIMITED_REVIEW') warnings.push('Limited review mode: candidates are generated only from stocks with current price, sufficient OHLCV history, and recent volume.');
+    if (mode === 'NO_REVIEW') warnings.push(`Trusted review universe has ${trustedCount} instruments; at least ${minLiteCount} are required for Today review generation.`);
+    if (Object.values(contextGapCounts).some((count) => count > 0)) {
+      warnings.push('Missing metadata is shown as context gap, not a hard blocker for price-action review.');
+    }
+    if (excludedCounts.insufficientBarsUnder252 > 0) {
+      warnings.push(`${excludedCounts.insufficientBarsUnder252} trusted instruments have fewer than 252 bars and are limited to lite evidence.`);
+    }
+    if (storedDataThroughDate && expectedLatestTradingDate && storedDataThroughDate < expectedLatestTradingDate) {
+      warnings.push(`Stored data-through date ${storedDataThroughDate} is older than required data-through date ${expectedLatestTradingDate}.`);
+    }
+
+    return {
+      health: {
+        scope,
+        asOfDate: now.toISOString().slice(0, 10),
+        targetTradingDate: reviewDatePolicy.targetTradingDate,
+        requiredDataThroughDate: reviewDatePolicy.requiredDataThroughDate,
+        storedDataThroughDate,
+        catalogCount: stocks.length,
+        providerSupportedCount,
+        trustedCount,
+        status,
+        mode,
+        minLiteCount,
+        minFullCount,
+        dataThroughDate: dataThroughDate || storedDataThroughDate,
+        scanPolicy: {
+          scanLimit: trustedCount,
+          scanComplete: true,
+          scanOrdering: TRUSTED_REVIEW_SCAN_ORDERING,
+        },
+        excludedCounts,
+        contextGapCounts,
+        warnings,
+      },
+      trustedStocks,
     };
   }
 
@@ -2684,13 +2875,20 @@ export class MarketDataFoundationService {
     stocks: any[],
     options: Pick<PaginationOptions, 'region' | 'assetType'> = {}
   ): Promise<Map<string, InstrumentUniverseReadiness>> {
-    if (stocks.length === 0) return new Map();
+    return (await this.universeReadinessAndStatsForStocks(stocks, options)).readinessBySymbol;
+  }
+
+  private async universeReadinessAndStatsForStocks(
+    stocks: any[],
+    options: Pick<PaginationOptions, 'region' | 'assetType'> = {}
+  ): Promise<{ readinessBySymbol: Map<string, InstrumentUniverseReadiness>; statsBySymbol: Map<string, any> }> {
+    if (stocks.length === 0) return { readinessBySymbol: new Map(), statsBySymbol: new Map() };
     const expectedLatestTradingDate = latestCompletedTradingDateForRegion(options.region || 'IN');
     const statsBySymbol = typeof (this.repository as any).priceReadinessStatsForSymbols === 'function'
       ? await this.repository.priceReadinessStatsForSymbols(stocks.map((stock) => stock.symbol))
       : new Map<string, never>();
     await this.repairProviderSupportFromStoredPrices(stocks, statsBySymbol as Map<string, any>);
-    return new Map(stocks.map((stock) => {
+    const readinessBySymbol = new Map(stocks.map((stock) => {
       const priceStats = statsBySymbol.get(stock.symbol);
       const readiness = classifyInstrumentUniverseReadiness({
         isActive: stock.isActive,
@@ -2712,6 +2910,7 @@ export class MarketDataFoundationService {
       });
       return [stock.symbol, readiness];
     }));
+    return { readinessBySymbol, statsBySymbol };
   }
 
   private emptyUniverseCounts(): MarketDataUniverseHealth['counts'] {
@@ -2757,6 +2956,90 @@ export class MarketDataFoundationService {
       counts[state] = 0;
     }
     return counts;
+  }
+
+  private emptyTrustedReviewExcludedCounts() {
+    return {
+      providerUnknown: 0,
+      providerRetryFailed: 0,
+      providerUnsupported: 0,
+      inactiveOrDelisted: 0,
+      noLatestPrice: 0,
+      staleLatestPrice: 0,
+      insufficientBarsUnder120: 0,
+      insufficientBarsUnder252: 0,
+      missingRecentVolume: 0,
+      corporateActionBlocked: 0,
+    };
+  }
+
+  private emptyTrustedReviewContextGapCounts() {
+    return {
+      missingSector: 0,
+      missingIndustry: 0,
+      missingMarketCap: 0,
+      missingIsin: 0,
+      missingListingDate: 0,
+    };
+  }
+
+  private trustedReviewDatePolicy(region: string, now: Date) {
+    const todayTradingDate = tradingDateForRegion(region, now);
+    const requiredDataThroughDate = latestCompletedTradingDateForRegion(region, now);
+    if (!todayTradingDate) {
+      return {
+        targetTradingDate: null,
+        requiredDataThroughDate,
+      };
+    }
+    const targetTradingDate = this.isConfiguredTradingDate(region, todayTradingDate) && (!requiredDataThroughDate || requiredDataThroughDate < todayTradingDate)
+      ? todayTradingDate
+      : this.nextConfiguredTradingDate(region, todayTradingDate) || todayTradingDate;
+    return {
+      targetTradingDate,
+      requiredDataThroughDate,
+    };
+  }
+
+  private isConfiguredTradingDate(region: string, date: string) {
+    const config = getMarketSessionConfig(region);
+    if (!config) return false;
+    const cursor = this.utcDateAtNoon(date);
+    const weekday = cursor.getUTCDay();
+    return config.weekdays.includes(weekday) && !config.holidays.includes(date);
+  }
+
+  private nextConfiguredTradingDate(region: string, date: string) {
+    const config = getMarketSessionConfig(region);
+    if (!config) return null;
+    const cursor = this.utcDateAtNoon(date);
+    for (let i = 0; i < 10; i += 1) {
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+      const candidate = cursor.toISOString().slice(0, 10);
+      if (config.weekdays.includes(cursor.getUTCDay()) && !config.holidays.includes(candidate)) return candidate;
+    }
+    return null;
+  }
+
+  private utcDateAtNoon(date: string) {
+    const [year, month, day] = date.split('-').map(Number);
+    return new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  }
+
+  private trustedReviewContextGaps(stock: any): string[] {
+    const gaps: string[] = [];
+    if (!this.hasValidMetadataValue(stock.sector)) gaps.push('sector');
+    if (!this.hasValidMetadataValue(stock.industry)) gaps.push('industry');
+    if (!this.hasValidMarketCap(stock.marketCap)) gaps.push('marketCap');
+    if (this.isBlank(stock.isin)) gaps.push('isin');
+    if (!stock.ipoDate) gaps.push('listingDate');
+    return gaps;
+  }
+
+  private numericOrNull(value: unknown): number | null {
+    if (value === null || value === undefined) return null;
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : null;
   }
 
   private async repairProviderSupportFromStoredPrices(stocks: any[], statsBySymbol: Map<string, { priceHistoryBars?: number; latestPriceDate?: string | null }>) {

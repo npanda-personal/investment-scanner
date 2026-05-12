@@ -1,6 +1,7 @@
 import { DataQualityEngineService } from '../data-quality-engine';
 import { MarketContextIntelligenceService } from '../market-context-intelligence';
 import { MarketDataFoundationService } from '../market-data-foundation';
+import type { TrustedReviewUniverseHealth, TrustedReviewUniverseInstrument } from '../market-data-foundation';
 import { SignalCalibrationEngineService } from '../signal-calibration-engine';
 import { SignalGenerationEngineService } from '../signal-generation-engine';
 import { SmartMoneyIntelligenceService } from '../smart-money-intelligence';
@@ -21,7 +22,9 @@ import type {
   TodayReviewRunRequest,
   TodayReviewRunResponse,
   TodayReviewRunStatus,
+  TodayReviewScanFunnel,
   TodayReviewSourceSnapshot,
+  TodayReviewTrustedLoadStatus,
   TodayReviewUpstreamServices,
 } from './today-trade-review.types';
 
@@ -29,6 +32,18 @@ const DEFAULT_REGION = 'IN';
 const DEFAULT_ASSET_TYPE = 'STOCK';
 const ENTRY_LIMIT = 30;
 const EXIT_LIMIT = 20;
+const TRUSTED_REVIEW_PAGE_SIZE = 250;
+const TRUSTED_REVIEW_SCAN_ORDERING = 'recentVolumeDesc_priceHistoryCompleteness_latestFreshness_symbol';
+const TRUSTED_REVIEW_UNAVAILABLE_WARNING = 'Trusted Review Universe unavailable or not ready; Today Review cannot publish candidates.';
+
+interface TrustedLoadResult {
+  status: TodayReviewTrustedLoadStatus;
+  instruments: TrustedReviewUniverseInstrument[];
+  scanLimit: number;
+  scanComplete: boolean;
+  scanOrdering: string;
+  failureReason?: string;
+}
 
 export class TodayTradeReviewService {
   constructor(
@@ -66,18 +81,24 @@ export class TodayTradeReviewService {
     try {
       const sources = await this.loadRunSources(scope, warnings);
       sourceSnapshot.marketData = sources.marketData;
+      sourceSnapshot.reviewUniverse = sources.reviewUniverse;
       sourceSnapshot.marketGate = sources.marketGate;
       sourceSnapshot.marketContext = sources.marketContext;
       sourceSnapshot.rawSignalUniverse = sources.rawSignalUniverse;
 
-      const candidateSources = await this.buildCandidateSources(sources.entryDecisions, sources.exitDecisions, sources, scope, warnings);
-      const candidates = this.rankCandidates(candidateSources.map((candidateSource) => this.mapCandidate(candidateSource)));
+      const liteResult = this.buildLiteCandidates(sources.trustedInstruments, sources.reviewUniverse, sources.scanEvidence, sources.strategyFunnel);
+      sourceSnapshot.scanFunnel = liteResult.scanFunnel;
+      const candidateSources = sources.reviewUniverse?.mode === 'NO_REVIEW'
+        ? []
+        : await this.buildCandidateSources(sources.entryDecisions, sources.exitDecisions, sources, scope, warnings);
+      const strategyCandidates = candidateSources.map((candidateSource) => this.mapCandidate(candidateSource));
+      const candidates = this.rankCandidates(this.mergeCandidates([...liteResult.candidates, ...strategyCandidates]));
       const candidateCounts = this.countCandidates(candidates);
-      const status: TodayReviewRunStatus = warnings.length > 0 ? 'PARTIAL' : 'COMPLETED';
+      const status: TodayReviewRunStatus = warnings.length > 0 || sources.reviewUniverse?.mode === 'NO_REVIEW' || sources.reviewUniverse?.mode === 'LIMITED_REVIEW' || !sources.scanEvidence.scanComplete ? 'PARTIAL' : 'COMPLETED';
       const completed = await this.repository.completeRun({
         runId: startedRun.id,
         status,
-        dataThroughDate: this.parseDataThroughDate(sources.marketData),
+        dataThroughDate: this.parseDataThroughDate(sources.marketData, sources.reviewUniverse),
         finishedAt: this.clock(),
         warnings,
         candidateCounts,
@@ -148,8 +169,11 @@ export class TodayTradeReviewService {
   }
 
   private async loadRunSources(scope: { region: string; assetType: string }, warnings: string[]) {
-    const [marketData, marketContext, marketGate, rawSignalUniverse, entryCandidates, exitCandidates] = await Promise.all([
+    const [marketData, reviewUniverseResult, marketContext, marketGate, rawSignalUniverse, entryCandidates, exitCandidates] = await Promise.all([
       this.safe(() => this.services.marketDataService.latestStoredCandleInfo(scope.region, scope.assetType, this.clock()), 'Market data freshness is unavailable.', warnings),
+      this.services.marketDataService.trustedReviewUniverseHealth
+        ? this.safe(() => this.services.marketDataService.trustedReviewUniverseHealth!({ region: scope.region, assetType: scope.assetType }), TRUSTED_REVIEW_UNAVAILABLE_WARNING, warnings)
+        : Promise.resolve(null),
       this.safe(() => this.services.marketContextService.latestPersistedSummary(scope.region), 'Market context snapshot is unavailable.', warnings),
       this.safe(() => this.services.strategyDecisionService.marketGate(scope.region), 'Market gate is unavailable.', warnings),
       this.safe(() => this.services.signalService.latestSignalUniverse({ region: scope.region, assetType: scope.assetType, limit: 25, offset: 0 }), 'Raw signal support is unavailable.', warnings),
@@ -164,9 +188,60 @@ export class TodayTradeReviewService {
       }), 'Strategy entry candidates are unavailable.', warnings),
       this.safe(() => this.services.strategyDecisionService.exits(undefined, scope.region, scope.assetType), 'Strategy exit-risk candidates are unavailable.', warnings),
     ]);
+    const reviewUniverseUnavailable = !reviewUniverseResult;
+    let reviewUniverse = reviewUniverseResult || this.noReviewUniverse(scope, TRUSTED_REVIEW_UNAVAILABLE_WARNING);
+    if (reviewUniverseUnavailable || reviewUniverse.mode === 'NO_REVIEW') this.addWarning(warnings, TRUSTED_REVIEW_UNAVAILABLE_WARNING);
+    let trustedLoad: TrustedLoadResult = {
+      status: reviewUniverseUnavailable ? 'LOAD_FAILED' : 'COMPLETE',
+      instruments: [],
+      scanLimit: 0,
+      scanComplete: !reviewUniverseUnavailable,
+      scanOrdering: reviewUniverse.scanPolicy?.scanOrdering || TRUSTED_REVIEW_SCAN_ORDERING,
+      failureReason: reviewUniverseUnavailable ? TRUSTED_REVIEW_UNAVAILABLE_WARNING : undefined,
+    };
+    if (reviewUniverse.mode !== 'NO_REVIEW') {
+      if (!this.services.marketDataService.listTrustedReviewUniverseInstruments) {
+        trustedLoad = {
+          status: 'LOAD_FAILED',
+          instruments: [],
+          scanLimit: Math.max(0, Number(reviewUniverse.trustedCount || 0)),
+          scanComplete: false,
+          scanOrdering: reviewUniverse.scanPolicy?.scanOrdering || TRUSTED_REVIEW_SCAN_ORDERING,
+          failureReason: 'Trusted universe membership loader is unavailable.',
+        };
+        this.addWarning(warnings, TRUSTED_REVIEW_UNAVAILABLE_WARNING);
+        if (trustedLoad.failureReason) this.addWarning(warnings, trustedLoad.failureReason);
+        reviewUniverse = this.noReviewUniverse(scope, TRUSTED_REVIEW_UNAVAILABLE_WARNING, reviewUniverse);
+      } else {
+        trustedLoad = await this.loadTrustedInstrumentsForReview(scope, reviewUniverse);
+        if (trustedLoad.status === 'LOAD_FAILED') {
+          this.addWarning(warnings, TRUSTED_REVIEW_UNAVAILABLE_WARNING);
+          if (trustedLoad.failureReason) this.addWarning(warnings, trustedLoad.failureReason);
+          trustedLoad = { ...trustedLoad, instruments: [] };
+          reviewUniverse = this.noReviewUniverse(scope, TRUSTED_REVIEW_UNAVAILABLE_WARNING, reviewUniverse);
+        } else if (trustedLoad.status === 'CONFIGURED_PARTIAL') {
+          this.addWarning(warnings, `Trusted universe scan is partial: scanned ${trustedLoad.instruments.length} of ${reviewUniverse.trustedCount} instruments.`);
+        }
+      }
+    }
+    for (const warning of reviewUniverse?.warnings || []) this.addWarning(warnings, warning);
+    const rawEntryDecisions = (entryCandidates?.results || []).filter((decision) => Boolean(decision.instrumentId && decision.symbol)).slice(0, ENTRY_LIMIT);
+    const rawExitDecisions = (exitCandidates || []).filter((decision) => Boolean(decision.instrumentId && decision.symbol)).slice(0, EXIT_LIMIT);
+    const strategyFilter = this.filterDecisionsByTrustedUniverse(rawEntryDecisions, rawExitDecisions, trustedLoad.instruments);
 
     return {
       marketData,
+      reviewUniverse,
+      trustedInstruments: trustedLoad.instruments,
+      scanEvidence: {
+        trustedUniverseCount: reviewUniverse.trustedCount || 0,
+        scanLimit: trustedLoad.scanLimit,
+        scanComplete: trustedLoad.scanComplete,
+        scanOrdering: trustedLoad.scanOrdering,
+        trustedLoadStatus: trustedLoad.status,
+        membershipLoadFailureReason: trustedLoad.failureReason || null,
+      },
+      strategyFunnel: strategyFilter.stats,
       marketContext,
       marketGate,
       rawSignalUniverse: rawSignalUniverse ? {
@@ -175,8 +250,172 @@ export class TodayTradeReviewService {
         bullishCount: rawSignalUniverse.filter((signal) => signal.direction === 'BULLISH').length,
         bearishCount: rawSignalUniverse.filter((signal) => signal.direction === 'BEARISH').length,
       } : null,
-      entryDecisions: (entryCandidates?.results || []).filter((decision) => Boolean(decision.instrumentId && decision.symbol)).slice(0, ENTRY_LIMIT),
-      exitDecisions: (exitCandidates || []).filter((decision) => Boolean(decision.instrumentId && decision.symbol)).slice(0, EXIT_LIMIT),
+      entryDecisions: strategyFilter.entryDecisions,
+      exitDecisions: strategyFilter.exitDecisions,
+    };
+  }
+
+  private async loadTrustedInstrumentsForReview(
+    scope: { region: string; assetType: string },
+    reviewUniverse: TrustedReviewUniverseHealth
+  ): Promise<TrustedLoadResult> {
+    const trustedCount = Math.max(0, Number(reviewUniverse.trustedCount || 0));
+    const configuredLimit = this.configuredTrustedScanLimit();
+    const scanLimit = configuredLimit ? Math.min(configuredLimit, trustedCount) : trustedCount;
+    const scanOrdering = reviewUniverse.scanPolicy?.scanOrdering || TRUSTED_REVIEW_SCAN_ORDERING;
+    if (trustedCount === 0) {
+      return {
+        status: 'COMPLETE',
+        instruments: [],
+        scanLimit: 0,
+        scanComplete: true,
+        scanOrdering,
+      };
+    }
+    const instruments: TrustedReviewUniverseInstrument[] = [];
+    let offset = 0;
+    while (offset < scanLimit) {
+      const limit = Math.min(TRUSTED_REVIEW_PAGE_SIZE, scanLimit - offset);
+      let page: TrustedReviewUniverseInstrument[] | null | undefined;
+      try {
+        page = await this.services.marketDataService.listTrustedReviewUniverseInstruments!({ region: scope.region, assetType: scope.assetType, limit, offset });
+      } catch {
+        return this.failedTrustedLoad(scanLimit, scanOrdering, `Trusted universe membership page failed at offset ${offset}.`);
+      }
+      if (!Array.isArray(page)) {
+        return this.failedTrustedLoad(scanLimit, scanOrdering, `Trusted universe membership page returned no data at offset ${offset}.`);
+      }
+      if (page.length === 0) {
+        return this.failedTrustedLoad(scanLimit, scanOrdering, 'Trusted universe membership returned empty page before expected scan limit.');
+      }
+      instruments.push(...page);
+      offset += page.length;
+      if (page.length < limit && offset < scanLimit) {
+        return this.failedTrustedLoad(scanLimit, scanOrdering, 'Trusted universe membership returned fewer instruments than expected.');
+      }
+    }
+    if (instruments.length === trustedCount) {
+      return {
+        status: 'COMPLETE',
+        instruments,
+        scanLimit,
+        scanComplete: true,
+        scanOrdering,
+      };
+    }
+    if (configuredLimit && instruments.length === scanLimit && scanLimit < trustedCount) {
+      return {
+        status: 'CONFIGURED_PARTIAL',
+        instruments,
+        scanLimit,
+        scanComplete: false,
+        scanOrdering,
+      };
+    }
+    if (instruments.length < trustedCount) {
+      return this.failedTrustedLoad(scanLimit, scanOrdering, 'Trusted universe membership returned fewer instruments than expected.');
+    }
+    return {
+      status: 'COMPLETE',
+      instruments,
+      scanLimit,
+      scanComplete: true,
+      scanOrdering,
+    };
+  }
+
+  private failedTrustedLoad(scanLimit: number, scanOrdering: string, failureReason: string): TrustedLoadResult {
+    return {
+      status: 'LOAD_FAILED',
+      instruments: [],
+      scanLimit,
+      scanComplete: false,
+      scanOrdering,
+      failureReason,
+    };
+  }
+
+  private filterDecisionsByTrustedUniverse(
+    entryDecisions: StrategyDecisionDto[],
+    exitDecisions: StrategyDecisionDto[],
+    trustedInstruments: TrustedReviewUniverseInstrument[]
+  ) {
+    const trustedIds = new Set(trustedInstruments.map((instrument) => this.normalizedMembershipKey(instrument.id)).filter(Boolean));
+    const trustedSymbols = new Set(
+      trustedInstruments
+        .flatMap((instrument) => [instrument.symbol, instrument.providerSymbol])
+        .map((value) => this.normalizedMembershipKey(value))
+        .filter(Boolean)
+    );
+    const all = [
+      ...entryDecisions.map((decision) => ({ decision, sourceKind: 'ENTRY' as const })),
+      ...exitDecisions.map((decision) => ({ decision, sourceKind: 'EXIT' as const })),
+    ];
+    const eligible = all.filter(({ decision }) => {
+      const id = this.normalizedMembershipKey(decision.instrumentId);
+      const symbol = this.normalizedMembershipKey(decision.symbol);
+      return Boolean((id && trustedIds.has(id)) || (symbol && trustedSymbols.has(symbol)));
+    });
+    const strategyCandidatesSeen = all.length;
+    const strategyCandidatesEligible = eligible.length;
+    const strategyCandidatesExcluded = strategyCandidatesSeen - strategyCandidatesEligible;
+    return {
+      entryDecisions: eligible.filter((item) => item.sourceKind === 'ENTRY').map((item) => item.decision),
+      exitDecisions: eligible.filter((item) => item.sourceKind === 'EXIT').map((item) => item.decision),
+      stats: {
+        strategyCandidatesSeen,
+        strategyCandidatesEligible,
+        strategyCandidatesExcluded,
+        outsideTrustedUniverse: strategyCandidatesExcluded,
+      },
+    };
+  }
+
+  private noReviewUniverse(
+    scope: { region: string; assetType: string },
+    warning: string,
+    base?: TrustedReviewUniverseHealth | null
+  ): TrustedReviewUniverseHealth {
+    const now = this.clock().toISOString().slice(0, 10);
+    return {
+      scope,
+      asOfDate: base?.asOfDate || now,
+      targetTradingDate: base?.targetTradingDate || null,
+      requiredDataThroughDate: base?.requiredDataThroughDate || null,
+      storedDataThroughDate: base?.storedDataThroughDate || base?.dataThroughDate || null,
+      catalogCount: base?.catalogCount || 0,
+      providerSupportedCount: base?.providerSupportedCount || 0,
+      trustedCount: base?.trustedCount || 0,
+      status: 'NOT_READY',
+      mode: 'NO_REVIEW',
+      minLiteCount: base?.minLiteCount || 100,
+      minFullCount: base?.minFullCount || 300,
+      dataThroughDate: base?.dataThroughDate || base?.storedDataThroughDate || null,
+      scanPolicy: {
+        scanLimit: 0,
+        scanComplete: true,
+        scanOrdering: base?.scanPolicy?.scanOrdering || TRUSTED_REVIEW_SCAN_ORDERING,
+      },
+      excludedCounts: base?.excludedCounts || {
+        providerUnknown: 0,
+        providerRetryFailed: 0,
+        providerUnsupported: 0,
+        inactiveOrDelisted: 0,
+        noLatestPrice: 0,
+        staleLatestPrice: 0,
+        insufficientBarsUnder120: 0,
+        insufficientBarsUnder252: 0,
+        missingRecentVolume: 0,
+        corporateActionBlocked: 0,
+      },
+      contextGapCounts: base?.contextGapCounts || {
+        missingSector: 0,
+        missingIndustry: 0,
+        missingMarketCap: 0,
+        missingIsin: 0,
+        missingListingDate: 0,
+      },
+      warnings: Array.from(new Set([...(base?.warnings || []), warning])),
     };
   }
 
@@ -245,6 +484,402 @@ export class TodayTradeReviewService {
       `${decision.symbol} trade-plan snapshot could not be generated.`,
       warnings
     );
+  }
+
+  private buildLiteCandidates(
+    instruments: TrustedReviewUniverseInstrument[],
+    reviewUniverse: TrustedReviewUniverseHealth | null,
+    scanEvidence: {
+      trustedUniverseCount: number;
+      scanLimit: number;
+      scanComplete: boolean;
+      scanOrdering: string;
+      trustedLoadStatus: TodayReviewTrustedLoadStatus;
+      membershipLoadFailureReason: string | null;
+    },
+    strategyFunnel: { strategyCandidatesSeen: number; strategyCandidatesEligible: number; strategyCandidatesExcluded: number; outsideTrustedUniverse: number }
+  ): { candidates: TodayReviewCandidateDto[]; scanFunnel: TodayReviewScanFunnel } {
+    const scanFunnel: TodayReviewScanFunnel = {
+      trustedUniverseCount: scanEvidence.trustedUniverseCount,
+      trustedInstrumentsScanned: instruments.length,
+      trustedInstrumentsSkipped: Math.max(0, scanEvidence.trustedUniverseCount - instruments.length),
+      scanLimit: scanEvidence.scanLimit,
+      scanComplete: scanEvidence.scanComplete,
+      scanOrdering: scanEvidence.scanOrdering,
+      trustedLoadStatus: scanEvidence.trustedLoadStatus,
+      membershipLoadFailureReason: scanEvidence.membershipLoadFailureReason,
+      strategyCandidatesSeen: strategyFunnel.strategyCandidatesSeen,
+      strategyCandidatesEligible: strategyFunnel.strategyCandidatesEligible,
+      strategyCandidatesExcluded: strategyFunnel.strategyCandidatesExcluded,
+      outsideTrustedUniverse: strategyFunnel.outsideTrustedUniverse,
+      setupsDetected: 0,
+      promotedCandidates: 0,
+      watchOnly: 0,
+      unproven: 0,
+      blocked: 0,
+      noSetup: 0,
+      topNoPromotionReasons: {},
+    };
+    if (!reviewUniverse || reviewUniverse.mode === 'NO_REVIEW') {
+      if (reviewUniverse?.mode === 'NO_REVIEW') scanFunnel.topNoPromotionReasons.NO_REVIEW_UNIVERSE = reviewUniverse.trustedCount;
+      return { candidates: [], scanFunnel };
+    }
+
+    const candidates: TodayReviewCandidateDto[] = [];
+    for (const instrument of instruments) {
+      const setup = this.detectLiteSetup(instrument.priceHistory);
+      if (!setup) {
+        scanFunnel.noSetup += 1;
+        continue;
+      }
+      scanFunnel.setupsDetected += 1;
+      const evidence = this.liteHistoricalEvidence(instrument.priceHistory, setup);
+      const tradePlan = this.liteTradePlan(instrument, setup);
+      const blockers = [...tradePlan.blockers];
+      const contextGapPenalty = this.contextGapPenalty(instrument.contextGaps);
+      let state: TodayReviewCandidateState;
+      if (blockers.length > 0) {
+        state = 'BLOCKED';
+        scanFunnel.blocked += 1;
+        this.incrementReason(scanFunnel, 'hard blocker');
+      } else if (evidence.label === 'UNPROVEN') {
+        state = 'WATCH_ONLY';
+        scanFunnel.watchOnly += 1;
+        scanFunnel.unproven += 1;
+        this.incrementReason(scanFunnel, 'historical evidence unproven');
+      } else if (tradePlan.rewardRiskRatio < 1.2) {
+        state = 'WATCH_ONLY';
+        scanFunnel.watchOnly += 1;
+        this.incrementReason(scanFunnel, 'reward/risk incomplete');
+      } else {
+        state = setup.direction === 'SHORT' ? 'SHORT_REVIEW' : 'LONG_REVIEW';
+        scanFunnel.promotedCandidates += 1;
+      }
+      const score = state === 'BLOCKED' ? 0 : this.liteScore(setup, evidence, tradePlan.rewardRiskRatio, instrument, contextGapPenalty);
+      const watchReasons = [
+        ...(state === 'WATCH_ONLY' && evidence.label === 'UNPROVEN' ? ['Historical evidence is UNPROVEN; keep as watch only until more occurrences are available.'] : []),
+        ...(tradePlan.rewardRiskRatio < 1.2 ? ['Reward/risk is incomplete for paper review.'] : []),
+        ...(instrument.contextGaps.length > 0 ? [`Context gaps: ${instrument.contextGaps.join(', ')}.`] : []),
+        ...instrument.warnings.slice(0, 2),
+      ];
+      candidates.push({
+        instrumentId: instrument.id,
+        symbol: instrument.symbol,
+        companyName: instrument.companyName,
+        direction: state === 'BLOCKED' ? 'BLOCKED' : state === 'WATCH_ONLY' ? 'WATCH' : setup.direction,
+        state,
+        setupType: setup.type,
+        strategyCode: 'TODAY_REVIEW_LITE',
+        strategyVersion: '1.0.0',
+        rank: 0,
+        grade: this.gradeFor(state, score),
+        confidenceScore: state === 'BLOCKED' ? 0 : score,
+        reasonSummary: this.liteReasonSummary(state, evidence, blockers, watchReasons),
+        blockers,
+        watchReasons,
+        dataQualitySnapshot: {
+          source: 'trusted-review-universe',
+          latestPriceDate: instrument.latestPriceDate,
+          priceHistoryBars: instrument.priceHistoryBars,
+          hasRecentVolume: instrument.hasRecentVolume,
+          contextGaps: instrument.contextGaps,
+          dataStatus: 'PRICE_ACTION_READY',
+        },
+        marketContextSnapshot: {
+          reviewUniverseMode: reviewUniverse.mode,
+          trustedUniverseCount: reviewUniverse.trustedCount,
+          dataThroughDate: reviewUniverse.dataThroughDate,
+          targetTradingDate: reviewUniverse.targetTradingDate,
+          requiredDataThroughDate: reviewUniverse.requiredDataThroughDate,
+          storedDataThroughDate: reviewUniverse.storedDataThroughDate,
+          contextGapCounts: reviewUniverse.contextGapCounts,
+        },
+        strategyProofSnapshot: {
+          proofType: 'OHLCV_LITE_HISTORICAL_EVIDENCE',
+          evidenceLabel: evidence.label,
+          sampleSize: evidence.sampleSize,
+          medianForwardReturn5D: evidence.medianForwardReturn5D,
+          medianForwardReturn20D: evidence.medianForwardReturn20D,
+          winRate: evidence.winRate,
+          maxAdverseExcursion: evidence.maxAdverseExcursion,
+          maxFavorableExcursion: evidence.maxFavorableExcursion,
+          setupType: setup.type,
+        },
+        tradePlanSnapshot: tradePlan,
+        sourceSignalSnapshot: {
+          supportOnly: true,
+          setup: {
+            type: setup.type,
+            direction: setup.direction,
+            signalStrength: setup.signalStrength,
+            reason: setup.reason,
+          },
+        },
+      });
+    }
+
+    return { candidates, scanFunnel };
+  }
+
+  private detectLiteSetup(history: TrustedReviewUniverseInstrument['priceHistory']) {
+    if (history.length < 60) return null;
+    const latestIndex = history.length - 1;
+    const latest = history[latestIndex];
+    const prior20 = history.slice(Math.max(0, latestIndex - 20), latestIndex);
+    const prior50 = history.slice(Math.max(0, latestIndex - 50), latestIndex);
+    if (prior20.length < 20 || prior50.length < 50) return null;
+    const high20 = Math.max(...prior20.map((row) => row.high));
+    const low20 = Math.min(...prior20.map((row) => row.low));
+    const avgVol20 = this.average(prior20.map((row) => row.volume || 0));
+    const sma20 = this.average(prior20.map((row) => row.close));
+    const sma50 = this.average(prior50.map((row) => row.close));
+    const ret20 = (latest.close - history[latestIndex - 20].close) / Math.max(history[latestIndex - 20].close, 0.01);
+    const avgRange20 = this.average(prior20.map((row) => row.high - row.low));
+    const latestRange = latest.high - latest.low;
+    const volumeConfirmed = (latest.volume || 0) > avgVol20 * 1.05;
+
+    if (latest.close > high20 && volumeConfirmed) return { type: 'BREAKOUT_20D', direction: 'LONG' as const, signalStrength: 30, reason: 'Close is above the prior 20-day high with volume confirmation.' };
+    if (latest.close < low20 && volumeConfirmed) return { type: 'BREAKDOWN_20D', direction: 'SHORT' as const, signalStrength: 30, reason: 'Close is below the prior 20-day low with volume confirmation.' };
+    if (ret20 > 0.05 && latest.close >= high20 * 0.96 && (latest.volume || 0) >= avgVol20) return { type: 'MOMENTUM_CONTINUATION', direction: 'LONG' as const, signalStrength: 25, reason: 'Positive 20-day return near recent highs with volume support.' };
+    if (latest.close > sma50 && Math.abs(latest.close - sma20) / Math.max(latest.close, 0.01) <= 0.035 && latest.low > Math.min(...history.slice(latestIndex - 10, latestIndex - 5).map((row) => row.low))) return { type: 'PULLBACK_TO_TREND', direction: 'LONG' as const, signalStrength: 22, reason: 'Pullback is near the 20-day average while price remains above the 50-day average.' };
+    if (latest.close < sma50 && ret20 < -0.03) return { type: 'TREND_LOSS', direction: 'SHORT' as const, signalStrength: 22, reason: 'Close is below the 50-day average with weak 20-day return.' };
+    if (latest.close < latest.open && latestRange > avgRange20 * 1.5 && volumeConfirmed) return { type: 'VOLATILITY_EXPANSION_DOWN', direction: 'SHORT' as const, signalStrength: 20, reason: 'Downside range expansion happened on elevated volume.' };
+    return null;
+  }
+
+  private liteHistoricalEvidence(history: TrustedReviewUniverseInstrument['priceHistory'], setup: { type: string; direction: 'LONG' | 'SHORT' }) {
+    const outcomes: Array<{ five: number; twenty: number; mae: number; mfe: number }> = [];
+    for (let index = 60; index < history.length - 20; index += 1) {
+      if (!this.setupMatchesAt(history, index, setup.type)) continue;
+      const entry = history[index].close;
+      const next5 = history[index + 5].close;
+      const forward = history.slice(index + 1, index + 21);
+      const raw5 = (next5 - entry) / Math.max(entry, 0.01);
+      const raw20 = (history[index + 20].close - entry) / Math.max(entry, 0.01);
+      const favorable = setup.direction === 'SHORT'
+        ? (entry - Math.min(...forward.map((row) => row.low))) / Math.max(entry, 0.01)
+        : (Math.max(...forward.map((row) => row.high)) - entry) / Math.max(entry, 0.01);
+      const adverse = setup.direction === 'SHORT'
+        ? (Math.max(...forward.map((row) => row.high)) - entry) / Math.max(entry, 0.01)
+        : (entry - Math.min(...forward.map((row) => row.low))) / Math.max(entry, 0.01);
+      outcomes.push({
+        five: setup.direction === 'SHORT' ? -raw5 : raw5,
+        twenty: setup.direction === 'SHORT' ? -raw20 : raw20,
+        mae: adverse,
+        mfe: favorable,
+      });
+    }
+    const sampleSize = outcomes.length;
+    const median5 = this.median(outcomes.map((item) => item.five));
+    const median20 = this.median(outcomes.map((item) => item.twenty));
+    const winRate = sampleSize > 0 ? outcomes.filter((item) => item.twenty > 0).length / sampleSize : 0;
+    const label = sampleSize >= 30 && median20 > 0 && winRate >= 0.52 ? 'PROVEN' : sampleSize >= 10 ? 'WEAK' : 'UNPROVEN';
+    return {
+      label,
+      sampleSize,
+      medianForwardReturn5D: Number((median5 * 100).toFixed(2)),
+      medianForwardReturn20D: Number((median20 * 100).toFixed(2)),
+      winRate: Number((winRate * 100).toFixed(1)),
+      maxAdverseExcursion: Number((this.median(outcomes.map((item) => item.mae)) * 100).toFixed(2)),
+      maxFavorableExcursion: Number((this.median(outcomes.map((item) => item.mfe)) * 100).toFixed(2)),
+    };
+  }
+
+  private setupMatchesAt(history: TrustedReviewUniverseInstrument['priceHistory'], index: number, setupType: string) {
+    const latest = history[index];
+    const prior20 = history.slice(index - 20, index);
+    const prior50 = history.slice(index - 50, index);
+    if (!latest || prior20.length < 20 || prior50.length < 50) return false;
+    const high20 = Math.max(...prior20.map((row) => row.high));
+    const low20 = Math.min(...prior20.map((row) => row.low));
+    const avgVol20 = this.average(prior20.map((row) => row.volume || 0));
+    const sma20 = this.average(prior20.map((row) => row.close));
+    const sma50 = this.average(prior50.map((row) => row.close));
+    const ret20 = (latest.close - history[index - 20].close) / Math.max(history[index - 20].close, 0.01);
+    const avgRange20 = this.average(prior20.map((row) => row.high - row.low));
+    const volumeConfirmed = (latest.volume || 0) > avgVol20 * 1.05;
+    if (setupType === 'BREAKOUT_20D') return latest.close > high20 && volumeConfirmed;
+    if (setupType === 'BREAKDOWN_20D') return latest.close < low20 && volumeConfirmed;
+    if (setupType === 'MOMENTUM_CONTINUATION') return ret20 > 0.05 && latest.close >= high20 * 0.96 && (latest.volume || 0) >= avgVol20;
+    if (setupType === 'PULLBACK_TO_TREND') return latest.close > sma50 && Math.abs(latest.close - sma20) / Math.max(latest.close, 0.01) <= 0.035;
+    if (setupType === 'TREND_LOSS') return latest.close < sma50 && ret20 < -0.03;
+    if (setupType === 'VOLATILITY_EXPANSION_DOWN') return latest.close < latest.open && (latest.high - latest.low) > avgRange20 * 1.5 && volumeConfirmed;
+    return false;
+  }
+
+  private liteTradePlan(instrument: TrustedReviewUniverseInstrument, setup: { type: string; direction: 'LONG' | 'SHORT'; reason: string }) {
+    const history = instrument.priceHistory;
+    const latest = history[history.length - 1];
+    const recent = history.slice(Math.max(0, history.length - 14));
+    const avgRange = Math.max(this.average(recent.map((row) => row.high - row.low)), latest.close * 0.015);
+    const blockers: string[] = [];
+    if (setup.direction === 'LONG') {
+      const entryFloor = Number((latest.close * 0.995).toFixed(2));
+      const entryCeiling = Number((Math.max(latest.close * 1.01, latest.high)).toFixed(2));
+      const recentLow = Math.min(...recent.map((row) => row.low));
+      const stop = Number((Math.min(recentLow, entryFloor - avgRange)).toFixed(2));
+      if (stop >= entryFloor) blockers.push('Invalid long review geometry: stop/invalidation is not below the entry floor.');
+      const risk = Math.max(entryFloor - stop, latest.close * 0.01);
+      const target1 = Number((entryCeiling + risk * 2).toFixed(2));
+      const target2 = Number((entryCeiling + risk * 3).toFixed(2));
+      return this.liteTradePlanDto(instrument, setup, entryFloor, entryCeiling, stop, target1, target2, blockers);
+    }
+    const entryCeiling = Number((latest.close * 1.005).toFixed(2));
+    const entryFloor = Number((Math.min(latest.close * 0.99, latest.low)).toFixed(2));
+    const recentHigh = Math.max(...recent.map((row) => row.high));
+    const stop = Number((Math.max(recentHigh, entryCeiling + avgRange)).toFixed(2));
+    if (stop <= entryCeiling) blockers.push('Invalid short review geometry: stop/invalidation is not above the entry ceiling.');
+    const risk = Math.max(stop - entryCeiling, latest.close * 0.01);
+    const target1 = Number(Math.max(entryFloor - risk * 2, 0.01).toFixed(2));
+    const target2 = Number(Math.max(entryFloor - risk * 3, 0.01).toFixed(2));
+    return this.liteTradePlanDto(instrument, setup, entryFloor, entryCeiling, stop, target1, target2, blockers);
+  }
+
+  private liteTradePlanDto(
+    instrument: TrustedReviewUniverseInstrument,
+    setup: { type: string; direction: 'LONG' | 'SHORT'; reason: string },
+    entryFloor: number,
+    entryCeiling: number,
+    stop: number,
+    target1: number,
+    target2: number,
+    blockers: string[]
+  ) {
+    const reward = setup.direction === 'SHORT' ? entryFloor - target1 : target1 - entryCeiling;
+    const risk = setup.direction === 'SHORT' ? stop - entryCeiling : entryFloor - stop;
+    const rewardRiskRatio = Number((Math.max(reward, 0) / Math.max(risk, 0.01)).toFixed(2));
+    return {
+      id: null,
+      instrumentId: instrument.id,
+      symbol: instrument.symbol,
+      strategy: 'TODAY_REVIEW_LITE',
+      strategyVersion: '1.0.0',
+      planStatus: blockers.length > 0 ? 'BLOCKED' : 'VALID',
+      riskGrade: blockers.length > 0 ? 'HIGH' : rewardRiskRatio >= 1.8 ? 'LOW' : 'MEDIUM',
+      entryTrigger: setup.reason,
+      entryZone: {
+        type: setup.type,
+        referencePrice: entryFloor,
+        preferredEntryMin: entryFloor,
+        preferredEntryMax: entryCeiling,
+        quality: 'LITE',
+        rationale: setup.reason,
+      },
+      stopLoss: {
+        price: stop,
+        method: setup.direction === 'SHORT' ? 'ABOVE_ENTRY_CEILING' : 'BELOW_ENTRY_FLOOR',
+        quality: blockers.length > 0 ? 'BLOCKED' : 'ACCEPTABLE',
+        rationale: setup.direction === 'SHORT' ? 'Invalidation sits above the short review entry ceiling.' : 'Invalidation sits below the long review entry floor.',
+      },
+      target: {
+        price: target1,
+        target2,
+        method: 'LITE_REWARD_RISK_MULTIPLE',
+        quality: rewardRiskRatio >= 1.8 ? 'ACCEPTABLE' : 'WATCH_ONLY',
+        rationale: 'Targets are derived from entry risk for research support only.',
+      },
+      rewardRiskRatio,
+      invalidationRules: [
+        setup.direction === 'SHORT'
+          ? `Do nothing unless price remains below the entry zone; invalidation is a daily close above INR ${stop.toFixed(2)}.`
+          : `Do nothing unless price remains above the entry trigger; invalidation is a daily close below INR ${stop.toFixed(2)}.`,
+      ],
+      timeHorizon: '5-20 trading days',
+      doNothingUnless: setup.reason,
+      warnings: instrument.warnings,
+      blockers,
+      dataGaps: instrument.contextGaps,
+      paperReadinessStatus: blockers.length > 0 ? 'BLOCKED' : 'READY_FOR_PAPER_REVIEW',
+      paperReadinessReasons: blockers.length > 0 ? [] : ['Lite trade plan geometry is valid for research support.'],
+      paperReadinessBlockers: blockers,
+      marketDataSnapshot: {
+        latestStoredTradingDate: instrument.latestPriceDate,
+        latestPriceTimestamp: instrument.latestPriceDate,
+        currency: 'INR',
+        priceHistoryBars: instrument.priceHistoryBars,
+      },
+      generatedAt: this.clock().toISOString(),
+      modelVersion: 'today-review-lite-v1',
+    };
+  }
+
+  private liteScore(
+    setup: { signalStrength: number },
+    evidence: { label: string },
+    rewardRiskRatio: number,
+    instrument: TrustedReviewUniverseInstrument,
+    contextGapPenalty: number
+  ) {
+    const signal = setup.signalStrength;
+    const historical = evidence.label === 'PROVEN' ? 25 : evidence.label === 'WEAK' ? 16 : 4;
+    const rewardRisk = Math.min(20, Math.max(0, rewardRiskRatio / 2 * 20));
+    const liquidity = instrument.latestVolume && instrument.latestVolume > 0 ? 15 : 0;
+    const freshness = 10;
+    const rrPenalty = rewardRiskRatio < 1.2 ? 10 : 0;
+    return Math.max(0, Math.min(100, Math.round(signal + historical + rewardRisk + liquidity + freshness - contextGapPenalty - rrPenalty)));
+  }
+
+  private contextGapPenalty(gaps: string[]) {
+    return gaps.reduce((total, gap) => total + (gap === 'marketCap' ? 3 : gap === 'sector' || gap === 'industry' ? 2 : 0), 0);
+  }
+
+  private liteReasonSummary(state: TodayReviewCandidateState, evidence: { label: string; sampleSize: number }, blockers: string[], watchReasons: string[]) {
+    if (state === 'BLOCKED') return `Blocked: ${blockers[0] || 'hard blocker exists.'}`;
+    if (state === 'WATCH_ONLY') return `Watch only: ${watchReasons[0] || 'lite evidence is not strong enough for paper review.'}`;
+    if (state === 'SHORT_REVIEW') return `Short review candidate from price-action setup and ${evidence.label.toLowerCase()} OHLCV evidence across ${evidence.sampleSize} prior occurrences.`;
+    return `Long review candidate from price-action setup and ${evidence.label.toLowerCase()} OHLCV evidence across ${evidence.sampleSize} prior occurrences.`;
+  }
+
+  private mergeCandidates(candidates: TodayReviewCandidateDto[]) {
+    const priority: Record<TodayReviewCandidateState, number> = {
+      LONG_REVIEW: 0,
+      SHORT_REVIEW: 1,
+      EXIT_RISK_REVIEW: 2,
+      WATCH_ONLY: 3,
+      UNPROVEN: 4,
+      INSUFFICIENT_DATA: 5,
+      BLOCKED: 6,
+      AVOID: 7,
+    };
+    const byKey = new Map<string, TodayReviewCandidateDto>();
+    for (const candidate of candidates) {
+      const key = `${candidate.symbol}:${candidate.direction}:${candidate.setupType || candidate.strategyCode}`;
+      const current = byKey.get(key);
+      if (!current || priority[candidate.state] < priority[current.state] || candidate.confidenceScore > current.confidenceScore) {
+        byKey.set(key, candidate);
+      }
+    }
+    return [...byKey.values()];
+  }
+
+  private incrementReason(scanFunnel: TodayReviewScanFunnel, reason: string) {
+    scanFunnel.topNoPromotionReasons[reason] = (scanFunnel.topNoPromotionReasons[reason] || 0) + 1;
+  }
+
+  private addWarning(warnings: string[], warning: string) {
+    if (!warnings.includes(warning)) warnings.push(warning);
+  }
+
+  private normalizedMembershipKey(value?: string | null) {
+    return value ? value.trim().toUpperCase() : '';
+  }
+
+  private configuredTrustedScanLimit() {
+    const configured = Number(process.env.TODAY_REVIEW_TRUSTED_SCAN_LIMIT);
+    if (Number.isFinite(configured) && configured > 0) return Math.max(1, Math.floor(configured));
+    return null;
+  }
+
+  private average(values: number[]) {
+    const usable = values.filter((value) => Number.isFinite(value));
+    return usable.length > 0 ? usable.reduce((sum, value) => sum + value, 0) / usable.length : 0;
+  }
+
+  private median(values: number[]) {
+    const usable = values.filter((value) => Number.isFinite(value)).sort((a, b) => a - b);
+    if (usable.length === 0) return 0;
+    const mid = Math.floor(usable.length / 2);
+    return usable.length % 2 ? usable[mid] : (usable[mid - 1] + usable[mid]) / 2;
   }
 
   private mapCandidate(source: TodayReviewCandidateSource): TodayReviewCandidateDto {
@@ -552,8 +1187,11 @@ export class TodayTradeReviewService {
     }
   }
 
-  private parseDataThroughDate(marketData: Record<string, unknown> | null) {
-    const raw = marketData?.latestTradingDate || marketData?.latestStoredTradingDate;
+  private parseDataThroughDate(
+    marketData: Record<string, unknown> | null,
+    reviewUniverse?: { dataThroughDate?: string | null; storedDataThroughDate?: string | null } | null
+  ) {
+    const raw = marketData?.latestTradingDate || marketData?.latestStoredTradingDate || reviewUniverse?.storedDataThroughDate || reviewUniverse?.dataThroughDate;
     if (typeof raw !== 'string' || raw.length === 0) return null;
     const date = new Date(raw);
     return Number.isNaN(date.getTime()) ? null : date;

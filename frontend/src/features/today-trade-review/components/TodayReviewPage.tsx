@@ -49,8 +49,8 @@ export function TodayReviewPage() {
   return (
     <Stack spacing={3}>
       <PageHeader
-        title="Today’s Trade Review"
-        subtitle="Before-market research support shortlist built from Strategy Decision, proof snapshots, data quality, market context, and trade-plan geometry."
+        title="Today's Trade Review"
+        subtitle="Before-market research support shortlist built from trusted OHLCV coverage, supporting evidence, and trade-plan geometry."
         badges={<Chip label={`${scope.region} / ${scope.assetType}`} color="primary" variant="outlined" />}
         primaryAction={
           <Button
@@ -59,7 +59,7 @@ export function TodayReviewPage() {
             onClick={() => void runReview()}
             disabled={running}
           >
-            {running ? 'Running review' : 'Run Today’s Review'}
+            {running ? 'Running review' : "Run Today's Review"}
           </Button>
         }
         secondaryActions={<Button onClick={() => void reload()} disabled={loading || running}>Refresh</Button>}
@@ -67,7 +67,7 @@ export function TodayReviewPage() {
 
       {loading && (
         <Alert severity="info" icon={<CircularProgress size={18} />}>
-          Loading Today’s Trade Review for {scope.region} / {scope.assetType}.
+          Loading Today's Trade Review for {scope.region} / {scope.assetType}.
         </Alert>
       )}
 
@@ -92,6 +92,7 @@ export function TodayReviewPage() {
       {run && (
         <>
           <RunStatusPanel run={run} />
+          <CoveragePanel run={run} />
           {run.warnings.length > 0 && (
             <Alert severity={run.status === 'PARTIAL' ? 'warning' : 'info'}>
               {run.warnings.join(' ')}
@@ -106,12 +107,12 @@ export function TodayReviewPage() {
           </Grid>
 
           <Alert severity="info">
-            Signals and calibration are supporting evidence only. Promoted long review candidates require Strategy Framework proof and valid trade-plan geometry.
+            Signals and calibration are supporting evidence only. Promoted review candidates require trusted price data, enough OHLCV history, and valid trade-plan geometry.
           </Alert>
 
           {groups.longReview.length === 0 && (
             <Alert severity="warning">
-              No long review candidates are currently promoted. Market gate, proof, data quality, or plan geometry prevented promotion.
+              No long review candidates are currently promoted. Trusted instruments scanned: {formatNumber(run.scanFunnel?.trustedInstrumentsScanned ?? (run.sourceSnapshot as any)?.scanFunnel?.trustedInstrumentsScanned ?? 0)}; setups detected: {formatNumber(run.scanFunnel?.setupsDetected ?? (run.sourceSnapshot as any)?.scanFunnel?.setupsDetected ?? 0)}; watch/unproven: {formatNumber((run.scanFunnel?.watchOnly ?? (run.sourceSnapshot as any)?.scanFunnel?.watchOnly ?? 0) + (run.scanFunnel?.unproven ?? (run.sourceSnapshot as any)?.scanFunnel?.unproven ?? 0))}.
             </Alert>
           )}
 
@@ -148,6 +149,66 @@ function RunStatusPanel({ run }: { run: TodayReviewRun | null }) {
           <Typography variant="body2" color="text.secondary">Last run: {formatDateTime(run.finishedAt || run.startedAt)}</Typography>
           <Typography variant="body2" color="text.secondary">Data-through: {formatDate(run.dataThroughDate)}</Typography>
           <Typography variant="body2" color="text.secondary">Scope: {run.region} / {run.assetType}</Typography>
+          <Typography variant="body2" color="text.secondary">Review mode: {coverageValue(run, 'mode')}</Typography>
+          <Typography variant="body2" color="text.secondary">Trusted universe: {formatNumber(Number(coverageValue(run, 'trustedCount') || 0))} / Catalog {formatNumber(Number(coverageValue(run, 'catalogCount') || 0))}</Typography>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CoveragePanel({ run }: { run: TodayReviewRun }) {
+  const reviewUniverse = (run.sourceSnapshot as any)?.reviewUniverse || {};
+  const scanFunnel = run.scanFunnel || (run.sourceSnapshot as any)?.scanFunnel || {};
+  const warnings = run.coverageWarnings || reviewUniverse.warnings || [];
+  const trustedLoadStatus = scanFunnel.trustedLoadStatus || (scanFunnel.scanComplete === false ? 'CONFIGURED_PARTIAL' : 'COMPLETE');
+  const membershipFailureReason = scanFunnel.membershipLoadFailureReason;
+  return (
+    <Card variant="outlined">
+      <CardContent>
+        <Stack spacing={1.5}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} useFlexGap flexWrap="wrap">
+            <Chip label={`Review mode: ${coverageValue(run, 'mode')}`} color={coverageValue(run, 'mode') === 'FULL_REVIEW' ? 'success' : coverageValue(run, 'mode') === 'LIMITED_REVIEW' ? 'warning' : 'default'} />
+            <Chip label={`Trusted universe: ${formatNumber(Number(coverageValue(run, 'trustedCount') || 0))}`} variant="outlined" />
+            <Chip label={`Catalog: ${formatNumber(Number(coverageValue(run, 'catalogCount') || 0))}`} variant="outlined" />
+            <Chip label={`Target session: ${reviewUniverse.targetTradingDate || 'Unavailable'}`} variant="outlined" />
+            <Chip label={`Required data-through: ${reviewUniverse.requiredDataThroughDate || 'Unavailable'}`} variant="outlined" />
+            <Chip label={`Stored data-through: ${reviewUniverse.storedDataThroughDate || reviewUniverse.dataThroughDate || formatDate(run.dataThroughDate)}`} variant="outlined" />
+          </Stack>
+          {coverageValue(run, 'mode') === 'LIMITED_REVIEW' && (
+            <Alert severity="warning">
+              Limited review mode: candidates are generated only from stocks with current price, sufficient OHLCV history, and recent volume. Missing sector/market-cap data is shown as context gaps.
+            </Alert>
+          )}
+          {coverageValue(run, 'mode') === 'NO_REVIEW' && (
+            <Alert severity="warning">
+              No review mode: trusted price-action universe is unavailable or below the lite threshold. Today review cannot publish candidates until the trusted-universe evidence is ready.
+            </Alert>
+          )}
+          {trustedLoadStatus === 'LOAD_FAILED' && (
+            <Alert severity="error">
+              Trusted universe membership unavailable. {membershipFailureReason || 'Today review cannot publish candidates until membership can be loaded reliably.'}
+            </Alert>
+          )}
+          {trustedLoadStatus === 'CONFIGURED_PARTIAL' && (
+            <Alert severity="warning">
+              Partial trusted-universe scan: scanned {formatNumber(scanFunnel.trustedInstrumentsScanned)} of {formatNumber(scanFunnel.trustedUniverseCount)} instruments using {scanFunnel.scanOrdering || 'configured'} ordering.
+            </Alert>
+          )}
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} useFlexGap flexWrap="wrap">
+            <Typography variant="caption">Trusted available: {formatNumber(scanFunnel.trustedUniverseCount ?? coverageValue(run, 'trustedCount'))}</Typography>
+            <Typography variant="caption">Scanned: {formatNumber(scanFunnel.trustedInstrumentsScanned)}</Typography>
+            <Typography variant="caption">Scan complete: {scanFunnel.scanComplete === false ? 'no' : 'yes'}</Typography>
+            <Typography variant="caption">Membership load: {trustedLoadStatus}</Typography>
+            <Typography variant="caption">Setups detected: {formatNumber(scanFunnel.setupsDetected)}</Typography>
+            <Typography variant="caption">Promoted: {formatNumber(scanFunnel.promotedCandidates)}</Typography>
+            <Typography variant="caption">Watch/unproven: {formatNumber((scanFunnel.watchOnly || 0) + (scanFunnel.unproven || 0))}</Typography>
+            <Typography variant="caption">Blocked: {formatNumber(scanFunnel.blocked)}</Typography>
+            <Typography variant="caption">Strategy outside trusted universe: {formatNumber(scanFunnel.outsideTrustedUniverse)}</Typography>
+          </Stack>
+          {warnings.slice(0, 3).map((warning: string) => (
+            <Typography key={warning} variant="caption" color="text.secondary">{warning}</Typography>
+          ))}
         </Stack>
       </CardContent>
     </Card>
@@ -264,6 +325,17 @@ function formatDate(value?: string | null) {
 function formatDateTime(value?: string | null) {
   if (!value) return 'Unavailable';
   return new Date(value).toLocaleString();
+}
+
+function formatNumber(value?: number | null) {
+  return new Intl.NumberFormat().format(Number(value || 0));
+}
+
+function coverageValue(run: TodayReviewRun, key: 'mode' | 'trustedCount' | 'catalogCount') {
+  const reviewUniverse = (run.sourceSnapshot as any)?.reviewUniverse || {};
+  if (key === 'mode') return run.reviewUniverseMode || reviewUniverse.mode || 'NO_REVIEW';
+  if (key === 'trustedCount') return run.trustedUniverseCount ?? reviewUniverse.trustedCount ?? 0;
+  return run.catalogCount ?? reviewUniverse.catalogCount ?? 0;
 }
 
 function formatCurrency(value?: number | null) {

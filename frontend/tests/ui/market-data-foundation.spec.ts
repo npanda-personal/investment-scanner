@@ -153,6 +153,50 @@ test.describe('Market Data Foundation UI', () => {
         },
       });
     });
+    await page.route('**/api/v1/market-data/review-universe**', async (route) => {
+      await route.fulfill({
+        json: {
+          scope: { region: 'IN', assetType: 'STOCK' },
+          asOfDate: '2026-05-12',
+          targetTradingDate: '2026-05-12',
+          requiredDataThroughDate: '2026-05-11',
+          storedDataThroughDate: '2026-05-11',
+          catalogCount: 2910,
+          providerSupportedCount: 585,
+          trustedCount: 144,
+          status: 'LIMITED',
+          mode: 'LIMITED_REVIEW',
+          minLiteCount: 100,
+          minFullCount: 300,
+          dataThroughDate: '2026-05-11',
+          scanPolicy: {
+            scanLimit: 144,
+            scanComplete: true,
+            scanOrdering: 'recentVolumeDesc_priceHistoryCompleteness_latestFreshness_symbol',
+          },
+          excludedCounts: {
+            providerUnknown: 2325,
+            providerRetryFailed: 7,
+            providerUnsupported: 0,
+            inactiveOrDelisted: 0,
+            noLatestPrice: 100,
+            staleLatestPrice: 200,
+            insufficientBarsUnder120: 30,
+            insufficientBarsUnder252: 144,
+            missingRecentVolume: 20,
+            corporateActionBlocked: 0,
+          },
+          contextGapCounts: {
+            missingSector: 140,
+            missingIndustry: 140,
+            missingMarketCap: 140,
+            missingIsin: 140,
+            missingListingDate: 140,
+          },
+          warnings: ['Missing metadata is shown as context gap, not a hard blocker for price-action review.'],
+        },
+      });
+    });
     await page.route('**/api/v1/market-data/universe/repair-plan**', async (route) => {
       await route.fulfill({
         json: {
@@ -537,6 +581,17 @@ test.describe('Market Data Foundation UI', () => {
     await expect(page.getByText('Downstream allowed: no')).toBeVisible();
     await expect(page.getByText('Review-ready: 0 / 300')).toBeVisible();
     await expect(page.getByText('Next action: VALIDATE_PROVIDERS')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Trusted Review Universe' })).toBeVisible();
+    await expect(page.getByText('Status: LIMITED')).toBeVisible();
+    await expect(page.getByText('Mode: LIMITED_REVIEW')).toBeVisible();
+    await expect(page.getByText('Trusted review universe: 144')).toBeVisible();
+    await expect(page.getByText('Target session: 2026-05-12')).toBeVisible();
+    await expect(page.getByText('Required data-through: 2026-05-11')).toBeVisible();
+    await expect(page.getByText('Stored data-through: 2026-05-11')).toBeVisible();
+    await expect(page.getByText('Stale latest price excluded: 200')).toBeVisible();
+    await expect(page.getByText('Missing sector context gaps: 140')).toBeVisible();
+    await expect(page.getByText('Scan ordering: recentVolumeDesc_priceHistoryCompleteness_latestFreshness_symbol')).toBeVisible();
+    await expect(page.getByText('Missing metadata is shown as context gap, not a hard blocker for price-action review.').first()).toBeVisible();
     await expect(page.getByText('Operational Repair Run')).toBeVisible();
     await expect(page.getByText('Last run: COMPLETED')).toBeVisible();
     const latestRunChipClass = await page.locator('.MuiChip-root', { hasText: 'Last run: COMPLETED' }).getAttribute('class');

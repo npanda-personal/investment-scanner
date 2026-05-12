@@ -14,6 +14,30 @@ export type TodayReviewCandidateState =
   | 'UNPROVEN';
 export type TodayReviewDirection = 'LONG' | 'SHORT' | 'EXIT_RISK' | 'WATCH' | 'BLOCKED' | 'AVOID';
 export type TodayReviewGrade = 'A' | 'B' | 'C' | 'D' | 'UNPROVEN';
+export type TodayReviewUniverseMode = 'FULL_REVIEW' | 'LIMITED_REVIEW' | 'NO_REVIEW';
+export type TodayReviewTrustedLoadStatus = 'COMPLETE' | 'CONFIGURED_PARTIAL' | 'LOAD_FAILED';
+
+export interface TodayReviewScanFunnel {
+  trustedUniverseCount: number;
+  trustedInstrumentsScanned: number;
+  trustedInstrumentsSkipped: number;
+  scanLimit: number;
+  scanComplete: boolean;
+  scanOrdering: string;
+  trustedLoadStatus: TodayReviewTrustedLoadStatus;
+  membershipLoadFailureReason: string | null;
+  strategyCandidatesSeen: number;
+  strategyCandidatesEligible: number;
+  strategyCandidatesExcluded: number;
+  outsideTrustedUniverse: number;
+  setupsDetected: number;
+  promotedCandidates: number;
+  watchOnly: number;
+  unproven: number;
+  blocked: number;
+  noSetup: number;
+  topNoPromotionReasons: Record<string, number>;
+}
 
 export interface TodayReviewCandidate {
   id: string;
@@ -54,6 +78,11 @@ export interface TodayReviewRun {
   warnings: string[];
   candidateCounts: Record<string, number>;
   sourceSnapshot: Record<string, any>;
+  reviewUniverseMode?: TodayReviewUniverseMode;
+  trustedUniverseCount?: number;
+  catalogCount?: number;
+  coverageWarnings?: string[];
+  scanFunnel?: TodayReviewScanFunnel | null;
   createdAt: string;
   updatedAt: string;
   candidates: TodayReviewCandidate[];

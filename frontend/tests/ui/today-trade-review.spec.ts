@@ -144,7 +144,70 @@ const completedResponse = {
     finishedAt: '2026-05-11T06:31:00.000Z',
     warnings: [],
     candidateCounts: { LONG_REVIEW: 1, BLOCKED: 1, UNPROVEN: 1 },
-    sourceSnapshot: { rawSignalUniverse: { supportOnly: true, sampleCount: 25 } },
+    sourceSnapshot: {
+      rawSignalUniverse: { supportOnly: true, sampleCount: 25 },
+      reviewUniverse: {
+        mode: 'LIMITED_REVIEW',
+        trustedCount: 144,
+        catalogCount: 2910,
+        targetTradingDate: '2026-05-12',
+        requiredDataThroughDate: '2026-05-11',
+        storedDataThroughDate: '2026-05-11',
+        dataThroughDate: '2026-05-10',
+        scanPolicy: {
+          scanLimit: 144,
+          scanComplete: true,
+          scanOrdering: 'recentVolumeDesc_priceHistoryCompleteness_latestFreshness_symbol',
+        },
+        warnings: ['Missing metadata is shown as context gap, not a hard blocker for price-action review.'],
+      },
+      scanFunnel: {
+        trustedUniverseCount: 144,
+        trustedInstrumentsScanned: 144,
+        trustedInstrumentsSkipped: 0,
+        scanLimit: 144,
+        scanComplete: true,
+        scanOrdering: 'recentVolumeDesc_priceHistoryCompleteness_latestFreshness_symbol',
+        trustedLoadStatus: 'COMPLETE',
+        membershipLoadFailureReason: null,
+        strategyCandidatesSeen: 18,
+        strategyCandidatesEligible: 12,
+        strategyCandidatesExcluded: 6,
+        outsideTrustedUniverse: 6,
+        setupsDetected: 12,
+        promotedCandidates: 1,
+        watchOnly: 4,
+        unproven: 1,
+        blocked: 1,
+        noSetup: 132,
+        topNoPromotionReasons: { 'historical evidence unproven': 1 },
+      },
+    },
+    reviewUniverseMode: 'LIMITED_REVIEW',
+    trustedUniverseCount: 144,
+    catalogCount: 2910,
+    coverageWarnings: ['Missing metadata is shown as context gap, not a hard blocker for price-action review.'],
+    scanFunnel: {
+      trustedUniverseCount: 144,
+      trustedInstrumentsScanned: 144,
+      trustedInstrumentsSkipped: 0,
+      scanLimit: 144,
+      scanComplete: true,
+      scanOrdering: 'recentVolumeDesc_priceHistoryCompleteness_latestFreshness_symbol',
+      trustedLoadStatus: 'COMPLETE',
+      membershipLoadFailureReason: null,
+      strategyCandidatesSeen: 18,
+      strategyCandidatesEligible: 12,
+      strategyCandidatesExcluded: 6,
+      outsideTrustedUniverse: 6,
+      setupsDetected: 12,
+      promotedCandidates: 1,
+      watchOnly: 4,
+      unproven: 1,
+      blocked: 1,
+      noSetup: 132,
+      topNoPromotionReasons: { 'historical evidence unproven': 1 },
+    },
     createdAt: '2026-05-11T06:30:00.000Z',
     updatedAt: '2026-05-11T06:31:00.000Z',
     candidates: [candidate, blockedCandidate, unprovenCandidate],
@@ -188,7 +251,7 @@ test.describe('Today Trade Review UI', () => {
 
     await visitAuthenticated(page, '/today-review');
 
-    await expect(page.getByRole('heading', { name: 'Today’s Trade Review' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: "Today's Trade Review" })).toBeVisible();
     await expect(page.getByText('No Today review has been published for IN / STOCK.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Run review' })).toBeVisible();
     await expect(page.getByRole('progressbar')).toHaveCount(0);
@@ -198,6 +261,16 @@ test.describe('Today Trade Review UI', () => {
     await expect(page.getByText('Scope: IN / STOCK')).toBeVisible();
     await expect(page.getByText('Long review candidates', { exact: true })).toBeVisible();
     await expect(page.getByText('Signals and calibration are supporting evidence only.').first()).toBeVisible();
+    await expect(page.getByText('Review mode: LIMITED_REVIEW').first()).toBeVisible();
+    await expect(page.getByText('Target session: 2026-05-12')).toBeVisible();
+    await expect(page.getByText('Required data-through: 2026-05-11')).toBeVisible();
+    await expect(page.getByText('Stored data-through: 2026-05-11')).toBeVisible();
+    await expect(page.getByText('Limited review mode: candidates are generated only from stocks with current price, sufficient OHLCV history, and recent volume. Missing sector/market-cap data is shown as context gaps.')).toBeVisible();
+    await expect(page.getByText('Scanned: 144')).toBeVisible();
+    await expect(page.getByText('Scan complete: yes')).toBeVisible();
+    await expect(page.getByText('Membership load: COMPLETE')).toBeVisible();
+    await expect(page.getByText('Trusted universe membership unavailable')).toHaveCount(0);
+    await expect(page.getByText('Strategy outside trusted universe: 6')).toBeVisible();
     await expect(page.getByRole('link', { name: 'ALPHA.NS' })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Long Review (1)' })).toBeVisible();
     await page.getByRole('tab', { name: /Watch Only/ }).click();
@@ -208,12 +281,12 @@ test.describe('Today Trade Review UI', () => {
     await expect(page.getByText('Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.').first()).toBeVisible();
 
     await page.reload();
-    await expect(page.getByRole('heading', { name: 'Today’s Trade Review' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: "Today's Trade Review" })).toBeVisible();
     await expect(page.getByRole('progressbar')).toHaveCount(0);
     await expect(page.getByRole('link', { name: 'ALPHA.NS' })).toBeVisible();
 
     const body = await page.locator('body').innerText();
-    expect(body).not.toMatch(/buy now|sell now|guaranteed|place order|execute order|live trade|financial advice/i);
+    expect(body).not.toMatch(/buy now|sell now|guaranteed|place order|execute order|live trade|financial advice|execution/i);
     expect(body).not.toContain('Raw signal count');
   });
 
@@ -240,7 +313,152 @@ test.describe('Today Trade Review UI', () => {
     await expect(page.getByRole('link', { name: 'Research Hub stock view' })).toHaveAttribute('href', '/research/stocks/stock-1');
 
     const body = await page.locator('body').innerText();
-    expect(body).not.toMatch(/buy now|sell now|guaranteed|place order|execute order|live trade|financial advice/i);
+    expect(body).not.toMatch(/buy now|sell now|guaranteed|place order|execute order|live trade|financial advice|execution/i);
+  });
+
+  test('NO_REVIEW explains trusted-universe gating and scan evidence', async ({ page }) => {
+    await page.route('**/api/v1/today-review/latest**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          run: {
+            ...completedResponse.run,
+            id: 'run-no-review',
+            status: 'PARTIAL',
+            trustStatus: 'PARTIAL',
+            warnings: ['Trusted Review Universe unavailable or not ready; Today Review cannot publish candidates.'],
+            candidateCounts: {},
+            sourceSnapshot: {
+              ...completedResponse.run.sourceSnapshot,
+              reviewUniverse: {
+                mode: 'NO_REVIEW',
+                trustedCount: 0,
+                catalogCount: 2910,
+                targetTradingDate: '2026-05-12',
+                requiredDataThroughDate: '2026-05-11',
+                storedDataThroughDate: '2026-05-10',
+                dataThroughDate: '2026-05-10',
+                warnings: ['Trusted Review Universe unavailable or not ready; Today Review cannot publish candidates.'],
+              },
+              scanFunnel: {
+                trustedUniverseCount: 0,
+                trustedInstrumentsScanned: 0,
+                trustedInstrumentsSkipped: 0,
+                scanLimit: 0,
+                scanComplete: false,
+                scanOrdering: 'recentVolumeDesc_priceHistoryCompleteness_latestFreshness_symbol',
+                trustedLoadStatus: 'LOAD_FAILED',
+                membershipLoadFailureReason: 'Trusted universe membership page failed at offset 250.',
+                strategyCandidatesSeen: 8,
+                strategyCandidatesEligible: 0,
+                strategyCandidatesExcluded: 8,
+                outsideTrustedUniverse: 8,
+                setupsDetected: 0,
+                promotedCandidates: 0,
+                watchOnly: 0,
+                unproven: 0,
+                blocked: 0,
+                noSetup: 0,
+                topNoPromotionReasons: { NO_REVIEW_UNIVERSE: 0 },
+              },
+            },
+            reviewUniverseMode: 'NO_REVIEW',
+            trustedUniverseCount: 0,
+            scanFunnel: {
+              trustedUniverseCount: 0,
+              trustedInstrumentsScanned: 0,
+              trustedInstrumentsSkipped: 0,
+              scanLimit: 0,
+              scanComplete: false,
+              scanOrdering: 'recentVolumeDesc_priceHistoryCompleteness_latestFreshness_symbol',
+              trustedLoadStatus: 'LOAD_FAILED',
+              membershipLoadFailureReason: 'Trusted universe membership page failed at offset 250.',
+              strategyCandidatesSeen: 8,
+              strategyCandidatesEligible: 0,
+              strategyCandidatesExcluded: 8,
+              outsideTrustedUniverse: 8,
+              setupsDetected: 0,
+              promotedCandidates: 0,
+              watchOnly: 0,
+              unproven: 0,
+              blocked: 0,
+              noSetup: 0,
+              topNoPromotionReasons: { NO_REVIEW_UNIVERSE: 0 },
+            },
+            candidates: [],
+          },
+          groups: { longReview: [], shortReview: [], exitRiskReview: [], watchOnly: [], blocked: [], avoid: [], insufficientData: [], unproven: [] },
+          scope: { region: 'IN', assetType: 'STOCK' },
+        }),
+      });
+    });
+
+    await visitAuthenticated(page, '/today-review');
+
+    await expect(page.getByText('Review mode: NO_REVIEW').first()).toBeVisible();
+    await expect(page.getByText('No review mode: trusted price-action universe is unavailable or below the lite threshold. Today review cannot publish candidates until the trusted-universe evidence is ready.')).toBeVisible();
+    await expect(page.getByText('Target session: 2026-05-12')).toBeVisible();
+    await expect(page.getByText('Required data-through: 2026-05-11')).toBeVisible();
+    await expect(page.getByText('Stored data-through: 2026-05-10')).toBeVisible();
+    await expect(page.getByText('Trusted universe membership unavailable. Trusted universe membership page failed at offset 250.')).toBeVisible();
+    await expect(page.getByText('Membership load: LOAD_FAILED')).toBeVisible();
+    await expect(page.getByText('Strategy outside trusted universe: 8')).toBeVisible();
+    await expect(page.getByText(/No long review candidates are currently promoted/)).toBeVisible();
+  });
+
+  test('configured partial membership scan is disclosed without treating it as a load failure', async ({ page }) => {
+    const partialResponse = {
+      ...completedResponse,
+      run: {
+        ...completedResponse.run,
+        status: 'PARTIAL',
+        trustStatus: 'PARTIAL',
+        warnings: ['Trusted universe scan is partial: scanned 100 of 500 instruments.'],
+        sourceSnapshot: {
+          ...completedResponse.run.sourceSnapshot,
+          reviewUniverse: {
+            ...completedResponse.run.sourceSnapshot.reviewUniverse,
+            trustedCount: 500,
+            scanPolicy: {
+              scanLimit: 100,
+              scanComplete: false,
+              scanOrdering: 'recentVolumeDesc_priceHistoryCompleteness_latestFreshness_symbol',
+            },
+          },
+          scanFunnel: {
+            ...completedResponse.run.sourceSnapshot.scanFunnel,
+            trustedUniverseCount: 500,
+            trustedInstrumentsScanned: 100,
+            trustedInstrumentsSkipped: 400,
+            scanLimit: 100,
+            scanComplete: false,
+            trustedLoadStatus: 'CONFIGURED_PARTIAL',
+            membershipLoadFailureReason: null,
+          },
+        },
+        trustedUniverseCount: 500,
+        scanFunnel: {
+          ...completedResponse.run.scanFunnel,
+          trustedUniverseCount: 500,
+          trustedInstrumentsScanned: 100,
+          trustedInstrumentsSkipped: 400,
+          scanLimit: 100,
+          scanComplete: false,
+          trustedLoadStatus: 'CONFIGURED_PARTIAL',
+          membershipLoadFailureReason: null,
+        },
+      },
+    };
+    await page.route('**/api/v1/today-review/latest**', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(partialResponse) });
+    });
+
+    await visitAuthenticated(page, '/today-review');
+
+    await expect(page.getByText('Partial trusted-universe scan: scanned 100 of 500 instruments using recentVolumeDesc_priceHistoryCompleteness_latestFreshness_symbol ordering.')).toBeVisible();
+    await expect(page.getByText('Membership load: CONFIGURED_PARTIAL')).toBeVisible();
+    await expect(page.getByText('Trusted universe membership unavailable')).toHaveCount(0);
   });
 
   test('partial run keeps usable grouped sections and shows warnings', async ({ page }) => {

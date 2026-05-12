@@ -17,6 +17,7 @@ import type {
   MarketDataRepairStateStatus,
   ProviderValidationQueue,
   ScheduledRegionSyncSummary,
+  TrustedReviewUniversePriceRow,
 } from './market-data-foundation.types';
 import { partitionHistoricalPrices } from './market-data-foundation.validation';
 import type { YahooFinanceIngestionService } from './market-data-foundation.provider';
@@ -899,6 +900,50 @@ export class MarketDataFoundationRepository {
     }
 
     return emptyStats;
+  }
+
+  async priceHistoryForSymbols(
+    symbols: string[],
+    options: { perSymbolLimit?: number } = {}
+  ): Promise<Map<string, TrustedReviewUniversePriceRow[]>> {
+    const uniqueSymbols = [...new Set(symbols.filter(Boolean))];
+    const perSymbolLimit = Math.max(1, Math.min(options.perSymbolLimit ?? 320, 500));
+    const rowsBySymbol = new Map<string, TrustedReviewUniversePriceRow[]>(
+      uniqueSymbols.map((symbol) => [symbol, []])
+    );
+    const chunkSize = 25;
+    for (let index = 0; index < uniqueSymbols.length; index += chunkSize) {
+      const chunk = uniqueSymbols.slice(index, index + chunkSize);
+      const chunkRows = await Promise.all(chunk.map(async (symbol) => {
+        const rows = await this.prisma.priceTick.findMany({
+          where: { symbol },
+          orderBy: { timestamp: 'desc' },
+          take: perSymbolLimit,
+          select: {
+            timestamp: true,
+            open: true,
+            high: true,
+            low: true,
+            close: true,
+            adjustedClose: true,
+            volume: true,
+          },
+        });
+        return [symbol, rows] as const;
+      }));
+      for (const [symbol, rows] of chunkRows) {
+        rowsBySymbol.set(symbol, rows.reverse().map((row) => ({
+          date: row.timestamp.toISOString().slice(0, 10),
+          open: Number(row.open),
+          high: Number(row.high),
+          low: Number(row.low),
+          close: Number(row.close),
+          adjustedClose: row.adjustedClose === null || row.adjustedClose === undefined ? null : Number(row.adjustedClose),
+          volume: row.volume === null || row.volume === undefined ? null : Number(row.volume),
+        })));
+      }
+    }
+    return rowsBySymbol;
   }
 
   private async priceQualityRowsForSymbols(symbols: string[]) {
