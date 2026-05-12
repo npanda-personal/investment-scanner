@@ -1,4 +1,5 @@
 import fs from 'fs/promises';
+import { createHash } from 'crypto';
 import net from 'net';
 import path from 'path';
 import { MarketDataFoundationRepository } from './market-data-foundation.repository';
@@ -9,7 +10,23 @@ import type {
   CreateStockRequest,
   HistoricalPrice,
   MarketDataStatus,
+  MarketDataRepairPlan,
+  MarketDataRepairRequest,
+  MarketDataRepairRunAction,
+  MarketDataRepairRunActionResult,
+  MarketDataRepairRunRecord,
+  MarketDataRepairRunRequest,
+  MarketDataRepairRunResponse,
+  MarketDataRepairRunStatus,
+  MarketDataRepairSourceIdentity,
+  MarketDataRepairSummary,
+  MarketDataUniverseSignoff,
+  MarketDataManualMetadataTemplate,
+  MarketDataProviderBusinessRepairStatus,
+  MarketDataRepairStateStatus,
+  MarketDataUniverseHealth,
   MarketDataSyncSkipReason,
+  InstrumentUniverseReadiness,
   ScheduledRegionSyncSummary,
   PaginationOptions,
   CatalogBackfillRequest,
@@ -26,8 +43,13 @@ import type {
   V1SyncResult,
 } from './market-data-foundation.types';
 import { validateInstrumentInput } from './market-data-foundation.validation';
-import { shouldRunMarketDataSync, tradingDateForRegion } from './market-data-foundation.market-session';
+import { latestCompletedTradingDateForRegion, shouldRunMarketDataSync, tradingDateForRegion } from './market-data-foundation.market-session';
 import { isKnownNseFnoStockUnderlying } from './market-data-foundation.fno-underlyings';
+import {
+  classifyInstrumentUniverseReadiness,
+  normalizeProviderStatus,
+  UNIVERSE_STATES,
+} from './market-data-foundation.universe';
 
 const KNOWN_NSE_FNO_STOCK_UNDERLYINGS = new Set([
   '360ONE',
@@ -249,6 +271,23 @@ const KNOWN_NSE_FNO_STOCK_UNDERLYINGS = new Set([
   'ZYDUSLIFE',
 ]);
 
+type CatalogIdentityRowsSnapshot = {
+  catalogSource: CatalogSource;
+  rows: CreateStockRequest[];
+  warnings: string[];
+  downloaded: boolean;
+  sourceFingerprint: string;
+  sourceIdentity: MarketDataRepairSourceIdentity;
+};
+
+type RepairRunSourceSnapshot = {
+  fingerprint?: string;
+  identity?: MarketDataRepairSourceIdentity;
+  catalogSnapshot?: CatalogIdentityRowsSnapshot;
+  error?: string;
+  warnings?: string[];
+};
+
 export class MarketDataFoundationService {
   private static lastIngestionAt = 0;
   private readonly manualSyncCooldownMinutes = this.readPositiveNumber(
@@ -290,6 +329,1098 @@ export class MarketDataFoundationService {
       region: options.region || 'GLOBAL',
       assetType: options.assetType || 'ALL',
     };
+  }
+
+  async universeHealth(options: Pick<PaginationOptions, 'region' | 'assetType'> = {}): Promise<MarketDataUniverseHealth> {
+    const scope = {
+      region: options.region?.trim().toUpperCase() || 'IN',
+      assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
+    };
+    const stocks = await this.repository.listStocksForUniverseHealth(scope);
+    const readinessBySymbol = await this.universeReadinessForStocks(stocks, scope);
+    const latestStoredEodDate = this.latestDateFromReadiness(readinessBySymbol);
+    const expectedLatestTradingDate = latestCompletedTradingDateForRegion(scope.region);
+    const generatedAt = new Date().toISOString();
+    const counts = this.emptyUniverseCounts();
+    const blockerCounts = new Map<string, number>();
+    let metadataCompleteCount = 0;
+
+    for (const stock of stocks) {
+      const readiness = readinessBySymbol.get(stock.symbol);
+      if (!readiness) continue;
+      counts.totalCatalogInstruments += 1;
+      counts[readiness.universeState] += 1;
+      counts.byUniverseState[readiness.universeState] += 1;
+      const isInactiveOrDelisted = stock.isActive === false || stock.isDelisted === true;
+      if (isInactiveOrDelisted) counts.inactiveOrDelistedInstruments += 1;
+      else counts.activeInstruments += 1;
+      const providerStatus = normalizeProviderStatus(stock.providerSupportStatus);
+      if (!isInactiveOrDelisted) {
+        if (providerStatus === 'SUPPORTED') counts.providerSupported += 1;
+        if (providerStatus === 'UNKNOWN') {
+          counts.providerUnknown += 1;
+          counts.providerUnknownValidationNeeded += 1;
+        }
+        if (providerStatus === 'VALIDATION_FAILED') {
+          counts.providerRetryValidationNeeded += 1;
+          counts.providerValidationFailed += 1;
+        }
+        if (providerStatus === 'UNSUPPORTED') {
+          counts.unsupported += 1;
+          counts.unsupportedExcluded += 1;
+          counts.providerUnsupportedExcluded += 1;
+        }
+        if (providerStatus === 'VALIDATION_FAILED') counts.unsupported += 1;
+        if (providerStatus === 'SUPPORTED' && (readiness.readinessBlockers.includes('MISSING_ISIN') || readiness.readinessBlockers.includes('MISSING_LISTING_DATE'))) {
+          counts.supportedCatalogIdentityRepairNeeded += 1;
+        }
+        if (providerStatus === 'SUPPORTED' && (readiness.readinessBlockers.includes('MISSING_SECTOR') || readiness.readinessBlockers.includes('MISSING_INDUSTRY') || readiness.readinessBlockers.includes('MISSING_MARKET_CAP'))) {
+          counts.supportedBusinessMetadataRepairNeeded += 1;
+        }
+        if (providerStatus === 'SUPPORTED' && readiness.priceReadiness !== 'READY') {
+          counts.supportedPriceBackfillNeeded += 1;
+        }
+        if (readiness.universeState === 'CATALOG_ONLY') counts.catalogOnly += 1;
+        if (readiness.universeState === 'STALE_OR_INCOMPLETE') counts.staleOrIncomplete += 1;
+        if (readiness.isPriceReady) {
+          counts.priceReady += 1;
+          counts.readiness.priceReady += 1;
+        }
+        if (readiness.isContextReady) {
+          counts.contextReady += 1;
+          counts.readiness.contextReady += 1;
+        }
+        if (readiness.isReviewReady) {
+          counts.reviewReady += 1;
+          counts.readiness.reviewReady += 1;
+        }
+        if (!readiness.latestPriceDate) counts.missingLatestPrice += 1;
+        if (readiness.readinessBlockers.includes('STALE_LATEST_PRICE')) counts.staleLatestPrice += 1;
+        if (readiness.readinessBlockers.includes('INADEQUATE_PRICE_HISTORY') || readiness.readinessBlockers.includes('INADEQUATE_ROLLING_PRICE_WINDOW') || readiness.readinessBlockers.includes('PRICE_HISTORY_GAPS')) counts.missingOrInadequatePriceHistory += 1;
+        if (readiness.readinessBlockers.includes('MISSING_RECENT_VOLUME') || readiness.readinessBlockers.includes('LOW_RECENT_VOLUME_COVERAGE')) counts.missingRecentVolume += 1;
+        if (readiness.readinessBlockers.includes('MISSING_SECTOR')) counts.missingSector += 1;
+        if (readiness.readinessBlockers.includes('MISSING_INDUSTRY')) counts.missingIndustry += 1;
+        if (readiness.readinessBlockers.includes('MISSING_COUNTRY')) counts.missingCountry += 1;
+        if (readiness.readinessBlockers.includes('MISSING_CURRENCY')) counts.missingCurrency += 1;
+        if (readiness.readinessBlockers.includes('MISSING_MARKET_CAP')) counts.missingMarketCap += 1;
+        if (readiness.readinessBlockers.includes('MISSING_ISIN')) counts.missingIsin += 1;
+        if (readiness.readinessBlockers.includes('MISSING_LISTING_DATE')) counts.missingListingDate += 1;
+        if (readiness.metadataCompletenessScore === 100) metadataCompleteCount += 1;
+      }
+      for (const blocker of readiness.readinessBlockers) {
+        blockerCounts.set(blocker, (blockerCounts.get(blocker) || 0) + 1);
+      }
+    }
+
+    const activeDenominator = counts.activeInstruments || counts.totalCatalogInstruments || 1;
+    const coverage = {
+      priceCoveragePercentage: this.percent(counts.priceReady, activeDenominator),
+      metadataCoveragePercentage: this.percent(metadataCompleteCount, activeDenominator),
+      reviewReadyPercentage: this.percent(counts.reviewReady, activeDenominator),
+    };
+    const warnings: string[] = [];
+    if (counts.providerUnknown > 0) warnings.push(`${counts.providerUnknown} instruments still have UNKNOWN provider support.`);
+    if (counts.providerRetryValidationNeeded > 0) warnings.push(`${counts.providerRetryValidationNeeded} provider validations failed and need an explicit retry or provider diagnosis.`);
+    if (counts.missingLatestPrice > 0) warnings.push(`${counts.missingLatestPrice} instruments have no latest stored EOD price.`);
+    if (counts.missingSector > 0 || counts.missingIndustry > 0) {
+      warnings.push(`${counts.missingSector} instruments are missing sector and ${counts.missingIndustry} are missing industry metadata.`);
+    }
+    if (counts.missingIsin > 0 || counts.missingListingDate > 0) {
+      warnings.push(`${counts.missingIsin} instruments are missing ISIN and ${counts.missingListingDate} are missing listing date metadata.`);
+    }
+    if (counts.reviewReady === 0 && counts.totalCatalogInstruments > 0) warnings.push('No instruments currently satisfy REVIEW_READY rules.');
+
+    const trustReasons = this.universeTrustReasons(counts, coverage);
+    const healthWithoutSignoff = {
+      scope,
+      generatedAt,
+      latestStoredEodDate,
+      expectedLatestTradingDate,
+      counts,
+      coverage,
+      topBlockers: this.topUniverseBlockers(blockerCounts),
+      warnings,
+      trustStatus: this.universeTrustStatus(counts, coverage),
+      trustReasons,
+    } as Omit<MarketDataUniverseHealth, 'universeSignoff'>;
+    return {
+      ...healthWithoutSignoff,
+      universeSignoff: this.universeSignoffFromHealth(healthWithoutSignoff),
+    };
+  }
+
+  async repairPlan(options: Pick<PaginationOptions, 'region' | 'assetType'> = {}): Promise<MarketDataRepairPlan> {
+    const scope = {
+      region: options.region?.trim().toUpperCase() || 'IN',
+      assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
+    };
+    const stocks = await this.repository.listStocksForUniverseHealth(scope);
+    const readinessBySymbol = await this.universeReadinessForStocks(stocks, scope);
+    let providerUnknownValidationNeeded = 0;
+    let providerRetryValidationNeeded = 0;
+    let providerUnsupportedExcluded = 0;
+    let providerValidationFailed = 0;
+    let providerValidationNeeded = 0;
+    let retryFailedValidations = 0;
+    let supportedCatalogIdentityRepairNeeded = 0;
+    let supportedBusinessMetadataRepairNeeded = 0;
+    let supportedPriceBackfillNeeded = 0;
+    let unsupportedExcluded = 0;
+    let catalogIdentityRepairNeeded = 0;
+    let priceBackfillNeeded = 0;
+    let businessMetadataRepairNeeded = 0;
+    let businessMetadataAutoRepairable = 0;
+    let businessMetadataManualRequired = 0;
+    let businessMetadataRetryBlocked = 0;
+    let businessMetadataRetryEligible = 0;
+    let businessMetadataRecentlyAttempted = 0;
+    let metadataEnrichmentNeeded = 0;
+    let manualMetadataRequired = 0;
+    let manualBusinessMetadataRequired = 0;
+    let missingIsin = 0;
+    let missingListingDate = 0;
+    let missingSector = 0;
+    let missingIndustry = 0;
+    let missingMarketCap = 0;
+    let manualSectorIndustryRequired = 0;
+    let activeInstruments = 0;
+    let reviewReadyActual = 0;
+    let latestStoredEodDate: string | null = null;
+    const expectedLatestTradingDate = latestCompletedTradingDateForRegion(scope.region);
+
+    for (const stock of stocks) {
+      if (stock.isActive === false || stock.isDelisted === true) continue;
+      activeInstruments += 1;
+      const providerStatus = normalizeProviderStatus(stock.providerSupportStatus);
+      const readiness = readinessBySymbol.get(stock.symbol);
+      if (readiness?.isReviewReady) reviewReadyActual += 1;
+      if (readiness?.latestPriceDate && (!latestStoredEodDate || readiness.latestPriceDate > latestStoredEodDate)) latestStoredEodDate = readiness.latestPriceDate;
+      const isProviderSupported = providerStatus === 'SUPPORTED';
+      if (providerStatus === 'UNKNOWN') providerUnknownValidationNeeded += 1;
+      if (providerStatus === 'VALIDATION_FAILED') {
+        providerRetryValidationNeeded += 1;
+        providerValidationFailed += 1;
+      }
+      if (providerStatus === 'UNSUPPORTED') {
+        providerUnsupportedExcluded += 1;
+        unsupportedExcluded += 1;
+      }
+      if (this.needsCatalogIdentityRepair(stock)) catalogIdentityRepairNeeded += 1;
+      if (isProviderSupported && this.needsCatalogIdentityRepair(stock)) supportedCatalogIdentityRepairNeeded += 1;
+      if (isProviderSupported && readiness?.priceReadiness !== 'READY') {
+        priceBackfillNeeded += 1;
+        supportedPriceBackfillNeeded += 1;
+      }
+      if (this.needsBusinessMetadataRepair(stock)) businessMetadataRepairNeeded += 1;
+      if (isProviderSupported && this.needsBusinessMetadataRepair(stock)) supportedBusinessMetadataRepairNeeded += 1;
+      if (isProviderSupported && this.needsBusinessMetadataRepair(stock)) manualBusinessMetadataRequired += 1;
+      if (this.needsMetadataEnrichment(stock)) metadataEnrichmentNeeded += 1;
+      if (this.isBlank(stock.isin)) missingIsin += 1;
+      if (!stock.ipoDate) missingListingDate += 1;
+      if (!this.hasValidMetadataValue(stock.sector)) missingSector += 1;
+      if (!this.hasValidMetadataValue(stock.industry)) missingIndustry += 1;
+      if (!this.hasValidMarketCap(stock.marketCap)) missingMarketCap += 1;
+      if (!this.hasValidMetadataValue(stock.sector) || !this.hasValidMetadataValue(stock.industry)) manualSectorIndustryRequired += 1;
+      if (this.needsMetadataEnrichment(stock)) manualMetadataRequired += 1;
+    }
+    providerValidationNeeded = providerUnknownValidationNeeded;
+    retryFailedValidations = providerRetryValidationNeeded;
+
+    const repositoryAny = this.repository as any;
+    let businessMetadataQueueRepairable = 0;
+    if (typeof repositoryAny.countStocksForBusinessMetadataRepair === 'function') {
+      businessMetadataQueueRepairable = await repositoryAny.countStocksForBusinessMetadataRepair({
+        ...scope,
+        includeManualRequired: false,
+        includeRetryable: false,
+      });
+      businessMetadataAutoRepairable = businessMetadataQueueRepairable;
+    } else {
+      businessMetadataAutoRepairable = businessMetadataRepairNeeded;
+      businessMetadataQueueRepairable = businessMetadataAutoRepairable;
+    }
+    if (typeof repositoryAny.countBusinessMetadataRepairStates === 'function') {
+      businessMetadataManualRequired = await repositoryAny.countBusinessMetadataRepairStates({
+        ...scope,
+        statuses: ['MANUAL_REQUIRED'],
+      });
+      businessMetadataRetryBlocked = await repositoryAny.countBusinessMetadataRepairStates({
+        ...scope,
+        statuses: ['FAILED_RETRYABLE'],
+        retryTiming: 'blocked',
+      });
+      businessMetadataRetryEligible = await repositoryAny.countBusinessMetadataRepairStates({
+        ...scope,
+        statuses: ['FAILED_RETRYABLE'],
+        retryTiming: 'eligible',
+      });
+      const retryCooldown = await repositoryAny.countBusinessMetadataRepairStates({
+        ...scope,
+        statuses: ['RETRY_COOLDOWN'],
+      });
+      businessMetadataRecentlyAttempted = businessMetadataManualRequired + businessMetadataRetryBlocked + retryCooldown;
+      businessMetadataAutoRepairable = Math.max(businessMetadataQueueRepairable - businessMetadataRetryEligible, 0);
+    } else {
+      businessMetadataRecentlyAttempted = Math.max(businessMetadataRepairNeeded - businessMetadataAutoRepairable, 0);
+      businessMetadataManualRequired = businessMetadataRecentlyAttempted;
+    }
+
+    const warnings: string[] = [];
+    if (providerValidationNeeded > 0) warnings.push(`${providerValidationNeeded} UNKNOWN instruments need provider validation before review workflows can trust them.`);
+    if (retryFailedValidations > 0) warnings.push(`${retryFailedValidations} failed provider validations need explicit retry or provider diagnosis.`);
+    if (supportedCatalogIdentityRepairNeeded > 0) warnings.push(`${supportedCatalogIdentityRepairNeeded} provider-supported instruments need catalog identity repair for ISIN, listing date, exchange, or provider symbol.`);
+    if (supportedPriceBackfillNeeded > 0) warnings.push(`${supportedPriceBackfillNeeded} provider-supported instruments need price backfill or latest EOD repair.`);
+    if (businessMetadataAutoRepairable > 0) warnings.push(`${businessMetadataAutoRepairable} instruments are auto-repairable through provider business metadata repair.`);
+    if (businessMetadataManualRequired > 0) warnings.push(`${businessMetadataManualRequired} instruments are marked manual-required after provider business metadata attempts.`);
+    if (businessMetadataRetryBlocked > 0) warnings.push(`${businessMetadataRetryBlocked} provider business metadata repairs are retry-blocked until their next retry time.`);
+    if (businessMetadataRetryEligible > 0) warnings.push(`${businessMetadataRetryEligible} provider business metadata repairs are retry-eligible.`);
+    if (manualBusinessMetadataRequired > 0) warnings.push(`${manualBusinessMetadataRequired} instruments may require manual business metadata for sector, industry, or market cap if provider enrichment cannot fill them.`);
+
+    const topActions: MarketDataRepairPlan['topActions'] = [
+      { action: 'VALIDATE_PROVIDERS' as const, label: 'Validate unknown providers', count: providerValidationNeeded },
+      { action: 'RETRY_FAILED_PROVIDERS' as const, label: 'Retry failed providers', count: retryFailedValidations },
+      { action: 'CATALOG_IDENTITY_REPAIR' as const, label: 'Repair catalog identity', count: supportedCatalogIdentityRepairNeeded },
+      { action: 'PROVIDER_BUSINESS_METADATA_REPAIR' as const, label: 'Enrich provider business metadata', count: businessMetadataAutoRepairable + businessMetadataRetryEligible },
+      { action: 'BACKFILL_PRICES' as const, label: 'Backfill prices', count: supportedPriceBackfillNeeded },
+      { action: 'MANUAL_METADATA_IMPORT' as const, label: 'Import manual metadata', count: manualBusinessMetadataRequired },
+    ].filter((item) => item.count > 0);
+
+    const planWithoutSignoff = {
+      scope,
+      generatedAt: new Date().toISOString(),
+      totalCatalogInstruments: stocks.length,
+      providerUnknownValidationNeeded,
+      providerRetryValidationNeeded,
+      providerUnsupportedExcluded,
+      providerValidationFailed,
+      providerValidationNeeded,
+      retryFailedValidations,
+      supportedCatalogIdentityRepairNeeded,
+      supportedBusinessMetadataRepairNeeded,
+      supportedPriceBackfillNeeded,
+      unsupportedExcluded,
+      catalogIdentityRepairNeeded,
+      priceBackfillNeeded,
+      businessMetadataRepairNeeded,
+      businessMetadataAutoRepairable,
+      businessMetadataManualRequired,
+      businessMetadataRetryBlocked,
+      businessMetadataRetryEligible,
+      businessMetadataRecentlyAttempted,
+      metadataEnrichmentNeeded,
+      manualMetadataRequired,
+      manualBusinessMetadataRequired,
+      missingIsin,
+      missingListingDate,
+      missingSector,
+      missingIndustry,
+      missingMarketCap,
+      manualSectorIndustryRequired,
+      topActions,
+      warnings,
+    } as Omit<MarketDataRepairPlan, 'universeSignoff'>;
+    return {
+      ...planWithoutSignoff,
+      universeSignoff: this.universeSignoffFromRepairPlan(planWithoutSignoff, {
+        activeInstruments,
+        reviewReadyActual,
+        latestStoredEodDate,
+        expectedLatestTradingDate,
+      }),
+    };
+  }
+
+  async manualMetadataTemplate(options: Pick<PaginationOptions, 'region' | 'assetType'> = {}): Promise<MarketDataManualMetadataTemplate> {
+    const scope = {
+      region: options.region?.trim().toUpperCase() || 'IN',
+      assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
+    };
+    const stocks = (await this.repository.listStocksForUniverseHealth(scope))
+      .filter((stock) => stock.isActive !== false && stock.isDelisted !== true)
+      .filter((stock) => normalizeProviderStatus(stock.providerSupportStatus) === 'SUPPORTED')
+      .filter((stock) => this.needsBusinessMetadataRepair(stock));
+    const rows = stocks.map((stock) => {
+      const requiredFields = this.missingBusinessMetadataFields(stock);
+      return {
+        symbol: stock.symbol,
+        providerSymbol: stock.providerSymbol || null,
+        companyName: stock.name || null,
+        exchange: stock.exchange || null,
+        currentSector: stock.sector || null,
+        currentIndustry: stock.industry || null,
+        currentMarketCap: this.hasValidMarketCap(stock.marketCap) ? Number(stock.marketCap) : null,
+        requiredFields,
+        suggestedSource: 'Manual curated exchange/company reference',
+        notes: `Fill required business metadata: ${requiredFields.join(', ')}.`,
+      };
+    });
+    const header = [
+      'symbol',
+      'providerSymbol',
+      'companyName',
+      'exchange',
+      'currentSector',
+      'currentIndustry',
+      'currentMarketCap',
+      'sector',
+      'industry',
+      'marketCap',
+      'requiredFields',
+      'suggestedSource',
+      'notes',
+    ];
+    const csvRows = rows.map((row) => [
+      row.symbol,
+      row.providerSymbol || '',
+      row.companyName || '',
+      row.exchange || '',
+      row.currentSector || '',
+      row.currentIndustry || '',
+      row.currentMarketCap ?? '',
+      '',
+      '',
+      '',
+      row.requiredFields.join('|'),
+      row.suggestedSource,
+      row.notes,
+    ].map((value) => this.csvEscape(value)).join(','));
+    return {
+      scope,
+      generatedAt: new Date().toISOString(),
+      count: rows.length,
+      rows,
+      csvText: [header.join(','), ...csvRows].join('\n'),
+    };
+  }
+
+  async repairRun(request: MarketDataRepairRunRequest = {}): Promise<MarketDataRepairRunResponse> {
+    const startedAt = new Date();
+    const scope = this.repairScope(request);
+    const batchSize = Math.min(Math.max(Number(request.batchSize ?? request.limit) || 50, 1), 100);
+    const maxBatchesPerAction = Math.min(Math.max(Number(request.maxBatchesPerAction) || 20, 1), 100);
+    const drainMode = request.mode === 'DRAIN_UNTIL_BLOCKED';
+    const actions = this.normalizeRepairRunActions(request.actions, request.mode, request.csvText);
+    const beforeHealth = await this.universeHealth(scope);
+    const beforeRepairPlan = await this.repairPlan(scope);
+    const dryRun = Boolean(request.dryRun);
+    const plannedActions = actions.map((action) => this.createRepairRunActionResult(
+      action,
+      beforeRepairPlan,
+      batchSize,
+      maxBatchesPerAction,
+      dryRun
+    ));
+
+    if (dryRun) {
+      const summary = this.repairRunTotals(plannedActions, actions);
+      const warnings = this.repairRunWarnings(beforeHealth, beforeRepairPlan, plannedActions, true);
+      const expectedNextAction = this.expectedNextRepairRunAction(beforeRepairPlan, actions);
+      return {
+        id: null,
+        dryRun: true,
+        scope,
+        status: 'COMPLETED',
+        startedAt: startedAt.toISOString(),
+        completedAt: new Date().toISOString(),
+        beforeHealth,
+        afterHealth: beforeHealth,
+        beforeRepairPlan,
+        afterRepairPlan: beforeRepairPlan,
+        actions: plannedActions,
+        summary,
+        warnings,
+        anotherRunNeeded: plannedActions.some((action) => action.estimatedTotal > 0),
+        hardBlockersRemaining: this.hardBlockersFromHealth(beforeHealth),
+        expectedNextAction,
+        afterTrustStatus: beforeHealth.trustStatus,
+        universeSignoff: beforeHealth.universeSignoff,
+        error: null,
+      };
+    }
+
+    const repositoryAny = this.repository as any;
+    const sourceFingerprints = await this.repairRunSourceFingerprints(request, scope, actions);
+    const startState = await this.repairRunStartOffsets(scope, actions, sourceFingerprints);
+    const sourceFingerprintMetadata = this.repairRunSourceFingerprintMetadata(sourceFingerprints);
+    const runRecord = typeof repositoryAny.createRepairRun === 'function'
+      ? await repositoryAny.createRepairRun({
+        region: scope.region,
+        assetType: scope.assetType,
+        status: 'RUNNING' as MarketDataRepairRunStatus,
+        beforeHealthJson: this.jsonSnapshot(beforeHealth),
+        beforeRepairPlanJson: this.jsonSnapshot(beforeRepairPlan),
+        actionsJson: this.jsonSnapshot({ actions, batchSize, maxBatchesPerAction, sourceFingerprints: sourceFingerprintMetadata }),
+        warningsJson: [],
+      })
+      : null;
+
+    const results: MarketDataRepairRunActionResult[] = [];
+    const warnings: string[] = [];
+    let error: string | null = null;
+    let blockedStatus: MarketDataRepairRunStatus | null = null;
+    let actionPlan = beforeRepairPlan;
+
+    for (const action of actions) {
+      const result = this.createRepairRunActionResult(action, actionPlan, batchSize, maxBatchesPerAction, false);
+      const sourceFingerprint = sourceFingerprints[action];
+      if (sourceFingerprint?.fingerprint) {
+        result.sourceFingerprint = sourceFingerprint.fingerprint;
+        result.sourceIdentity = sourceFingerprint.identity;
+      }
+      result.resumeOffset = startState.offsets[action] || 0;
+      result.warnings.push(...(startState.warningsByAction[action] || []));
+      result.warnings.push(...(sourceFingerprint?.warnings || []));
+      results.push(result);
+      if (drainMode && action === 'RETRY_FAILED_PROVIDERS' && (actionPlan.providerValidationNeeded ?? actionPlan.providerUnknownValidationNeeded ?? 0) > 0) {
+        const message = 'Unknown provider validations remain; retry-failed providers are deferred until the UNKNOWN queue is drained.';
+        result.hasMore = true;
+        result.anotherRunNeeded = true;
+        result.warnings.push(message);
+        warnings.push(message);
+        break;
+      }
+      try {
+        const beforeActionCount = this.repairRunActionCount(action, actionPlan);
+        await this.executeRepairRunAction(action, request, scope, batchSize, maxBatchesPerAction, result, result.resumeOffset || 0, sourceFingerprint);
+        if (drainMode && beforeActionCount <= 0) {
+          continue;
+        }
+        if (drainMode) {
+          const afterActionPlan = await this.repairPlan(scope);
+          const afterActionCount = this.repairRunActionCount(action, afterActionPlan);
+          if (beforeActionCount > 0 && afterActionCount >= beforeActionCount && result.batchesExecuted > 0) {
+            blockedStatus = 'PARTIAL_BLOCKED';
+            const message = action === 'RETRY_FAILED_PROVIDERS'
+              ? 'Retry failed provider validations did not reduce; manual/provider diagnosis required.'
+              : `${result.label} did not reduce its queue; stopping drain before downstream actions.`;
+            result.warnings.push(message);
+            warnings.push(message);
+            actionPlan = afterActionPlan;
+            break;
+          }
+          actionPlan = afterActionPlan;
+          if (result.hasMore || result.anotherRunNeeded) {
+            warnings.push(`${result.label} still has more rows; another bounded drain run is needed before downstream actions.`);
+            break;
+          }
+        }
+      } catch (err) {
+        error = err instanceof Error ? err.message : `${action} failed`;
+        result.error = error;
+        result.warnings.push(error);
+        warnings.push(`${this.repairRunActionLabel(action)} failed: ${error}`);
+        break;
+      }
+      warnings.push(...result.warnings);
+    }
+
+    const afterHealth = await this.universeHealth(scope);
+    const afterRepairPlan = await this.repairPlan(scope);
+    const completedAt = new Date();
+    const summary = this.repairRunTotals(results, actions);
+    const manualOnlyRemaining = drainMode && !request.csvText?.trim() && this.onlyManualMetadataRemains(afterRepairPlan);
+    const expectedNextAction = this.expectedNextRepairRunAction(afterRepairPlan, actions)
+      || afterRepairPlan.universeSignoff.nextAction
+      || (manualOnlyRemaining && afterRepairPlan.universeSignoff.nextAction === 'MANUAL_METADATA_IMPORT'
+        ? 'MANUAL_METADATA_IMPORT'
+        : null);
+    const hardBlockersRemaining = this.hardBlockersFromHealth(afterHealth);
+    if (!blockedStatus && manualOnlyRemaining) {
+      blockedStatus = 'PARTIAL_MANUAL_REQUIRED';
+    }
+    const anotherRunNeeded = error
+      ? true
+      : Boolean(blockedStatus)
+        || results.some((action) => action.anotherRunNeeded || action.hasMore)
+        || expectedNextAction !== null;
+    const status: MarketDataRepairRunStatus = error
+      ? 'PARTIAL'
+      : blockedStatus
+        ? blockedStatus
+      : anotherRunNeeded
+        ? 'PARTIAL'
+        : 'COMPLETED';
+    const runWarnings = [
+      ...this.repairRunWarnings(afterHealth, afterRepairPlan, results, false),
+      ...warnings,
+    ].slice(0, 50);
+
+    if (runRecord?.id && typeof repositoryAny.updateRepairRun === 'function') {
+      await repositoryAny.updateRepairRun(runRecord.id, {
+        status,
+        completedAt,
+        afterHealthJson: this.jsonSnapshot(afterHealth),
+        afterRepairPlanJson: this.jsonSnapshot(afterRepairPlan),
+        summaryJson: this.jsonSnapshot({
+          actions: results,
+          summary,
+          anotherRunNeeded,
+          expectedNextAction,
+          hardBlockersRemaining,
+          afterTrustStatus: afterHealth.trustStatus,
+          universeSignoff: afterHealth.universeSignoff,
+        }),
+        warningsJson: this.jsonSnapshot(runWarnings),
+        error,
+      });
+    }
+
+    return {
+      id: runRecord?.id ?? null,
+      dryRun: false,
+      scope,
+      status,
+      startedAt: startedAt.toISOString(),
+      completedAt: completedAt.toISOString(),
+      beforeHealth,
+      afterHealth,
+      beforeRepairPlan,
+      afterRepairPlan,
+      actions: results,
+      summary,
+      warnings: runWarnings,
+      anotherRunNeeded,
+      hardBlockersRemaining,
+      expectedNextAction,
+      afterTrustStatus: afterHealth.trustStatus,
+      universeSignoff: afterHealth.universeSignoff,
+      error,
+    };
+  }
+
+  async latestRepairRun(options: Pick<PaginationOptions, 'region' | 'assetType'> = {}): Promise<MarketDataRepairRunRecord | null> {
+    const scope = this.repairScope(options);
+    const repositoryAny = this.repository as any;
+    if (typeof repositoryAny.latestRepairRun !== 'function') return null;
+    const row = await repositoryAny.latestRepairRun(scope);
+    if (!row) return null;
+    const summaryJson = row.summaryJson || {};
+    return {
+      id: row.id,
+      scope: {
+        region: row.region,
+        assetType: row.assetType || scope.assetType,
+      },
+      status: row.status as MarketDataRepairRunStatus,
+      startedAt: row.startedAt instanceof Date ? row.startedAt.toISOString() : String(row.startedAt),
+      completedAt: row.completedAt ? (row.completedAt instanceof Date ? row.completedAt.toISOString() : String(row.completedAt)) : null,
+      beforeHealth: row.beforeHealthJson || null,
+      afterHealth: row.afterHealthJson || null,
+      beforeRepairPlan: row.beforeRepairPlanJson || null,
+      afterRepairPlan: row.afterRepairPlanJson || null,
+      actions: Array.isArray(summaryJson.actions) ? summaryJson.actions : [],
+      summary: summaryJson.summary || null,
+      warnings: Array.isArray(row.warningsJson) ? row.warningsJson : [],
+      anotherRunNeeded: Boolean(summaryJson.anotherRunNeeded),
+      hardBlockersRemaining: Array.isArray(summaryJson.hardBlockersRemaining) ? summaryJson.hardBlockersRemaining : [],
+      expectedNextAction: summaryJson.expectedNextAction || null,
+      afterTrustStatus: summaryJson.afterTrustStatus || row.afterHealthJson?.trustStatus || null,
+      universeSignoff: summaryJson.universeSignoff || row.afterHealthJson?.universeSignoff || null,
+      error: row.error || null,
+    };
+  }
+
+  async validateProviders(request: MarketDataRepairRequest = {}): Promise<MarketDataRepairSummary> {
+    const started = Date.now();
+    const scope = this.repairScope(request);
+    const batch = this.mutatingRepairBatch(request);
+    const providerValidationQueue = request.providerValidationQueue === 'RETRY_FAILED' ? 'RETRY_FAILED' : 'UNKNOWN_FIRST';
+    const { stocks, total } = await this.repository.listStocksForProviderValidation({
+      ...scope,
+      ...batch,
+      providerValidationQueue,
+    });
+    const summary = this.emptyRepairSummary(scope, batch, total, true);
+    summary.providerValidationQueue = providerValidationQueue;
+
+    for (const stock of stocks) {
+      summary.processedCount += 1;
+      const providerSymbol = stock.providerSymbol || this.normalizeCatalogSymbol({
+        symbol: stock.symbol,
+        sourceSymbol: stock.sourceSymbol,
+        providerSymbol: stock.providerSymbol,
+        displaySymbol: stock.displaySymbol,
+        exchange: stock.exchange,
+      }).providerSymbol;
+      if (!providerSymbol) {
+        await this.repository.updateProviderSupportStatus(stock.symbol, 'UNSUPPORTED', 'Provider symbol could not be mapped.');
+        summary.updated += 1;
+        summary.providerUnsupported = (summary.providerUnsupported || 0) + 1;
+        continue;
+      }
+
+      try {
+        const validation = await this.marketDataProvider.validateProviderSymbol(providerSymbol);
+        summary.providerValidated = (summary.providerValidated || 0) + 1;
+        const status = validation.supported ? 'SUPPORTED' : validation.failed ? 'VALIDATION_FAILED' : 'UNSUPPORTED';
+        await this.repository.updateProviderSupportStatus(stock.symbol, status, validation.message);
+        summary.updated += 1;
+        if (status === 'SUPPORTED') summary.providerSupported = (summary.providerSupported || 0) + 1;
+        if (status === 'UNSUPPORTED') summary.providerUnsupported = (summary.providerUnsupported || 0) + 1;
+        if (status === 'VALIDATION_FAILED') {
+          summary.validationFailed = (summary.validationFailed || 0) + 1;
+          summary.failed += 1;
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Provider validation failed.';
+        await this.repository.updateProviderSupportStatus(stock.symbol, 'VALIDATION_FAILED', message);
+        summary.failed += 1;
+        summary.validationFailed = (summary.validationFailed || 0) + 1;
+        summary.warnings.push(`${stock.symbol}: ${message}`);
+      }
+    }
+
+    this.finishRepairSummary(summary, started);
+    return summary;
+  }
+
+  async repairCatalogIdentity(request: MarketDataRepairRequest = {}): Promise<MarketDataRepairSummary> {
+    const scope = this.repairScope(request);
+    const catalogSource = this.normalizeCatalogSource(request.catalogSource || this.defaultCatalogIdentitySource(scope));
+    const catalog = await this.loadCatalogIdentityRows(catalogSource, request.csvText, request.importMode);
+    return this.repairCatalogIdentityFromRows(request, {
+      catalogSource,
+      ...catalog,
+    });
+  }
+
+  private async repairCatalogIdentityFromRows(
+    request: MarketDataRepairRequest,
+    catalog: CatalogIdentityRowsSnapshot
+  ): Promise<MarketDataRepairSummary> {
+    const started = Date.now();
+    const scope = this.repairScope(request);
+    const batch = this.stableSourceRepairBatch(request);
+    const sourceRows = catalog.rows;
+    const page = sourceRows.slice(batch.offset, batch.offset + batch.batchSize);
+    const scopedStocks = (await this.repository.listStocksForUniverseHealth(scope))
+      .filter((stock) => stock.isActive !== false && stock.isDelisted !== true);
+    const stocksByKey = this.stocksByIdentityKey(scopedStocks);
+    const summary = this.emptyRepairSummary(scope, batch, sourceRows.length, false);
+    summary.catalogSource = catalog.catalogSource;
+    summary.catalogRowsRead = sourceRows.length;
+    summary.downloaded = catalog.downloaded;
+    summary.sourceFingerprint = catalog.sourceFingerprint;
+    summary.sourceIdentity = catalog.sourceIdentity;
+    summary.fieldsFilled = {};
+    summary.fieldProvenance = [];
+    summary.warnings.push(...catalog.warnings);
+
+    for (const row of page) {
+      summary.processedCount += 1;
+      const stock = this.findStockForCatalogIdentityRow(row, stocksByKey);
+      if (!stock) {
+        summary.skipped += 1;
+        summary.noOp = (summary.noOp || 0) + 1;
+        summary.unmatchedCatalogRows = (summary.unmatchedCatalogRows || 0) + 1;
+        continue;
+      }
+      summary.matchedExistingRows = (summary.matchedExistingRows || 0) + 1;
+
+      const filledFields = this.repairedCatalogIdentityFields(stock, row);
+      if (filledFields.length === 0) {
+        summary.skipped += 1;
+        summary.noOp = (summary.noOp || 0) + 1;
+        if (this.needsCatalogIdentityRepair(stock)) summary.manualRequired = (summary.manualRequired || 0) + 1;
+        continue;
+      }
+
+      const result = await this.repository.repairCatalogIdentityForStock(stock.id, row, { force: Boolean(request.force) });
+      if (result.action === 'updated') {
+        summary.updated += 1;
+        summary.catalogIdentityRepaired = (summary.catalogIdentityRepaired || 0) + 1;
+        for (const field of filledFields) {
+          summary.fieldsFilled[field] = (summary.fieldsFilled[field] || 0) + 1;
+        }
+        summary.fieldProvenance.push({
+          instrumentId: stock.id,
+          symbol: stock.symbol,
+          isinSource: row.isin ? catalog.catalogSource : stock.isin ? 'existing_db' : null,
+          listingDateSource: row.ipoDate ? catalog.catalogSource : stock.ipoDate ? 'existing_db' : null,
+          metadataUpdatedAt: new Date().toISOString(),
+        });
+      } else {
+        summary.skipped += 1;
+        summary.noOp = (summary.noOp || 0) + 1;
+      }
+    }
+
+    this.finishRepairSummary(summary, started);
+    return summary;
+  }
+
+  async repairProviderBusinessMetadata(request: MarketDataRepairRequest = {}): Promise<MarketDataRepairSummary> {
+    const started = Date.now();
+    const scope = this.repairScope(request);
+    const batch = this.mutatingRepairBatch(request);
+    const repositoryAny = this.repository as any;
+    const { stocks, total } = await repositoryAny.listStocksForBusinessMetadataRepair({
+      ...scope,
+      ...batch,
+      includeManualRequired: Boolean(request.force),
+      includeRetryable: Boolean(request.force),
+    });
+    const summary = this.emptyRepairSummary(scope, batch, total, true);
+    summary.fieldsFilled = {};
+    summary.fieldProvenance = [];
+    if (!request.force && typeof repositoryAny.countBusinessMetadataRepairStates === 'function') {
+      const [manualRequired, retryCooldown, retryBlocked] = await Promise.all([
+        repositoryAny.countBusinessMetadataRepairStates({ ...scope, statuses: ['MANUAL_REQUIRED'] }),
+        repositoryAny.countBusinessMetadataRepairStates({ ...scope, statuses: ['RETRY_COOLDOWN'] }),
+        repositoryAny.countBusinessMetadataRepairStates({ ...scope, statuses: ['FAILED_RETRYABLE'], retryTiming: 'blocked' }),
+      ]);
+      summary.skippedRecentAttempt = manualRequired + retryCooldown + retryBlocked;
+    } else {
+      summary.skippedRecentAttempt = 0;
+    }
+    summary.remainingManualRequired = summary.skippedRecentAttempt;
+
+    for (const stock of stocks) {
+      summary.processedCount += 1;
+      const providerSymbol = stock.providerSymbol || stock.symbol;
+      try {
+        const missingBefore = this.missingBusinessMetadataFields(stock);
+        const providerData = await this.marketDataProvider.fetchCompanyMasterData(providerSymbol);
+        if (!this.providerBusinessMetadataHasUsefulFields(providerData)) {
+          summary.providerNotFound = (summary.providerNotFound || 0) + 1;
+          summary.noOp = (summary.noOp || 0) + 1;
+          summary.skipped += 1;
+          summary.manualRequired = (summary.manualRequired || 0) + 1;
+          summary.warnings.push(`${stock.symbol}: provider returned no usable business metadata; manual metadata is required for ${missingBefore.join(', ')}.`);
+          await this.recordProviderBusinessRepairAttempt(stock, scope, 'NO_PROVIDER_DATA', {}, 'Provider returned no usable sector, industry, or market cap.', 'Provider business metadata was unavailable.');
+          continue;
+        }
+
+        const update = this.providerBusinessMetadataUpdate(stock, providerData);
+        const filledFields = this.repairedMetadataFields(stock, update, missingBefore)
+          .filter((field) => ['sector', 'industry', 'marketCap'].includes(field));
+        if (filledFields.length === 0) {
+          summary.noOp = (summary.noOp || 0) + 1;
+          summary.skipped += 1;
+          summary.manualRequired = (summary.manualRequired || 0) + 1;
+          summary.warnings.push(`${stock.symbol}: provider metadata did not fill any missing business fields; manual metadata is required for ${missingBefore.join(', ')}.`);
+          await this.recordProviderBusinessRepairAttempt(stock, scope, 'NO_FIELDS_FILLED', {}, 'Provider data did not improve missing business metadata.', 'Provider business metadata did not fill required fields.');
+          continue;
+        }
+
+        await this.repository.updateCompanyMasterData(stock.id, update);
+        const stockAfterRepair = { ...stock, ...update };
+        const repairState = this.providerBusinessStateAfterRepair(stockAfterRepair, filledFields);
+        summary.updated += 1;
+        summary.providerBusinessMetadataRepaired = (summary.providerBusinessMetadataRepaired || 0) + 1;
+        summary.metadataEnriched = (summary.metadataEnriched || 0) + 1;
+        if (repairState.attemptStatus === 'PARTIAL_SUCCESS') {
+          summary.partialSuccess = (summary.partialSuccess || 0) + 1;
+          summary.manualRequired = (summary.manualRequired || 0) + 1;
+          summary.warnings.push(`${stock.symbol}: partial metadata repair filled ${filledFields.join(', ')} but still requires ${repairState.remainingFields.join(', ')}.`);
+        }
+        const fieldsFilled: Record<string, number> = {};
+        for (const field of filledFields) {
+          summary.fieldsFilled[field] = (summary.fieldsFilled[field] || 0) + 1;
+          fieldsFilled[field] = 1;
+        }
+        summary.fieldProvenance.push({
+          instrumentId: stock.id,
+          symbol: stock.symbol,
+          sectorSource: filledFields.includes('sector') ? 'yahoo' : stock.sector ? 'existing_db' : null,
+          industrySource: filledFields.includes('industry') ? 'yahoo' : stock.industry ? 'existing_db' : null,
+          marketCapSource: filledFields.includes('marketCap') ? 'yahoo' : stock.marketCap ? 'existing_db' : null,
+          metadataUpdatedAt: new Date().toISOString(),
+        });
+        await this.recordProviderBusinessRepairAttempt(
+          stock,
+          scope,
+          repairState.attemptStatus,
+          fieldsFilled,
+          undefined,
+          repairState.manualRequiredReason,
+          repairState.stateStatus
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'provider business metadata repair failed';
+        summary.failed += 1;
+        summary.warnings.push(`${stock.symbol}: ${message}`);
+        await this.recordProviderBusinessRepairAttempt(stock, scope, 'FAILED', {}, message);
+      }
+    }
+
+    if (typeof repositoryAny.countStocksForBusinessMetadataRepair === 'function') {
+      summary.remainingAutoRepairable = await repositoryAny.countStocksForBusinessMetadataRepair({
+        ...scope,
+        includeManualRequired: Boolean(request.force),
+        includeRetryable: Boolean(request.force),
+      });
+    } else {
+      summary.remainingAutoRepairable = Math.max(total - summary.processedCount, 0);
+    }
+    if (typeof repositoryAny.countBusinessMetadataRepairStates === 'function') {
+      summary.remainingManualRequired = await repositoryAny.countBusinessMetadataRepairStates({
+        ...scope,
+        statuses: ['MANUAL_REQUIRED'],
+      });
+    } else {
+      summary.remainingManualRequired = (summary.skippedRecentAttempt || 0) + (summary.manualRequired || 0);
+    }
+
+    this.finishRepairSummary(summary, started);
+    return summary;
+  }
+
+  async enrichMetadata(request: MarketDataRepairRequest = {}): Promise<MarketDataRepairSummary> {
+    const started = Date.now();
+    const scope = this.repairScope(request);
+    const batch = this.mutatingRepairBatch(request);
+    const catalogOverrides = this.metadataOverridesFromCsv(request.csvText || '', request.catalogSource || 'NSE_EQUITY_SECURITIES');
+    const { stocks, total } = await this.repository.listStocksForMetadataEnrichment({
+      ...scope,
+      ...batch,
+    });
+    const summary = this.emptyRepairSummary(scope, batch, total, true);
+    summary.fieldProvenance = [];
+    summary.fieldsFilled = {};
+
+    for (const stock of stocks) {
+      summary.processedCount += 1;
+      try {
+        const missingBefore = this.missingRepairFields(stock);
+        const providerSymbol = stock.providerSymbol || stock.symbol;
+        const providerData = await this.marketDataProvider.fetchCompanyMasterData(providerSymbol).catch(() => null);
+        const providerUseful = this.providerMetadataHasUsefulFields(providerData);
+        const providerUpdate = providerUseful ? providerData : null;
+        if (!providerUseful) summary.providerNotFound = (summary.providerNotFound || 0) + 1;
+        const override = catalogOverrides.get(String(stock.sourceSymbol || stock.displaySymbol || stock.symbol).replace(/\.(NS|BO)$/i, '').toUpperCase())
+          || catalogOverrides.get(String(stock.symbol || '').replace(/\.(NS|BO)$/i, '').toUpperCase())
+          || catalogOverrides.get(String(stock.providerSymbol || '').replace(/\.(NS|BO)$/i, '').toUpperCase());
+        const update: Partial<CreateStockRequest> = {
+          name: providerUpdate?.companyName || stock.name,
+          region: stock.region || (providerUpdate?.country === 'India' ? 'IN' : undefined),
+          exchange: providerUpdate?.exchange || stock.exchange || undefined,
+          country: providerUpdate?.country || stock.country || this.defaultCountryForInstrument(stock.symbol, stock.exchange, stock.region) || undefined,
+          sector: providerUpdate?.sector || stock.sector || undefined,
+          industry: providerUpdate?.industry || stock.industry || undefined,
+          currency: providerUpdate?.currency || stock.currency || this.defaultCurrencyForInstrument(stock.symbol, stock.exchange, stock.region),
+          marketCap: providerUpdate?.marketCap ?? (stock.marketCap !== null && stock.marketCap !== undefined ? Number(stock.marketCap) : undefined),
+          assetType: providerUpdate?.assetType || stock.assetType || undefined,
+          isDelisted: providerUpdate?.isDelisted ?? stock.isDelisted,
+          ipoDate: override?.ipoDate || stock.ipoDate || undefined,
+          isin: override?.isin || stock.isin || undefined,
+          source: providerUseful ? 'yahoo' : stock.source,
+        };
+        const filledFields = this.repairedMetadataFields(stock, update, missingBefore);
+        const missingAfter = this.missingRepairFields({ ...stock, ...update });
+
+        if (missingAfter.length > 0) {
+          summary.manualRequired = (summary.manualRequired || 0) + 1;
+        }
+
+        if (filledFields.length === 0) {
+          summary.noOp = (summary.noOp || 0) + 1;
+          summary.skipped += 1;
+          summary.warnings.push(`${stock.symbol}: no missing metadata fields were repaired; manual metadata remains required for ${missingAfter.join(', ') || 'none'}.`);
+          continue;
+        }
+
+        await this.repository.updateCompanyMasterData(stock.id, update);
+        summary.updated += 1;
+        summary.metadataEnriched = (summary.metadataEnriched || 0) + 1;
+        for (const field of filledFields) {
+          summary.fieldsFilled[field] = (summary.fieldsFilled[field] || 0) + 1;
+        }
+        if (filledFields.some((field) => ['isin', 'ipoDate', 'exchange', 'providerSymbol', 'sourceSymbol'].includes(field))) {
+          summary.catalogIdentityRepaired = (summary.catalogIdentityRepaired || 0) + 1;
+        }
+        if (filledFields.some((field) => ['sector', 'industry', 'marketCap', 'country', 'currency'].includes(field))) {
+          summary.providerBusinessMetadataRepaired = (summary.providerBusinessMetadataRepaired || 0) + 1;
+        }
+        summary.fieldProvenance.push({
+          instrumentId: stock.id,
+          symbol: stock.symbol,
+          sectorSource: providerUpdate?.sector ? 'yahoo' : stock.sector ? 'existing_db' : null,
+          industrySource: providerUpdate?.industry ? 'yahoo' : stock.industry ? 'existing_db' : null,
+          marketCapSource: providerUpdate?.marketCap !== null && providerUpdate?.marketCap !== undefined ? 'yahoo' : stock.marketCap ? 'existing_db' : null,
+          isinSource: override?.isin ? String(request.catalogSource || 'manual_csv') : stock.isin ? 'existing_db' : null,
+          listingDateSource: override?.ipoDate ? String(request.catalogSource || 'manual_csv') : stock.ipoDate ? 'existing_db' : null,
+          metadataUpdatedAt: new Date().toISOString(),
+        });
+      } catch (error) {
+        summary.failed += 1;
+        summary.warnings.push(`${stock.symbol}: ${error instanceof Error ? error.message : 'metadata enrichment failed'}`);
+      }
+    }
+
+    this.finishRepairSummary(summary, started);
+    return summary;
+  }
+
+  async importManualMetadata(request: MarketDataRepairRequest = {}): Promise<MarketDataRepairSummary> {
+    const started = Date.now();
+    const scope = this.repairScope(request);
+    const batch = this.stableSourceRepairBatch(request);
+    const csvText = request.csvText || '';
+    if (!csvText.trim()) {
+      throw new Error('Manual metadata import requires CSV text.');
+    }
+    const rows = this.parseCsv(csvText);
+    const firstRow = rows[0] || {};
+    const headers = new Set(Object.keys(firstRow).map((key) => key.toUpperCase()));
+    const hasSymbolColumn = headers.has('SYMBOL') || headers.has('PROVIDERSYMBOL') || headers.has('PROVIDER SYMBOL');
+    if (!hasSymbolColumn) {
+      throw new Error('Manual metadata import requires symbol or providerSymbol column.');
+    }
+    if (!headers.has('SECTOR') || !headers.has('INDUSTRY')) {
+      throw new Error('Manual metadata import requires sector and industry columns.');
+    }
+    if (!headers.has('MARKETCAP') && !headers.has('MARKET CAP')) {
+      throw new Error('Manual metadata import requires marketCap column.');
+    }
+    const page = rows.slice(batch.offset, batch.offset + batch.batchSize);
+    const scopedStocks = (await this.repository.listStocksForUniverseHealth(scope))
+      .filter((stock) => stock.isActive !== false && stock.isDelisted !== true);
+    const stocksByKey = this.stocksByIdentityKey(scopedStocks);
+    const summary = this.emptyRepairSummary(scope, batch, rows.length, false);
+    summary.catalogSource = 'MANUAL';
+    const manualSource = this.repairSourceIdentity({
+      action: 'MANUAL_METADATA_IMPORT',
+      importMode: 'MANUAL_CSV',
+      sourceKey: 'MANUAL_CSV',
+      rawText: csvText,
+      rows,
+    });
+    summary.sourceFingerprint = manualSource.fingerprint;
+    summary.sourceIdentity = manualSource.identity;
+    summary.fieldsFilled = {};
+    summary.fieldProvenance = [];
+
+    for (const row of page) {
+      summary.processedCount += 1;
+      const symbol = this.readCsv(row, ['SYMBOL', 'symbol', 'SOURCE SYMBOL', 'TRADING SYMBOL']);
+      const providerSymbol = this.readCsv(row, ['PROVIDERSYMBOL', 'PROVIDER SYMBOL', 'providerSymbol']);
+      if (!symbol) {
+        if (!providerSymbol) {
+          summary.failed += 1;
+          summary.warnings.push('Manual metadata row rejected: symbol or providerSymbol is required.');
+          continue;
+        }
+      }
+      const lookupSymbol = symbol || providerSymbol;
+      const sector = this.readCsv(row, ['SECTOR', 'sector']);
+      const industry = this.readCsv(row, ['INDUSTRY', 'industry']);
+      const marketCapText = this.readCsv(row, ['MARKET CAP', 'MARKETCAP', 'marketCap']);
+      const marketCap = Number(marketCapText);
+      if (!this.hasValidMetadataValue(sector) || !this.hasValidMetadataValue(industry)) {
+        summary.failed += 1;
+        summary.warnings.push(`${lookupSymbol}: manual sector/industry rejected because both fields are required and cannot be null-equivalent.`);
+        continue;
+      }
+      if (!marketCapText || !this.hasValidMarketCap(marketCap)) {
+        summary.failed += 1;
+        summary.manualRequired = (summary.manualRequired || 0) + 1;
+        summary.warnings.push(`${lookupSymbol}: manual marketCap rejected because a positive numeric marketCap is required to resolve business metadata.`);
+        continue;
+      }
+      const stock = this.findStockForCatalogIdentityRow({
+        symbol: lookupSymbol,
+        sourceSymbol: symbol || this.baseSymbolFromProviderSymbol(providerSymbol),
+        providerSymbol: providerSymbol || this.providerSymbolForExchange(lookupSymbol, this.readCsv(row, ['EXCHANGE', 'exchange']) || undefined),
+        displaySymbol: symbol || this.baseSymbolFromProviderSymbol(providerSymbol),
+        name: lookupSymbol,
+        region: scope.region,
+        assetType: scope.assetType,
+        exchange: this.readCsv(row, ['EXCHANGE', 'exchange']) || undefined,
+      } as CreateStockRequest, stocksByKey);
+      if (!stock) {
+        summary.skipped += 1;
+        summary.manualRequired = (summary.manualRequired || 0) + 1;
+        summary.warnings.push(`${lookupSymbol}: no existing scoped instrument matched manual metadata row.`);
+        continue;
+      }
+
+      const listingDateText = this.readCsv(row, ['LISTING DATE', 'LISTINGDATE', 'DATE OF LISTING', 'IPO DATE', 'IPODATE']);
+      const update: Partial<CreateStockRequest> = {
+        sector: sector.trim(),
+        industry: industry.trim(),
+        isin: this.readCsv(row, ['ISIN', 'ISIN NUMBER', 'ISINNUMBER']) || stock.isin || undefined,
+        ipoDate: listingDateText ? this.parseCatalogDate(listingDateText) || stock.ipoDate || undefined : stock.ipoDate || undefined,
+        exchange: this.readCsv(row, ['EXCHANGE', 'exchange']) || stock.exchange || undefined,
+        marketCap,
+        source: stock.source || 'manual_metadata',
+      };
+      const missingBefore = this.missingRepairFields(stock);
+      const filledFields = this.repairedMetadataFields(stock, update, missingBefore);
+      if (filledFields.length === 0) {
+        summary.skipped += 1;
+        summary.noOp = (summary.noOp || 0) + 1;
+        summary.manualRequired = (summary.manualRequired || 0) + 1;
+        continue;
+      }
+
+      await this.repository.updateCompanyMasterData(stock.id, update);
+      const stockAfterRepair = { ...stock, ...update };
+      await this.recordManualMetadataRepairSuccess(stockAfterRepair, scope, filledFields);
+      const businessRepairState = this.providerBusinessStateAfterRepair(
+        stockAfterRepair,
+        filledFields.filter((field) => ['sector', 'industry', 'marketCap'].includes(field))
+      );
+      if (businessRepairState.attemptStatus === 'PARTIAL_SUCCESS') {
+        summary.partialSuccess = (summary.partialSuccess || 0) + 1;
+        summary.manualRequired = (summary.manualRequired || 0) + 1;
+        summary.warnings.push(`${stock.symbol}: manual metadata import remains incomplete; required fields still missing: ${businessRepairState.remainingFields.join(', ')}.`);
+      }
+      summary.updated += 1;
+      for (const field of filledFields) {
+        summary.fieldsFilled[field] = (summary.fieldsFilled[field] || 0) + 1;
+      }
+      summary.fieldProvenance.push({
+        instrumentId: stock.id,
+        symbol: stock.symbol,
+        sectorSource: filledFields.includes('sector') ? 'manual_csv' : stock.sector ? 'existing_db' : null,
+        industrySource: filledFields.includes('industry') ? 'manual_csv' : stock.industry ? 'existing_db' : null,
+        isinSource: filledFields.includes('isin') ? 'manual_csv' : stock.isin ? 'existing_db' : null,
+        listingDateSource: filledFields.includes('ipoDate') ? 'manual_csv' : stock.ipoDate ? 'existing_db' : null,
+        metadataUpdatedAt: new Date().toISOString(),
+      });
+    }
+
+    this.finishRepairSummary(summary, started);
+    return summary;
+  }
+
+  async backfillPrices(request: MarketDataRepairRequest = {}): Promise<MarketDataRepairSummary> {
+    const started = Date.now();
+    const scope = this.repairScope(request);
+    const batch = this.mutatingRepairBatch(request);
+    const candidates = await this.priceBackfillCandidates(scope);
+    const page = candidates.slice(0, batch.batchSize);
+    const summary = this.emptyRepairSummary(scope, batch, candidates.length, true);
+    const latestCompletedDate = latestCompletedTradingDateForRegion(scope.region);
+    const safeEndDate = this.endOfTradingDateUtc(latestCompletedDate);
+
+    for (const stock of page) {
+      summary.processedCount += 1;
+      try {
+        const result = await this.ingestSymbol(stock.symbol, undefined, safeEndDate, Boolean(request.fullReload), {
+          force: request.force !== false,
+          region: scope.region,
+          assetType: scope.assetType,
+          skipFreshnessGate: true,
+        });
+        summary.priceRowsReceived = (summary.priceRowsReceived || 0) + result.rowsReceived;
+        summary.priceRowsInserted = (summary.priceRowsInserted || 0) + result.rowsInserted;
+        summary.priceRowsUpdated = (summary.priceRowsUpdated || 0) + result.rowsUpdated;
+        summary.priceRowsNoOp = (summary.priceRowsNoOp || 0) + (result.rowsNoOp || 0);
+        summary.updated += result.rowsInserted > 0 || result.rowsUpdated > 0 || (result.rowsNoOp || 0) > 0 ? 1 : 0;
+        if (result.rowsReceived === 0 && !result.noNewData) {
+          summary.skipped += 1;
+          summary.warnings.push(`${stock.symbol}: provider returned zero usable price rows.`);
+        }
+      } catch (error) {
+        summary.failed += 1;
+        summary.warnings.push(`${stock.symbol}: ${error instanceof Error ? error.message : 'price backfill failed'}`);
+      }
+    }
+
+    this.finishRepairSummary(summary, started);
+    return summary;
   }
 
   get(id: string) {
@@ -345,7 +1476,7 @@ export class MarketDataFoundationService {
   }
 
   async listInstruments(options: Partial<PaginationOptions> = {}) {
-    const result = await this.list({
+    const requestOptions: PaginationOptions = {
       page: options.page ?? 1,
       pageSize: options.pageSize ?? 50,
       sortBy: options.sortBy,
@@ -363,17 +1494,21 @@ export class MarketDataFoundationService {
       providerSupportStatus: options.providerSupportStatus,
       derivativesEligible: options.derivativesEligible,
       search: options.search,
-    });
+    };
+    const result = await this.list(requestOptions);
+    const readinessBySymbol = await this.universeReadinessForStocks(result.stocks, requestOptions);
 
     return {
-      instruments: result.stocks.map((stock) => this.toV1Instrument(stock)),
+      instruments: result.stocks.map((stock) => this.toV1Instrument({ ...stock, universeReadiness: readinessBySymbol.get(stock.symbol) })),
       pagination: result.pagination,
     };
   }
 
   async getInstrument(id: string, options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
     const stock = await this.repository.findStockByIdInScope(id, options);
-    return stock ? this.toV1Instrument(stock) : null;
+    if (!stock) return null;
+    const readinessBySymbol = await this.universeReadinessForStocks([stock], options);
+    return this.toV1Instrument({ ...stock, universeReadiness: readinessBySymbol.get(stock.symbol) });
   }
 
   async importCatalog(request: CatalogImportRequest): Promise<CatalogImportSummary> {
@@ -455,7 +1590,7 @@ export class MarketDataFoundationService {
           if (!validation.supported) summary.providerUnsupported += 1;
           await this.repository.updateProviderSupportStatus(
             row.symbol,
-            validation.supported ? 'SUPPORTED' : 'UNSUPPORTED',
+            validation.supported ? 'SUPPORTED' : validation.failed ? 'VALIDATION_FAILED' : 'UNSUPPORTED',
             validation.message
           );
         }
@@ -566,7 +1701,7 @@ export class MarketDataFoundationService {
         if (!validation.supported) summary.providerUnsupported += 1;
         await this.repository.updateProviderSupportStatus(
           normalized.symbol,
-          validation.supported ? 'SUPPORTED' : 'UNSUPPORTED',
+          validation.supported ? 'SUPPORTED' : validation.failed ? 'VALIDATION_FAILED' : 'UNSUPPORTED',
           validation.message
         );
       }
@@ -1111,8 +2246,15 @@ export class MarketDataFoundationService {
 
     if (prices.length === 0) {
       console.log(`  No new price data available for ${symbol}`);
-      await this.repository.updateStockLoadTimestampBySymbol(symbol);
-      const emptySummary = { rowsReceived: 0, rowsInserted: 0, rowsUpdated: 0, rowsSkipped: 0, rowsNoOp: 0, warningCount: 0, warnings: [] };
+      const emptySummary = {
+        rowsReceived: 0,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsSkipped: 0,
+        rowsNoOp: 0,
+        warningCount: 1,
+        warnings: ['Provider returned zero usable historical price rows.'],
+      };
       await this.repository.upsertSyncState({
         region,
         assetType,
@@ -1120,17 +2262,23 @@ export class MarketDataFoundationService {
         scopeKey: symbol,
         tradingDate,
         timeframe: '1D',
-        status: 'SYNCED',
+        status: 'FAILED',
         summary: emptySummary,
         lastCheckedAt: now,
         lastProviderFetchAt: now,
       });
+      if (stock && typeof (this.repository as any).updateProviderSupportStatus === 'function') {
+        await this.repository.updateProviderSupportStatus(symbol, 'UNSUPPORTED', 'Provider returned zero usable historical price rows.').catch(() => null);
+      }
       return emptySummary;
     }
 
     const pricesForStorage = prices.map((price) => ({ ...price, symbol }));
     const syncSummary = await this.storeHistorical(pricesForStorage);
     await this.repository.updateStockLoadTimestampBySymbol(symbol);
+    if (typeof (this.repository as any).updateProviderSupportStatus === 'function') {
+      await this.repository.updateProviderSupportStatus(symbol, 'SUPPORTED', null).catch(() => null);
+    }
     await this.repository.upsertSyncState({
       region,
       assetType,
@@ -1532,6 +2680,1210 @@ export class MarketDataFoundationService {
     return this.repository.prisma.$disconnect();
   }
 
+  private async universeReadinessForStocks(
+    stocks: any[],
+    options: Pick<PaginationOptions, 'region' | 'assetType'> = {}
+  ): Promise<Map<string, InstrumentUniverseReadiness>> {
+    if (stocks.length === 0) return new Map();
+    const expectedLatestTradingDate = latestCompletedTradingDateForRegion(options.region || 'IN');
+    const statsBySymbol = typeof (this.repository as any).priceReadinessStatsForSymbols === 'function'
+      ? await this.repository.priceReadinessStatsForSymbols(stocks.map((stock) => stock.symbol))
+      : new Map<string, never>();
+    await this.repairProviderSupportFromStoredPrices(stocks, statsBySymbol as Map<string, any>);
+    return new Map(stocks.map((stock) => {
+      const priceStats = statsBySymbol.get(stock.symbol);
+      const readiness = classifyInstrumentUniverseReadiness({
+        isActive: stock.isActive,
+        isDelisted: stock.isDelisted,
+        providerSupportStatus: stock.providerSupportStatus,
+        providerSymbol: stock.providerSymbol || stock.symbol,
+        providerError: stock.providerError,
+        sector: stock.sector,
+        industry: stock.industry,
+        country: stock.country || this.defaultCountryForInstrument(stock.symbol, stock.exchange, stock.region),
+        currency: stock.currency || this.defaultCurrencyForInstrument(stock.symbol, stock.exchange, stock.region),
+        marketCap: stock.marketCap,
+        isin: stock.isin,
+        ipoDate: stock.ipoDate,
+        region: stock.region || options.region,
+        assetType: stock.assetType || options.assetType,
+        expectedLatestTradingDate,
+        priceStats,
+      });
+      return [stock.symbol, readiness];
+    }));
+  }
+
+  private emptyUniverseCounts(): MarketDataUniverseHealth['counts'] {
+    const counts = {
+      byUniverseState: Object.fromEntries(UNIVERSE_STATES.map((state) => [state, 0])) as unknown as MarketDataUniverseHealth['counts']['byUniverseState'],
+      readiness: {
+        priceReady: 0,
+        contextReady: 0,
+        reviewReady: 0,
+      },
+      totalCatalogInstruments: 0,
+      activeInstruments: 0,
+      inactiveOrDelistedInstruments: 0,
+      providerSupported: 0,
+      providerUnknown: 0,
+      providerUnknownValidationNeeded: 0,
+      providerRetryValidationNeeded: 0,
+      providerUnsupportedExcluded: 0,
+      providerValidationFailed: 0,
+      unsupported: 0,
+      unsupportedExcluded: 0,
+      supportedCatalogIdentityRepairNeeded: 0,
+      supportedBusinessMetadataRepairNeeded: 0,
+      supportedPriceBackfillNeeded: 0,
+      catalogOnly: 0,
+      priceReady: 0,
+      contextReady: 0,
+      reviewReady: 0,
+      staleOrIncomplete: 0,
+      missingLatestPrice: 0,
+      staleLatestPrice: 0,
+      missingOrInadequatePriceHistory: 0,
+      missingRecentVolume: 0,
+      missingSector: 0,
+      missingIndustry: 0,
+      missingCountry: 0,
+      missingCurrency: 0,
+      missingMarketCap: 0,
+      missingIsin: 0,
+      missingListingDate: 0,
+    } as MarketDataUniverseHealth['counts'];
+    for (const state of UNIVERSE_STATES) {
+      counts[state] = 0;
+    }
+    return counts;
+  }
+
+  private async repairProviderSupportFromStoredPrices(stocks: any[], statsBySymbol: Map<string, { priceHistoryBars?: number; latestPriceDate?: string | null }>) {
+    const symbols = stocks
+      .filter((stock) => normalizeProviderStatus(stock.providerSupportStatus) === 'UNKNOWN')
+      .filter((stock) => {
+        const stats = statsBySymbol.get(stock.symbol);
+        return Boolean(stats?.latestPriceDate && Number(stats.priceHistoryBars || 0) > 0);
+      })
+      .map((stock) => stock.symbol);
+    if (symbols.length === 0) return;
+    if (typeof (this.repository as any).markProviderSupportedFromStoredPrices === 'function') {
+      await this.repository.markProviderSupportedFromStoredPrices(symbols);
+    }
+    const symbolSet = new Set(symbols);
+    for (const stock of stocks) {
+      if (symbolSet.has(stock.symbol)) {
+        stock.providerSupportStatus = 'SUPPORTED';
+        stock.providerError = null;
+      }
+    }
+  }
+
+  private latestDateFromReadiness(readinessBySymbol: Map<string, InstrumentUniverseReadiness>): string | null {
+    let latest: string | null = null;
+    for (const readiness of readinessBySymbol.values()) {
+      if (readiness.latestPriceDate && (!latest || readiness.latestPriceDate > latest)) latest = readiness.latestPriceDate;
+    }
+    return latest;
+  }
+
+  private percent(value: number, denominator: number): number {
+    if (denominator <= 0) return 0;
+    return Number(((value / denominator) * 100).toFixed(1));
+  }
+
+  private minReviewReadyRequired(): number {
+    return Math.max(this.readPositiveNumber(process.env.MARKET_DATA_SIGNOFF_MIN_REVIEW_READY, 300), 1);
+  }
+
+  private universeSignoffFromHealth(health: Omit<MarketDataUniverseHealth, 'universeSignoff'>): MarketDataUniverseSignoff {
+    const counts = health.counts;
+    const planLike = {
+      providerValidationNeeded: counts.providerUnknownValidationNeeded ?? counts.providerUnknown,
+      retryFailedValidations: counts.providerRetryValidationNeeded ?? counts.providerValidationFailed ?? 0,
+      catalogIdentityRepairNeeded: counts.supportedCatalogIdentityRepairNeeded ?? Math.max(counts.missingIsin, counts.missingListingDate),
+      businessMetadataAutoRepairable: counts.supportedBusinessMetadataRepairNeeded ?? Math.max(counts.missingSector, counts.missingIndustry, counts.missingMarketCap),
+      businessMetadataRetryEligible: 0,
+      manualBusinessMetadataRequired: counts.supportedBusinessMetadataRepairNeeded ?? Math.max(counts.missingSector, counts.missingIndustry, counts.missingMarketCap),
+      priceBackfillNeeded: counts.supportedPriceBackfillNeeded ?? counts.staleOrIncomplete,
+    };
+    return this.buildUniverseSignoff({
+      providerUnknown: counts.providerUnknown,
+      providerRetryValidationNeeded: planLike.retryFailedValidations,
+      catalogIdentityRepairNeeded: planLike.catalogIdentityRepairNeeded,
+      businessMetadataAutoRepairable: planLike.businessMetadataAutoRepairable,
+      businessMetadataRetryEligible: planLike.businessMetadataRetryEligible,
+      priceBackfillNeeded: planLike.priceBackfillNeeded,
+      latestStoredEodDate: health.latestStoredEodDate,
+      expectedLatestTradingDate: health.expectedLatestTradingDate,
+      reviewReadyActual: counts.reviewReady,
+      reviewReadyPercentage: health.coverage.reviewReadyPercentage,
+      manualBusinessMetadataRequired: planLike.manualBusinessMetadataRequired,
+      trustStatus: health.trustStatus,
+    });
+  }
+
+  private universeSignoffFromRepairPlan(
+    plan: Pick<MarketDataRepairPlan,
+      'providerValidationNeeded'
+      | 'retryFailedValidations'
+      | 'catalogIdentityRepairNeeded'
+      | 'supportedCatalogIdentityRepairNeeded'
+      | 'businessMetadataAutoRepairable'
+      | 'businessMetadataRetryEligible'
+      | 'manualBusinessMetadataRequired'
+      | 'priceBackfillNeeded'
+      | 'supportedPriceBackfillNeeded'
+      | 'totalCatalogInstruments'>,
+    evidence: {
+      activeInstruments: number;
+      reviewReadyActual: number;
+      latestStoredEodDate: string | null;
+      expectedLatestTradingDate: string | null;
+      trustStatus?: MarketDataUniverseHealth['trustStatus'];
+    }
+  ): MarketDataUniverseSignoff {
+    const reviewReadyPercentage = this.percent(evidence.reviewReadyActual, evidence.activeInstruments || plan.totalCatalogInstruments || 1);
+    const supportedCatalogIdentityRepairNeeded = plan.supportedCatalogIdentityRepairNeeded ?? plan.catalogIdentityRepairNeeded;
+    const supportedPriceBackfillNeeded = plan.supportedPriceBackfillNeeded ?? plan.priceBackfillNeeded;
+    const impliedTrustStatus: MarketDataUniverseHealth['trustStatus'] = plan.providerValidationNeeded === 0
+      && plan.retryFailedValidations === 0
+      && supportedCatalogIdentityRepairNeeded === 0
+      && plan.businessMetadataAutoRepairable + plan.businessMetadataRetryEligible === 0
+      && plan.manualBusinessMetadataRequired === 0
+      && supportedPriceBackfillNeeded === 0
+      && Boolean(evidence.latestStoredEodDate && evidence.expectedLatestTradingDate && evidence.latestStoredEodDate >= evidence.expectedLatestTradingDate)
+      && evidence.reviewReadyActual >= this.minReviewReadyRequired()
+      && reviewReadyPercentage >= 10
+      ? 'OK'
+      : 'NOT_TRUSTWORTHY';
+    return this.buildUniverseSignoff({
+      providerUnknown: plan.providerValidationNeeded,
+      providerRetryValidationNeeded: plan.retryFailedValidations,
+      catalogIdentityRepairNeeded: supportedCatalogIdentityRepairNeeded,
+      businessMetadataAutoRepairable: plan.businessMetadataAutoRepairable,
+      businessMetadataRetryEligible: plan.businessMetadataRetryEligible,
+      priceBackfillNeeded: supportedPriceBackfillNeeded,
+      latestStoredEodDate: evidence.latestStoredEodDate,
+      expectedLatestTradingDate: evidence.expectedLatestTradingDate,
+      reviewReadyActual: evidence.reviewReadyActual,
+      reviewReadyPercentage,
+      manualBusinessMetadataRequired: plan.manualBusinessMetadataRequired,
+      trustStatus: evidence.trustStatus || impliedTrustStatus,
+    });
+  }
+
+  private buildUniverseSignoff(input: {
+    providerUnknown: number;
+    providerRetryValidationNeeded: number;
+    catalogIdentityRepairNeeded: number;
+    businessMetadataAutoRepairable: number;
+    businessMetadataRetryEligible: number;
+    priceBackfillNeeded: number;
+    latestStoredEodDate: string | null;
+    expectedLatestTradingDate: string | null;
+    reviewReadyActual: number;
+    reviewReadyPercentage: number;
+    manualBusinessMetadataRequired: number;
+    trustStatus: MarketDataUniverseHealth['trustStatus'];
+  }): MarketDataUniverseSignoff {
+    const minReviewReadyRequired = this.minReviewReadyRequired();
+    const blockers: MarketDataUniverseSignoff['blockers'] = [];
+    const addBlocker = (
+      code: string,
+      count: number,
+      required: number | string,
+      nextAction: MarketDataRepairRunAction | 'MANUAL_METADATA_IMPORT' | null,
+      severity: 'warning' | 'critical' = 'critical'
+    ) => {
+      if (count > 0) blockers.push({ code, severity, count, required, nextAction });
+    };
+
+    addBlocker('PROVIDER_UNKNOWN_REMAINING', input.providerUnknown, 0, 'VALIDATE_PROVIDERS');
+    addBlocker('PROVIDER_VALIDATION_RETRY_FAILED_REMAINING', input.providerRetryValidationNeeded, 0, 'RETRY_FAILED_PROVIDERS');
+    addBlocker('CATALOG_IDENTITY_REPAIR_REMAINING', input.catalogIdentityRepairNeeded, 0, 'CATALOG_IDENTITY_REPAIR');
+    addBlocker('BUSINESS_METADATA_AUTO_REPAIRABLE_REMAINING', input.businessMetadataAutoRepairable, 0, 'PROVIDER_BUSINESS_METADATA_REPAIR');
+    addBlocker('BUSINESS_METADATA_RETRY_ELIGIBLE_REMAINING', input.businessMetadataRetryEligible, 0, 'PROVIDER_BUSINESS_METADATA_REPAIR');
+    addBlocker('PRICE_BACKFILL_REMAINING', input.priceBackfillNeeded, 0, 'BACKFILL_PRICES');
+    addBlocker('MANUAL_BUSINESS_METADATA_REQUIRED', input.manualBusinessMetadataRequired, 0, 'MANUAL_METADATA_IMPORT');
+    if (!input.latestStoredEodDate || !input.expectedLatestTradingDate || input.latestStoredEodDate < input.expectedLatestTradingDate) {
+      blockers.push({
+        code: 'LATEST_EOD_BEHIND_EXPECTED',
+        severity: 'critical',
+        count: 1,
+        required: input.expectedLatestTradingDate || 'known expected trading date',
+        nextAction: 'BACKFILL_PRICES',
+      });
+    }
+    if (input.reviewReadyActual < minReviewReadyRequired) {
+      blockers.push({
+        code: 'REVIEW_READY_BELOW_MINIMUM',
+        severity: 'critical',
+        count: input.reviewReadyActual,
+        required: minReviewReadyRequired,
+        nextAction: this.signoffNextActionFromCounts(input),
+      });
+    }
+    if (input.reviewReadyPercentage < 10) {
+      blockers.push({
+        code: 'REVIEW_READY_PERCENTAGE_BELOW_MINIMUM',
+        severity: 'critical',
+        count: input.reviewReadyPercentage,
+        required: '>=10%',
+        nextAction: this.signoffNextActionFromCounts(input),
+      });
+    }
+    if (input.trustStatus !== 'OK') {
+      blockers.push({
+        code: 'TRUST_STATUS_NOT_OK',
+        severity: 'critical',
+        count: 1,
+        required: 'OK',
+        nextAction: this.signoffNextActionFromCounts(input),
+      });
+    }
+
+    const nextAction = blockers.find((blocker) => blocker.nextAction)?.nextAction || null;
+    const status = blockers.length === 0 ? 'PASS' : 'FAIL';
+    return {
+      status,
+      minReviewReadyRequired,
+      reviewReadyActual: input.reviewReadyActual,
+      blockers,
+      nextAction,
+      downstreamAllowed: status === 'PASS',
+    };
+  }
+
+  private signoffNextActionFromCounts(input: {
+    providerUnknown: number;
+    providerRetryValidationNeeded: number;
+    catalogIdentityRepairNeeded: number;
+    businessMetadataAutoRepairable: number;
+    businessMetadataRetryEligible: number;
+    priceBackfillNeeded: number;
+    manualBusinessMetadataRequired: number;
+  }): MarketDataRepairRunAction | 'MANUAL_METADATA_IMPORT' | null {
+    if (input.providerUnknown > 0) return 'VALIDATE_PROVIDERS';
+    if (input.providerRetryValidationNeeded > 0) return 'RETRY_FAILED_PROVIDERS';
+    if (input.catalogIdentityRepairNeeded > 0) return 'CATALOG_IDENTITY_REPAIR';
+    if (input.businessMetadataAutoRepairable > 0 || input.businessMetadataRetryEligible > 0) return 'PROVIDER_BUSINESS_METADATA_REPAIR';
+    if (input.priceBackfillNeeded > 0) return 'BACKFILL_PRICES';
+    if (input.manualBusinessMetadataRequired > 0) return 'MANUAL_METADATA_IMPORT';
+    return null;
+  }
+
+  private topUniverseBlockers(blockerCounts: Map<string, number>): MarketDataUniverseHealth['topBlockers'] {
+    const labels: Record<string, string> = {
+      PROVIDER_UNKNOWN: 'Provider support not validated',
+      PROVIDER_UNSUPPORTED: 'Provider validation failed or unsupported',
+      PROVIDER_SYMBOL_MISSING: 'Provider symbol missing',
+      MISSING_LATEST_PRICE: 'Latest EOD price missing',
+      STALE_LATEST_PRICE: 'Latest EOD price is stale',
+      INADEQUATE_PRICE_HISTORY: 'Less than 252 daily bars',
+      INADEQUATE_SMA200_HISTORY: 'Less than 200 daily bars',
+      INADEQUATE_ROLLING_PRICE_WINDOW: 'Last 252-session window is incomplete',
+      PRICE_HISTORY_GAPS: 'Price history has large date gaps',
+      MISSING_RECENT_VOLUME: 'Recent volume missing',
+      LOW_RECENT_VOLUME_COVERAGE: 'Recent volume coverage is incomplete',
+      MISSING_SECTOR: 'Sector metadata missing',
+      MISSING_INDUSTRY: 'Industry metadata missing',
+      MISSING_COUNTRY: 'Country metadata missing',
+      MISSING_CURRENCY: 'Currency metadata missing',
+      MISSING_MARKET_CAP: 'Market cap metadata missing',
+      MISSING_ISIN: 'ISIN metadata missing',
+      MISSING_LISTING_DATE: 'Listing date metadata missing',
+      DELISTED_OR_INACTIVE: 'Inactive or delisted instrument',
+      CRITICAL_PROVIDER_SYMBOL_MISMATCH: 'Critical provider symbol mismatch',
+    };
+    return Array.from(blockerCounts.entries())
+      .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+      .slice(0, 10)
+      .map(([code, count]) => ({
+        code,
+        label: labels[code] || code.replace(/_/g, ' ').toLowerCase(),
+        count,
+        severity: this.isCriticalUniverseBlocker(code) ? 'critical' : 'warning',
+      }));
+  }
+
+  private universeTrustStatus(
+    counts: MarketDataUniverseHealth['counts'],
+    coverage: MarketDataUniverseHealth['coverage']
+  ): MarketDataUniverseHealth['trustStatus'] {
+    if (counts.totalCatalogInstruments === 0) return 'NOT_TRUSTWORTHY';
+    if (counts.activeInstruments > 0 && counts.providerUnknown >= counts.activeInstruments) return 'NOT_TRUSTWORTHY';
+    if (counts.reviewReady === 0) return 'NOT_TRUSTWORTHY';
+    if (coverage.priceCoveragePercentage < 50 || coverage.metadataCoveragePercentage < 50) return 'NOT_TRUSTWORTHY';
+    if (counts.catalogOnly > 0 || counts.staleOrIncomplete > 0 || counts.unsupported > 0) return 'PARTIAL';
+    return 'OK';
+  }
+
+  private universeTrustReasons(
+    counts: MarketDataUniverseHealth['counts'],
+    coverage: MarketDataUniverseHealth['coverage']
+  ): string[] {
+    const reasons: string[] = [];
+    if (counts.totalCatalogInstruments === 0) reasons.push('No scoped catalog instruments were found.');
+    if (counts.activeInstruments > 0 && counts.providerUnknown >= counts.activeInstruments) {
+      reasons.push('Provider support is UNKNOWN for the entire active scoped universe.');
+    } else if (counts.providerUnknown > 0) {
+      reasons.push(`${counts.providerUnknown} active instruments still need provider validation.`);
+    }
+    if (counts.reviewReady === 0 && counts.totalCatalogInstruments > 0) reasons.push('Review-ready universe is empty under strict rules.');
+    if (coverage.priceCoveragePercentage < 50) reasons.push(`Price coverage is ${coverage.priceCoveragePercentage}%.`);
+    if (coverage.metadataCoveragePercentage < 50) reasons.push(`Metadata coverage is ${coverage.metadataCoveragePercentage}%.`);
+    if (counts.catalogOnly > 0) reasons.push(`${counts.catalogOnly} instruments are catalog-only and not reviewable.`);
+    if (counts.staleOrIncomplete > 0) reasons.push(`${counts.staleOrIncomplete} provider-supported instruments have stale or incomplete prices.`);
+    return reasons.length > 0 ? reasons : ['Universe health satisfies strict review-ready checks.'];
+  }
+
+  private normalizeRepairRunActions(actions?: MarketDataRepairRunAction[], mode?: MarketDataRepairRunRequest['mode'], csvText?: string): MarketDataRepairRunAction[] {
+    const defaultActions: MarketDataRepairRunAction[] = mode === 'DRAIN_UNTIL_BLOCKED'
+      ? [
+        'VALIDATE_PROVIDERS',
+        'RETRY_FAILED_PROVIDERS',
+        'CATALOG_IDENTITY_REPAIR',
+        'PROVIDER_BUSINESS_METADATA_REPAIR',
+        ...(csvText?.trim() ? ['MANUAL_METADATA_IMPORT' as MarketDataRepairRunAction] : []),
+        'BACKFILL_PRICES',
+      ]
+      : [
+        'VALIDATE_PROVIDERS',
+        'CATALOG_IDENTITY_REPAIR',
+        'PROVIDER_BUSINESS_METADATA_REPAIR',
+        'BACKFILL_PRICES',
+      ];
+    const requested = new Set(actions?.length ? actions : defaultActions);
+    const order: MarketDataRepairRunAction[] = [
+      'VALIDATE_PROVIDERS',
+      'RETRY_FAILED_PROVIDERS',
+      'CATALOG_IDENTITY_REPAIR',
+      'PROVIDER_BUSINESS_METADATA_REPAIR',
+      'MANUAL_METADATA_IMPORT',
+      'BACKFILL_PRICES',
+    ];
+    return order.filter((action) => requested.has(action));
+  }
+
+  private onlyManualMetadataRemains(plan: MarketDataRepairPlan): boolean {
+    return plan.manualBusinessMetadataRequired > 0
+      && plan.providerValidationNeeded + plan.retryFailedValidations === 0
+      && (plan.supportedCatalogIdentityRepairNeeded ?? plan.catalogIdentityRepairNeeded) === 0
+      && plan.businessMetadataAutoRepairable + plan.businessMetadataRetryEligible === 0
+      && (plan.supportedPriceBackfillNeeded ?? plan.priceBackfillNeeded) === 0;
+  }
+
+  private repairRunActionLabel(action: MarketDataRepairRunAction): string {
+    return {
+      VALIDATE_PROVIDERS: 'Validate unknown providers',
+      RETRY_FAILED_PROVIDERS: 'Retry failed providers',
+      CATALOG_IDENTITY_REPAIR: 'Repair catalog identity',
+      PROVIDER_BUSINESS_METADATA_REPAIR: 'Enrich provider business metadata',
+      MANUAL_METADATA_IMPORT: 'Import manual metadata',
+      BACKFILL_PRICES: 'Backfill prices',
+    }[action];
+  }
+
+  private repairRunActionCount(action: MarketDataRepairRunAction, plan: MarketDataRepairPlan): number {
+    if (action === 'VALIDATE_PROVIDERS') return plan.providerUnknownValidationNeeded ?? plan.providerValidationNeeded;
+    if (action === 'RETRY_FAILED_PROVIDERS') return plan.providerRetryValidationNeeded ?? plan.retryFailedValidations;
+    if (action === 'CATALOG_IDENTITY_REPAIR') return plan.supportedCatalogIdentityRepairNeeded ?? plan.catalogIdentityRepairNeeded;
+    if (action === 'PROVIDER_BUSINESS_METADATA_REPAIR') return plan.businessMetadataAutoRepairable + plan.businessMetadataRetryEligible;
+    if (action === 'MANUAL_METADATA_IMPORT') return plan.manualBusinessMetadataRequired ?? plan.manualMetadataRequired;
+    if (action === 'BACKFILL_PRICES') return plan.supportedPriceBackfillNeeded ?? plan.priceBackfillNeeded;
+    return 0;
+  }
+
+  private createRepairRunActionResult(
+    action: MarketDataRepairRunAction,
+    plan: MarketDataRepairPlan,
+    batchSize: number,
+    maxBatchesPerAction: number,
+    dryRun: boolean
+  ): MarketDataRepairRunActionResult {
+    const estimatedTotal = this.repairRunActionCount(action, plan);
+    const estimatedBatchCount = estimatedTotal > 0 ? Math.ceil(estimatedTotal / batchSize) : 0;
+    return {
+      action,
+      label: this.repairRunActionLabel(action),
+      estimatedTotal,
+      estimatedBatchCount,
+      batchesPlanned: Math.min(estimatedBatchCount, maxBatchesPerAction),
+      batchesExecuted: 0,
+      dryRun,
+      hasMore: estimatedTotal > batchSize * maxBatchesPerAction,
+      anotherRunNeeded: estimatedTotal > batchSize * maxBatchesPerAction,
+      totals: {
+        processedCount: 0,
+        updated: 0,
+        skipped: 0,
+        failed: 0,
+        noOp: 0,
+        manualRequired: 0,
+      },
+      summaries: [],
+      warnings: [],
+    };
+  }
+
+  private async executeRepairRunAction(
+    action: MarketDataRepairRunAction,
+    request: MarketDataRepairRunRequest,
+    scope: { region: string; assetType: string },
+    batchSize: number,
+    maxBatchesPerAction: number,
+    result: MarketDataRepairRunActionResult,
+    startOffset = 0,
+    sourceSnapshot?: RepairRunSourceSnapshot
+  ) {
+    if (sourceSnapshot?.error) {
+      throw new Error(sourceSnapshot.error);
+    }
+
+    if (result.estimatedTotal <= 0) {
+      result.hasMore = false;
+      result.anotherRunNeeded = false;
+      return;
+    }
+
+    if (action === 'MANUAL_METADATA_IMPORT' && !request.csvText?.trim()) {
+      result.warnings.push('Manual metadata import was not executed because CSV text was not supplied; manual-required rows remain visible.');
+      result.anotherRunNeeded = result.estimatedTotal > 0;
+      result.hasMore = result.estimatedTotal > 0;
+      return;
+    }
+
+    let offset = this.isStableRepairRunSourceAction(action) ? startOffset : 0;
+    let lastSummary: MarketDataRepairSummary | null = null;
+    for (let index = 0; index < maxBatchesPerAction; index += 1) {
+      const summary = await this.executeRepairRunBatch(action, request, scope, batchSize, offset, sourceSnapshot);
+      if (result.sourceFingerprint && summary.sourceFingerprint && result.sourceFingerprint !== summary.sourceFingerprint) {
+        throw new Error(`${this.repairRunActionLabel(action)} source fingerprint changed during the repair run.`);
+      }
+      result.batchesExecuted += 1;
+      result.summaries.push(summary);
+      if (summary.sourceFingerprint) result.sourceFingerprint = summary.sourceFingerprint;
+      if (summary.sourceIdentity) result.sourceIdentity = summary.sourceIdentity;
+      result.totals.processedCount += summary.processedCount;
+      result.totals.updated += summary.updated;
+      result.totals.skipped += summary.skipped;
+      result.totals.failed += summary.failed;
+      result.totals.noOp += summary.noOp || 0;
+      result.totals.manualRequired += summary.manualRequired || 0;
+      result.warnings.push(...(summary.warnings || []));
+      lastSummary = summary;
+
+      if (!summary.hasMore || summary.processedCount === 0) break;
+      offset = summary.nextOffset ?? 0;
+    }
+
+    result.hasMore = Boolean(lastSummary?.hasMore);
+    result.anotherRunNeeded = result.hasMore && result.batchesExecuted >= maxBatchesPerAction;
+    if (result.anotherRunNeeded) {
+      result.warnings.push(`${result.label} reached the per-run batch limit; another repair run is needed.`);
+    }
+  }
+
+  private executeRepairRunBatch(
+    action: MarketDataRepairRunAction,
+    request: MarketDataRepairRunRequest,
+    scope: { region: string; assetType: string },
+    batchSize: number,
+    offset: number,
+    sourceSnapshot?: RepairRunSourceSnapshot
+  ): Promise<MarketDataRepairSummary> {
+    const base: MarketDataRepairRequest = {
+      region: scope.region,
+      assetType: scope.assetType,
+      batchSize,
+      offset,
+    };
+    if (action === 'VALIDATE_PROVIDERS') {
+      return this.validateProviders({
+        ...base,
+        providerValidationQueue: 'UNKNOWN_FIRST',
+      });
+    }
+    if (action === 'RETRY_FAILED_PROVIDERS') {
+      return this.validateProviders({
+        ...base,
+        providerValidationQueue: 'RETRY_FAILED',
+      });
+    }
+    if (action === 'CATALOG_IDENTITY_REPAIR') {
+      if (!sourceSnapshot?.catalogSnapshot) {
+        throw new Error('Catalog identity repair source was not loaded for this operational run.');
+      }
+      return this.repairCatalogIdentityFromRows({
+        ...base,
+        force: request.force,
+      }, sourceSnapshot.catalogSnapshot);
+    }
+    if (action === 'PROVIDER_BUSINESS_METADATA_REPAIR') {
+      return this.repairProviderBusinessMetadata({
+        ...base,
+        force: Boolean(request.force),
+      });
+    }
+    if (action === 'MANUAL_METADATA_IMPORT') {
+      return this.importManualMetadata({
+        ...base,
+        csvText: request.csvText,
+        importMode: 'MANUAL_CSV',
+      });
+    }
+    return this.backfillPrices({
+      ...base,
+      force: request.force !== false,
+      fullReload: request.fullReload,
+    });
+  }
+
+  private async repairRunSourceFingerprints(
+    request: MarketDataRepairRunRequest,
+    scope: { region: string; assetType: string },
+    actions: MarketDataRepairRunAction[]
+  ): Promise<Partial<Record<MarketDataRepairRunAction, RepairRunSourceSnapshot>>> {
+    const fingerprints: Partial<Record<MarketDataRepairRunAction, RepairRunSourceSnapshot>> = {};
+    for (const action of actions) {
+      if (action === 'CATALOG_IDENTITY_REPAIR') {
+        try {
+          const catalogSource = this.normalizeCatalogSource(request.catalogSource || this.defaultCatalogIdentitySource(scope));
+          const catalog = await this.loadCatalogIdentityRows(catalogSource, request.csvText, request.importMode || 'CONFIGURED_URL');
+          const catalogSnapshot: CatalogIdentityRowsSnapshot = {
+            catalogSource,
+            ...catalog,
+          };
+          fingerprints[action] = {
+            fingerprint: catalog.sourceFingerprint,
+            identity: catalog.sourceIdentity,
+            catalogSnapshot,
+          };
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Catalog source could not be loaded.';
+          fingerprints[action] = {
+            error: `Catalog identity repair source could not be loaded: ${message}`,
+            warnings: [`Catalog identity repair source could not be loaded before processing; no catalog offsets were applied.`],
+          };
+        }
+      }
+      if (action === 'MANUAL_METADATA_IMPORT' && request.csvText?.trim()) {
+        const rows = this.parseCsv(request.csvText);
+        const source = this.repairSourceIdentity({
+          action,
+          importMode: 'MANUAL_CSV',
+          sourceKey: 'MANUAL_CSV',
+          rawText: request.csvText,
+          rows,
+        });
+        fingerprints[action] = source;
+      }
+    }
+    return fingerprints;
+  }
+
+  private repairRunSourceFingerprintMetadata(
+    sourceFingerprints: Partial<Record<MarketDataRepairRunAction, RepairRunSourceSnapshot>>
+  ) {
+    return Object.fromEntries(Object.entries(sourceFingerprints).map(([action, source]) => [
+      action,
+      {
+        fingerprint: source?.fingerprint,
+        identity: source?.identity,
+        error: source?.error,
+        warnings: source?.warnings,
+      },
+    ]));
+  }
+
+  private async repairRunStartOffsets(
+    scope: { region: string; assetType: string },
+    actions: MarketDataRepairRunAction[],
+    sourceFingerprints: Partial<Record<MarketDataRepairRunAction, RepairRunSourceSnapshot>>
+  ): Promise<{
+    offsets: Partial<Record<MarketDataRepairRunAction, number>>;
+    warningsByAction: Partial<Record<MarketDataRepairRunAction, string[]>>;
+  }> {
+    const offsets: Partial<Record<MarketDataRepairRunAction, number>> = {};
+    const warningsByAction: Partial<Record<MarketDataRepairRunAction, string[]>> = {};
+    const repositoryAny = this.repository as any;
+    if (typeof repositoryAny.latestRepairRun !== 'function') return { offsets, warningsByAction };
+    const latest = await repositoryAny.latestRepairRun(scope);
+    const previousActions = latest?.summaryJson?.actions;
+    if (!Array.isArray(previousActions)) return { offsets, warningsByAction };
+    for (const action of actions) {
+      if (!this.isStableRepairRunSourceAction(action)) continue;
+      const previous = previousActions.find((item: any) => item?.action === action);
+      const lastSummary = Array.isArray(previous?.summaries) ? previous.summaries[previous.summaries.length - 1] : null;
+      const currentSource = sourceFingerprints[action];
+      if (currentSource?.error) {
+        warningsByAction[action] = [`Source could not be loaded; no persisted offset was reused for ${this.repairRunActionLabel(action)}.`];
+        offsets[action] = 0;
+        continue;
+      }
+      const currentFingerprint = currentSource?.fingerprint;
+      const previousFingerprint = previous?.sourceFingerprint || lastSummary?.sourceFingerprint;
+      if (lastSummary?.hasMore && currentFingerprint && previousFingerprint && currentFingerprint !== previousFingerprint) {
+        warningsByAction[action] = [`Source changed; restart from offset 0 for ${this.repairRunActionLabel(action)}.`];
+        offsets[action] = 0;
+        continue;
+      }
+      if (!previous?.error && lastSummary?.hasMore && Number.isFinite(Number(lastSummary.nextOffset))) {
+        offsets[action] = Math.max(Number(lastSummary.nextOffset), 0);
+      }
+    }
+    return { offsets, warningsByAction };
+  }
+
+  private isStableRepairRunSourceAction(action: MarketDataRepairRunAction): boolean {
+    return action === 'CATALOG_IDENTITY_REPAIR' || action === 'MANUAL_METADATA_IMPORT';
+  }
+
+  private repairRunTotals(
+    actions: MarketDataRepairRunActionResult[],
+    actionsRequested: MarketDataRepairRunAction[]
+  ): MarketDataRepairRunResponse['summary'] {
+    return {
+      actionsRequested,
+      batchesExecuted: actions.reduce((sum, action) => sum + action.batchesExecuted, 0),
+      updated: actions.reduce((sum, action) => sum + action.totals.updated, 0),
+      skipped: actions.reduce((sum, action) => sum + action.totals.skipped, 0),
+      failed: actions.reduce((sum, action) => sum + action.totals.failed, 0),
+      noOp: actions.reduce((sum, action) => sum + action.totals.noOp, 0),
+      manualRequired: actions.reduce((sum, action) => sum + action.totals.manualRequired, 0),
+    };
+  }
+
+  private repairRunWarnings(
+    health: MarketDataUniverseHealth,
+    plan: MarketDataRepairPlan,
+    actions: MarketDataRepairRunActionResult[],
+    dryRun: boolean
+  ): string[] {
+    const warnings: string[] = [];
+    if (dryRun) warnings.push('Dry run only: no provider, catalog, metadata, or price rows were mutated.');
+    if (health.trustStatus !== 'OK') warnings.push(`Today Plan remains blocked because universe trust is ${health.trustStatus}.`);
+    if (health.counts.reviewReady === 0) warnings.push('Today Plan remains blocked because review-ready universe is 0.');
+    if (plan.providerValidationNeeded > 0) warnings.push(`${plan.providerValidationNeeded} unknown provider validations remain.`);
+    if (plan.retryFailedValidations > 0) warnings.push(`${plan.retryFailedValidations} retry-failed provider validations remain.`);
+    if ((plan.supportedCatalogIdentityRepairNeeded ?? plan.catalogIdentityRepairNeeded) > 0) warnings.push(`${plan.supportedCatalogIdentityRepairNeeded ?? plan.catalogIdentityRepairNeeded} provider-supported catalog identity repairs remain.`);
+    if (plan.businessMetadataAutoRepairable > 0 || plan.businessMetadataRetryEligible > 0) {
+      warnings.push(`${plan.businessMetadataAutoRepairable + plan.businessMetadataRetryEligible} provider business metadata rows remain auto-repairable or retry-eligible.`);
+    }
+    if (plan.manualBusinessMetadataRequired > 0) warnings.push(`${plan.manualBusinessMetadataRequired} rows still need manual business metadata if providers cannot fill them.`);
+    if ((plan.supportedPriceBackfillNeeded ?? plan.priceBackfillNeeded) > 0) warnings.push(`${plan.supportedPriceBackfillNeeded ?? plan.priceBackfillNeeded} provider-supported rows still need price backfill.`);
+    for (const action of actions) {
+      if (action.error) warnings.push(`${action.label}: ${action.error}`);
+      if (action.anotherRunNeeded) warnings.push(`${action.label}: another bounded run is needed.`);
+    }
+    return [...new Set(warnings)].slice(0, 50);
+  }
+
+  private expectedNextRepairRunAction(
+    plan: MarketDataRepairPlan,
+    actions: MarketDataRepairRunAction[]
+  ): MarketDataRepairRunAction | null {
+    return actions.find((action) => this.repairRunActionCount(action, plan) > 0) || null;
+  }
+
+  private hardBlockersFromHealth(health: MarketDataUniverseHealth): MarketDataUniverseHealth['topBlockers'] {
+    return (health.topBlockers || []).filter((blocker) => blocker.severity === 'critical');
+  }
+
+  private jsonSnapshot<T>(value: T): T {
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  private isCriticalUniverseBlocker(code: string): boolean {
+    return [
+      'PROVIDER_UNKNOWN',
+      'PROVIDER_UNSUPPORTED',
+      'MISSING_LATEST_PRICE',
+      'STALE_LATEST_PRICE',
+      'INADEQUATE_PRICE_HISTORY',
+      'INADEQUATE_ROLLING_PRICE_WINDOW',
+      'PRICE_HISTORY_GAPS',
+      'MISSING_RECENT_VOLUME',
+      'LOW_RECENT_VOLUME_COVERAGE',
+      'MISSING_SECTOR',
+      'MISSING_INDUSTRY',
+      'MISSING_MARKET_CAP',
+      'MISSING_ISIN',
+      'MISSING_LISTING_DATE',
+      'CRITICAL_PROVIDER_SYMBOL_MISMATCH',
+    ].includes(code);
+  }
+
+  private repairScope(request: Pick<MarketDataRepairRequest, 'region' | 'assetType'>) {
+    return {
+      region: request.region?.trim().toUpperCase() || 'IN',
+      assetType: request.assetType?.trim().toUpperCase() || 'STOCK',
+    };
+  }
+
+  private mutatingRepairBatch(request: Pick<MarketDataRepairRequest, 'batchSize' | 'limit'>) {
+    return {
+      batchSize: Math.min(Math.max(Number(request.batchSize ?? request.limit) || 50, 1), 100),
+      offset: 0,
+    };
+  }
+
+  private stableSourceRepairBatch(request: Pick<MarketDataRepairRequest, 'batchSize' | 'limit' | 'offset'>) {
+    return {
+      batchSize: Math.min(Math.max(Number(request.batchSize ?? request.limit) || 100, 1), 250),
+      offset: Math.max(Number(request.offset) || 0, 0),
+    };
+  }
+
+  private defaultCatalogIdentitySource(scope: { region: string; assetType: string }): CatalogSource {
+    if (scope.region === 'IN' && scope.assetType === 'STOCK') return 'NSE_EQUITY_SECURITIES';
+    return 'NSE_EQUITY_SECURITIES';
+  }
+
+  private repairSourceIdentity(input: {
+    action: MarketDataRepairRunAction;
+    catalogSource?: string;
+    importMode?: string;
+    sourceKey?: string;
+    sourceUrl?: string | null;
+    urlSource?: string | null;
+    rawText: string;
+    rows?: unknown[];
+  }): { fingerprint: string; identity: MarketDataRepairSourceIdentity } {
+    const contentSha256 = this.sha256(input.rawText);
+    const rowsSha256 = this.sha256(JSON.stringify(input.rows || []));
+    const identity: MarketDataRepairSourceIdentity = {
+      action: input.action,
+      catalogSource: input.catalogSource,
+      importMode: input.importMode,
+      sourceKey: input.sourceKey,
+      sourceUrl: input.sourceUrl ?? null,
+      urlSource: input.urlSource ?? null,
+      rowCount: input.rows?.length ?? 0,
+      contentSha256,
+      rowsSha256,
+    };
+    return {
+      identity,
+      fingerprint: this.sha256(JSON.stringify(identity)),
+    };
+  }
+
+  private sha256(value: string): string {
+    return createHash('sha256').update(value).digest('hex');
+  }
+
+  private async loadCatalogIdentityRows(catalogSource: CatalogSource, csvText?: string, importMode?: MarketDataRepairRequest['importMode']): Promise<{
+    rows: CreateStockRequest[];
+    warnings: string[];
+    downloaded: boolean;
+    sourceFingerprint: string;
+    sourceIdentity: MarketDataRepairSourceIdentity;
+  }> {
+    const warnings: string[] = [];
+    let resolvedCsvText = csvText || '';
+    let downloadInfo: Awaited<ReturnType<MarketDataFoundationService['downloadConfiguredCatalogCsv']>> | null = null;
+    let resolvedImportMode: MarketDataRepairRequest['importMode'] = importMode;
+    try {
+      if (importMode === 'MANUAL_CSV' && !resolvedCsvText.trim()) {
+        throw new Error('Manual CSV catalog identity repair requires csvText.');
+      }
+      if (importMode === 'CONFIGURED_URL' || !resolvedCsvText.trim()) {
+        resolvedImportMode = 'CONFIGURED_URL';
+        const sourceConfig = getCatalogSourceConfig(catalogSource);
+        if (!sourceConfig?.supportsConfiguredUrl) {
+          throw new Error(`Catalog identity repair requires CSV text or a configured URL for ${catalogSource}.`);
+        }
+        downloadInfo = await this.downloadConfiguredCatalogCsv(catalogSource);
+        resolvedCsvText = downloadInfo.csvText;
+      } else {
+        resolvedImportMode = 'MANUAL_CSV';
+      }
+      this.validateCsvColumns(catalogSource, resolvedCsvText);
+      const rows = this.catalogRowsForSource(catalogSource, resolvedCsvText, warnings);
+      const sourceConfig = getCatalogSourceConfig(catalogSource);
+      const sourceIdentity = this.repairSourceIdentity({
+        action: 'CATALOG_IDENTITY_REPAIR',
+        catalogSource,
+        importMode: resolvedImportMode || 'MANUAL_CSV',
+        sourceKey: resolvedImportMode === 'CONFIGURED_URL'
+          ? `${sourceConfig?.urlSource || 'NONE'}:${sourceConfig?.url || ''}`
+          : 'MANUAL_CSV',
+        sourceUrl: resolvedImportMode === 'CONFIGURED_URL' ? sourceConfig?.url || null : null,
+        urlSource: sourceConfig?.urlSource || null,
+        rawText: resolvedCsvText,
+        rows,
+      });
+      return {
+        rows,
+        warnings,
+        downloaded: Boolean(downloadInfo),
+        sourceFingerprint: sourceIdentity.fingerprint,
+        sourceIdentity: sourceIdentity.identity,
+      };
+    } finally {
+      if (downloadInfo) {
+        await this.cleanupCatalogTempFile(downloadInfo).catch((error) => {
+          warnings.push(`${catalogSource}: temporary catalog file cleanup failed: ${error instanceof Error ? error.message : 'unknown error'}`);
+        });
+      }
+    }
+  }
+
+  private stocksByIdentityKey(stocks: any[]) {
+    const byKey = new Map<string, any[]>();
+    for (const stock of stocks) {
+      for (const key of this.identityKeysForStock(stock)) {
+        byKey.set(key, [...(byKey.get(key) || []), stock]);
+      }
+    }
+    return byKey;
+  }
+
+  private findStockForCatalogIdentityRow(row: CreateStockRequest, stocksByKey: Map<string, any[]>) {
+    for (const key of this.identityKeysForCatalogRow(row)) {
+      const stocks = this.uniqueStocks(stocksByKey.get(key) || []);
+      if (stocks.length === 1) return stocks[0];
+      if (stocks.length > 1) return null;
+    }
+    return null;
+  }
+
+  private identityKeysForCatalogRow(row: Partial<CreateStockRequest>): string[] {
+    const keys: string[] = [];
+    const exchange = this.identityText(row.exchange);
+    const region = this.identityText(row.region);
+    const assetType = this.identityAssetType(row.assetType);
+    const providerSymbol = this.identityText(row.providerSymbol);
+    const sourceSymbol = this.identityText(row.sourceSymbol);
+    const symbol = this.identityText(row.symbol || row.displaySymbol);
+    const name = this.identityText(row.name);
+    if (providerSymbol && exchange) keys.push(`provider:${exchange}:${providerSymbol}`);
+    if (sourceSymbol && exchange) keys.push(`source:${exchange}:${this.baseSymbolFromProviderSymbol(sourceSymbol)}`);
+    if (symbol && region && assetType) keys.push(`symbol:${region}:${assetType}:${this.baseSymbolFromProviderSymbol(symbol)}`);
+    if (name && exchange) keys.push(`name:${exchange}:${name}`);
+    return keys;
+  }
+
+  private identityKeysForStock(stock: any): string[] {
+    const keys: string[] = [];
+    const exchange = this.identityText(stock.exchange);
+    const region = this.identityText(stock.region);
+    const assetType = this.identityAssetType(stock.assetType);
+    const providerSymbol = this.identityText(stock.providerSymbol);
+    const sourceSymbol = this.identityText(stock.sourceSymbol);
+    const symbol = this.identityText(stock.symbol || stock.displaySymbol);
+    const name = this.identityText(stock.name);
+    if (providerSymbol && exchange) keys.push(`provider:${exchange}:${providerSymbol}`);
+    if (sourceSymbol && exchange) keys.push(`source:${exchange}:${this.baseSymbolFromProviderSymbol(sourceSymbol)}`);
+    if (symbol && region && assetType) keys.push(`symbol:${region}:${assetType}:${this.baseSymbolFromProviderSymbol(symbol)}`);
+    if (name && exchange) keys.push(`name:${exchange}:${name}`);
+    return keys;
+  }
+
+  private uniqueStocks(stocks: any[]) {
+    const byId = new Map<string, any>();
+    for (const stock of stocks) {
+      byId.set(stock.id || stock.symbol, stock);
+    }
+    return [...byId.values()];
+  }
+
+  private identityText(value: unknown): string | null {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim().toUpperCase();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  private identityAssetType(value: unknown): string {
+    const normalized = typeof value === 'string' ? value.trim().toUpperCase() : '';
+    if (!normalized || normalized === 'EQUITY') return 'STOCK';
+    return normalized;
+  }
+
+  private needsCatalogIdentityRepair(stock: any): boolean {
+    return this.isBlank(stock.exchange)
+      || this.isBlank(stock.providerSymbol)
+      || this.isBlank(stock.sourceSymbol)
+      || this.isBlank(stock.displaySymbol)
+      || this.isBlank(stock.catalogSource)
+      || this.isBlank(stock.isin)
+      || !stock.ipoDate;
+  }
+
+  private repairedCatalogIdentityFields(stock: any, row: CreateStockRequest): string[] {
+    const repaired: string[] = [];
+    if (this.isBlank(stock.exchange) && !this.isBlank(row.exchange)) repaired.push('exchange');
+    if (this.isBlank(stock.providerSymbol) && !this.isBlank(row.providerSymbol)) repaired.push('providerSymbol');
+    if (this.isBlank(stock.sourceSymbol) && !this.isBlank(row.sourceSymbol)) repaired.push('sourceSymbol');
+    if (this.isBlank(stock.displaySymbol) && !this.isBlank(row.displaySymbol)) repaired.push('displaySymbol');
+    if (this.isBlank(stock.catalogSource) && !this.isBlank(row.catalogSource)) repaired.push('catalogSource');
+    if (this.isBlank(stock.isin) && !this.isBlank(row.isin)) repaired.push('isin');
+    if (!stock.ipoDate && row.ipoDate) repaired.push('ipoDate');
+    return repaired;
+  }
+
+  private emptyRepairSummary(
+    scope: { region: string; assetType: string },
+    batch: { batchSize: number; offset: number },
+    totalCount: number,
+    stableMutatingQueue = false
+  ): MarketDataRepairSummary {
+    const nextOffset = batch.offset + batch.batchSize;
+    const hasMore = stableMutatingQueue ? totalCount > batch.batchSize : nextOffset < totalCount;
+    return {
+      scope,
+      processedCount: 0,
+      totalCount,
+      batchSize: batch.batchSize,
+      offset: batch.offset,
+      nextOffset: hasMore ? (stableMutatingQueue ? 0 : nextOffset) : null,
+      hasMore,
+      updated: 0,
+      skipped: 0,
+      failed: 0,
+      warnings: [],
+      durationMs: 0,
+    };
+  }
+
+  private finishRepairSummary(summary: MarketDataRepairSummary, started: number) {
+    summary.durationMs = Date.now() - started;
+    summary.warnings = summary.warnings.slice(0, 25);
+  }
+
+  private needsMetadataEnrichment(stock: any): boolean {
+    return !this.hasValidMetadataValue(stock.sector)
+      || !this.hasValidMetadataValue(stock.industry)
+      || !this.hasValidMarketCap(stock.marketCap)
+      || !stock.isin
+      || !stock.ipoDate;
+  }
+
+  private needsBusinessMetadataRepair(stock: any): boolean {
+    return !this.hasValidMetadataValue(stock.sector)
+      || !this.hasValidMetadataValue(stock.industry)
+      || !this.hasValidMarketCap(stock.marketCap);
+  }
+
+  private missingBusinessMetadataFields(stock: any): string[] {
+    const missing: string[] = [];
+    if (!this.hasValidMetadataValue(stock.sector)) missing.push('sector');
+    if (!this.hasValidMetadataValue(stock.industry)) missing.push('industry');
+    if (!this.hasValidMarketCap(stock.marketCap)) missing.push('marketCap');
+    return missing;
+  }
+
+  private providerBusinessMetadataHasUsefulFields(providerData: any): boolean {
+    if (!providerData || providerData.dataStatus === 'MISSING') return false;
+    return this.hasValidMetadataValue(providerData.sector)
+      || this.hasValidMetadataValue(providerData.industry)
+      || this.hasValidMarketCap(providerData.marketCap);
+  }
+
+  private providerBusinessMetadataUpdate(stock: any, providerData: any): Partial<CreateStockRequest> {
+    const update: Partial<CreateStockRequest> = {
+      source: stock.source || 'database',
+    };
+    if (!this.hasValidMetadataValue(stock.sector) && this.hasValidMetadataValue(providerData.sector)) {
+      update.sector = String(providerData.sector).trim();
+      update.source = 'yahoo';
+    }
+    if (!this.hasValidMetadataValue(stock.industry) && this.hasValidMetadataValue(providerData.industry)) {
+      update.industry = String(providerData.industry).trim();
+      update.source = 'yahoo';
+    }
+    if (!this.hasValidMarketCap(stock.marketCap) && this.hasValidMarketCap(providerData.marketCap)) {
+      update.marketCap = Number(providerData.marketCap);
+      update.source = 'yahoo';
+    }
+    return update;
+  }
+
+  private providerBusinessStateAfterRepair(
+    stockAfterRepair: any,
+    fieldsFilled: string[]
+  ): {
+    stateStatus: MarketDataRepairStateStatus;
+    attemptStatus: MarketDataProviderBusinessRepairStatus;
+    remainingFields: string[];
+    manualRequiredReason?: string;
+  } {
+    const remainingFields = this.missingBusinessMetadataFields(stockAfterRepair);
+    if (remainingFields.length === 0) {
+      return {
+        stateStatus: 'RESOLVED',
+        attemptStatus: 'SUCCESS',
+        remainingFields,
+      };
+    }
+    const manualRequiredReason = `Missing business metadata after repair: ${remainingFields.join(', ')}`;
+    return {
+      stateStatus: 'MANUAL_REQUIRED',
+      attemptStatus: fieldsFilled.length > 0 ? 'PARTIAL_SUCCESS' : 'NO_FIELDS_FILLED',
+      remainingFields,
+      manualRequiredReason,
+    };
+  }
+
+  private async recordProviderBusinessRepairAttempt(
+    stock: any,
+    scope: { region: string; assetType: string },
+    status: MarketDataProviderBusinessRepairStatus,
+    fieldsFilled: Record<string, number>,
+    error?: string,
+    manualRequiredReason?: string,
+    stateStatusOverride?: MarketDataRepairStateStatus
+  ) {
+    const repositoryAny = this.repository as any;
+    if (typeof repositoryAny.recordRepairAttempt !== 'function') return;
+    const attempt = await repositoryAny.recordRepairAttempt({
+      stockId: stock.id,
+      region: scope.region,
+      assetType: scope.assetType,
+      repairType: 'PROVIDER_BUSINESS_METADATA',
+      status,
+      provider: 'yahoo',
+      fieldsFilledJson: fieldsFilled,
+      error,
+      manualRequiredReason,
+    });
+    if (typeof repositoryAny.upsertRepairState !== 'function') return;
+    const stateStatus = stateStatusOverride ?? this.providerBusinessCurrentStateForAttempt(status);
+    await repositoryAny.upsertRepairState({
+      stockId: stock.id,
+      region: scope.region,
+      assetType: scope.assetType,
+      repairType: 'PROVIDER_BUSINESS_METADATA',
+      status: stateStatus,
+      provider: 'yahoo',
+      lastAttemptId: attempt?.id ?? null,
+      fieldsFilledJson: fieldsFilled,
+      error,
+      manualRequiredReason,
+      nextRetryAt: stateStatus === 'FAILED_RETRYABLE' ? new Date(Date.now() + 24 * 60 * 60 * 1000) : null,
+      resolvedAt: stateStatus === 'RESOLVED' ? new Date() : null,
+    });
+  }
+
+  private providerBusinessCurrentStateForAttempt(status: MarketDataProviderBusinessRepairStatus): MarketDataRepairStateStatus {
+    if (status === 'SUCCESS') return 'RESOLVED';
+    if (status === 'FAILED') return 'FAILED_RETRYABLE';
+    if (status === 'SKIPPED_RECENT_ATTEMPT') return 'RETRY_COOLDOWN';
+    return 'MANUAL_REQUIRED';
+  }
+
+  private async recordManualMetadataRepairSuccess(stock: any, scope: { region: string; assetType: string }, filledFields: string[]) {
+    const repositoryAny = this.repository as any;
+    if (typeof repositoryAny.recordRepairAttempt !== 'function') return;
+    const fieldsFilled = Object.fromEntries(filledFields.map((field) => [field, 1]));
+    const businessState = this.providerBusinessStateAfterRepair(
+      stock,
+      filledFields.filter((field) => ['sector', 'industry', 'marketCap'].includes(field))
+    );
+    const attempt = await repositoryAny.recordRepairAttempt({
+      stockId: stock.id,
+      region: scope.region,
+      assetType: scope.assetType,
+      repairType: 'MANUAL_METADATA_IMPORT',
+      status: businessState.attemptStatus,
+      provider: 'manual_csv',
+      fieldsFilledJson: fieldsFilled,
+      manualRequiredReason: businessState.manualRequiredReason,
+    });
+    if (typeof repositoryAny.upsertRepairState !== 'function') return;
+    await repositoryAny.upsertRepairState({
+      stockId: stock.id,
+      region: scope.region,
+      assetType: scope.assetType,
+      repairType: 'PROVIDER_BUSINESS_METADATA',
+      status: businessState.stateStatus,
+      provider: 'manual_csv',
+      lastAttemptId: attempt?.id ?? null,
+      fieldsFilledJson: fieldsFilled,
+      error: null,
+      manualRequiredReason: businessState.manualRequiredReason ?? null,
+      nextRetryAt: null,
+      resolvedAt: businessState.stateStatus === 'RESOLVED' ? new Date() : null,
+    });
+  }
+
+  private missingRepairFields(stock: any): string[] {
+    const missing: string[] = [];
+    if (!this.hasValidMetadataValue(stock.sector)) missing.push('sector');
+    if (!this.hasValidMetadataValue(stock.industry)) missing.push('industry');
+    if (!this.hasValidMarketCap(stock.marketCap)) missing.push('marketCap');
+    if (!stock.isin) missing.push('isin');
+    if (!stock.ipoDate) missing.push('ipoDate');
+    return missing;
+  }
+
+  private providerMetadataHasUsefulFields(providerData: any): boolean {
+    if (!providerData) return false;
+    if (providerData.dataStatus === 'MISSING') return false;
+    return ['companyName', 'exchange', 'sector', 'industry', 'marketCap']
+      .some((field) => providerData[field] !== null && providerData[field] !== undefined && providerData[field] !== '');
+  }
+
+  private repairedMetadataFields(stock: any, update: Partial<CreateStockRequest>, missingBefore: string[]): string[] {
+    return missingBefore.filter((field) => {
+      const before = stock[field];
+      const after = (update as any)[field];
+      if (after === null || after === undefined || after === '') return false;
+      if (field === 'marketCap') return !this.hasValidMarketCap(before) && this.hasValidMarketCap(after);
+      return !before;
+    });
+  }
+
+  private metadataOverridesFromCsv(csvText: string, catalogSource: string): Map<string, { isin?: string | null; ipoDate?: Date | null }> {
+    const overrides = new Map<string, { isin?: string | null; ipoDate?: Date | null }>();
+    if (!csvText.trim()) return overrides;
+    const warnings: string[] = [];
+    for (const row of this.catalogRowsForSource(String(catalogSource || 'NSE_EQUITY_SECURITIES').toUpperCase(), csvText, warnings)) {
+      const keys = [row.sourceSymbol, row.symbol, row.providerSymbol, row.displaySymbol]
+        .filter((value): value is string => Boolean(value))
+        .map((value) => this.baseSymbolFromProviderSymbol(value));
+      for (const key of keys) {
+        overrides.set(key, { isin: row.isin || null, ipoDate: row.ipoDate || null });
+      }
+    }
+    return overrides;
+  }
+
+  private async priceBackfillCandidates(scope: { region: string; assetType: string }) {
+    const stocks = await this.repository.listStocksForUniverseHealth(scope);
+    const readinessBySymbol = await this.universeReadinessForStocks(stocks, scope);
+    return stocks.filter((stock) => {
+      if (stock.isActive === false || stock.isDelisted === true) return false;
+      if (normalizeProviderStatus(stock.providerSupportStatus) !== 'SUPPORTED') return false;
+      const readiness = readinessBySymbol.get(stock.symbol);
+      return readiness?.priceReadiness !== 'READY';
+    });
+  }
+
+  private endOfTradingDateUtc(tradingDate: string | null): Date {
+    const safeDate = tradingDate || new Date().toISOString().slice(0, 10);
+    return new Date(`${safeDate}T23:59:59.999Z`);
+  }
+
+  private isBlank(value: unknown): boolean {
+    return value === null || value === undefined || (typeof value === 'string' && value.trim().length === 0);
+  }
+
+  private hasValidMetadataValue(value: unknown): value is string {
+    if (typeof value !== 'string') return false;
+    const normalized = value.trim().toUpperCase();
+    return Boolean(normalized) && !['UNKNOWN', 'N/A', 'NA', 'NONE', 'NULL'].includes(normalized);
+  }
+
+  private hasValidMarketCap(value: unknown): boolean {
+    if (value === null || value === undefined || value === '') return false;
+    const numeric = Number(value);
+    return Number.isFinite(numeric) && numeric > 0;
+  }
+
   private toV1Instrument(stock: any, overrides?: Partial<V1CreateInstrumentRequest>): V1Instrument {
     const assetType = this.normalizeInstrumentAssetType(overrides?.asset_type || stock.assetType || 'STOCK', stock.symbol, stock.name);
     const segment = this.deriveInstrumentSegment(assetType, stock.symbol);
@@ -1545,6 +3897,7 @@ export class MarketDataFoundationService {
       exchange: stock.exchange,
     });
     const derivativesEligible = Boolean(stock.derivativesEligible) || (assetType === 'STOCK' && this.isKnownNseDerivativesEligibleStock(symbolParts.sourceSymbol));
+    const readiness = stock.universeReadiness as InstrumentUniverseReadiness | undefined;
     const missingFields = this.missingMetadataFields({
       companyName: overrides?.company_name || stock.name,
       exchange: overrides?.exchange || stock.exchange,
@@ -1555,6 +3908,8 @@ export class MarketDataFoundationService {
       marketCap: stock.marketCap,
       assetType,
       instrumentSegment: segment,
+      isin: stock.isin,
+      listingDate: stock.ipoDate,
     });
     return {
       id: stock.id,
@@ -1583,6 +3938,23 @@ export class MarketDataFoundationService {
       contract_status: stock.contractStatus || null,
       metadata_completeness_score: this.metadataCompletenessScore(missingFields),
       missing_metadata_fields: missingFields,
+      universe_state: readiness?.universeState,
+      price_history_bars: readiness?.priceHistoryBars,
+      latest_price_date: readiness?.latestPriceDate ?? undefined,
+      expected_latest_trading_date: readiness?.expectedLatestTradingDate ?? undefined,
+      has_recent_volume: readiness?.hasRecentVolume,
+      rolling_window_bars: readiness?.rollingWindowBars,
+      rolling_window_coverage_percent: readiness?.rollingWindowCoveragePercent,
+      max_price_gap_days: readiness?.maxPriceGapDays ?? null,
+      recent_volume_coverage_percent: readiness?.recentVolumeCoveragePercent,
+      adjusted_close_coverage_percent: readiness?.adjustedCloseCoveragePercent,
+      uses_adjusted_close_fallback: readiness?.usesAdjustedCloseFallback,
+      readiness_blockers: readiness?.readinessBlockers,
+      readiness_warnings: readiness?.readinessWarnings,
+      provider_readiness: readiness?.providerReadiness,
+      price_readiness: readiness?.priceReadiness,
+      metadata_readiness: readiness?.metadataReadiness,
+      review_readiness: readiness?.reviewReadiness,
       is_active: stock.isActive ?? true,
       is_delisted: stock.isDelisted ?? false,
       ipo_date: stock.ipoDate instanceof Date ? stock.ipoDate.toISOString() : stock.ipoDate ? new Date(stock.ipoDate).toISOString() : null,
@@ -1654,7 +4026,7 @@ export class MarketDataFoundationService {
   }
 
   private metadataCompletenessScore(missingFields: string[]): number {
-    const total = 9;
+    const total = 11;
     return Math.max(0, Math.round(((total - missingFields.length) / total) * 100));
   }
 
@@ -2159,6 +4531,11 @@ export class MarketDataFoundationService {
     }
     values.push(current);
     return values;
+  }
+
+  private csvEscape(value: unknown): string {
+    const text = value === null || value === undefined ? '' : String(value);
+    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
   }
 
   private readCsv(row: Record<string, string>, keys: string[]): string {

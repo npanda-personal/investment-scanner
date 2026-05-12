@@ -37,6 +37,23 @@ export interface V1Instrument {
   contract_status?: string | null;
   metadata_completeness_score?: number;
   missing_metadata_fields?: string[];
+  universe_state?: UniverseState;
+  price_history_bars?: number;
+  latest_price_date?: string | null;
+  expected_latest_trading_date?: string | null;
+  has_recent_volume?: boolean;
+  rolling_window_bars?: number;
+  rolling_window_coverage_percent?: number;
+  max_price_gap_days?: number | null;
+  recent_volume_coverage_percent?: number;
+  adjusted_close_coverage_percent?: number;
+  uses_adjusted_close_fallback?: boolean;
+  readiness_blockers?: string[];
+  readiness_warnings?: string[];
+  provider_readiness?: string;
+  price_readiness?: 'READY' | 'MISSING_LATEST_PRICE' | 'MARKET_CALENDAR_UNCERTAIN' | 'STALE_LATEST_PRICE' | 'INADEQUATE_HISTORY' | 'MISSING_RECENT_VOLUME';
+  metadata_readiness?: 'READY' | 'MISSING_REQUIRED_METADATA';
+  review_readiness?: 'REVIEW_READY' | 'NOT_REVIEW_READY';
   is_active: boolean;
   is_delisted: boolean;
   ipo_date: string | null;
@@ -45,6 +62,343 @@ export interface V1Instrument {
   ingestion_timestamp: string;
   last_updated_timestamp: string;
   data_status: 'COMPLETE' | 'PARTIAL' | 'DELAYED' | 'MISSING' | 'ERROR';
+}
+
+export type UniverseState =
+  | 'CATALOG_ONLY'
+  | 'PROVIDER_SUPPORTED'
+  | 'PRICE_READY'
+  | 'CONTEXT_READY'
+  | 'REVIEW_READY'
+  | 'UNSUPPORTED'
+  | 'STALE_OR_INCOMPLETE'
+  | 'DELISTED_OR_INACTIVE';
+
+export type MarketDataRepairRunAction =
+  | 'VALIDATE_PROVIDERS'
+  | 'RETRY_FAILED_PROVIDERS'
+  | 'CATALOG_IDENTITY_REPAIR'
+  | 'PROVIDER_BUSINESS_METADATA_REPAIR'
+  | 'MANUAL_METADATA_IMPORT'
+  | 'BACKFILL_PRICES';
+
+export interface MarketDataUniverseSignoff {
+  status: 'PASS' | 'FAIL';
+  minReviewReadyRequired: number;
+  reviewReadyActual: number;
+  blockers: Array<{
+    code: string;
+    severity: 'warning' | 'critical';
+    count: number;
+    required: number | string;
+    nextAction: MarketDataRepairRunAction | 'MANUAL_METADATA_IMPORT' | null;
+  }>;
+  nextAction: MarketDataRepairRunAction | 'MANUAL_METADATA_IMPORT' | null;
+  downstreamAllowed: boolean;
+}
+
+export interface MarketDataUniverseHealth {
+  scope: {
+    region: string;
+    assetType: string;
+  };
+  generatedAt: string;
+  latestStoredEodDate: string | null;
+  expectedLatestTradingDate: string | null;
+  counts: Record<UniverseState, number> & {
+    byUniverseState: Record<UniverseState, number>;
+    readiness: {
+      priceReady: number;
+      contextReady: number;
+      reviewReady: number;
+    };
+    totalCatalogInstruments: number;
+    activeInstruments: number;
+    inactiveOrDelistedInstruments: number;
+    providerSupported: number;
+    providerUnknown: number;
+    providerUnknownValidationNeeded: number;
+    providerRetryValidationNeeded: number;
+    providerUnsupportedExcluded: number;
+    providerValidationFailed: number;
+    unsupported: number;
+    unsupportedExcluded: number;
+    supportedCatalogIdentityRepairNeeded: number;
+    supportedBusinessMetadataRepairNeeded: number;
+    supportedPriceBackfillNeeded: number;
+    catalogOnly: number;
+    priceReady: number;
+    contextReady: number;
+    reviewReady: number;
+    staleOrIncomplete: number;
+    missingLatestPrice: number;
+    staleLatestPrice: number;
+    missingOrInadequatePriceHistory: number;
+    missingRecentVolume: number;
+    missingSector: number;
+    missingIndustry: number;
+    missingCountry: number;
+    missingCurrency: number;
+    missingMarketCap: number;
+    missingIsin: number;
+    missingListingDate: number;
+  };
+  coverage: {
+    priceCoveragePercentage: number;
+    metadataCoveragePercentage: number;
+    reviewReadyPercentage: number;
+  };
+  topBlockers: Array<{
+    code: string;
+    label: string;
+    count: number;
+    severity: 'warning' | 'critical';
+  }>;
+  warnings: string[];
+  trustStatus: 'OK' | 'PARTIAL' | 'NOT_TRUSTWORTHY';
+  trustReasons: string[];
+  universeSignoff: MarketDataUniverseSignoff;
+}
+
+export interface MarketDataRepairPlan {
+  scope: {
+    region: string;
+    assetType: string;
+  };
+  generatedAt: string;
+  totalCatalogInstruments: number;
+  providerUnknownValidationNeeded: number;
+  providerRetryValidationNeeded: number;
+  providerUnsupportedExcluded: number;
+  providerValidationFailed: number;
+  providerValidationNeeded: number;
+  retryFailedValidations: number;
+  supportedCatalogIdentityRepairNeeded: number;
+  supportedBusinessMetadataRepairNeeded: number;
+  supportedPriceBackfillNeeded: number;
+  unsupportedExcluded: number;
+  catalogIdentityRepairNeeded: number;
+  priceBackfillNeeded: number;
+  businessMetadataRepairNeeded: number;
+  businessMetadataAutoRepairable: number;
+  businessMetadataManualRequired: number;
+  businessMetadataRetryBlocked: number;
+  businessMetadataRetryEligible: number;
+  businessMetadataRecentlyAttempted: number;
+  metadataEnrichmentNeeded: number;
+  manualMetadataRequired: number;
+  manualBusinessMetadataRequired: number;
+  missingIsin: number;
+  missingListingDate: number;
+  missingSector: number;
+  missingIndustry: number;
+  missingMarketCap: number;
+  manualSectorIndustryRequired: number;
+  topActions: Array<{
+    action:
+      | 'VALIDATE_PROVIDERS'
+      | 'RETRY_FAILED_PROVIDERS'
+      | 'CATALOG_IDENTITY_REPAIR'
+      | 'PROVIDER_BUSINESS_METADATA_REPAIR'
+      | 'BACKFILL_PRICES'
+      | 'MANUAL_METADATA_IMPORT';
+    label: string;
+    count: number;
+  }>;
+  warnings: string[];
+  universeSignoff: MarketDataUniverseSignoff;
+}
+
+export interface MarketDataRepairRequest {
+  region?: string;
+  assetType?: string;
+  batchSize?: number;
+  offset?: number;
+  maxBatchesPerAction?: number;
+  includeRetryFailed?: boolean;
+  providerValidationQueue?: 'UNKNOWN_FIRST' | 'RETRY_FAILED';
+  force?: boolean;
+  fullReload?: boolean;
+  csvText?: string;
+  catalogSource?: string;
+  importMode?: 'MANUAL_CSV' | 'CONFIGURED_URL';
+  actions?: MarketDataRepairRunAction[];
+  dryRun?: boolean;
+  mode?: 'DRAIN_UNTIL_BLOCKED';
+}
+
+export type MarketDataRepairRunStatus = 'RUNNING' | 'COMPLETED' | 'PARTIAL' | 'PARTIAL_BLOCKED' | 'PARTIAL_MANUAL_REQUIRED' | 'FAILED';
+
+export interface MarketDataManualMetadataTemplate {
+  scope: {
+    region: string;
+    assetType: string;
+  };
+  generatedAt: string;
+  count: number;
+  csvText: string;
+  rows: Array<{
+    symbol: string;
+    providerSymbol: string | null;
+    companyName: string | null;
+    exchange: string | null;
+    currentSector: string | null;
+    currentIndustry: string | null;
+    currentMarketCap: number | null;
+    requiredFields: string[];
+    suggestedSource: string;
+    notes: string;
+  }>;
+}
+
+export interface MarketDataRepairSourceIdentity {
+  action?: MarketDataRepairRunAction;
+  catalogSource?: string;
+  importMode?: string;
+  sourceKey?: string;
+  sourceUrl?: string | null;
+  urlSource?: string | null;
+  rowCount?: number;
+  contentSha256?: string;
+  rowsSha256?: string;
+}
+
+export interface MarketDataRepairSummary {
+  scope: {
+    region: string;
+    assetType: string;
+  };
+  processedCount: number;
+  totalCount: number;
+  batchSize: number;
+  offset: number;
+  nextOffset: number | null;
+  hasMore: boolean;
+  updated: number;
+  skipped: number;
+  failed: number;
+  noOp?: number;
+  partialSuccess?: number;
+  manualRequired?: number;
+  providerNotFound?: number;
+  skippedRecentAttempt?: number;
+  remainingAutoRepairable?: number;
+  remainingManualRequired?: number;
+  catalogIdentityRepaired?: number;
+  providerBusinessMetadataRepaired?: number;
+  fieldsFilled?: Record<string, number>;
+  warnings: string[];
+  durationMs: number;
+  providerValidationQueue?: 'UNKNOWN_FIRST' | 'RETRY_FAILED';
+  providerValidated?: number;
+  providerSupported?: number;
+  providerUnsupported?: number;
+  validationFailed?: number;
+  metadataEnriched?: number;
+  priceRowsReceived?: number;
+  priceRowsInserted?: number;
+  priceRowsUpdated?: number;
+  priceRowsNoOp?: number;
+  fieldProvenance?: Array<{
+    instrumentId: string;
+    symbol: string;
+    sectorSource?: string | null;
+    industrySource?: string | null;
+    marketCapSource?: string | null;
+    isinSource?: string | null;
+    listingDateSource?: string | null;
+    metadataUpdatedAt: string;
+  }>;
+  catalogSource?: string;
+  catalogRowsRead?: number;
+  downloaded?: boolean;
+  matchedExistingRows?: number;
+  unmatchedCatalogRows?: number;
+  sourceFingerprint?: string;
+  sourceIdentity?: MarketDataRepairSourceIdentity;
+}
+
+export interface MarketDataRepairRunActionResult {
+  action: MarketDataRepairRunAction;
+  label: string;
+  estimatedTotal: number;
+  estimatedBatchCount: number;
+  batchesPlanned: number;
+  batchesExecuted: number;
+  dryRun: boolean;
+  hasMore: boolean;
+  anotherRunNeeded: boolean;
+  totals: {
+    processedCount: number;
+    updated: number;
+    skipped: number;
+    failed: number;
+    noOp: number;
+    manualRequired: number;
+  };
+  summaries: MarketDataRepairSummary[];
+  warnings: string[];
+  error?: string;
+  sourceFingerprint?: string;
+  sourceIdentity?: MarketDataRepairSourceIdentity;
+  resumeOffset?: number;
+}
+
+export interface MarketDataRepairRunResponse {
+  id: string | null;
+  dryRun: boolean;
+  scope: {
+    region: string;
+    assetType: string;
+  };
+  status: MarketDataRepairRunStatus;
+  startedAt: string;
+  completedAt: string | null;
+  beforeHealth: MarketDataUniverseHealth;
+  afterHealth: MarketDataUniverseHealth;
+  beforeRepairPlan: MarketDataRepairPlan;
+  afterRepairPlan: MarketDataRepairPlan;
+  actions: MarketDataRepairRunActionResult[];
+  summary: {
+    actionsRequested: MarketDataRepairRunAction[];
+    batchesExecuted: number;
+    updated: number;
+    skipped: number;
+    failed: number;
+    noOp: number;
+    manualRequired: number;
+  };
+  warnings: string[];
+  anotherRunNeeded: boolean;
+  hardBlockersRemaining: MarketDataUniverseHealth['topBlockers'];
+  expectedNextAction: MarketDataRepairRunAction | null;
+  afterTrustStatus: MarketDataUniverseHealth['trustStatus'];
+  universeSignoff: MarketDataUniverseSignoff;
+  error?: string | null;
+}
+
+export interface MarketDataRepairRunRecord {
+  id: string;
+  scope: {
+    region: string;
+    assetType: string;
+  };
+  status: MarketDataRepairRunStatus;
+  startedAt: string;
+  completedAt: string | null;
+  beforeHealth: MarketDataUniverseHealth | null;
+  afterHealth: MarketDataUniverseHealth | null;
+  beforeRepairPlan: MarketDataRepairPlan | null;
+  afterRepairPlan: MarketDataRepairPlan | null;
+  actions: MarketDataRepairRunActionResult[];
+  summary: MarketDataRepairRunResponse['summary'] | null;
+  warnings: string[];
+  anotherRunNeeded: boolean;
+  hardBlockersRemaining: MarketDataUniverseHealth['topBlockers'];
+  expectedNextAction: MarketDataRepairRunAction | null;
+  afterTrustStatus: MarketDataUniverseHealth['trustStatus'] | null;
+  universeSignoff: MarketDataUniverseSignoff | null;
+  error?: string | null;
 }
 
 export interface V1CreateInstrumentRequest {

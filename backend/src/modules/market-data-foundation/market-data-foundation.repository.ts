@@ -12,12 +12,17 @@ import type {
   MarketDataSyncStateDto,
   MarketDataSyncScopeType,
   MarketDataSyncStateStatus,
+  MarketDataRepairType,
+  MarketDataRepairRunStatus,
+  MarketDataRepairStateStatus,
+  ProviderValidationQueue,
   ScheduledRegionSyncSummary,
 } from './market-data-foundation.types';
 import { partitionHistoricalPrices } from './market-data-foundation.validation';
 import type { YahooFinanceIngestionService } from './market-data-foundation.provider';
 import { resolveMarketRegionFilter } from '../../shared/utils/market-scope';
 import { knownNseFnoStockUnderlyingSymbols } from './market-data-foundation.fno-underlyings';
+import { STANDARD_REVIEW_MIN_BARS, type UniversePriceStats } from './market-data-foundation.universe';
 
 export class MarketDataFoundationRepository {
   constructor(public readonly prisma: PrismaClient = defaultPrisma) {}
@@ -275,12 +280,51 @@ export class MarketDataFoundationRepository {
     return { stock, action: 'updated' };
   }
 
+  async repairCatalogIdentityForStock(
+    stockId: string,
+    data: CreateStockRequest,
+    options: { force?: boolean } = {}
+  ): Promise<{ stock: any; action: 'updated' | 'noOp' }> {
+    const existing = await this.prisma.stock.findUnique({ where: { id: stockId } });
+    if (!existing) {
+      throw new Error(`Stock ${stockId} not found for catalog identity repair.`);
+    }
+    const updateData = this.catalogIdentityUpdateData(existing, data, Boolean(options.force));
+    if (Object.keys(updateData).length === 0) {
+      return { stock: existing, action: 'noOp' };
+    }
+    const stock = await this.prisma.stock.update({
+      where: { id: stockId },
+      data: updateData,
+    });
+    return { stock, action: 'updated' };
+  }
+
   async updateProviderSupportStatus(symbol: string, status: string, providerError?: string | null) {
     return this.prisma.stock.update({
       where: { symbol },
       data: {
         providerSupportStatus: status,
         providerError: providerError || null,
+      },
+    });
+  }
+
+  async markProviderSupportedFromStoredPrices(symbols: string[]) {
+    const uniqueSymbols = [...new Set(symbols.filter(Boolean))];
+    if (uniqueSymbols.length === 0) return { count: 0 };
+    return this.prisma.stock.updateMany({
+      where: {
+        symbol: { in: uniqueSymbols },
+        OR: [
+          { providerSupportStatus: null },
+          { providerSupportStatus: '' },
+          { providerSupportStatus: { equals: 'UNKNOWN', mode: 'insensitive' } },
+        ],
+      },
+      data: {
+        providerSupportStatus: 'SUPPORTED',
+        providerError: null,
       },
     });
   }
@@ -473,6 +517,447 @@ export class MarketDataFoundationRepository {
     });
 
     return latestPrice?.timestamp ?? null;
+  }
+
+  listStocksForUniverseHealth(options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
+    return this.prisma.stock.findMany({
+      where: this.stockWhere(options),
+      orderBy: { symbol: 'asc' },
+    });
+  }
+
+  async listStocksForProviderValidation(options: Pick<PaginationOptions, 'region' | 'assetType'> & {
+    offset: number;
+    batchSize: number;
+    includeRetryFailed?: boolean;
+    providerValidationQueue?: ProviderValidationQueue;
+  }) {
+    const unknownWhere = this.providerValidationWhere(options, 'UNKNOWN_FIRST');
+    const retryWhere = this.providerValidationWhere(options, 'RETRY_FAILED');
+    const queue = options.providerValidationQueue || (options.includeRetryFailed ? null : 'UNKNOWN_FIRST');
+
+    if (queue === 'RETRY_FAILED') {
+      const [stocks, total] = await Promise.all([
+        this.prisma.stock.findMany({
+          where: retryWhere,
+          orderBy: { symbol: 'asc' },
+          skip: options.offset,
+          take: options.batchSize,
+        }),
+        this.prisma.stock.count({ where: retryWhere }),
+      ]);
+      return { stocks, total };
+    }
+
+    if (queue === 'UNKNOWN_FIRST') {
+      const [stocks, total] = await Promise.all([
+        this.prisma.stock.findMany({
+          where: unknownWhere,
+          orderBy: { symbol: 'asc' },
+          skip: options.offset,
+          take: options.batchSize,
+        }),
+        this.prisma.stock.count({ where: unknownWhere }),
+      ]);
+      return { stocks, total };
+    }
+
+    const [unknownTotal, retryTotal] = await Promise.all([
+      this.prisma.stock.count({ where: unknownWhere }),
+      this.prisma.stock.count({ where: retryWhere }),
+    ]);
+    const stocks = [];
+    if (options.offset < unknownTotal) {
+      const unknownStocks = await this.prisma.stock.findMany({
+        where: unknownWhere,
+        orderBy: { symbol: 'asc' },
+        skip: options.offset,
+        take: options.batchSize,
+      });
+      stocks.push(...unknownStocks);
+    }
+    if (stocks.length < options.batchSize) {
+      const retrySkip = Math.max(options.offset - unknownTotal, 0);
+      const retryStocks = await this.prisma.stock.findMany({
+        where: retryWhere,
+        orderBy: { symbol: 'asc' },
+        skip: retrySkip,
+        take: options.batchSize - stocks.length,
+      });
+      stocks.push(...retryStocks);
+    }
+    return { stocks, total: unknownTotal + retryTotal };
+  }
+
+  async listStocksForMetadataEnrichment(options: Pick<PaginationOptions, 'region' | 'assetType'> & { offset: number; batchSize: number }) {
+    const where: Prisma.StockWhereInput = {
+      AND: [
+        this.stockWhere(options),
+        { isActive: true },
+        { isDelisted: false },
+        {
+          OR: [
+            { sector: null },
+            { sector: '' },
+            { industry: null },
+            { industry: '' },
+            { marketCap: null },
+            { isin: null },
+            { isin: '' },
+            { ipoDate: null },
+          ],
+        },
+      ],
+    };
+    const [stocks, total] = await Promise.all([
+      this.prisma.stock.findMany({
+        where,
+        orderBy: { symbol: 'asc' },
+        skip: options.offset,
+        take: options.batchSize,
+      }),
+      this.prisma.stock.count({ where }),
+    ]);
+    return { stocks, total };
+  }
+
+  async listStocksForBusinessMetadataRepair(options: Pick<PaginationOptions, 'region' | 'assetType'> & {
+    offset: number;
+    batchSize: number;
+    includeManualRequired?: boolean;
+    includeRetryable?: boolean;
+  }) {
+    const where = this.businessMetadataRepairWhere(options, {
+      includeManualRequired: options.includeManualRequired,
+      includeRetryable: options.includeRetryable,
+    });
+    const [stocks, total] = await Promise.all([
+      this.prisma.stock.findMany({
+        where,
+        orderBy: { symbol: 'asc' },
+        skip: options.offset,
+        take: options.batchSize,
+      }),
+      this.prisma.stock.count({ where }),
+    ]);
+    return { stocks, total };
+  }
+
+  async countStocksForBusinessMetadataRepair(options: Pick<PaginationOptions, 'region' | 'assetType'> & {
+    includeManualRequired?: boolean;
+    includeRetryable?: boolean;
+  }) {
+    return this.prisma.stock.count({
+      where: this.businessMetadataRepairWhere(options, {
+        includeManualRequired: options.includeManualRequired,
+        includeRetryable: options.includeRetryable,
+      }),
+    });
+  }
+
+  async countBusinessMetadataRepairStates(options: Pick<PaginationOptions, 'region' | 'assetType'> & {
+    statuses: MarketDataRepairStateStatus[];
+    retryTiming?: 'blocked' | 'eligible';
+    now?: Date;
+  }) {
+    const now = options.now ?? new Date();
+    const stateFilters: Prisma.MarketDataRepairStateWhereInput[] = [
+      { status: { in: options.statuses } },
+    ] as any;
+    if (options.retryTiming === 'blocked') {
+      stateFilters.push({ status: 'FAILED_RETRYABLE' } as any, { nextRetryAt: { gt: now } } as any);
+    }
+    if (options.retryTiming === 'eligible') {
+      stateFilters.push(
+        { status: 'FAILED_RETRYABLE' } as any,
+        { OR: [{ nextRetryAt: null }, { nextRetryAt: { lte: now } }] } as any
+      );
+    }
+    return (this.prisma as any).marketDataRepairState.count({
+      where: {
+        region: options.region,
+        assetType: options.assetType,
+        repairType: 'PROVIDER_BUSINESS_METADATA',
+        AND: stateFilters,
+        stock: {
+          is: {
+            AND: [
+              this.stockWhere(options),
+              { isActive: true },
+              { isDelisted: false },
+              { providerSupportStatus: { equals: 'SUPPORTED', mode: 'insensitive' } },
+              this.businessMetadataMissingWhere(),
+            ],
+          },
+        },
+      },
+    });
+  }
+
+  async recordRepairAttempt(input: {
+    stockId: string;
+    region: string;
+    assetType?: string | null;
+    repairType: MarketDataRepairType;
+    status: string;
+    provider?: string | null;
+    attemptedAt?: Date;
+    completedAt?: Date | null;
+    fieldsFilledJson?: Prisma.InputJsonValue | null;
+    error?: string | null;
+    manualRequiredReason?: string | null;
+  }) {
+    const now = new Date();
+    return (this.prisma as any).marketDataRepairAttempt.create({
+      data: {
+        stockId: input.stockId,
+        region: input.region,
+        assetType: input.assetType ?? null,
+        repairType: input.repairType,
+        status: input.status,
+        provider: input.provider ?? null,
+        attemptedAt: input.attemptedAt ?? now,
+        completedAt: input.completedAt === undefined ? now : input.completedAt,
+        fieldsFilledJson: input.fieldsFilledJson ?? undefined,
+        error: input.error ?? null,
+        manualRequiredReason: input.manualRequiredReason ?? null,
+      },
+    });
+  }
+
+  async upsertRepairState(input: {
+    stockId: string;
+    region: string;
+    assetType?: string | null;
+    repairType: MarketDataRepairType;
+    status: MarketDataRepairStateStatus;
+    provider?: string | null;
+    lastAttemptId?: string | null;
+    fieldsFilledJson?: Prisma.InputJsonValue | null;
+    error?: string | null;
+    manualRequiredReason?: string | null;
+    nextRetryAt?: Date | null;
+    lastAttemptedAt?: Date | null;
+    resolvedAt?: Date | null;
+  }) {
+    const now = new Date();
+    return (this.prisma as any).marketDataRepairState.upsert({
+      where: {
+        stockId_repairType: {
+          stockId: input.stockId,
+          repairType: input.repairType,
+        },
+      },
+      create: {
+        stockId: input.stockId,
+        region: input.region,
+        assetType: input.assetType ?? null,
+        repairType: input.repairType,
+        status: input.status,
+        provider: input.provider ?? null,
+        lastAttemptId: input.lastAttemptId ?? null,
+        fieldsFilledJson: input.fieldsFilledJson ?? undefined,
+        error: input.error ?? null,
+        manualRequiredReason: input.manualRequiredReason ?? null,
+        nextRetryAt: input.nextRetryAt ?? null,
+        lastAttemptedAt: input.lastAttemptedAt ?? now,
+        resolvedAt: input.resolvedAt ?? (input.status === 'RESOLVED' ? now : null),
+      },
+      update: {
+        region: input.region,
+        assetType: input.assetType ?? null,
+        status: input.status,
+        provider: input.provider ?? null,
+        lastAttemptId: input.lastAttemptId ?? null,
+        fieldsFilledJson: input.fieldsFilledJson ?? undefined,
+        error: input.error ?? null,
+        manualRequiredReason: input.manualRequiredReason ?? null,
+        nextRetryAt: input.nextRetryAt ?? null,
+        lastAttemptedAt: input.lastAttemptedAt ?? now,
+        resolvedAt: input.resolvedAt ?? (input.status === 'RESOLVED' ? now : null),
+      },
+    });
+  }
+
+  async createRepairRun(input: {
+    region: string;
+    assetType?: string | null;
+    status: MarketDataRepairRunStatus;
+    beforeHealthJson?: Prisma.InputJsonValue | null;
+    beforeRepairPlanJson?: Prisma.InputJsonValue | null;
+    actionsJson: Prisma.InputJsonValue;
+    warningsJson?: Prisma.InputJsonValue | null;
+  }) {
+    return (this.prisma as any).marketDataRepairRun.create({
+      data: {
+        region: input.region,
+        assetType: input.assetType ?? null,
+        status: input.status,
+        beforeHealthJson: input.beforeHealthJson ?? undefined,
+        beforeRepairPlanJson: input.beforeRepairPlanJson ?? undefined,
+        actionsJson: input.actionsJson,
+        warningsJson: input.warningsJson ?? undefined,
+      },
+    });
+  }
+
+  async updateRepairRun(id: string, input: {
+    status: MarketDataRepairRunStatus;
+    completedAt?: Date | null;
+    afterHealthJson?: Prisma.InputJsonValue | null;
+    afterRepairPlanJson?: Prisma.InputJsonValue | null;
+    summaryJson?: Prisma.InputJsonValue | null;
+    warningsJson?: Prisma.InputJsonValue | null;
+    error?: string | null;
+  }) {
+    return (this.prisma as any).marketDataRepairRun.update({
+      where: { id },
+      data: {
+        status: input.status,
+        completedAt: input.completedAt ?? null,
+        afterHealthJson: input.afterHealthJson ?? undefined,
+        afterRepairPlanJson: input.afterRepairPlanJson ?? undefined,
+        summaryJson: input.summaryJson ?? undefined,
+        warningsJson: input.warningsJson ?? undefined,
+        error: input.error ?? null,
+      },
+    });
+  }
+
+  async latestRepairRun(options: Pick<PaginationOptions, 'region' | 'assetType'>) {
+    return (this.prisma as any).marketDataRepairRun.findFirst({
+      where: {
+        region: options.region,
+        assetType: options.assetType ?? null,
+      },
+      orderBy: { startedAt: 'desc' },
+    });
+  }
+
+  async priceReadinessStatsForSymbols(symbols: string[]): Promise<Map<string, UniversePriceStats>> {
+    const uniqueSymbols = [...new Set(symbols.filter(Boolean))];
+    const emptyStats: Map<string, UniversePriceStats> = new Map(uniqueSymbols.map((symbol) => [symbol, {
+      priceHistoryBars: 0,
+      latestPriceDate: null,
+      latestVolume: null,
+      latestAdjustedClose: null,
+      latestClose: null,
+      rollingWindowBars: 0,
+      rollingWindowCoveragePercent: 0,
+      maxPriceGapDays: null,
+      recentVolumeCoveragePercent: 0,
+      adjustedCloseCoveragePercent: 0,
+      usesAdjustedCloseFallback: true,
+    } satisfies UniversePriceStats]));
+    if (uniqueSymbols.length === 0) return emptyStats;
+
+    const aggregates = await this.prisma.priceTick.groupBy({
+      by: ['symbol'],
+      where: { symbol: { in: uniqueSymbols } },
+      _count: { _all: true },
+      _max: { timestamp: true },
+    });
+    const latestRows: Array<{
+      symbol: string;
+      timestamp: Date;
+      volume: bigint | null;
+      adjustedClose: Prisma.Decimal | null;
+      close: Prisma.Decimal;
+    }> = [];
+    const latestConditions = aggregates
+      .filter((item) => item._max.timestamp)
+      .map((item) => ({ symbol: item.symbol, timestamp: item._max.timestamp as Date }));
+    const chunkSize = 250;
+    for (let index = 0; index < latestConditions.length; index += chunkSize) {
+      latestRows.push(...await this.prisma.priceTick.findMany({
+        where: { OR: latestConditions.slice(index, index + chunkSize) },
+        select: {
+          symbol: true,
+          timestamp: true,
+          volume: true,
+          adjustedClose: true,
+          close: true,
+        },
+      }));
+    }
+    const latestByKey = new Map(latestRows.map((row) => [`${row.symbol}|${row.timestamp.toISOString()}`, row]));
+
+    const recentQualityBySymbol = await this.priceQualityRowsForSymbols(aggregates.map((aggregate) => aggregate.symbol));
+
+    for (const aggregate of aggregates) {
+      const latestTimestamp = aggregate._max.timestamp;
+      const latest = latestTimestamp ? latestByKey.get(`${aggregate.symbol}|${latestTimestamp.toISOString()}`) : null;
+      const quality = this.priceQualityStats(recentQualityBySymbol.get(aggregate.symbol) || []);
+      emptyStats.set(aggregate.symbol, {
+        priceHistoryBars: aggregate._count._all,
+        latestPriceDate: latestTimestamp ? latestTimestamp.toISOString().slice(0, 10) : null,
+        latestVolume: latest?.volume ?? null,
+        latestAdjustedClose: latest?.adjustedClose ?? null,
+        latestClose: latest?.close ?? null,
+        ...quality,
+      });
+    }
+
+    return emptyStats;
+  }
+
+  private async priceQualityRowsForSymbols(symbols: string[]) {
+    const rowsBySymbol = new Map<string, Array<{
+      timestamp: Date;
+      volume: bigint | null;
+      adjustedClose: Prisma.Decimal | null;
+      close: Prisma.Decimal;
+    }>>();
+    const uniqueSymbols = [...new Set(symbols.filter(Boolean))];
+    const chunkSize = 25;
+    for (let index = 0; index < uniqueSymbols.length; index += chunkSize) {
+      const chunk = uniqueSymbols.slice(index, index + chunkSize);
+      const chunkRows = await Promise.all(chunk.map(async (symbol) => {
+        const rows = await this.prisma.priceTick.findMany({
+          where: { symbol },
+          orderBy: { timestamp: 'desc' },
+          take: STANDARD_REVIEW_MIN_BARS,
+          select: {
+            timestamp: true,
+            volume: true,
+            adjustedClose: true,
+            close: true,
+          },
+        });
+        return [symbol, rows] as const;
+      }));
+      for (const [symbol, rows] of chunkRows) rowsBySymbol.set(symbol, rows);
+    }
+    return rowsBySymbol;
+  }
+
+  private priceQualityStats(rows: Array<{
+    timestamp: Date;
+    volume: bigint | null;
+    adjustedClose: Prisma.Decimal | null;
+    close: Prisma.Decimal;
+  }>): Pick<UniversePriceStats, 'rollingWindowBars' | 'rollingWindowCoveragePercent' | 'maxPriceGapDays' | 'recentVolumeCoveragePercent' | 'adjustedCloseCoveragePercent' | 'usesAdjustedCloseFallback'> {
+    const rollingWindowBars = rows.length;
+    let maxPriceGapDays = 0;
+    for (let index = 1; index < rows.length; index += 1) {
+      const gapDays = Math.round(Math.abs(rows[index - 1].timestamp.getTime() - rows[index].timestamp.getTime()) / 86_400_000);
+      maxPriceGapDays = Math.max(maxPriceGapDays, gapDays);
+    }
+    const rowsWithVolume = rows.filter((row) => row.volume !== null && Number(row.volume) > 0).length;
+    const rowsWithAdjustedClose = rows.filter((row) => row.adjustedClose !== null && row.adjustedClose !== undefined).length;
+    return {
+      rollingWindowBars,
+      rollingWindowCoveragePercent: this.percent(rollingWindowBars, STANDARD_REVIEW_MIN_BARS),
+      maxPriceGapDays: rollingWindowBars > 1 ? maxPriceGapDays : null,
+      recentVolumeCoveragePercent: this.percent(rowsWithVolume, Math.max(rollingWindowBars, 1)),
+      adjustedCloseCoveragePercent: this.percent(rowsWithAdjustedClose, Math.max(rollingWindowBars, 1)),
+      usesAdjustedCloseFallback: rowsWithAdjustedClose < rollingWindowBars,
+    };
+  }
+
+  private percent(value: number, denominator: number) {
+    if (denominator <= 0) return 0;
+    return Number(((value / denominator) * 100).toFixed(1));
   }
 
   async priceCoverage(symbol: string) {
@@ -770,7 +1255,7 @@ export class MarketDataFoundationRepository {
         isDelisted: data.isDelisted ?? current.isDelisted,
         ipoDate: data.ipoDate ?? current.ipoDate,
         isin: this.keepExistingIfBlank(data.isin, current.isin),
-        source: 'yahoo',
+        source: data.source ?? current.source ?? 'yahoo',
         dataStatus: 'PARTIAL',
       },
     });
@@ -1085,6 +1570,10 @@ export class MarketDataFoundationRepository {
     if (data.expiryDate && data.expiryDate.getTime() !== existing.expiryDate?.getTime?.()) {
       next.expiryDate = data.expiryDate;
     }
+    if (data.ipoDate && data.ipoDate.getTime() !== existing.ipoDate?.getTime?.()) {
+      next.ipoDate = data.ipoDate;
+    }
+    this.assignIfChanged(next, 'isin', this.keepExistingIfBlank(data.isin, existing.isin), existing.isin);
     if (data.isDelisted !== undefined && data.isDelisted !== existing.isDelisted) next.isDelisted = data.isDelisted;
     if (data.isActive !== undefined && data.isActive !== existing.isActive) next.isActive = data.isActive;
     if (Object.keys(next).length > 0) {
@@ -1094,9 +1583,118 @@ export class MarketDataFoundationRepository {
     return next;
   }
 
+  private catalogIdentityUpdateData(existing: any, data: CreateStockRequest, force: boolean): Prisma.StockUpdateInput {
+    const next: Prisma.StockUpdateInput = {};
+    this.assignIdentityIfChanged(next, 'exchange', data.exchange, existing.exchange, force);
+    this.assignIdentityIfChanged(next, 'country', data.country, existing.country, force);
+    this.assignIdentityIfChanged(next, 'currency', data.currency, existing.currency, force);
+    this.assignIdentityIfChanged(next, 'assetType', data.assetType, existing.assetType, force);
+    this.assignIdentityIfChanged(next, 'instrumentSegment', data.instrumentSegment, existing.instrumentSegment, force);
+    this.assignIdentityIfChanged(next, 'displaySymbol', data.displaySymbol, existing.displaySymbol, force);
+    this.assignIdentityIfChanged(next, 'providerSymbol', data.providerSymbol, existing.providerSymbol, force);
+    this.assignIdentityIfChanged(next, 'sourceSymbol', data.sourceSymbol, existing.sourceSymbol, force);
+    this.assignIdentityIfChanged(next, 'catalogSource', data.catalogSource, existing.catalogSource, force);
+    this.assignIdentityIfChanged(next, 'isin', data.isin, existing.isin, force);
+    if (data.ipoDate && (force || !existing.ipoDate) && data.ipoDate.getTime() !== existing.ipoDate?.getTime?.()) {
+      next.ipoDate = data.ipoDate;
+    }
+    if (Object.keys(next).length > 0) {
+      next.source = data.catalogSource || data.source || existing.source || 'catalog';
+      next.dataStatus = data.dataStatus || existing.dataStatus || 'PARTIAL';
+    }
+    return next;
+  }
+
   private assignIfChanged(target: Prisma.StockUpdateInput, key: string, next: unknown, current: unknown) {
     if (next === undefined || next === null) return;
     if (next !== current) (target as any)[key] = next;
+  }
+
+  private assignIdentityIfChanged(target: Prisma.StockUpdateInput, key: string, next: unknown, current: unknown, force: boolean) {
+    if (next === undefined || next === null) return;
+    if (typeof next === 'string' && next.trim().length === 0) return;
+    if (!force && current !== null && current !== undefined && !(typeof current === 'string' && current.trim().length === 0)) return;
+    if (next !== current) (target as any)[key] = next;
+  }
+
+  private businessMetadataRepairWhere(
+    options: Pick<PaginationOptions, 'region' | 'assetType'>,
+    stateOptions: { includeManualRequired?: boolean; includeRetryable?: boolean } = {}
+  ): Prisma.StockWhereInput {
+    const and: Prisma.StockWhereInput[] = [
+      this.stockWhere(options),
+      { isActive: true },
+      { isDelisted: false },
+      { providerSupportStatus: { equals: 'SUPPORTED', mode: 'insensitive' } },
+      this.businessMetadataMissingWhere(),
+    ];
+    const now = new Date();
+    const excludedStates: Prisma.MarketDataRepairStateWhereInput[] = [];
+    if (!stateOptions.includeManualRequired) excludedStates.push({ status: 'MANUAL_REQUIRED' } as any);
+    if (!stateOptions.includeRetryable) {
+      excludedStates.push(
+        { status: 'RETRY_COOLDOWN' } as any,
+        { status: 'FAILED_RETRYABLE', nextRetryAt: { gt: now } } as any
+      );
+    }
+    if (excludedStates.length > 0) {
+      and.push({
+        marketDataRepairStates: {
+          none: {
+            repairType: 'PROVIDER_BUSINESS_METADATA',
+            OR: excludedStates,
+          },
+        },
+      } as any);
+    }
+    return { AND: and };
+  }
+
+  private providerValidationWhere(
+    options: Pick<PaginationOptions, 'region' | 'assetType'>,
+    queue: ProviderValidationQueue
+  ): Prisma.StockWhereInput {
+    return {
+      AND: [
+        this.stockWhere(options),
+        { isActive: true },
+        { isDelisted: false },
+        queue === 'RETRY_FAILED'
+          ? { providerSupportStatus: { equals: 'VALIDATION_FAILED', mode: 'insensitive' } }
+          : {
+            OR: [
+              { providerSupportStatus: null },
+              { providerSupportStatus: '' },
+              { providerSupportStatus: { equals: 'UNKNOWN', mode: 'insensitive' } },
+            ],
+          },
+      ],
+    };
+  }
+
+  private businessMetadataMissingWhere(): Prisma.StockWhereInput {
+    return {
+      OR: [
+        this.invalidStringWhere('sector'),
+        this.invalidStringWhere('industry'),
+        { marketCap: null },
+        { marketCap: { lte: 0 } },
+      ],
+    };
+  }
+
+  private invalidStringWhere(field: 'sector' | 'industry'): Prisma.StockWhereInput {
+    return {
+      OR: [
+        { [field]: null } as Prisma.StockWhereInput,
+        { [field]: '' } as Prisma.StockWhereInput,
+        { [field]: { equals: 'UNKNOWN', mode: 'insensitive' } } as Prisma.StockWhereInput,
+        { [field]: { equals: 'N/A', mode: 'insensitive' } } as Prisma.StockWhereInput,
+        { [field]: { equals: 'NA', mode: 'insensitive' } } as Prisma.StockWhereInput,
+        { [field]: { equals: 'NONE', mode: 'insensitive' } } as Prisma.StockWhereInput,
+        { [field]: { equals: 'NULL', mode: 'insensitive' } } as Prisma.StockWhereInput,
+      ],
+    };
   }
 
   private stockWhere(options: Pick<PaginationOptions, 'region' | 'assetType' | 'instrumentSegment'>): Prisma.StockWhereInput {

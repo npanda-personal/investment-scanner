@@ -52,6 +52,18 @@ export const createMarketDataV1Router = (
 
   router.get('/market-data/scheduler/status', controller.schedulerStatus);
   router.get('/market-data/health', controller.health);
+  router.get('/market-data/universe/health', controller.universeHealth);
+  router.get('/market-data/universe/repair-plan', controller.repairPlan);
+  router.get('/market-data/universe/repair-runs/latest', controller.latestRepairRun);
+  router.post('/market-data/universe/repair-run', controller.repairRun);
+  router.get('/market-data/metadata/manual-template', controller.manualMetadataTemplate);
+  router.post('/market-data/provider/validate', controller.validateProviders);
+  router.post('/market-data/catalog/identity/repair', controller.repairCatalogIdentity);
+  router.post('/market-data/catalog/identity-repair', controller.repairCatalogIdentity);
+  router.post('/market-data/metadata/provider-business/repair', controller.repairProviderBusinessMetadata);
+  router.post('/market-data/metadata/manual-import', controller.importManualMetadata);
+  router.post('/market-data/metadata/enrich', controller.enrichMetadata);
+  router.post('/market-data/prices/backfill', controller.backfillPrices);
   router.get('/market-data/catalog/sources', controller.listCatalogSources);
   router.post('/market-data/catalog/import', controller.importCatalog);
   router.post('/market-data/catalog/backfill-metadata', controller.backfillCatalogMetadata);

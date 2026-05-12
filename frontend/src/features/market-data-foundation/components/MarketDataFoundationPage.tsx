@@ -518,6 +518,11 @@ const MarketDataFoundationPage: React.FC = () => {
             <Tooltip title={missing.length > 0 ? `Missing: ${missing.join(', ')}` : 'Metadata complete'} arrow>
               <Chip size="small" label={`${instrument.metadata_completeness_score ?? 0}%`} color={missing.length > 0 ? 'warning' : 'success'} variant="outlined" />
             </Tooltip>
+            {instrument.universe_state && (
+              <Tooltip title={instrument.readiness_blockers?.length ? instrument.readiness_blockers.join(', ') : 'Strict universe state'} arrow>
+                <Chip size="small" label={instrument.universe_state} color={instrument.universe_state === 'REVIEW_READY' ? 'success' : instrument.universe_state === 'CATALOG_ONLY' || instrument.universe_state === 'STALE_OR_INCOMPLETE' ? 'warning' : 'default'} variant="outlined" />
+              </Tooltip>
+            )}
             <StatusBadge label={instrument.data_status} />
           </Stack>
         );
@@ -698,7 +703,7 @@ const MarketDataFoundationPage: React.FC = () => {
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>{success}</Alert>}
 
       {activeTab === 'health' && (
-        <MarketDataStatusPanel region={scope.region} />
+        <MarketDataStatusPanel region={scope.region} assetType={scope.assetType} />
       )}
 
       {activeTab === 'import' && (
@@ -981,6 +986,12 @@ const MarketDataFoundationPage: React.FC = () => {
               <Stack spacing={0.75}>
                 <Typography variant="body2"><strong>Provider support:</strong> {selectedInstrument.provider_support_status || 'UNKNOWN'}</Typography>
                 <Typography variant="body2"><strong>Provider error:</strong> {selectedInstrument.provider_error || 'None'}</Typography>
+                <Typography variant="body2"><strong>Universe state:</strong> {selectedInstrument.universe_state || 'Not classified'}</Typography>
+                <Typography variant="body2"><strong>Price history bars:</strong> {selectedInstrument.price_history_bars ?? 0}</Typography>
+                <Typography variant="body2"><strong>Latest price date:</strong> {selectedInstrument.latest_price_date || 'Missing'}</Typography>
+                <Typography variant="body2"><strong>Expected trading date:</strong> {selectedInstrument.expected_latest_trading_date || 'Unknown'}</Typography>
+                <Typography variant="body2"><strong>Recent volume:</strong> {selectedInstrument.has_recent_volume ? 'Present' : 'Missing'}</Typography>
+                <Typography variant="body2"><strong>Readiness blockers:</strong> {selectedInstrument.readiness_blockers?.length ? selectedInstrument.readiness_blockers.join(', ') : 'None'}</Typography>
                 <Typography variant="body2"><strong>Data status:</strong> {selectedInstrument.data_status}</Typography>
                 <Typography variant="body2"><strong>Last updated:</strong> {formatTimestamp(selectedInstrument.last_updated_timestamp)}</Typography>
               </Stack>

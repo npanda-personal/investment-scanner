@@ -39,6 +39,10 @@ export {
   validateInstrumentInput,
   validateRequiredString,
 } from './market-data-foundation.validation';
+export {
+  classifyInstrumentUniverseReadiness,
+  isFreshLatestPrice,
+} from './market-data-foundation.universe';
 export type {
   CorporateAction,
   CorporateActionType,
@@ -48,6 +52,15 @@ export type {
   FxRateInput,
   HistoricalPrice,
   MarketDataStatus,
+  MarketDataRepairPlan,
+  MarketDataRepairRequest,
+  MarketDataRepairRunAction,
+  MarketDataRepairRunRecord,
+  MarketDataRepairRunRequest,
+  MarketDataRepairRunResponse,
+  MarketDataRepairRunStatus,
+  MarketDataRepairSummary,
+  MarketDataUniverseHealth,
   MarketDataSchedulerDecision,
   MarketDataSchedulerRegionStatus,
   MarketDataSchedulerStatus,
@@ -56,6 +69,8 @@ export type {
   SearchResult,
   SyncSummary,
   StockSyncTask,
+  UniverseState,
+  UniverseTrustStatus,
   UpdateStockRequest,
   ValidationResult,
   WorkerResult,

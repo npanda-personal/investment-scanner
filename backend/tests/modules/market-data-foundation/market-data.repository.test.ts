@@ -147,6 +147,75 @@ describe('MarketDataFoundationRepository', () => {
     }));
   });
 
+  it('uses STOCK-compatible filters for universe health including legacy EQUITY and null stock rows', async () => {
+    const prisma = {
+      stock: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await repository.listStocksForUniverseHealth({ region: 'IN', assetType: 'STOCK' });
+
+    expect(prisma.stock.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        AND: expect.arrayContaining([
+          expect.objectContaining({
+            AND: expect.arrayContaining([
+              expect.objectContaining({
+                OR: expect.arrayContaining([
+                  expect.objectContaining({ assetType: expect.objectContaining({ in: ['STOCK', 'EQUITY'] }) }),
+                  { assetType: null },
+                ]),
+              }),
+            ]),
+          }),
+        ]),
+      }),
+      orderBy: { symbol: 'asc' },
+    }));
+  });
+
+  it('summarizes price readiness stats by symbol for universe classification', async () => {
+    const latestTimestamp = new Date('2026-05-08T00:00:00.000Z');
+    const qualityRows = Array.from({ length: 252 }).map((_, index) => ({
+      timestamp: new Date(Date.UTC(2026, 4, 8 - index)),
+      volume: BigInt(index < 250 ? 1000 : 0),
+      adjustedClose: index < 251 ? '100' : null,
+      close: '100',
+    }));
+    const prisma = {
+      priceTick: {
+        groupBy: jest.fn().mockResolvedValue([
+          { symbol: 'READY.NS', _count: { _all: 252 }, _max: { timestamp: latestTimestamp } },
+        ]),
+        findMany: jest.fn()
+          .mockResolvedValueOnce([
+            { symbol: 'READY.NS', timestamp: latestTimestamp, volume: BigInt(1000), adjustedClose: '100', close: '100' },
+          ])
+          .mockResolvedValueOnce(qualityRows),
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    const result = await repository.priceReadinessStatsForSymbols(['READY.NS', 'CATALOG.NS']);
+
+    expect(result.get('READY.NS')).toMatchObject({
+      priceHistoryBars: 252,
+      latestPriceDate: '2026-05-08',
+      latestVolume: BigInt(1000),
+      rollingWindowBars: 252,
+      rollingWindowCoveragePercent: 100,
+      recentVolumeCoveragePercent: 99.2,
+      adjustedCloseCoveragePercent: 99.6,
+      usesAdjustedCloseFallback: true,
+    });
+    expect(result.get('CATALOG.NS')).toMatchObject({
+      priceHistoryBars: 0,
+      latestPriceDate: null,
+    });
+  });
+
   it('maps CASH segment filtering to cash stock, legacy equity, and null asset type rows', async () => {
     const prisma = {
       stock: {
@@ -392,6 +461,284 @@ describe('MarketDataFoundationRepository', () => {
     }));
   });
 
+  it('selects only UNKNOWN provider rows for the default validation queue', async () => {
+    const prisma = {
+      stock: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await repository.listStocksForProviderValidation({
+      region: 'IN',
+      assetType: 'STOCK',
+      offset: 0,
+      batchSize: 25,
+      providerValidationQueue: 'UNKNOWN_FIRST',
+    });
+
+    const whereJson = JSON.stringify(prisma.stock.findMany.mock.calls[0][0].where);
+    expect(whereJson).toContain('UNKNOWN');
+    expect(whereJson).not.toContain('VALIDATION_FAILED');
+  });
+
+  it('selects only VALIDATION_FAILED provider rows for the retry queue', async () => {
+    const prisma = {
+      stock: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await repository.listStocksForProviderValidation({
+      region: 'IN',
+      assetType: 'STOCK',
+      offset: 0,
+      batchSize: 25,
+      providerValidationQueue: 'RETRY_FAILED',
+    });
+
+    const whereJson = JSON.stringify(prisma.stock.findMany.mock.calls[0][0].where);
+    expect(whereJson).toContain('VALIDATION_FAILED');
+    expect(whereJson).not.toContain('UNKNOWN');
+  });
+
+  it('orders legacy combined provider validation as UNKNOWN rows before retry-failed rows', async () => {
+    const prisma = {
+      stock: {
+        count: jest.fn().mockResolvedValueOnce(1).mockResolvedValueOnce(1),
+        findMany: jest
+          .fn()
+          .mockResolvedValueOnce([{ symbol: 'ZZZ.NS', providerSupportStatus: 'UNKNOWN' }])
+          .mockResolvedValueOnce([{ symbol: 'AAA.NS', providerSupportStatus: 'VALIDATION_FAILED' }]),
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    const result = await repository.listStocksForProviderValidation({
+      region: 'IN',
+      assetType: 'STOCK',
+      offset: 0,
+      batchSize: 2,
+      includeRetryFailed: true,
+    });
+
+    expect(result.stocks.map((stock: any) => stock.providerSupportStatus)).toEqual(['UNKNOWN', 'VALIDATION_FAILED']);
+  });
+
+  it('selects provider business metadata repair rows without identity-only gaps', async () => {
+    const prisma = {
+      stock: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await repository.listStocksForBusinessMetadataRepair({
+      region: 'IN',
+      assetType: 'STOCK',
+      offset: 0,
+      batchSize: 25,
+    });
+
+    const whereJson = JSON.stringify(prisma.stock.findMany.mock.calls[0][0].where);
+    expect(whereJson).toContain('sector');
+    expect(whereJson).toContain('industry');
+    expect(whereJson).toContain('marketCap');
+    expect(whereJson).not.toContain('isin');
+    expect(whereJson).not.toContain('ipoDate');
+    expect(whereJson).toContain('marketDataRepairStates');
+    expect(whereJson).not.toContain('attemptedAt');
+  });
+
+  it('counts current manual-required business metadata states as distinct stocks, not attempts', async () => {
+    const prisma = {
+      marketDataRepairState: {
+        count: jest.fn().mockResolvedValue(1),
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    const count = await repository.countBusinessMetadataRepairStates({
+      region: 'IN',
+      assetType: 'STOCK',
+      statuses: ['MANUAL_REQUIRED'],
+    });
+
+    expect(count).toBe(1);
+    expect(prisma.marketDataRepairState.count).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        repairType: 'PROVIDER_BUSINESS_METADATA',
+        AND: expect.arrayContaining([{ status: { in: ['MANUAL_REQUIRED'] } }]),
+      }),
+    }));
+  });
+
+  it('allows explicit retry of manual-required business metadata state without a 24-hour cutoff', async () => {
+    const prisma = {
+      stock: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await repository.listStocksForBusinessMetadataRepair({
+      region: 'IN',
+      assetType: 'STOCK',
+      offset: 0,
+      batchSize: 25,
+      includeManualRequired: true,
+    });
+
+    const whereJson = JSON.stringify(prisma.stock.findMany.mock.calls[0][0].where);
+    expect(whereJson).not.toContain('MANUAL_REQUIRED');
+    expect(whereJson).not.toContain('RESOLVED');
+    expect(whereJson).not.toContain('attemptedAt');
+  });
+
+  it('excludes future retryable business metadata failures from the auto queue', async () => {
+    const prisma = {
+      stock: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await repository.listStocksForBusinessMetadataRepair({
+      region: 'IN',
+      assetType: 'STOCK',
+      offset: 0,
+      batchSize: 25,
+    });
+
+    const whereJson = JSON.stringify(prisma.stock.findMany.mock.calls[0][0].where);
+    expect(whereJson).toContain('FAILED_RETRYABLE');
+    expect(whereJson).toContain('nextRetryAt');
+    expect(whereJson).toContain('"nextRetryAt":{"gt"');
+    expect(whereJson).not.toContain('"nextRetryAt":{"lte"');
+  });
+
+  it('allows forced provider business metadata repair to include manual and retry states', async () => {
+    const prisma = {
+      stock: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await repository.listStocksForBusinessMetadataRepair({
+      region: 'IN',
+      assetType: 'STOCK',
+      offset: 0,
+      batchSize: 25,
+      includeManualRequired: true,
+      includeRetryable: true,
+    });
+
+    const whereJson = JSON.stringify(prisma.stock.findMany.mock.calls[0][0].where);
+    expect(whereJson).not.toContain('MANUAL_REQUIRED');
+    expect(whereJson).not.toContain('FAILED_RETRYABLE');
+    expect(whereJson).not.toContain('RETRY_COOLDOWN');
+  });
+
+  it('counts retry-blocked and retry-eligible business metadata states separately', async () => {
+    const prisma = {
+      marketDataRepairState: {
+        count: jest.fn().mockResolvedValueOnce(2).mockResolvedValueOnce(3),
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+    const now = new Date('2026-05-12T00:00:00.000Z');
+
+    const blocked = await repository.countBusinessMetadataRepairStates({
+      region: 'IN',
+      assetType: 'STOCK',
+      statuses: ['FAILED_RETRYABLE'],
+      retryTiming: 'blocked',
+      now,
+    });
+    const eligible = await repository.countBusinessMetadataRepairStates({
+      region: 'IN',
+      assetType: 'STOCK',
+      statuses: ['FAILED_RETRYABLE'],
+      retryTiming: 'eligible',
+      now,
+    });
+
+    expect(blocked).toBe(2);
+    expect(eligible).toBe(3);
+    const blockedWhere = JSON.stringify(prisma.marketDataRepairState.count.mock.calls[0][0].where);
+    const eligibleWhere = JSON.stringify(prisma.marketDataRepairState.count.mock.calls[1][0].where);
+    expect(blockedWhere).toContain('gt');
+    expect(eligibleWhere).toContain('lte');
+    expect(eligibleWhere).toContain('nextRetryAt');
+  });
+
+  it('repairs catalog identity only for the provided stock id', async () => {
+    const update = jest.fn().mockImplementation(({ data }) => Promise.resolve(data));
+    const prisma = {
+      stock: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'stock-intended',
+          symbol: 'DUP.NS',
+          name: 'Duplicate Limited',
+          region: 'IN',
+          exchange: 'NSE',
+          country: null,
+          currency: null,
+          assetType: null,
+          instrumentSegment: null,
+          displaySymbol: null,
+          providerSymbol: null,
+          sourceSymbol: null,
+          catalogSource: null,
+          isin: null,
+          ipoDate: null,
+          source: 'database',
+          dataStatus: 'PARTIAL',
+        }),
+        update,
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    const result = await repository.repairCatalogIdentityForStock('stock-intended', {
+      symbol: 'DUP.NS',
+      sourceSymbol: 'DUP',
+      providerSymbol: 'DUP.NS',
+      displaySymbol: 'DUP',
+      name: 'Duplicate Limited',
+      region: 'IN',
+      exchange: 'NSE',
+      country: 'India',
+      currency: 'INR',
+      assetType: 'STOCK',
+      instrumentSegment: 'CASH',
+      catalogSource: 'NSE_EQUITY_SECURITIES',
+      isin: 'INEDUP01010',
+      ipoDate: new Date('2001-01-01T00:00:00.000Z'),
+    });
+
+    expect(prisma.stock.findUnique).toHaveBeenCalledWith({ where: { id: 'stock-intended' } });
+    expect('findFirst' in prisma.stock).toBe(false);
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'stock-intended' },
+      data: expect.objectContaining({
+        providerSymbol: 'DUP.NS',
+        sourceSymbol: 'DUP',
+        isin: 'INEDUP01010',
+        ipoDate: new Date('2001-01-01T00:00:00.000Z'),
+      }),
+    }));
+    expect(result.action).toBe('updated');
+  });
+
   it('matches catalog upserts against existing provider-style and base symbols', async () => {
     const update = jest.fn().mockImplementation(({ data }) => Promise.resolve(data));
     const prisma = {
@@ -483,6 +830,8 @@ describe('MarketDataFoundationRepository', () => {
       assetType: 'STOCK',
       instrumentSegment: 'CASH',
       catalogSource: 'NSE_EQUITY_SECURITIES',
+      isin: 'INE117A01022',
+      ipoDate: new Date('1999-01-01T00:00:00.000Z'),
     });
 
     expect(prisma.stock.findFirst).toHaveBeenCalledWith(expect.objectContaining({
@@ -509,6 +858,8 @@ describe('MarketDataFoundationRepository', () => {
         assetType: 'STOCK',
         instrumentSegment: 'CASH',
         catalogSource: 'NSE_EQUITY_SECURITIES',
+        isin: 'INE117A01022',
+        ipoDate: new Date('1999-01-01T00:00:00.000Z'),
       }),
     }));
     expect(result.action).toBe('updated');

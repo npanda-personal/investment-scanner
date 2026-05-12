@@ -63,7 +63,7 @@ export const getCatalogSourceConfigs = (): CatalogSourceConfig[] => {
     if (defaultUrl) return { url: defaultUrl, urlSource: 'DEFAULT' };
     return { urlSource: 'NONE' };
   };
-  const nseEquity = sourceUrl(process.env.MARKET_DATA_CATALOG_NSE_EQUITY_URL, 'https://nsearchives.nseindia.com/content/equities/sec_list.csv');
+  const nseEquity = sourceUrl(process.env.MARKET_DATA_CATALOG_NSE_EQUITY_URL, 'https://archives.nseindia.com/content/equities/EQUITY_L.csv');
   const nseEtf = sourceUrl(process.env.MARKET_DATA_CATALOG_NSE_ETF_URL, 'https://nsearchives.nseindia.com/content/equities/eq_etfseclist.csv');
   const nseIndices = sourceUrl(process.env.MARKET_DATA_CATALOG_NSE_INDICES_URL, 'https://www.nseindia.com/api/allIndices');
   const bseIndices = sourceUrl(process.env.MARKET_DATA_CATALOG_BSE_INDICES_URL, 'https://m.bseindia.com/IndicesView_New.aspx');
@@ -89,7 +89,7 @@ export const getCatalogSourceConfigs = (): CatalogSourceConfig[] => {
       currency: 'INR',
       maxDownloadBytes: download.defaultMaxDownloadBytes,
       timeoutMs: download.defaultTimeoutMs,
-      setupHint: 'Uses the built-in public NSE equity security list by default. Override with MARKET_DATA_CATALOG_NSE_EQUITY_URL if needed.',
+      setupHint: 'Uses the built-in public NSE listed-equity security master by default. Override with MARKET_DATA_CATALOG_NSE_EQUITY_URL if needed.',
       supportsManualCsv: true,
       supportsConfiguredUrl: true,
       supportsInternalSeed: false,

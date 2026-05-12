@@ -1,0 +1,292 @@
+/// <reference types="@types/jest" />
+import { MarketDataFoundationService, classifyInstrumentUniverseReadiness } from '../../../src/modules/market-data-foundation';
+
+const freshDate = '2026-05-11';
+const expectedDate = '2026-05-11';
+
+const readyPriceStats = {
+  priceHistoryBars: 252,
+  latestPriceDate: freshDate,
+  latestVolume: 1000,
+  latestAdjustedClose: 100,
+  latestClose: 100,
+};
+
+const baseInstrument = {
+  isActive: true,
+  isDelisted: false,
+  providerSupportStatus: 'SUPPORTED',
+  providerSymbol: 'RELIANCE.NS',
+  sector: 'Energy',
+  industry: 'Oil & Gas',
+  marketCap: 1000,
+  country: 'India',
+  currency: 'INR',
+  isin: 'INE002A01018',
+  ipoDate: new Date('2000-01-01T00:00:00.000Z'),
+  expectedLatestTradingDate: expectedDate,
+};
+
+describe('Market Data Foundation universe readiness', () => {
+  it('classifies catalog-only rows as not review-ready', () => {
+    const readiness = classifyInstrumentUniverseReadiness({
+      ...baseInstrument,
+      providerSupportStatus: 'UNKNOWN',
+      priceStats: null,
+    });
+
+    expect(readiness.universeState).toBe('CATALOG_ONLY');
+    expect(readiness.isReviewReady).toBe(false);
+    expect(readiness.readinessBlockers).toEqual(expect.arrayContaining(['PROVIDER_UNKNOWN']));
+  });
+
+  it('keeps provider-supported rows without prices out of review-ready state', () => {
+    const readiness = classifyInstrumentUniverseReadiness({
+      ...baseInstrument,
+      priceStats: { priceHistoryBars: 0, latestPriceDate: null, latestVolume: null, latestAdjustedClose: null, latestClose: null },
+    });
+
+    expect(['PROVIDER_SUPPORTED', 'STALE_OR_INCOMPLETE']).toContain(readiness.universeState);
+    expect(readiness.isReviewReady).toBe(false);
+    expect(readiness.readinessBlockers).toEqual(expect.arrayContaining(['MISSING_LATEST_PRICE', 'INADEQUATE_PRICE_HISTORY', 'MISSING_RECENT_VOLUME']));
+  });
+
+  it('classifies stale latest prices as stale or incomplete', () => {
+    const readiness = classifyInstrumentUniverseReadiness({
+      ...baseInstrument,
+      priceStats: { ...readyPriceStats, latestPriceDate: '2026-04-30' },
+    });
+
+    expect(readiness.universeState).toBe('STALE_OR_INCOMPLETE');
+    expect(readiness.readinessBlockers).toEqual(expect.arrayContaining(['STALE_LATEST_PRICE']));
+  });
+
+  it('treats Friday data as stale when Monday EOD is expected', () => {
+    const readiness = classifyInstrumentUniverseReadiness({
+      ...baseInstrument,
+      expectedLatestTradingDate: '2026-05-11',
+      priceStats: { ...readyPriceStats, latestPriceDate: '2026-05-08' },
+    });
+
+    expect(readiness.priceReadiness).toBe('STALE_LATEST_PRICE');
+    expect(readiness.universeState).toBe('STALE_OR_INCOMPLETE');
+    expect(readiness.readinessBlockers).toEqual(expect.arrayContaining(['STALE_LATEST_PRICE']));
+  });
+
+  it('blocks price readiness when the expected trading date is uncertain', () => {
+    const readiness = classifyInstrumentUniverseReadiness({
+      ...baseInstrument,
+      expectedLatestTradingDate: null,
+      priceStats: readyPriceStats,
+    });
+
+    expect(readiness.priceReadiness).toBe('MARKET_CALENDAR_UNCERTAIN');
+    expect(readiness.isPriceReady).toBe(false);
+    expect(readiness.universeState).toBe('STALE_OR_INCOMPLETE');
+    expect(readiness.readinessBlockers).toEqual(expect.arrayContaining(['MARKET_CALENDAR_UNCERTAIN']));
+  });
+
+  it('allows 252 fresh bars with volume to become price-ready before metadata is complete', () => {
+    const readiness = classifyInstrumentUniverseReadiness({
+      ...baseInstrument,
+      sector: null,
+      industry: null,
+      priceStats: readyPriceStats,
+    });
+
+    expect(readiness.universeState).toBe('PRICE_READY');
+    expect(readiness.isPriceReady).toBe(true);
+    expect(readiness.isContextReady).toBe(false);
+    expect(readiness.readinessBlockers).toEqual(expect.arrayContaining(['MISSING_SECTOR', 'MISSING_INDUSTRY']));
+  });
+
+  it('blocks price readiness when the rolling 252-session window has gaps', () => {
+    const readiness = classifyInstrumentUniverseReadiness({
+      ...baseInstrument,
+      priceStats: {
+        ...readyPriceStats,
+        rollingWindowBars: 240,
+        rollingWindowCoveragePercent: 95.2,
+        maxPriceGapDays: 12,
+        recentVolumeCoveragePercent: 100,
+        adjustedCloseCoveragePercent: 100,
+        usesAdjustedCloseFallback: false,
+      },
+    });
+
+    expect(readiness.priceReadiness).toBe('INADEQUATE_HISTORY');
+    expect(readiness.isPriceReady).toBe(false);
+    expect(readiness.readinessBlockers).toEqual(expect.arrayContaining(['INADEQUATE_ROLLING_PRICE_WINDOW', 'PRICE_HISTORY_GAPS']));
+  });
+
+  it('classifies valid metadata plus price readiness as review-ready', () => {
+    const readiness = classifyInstrumentUniverseReadiness({
+      ...baseInstrument,
+      priceStats: readyPriceStats,
+    });
+
+    expect(readiness.universeState).toBe('REVIEW_READY');
+    expect(readiness.isReviewReady).toBe(true);
+    expect(readiness.readinessBlockers).toEqual([]);
+  });
+
+  it('blocks IN/STOCK review readiness when market cap is missing', () => {
+    const readiness = classifyInstrumentUniverseReadiness({
+      ...baseInstrument,
+      marketCap: null,
+      priceStats: readyPriceStats,
+    });
+
+    expect(readiness.isReviewReady).toBe(false);
+    expect(readiness.metadataReadiness).toBe('MISSING_REQUIRED_METADATA');
+    expect(readiness.readinessBlockers).toEqual(expect.arrayContaining(['MISSING_MARKET_CAP']));
+  });
+
+  it('reports missing listing date as a critical blocker when it blocks review readiness', async () => {
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue([
+        { ...stockRow('missing-listing', 'LISTING.NS', 'SUPPORTED'), ipoDate: null },
+      ]),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['LISTING.NS', { ...readyPriceStats, latestPriceDate: '2099-01-01' }],
+      ])),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+
+    const result = await service.universeHealth({ region: 'IN', assetType: 'STOCK' });
+    const listingBlocker = result.topBlockers.find((item) => item.code === 'MISSING_LISTING_DATE');
+
+    expect(result.counts.reviewReady).toBe(0);
+    expect(listingBlocker).toMatchObject({ severity: 'critical', count: 1 });
+  });
+
+  it('classifies unsupported provider rows as unsupported', () => {
+    const readiness = classifyInstrumentUniverseReadiness({
+      ...baseInstrument,
+      providerSupportStatus: 'UNSUPPORTED',
+      priceStats: readyPriceStats,
+    });
+
+    expect(readiness.universeState).toBe('UNSUPPORTED');
+    expect(readiness.isReviewReady).toBe(false);
+    expect(readiness.readinessBlockers).toEqual(expect.arrayContaining(['PROVIDER_UNSUPPORTED']));
+  });
+
+  it('classifies inactive or delisted rows outside the current review universe', () => {
+    const readiness = classifyInstrumentUniverseReadiness({
+      ...baseInstrument,
+      isActive: false,
+      priceStats: readyPriceStats,
+    });
+
+    expect(readiness.universeState).toBe('DELISTED_OR_INACTIVE');
+    expect(readiness.isReviewReady).toBe(false);
+    expect(readiness.readinessBlockers).toEqual(expect.arrayContaining(['DELISTED_OR_INACTIVE']));
+  });
+
+  it('counts scoped universe health states and blockers', async () => {
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue([
+        stockRow('catalog', 'CATALOG.NS', 'UNKNOWN'),
+        stockRow('ready', 'READY.NS', 'SUPPORTED'),
+        stockRow('stale', 'STALE.NS', 'SUPPORTED'),
+        { ...stockRow('unsupported', 'UNSUPPORTED.NS', 'UNSUPPORTED'), providerError: 'no chart data' },
+        { ...stockRow('inactive', 'INACTIVE.NS', 'SUPPORTED'), isActive: false },
+      ]),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['CATALOG.NS', { priceHistoryBars: 0, latestPriceDate: null, latestVolume: null, latestAdjustedClose: null, latestClose: null }],
+        ['READY.NS', { ...readyPriceStats, latestPriceDate: '2099-01-01' }],
+        ['STALE.NS', { ...readyPriceStats, latestPriceDate: '2020-01-01' }],
+        ['UNSUPPORTED.NS', { ...readyPriceStats, latestPriceDate: '2099-01-01' }],
+        ['INACTIVE.NS', { ...readyPriceStats, latestPriceDate: '2099-01-01' }],
+      ])),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+
+    const result = await service.universeHealth({ region: 'IN', assetType: 'STOCK' });
+
+    expect(repository.listStocksForUniverseHealth).toHaveBeenCalledWith({ region: 'IN', assetType: 'STOCK' });
+    expect(result.counts.totalCatalogInstruments).toBe(5);
+    expect(result.counts.activeInstruments).toBe(4);
+    expect(result.counts.catalogOnly).toBe(1);
+    expect(result.counts.reviewReady).toBe(1);
+    expect(result.counts.readiness.reviewReady).toBe(1);
+    expect(result.counts.staleOrIncomplete).toBe(1);
+    expect(result.counts.byUniverseState.CATALOG_ONLY).toBe(1);
+    expect(result.counts.byUniverseState.REVIEW_READY).toBe(1);
+    expect(result.counts.byUniverseState.STALE_OR_INCOMPLETE).toBe(1);
+    expect(result.counts.readiness.priceReady).toBeGreaterThan(result.counts.byUniverseState.PRICE_READY);
+    expect(result.counts.missingLatestPrice).toBe(1);
+    expect(result.counts.staleLatestPrice).toBe(1);
+    expect(result.coverage.reviewReadyPercentage).toBe(25);
+    expect(result.topBlockers.map((item) => item.code)).toEqual(expect.arrayContaining(['PROVIDER_UNKNOWN', 'MISSING_LATEST_PRICE', 'STALE_LATEST_PRICE']));
+    expect(result.trustStatus).toBe('PARTIAL');
+  });
+
+  it('marks an all-UNKNOWN active provider universe as not trustworthy', async () => {
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue([
+        stockRow('catalog-1', 'CATALOG1.NS', 'UNKNOWN'),
+        stockRow('catalog-2', 'CATALOG2.NS', 'UNKNOWN'),
+      ]),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['CATALOG1.NS', { priceHistoryBars: 0, latestPriceDate: null, latestVolume: null, latestAdjustedClose: null, latestClose: null }],
+        ['CATALOG2.NS', { priceHistoryBars: 0, latestPriceDate: null, latestVolume: null, latestAdjustedClose: null, latestClose: null }],
+      ])),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+
+    const result = await service.universeHealth({ region: 'IN', assetType: 'STOCK' });
+
+    expect(result.counts.providerUnknown).toBe(2);
+    expect(result.trustStatus).toBe('NOT_TRUSTWORTHY');
+    expect(result.trustReasons).toEqual(expect.arrayContaining(['Provider support is UNKNOWN for the entire active scoped universe.']));
+  });
+
+  it('repairs UNKNOWN provider status from existing usable price history on read', async () => {
+    const markProviderSupportedFromStoredPrices = jest.fn().mockResolvedValue({ count: 1 });
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue([
+        stockRow('priced-unknown', 'PRICED.NS', 'UNKNOWN'),
+      ]),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['PRICED.NS', { ...readyPriceStats, latestPriceDate: '2099-01-01' }],
+      ])),
+      markProviderSupportedFromStoredPrices,
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+
+    const result = await service.universeHealth({ region: 'IN', assetType: 'STOCK' });
+
+    expect(markProviderSupportedFromStoredPrices).toHaveBeenCalledWith(['PRICED.NS']);
+    expect(result.counts.providerUnknown).toBe(0);
+    expect(result.counts.providerSupported).toBe(1);
+    expect(result.counts.catalogOnly).toBe(0);
+  });
+});
+
+function stockRow(id: string, symbol: string, providerSupportStatus: string) {
+  return {
+    id,
+    symbol,
+    name: symbol,
+    region: 'IN',
+    exchange: 'NSE',
+    country: 'India',
+    sector: 'Energy',
+    industry: 'Oil & Gas',
+    currency: 'INR',
+    isin: 'INE002A01018',
+    ipoDate: new Date('2000-01-01T00:00:00.000Z'),
+    marketCap: 1000,
+    assetType: 'STOCK',
+    providerSymbol: symbol,
+    providerSupportStatus,
+    providerError: null,
+    isActive: true,
+    isDelisted: false,
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    dataStatus: 'PARTIAL',
+  };
+}

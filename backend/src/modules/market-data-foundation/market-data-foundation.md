@@ -29,6 +29,9 @@ Implemented:
 - **Metadata hardening**: Provider/company metadata updates preserve existing non-null values when a later provider response omits fields. Indian NSE/BSE symbols default to `India`, `IN`, and `INR` when the provider omits country/currency.
 - **Instrument classification**: API DTOs expose normalized `asset_type` plus `instrument_segment`. New catalog imports persist segment/source/provider-support metadata; older rows still get safe DTO-level derivation.
 - **Catalog-source ingestion**: Bounded imports can create/update instrument master rows from NSE security-master style CSVs, F&O underlying lists, ETF rows, and a small Indian index seed list. Yahoo Finance remains validation/enrichment/history only, not the master catalog.
+- **Universe readiness contract**: Scoped instruments are classified into explicit computed states (`CATALOG_ONLY`, `PROVIDER_SUPPORTED`, `PRICE_READY`, `CONTEXT_READY`, `REVIEW_READY`, `UNSUPPORTED`, `STALE_OR_INCOMPLETE`, `DELISTED_OR_INACTIVE`). The health endpoint quantifies provider validation, price readiness, metadata coverage, review-ready counts, blockers, warnings, and trust status so downstream modules do not treat catalog size as the reviewable universe.
+- **Universe repair workflow**: First-class bounded repair endpoints expose provider validation, catalog identity repair, provider business metadata repair, manual metadata import, and price backfill queues. Provider validation is staged: fresh `UNKNOWN` rows are validated first, retryable `VALIDATION_FAILED` rows are a separate explicit queue, and unsupported rows stay visible but excluded from downstream metadata/price blockers. Mutating provider/price/provider-business-metadata queues process from `offset=0` until empty so repaired rows cannot shrink the queue and cause skipped rows; catalog/manual CSV repairs page over a stable source list with normal `offset`/`nextOffset` semantics. Provider business metadata attempts are persisted as audit, and the current repair state is persisted separately so no-provider/no-op/partial rows become durable manual-required work instead of blocking later auto-repairable rows or reappearing after a time cutoff. Retryable provider errors carry `nextRetryAt` and are excluded until retry time. The UI shows the required work, one-batch actions, progress counts, warnings/no-ops/partial/manual-required counts, and refreshed health after each batch.
+- **Provider proof repair**: A successful OHLCV fetch with usable rows marks the instrument provider status `SUPPORTED`. Existing `UNKNOWN` rows with stored usable price history are repaired on universe-read paths so catalog-only status does not hide proven provider support.
 
 Partially implemented:
 
@@ -116,6 +119,12 @@ Persisted models used by Market Data Foundation:
   - Latest FX rates with pair, base currency, quote currency, rate, source, and metadata.
 - `MarketDataSyncState`
   - Per-region/per-asset/per-trading-day scheduler state. The scheduler records `PENDING`, `SYNCED`, `FINAL_CONFIRMED`, or `FAILED` so server restarts do not cause repeated post-close API calls after the final daily candle is confirmed.
+- `MarketDataRepairAttempt`
+  - Per-stock repair attempt audit for provider validation, catalog identity, price backfill, provider business metadata, and manual metadata import workflows. Provider business metadata attempts persist `SUCCESS`, `PARTIAL_SUCCESS`, `NO_PROVIDER_DATA`, `NO_FIELDS_FILLED`, `MANUAL_REQUIRED`, `FAILED`, and `SKIPPED_RECENT_ATTEMPT` outcomes.
+- `MarketDataRepairState`
+  - Durable current repair state keyed by `stockId + repairType`. Provider business metadata repair uses `MANUAL_REQUIRED`, `FAILED_RETRYABLE`, `RETRY_COOLDOWN`, and `RESOLVED` states so repair-plan counts are distinct stocks, not attempt rows. `RESOLVED` is allowed only after valid sector, industry, and market cap are present. Missing business metadata with no blocking current state is inferred as auto-repairable, while retryable failures become eligible only after `nextRetryAt`.
+- `MarketDataRepairRun`
+  - Operational repair-run evidence for bounded universe repair execution. Each row stores scope, status (`RUNNING`, `COMPLETED`, `PARTIAL`, `PARTIAL_BLOCKED`, `PARTIAL_MANUAL_REQUIRED`, `FAILED`), started/completed timestamps, before/after universe-health snapshots, before/after repair-plan snapshots, requested actions, aggregate summary, universe signoff evidence, warnings, and error text when a run stops early.
 
 ## Backend API Surface
 
@@ -157,6 +166,71 @@ Yahoo Finance remains the only provider. Market Data Foundation maps free provid
 
 Repository updates are null-preserving: an omitted/null provider field does not erase an existing non-null country, sector, industry, currency, market cap, asset type, ISIN, IPO date, or exchange. Missing metadata is surfaced through `missing_metadata_fields` and `metadata_completeness_score` in the v1 instrument DTO so the UI can show diagnostics instead of hiding gaps behind generic `N/A` values.
 
+Metadata repair is split by source ownership:
+
+1. `CATALOG_IDENTITY_REPAIR` uses NSE/BSE/security-master catalog sources for deterministic identity fields: source symbol, display symbol, provider symbol, exchange, country, currency, asset type, segment, ISIN, listing date, catalog source, and row source. This is the primary path for missing ISIN/listing-date repair.
+2. `PROVIDER_BUSINESS_METADATA_REPAIR` uses Yahoo/company master data for business fields only: company name, confirmed provider exchange/name fields, sector, industry, and market cap. A provider response with `dataStatus=MISSING` is provider-not-found even if country/currency/asset type can be inferred from symbol suffix.
+3. `MANUAL_METADATA_IMPORT` accepts curated local CSV fallback for business fields provider/catalog cannot fill, especially sector, industry, and market cap for Indian small/mid-cap names. Null-equivalent sector/industry values (`Unknown`, `N/A`, `NA`, blank, `None`, `Null`) are rejected. The CSV must include `symbol` or `providerSymbol`, valid `sector`, valid `industry`, and positive numeric `marketCap`; rows without valid market cap stay unresolved and are not counted as repaired.
+4. Existing non-null database values are preserved unless a workflow explicitly supplies a real replacement.
+
+Null provider fields never erase existing non-null values. Metadata repair is no-op safe: it reports `updated` only when a missing required field actually improves. Responses include `fieldsFilled`, `partialSuccess`, `noOp`, `manualRequired`, `providerNotFound`, catalog-identity repair counts, matched/unmatched catalog rows, provider-business metadata repair counts, and field-provenance entries for rows that changed. For `IN / STOCK`, provider-business metadata is unresolved until sector, industry, and a positive numeric market cap are present; partial provider/manual fills remain `MANUAL_REQUIRED` with the remaining fields named.
+
+### Universe Readiness Contract
+
+`GET /api/v1/market-data/universe/health?region=IN&assetType=STOCK` is the primary health contract for downstream review workflows. It defaults to `IN / STOCK` when a caller does not provide scope and returns:
+
+- `scope`, `generatedAt`, `latestStoredEodDate`, and `expectedLatestTradingDate`.
+- Counts by universe state plus active, inactive/delisted, provider-supported, provider-unknown, unsupported, catalog-only, price-ready, context-ready, review-ready, stale/incomplete, missing latest price, stale latest price, inadequate history, missing recent volume, and missing metadata fields.
+- `coverage.priceCoveragePercentage`, `coverage.metadataCoveragePercentage`, and `coverage.reviewReadyPercentage`.
+- `topBlockers`, `warnings`, `trustStatus`, `trustReasons`, and `universeSignoff`.
+
+`universeSignoff` is the explicit downstream gate. For `IN / STOCK`, `status=PASS` requires provider unknown count `0`, retry-failed provider validations `0`, provider-supported catalog identity repair needed `0`, provider-supported business metadata auto-repairable/retry-eligible/manual-required `0`, provider-supported price backfill needed `0`, latest stored EOD at or after expected EOD, `reviewReady` at least the configured threshold (`MARKET_DATA_SIGNOFF_MIN_REVIEW_READY`, default `300`), review-ready percentage at least `10%` of active catalog unless a smaller configured review universe is introduced, and `trustStatus=OK`. `downstreamAllowed` is `false` unless signoff passes.
+
+State rules:
+
+- `CATALOG_ONLY`: catalog row exists but provider support is `UNKNOWN` or blank. These rows are not reviewable.
+- `UNSUPPORTED`: provider validation failed, provider symbol cannot be mapped, or provider data is unusable.
+- `STALE_OR_INCOMPLETE`: provider exists but latest price, freshness, history, or volume is incomplete.
+- `PRICE_READY`: latest EOD date is greater than or equal to `expectedLatestTradingDate`, at least 252 bars exist, at least 200 bars exist for SMA200 workflows, the rolling 252-row window is sufficiently complete, large date gaps are absent, recent volume coverage is acceptable, and adjusted-close fallback status is explicit. There is no blanket calendar-day tolerance; weekends and holidays must be handled by the market calendar. If the expected trading date cannot be determined, the row is blocked with `MARKET_CALENDAR_UNCERTAIN`.
+- `CONTEXT_READY`: `PRICE_READY` plus sector, industry, country, currency, and for `IN / STOCK`, ISIN and listing-date metadata.
+- `REVIEW_READY`: `CONTEXT_READY`, active, not delisted, provider-supported, and no critical provider/symbol or price-adjustment blockers.
+- `DELISTED_OR_INACTIVE`: excluded from current review workflows and counted separately.
+
+The v1 instrument list/detail DTOs also expose computed read-model fields: `universe_state`, `provider_readiness`, `price_readiness`, `metadata_readiness`, `review_readiness`, `price_history_bars`, `latest_price_date`, `expected_latest_trading_date`, `has_recent_volume`, `rolling_window_bars`, `rolling_window_coverage_percent`, `max_price_gap_days`, `recent_volume_coverage_percent`, `adjusted_close_coverage_percent`, `uses_adjusted_close_fallback`, `readiness_blockers`, and `readiness_warnings`.
+
+### Universe Repair Workflow
+
+Universe health does not mutate data. The repair workflow is intentionally separate and bounded so provider-facing work is explicit:
+
+- `GET /api/v1/market-data/universe/repair-plan?region=IN&assetType=STOCK`
+  - Returns staged provider queue counts (`providerUnknownValidationNeeded`, `providerRetryValidationNeeded`, `providerUnsupportedExcluded`, `providerValidationFailed`), compatibility provider counts (`providerValidationNeeded`, `retryFailedValidations`), supported-only downstream blocker counts (`supportedCatalogIdentityRepairNeeded`, `supportedBusinessMetadataRepairNeeded`, `supportedPriceBackfillNeeded`, `unsupportedExcluded`), catalog-identity-repair-needed, price-backfill-needed, business-metadata-repair-needed, business-metadata-auto-repairable, business-metadata-manual-required, business-metadata-retry-blocked, business-metadata-retry-eligible, business-metadata-recently-attempted/current-state, manual-metadata-required, manual-business-metadata-required, missing-ISIN, missing-listing-date, missing-sector, missing-industry, missing-market-cap, legacy manual-sector-industry-required counts, and `universeSignoff` for the scope. `providerValidationNeeded` maps to unknown validation only, while `retryFailedValidations` maps to retry validation. `manualBusinessMetadataRequired` is the primary manual import count; `manualSectorIndustryRequired` is a narrower compatibility/detail count.
+- `GET /api/v1/market-data/universe/repair-runs/latest?region=IN&assetType=STOCK`
+  - Returns the latest persisted operational repair run for the scope, including status, before/after snapshots, summary, warnings, `anotherRunNeeded`, `expectedNextAction`, `hardBlockersRemaining`, final trust status, `universeSignoff`, stable-source fingerprints, and error.
+- `POST /api/v1/market-data/universe/repair-run`
+  - Orchestrates bounded repair batches in dependency order: unknown provider validation, retry-failed provider validation only after unknowns are drained, catalog identity repair, provider business metadata repair, optional manual metadata import when CSV text is supplied/requested, and price backfill. Request fields include `region`, `assetType`, `batchSize`, `maxBatchesPerAction`, `mode`, `actions`, `dryRun`, `csvText`, `catalogSource`, `importMode`, `providerValidationQueue`, `force`, and `fullReload`. `mode=DRAIN_UNTIL_BLOCKED` keeps executing dependency-ordered bounded batches until requested queues drain, a queue stops decreasing, a stable source fails, max-batch bounds are reached, or only manual metadata remains. It must not stop on retry-failed provider rows while fresh unknown provider rows remain; retry no-progress stops with the explicit diagnosis warning. Dry-run mode does not mutate or persist; it returns estimated totals, planned batches, top blockers, and the expected next action. Mutation mode persists a `MarketDataRepairRun`, records before/after health and repair-plan snapshots, stops safely as `PARTIAL`, `PARTIAL_BLOCKED`, or `PARTIAL_MANUAL_REQUIRED` when appropriate, and returns per-action summaries, aggregate counts, remaining hard blockers, final trust status, `universeSignoff`, and whether another bounded run or manual import is needed. `COMPLETED` is reserved for a requested repair scope that has no unfinished requested batches.
+- `GET /api/v1/market-data/metadata/manual-template?region=IN&assetType=STOCK`
+  - Exports unresolved business-metadata rows for curated repair. Rows include symbol, provider symbol, company name, exchange, current sector, current industry, current market cap, required fields, suggested source, notes, and a CSV template with `sector`, `industry`, and `marketCap` fill-in columns.
+- `POST /api/v1/market-data/provider/validate`
+  - Validates one bounded batch from the requested provider queue. `providerValidationQueue=UNKNOWN_FIRST` (default) selects only blank/null/`UNKNOWN` provider-support rows. `providerValidationQueue=RETRY_FAILED` selects only `VALIDATION_FAILED` rows. Clean provider failures persist `UNSUPPORTED`; request/provider errors persist `VALIDATION_FAILED`. The service ignores caller offset for this mutating queue and always fetches the first remaining batch.
+- `POST /api/v1/market-data/catalog/identity-repair`
+  - Parses a configured or manual NSE/BSE catalog source and repairs deterministic identity fields on existing rows. It pages over the stable catalog source list using `offset`/`nextOffset`, matches existing instruments by `providerSymbol + exchange`, `sourceSymbol + exchange`, `symbol + region + assetType`, then exact `name + exchange` fallback, rejects ambiguous collisions, updates only the matched stock id, preserves non-null values unless forced, and reports `fieldsFilled`, `matchedExistingRows`, `unmatchedCatalogRows`, `noOp`, and `manualRequired`.
+- `POST /api/v1/market-data/metadata/provider-business/repair`
+  - Enriches one bounded batch from Yahoo/company master business metadata for `sector`, `industry`, and `marketCap` only. The selector excludes rows missing only catalog identity fields such as ISIN or listing date. Provider `dataStatus=MISSING`, inferred country/currency/asset-type fallbacks, and company-name-only responses are not counted as business metadata success. No-provider/no-fields-filled attempts persist current state as `MANUAL_REQUIRED` and are skipped on later non-forced batches until explicitly forced or repaired manually, so the queue remains drainable without a time-window loophole.
+- `POST /api/v1/market-data/metadata/manual-import`
+  - Imports curated CSV metadata for existing rows. The CSV requires `symbol` or `providerSymbol`, valid `sector`, valid `industry`, and positive numeric `marketCap`; optional columns include `exchange`, `isin`, and `listingDate`. Null-equivalent sector/industry values and invalid/zero market cap values are rejected and do not update the database. Successful rows update only existing scoped instruments and resolve provider-business repair state only after sector, industry, and market cap are all valid.
+- `POST /api/v1/market-data/prices/backfill`
+  - Backfills one bounded batch of provider-supported rows whose price readiness is not `READY`. The repair caps `endDate` to the latest completed trading date for the region; `skipFreshnessGate=true` bypasses cooldown only, not completed-EOD safety. Provider responses with zero usable rows are treated as failed/no data, not as successful syncs.
+
+All repair endpoints accept `region`, `assetType`, `batchSize`/`limit`, and `offset` for API compatibility. Mutating predicate queues intentionally return `nextOffset=0` while `hasMore=true` because callers must rerun against the first remaining queue page. Stable source-list repairs, including manual metadata CSV imports, return the next source offset and the UI must send that offset on the next batch. Responses include `processedCount`, `totalCount`, `nextOffset`, `hasMore`, `updated`, `skipped`, `failed`, `noOp`, `manualRequired`, warnings, and action-specific counts. Provider business repair additionally reports `providerNotFound`, `skippedRecentAttempt`, `remainingAutoRepairable`, and `remainingManualRequired`. No repair endpoint scans or mutates the full universe in one unbounded request.
+
+Operational repair runs persist stable-source `sourceFingerprint` and `sourceIdentity` for catalog identity and manual metadata actions. Catalog fingerprints include the catalog source, import mode, configured URL/source key, raw content hash, normalized row hash, and row count. During an operational run, catalog identity repair loads the catalog source once into an in-memory snapshot and reuses the same rows, fingerprint, and source identity for every bounded batch in that action. The service must not download or parse the catalog again inside each batch; if the source cannot be loaded, the catalog action fails as `PARTIAL` before any persisted offset is reused or any catalog row is processed. Manual metadata fingerprints include the CSV content hash and row count. A later operational run resumes a stable source offset only when the action and fingerprint match; if the source changes, it restarts at offset 0 and warns `Source changed; restart from offset 0`.
+
+Health count contract:
+
+- `counts.readiness.priceReady`, `counts.readiness.contextReady`, and `counts.readiness.reviewReady` are readiness dimensions and are the fields downstream workflows should use for gates.
+- `counts.byUniverseState.*` contains exact final universe-state buckets. These can differ from readiness counts because a `REVIEW_READY` row is also price-ready but is counted under `byUniverseState.REVIEW_READY`, not `byUniverseState.PRICE_READY`.
+- Legacy flat fields such as `counts.priceReady` and `counts.PRICE_READY` remain for compatibility but new integrations should prefer the explicit nested contract.
+
 ### Catalog Source Strategy
 
 Market Data Foundation separates catalog discovery from provider ingestion:
@@ -169,7 +243,7 @@ Supported catalog source values:
 
 | Source | Behavior |
 | --- | --- |
-| `NSE_EQUITY_SECURITIES` | Imports NSE cash-equity style rows as `.NS`, `STOCK / CASH`, `IN`, `NSE`, `India`, `INR`. Default URL: `https://nsearchives.nseindia.com/content/equities/sec_list.csv`. |
+| `NSE_EQUITY_SECURITIES` | Imports NSE cash-equity style rows as `.NS`, `STOCK / CASH`, `IN`, `NSE`, `India`, `INR`, including ISIN and listing date when available. Default URL: `https://archives.nseindia.com/content/equities/EQUITY_L.csv`. |
 | `NSE_EQUITY_DERIVATIVES_UNDERLYINGS` | Marks stock/index underlyings as `derivativesEligible=true`. It does not create futures contracts. No stable default URL is bundled; configure `MARKET_DATA_CATALOG_NSE_FO_UNDERLYINGS_URL` or use Manual CSV. |
 | `NSE_INDEX_SECURITIES` | Imports NSE index catalog rows from the public NSE all-indices JSON endpoint as `INDEX / INDEX`. Default URL: `https://www.nseindia.com/api/allIndices`. Known Yahoo symbols such as `^NSEI`, `^NSEBANK`, and common sector index symbols are attached when mapped; other rows remain catalog-visible with `providerSupportStatus=UNKNOWN` until validation. |
 | `BSE_INDEX_SECURITIES` | Imports BSE index catalog rows from the public BSE mobile index-watch page as `INDEX / INDEX`. Default URL: `https://m.bseindia.com/IndicesView_New.aspx`. Known Yahoo symbols such as `^BSESN` are attached when mapped; other rows remain catalog-visible until provider validation. |
@@ -197,7 +271,7 @@ Configured source URLs are controlled by environment variables. No arbitrary run
 
 | Variable | Purpose |
 | --- | --- |
-| `MARKET_DATA_CATALOG_NSE_EQUITY_URL` | Override for NSE cash-equity CSV. Default: `https://nsearchives.nseindia.com/content/equities/sec_list.csv`. |
+| `MARKET_DATA_CATALOG_NSE_EQUITY_URL` | Override for NSE cash-equity CSV. Default: `https://archives.nseindia.com/content/equities/EQUITY_L.csv`. |
 | `MARKET_DATA_CATALOG_NSE_ETF_URL` | Override for NSE ETF CSV. Default: `https://nsearchives.nseindia.com/content/equities/eq_etfseclist.csv`. |
 | `MARKET_DATA_CATALOG_NSE_INDICES_URL` | Override for NSE all-indices JSON. Default: `https://www.nseindia.com/api/allIndices`. |
 | `MARKET_DATA_CATALOG_BSE_INDICES_URL` | Override for BSE index-watch HTML. Default: `https://m.bseindia.com/IndicesView_New.aspx`. |
@@ -252,7 +326,7 @@ F&O underlying matching compares base and provider symbols, so `ABB` from an und
 
 The service also includes a conservative built-in NSE F&O stock-underlying seed so obvious current F&O stocks such as `RELIANCE` render as F&O eligible during catalog import/backfill even before a separate F&O underlying file is imported. A source import remains the preferred way to keep the full list current.
 
-Provider validation is optional and batch-bounded. When enabled, the module runs a lightweight Yahoo chart check for each imported or backfilled provider symbol in the current batch and records `SUPPORTED` or `UNSUPPORTED` with the provider error/message. OHLCV sync selection skips `UNSUPPORTED` rows so unsupported symbols stay visible in the catalog but are not repeatedly ingested.
+Provider validation is optional and batch-bounded. When enabled, the module runs a lightweight Yahoo chart check for each imported, backfilled, or repair-selected provider symbol in the current batch and records `SUPPORTED`, clean `UNSUPPORTED`, or retryable `VALIDATION_FAILED` with the provider error/message. OHLCV sync selection skips `UNSUPPORTED` rows so unsupported symbols stay visible in the catalog but are not repeatedly ingested.
 
 OHLCV ingestion fetches from `providerSymbol` when present and falls back to `symbol` only when provider metadata is missing. Returned provider rows are remapped to the stored `symbol` before persistence, so existing `PriceTick` uniqueness and downstream reads remain backward-compatible.
 
@@ -282,6 +356,14 @@ For the current India catalog scope, `.NS`, `.BO`, NSE, and BSE cash equity rows
 | Endpoint | Purpose | Status |
 | --- | --- | --- |
 | `GET /api/v1/market-data/health` | Market data health, instrument count, freshness, trust metadata | Implemented |
+| `GET /api/v1/market-data/universe/health` | Strict scoped universe readiness health and review-ready counts | Implemented |
+| `GET /api/v1/market-data/universe/repair-plan` | Bounded repair queue counts for provider validation, catalog identity, provider business metadata, manual metadata, and price backfill | Implemented |
+| `POST /api/v1/market-data/provider/validate` | Bounded provider support validation for explicit `UNKNOWN_FIRST` or `RETRY_FAILED` queues | Implemented |
+| `POST /api/v1/market-data/catalog/identity-repair` | Bounded catalog identity repair from configured/manual NSE/BSE catalog sources | Implemented |
+| `POST /api/v1/market-data/metadata/provider-business/repair` | Bounded provider business metadata repair with no-op/provider-not-found accounting | Implemented |
+| `POST /api/v1/market-data/metadata/manual-import` | Bounded curated CSV metadata import for manual business metadata and identity gaps | Implemented |
+| `POST /api/v1/market-data/metadata/enrich` | Backward-compatible provider business metadata repair alias | Implemented |
+| `POST /api/v1/market-data/prices/backfill` | Bounded price backfill for provider-supported price gaps | Implemented |
 | `GET /api/v1/market-data/scheduler/status` | Scheduler config, active run state, region session decisions, and latest sync summaries | Implemented |
 | `GET /api/v1/market-data/catalog/sources` | Lists configured catalog sources and URL availability without exposing full URLs | Implemented |
 | `POST /api/v1/market-data/catalog/import` | Bounded source-based catalog import and optional provider validation | Implemented |
@@ -419,7 +501,7 @@ Natural keys for stock-data records owned by this module:
 
 - `MarketDataFoundationPage`: Integrated with `useMarketScope()`. Automatically filters by the globally selected region.
   - Splits the operational surface into Catalog, Import & Backfill, and Data Health tabs so import controls, diagnostics, and table exploration do not compete in one crowded view.
-  - Shows a scan-focused catalog table with Symbol, Company, Provider Symbol, Exchange, Asset Type, Segment/Class, F&O Eligible, Provider Support, Data Health, Last Updated, and Actions. Lower-frequency metadata such as sector, industry, market cap, source symbols, catalog source, and provider errors is available in a row detail drawer.
+  - Shows a scan-focused catalog table with Symbol, Company, Provider Symbol, Exchange, Asset Type, Segment/Class, F&O Eligible, Provider Support, Data Health, strict universe state, Last Updated, and Actions. Lower-frequency metadata such as sector, industry, market cap, source symbols, catalog source, provider errors, price bars, latest price date, expected trading date, volume presence, and readiness blockers is available in a row detail drawer.
   - Provides preset chips for common catalog workflows such as Stocks, F&O Eligible, Needs Validation, Unsupported, Indices, and ETFs. The main filter bar stays intentionally compact with search, exchange, asset type, segment/class, currency, and F&O eligibility; diagnostic filters remain backend-supported and can be applied by presets.
   - Provides a bounded Catalog Import panel for NSE equity securities, F&O underlyings, index seed rows, ETF rows, and fallback broker/public scrip-master CSVs. Index seed import does not require CSV text.
   - Catalog import and metadata backfill run client-orchestrated bounded batches until `hasMore=false`, disable competing actions while running, and show determinate progress from backend `processedCount`/`totalCount`.
@@ -427,7 +509,7 @@ Natural keys for stock-data records owned by this module:
   - Changing any local filter resets to page 1. Reset clears only local filters and preserves the global market scope. Empty states name the active filters so no-result states such as `FUTURE / FUTURES` are explicit.
   - Status cards show scoped instrument health before local filters; the table match chip shows the locally filtered count.
   - Sync Catalog success/no-new-data alerts include daily candle freshness details from `/api/v1/market-data/scheduler/status`, so users can see whether the latest completed candle is already synced.
-- `MarketDataStatusPanel`: Shows health, instrument count, last data timestamp, and a Daily Candle card with the latest completed/stored candle status.
+- `MarketDataStatusPanel`: Shows system health plus Universe Health: catalog vs review-ready counts, staged provider validation status, price coverage, metadata coverage, latest stored versus expected EOD date, stale/incomplete counts, top blockers, `trustStatus`, and a Universe Signoff panel. The signoff panel shows PASS/FAIL, downstream allowed yes/no, review-ready actual versus required, provider unknown remaining, retry-failed providers, supported identity gaps, supported business metadata gaps, supported price backfill needed, latest/expected EOD, blockers, and next action. When coverage is poor it explicitly states that catalog size is not the reviewable universe and Today Plan remains blocked until the foundation is trustworthy. The same panel exposes an Operational Repair Run section with dry-run/start/drain actions, latest run status, before/after review-ready, provider-supported, metadata coverage, price-ready, remaining blockers, exact next action, and non-success treatment while another run is needed, final trust is not `OK`, signoff is not `PASS`, or a run is partial/blocked/manual-required. It also exposes the repair workflow with provider unknown, retry-failed providers, unsupported excluded, supported catalog-identity gaps, supported price-backfill-needed, supported business-metadata gaps, business-metadata-auto-repairable, business-metadata-manual-required, business-metadata-retry-blocked, business-metadata-retry-eligible, recently-attempted/skipped, and manual-business-metadata-needed counts plus one-batch Validate unknown providers, Retry failed providers, Repair catalog identity, Enrich provider business metadata, Export Manual Metadata Template, Import manual metadata, Backfill prices, and Refresh health actions. Manual metadata import keeps a separate CSV offset, sends backend `nextOffset` on the next import batch, validates `marketCap`, and exposes restart-from-zero.
 - `InstrumentSearchSelect`: Shared component for picking stocks. Defaults to the active region scope with an optional `global` override.
 
 Frontend routes are defined in `routes.tsx` and exported via `index.ts`.
@@ -435,12 +517,14 @@ Frontend routes are defined in `routes.tsx` and exported via `index.ts`.
 ## Tests And Verification
 
 - `backend/src/shared/utils/market-scope.test.ts`: Verifies regional mapping logic.
-- `backend/tests/modules/market-data-foundation/market-data.service.test.ts`: Verifies service logic.
+- `backend/tests/modules/market-data-foundation/market-data.service.test.ts`: Verifies service logic, provider validation repair, UNKNOWN-first versus retry-failed provider queue behavior, stable offset-zero mutating repair queues, successful OHLCV support marking, catalog identity repair from NSE catalog rows, stable source-list catalog pagination, no-op catalog repair accounting, provider business metadata repair with durable manual-required state, provider partial/full/error outcomes, manual metadata null-equivalent/invalid-market-cap rejection, manual metadata template export, null-preserving/no-op-safe provider metadata, supported-only repair-plan/signoff breakdown counts, operational repair-run dry-run/no-mutation behavior, dependency-order drain execution, retry-failed blocker handling after UNKNOWN drain, `PARTIAL`/`PARTIAL_BLOCKED`/`PARTIAL_MANUAL_REQUIRED` handling, persisted before/after snapshots, max-batch loop bounds, source-fingerprint resume/restart behavior, single-load catalog source snapshot reuse across run batches, catalog source-load failure before offset reuse, latest-run operator fields, strict review-ready/trust blockers, EOD-capped price backfill, and zero-row provider backfill failure handling.
 - `backend/tests/modules/market-data-foundation/market-data.market-session.test.ts`: Verifies IN market-session skip/run decisions.
 - `backend/tests/modules/market-data-foundation/market-data.scheduler.test.ts`: Verifies scheduler skip, incremental mode, and overlap protection.
-- `backend/tests/modules/market-data-foundation/market-data.repository.test.ts`: Verifies smart daily-candle no-op/update persistence.
+- `backend/tests/modules/market-data-foundation/market-data.repository.test.ts`: Verifies smart daily-candle no-op/update persistence, UNKNOWN-first and retry-failed provider validation selectors, business metadata repair queue filtering, durable repair-state counts, explicit retry behavior, and stock-id catalog identity repair.
 - `backend/tests/modules/market-data-foundation/market-data.repository.test.ts`: Verifies corporate-action natural-key deduplication before upsert, read-time dedupe for existing duplicate rows, and idempotent cleanup of older duplicate corporate actions.
+- `backend/tests/modules/market-data-foundation/market-data.universe.test.ts`: Verifies universe-state classification, strict latest-EOD freshness, rolling-window/gap checks, market-calendar uncertainty blocking, review-ready gating, all-UNKNOWN provider trust failure, read-time provider support repair from stored price history, and scoped health counts.
 - `backend/tests/modules/market-data-foundation/market-data.provider.test.ts`: Verifies provider mapping, malformed row handling, corporate actions, and Indian metadata fallbacks.
+- `frontend/tests/ui/market-data-foundation.spec.ts`: Verifies Universe Health, Universe Signoff FAIL/downstream-blocked display, repair-plan counts, operational repair-run dry-run/start/drain request payloads, before/after run evidence, non-green completed-but-untrusted latest-run states, partial-run warning treatment, exact next-action wording, separate provider/catalog/business/manual/price repair action payloads, manual template export, manual CSV validation including `marketCap`, manual CSV next-offset batching, progress/final batch counts, and poor-coverage trust language.
 
 Verification commands:
 

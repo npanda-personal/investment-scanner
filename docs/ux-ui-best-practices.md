@@ -40,6 +40,12 @@ These guidelines apply across the application. They are intentionally product-le
 - Keep progress, warnings, and final summary in the same visual container as the action that started the work.
 - After each batch or final completion, refresh the visible data if the operation changes what the user is looking at.
 - Keep progress count labels semantically distinct. For example, do not roll missing prerequisites, skipped records, failed records, and "not yet evaluable" records into one generic skipped/unevaluated count.
+- Data repair workflows should show the size of each repair queue before action and send bounded requests with visible `batchSize`/cursor semantics. For mutating queues, the UI should follow the backend cursor contract instead of advancing offsets over a queue that shrinks as rows are repaired. For stable source-list workflows such as manual metadata CSV import, the UI must persist and send the backend `nextOffset`, show progress, and offer a restart-from-zero action. A repair button should not imply the universe is fixed until the refreshed health metrics improve.
+- Provider validation repair must show fresh unknown providers separately from retry-failed providers. The default validation button should validate only the `UNKNOWN_FIRST` queue; retry failures need a separate `Retry failed providers` action and warning treatment so a small retry-failed queue cannot hide or block a large unknown queue.
+- Operational repair runs should show dry-run estimates before mutation and before/after evidence after mutation, including review-ready count, provider-supported count, metadata coverage, price-ready count, remaining blockers, exact next action, and whether dependent workflows remain blocked. A run is green only when `status=COMPLETED`, `anotherRunNeeded=false`, final universe trust is `OK`, and `universeSignoff.status=PASS`. A `PARTIAL`, `PARTIAL_BLOCKED`, or `PARTIAL_MANUAL_REQUIRED` run, a run with more requested batches, or a run that leaves trust/signoff failing should render warning/error treatment, not success styling.
+- Repair summaries should distinguish updated rows from partial, no-op, skipped, failed, provider-not-found, retry-blocked, and manual-required rows. Do not use a green/success result when a batch only produced partial fills, no-ops, or manual follow-up.
+- Market-data metadata repair should separate deterministic catalog identity repair, provider business metadata enrichment, and manual curated metadata import. A generic metadata button is not enough when each source has different trust, cursor, and fallback behavior. Provider-business repair results should render green only when rows were actually updated and fully resolved; partial, no-op, provider-not-found, retry-blocked, or manual-required batches are warnings/neutral states with visible remaining auto-repairable, retry-eligible, retry-blocked, and manual-required counts.
+- Manual metadata UI should describe the fallback as business metadata when readiness requires sector, industry, and market cap. Do not label the primary manual workflow as sector/industry-only once market cap is required for resolution; helper text should say that sector, industry, and positive numeric market cap are required before a row can resolve. Provide an exportable manual metadata template for unresolved rows when bulk curation is expected.
 
 ## Status And Diagnostics
 
@@ -47,6 +53,8 @@ These guidelines apply across the application. They are intentionally product-le
 - Do not hide missing or unknown data behind generic `N/A` when the user needs to understand why data is incomplete.
 - Provide concise tooltips for unknown, unsupported, partial, or missing states.
 - Distinguish source truth from provider support. Catalog presence does not guarantee provider history support.
+- For market-data foundations, show catalog size separately from review-ready universe size. Provider unknowns, missing latest price, stale price, market-calendar uncertainty, inadequate history, missing volume, and missing sector/industry should be quantified as blockers; do not let a generic `PARTIAL` status imply the universe is usable.
+- For market-data foundations, show Universe Signoff separately from operational run status. A completed repair run can still leave signoff failed; downstream-allowed messaging must remain negative until signoff passes.
 - Use the persisted market/instrument currency for money values. If the row lacks a currency, use a documented scope fallback such as `INR` for `IN` and `USD` otherwise. Do not hardcode `$` on scoped market pages.
 - If persisted business math is stale or unreconciled, repair it on read when the source inputs are sufficient; otherwise clearly mark it as legacy invalid and withhold the stale metric. Do not keep showing unreconciled capital, return, readiness, or risk values because new records are now fixed.
 - For geometry-sensitive workflows, warnings and blocker text must name the relationship that failed, such as a long-plan stop sitting inside the entry zone. A `VALID` status must not coexist with a visible hard geometry violation.
@@ -63,6 +71,7 @@ These guidelines apply across the application. They are intentionally product-le
 - Prefer selectors/searchable pickers over raw ID entry.
 - Use explicit labels for actions that fetch external/provider data, import catalog data, or run batch updates.
 - Avoid dead-end disabled states; pair disabled actions with a clear setup hint or fallback path.
+- CSV repair/import forms should show required columns and validate null-equivalent business values before submission. Values such as `Unknown`, `N/A`, `NA`, `None`, `Null`, or blank should remain diagnostics, not curated sector/industry metadata.
 
 ## Responsive Layout
 

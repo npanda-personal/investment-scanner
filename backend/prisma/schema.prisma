@@ -86,8 +86,80 @@ model Stock {
   alertEvents                   AlertEvent[]
   smartMoneySnapshots           SmartMoneyContextSnapshot[]
   strategyDecisions             StrategyDecisionResult[]
+  marketDataRepairAttempts      MarketDataRepairAttempt[]
+  marketDataRepairStates        MarketDataRepairState[]
 
   @@map("stocks")
+}
+
+model MarketDataRepairAttempt {
+  id                   String   @id @default(cuid())
+  stockId              String
+  stock                Stock    @relation(fields: [stockId], references: [id], onDelete: Cascade)
+  region               String
+  assetType            String?
+  repairType           String
+  status               String
+  provider             String?
+  attemptedAt          DateTime @default(now())
+  completedAt          DateTime?
+  fieldsFilledJson     Json?
+  error                String?
+  manualRequiredReason String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([stockId, repairType, status, attemptedAt])
+  @@index([region, assetType, repairType, status])
+  @@map("market_data_repair_attempts")
+}
+
+model MarketDataRepairState {
+  id                   String   @id @default(cuid())
+  stockId              String
+  stock                Stock    @relation(fields: [stockId], references: [id], onDelete: Cascade)
+  region               String
+  assetType            String?
+  repairType           String
+  status               String
+  provider             String?
+  lastAttemptId        String?
+  fieldsFilledJson     Json?
+  error                String?
+  manualRequiredReason String?
+  nextRetryAt          DateTime?
+  firstDetectedAt      DateTime @default(now())
+  lastAttemptedAt      DateTime?
+  resolvedAt           DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([stockId, repairType])
+  @@index([region, assetType, repairType, status])
+  @@index([repairType, status, nextRetryAt])
+  @@map("market_data_repair_states")
+}
+
+model MarketDataRepairRun {
+  id                   String    @id @default(cuid())
+  region               String
+  assetType            String?
+  status               String
+  startedAt            DateTime  @default(now())
+  completedAt          DateTime?
+  beforeHealthJson     Json?
+  afterHealthJson      Json?
+  beforeRepairPlanJson Json?
+  afterRepairPlanJson  Json?
+  actionsJson          Json
+  summaryJson          Json?
+  warningsJson         Json?
+  error                String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([region, assetType, status, startedAt])
+  @@map("market_data_repair_runs")
 }
 
 model SignalResult {

@@ -1,9 +1,28 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Box, CircularProgress, Paper, Typography } from '@mui/material';
+import { Alert, Box, Button, Chip, CircularProgress, Divider, LinearProgress, Paper, Stack, TextField, Typography } from '@mui/material';
+import FactCheckIcon from '@mui/icons-material/FactCheck';
+import ManageSearchIcon from '@mui/icons-material/ManageSearch';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import SyncIcon from '@mui/icons-material/Sync';
 import {
+  backfillMarketDataPrices,
+  fetchLatestMarketDataRepairRun,
   fetchMarketDataHealth,
+  fetchMarketDataRepairPlan,
+  fetchMarketDataUniverseHealth,
   fetchMarketDataSchedulerStatus,
+  fetchManualMetadataTemplate,
+  importMarketDataManualMetadata,
+  repairMarketDataCatalogIdentity,
+  repairMarketDataProviderBusinessMetadata,
+  runMarketDataUniverseRepair,
+  validateMarketDataProviders,
   type MarketDataHealth,
+  type MarketDataRepairPlan,
+  type MarketDataRepairRunRecord,
+  type MarketDataRepairRunResponse,
+  type MarketDataRepairSummary,
+  type MarketDataUniverseHealth,
   type MarketDataSchedulerRegionStatus,
 } from '../api/marketDataFoundationService';
 import { normalizeMarketForApi } from '../api/marketScopeApi';
@@ -22,6 +41,36 @@ const formatCandleStatus = (status: MarketDataSchedulerRegionStatus | null) => {
   return 'Unknown';
 };
 
+const formatCount = (value?: number) => new Intl.NumberFormat().format(value ?? 0);
+const formatPercent = (value?: number) => `${Number(value ?? 0).toFixed(1)}%`;
+const REPAIR_BATCH_SIZE = 50;
+
+type RepairAction =
+  | 'VALIDATE_PROVIDERS'
+  | 'RETRY_FAILED_PROVIDERS'
+  | 'CATALOG_IDENTITY_REPAIR'
+  | 'PROVIDER_BUSINESS_METADATA_REPAIR'
+  | 'MANUAL_METADATA_IMPORT'
+  | 'BACKFILL_PRICES';
+
+const trustColor = (trustStatus?: MarketDataUniverseHealth['trustStatus']): 'success' | 'warning' | 'error' | 'default' => {
+  if (trustStatus === 'OK') return 'success';
+  if (trustStatus === 'PARTIAL') return 'warning';
+  if (trustStatus === 'NOT_TRUSTWORTHY') return 'error';
+  return 'default';
+};
+
+const repairRunIsGreen = (run?: Pick<MarketDataRepairRunResponse, 'status' | 'anotherRunNeeded' | 'afterTrustStatus' | 'universeSignoff'> | MarketDataRepairRunRecord | null) =>
+  Boolean(run && run.status === 'COMPLETED' && !run.anotherRunNeeded && run.afterTrustStatus === 'OK' && run.universeSignoff?.status === 'PASS');
+
+const repairRunColor = (run?: Pick<MarketDataRepairRunResponse, 'status' | 'anotherRunNeeded' | 'afterTrustStatus' | 'universeSignoff'> | MarketDataRepairRunRecord | null): 'success' | 'warning' | 'error' | 'default' => {
+  if (!run) return 'default';
+  if (run.status === 'FAILED') return 'error';
+  if (repairRunIsGreen(run)) return 'success';
+  if (run.status !== 'COMPLETED' || run.anotherRunNeeded || run.afterTrustStatus !== 'OK' || run.universeSignoff?.status !== 'PASS') return 'warning';
+  return 'default';
+};
+
 interface MarketDataStatusPanelProps {
   region?: string;
   assetType?: string;
@@ -29,9 +78,23 @@ interface MarketDataStatusPanelProps {
 
 const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, assetType }) => {
   const [status, setStatus] = useState<MarketDataHealth | null>(null);
+  const [universeHealth, setUniverseHealth] = useState<MarketDataUniverseHealth | null>(null);
+  const [repairPlan, setRepairPlan] = useState<MarketDataRepairPlan | null>(null);
+  const [repairSummary, setRepairSummary] = useState<MarketDataRepairSummary | null>(null);
+  const [repairRunResult, setRepairRunResult] = useState<MarketDataRepairRunResponse | null>(null);
+  const [latestRepairRun, setLatestRepairRun] = useState<MarketDataRepairRunRecord | null>(null);
+  const [repairRunning, setRepairRunning] = useState<RepairAction | null>(null);
+  const [repairRunRunning, setRepairRunRunning] = useState<'DRY_RUN' | 'RUN' | 'DRAIN' | null>(null);
+  const [lastRepairAction, setLastRepairAction] = useState<RepairAction | null>(null);
+  const [catalogIdentityOffset, setCatalogIdentityOffset] = useState(0);
+  const [manualMetadataOffset, setManualMetadataOffset] = useState(0);
+  const [manualMetadataCsv, setManualMetadataCsv] = useState('');
+  const [manualTemplateMessage, setManualTemplateMessage] = useState<string | null>(null);
+  const [repairError, setRepairError] = useState<string | null>(null);
   const [candleStatus, setCandleStatus] = useState<MarketDataSchedulerRegionStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshNonce, setRefreshNonce] = useState(0);
 
   useEffect(() => {
     let mounted = true;
@@ -40,11 +103,17 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
     setError(null);
     Promise.all([
       fetchMarketDataHealth({ region, assetType }),
+      fetchMarketDataUniverseHealth({ region, assetType }),
+      fetchMarketDataRepairPlan({ region, assetType }),
+      fetchLatestMarketDataRepairRun({ region, assetType }).catch(() => null),
       fetchMarketDataSchedulerStatus().catch(() => null),
     ])
-      .then(([result, schedulerStatus]) => {
+      .then(([result, universeResult, repairPlanResult, latestRepairRunResult, schedulerStatus]) => {
         if (!mounted) return;
         setStatus(result);
+        setUniverseHealth(universeResult);
+        setRepairPlan(repairPlanResult);
+        setLatestRepairRun(latestRepairRunResult);
         const normalizedRegion = normalizeMarketForApi(region);
         setCandleStatus(schedulerStatus?.regionStatuses.find((item) => item.region === normalizedRegion) ?? null);
       })
@@ -58,7 +127,152 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
     return () => {
       mounted = false;
     };
-  }, [region, assetType]);
+  }, [region, assetType, refreshNonce]);
+
+  const manualMetadataErrors = (() => {
+    const text = manualMetadataCsv.trim();
+    if (!text) return [] as string[];
+    const [headerLine, ...rows] = text.split(/\r?\n/).filter((line) => line.trim());
+    const headers = headerLine.split(',').map((header) => header.trim().toLowerCase());
+    const errors: string[] = [];
+    if (!headers.includes('symbol') && !headers.includes('providersymbol') && !headers.includes('provider symbol')) {
+      errors.push('CSV must include symbol or providerSymbol.');
+    }
+    if (!headers.includes('sector')) errors.push('CSV must include sector.');
+    if (!headers.includes('industry')) errors.push('CSV must include industry.');
+    if (!headers.includes('marketcap') && !headers.includes('market cap')) errors.push('CSV must include marketCap.');
+    const sectorIndex = headers.indexOf('sector');
+    const industryIndex = headers.indexOf('industry');
+    const marketCapIndex = headers.includes('marketcap') ? headers.indexOf('marketcap') : headers.indexOf('market cap');
+    const nullEquivalent = (value: string) => {
+      const normalized = value.trim().toLowerCase();
+      return normalized.length === 0 || ['unknown', 'n/a', 'na', 'none', 'null'].includes(normalized);
+    };
+    for (const row of rows.slice(0, 5)) {
+      const cells = row.split(',');
+      if (sectorIndex >= 0 && nullEquivalent(cells[sectorIndex] || '')) errors.push('Sector cannot be Unknown, N/A, NA, None, Null, or blank.');
+      if (industryIndex >= 0 && nullEquivalent(cells[industryIndex] || '')) errors.push('Industry cannot be Unknown, N/A, NA, None, Null, or blank.');
+      if (marketCapIndex >= 0 && (!Number.isFinite(Number(cells[marketCapIndex])) || Number(cells[marketCapIndex]) <= 0)) errors.push('marketCap must be a positive number.');
+    }
+    return [...new Set(errors)];
+  })();
+
+  const repairSummarySeverity = (() => {
+    if (!repairSummary) return 'info' as const;
+    if (repairSummary.failed > 0) return 'error' as const;
+    if ((repairSummary.partialSuccess || 0) > 0 || (repairSummary.manualRequired || 0) > 0 || (repairSummary.providerNotFound || 0) > 0 || (repairSummary.noOp || 0) > 0) return 'warning' as const;
+    if ((repairSummary.skippedRecentAttempt || 0) > 0 && repairSummary.updated === 0) return 'info' as const;
+    if (repairSummary.updated > 0) {
+      return universeHealth?.universeSignoff?.status === 'PASS' ? 'success' as const : 'warning' as const;
+    }
+    return 'info' as const;
+  })();
+
+  const runRepair = async (action: RepairAction) => {
+    setRepairRunning(action);
+    setRepairError(null);
+    const request = {
+      region,
+      assetType,
+      batchSize: REPAIR_BATCH_SIZE,
+      offset: action === 'CATALOG_IDENTITY_REPAIR' ? catalogIdentityOffset : action === 'MANUAL_METADATA_IMPORT' ? manualMetadataOffset : 0,
+      providerValidationQueue: action === 'RETRY_FAILED_PROVIDERS' ? 'RETRY_FAILED' as const : 'UNKNOWN_FIRST' as const,
+      force: action === 'PROVIDER_BUSINESS_METADATA_REPAIR' ? false : true,
+    };
+    const catalogIdentityRequest = {
+      ...request,
+      catalogSource: 'NSE_EQUITY_SECURITIES',
+      importMode: 'CONFIGURED_URL' as const,
+    };
+    const manualMetadataRequest = {
+      ...request,
+      csvText: manualMetadataCsv,
+      importMode: 'MANUAL_CSV' as const,
+    };
+
+    try {
+      const result = action === 'VALIDATE_PROVIDERS' || action === 'RETRY_FAILED_PROVIDERS'
+        ? await validateMarketDataProviders(request)
+        : action === 'CATALOG_IDENTITY_REPAIR'
+          ? await repairMarketDataCatalogIdentity(catalogIdentityRequest)
+        : action === 'PROVIDER_BUSINESS_METADATA_REPAIR'
+          ? await repairMarketDataProviderBusinessMetadata(request)
+        : action === 'MANUAL_METADATA_IMPORT'
+          ? await importMarketDataManualMetadata(manualMetadataRequest)
+          : await backfillMarketDataPrices(request);
+      setRepairSummary(result);
+      setLastRepairAction(action);
+      if (action === 'CATALOG_IDENTITY_REPAIR') setCatalogIdentityOffset(result.nextOffset ?? 0);
+      if (action === 'MANUAL_METADATA_IMPORT') setManualMetadataOffset(result.nextOffset ?? 0);
+      setRefreshNonce((value) => value + 1);
+    } catch (err: any) {
+      setRepairError(err.response?.data?.error || err.message || 'Repair action failed.');
+    } finally {
+      setRepairRunning(null);
+    }
+  };
+
+  const runOperationalRepair = async (dryRun: boolean, drain = false) => {
+    setRepairRunRunning(dryRun ? 'DRY_RUN' : drain ? 'DRAIN' : 'RUN');
+    setRepairError(null);
+    try {
+      const result = await runMarketDataUniverseRepair({
+        region,
+        assetType,
+        batchSize: REPAIR_BATCH_SIZE,
+        maxBatchesPerAction: drain ? 50 : 20,
+        dryRun,
+        mode: drain ? 'DRAIN_UNTIL_BLOCKED' : undefined,
+        actions: drain ? undefined : [
+          'VALIDATE_PROVIDERS',
+          'CATALOG_IDENTITY_REPAIR',
+          'PROVIDER_BUSINESS_METADATA_REPAIR',
+          'BACKFILL_PRICES',
+        ],
+        includeRetryFailed: true,
+        catalogSource: 'NSE_EQUITY_SECURITIES',
+        importMode: 'CONFIGURED_URL',
+      });
+      setRepairRunResult(result);
+      if (!dryRun) setLatestRepairRun(result.id ? {
+        id: result.id,
+        scope: result.scope,
+        status: result.status,
+        startedAt: result.startedAt,
+        completedAt: result.completedAt,
+        beforeHealth: result.beforeHealth,
+        afterHealth: result.afterHealth,
+        beforeRepairPlan: result.beforeRepairPlan,
+        afterRepairPlan: result.afterRepairPlan,
+        actions: result.actions,
+        summary: result.summary,
+        warnings: result.warnings,
+        anotherRunNeeded: result.anotherRunNeeded,
+        hardBlockersRemaining: result.hardBlockersRemaining,
+        expectedNextAction: result.expectedNextAction,
+        afterTrustStatus: result.afterTrustStatus,
+        universeSignoff: result.universeSignoff,
+        error: result.error,
+      } : null);
+      setRefreshNonce((value) => value + 1);
+    } catch (err: any) {
+      setRepairError(err.response?.data?.error || err.message || 'Operational repair run failed.');
+    } finally {
+      setRepairRunRunning(null);
+    }
+  };
+
+  const exportManualTemplate = async () => {
+    setRepairError(null);
+    try {
+      const template = await fetchManualMetadataTemplate({ region, assetType });
+      setManualMetadataCsv(template.csvText);
+      setManualMetadataOffset(0);
+      setManualTemplateMessage(`Manual metadata template loaded with ${formatCount(template.count)} unresolved rows.`);
+    } catch (err: any) {
+      setRepairError(err.response?.data?.error || err.message || 'Manual metadata template export failed.');
+    }
+  };
 
   if (loading) {
     return (
@@ -76,31 +290,464 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
   }
 
   return (
-    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2, mb: 3 }}>
-      <Paper sx={{ p: 2 }}>
+    <Stack spacing={2} sx={{ mb: 3 }}>
+      <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'center' }} justifyContent="space-between">
+        <Box>
+          <Typography variant="h6">Universe Health</Typography>
+          <Typography variant="body2" color="text.secondary">
+            {universeHealth?.scope.region || region || 'IN'} / {universeHealth?.scope.assetType || assetType || 'STOCK'} catalog coverage and review-ready gate.
+          </Typography>
+        </Box>
+        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+          <Chip
+            label={`Trust: ${universeHealth?.trustStatus || 'UNKNOWN'}`}
+            color={trustColor(universeHealth?.trustStatus)}
+            variant="filled"
+          />
+          <Button variant="outlined" size="small" startIcon={<RefreshIcon />} onClick={() => setRefreshNonce((value) => value + 1)}>
+            Refresh Universe Health
+          </Button>
+        </Stack>
+      </Stack>
+
+      {universeHealth?.trustStatus !== 'OK' && (
+        <Alert severity={universeHealth?.trustStatus === 'NOT_TRUSTWORTHY' ? 'error' : 'warning'}>
+          <Stack spacing={0.5}>
+            <Typography variant="body2">
+              Catalog size is not the reviewable universe. Today&apos;s Plan remains blocked until provider, price, and metadata coverage are trustworthy.
+            </Typography>
+            {(universeHealth?.trustReasons || []).slice(0, 3).map((reason) => (
+              <Typography key={reason} variant="caption">{reason}</Typography>
+            ))}
+          </Stack>
+        </Alert>
+      )}
+
+      <Box sx={{ border: '1px solid', borderColor: universeHealth?.universeSignoff?.status === 'PASS' ? 'success.main' : 'error.main', borderRadius: 1, p: 2 }}>
+        <Stack spacing={1.5}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} justifyContent="space-between">
+            <Box>
+              <Typography variant="subtitle1" fontWeight={700}>Universe Signoff</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Downstream workflows use this gate, not catalog count.
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+              <Chip
+                label={`Signoff: ${universeHealth?.universeSignoff?.status || 'FAIL'}`}
+                color={universeHealth?.universeSignoff?.status === 'PASS' ? 'success' : 'error'}
+              />
+              <Chip
+                label={`Downstream allowed: ${universeHealth?.universeSignoff?.downstreamAllowed ? 'yes' : 'no'}`}
+                color={universeHealth?.universeSignoff?.downstreamAllowed ? 'success' : 'warning'}
+                variant="outlined"
+              />
+            </Stack>
+          </Stack>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 1 }}>
+            <Typography variant="caption">Review-ready: {formatCount(universeHealth?.universeSignoff?.reviewReadyActual)} / {formatCount(universeHealth?.universeSignoff?.minReviewReadyRequired)}</Typography>
+            <Typography variant="caption">Provider unknown: {formatCount(repairPlan?.providerUnknownValidationNeeded ?? repairPlan?.providerValidationNeeded ?? universeHealth?.counts.providerUnknownValidationNeeded ?? universeHealth?.counts.providerUnknown)}</Typography>
+            <Typography variant="caption">Retry failed providers: {formatCount(repairPlan?.providerRetryValidationNeeded ?? repairPlan?.retryFailedValidations ?? universeHealth?.counts.providerRetryValidationNeeded)}</Typography>
+            <Typography variant="caption">Supported identity gaps: {formatCount(repairPlan?.supportedCatalogIdentityRepairNeeded ?? universeHealth?.counts.supportedCatalogIdentityRepairNeeded)}</Typography>
+            <Typography variant="caption">Business auto-repairable: {formatCount(repairPlan?.businessMetadataAutoRepairable)}</Typography>
+            <Typography variant="caption">Manual business metadata: {formatCount(repairPlan?.manualBusinessMetadataRequired)}</Typography>
+            <Typography variant="caption">Supported price backfill: {formatCount(repairPlan?.supportedPriceBackfillNeeded ?? repairPlan?.priceBackfillNeeded)}</Typography>
+            <Typography variant="caption">Latest EOD: {universeHealth?.latestStoredEodDate || 'none'} / {universeHealth?.expectedLatestTradingDate || 'unknown'}</Typography>
+            <Typography variant="caption">Next action: {universeHealth?.universeSignoff?.nextAction || repairPlan?.universeSignoff?.nextAction || 'none'}</Typography>
+          </Box>
+          {(repairPlan?.universeSignoff?.blockers || universeHealth?.universeSignoff?.blockers || []).slice(0, 5).map((blocker) => (
+            <Typography key={blocker.code} variant="caption" color="text.secondary">
+              {blocker.code}: {formatCount(typeof blocker.count === 'number' ? blocker.count : 0)}; required {blocker.required}; next {blocker.nextAction || 'none'}.
+            </Typography>
+          ))}
+        </Stack>
+      </Box>
+
+      <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 2 }}>
+        <Stack spacing={1.5}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} justifyContent="space-between">
+            <Box>
+              <Typography variant="subtitle1" fontWeight={700}>Operational Repair Run</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Runs bounded provider, catalog, business metadata, and price repair batches in dependency order, then records before/after health.
+              </Typography>
+            </Box>
+            {latestRepairRun && (
+              <Chip
+                label={`Last run: ${latestRepairRun.status}`}
+                color={repairRunColor(latestRepairRun)}
+              />
+            )}
+          </Stack>
+          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+            <Button
+              variant="outlined"
+              size="small"
+              disabled={Boolean(repairRunRunning || repairRunning)}
+              startIcon={repairRunRunning === 'DRY_RUN' ? <CircularProgress size={16} /> : <ManageSearchIcon />}
+              onClick={() => void runOperationalRepair(true)}
+            >
+              Run dry-run
+            </Button>
+            <Button
+              variant="contained"
+              size="small"
+              disabled={Boolean(repairRunRunning || repairRunning)}
+              startIcon={repairRunRunning === 'RUN' ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
+              onClick={() => void runOperationalRepair(false)}
+            >
+              Start repair run
+            </Button>
+            <Button
+              variant="contained"
+              size="small"
+              color="warning"
+              disabled={Boolean(repairRunRunning || repairRunning)}
+              startIcon={repairRunRunning === 'DRAIN' ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
+              onClick={() => void runOperationalRepair(false, true)}
+            >
+              Run Drain
+            </Button>
+          </Stack>
+
+          {latestRepairRun && !repairRunIsGreen(latestRepairRun) && (
+            <Typography variant="caption" color="warning.main">
+              Latest repair run is not signoff-ready{latestRepairRun.afterTrustStatus ? `; trust ${latestRepairRun.afterTrustStatus}` : ''}{latestRepairRun.expectedNextAction ? `; next action ${latestRepairRun.expectedNextAction}` : ''}.
+            </Typography>
+          )}
+
+          {repairRunRunning && <LinearProgress aria-label="Market data operational repair run progress" />}
+
+          {repairRunResult && (
+            <Alert severity={repairRunResult.status === 'FAILED' ? 'error' : repairRunIsGreen(repairRunResult) ? 'success' : 'warning'}>
+              <Stack spacing={1}>
+                <Typography variant="body2">
+                  {repairRunResult.dryRun ? 'Dry-run expected actions' : `Repair run ${repairRunResult.status}`}:
+                  {' '}updated {formatCount(repairRunResult.summary.updated)}, skipped {formatCount(repairRunResult.summary.skipped)}, failed {formatCount(repairRunResult.summary.failed)}, manual-required {formatCount(repairRunResult.summary.manualRequired)}.
+                </Typography>
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 1 }}>
+                  <Typography variant="caption">Review-ready: {formatCount(repairRunResult.beforeHealth.counts.reviewReady)}{' -> '}{formatCount(repairRunResult.afterHealth.counts.reviewReady)}</Typography>
+                  <Typography variant="caption">Provider-supported: {formatCount(repairRunResult.beforeHealth.counts.providerSupported)}{' -> '}{formatCount(repairRunResult.afterHealth.counts.providerSupported)}</Typography>
+                  <Typography variant="caption">Metadata coverage: {formatPercent(repairRunResult.beforeHealth.coverage.metadataCoveragePercentage)}{' -> '}{formatPercent(repairRunResult.afterHealth.coverage.metadataCoveragePercentage)}</Typography>
+                  <Typography variant="caption">Price-ready: {formatCount(repairRunResult.beforeHealth.counts.priceReady)}{' -> '}{formatCount(repairRunResult.afterHealth.counts.priceReady)}</Typography>
+                </Box>
+                <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                  {repairRunResult.actions.map((action) => (
+                    <Chip
+                      key={action.action}
+                      size="small"
+                      label={`${action.label}: ${repairRunResult.dryRun ? `${formatCount(action.estimatedTotal)} planned` : `${formatCount(action.batchesExecuted)} batches`}`}
+                      color={action.error ? 'error' : action.anotherRunNeeded ? 'warning' : 'default'}
+                      variant="outlined"
+                    />
+                  ))}
+                </Stack>
+                {repairRunResult.afterHealth.trustStatus !== 'OK' && (
+                  <Typography variant="caption" color="warning.main">
+                    Today&apos;s Plan remains blocked because {repairRunResult.afterHealth.counts.reviewReady === 0 ? 'review-ready universe is 0 and ' : ''}universe trust is {repairRunResult.afterHealth.trustStatus}.
+                  </Typography>
+                )}
+                {(repairRunResult.anotherRunNeeded || repairRunResult.expectedNextAction) && (
+                  <Typography variant="caption" color="warning.main">
+                    Another bounded repair run is needed{repairRunResult.expectedNextAction ? `; next action ${repairRunResult.expectedNextAction}.` : '.'}
+                  </Typography>
+                )}
+                {repairRunResult.universeSignoff?.status === 'FAIL' && (
+                  <Typography variant="caption" color="warning.main">
+                    Universe signoff FAIL; downstream allowed: no; next action {repairRunResult.universeSignoff.nextAction || 'manual review'}.
+                  </Typography>
+                )}
+                {repairRunResult.hardBlockersRemaining.slice(0, 3).map((blocker) => (
+                  <Typography key={blocker.code} variant="caption">{blocker.label}: {formatCount(blocker.count)}</Typography>
+                ))}
+                {repairRunResult.warnings.slice(0, 3).map((warning) => (
+                  <Typography key={warning} variant="caption">{warning}</Typography>
+                ))}
+              </Stack>
+            </Alert>
+          )}
+        </Stack>
+      </Box>
+
+      <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 2 }}>
+        <Stack spacing={1.5}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} justifyContent="space-between">
+            <Box>
+              <Typography variant="subtitle1" fontWeight={700}>Universe Repair Workflow</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Each action runs one bounded batch. Refresh health after each batch to confirm whether coverage actually improved.
+              </Typography>
+            </Box>
+            <Typography variant="caption" color="text.secondary">
+              Batch size {REPAIR_BATCH_SIZE}; mutating queues re-read from offset 0 until empty
+            </Typography>
+          </Stack>
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 1 }}>
+            <Box sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+              <Typography variant="caption" color="text.secondary">Provider unknown</Typography>
+              <Typography variant="h6">{formatCount(repairPlan?.providerUnknownValidationNeeded ?? repairPlan?.providerValidationNeeded)}</Typography>
+            </Box>
+            <Box sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+              <Typography variant="caption" color="text.secondary">Retry failed providers</Typography>
+              <Typography variant="h6">{formatCount(repairPlan?.providerRetryValidationNeeded ?? repairPlan?.retryFailedValidations)}</Typography>
+            </Box>
+            <Box sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+              <Typography variant="caption" color="text.secondary">Unsupported excluded</Typography>
+              <Typography variant="h6">{formatCount(repairPlan?.providerUnsupportedExcluded ?? repairPlan?.unsupportedExcluded ?? universeHealth?.counts.unsupportedExcluded)}</Typography>
+            </Box>
+            <Box sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+              <Typography variant="caption" color="text.secondary">Supported identity gaps</Typography>
+              <Typography variant="h6">{formatCount(repairPlan?.supportedCatalogIdentityRepairNeeded ?? repairPlan?.catalogIdentityRepairNeeded)}</Typography>
+            </Box>
+            <Box sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+              <Typography variant="caption" color="text.secondary">Supported price backfill needed</Typography>
+              <Typography variant="h6">{formatCount(repairPlan?.supportedPriceBackfillNeeded ?? repairPlan?.priceBackfillNeeded)}</Typography>
+            </Box>
+            <Box sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+              <Typography variant="caption" color="text.secondary">Supported business metadata gaps</Typography>
+              <Typography variant="h6">{formatCount(repairPlan?.supportedBusinessMetadataRepairNeeded ?? repairPlan?.businessMetadataRepairNeeded)}</Typography>
+            </Box>
+            <Box sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+              <Typography variant="caption" color="text.secondary">Business metadata auto-repairable</Typography>
+              <Typography variant="h6">{formatCount(repairPlan?.businessMetadataAutoRepairable ?? repairPlan?.businessMetadataRepairNeeded ?? repairPlan?.metadataEnrichmentNeeded)}</Typography>
+            </Box>
+            <Box sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+              <Typography variant="caption" color="text.secondary">Business metadata manual-required</Typography>
+              <Typography variant="h6">{formatCount(repairPlan?.businessMetadataManualRequired ?? 0)}</Typography>
+            </Box>
+            <Box sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+              <Typography variant="caption" color="text.secondary">Business metadata retry-blocked</Typography>
+              <Typography variant="h6">{formatCount(repairPlan?.businessMetadataRetryBlocked ?? 0)}</Typography>
+            </Box>
+            <Box sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+              <Typography variant="caption" color="text.secondary">Business metadata retry-eligible</Typography>
+              <Typography variant="h6">{formatCount(repairPlan?.businessMetadataRetryEligible ?? 0)}</Typography>
+            </Box>
+            <Box sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+              <Typography variant="caption" color="text.secondary">Recently attempted/skipped</Typography>
+              <Typography variant="h6">{formatCount(repairPlan?.businessMetadataRecentlyAttempted ?? 0)}</Typography>
+            </Box>
+            <Box sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+              <Typography variant="caption" color="text.secondary">Manual business metadata required</Typography>
+              <Typography variant="h6">{formatCount(repairPlan?.manualBusinessMetadataRequired ?? repairPlan?.manualMetadataRequired)}</Typography>
+            </Box>
+          </Box>
+
+          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={repairRunning === 'VALIDATE_PROVIDERS' ? <CircularProgress size={16} color="inherit" /> : <FactCheckIcon />}
+              disabled={Boolean(repairRunning) || ((repairPlan?.providerUnknownValidationNeeded ?? repairPlan?.providerValidationNeeded ?? 0) === 0)}
+              onClick={() => void runRepair('VALIDATE_PROVIDERS')}
+            >
+              Validate unknown providers
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={repairRunning === 'RETRY_FAILED_PROVIDERS' ? <CircularProgress size={16} /> : <FactCheckIcon />}
+              disabled={Boolean(repairRunning) || ((repairPlan?.providerRetryValidationNeeded ?? repairPlan?.retryFailedValidations ?? 0) === 0)}
+              onClick={() => void runRepair('RETRY_FAILED_PROVIDERS')}
+            >
+              Retry failed providers
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={repairRunning === 'CATALOG_IDENTITY_REPAIR' ? <CircularProgress size={16} /> : <ManageSearchIcon />}
+              disabled={Boolean(repairRunning) || ((repairPlan?.supportedCatalogIdentityRepairNeeded ?? repairPlan?.catalogIdentityRepairNeeded ?? 0) === 0)}
+              onClick={() => void runRepair('CATALOG_IDENTITY_REPAIR')}
+            >
+              Repair catalog identity
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={repairRunning === 'PROVIDER_BUSINESS_METADATA_REPAIR' ? <CircularProgress size={16} /> : <ManageSearchIcon />}
+              disabled={Boolean(repairRunning) || (((repairPlan?.businessMetadataAutoRepairable ?? repairPlan?.businessMetadataRepairNeeded ?? repairPlan?.metadataEnrichmentNeeded) || 0) + (repairPlan?.businessMetadataRetryEligible || 0)) === 0}
+              onClick={() => void runRepair('PROVIDER_BUSINESS_METADATA_REPAIR')}
+            >
+              Enrich provider business metadata
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={repairRunning === 'MANUAL_METADATA_IMPORT' ? <CircularProgress size={16} /> : <ManageSearchIcon />}
+              disabled={Boolean(repairRunning) || !manualMetadataCsv.trim() || manualMetadataErrors.length > 0}
+              onClick={() => void runRepair('MANUAL_METADATA_IMPORT')}
+            >
+              Import manual metadata
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<ManageSearchIcon />}
+              disabled={Boolean(repairRunning)}
+              onClick={() => void exportManualTemplate()}
+            >
+              Export Manual Metadata Template
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={repairRunning === 'BACKFILL_PRICES' ? <CircularProgress size={16} /> : <SyncIcon />}
+              disabled={Boolean(repairRunning) || ((repairPlan?.supportedPriceBackfillNeeded ?? repairPlan?.priceBackfillNeeded ?? 0) === 0)}
+              onClick={() => void runRepair('BACKFILL_PRICES')}
+            >
+              Backfill prices
+            </Button>
+            <Button variant="text" size="small" startIcon={<RefreshIcon />} onClick={() => setRefreshNonce((value) => value + 1)} disabled={Boolean(repairRunning)}>
+              Refresh health
+            </Button>
+          </Stack>
+
+          <TextField
+            label="Manual metadata CSV"
+            value={manualMetadataCsv}
+            onChange={(event) => {
+              setManualMetadataCsv(event.target.value);
+              setManualMetadataOffset(0);
+            }}
+            multiline
+            minRows={3}
+            placeholder="symbol,sector,industry,marketCap,isin,listingDate"
+            helperText="Required columns: symbol or providerSymbol, sector, industry, and marketCap. marketCap must be a positive number."
+            error={manualMetadataErrors.length > 0}
+          />
+          {manualTemplateMessage && (
+            <Typography variant="caption" color="text.secondary">{manualTemplateMessage}</Typography>
+          )}
+          {manualMetadataErrors.map((validationError) => (
+            <Typography key={validationError} variant="caption" color="error">{validationError}</Typography>
+          ))}
+
+          {repairRunning && <LinearProgress aria-label="Market data repair progress" />}
+          {repairError && <Alert severity="error">{repairError}</Alert>}
+          {repairSummary && (
+            <Alert severity={repairSummarySeverity}>
+              Last repair batch processed {formatCount(repairSummary.processedCount)} of {formatCount(repairSummary.totalCount)}; updated {formatCount(repairSummary.updated)}, skipped {formatCount(repairSummary.skipped)}, failed {formatCount(repairSummary.failed)}, no-op {formatCount(repairSummary.noOp)}, manual required {formatCount(repairSummary.manualRequired)}.
+              {repairSummary.providerValidationQueue ? ` Provider queue: ${repairSummary.providerValidationQueue}.` : ''}
+              {repairSummary.partialSuccess ? ` Partial metadata repairs: ${formatCount(repairSummary.partialSuccess)}.` : ''}
+              {repairSummary.providerNotFound ? ` Provider not found/useful for ${formatCount(repairSummary.providerNotFound)} rows.` : ''}
+              {repairSummary.skippedRecentAttempt ? ` Recently attempted/skipped: ${formatCount(repairSummary.skippedRecentAttempt)}.` : ''}
+              {repairSummary.remainingAutoRepairable !== undefined ? ` Remaining auto-repairable: ${formatCount(repairSummary.remainingAutoRepairable)}.` : ''}
+              {repairSummary.remainingManualRequired !== undefined ? ` Remaining manual-required: ${formatCount(repairSummary.remainingManualRequired)}.` : ''}
+              {repairSummary.catalogIdentityRepaired ? ` Catalog identity repaired for ${formatCount(repairSummary.catalogIdentityRepaired)} rows.` : ''}
+              {repairSummary.matchedExistingRows ? ` Matched existing rows: ${formatCount(repairSummary.matchedExistingRows)}.` : ''}
+              {repairSummary.unmatchedCatalogRows ? ` Unmatched catalog rows: ${formatCount(repairSummary.unmatchedCatalogRows)}.` : ''}
+              {repairSummary.fieldsFilled ? ` Fields repaired: ${Object.entries(repairSummary.fieldsFilled).map(([field, count]) => `${field} ${formatCount(count)}`).join(', ')}.` : ''}
+              {repairSummary.hasMore
+                ? lastRepairAction === 'CATALOG_IDENTITY_REPAIR' || lastRepairAction === 'MANUAL_METADATA_IMPORT'
+                  ? ` More source rows remain; next offset ${formatCount(repairSummary.nextOffset ?? 0)}.`
+                  : ' More rows remain; rerun this batch action from offset 0.'
+                : ' No more rows in this repair queue.'}
+              {(repairSummary.warnings || []).slice(0, 2).map((warning) => ` ${warning}`).join('')}
+            </Alert>
+          )}
+          {catalogIdentityOffset > 0 && (
+            <Button variant="text" size="small" onClick={() => setCatalogIdentityOffset(0)} disabled={Boolean(repairRunning)}>
+              Restart catalog identity from zero
+            </Button>
+          )}
+          {manualMetadataOffset > 0 && (
+            <Button variant="text" size="small" onClick={() => setManualMetadataOffset(0)} disabled={Boolean(repairRunning)}>
+              Restart manual metadata import from zero
+            </Button>
+          )}
+          {(repairPlan?.warnings || []).slice(0, 3).map((warning) => (
+            <Typography key={warning} variant="caption" color="text.secondary">{warning}</Typography>
+          ))}
+        </Stack>
+      </Box>
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2 }}>
+      <Paper variant="outlined" sx={{ p: 2 }}>
         <Typography variant="overline" color="text.secondary">System Status</Typography>
         <Typography variant="h6">{status?.status === 'ok' ? 'Healthy' : 'Unknown'}</Typography>
         <Typography variant="caption" color="text.secondary">Trust: {status?.data_status || 'MISSING'}</Typography>
       </Paper>
-      <Paper sx={{ p: 2 }}>
-        <Typography variant="overline" color="text.secondary">Scoped Instruments</Typography>
-        <Typography variant="h6">{status?.instrumentCount ?? 0}</Typography>
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Typography variant="overline" color="text.secondary">Catalog vs Review Ready</Typography>
+        <Typography variant="h6">{formatCount(universeHealth?.counts.totalCatalogInstruments)} / {formatCount(universeHealth?.counts.reviewReady)}</Typography>
         <Typography variant="caption" color="text.secondary">
-          {status?.region || region || 'GLOBAL'} / {status?.assetType || assetType || 'ALL'}, before local filters
+          total catalog / strict review-ready
         </Typography>
       </Paper>
-      <Paper sx={{ p: 2 }}>
-        <Typography variant="overline" color="text.secondary">Last Updated</Typography>
-        <Typography variant="body1">{formatTimestamp(status?.latestDataTimestamp ?? null)}</Typography>
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Typography variant="overline" color="text.secondary">Provider Validation</Typography>
+        <Typography variant="h6">{formatCount(universeHealth?.counts.providerSupported)} supported</Typography>
+        <Typography variant="caption" color="text.secondary">
+          {formatCount(universeHealth?.counts.providerUnknownValidationNeeded ?? universeHealth?.counts.providerUnknown)} unknown, {formatCount(universeHealth?.counts.providerRetryValidationNeeded)} retry failed, {formatCount(universeHealth?.counts.unsupportedExcluded ?? universeHealth?.counts.unsupported)} unsupported excluded
+        </Typography>
       </Paper>
-      <Paper sx={{ p: 2 }}>
+      <Paper variant="outlined" sx={{ p: 2 }}>
         <Typography variant="overline" color="text.secondary">Daily Candle</Typography>
         <Typography variant="body1">{formatCandleStatus(candleStatus)}</Typography>
         <Typography variant="caption" color="text.secondary">
           Stored: {candleStatus?.latestStoredTradingDate || 'none'}
         </Typography>
       </Paper>
-    </Box>
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Typography variant="overline" color="text.secondary">Price Coverage</Typography>
+        <Typography variant="h6">{formatPercent(universeHealth?.coverage.priceCoveragePercentage)}</Typography>
+        <Typography variant="caption" color="text.secondary">
+          {formatCount(universeHealth?.counts.priceReady)} price-ready; {formatCount(universeHealth?.counts.missingLatestPrice)} missing latest
+        </Typography>
+      </Paper>
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Typography variant="overline" color="text.secondary">Metadata Coverage</Typography>
+        <Typography variant="h6">{formatPercent(universeHealth?.coverage.metadataCoveragePercentage)}</Typography>
+        <Typography variant="caption" color="text.secondary">
+          {formatCount(universeHealth?.counts.missingSector)} missing sector, {formatCount(universeHealth?.counts.missingIndustry)} missing industry
+        </Typography>
+      </Paper>
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Typography variant="overline" color="text.secondary">Latest EOD</Typography>
+        <Typography variant="body1">Stored: {universeHealth?.latestStoredEodDate || 'none'}</Typography>
+        <Typography variant="caption" color="text.secondary">
+          Expected: {universeHealth?.expectedLatestTradingDate || 'unknown'}
+        </Typography>
+      </Paper>
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Typography variant="overline" color="text.secondary">Stale / Incomplete</Typography>
+        <Typography variant="h6">{formatCount(universeHealth?.counts.staleOrIncomplete)}</Typography>
+        <Typography variant="caption" color="text.secondary">
+          {formatCount(universeHealth?.counts.missingOrInadequatePriceHistory)} history gaps, {formatCount(universeHealth?.counts.missingRecentVolume)} volume gaps
+        </Typography>
+      </Paper>
+      </Box>
+
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Stack spacing={1.5}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} justifyContent="space-between">
+            <Box>
+              <Typography variant="subtitle1" fontWeight={700}>Top Readiness Blockers</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Bad data is shown as review blockers; active catalog rows are not treated as reviewable rows.
+              </Typography>
+            </Box>
+            <Typography variant="caption" color="text.secondary">
+              Last health check: {universeHealth?.generatedAt ? formatTimestamp(universeHealth.generatedAt) : 'not available'}
+            </Typography>
+          </Stack>
+          <Divider />
+          {universeHealth?.topBlockers.length ? (
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }, gap: 1 }}>
+              {universeHealth.topBlockers.map((blocker) => (
+                <Stack key={blocker.code} direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                  <Typography variant="body2">{blocker.label}</Typography>
+                  <Chip size="small" color={blocker.severity === 'critical' ? 'error' : 'warning'} label={formatCount(blocker.count)} />
+                </Stack>
+              ))}
+            </Box>
+          ) : (
+            <Typography variant="body2" color="text.secondary">No active universe blockers reported.</Typography>
+          )}
+        </Stack>
+      </Paper>
+    </Stack>
   );
 };
 

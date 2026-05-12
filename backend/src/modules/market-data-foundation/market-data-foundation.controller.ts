@@ -292,6 +292,180 @@ export class MarketDataFoundationController {
     }
   };
 
+  universeHealth = async (req: Request, res: Response) => {
+    try {
+      const { region, assetType } = this.getMarketFilter(req);
+      return res.json(await this.service.universeHealth({ region, assetType }));
+    } catch (error) {
+      console.error('Market data universe health error:', error);
+      return res.status(500).json({ error: 'Market data universe health check failed' });
+    }
+  };
+
+  repairPlan = async (req: Request, res: Response) => {
+    try {
+      const { region, assetType } = this.getMarketFilter(req);
+      return res.json(await this.service.repairPlan({ region, assetType }));
+    } catch (error) {
+      console.error('Market data repair plan error:', error);
+      return res.status(500).json({ error: 'Market data repair plan failed' });
+    }
+  };
+
+  manualMetadataTemplate = async (req: Request, res: Response) => {
+    try {
+      const { region, assetType } = this.getMarketFilter(req);
+      return res.json(await this.service.manualMetadataTemplate({ region, assetType }));
+    } catch (error) {
+      console.error('Market data manual metadata template error:', error);
+      return res.status(500).json({ error: 'Market data manual metadata template failed' });
+    }
+  };
+
+  repairRun = async (req: Request, res: Response) => {
+    try {
+      const { region, assetType } = this.getMarketFilter(req);
+      return res.json(await this.service.repairRun({
+        region,
+        assetType,
+        batchSize: this.numberParam(req, 'batchSize') ?? this.numberParam(req, 'limit'),
+        maxBatchesPerAction: this.numberParam(req, 'maxBatchesPerAction'),
+        actions: this.parseRepairRunActions(req.body?.actions),
+        dryRun: this.parseOptionalBoolean(req.query.dryRun ?? req.body?.dryRun),
+        mode: req.body?.mode === 'DRAIN_UNTIL_BLOCKED' || req.query.mode === 'DRAIN_UNTIL_BLOCKED' ? 'DRAIN_UNTIL_BLOCKED' : undefined,
+        includeRetryFailed: this.parseOptionalBoolean(req.query.includeRetryFailed ?? req.body?.includeRetryFailed),
+        providerValidationQueue: req.body?.providerValidationQueue === 'RETRY_FAILED' || req.query.providerValidationQueue === 'RETRY_FAILED'
+          ? 'RETRY_FAILED'
+          : req.body?.providerValidationQueue === 'UNKNOWN_FIRST' || req.query.providerValidationQueue === 'UNKNOWN_FIRST'
+            ? 'UNKNOWN_FIRST'
+            : undefined,
+        force: this.parseOptionalBoolean(req.query.force ?? req.body?.force),
+        fullReload: this.parseOptionalBoolean(req.query.fullReload ?? req.body?.fullReload),
+        csvText: typeof req.body?.csvText === 'string' ? req.body.csvText : undefined,
+        catalogSource: typeof req.body?.catalogSource === 'string' ? req.body.catalogSource : undefined,
+        importMode: req.body?.importMode === 'MANUAL_CSV' || req.body?.importMode === 'CONFIGURED_URL' ? req.body.importMode : undefined,
+      }));
+    } catch (error: any) {
+      console.error('Market data repair run error:', error);
+      return res.status(500).json({ error: error.message || 'Market data repair run failed' });
+    }
+  };
+
+  latestRepairRun = async (req: Request, res: Response) => {
+    try {
+      const { region, assetType } = this.getMarketFilter(req);
+      return res.json(await this.service.latestRepairRun({ region, assetType }));
+    } catch (error) {
+      console.error('Latest market data repair run error:', error);
+      return res.status(500).json({ error: 'Latest market data repair run failed' });
+    }
+  };
+
+  validateProviders = async (req: Request, res: Response) => {
+    try {
+      const { region, assetType } = this.getMarketFilter(req);
+      return res.json(await this.service.validateProviders({
+        region,
+        assetType,
+        batchSize: this.numberParam(req, 'batchSize') ?? this.numberParam(req, 'limit'),
+        offset: this.numberParam(req, 'offset'),
+        includeRetryFailed: this.parseOptionalBoolean(req.query.includeRetryFailed ?? req.body?.includeRetryFailed),
+        providerValidationQueue: req.body?.providerValidationQueue === 'RETRY_FAILED' || req.query.providerValidationQueue === 'RETRY_FAILED'
+          ? 'RETRY_FAILED'
+          : req.body?.providerValidationQueue === 'UNKNOWN_FIRST' || req.query.providerValidationQueue === 'UNKNOWN_FIRST'
+            ? 'UNKNOWN_FIRST'
+            : undefined,
+      }));
+    } catch (error) {
+      console.error('Provider validation repair error:', error);
+      return res.status(500).json({ error: 'Provider validation repair failed' });
+    }
+  };
+
+  enrichMetadata = async (req: Request, res: Response) => {
+    try {
+      const { region, assetType } = this.getMarketFilter(req);
+      return res.json(await this.service.enrichMetadata({
+        region,
+        assetType,
+        batchSize: this.numberParam(req, 'batchSize') ?? this.numberParam(req, 'limit'),
+        offset: this.numberParam(req, 'offset'),
+        csvText: typeof req.body?.csvText === 'string' ? req.body.csvText : undefined,
+        catalogSource: typeof req.body?.catalogSource === 'string' ? req.body.catalogSource : undefined,
+      }));
+    } catch (error) {
+      console.error('Metadata enrichment repair error:', error);
+      return res.status(500).json({ error: 'Metadata enrichment repair failed' });
+    }
+  };
+
+  repairCatalogIdentity = async (req: Request, res: Response) => {
+    try {
+      const { region, assetType } = this.getMarketFilter(req);
+      return res.json(await this.service.repairCatalogIdentity({
+        region,
+        assetType,
+        batchSize: this.numberParam(req, 'batchSize') ?? this.numberParam(req, 'limit'),
+        offset: this.numberParam(req, 'offset'),
+        csvText: typeof req.body?.csvText === 'string' ? req.body.csvText : undefined,
+        catalogSource: typeof req.body?.catalogSource === 'string' ? req.body.catalogSource : undefined,
+        importMode: req.body?.importMode === 'MANUAL_CSV' || req.body?.importMode === 'CONFIGURED_URL' ? req.body.importMode : undefined,
+      }));
+    } catch (error) {
+      console.error('Catalog identity repair error:', error);
+      return res.status(500).json({ error: 'Catalog identity repair failed' });
+    }
+  };
+
+  repairProviderBusinessMetadata = async (req: Request, res: Response) => {
+    try {
+      const { region, assetType } = this.getMarketFilter(req);
+      return res.json(await this.service.repairProviderBusinessMetadata({
+        region,
+        assetType,
+        batchSize: this.numberParam(req, 'batchSize') ?? this.numberParam(req, 'limit'),
+        offset: this.numberParam(req, 'offset'),
+        force: this.parseOptionalBoolean(req.query.force ?? req.body?.force),
+      }));
+    } catch (error) {
+      console.error('Provider business metadata repair error:', error);
+      return res.status(500).json({ error: 'Provider business metadata repair failed' });
+    }
+  };
+
+  importManualMetadata = async (req: Request, res: Response) => {
+    try {
+      const { region, assetType } = this.getMarketFilter(req);
+      return res.json(await this.service.importManualMetadata({
+        region,
+        assetType,
+        batchSize: this.numberParam(req, 'batchSize') ?? this.numberParam(req, 'limit'),
+        offset: this.numberParam(req, 'offset'),
+        csvText: typeof req.body?.csvText === 'string' ? req.body.csvText : undefined,
+      }));
+    } catch (error: any) {
+      console.error('Manual metadata import error:', error);
+      return res.status(500).json({ error: error.message || 'Manual metadata import failed' });
+    }
+  };
+
+  backfillPrices = async (req: Request, res: Response) => {
+    try {
+      const { region, assetType } = this.getMarketFilter(req);
+      return res.json(await this.service.backfillPrices({
+        region,
+        assetType,
+        batchSize: this.numberParam(req, 'batchSize') ?? this.numberParam(req, 'limit'),
+        offset: this.numberParam(req, 'offset'),
+        force: this.parseOptionalBoolean(req.query.force ?? req.body?.force),
+        fullReload: this.parseOptionalBoolean(req.query.fullReload ?? req.body?.fullReload),
+      }));
+    } catch (error) {
+      console.error('Price backfill repair error:', error);
+      return res.status(500).json({ error: 'Price backfill repair failed' });
+    }
+  };
+
   schedulerStatus = async (_req: Request, res: Response) => {
     try {
       return res.json(await getMarketDataFoundationScheduler().status());
@@ -466,6 +640,13 @@ export class MarketDataFoundationController {
     }
   };
 
+  private numberParam(req: Request, key: string): number | undefined {
+    const value = req.query[key] ?? req.body?.[key];
+    if (value === undefined || value === null || value === '') return undefined;
+    const parsed = Number(Array.isArray(value) ? value[0] : value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
   private parseBoolean(value: unknown): boolean {
     if (typeof value === 'boolean') return value;
     if (typeof value !== 'string') return false;
@@ -475,6 +656,12 @@ export class MarketDataFoundationController {
   private parseOptionalBoolean(value: unknown): boolean | undefined {
     if (value === undefined || value === null || value === '') return undefined;
     return this.parseBoolean(value);
+  }
+
+  private parseRepairRunActions(value: unknown): any[] | undefined {
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string') return value.split(',').map((item) => item.trim()).filter(Boolean);
+    return undefined;
   }
 
   listFxRates = async (_req: Request, res: Response) => {

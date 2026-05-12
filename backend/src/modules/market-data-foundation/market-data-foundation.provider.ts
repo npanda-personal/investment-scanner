@@ -188,7 +188,7 @@ export class YahooFinanceIngestionService {
     }
   }
 
-  async validateProviderSymbol(symbol: string): Promise<{ supported: boolean; message?: string }> {
+  async validateProviderSymbol(symbol: string): Promise<{ supported: boolean; message?: string; failed?: boolean }> {
     try {
       const result = await this.yahooFinance.chart(symbol, {
         period1: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
@@ -203,6 +203,7 @@ export class YahooFinanceIngestionService {
     } catch (error) {
       return {
         supported: false,
+        failed: true,
         message: error instanceof Error ? error.message : 'Provider validation failed.',
       };
     }

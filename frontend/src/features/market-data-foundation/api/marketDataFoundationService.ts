@@ -9,6 +9,13 @@ import type {
   CreateStockRequest,
   BulkSyncResponse,
   MarketDataHealth,
+  MarketDataRepairPlan,
+  MarketDataRepairRequest,
+  MarketDataRepairRunRecord,
+  MarketDataRepairRunResponse,
+  MarketDataRepairSummary,
+  MarketDataManualMetadataTemplate,
+  MarketDataUniverseHealth,
   MarketDataSchedulerStatus,
   PaginatedResponse,
   PaginationOptions,
@@ -38,6 +45,15 @@ export type {
   CatalogImportResponse,
   BulkSyncResponse,
   MarketDataHealth,
+  MarketDataRepairPlan,
+  MarketDataRepairRequest,
+  MarketDataRepairRunAction,
+  MarketDataRepairRunRecord,
+  MarketDataRepairRunResponse,
+  MarketDataRepairRunStatus,
+  MarketDataRepairSummary,
+  MarketDataManualMetadataTemplate,
+  MarketDataUniverseHealth,
   MarketDataSchedulerStatus,
   PaginatedResponse,
   PaginationOptions,
@@ -187,6 +203,107 @@ export async function fetchMarketDataHealth(options: MarketScopedApiOptions = {}
   };
   logMarketDataApi(options.region || 'GLOBAL', params.region, params, 'health');
   const response = await axios.get<MarketDataHealth>(`${API_BASE}/v1/market-data/health`, { params });
+  return response.data;
+}
+
+export async function fetchMarketDataUniverseHealth(options: MarketScopedApiOptions = {}): Promise<MarketDataUniverseHealth> {
+  const params = {
+    region: normalizeMarketForApi(options.region) || 'IN',
+    assetType: normalizeAssetTypeForMarketDataApi(options.assetType) || 'STOCK',
+  };
+  logMarketDataApi(options.region || 'IN', params.region, params, 'universe-health');
+  const response = await axios.get<MarketDataUniverseHealth>(`${API_BASE}/v1/market-data/universe/health`, { params });
+  return response.data;
+}
+
+export async function fetchMarketDataRepairPlan(options: MarketScopedApiOptions = {}): Promise<MarketDataRepairPlan> {
+  const params = {
+    region: normalizeMarketForApi(options.region) || 'IN',
+    assetType: normalizeAssetTypeForMarketDataApi(options.assetType) || 'STOCK',
+  };
+  const response = await axios.get<MarketDataRepairPlan>(`${API_BASE}/v1/market-data/universe/repair-plan`, { params });
+  return response.data;
+}
+
+export async function fetchLatestMarketDataRepairRun(options: MarketScopedApiOptions = {}): Promise<MarketDataRepairRunRecord | null> {
+  const params = {
+    region: normalizeMarketForApi(options.region) || 'IN',
+    assetType: normalizeAssetTypeForMarketDataApi(options.assetType) || 'STOCK',
+  };
+  const response = await axios.get<MarketDataRepairRunRecord | null>(`${API_BASE}/v1/market-data/universe/repair-runs/latest`, { params });
+  return response.data;
+}
+
+export async function fetchManualMetadataTemplate(options: MarketScopedApiOptions = {}): Promise<MarketDataManualMetadataTemplate> {
+  const params = {
+    region: normalizeMarketForApi(options.region) || 'IN',
+    assetType: normalizeAssetTypeForMarketDataApi(options.assetType) || 'STOCK',
+  };
+  const response = await axios.get<MarketDataManualMetadataTemplate>(`${API_BASE}/v1/market-data/metadata/manual-template`, { params });
+  return response.data;
+}
+
+function scopedRepairPayload(data: MarketDataRepairRequest): MarketDataRepairRequest {
+  return {
+    ...data,
+    region: normalizeMarketForApi(data.region) || 'IN',
+    assetType: normalizeAssetTypeForMarketDataApi(data.assetType) || 'STOCK',
+  };
+}
+
+export async function validateMarketDataProviders(data: MarketDataRepairRequest): Promise<MarketDataRepairSummary> {
+  const response = await axios.post<MarketDataRepairSummary>(
+    `${API_BASE}/v1/market-data/provider/validate`,
+    scopedRepairPayload(data)
+  );
+  return response.data;
+}
+
+export async function runMarketDataUniverseRepair(data: MarketDataRepairRequest): Promise<MarketDataRepairRunResponse> {
+  const response = await axios.post<MarketDataRepairRunResponse>(
+    `${API_BASE}/v1/market-data/universe/repair-run`,
+    scopedRepairPayload(data)
+  );
+  return response.data;
+}
+
+export async function repairMarketDataCatalogIdentity(data: MarketDataRepairRequest): Promise<MarketDataRepairSummary> {
+  const response = await axios.post<MarketDataRepairSummary>(
+    `${API_BASE}/v1/market-data/catalog/identity-repair`,
+    scopedRepairPayload(data)
+  );
+  return response.data;
+}
+
+export async function repairMarketDataProviderBusinessMetadata(data: MarketDataRepairRequest): Promise<MarketDataRepairSummary> {
+  const response = await axios.post<MarketDataRepairSummary>(
+    `${API_BASE}/v1/market-data/metadata/provider-business/repair`,
+    scopedRepairPayload(data)
+  );
+  return response.data;
+}
+
+export async function importMarketDataManualMetadata(data: MarketDataRepairRequest): Promise<MarketDataRepairSummary> {
+  const response = await axios.post<MarketDataRepairSummary>(
+    `${API_BASE}/v1/market-data/metadata/manual-import`,
+    scopedRepairPayload(data)
+  );
+  return response.data;
+}
+
+export async function enrichMarketDataMetadata(data: MarketDataRepairRequest): Promise<MarketDataRepairSummary> {
+  const response = await axios.post<MarketDataRepairSummary>(
+    `${API_BASE}/v1/market-data/metadata/enrich`,
+    scopedRepairPayload(data)
+  );
+  return response.data;
+}
+
+export async function backfillMarketDataPrices(data: MarketDataRepairRequest): Promise<MarketDataRepairSummary> {
+  const response = await axios.post<MarketDataRepairSummary>(
+    `${API_BASE}/v1/market-data/prices/backfill`,
+    scopedRepairPayload(data)
+  );
   return response.data;
 }
 
