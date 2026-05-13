@@ -560,10 +560,12 @@ const MarketDataFoundationPage: React.FC = () => {
       let offset = 0;
       let hasMore = true;
       const batchSize = 100;
+      const backfillSource = selectedCatalogSource;
       while (hasMore) {
         const result = await backfillCatalogMetadata({
-          region: scope.region,
-          assetType: assetType.trim() || undefined,
+          region: backfillSource?.region || scope.region,
+          assetType: backfillSource?.assetType || assetType.trim() || undefined,
+          catalogSource: importSource,
           batchSize,
           offset,
           validateProvider,

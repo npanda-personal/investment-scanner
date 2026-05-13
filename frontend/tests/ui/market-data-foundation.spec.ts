@@ -1,7 +1,28 @@
 import { expect, test, type Page } from '@playwright/test';
 import { visitModule } from './support/moduleAssertions';
 
-async function mockCatalogPageShell(page: Page) {
+async function mockAuthenticatedUser(page: Page) {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('investment_scanner_auth_token', 'playwright-market-data-token');
+  });
+  await page.route('**/api/v1/auth/me', async (route) => {
+    await route.fulfill({
+      json: {
+        id: 'playwright-market-data-user',
+        email: 'codex.test@example.com',
+        name: 'Codex Test',
+        createdAt: '2026-05-13T00:00:00.000Z',
+        updatedAt: '2026-05-13T00:00:00.000Z',
+        lastLoginAt: '2026-05-13T00:00:00.000Z',
+      },
+    });
+  });
+  await page.route('**/api/v1/auth/logout', async (route) => {
+    await route.fulfill({ json: { success: true } });
+  });
+}
+
+async function mockCatalogPageShell(page: Page, sources: any[] = []) {
   await page.route('**/api/v1/instruments**', async (route) => {
     await route.fulfill({
       json: {
@@ -11,7 +32,7 @@ async function mockCatalogPageShell(page: Page) {
     });
   });
   await page.route('**/api/v1/market-data/catalog/sources', async (route) => {
-    await route.fulfill({ json: { sources: [] } });
+    await route.fulfill({ json: { sources } });
   });
 }
 
@@ -1612,5 +1633,87 @@ test.describe('Market Data Foundation UI', () => {
       offset: 0,
     });
     await expect(page.getByText('NSE_EQUITY_SECURITIES: 0 inserted, 0 updated, 1 no-op')).toBeVisible();
+  });
+
+  test('catalog metadata backfill sends selected catalog source scope', async ({ page }) => {
+    let backfillPayload: any = null;
+    await mockAuthenticatedUser(page);
+    await mockCatalogPageShell(page, [
+      {
+        catalogSource: 'NSE_EQUITY_SECURITIES',
+        displayName: 'NSE Equity Securities',
+        enabled: true,
+        region: 'IN',
+        assetType: 'STOCK',
+        segmentClass: 'CASH',
+        fileType: 'csv',
+        parserType: 'NSE_EQUITY_SECURITIES',
+        importModes: ['CONFIGURED_URL'],
+        urlConfigured: true,
+        urlSource: 'DEFAULT',
+        supportsManualCsv: true,
+        supportsConfiguredUrl: true,
+        supportsInternalSeed: false,
+        lastImportedAt: null,
+      },
+      {
+        catalogSource: 'NSE_ETF_SECURITIES',
+        displayName: 'NSE ETF Securities',
+        enabled: true,
+        region: 'IN',
+        assetType: 'ETF',
+        segmentClass: 'ETF',
+        fileType: 'csv',
+        parserType: 'NSE_ETF_SECURITIES',
+        importModes: ['CONFIGURED_URL'],
+        urlConfigured: true,
+        urlSource: 'DEFAULT',
+        supportsManualCsv: true,
+        supportsConfiguredUrl: true,
+        supportsInternalSeed: false,
+        lastImportedAt: null,
+      },
+    ]);
+    await page.route('**/api/v1/market-data/catalog/backfill-metadata', async (route) => {
+      backfillPayload = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          catalogSource: backfillPayload.catalogSource,
+          processedCount: 0,
+          totalCount: 0,
+          batchSize: backfillPayload.batchSize,
+          workerConcurrency: 16,
+          offset: backfillPayload.offset,
+          nextOffset: null,
+          hasMore: false,
+          updated: 0,
+          noOp: 0,
+          skipped: 0,
+          validated: 0,
+          providerUnsupported: 0,
+          warnings: [],
+          durationMs: 1,
+        }),
+      });
+    });
+
+    await visitModule(page, '/market-data-foundation', 'Market Data Foundation');
+    await page.getByRole('tab', { name: 'Import & Backfill' }).click();
+    await page.getByLabel('Catalog Source').click();
+    await page.getByRole('option', { name: 'NSE ETF Securities' }).click();
+    await page.getByRole('button', { name: 'Backfill Metadata' }).click();
+
+    await expect.poll(() => backfillPayload).toMatchObject({
+      region: 'IN',
+      assetType: 'ETF',
+      catalogSource: 'NSE_ETF_SECURITIES',
+      batchSize: 100,
+      offset: 0,
+      validateProvider: false,
+    });
+    await expect(page.getByText('Backfill processed 0/0')).toBeVisible();
   });
 });

@@ -1346,16 +1346,20 @@ export interface CatalogImportSummary {
 export interface CatalogBackfillRequest {
   region?: string;
   assetType?: string;
+  catalogSource?: CatalogSource | string;
   batchSize?: number;
   limit?: number;
   offset?: number;
   validateProvider?: boolean;
+  workerConcurrency?: number;
 }
 
 export interface CatalogBackfillSummary {
+  catalogSource?: string;
   processedCount: number;
   totalCount: number;
   batchSize: number;
+  workerConcurrency?: number;
   offset: number;
   nextOffset: number | null;
   hasMore: boolean;

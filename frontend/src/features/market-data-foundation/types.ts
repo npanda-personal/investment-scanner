@@ -1056,16 +1056,20 @@ export interface CatalogSourceInfo {
 export interface CatalogBackfillRequest {
   region?: string;
   assetType?: string;
+  catalogSource?: string;
   batchSize?: number;
   offset?: number;
   validateProvider?: boolean;
+  workerConcurrency?: number;
 }
 
 export interface CatalogBackfillResponse {
   success: boolean;
+  catalogSource?: string;
   processedCount: number;
   totalCount: number;
   batchSize: number;
+  workerConcurrency?: number;
   offset: number;
   nextOffset: number | null;
   hasMore: boolean;

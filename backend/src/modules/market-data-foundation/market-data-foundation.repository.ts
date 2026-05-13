@@ -348,8 +348,14 @@ export class MarketDataFoundationRepository {
     });
   }
 
-  async listStocksForCatalogBackfill(options: Pick<PaginationOptions, 'region' | 'assetType'> & { offset: number; batchSize: number }) {
+  async listStocksForCatalogBackfill(options: Pick<PaginationOptions, 'region' | 'assetType'> & { offset: number; batchSize: number; catalogSource?: string }) {
     const where = this.stockWhere({ region: options.region, assetType: options.assetType });
+    if (options.catalogSource) {
+      where.AND = [
+        ...this.asAndArray(where.AND),
+        { catalogSource: { equals: options.catalogSource.trim().toUpperCase(), mode: 'insensitive' } },
+      ];
+    }
     const [stocks, total] = await Promise.all([
       this.prisma.stock.findMany({
         where,

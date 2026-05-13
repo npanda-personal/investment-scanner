@@ -2664,16 +2664,21 @@ export class MarketDataFoundationService {
     const started = Date.now();
     const batchSize = Math.min(Math.max(Number(request.batchSize ?? request.limit) || 100, 1), 250);
     const offset = Math.max(Number(request.offset) || 0, 0);
+    const catalogSource = request.catalogSource ? this.normalizeCatalogSource(String(request.catalogSource)) : undefined;
+    const workerConcurrency = this.catalogBackfillConcurrency(request);
     const { stocks, total } = await this.repository.listStocksForCatalogBackfill({
       region: request.region || 'IN',
       assetType: request.assetType,
+      catalogSource,
       offset,
       batchSize,
     });
     const summary: CatalogBackfillSummary = {
+      catalogSource,
       processedCount: 0,
       totalCount: total,
       batchSize,
+      workerConcurrency,
       offset,
       nextOffset: null,
       hasMore: false,
@@ -2686,30 +2691,52 @@ export class MarketDataFoundationService {
       durationMs: 0,
     };
 
-    for (const stock of stocks) {
+    const itemResults: Array<Pick<CatalogBackfillSummary, 'processedCount' | 'updated' | 'noOp' | 'skipped' | 'validated' | 'providerUnsupported'> & { warnings: string[] }> = [];
+    await this.eachWithConcurrency(stocks, workerConcurrency, async (stock: any) => {
+      const item = {
+        processedCount: 0,
+        updated: 0,
+        noOp: 0,
+        skipped: 0,
+        validated: 0,
+        providerUnsupported: 0,
+        warnings: [] as string[],
+      };
       const normalized = this.catalogBackfillRow(stock);
       if (!normalized) {
-        summary.skipped += 1;
-        continue;
+        item.skipped += 1;
+        itemResults.push(item);
+        return;
       }
       const result = await this.repository.upsertCatalogInstrument(normalized);
-      summary.processedCount += 1;
-      if (result.action === 'updated') summary.updated += 1;
-      if (result.action === 'noOp') summary.noOp += 1;
+      item.processedCount += 1;
+      if (result.action === 'updated') item.updated += 1;
+      if (result.action === 'noOp') item.noOp += 1;
 
       if (request.validateProvider && normalized.providerSymbol) {
         const validation = await this.marketDataProvider.validateProviderSymbol(normalized.providerSymbol, {
           region: normalized.region,
           assetType: normalized.assetType || undefined,
         });
-        summary.validated += 1;
-        if (!validation.supported) summary.providerUnsupported += 1;
+        item.validated += 1;
+        if (!validation.supported) item.providerUnsupported += 1;
         await this.repository.updateProviderSupportStatus(
           normalized.symbol,
           this.providerStatusForValidation(validation, validation.classification || this.compatibleProviderValidationClassification(validation)),
           validation.message
         );
       }
+      itemResults.push(item);
+    });
+
+    for (const item of itemResults) {
+      summary.processedCount += item.processedCount;
+      summary.updated += item.updated;
+      summary.noOp += item.noOp;
+      summary.skipped += item.skipped;
+      summary.validated += item.validated;
+      summary.providerUnsupported += item.providerUnsupported;
+      summary.warnings.push(...item.warnings);
     }
 
     const nextOffset = offset + batchSize;
@@ -6295,6 +6322,14 @@ export class MarketDataFoundationService {
 
   private providerBusinessMetadataRepairConcurrency(request: Pick<MarketDataRepairRequest, 'workerConcurrency'>) {
     return Math.max(1, Math.min(Number(request.workerConcurrency) || this.readPositiveNumber(process.env.MARKET_DATA_PROVIDER_METADATA_REPAIR_CONCURRENCY, 4), 6));
+  }
+
+  private catalogBackfillConcurrency(request: Pick<CatalogBackfillRequest, 'workerConcurrency' | 'validateProvider'>) {
+    const fallback = request.validateProvider
+      ? this.readPositiveNumber(process.env.MARKET_DATA_CATALOG_BACKFILL_PROVIDER_CONCURRENCY, 4)
+      : this.readPositiveNumber(process.env.MARKET_DATA_CATALOG_BACKFILL_CONCURRENCY, 16);
+    const max = request.validateProvider ? 8 : 24;
+    return Math.max(1, Math.min(Number(request.workerConcurrency) || fallback, max));
   }
 
   private stableSourceRepairBatch(request: Pick<MarketDataRepairRequest, 'batchSize' | 'limit' | 'offset'>) {

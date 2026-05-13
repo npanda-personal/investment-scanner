@@ -612,6 +612,31 @@ describe('MarketDataFoundationRepository', () => {
     expect(result.stocks.map((stock: any) => stock.providerSupportStatus)).toEqual(['UNKNOWN', 'VALIDATION_FAILED']);
   });
 
+  it('filters catalog metadata backfill by selected catalog source', async () => {
+    const prisma = {
+      stock: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await repository.listStocksForCatalogBackfill({
+      region: 'IN',
+      assetType: 'ETF',
+      catalogSource: 'NSE_ETF_SECURITIES',
+      offset: 0,
+      batchSize: 25,
+    });
+
+    const whereJson = JSON.stringify(prisma.stock.findMany.mock.calls[0][0].where);
+    expect(whereJson).toContain('NSE_ETF_SECURITIES');
+    expect(whereJson).toContain('catalogSource');
+    expect(prisma.stock.count).toHaveBeenCalledWith(expect.objectContaining({
+      where: prisma.stock.findMany.mock.calls[0][0].where,
+    }));
+  });
+
   it('selects provider business metadata repair rows without identity-only gaps', async () => {
     const prisma = {
       stock: {

@@ -802,6 +802,75 @@ describe('MarketDataFoundationService syncV1', () => {
     });
   });
 
+  it('scopes catalog metadata backfill by selected catalog source', async () => {
+    const repository = {
+      listStocksForCatalogBackfill: jest.fn().mockResolvedValue({
+        total: 0,
+        stocks: [],
+      }),
+    };
+    const service = new MarketDataFoundationService(repository as any, { validateProviderSymbol: jest.fn() } as any);
+
+    const result = await service.backfillCatalogMetadata({
+      region: 'IN',
+      assetType: 'ETF',
+      catalogSource: 'NSE_ETF_SECURITIES',
+      batchSize: 25,
+      validateProvider: false,
+    });
+
+    expect(repository.listStocksForCatalogBackfill).toHaveBeenCalledWith(expect.objectContaining({
+      region: 'IN',
+      assetType: 'ETF',
+      catalogSource: 'NSE_ETF_SECURITIES',
+      batchSize: 25,
+      offset: 0,
+    }));
+    expect(result).toMatchObject({
+      catalogSource: 'NSE_ETF_SECURITIES',
+      workerConcurrency: 16,
+      totalCount: 0,
+    });
+  });
+
+  it('runs catalog metadata backfill with bounded parallel workers', async () => {
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const repository = {
+      listStocksForCatalogBackfill: jest.fn().mockResolvedValue({
+        total: 4,
+        stocks: ['A', 'B', 'C', 'D'].map((symbol) => ({
+          symbol: `${symbol}.NS`,
+          name: `${symbol} Limited`,
+          region: 'IN',
+          exchange: 'NSE',
+          assetType: 'STOCK',
+          source: 'database',
+          dataStatus: 'PARTIAL',
+          isActive: true,
+        })),
+      }),
+      upsertCatalogInstrument: jest.fn().mockImplementation(async () => {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        inFlight -= 1;
+        return { action: 'updated', stock: {} };
+      }),
+    };
+    const service = new MarketDataFoundationService(repository as any, { validateProviderSymbol: jest.fn() } as any);
+
+    const result = await service.backfillCatalogMetadata({ region: 'IN', batchSize: 4, workerConcurrency: 3, validateProvider: false });
+
+    expect(maxInFlight).toBeGreaterThan(1);
+    expect(maxInFlight).toBeLessThanOrEqual(3);
+    expect(result).toMatchObject({
+      processedCount: 4,
+      updated: 4,
+      workerConcurrency: 3,
+    });
+  });
+
   it('backfills provider validation status when requested', async () => {
     const repository = {
       listStocksForCatalogBackfill: jest.fn().mockResolvedValue({
@@ -821,7 +890,7 @@ describe('MarketDataFoundationService syncV1', () => {
     };
     const service = new MarketDataFoundationService(repository as any, provider as any);
 
-    const result = await service.backfillCatalogMetadata({ region: 'IN', batchSize: 1, validateProvider: true });
+    const result = await service.backfillCatalogMetadata({ region: 'IN', batchSize: 1, validateProvider: true, workerConcurrency: 1 });
 
     expect(repository.updateProviderSupportStatus).toHaveBeenCalledWith('ABB.NS', 'SUPPORTED', undefined);
     expect(repository.updateProviderSupportStatus).toHaveBeenCalledWith('BAD.NS', 'UNSUPPORTED', 'not found');
