@@ -3,6 +3,15 @@ export type RiskGrade = 'LOW' | 'MEDIUM' | 'HIGH' | 'UNDEFINED';
 export type Quality = 'STRONG' | 'ACCEPTABLE' | 'WEAK' | 'FALLBACK' | 'UNKNOWN';
 export type PaperReadinessStatus = 'READY_FOR_PAPER_REVIEW' | 'WATCH_ONLY' | 'BLOCKED' | 'INSUFFICIENT_DATA';
 export type ProofStatus = 'AVAILABLE' | 'MISSING' | 'PARTIAL' | 'UNPROVEN';
+export type PaperReadinessProofStage =
+  | 'DATA_QUALITY'
+  | 'STRATEGY_DECISION'
+  | 'STRATEGY_PROOF'
+  | 'BACKTEST_EVIDENCE'
+  | 'RISK_GEOMETRY'
+  | 'SCOPE'
+  | 'PAPER_READINESS';
+export type PaperReadinessProofStageStatus = 'PASS' | 'LIMITED' | 'BLOCKED' | 'INSUFFICIENT_DATA' | 'UNPROVEN';
 
 export interface BacktestSummarySnapshot {
   timeframe: string | null;
@@ -151,6 +160,7 @@ export interface TradePlanResultDto {
   paperReadinessStatus?: PaperReadinessStatus;
   paperReadinessReasons?: string[];
   paperReadinessBlockers?: string[];
+  paperReadinessProofChain?: PaperReadinessProofChain;
   proofGeneratedAt?: string | null;
   snapshotVersion?: string | null;
   generatedAt: string;
@@ -199,6 +209,7 @@ export interface BatchGenerateTradePlanResponse {
   skipReasonCounts?: Record<string, number>;
   paperReadinessSummary?: Record<string, number>;
   topBlockers?: Array<{ reason: string; count: number }>;
+  paperReadinessProofChain?: PaperReadinessProofChain;
   backtestTimeframe?: string | null;
   totalCount: number;
   batchSize: number;
@@ -223,6 +234,47 @@ export interface TradePlanFunnelQuery {
 export interface CountItem {
   key: string;
   count: number;
+}
+
+export interface PaperReadinessProofBlocker {
+  code: string;
+  label: string;
+  count: number;
+  targetRoute?: string;
+}
+
+export interface PaperReadinessProofStageSummary {
+  stage: PaperReadinessProofStage;
+  status: PaperReadinessProofStageStatus;
+  affectedCount: number;
+  hardBlockerCount: number;
+  topBlockers: PaperReadinessProofBlocker[];
+  nextAction?: {
+    label: string;
+    targetRoute: string;
+    sourceModule: string;
+  };
+}
+
+export interface PaperReadinessPrioritizedBlocker {
+  priority: number;
+  category: string;
+  count: number;
+  sourceModule: string;
+  nextActionLabel: string;
+  targetRoute: string;
+}
+
+export interface PaperReadinessProofChain {
+  scope: {
+    region: string;
+    assetType: string;
+    backtestTimeframe?: string | null;
+  };
+  generatedPlanCount: number;
+  paperReadyCount: number;
+  stages: PaperReadinessProofStageSummary[];
+  prioritizedBlockers: PaperReadinessPrioritizedBlocker[];
 }
 
 export interface TradePlanListQuery {

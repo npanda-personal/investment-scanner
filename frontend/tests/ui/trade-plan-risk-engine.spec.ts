@@ -15,6 +15,23 @@ const funnelResponse = {
   proof: { byBacktestTimeframe: [], byStrategyRating: [], missingBacktestSummaryCount: 0, weakOrUnprovenRatingCount: 0 },
   dataQuality: { missingSnapshotCount: 0, unusableCount: 0, illiquidCount: 0, unknownLiquidityCount: 0 },
   recommendations: ['Run trade plan generation after Strategy Decision produces candidates.'],
+  paperReadinessProofChain: {
+    scope: { region: 'IN', assetType: 'STOCK', backtestTimeframe: null },
+    generatedPlanCount: 3,
+    paperReadyCount: 0,
+    stages: [
+      { stage: 'DATA_QUALITY', status: 'PASS', affectedCount: 0, hardBlockerCount: 0, topBlockers: [] },
+      { stage: 'STRATEGY_DECISION', status: 'PASS', affectedCount: 0, hardBlockerCount: 0, topBlockers: [] },
+      { stage: 'STRATEGY_PROOF', status: 'UNPROVEN', affectedCount: 3, hardBlockerCount: 0, topBlockers: [{ code: 'WEAK_OR_UNPROVEN_STRATEGY', label: 'Weak or unproven strategy', count: 3, targetRoute: '/strategy-framework' }] },
+      { stage: 'BACKTEST_EVIDENCE', status: 'PASS', affectedCount: 0, hardBlockerCount: 0, topBlockers: [] },
+      { stage: 'RISK_GEOMETRY', status: 'PASS', affectedCount: 0, hardBlockerCount: 0, topBlockers: [] },
+      { stage: 'SCOPE', status: 'PASS', affectedCount: 0, hardBlockerCount: 0, topBlockers: [] },
+      { stage: 'PAPER_READINESS', status: 'LIMITED', affectedCount: 3, hardBlockerCount: 0, topBlockers: [] },
+    ],
+    prioritizedBlockers: [
+      { priority: 1, category: 'WEAK_OR_UNPROVEN_STRATEGY', count: 3, sourceModule: 'Strategy Framework', nextActionLabel: 'Review strategy rating proof', targetRoute: '/strategy-framework' },
+    ],
+  },
 };
 
 test.describe('Trade Plan Risk Engine UI', () => {
@@ -44,6 +61,9 @@ test.describe('Trade Plan Risk Engine UI', () => {
     await expect(page.getByText('Blocked / Watch / Insufficient')).toBeVisible();
     await expect(page.getByText('Blocked / Watch / Insufficient').locator('xpath=..').getByText('3', { exact: true })).toBeVisible();
     await expect(page.getByText('3 UNPROVEN strategy rating')).toBeVisible();
+    await expect(page.getByText('Paper Readiness Proof Chain')).toBeVisible();
+    await expect(page.getByText('Strategy Proof: UNPROVEN (3)')).toBeVisible();
+    await expect(page.getByText('1. 3 Review strategy rating proof')).toBeVisible();
     await expect(page.getByText('No trade plans found for IN/STOCK. Run Generate Plans after Strategy Decision has review candidates, or loosen the readiness/proof filters.')).toBeVisible();
   });
 
@@ -142,6 +162,18 @@ test.describe('Trade Plan Risk Engine UI', () => {
           paperReadinessReasons: [],
           marketDataSnapshot: { instrumentId: 'INST-2', symbol: 'RELIANCE.NS', latestPrice: 2500, latestPriceTimestamp: '2026-05-10T00:00:00.000Z', latestCompletedTradingDate: '2026-05-10T00:00:00.000Z', latestStoredTradingDate: '2026-05-10T00:00:00.000Z', currency: 'INR', exchange: 'NSE', region: 'IN', assetType: 'STOCK', dataStatus: 'COMPLETE' },
           dataQualitySnapshot: { status: 'AVAILABLE', coverageStatus: 'GOOD', signalReadinessStatus: 'READY', liquidityStatus: 'LIQUID', warnings: [], blockers: [], generatedAt: '2026-05-10T00:00:00.000Z' },
+          paperReadinessProofChain: {
+            scope: { region: 'IN', assetType: 'STOCK', backtestTimeframe: null },
+            generatedPlanCount: 1,
+            paperReadyCount: 0,
+            stages: [
+              { stage: 'RISK_GEOMETRY', status: 'BLOCKED', affectedCount: 1, hardBlockerCount: 1, topBlockers: [{ code: 'INVALID_LONG_GEOMETRY', label: 'Invalid long geometry', count: 1, targetRoute: '/trade-plans' }] },
+              { stage: 'PAPER_READINESS', status: 'BLOCKED', affectedCount: 1, hardBlockerCount: 0, topBlockers: [] },
+            ],
+            prioritizedBlockers: [
+              { priority: 1, category: 'INVALID_LONG_GEOMETRY', count: 1, sourceModule: 'Trade Plan Risk Engine', nextActionLabel: 'Repair entry/stop/target geometry', targetRoute: '/trade-plans' },
+            ],
+          },
           generatedAt: '2026-05-10T00:00:00.000Z',
           modelVersion: 'trade-plan-risk-v1',
         }),
@@ -191,6 +223,18 @@ test.describe('Trade Plan Risk Engine UI', () => {
           paperReadinessReasons: ['Trade plan status is VALID.', 'Risk grade is LOW.', 'Strategy Framework-backed proof is present.'],
           marketDataSnapshot: { instrumentId: 'cmo2xk6xa0010w5og9g9zg0am', symbol: 'POWERGRID.NS', latestPrice: 310, latestPriceTimestamp: '2026-05-10T00:00:00.000Z', latestCompletedTradingDate: '2026-05-10T00:00:00.000Z', latestStoredTradingDate: '2026-05-10T00:00:00.000Z', currency: 'INR', exchange: 'NSE', region: 'IN', assetType: 'STOCK', dataStatus: 'COMPLETE' },
           dataQualitySnapshot: { status: 'AVAILABLE', coverageStatus: 'GOOD', signalReadinessStatus: 'READY', liquidityStatus: 'LIQUID', warnings: [], blockers: [], generatedAt: '2026-05-10T00:00:00.000Z' },
+          paperReadinessProofChain: {
+            scope: { region: 'IN', assetType: 'STOCK', backtestTimeframe: null },
+            generatedPlanCount: 1,
+            paperReadyCount: 0,
+            stages: [
+              { stage: 'RISK_GEOMETRY', status: 'BLOCKED', affectedCount: 1, hardBlockerCount: 1, topBlockers: [{ code: 'INVALID_LONG_GEOMETRY', label: 'Invalid long geometry', count: 1, targetRoute: '/trade-plans' }] },
+              { stage: 'PAPER_READINESS', status: 'BLOCKED', affectedCount: 1, hardBlockerCount: 0, topBlockers: [] },
+            ],
+            prioritizedBlockers: [
+              { priority: 1, category: 'INVALID_LONG_GEOMETRY', count: 1, sourceModule: 'Trade Plan Risk Engine', nextActionLabel: 'Repair entry/stop/target geometry', targetRoute: '/trade-plans' },
+            ],
+          },
           generatedAt: '2026-05-10T00:00:00.000Z',
           modelVersion: 'trade-plan-risk-v1',
         }),
@@ -208,5 +252,8 @@ test.describe('Trade Plan Risk Engine UI', () => {
     await expect(page.getByText('Trade plan status is VALID.')).toHaveCount(0);
     await expect(page.getByText('Risk grade is LOW.')).toHaveCount(0);
     await expect(page.getByText('Strategy Framework-backed proof is present.')).toHaveCount(0);
+    await page.getByRole('heading', { name: 'Proof Snapshot' }).scrollIntoViewIfNeeded();
+    await expect(page.getByText('Risk Geometry: BLOCKED')).toBeVisible();
+    await expect(page.getByText('1. Repair entry/stop/target geometry')).toBeVisible();
   });
 });

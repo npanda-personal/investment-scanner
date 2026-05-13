@@ -621,6 +621,23 @@ describe('TradePlanRiskEngineService', () => {
         { reason: 'WEAK strategy rating', count: 1 },
         { reason: 'risk grade HIGH', count: 1 },
       ]));
+      expect(res.paperReadinessProofChain?.scope).toEqual({ region: 'IN', assetType: 'STOCK', backtestTimeframe: '10Y' });
+      expect(res.paperReadinessProofChain?.generatedPlanCount).toBe(1);
+      expect(res.paperReadinessProofChain?.paperReadyCount).toBe(0);
+      expect(res.paperReadinessProofChain?.prioritizedBlockers).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          category: 'WEAK_OR_UNPROVEN_STRATEGY',
+          count: 1,
+          sourceModule: 'Strategy Framework',
+          targetRoute: '/strategy-framework',
+        }),
+        expect.objectContaining({
+          category: 'RISK_GRADE_HIGH',
+          count: 1,
+          sourceModule: 'Trade Plan Risk Engine',
+          targetRoute: '/trade-plans',
+        }),
+      ]));
       expect(res.backtestTimeframe).toBe('10Y');
     });
   });
@@ -683,6 +700,26 @@ describe('TradePlanRiskEngineService', () => {
         { reason: 'risk grade HIGH', count: 1 },
         { reason: 'using 10Y proof timeframe', count: 1 },
       ]));
+      expect(result.paperReadinessProofChain.generatedPlanCount).toBe(1);
+      expect(result.paperReadinessProofChain.paperReadyCount).toBe(0);
+      expect(result.paperReadinessProofChain.stages).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          stage: 'STRATEGY_PROOF',
+          status: 'UNPROVEN',
+          affectedCount: 1,
+          topBlockers: expect.arrayContaining([
+            expect.objectContaining({ code: 'WEAK_OR_UNPROVEN_STRATEGY', targetRoute: '/strategy-framework' }),
+          ]),
+        }),
+        expect.objectContaining({
+          stage: 'RISK_GEOMETRY',
+          status: 'BLOCKED',
+          hardBlockerCount: expect.any(Number),
+          topBlockers: expect.arrayContaining([
+            expect.objectContaining({ code: 'RISK_GRADE_HIGH', targetRoute: '/trade-plans' }),
+          ]),
+        }),
+      ]));
       expect(result.proof.byBacktestTimeframe).toEqual([{ reason: '10Y', count: 1 }]);
       expect(result.dataQuality.unknownLiquidityCount).toBe(1);
       expect(result.recommendations).toContain('Current plans use 10Y proof. Consider regenerating with 3Y or 5Y if 10Y history is insufficient.');
@@ -713,6 +750,11 @@ describe('TradePlanRiskEngineService', () => {
 
       expect(result.strategyDecisions.tradeCandidates).toBe(87);
       expect(result.tradePlanCandidateDiscovery.eligibleForPlanGeneration).toBe(87);
+      expect(result.paperReadinessProofChain).toEqual(expect.objectContaining({
+        generatedPlanCount: 0,
+        paperReadyCount: 0,
+        prioritizedBlockers: [],
+      }));
     });
 
     it('reports non-framework-backed decisions only when legacy diagnostics are explicitly included', async () => {

@@ -1,5 +1,5 @@
 import { TradePlanRiskEngineRepository } from './trade-plan-risk-engine.repository';
-import type { GenerateTradePlanRequest, TradePlanResultDto, TradePlanModelRules, EntryZone, StopLoss, Target, BatchGenerateTradePlanRequest, BatchGenerateTradePlanResponse, TradePlanListQuery, Quality, PaperReadinessInput, PaperReadinessStatus, BacktestSummarySnapshot, DataQualitySnapshot, MarketDataSnapshot, StrategyDecisionSnapshot, StrategyProofSnapshot, BatchGenerateFailure, TradePlanFunnelQuery } from './trade-plan-risk-engine.types';
+import type { GenerateTradePlanRequest, TradePlanResultDto, TradePlanModelRules, EntryZone, StopLoss, Target, BatchGenerateTradePlanRequest, BatchGenerateTradePlanResponse, TradePlanListQuery, Quality, PaperReadinessInput, PaperReadinessStatus, BacktestSummarySnapshot, DataQualitySnapshot, MarketDataSnapshot, StrategyDecisionSnapshot, StrategyProofSnapshot, BatchGenerateFailure, TradePlanFunnelQuery, PaperReadinessProofChain, PaperReadinessProofStage, PaperReadinessProofStageStatus } from './trade-plan-risk-engine.types';
 import { StrategyDecisionEngineService } from '../strategy-decision-engine';
 import { SignalGenerationEngineService } from '../signal-generation-engine';
 import { MarketDataFoundationService } from '../market-data-foundation/market-data-foundation.service';
@@ -7,6 +7,18 @@ import { PortfolioManagementService } from '../portfolio-management';
 import { DataQualityEngineService } from '../data-quality-engine';
 import { StrategyFrameworkService } from '../strategy-framework';
 import { applyLongPlanGeometryGuards, canonicalizeTradePlanReadiness } from './trade-plan-risk-engine.geometry';
+
+type ProofBlockerDefinition = {
+  code: string;
+  label: string;
+  stage: PaperReadinessProofStage;
+  sourceModule: string;
+  nextActionLabel: string;
+  targetRoute: string;
+  hard: boolean;
+  priority: number;
+  status: PaperReadinessProofStageStatus;
+};
 
 export class TradePlanRiskEngineService {
   private repository = new TradePlanRiskEngineRepository();
@@ -667,6 +679,11 @@ export class TradePlanRiskEngineService {
     const nextOffset = offset + batchSize < totalCount ? offset + batchSize : null;
     const paperReadinessSummary = this.countBy(plans, (plan) => plan.paperReadinessStatus || 'UNCLASSIFIED');
     const topBlockers = this.topCounts(plans.flatMap((plan) => this.paperBlockerCategories(plan)));
+    const paperReadinessProofChain = this.buildPaperReadinessProofChain(plans, {
+      region: region || 'IN',
+      assetType: assetType || 'STOCK',
+      backtestTimeframe: request.backtestTimeframe || null,
+    });
 
     return {
       count: plans.length,
@@ -680,6 +697,7 @@ export class TradePlanRiskEngineService {
       skipReasonCounts: {},
       paperReadinessSummary,
       topBlockers,
+      paperReadinessProofChain,
       backtestTimeframe: request.backtestTimeframe || null,
       totalCount,
       batchSize,
@@ -730,6 +748,11 @@ export class TradePlanRiskEngineService {
     const reasonCounts = this.topCounts(plans.flatMap((plan) => plan.paperReadinessReasons || []));
     const timeframeCounts = this.topCounts(plans.map((plan) => plan.backtestTimeframe || 'MISSING'));
     const recommendations = this.buildFunnelRecommendations(plans, blockerCounts, timeframeCounts);
+    const paperReadinessProofChain = this.buildPaperReadinessProofChain(plans, {
+      region,
+      assetType,
+      backtestTimeframe: query.backtestTimeframe || null,
+    });
 
     return {
       region,
@@ -798,15 +821,21 @@ export class TradePlanRiskEngineService {
         unknownLiquidityCount: plans.filter((plan) => plan.dataQualitySnapshot?.liquidityStatus === 'UNKNOWN').length,
       },
       recommendations,
+      paperReadinessProofChain,
     };
   }
 
   async latestForInstrument(instrumentId: string, strategy?: string, portfolioId?: string, scope: { region?: string; assetType?: string } = {}) {
-     return this.repository.latestForInstrument(instrumentId, strategy, portfolioId, scope);
+     const plan = await this.repository.latestForInstrument(instrumentId, strategy, portfolioId, scope);
+     return plan ? this.withSinglePlanProofChain(plan) : null;
   }
 
   async list(query: TradePlanListQuery) {
-     return this.repository.list(query);
+     const result = await this.repository.list(query);
+     return {
+      ...result,
+      results: result.results.map((plan) => this.withSinglePlanProofChain(plan)),
+     };
   }
 
   private planDiscoverySkipReasons(decision: any): string[] {
@@ -851,6 +880,344 @@ export class TradePlanRiskEngineService {
     if (plan.dataQualitySnapshot?.liquidityStatus === 'UNKNOWN') categories.add('liquidity is UNKNOWN');
     if (plan.backtestTimeframe === '10Y') categories.add('using 10Y proof timeframe');
     return Array.from(categories);
+  }
+
+  private withSinglePlanProofChain(plan: TradePlanResultDto): TradePlanResultDto {
+    return {
+      ...plan,
+      paperReadinessProofChain: this.buildPaperReadinessProofChain([plan], {
+        region: plan.region || 'IN',
+        assetType: plan.assetType || 'STOCK',
+        backtestTimeframe: plan.backtestTimeframe || null,
+      }),
+    };
+  }
+
+  private buildPaperReadinessProofChain(
+    plans: TradePlanResultDto[],
+    scope: { region: string; assetType: string; backtestTimeframe?: string | null }
+  ): PaperReadinessProofChain {
+    const stageOrder: PaperReadinessProofStage[] = [
+      'DATA_QUALITY',
+      'STRATEGY_DECISION',
+      'STRATEGY_PROOF',
+      'BACKTEST_EVIDENCE',
+      'RISK_GEOMETRY',
+      'SCOPE',
+      'PAPER_READINESS',
+    ];
+    const definitionsByPlan = plans.map((plan) => this.proofBlockersForPlan(plan));
+    const flatDefinitions = definitionsByPlan.flat();
+    const uniqueAffectedByStage = new Map<PaperReadinessProofStage, Set<number>>();
+    const countsByStageAndCode = new Map<PaperReadinessProofStage, Map<string, { definition: ProofBlockerDefinition; count: number }>>();
+
+    definitionsByPlan.forEach((definitions, planIndex) => {
+      const plan = plans[planIndex];
+      for (const definition of definitions) {
+        if (!uniqueAffectedByStage.has(definition.stage)) uniqueAffectedByStage.set(definition.stage, new Set());
+        uniqueAffectedByStage.get(definition.stage)!.add(planIndex);
+        if (!countsByStageAndCode.has(definition.stage)) countsByStageAndCode.set(definition.stage, new Map());
+        const stageCounts = countsByStageAndCode.get(definition.stage)!;
+        const current = stageCounts.get(definition.code) || { definition, count: 0 };
+        current.count += 1;
+        stageCounts.set(definition.code, current);
+      }
+      if (this.paperReadinessBlocked(plan)) {
+        if (!uniqueAffectedByStage.has('PAPER_READINESS')) uniqueAffectedByStage.set('PAPER_READINESS', new Set());
+        uniqueAffectedByStage.get('PAPER_READINESS')!.add(planIndex);
+      }
+    });
+
+    const stages = stageOrder.map((stage) => {
+      const stageCounts = countsByStageAndCode.get(stage) || new Map();
+      const blockers = Array.from(stageCounts.values())
+        .sort((a, b) => b.count - a.count || a.definition.priority - b.definition.priority)
+        .map(({ definition, count }) => ({
+          code: definition.code,
+          label: definition.label,
+          count,
+          targetRoute: definition.targetRoute,
+        }));
+      const definitions = Array.from(stageCounts.values()).map((item) => item.definition);
+      const hardBlockerCount = Array.from(stageCounts.values())
+        .filter((item) => item.definition.hard)
+        .reduce((sum, item) => sum + item.count, 0);
+      return {
+        stage,
+        status: this.proofStageStatus(stage, definitions, plans),
+        affectedCount: uniqueAffectedByStage.get(stage)?.size || 0,
+        hardBlockerCount,
+        topBlockers: blockers.slice(0, 5),
+        nextAction: blockers[0]
+          ? {
+            label: this.nextActionForStage(stage, blockers[0].label),
+            targetRoute: blockers[0].targetRoute || '/trade-plans',
+            sourceModule: this.sourceModuleForStage(stage),
+          }
+          : undefined,
+      };
+    });
+
+    const prioritizedBlockers = Array.from(
+      flatDefinitions.reduce<Map<string, { definition: ProofBlockerDefinition; count: number }>>((acc, definition) => {
+        const current = acc.get(definition.code) || { definition, count: 0 };
+        current.count += 1;
+        acc.set(definition.code, current);
+        return acc;
+      }, new Map()).values()
+    )
+      .sort((a, b) => a.definition.priority - b.definition.priority || b.count - a.count)
+      .slice(0, 8)
+      .map((item, index) => ({
+        priority: index + 1,
+        category: item.definition.code,
+        count: item.count,
+        sourceModule: item.definition.sourceModule,
+        nextActionLabel: item.definition.nextActionLabel,
+        targetRoute: item.definition.targetRoute,
+      }));
+
+    return {
+      scope,
+      generatedPlanCount: plans.length,
+      paperReadyCount: plans.filter((plan) => plan.paperReadinessStatus === 'READY_FOR_PAPER_REVIEW').length,
+      stages,
+      prioritizedBlockers,
+    };
+  }
+
+  private proofBlockersForPlan(plan: TradePlanResultDto): ProofBlockerDefinition[] {
+    const definitions = new Map<string, ProofBlockerDefinition>();
+    const add = (definition: ProofBlockerDefinition) => {
+      if (!definitions.has(definition.code)) definitions.set(definition.code, definition);
+    };
+    const addByCode = (code: string) => add(this.proofBlockerDefinition(code));
+
+    for (const blocker of [...(plan.paperReadinessBlockers || []), ...(plan.blockers || [])]) {
+      const text = blocker.toLowerCase();
+      if (text.includes('latest price') && text.includes('missing')) addByCode('MISSING_LATEST_PRICE');
+      else if (text.includes('insufficient historical price') || text.includes('price history is insufficient')) addByCode('INSUFFICIENT_PRICE_HISTORY');
+      else if (text.includes('data quality') || text.includes('liquidity') || text.includes('stale price')) addByCode('DATA_QUALITY_BLOCKED');
+      else if (text.includes('market gate is closed')) addByCode('MARKET_GATE_CLOSED');
+      else if (text.includes('strategy decision') || text.includes('decision confidence')) addByCode('STRATEGY_DECISION_BLOCKED');
+      else if (text.includes('framework-backed proof is missing')) addByCode('NOT_FRAMEWORK_BACKED');
+      else if (text.includes('strategy rating is') || text.includes('readiness label')) addByCode('WEAK_OR_UNPROVEN_STRATEGY');
+      else if (text.includes('backtest summary is missing')) addByCode('MISSING_BACKTEST_SUMMARY');
+      else if (text.includes('plan status is')) addByCode('PLAN_STATUS_NOT_VALID');
+      else if (text.includes('risk grade is high')) addByCode('RISK_GRADE_HIGH');
+      else if (text.includes('reward/risk ratio')) addByCode('REWARD_RISK_TOO_LOW');
+      else if (text.includes('stop loss') || text.includes('entry zone') || text.includes('target is missing') || text.includes('position sizing') || text.includes('invalidation')) addByCode('INVALID_LONG_GEOMETRY');
+      else if (text.includes('asset type') || text.includes('region scope')) addByCode('OUT_OF_SCOPE');
+      else if (plan.planStatus !== 'VALID') addByCode('PLAN_STATUS_NOT_VALID');
+    }
+
+    if (!plan.marketDataSnapshot || plan.latestPrice === null || plan.marketDataSnapshot.latestPrice === null) addByCode('MISSING_LATEST_PRICE');
+    if (!plan.dataQualitySnapshot || plan.dataQualitySnapshot.status === 'MISSING') addByCode('DATA_QUALITY_BLOCKED');
+    if (plan.dataQualitySnapshot?.coverageStatus === 'UNUSABLE' || plan.dataQualitySnapshot?.liquidityStatus === 'ILLIQUID') addByCode('DATA_QUALITY_BLOCKED');
+    if (plan.strategyDecisionSnapshot?.marketGate === 'CLOSED') addByCode('MARKET_GATE_CLOSED');
+    if ((plan.strategyDecisionSnapshot?.blockers || []).length > 0) addByCode('STRATEGY_DECISION_BLOCKED');
+    if (plan.strategyProofSnapshot?.frameworkBacked === false) addByCode('NOT_FRAMEWORK_BACKED');
+    if (['WEAK', 'UNPROVEN', 'POOR'].includes(String(plan.strategyRating || plan.strategyProofSnapshot?.strategyRating || ''))) addByCode('WEAK_OR_UNPROVEN_STRATEGY');
+    if (!plan.backtestSummary) addByCode('MISSING_BACKTEST_SUMMARY');
+    if (plan.planStatus !== 'VALID') addByCode('PLAN_STATUS_NOT_VALID');
+    if (plan.riskGrade === 'HIGH') addByCode('RISK_GRADE_HIGH');
+    if (plan.rewardRiskRatio < this.getModelRules().paperReadinessCriteria.minimumRewardRiskRatio) addByCode('REWARD_RISK_TOO_LOW');
+    if (plan.assetType && plan.assetType !== 'STOCK') addByCode('OUT_OF_SCOPE');
+    if (!plan.region) addByCode('OUT_OF_SCOPE');
+
+    return Array.from(definitions.values());
+  }
+
+  private proofBlockerDefinition(code: string): ProofBlockerDefinition {
+    const definitions: Record<string, ProofBlockerDefinition> = {
+      DATA_QUALITY_BLOCKED: {
+        code,
+        label: 'Data quality blocked',
+        stage: 'DATA_QUALITY',
+        sourceModule: 'Data Quality Engine',
+        nextActionLabel: 'Review data quality evaluation',
+        targetRoute: '/data-quality',
+        hard: true,
+        priority: 10,
+        status: 'BLOCKED',
+      },
+      MISSING_LATEST_PRICE: {
+        code,
+        label: 'Missing latest price',
+        stage: 'DATA_QUALITY',
+        sourceModule: 'Market Data Foundation',
+        nextActionLabel: 'Refresh latest market data',
+        targetRoute: '/market-data',
+        hard: true,
+        priority: 20,
+        status: 'INSUFFICIENT_DATA',
+      },
+      INSUFFICIENT_PRICE_HISTORY: {
+        code,
+        label: 'Insufficient price history',
+        stage: 'DATA_QUALITY',
+        sourceModule: 'Market Data Foundation',
+        nextActionLabel: 'Load more historical candles',
+        targetRoute: '/market-data',
+        hard: true,
+        priority: 30,
+        status: 'INSUFFICIENT_DATA',
+      },
+      STRATEGY_DECISION_BLOCKED: {
+        code,
+        label: 'Strategy Decision blocked',
+        stage: 'STRATEGY_DECISION',
+        sourceModule: 'Strategy Decision Engine',
+        nextActionLabel: 'Review Strategy Decision blockers',
+        targetRoute: '/strategy-decisions',
+        hard: true,
+        priority: 40,
+        status: 'BLOCKED',
+      },
+      MARKET_GATE_CLOSED: {
+        code,
+        label: 'Market gate closed',
+        stage: 'STRATEGY_DECISION',
+        sourceModule: 'Strategy Decision Engine',
+        nextActionLabel: 'Wait for market gate to reopen',
+        targetRoute: '/strategy-decisions',
+        hard: true,
+        priority: 50,
+        status: 'BLOCKED',
+      },
+      NOT_FRAMEWORK_BACKED: {
+        code,
+        label: 'Not framework-backed',
+        stage: 'STRATEGY_PROOF',
+        sourceModule: 'Strategy Framework',
+        nextActionLabel: 'Attach Strategy Framework proof',
+        targetRoute: '/strategy-framework',
+        hard: true,
+        priority: 60,
+        status: 'UNPROVEN',
+      },
+      WEAK_OR_UNPROVEN_STRATEGY: {
+        code,
+        label: 'Weak or unproven strategy',
+        stage: 'STRATEGY_PROOF',
+        sourceModule: 'Strategy Framework',
+        nextActionLabel: 'Review strategy rating proof',
+        targetRoute: '/strategy-framework',
+        hard: false,
+        priority: 70,
+        status: 'UNPROVEN',
+      },
+      MISSING_BACKTEST_SUMMARY: {
+        code,
+        label: 'Missing backtest summary',
+        stage: 'BACKTEST_EVIDENCE',
+        sourceModule: 'Strategy Framework',
+        nextActionLabel: 'Run selected timeframe backtest',
+        targetRoute: '/strategy-framework',
+        hard: true,
+        priority: 80,
+        status: 'INSUFFICIENT_DATA',
+      },
+      PLAN_STATUS_NOT_VALID: {
+        code,
+        label: 'Plan status not valid',
+        stage: 'RISK_GEOMETRY',
+        sourceModule: 'Trade Plan Risk Engine',
+        nextActionLabel: 'Regenerate or repair trade plan',
+        targetRoute: '/trade-plans',
+        hard: true,
+        priority: 90,
+        status: 'BLOCKED',
+      },
+      RISK_GRADE_HIGH: {
+        code,
+        label: 'Risk grade high',
+        stage: 'RISK_GEOMETRY',
+        sourceModule: 'Trade Plan Risk Engine',
+        nextActionLabel: 'Review risk geometry',
+        targetRoute: '/trade-plans',
+        hard: true,
+        priority: 100,
+        status: 'BLOCKED',
+      },
+      REWARD_RISK_TOO_LOW: {
+        code,
+        label: 'Reward/risk below threshold',
+        stage: 'RISK_GEOMETRY',
+        sourceModule: 'Trade Plan Risk Engine',
+        nextActionLabel: 'Adjust risk geometry',
+        targetRoute: '/trade-plans',
+        hard: true,
+        priority: 110,
+        status: 'BLOCKED',
+      },
+      INVALID_LONG_GEOMETRY: {
+        code,
+        label: 'Invalid long geometry',
+        stage: 'RISK_GEOMETRY',
+        sourceModule: 'Trade Plan Risk Engine',
+        nextActionLabel: 'Repair entry/stop/target geometry',
+        targetRoute: '/trade-plans',
+        hard: true,
+        priority: 120,
+        status: 'BLOCKED',
+      },
+      OUT_OF_SCOPE: {
+        code,
+        label: 'Out of scope',
+        stage: 'SCOPE',
+        sourceModule: 'Trade Plan Risk Engine',
+        nextActionLabel: 'Use supported IN/STOCK scope',
+        targetRoute: '/trade-plans',
+        hard: true,
+        priority: 130,
+        status: 'BLOCKED',
+      },
+    };
+    return definitions[code] || {
+      code,
+      label: code,
+      stage: 'PAPER_READINESS',
+      sourceModule: 'Trade Plan Risk Engine',
+      nextActionLabel: 'Review paper readiness blocker',
+      targetRoute: '/trade-plans',
+      hard: true,
+      priority: 999,
+      status: 'BLOCKED',
+    };
+  }
+
+  private proofStageStatus(stage: PaperReadinessProofStage, definitions: ProofBlockerDefinition[], plans: TradePlanResultDto[]): PaperReadinessProofStageStatus {
+    if (stage === 'PAPER_READINESS') {
+      if (plans.some((plan) => ['BLOCKED'].includes(String(plan.paperReadinessStatus)))) return 'BLOCKED';
+      if (plans.some((plan) => plan.paperReadinessStatus === 'INSUFFICIENT_DATA')) return 'INSUFFICIENT_DATA';
+      if (plans.some((plan) => plan.paperReadinessStatus === 'WATCH_ONLY')) return 'LIMITED';
+      return 'PASS';
+    }
+    if (definitions.length === 0) return 'PASS';
+    if (definitions.some((definition) => definition.status === 'BLOCKED')) return 'BLOCKED';
+    if (definitions.some((definition) => definition.status === 'INSUFFICIENT_DATA')) return 'INSUFFICIENT_DATA';
+    if (definitions.some((definition) => definition.status === 'UNPROVEN')) return 'UNPROVEN';
+    if (definitions.some((definition) => definition.status === 'LIMITED')) return 'LIMITED';
+    return 'PASS';
+  }
+
+  private paperReadinessBlocked(plan: TradePlanResultDto): boolean {
+    return Boolean(plan.paperReadinessStatus && plan.paperReadinessStatus !== 'READY_FOR_PAPER_REVIEW');
+  }
+
+  private sourceModuleForStage(stage: PaperReadinessProofStage): string {
+    if (stage === 'DATA_QUALITY') return 'Data Quality Engine';
+    if (stage === 'STRATEGY_DECISION') return 'Strategy Decision Engine';
+    if (stage === 'STRATEGY_PROOF' || stage === 'BACKTEST_EVIDENCE') return 'Strategy Framework';
+    return 'Trade Plan Risk Engine';
+  }
+
+  private nextActionForStage(stage: PaperReadinessProofStage, blockerLabel: string): string {
+    if (stage === 'DATA_QUALITY') return `Resolve ${blockerLabel.toLowerCase()}`;
+    if (stage === 'STRATEGY_DECISION') return `Review ${blockerLabel.toLowerCase()}`;
+    if (stage === 'STRATEGY_PROOF' || stage === 'BACKTEST_EVIDENCE') return `Refresh ${blockerLabel.toLowerCase()}`;
+    return `Resolve ${blockerLabel.toLowerCase()}`;
   }
 
   private buildFunnelRecommendations(plans: TradePlanResultDto[], blockers: Array<{ reason: string; count: number }>, timeframes: Array<{ reason: string; count: number }>) {
@@ -1103,12 +1470,12 @@ export class TradePlanRiskEngineService {
 
   private async persistWithReadiness(result: TradePlanResultDto): Promise<TradePlanResultDto> {
     const saved = await this.repository.upsert(result);
-    return {
+    return this.withSinglePlanProofChain({
       ...saved,
       paperReadinessStatus: result.paperReadinessStatus,
       paperReadinessReasons: result.paperReadinessReasons,
       paperReadinessBlockers: result.paperReadinessBlockers,
-    };
+    });
   }
 
   private ratingFromDecision(decision: any | null) {

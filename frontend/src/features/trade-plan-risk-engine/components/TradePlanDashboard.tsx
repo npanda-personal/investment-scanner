@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Box, Typography, Button, Alert, Tab, Tabs, FormControlLabel, Switch, FormControl, InputLabel, MenuItem, Select, Stack, Grid, Paper, Chip, List, ListItem, ListItemText, CircularProgress, LinearProgress } from '@mui/material';
 import { TradePlanApi } from '../api';
 import { TradePlanTable } from './TradePlanTable';
-import { CountItem, TradePlanFunnelDiagnostics, TradePlanResultDto } from '../types';
+import { CountItem, PaperReadinessProofChain, TradePlanFunnelDiagnostics, TradePlanResultDto } from '../types';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { SortDirection } from '@/shared/components/DataTable';
 
@@ -12,6 +12,52 @@ const mergeCountItems = (left: CountItem[], right: CountItem[]): CountItem[] => 
   return Array.from(counts.entries())
     .map(([reason, count]) => ({ reason, count }))
     .sort((a, b) => b.count - a.count);
+};
+
+const stageLabel = (stage: string) => stage.split('_').map((item) => item[0] + item.slice(1).toLowerCase()).join(' ');
+const statusColor = (status: string) => {
+  if (status === 'PASS') return 'success';
+  if (status === 'LIMITED' || status === 'UNPROVEN') return 'warning';
+  return 'error';
+};
+
+const ProofChainSummary: React.FC<{ chain?: PaperReadinessProofChain }> = ({ chain }) => {
+  if (!chain) return null;
+  return (
+    <Box sx={{ mt: 2 }}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'flex-start', sm: 'center' }} sx={{ mb: 1 }}>
+        <Typography variant="subtitle2">Paper Readiness Proof Chain</Typography>
+        <Chip size="small" label={`${chain.generatedPlanCount} generated`} />
+        <Chip size="small" color={chain.paperReadyCount > 0 ? 'success' : 'default'} label={`${chain.paperReadyCount} paper-ready`} />
+      </Stack>
+      <Grid container spacing={2}>
+        <Grid item xs={12} md={7}>
+          <Stack direction="row" spacing={1} flexWrap="wrap">
+            {chain.stages.map((stage) => (
+              <Chip
+                key={stage.stage}
+                size="small"
+                color={statusColor(stage.status) as any}
+                variant={stage.status === 'PASS' ? 'outlined' : 'filled'}
+                label={`${stageLabel(stage.stage)}: ${stage.status}${stage.affectedCount > 0 ? ` (${stage.affectedCount})` : ''}`}
+                sx={{ mb: 1 }}
+              />
+            ))}
+          </Stack>
+        </Grid>
+        <Grid item xs={12} md={5}>
+          <List dense disablePadding>
+            {chain.prioritizedBlockers.slice(0, 4).map((blocker) => (
+              <ListItem key={blocker.category} disablePadding>
+                <ListItemText primary={`${blocker.priority}. ${blocker.count} ${blocker.nextActionLabel}`} secondary={blocker.sourceModule} />
+              </ListItem>
+            ))}
+            {chain.prioritizedBlockers.length === 0 && <ListItem disablePadding><ListItemText primary="All proof-chain stages pass for current generated plans." /></ListItem>}
+          </List>
+        </Grid>
+      </Grid>
+    </Box>
+  );
 };
 
 export const TradePlanDashboard: React.FC = () => {
@@ -278,6 +324,7 @@ export const TradePlanDashboard: React.FC = () => {
             </Grid>
           </Grid>
         )}
+        <ProofChainSummary chain={funnel?.paperReadinessProofChain} />
       </Paper>
 
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="flex-end" sx={{ mb: 2 }}>

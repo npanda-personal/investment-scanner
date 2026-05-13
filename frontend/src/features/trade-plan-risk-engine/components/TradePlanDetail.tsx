@@ -20,6 +20,12 @@ const excludeRepeatedMessages = (items: string[], seen: Set<string>) =>
     seen.add(item);
     return true;
   });
+const stageLabel = (stage: string) => stage.split('_').map((item) => item[0] + item.slice(1).toLowerCase()).join(' ');
+const proofStageColor = (status: string) => {
+  if (status === 'PASS') return 'success';
+  if (status === 'LIMITED' || status === 'UNPROVEN') return 'warning';
+  return 'error';
+};
 
 export const TradePlanDetail: React.FC = () => {
   const { instrumentId } = useParams<{ instrumentId: string }>();
@@ -284,6 +290,29 @@ export const TradePlanDetail: React.FC = () => {
                 <Stack direction="row" spacing={1} flexWrap="wrap">
                   {plan.paperReadinessReasons?.map((reason) => <Chip key={reason} size="small" label={reason} />)}
                 </Stack>
+              </Box>
+            )}
+            {plan.paperReadinessProofChain && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2">Paper Readiness Proof Chain</Typography>
+                <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 1 }}>
+                  {plan.paperReadinessProofChain.stages.map((stage) => (
+                    <Chip
+                      key={stage.stage}
+                      size="small"
+                      color={proofStageColor(stage.status) as any}
+                      variant={stage.status === 'PASS' ? 'outlined' : 'filled'}
+                      label={`${stageLabel(stage.stage)}: ${stage.status}`}
+                    />
+                  ))}
+                </Stack>
+                <List dense disablePadding>
+                  {plan.paperReadinessProofChain.prioritizedBlockers.slice(0, 4).map((blocker) => (
+                    <ListItem key={blocker.category} disablePadding>
+                      <ListItemText primary={`${blocker.priority}. ${blocker.nextActionLabel}`} secondary={`${blocker.sourceModule} - ${blocker.count} affected`} />
+                    </ListItem>
+                  ))}
+                </List>
               </Box>
             )}
           </Paper>

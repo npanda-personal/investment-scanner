@@ -102,6 +102,10 @@ Frontend money displays must use the persisted `marketDataSnapshot.currency` whe
 
 `paperReadinessStatus`, reasons, and blockers are persisted at generation time. Candidate listing and funnel filters first run the same canonical geometry/readiness repair over the relevant stable scope, then apply persisted readiness/status/risk filters against repaired rows. This keeps `paperReadyOnly=true`, `paperReadinessStatus`, `planStatus`, `riskGrade`, totals, and funnel counts from selecting stale legacy rows whose stop/entry geometry is now blocked.
 
+`paperReadinessProofChain` is additive, derived at response time, and is not persisted in this slice. It is returned on generated plans, latest-plan detail reads, list rows, batch generation responses, and funnel diagnostics where practical. The proof chain summarizes the selected `region`/`assetType`/`backtestTimeframe`, generated-plan count, paper-ready count, stage status, affected counts, hard-blocker counts, top blockers, and prioritized next actions.
+
+Proof-chain stages are `DATA_QUALITY`, `STRATEGY_DECISION`, `STRATEGY_PROOF`, `BACKTEST_EVIDENCE`, `RISK_GEOMETRY`, `SCOPE`, and `PAPER_READINESS`. Hard blockers remain authoritative: positive readiness reasons are not used as proof-chain authority when an active blocker exists, and blocked/insufficient stages point to the resolving source module route where known. Current routes are advisory operator links; they do not create paper trades or update upstream modules.
+
 Latest-plan detail reads, candidate lists, and funnel reads apply the same long-plan geometry guard and readiness canonicalizer used during generation. If a persisted legacy row has a stop inside or above the long entry zone, the read path returns `BLOCKED` / `HIGH` / `paperReadinessStatus = BLOCKED`, clears stale positive readiness reasons, records the geometry blocker, and persists that repaired status back to the row. Stop-loss rationale repair is idempotent; repeated reads do not append the geometry text repeatedly. `INSUFFICIENT_DATA` plans keep `paperReadinessStatus = INSUFFICIENT_DATA` and `riskGrade = UNDEFINED`; generic data-gap blockers are not collapsed into `BLOCKED`. The detail UI deduplicates identical blocker text across readiness and plan-blocker sections so the same hard blocker is not rendered twice while the API still exposes both canonical arrays. This prevents old generated plans from continuing to appear `VALID` or paper-ready after the rule is fixed.
 
 Future Paper Trading module rule: consume Trade Plan & Risk Engine public output and persisted snapshots only. It must not reach into upstream repositories or reconstruct eligibility from Strategy Decision, Strategy Framework, Market Data, or Data Quality internals.
@@ -141,7 +145,7 @@ Generated plans are idempotent per UTC generated date using:
 - `GET /api/v1/trade-plans/candidates` (Supports `region`, `assetType`, `strategyCode`, `planStatus`, `riskGrade`, `minRewardRisk`, `paperReadyOnly`, `paperReadinessStatus`, `backtestTimeframe`, `strategyRating`, `readinessLabel`, `portfolioId`, `includeLegacy`, `limit`, `offset`, `sortBy`, `sortDirection`)
 - `GET /api/v1/trade-plans/:instrumentId` (Supports `region`, `assetType`, `strategyCode`, and `portfolioId`; scoped requests must not return a plan from a different market scope)
 - `POST /api/v1/trade-plans/generate`
-- `POST /api/v1/trade-plans/generate/batch` (Uses bounded backend worker concurrency within each request and returns `processedCount`, `candidateCount`, `rawCandidateCount`, `eligibleCandidateCount`, `generatedCount`, `skippedCount`, `paperReadinessSummary`, `topBlockers`, `totalCount`, `nextOffset`, `hasMore`, and per-candidate `failures` for frontend multi-batch orchestration)
+- `POST /api/v1/trade-plans/generate/batch` (Uses bounded backend worker concurrency within each request and returns `processedCount`, `candidateCount`, `rawCandidateCount`, `eligibleCandidateCount`, `generatedCount`, `skippedCount`, `paperReadinessSummary`, `topBlockers`, additive `paperReadinessProofChain`, `totalCount`, `nextOffset`, `hasMore`, and per-candidate `failures` for frontend multi-batch orchestration)
 
 ## Generation Funnel Diagnostics
 
@@ -158,6 +162,7 @@ The funnel endpoint returns:
 - Generated plan counts by plan status, risk grade, strategy, and paper readiness. When no date range is supplied, funnel diagnostics use the latest generated UTC date for the selected scope so stale older plan rows do not dominate current blocker counts.
 - Generated plan lists, latest-plan detail reads, and funnel generated-plan counts are proof-safe by default. Rows whose persisted `strategyProofSnapshot.frameworkBacked` is not `true` are hidden unless `includeLegacy=true` is explicitly supplied. Legacy rows are kept for auditability and are not deleted.
 - Paper readiness blocker/reason aggregation from persisted plan snapshots.
+- Additive `paperReadinessProofChain` diagnostics that convert Trade Plan-owned blocker evidence into stage counts, top blockers, and prioritized source-module next actions.
 - Proof diagnostics by backtest timeframe and strategy rating.
 - Data quality diagnostics for missing snapshots, unusable coverage, illiquidity, and unknown liquidity.
 - Recommendations that explain whether caution is expected or data/proof should be regenerated.
