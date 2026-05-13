@@ -13,7 +13,10 @@ import type {
   ResearchWhatChanged,
   ResearchPriorityCandidate,
   ResearchBacktestSummary,
-  StrategyProofSummary
+  StrategyProofSummary,
+  ResearchActionability,
+  ActionabilityDimension,
+  ActionabilityStatus
 } from './research-hub.types';
 
 export class ResearchHubService {
@@ -71,7 +74,7 @@ export class ResearchHubService {
       marketGate: gate?.marketGate || 'UNKNOWN',
       marketCondition: gate?.marketCondition || 'UNKNOWN',
       headline: this.generateReadinessHeadline(gate),
-      allowedActions: gate?.allowedActions || [],
+      allowedActions: [],
       reasons: gate?.reasons || [],
       blockers: gate?.blockers || [],
       dataStatus: gate?.dataStatus || 'MISSING',
@@ -136,8 +139,10 @@ export class ResearchHubService {
 
     // 5. Next Actions
     const nextActions: NextAction[] = this.generateNextActions(marketReadiness, priorities, dataGaps, strategyProofSummary);
+    const actionability = this.buildActionability(marketReadiness, priorities, strategyProofSummary, confirmationSummary, dataGaps, nextActions);
 
     return {
+      actionability,
       marketReadiness,
       researchPriorities: priorities,
       strategyProofSummary,
@@ -149,10 +154,212 @@ export class ResearchHubService {
     };
   }
 
+  private buildActionability(
+    readiness: MarketReadiness,
+    priorities: ResearchPriorities,
+    proof: StrategyProofSummary,
+    confirmation: ConfirmationSummary,
+    dataGaps: string[],
+    nextActions: NextAction[]
+  ): ResearchActionability {
+    const reviewCandidateCount = priorities.tradeCandidates.length;
+    const signalCount = confirmation.signalSummary.topBullishCount + confirmation.signalSummary.topBearishCount;
+    const dimensions = {
+      marketEnvironment: this.marketEnvironmentDimension(readiness),
+      dataReadiness: this.dataReadinessDimension(readiness, dataGaps),
+      signalEvidence: this.unstableDimension(
+        signalCount > 0 ? 'LIMITED' : 'INSUFFICIENT_DATA',
+        'Signal Evidence',
+        'signal-quality-lab',
+        signalCount,
+        signalCount > 0
+          ? 'Raw signal counts are available, but Signal Quality evidence maturity is not yet wired into Research Hub actionability.'
+          : 'Signal Quality evidence maturity is not yet available for this overview.'
+      ),
+      calibrationReadiness: this.unstableDimension(
+        'INSUFFICIENT_DATA',
+        'Calibration Readiness',
+        'signal-calibration-engine',
+        undefined,
+        'Calibration readiness is not yet wired into Research Hub actionability.'
+      ),
+      strategyProof: this.strategyProofDimension(proof, reviewCandidateCount),
+      todayReviewReadiness: this.unstableDimension(
+        'INSUFFICIENT_DATA',
+        'Today Review Readiness',
+        'today-trade-review',
+        undefined,
+        'Today Review readiness is not yet a stable Research Hub input.'
+      ),
+      tradePlanReadiness: this.unstableDimension(
+        'INSUFFICIENT_DATA',
+        'Trade Plan Readiness',
+        'trade-plan-risk-engine',
+        undefined,
+        'Trade Plan paper-readiness is not yet a stable Research Hub input.'
+      ),
+    };
+    const allDimensions = Object.values(dimensions);
+    const blockers = allDimensions
+      .filter((dimension) => dimension.blocking)
+      .map((dimension) => ({
+        sourceModule: dimension.sourceModule,
+        category: dimension.status,
+        count: dimension.count,
+        message: dimension.message,
+      }));
+    const overallStatus = this.reduceActionability(allDimensions);
+    const nextBestAction = nextActions[0]
+      ? { ...nextActions[0], sourceModule: nextActions[0].targetRoute.includes('data-quality') ? 'data-quality-engine' : 'strategy-decision-engine' }
+      : null;
+
+    return {
+      overallStatus,
+      canReviewActionableSetups: false,
+      headline: this.actionabilityHeadline(overallStatus),
+      researchSupportOnly: true,
+      dimensions,
+      nextBestAction,
+      blockers,
+    };
+  }
+
+  private marketEnvironmentDimension(readiness: MarketReadiness): ActionabilityDimension {
+    if (readiness.marketGate === 'CLOSED') {
+      return {
+        status: 'BLOCKED',
+        label: 'Market Environment',
+        sourceModule: 'strategy-decision-engine',
+        blocking: true,
+        message: 'Market gate is closed for new long review candidates.',
+      };
+    }
+    if (readiness.marketGate === 'OPEN') {
+      return {
+        status: 'READY',
+        label: 'Market Environment',
+        sourceModule: 'strategy-decision-engine',
+        blocking: false,
+        message: 'Market environment is open, but this does not prove actionable setup readiness.',
+      };
+    }
+    if (readiness.marketGate === 'SELECTIVE') {
+      return {
+        status: 'LIMITED',
+        label: 'Market Environment',
+        sourceModule: 'strategy-decision-engine',
+        blocking: false,
+        message: 'Market environment is selective; review quality gates before promoting candidates.',
+      };
+    }
+    return {
+      status: 'INSUFFICIENT_DATA',
+      label: 'Market Environment',
+      sourceModule: 'strategy-decision-engine',
+      blocking: true,
+      message: 'Market environment is unavailable.',
+    };
+  }
+
+  private dataReadinessDimension(readiness: MarketReadiness, dataGaps: string[]): ActionabilityDimension {
+    if (readiness.dataStatus === 'MISSING') {
+      return {
+        status: 'INSUFFICIENT_DATA',
+        label: 'Data Readiness',
+        sourceModule: 'research-hub',
+        blocking: true,
+        count: dataGaps.length,
+        message: dataGaps.length > 0 ? 'One or more upstream research inputs are unavailable.' : 'Market data readiness is missing.',
+      };
+    }
+    if (dataGaps.length > 0 || readiness.dataStatus === 'PARTIAL') {
+      return {
+        status: 'LIMITED',
+        label: 'Data Readiness',
+        sourceModule: 'research-hub',
+        blocking: false,
+        count: dataGaps.length,
+        message: 'Research Hub is operating with partial upstream data.',
+      };
+    }
+    return {
+      status: 'LIMITED',
+      label: 'Data Readiness',
+      sourceModule: 'research-hub',
+      blocking: false,
+      count: dataGaps.length,
+      message: 'Research Hub has no local data gaps, but trusted review-universe readiness is not yet wired.',
+    };
+  }
+
+  private strategyProofDimension(proof: StrategyProofSummary, reviewCandidateCount: number): ActionabilityDimension {
+    if (proof.provenCandidateCount > 0 && reviewCandidateCount > 0) {
+      return {
+        status: 'LIMITED',
+        label: 'Strategy Proof',
+        sourceModule: 'strategy-decision-engine',
+        blocking: false,
+        count: proof.provenCandidateCount,
+        message: 'Framework-backed review candidates exist, but downstream review and plan readiness are not yet proven here.',
+      };
+    }
+    if (proof.missingBacktestCount > 0 || proof.unprovenCandidateCount > 0) {
+      return {
+        status: 'UNPROVEN',
+        label: 'Strategy Proof',
+        sourceModule: 'strategy-decision-engine',
+        blocking: true,
+        count: proof.unprovenCandidateCount + proof.missingBacktestCount,
+        message: 'Strategy proof is missing or unproven for review candidates.',
+      };
+    }
+    return {
+      status: 'INSUFFICIENT_DATA',
+      label: 'Strategy Proof',
+      sourceModule: 'strategy-decision-engine',
+      blocking: true,
+      count: 0,
+      message: 'No framework-backed strategy proof is available for review candidates.',
+    };
+  }
+
+  private unstableDimension(
+    status: Exclude<ActionabilityStatus, 'READY'>,
+    label: string,
+    sourceModule: string,
+    count: number | undefined,
+    message: string
+  ): ActionabilityDimension {
+    return {
+      status,
+      label,
+      sourceModule,
+      blocking: status === 'BLOCKED' || status === 'UNPROVEN' || status === 'INSUFFICIENT_DATA',
+      count,
+      message,
+    };
+  }
+
+  private reduceActionability(dimensions: ActionabilityDimension[]): ActionabilityStatus {
+    if (dimensions.some((dimension) => dimension.status === 'BLOCKED')) return 'BLOCKED';
+    if (dimensions.some((dimension) => dimension.status === 'INSUFFICIENT_DATA')) return 'INSUFFICIENT_DATA';
+    if (dimensions.some((dimension) => dimension.status === 'UNPROVEN')) return 'UNPROVEN';
+    if (dimensions.some((dimension) => dimension.status === 'LIMITED')) return 'LIMITED';
+    return 'READY';
+  }
+
+  private actionabilityHeadline(status: ActionabilityStatus): string {
+    if (status === 'BLOCKED') return 'Actionable setup review is blocked; use repair or diagnostic workflows first.';
+    if (status === 'UNPROVEN') return 'Actionable setup review is not proven yet; review strategy evidence first.';
+    if (status === 'LIMITED') return 'Actionable setup review is limited; verify upstream evidence before promotion.';
+    if (status === 'READY') return 'Actionable setup review is ready for research review.';
+    return 'Actionable setup review is not confirmed because required readiness evidence is unavailable.';
+  }
+
   private generateReadinessHeadline(gate: any): string {
     if (!gate || gate.marketGate === 'UNKNOWN') return 'Market environment is currently unknown.';
-    if (gate.marketGate === 'OPEN') return 'Environment is healthy: high-conviction setups allowed.';
-    if (gate.marketGate === 'SELECTIVE') return 'Conditions are mixed: exercise high selectivity.';
+    if (gate.marketGate === 'OPEN') return 'Market environment is open; confirm actionability evidence before reviewing setup readiness.';
+    if (gate.marketGate === 'SELECTIVE') return 'Market environment is selective; review diagnostics and evidence before promoting candidates.';
     if (gate.marketGate === 'CLOSED') return 'No new long review candidates are available. Review exits and watchlist only.';
     return 'Market conditions are being evaluated.';
   }

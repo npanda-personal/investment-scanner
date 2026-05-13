@@ -38,7 +38,7 @@ import { Link } from 'react-router-dom';
 import { useResearchOverview } from '../hooks/useResearchOverview';
 import { PageHeader } from '@/shared/components';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
-import type { ResearchOverview, NextAction, ResearchPriorityCandidate } from '../api/researchHubApi';
+import type { ActionabilityDimension, ActionabilityStatus, ResearchOverview, NextAction, ResearchPriorityCandidate } from '../api/researchHubApi';
 
 const ResearchOverviewPage: React.FC = () => {
   const { scope } = useMarketScope();
@@ -63,6 +63,7 @@ const ResearchOverviewPage: React.FC = () => {
   }
 
   const {
+    actionability = defaultActionability(),
     marketReadiness = {
       marketGate: 'UNKNOWN',
       marketCondition: 'UNKNOWN',
@@ -110,9 +111,13 @@ const ResearchOverviewPage: React.FC = () => {
       />
 
       <Grid container spacing={4}>
+        <Grid item xs={12}>
+          <ActionabilitySummary actionability={actionability} />
+        </Grid>
+
         {/* 1. Market Readiness Hero */}
         <Grid item xs={12}>
-          <MarketReadinessHero readiness={marketReadiness} nextActions={nextActions} />
+          <MarketReadinessHero readiness={marketReadiness} actionability={actionability} nextActions={nextActions} />
         </Grid>
 
         {/* 2. Research Priority Board */}
@@ -169,9 +174,80 @@ const ResearchOverviewPage: React.FC = () => {
   );
 };
 
-const MarketReadinessHero: React.FC<{ readiness: ResearchOverview['marketReadiness'], nextActions: NextAction[] }> = ({ readiness, nextActions = [] }) => {
+const ActionabilitySummary: React.FC<{ actionability: ResearchOverview['actionability'] }> = ({ actionability }) => {
+  const dimensions = Object.values(actionability.dimensions);
+  const nextBestAction = actionability.nextBestAction;
+
+  return (
+    <Paper variant="outlined" sx={{ p: 3 }}>
+      <Stack spacing={2}>
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }}>
+          <Box>
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+              <Typography variant="h6" fontWeight={800}>Actionability</Typography>
+              <Chip size="small" label={formatStatus(actionability.overallStatus)} color={statusColor(actionability.overallStatus)} />
+              <Chip
+                size="small"
+                label={actionability.canReviewActionableSetups ? 'Reviewable setups confirmed' : 'Reviewable setups not confirmed'}
+                color={actionability.canReviewActionableSetups ? 'success' : 'warning'}
+                variant="outlined"
+              />
+            </Stack>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              {actionability.headline}
+            </Typography>
+          </Box>
+          {nextBestAction && (
+            <Button
+              component={Link}
+              to={nextBestAction.targetRoute}
+              variant={nextBestAction.priority === 'HIGH' ? 'contained' : 'outlined'}
+              endIcon={<ArrowForwardOutlined />}
+            >
+              {nextBestAction.label}
+            </Button>
+          )}
+        </Stack>
+
+        <Grid container spacing={1.5}>
+          {dimensions.map((dimension) => (
+            <Grid item xs={12} sm={6} md={3} key={`${dimension.sourceModule}-${dimension.label}`}>
+              <ActionabilityDimensionTile dimension={dimension} />
+            </Grid>
+          ))}
+        </Grid>
+      </Stack>
+    </Paper>
+  );
+};
+
+const ActionabilityDimensionTile: React.FC<{ dimension: ActionabilityDimension }> = ({ dimension }) => (
+  <Paper variant="outlined" sx={{ p: 1.5, height: '100%', bgcolor: 'background.paper' }}>
+    <Stack spacing={1}>
+      <Stack direction="row" spacing={1} justifyContent="space-between" alignItems="flex-start">
+        <Typography variant="subtitle2" fontWeight={700}>{dimension.label}</Typography>
+        <Chip size="small" label={formatStatus(dimension.status)} color={statusColor(dimension.status)} variant={dimension.blocking ? 'filled' : 'outlined'} />
+      </Stack>
+      <Typography variant="caption" color="text.secondary" display="block">
+        {dimension.sourceModule}
+      </Typography>
+      <Typography variant="body2">{dimension.message}</Typography>
+    </Stack>
+  </Paper>
+);
+
+const MarketReadinessHero: React.FC<{
+  readiness: ResearchOverview['marketReadiness'];
+  actionability: ResearchOverview['actionability'];
+  nextActions: NextAction[];
+}> = ({ readiness, actionability, nextActions = [] }) => {
   const gateColor = readiness?.marketGate === 'OPEN' ? 'success' : readiness?.marketGate === 'CLOSED' ? 'error' : 'warning';
   const gateIcon = readiness?.marketGate === 'OPEN' ? <CheckCircleOutline fontSize="large" /> : readiness?.marketGate === 'CLOSED' ? <LockOutlined fontSize="large" /> : <WarningAmberOutlined fontSize="large" />;
+  const canShowMarketActions = Boolean(actionability?.canReviewActionableSetups);
+  const marketEnvironmentMessage = actionability?.dimensions?.marketEnvironment?.message;
+  const headline = canShowMarketActions
+    ? readiness?.headline
+    : marketEnvironmentMessage || 'Market environment is one input; setup readiness is not confirmed.';
 
   return (
     <Paper 
@@ -195,12 +271,18 @@ const MarketReadinessHero: React.FC<{ readiness: ResearchOverview['marketReadine
             </Typography>
           </Stack>
           <Typography variant="h6" color="text.secondary" sx={{ mb: 3, fontWeight: 400 }}>
-            {readiness?.headline}
+            {headline}
           </Typography>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ gap: 1, mb: 3 }}>
-            {(readiness?.allowedActions || []).map(action => (
+            {canShowMarketActions && (readiness?.allowedActions || []).map(action => (
               <Chip key={action} label={action.replace(/_/g, ' ')} color="primary" variant="outlined" size="small" />
             ))}
+            {!canShowMarketActions && (
+              <>
+                <Chip label="Market input only" color="default" variant="outlined" size="small" />
+                <Chip label="Review actionability evidence" color="warning" variant="outlined" size="small" />
+              </>
+            )}
           </Stack>
           
           {(readiness?.blockers?.length ?? 0) > 0 && (
@@ -524,6 +606,46 @@ const ResearchModuleDrilldowns: React.FC = () => {
 };
 
 export default ResearchOverviewPage;
+
+function defaultActionability(): ResearchOverview['actionability'] {
+  const unavailable = (label: string, sourceModule: string): ActionabilityDimension => ({
+    status: 'INSUFFICIENT_DATA',
+    label,
+    sourceModule,
+    blocking: true,
+    message: `${label} is not available in this Research Hub response.`,
+  });
+
+  return {
+    overallStatus: 'INSUFFICIENT_DATA',
+    canReviewActionableSetups: false,
+    headline: 'Actionable setup review is not confirmed because required readiness evidence is unavailable.',
+    researchSupportOnly: true,
+    dimensions: {
+      marketEnvironment: unavailable('Market Environment', 'strategy-decision-engine'),
+      dataReadiness: unavailable('Data Readiness', 'research-hub'),
+      signalEvidence: unavailable('Signal Evidence', 'signal-quality-lab'),
+      calibrationReadiness: unavailable('Calibration Readiness', 'signal-calibration-engine'),
+      strategyProof: unavailable('Strategy Proof', 'strategy-decision-engine'),
+      todayReviewReadiness: unavailable('Today Review Readiness', 'today-trade-review'),
+      tradePlanReadiness: unavailable('Trade Plan Readiness', 'trade-plan-risk-engine'),
+    },
+    nextBestAction: null,
+    blockers: [],
+  };
+}
+
+function statusColor(status: ActionabilityStatus): 'success' | 'warning' | 'error' | 'default' | 'info' {
+  if (status === 'READY') return 'success';
+  if (status === 'BLOCKED') return 'error';
+  if (status === 'LIMITED' || status === 'UNPROVEN') return 'warning';
+  if (status === 'INSUFFICIENT_DATA') return 'info';
+  return 'default';
+}
+
+function formatStatus(status: string) {
+  return status.replace(/_/g, ' ');
+}
 
 function safeReadiness(label?: string | null) {
   if (label === 'PAPER_TEST_CANDIDATE' || label === 'WATCHLIST_CANDIDATE' || label === 'NOT_AUTOMATION_READY') return label;

@@ -8,6 +8,41 @@ export interface NextAction {
   targetRoute: string;
 }
 
+export type ActionabilityStatus = 'READY' | 'LIMITED' | 'BLOCKED' | 'UNPROVEN' | 'INSUFFICIENT_DATA';
+
+export interface ActionabilityDimension {
+  status: ActionabilityStatus;
+  label: string;
+  sourceModule: string;
+  blocking: boolean;
+  count?: number;
+  evidenceDate?: string | null;
+  message: string;
+}
+
+export interface ResearchActionability {
+  overallStatus: ActionabilityStatus;
+  canReviewActionableSetups: boolean;
+  headline: string;
+  researchSupportOnly: true;
+  dimensions: {
+    marketEnvironment: ActionabilityDimension;
+    dataReadiness: ActionabilityDimension;
+    signalEvidence: ActionabilityDimension;
+    calibrationReadiness: ActionabilityDimension;
+    strategyProof: ActionabilityDimension;
+    todayReviewReadiness: ActionabilityDimension;
+    tradePlanReadiness: ActionabilityDimension;
+  };
+  nextBestAction: {
+    label: string;
+    targetRoute: string;
+    sourceModule: string;
+    priority: PriorityLevel;
+  } | null;
+  blockers: Array<{ sourceModule: string; category: string; count?: number; message: string }>;
+}
+
 export interface MarketReadiness {
   marketGate: MarketGate;
   marketCondition: MarketCondition;
@@ -95,6 +130,7 @@ export interface ResearchWhatChanged {
 }
 
 export interface ResearchOverview {
+  actionability: ResearchActionability;
   marketReadiness: MarketReadiness;
   researchPriorities: ResearchPriorities;
   strategyProofSummary: StrategyProofSummary;

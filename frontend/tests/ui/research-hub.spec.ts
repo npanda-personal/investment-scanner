@@ -13,11 +13,70 @@ test.describe('Research Hub UI', () => {
     await page.route('**/api/v1/research/overview**', async (route) => {
       await route.fulfill({
         json: {
+          actionability: {
+            overallStatus: 'INSUFFICIENT_DATA',
+            canReviewActionableSetups: false,
+            headline: 'Actionable setup review is not confirmed because required readiness evidence is unavailable.',
+            researchSupportOnly: true,
+            dimensions: {
+              marketEnvironment: {
+                status: 'READY',
+                label: 'Market Environment',
+                sourceModule: 'strategy-decision-engine',
+                blocking: false,
+                message: 'Market environment is open, but this does not prove actionable setup readiness.'
+              },
+              dataReadiness: {
+                status: 'LIMITED',
+                label: 'Data Readiness',
+                sourceModule: 'research-hub',
+                blocking: false,
+                message: 'Research Hub has no local data gaps, but trusted review-universe readiness is not yet wired.'
+              },
+              signalEvidence: {
+                status: 'INSUFFICIENT_DATA',
+                label: 'Signal Evidence',
+                sourceModule: 'signal-quality-lab',
+                blocking: true,
+                message: 'Signal Quality evidence maturity is not yet available for this overview.'
+              },
+              calibrationReadiness: {
+                status: 'INSUFFICIENT_DATA',
+                label: 'Calibration Readiness',
+                sourceModule: 'signal-calibration-engine',
+                blocking: true,
+                message: 'Calibration readiness is not yet wired into Research Hub actionability.'
+              },
+              strategyProof: {
+                status: 'INSUFFICIENT_DATA',
+                label: 'Strategy Proof',
+                sourceModule: 'strategy-decision-engine',
+                blocking: true,
+                message: 'No framework-backed strategy proof is available for review candidates.'
+              },
+              todayReviewReadiness: {
+                status: 'INSUFFICIENT_DATA',
+                label: 'Today Review Readiness',
+                sourceModule: 'today-trade-review',
+                blocking: true,
+                message: 'Today Review readiness is not yet a stable Research Hub input.'
+              },
+              tradePlanReadiness: {
+                status: 'INSUFFICIENT_DATA',
+                label: 'Trade Plan Readiness',
+                sourceModule: 'trade-plan-risk-engine',
+                blocking: true,
+                message: 'Trade Plan paper-readiness is not yet a stable Research Hub input.'
+              }
+            },
+            nextBestAction: null,
+            blockers: []
+          },
           marketReadiness: {
             marketGate: 'OPEN',
             marketCondition: 'HEALTHY',
             headline: 'Environment is healthy: high-conviction setups allowed.',
-            allowedActions: [],
+            allowedActions: ['NEW_LONG_TRADES_ALLOWED'],
             reasons: [],
             blockers: [],
             dataStatus: 'COMPLETE'
@@ -54,6 +113,15 @@ test.describe('Research Hub UI', () => {
     });
 
     await visitModule(page, '/research', 'Research Command Center');
+    await expect(page.getByRole('heading', { name: 'Actionability' })).toBeVisible();
+    await expect(page.getByText('Reviewable setups not confirmed')).toBeVisible();
+    await expect(page.getByText('Actionable setup review is not confirmed because required readiness evidence is unavailable.')).toBeVisible();
+    await expect(page.getByText('Market environment is open, but this does not prove actionable setup readiness.').first()).toBeVisible();
+    await expect(page.getByText('Market input only')).toBeVisible();
+    await expect(page.getByText('Review actionability evidence')).toBeVisible();
+    await expect(page.getByText('Environment is healthy: high-conviction setups allowed.')).toHaveCount(0);
+    await expect(page.getByText('NEW LONG TRADES ALLOWED')).toHaveCount(0);
+    await expect(page.getByText('Trade Plan Readiness')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Review Candidates' })).toBeVisible();
     await expect(page.getByText('Strategy Proof').first()).toBeVisible();
     await expect(page.getByText('Confirmation Layers')).toBeVisible();

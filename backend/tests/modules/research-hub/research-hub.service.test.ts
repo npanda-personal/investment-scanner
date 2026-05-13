@@ -134,7 +134,8 @@ describe('ResearchHubService', () => {
       expect(strategyService.candidates).toHaveBeenCalledWith(expect.objectContaining({ region: 'IN', assetType: 'STOCK', decision: 'TRADE_CANDIDATE' }));
       expect(strategyFrameworkService.performance).toHaveBeenCalledWith('TREND_MOMENTUM', { region: 'IN', assetType: 'STOCK' });
       expect(result.marketReadiness.marketGate).toBe('OPEN');
-      expect(result.marketReadiness.headline).toContain('Environment is healthy');
+      expect(result.marketReadiness.headline).toBe('Market environment is open; confirm actionability evidence before reviewing setup readiness.');
+      expect(result.marketReadiness.allowedActions).toEqual([]);
       
       expect(result.researchPriorities.tradeCandidates).toHaveLength(1);
       expect(result.researchPriorities.tradeCandidates[0].symbol).toBe('AAPL');
@@ -150,6 +151,13 @@ describe('ResearchHubService', () => {
       expect(result.nextActions).toBeDefined();
       expect(result.nextActions.length).toBeGreaterThan(0);
       expect(result.generatedAt).toBeDefined();
+      expect(result.actionability.dimensions.marketEnvironment.status).toBe('READY');
+      expect(result.actionability.dimensions.todayReviewReadiness.status).toBe('INSUFFICIENT_DATA');
+      expect(result.actionability.dimensions.tradePlanReadiness.status).toBe('INSUFFICIENT_DATA');
+      expect(result.actionability.overallStatus).toBe('INSUFFICIENT_DATA');
+      expect(result.actionability.canReviewActionableSetups).toBe(false);
+      expect(JSON.stringify(result)).not.toContain('setups allowed');
+      expect(JSON.stringify(result)).not.toContain('NEW_LONG_TRADES_ALLOWED');
     });
 
     it('should handle partial failures gracefully', async () => {
@@ -166,6 +174,9 @@ describe('ResearchHubService', () => {
       expect(result.marketReadiness.marketGate).toBe('UNKNOWN');
       expect(result.dataGaps).toContain('Market gate status unavailable');
       expect(result.nextActions.some(a => a.label.includes('Data Quality'))).toBe(true);
+      expect(result.actionability.overallStatus).toBe('INSUFFICIENT_DATA');
+      expect(result.actionability.canReviewActionableSetups).toBe(false);
+      expect(result.actionability.dimensions.marketEnvironment.status).toBe('INSUFFICIENT_DATA');
     });
 
     it('does not promote raw bullish signals without framework-backed strategy decisions', async () => {
@@ -235,6 +246,9 @@ describe('ResearchHubService', () => {
       expect(result.marketReadiness.headline).toContain('No new long review candidates');
       expect(result.researchPriorities.tradeCandidates).toHaveLength(0);
       expect(result.strategyProofSummary.blockedByMarketGateCount).toBeGreaterThan(0);
+      expect(result.actionability.overallStatus).toBe('BLOCKED');
+      expect(result.actionability.canReviewActionableSetups).toBe(false);
+      expect(result.actionability.blockers.some((blocker) => blocker.sourceModule === 'strategy-decision-engine' && blocker.category === 'BLOCKED')).toBe(true);
     });
 
     it('does not expose live-trading readiness labels', async () => {
@@ -252,6 +266,32 @@ describe('ResearchHubService', () => {
 
       expect(JSON.stringify(result)).not.toContain('LIVE_TRADING_ELIGIBLE_FUTURE');
       expect(result.researchPriorities.tradeCandidates[0].readinessLabel).toBe('RESEARCH_ONLY');
+    });
+
+    it('does not mark actionability ready when market is healthy but readiness evidence is unavailable', async () => {
+      strategyService.marketGate.mockResolvedValue({ marketGate: 'OPEN', marketCondition: 'HEALTHY', reasons: [], blockers: [], allowedActions: ['NEW_LONG_TRADES_ALLOWED'], dataStatus: 'COMPLETE' } as any);
+      contextService.summary.mockResolvedValue({ topSectors: [], weakSectors: [], breadth: {}, explanation: [] } as any);
+      strategyService.candidates.mockResolvedValue({ results: [
+        { instrumentId: '1', symbol: 'AAPL', strategy: 'TREND_MOMENTUM', frameworkBacked: true, decision: 'TRADE_CANDIDATE', action: 'CONSIDER_ENTRY', decisionScore: 95, confidence: 'HIGH', marketGate: 'OPEN', marketCondition: 'HEALTHY', reasons: ['Strong setup'], blockers: [], warnings: [], dataGaps: [], modelVersion: 'strategy-decision-v1', generatedAt: new Date().toISOString() }
+      ] } as any);
+      strategyService.exits.mockResolvedValue([]);
+      signalService.funnelDiagnostics.mockResolvedValue({ total: 3, bullish: 3, bearish: 0, neutral: 0, byDirection: { BULLISH: 3, BEARISH: 0, NEUTRAL: 0 } } as any);
+      smartMoneyService.top.mockResolvedValue({ results: [], total: 0 } as any);
+      strategyFrameworkService.performance.mockResolvedValue([{ timeframe: '3Y', cagr: 0.1, maxDrawdown: -0.1, sharpe: 1, winRate: 0.6, profitFactor: 1.5, tradeCount: 30, ratingGrade: 'GOOD', generatedAt: new Date().toISOString() }] as any);
+
+      const result = await service.overview();
+
+      expect(result.actionability.dimensions.marketEnvironment.status).toBe('READY');
+      expect(result.actionability.dimensions.signalEvidence.status).toBe('LIMITED');
+      expect(result.actionability.dimensions.strategyProof.status).toBe('LIMITED');
+      expect(result.actionability.dimensions.todayReviewReadiness.status).toBe('INSUFFICIENT_DATA');
+      expect(result.actionability.dimensions.tradePlanReadiness.status).toBe('INSUFFICIENT_DATA');
+      expect(result.actionability.overallStatus).toBe('INSUFFICIENT_DATA');
+      expect(result.actionability.canReviewActionableSetups).toBe(false);
+      expect(JSON.stringify(result.actionability).toLowerCase()).not.toMatch(/\b(buy|sell|execute|order placement|live trading)\b/);
+      expect(JSON.stringify(result)).not.toContain('setups allowed');
+      expect(JSON.stringify(result)).not.toContain('NEW_LONG_TRADES_ALLOWED');
+      expect(result.marketReadiness.allowedActions).toEqual([]);
     });
   });
 });

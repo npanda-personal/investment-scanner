@@ -41,10 +41,69 @@ Returns a consolidated decision-oriented response.
 
 ```json
 {
+  "actionability": {
+    "overallStatus": "READY | LIMITED | BLOCKED | UNPROVEN | INSUFFICIENT_DATA",
+    "canReviewActionableSetups": false,
+    "headline": "Actionable setup review is not confirmed because required readiness evidence is unavailable.",
+    "researchSupportOnly": true,
+    "dimensions": {
+      "marketEnvironment": {
+        "status": "READY",
+        "label": "Market Environment",
+        "sourceModule": "strategy-decision-engine",
+        "blocking": false,
+        "message": "Market environment is open, but this does not prove actionable setup readiness."
+      },
+      "dataReadiness": {
+        "status": "LIMITED",
+        "label": "Data Readiness",
+        "sourceModule": "research-hub",
+        "blocking": false,
+        "message": "Research Hub has no local data gaps, but trusted review-universe readiness is not yet wired."
+      },
+      "signalEvidence": {
+        "status": "INSUFFICIENT_DATA",
+        "label": "Signal Evidence",
+        "sourceModule": "signal-quality-lab",
+        "blocking": true,
+        "message": "Signal Quality evidence maturity is not yet available for this overview."
+      },
+      "calibrationReadiness": {
+        "status": "INSUFFICIENT_DATA",
+        "label": "Calibration Readiness",
+        "sourceModule": "signal-calibration-engine",
+        "blocking": true,
+        "message": "Calibration readiness is not yet wired into Research Hub actionability."
+      },
+      "strategyProof": {
+        "status": "LIMITED",
+        "label": "Strategy Proof",
+        "sourceModule": "strategy-decision-engine",
+        "blocking": false,
+        "message": "Framework-backed review candidates exist, but downstream review and plan readiness are not yet proven here."
+      },
+      "todayReviewReadiness": {
+        "status": "INSUFFICIENT_DATA",
+        "label": "Today Review Readiness",
+        "sourceModule": "today-trade-review",
+        "blocking": true,
+        "message": "Today Review readiness is not yet a stable Research Hub input."
+      },
+      "tradePlanReadiness": {
+        "status": "INSUFFICIENT_DATA",
+        "label": "Trade Plan Readiness",
+        "sourceModule": "trade-plan-risk-engine",
+        "blocking": true,
+        "message": "Trade Plan paper-readiness is not yet a stable Research Hub input."
+      }
+    },
+    "nextBestAction": null,
+    "blockers": []
+  },
   "marketReadiness": {
     "marketGate": "OPEN | SELECTIVE | CLOSED | UNKNOWN",
     "marketCondition": "HEALTHY | MIXED | BAD | UNKNOWN",
-    "headline": "...",
+    "headline": "Market environment is open; confirm actionability evidence before reviewing setup readiness.",
     "allowedActions": [],
     "reasons": [],
     "blockers": [],
@@ -101,6 +160,28 @@ Returns a consolidated decision-oriented response.
   "dataGaps": []
 }
 ```
+
+## Actionability Adapter
+
+The `actionability` object is a conservative, additive Research Hub adapter. It separates market environment from actionable setup readiness and uses only the local Research Hub view of stable public outputs.
+
+Vocabulary:
+
+- `READY`
+- `LIMITED`
+- `BLOCKED`
+- `UNPROVEN`
+- `INSUFFICIENT_DATA`
+
+Current conservative semantics:
+
+- `canReviewActionableSetups` remains `false` unless Research Hub can prove both review readiness and trade-plan readiness from stable public outputs.
+- Missing Today Review, Trade Plan paper-readiness, Signal Quality evidence maturity, or Calibration readiness is `LIMITED` or `INSUFFICIENT_DATA`, never `READY`.
+- A healthy/open market environment can make only the `marketEnvironment` dimension `READY`; it does not make overall actionability ready.
+- Market-readiness headlines and `allowedActions` are not setup permission. While `canReviewActionableSetups` is `false`, Research Hub suppresses market-gate allowance labels such as `NEW_LONG_TRADES_ALLOWED` and uses review, evaluate, repair, or diagnostic wording instead.
+- Market-gate blockers can reduce overall actionability to `BLOCKED`.
+- Strategy proof without stable downstream review and plan readiness is at most `LIMITED`.
+- Copy remains research-support only and should direct users to review, repair, evaluate, diagnose, or paper-review workflows.
 
 ## Performance & Resilience
 
