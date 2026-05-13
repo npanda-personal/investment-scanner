@@ -74,8 +74,8 @@ QA validates:
 
 ## MD-A2 - Sync Catalog Progress And Bulk Performance
 
-State: `PO Accepted`
-Mode: `GitHub Check-In`
+State: `Released`
+Mode: `Released`
 Owner: Senior Fullstack Lead / Orchestrator
 Lane/module: Lane 1, `market-data-foundation`
 
@@ -86,6 +86,7 @@ QA evidence: [MD-A2 QA evidence](../qa-evidence/2026-05-13-md-a2-qa-evidence.md)
 Lead validation: [MD-A2 Lead validation](../lead-validation/2026-05-13-md-a2-lead-validation.md)
 Architect signoff: [MD-A2 Architect signoff](../architecture-signoff/2026-05-13-md-a2-architect-signoff.md)
 PO acceptance: [MD-A2 PO acceptance](../po-acceptance/2026-05-13-md-a2-po-acceptance.md)
+GitHub check-in: [MD-A2 GitHub check-in](../github-check-in/2026-05-13-md-a2-github-check-in.md)
 
 ### Product Goal
 
