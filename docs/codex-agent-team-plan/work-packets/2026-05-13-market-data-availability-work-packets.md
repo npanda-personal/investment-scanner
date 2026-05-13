@@ -267,7 +267,7 @@ Forbidden scope:
 
 ## MD-A5 - 15-Year History And Free-Source Fallback
 
-State: `PO Accepted - GitHub Check-In Pending`
+State: `Released`
 Mode: `Implementation Mode`
 Owner: Senior Fullstack Lead / Orchestrator
 Lane/module: Lane 1, `market-data-foundation`
@@ -279,6 +279,7 @@ QA evidence: [MD-A5 QA evidence](../qa-evidence/2026-05-13-md-a5-15-year-history
 Lead validation: [MD-A5 Lead validation](../lead-validation/2026-05-13-md-a5-lead-validation.md)
 Architect signoff: [MD-A5 Architect signoff](../architecture-signoff/2026-05-13-md-a5-architect-signoff.md)
 PO acceptance: [MD-A5 PO acceptance](../po-acceptance/2026-05-13-md-a5-po-acceptance.md)
+GitHub check-in: [MD-A5 GitHub check-in](../github-check-in/2026-05-13-md-a5-github-check-in.md)
 
 ### Product Goal
 
@@ -288,11 +289,11 @@ Guarantee that every active `IN / STOCK` has daily OHLCV for the required histor
 
 | Packet | Current State | Mode | Owner | Reserved Write Scope | Dependency / Next Action |
 |---|---|---|---|---|---|
-| MD-A5-BE-1 Required history-window computation and coverage diagnostics | `PO Accepted` | `GitHub Check-In Mode` | Senior Fullstack Lead / Orchestrator | `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`, `market-data-foundation.repository.ts`, `market-data-foundation.types.ts`, focused backend Market Data tests | Scoped GitHub check-in pending. |
-| MD-A5-BE-2 Official/public exchange EOD source adapters and local cache | `PO Accepted` | `GitHub Check-In Mode` | Senior Fullstack Lead / Orchestrator | `backend/src/modules/market-data-foundation/market-data-foundation.exchange-eod-adapter.ts`, focused adapter tests, fallback integration in service | Scoped GitHub check-in pending; BSE automatic download remains future/configured-source work. |
-| MD-A5-BE-3 Repair-run integration and provenance persistence | `PO Accepted` | `GitHub Check-In Mode` | Senior Fullstack Lead / Orchestrator | `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`, `market-data-foundation.repository.ts`, `market-data-foundation.types.ts`, focused backend tests | Scoped GitHub check-in pending; full active-universe drain remains bounded operational work. |
-| MD-A5-FE-1 Market Data UI evidence for full-window coverage and fallback | `PO Accepted` | `GitHub Check-In Mode` | Senior Fullstack Lead / Orchestrator | `frontend/src/features/market-data-foundation/types.ts`, `frontend/src/features/market-data-foundation/components/MarketDataStatusPanel.tsx`, `frontend/tests/ui/market-data-foundation.spec.ts` | Scoped GitHub check-in pending. |
-| MD-A5-QA-1 Validation evidence | `PO Accepted` | `GitHub Check-In Mode` | Senior Fullstack Lead / Orchestrator | [MD-A5 QA evidence](../qa-evidence/2026-05-13-md-a5-15-year-history-and-free-source-fallback-qa-evidence.md), [Lead validation](../lead-validation/2026-05-13-md-a5-lead-validation.md), [Architect signoff](../architecture-signoff/2026-05-13-md-a5-architect-signoff.md), [PO acceptance](../po-acceptance/2026-05-13-md-a5-po-acceptance.md) | Scoped GitHub check-in pending. |
+| MD-A5-BE-1 Required history-window computation and coverage diagnostics | `Released` |  | Senior Fullstack Lead / Orchestrator | `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`, `market-data-foundation.repository.ts`, `market-data-foundation.types.ts`, focused backend Market Data tests | Released to `origin/dev` at `22db47a`. |
+| MD-A5-BE-2 Official/public exchange EOD source adapters and local cache | `Released` |  | Senior Fullstack Lead / Orchestrator | `backend/src/modules/market-data-foundation/market-data-foundation.exchange-eod-adapter.ts`, focused adapter tests, fallback integration in service | Released to `origin/dev` at `22db47a`; BSE automatic download remains future/configured-source work. |
+| MD-A5-BE-3 Repair-run integration and provenance persistence | `Released` |  | Senior Fullstack Lead / Orchestrator | `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`, `market-data-foundation.repository.ts`, `market-data-foundation.types.ts`, focused backend tests | Released to `origin/dev` at `22db47a`; full active-universe drain remains bounded operational work. |
+| MD-A5-FE-1 Market Data UI evidence for full-window coverage and fallback | `Released` |  | Senior Fullstack Lead / Orchestrator | `frontend/src/features/market-data-foundation/types.ts`, `frontend/src/features/market-data-foundation/components/MarketDataStatusPanel.tsx`, `frontend/tests/ui/market-data-foundation.spec.ts` | Released to `origin/dev` at `22db47a`. |
+| MD-A5-QA-1 Validation evidence | `Released` |  | Senior Fullstack Lead / Orchestrator | [MD-A5 QA evidence](../qa-evidence/2026-05-13-md-a5-15-year-history-and-free-source-fallback-qa-evidence.md), [Lead validation](../lead-validation/2026-05-13-md-a5-lead-validation.md), [Architect signoff](../architecture-signoff/2026-05-13-md-a5-architect-signoff.md), [PO acceptance](../po-acceptance/2026-05-13-md-a5-po-acceptance.md), [GitHub check-in](../github-check-in/2026-05-13-md-a5-github-check-in.md) | Released to `origin/dev` at `22db47a`. |
 
 ### Operating Rules
 
