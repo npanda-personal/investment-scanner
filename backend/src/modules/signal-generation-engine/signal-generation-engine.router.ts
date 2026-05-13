@@ -7,6 +7,7 @@ export const createSignalGenerationEngineRouter = (
   const router = express.Router();
 
   router.get('/signals/health', controller.health);
+  router.get('/signals/runs/latest', controller.latestRun);
   router.get('/signals/top', controller.top);
   router.get('/signals/screener', controller.screener);
   router.get('/signals/:instrumentId', controller.latestForInstrument);
@@ -18,4 +19,3 @@ export const createSignalGenerationEngineRouter = (
 export const signalGenerationEngineRouter = createSignalGenerationEngineRouter();
 
 export default signalGenerationEngineRouter;
-

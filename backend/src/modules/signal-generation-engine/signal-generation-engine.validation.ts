@@ -36,6 +36,9 @@ const normalizeRegionText = (value: unknown): string | undefined => {
 const normalizeAssetTypeText = (value: unknown): string | undefined =>
   typeof first(value) === 'string' ? String(first(value)).trim().toUpperCase() || undefined : undefined;
 
+const normalizeVersionText = (value: unknown): string | undefined =>
+  typeof first(value) === 'string' ? String(first(value)).trim() || undefined : undefined;
+
 export function parseSignalQuery(query: Record<string, unknown>): SignalQuery {
   const minScoreValue = Number(first(query.minScore));
   const limitValue = Number(first(query.limit));
@@ -53,6 +56,7 @@ export function parseSignalQuery(query: Record<string, unknown>): SignalQuery {
     country: typeof first(query.country) === 'string' ? String(first(query.country)).trim() || undefined : undefined,
     region: normalizeRegionText(query.region),
     assetType: normalizeAssetTypeText(query.assetType),
+    modelVersion: normalizeVersionText(query.modelVersion),
     signalType: typeof first(query.signalType) === 'string' ? String(first(query.signalType)).trim() || undefined : undefined,
     confidence: normalizeConfidence(query.confidence),
     search: typeof first(query.search) === 'string' ? String(first(query.search)).trim() || undefined : undefined,
@@ -85,6 +89,9 @@ export function parseRunRequest(body: any): SignalRunRequest {
     country: typeof body?.country === 'string' ? body.country.trim() || undefined : undefined,
     region: normalizeRegionText(body?.region),
     assetType: normalizeAssetTypeText(body?.assetType),
+    modelVersion: normalizeVersionText(body?.modelVersion),
+    rulesetVersion: normalizeVersionText(body?.rulesetVersion),
+    requestedByUserId: normalizeVersionText(body?.requestedByUserId),
     useDataQualityFilter: body?.useDataQualityFilter === true,
     minSignalReadinessScore: Number.isFinite(Number(body?.minSignalReadinessScore)) ? Math.min(100, Math.max(0, Number(body.minSignalReadinessScore))) : undefined,
     allowedReadinessStatuses: Array.isArray(body?.allowedReadinessStatuses) ? body.allowedReadinessStatuses : undefined,

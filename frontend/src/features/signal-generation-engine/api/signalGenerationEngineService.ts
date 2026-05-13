@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { PaginatedSignalResponse, SignalQuery, SignalResult, SignalRunRequest, SignalRunResponse } from '../types';
+import type { PaginatedSignalResponse, SignalGenerationRunAudit, SignalQuery, SignalResult, SignalRunRequest, SignalRunResponse } from '../types';
 
 const API_BASE = '/api/v1/signals';
 
@@ -23,3 +23,7 @@ export async function runSignals(request: SignalRunRequest = {}): Promise<Signal
   return response.data;
 }
 
+export async function fetchLatestSignalRun(query: Pick<SignalQuery, 'region' | 'assetType' | 'modelVersion'> = {}): Promise<SignalGenerationRunAudit | null> {
+  const response = await axios.get<SignalGenerationRunAudit | null>(`${API_BASE}/runs/latest`, { params: query });
+  return response.data;
+}

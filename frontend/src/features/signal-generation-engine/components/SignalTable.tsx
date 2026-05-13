@@ -27,6 +27,7 @@ const formatMoney = (value: number | null, currency: string | null) => {
   }
 };
 const formatPercent = (value: number | null) => value === null ? 'N/A' : `${value >= 0 ? '+' : ''}${(value * 100).toFixed(1)}%`;
+const formatDate = (value?: string | null) => value ? new Date(value).toLocaleDateString() : 'N/A';
 
 const SignalReasons = ({ signal }: { signal: SignalResult }) => {
   const triggered = signal.triggered_signals.map(s => s.label);
@@ -121,6 +122,18 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
     { id: 'score', label: 'Raw Score', sortable: true, align: 'right', render: (signal) => signal.score },
     { id: 'direction', label: 'Raw Direction', sortable: true, render: (signal) => <StatusBadge label={signal.direction} /> },
     { id: 'confidence', label: 'Confidence', sortable: true, render: (signal) => <StatusBadge label={signal.confidence} /> },
+    {
+      id: 'audit',
+      label: 'Audit',
+      render: (signal) => (
+        <Tooltip title={`${signal.rulesetVersion || signal.modelVersion || 'legacy'} | source ${formatDate(signal.sourceDataDate)}`} arrow>
+          <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', maxWidth: 180 }}>
+            <Chip size="small" variant="outlined" label={signal.modelVersion || 'legacy'} />
+            <Chip size="small" variant="outlined" label={formatDate(signal.sourceDataDate)} color={signal.auditStatus === 'LEGACY_MISSING' ? 'warning' : 'default'} />
+          </Box>
+        </Tooltip>
+      ),
+    },
     { id: 'currentPrice', label: 'Price', align: 'right', render: (signal) => formatMoney(signal.currentPrice, signal.currency) },
     {
       id: 'dailyChangePercent',
@@ -279,6 +292,44 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
             </Stack>
 
             <Typography variant="body2">{selectedSignal.explanation}</Typography>
+
+            <Divider />
+
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>Generation Audit</Typography>
+              <Stack spacing={0.75}>
+                <Typography variant="body2" color="text.secondary">Model: {selectedSignal.modelVersion || 'N/A'}</Typography>
+                <Typography variant="body2" color="text.secondary">Ruleset: {selectedSignal.rulesetVersion || 'N/A'}</Typography>
+                <Typography variant="body2" color="text.secondary">Generated date: {formatDate(selectedSignal.generatedDate || selectedSignal.generated_at)}</Typography>
+                <Typography variant="body2" color="text.secondary">Source data date: {formatDate(selectedSignal.sourceDataDate)}</Typography>
+                <Typography variant="body2" color="text.secondary">Source price date: {formatDate(selectedSignal.sourcePriceDate)}</Typography>
+                <Typography variant="body2" color="text.secondary">Write status: {selectedSignal.writeStatus || 'N/A'}</Typography>
+                <Typography variant="body2" color="text.secondary">Audit status: {selectedSignal.auditStatus || 'N/A'}</Typography>
+              </Stack>
+            </Box>
+
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>Scoring Inputs</Typography>
+              {selectedSignal.scoringInputSummary ? (
+                <Stack spacing={0.75}>
+                  <Typography variant="body2" color="text.secondary">Price bars: {selectedSignal.scoringInputSummary.priceBarsUsed}</Typography>
+                  <Typography variant="body2" color="text.secondary">Latest close: {formatDate(selectedSignal.scoringInputSummary.latestCloseDate)}</Typography>
+                  <Typography variant="body2" color="text.secondary">SMA50: {selectedSignal.scoringInputSummary.hasSma50 ? 'Yes' : 'No'} | SMA200: {selectedSignal.scoringInputSummary.hasSma200 ? 'Yes' : 'No'} | Volume: {selectedSignal.scoringInputSummary.hasVolume ? 'Yes' : 'No'}</Typography>
+                  <Typography variant="body2" color="text.secondary">Fundamentals: {selectedSignal.scoringInputSummary.fundamentalsAvailable ? 'Yes' : 'No'} | Strategy context: {selectedSignal.scoringInputSummary.strategyContextLoaded ? 'Yes' : 'No'}</Typography>
+                </Stack>
+              ) : <Typography variant="body2" color="text.secondary">Legacy signal has no scoring input snapshot.</Typography>}
+            </Box>
+
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>Data Quality Eligibility</Typography>
+              {selectedSignal.dataQualityEligibility ? (
+                <Stack spacing={0.75}>
+                  <Typography variant="body2" color="text.secondary">Filter applied: {selectedSignal.dataQualityEligibility.filterApplied ? 'Yes' : 'No'} | Eligible: {selectedSignal.dataQualityEligibility.eligible === null ? 'Unknown' : selectedSignal.dataQualityEligibility.eligible ? 'Yes' : 'No'}</Typography>
+                  <Typography variant="body2" color="text.secondary">Coverage: {selectedSignal.dataQualityEligibility.coverageStatus || 'N/A'} | Readiness: {selectedSignal.dataQualityEligibility.signalReadinessStatus || 'N/A'} | Liquidity: {selectedSignal.dataQualityEligibility.liquidityStatus || 'N/A'}</Typography>
+                  {selectedSignal.dataQualityEligibility.excludedReason && <Typography variant="body2" color="text.secondary">Reason: {selectedSignal.dataQualityEligibility.excludedReason}</Typography>}
+                </Stack>
+              ) : <Typography variant="body2" color="text.secondary">Legacy signal has no eligibility snapshot.</Typography>}
+            </Box>
 
             <Divider />
 

@@ -26,6 +26,61 @@ const freshPrice = (index: number, adjusted_close: number, volume = 100) => {
   };
 };
 
+const runAuditRepository = () => ({
+  createRunAudit: jest.fn(async (input: any) => ({
+    id: 'run-1',
+    scope: { region: input.region, assetType: input.assetType },
+    requestedByUserId: input.requestedByUserId,
+    status: 'RUNNING',
+    modelVersion: input.modelVersion,
+    rulesetVersion: input.rulesetVersion,
+    sourceDataDate: input.sourceDataDate?.toISOString?.() ?? null,
+    generatedDate: input.generatedDate.toISOString(),
+    batchSize: input.batchSize,
+    offset: input.offset,
+    totalCount: input.totalCount,
+    processedCount: 0,
+    generatedCount: 0,
+    updatedCount: 0,
+    noOpCount: 0,
+    duplicateOrIdempotentCount: 0,
+    skippedCount: 0,
+    failedCount: 0,
+    excludedByDataQuality: 0,
+    missingQualityEvaluationCount: 0,
+    durationMs: 0,
+    startedAt: '2026-05-13T10:00:00.000Z',
+    completedAt: null,
+    warnings: input.warnings,
+  })),
+  completeRunAudit: jest.fn(async (_id: string, input: any) => ({
+    id: 'run-1',
+    scope: { region: 'IN', assetType: 'STOCK' },
+    requestedByUserId: 'system',
+    status: input.status,
+    modelVersion: 'signal-engine-v1',
+    rulesetVersion: 'signal-engine-v1',
+    sourceDataDate: input.sourceDataDate?.toISOString?.() ?? null,
+    generatedDate: '2026-05-13T00:00:00.000Z',
+    batchSize: 100,
+    offset: 0,
+    totalCount: input.processedCount,
+    processedCount: input.processedCount,
+    generatedCount: input.generatedCount,
+    updatedCount: input.updatedCount,
+    noOpCount: input.noOpCount,
+    duplicateOrIdempotentCount: input.duplicateOrIdempotentCount,
+    skippedCount: input.skippedCount,
+    failedCount: input.failedCount,
+    excludedByDataQuality: input.excludedByDataQuality,
+    missingQualityEvaluationCount: input.missingQualityEvaluationCount,
+    durationMs: input.durationMs,
+    startedAt: '2026-05-13T10:00:00.000Z',
+    completedAt: '2026-05-13T10:00:01.000Z',
+    warnings: input.warnings,
+  })),
+});
+
 describe('SignalGenerationEngineService', () => {
   it('calculates SMA values', () => {
     const service = new SignalGenerationEngineService({} as any, {} as any, {} as any);
@@ -257,7 +312,7 @@ describe('SignalGenerationEngineService', () => {
   });
 
   it('skips not-ready instruments when data quality filter is enabled and warns on missing evaluations', async () => {
-    const repository = { createSignalResult: jest.fn() };
+    const repository = { createSignalResult: jest.fn(), ...runAuditRepository() };
     const marketDataService = {
       listInstruments: jest.fn().mockResolvedValue({ instruments: [{ id: 'ready', symbol: 'RDY' }, { id: 'blocked', symbol: 'BLK' }, { id: 'missing', symbol: 'MSG' }] }),
     };
@@ -315,7 +370,7 @@ describe('SignalGenerationEngineService', () => {
         pagination: { total: 5 },
       }),
     };
-    const service = new SignalGenerationEngineService({} as any, marketDataService as any, {} as any);
+    const service = new SignalGenerationEngineService(runAuditRepository() as any, marketDataService as any, {} as any);
     jest.spyOn(service, 'generateForInstrument').mockImplementation(async (instrumentId) => ({
       instrument_id: instrumentId,
       symbol: instrumentId.toUpperCase(),
@@ -369,7 +424,7 @@ describe('SignalGenerationEngineService', () => {
         pagination: { total: 5 },
       }),
     };
-    const service = new SignalGenerationEngineService({} as any, marketDataService as any, {} as any);
+    const service = new SignalGenerationEngineService(runAuditRepository() as any, marketDataService as any, {} as any);
     jest.spyOn(service, 'generateForInstrument').mockResolvedValue(null);
 
     const result = await service.run({ batchSize: 2, offset: 4, region: 'IN', assetType: 'STOCK' });
@@ -387,7 +442,7 @@ describe('SignalGenerationEngineService', () => {
         pagination: { total: 2 },
       }),
     };
-    const service = new SignalGenerationEngineService({} as any, marketDataService as any, {} as any);
+    const service = new SignalGenerationEngineService(runAuditRepository() as any, marketDataService as any, {} as any);
     jest.spyOn(service, 'generateForInstrument').mockImplementation(async (instrumentId) => {
       if (instrumentId === 'bad') throw new Error('missing prices');
       return {
@@ -428,7 +483,7 @@ describe('SignalGenerationEngineService', () => {
         pagination: { total: 4 },
       }),
     };
-    const service = new SignalGenerationEngineService({} as any, marketDataService as any, {} as any);
+    const service = new SignalGenerationEngineService(runAuditRepository() as any, marketDataService as any, {} as any);
     let active = 0;
     let maxActive = 0;
     jest.spyOn(service, 'generateForInstrument').mockImplementation(async (instrumentId) => {
@@ -475,7 +530,7 @@ describe('SignalGenerationEngineService', () => {
         pagination: { total: 3 },
       }),
     };
-    const service = new SignalGenerationEngineService({} as any, marketDataService as any, {} as any);
+    const service = new SignalGenerationEngineService(runAuditRepository() as any, marketDataService as any, {} as any);
     jest.spyOn(service, 'generateForInstrument').mockImplementation(async (instrumentId) => ({
       instrument_id: instrumentId,
       symbol: instrumentId.toUpperCase(),

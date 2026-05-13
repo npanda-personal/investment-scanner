@@ -16,7 +16,10 @@ export {
 } from './signal-generation-engine.validation';
 export type {
   SignalConfidence,
+  SignalDataQualityEligibility,
   SignalDirection,
+  SignalGenerationRunAudit,
+  SignalGenerationRunStatus,
   SignalHistoryQuery,
   SignalItem,
   SignalPricePoint,
@@ -24,6 +27,7 @@ export type {
   SignalResultDto,
   SignalRunRequest,
   SignalRunResponse,
+  SignalScoringInputSummary,
   SignalWriteResult,
   SignalWriteStatus,
 } from './signal-generation-engine.types';

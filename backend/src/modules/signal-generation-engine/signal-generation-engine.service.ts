@@ -19,6 +19,8 @@ import type {
   SignalRunResponse,
   SignalBlockedStrategySummary,
   SignalStrategyMatchSummary,
+  SignalDataQualityEligibility,
+  SignalScoringInputSummary,
 } from './signal-generation-engine.types';
 import {
   signal_generation_engine_batch_size,
@@ -30,6 +32,7 @@ import {
 const TECHNICAL_WEIGHT = 0.4;
 const MOMENTUM_WEIGHT = 0.35;
 const FUNDAMENTAL_WEIGHT = 0.25;
+const MODEL_VERSION = 'signal-engine-v1';
 
 export class SignalGenerationEngineService {
   constructor(
@@ -91,6 +94,9 @@ export class SignalGenerationEngineService {
   async run(request: SignalRunRequest): Promise<SignalRunResponse> {
     const startedAt = Date.now();
     const generatedAt = new Date().toISOString();
+    const generatedDate = this.normalizeUtcDay(new Date(generatedAt));
+    const modelVersion = request.modelVersion || MODEL_VERSION;
+    const rulesetVersion = request.rulesetVersion || modelVersion;
     const errors: string[] = [];
     const warnings: string[] = [];
     const batchSize = request.instrumentId || request.symbol ? 1 : this.clampInt(request.batchSize ?? request.limit, signal_generation_engine_batch_size, 1, signal_generation_engine_batch_size);
@@ -143,8 +149,38 @@ export class SignalGenerationEngineService {
       }
     }
 
+    const scope = this.scopeFor(request);
+    const runAudit = await this.repository.createRunAudit({
+      region: scope.region,
+      assetType: scope.assetType,
+      requestedByUserId: request.requestedByUserId || 'system',
+      modelVersion,
+      rulesetVersion,
+      sourceDataDate: null,
+      generatedDate,
+      batchSize,
+      offset,
+      totalCount: resolved.totalCount,
+      warnings,
+    });
+    const dataQualityEvaluationsByInstrumentId = request.useDataQualityFilter
+      ? await this.getDataQualityEligibilityMap(resolvedInstrumentIds, request).catch((error: any) => {
+        warnings.push(`Data quality audit snapshot unavailable: ${error?.message || 'unknown error'}`);
+        return {};
+      })
+      : {};
     const researchContextMode: NonNullable<SignalRunRequest['researchContextMode']> = request.instrumentId || request.symbol ? 'FULL' : 'LIGHTWEIGHT';
-    const generationRequest = { ...request, researchContextMode };
+    const generationRequest = {
+      ...request,
+      researchContextMode,
+      modelVersion,
+      rulesetVersion,
+      generationRunId: runAudit.id,
+      dataQualityEvaluationsByInstrumentId,
+    } as SignalRunRequest & {
+      generationRunId: string;
+      dataQualityEvaluationsByInstrumentId: Record<string, SignalDataQualityEligibility>;
+    };
     const effectiveProviderThrottleMs = researchContextMode === 'LIGHTWEIGHT' ? 0 : providerThrottleMs;
     const generatedResults = await this.generateBatchWithConcurrency(instrumentIds, generationRequest, maxConcurrency, effectiveProviderThrottleMs);
     const results = generatedResults
@@ -167,6 +203,22 @@ export class SignalGenerationEngineService {
       acc[result.direction] += 1;
       return acc;
     }, { BULLISH: 0, NEUTRAL: 0, BEARISH: 0 });
+    const durationMs = Date.now() - startedAt;
+    const completedRunAudit = await this.repository.completeRunAudit(runAudit.id, {
+      status: failedCount > 0 ? (results.length > 0 ? 'PARTIAL' : 'FAILED') : 'COMPLETED',
+      sourceDataDate: this.latestDate(results.map((result) => result.sourceDataDate || result.sourcePriceDate)),
+      processedCount,
+      generatedCount,
+      updatedCount,
+      noOpCount,
+      duplicateOrIdempotentCount: updatedCount + noOpCount,
+      skippedCount,
+      failedCount,
+      excludedByDataQuality: dataQuality.excludedByDataQuality,
+      missingQualityEvaluationCount: dataQuality.missingQualityEvaluationCount,
+      durationMs,
+      warnings,
+    });
 
     return {
       generated: generatedCount,
@@ -175,6 +227,7 @@ export class SignalGenerationEngineService {
       warnings,
       dataQuality,
       results,
+      runAudit: completedRunAudit,
       generated_at: generatedAt,
       processedCount,
       totalCount: resolved.totalCount,
@@ -193,12 +246,16 @@ export class SignalGenerationEngineService {
       strategyBlockedCount: request.includeStrategyMatches ? results.reduce((sum, result) => sum + (result.blockedStrategies?.length || 0), 0) : undefined,
       outOfScopeSkipped: 0,
       directionCountsGenerated,
-      scope: this.scopeFor(request),
+      scope,
       latestGeneratedAt: results[results.length - 1]?.generated_at ?? null,
-      durationMs: Date.now() - startedAt,
+      durationMs,
       eligibleInstrumentCount: instrumentIds.length,
       attemptedGenerationCount,
     };
+  }
+
+  async latestRunAudit(query: Pick<SignalRunRequest, 'region' | 'assetType' | 'modelVersion'>) {
+    return this.repository.latestRunAudit(query);
   }
 
   async health() {
@@ -233,7 +290,10 @@ export class SignalGenerationEngineService {
     return this.repository.latestSignalUniverseCount(query);
   }
 
-  async generateForInstrument(instrumentId: string, options: Pick<SignalRunRequest, 'strategyCode' | 'includeStrategyMatches' | 'onlyStrategyEligible' | 'excludeNoiseFiltered' | 'researchContextMode' | 'region' | 'assetType'> = {}): Promise<SignalResultDto | null> {
+  async generateForInstrument(instrumentId: string, options: Pick<SignalRunRequest, 'strategyCode' | 'includeStrategyMatches' | 'onlyStrategyEligible' | 'excludeNoiseFiltered' | 'researchContextMode' | 'region' | 'assetType' | 'modelVersion' | 'rulesetVersion' | 'useDataQualityFilter'> & {
+    generationRunId?: string;
+    dataQualityEvaluationsByInstrumentId?: Record<string, SignalDataQualityEligibility>;
+  } = {}): Promise<SignalResultDto | null> {
     const useFullResearchContext = options.researchContextMode !== 'LIGHTWEIGHT';
     const marketScope = { region: options.region, assetType: options.assetType };
     const [instrument, pricesResponse, fundamentalsResponse, research] = await Promise.all([
@@ -297,7 +357,14 @@ export class SignalGenerationEngineService {
       negative_signals: negativeSignals,
       explanation: this.explain(direction, triggeredSignals, negativeSignals),
       generated_at: new Date().toISOString(),
-      modelVersion: 'signal-engine-v1',
+      modelVersion: options.modelVersion || MODEL_VERSION,
+      rulesetVersion: options.rulesetVersion || options.modelVersion || MODEL_VERSION,
+      generatedDate: this.normalizeUtcDay(new Date()).toISOString(),
+      sourceDataDate: latestDate?.toISOString() ?? null,
+      sourcePriceDate: latestDate?.toISOString() ?? null,
+      scoringInputSummary: this.scoringInputSummary(prices, latestFundamental, useFullResearchContext || Boolean(options.includeStrategyMatches)),
+      dataQualityEligibility: this.dataQualityEligibilityFor(instrumentId, options),
+      generationRunId: options.generationRunId ?? null,
       source: 'signal-generation-engine',
       data_status: prices.length >= 50 ? (prices.length >= 200 ? 'COMPLETE' : 'PARTIAL') : 'MISSING',
       warnings,
@@ -882,9 +949,18 @@ export class SignalGenerationEngineService {
     };
   }
 
+  private normalizeUtcDay(value: Date): Date {
+    const date = new Date(value);
+    date.setUTCHours(0, 0, 0, 0);
+    return date;
+  }
+
   private async generateBatchWithConcurrency(
     instrumentIds: string[],
-    request: SignalRunRequest,
+    request: SignalRunRequest & {
+      generationRunId?: string;
+      dataQualityEvaluationsByInstrumentId?: Record<string, SignalDataQualityEligibility>;
+    },
     maxConcurrency: number,
     providerThrottleMs: number
   ): Promise<Array<{ instrumentId: string; result: SignalResultDto | null; error?: string }>> {
@@ -935,6 +1011,79 @@ export class SignalGenerationEngineService {
     };
   }
 
+  private async getDataQualityEligibilityMap(instrumentIds: string[], request: SignalRunRequest): Promise<Record<string, SignalDataQualityEligibility>> {
+    const filtered = await this.dataQualityService.filterEligibleInstruments(instrumentIds, {
+      minSignalReadinessScore: request.minSignalReadinessScore ?? 70,
+      allowedReadinessStatuses: request.allowedReadinessStatuses,
+      includeLimited: request.includeLimited,
+      skipUnusable: request.skipUnusable ?? true,
+      missingQualityBehavior: request.missingQualityBehavior ?? 'WARN_AND_PROCESS',
+    });
+    const evaluations = (filtered as any).evaluationsByInstrumentId || {};
+    const excluded = new Set(filtered.excludedInstrumentIds);
+    const eligible = new Set(filtered.eligibleInstrumentIds);
+    return Object.fromEntries(instrumentIds.map((instrumentId) => {
+      const evaluation = evaluations[instrumentId];
+      return [instrumentId, this.toEligibilitySnapshot(true, eligible.has(instrumentId), excluded.has(instrumentId), evaluation)];
+    }));
+  }
+
+  private dataQualityEligibilityFor(instrumentId: string, options: { useDataQualityFilter?: boolean; dataQualityEvaluationsByInstrumentId?: Record<string, SignalDataQualityEligibility> }): SignalDataQualityEligibility {
+    if (!options.useDataQualityFilter) return { filterApplied: false, eligible: null };
+    return options.dataQualityEvaluationsByInstrumentId?.[instrumentId] || {
+      filterApplied: true,
+      eligible: null,
+      excludedReason: 'Data quality evaluation snapshot unavailable.',
+    };
+  }
+
+  private toEligibilitySnapshot(filterApplied: boolean, eligible: boolean, excluded: boolean, evaluation: any): SignalDataQualityEligibility {
+    if (!evaluation) {
+      return {
+        filterApplied,
+        eligible: excluded ? false : (eligible ? true : null),
+        excludedReason: excluded ? 'Missing data quality evaluation.' : 'Missing data quality evaluation; configured behavior allowed processing.',
+      };
+    }
+    return {
+      filterApplied,
+      eligible,
+      coverageStatus: evaluation.coverageStatus,
+      signalReadinessStatus: evaluation.signalReadinessStatus,
+      liquidityStatus: evaluation.liquidityStatus,
+      excludedReason: excluded ? this.dataQualityExcludedReason(evaluation) : undefined,
+    };
+  }
+
+  private dataQualityExcludedReason(evaluation: any): string {
+    if (!evaluation.eligibleForSignals) return 'Not eligible for signals.';
+    if (evaluation.signalReadinessStatus && evaluation.signalReadinessStatus !== 'READY') return `Signal readiness is ${evaluation.signalReadinessStatus}.`;
+    if (evaluation.coverageStatus === 'UNUSABLE') return 'Coverage is unusable.';
+    if (evaluation.liquidityStatus === 'ILLIQUID') return 'Liquidity is illiquid.';
+    return 'Data quality filter excluded this instrument.';
+  }
+
+  private scoringInputSummary(prices: SignalPricePoint[], latestFundamental: any, strategyContextLoaded: boolean): SignalScoringInputSummary {
+    return {
+      priceBarsUsed: prices.length,
+      latestCloseDate: prices[0]?.date ?? null,
+      hasSma50: this.sma(prices, 50) !== null,
+      hasSma200: this.sma(prices, 200) !== null,
+      hasVolume: prices.some((price) => typeof price.volume === 'number'),
+      fundamentalsAvailable: Boolean(latestFundamental),
+      strategyContextLoaded,
+    };
+  }
+
+  private latestDate(values: Array<string | null | undefined>): Date | null {
+    const timestamps = values
+      .filter((value): value is string => Boolean(value))
+      .map((value) => new Date(value))
+      .filter((value) => Number.isFinite(value.getTime()));
+    if (timestamps.length === 0) return null;
+    return timestamps.reduce((latest, value) => value > latest ? value : latest, timestamps[0]);
+  }
+
   private canonicalRegion(value?: string | null) {
     return normalizeMarketRegion(value) || 'IN';
   }
@@ -948,6 +1097,7 @@ export class SignalGenerationEngineService {
       country: query.country,
       region: query.region,
       assetType: query.assetType,
+      modelVersion: query.modelVersion,
       signalType: query.signalType,
       search: query.search,
       strategyCode: query.strategyCode,

@@ -32,6 +32,14 @@ export interface SignalResultDto {
   explanation: string;
   generated_at: string;
   modelVersion?: string | null;
+  rulesetVersion?: string | null;
+  generatedDate?: string | null;
+  sourceDataDate?: string | null;
+  sourcePriceDate?: string | null;
+  scoringInputSummary?: SignalScoringInputSummary | null;
+  dataQualityEligibility?: SignalDataQualityEligibility | null;
+  auditStatus?: 'CURRENT' | 'LEGACY_MISSING';
+  generationRunId?: string | null;
   source: string;
   data_status: MarketDataStatus;
   warnings?: string[];
@@ -41,6 +49,54 @@ export interface SignalResultDto {
 }
 
 export type SignalWriteStatus = 'CREATED' | 'UPDATED' | 'NO_OP';
+
+export interface SignalScoringInputSummary {
+  priceBarsUsed: number;
+  latestCloseDate: string | null;
+  hasSma50: boolean;
+  hasSma200: boolean;
+  hasVolume: boolean;
+  fundamentalsAvailable: boolean;
+  strategyContextLoaded: boolean;
+}
+
+export interface SignalDataQualityEligibility {
+  filterApplied: boolean;
+  eligible: boolean | null;
+  coverageStatus?: string;
+  signalReadinessStatus?: string;
+  liquidityStatus?: string;
+  excludedReason?: string;
+}
+
+export type SignalGenerationRunStatus = 'RUNNING' | 'COMPLETED' | 'PARTIAL' | 'FAILED';
+
+export interface SignalGenerationRunAudit {
+  id: string;
+  scope: { region: string; assetType: string };
+  requestedByUserId: string;
+  status: SignalGenerationRunStatus;
+  modelVersion: string;
+  rulesetVersion: string;
+  sourceDataDate: string | null;
+  generatedDate: string;
+  batchSize: number;
+  offset: number;
+  totalCount: number;
+  processedCount: number;
+  generatedCount: number;
+  updatedCount: number;
+  noOpCount: number;
+  duplicateOrIdempotentCount: number;
+  skippedCount: number;
+  failedCount: number;
+  excludedByDataQuality: number;
+  missingQualityEvaluationCount: number;
+  durationMs: number;
+  startedAt: string;
+  completedAt: string | null;
+  warnings: string[];
+}
 
 export interface SignalWriteResult {
   result: SignalResultDto;
@@ -103,6 +159,9 @@ export interface SignalRunRequest {
   country?: string;
   region?: string;
   assetType?: string;
+  modelVersion?: string;
+  rulesetVersion?: string;
+  requestedByUserId?: string;
   useDataQualityFilter?: boolean;
   minSignalReadinessScore?: number;
   allowedReadinessStatuses?: Array<'READY' | 'LIMITED' | 'NOT_READY'>;
@@ -127,6 +186,7 @@ export interface SignalQuery {
   country?: string;
   region?: string;
   assetType?: string;
+  modelVersion?: string;
   signalType?: string;
   confidence?: SignalConfidence;
   search?: string;
@@ -160,6 +220,7 @@ export interface SignalRunResponse {
     attemptedGenerationCount?: number;
   };
   results: SignalResultDto[];
+  runAudit?: SignalGenerationRunAudit;
   generated_at: string;
   processedCount?: number;
   totalCount?: number;

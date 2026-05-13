@@ -11,6 +11,7 @@ export function parseQualityQuery(query: any): QualityQuery {
     country: typeof query.country === 'string' && query.country.trim() ? query.country.trim() : undefined,
     region: typeof query.region === 'string' && query.region.trim() ? query.region.trim().toUpperCase() : 'IN',
     assetType: typeof query.assetType === 'string' && query.assetType.trim() ? query.assetType.trim().toUpperCase() : 'STOCK',
+    modelVersion: parseModelVersion(query.modelVersion),
     from: validDate(query.from) ? query.from : undefined,
     to: validDate(query.to) ? query.to : undefined,
     limit: clampInt(query.limit, 1000, 1, 5000),
@@ -35,7 +36,7 @@ export function requireInstrumentId(value: unknown): string {
   return value.trim();
 }
 
-export function parseQualityRecalculateRequest(input: any): { batchSize: number; offset: number; horizon: QualityHorizon; region: string; assetType: string; from?: string; to?: string } {
+export function parseQualityRecalculateRequest(input: any): { batchSize: number; offset: number; horizon: QualityHorizon; region: string; assetType: string; modelVersion?: string; from?: string; to?: string } {
   const from = validDate(input?.from) ? input.from : undefined;
   const to = validDate(input?.to) ? input.to : undefined;
   if (from && to && new Date(from).getTime() > new Date(to).getTime()) throw new Error('from must be before to');
@@ -45,9 +46,16 @@ export function parseQualityRecalculateRequest(input: any): { batchSize: number;
     horizon: parseHorizon(input?.horizon),
     region: typeof input?.region === 'string' && input.region.trim() ? input.region.trim().toUpperCase() : 'IN',
     assetType: typeof input?.assetType === 'string' && input.assetType.trim() ? input.assetType.trim().toUpperCase() : 'STOCK',
+    modelVersion: parseModelVersion(input?.modelVersion),
     from,
     to,
   };
+}
+
+function parseModelVersion(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim();
+  return /^[A-Za-z0-9._:-]{1,80}$/.test(normalized) ? normalized : undefined;
 }
 
 function clampInt(value: unknown, fallback: number, min: number, max: number): number {

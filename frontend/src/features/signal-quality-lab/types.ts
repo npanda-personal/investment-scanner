@@ -92,6 +92,7 @@ export interface QualityFilters {
   readinessStatus?: '' | 'READY' | 'LIMITED' | 'NOT_READY';
   coverageStatus?: '' | 'GOOD' | 'PARTIAL' | 'POOR' | 'UNUSABLE';
   liquidityStatus?: '' | 'LIQUID' | 'THIN' | 'ILLIQUID' | 'UNKNOWN';
+  modelVersion?: string;
   onlySignalReady?: boolean;
   excludePoorQuality?: boolean;
 }
@@ -152,6 +153,7 @@ export interface QualityRecalculateRequest {
   horizon?: QualityHorizon;
   region?: string;
   assetType?: string;
+  modelVersion?: string;
   from?: string;
   to?: string;
 }

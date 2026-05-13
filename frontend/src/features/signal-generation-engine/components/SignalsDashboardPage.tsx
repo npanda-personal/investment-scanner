@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Box, Button, Checkbox, CircularProgress, FormControlLabel, MenuItem, Paper, Tab, Tabs, TextField, Typography } from '@mui/material';
-import { fetchSignalScreener, fetchTopSignals, runSignals } from '../api/signalGenerationEngineService';
-import type { SignalConfidence, SignalDirection, SignalResult, SignalRunResponse } from '../types';
+import { Alert, Box, Button, Checkbox, Chip, CircularProgress, FormControlLabel, MenuItem, Paper, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
+import { fetchLatestSignalRun, fetchSignalScreener, fetchTopSignals, runSignals } from '../api/signalGenerationEngineService';
+import type { SignalConfidence, SignalDirection, SignalGenerationRunAudit, SignalResult, SignalRunResponse } from '../types';
 import { MarketRegimeWidget } from '@/features/market-context-intelligence';
 import { Link } from 'react-router-dom';
 import { SignalTable } from './SignalTable';
@@ -51,6 +51,7 @@ const SignalsDashboardPage: React.FC = () => {
   const [showStrategyContext, setShowStrategyContext] = useState(false);
   const [useDataQualityFilter, setUseDataQualityFilter] = useState(true);
   const [runIncludeStrategyMatches, setRunIncludeStrategyMatches] = useState(false);
+  const [latestRun, setLatestRun] = useState<SignalGenerationRunAudit | null>(null);
   const [runMessage, setRunMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -110,6 +111,12 @@ const SignalsDashboardPage: React.FC = () => {
   }, [scope.region, scope.assetType]);
 
   useEffect(() => {
+    fetchLatestSignalRun({ region: scope.region, assetType: scope.assetType, modelVersion: 'signal-engine-v1' })
+      .then(setLatestRun)
+      .catch(() => setLatestRun(null));
+  }, [scope.region, scope.assetType]);
+
+  useEffect(() => {
     resetPages();
   }, [direction, minScore, sector, country, confidence, signalType, search, strategyCode, onlyStrategyEligible, excludeNoiseFiltered, hasBlockedStrategies, showStrategyContext]);
 
@@ -139,6 +146,8 @@ const SignalsDashboardPage: React.FC = () => {
       });
       setPageByTab({ bullish: 0, bearish: 0, neutral: 0, momentum: 0, recent: 0, screener: 0 });
       const finalState = completedRun?.aggregate;
+      const finalSummary = completedRun ? (completedRun as { finalSummary: SignalRunResponse | null }).finalSummary : null;
+      if (finalSummary?.runAudit) setLatestRun(finalSummary.runAudit);
       setRunMessage(
         `Signal generation complete. Processed ${finalState?.processedCount ?? 0} instruments across ${finalState?.batchCount ?? 0} batches. ` +
         `Generated ${finalState?.generatedCount ?? 0}, updated ${finalState?.updatedCount ?? 0}, unchanged ${finalState?.noOpCount ?? 0}, skipped ${finalState?.skippedCount ?? 0}, failed ${finalState?.failedCount ?? 0}.`
@@ -224,6 +233,37 @@ const SignalsDashboardPage: React.FC = () => {
         warningsCount={batchRunner.warnings.length}
         error={batchRunner.error}
       />
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="space-between">
+          <Box>
+            <Typography variant="overline" color="text.secondary">Latest Run Audit</Typography>
+            <Typography variant="h6" fontWeight={700}>
+              {latestRun ? `${latestRun.scope.region} / ${latestRun.scope.assetType}` : `${scope.region} / ${scope.assetType}`}
+            </Typography>
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mt: 1 }}>
+              <Chip size="small" label={latestRun?.status || 'No run'} color={latestRun?.status === 'FAILED' ? 'error' : latestRun?.status === 'PARTIAL' ? 'warning' : 'default'} />
+              <Chip size="small" variant="outlined" label={`Model ${latestRun?.modelVersion || 'signal-engine-v1'}`} />
+              <Chip size="small" variant="outlined" label={`Ruleset ${latestRun?.rulesetVersion || 'signal-engine-v1'}`} />
+              <Chip size="small" variant="outlined" label={`Source ${latestRun?.sourceDataDate ? new Date(latestRun.sourceDataDate).toLocaleDateString() : 'N/A'}`} />
+            </Stack>
+          </Box>
+          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ maxWidth: { md: 720 } }}>
+            {[
+              ['Batch', latestRun?.batchSize],
+              ['Generated', latestRun?.generatedCount],
+              ['Updated', latestRun?.updatedCount],
+              ['No-op', latestRun?.noOpCount],
+              ['Skipped', latestRun?.skippedCount],
+              ['Failed', latestRun?.failedCount],
+              ['DQ excluded', latestRun?.excludedByDataQuality],
+              ['Missing DQ', latestRun?.missingQualityEvaluationCount],
+              ['Duration ms', latestRun?.durationMs],
+            ].map(([label, value]) => (
+              <Chip key={label} size="small" variant="outlined" label={`${label}: ${value ?? 0}`} />
+            ))}
+          </Stack>
+        </Stack>
+      </Paper>
       <Alert severity="info" sx={{ mb: 2 }}>
         <Typography variant="body2">
           Raw signals are confirmation inputs. Use Strategy Decision for candidate review and risk context.

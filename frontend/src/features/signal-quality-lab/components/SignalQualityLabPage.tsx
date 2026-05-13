@@ -47,6 +47,7 @@ const activeFilterLabels = (filters: QualityFilters) => [
   filters.readinessStatus && `Readiness: ${filters.readinessStatus}`,
   filters.coverageStatus && `Coverage: ${filters.coverageStatus}`,
   filters.liquidityStatus && `Liquidity: ${filters.liquidityStatus}`,
+  filters.modelVersion && `Model: ${filters.modelVersion}`,
   filters.onlySignalReady && 'Only signal-ready',
   filters.excludePoorQuality && 'Exclude poor quality',
 ].filter(Boolean) as string[];
@@ -144,7 +145,7 @@ const SignalQualityLabPage: React.FC = () => {
         batchSize: signal_quality_lab_batch_size,
         parallelism: signal_quality_lab_batch_request_workers_count,
         runBatch: async ({ offset, batchSize }) => {
-          const response = await recalculateSignalQuality({ batchSize, offset, horizon, region: scope.region, assetType: scope.assetType });
+          const response = await recalculateSignalQuality({ batchSize, offset, horizon, region: scope.region, assetType: scope.assetType, modelVersion: filters.modelVersion || undefined });
           await reload();
           return response;
         },
@@ -261,6 +262,14 @@ const SignalQualityLabPage: React.FC = () => {
             <MenuItem value="">All</MenuItem>
             {['LIQUID', 'THIN', 'ILLIQUID', 'UNKNOWN'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
           </TextField>
+          <TextField
+            size="small"
+            label="Model version"
+            value={filters.modelVersion || ''}
+            onChange={(event) => setFilters({ ...filters, modelVersion: event.target.value.trim() || undefined })}
+            placeholder="signal-engine-v1"
+            sx={{ minWidth: 180 }}
+          />
           <FormControlLabel control={<Checkbox checked={Boolean(filters.onlySignalReady)} onChange={(event) => setFilters({ ...filters, onlySignalReady: event.target.checked })} />} label="Only signal-ready" />
           <FormControlLabel control={<Checkbox checked={Boolean(filters.excludePoorQuality)} onChange={(event) => setFilters({ ...filters, excludePoorQuality: event.target.checked })} />} label="Exclude poor quality" />
         </FilterBar>

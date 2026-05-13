@@ -207,6 +207,7 @@ export class SignalQualityLabService {
         to: input.to,
         region: input.region,
         assetType: input.assetType,
+        modelVersion: input.modelVersion,
       }),
       this.signalService.signalHistory({
         limit: batchSize,
@@ -215,6 +216,7 @@ export class SignalQualityLabService {
         to: input.to,
         region: input.region,
         assetType: input.assetType,
+        modelVersion: input.modelVersion,
       }),
     ]);
     const processedCount = signals.length;
@@ -225,6 +227,7 @@ export class SignalQualityLabService {
       minSampleSize: 0,
       region: input.region,
       assetType: input.assetType,
+      modelVersion: input.modelVersion,
     });
     const evaluatedInBatch = this.evaluatedForHorizon(outcomes, selectedHorizon).length;
     const missingPriceHistoryInBatch = outcomes.filter((outcome) => !outcome.priceHistoryAvailable).length;

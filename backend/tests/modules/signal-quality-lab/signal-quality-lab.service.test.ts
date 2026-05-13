@@ -246,7 +246,7 @@ describe('signal quality lab service', () => {
     });
   });
 
-  it('passes market scope to recalculation signal paging', async () => {
+  it('passes market scope and model version to recalculation signal paging', async () => {
     const signalHistory = jest.fn().mockResolvedValue([baseSignal({ id: 's1' })]);
     const signalHistoryCount = jest.fn().mockResolvedValue(1);
     const service = new SignalQualityLabService(
@@ -259,9 +259,30 @@ describe('signal quality lab service', () => {
       } as any,
       { regimeForDate: jest.fn().mockResolvedValue(null) } as any
     );
-    await service.recalculate({ batchSize: 100, offset: 0, region: 'IN', assetType: 'STOCK' });
-    expect(signalHistoryCount).toHaveBeenCalledWith(expect.objectContaining({ region: 'IN', assetType: 'STOCK' }));
-    expect(signalHistory).toHaveBeenCalledWith(expect.objectContaining({ region: 'IN', assetType: 'STOCK' }));
+    await service.recalculate({ batchSize: 100, offset: 0, region: 'IN', assetType: 'STOCK', modelVersion: 'signal-engine-v1' });
+    expect(signalHistoryCount).toHaveBeenCalledWith(expect.objectContaining({ region: 'IN', assetType: 'STOCK', modelVersion: 'signal-engine-v1' }));
+    expect(signalHistory).toHaveBeenCalledWith(expect.objectContaining({ region: 'IN', assetType: 'STOCK', modelVersion: 'signal-engine-v1' }));
+  });
+
+  it('passes model version filters through dashboard signal history queries', async () => {
+    const signalHistory = jest.fn().mockResolvedValue([baseSignal({ id: 's1', modelVersion: 'signal-engine-v1' })]);
+    const service = new SignalQualityLabService(
+      {} as any,
+      {
+        signalHistory,
+        signalHistoryCount: jest.fn().mockResolvedValue(1),
+      } as any,
+      {
+        listPricesByInstrumentId: jest.fn().mockResolvedValue({
+          prices: prices.map((price) => ({ date: price.date, adjusted_close: price.adjustedClose })),
+        }),
+      } as any,
+      { regimeForDate: jest.fn().mockResolvedValue(null) } as any
+    );
+
+    await service.dashboard({ horizon: '20D', limit: 10, minSampleSize: 0, region: 'IN', assetType: 'STOCK', modelVersion: 'signal-engine-v1' });
+
+    expect(signalHistory).toHaveBeenCalledWith(expect.objectContaining({ modelVersion: 'signal-engine-v1' }));
   });
 
   it('diagnoses raw signals with no future prices instead of returning misleading empties', async () => {

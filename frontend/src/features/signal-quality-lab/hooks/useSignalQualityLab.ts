@@ -49,7 +49,7 @@ export function useSignalQualityLab(horizon: QualityHorizon, filters: QualityFil
         if (abortRef.current === controller) abortRef.current = null;
       }
     }
-  }, [horizon, filters.readinessStatus, filters.coverageStatus, filters.liquidityStatus, filters.onlySignalReady, filters.excludePoorQuality, scope.region, scope.assetType]);
+  }, [horizon, filters.readinessStatus, filters.coverageStatus, filters.liquidityStatus, filters.modelVersion, filters.onlySignalReady, filters.excludePoorQuality, scope.region, scope.assetType]);
 
   useEffect(() => {
     void reload();

@@ -7,6 +7,7 @@ describe('signal generation routes', () => {
       health: jest.fn(),
       top: jest.fn(),
       latestForInstrument: jest.fn(),
+      latestRun: jest.fn(),
       run: jest.fn(),
       screener: jest.fn(),
     };
@@ -17,6 +18,7 @@ describe('signal generation routes', () => {
 
     expect(routes).toEqual([
       'GET /signals/health',
+      'GET /signals/runs/latest',
       'GET /signals/top',
       'GET /signals/screener',
       'GET /signals/:instrumentId',
@@ -24,4 +26,3 @@ describe('signal generation routes', () => {
     ]);
   });
 });
-

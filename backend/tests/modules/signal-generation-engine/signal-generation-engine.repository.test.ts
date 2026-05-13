@@ -117,6 +117,147 @@ describe('SignalGenerationEngineRepository', () => {
     await expect(repository.createSignalResultWithStatus(signal)).resolves.toMatchObject({ status: 'NO_OP' });
   });
 
+  it('persists per-signal audit snapshots without changing idempotency key', async () => {
+    const auditedSignal: SignalResultDto = {
+      ...signal,
+      rulesetVersion: 'rules-v1',
+      sourceDataDate: '2026-04-28T00:00:00.000Z',
+      sourcePriceDate: '2026-04-28T00:00:00.000Z',
+      generationRunId: 'run-1',
+      scoringInputSummary: {
+        priceBarsUsed: 260,
+        latestCloseDate: '2026-04-28T00:00:00.000Z',
+        hasSma50: true,
+        hasSma200: true,
+        hasVolume: true,
+        fundamentalsAvailable: true,
+        strategyContextLoaded: false,
+      },
+      dataQualityEligibility: {
+        filterApplied: true,
+        eligible: true,
+        coverageStatus: 'GOOD',
+        signalReadinessStatus: 'READY',
+        liquidityStatus: 'LIQUID',
+      },
+    };
+    const upsert = jest.fn().mockResolvedValue({
+      id: 'signal-1',
+      instrumentId: 'stock-1',
+      symbol: 'AAPL',
+      companyName: 'Apple',
+      sector: 'Technology',
+      country: 'US',
+      score: 75,
+      direction: 'BULLISH',
+      confidence: 'HIGH',
+      triggeredSignals: signal.triggered_signals,
+      negativeSignals: [],
+      explanation: signal.explanation,
+      generatedAt: new Date(signal.generated_at),
+      generatedDate: new Date('2026-04-29T00:00:00.000Z'),
+      modelVersion: 'signal-engine-v1',
+      rulesetVersion: 'rules-v1',
+      sourceDataDate: new Date('2026-04-28T00:00:00.000Z'),
+      sourcePriceDate: new Date('2026-04-28T00:00:00.000Z'),
+      scoringInputSummary: auditedSignal.scoringInputSummary,
+      dataQualityEligibilitySnapshot: auditedSignal.dataQualityEligibility,
+      generationRunId: 'run-1',
+      source: 'signal-generation-engine',
+      dataStatus: 'COMPLETE',
+    });
+    const repository = new SignalGenerationEngineRepository({ signalResult: { findUnique: jest.fn().mockResolvedValue(null), upsert } } as any);
+
+    const saved = await repository.createSignalResultWithStatus(auditedSignal);
+
+    expect(upsert.mock.calls[0][0].where.instrumentId_modelVersion_generatedDate).toEqual({
+      instrumentId: 'stock-1',
+      modelVersion: 'signal-engine-v1',
+      generatedDate: new Date('2026-04-29T00:00:00.000Z'),
+    });
+    expect(upsert.mock.calls[0][0].create).toMatchObject({
+      rulesetVersion: 'rules-v1',
+      generationRunId: 'run-1',
+      scoringInputSummary: auditedSignal.scoringInputSummary,
+      dataQualityEligibilitySnapshot: auditedSignal.dataQualityEligibility,
+    });
+    expect(saved.result).toMatchObject({
+      rulesetVersion: 'rules-v1',
+      sourceDataDate: '2026-04-28T00:00:00.000Z',
+      auditStatus: 'CURRENT',
+    });
+  });
+
+  it('creates, completes, and reads latest run audit records', async () => {
+    const runRecord = {
+      id: 'run-1',
+      region: 'IN',
+      assetType: 'STOCK',
+      requestedByUserId: 'system',
+      status: 'RUNNING',
+      modelVersion: 'signal-engine-v1',
+      rulesetVersion: 'signal-engine-v1',
+      sourceDataDate: null,
+      generatedDate: new Date('2026-05-13T00:00:00.000Z'),
+      batchSize: 100,
+      offset: 0,
+      totalCount: 3,
+      processedCount: 0,
+      generatedCount: 0,
+      updatedCount: 0,
+      noOpCount: 0,
+      duplicateOrIdempotentCount: 0,
+      skippedCount: 0,
+      failedCount: 0,
+      excludedByDataQuality: 0,
+      missingQualityEvaluationCount: 0,
+      durationMs: 0,
+      warnings: [],
+      startedAt: new Date('2026-05-13T10:00:00.000Z'),
+      completedAt: null,
+    };
+    const create = jest.fn().mockResolvedValue(runRecord);
+    const update = jest.fn().mockResolvedValue({ ...runRecord, status: 'COMPLETED', processedCount: 3, generatedCount: 1, updatedCount: 1, noOpCount: 1, duplicateOrIdempotentCount: 2, completedAt: new Date('2026-05-13T10:00:01.000Z'), durationMs: 1000 });
+    const findFirst = jest.fn().mockResolvedValue({ ...runRecord, status: 'COMPLETED', completedAt: new Date('2026-05-13T10:00:01.000Z') });
+    const repository = new SignalGenerationEngineRepository({ signalGenerationRun: { create, update, findFirst } } as any);
+
+    await expect(repository.createRunAudit({
+      region: 'IN',
+      assetType: 'STOCK',
+      requestedByUserId: 'system',
+      modelVersion: 'signal-engine-v1',
+      rulesetVersion: 'signal-engine-v1',
+      sourceDataDate: null,
+      generatedDate: new Date('2026-05-13T00:00:00.000Z'),
+      batchSize: 100,
+      offset: 0,
+      totalCount: 3,
+      warnings: [],
+    })).resolves.toMatchObject({ id: 'run-1', status: 'RUNNING', scope: { region: 'IN', assetType: 'STOCK' } });
+
+    await expect(repository.completeRunAudit('run-1', {
+      status: 'COMPLETED',
+      sourceDataDate: new Date('2026-05-12T00:00:00.000Z'),
+      processedCount: 3,
+      generatedCount: 1,
+      updatedCount: 1,
+      noOpCount: 1,
+      duplicateOrIdempotentCount: 2,
+      skippedCount: 0,
+      failedCount: 0,
+      excludedByDataQuality: 0,
+      missingQualityEvaluationCount: 0,
+      durationMs: 1000,
+      warnings: [],
+    })).resolves.toMatchObject({ status: 'COMPLETED', duplicateOrIdempotentCount: 2 });
+
+    await repository.latestRunAudit({ region: 'IN', assetType: 'STOCK', modelVersion: 'signal-engine-v1' });
+    expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { region: 'IN', assetType: 'STOCK', modelVersion: 'signal-engine-v1' },
+      orderBy: { startedAt: 'desc' },
+    }));
+  });
+
   it('applies searchable, partial, and confidence filters to latest signals', async () => {
     const findMany = jest.fn().mockResolvedValue([{
       id: 'signal-1',

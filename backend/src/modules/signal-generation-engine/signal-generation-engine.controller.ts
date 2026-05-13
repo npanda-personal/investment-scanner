@@ -38,6 +38,15 @@ export class SignalGenerationEngineController {
     }
   };
 
+  latestRun = async (req: Request, res: Response) => {
+    try {
+      return res.json(await this.service.latestRunAudit(parseSignalQuery(req.query)));
+    } catch (error) {
+      console.error('Signal latest run endpoint error:', error);
+      return res.status(500).json({ error: 'Failed to load latest signal run audit' });
+    }
+  };
+
   screener = async (req: Request, res: Response) => {
     try {
       return res.json(await this.service.screener(parseSignalQuery(req.query)));
@@ -56,4 +65,3 @@ export class SignalGenerationEngineController {
     }
   };
 }
-

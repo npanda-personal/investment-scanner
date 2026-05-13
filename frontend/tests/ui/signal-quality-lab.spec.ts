@@ -121,6 +121,51 @@ test.describe('Signal Quality Lab UI', () => {
     await expect(page.getByText('Horizon Availability')).toBeVisible();
   });
 
+  test('sends selected model version through dashboard and recalculation requests', async ({ page }) => {
+    const dashboardUrls: string[] = [];
+    let recalculatePayload: any = null;
+    await page.route('**/api/v1/signals/quality/dashboard**', async (route: Route) => {
+      dashboardUrls.push(route.request().url());
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(dashboardPayload),
+      });
+    });
+    await page.route('**/api/v1/signals/quality/recalculate', async (route) => {
+      recalculatePayload = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          processedCount: 1,
+          totalCount: 1,
+          batchSize: recalculatePayload.batchSize,
+          offset: recalculatePayload.offset,
+          nextOffset: null,
+          hasMore: false,
+          selectedHorizon: '20D',
+          evidenceUsability: 'LIMITED',
+          evaluatedCount: 1,
+          unevaluatedCount: 0,
+          missingPriceHistoryInBatch: 0,
+          missingPriceHistoryCount: 0,
+          warnings: [],
+          durationMs: 1,
+        }),
+      });
+    });
+
+    await visitModule(page, '/signals/quality', 'Signal Quality Lab');
+    await page.getByLabel('Model version').fill('signal-engine-v1');
+
+    await expect(page.getByLabel('Model version')).toHaveValue('signal-engine-v1');
+    await expect.poll(() => dashboardUrls.some((url) => url.includes('modelVersion=signal-engine-v1'))).toBe(true);
+
+    await page.getByRole('button', { name: 'Recalculate' }).click();
+    await expect.poll(() => recalculatePayload).toMatchObject({ modelVersion: 'signal-engine-v1' });
+  });
+
   test('recalculate sends selected horizon and scoped bounded batch request without real recalculation', async ({ page }) => {
     let recalculatePayload: any = null;
     await routeDashboard(page);

@@ -11,6 +11,7 @@ export interface QualityQuery {
   country?: string;
   region?: string;
   assetType?: string;
+  modelVersion?: string;
   from?: string;
   to?: string;
   limit: number;
@@ -37,6 +38,7 @@ export interface QualityRecalculateRequest {
   horizon?: QualityHorizon;
   region?: string;
   assetType?: string;
+  modelVersion?: string;
   from?: string;
   to?: string;
 }

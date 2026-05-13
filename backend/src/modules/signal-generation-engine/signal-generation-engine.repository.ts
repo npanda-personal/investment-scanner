@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import prisma from '../../db/prisma';
-import type { SignalHistoryQuery, SignalQuery, SignalResultDto, SignalWriteResult, SignalWriteStatus } from './signal-generation-engine.types';
+import type { SignalGenerationRunAudit, SignalHistoryQuery, SignalQuery, SignalResultDto, SignalWriteResult, SignalWriteStatus } from './signal-generation-engine.types';
 import { resolveMarketRegionFilter } from '../../shared/utils/market-scope';
 
 export interface SignalFunnelDiagnosticsQuery {
@@ -22,8 +22,10 @@ export class SignalGenerationEngineRepository {
     const generatedAt = new Date(result.generated_at);
     const generatedDate = this.normalizeUtcDay(generatedAt);
     const modelVersion = result.modelVersion || 'signal-engine-v1';
+    const rulesetVersion = result.rulesetVersion || modelVersion;
     const data = {
       instrumentId: result.instrument_id,
+      generationRunId: result.generationRunId ?? null,
       symbol: result.symbol,
       companyName: result.company_name,
       sector: result.sector,
@@ -37,6 +39,11 @@ export class SignalGenerationEngineRepository {
       generatedAt,
       generatedDate,
       modelVersion,
+      rulesetVersion,
+      sourceDataDate: result.sourceDataDate ? new Date(result.sourceDataDate) : null,
+      sourcePriceDate: result.sourcePriceDate ? new Date(result.sourcePriceDate) : null,
+      scoringInputSummary: result.scoringInputSummary as unknown as Prisma.InputJsonValue,
+      dataQualityEligibilitySnapshot: result.dataQualityEligibility as unknown as Prisma.InputJsonValue,
       source: result.source,
       dataStatus: result.data_status,
     };
@@ -59,6 +66,87 @@ export class SignalGenerationEngineRepository {
       result: this.toDto(saved),
       status: this.writeStatus(existing, data),
     };
+  }
+
+  async createRunAudit(input: {
+    region: string;
+    assetType: string;
+    requestedByUserId: string;
+    modelVersion: string;
+    rulesetVersion: string;
+    sourceDataDate: Date | null;
+    generatedDate: Date;
+    batchSize: number;
+    offset: number;
+    totalCount: number;
+    warnings: string[];
+  }): Promise<SignalGenerationRunAudit> {
+    const created = await this.db.signalGenerationRun.create({
+      data: {
+        region: input.region,
+        assetType: input.assetType,
+        requestedByUserId: input.requestedByUserId,
+        status: 'RUNNING',
+        modelVersion: input.modelVersion,
+        rulesetVersion: input.rulesetVersion,
+        sourceDataDate: input.sourceDataDate,
+        generatedDate: input.generatedDate,
+        batchSize: input.batchSize,
+        offset: input.offset,
+        totalCount: input.totalCount,
+        warnings: input.warnings as unknown as Prisma.InputJsonValue,
+      },
+    });
+    return this.runToDto(created);
+  }
+
+  async completeRunAudit(id: string, input: {
+    status: 'COMPLETED' | 'PARTIAL' | 'FAILED';
+    sourceDataDate: Date | null;
+    processedCount: number;
+    generatedCount: number;
+    updatedCount: number;
+    noOpCount: number;
+    duplicateOrIdempotentCount: number;
+    skippedCount: number;
+    failedCount: number;
+    excludedByDataQuality: number;
+    missingQualityEvaluationCount: number;
+    durationMs: number;
+    warnings: string[];
+  }): Promise<SignalGenerationRunAudit> {
+    const updated = await this.db.signalGenerationRun.update({
+      where: { id },
+      data: {
+        status: input.status,
+        sourceDataDate: input.sourceDataDate,
+        processedCount: input.processedCount,
+        generatedCount: input.generatedCount,
+        updatedCount: input.updatedCount,
+        noOpCount: input.noOpCount,
+        duplicateOrIdempotentCount: input.duplicateOrIdempotentCount,
+        skippedCount: input.skippedCount,
+        failedCount: input.failedCount,
+        excludedByDataQuality: input.excludedByDataQuality,
+        missingQualityEvaluationCount: input.missingQualityEvaluationCount,
+        durationMs: input.durationMs,
+        warnings: input.warnings as unknown as Prisma.InputJsonValue,
+        completedAt: new Date(),
+      },
+    });
+    return this.runToDto(updated);
+  }
+
+  async latestRunAudit(query: { region?: string; assetType?: string; modelVersion?: string }): Promise<SignalGenerationRunAudit | null> {
+    const record = await this.db.signalGenerationRun.findFirst({
+      where: {
+        region: query.region,
+        assetType: query.assetType,
+        modelVersion: query.modelVersion,
+      },
+      orderBy: { startedAt: 'desc' },
+    });
+    return record ? this.runToDto(record) : null;
   }
 
   async latestForInstrument(instrumentId: string): Promise<SignalResultDto | null> {
@@ -176,6 +264,7 @@ export class SignalGenerationEngineRepository {
       } : undefined,
       sector: query.sector ? { contains: query.sector, mode: 'insensitive' } : undefined,
       country: query.country ? { contains: query.country, mode: 'insensitive' } : undefined,
+      modelVersion: query.modelVersion,
       OR: query.search ? [
         { symbol: { contains: query.search, mode: 'insensitive' } },
         { companyName: { contains: query.search, mode: 'insensitive' } },
@@ -287,9 +376,19 @@ export class SignalGenerationEngineRepository {
       JSON.stringify(existing.triggeredSignals || []) === JSON.stringify(data.triggeredSignals || []) &&
       JSON.stringify(existing.negativeSignals || []) === JSON.stringify(data.negativeSignals || []) &&
       existing.explanation === data.explanation &&
+      (existing.rulesetVersion || existing.modelVersion) === data.rulesetVersion &&
+      this.dateValue(existing.sourceDataDate) === this.dateValue(data.sourceDataDate) &&
+      this.dateValue(existing.sourcePriceDate) === this.dateValue(data.sourcePriceDate) &&
+      JSON.stringify(existing.scoringInputSummary || null) === JSON.stringify(data.scoringInputSummary || null) &&
+      JSON.stringify(existing.dataQualityEligibilitySnapshot || null) === JSON.stringify(data.dataQualityEligibilitySnapshot || null) &&
       existing.source === data.source &&
       existing.dataStatus === data.dataStatus;
     return same ? 'NO_OP' : 'UPDATED';
+  }
+
+  private dateValue(value: unknown): string | null {
+    if (!value) return null;
+    return new Date(value as any).toISOString();
   }
 
   private toDto(record: any): SignalResultDto {
@@ -313,9 +412,46 @@ export class SignalGenerationEngineRepository {
       negative_signals: Array.isArray(record.negativeSignals) ? record.negativeSignals : [],
       explanation: record.explanation,
       generated_at: record.generatedAt.toISOString(),
+      generatedDate: record.generatedDate?.toISOString() ?? null,
       modelVersion: record.modelVersion || 'signal-engine-v1',
+      rulesetVersion: record.rulesetVersion || record.modelVersion || 'signal-engine-v1',
+      sourceDataDate: record.sourceDataDate?.toISOString() ?? null,
+      sourcePriceDate: record.sourcePriceDate?.toISOString() ?? null,
+      scoringInputSummary: record.scoringInputSummary || null,
+      dataQualityEligibility: record.dataQualityEligibilitySnapshot || null,
+      auditStatus: record.rulesetVersion && record.scoringInputSummary && record.dataQualityEligibilitySnapshot ? 'CURRENT' : 'LEGACY_MISSING',
+      generationRunId: record.generationRunId ?? null,
       source: record.source,
       data_status: record.dataStatus,
+    };
+  }
+
+  private runToDto(record: any): SignalGenerationRunAudit {
+    return {
+      id: record.id,
+      scope: { region: record.region, assetType: record.assetType },
+      requestedByUserId: record.requestedByUserId,
+      status: record.status,
+      modelVersion: record.modelVersion,
+      rulesetVersion: record.rulesetVersion,
+      sourceDataDate: record.sourceDataDate?.toISOString() ?? null,
+      generatedDate: record.generatedDate.toISOString(),
+      batchSize: record.batchSize,
+      offset: record.offset,
+      totalCount: record.totalCount,
+      processedCount: record.processedCount,
+      generatedCount: record.generatedCount,
+      updatedCount: record.updatedCount,
+      noOpCount: record.noOpCount,
+      duplicateOrIdempotentCount: record.duplicateOrIdempotentCount,
+      skippedCount: record.skippedCount,
+      failedCount: record.failedCount,
+      excludedByDataQuality: record.excludedByDataQuality,
+      missingQualityEvaluationCount: record.missingQualityEvaluationCount,
+      durationMs: record.durationMs,
+      startedAt: record.startedAt.toISOString(),
+      completedAt: record.completedAt?.toISOString() ?? null,
+      warnings: Array.isArray(record.warnings) ? record.warnings : [],
     };
   }
 }

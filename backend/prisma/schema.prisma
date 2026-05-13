@@ -166,6 +166,8 @@ model SignalResult {
   id               String   @id @default(cuid())
   instrumentId     String
   stock            Stock    @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  generationRunId  String?
+  generationRun    SignalGenerationRun? @relation(fields: [generationRunId], references: [id], onDelete: SetNull)
   symbol           String
   companyName      String?
   sector           String?
@@ -179,17 +181,59 @@ model SignalResult {
   generatedAt      DateTime @default(now())
   generatedDate    DateTime?
   modelVersion     String   @default("signal-engine-v1")
+  rulesetVersion   String?
+  sourceDataDate   DateTime?
+  sourcePriceDate  DateTime?
+  scoringInputSummary Json?
+  dataQualityEligibilitySnapshot Json?
   source           String   @default("signal-generation-engine")
   dataStatus       String   @default("PARTIAL")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
   @@unique([instrumentId, modelVersion, generatedDate])
+  @@index([generationRunId])
+  @@index([modelVersion, sourceDataDate])
   @@index([instrumentId, generatedAt])
   @@index([direction, score])
   @@index([sector])
   @@index([country])
   @@map("signal_results")
+}
+
+model SignalGenerationRun {
+  id                             String   @id @default(cuid())
+  region                         String
+  assetType                      String
+  requestedByUserId              String
+  status                         String
+  modelVersion                   String
+  rulesetVersion                 String
+  sourceDataDate                 DateTime?
+  generatedDate                  DateTime
+  batchSize                      Int
+  offset                         Int
+  totalCount                     Int       @default(0)
+  processedCount                 Int       @default(0)
+  generatedCount                 Int       @default(0)
+  updatedCount                   Int       @default(0)
+  noOpCount                      Int       @default(0)
+  duplicateOrIdempotentCount     Int       @default(0)
+  skippedCount                   Int       @default(0)
+  failedCount                    Int       @default(0)
+  excludedByDataQuality          Int       @default(0)
+  missingQualityEvaluationCount  Int       @default(0)
+  durationMs                     Int       @default(0)
+  warnings                       Json
+  startedAt                      DateTime  @default(now())
+  completedAt                    DateTime?
+  createdAt                      DateTime  @default(now())
+  updatedAt                      DateTime  @updatedAt
+  signalResults                  SignalResult[]
+
+  @@index([region, assetType, modelVersion, generatedDate])
+  @@index([status, startedAt])
+  @@map("signal_generation_runs")
 }
 
 model SignalCalibrationResult {

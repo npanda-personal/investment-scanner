@@ -3,19 +3,21 @@ import { parseQualityQuery, parseQualityRecalculateRequest, requireInstrumentId 
 
 describe('signal quality lab validation', () => {
   it('parses and clamps query params', () => {
-    expect(parseQualityQuery({ horizon: '5D', direction: 'BULLISH', limit: '99999', minSampleSize: '-1' })).toMatchObject({
+    expect(parseQualityQuery({ horizon: '5D', direction: 'BULLISH', limit: '99999', minSampleSize: '-1', modelVersion: 'signal-engine-v1' })).toMatchObject({
       horizon: '5D',
       direction: 'BULLISH',
       limit: 5000,
       minSampleSize: 0,
+      modelVersion: 'signal-engine-v1',
     });
   });
 
   it('defaults invalid values safely', () => {
-    expect(parseQualityQuery({ horizon: '9D', direction: 'BAD', from: 'nope' })).toMatchObject({
+    expect(parseQualityQuery({ horizon: '9D', direction: 'BAD', from: 'nope', modelVersion: '../bad value' })).toMatchObject({
       horizon: '20D',
       direction: undefined,
       from: undefined,
+      modelVersion: undefined,
     });
   });
 
@@ -25,9 +27,10 @@ describe('signal quality lab validation', () => {
   });
 
   it('parses recalculation batch request and clamps batch size', () => {
-    expect(parseQualityRecalculateRequest({ batchSize: '999', offset: '10' })).toMatchObject({
+    expect(parseQualityRecalculateRequest({ batchSize: '999', offset: '10', modelVersion: 'signal-engine-v1' })).toMatchObject({
       batchSize: 100,
       offset: 10,
+      modelVersion: 'signal-engine-v1',
     });
     expect(parseQualityRecalculateRequest({ cursor: '5', batchSize: '0' })).toMatchObject({
       batchSize: 1,
