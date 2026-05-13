@@ -75,6 +75,8 @@ Response fields:
 - `offset`
 - `nextOffset`
 - `hasMore`
+- `selectedHorizon`
+- `evidenceUsability`
 - `inserted`
 - `updated`
 - `skipped`
@@ -82,11 +84,14 @@ Response fields:
 - `updatedCount`
 - `skippedCount`
 - `failedCount`
+- `matureSignalsInBatch`
 - `evaluatedInBatch`
 - `evaluatedCount`
+- `notYetMatureInBatch`
 - `unevaluatedInBatch`
 - `unevaluatedCount`
 - `insufficientFuturePriceInBatch`
+- `insufficientFuturePriceCount`
 - `missingPriceHistoryInBatch`
 - `missingPriceHistoryCount`
 - `outcomesPersisted`
@@ -128,7 +133,8 @@ Dashboard, summary, grouped, and noisy-signal responses include evaluation diagn
 
 - raw signal count for the selected query
 - signal count after data-quality filters
-- evaluated and unevaluated counts for the selected horizon
+- `matureSignals` / `evaluatedSignals` for the selected horizon
+- `notYetMatureSignals` / `unevaluatedSignals` for records that have price history but not enough future trading rows for the selected horizon
 - insufficient future price count
 - missing price history count
 - selected horizon and minimum required future rows
@@ -138,13 +144,22 @@ Dashboard, summary, grouped, and noisy-signal responses include evaluation diagn
 - excluded counts for data quality, date, and direction filters
 - recommended action and warnings
 
-`horizonAvailability` reports `eligible`, `evaluated`, and `insufficientFuturePrice` for `1D`, `5D`, `10D`, `20D`, and `60D`. A fresh 20D signal can remain unevaluated while 1D or 5D is already measurable.
+`horizonAvailability` reports `eligible`, `evaluated`, `insufficientFuturePrice`, `missingPriceHistory`, and `evidenceUsability` for `1D`, `5D`, `10D`, `20D`, and `60D`. A fresh 20D signal can remain unavailable while 1D or 5D is already measurable; shorter-horizon samples are not mixed into selected 20D metrics.
+
+Dashboard, summary, grouped, noisy, and recalculation responses expose the selected horizon and an additive `evidenceUsability` status:
+
+- `USABLE`: selected horizon has evaluated samples, no missing/immature selected-horizon records, and meets the small-sample floor.
+- `LIMITED`: selected horizon has at least one evaluated sample but the sample is small or only partially evaluable.
+- `UNAVAILABLE`: no selected-horizon evaluated samples exist, even if a shorter horizon already has evidence.
+
+When `evidenceUsability = UNAVAILABLE`, clients must show the zero-evaluable explanation and recommended action instead of presenting win-rate, average-return, or quality-confidence metrics as usable selected-horizon evidence.
 
 Raw signals and evaluated outcomes are intentionally separate:
 
 - `totalSignals` counts Signal Generation Engine records in scope.
 - `evaluatedSignals` counts only records with a forward return available for the selected horizon.
-- `unevaluatedSignals` counts signals that have price history but not enough future trading rows for the selected horizon.
+- `matureSignals` is an alias for selected-horizon `evaluatedSignals`.
+- `notYetMatureSignals` / `unevaluatedSignals` count signals that have price history but not enough future trading rows for the selected horizon.
 - `missingPriceHistoryCount` counts signals whose instruments have no usable price history in the lookup window and is intentionally separate from `unevaluatedSignals`.
 
 When `totalSignals > 0` and `evaluatedSignals = 0`, APIs return `dataStatus = PARTIAL` with a recommended action such as trying a shorter horizon, syncing market data, waiting for more trading days, or checking signal dates against available prices.
@@ -226,10 +241,11 @@ Instrument history and outcome requests also send the current `region`, `assetTy
 If evaluated outcomes are zero, the frontend shows:
 
 - a banner explaining why the selected horizon cannot be evaluated
-- horizon availability chips in the Performance tab so users can switch to an evaluable horizon while inspecting performance tables
-- cards for eligible, evaluated, not-yet-evaluable, and missing price history counts
+- selected-horizon evidence usability and maturity cards
+- horizon availability chips plus selected-horizon eligible, mature/evaluable, not-yet-mature, missing-price, and evidence-usability copy in the Performance tab
 - table-level raw counts, evaluated samples, unevaluated counts, status, and reason
 - active filter copy with a reset action when filters leave no evaluated data
+- no selected-horizon win-rate or average-return cards until at least one selected-horizon outcome is evaluable
 
 The dashboard links to `/signals/calibration`, where Signal Calibration Engine applies explainable score and confidence adjustments using these measured outcomes.
 

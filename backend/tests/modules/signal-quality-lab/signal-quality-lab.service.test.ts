@@ -203,8 +203,47 @@ describe('signal quality lab service', () => {
       outcomesPersisted: false,
       nextOffset: 1,
       hasMore: true,
+      selectedHorizon: '20D',
+      evidenceUsability: 'LIMITED',
+      matureSignalsInBatch: 1,
+      notYetMatureInBatch: 0,
+      insufficientFuturePriceCount: 0,
     });
     expect(result.warnings).toEqual([]);
+  });
+
+  it('clamps recalculation to a bounded batch and keeps selected horizon diagnostics separate', async () => {
+    const signalHistory = jest.fn().mockResolvedValue([baseSignal({ id: 's1' })]);
+    const service = new SignalQualityLabService(
+      {} as any,
+      {
+        signalHistory,
+        signalHistoryCount: jest.fn().mockResolvedValue(200),
+      } as any,
+      {
+        listPricesByInstrumentId: jest.fn().mockResolvedValue({
+          prices: [{ date: '2026-01-02T00:00:00.000Z', adjusted_close: 100 }],
+        }),
+      } as any,
+      { regimeForDate: jest.fn().mockResolvedValue(null) } as any
+    );
+
+    const result = await service.recalculate({ batchSize: 999, offset: 0, horizon: '20D', region: 'IN', assetType: 'STOCK' });
+
+    expect(signalHistory).toHaveBeenCalledWith(expect.objectContaining({ limit: 100, offset: 0, region: 'IN', assetType: 'STOCK' }));
+    expect(result).toMatchObject({
+      batchSize: 100,
+      selectedHorizon: '20D',
+      evidenceUsability: 'UNAVAILABLE',
+      evaluatedCount: 0,
+      matureSignalsInBatch: 0,
+      notYetMatureInBatch: 1,
+      insufficientFuturePriceInBatch: 1,
+      insufficientFuturePriceCount: 1,
+      missingPriceHistoryCount: 0,
+      hasMore: true,
+      nextOffset: 1,
+    });
   });
 
   it('passes market scope to recalculation signal paging', async () => {
@@ -241,16 +280,25 @@ describe('signal quality lab service', () => {
     );
     const dashboard = await service.dashboard({ horizon: '20D', limit: 10, minSampleSize: 0 });
     expect(dashboard.summary).toMatchObject({
+      selectedHorizon: '20D',
+      evidenceUsability: 'UNAVAILABLE',
       totalSignals: 1,
+      matureSignals: 0,
       evaluatedSignals: 0,
+      notYetMatureSignals: 1,
       unevaluatedSignals: 1,
       dataStatus: 'PARTIAL',
+      overallBullishWinRate: null,
     });
     expect(dashboard.summary.evaluationDiagnostics).toMatchObject({
+      matureSignals: 0,
+      notYetMatureSignals: 1,
       insufficientFuturePriceCount: 1,
       minimumRequiredFutureRows: 20,
       selectedHorizon: '20D',
     });
+    expect(dashboard.summary.horizonAvailability['1D']).toMatchObject({ eligible: 1, evaluated: 0, insufficientFuturePrice: 1, missingPriceHistory: 0, evidenceUsability: 'UNAVAILABLE' });
+    expect(dashboard.summary.horizonAvailability['20D']).toMatchObject({ eligible: 1, evaluated: 0, insufficientFuturePrice: 1, missingPriceHistory: 0, evidenceUsability: 'UNAVAILABLE' });
     expect(dashboard.bySector[0]).toMatchObject({
       rawSignalCount: 1,
       sampleSize: 0,
@@ -262,7 +310,61 @@ describe('signal quality lab service', () => {
     const service = serviceWithSignals([baseSignal({ id: 's1', generated_at: '2026-01-02T15:30:00.000Z' })]);
     const summary = await service.summary({ horizon: '1D', limit: 10, minSampleSize: 0 });
     expect(summary.evaluatedSignals).toBe(1);
-    expect(summary.horizonAvailability['1D']).toMatchObject({ eligible: 1, evaluated: 1, insufficientFuturePrice: 0 });
+    expect(summary.matureSignals).toBe(1);
+    expect(summary.notYetMatureSignals).toBe(0);
+    expect(summary.evidenceUsability).toBe('LIMITED');
+    expect(summary.horizonAvailability['1D']).toMatchObject({ eligible: 1, evaluated: 1, insufficientFuturePrice: 0, missingPriceHistory: 0, evidenceUsability: 'LIMITED' });
+    expect(summary.horizonAvailability['20D']).toMatchObject({ eligible: 1, evaluated: 1, insufficientFuturePrice: 0, missingPriceHistory: 0, evidenceUsability: 'LIMITED' });
+  });
+
+  it('keeps selected long-horizon evidence unavailable when only shorter horizons are mature', async () => {
+    const service = new SignalQualityLabService(
+      {} as any,
+      {
+        signalHistory: jest.fn().mockResolvedValue([baseSignal({ id: 'fresh', generated_at: '2026-01-02T00:00:00.000Z' })]),
+        signalHistoryCount: jest.fn().mockResolvedValue(1),
+      } as any,
+      {
+        listPricesByInstrumentId: jest.fn().mockResolvedValue({
+          prices: prices.slice(0, 6).map((price) => ({ date: price.date, adjusted_close: price.adjustedClose })),
+        }),
+      } as any,
+      { regimeForDate: jest.fn().mockResolvedValue(null) } as any
+    );
+
+    const summary = await service.summary({ horizon: '20D', limit: 10, minSampleSize: 0 });
+
+    expect(summary.selectedHorizon).toBe('20D');
+    expect(summary.evidenceUsability).toBe('UNAVAILABLE');
+    expect(summary.evaluatedSignals).toBe(0);
+    expect(summary.horizonAvailability['1D']).toMatchObject({ evaluated: 1, evidenceUsability: 'LIMITED' });
+    expect(summary.horizonAvailability['5D']).toMatchObject({ evaluated: 1, evidenceUsability: 'LIMITED' });
+    expect(summary.horizonAvailability['20D']).toMatchObject({ evaluated: 0, insufficientFuturePrice: 1, evidenceUsability: 'UNAVAILABLE' });
+    expect(summary.evaluationDiagnostics.recommendedAction).toContain('Try a shorter horizon');
+  });
+
+  it('marks selected horizon evidence usable when the mature sample has no gaps', async () => {
+    const signals = Array.from({ length: 5 }).map((_, index) => baseSignal({ id: `s${index}`, instrument_id: `stock-${index}` }));
+    const service = serviceWithSignals(signals);
+
+    const summary = await service.summary({ horizon: '20D', limit: 10, minSampleSize: 0 });
+
+    expect(summary).toMatchObject({
+      selectedHorizon: '20D',
+      evidenceUsability: 'USABLE',
+      totalSignals: 5,
+      matureSignals: 5,
+      evaluatedSignals: 5,
+      notYetMatureSignals: 0,
+      unevaluatedSignals: 0,
+    });
+    expect(summary.horizonAvailability['20D']).toMatchObject({
+      eligible: 5,
+      evaluated: 5,
+      insufficientFuturePrice: 0,
+      missingPriceHistory: 0,
+      evidenceUsability: 'USABLE',
+    });
   });
 
   it('uses a bounded historical analysis window instead of only the small visible page limit', async () => {
@@ -325,6 +427,9 @@ describe('signal quality lab service', () => {
     );
     const summary = await service.summary({ horizon: '5D', limit: 10, minSampleSize: 0 });
     expect(summary.evaluationDiagnostics.missingPriceHistoryCount).toBe(1);
+    expect(summary.evaluationDiagnostics.notYetMatureSignals).toBe(0);
+    expect(summary.evidenceUsability).toBe('UNAVAILABLE');
+    expect(summary.horizonAvailability['5D']).toMatchObject({ missingPriceHistory: 1, evidenceUsability: 'UNAVAILABLE' });
     expect(summary.unevaluatedSignals).toBe(0);
     expect(summary.evaluationDiagnostics.unevaluatedSignals).toBe(0);
     expect(summary.recommendedAction).toContain('Sync historical market data');

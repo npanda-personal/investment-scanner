@@ -16,32 +16,32 @@ export class SignalQualityLabController {
   };
 
   byType = async (req: Request, res: Response) => {
-    try { const query = parseQualityQuery(req.query); const [items, summary] = await Promise.all([this.service.byType(query), this.service.summary(query)]); return res.json({ items, evaluationDiagnostics: summary.evaluationDiagnostics, horizonAvailability: summary.horizonAvailability, dataStatus: summary.dataStatus, recommendedAction: summary.recommendedAction }); }
+    try { const query = parseQualityQuery(req.query); const [items, summary] = await Promise.all([this.service.byType(query), this.service.summary(query)]); return res.json({ items, selectedHorizon: summary.selectedHorizon, evidenceUsability: summary.evidenceUsability, evaluationDiagnostics: summary.evaluationDiagnostics, horizonAvailability: summary.horizonAvailability, dataStatus: summary.dataStatus, recommendedAction: summary.recommendedAction }); }
     catch (error) { return this.error(res, error, 'Failed to load signal type quality'); }
   };
 
   bySector = async (req: Request, res: Response) => {
-    try { const query = parseQualityQuery(req.query); const [items, summary] = await Promise.all([this.service.bySector(query), this.service.summary(query)]); return res.json({ items, evaluationDiagnostics: summary.evaluationDiagnostics, horizonAvailability: summary.horizonAvailability, dataStatus: summary.dataStatus, recommendedAction: summary.recommendedAction }); }
+    try { const query = parseQualityQuery(req.query); const [items, summary] = await Promise.all([this.service.bySector(query), this.service.summary(query)]); return res.json({ items, selectedHorizon: summary.selectedHorizon, evidenceUsability: summary.evidenceUsability, evaluationDiagnostics: summary.evaluationDiagnostics, horizonAvailability: summary.horizonAvailability, dataStatus: summary.dataStatus, recommendedAction: summary.recommendedAction }); }
     catch (error) { return this.error(res, error, 'Failed to load sector signal quality'); }
   };
 
   byScoreBucket = async (req: Request, res: Response) => {
-    try { const query = parseQualityQuery(req.query); const [items, summary] = await Promise.all([this.service.byScoreBucket(query), this.service.summary(query)]); return res.json({ items, evaluationDiagnostics: summary.evaluationDiagnostics, horizonAvailability: summary.horizonAvailability, dataStatus: summary.dataStatus, recommendedAction: summary.recommendedAction }); }
+    try { const query = parseQualityQuery(req.query); const [items, summary] = await Promise.all([this.service.byScoreBucket(query), this.service.summary(query)]); return res.json({ items, selectedHorizon: summary.selectedHorizon, evidenceUsability: summary.evidenceUsability, evaluationDiagnostics: summary.evaluationDiagnostics, horizonAvailability: summary.horizonAvailability, dataStatus: summary.dataStatus, recommendedAction: summary.recommendedAction }); }
     catch (error) { return this.error(res, error, 'Failed to load score bucket signal quality'); }
   };
 
   byRegime = async (req: Request, res: Response) => {
-    try { const query = parseQualityQuery(req.query); const [items, summary] = await Promise.all([this.service.byRegime(query), this.service.summary(query)]); return res.json({ items, evaluationDiagnostics: summary.evaluationDiagnostics, horizonAvailability: summary.horizonAvailability, dataStatus: summary.dataStatus, recommendedAction: summary.recommendedAction }); }
+    try { const query = parseQualityQuery(req.query); const [items, summary] = await Promise.all([this.service.byRegime(query), this.service.summary(query)]); return res.json({ items, selectedHorizon: summary.selectedHorizon, evidenceUsability: summary.evidenceUsability, evaluationDiagnostics: summary.evaluationDiagnostics, horizonAvailability: summary.horizonAvailability, dataStatus: summary.dataStatus, recommendedAction: summary.recommendedAction }); }
     catch (error) { return this.error(res, error, 'Failed to load regime signal quality'); }
   };
 
   byDataQuality = async (req: Request, res: Response) => {
-    try { const query = parseQualityQuery(req.query); const [items, summary] = await Promise.all([this.service.byDataQuality(query), this.service.summary(query)]); return res.json({ items, evaluationDiagnostics: summary.evaluationDiagnostics, horizonAvailability: summary.horizonAvailability, dataStatus: summary.dataStatus, recommendedAction: summary.recommendedAction }); }
+    try { const query = parseQualityQuery(req.query); const [items, summary] = await Promise.all([this.service.byDataQuality(query), this.service.summary(query)]); return res.json({ items, selectedHorizon: summary.selectedHorizon, evidenceUsability: summary.evidenceUsability, evaluationDiagnostics: summary.evaluationDiagnostics, horizonAvailability: summary.horizonAvailability, dataStatus: summary.dataStatus, recommendedAction: summary.recommendedAction }); }
     catch (error) { return this.error(res, error, 'Failed to load data-quality signal quality'); }
   };
 
   noisy = async (req: Request, res: Response) => {
-    try { const query = parseQualityQuery(req.query); const [items, summary] = await Promise.all([this.service.noisy(query), this.service.summary(query)]); return res.json({ items, evaluationDiagnostics: summary.evaluationDiagnostics, horizonAvailability: summary.horizonAvailability, dataStatus: summary.dataStatus, recommendedAction: summary.recommendedAction }); }
+    try { const query = parseQualityQuery(req.query); const [items, summary] = await Promise.all([this.service.noisy(query), this.service.summary(query)]); return res.json({ items, selectedHorizon: summary.selectedHorizon, evidenceUsability: summary.evidenceUsability, evaluationDiagnostics: summary.evaluationDiagnostics, horizonAvailability: summary.horizonAvailability, dataStatus: summary.dataStatus, recommendedAction: summary.recommendedAction }); }
     catch (error) { return this.error(res, error, 'Failed to load noisy signals'); }
   };
 

@@ -40,6 +40,9 @@ const qualityTabs = ['overview', 'performance', 'noise', 'instrument'] as const;
 type QualityTab = typeof qualityTabs[number];
 const percent = (value: number | null | undefined) => value === null || value === undefined ? 'N/A' : `${(value * 100).toFixed(2)}%`;
 const number = (value: number | null | undefined) => value === null || value === undefined ? 'N/A' : value.toLocaleString();
+const evidenceTone = (value: string | undefined): 'success' | 'warning' | 'error' | undefined => (
+  value === 'USABLE' ? 'success' : value === 'LIMITED' ? 'warning' : value === 'UNAVAILABLE' ? 'error' : undefined
+);
 const activeFilterLabels = (filters: QualityFilters) => [
   filters.readinessStatus && `Readiness: ${filters.readinessStatus}`,
   filters.coverageStatus && `Coverage: ${filters.coverageStatus}`,
@@ -115,6 +118,9 @@ const SignalQualityLabPage: React.FC = () => {
   const diagnostics = summary?.evaluationDiagnostics;
   const availability = summary?.horizonAvailability;
   const activeFilters = activeFilterLabels(filters);
+  const selectedAvailability = availability?.[horizon];
+  const evidenceUsability = summary?.evidenceUsability ?? (diagnostics ? (diagnostics.evaluatedSignals > 0 ? 'LIMITED' : 'UNAVAILABLE') : undefined);
+  const hasEvaluableEvidence = Boolean(diagnostics && diagnostics.evaluatedSignals > 0);
 
   const loadInstrument = async () => {
     setFormError(null);
@@ -226,7 +232,7 @@ const SignalQualityLabPage: React.FC = () => {
       )}
       {diagnostics && diagnostics.totalSignals > 0 && diagnostics.evaluatedSignals === 0 && (
         <Alert severity="warning" sx={{ mb: 2 }}>
-          {diagnostics.totalSignals} signals found, but 0 can be evaluated for the selected {diagnostics.selectedHorizon} horizon.
+          Evidence usability is UNAVAILABLE. {diagnostics.totalSignals} signals found, but 0 can be evaluated for the selected {diagnostics.selectedHorizon} horizon.
           {' '}{diagnostics.insufficientFuturePriceCount > 0 ? `Most signals do not yet have ${diagnostics.minimumRequiredFutureRows} future trading days of price data.` : diagnostics.recommendedAction}
           {' '}Try 1D/5D, sync market data, or wait for more trading days. Historical measurement only; not prediction or trading advice.
         </Alert>
@@ -277,15 +283,18 @@ const SignalQualityLabPage: React.FC = () => {
 
       {activeTab === 'overview' && summary && (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2, mb: 3 }}>
+          <MetricCard label="Selected Horizon" value={summary.selectedHorizon || horizon} />
+          <MetricCard label="Evidence Usability" value={evidenceUsability || 'UNAVAILABLE'} tone={evidenceTone(evidenceUsability)} />
           <MetricCard label="Total Signals" value={number(summary.totalSignals)} />
           <MetricCard label="Eligible Signals" value={number(diagnostics?.signalsAfterFilters)} />
-          <MetricCard label="Evaluated Signals" value={number(summary.evaluatedSignals)} />
-          <MetricCard label="Not Yet Evaluable" value={number(summary.unevaluatedSignals)} tone={summary.unevaluatedSignals > 0 ? 'warning' : undefined} />
+          <MetricCard label="Mature / Evaluable" value={number(diagnostics?.matureSignals ?? summary.matureSignals ?? summary.evaluatedSignals)} />
+          <MetricCard label="Not Yet Mature" value={number(diagnostics?.notYetMatureSignals ?? summary.notYetMatureSignals ?? summary.unevaluatedSignals)} tone={(diagnostics?.notYetMatureSignals ?? summary.notYetMatureSignals ?? summary.unevaluatedSignals) > 0 ? 'warning' : undefined} />
+          <MetricCard label="Insufficient Future Price" value={number(diagnostics?.insufficientFuturePriceCount)} tone={diagnostics?.insufficientFuturePriceCount ? 'warning' : undefined} />
           <MetricCard label="Missing Price History" value={number(diagnostics?.missingPriceHistoryCount)} tone={diagnostics?.missingPriceHistoryCount ? 'error' : undefined} />
-          <MetricCard label="Bullish Win Rate" value={percent(summary.overallBullishWinRate)} tone="success" />
-          <MetricCard label="Bearish Win Rate" value={percent(summary.overallBearishWinRate)} tone="warning" />
-          <MetricCard label="Average 5D Return" value={percent(summary.average5DReturn)} />
-          <MetricCard label="Average 20D Return" value={percent(summary.average20DReturn)} />
+          {hasEvaluableEvidence && <MetricCard label="Bullish Win Rate" value={percent(summary.overallBullishWinRate)} tone="success" />}
+          {hasEvaluableEvidence && <MetricCard label="Bearish Win Rate" value={percent(summary.overallBearishWinRate)} tone="warning" />}
+          {hasEvaluableEvidence && <MetricCard label="Average 5D Return" value={percent(summary.average5DReturn)} />}
+          {hasEvaluableEvidence && <MetricCard label="Average 20D Return" value={percent(summary.average20DReturn)} />}
           <MetricCard label="Noisy Signals" value={number(summary.noisySignalCount)} tone={summary.noisySignalCount > 0 ? 'warning' : undefined} />
           <MetricCard label="Data Status" value={summary.dataStatus} />
         </Box>
@@ -293,17 +302,22 @@ const SignalQualityLabPage: React.FC = () => {
 
       {activeTab === 'performance' && availability && (
         <Paper sx={{ p: 2, mb: 3 }}>
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'center' }}>
-            <Typography variant="subtitle1" fontWeight={700}>Horizon Availability</Typography>
-            {horizons.map((item) => (
-              <Chip
-                key={item}
-                label={`${item}: ${availability[item]?.evaluated ?? 0} / ${availability[item]?.eligible ?? 0}`}
-                color={item === horizon ? 'primary' : (availability[item]?.evaluated ?? 0) > 0 ? 'success' : 'default'}
-                variant={item === horizon ? 'filled' : 'outlined'}
-                onClick={() => setHorizon(item)}
-              />
-            ))}
+          <Stack spacing={1.5}>
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'center' }}>
+              <Typography variant="subtitle1" fontWeight={700}>Horizon Availability</Typography>
+              {horizons.map((item) => (
+                <Chip
+                  key={item}
+                  label={`${item}: ${availability[item]?.evaluated ?? 0} / ${availability[item]?.eligible ?? 0} mature`}
+                  color={item === horizon ? 'primary' : (availability[item]?.evaluated ?? 0) > 0 ? 'success' : 'default'}
+                  variant={item === horizon ? 'filled' : 'outlined'}
+                  onClick={() => setHorizon(item)}
+                />
+              ))}
+            </Stack>
+            <Typography color="text.secondary" variant="body2">
+              Selected {horizon}: eligible {number(selectedAvailability?.eligible)}, mature/evaluable {number(selectedAvailability?.evaluated)}, not yet mature {number(selectedAvailability?.insufficientFuturePrice)}, missing price {number(selectedAvailability?.missingPriceHistory)}, evidence {selectedAvailability?.evidenceUsability ?? evidenceUsability ?? 'UNAVAILABLE'}.
+            </Typography>
             {availability[horizon]?.evaluated === 0 && (availability['1D']?.evaluated > 0 || availability['5D']?.evaluated > 0) && (
               <Typography color="text.secondary" variant="body2">A shorter horizon has evaluated samples.</Typography>
             )}

@@ -3,8 +3,12 @@ import { visitModule } from './support/moduleAssertions';
 
 const dashboardPayload = {
   summary: {
+    selectedHorizon: '20D',
+    evidenceUsability: 'LIMITED',
     totalSignals: 3,
+    matureSignals: 2,
     evaluatedSignals: 2,
+    notYetMatureSignals: 1,
     unevaluatedSignals: 1,
     overallBullishWinRate: 0.5,
     overallBearishWinRate: 0,
@@ -27,23 +31,33 @@ const dashboardPayload = {
       filterApplied: false,
     },
     evaluationDiagnostics: {
-      rawSignalCount: 3,
+      totalSignals: 3,
       signalsAfterFilters: 3,
+      matureSignals: 2,
       evaluatedSignals: 2,
+      notYetMatureSignals: 1,
       unevaluatedSignals: 1,
       insufficientFuturePriceCount: 1,
       missingPriceHistoryCount: 0,
+      missingInstrumentCount: 0,
+      excludedByDataQualityCount: 0,
+      excludedByDateFilterCount: 0,
+      excludedByDirectionCount: 0,
       selectedHorizon: '20D',
+      earliestSignalDate: '2026-04-01T00:00:00.000Z',
+      latestSignalDate: '2026-05-01T00:00:00.000Z',
+      latestAvailablePriceDate: '2026-05-11T00:00:00.000Z',
       minimumRequiredFutureRows: 20,
+      nextEvaluableDate: '2026-05-21T00:00:00.000Z',
       recommendedAction: 'Try a shorter horizon.',
       warnings: [],
     },
     horizonAvailability: {
-      '1D': { eligible: 3, evaluated: 3, insufficientFuturePrice: 0 },
-      '5D': { eligible: 3, evaluated: 2, insufficientFuturePrice: 1 },
-      '10D': { eligible: 3, evaluated: 2, insufficientFuturePrice: 1 },
-      '20D': { eligible: 3, evaluated: 2, insufficientFuturePrice: 1 },
-      '60D': { eligible: 3, evaluated: 1, insufficientFuturePrice: 2 },
+      '1D': { eligible: 3, evaluated: 3, insufficientFuturePrice: 0, missingPriceHistory: 0, evidenceUsability: 'LIMITED' },
+      '5D': { eligible: 3, evaluated: 2, insufficientFuturePrice: 1, missingPriceHistory: 0, evidenceUsability: 'LIMITED' },
+      '10D': { eligible: 3, evaluated: 2, insufficientFuturePrice: 1, missingPriceHistory: 0, evidenceUsability: 'LIMITED' },
+      '20D': { eligible: 3, evaluated: 2, insufficientFuturePrice: 1, missingPriceHistory: 0, evidenceUsability: 'LIMITED' },
+      '60D': { eligible: 3, evaluated: 1, insufficientFuturePrice: 2, missingPriceHistory: 0, evidenceUsability: 'LIMITED' },
     },
   },
   byType: [],
@@ -53,12 +67,46 @@ const dashboardPayload = {
   noisy: [],
 };
 
-async function routeDashboard(page: Page) {
+const zeroEvaluablePayload = {
+  ...dashboardPayload,
+  summary: {
+    ...dashboardPayload.summary,
+    evidenceUsability: 'UNAVAILABLE',
+    totalSignals: 3,
+    matureSignals: 0,
+    evaluatedSignals: 0,
+    notYetMatureSignals: 2,
+    unevaluatedSignals: 2,
+    overallBullishWinRate: null,
+    overallBearishWinRate: null,
+    average5DReturn: null,
+    average20DReturn: null,
+    evaluationDiagnostics: {
+      ...dashboardPayload.summary.evaluationDiagnostics,
+      matureSignals: 0,
+      evaluatedSignals: 0,
+      notYetMatureSignals: 2,
+      unevaluatedSignals: 2,
+      insufficientFuturePriceCount: 2,
+      missingPriceHistoryCount: 1,
+      recommendedAction: 'Try a shorter horizon such as 1D or 5D, sync latest market data, or wait until enough future trading days exist.',
+    },
+    horizonAvailability: {
+      '1D': { eligible: 2, evaluated: 2, insufficientFuturePrice: 0, missingPriceHistory: 1, evidenceUsability: 'LIMITED' },
+      '5D': { eligible: 2, evaluated: 1, insufficientFuturePrice: 1, missingPriceHistory: 1, evidenceUsability: 'LIMITED' },
+      '10D': { eligible: 2, evaluated: 0, insufficientFuturePrice: 2, missingPriceHistory: 1, evidenceUsability: 'UNAVAILABLE' },
+      '20D': { eligible: 2, evaluated: 0, insufficientFuturePrice: 2, missingPriceHistory: 1, evidenceUsability: 'UNAVAILABLE' },
+      '60D': { eligible: 2, evaluated: 0, insufficientFuturePrice: 2, missingPriceHistory: 1, evidenceUsability: 'UNAVAILABLE' },
+    },
+  },
+};
+
+async function routeDashboard(page: Page, payload = dashboardPayload) {
   await page.route('**/api/v1/signals/quality/dashboard**', async (route: Route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(dashboardPayload),
+      body: JSON.stringify(payload),
     });
   });
 }
@@ -88,8 +136,15 @@ test.describe('Signal Quality Lab UI', () => {
           offset: recalculatePayload.offset,
           nextOffset: null,
           hasMore: false,
+          selectedHorizon: '20D',
+          evidenceUsability: 'LIMITED',
           evaluatedCount: 1,
+          matureSignalsInBatch: 1,
           unevaluatedCount: 0,
+          notYetMatureInBatch: 0,
+          insufficientFuturePriceInBatch: 0,
+          insufficientFuturePriceCount: 0,
+          missingPriceHistoryInBatch: 0,
           missingPriceHistoryCount: 0,
           warnings: [],
           durationMs: 1,
@@ -119,6 +174,23 @@ test.describe('Signal Quality Lab UI', () => {
     await expect(page.getByRole('heading', { name: 'Signal Quality Lab' })).toBeVisible();
     await expect(page.getByText('Total Signals')).toBeVisible();
     await expect(page.getByText('Loading Signal Quality dashboard')).toHaveCount(0);
+  });
+
+  test('explains zero-evaluable selected horizon without showing win-rate confidence', async ({ page }) => {
+    await routeDashboard(page, zeroEvaluablePayload);
+
+    await visitModule(page, '/signals/quality', 'Signal Quality Lab');
+
+    await expect(page.getByText('Evidence usability is UNAVAILABLE')).toBeVisible();
+    await expect(page.getByText('Evidence Usability', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'UNAVAILABLE' })).toBeVisible();
+    await expect(page.getByText('Mature / Evaluable')).toBeVisible();
+    await expect(page.getByText('Missing Price History')).toBeVisible();
+    await expect(page.getByText('Bullish Win Rate')).toHaveCount(0);
+
+    await page.getByRole('tab', { name: 'Performance' }).click();
+    await expect(page.getByText('Selected 20D: eligible 2, mature/evaluable 0, not yet mature 2, missing price 1, evidence UNAVAILABLE.')).toBeVisible();
+    await expect(page.getByText('A shorter horizon has evaluated samples.')).toBeVisible();
   });
 
   test('dashboard timeout shows Signal Quality-specific retry state', async ({ page }) => {

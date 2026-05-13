@@ -12,6 +12,7 @@ import type {
   QualityMetricGroup,
   QualityQuery,
   DataQualityFilterSummary,
+  EvidenceUsability,
   EvaluationDiagnostics,
   HorizonAvailabilitySummary,
   QualityRecalculateRequest,
@@ -70,10 +71,15 @@ export class SignalQualityLabService {
     const bySector = this.groupMetrics(outcomes, analysisQuery.horizon, (item) => item.sector || 'Unknown').filter((item) => item.sampleSize >= analysisQuery.minSampleSize);
     const noisy = this.detectNoisySignals(signals, outcomes);
     const unevaluatedSignals = diagnostics.insufficientFuturePriceCount;
+    const evidenceUsability = this.evidenceUsability(signals.length, evaluated.length, diagnostics.missingPriceHistoryCount, diagnostics.insufficientFuturePriceCount, analysisQuery.minSampleSize);
     
     const summary: QualitySummary = {
+      selectedHorizon: analysisQuery.horizon,
+      evidenceUsability,
       totalSignals: signals.length,
+      matureSignals: evaluated.length,
       evaluatedSignals: evaluated.length,
+      notYetMatureSignals: diagnostics.notYetMatureSignals,
       unevaluatedSignals,
       overallBullishWinRate: this.winRate(outcomes, query.horizon, 'BULLISH'),
       overallBearishWinRate: this.winRate(outcomes, query.horizon, 'BEARISH'),
@@ -122,9 +128,14 @@ export class SignalQualityLabService {
     const bySector = this.groupMetrics(outcomes, analysisQuery.horizon, (item) => item.sector || 'Unknown').filter((item) => item.sampleSize >= analysisQuery.minSampleSize);
     const noisy = this.detectNoisySignals(signals, outcomes);
     const unevaluatedSignals = diagnostics.insufficientFuturePriceCount;
+    const evidenceUsability = this.evidenceUsability(signals.length, evaluated.length, diagnostics.missingPriceHistoryCount, diagnostics.insufficientFuturePriceCount, analysisQuery.minSampleSize);
     return {
+      selectedHorizon: analysisQuery.horizon,
+      evidenceUsability,
       totalSignals: signals.length,
+      matureSignals: evaluated.length,
       evaluatedSignals: evaluated.length,
+      notYetMatureSignals: diagnostics.notYetMatureSignals,
       unevaluatedSignals,
       overallBullishWinRate: this.winRate(outcomes, query.horizon, 'BULLISH'),
       overallBearishWinRate: this.winRate(outcomes, query.horizon, 'BEARISH'),
@@ -219,6 +230,7 @@ export class SignalQualityLabService {
     const missingPriceHistoryInBatch = outcomes.filter((outcome) => !outcome.priceHistoryAvailable).length;
     const insufficientFuturePriceInBatch = Math.max(0, outcomes.length - evaluatedInBatch - missingPriceHistoryInBatch);
     const unevaluatedInBatch = insufficientFuturePriceInBatch;
+    const evidenceUsability = this.evidenceUsability(outcomes.length, evaluatedInBatch, missingPriceHistoryInBatch, insufficientFuturePriceInBatch, 0);
     const nextOffset = offset + processedCount;
     return {
       processedCount,
@@ -227,6 +239,8 @@ export class SignalQualityLabService {
       offset,
       nextOffset: nextOffset < totalCount ? nextOffset : null,
       hasMore: nextOffset < totalCount,
+      selectedHorizon,
+      evidenceUsability,
       inserted: 0,
       updated: 0,
       skipped: 0,
@@ -234,11 +248,14 @@ export class SignalQualityLabService {
       updatedCount: 0,
       skippedCount: 0,
       failedCount: 0,
+      matureSignalsInBatch: evaluatedInBatch,
       evaluatedInBatch,
       evaluatedCount: evaluatedInBatch,
+      notYetMatureInBatch: unevaluatedInBatch,
       unevaluatedInBatch,
       unevaluatedCount: unevaluatedInBatch,
       insufficientFuturePriceInBatch,
+      insufficientFuturePriceCount: insufficientFuturePriceInBatch,
       missingPriceHistoryInBatch,
       missingPriceHistoryCount: missingPriceHistoryInBatch,
       outcomesPersisted: false,
@@ -606,10 +623,13 @@ export class SignalQualityLabService {
     return (Object.keys(HORIZON_DAYS) as QualityHorizon[]).reduce((summary, horizon) => {
       const evaluated = this.evaluatedForHorizon(outcomes, horizon).length;
       const missingPriceHistory = outcomes.filter((item) => !item.priceHistoryAvailable).length;
+      const insufficientFuturePrice = Math.max(0, outcomes.length - missingPriceHistory - evaluated);
       summary[horizon] = {
         eligible: outcomes.length - missingPriceHistory,
         evaluated,
-        insufficientFuturePrice: Math.max(0, outcomes.length - missingPriceHistory - evaluated),
+        insufficientFuturePrice,
+        missingPriceHistory,
+        evidenceUsability: this.evidenceUsability(outcomes.length, evaluated, missingPriceHistory, insufficientFuturePrice, 0),
       };
       return summary;
     }, {} as HorizonAvailabilitySummary);
@@ -645,7 +665,9 @@ export class SignalQualityLabService {
     return {
       totalSignals: rawSignals.length,
       signalsAfterFilters: filteredSignals.length,
+      matureSignals: evaluatedSignals,
       evaluatedSignals,
+      notYetMatureSignals: insufficientFuturePriceCount,
       unevaluatedSignals: insufficientFuturePriceCount,
       insufficientFuturePriceCount,
       missingPriceHistoryCount,
@@ -686,6 +708,12 @@ export class SignalQualityLabService {
     if (missing > 0) warnings.push('Some signals have no available price history in Market Data Foundation.');
     if (dataQuality.filterApplied && dataQuality.totalSignalsAfterFilter === 0) warnings.push('0 signals remain after data-quality filters.');
     return warnings;
+  }
+
+  private evidenceUsability(total: number, evaluated: number, missing: number, insufficient: number, minSampleSize: number): EvidenceUsability {
+    if (total === 0 || evaluated === 0) return 'UNAVAILABLE';
+    if (evaluated < Math.max(5, minSampleSize) || missing > 0 || insufficient > 0) return 'LIMITED';
+    return 'USABLE';
   }
 
   private groupStatus(rawCount: number, evaluatedCount: number, missingPriceCount: number, horizon: QualityHorizon): QualityMetricGroup['status'] {

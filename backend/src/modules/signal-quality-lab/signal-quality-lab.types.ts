@@ -2,6 +2,7 @@ import type { SignalConfidence, SignalDirection, SignalItem, SignalResultDto } f
 
 export type QualityHorizon = '1D' | '5D' | '10D' | '20D' | '60D';
 export type NoiseSeverity = 'LOW' | 'MEDIUM' | 'HIGH';
+export type EvidenceUsability = 'USABLE' | 'LIMITED' | 'UNAVAILABLE';
 
 export interface QualityQuery {
   horizon: QualityHorizon;
@@ -47,6 +48,8 @@ export interface QualityRecalculateResponse {
   offset: number;
   nextOffset: number | null;
   hasMore: boolean;
+  selectedHorizon: QualityHorizon;
+  evidenceUsability: EvidenceUsability;
   inserted: number;
   updated: number;
   skipped: number;
@@ -54,11 +57,14 @@ export interface QualityRecalculateResponse {
   updatedCount: number;
   skippedCount: number;
   failedCount: number;
+  matureSignalsInBatch: number;
   evaluatedInBatch: number;
   evaluatedCount: number;
+  notYetMatureInBatch: number;
   unevaluatedInBatch: number;
   unevaluatedCount: number;
   insufficientFuturePriceInBatch: number;
+  insufficientFuturePriceCount: number;
   missingPriceHistoryInBatch: number;
   missingPriceHistoryCount: number;
   outcomesPersisted: boolean;
@@ -140,8 +146,12 @@ export interface NoisySignalItem {
 }
 
 export interface QualitySummary {
+  selectedHorizon: QualityHorizon;
+  evidenceUsability: EvidenceUsability;
   totalSignals: number;
+  matureSignals: number;
   evaluatedSignals: number;
+  notYetMatureSignals: number;
   unevaluatedSignals: number;
   overallBullishWinRate: number | null;
   overallBearishWinRate: number | null;
@@ -170,6 +180,8 @@ export interface HorizonAvailabilityItem {
   eligible: number;
   evaluated: number;
   insufficientFuturePrice: number;
+  missingPriceHistory: number;
+  evidenceUsability: EvidenceUsability;
 }
 
 export type HorizonAvailabilitySummary = Record<QualityHorizon, HorizonAvailabilityItem>;
@@ -177,7 +189,9 @@ export type HorizonAvailabilitySummary = Record<QualityHorizon, HorizonAvailabil
 export interface EvaluationDiagnostics {
   totalSignals: number;
   signalsAfterFilters: number;
+  matureSignals: number;
   evaluatedSignals: number;
+  notYetMatureSignals: number;
   unevaluatedSignals: number;
   insufficientFuturePriceCount: number;
   missingPriceHistoryCount: number;
