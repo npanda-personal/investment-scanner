@@ -155,6 +155,9 @@ test.describe('Market Data Foundation UI', () => {
             providerUnknown: 2909,
             providerUnknownValidationNeeded: 2909,
             providerRetryValidationNeeded: 7,
+            historyCoverageIncomplete: 144,
+            historyCoverageListingDateMissing: 140,
+            historyCoverageFallbackRequired: 2,
             providerUnsupportedExcluded: 0,
             providerValidationFailed: 7,
             unsupported: 0,
@@ -297,6 +300,24 @@ test.describe('Market Data Foundation UI', () => {
           providerRetryBlocked: 8,
           providerManualRepairRequired: 5,
           nextProviderRetryAtMin: '2026-05-13T12:45:00.000Z',
+          historyCoverageIncomplete: 144,
+          historyCoverageListingDateMissing: 140,
+          historyCoverageFallbackRequired: 2,
+          sampleCoverageResults: [
+            {
+              symbol: 'PLAN.NS',
+              requiredHistoryStartDate: '2011-05-12',
+              requiredHistoryEndDate: '2026-05-12',
+              listingDate: null,
+              listingDateMissing: true,
+              storedHistoryStartDate: '2018-01-01',
+              storedHistoryEndDate: '2026-05-10',
+              storedHistoryBars: 1830,
+              requiredHistoryComplete: false,
+              coverageStatus: 'NEEDS_BACKFILL',
+              sourceFallbackReason: 'YAHOO_SHALLOW_HISTORY',
+            },
+          ],
           providerUnsupportedExcluded: 0,
           providerValidationFailed: 7,
           providerValidationNeeded: unknownProvidersDrained ? 0 : 2909,
@@ -780,6 +801,24 @@ test.describe('Market Data Foundation UI', () => {
           stillUnder120: 30,
           stillUnder200: 75,
           stillUnder252: 144,
+          historyCoverageIncomplete: 144,
+          historyCoverageListingDateMissing: 20,
+          historyCoverageFallbackRequired: 2,
+          sampleCoverageResults: [
+            {
+              symbol: 'BACKFILL.NS',
+              requiredHistoryStartDate: '2011-05-12',
+              requiredHistoryEndDate: '2026-05-12',
+              listingDate: '2018-08-10',
+              listingDateMissing: false,
+              storedHistoryStartDate: '2020-01-01',
+              storedHistoryEndDate: '2026-05-10',
+              storedHistoryBars: 1200,
+              requiredHistoryComplete: false,
+              coverageStatus: 'NEEDS_BACKFILL',
+              sourceFallbackReason: 'YAHOO_SHALLOW_HISTORY',
+            },
+          ],
         },
       });
     });
@@ -834,6 +873,9 @@ test.describe('Market Data Foundation UI', () => {
     await expect(page.getByText('Signoff: FAIL')).toBeVisible();
     await expect(page.getByText('Downstream allowed: no')).toBeVisible();
     await expect(page.getByText('Review-ready: 0 / 300')).toBeVisible();
+    await expect(page.getByText('15-year/listing-date coverage incomplete: 144')).toBeVisible();
+    await expect(page.getByText('Listing date missing for coverage: 140')).toBeVisible();
+    await expect(page.getByText('History fallback required: 2')).toBeVisible();
     await expect(page.getByText('Next action: VALIDATE_PROVIDERS')).toBeVisible();
     await expect(page.getByText('Review Readiness Summary')).toBeVisible();
     await expect(page.getByText('Decision: REPAIR_DATA')).toBeVisible();
@@ -925,6 +967,11 @@ test.describe('Market Data Foundation UI', () => {
     await expect(page.getByText('Unsupported excluded', { exact: true })).toBeVisible();
     await expect(page.getByText('Supported identity gaps', { exact: true })).toBeVisible();
     await expect(page.getByText('Supported price backfill needed', { exact: true })).toBeVisible();
+    await expect(page.getByText('15-year/listing-date incomplete', { exact: true })).toBeVisible();
+    await expect(page.getByText('Missing listing date coverage', { exact: true })).toBeVisible();
+    await expect(page.getByText('Fallback-required coverage', { exact: true })).toBeVisible();
+    await expect(page.getByText('Every IN/STOCK needs 15 years of daily OHLCV, or listing-date-to-latest coverage when the listing is newer.')).toBeVisible();
+    await expect(page.getByText(/Coverage sample PLAN\.NS: NEEDS_BACKFILL; required 2011-05-12 to 2026-05-12; listing date missing; stored 2018-01-01 to 2026-05-10 \(1,830 bars\); complete no; fallback reason YAHOO_SHALLOW_HISTORY\./)).toBeVisible();
     await expect(page.getByText('Supported business metadata gaps', { exact: true })).toBeVisible();
     await expect(page.getByText('Business metadata auto-repairable')).toBeVisible();
     await expect(page.getByText('Business metadata manual-required')).toBeVisible();
@@ -1039,6 +1086,8 @@ test.describe('Market Data Foundation UI', () => {
     await expect(page.getByText('Zero-row provider returns 2; deep reloaded 0; incremental caught up 0; remaining candidates 585.')).toBeVisible();
     await expect(page.getByText('Latest completed EOD 2026-05-12; target end 2026-05-12T23:59:59.999Z.')).toBeVisible();
     await expect(page.getByText('Still under 120 30, under 200 75, under 252 144.')).toBeVisible();
+    await expect(page.getByText('15-year/listing-date coverage: incomplete 144, missing listing date 20, fallback required 2.')).toBeVisible();
+    await expect(page.getByText(/Coverage sample BACKFILL\.NS: NEEDS_BACKFILL; required 2011-05-12 to 2026-05-12; listing date 2018-08-10; stored 2020-01-01 to 2026-05-10 \(1,200 bars\); complete no; fallback reason YAHOO_SHALLOW_HISTORY\./)).toBeVisible();
     await expect(page.getByText('Zero rows returned by provider for 2 supported symbols.')).toBeVisible();
     const priceRepairAlertClass = await page.getByRole('alert').filter({ hasText: 'Zero-row provider returns 2' }).getAttribute('class');
     expect(priceRepairAlertClass).toContain('MuiAlert-standardWarning');

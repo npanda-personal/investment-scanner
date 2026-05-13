@@ -119,6 +119,12 @@ export interface MarketDataUniverseHealth {
     providerUnknown: number;
     providerUnknownValidationNeeded: number;
     providerRetryValidationNeeded: number;
+    providerRetryBlocked?: number;
+    providerManualRepairRequired?: number;
+    nextProviderRetryAtMin?: string | null;
+    historyCoverageIncomplete?: number;
+    historyCoverageListingDateMissing?: number;
+    historyCoverageFallbackRequired?: number;
     providerUnsupportedExcluded: number;
     providerValidationFailed: number;
     unsupported: number;
@@ -189,6 +195,7 @@ export interface TrustedReviewUniverseHealth {
     inactiveOrDelisted: number;
     noLatestPrice: number;
     staleLatestPrice: number;
+    requiredHistoryIncomplete?: number;
     insufficientBarsUnder120: number;
     insufficientBarsUnder200?: number;
     insufficientBarsUnder252: number;
@@ -282,6 +289,10 @@ export interface MarketDataRepairPlan {
   providerRetryBlocked?: number;
   providerManualRepairRequired?: number;
   nextProviderRetryAtMin?: string | null;
+  historyCoverageIncomplete?: number;
+  historyCoverageListingDateMissing?: number;
+  historyCoverageFallbackRequired?: number;
+  sampleCoverageResults?: MarketDataCoverageSample[];
   providerUnsupportedExcluded: number;
   providerValidationFailed: number;
   providerValidationNeeded: number;
@@ -438,6 +449,20 @@ export interface MarketDataRepairSourceIdentity {
   rowsSha256?: string;
 }
 
+export interface MarketDataCoverageSample {
+  symbol: string;
+  requiredHistoryStartDate: string;
+  requiredHistoryEndDate?: string | null;
+  listingDate?: string | null;
+  listingDateMissing?: boolean;
+  storedHistoryStartDate?: string | null;
+  storedHistoryEndDate?: string | null;
+  storedHistoryBars?: number;
+  requiredHistoryComplete?: boolean;
+  coverageStatus?: string | null;
+  sourceFallbackReason?: string | null;
+}
+
 export interface MarketDataRepairSummary {
   scope: {
     region: string;
@@ -519,6 +544,10 @@ export interface MarketDataRepairSummary {
   stillUnder120?: number;
   stillUnder200?: number;
   stillUnder252?: number;
+  historyCoverageIncomplete?: number;
+  historyCoverageListingDateMissing?: number;
+  historyCoverageFallbackRequired?: number;
+  sampleCoverageResults?: MarketDataCoverageSample[];
   fieldProvenance?: Array<{
     instrumentId: string;
     symbol: string;

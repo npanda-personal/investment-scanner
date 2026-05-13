@@ -108,10 +108,14 @@ describe('MarketDataFoundationRepository', () => {
         low: 101,
         close: 108,
         volume: 20,
+        source: 'nse_cm_udiff_bhavcopy',
       },
     ], () => ({ region: 'US', exchange: 'NASDAQ' }));
 
     expect(upsert).toHaveBeenCalledTimes(2);
+    expect(upsert.mock.calls.map((call) => call[0].create.source)).toEqual(
+      expect.arrayContaining(['yahoo', 'nse_cm_udiff_bhavcopy'])
+    );
     expect(upsert.mock.calls.map((call) => call[0].where.symbol_timestamp.timestamp)).toEqual(
       expect.arrayContaining([
         new Date('2025-01-01T00:00:00.000Z'),
@@ -123,6 +127,57 @@ describe('MarketDataFoundationRepository', () => {
       rowsInserted: 1,
       rowsUpdated: 1,
       rowsSkipped: 0,
+    });
+  });
+
+  it('updates source provenance when a fallback source confirms an existing candle', async () => {
+    const upsert = jest.fn().mockResolvedValue({});
+    const latestPriceUpsert = jest.fn().mockResolvedValue({});
+    const prisma = {
+      priceTick: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            timestamp: new Date('2025-01-01T00:00:00.000Z'),
+            open: 100,
+            high: 110,
+            low: 95,
+            close: 105,
+            adjustedClose: null,
+            volume: BigInt(10),
+            source: 'yahoo',
+          },
+        ]),
+      },
+      latestPrice: {
+        upsert: latestPriceUpsert,
+      },
+      $transaction: jest.fn(async (callback: any): Promise<any> => callback({
+        priceTick: { upsert },
+        latestPrice: { upsert: latestPriceUpsert },
+      })),
+    } as any;
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    const summary = await repository.storeHistorical([
+      {
+        symbol: 'AAPL',
+        date: new Date('2025-01-01T15:30:00.000Z'),
+        open: 100,
+        high: 110,
+        low: 95,
+        close: 105,
+        volume: 10,
+        source: 'nse_cm_udiff_bhavcopy',
+      },
+    ], () => ({ region: 'US', exchange: 'NASDAQ' }));
+
+    expect(upsert).toHaveBeenCalledTimes(1);
+    expect(upsert.mock.calls[0][0].update.source).toBe('nse_cm_udiff_bhavcopy');
+    expect(summary).toMatchObject({
+      rowsReceived: 1,
+      rowsInserted: 0,
+      rowsUpdated: 1,
+      rowsNoOp: 0,
     });
   });
 

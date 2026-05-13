@@ -265,17 +265,47 @@ Forbidden scope:
 - `git diff --check` passed with line-ending warnings only.
 - PO accepted MD-A4 and the scoped implementation commit was pushed to `origin/dev` at `89ebe8e`. MD-A5 remains the next required implementation to actually populate 15-year/listing-date OHLCV and free-source fallback data.
 
-## Later Packets Parked Behind MD-A4
+## MD-A5 - 15-Year History And Free-Source Fallback
 
-1. **MD-A5 - 15-Year History And Free-Source Fallback**
-   Guarantee 15 years of daily OHLCV for every active stock, or listing-date-to-latest completed EOD when the company is younger. If Yahoo cannot provide sufficient reliable history, use approved official/public free exchange EOD sources before accepting missing data; paid providers, paid APIs, broker APIs, paid hosted services, and commercial free-tier providers are not approved by default.
-   Product brief: [MD-A5 product brief](../po-briefs/2026-05-13-md-a5-15-year-history-and-free-source-fallback-product-brief.md)
-   Architecture contract: [MD-A5 architecture contract](../architecture-contracts/2026-05-13-md-a5-15-year-history-and-free-source-fallback-contract.md)
-   QA plan: [MD-A5 QA plan](../qa-plans/2026-05-13-md-a5-15-year-history-and-free-source-fallback-qa-plan.md)
-   State: `QA Planning Completed`; parked behind MD-A4 implementation/signoff to avoid market-data write-scope conflicts.
-2. **MD-A6 - Catalog Identity And Manual CSV Repair Hardening**
+State: `PO Accepted - GitHub Check-In Pending`
+Mode: `Implementation Mode`
+Owner: Senior Fullstack Lead / Orchestrator
+Lane/module: Lane 1, `market-data-foundation`
+
+Product brief: [MD-A5 product brief](../po-briefs/2026-05-13-md-a5-15-year-history-and-free-source-fallback-product-brief.md)
+Architecture contract: [MD-A5 architecture contract](../architecture-contracts/2026-05-13-md-a5-15-year-history-and-free-source-fallback-contract.md)
+QA plan: [MD-A5 QA plan](../qa-plans/2026-05-13-md-a5-15-year-history-and-free-source-fallback-qa-plan.md)
+QA evidence: [MD-A5 QA evidence](../qa-evidence/2026-05-13-md-a5-15-year-history-and-free-source-fallback-qa-evidence.md)
+Lead validation: [MD-A5 Lead validation](../lead-validation/2026-05-13-md-a5-lead-validation.md)
+Architect signoff: [MD-A5 Architect signoff](../architecture-signoff/2026-05-13-md-a5-architect-signoff.md)
+PO acceptance: [MD-A5 PO acceptance](../po-acceptance/2026-05-13-md-a5-po-acceptance.md)
+
+### Product Goal
+
+Guarantee that every active `IN / STOCK` has daily OHLCV for the required history window through the latest completed EOD: 15 years for older listings, or listing-date-to-latest completed EOD when listed more recently. If Yahoo is shallow, missing, stale, throttled, or otherwise insufficient, MD-A5 must use or queue a free official/public fallback before accepting missing data. Paid providers, paid APIs, broker APIs, paid hosted services, and commercial free-tier providers are not approved by default.
+
+### Active Lane Split
+
+| Packet | Current State | Mode | Owner | Reserved Write Scope | Dependency / Next Action |
+|---|---|---|---|---|---|
+| MD-A5-BE-1 Required history-window computation and coverage diagnostics | `PO Accepted` | `GitHub Check-In Mode` | Senior Fullstack Lead / Orchestrator | `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`, `market-data-foundation.repository.ts`, `market-data-foundation.types.ts`, focused backend Market Data tests | Scoped GitHub check-in pending. |
+| MD-A5-BE-2 Official/public exchange EOD source adapters and local cache | `PO Accepted` | `GitHub Check-In Mode` | Senior Fullstack Lead / Orchestrator | `backend/src/modules/market-data-foundation/market-data-foundation.exchange-eod-adapter.ts`, focused adapter tests, fallback integration in service | Scoped GitHub check-in pending; BSE automatic download remains future/configured-source work. |
+| MD-A5-BE-3 Repair-run integration and provenance persistence | `PO Accepted` | `GitHub Check-In Mode` | Senior Fullstack Lead / Orchestrator | `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`, `market-data-foundation.repository.ts`, `market-data-foundation.types.ts`, focused backend tests | Scoped GitHub check-in pending; full active-universe drain remains bounded operational work. |
+| MD-A5-FE-1 Market Data UI evidence for full-window coverage and fallback | `PO Accepted` | `GitHub Check-In Mode` | Senior Fullstack Lead / Orchestrator | `frontend/src/features/market-data-foundation/types.ts`, `frontend/src/features/market-data-foundation/components/MarketDataStatusPanel.tsx`, `frontend/tests/ui/market-data-foundation.spec.ts` | Scoped GitHub check-in pending. |
+| MD-A5-QA-1 Validation evidence | `PO Accepted` | `GitHub Check-In Mode` | Senior Fullstack Lead / Orchestrator | [MD-A5 QA evidence](../qa-evidence/2026-05-13-md-a5-15-year-history-and-free-source-fallback-qa-evidence.md), [Lead validation](../lead-validation/2026-05-13-md-a5-lead-validation.md), [Architect signoff](../architecture-signoff/2026-05-13-md-a5-architect-signoff.md), [PO acceptance](../po-acceptance/2026-05-13-md-a5-po-acceptance.md) | Scoped GitHub check-in pending. |
+
+### Operating Rules
+
+- Every started or resumed MD-A5 agent must receive explicit instructions immediately: current mode, work item, owned files, forbidden files, expected artifact or handoff, validation expectations, and blocker protocol.
+- No MD-A5 agent may remain in `awaiting-instruction` state. The Orchestrator or Deputy must assign work, close the agent, or record a blocker with owner and next action.
+- Shared files must have one writing owner at a time. BE-1 and BE-3 overlap on service/repository/types and must be serialized or assigned to the same backend owner.
+- The hard product rule is not negotiable: every active `IN / STOCK` must have 15 years of daily OHLCV, or listing-date-to-latest daily OHLCV if listed more recently; Yahoo insufficiency requires a free official/public fallback path before missing data is accepted.
+
+## Later Packets Parked Behind MD-A5
+
+1. **MD-A6 - Catalog Identity And Manual CSV Repair Hardening**
    Fix deterministic provider symbol, ISIN, listing-date, and exchange identity gaps using public/local sources.
-3. **MD-A7 - Holiday/Session Accuracy**
+2. **MD-A7 - Holiday/Session Accuracy**
    Prevent false stale-EOD blockers caused by missing local holiday knowledge.
-4. **MD-A8 - Adjusted-Close And Volume Coverage Honesty**
+3. **MD-A8 - Adjusted-Close And Volume Coverage Honesty**
    Preserve volume and adjusted-close provenance so trusted review uses reliable OHLCV.

@@ -7,6 +7,7 @@ export interface HistoricalPrice {
   close: number;
   adjustedClose?: number | null;
   volume?: number;
+  source?: string;
 }
 
 export type MarketDataStatus = 'COMPLETE' | 'PARTIAL' | 'DELAYED' | 'MISSING' | 'ERROR';
@@ -441,6 +442,9 @@ export interface MarketDataUniverseHealth {
     providerRetryBlocked?: number;
     providerManualRepairRequired?: number;
     nextProviderRetryAtMin?: string | null;
+    historyCoverageIncomplete?: number;
+    historyCoverageListingDateMissing?: number;
+    historyCoverageFallbackRequired?: number;
     providerUnsupportedExcluded: number;
     providerValidationFailed: number;
     unsupported: number;
@@ -484,6 +488,7 @@ export interface TrustedReviewUniverseExcludedCounts {
   inactiveOrDelisted: number;
   noLatestPrice: number;
   staleLatestPrice: number;
+  requiredHistoryIncomplete: number;
   insufficientBarsUnder120: number;
   insufficientBarsUnder252: number;
   missingRecentVolume: number;
@@ -743,6 +748,9 @@ export interface MarketDataRepairPlan {
   providerRetryBlocked?: number;
   providerManualRepairRequired?: number;
   nextProviderRetryAtMin?: string | null;
+  historyCoverageIncomplete?: number;
+  historyCoverageListingDateMissing?: number;
+  historyCoverageFallbackRequired?: number;
   supportedCatalogIdentityRepairNeeded: number;
   supportedBusinessMetadataRepairNeeded: number;
   supportedPriceBackfillNeeded: number;
@@ -860,6 +868,8 @@ export interface MarketDataRepairSummary {
   storedHistoryStartDate?: string | null;
   storedHistoryEndDate?: string | null;
   storedHistoryBars?: number;
+  requiredHistoryMinimumBars?: number;
+  storedHistoryCoveragePercent?: number;
   requiredHistoryComplete?: boolean;
   remainingUnknown?: number;
   remainingRetryEligible?: number;
@@ -882,6 +892,8 @@ export interface MarketDataRepairSummary {
     storedHistoryStartDate?: string | null;
     storedHistoryEndDate?: string | null;
     storedHistoryBars?: number;
+    requiredHistoryMinimumBars?: number;
+    storedHistoryCoveragePercent?: number;
     requiredHistoryComplete?: boolean;
     sourceName?: string | null;
   }>;
@@ -896,6 +908,24 @@ export interface MarketDataRepairSummary {
   stillUnder120?: number;
   stillUnder200?: number;
   stillUnder252?: number;
+  historyCoverageIncomplete?: number;
+  historyCoverageListingDateMissing?: number;
+  historyCoverageFallbackRequired?: number;
+  sampleCoverageResults?: Array<{
+    symbol: string;
+    requiredHistoryStartDate: string;
+    requiredHistoryEndDate?: string | null;
+    listingDate?: string | null;
+    listingDateMissing?: boolean;
+    storedHistoryStartDate?: string | null;
+    storedHistoryEndDate?: string | null;
+    storedHistoryBars?: number;
+    requiredHistoryMinimumBars?: number;
+    storedHistoryCoveragePercent?: number;
+    requiredHistoryComplete?: boolean;
+    coverageStatus?: string;
+    sourceFallbackReason?: string | null;
+  }>;
   latestCompletedEodDate?: string | null;
   targetEndDate?: string | null;
   remainingCandidates?: number;

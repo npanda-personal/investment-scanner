@@ -931,6 +931,7 @@ export class MarketDataFoundationRepository {
     const uniqueSymbols = [...new Set(symbols.filter(Boolean))];
     const emptyStats: Map<string, UniversePriceStats> = new Map(uniqueSymbols.map((symbol) => [symbol, {
       priceHistoryBars: 0,
+      firstPriceDate: null,
       latestPriceDate: null,
       latestVolume: null,
       latestAdjustedClose: null,
@@ -1159,7 +1160,7 @@ export class MarketDataFoundationRepository {
         symbol: prices[0].symbol,
         timestamp: { in: prices.map((price) => price.date) },
       },
-      select: { timestamp: true, open: true, high: true, low: true, close: true, adjustedClose: true, volume: true },
+      select: { timestamp: true, open: true, high: true, low: true, close: true, adjustedClose: true, volume: true, source: true },
     });
     const existingByTimestamp = new Map(existingRows.map((row) => [row.timestamp.toISOString(), row]));
     const rowsToInsert = prices.filter((price) => !existingByTimestamp.has(price.date.toISOString()));
@@ -1178,8 +1179,9 @@ export class MarketDataFoundationRepository {
       const batchSize = 100;
       for (let i = 0; i < rowsToWrite.length; i += batchSize) {
         const batch = rowsToWrite.slice(i, i + batchSize);
-        const upsertOperations = batch.map(price =>
-          tx.priceTick.upsert({
+        const upsertOperations = batch.map((price) => {
+          const source = price.source || 'yahoo';
+          return tx.priceTick.upsert({
             where: {
               symbol_timestamp: {
                 symbol: price.symbol,
@@ -1193,7 +1195,7 @@ export class MarketDataFoundationRepository {
               close: new Prisma.Decimal(price.close),
               adjustedClose: price.adjustedClose !== undefined && price.adjustedClose !== null ? new Prisma.Decimal(price.adjustedClose) : null,
               volume: price.volume !== undefined && price.volume !== null ? BigInt(price.volume) : null,
-              source: 'yahoo',
+              source,
               region: regionInfo.region,
               exchange: regionInfo.exchange,
               dataStatus: 'COMPLETE',
@@ -1209,11 +1211,11 @@ export class MarketDataFoundationRepository {
               close: new Prisma.Decimal(price.close),
               adjustedClose: price.adjustedClose !== undefined && price.adjustedClose !== null ? new Prisma.Decimal(price.adjustedClose) : null,
               volume: price.volume !== undefined && price.volume !== null ? BigInt(price.volume) : null,
-              source: 'yahoo',
+              source,
               dataStatus: 'COMPLETE',
             },
-          })
-        );
+          });
+        });
 
         await Promise.all(upsertOperations);
 
@@ -1643,7 +1645,8 @@ export class MarketDataFoundationRepository {
       && this.sameDecimal(existing.low, price.low)
       && this.sameDecimal(existing.close, price.close)
       && this.sameNullableDecimal(existing.adjustedClose, price.adjustedClose ?? null)
-      && this.sameNullableBigInt(existing.volume, price.volume ?? null);
+      && this.sameNullableBigInt(existing.volume, price.volume ?? null)
+      && String(existing.source || 'yahoo') === String(price.source || 'yahoo');
   }
 
   private sameDecimal(left: unknown, right: number, tolerance = 0.000001): boolean {

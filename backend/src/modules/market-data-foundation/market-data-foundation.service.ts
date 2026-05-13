@@ -68,6 +68,10 @@ import {
   normalizeProviderStatus,
   UNIVERSE_STATES,
 } from './market-data-foundation.universe';
+import {
+  buildNseSecurityBhavdataArchiveUrl,
+  parseIndianExchangeEodCsv,
+} from './market-data-foundation.exchange-eod-adapter';
 
 const TRUSTED_REVIEW_SCAN_ORDERING = 'recentVolumeDesc_priceHistoryCompleteness_latestFreshness_symbol';
 
@@ -323,6 +327,27 @@ type RepairRunSourceSnapshot = {
 type PriceBackfillCandidate = {
   stock: any;
   readiness: InstrumentUniverseReadiness;
+  historyDiagnostics: {
+    requiredHistoryStartDate: string;
+    latestCompletedEodDate: string | null;
+    listingDate: string | null;
+    listingDateMissing: boolean;
+    storedHistoryStartDate: string | null;
+    storedHistoryEndDate: string | null;
+    storedHistoryBars: number;
+    requiredHistoryMinimumBars: number;
+    storedHistoryCoveragePercent: number;
+    requiredHistoryComplete: boolean;
+  };
+};
+
+type IndianExchangeFallbackResult = {
+  attempted: boolean;
+  prices: HistoricalPrice[];
+  warnings: string[];
+  sourceName: string | null;
+  daysAttempted: number;
+  rowsParsed: number;
 };
 
 export class MarketDataFoundationService {
@@ -376,7 +401,8 @@ export class MarketDataFoundationService {
       assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
     };
     const stocks = await this.repository.listStocksForUniverseHealth(scope);
-    const readinessBySymbol = await this.universeReadinessForStocks(stocks, scope);
+    const { readinessBySymbol, statsBySymbol } = await this.universeReadinessAndStatsForStocks(stocks, scope);
+    const validationWindow = this.providerValidationWindow(scope);
     const latestStoredEodDate = this.latestDateFromReadiness(readinessBySymbol);
     const expectedLatestTradingDate = latestCompletedTradingDateForRegion(scope.region);
     const generatedAt = new Date().toISOString();
@@ -387,6 +413,7 @@ export class MarketDataFoundationService {
     for (const stock of stocks) {
       const readiness = readinessBySymbol.get(stock.symbol);
       if (!readiness) continue;
+      let hasRequiredHistoryCoverage = true;
       counts.totalCatalogInstruments += 1;
       counts[readiness.universeState] += 1;
       counts.byUniverseState[readiness.universeState] += 1;
@@ -419,6 +446,17 @@ export class MarketDataFoundationService {
         if (providerStatus === 'SUPPORTED' && readiness.priceReadiness !== 'READY') {
           counts.supportedPriceBackfillNeeded += 1;
         }
+        if (providerStatus === 'SUPPORTED') {
+          const historyDiagnostics = this.requiredHistoryDiagnostics(stock, validationWindow, statsBySymbol.get(stock.symbol));
+          if (!historyDiagnostics.requiredHistoryComplete) {
+            hasRequiredHistoryCoverage = false;
+            counts.historyCoverageIncomplete = (counts.historyCoverageIncomplete || 0) + 1;
+            if (readiness.priceReadiness === 'READY') counts.supportedPriceBackfillNeeded += 1;
+          }
+          if (historyDiagnostics.listingDateMissing) {
+            counts.historyCoverageListingDateMissing = (counts.historyCoverageListingDateMissing || 0) + 1;
+          }
+        }
         if (readiness.universeState === 'CATALOG_ONLY') counts.catalogOnly += 1;
         if (readiness.universeState === 'STALE_OR_INCOMPLETE') counts.staleOrIncomplete += 1;
         if (readiness.isPriceReady) {
@@ -429,7 +467,7 @@ export class MarketDataFoundationService {
           counts.contextReady += 1;
           counts.readiness.contextReady += 1;
         }
-        if (readiness.isReviewReady) {
+        if (readiness.isReviewReady && hasRequiredHistoryCoverage) {
           counts.reviewReady += 1;
           counts.readiness.reviewReady += 1;
         }
@@ -786,6 +824,11 @@ export class MarketDataFoundationService {
       }
 
       providerSupportedCount += 1;
+      const historyDiagnostics = this.requiredHistoryDiagnostics(stock, this.providerValidationWindow(scope), stats);
+      if (!historyDiagnostics.requiredHistoryComplete) {
+        excludedCounts.requiredHistoryIncomplete += 1;
+        continue;
+      }
       if (!readiness.latestPriceDate) {
         excludedCounts.noLatestPrice += 1;
         continue;
@@ -850,6 +893,9 @@ export class MarketDataFoundationService {
     if (excludedCounts.insufficientBarsUnder252 > 0) {
       warnings.push(`${excludedCounts.insufficientBarsUnder252} trusted instruments have fewer than 252 bars and are limited to lite evidence.`);
     }
+    if (excludedCounts.requiredHistoryIncomplete > 0) {
+      warnings.push(`${excludedCounts.requiredHistoryIncomplete} provider-supported instruments are excluded until they have 15 years of daily OHLCV, or listing-date-to-latest coverage for newer listings.`);
+    }
     if (storedDataThroughDate && expectedLatestTradingDate && storedDataThroughDate < expectedLatestTradingDate) {
       warnings.push(`Stored data-through date ${storedDataThroughDate} is older than required data-through date ${expectedLatestTradingDate}.`);
     }
@@ -888,7 +934,8 @@ export class MarketDataFoundationService {
       assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
     };
     const stocks = await this.repository.listStocksForUniverseHealth(scope);
-    const readinessBySymbol = await this.universeReadinessForStocks(stocks, scope);
+    const { readinessBySymbol, statsBySymbol } = await this.universeReadinessAndStatsForStocks(stocks, scope);
+    const validationWindow = this.providerValidationWindow(scope);
     let providerUnknownValidationNeeded = 0;
     let providerRetryValidationNeeded = 0;
     let providerUnsupportedExcluded = 0;
@@ -898,6 +945,9 @@ export class MarketDataFoundationService {
     let providerRetryBlocked = 0;
     let providerManualRepairRequired = 0;
     let nextProviderRetryAtMin: string | null = null;
+    let historyCoverageIncomplete = 0;
+    let historyCoverageListingDateMissing = 0;
+    let historyCoverageFallbackRequired = 0;
     let supportedCatalogIdentityRepairNeeded = 0;
     let supportedBusinessMetadataRepairNeeded = 0;
     let supportedPriceBackfillNeeded = 0;
@@ -946,6 +996,17 @@ export class MarketDataFoundationService {
       if (isProviderSupported && readiness?.priceReadiness !== 'READY') {
         priceBackfillNeeded += 1;
         supportedPriceBackfillNeeded += 1;
+      }
+      if (isProviderSupported) {
+        const historyDiagnostics = this.requiredHistoryDiagnostics(stock, validationWindow, statsBySymbol.get(stock.symbol));
+        if (!historyDiagnostics.requiredHistoryComplete) {
+          historyCoverageIncomplete += 1;
+          if (readiness?.priceReadiness === 'READY') {
+            priceBackfillNeeded += 1;
+            supportedPriceBackfillNeeded += 1;
+          }
+        }
+        if (historyDiagnostics.listingDateMissing) historyCoverageListingDateMissing += 1;
       }
       if (this.needsBusinessMetadataRepair(stock)) businessMetadataRepairNeeded += 1;
       if (isProviderSupported && this.needsBusinessMetadataRepair(stock)) supportedBusinessMetadataRepairNeeded += 1;
@@ -1025,6 +1086,8 @@ export class MarketDataFoundationService {
     if (providerManualRepairRequired > 0) warnings.push(`${providerManualRepairRequired} provider validations require manual symbol/source repair.`);
     if (supportedCatalogIdentityRepairNeeded > 0) warnings.push(`${supportedCatalogIdentityRepairNeeded} provider-supported instruments need catalog identity repair for ISIN, listing date, exchange, or provider symbol.`);
     if (supportedPriceBackfillNeeded > 0) warnings.push(`${supportedPriceBackfillNeeded} provider-supported instruments need price backfill or latest EOD repair.`);
+    if (historyCoverageIncomplete > 0) warnings.push(`${historyCoverageIncomplete} provider-supported instruments do not yet have the required 15-year/listing-date daily OHLCV window.`);
+    if (historyCoverageListingDateMissing > 0) warnings.push(`${historyCoverageListingDateMissing} provider-supported instruments are missing listing date, so the 15-year target remains required and listing-date repair stays visible.`);
     if (businessMetadataAutoRepairable > 0) warnings.push(`${businessMetadataAutoRepairable} instruments are auto-repairable through provider business metadata repair.`);
     if (businessMetadataManualRequired > 0) warnings.push(`${businessMetadataManualRequired} instruments are marked manual-required after provider business metadata attempts.`);
     if (businessMetadataRetryBlocked > 0) warnings.push(`${businessMetadataRetryBlocked} provider business metadata repairs are retry-blocked until their next retry time.`);
@@ -1053,6 +1116,9 @@ export class MarketDataFoundationService {
       providerRetryBlocked,
       providerManualRepairRequired,
       nextProviderRetryAtMin,
+      historyCoverageIncomplete,
+      historyCoverageListingDateMissing,
+      historyCoverageFallbackRequired,
       supportedCatalogIdentityRepairNeeded,
       supportedBusinessMetadataRepairNeeded,
       supportedPriceBackfillNeeded,
@@ -2066,6 +2132,8 @@ export class MarketDataFoundationService {
     summary.zeroRowProviderReturns = 0;
     summary.deepReloaded = 0;
     summary.incrementalCaughtUp = 0;
+    summary.historyCoverageFallbackRequired = 0;
+    summary.sampleCoverageResults = [];
     const latestCompletedDate = latestCompletedTradingDateForRegion(scope.region);
     summary.latestCompletedEodDate = latestCompletedDate;
 
@@ -2099,16 +2167,22 @@ export class MarketDataFoundationService {
         summary.priceRowsNoOp = (summary.priceRowsNoOp || 0) + (result.rowsNoOp || 0);
         if (result.rowsReceived === 0 && !result.noNewData) {
           summary.zeroRowProviderReturns = (summary.zeroRowProviderReturns || 0) + 1;
+          summary.historyCoverageFallbackRequired = (summary.historyCoverageFallbackRequired || 0) + 1;
           summary.skipped += 1;
-          summary.warnings.push(`${stock.symbol}: provider returned zero usable price rows.`);
+          summary.warnings.push(`${stock.symbol}: provider returned zero usable price rows; approved free official/public exchange fallback is required before accepting missing history.`);
+          this.addPriceBackfillCoverageSample(summary, candidate, 'YAHOO_ZERO_ROWS');
         } else if (result.rowsInserted > 0 || result.rowsUpdated > 0) {
           summary.updated += 1;
+          this.addPriceBackfillCoverageSample(summary, candidate, null);
         } else if ((result.rowsNoOp || 0) > 0) {
           summary.noOp = (summary.noOp || 0) + 1;
+          this.addPriceBackfillCoverageSample(summary, candidate, null);
         }
       } catch (error) {
         summary.failed += 1;
+        summary.historyCoverageFallbackRequired = (summary.historyCoverageFallbackRequired || 0) + 1;
         summary.warnings.push(`${stock.symbol}: ${error instanceof Error ? error.message : 'price backfill failed'}`);
+        this.addPriceBackfillCoverageSample(summary, candidate, 'YAHOO_PROVIDER_ERROR');
       }
     }
 
@@ -2950,7 +3024,21 @@ export class MarketDataFoundationService {
 
     console.log(`  Fetching data from ${effectiveStartDate.toISOString().split('T')[0]} to ${effectiveEndDate.toISOString().split('T')[0]}`);
 
-    const prices = await this.fetchHistorical(providerSymbol, effectiveStartDate, effectiveEndDate);
+    let prices = await this.fetchHistorical(providerSymbol, effectiveStartDate, effectiveEndDate);
+    const exchangeFallback = await this.fetchIndianExchangeEodFallbackIfNeeded({
+      stock,
+      symbol,
+      providerSymbol,
+      region,
+      assetType,
+      startDate: effectiveStartDate,
+      endDate: effectiveEndDate,
+      providerPrices: prices,
+      enabled: Boolean(options.preserveProviderSupportOnZeroRows),
+    });
+    if (exchangeFallback.prices.length > 0) {
+      prices = this.mergeHistoricalPriceRows([...prices, ...exchangeFallback.prices]);
+    }
 
     if (prices.length === 0) {
       console.log(`  No new price data available for ${symbol}`);
@@ -2960,8 +3048,8 @@ export class MarketDataFoundationService {
         rowsUpdated: 0,
         rowsSkipped: 0,
         rowsNoOp: 0,
-        warningCount: 1,
-        warnings: ['Provider returned zero usable historical price rows.'],
+        warningCount: 1 + exchangeFallback.warnings.length,
+        warnings: ['Provider returned zero usable historical price rows.', ...exchangeFallback.warnings],
       };
       await this.repository.upsertSyncState({
         region,
@@ -2983,6 +3071,13 @@ export class MarketDataFoundationService {
 
     const pricesForStorage = prices.map((price) => ({ ...price, symbol }));
     const syncSummary = await this.storeHistorical(pricesForStorage);
+    if (exchangeFallback.attempted) {
+      syncSummary.warnings = [
+        ...(syncSummary.warnings || []),
+        ...exchangeFallback.warnings,
+      ].slice(0, 10);
+      syncSummary.warningCount = (syncSummary.warningCount || 0) + exchangeFallback.warnings.length;
+    }
     await this.repository.updateStockLoadTimestampBySymbol(symbol);
     if (typeof (this.repository as any).updateProviderSupportStatus === 'function') {
       await this.repository.updateProviderSupportStatus(symbol, 'SUPPORTED', null).catch(() => null);
@@ -3002,6 +3097,183 @@ export class MarketDataFoundationService {
 
     console.log(`  Successfully ingested ${prices.length} price ticks for ${symbol}`);
     return syncSummary;
+  }
+
+  private async fetchIndianExchangeEodFallbackIfNeeded(input: {
+    stock: any;
+    symbol: string;
+    providerSymbol: string;
+    region: string;
+    assetType: string;
+    startDate: Date;
+    endDate: Date;
+    providerPrices: HistoricalPrice[];
+    enabled: boolean;
+  }): Promise<IndianExchangeFallbackResult> {
+    const empty = (warnings: string[] = []): IndianExchangeFallbackResult => ({
+      attempted: false,
+      prices: [],
+      warnings,
+      sourceName: null,
+      daysAttempted: 0,
+      rowsParsed: 0,
+    });
+    if (!input.enabled || !this.exchangeEodFallbackEnabled()) return empty();
+    if (input.region !== 'IN' || input.assetType !== 'STOCK') return empty();
+    const exchange = String(input.stock?.exchange || '').trim().toUpperCase();
+    const symbolText = `${input.symbol} ${input.providerSymbol}`.toUpperCase();
+    if (exchange && exchange !== 'NSE' && exchange !== 'BSE') return empty();
+    if (exchange === 'BSE' || symbolText.includes('.BO')) {
+      return empty(['BSE official/public EOD fallback parsing is available, but no stable configured free BSE download URL is active for automatic backfill.']);
+    }
+    if (!this.providerHistoryNeedsExchangeFallback(input.providerPrices, input.startDate)) return empty();
+
+    const dates = this.exchangeEodFallbackDates(input.startDate, input.endDate);
+    if (dates.length === 0) return empty();
+    const targetSymbols = this.exchangeEodTargetSymbols(input);
+    const concurrency = this.exchangeEodFallbackConcurrency();
+    const warnings: string[] = [];
+    const prices: HistoricalPrice[] = [];
+    let rowsParsed = 0;
+
+    await this.eachWithConcurrency(dates, concurrency, async (date) => {
+      const archive = buildNseSecurityBhavdataArchiveUrl(date);
+      try {
+        const csvText = await this.downloadOfficialExchangeText(archive.url);
+        const parsed = parseIndianExchangeEodCsv(csvText, {
+          source: archive.sourceName,
+          sourceUrl: archive.url,
+          exchange: 'NSE',
+          includeSeries: ['EQ', 'BE'],
+          tradingDate: date,
+        });
+        rowsParsed += parsed.rowsParsed;
+        warnings.push(...parsed.warnings.slice(0, 2));
+        prices.push(...parsed.prices.filter((price) => targetSymbols.has(price.symbol.toUpperCase())));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'official exchange fallback download failed';
+        warnings.push(`${archive.sourceName} ${archive.fileName}: ${message}`);
+      }
+    });
+
+    const uniquePrices = this.mergeHistoricalPriceRows(prices.map((price) => ({ ...price, symbol: input.symbol })));
+    if (uniquePrices.length === 0) {
+      warnings.unshift(`${input.symbol}: free official NSE EOD fallback attempted ${dates.length} day(s), but no matching daily OHLCV rows were stored.`);
+    } else {
+      warnings.unshift(`${input.symbol}: free official NSE EOD fallback stored ${uniquePrices.length} daily OHLCV row(s) from ${dates.length} bounded archive day(s).`);
+    }
+
+    return {
+      attempted: true,
+      prices: uniquePrices,
+      warnings: warnings.slice(0, 10),
+      sourceName: 'NSE_SECURITY_BHAVDATA',
+      daysAttempted: dates.length,
+      rowsParsed,
+    };
+  }
+
+  private exchangeEodFallbackEnabled(): boolean {
+    const value = process.env.MARKET_DATA_EXCHANGE_EOD_FALLBACK_ENABLED;
+    if (value !== undefined) return !['0', 'false', 'no', 'off'].includes(value.trim().toLowerCase());
+    return process.env.NODE_ENV !== 'test';
+  }
+
+  private providerHistoryNeedsExchangeFallback(prices: HistoricalPrice[], startDate: Date): boolean {
+    if (prices.length === 0) return true;
+    const earliest = prices.reduce((earliestDate, price) => price.date < earliestDate ? price.date : earliestDate, prices[0].date);
+    const gapDays = Math.floor((this.startOfUtcDay(earliest).getTime() - this.startOfUtcDay(startDate).getTime()) / 86_400_000);
+    return gapDays > this.readPositiveNumber(process.env.MARKET_DATA_EXCHANGE_EOD_FALLBACK_EARLIEST_GAP_DAYS, 14);
+  }
+
+  private exchangeEodFallbackDates(startDate: Date, endDate: Date): Date[] {
+    const maxDays = Math.max(1, Math.min(this.readPositiveNumber(process.env.MARKET_DATA_EXCHANGE_EOD_FALLBACK_MAX_DAYS_PER_SYMBOL, 20), 90));
+    const dates: Date[] = [];
+    const cursor = this.startOfUtcDay(startDate);
+    const stop = this.startOfUtcDay(endDate);
+    while (cursor <= stop && dates.length < maxDays) {
+      dates.push(new Date(cursor));
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+    return dates;
+  }
+
+  private exchangeEodTargetSymbols(input: { stock: any; symbol: string; providerSymbol: string }): Set<string> {
+    const candidates = [
+      input.symbol,
+      input.providerSymbol,
+      input.stock?.symbol,
+      input.stock?.providerSymbol,
+      input.stock?.sourceSymbol,
+      input.stock?.displaySymbol,
+    ].filter(Boolean).map((value) => String(value).trim().toUpperCase());
+    const withNseSuffix = candidates.flatMap((value) => {
+      const base = this.baseSymbolFromProviderSymbol(value);
+      return [value, base, `${base}.NS`];
+    });
+    return new Set(withNseSuffix.filter(Boolean));
+  }
+
+  private async downloadOfficialExchangeText(url: string): Promise<string> {
+    this.validateConfiguredCatalogUrl(url);
+    const maxBytes = Math.max(100_000, Math.min(this.readPositiveNumber(process.env.MARKET_DATA_EXCHANGE_EOD_MAX_DOWNLOAD_BYTES, 15_000_000), 50_000_000));
+    const timeoutMs = Math.max(1_000, Math.min(this.readPositiveNumber(process.env.MARKET_DATA_EXCHANGE_EOD_TIMEOUT_MS, 20_000), 120_000));
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          accept: 'text/csv, text/plain, */*',
+          'accept-language': 'en-US,en;q=0.9',
+          'user-agent': 'investment-scanner-market-data-foundation/1.0',
+        },
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const contentLength = response.headers.get('content-length');
+      if (contentLength && Number(contentLength) > maxBytes) throw new Error('download exceeds configured max size');
+      const buffer = Buffer.from(await response.arrayBuffer());
+      if (buffer.length > maxBytes) throw new Error('download exceeds configured max size');
+      return buffer.toString('utf8');
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') throw new Error('download timed out');
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  private mergeHistoricalPriceRows(prices: HistoricalPrice[]): HistoricalPrice[] {
+    const byKey = new Map<string, HistoricalPrice>();
+    for (const price of prices) {
+      byKey.set(`${price.symbol}|${this.startOfUtcDay(price.date).toISOString()}`, {
+        ...price,
+        date: this.startOfUtcDay(price.date),
+      });
+    }
+    return [...byKey.values()].sort((left, right) => left.date.getTime() - right.date.getTime());
+  }
+
+  private async eachWithConcurrency<T>(items: T[], concurrency: number, worker: (item: T) => Promise<void>) {
+    let index = 0;
+    const workerCount = Math.max(1, Math.min(concurrency, items.length));
+    await Promise.all(Array.from({ length: workerCount }, async () => {
+      while (index < items.length) {
+        const current = items[index];
+        index += 1;
+        await worker(current);
+      }
+    }));
+  }
+
+  private exchangeEodFallbackConcurrency(): number {
+    return Math.max(1, Math.min(this.readPositiveNumber(process.env.MARKET_DATA_EXCHANGE_EOD_FALLBACK_CONCURRENCY, 4), 8));
+  }
+
+  private startOfUtcDay(date: Date): Date {
+    const value = new Date(date);
+    value.setUTCHours(0, 0, 0, 0);
+    return value;
   }
 
   async syncV1(request: V1IngestionRequest): Promise<V1SyncResult> {
@@ -3938,6 +4210,9 @@ export class MarketDataFoundationService {
       providerRetryBlocked: 0,
       providerManualRepairRequired: 0,
       nextProviderRetryAtMin: null,
+      historyCoverageIncomplete: 0,
+      historyCoverageListingDateMissing: 0,
+      historyCoverageFallbackRequired: 0,
       providerUnsupportedExcluded: 0,
       providerValidationFailed: 0,
       unsupported: 0,
@@ -3976,6 +4251,7 @@ export class MarketDataFoundationService {
       inactiveOrDelisted: 0,
       noLatestPrice: 0,
       staleLatestPrice: 0,
+      requiredHistoryIncomplete: 0,
       insufficientBarsUnder120: 0,
       insufficientBarsUnder252: 0,
       missingRecentVolume: 0,
@@ -4271,11 +4547,16 @@ export class MarketDataFoundationService {
     const storedHistoryStartDate = storedStats?.firstPriceDate ?? null;
     const storedHistoryEndDate = storedStats?.latestPriceDate ?? null;
     const storedHistoryBars = Number(storedStats?.priceHistoryBars || 0);
+    const requiredHistoryMinimumBars = this.requiredHistoryMinimumBars(requiredHistoryStartDate, validationWindow.latestCompletedEodDate);
+    const storedHistoryCoveragePercent = requiredHistoryMinimumBars > 0
+      ? Number(Math.min((storedHistoryBars / requiredHistoryMinimumBars) * 100, 100).toFixed(1))
+      : 100;
     const requiredHistoryComplete = Boolean(
       storedHistoryStartDate
       && storedHistoryEndDate
       && storedHistoryStartDate <= requiredHistoryStartDate
       && (!validationWindow.latestCompletedEodDate || storedHistoryEndDate >= validationWindow.latestCompletedEodDate)
+      && storedHistoryBars >= requiredHistoryMinimumBars
     );
     return {
       requiredHistoryStartDate,
@@ -4285,8 +4566,20 @@ export class MarketDataFoundationService {
       storedHistoryStartDate,
       storedHistoryEndDate,
       storedHistoryBars,
+      requiredHistoryMinimumBars,
+      storedHistoryCoveragePercent,
       requiredHistoryComplete,
     };
+  }
+
+  private requiredHistoryMinimumBars(requiredStartDate: string, latestCompletedEodDate: string | null): number {
+    if (!latestCompletedEodDate) return 1;
+    const start = new Date(`${requiredStartDate}T00:00:00.000Z`);
+    const end = new Date(`${latestCompletedEodDate}T00:00:00.000Z`);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) return 1;
+    const calendarDays = Math.floor((end.getTime() - start.getTime()) / 86_400_000) + 1;
+    const expectedTradingDays = Math.floor((calendarDays / 365.25) * 252);
+    return Math.max(1, Math.floor(expectedTradingDays * 0.9));
   }
 
   private providerStatusForValidation(
@@ -5597,14 +5890,17 @@ export class MarketDataFoundationService {
 
   private async priceBackfillCandidates(scope: { region: string; assetType: string }): Promise<PriceBackfillCandidate[]> {
     const stocks = await this.repository.listStocksForUniverseHealth(scope);
-    const readinessBySymbol = await this.universeReadinessForStocks(stocks, scope);
+    const { readinessBySymbol, statsBySymbol } = await this.universeReadinessAndStatsForStocks(stocks, scope);
+    const validationWindow = this.providerValidationWindow(scope);
     return stocks
       .flatMap((stock): PriceBackfillCandidate[] => {
         if (stock.isActive === false || stock.isDelisted === true) return [];
         if (normalizeProviderStatus(stock.providerSupportStatus) !== 'SUPPORTED') return [];
         const readiness = readinessBySymbol.get(stock.symbol);
-        if (!readiness || readiness.priceReadiness === 'READY') return [];
-        return [{ stock, readiness }];
+        if (!readiness) return [];
+        const historyDiagnostics = this.requiredHistoryDiagnostics(stock, validationWindow, statsBySymbol.get(stock.symbol));
+        if (readiness.priceReadiness === 'READY' && historyDiagnostics.requiredHistoryComplete) return [];
+        return [{ stock, readiness, historyDiagnostics }];
       })
       .sort((left, right) => {
         const leftPriority = this.priceBackfillCandidatePriority(left.readiness);
@@ -5629,15 +5925,18 @@ export class MarketDataFoundationService {
     request: MarketDataRepairRequest
   ): { stock: any; mode: 'DEEP' | 'INCREMENTAL'; startDate: Date } {
     const forceDeep = request.fullReload === true || request.policy === 'FORCE_DEEP';
+    const missingRequiredHistoryStart = !candidate.historyDiagnostics.storedHistoryStartDate
+      || candidate.historyDiagnostics.storedHistoryStartDate > candidate.historyDiagnostics.requiredHistoryStartDate;
     const needsDeepHistory = forceDeep
       || !candidate.readiness.latestPriceDate
-      || candidate.readiness.priceHistoryBars < 252;
+      || candidate.readiness.priceHistoryBars < 252
+      || missingRequiredHistoryStart;
 
     if (needsDeepHistory) {
       return {
         stock: candidate.stock,
         mode: 'DEEP',
-        startDate: this.defaultBackfillStartDate(latestCompletedDate),
+        startDate: this.historyStartDate(candidate.historyDiagnostics.requiredHistoryStartDate, latestCompletedDate),
       };
     }
 
@@ -5661,6 +5960,50 @@ export class MarketDataFoundationService {
     summary.stillUnder120 = candidates.filter((candidate) => candidate.readiness.priceHistoryBars < 120).length;
     summary.stillUnder200 = candidates.filter((candidate) => candidate.readiness.priceHistoryBars < 200).length;
     summary.stillUnder252 = candidates.filter((candidate) => candidate.readiness.priceHistoryBars < 252).length;
+    summary.historyCoverageIncomplete = candidates.filter((candidate) => !candidate.historyDiagnostics.requiredHistoryComplete).length;
+    summary.historyCoverageListingDateMissing = candidates.filter((candidate) => candidate.historyDiagnostics.listingDateMissing).length;
+    const requiredStarts = candidates
+      .map((candidate) => candidate.historyDiagnostics.requiredHistoryStartDate)
+      .filter(Boolean)
+      .sort();
+    if (requiredStarts.length > 0) summary.requiredHistoryStartDate = requiredStarts[0];
+    summary.requiredHistoryCoverageStatus = (summary.historyCoverageFallbackRequired || 0) > 0
+      ? 'FALLBACK_REQUIRED'
+      : (summary.historyCoverageIncomplete || 0) > 0
+        ? 'NEEDS_BACKFILL'
+        : 'COMPLETE';
+  }
+
+  private addPriceBackfillCoverageSample(
+    summary: MarketDataRepairSummary,
+    candidate: PriceBackfillCandidate,
+    sourceFallbackReason: string | null
+  ) {
+    if (!summary.sampleCoverageResults) summary.sampleCoverageResults = [];
+    if (summary.sampleCoverageResults.length >= 20) return;
+    const diagnostics = candidate.historyDiagnostics;
+    summary.sampleCoverageResults.push({
+      symbol: candidate.stock.symbol,
+      requiredHistoryStartDate: diagnostics.requiredHistoryStartDate,
+      requiredHistoryEndDate: diagnostics.latestCompletedEodDate,
+      listingDate: diagnostics.listingDate,
+      listingDateMissing: diagnostics.listingDateMissing,
+      storedHistoryStartDate: diagnostics.storedHistoryStartDate,
+      storedHistoryEndDate: diagnostics.storedHistoryEndDate,
+      storedHistoryBars: diagnostics.storedHistoryBars,
+      requiredHistoryMinimumBars: diagnostics.requiredHistoryMinimumBars,
+      storedHistoryCoveragePercent: diagnostics.storedHistoryCoveragePercent,
+      requiredHistoryComplete: diagnostics.requiredHistoryComplete,
+      coverageStatus: diagnostics.requiredHistoryComplete ? 'COMPLETE' : 'NEEDS_BACKFILL',
+      sourceFallbackReason,
+    });
+  }
+
+  private historyStartDate(requiredHistoryStartDate: string, latestCompletedDate: string): Date {
+    const start = new Date(`${requiredHistoryStartDate}T00:00:00.000Z`);
+    if (Number.isNaN(start.getTime())) return this.defaultBackfillStartDate(latestCompletedDate);
+    start.setUTCHours(0, 0, 0, 0);
+    return start;
   }
 
   private endOfTradingDateUtc(tradingDate: string | null): Date {

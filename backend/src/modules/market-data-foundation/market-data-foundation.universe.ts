@@ -20,6 +20,7 @@ export const UNIVERSE_STATES: UniverseState[] = [
 
 export interface UniversePriceStats {
   priceHistoryBars: number;
+  firstPriceDate?: string | null;
   latestPriceDate: string | null;
   latestVolume?: bigint | number | string | null;
   latestAdjustedClose?: unknown;

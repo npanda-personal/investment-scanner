@@ -54,6 +54,29 @@ const formatPercent = (value?: number) => `${Number(value ?? 0).toFixed(1)}%`;
 const REPAIR_BATCH_SIZE = 50;
 const hasNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 const hasPositive = (value: unknown): value is number => hasNumber(value) && value > 0;
+type CoverageSample = NonNullable<MarketDataRepairSummary['sampleCoverageResults']>[number];
+
+const coverageSampleStatus = (sample: CoverageSample) => {
+  if (sample.coverageStatus) return sample.coverageStatus;
+  if (sample.requiredHistoryComplete === true) return 'COMPLETE';
+  if (sample.requiredHistoryComplete === false) return 'NEEDS_BACKFILL';
+  return 'UNKNOWN';
+};
+
+const formatCoverageComplete = (value?: boolean) => {
+  if (value === true) return 'yes';
+  if (value === false) return 'no';
+  return 'unknown';
+};
+
+const formatCoverageSample = (sample: CoverageSample) => {
+  const listingDate = sample.listingDateMissing ? 'listing date missing' : `listing date ${sample.listingDate || 'unknown'}`;
+  const storedRange = sample.storedHistoryStartDate || sample.storedHistoryEndDate || hasNumber(sample.storedHistoryBars)
+    ? `; stored ${sample.storedHistoryStartDate || 'none'} to ${sample.storedHistoryEndDate || 'none'}${hasNumber(sample.storedHistoryBars) ? ` (${formatCount(sample.storedHistoryBars)} bars)` : ''}`
+    : '';
+  const fallbackReason = sample.sourceFallbackReason ? `; fallback reason ${sample.sourceFallbackReason}` : '';
+  return `Coverage sample ${sample.symbol}: ${coverageSampleStatus(sample)}; required ${sample.requiredHistoryStartDate} to ${sample.requiredHistoryEndDate || 'unknown'}; ${listingDate}${storedRange}; complete ${formatCoverageComplete(sample.requiredHistoryComplete)}${fallbackReason}.`;
+};
 
 type RepairAction =
   | 'VALIDATE_PROVIDERS'
@@ -186,6 +209,9 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
       hasPositive(repairSummary.remainingRetryEligible) ||
       hasPositive(repairSummary.remainingRetryBlocked) ||
       hasPositive(repairSummary.validationFailed) ||
+      hasPositive(repairSummary.historyCoverageIncomplete) ||
+      hasPositive(repairSummary.historyCoverageListingDateMissing) ||
+      hasPositive(repairSummary.historyCoverageFallbackRequired) ||
       repairSummary.hasMore
     ) return 'warning' as const;
     const priceRowsChanged = (repairSummary.priceRowsInserted ?? 0) + (repairSummary.priceRowsUpdated ?? 0) + (repairSummary.priceRowsNoOp ?? 0);
@@ -324,6 +350,9 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
   const providerRetryEligible = repairPlan?.providerRetryValidationNeeded ?? repairPlan?.retryFailedValidations ?? universeHealth?.counts.providerRetryValidationNeeded ?? 0;
   const providerRetryBlocked = repairPlan?.providerRetryBlocked ?? 0;
   const providerManualRequired = repairPlan?.providerManualRepairRequired ?? 0;
+  const historyCoverageIncomplete = repairPlan?.historyCoverageIncomplete ?? universeHealth?.counts.historyCoverageIncomplete ?? 0;
+  const historyCoverageListingDateMissing = repairPlan?.historyCoverageListingDateMissing ?? universeHealth?.counts.historyCoverageListingDateMissing ?? 0;
+  const historyCoverageFallbackRequired = repairPlan?.historyCoverageFallbackRequired ?? universeHealth?.counts.historyCoverageFallbackRequired ?? 0;
   const retryDisabledReason = providerUnknownRemaining > 0
     ? `Retry blocked until ${formatCount(providerUnknownRemaining)} unknown provider rows drain.`
     : providerRetryEligible === 0 && (providerRetryBlocked > 0 || providerManualRequired > 0)
@@ -331,8 +360,8 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
       : null;
   const coverageStatus = (summary: MarketDataRepairSummary) => {
     if (summary.requiredHistoryCoverageStatus) return summary.requiredHistoryCoverageStatus;
-    if (hasPositive(summary.freeFallbackRequired)) return 'FALLBACK_REQUIRED';
-    if (hasPositive(summary.remainingCandidates) || hasPositive(summary.stillUnder252)) return 'NEEDS_BACKFILL';
+    if (hasPositive(summary.historyCoverageFallbackRequired) || hasPositive(summary.freeFallbackRequired)) return 'FALLBACK_REQUIRED';
+    if (hasPositive(summary.historyCoverageIncomplete) || hasPositive(summary.remainingCandidates) || hasPositive(summary.stillUnder252)) return 'NEEDS_BACKFILL';
     return 'COMPLETE_OR_NOT_REPORTED';
   };
 
@@ -416,6 +445,9 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
             <Typography variant="caption">Business auto-repairable: {formatCount(repairPlan?.businessMetadataAutoRepairable)}</Typography>
             <Typography variant="caption">Manual business metadata: {formatCount(repairPlan?.manualBusinessMetadataRequired)}</Typography>
             <Typography variant="caption">Supported price backfill: {formatCount(repairPlan?.supportedPriceBackfillNeeded ?? repairPlan?.priceBackfillNeeded)}</Typography>
+            <Typography variant="caption">15-year/listing-date coverage incomplete: {formatCount(historyCoverageIncomplete)}</Typography>
+            <Typography variant="caption">Listing date missing for coverage: {formatCount(historyCoverageListingDateMissing)}</Typography>
+            <Typography variant="caption">History fallback required: {formatCount(historyCoverageFallbackRequired)}</Typography>
             <Typography variant="caption">Latest EOD: {universeHealth?.latestStoredEodDate || 'none'} / {universeHealth?.expectedLatestTradingDate || 'unknown'}</Typography>
             <Typography variant="caption">Next provider retry: {repairPlan?.nextProviderRetryAtMin || 'none'}</Typography>
             <Typography variant="caption">Next action: {universeHealth?.universeSignoff?.nextAction || repairPlan?.universeSignoff?.nextAction || 'none'}</Typography>
@@ -495,6 +527,7 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
             <Typography variant="caption">Required data-through: {trustedReviewUniverse?.requiredDataThroughDate || 'unknown'}</Typography>
             <Typography variant="caption">Stored data-through: {trustedReviewUniverse?.storedDataThroughDate || trustedReviewUniverse?.dataThroughDate || 'none'}</Typography>
             <Typography variant="caption">Provider unknown excluded: {formatCount(trustedReviewUniverse?.excludedCounts.providerUnknown)}</Typography>
+            <Typography variant="caption">Required-history excluded: {formatCount(trustedReviewUniverse?.excludedCounts.requiredHistoryIncomplete)}</Typography>
             <Typography variant="caption">Stale latest price excluded: {formatCount(trustedReviewUniverse?.excludedCounts.staleLatestPrice)}</Typography>
             <Typography variant="caption">Under 120 bars excluded: {formatCount(trustedReviewUniverse?.excludedCounts.insufficientBarsUnder120)}</Typography>
             {hasNumber(trustedReviewUniverse?.excludedCounts.insufficientBarsUnder200) && (
@@ -699,7 +732,7 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
             <Box>
               <Typography variant="subtitle1" fontWeight={700}>Universe Repair Workflow</Typography>
               <Typography variant="body2" color="text.secondary">
-                Each action runs one bounded batch. Price backfill repairs shallow supported rows and catches up completed EOD candles.
+                Each action runs one bounded batch. Every IN/STOCK needs 15 years of daily OHLCV, or listing-date-to-latest coverage when the listing is newer.
               </Typography>
             </Box>
             <Typography variant="caption" color="text.secondary">
@@ -737,6 +770,18 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
               <Typography variant="caption" color="text.secondary">Supported price backfill needed</Typography>
               <Typography variant="h6">{formatCount(repairPlan?.supportedPriceBackfillNeeded ?? repairPlan?.priceBackfillNeeded)}</Typography>
             </Box>
+            <Box sx={{ p: 1.5, border: '1px solid', borderColor: historyCoverageIncomplete > 0 ? 'warning.main' : 'divider', borderRadius: 1 }}>
+              <Typography variant="caption" color="text.secondary">15-year/listing-date incomplete</Typography>
+              <Typography variant="h6">{formatCount(historyCoverageIncomplete)}</Typography>
+            </Box>
+            <Box sx={{ p: 1.5, border: '1px solid', borderColor: historyCoverageListingDateMissing > 0 ? 'warning.main' : 'divider', borderRadius: 1 }}>
+              <Typography variant="caption" color="text.secondary">Missing listing date coverage</Typography>
+              <Typography variant="h6">{formatCount(historyCoverageListingDateMissing)}</Typography>
+            </Box>
+            <Box sx={{ p: 1.5, border: '1px solid', borderColor: historyCoverageFallbackRequired > 0 ? 'warning.main' : 'divider', borderRadius: 1 }}>
+              <Typography variant="caption" color="text.secondary">Fallback-required coverage</Typography>
+              <Typography variant="h6">{formatCount(historyCoverageFallbackRequired)}</Typography>
+            </Box>
             <Box sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
               <Typography variant="caption" color="text.secondary">Supported business metadata gaps</Typography>
               <Typography variant="h6">{formatCount(repairPlan?.supportedBusinessMetadataRepairNeeded ?? repairPlan?.businessMetadataRepairNeeded)}</Typography>
@@ -766,6 +811,12 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
               <Typography variant="h6">{formatCount(repairPlan?.manualBusinessMetadataRequired ?? repairPlan?.manualMetadataRequired)}</Typography>
             </Box>
           </Box>
+
+          {(repairPlan?.sampleCoverageResults || []).slice(0, 3).map((sample) => (
+            <Typography key={`${sample.symbol}-${sample.requiredHistoryStartDate}-${sample.coverageStatus || 'coverage'}`} variant="caption" color="text.secondary">
+              {formatCoverageSample(sample)}
+            </Typography>
+          ))}
 
           <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
             <Button
@@ -958,11 +1009,21 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
                   repairSummary.latestCompletedEodDate ||
                   repairSummary.targetEndDate ||
                   repairSummary.requiredHistoryCoverageStatus ||
+                  hasNumber(repairSummary.historyCoverageIncomplete) ||
+                  hasNumber(repairSummary.historyCoverageListingDateMissing) ||
+                  hasNumber(repairSummary.historyCoverageFallbackRequired) ||
                   hasNumber(repairSummary.stillUnder252) ||
                   hasNumber(repairSummary.freeFallbackRequired) ||
                   hasNumber(repairSummary.remainingCandidates)) && (
                   <Typography variant="caption">
                     Coverage target: 15-year/listing-date daily OHLCV from {repairSummary.requiredHistoryStartDate || repairSummary.listingDate || 'target start unknown'} through latest completed EOD {repairSummary.latestCompletedEodDate || repairSummary.targetEndDate || 'unknown'}; listing date {repairSummary.listingDate || 'unknown'}; status {coverageStatus(repairSummary)}.
+                  </Typography>
+                )}
+                {(hasNumber(repairSummary.historyCoverageIncomplete) ||
+                  hasNumber(repairSummary.historyCoverageListingDateMissing) ||
+                  hasNumber(repairSummary.historyCoverageFallbackRequired)) && (
+                  <Typography variant="caption">
+                    15-year/listing-date coverage: incomplete {formatCount(repairSummary.historyCoverageIncomplete)}, missing listing date {formatCount(repairSummary.historyCoverageListingDateMissing)}, fallback required {formatCount(repairSummary.historyCoverageFallbackRequired)}.
                   </Typography>
                 )}
                 {repairSummary.partialSuccess ? <Typography variant="caption">Partial metadata repairs: {formatCount(repairSummary.partialSuccess)}.</Typography> : null}
@@ -980,6 +1041,11 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
                 {(repairSummary.sampleResults || []).slice(0, 3).map((sample) => (
                   <Typography key={`${sample.symbol}-${sample.classification || sample.status || 'result'}`} variant="caption">
                     Sample {sample.symbol}: {sample.classification || sample.status || 'unclassified'}{sample.providerSymbol ? ` via ${sample.providerSymbol}` : ''}{hasNumber(sample.candlesFound) ? `; candles ${formatCount(sample.candlesFound)}` : ''}{hasNumber(sample.providerCallMs) ? `; ${formatCount(sample.providerCallMs)} ms` : ''}{sample.nextRetryAt ? `; next retry ${sample.nextRetryAt}` : ''}{sample.message ? `; ${sample.message}` : ''}.
+                  </Typography>
+                ))}
+                {(repairSummary.sampleCoverageResults || []).slice(0, 3).map((sample) => (
+                  <Typography key={`${sample.symbol}-${sample.requiredHistoryStartDate}-${sample.coverageStatus || 'coverage'}`} variant="caption">
+                    {formatCoverageSample(sample)}
                   </Typography>
                 ))}
               </Stack>

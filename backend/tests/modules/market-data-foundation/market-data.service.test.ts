@@ -886,6 +886,136 @@ describe('MarketDataFoundationService syncV1', () => {
     expect(repository.updateProviderSupportStatus).toHaveBeenCalledWith('ABB', 'SUPPORTED', null);
   });
 
+  it('stores free official NSE EOD fallback rows when Yahoo returns no backfill data', async () => {
+    const originalFallbackFlag = process.env.MARKET_DATA_EXCHANGE_EOD_FALLBACK_ENABLED;
+    const originalMaxDays = process.env.MARKET_DATA_EXCHANGE_EOD_FALLBACK_MAX_DAYS_PER_SYMBOL;
+    const originalFetch = global.fetch;
+    process.env.MARKET_DATA_EXCHANGE_EOD_FALLBACK_ENABLED = 'true';
+    process.env.MARKET_DATA_EXCHANGE_EOD_FALLBACK_MAX_DAYS_PER_SYMBOL = '1';
+    const csv = [
+      'SYMBOL,SERIES,DATE1,OPEN_PRICE,HIGH_PRICE,LOW_PRICE,CLOSE_PRICE,TTL_TRD_QNTY',
+      'RELIANCE,EQ,13-May-2026,1430.00,1450.50,1420.25,1444.10,1234567',
+    ].join('\n');
+    const bytes = Buffer.from(csv);
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      headers: { get: jest.fn().mockReturnValue(String(bytes.length)) },
+      arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+    } as any);
+    const repository = {
+      findStockBySymbol: jest.fn().mockResolvedValue({
+        symbol: 'RELIANCE.NS',
+        providerSymbol: 'RELIANCE.NS',
+        sourceSymbol: 'RELIANCE',
+        exchange: 'NSE',
+        region: 'IN',
+        assetType: 'STOCK',
+        lastSuccessfulDataLoadTimestamp: null,
+      }),
+      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue(null),
+      getSyncState: jest.fn().mockResolvedValue(null),
+      updateStockLoadTimestampBySymbol: jest.fn().mockResolvedValue({}),
+      updateProviderSupportStatus: jest.fn().mockResolvedValue({}),
+      upsertSyncState: jest.fn().mockResolvedValue({}),
+    };
+    const provider = {
+      inferRegion: jest.fn().mockReturnValue({ region: 'IN', exchange: 'NSE' }),
+      fetchHistorical: jest.fn().mockResolvedValue([]),
+    };
+    const service = new MarketDataFoundationService(repository as any, provider as any);
+    const storeHistorical = jest.spyOn(service, 'storeHistorical').mockResolvedValue({
+      rowsReceived: 1,
+      rowsInserted: 1,
+      rowsUpdated: 0,
+      rowsSkipped: 0,
+      rowsNoOp: 0,
+      warningCount: 0,
+      warnings: [],
+    });
+
+    try {
+      const result = await service.ingestSymbol(
+        'RELIANCE.NS',
+        new Date('2026-05-13T00:00:00.000Z'),
+        new Date('2026-05-13T23:59:59.999Z'),
+        false,
+        { force: true, region: 'IN', assetType: 'STOCK', preserveProviderSupportOnZeroRows: true }
+      );
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://archives.nseindia.com/products/content/sec_bhavdata_full_13052026.csv',
+        expect.any(Object)
+      );
+      expect(storeHistorical).toHaveBeenCalledWith([
+        expect.objectContaining({
+          symbol: 'RELIANCE.NS',
+          source: 'NSE_SECURITY_BHAVDATA',
+          close: 1444.1,
+        }),
+      ]);
+      expect(repository.updateProviderSupportStatus).toHaveBeenCalledWith('RELIANCE.NS', 'SUPPORTED', null);
+      expect(result).toMatchObject({
+        rowsReceived: 1,
+        rowsInserted: 1,
+      });
+    } finally {
+      if (originalFallbackFlag === undefined) delete process.env.MARKET_DATA_EXCHANGE_EOD_FALLBACK_ENABLED;
+      else process.env.MARKET_DATA_EXCHANGE_EOD_FALLBACK_ENABLED = originalFallbackFlag;
+      if (originalMaxDays === undefined) delete process.env.MARKET_DATA_EXCHANGE_EOD_FALLBACK_MAX_DAYS_PER_SYMBOL;
+      else process.env.MARKET_DATA_EXCHANGE_EOD_FALLBACK_MAX_DAYS_PER_SYMBOL = originalMaxDays;
+      global.fetch = originalFetch;
+    }
+  });
+
+  it('excludes provider-supported stocks from trusted review until required 15-year coverage exists', async () => {
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue([
+        {
+          symbol: 'SPARSE.NS',
+          providerSymbol: 'SPARSE.NS',
+          providerSupportStatus: 'SUPPORTED',
+          isActive: true,
+          isDelisted: false,
+          sector: 'Tech',
+          industry: 'Software',
+          country: 'India',
+          currency: 'INR',
+          marketCap: 1000,
+          isin: 'INE123A01010',
+          ipoDate: new Date('2000-01-01T00:00:00.000Z'),
+          region: 'IN',
+          assetType: 'STOCK',
+          exchange: 'NSE',
+        },
+      ]),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['SPARSE.NS', {
+          priceHistoryBars: 300,
+          firstPriceDate: '2011-05-12',
+          latestPriceDate: latestCompletedTradingDateForRegion('IN'),
+          latestVolume: 100,
+          latestAdjustedClose: 10,
+          latestClose: 10,
+          rollingWindowBars: 252,
+          rollingWindowCoveragePercent: 100,
+          maxPriceGapDays: 1,
+          recentVolumeCoveragePercent: 100,
+          adjustedCloseCoveragePercent: 100,
+          usesAdjustedCloseFallback: false,
+        }],
+      ])),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+
+    const result = await service.trustedReviewUniverseHealth({ region: 'IN', assetType: 'STOCK' });
+
+    expect(result.trustedCount).toBe(0);
+    expect(result.excludedCounts.requiredHistoryIncomplete).toBe(1);
+    expect(result.warnings).toEqual(expect.arrayContaining([
+      expect.stringContaining('15 years of daily OHLCV'),
+    ]));
+  });
+
   it('imports index seed rows and records provider validation status', async () => {
     const upsertCatalogInstrument = jest.fn().mockResolvedValue({ action: 'inserted', stock: {} });
     const updateProviderSupportStatus = jest.fn().mockResolvedValue({});
@@ -2904,7 +3034,8 @@ describe('MarketDataFoundationService syncV1', () => {
   });
 
   const reviewReadyPriceStats = (overrides: any = {}) => ({
-    priceHistoryBars: 252,
+    priceHistoryBars: 3820,
+    firstPriceDate: '2011-05-12',
     latestPriceDate: latestCompletedTradingDateForRegion('IN'),
     latestVolume: 1000,
     latestAdjustedClose: 100,
@@ -2980,6 +3111,50 @@ describe('MarketDataFoundationService syncV1', () => {
     ]));
   });
 
+  it('repair plan keeps 15-year history gaps in the backfill queue even when 252-bar readiness passes', async () => {
+    const service = planServiceForStock(
+      reviewReadyStock(),
+      reviewReadyPriceStats({
+        priceHistoryBars: 300,
+        firstPriceDate: '2020-01-01',
+        rollingWindowBars: 252,
+        rollingWindowCoveragePercent: 100,
+      })
+    );
+
+    const result = await service.repairPlan({ region: 'IN', assetType: 'STOCK' });
+
+    expect(result).toMatchObject({
+      priceBackfillNeeded: 1,
+      supportedPriceBackfillNeeded: 1,
+      historyCoverageIncomplete: 1,
+      historyCoverageListingDateMissing: 0,
+    });
+    expect(result.warnings).toEqual(expect.arrayContaining([
+      expect.stringContaining('15-year/listing-date daily OHLCV window'),
+    ]));
+  });
+
+  it('does not treat sparse 15-year boundary rows as complete required history coverage', async () => {
+    const service = planServiceForStock(
+      reviewReadyStock(),
+      reviewReadyPriceStats({
+        priceHistoryBars: 300,
+        firstPriceDate: '2011-05-12',
+        latestPriceDate: latestCompletedTradingDateForRegion('IN'),
+        rollingWindowBars: 252,
+        rollingWindowCoveragePercent: 100,
+      })
+    );
+
+    const result = await service.repairPlan({ region: 'IN', assetType: 'STOCK' });
+
+    expect(result).toMatchObject({
+      priceBackfillNeeded: 1,
+      historyCoverageIncomplete: 1,
+    });
+  });
+
   it('signoff fails when review-ready count is below configured minimum', async () => {
     const service = planServiceForStock(reviewReadyStock(), reviewReadyPriceStats());
 
@@ -3024,7 +3199,7 @@ describe('MarketDataFoundationService syncV1', () => {
         { symbol: 'PRICE.NS', providerSupportStatus: 'SUPPORTED', isActive: true, isDelisted: false, providerSymbol: 'PRICE.NS', sector: 'Tech', industry: 'Software', country: 'India', currency: 'INR' },
       ]),
       priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
-        ['PRICE.NS', { priceHistoryBars: 0, latestPriceDate: null, latestVolume: null, latestAdjustedClose: null, latestClose: null }],
+        ['PRICE.NS', { priceHistoryBars: 0, firstPriceDate: null, latestPriceDate: null, latestVolume: null, latestAdjustedClose: null, latestClose: null }],
       ])),
     };
     const service = new MarketDataFoundationService(repository as any, {} as any);
@@ -3070,6 +3245,17 @@ describe('MarketDataFoundationService syncV1', () => {
       stillUnder120: 1,
       stillUnder200: 1,
       stillUnder252: 1,
+      historyCoverageIncomplete: 1,
+      historyCoverageListingDateMissing: 1,
+      requiredHistoryCoverageStatus: 'NEEDS_BACKFILL',
+    });
+    expect(result.sampleCoverageResults?.[0]).toMatchObject({
+      symbol: 'PRICE.NS',
+      listingDateMissing: true,
+      storedHistoryStartDate: null,
+      storedHistoryEndDate: null,
+      requiredHistoryComplete: false,
+      coverageStatus: 'NEEDS_BACKFILL',
     });
   });
 
@@ -3094,7 +3280,7 @@ describe('MarketDataFoundationService syncV1', () => {
         .mockResolvedValueOnce([]),
       priceReadinessStatsForSymbols: jest.fn()
         .mockResolvedValueOnce(new Map([
-          ['SHALLOW.NS', { priceHistoryBars: 20, latestPriceDate: '2026-05-11', latestVolume: 100, latestAdjustedClose: null, latestClose: 10, rollingWindowBars: 20, recentVolumeCoveragePercent: 100 }],
+          ['SHALLOW.NS', { priceHistoryBars: 20, firstPriceDate: '2026-04-15', latestPriceDate: '2026-05-11', latestVolume: 100, latestAdjustedClose: null, latestClose: 10, rollingWindowBars: 20, recentVolumeCoveragePercent: 100 }],
         ]))
         .mockResolvedValueOnce(new Map()),
     };
@@ -3127,14 +3313,115 @@ describe('MarketDataFoundationService syncV1', () => {
     });
   });
 
-  it('uses incremental catch-up for stale rows that already have 252 bars', async () => {
+  it('uses listing date as the deep backfill start for companies listed less than 15 years', async () => {
+    const repository = {
+      listStocksForUniverseHealth: jest.fn()
+        .mockResolvedValueOnce([
+          {
+            symbol: 'YOUNG.NS',
+            providerSupportStatus: 'SUPPORTED',
+            isActive: true,
+            isDelisted: false,
+            providerSymbol: 'YOUNG.NS',
+            ipoDate: new Date('2020-08-10T00:00:00.000Z'),
+            sector: 'Tech',
+            industry: 'Software',
+            country: 'India',
+            currency: 'INR',
+          },
+        ])
+        .mockResolvedValueOnce([]),
+      priceReadinessStatsForSymbols: jest.fn()
+        .mockResolvedValueOnce(new Map([
+          ['YOUNG.NS', { priceHistoryBars: 252, firstPriceDate: '2021-01-01', latestPriceDate: latestCompletedTradingDateForRegion('IN'), latestVolume: 100, latestAdjustedClose: 10, latestClose: 10, rollingWindowBars: 252, rollingWindowCoveragePercent: 100, recentVolumeCoveragePercent: 100 }],
+        ]))
+        .mockResolvedValueOnce(new Map()),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+    jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
+      rowsReceived: 10,
+      rowsInserted: 10,
+      rowsUpdated: 0,
+      rowsSkipped: 0,
+      rowsNoOp: 0,
+      warningCount: 0,
+      warnings: [],
+    });
+
+    const result = await service.backfillPrices({ region: 'IN', assetType: 'STOCK', batchSize: 1 });
+
+    const ingestCall = (service.ingestSymbol as jest.Mock).mock.calls[0];
+    const startDate = ingestCall[1] as Date;
+    expect(startDate.toISOString()).toBe('2020-08-10T00:00:00.000Z');
+    expect(result).toMatchObject({
+      deepReloaded: 1,
+      historyCoverageIncomplete: 0,
+      historyCoverageListingDateMissing: 0,
+    });
+    expect(result.sampleCoverageResults?.[0]).toMatchObject({
+      symbol: 'YOUNG.NS',
+      requiredHistoryStartDate: '2020-08-10',
+      listingDate: '2020-08-10',
+      storedHistoryStartDate: '2021-01-01',
+      requiredHistoryComplete: false,
+    });
+  });
+
+  it('keeps Yahoo zero-row price backfill results as free fallback required', async () => {
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue([
+        {
+          symbol: 'EMPTY.NS',
+          providerSupportStatus: 'SUPPORTED',
+          isActive: true,
+          isDelisted: false,
+          providerSymbol: 'EMPTY.NS',
+          sector: 'Tech',
+          industry: 'Software',
+          country: 'India',
+          currency: 'INR',
+        },
+      ]),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['EMPTY.NS', { priceHistoryBars: 0, firstPriceDate: null, latestPriceDate: null, latestVolume: null, latestAdjustedClose: null, latestClose: null }],
+      ])),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+    jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
+      rowsReceived: 0,
+      rowsInserted: 0,
+      rowsUpdated: 0,
+      rowsSkipped: 0,
+      rowsNoOp: 0,
+      warningCount: 1,
+      warnings: ['Provider returned zero usable historical price rows.'],
+    });
+
+    const result = await service.backfillPrices({ region: 'IN', assetType: 'STOCK', batchSize: 1 });
+
+    expect(result).toMatchObject({
+      zeroRowProviderReturns: 1,
+      historyCoverageFallbackRequired: 1,
+      requiredHistoryCoverageStatus: 'FALLBACK_REQUIRED',
+      skipped: 1,
+    });
+    expect(result.warnings).toEqual(expect.arrayContaining([
+      expect.stringContaining('approved free official/public exchange fallback is required'),
+    ]));
+    expect(result.sampleCoverageResults?.[0]).toMatchObject({
+      symbol: 'EMPTY.NS',
+      sourceFallbackReason: 'YAHOO_ZERO_ROWS',
+    });
+  });
+
+  it('uses incremental catch-up for stale rows that already have complete required history coverage', async () => {
     const latestCompletedEod = latestCompletedTradingDateForRegion('IN')!;
     const repository = {
       listStocksForUniverseHealth: jest.fn().mockResolvedValue([
         { symbol: 'STALE.NS', providerSupportStatus: 'SUPPORTED', isActive: true, isDelisted: false, providerSymbol: 'STALE.NS', sector: 'Tech', industry: 'Software', country: 'India', currency: 'INR' },
       ]),
       priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
-        ['STALE.NS', { priceHistoryBars: 300, latestPriceDate: '2026-01-01', latestVolume: 100, latestAdjustedClose: 10, latestClose: 10, rollingWindowBars: 252, rollingWindowCoveragePercent: 100, recentVolumeCoveragePercent: 100 }],
+        ['STALE.NS', { priceHistoryBars: 3820, firstPriceDate: '2011-05-12', latestPriceDate: '2026-01-01', latestVolume: 100, latestAdjustedClose: 10, latestClose: 10, rollingWindowBars: 252, rollingWindowCoveragePercent: 100, recentVolumeCoveragePercent: 100 }],
       ])),
     };
     const service = new MarketDataFoundationService(repository as any, {} as any);

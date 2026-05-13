@@ -178,6 +178,7 @@ export class YahooFinanceIngestionService {
           close: item.close,
           adjustedClose: providerAdjustedClose,
           volume: item.volume,
+          source: 'yahoo',
         };
       });
       const validation = partitionHistoricalPrices(prices);

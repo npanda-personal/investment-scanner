@@ -449,6 +449,7 @@ export class TodayTradeReviewService {
         inactiveOrDelisted: 0,
         noLatestPrice: 0,
         staleLatestPrice: 0,
+        requiredHistoryIncomplete: 0,
         insufficientBarsUnder120: 0,
         insufficientBarsUnder252: 0,
         missingRecentVolume: 0,
