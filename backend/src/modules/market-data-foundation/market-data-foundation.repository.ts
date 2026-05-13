@@ -927,6 +927,53 @@ export class MarketDataFoundationRepository {
     });
   }
 
+  async latestPriceExists(symbol: string): Promise<boolean> {
+    const row = await this.prisma.latestPrice.findUnique({
+      where: { symbol },
+      select: { symbol: true },
+    });
+    return Boolean(row);
+  }
+
+  async reassignPriceRowsToCanonicalSymbol(input: {
+    stockId: string;
+    fromSymbol: string;
+    toSymbol: string;
+  }): Promise<{ priceRowsMoved: number; latestPricesMoved: number }> {
+    return this.prisma.$transaction(async (tx) => {
+      const [targetLatest, canonicalPriceRows] = await Promise.all([
+        tx.latestPrice.findUnique({ where: { symbol: input.toSymbol }, select: { symbol: true } }),
+        tx.priceTick.count({ where: { symbol: input.toSymbol } }),
+      ]);
+      if (targetLatest) {
+        throw new Error(`TARGET_LATEST_PRICE_COLLISION: ${input.toSymbol} already has latest price.`);
+      }
+      if (canonicalPriceRows > 0) {
+        throw new Error(`CANONICAL_PRICE_ROWS_EXIST: ${input.toSymbol} already has price rows.`);
+      }
+
+      const priceRows = await tx.priceTick.updateMany({
+        where: { symbol: input.fromSymbol },
+        data: { symbol: input.toSymbol },
+      });
+      const latestRows = await tx.latestPrice.updateMany({
+        where: { symbol: input.fromSymbol },
+        data: { symbol: input.toSymbol },
+      });
+      if (priceRows.count > 0) {
+        await tx.stock.update({
+          where: { id: input.stockId },
+          data: { lastSuccessfulDataLoadTimestamp: new Date() },
+        });
+      }
+
+      return {
+        priceRowsMoved: priceRows.count,
+        latestPricesMoved: latestRows.count,
+      };
+    });
+  }
+
   async priceReadinessStatsForSymbols(symbols: string[]): Promise<Map<string, UniversePriceStats>> {
     const uniqueSymbols = [...new Set(symbols.filter(Boolean))];
     const emptyStats: Map<string, UniversePriceStats> = new Map(uniqueSymbols.map((symbol) => [symbol, {

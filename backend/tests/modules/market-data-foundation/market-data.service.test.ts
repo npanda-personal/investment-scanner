@@ -1016,6 +1016,286 @@ describe('MarketDataFoundationService syncV1', () => {
     ]));
   });
 
+  it('reports read-only active stock missing-data diagnostics with expected-null and identity mismatch samples', async () => {
+    const updateCompanyMasterData = jest.fn();
+    const updateProviderSupportStatus = jest.fn();
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue([
+        {
+          id: 'good',
+          symbol: 'GOOD.NS',
+          name: 'Good Limited',
+          region: 'IN',
+          exchange: 'NSE',
+          country: 'India',
+          sector: 'Technology',
+          industry: 'Software',
+          currency: 'INR',
+          marketCap: 1000,
+          assetType: 'STOCK',
+          instrumentSegment: 'CASH',
+          displaySymbol: 'GOOD',
+          providerSymbol: 'GOOD.NS',
+          sourceSymbol: 'GOOD',
+          catalogSource: 'NSE_EQUITY_SECURITIES',
+          providerSupportStatus: 'SUPPORTED',
+          providerError: null,
+          derivativesEligible: false,
+          underlyingSymbol: null,
+          expiryDate: null,
+          contractMonth: null,
+          lotSize: null,
+          contractStatus: null,
+          isActive: true,
+          isDelisted: false,
+          ipoDate: new Date('2000-01-01T00:00:00.000Z'),
+          isin: 'INE123A01010',
+          source: 'catalog',
+          dataStatus: 'PARTIAL',
+          lastSuccessfulDataLoadTimestamp: new Date('2026-05-12T00:00:00.000Z'),
+        },
+        {
+          id: 'bad',
+          symbol: 'BROKEN',
+          name: 'Broken Limited',
+          region: 'IN',
+          exchange: 'NSE',
+          country: 'Unknown',
+          sector: 'N/A',
+          industry: '',
+          currency: 'USD',
+          marketCap: 0,
+          assetType: 'STOCK',
+          instrumentSegment: 'CASH',
+          displaySymbol: 'BROKEN',
+          providerSymbol: 'BROKEN.BO',
+          sourceSymbol: 'OTHER',
+          catalogSource: '',
+          providerSupportStatus: 'SUPPORTED',
+          providerError: 'stale provider error',
+          derivativesEligible: false,
+          underlyingSymbol: 'NIFTY',
+          expiryDate: null,
+          contractMonth: null,
+          lotSize: null,
+          contractStatus: null,
+          isActive: true,
+          isDelisted: false,
+          ipoDate: null,
+          isin: 'BAD',
+          source: 'database',
+          dataStatus: 'BAD_STATUS',
+          lastSuccessfulDataLoadTimestamp: null,
+        },
+        {
+          id: 'alt-price',
+          symbol: 'CANON.NS',
+          name: 'Alternate Price Limited',
+          region: 'IN',
+          exchange: 'NSE',
+          country: 'India',
+          sector: 'Industrials',
+          industry: 'Machinery',
+          currency: 'INR',
+          marketCap: 500,
+          assetType: 'STOCK',
+          instrumentSegment: 'CASH',
+          displaySymbol: 'CANON',
+          providerSymbol: 'ALT.NS',
+          sourceSymbol: 'CANON',
+          catalogSource: 'NSE_EQUITY_SECURITIES',
+          providerSupportStatus: 'SUPPORTED',
+          providerError: null,
+          derivativesEligible: false,
+          underlyingSymbol: null,
+          expiryDate: null,
+          contractMonth: null,
+          lotSize: null,
+          contractStatus: null,
+          isActive: true,
+          isDelisted: false,
+          ipoDate: new Date('2019-01-01T00:00:00.000Z'),
+          isin: 'INE999A01010',
+          source: 'catalog',
+          dataStatus: 'PARTIAL',
+          lastSuccessfulDataLoadTimestamp: null,
+        },
+        {
+          id: 'inactive',
+          symbol: 'INACTIVE.NS',
+          name: '',
+          region: 'IN',
+          isActive: false,
+          isDelisted: false,
+        },
+      ]),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['GOOD.NS', { priceHistoryBars: 300 }],
+        ['BROKEN', { priceHistoryBars: 0 }],
+        ['BROKEN.BO', { priceHistoryBars: 10 }],
+        ['CANON.NS', { priceHistoryBars: 0 }],
+        ['ALT.NS', { priceHistoryBars: 50 }],
+      ])),
+      updateCompanyMasterData,
+      updateProviderSupportStatus,
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+
+    const result = await service.stockMissingDataDiagnostics({ region: 'IN', assetType: 'STOCK', sampleLimit: 2 });
+
+    expect(result.activeStockCount).toBe(3);
+    expect(result.sampleLimit).toBe(2);
+    expect(repository.priceReadinessStatsForSymbols).toHaveBeenCalledWith(expect.arrayContaining([
+      'GOOD.NS',
+      'BROKEN',
+      'BROKEN.BO',
+      'CANON.NS',
+      'ALT.NS',
+    ]));
+    expect(result.columns.find((item) => item.column === 'sector')).toMatchObject({ nullEquivalentCount: 1, affectedCount: 1 });
+    expect(result.columns.find((item) => item.column === 'industry')).toMatchObject({ blankCount: 1, affectedCount: 1 });
+    expect(result.columns.find((item) => item.column === 'marketCap')).toMatchObject({ invalidCount: 1, affectedCount: 1 });
+    expect(result.columns.find((item) => item.column === 'providerError')).toMatchObject({ expectedNullCount: 2, unexpectedNonNullCount: 1 });
+    expect(result.columns.find((item) => item.column === 'underlyingSymbol')).toMatchObject({ expectedNullCount: 2, unexpectedNonNullCount: 1 });
+    expect(result.expectedNullColumns.find((item) => item.column === 'underlyingSymbol')).toMatchObject({
+      expectedNullCount: 2,
+      unexpectedNonNullCount: 1,
+    });
+    expect(result.identityMismatches).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'PROVIDER_SYMBOL_SUFFIX_MISMATCH', count: 1 }),
+      expect.objectContaining({ code: 'STOCK_SYMBOL_SUFFIX_MISMATCH', count: 1 }),
+      expect.objectContaining({ code: 'PRICE_ROWS_UNDER_ALTERNATE_SYMBOL', count: 2 }),
+      expect.objectContaining({ code: 'SUPPORTED_WITHOUT_CANONICAL_PRICES', count: 2 }),
+    ]));
+    expect(result.identityMismatches.find((item) => item.code === 'PRICE_ROWS_UNDER_ALTERNATE_SYMBOL')?.samples[0]).toMatchObject({
+      issue: 'IDENTITY_MISMATCH',
+      alternatePriceHistoryBars: expect.any(Number),
+    });
+    expect(result.totals.identityMismatchRows).toBe(2);
+    expect(updateCompanyMasterData).not.toHaveBeenCalled();
+    expect(updateProviderSupportStatus).not.toHaveBeenCalled();
+  });
+
+  it('repairs price identity only for safe provider-symbol price rows', async () => {
+    const stocks = [
+      {
+        id: 'safe',
+        symbol: 'CCL',
+        name: 'CCL Products',
+        region: 'IN',
+        exchange: 'NSE',
+        assetType: 'STOCK',
+        instrumentSegment: 'CASH',
+        providerSymbol: 'CCL.NS',
+        sourceSymbol: 'CCL',
+        displaySymbol: 'CCL',
+        providerSupportStatus: 'SUPPORTED',
+        isActive: true,
+        isDelisted: false,
+      },
+      {
+        id: 'base-mismatch',
+        symbol: 'FEL.NS',
+        name: 'Future Enterprises',
+        region: 'IN',
+        exchange: 'NSE',
+        assetType: 'STOCK',
+        instrumentSegment: 'CASH',
+        providerSymbol: 'FELDVR.NS',
+        sourceSymbol: 'FELDVR',
+        displaySymbol: 'FELDVR',
+        providerSupportStatus: 'SUPPORTED',
+        isActive: true,
+        isDelisted: false,
+      },
+      {
+        id: 'exchange-mismatch',
+        symbol: 'BSEONLY.BO',
+        name: 'BSE Only',
+        region: 'IN',
+        exchange: 'BSE',
+        assetType: 'STOCK',
+        instrumentSegment: 'CASH',
+        providerSymbol: 'BSEONLY.NS',
+        sourceSymbol: 'BSEONLY',
+        displaySymbol: 'BSEONLY',
+        providerSupportStatus: 'SUPPORTED',
+        isActive: true,
+        isDelisted: false,
+      },
+      {
+        id: 'dup-a',
+        symbol: 'DUPA',
+        name: 'Duplicate A',
+        region: 'IN',
+        exchange: 'NSE',
+        assetType: 'STOCK',
+        instrumentSegment: 'CASH',
+        providerSymbol: 'DUP.NS',
+        sourceSymbol: 'DUP',
+        displaySymbol: 'DUP',
+        providerSupportStatus: 'SUPPORTED',
+        isActive: true,
+        isDelisted: false,
+      },
+      {
+        id: 'dup-b',
+        symbol: 'DUPB',
+        name: 'Duplicate B',
+        region: 'IN',
+        exchange: 'NSE',
+        assetType: 'STOCK',
+        instrumentSegment: 'CASH',
+        providerSymbol: 'DUP.NS',
+        sourceSymbol: 'DUP',
+        displaySymbol: 'DUP',
+        providerSupportStatus: 'SUPPORTED',
+        isActive: true,
+        isDelisted: false,
+      },
+    ];
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue(stocks),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['CCL', { priceHistoryBars: 0 }],
+        ['CCL.NS', { priceHistoryBars: 4036 }],
+        ['FEL.NS', { priceHistoryBars: 0 }],
+        ['FELDVR.NS', { priceHistoryBars: 1230 }],
+        ['BSEONLY.BO', { priceHistoryBars: 0 }],
+        ['BSEONLY.NS', { priceHistoryBars: 100 }],
+        ['DUPA', { priceHistoryBars: 0 }],
+        ['DUPB', { priceHistoryBars: 0 }],
+        ['DUP.NS', { priceHistoryBars: 50 }],
+      ])),
+      latestPriceExists: jest.fn().mockResolvedValue(false),
+      reassignPriceRowsToCanonicalSymbol: jest.fn().mockResolvedValue({ priceRowsMoved: 4036, latestPricesMoved: 1 }),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+
+    const dryRun = await service.repairPriceIdentity({ region: 'IN', assetType: 'STOCK', dryRun: true, batchSize: 10 });
+
+    expect(dryRun.dryRun).toBe(true);
+    expect(dryRun.totalCandidates).toBe(5);
+    expect(dryRun.repaired).toBe(0);
+    expect(dryRun.samples.find((item) => item.stockId === 'safe')).toMatchObject({ action: 'DRY_RUN', skippedReason: null });
+    expect(dryRun.samples.find((item) => item.stockId === 'base-mismatch')).toMatchObject({ action: 'SKIPPED' });
+    expect(dryRun.samples.find((item) => item.stockId === 'exchange-mismatch')).toMatchObject({ action: 'SKIPPED' });
+    expect(dryRun.samples.find((item) => item.stockId === 'dup-a')).toMatchObject({ action: 'SKIPPED' });
+    expect(repository.reassignPriceRowsToCanonicalSymbol).not.toHaveBeenCalled();
+
+    const repaired = await service.repairPriceIdentity({ region: 'IN', assetType: 'STOCK', dryRun: false, batchSize: 10 });
+
+    expect(repaired.repaired).toBe(1);
+    expect(repaired.skipped).toBe(4);
+    expect(repaired.priceRowsMoved).toBe(4036);
+    expect(repaired.latestPricesMoved).toBe(1);
+    expect(repository.reassignPriceRowsToCanonicalSymbol).toHaveBeenCalledWith({
+      stockId: 'safe',
+      fromSymbol: 'CCL.NS',
+      toSymbol: 'CCL',
+    });
+  });
+
   it('imports index seed rows and records provider validation status', async () => {
     const upsertCatalogInstrument = jest.fn().mockResolvedValue({ action: 'inserted', stock: {} });
     const updateProviderSupportStatus = jest.fn().mockResolvedValue({});

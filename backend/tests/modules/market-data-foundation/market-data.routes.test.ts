@@ -9,6 +9,7 @@ import {
 const controller = {
   health: jest.fn(),
   universeHealth: jest.fn(),
+  stockMissingDataDiagnostics: jest.fn(),
   reviewReadinessSummary: jest.fn(),
   trustedReviewUniverseHealth: jest.fn(),
   trustedReviewUniverseInstruments: jest.fn(),
@@ -20,6 +21,7 @@ const controller = {
   validateProviders: jest.fn(),
   repairCatalogIdentity: jest.fn(),
   repairProviderBusinessMetadata: jest.fn(),
+  repairPriceIdentity: jest.fn(),
   importManualMetadata: jest.fn(),
   enrichMetadata: jest.fn(),
   backfillPrices: jest.fn(),
@@ -69,6 +71,7 @@ describe('market data routers', () => {
       expect.arrayContaining([
         'GET /market-data/health',
         'GET /market-data/universe/health',
+        'GET /market-data/stocks/missing-data-diagnostics',
         'GET /market-data/review-readiness-summary',
         'GET /market-data/review-universe',
         'GET /market-data/review-universe/instruments',
@@ -81,6 +84,7 @@ describe('market data routers', () => {
         'POST /market-data/catalog/identity/repair',
         'POST /market-data/catalog/identity-repair',
         'POST /market-data/metadata/provider-business/repair',
+        'POST /market-data/prices/identity-repair',
         'POST /market-data/metadata/manual-import',
         'POST /market-data/metadata/enrich',
         'POST /market-data/prices/backfill',

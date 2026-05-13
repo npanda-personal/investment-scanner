@@ -9,6 +9,7 @@ import {
   fetchLatestMarketDataRepairRun,
   fetchMarketDataHealth,
   fetchMarketDataRepairPlan,
+  fetchMarketDataStockMissingDataDiagnostics,
   fetchTrustedReviewUniverseHealth,
   fetchReviewReadinessSummary,
   fetchMarketDataUniverseHealth,
@@ -26,6 +27,7 @@ import {
   type MarketDataRepairRunRecord,
   type MarketDataRepairRunResponse,
   type MarketDataRepairSummary,
+  type MarketDataStockMissingDataDiagnostics,
   type MarketDataUniverseHealth,
   type TrustedReviewUniverseHealth,
   type MarketDataSchedulerRegionStatus,
@@ -54,7 +56,9 @@ const formatPercent = (value?: number) => `${Number(value ?? 0).toFixed(1)}%`;
 const REPAIR_BATCH_SIZE = 50;
 const hasNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 const hasPositive = (value: unknown): value is number => hasNumber(value) && value > 0;
+const firstNumber = (...values: Array<number | null | undefined>) => values.find(hasNumber) ?? 0;
 type CoverageSample = NonNullable<MarketDataRepairSummary['sampleCoverageResults']>[number];
+type IdentityMismatchWarning = NonNullable<MarketDataStockMissingDataDiagnostics['identityMismatchWarnings']>[number];
 
 const coverageSampleStatus = (sample: CoverageSample) => {
   if (sample.coverageStatus) return sample.coverageStatus;
@@ -76,6 +80,24 @@ const formatCoverageSample = (sample: CoverageSample) => {
     : '';
   const fallbackReason = sample.sourceFallbackReason ? `; fallback reason ${sample.sourceFallbackReason}` : '';
   return `Coverage sample ${sample.symbol}: ${coverageSampleStatus(sample)}; required ${sample.requiredHistoryStartDate} to ${sample.requiredHistoryEndDate || 'unknown'}; ${listingDate}${storedRange}; complete ${formatCoverageComplete(sample.requiredHistoryComplete)}${fallbackReason}.`;
+};
+
+const formatMismatchPair = (label: string, current?: string | null, expected?: string | null) => {
+  if (!current && !expected) return null;
+  return `${label} ${current || 'missing'}${expected ? ` -> ${expected}` : ''}`;
+};
+
+const formatIdentityMismatchWarning = (warning: IdentityMismatchWarning) => {
+  const details = [
+    warning.issue,
+    formatMismatchPair('provider', warning.providerSymbol, warning.expectedProviderSymbol),
+    formatMismatchPair('source', warning.sourceSymbol, warning.expectedSourceSymbol),
+    formatMismatchPair('display', warning.displaySymbol, warning.expectedDisplaySymbol),
+    formatMismatchPair('exchange', warning.exchange, warning.expectedExchange),
+    formatMismatchPair('ISIN', warning.isin, warning.expectedIsin),
+  ].filter(Boolean);
+
+  return `${warning.symbol || 'Unknown symbol'}${details.length ? `: ${details.join('; ')}` : ''}.`;
 };
 
 type RepairAction =
@@ -115,6 +137,7 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
   const [reviewReadiness, setReviewReadiness] = useState<ReviewReadinessSummary | null>(null);
   const [trustedReviewUniverse, setTrustedReviewUniverse] = useState<TrustedReviewUniverseHealth | null>(null);
   const [repairPlan, setRepairPlan] = useState<MarketDataRepairPlan | null>(null);
+  const [missingDataDiagnostics, setMissingDataDiagnostics] = useState<MarketDataStockMissingDataDiagnostics | null>(null);
   const [repairWorkbench, setRepairWorkbench] = useState<TrustedUniverseRepairWorkbench | null>(null);
   const [repairSummary, setRepairSummary] = useState<MarketDataRepairSummary | null>(null);
   const [repairRunResult, setRepairRunResult] = useState<MarketDataRepairRunResponse | null>(null);
@@ -145,9 +168,10 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
       fetchMarketDataRepairPlan({ region, assetType }),
       fetchTrustedUniverseRepairWorkbench({ region, assetType }).catch(() => null),
       fetchLatestMarketDataRepairRun({ region, assetType }).catch(() => null),
+      fetchMarketDataStockMissingDataDiagnostics({ region, assetType }).catch(() => null),
       fetchMarketDataSchedulerStatus().catch(() => null),
     ])
-      .then(([result, universeResult, reviewReadinessResult, trustedReviewResult, repairPlanResult, repairWorkbenchResult, latestRepairRunResult, schedulerStatus]) => {
+      .then(([result, universeResult, reviewReadinessResult, trustedReviewResult, repairPlanResult, repairWorkbenchResult, latestRepairRunResult, missingDataDiagnosticsResult, schedulerStatus]) => {
         if (!mounted) return;
         setStatus(result);
         setUniverseHealth(universeResult);
@@ -156,6 +180,7 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
         setRepairPlan(repairPlanResult);
         setRepairWorkbench(repairWorkbenchResult);
         setLatestRepairRun(latestRepairRunResult);
+        setMissingDataDiagnostics(missingDataDiagnosticsResult);
         const normalizedRegion = normalizeMarketForApi(region);
         setCandleStatus(schedulerStatus?.regionStatuses.find((item) => item.region === normalizedRegion) ?? null);
       })
@@ -364,6 +389,85 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
     if (hasPositive(summary.historyCoverageIncomplete) || hasPositive(summary.remainingCandidates) || hasPositive(summary.stillUnder252)) return 'NEEDS_BACKFILL';
     return 'COMPLETE_OR_NOT_REPORTED';
   };
+  const identityMismatchWarnings = (() => {
+    if (!missingDataDiagnostics) return [] as IdentityMismatchWarning[];
+    const seen = new Set<string>();
+    return (missingDataDiagnostics.identityMismatchWarnings || []).filter((warning) => {
+      const key = `${warning.symbol}|${warning.issue || ''}|${warning.providerSymbol || ''}|${warning.expectedProviderSymbol || ''}|${warning.sourceSymbol || ''}|${warning.expectedSourceSymbol || ''}|${warning.exchange || ''}|${warning.expectedExchange || ''}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  })();
+  const identityMismatchCount = missingDataDiagnostics
+    ? firstNumber(
+      missingDataDiagnostics.counts?.identityMismatches,
+      missingDataDiagnostics.counts?.identityMismatchWarnings,
+      identityMismatchWarnings.length
+    )
+    : 0;
+  const stockMissingDiagnosticCounts = missingDataDiagnostics
+    ? [
+      {
+        label: 'Provider validation',
+        value: firstNumber(
+          missingDataDiagnostics.actionCounts?.providerValidationNeeded,
+          missingDataDiagnostics.actionCounts?.providerValidation,
+          missingDataDiagnostics.counts?.providerValidationNeeded,
+          missingDataDiagnostics.counts?.providerUnknownValidationNeeded,
+          providerUnknownRemaining + providerRetryEligible
+        ),
+      },
+      {
+        label: 'Catalog identity',
+        value: firstNumber(
+          missingDataDiagnostics.actionCounts?.catalogIdentityRepairNeeded,
+          missingDataDiagnostics.actionCounts?.catalogIdentityRepair,
+          missingDataDiagnostics.counts?.supportedCatalogIdentityRepairNeeded,
+          missingDataDiagnostics.counts?.catalogIdentityRepairNeeded,
+          repairPlan?.supportedCatalogIdentityRepairNeeded,
+          repairPlan?.catalogIdentityRepairNeeded
+        ),
+      },
+      {
+        label: 'Business metadata',
+        value: firstNumber(
+          missingDataDiagnostics.actionCounts?.providerBusinessMetadataRepairNeeded,
+          missingDataDiagnostics.actionCounts?.providerBusinessMetadataRepair,
+          missingDataDiagnostics.counts?.businessMetadataAutoRepairable,
+          missingDataDiagnostics.counts?.businessMetadataRepairNeeded,
+          repairPlan?.businessMetadataAutoRepairable,
+          repairPlan?.businessMetadataRepairNeeded
+        ),
+      },
+      {
+        label: 'Manual metadata',
+        value: firstNumber(
+          missingDataDiagnostics.actionCounts?.manualMetadataImportNeeded,
+          missingDataDiagnostics.actionCounts?.manualMetadataImport,
+          missingDataDiagnostics.counts?.manualBusinessMetadataRequired,
+          missingDataDiagnostics.counts?.manualMetadataRequired,
+          repairPlan?.manualBusinessMetadataRequired,
+          repairPlan?.manualMetadataRequired
+        ),
+      },
+      {
+        label: 'Price backfill',
+        value: firstNumber(
+          missingDataDiagnostics.actionCounts?.priceBackfillNeeded,
+          missingDataDiagnostics.actionCounts?.priceBackfill,
+          missingDataDiagnostics.counts?.supportedPriceBackfillNeeded,
+          missingDataDiagnostics.counts?.priceBackfillNeeded,
+          repairPlan?.supportedPriceBackfillNeeded,
+          repairPlan?.priceBackfillNeeded
+        ),
+      },
+      {
+        label: 'Identity mismatches',
+        value: identityMismatchCount,
+      },
+    ]
+    : [];
 
   if (loading) {
     return (
@@ -1123,6 +1227,49 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
         </Typography>
       </Paper>
       </Box>
+
+      {missingDataDiagnostics && (
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <Stack spacing={1.5}>
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} justifyContent="space-between">
+              <Box>
+                <Typography variant="subtitle1" fontWeight={700}>Stock Missing Data Diagnostics</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Generated: {missingDataDiagnostics.generatedAt ? formatTimestamp(missingDataDiagnostics.generatedAt) : 'not available'}
+                </Typography>
+              </Box>
+              <Chip
+                label={`${missingDataDiagnostics.scope?.region || region || 'IN'} / ${missingDataDiagnostics.scope?.assetType || assetType || 'STOCK'}`}
+                variant="outlined"
+              />
+            </Stack>
+            <Divider />
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: 'repeat(6, minmax(0, 1fr))' }, gap: 1 }}>
+              {stockMissingDiagnosticCounts.map((item) => (
+                <Box key={item.label} sx={{ minWidth: 0 }}>
+                  <Typography variant="caption" color="text.secondary">{item.label}</Typography>
+                  <Typography variant="h6">{formatCount(item.value)}</Typography>
+                </Box>
+              ))}
+            </Box>
+            {identityMismatchCount > 0 && (
+              <Alert severity="warning">
+                <Stack spacing={0.75}>
+                  <Typography variant="body2" fontWeight={700}>Identity mismatch warnings: {formatCount(identityMismatchCount)}</Typography>
+                  {identityMismatchWarnings.slice(0, 5).map((warning) => (
+                    <Typography key={`${warning.symbol}-${warning.issue || 'identity'}-${warning.providerSymbol || warning.sourceSymbol || warning.exchange || 'mismatch'}`} variant="caption">
+                      {formatIdentityMismatchWarning(warning)}
+                    </Typography>
+                  ))}
+                </Stack>
+              </Alert>
+            )}
+            {(missingDataDiagnostics.warnings || []).slice(0, 3).map((warning) => (
+              <Typography key={warning} variant="caption" color="text.secondary">{warning}</Typography>
+            ))}
+          </Stack>
+        </Paper>
+      )}
 
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Stack spacing={1.5}>

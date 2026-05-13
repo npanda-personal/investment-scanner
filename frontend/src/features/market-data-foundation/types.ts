@@ -212,6 +212,134 @@ export interface TrustedReviewUniverseHealth {
   warnings: string[];
 }
 
+export interface MarketDataStockMissingDataDiagnosticsCountMap {
+  totalStocks?: number;
+  activeStocks?: number;
+  inactiveStocks?: number;
+  providerUnknown?: number;
+  providerUnknownValidationNeeded?: number;
+  providerRetryValidationNeeded?: number;
+  providerValidationNeeded?: number;
+  missingProviderSymbol?: number;
+  providerSymbolMismatch?: number;
+  missingSourceSymbol?: number;
+  sourceSymbolMismatch?: number;
+  missingDisplaySymbol?: number;
+  displaySymbolMismatch?: number;
+  missingExchange?: number;
+  exchangeMismatch?: number;
+  missingCurrency?: number;
+  currencyMismatch?: number;
+  missingIsin?: number;
+  missingListingDate?: number;
+  missingSector?: number;
+  missingIndustry?: number;
+  missingMarketCap?: number;
+  missingLatestPrice?: number;
+  staleLatestPrice?: number;
+  missingOrInadequatePriceHistory?: number;
+  missingRecentVolume?: number;
+  catalogIdentityRepairNeeded?: number;
+  supportedCatalogIdentityRepairNeeded?: number;
+  businessMetadataRepairNeeded?: number;
+  businessMetadataAutoRepairable?: number;
+  manualBusinessMetadataRequired?: number;
+  manualMetadataRequired?: number;
+  priceBackfillNeeded?: number;
+  supportedPriceBackfillNeeded?: number;
+  identityMismatches?: number;
+  identityMismatchWarnings?: number;
+  [key: string]: number | undefined;
+}
+
+export interface MarketDataStockMissingDataDiagnosticsActionCounts {
+  providerValidation?: number;
+  providerValidationNeeded?: number;
+  catalogIdentityRepair?: number;
+  catalogIdentityRepairNeeded?: number;
+  providerBusinessMetadataRepair?: number;
+  providerBusinessMetadataRepairNeeded?: number;
+  manualMetadataImport?: number;
+  manualMetadataImportNeeded?: number;
+  priceBackfill?: number;
+  priceBackfillNeeded?: number;
+  [key: string]: number | undefined;
+}
+
+export interface MarketDataStockIdentityMismatchWarning {
+  symbol: string;
+  issue?: string;
+  severity?: 'info' | 'warning' | 'critical';
+  providerSymbol?: string | null;
+  expectedProviderSymbol?: string | null;
+  sourceSymbol?: string | null;
+  expectedSourceSymbol?: string | null;
+  displaySymbol?: string | null;
+  expectedDisplaySymbol?: string | null;
+  exchange?: string | null;
+  expectedExchange?: string | null;
+  isin?: string | null;
+  expectedIsin?: string | null;
+  alternateSymbol?: string | null;
+  alternatePriceHistoryBars?: number;
+  priceHistoryBars?: number;
+}
+
+export interface MarketDataStockMissingDataSample {
+  id: string;
+  symbol: string;
+  name?: string | null;
+  exchange?: string | null;
+  providerSymbol?: string | null;
+  sourceSymbol?: string | null;
+  displaySymbol?: string | null;
+  column?: string;
+  issue: string;
+  value?: string | null;
+  expected?: string | null;
+  reason: string;
+  priceHistoryBars?: number;
+  alternateSymbol?: string | null;
+  alternatePriceHistoryBars?: number;
+}
+
+export interface MarketDataStockColumnMissingDataDiagnostic {
+  column: string;
+  label: string;
+  totalRows: number;
+  affectedCount: number;
+  nullCount: number;
+  blankCount: number;
+  nullEquivalentCount: number;
+  invalidCount: number;
+  expectedNullCount: number;
+  unexpectedNonNullCount: number;
+  samples: MarketDataStockMissingDataSample[];
+}
+
+export interface MarketDataStockIdentityMismatchDiagnostic {
+  code: string;
+  label: string;
+  count: number;
+  samples: MarketDataStockMissingDataSample[];
+}
+
+export interface MarketDataStockMissingDataDiagnostics {
+  scope: {
+    region: string;
+    assetType: string;
+  };
+  generatedAt?: string;
+  activeStockCount?: number;
+  sampleLimit?: number;
+  columns?: MarketDataStockColumnMissingDataDiagnostic[];
+  counts?: MarketDataStockMissingDataDiagnosticsCountMap;
+  actionCounts?: MarketDataStockMissingDataDiagnosticsActionCounts;
+  identityMismatchWarnings?: MarketDataStockIdentityMismatchWarning[];
+  identityMismatches?: MarketDataStockIdentityMismatchDiagnostic[];
+  warnings?: string[];
+}
+
 export interface ReviewReadinessBlocker {
   category:
     | 'PROVIDER_VALIDATION'

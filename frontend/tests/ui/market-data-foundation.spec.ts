@@ -356,6 +356,44 @@ test.describe('Market Data Foundation UI', () => {
         },
       });
     });
+    await page.route('**/api/v1/market-data/stocks/missing-data-diagnostics**', async (route) => {
+      await route.fulfill({
+        json: {
+          scope: { region: 'IN', assetType: 'STOCK' },
+          generatedAt: '2026-05-12T08:00:00.000Z',
+          counts: {
+            activeStocks: 2910,
+            providerValidationNeeded: 2916,
+            catalogIdentityRepairNeeded: 12,
+            businessMetadataRepairNeeded: 2801,
+            manualBusinessMetadataRequired: 2801,
+            priceBackfillNeeded: 585,
+            identityMismatches: 3,
+            missingProviderSymbol: 2,
+            providerSymbolMismatch: 1,
+          },
+          actionCounts: {
+            providerValidationNeeded: 2916,
+            catalogIdentityRepairNeeded: 12,
+            providerBusinessMetadataRepairNeeded: 2801,
+            manualMetadataImportNeeded: 2801,
+            priceBackfillNeeded: 585,
+          },
+          identityMismatchWarnings: [
+            {
+              symbol: 'BAD.NS',
+              issue: 'Provider symbol suffix mismatch',
+              providerSymbol: 'BAD',
+              expectedProviderSymbol: 'BAD.NS',
+              sourceSymbol: 'BAD',
+              exchange: 'NSE',
+              severity: 'warning',
+            },
+          ],
+          warnings: ['3 identity mismatches require catalog identity repair.'],
+        },
+      });
+    });
     await page.route('**/api/v1/market-data/universe/repair-workbench**', async (route) => {
       await route.fulfill({
         json: {
@@ -877,6 +915,10 @@ test.describe('Market Data Foundation UI', () => {
     await expect(page.getByText('Listing date missing for coverage: 140')).toBeVisible();
     await expect(page.getByText('History fallback required: 2')).toBeVisible();
     await expect(page.getByText('Next action: VALIDATE_PROVIDERS')).toBeVisible();
+    await expect(page.getByText('Stock Missing Data Diagnostics')).toBeVisible();
+    await expect(page.getByText('Identity mismatch warnings: 3')).toBeVisible();
+    await expect(page.getByText('BAD.NS: Provider symbol suffix mismatch; provider BAD -> BAD.NS; source BAD; exchange NSE.')).toBeVisible();
+    await expect(page.getByText('3 identity mismatches require catalog identity repair.')).toBeVisible();
     await expect(page.getByText('Review Readiness Summary')).toBeVisible();
     await expect(page.getByText('Decision: REPAIR_DATA')).toBeVisible();
     await expect(page.getByText('Trusted / catalog: 144 / 2,910')).toBeVisible();
@@ -980,7 +1022,7 @@ test.describe('Market Data Foundation UI', () => {
     await expect(page.getByText('Recently attempted/skipped')).toBeVisible();
     await expect(page.getByText('Manual business metadata required')).toBeVisible();
     await expect(page.getByText('Manual sector/industry required')).toHaveCount(0);
-    await expect(page.getByRole('heading', { name: '2,801' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '2,801' }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'Retry failed providers' })).toBeDisabled();
     await page.getByRole('button', { name: 'Validate unknown providers' }).click();
     await expect.poll(() => providerPayload).toMatchObject({
@@ -1239,6 +1281,9 @@ test.describe('Market Data Foundation UI', () => {
           universeSignoff: signoffFail,
         },
       });
+    });
+    await page.route('**/api/v1/market-data/stocks/missing-data-diagnostics**', async (route) => {
+      await route.fulfill({ status: 404, json: { error: 'Stock missing-data diagnostics unavailable' } });
     });
     await page.route('**/api/v1/market-data/universe/repair-runs/latest**', async (route) => {
       await route.fulfill({ json: null });

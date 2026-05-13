@@ -25,8 +25,19 @@ import type {
   MarketDataUniverseSignoff,
   MarketDataManualMetadataTemplate,
   MarketDataProviderBusinessRepairStatus,
+  MarketDataPriceIdentityRepairCandidate,
+  MarketDataPriceIdentityRepairSummary,
   MarketDataRepairStateStatus,
   MarketDataUniverseHealth,
+  StockColumnMissingDataDiagnostic,
+  StockExpectedNullColumnDiagnostic,
+  StockIdentityMismatchWarning,
+  StockIdentityMismatchDiagnostic,
+  StockMissingDataDiagnostics,
+  StockMissingDataDiagnosticsActionCounts,
+  StockMissingDataDiagnosticsCountMap,
+  StockMissingDataIssueKind,
+  StockMissingDataSample,
   ProviderSupportStatus,
   ProviderValidationClassification,
   ProviderValidationResult,
@@ -66,6 +77,7 @@ import { isKnownNseFnoStockUnderlying } from './market-data-foundation.fno-under
 import {
   classifyInstrumentUniverseReadiness,
   normalizeProviderStatus,
+  STANDARD_REVIEW_MIN_BARS,
   UNIVERSE_STATES,
 } from './market-data-foundation.universe';
 import {
@@ -76,6 +88,16 @@ import {
 const TRUSTED_REVIEW_SCAN_ORDERING = 'recentVolumeDesc_priceHistoryCompleteness_latestFreshness_symbol';
 
 type TrustedReviewUniverseOptions = Pick<PaginationOptions, 'region' | 'assetType'> & { now?: Date };
+type StockMissingDataColumnConfig = {
+  column: string;
+  label: string;
+  nullable: boolean;
+  value: (stock: any) => unknown;
+  expectedNull?: (stock: any) => boolean;
+  expectedNullReason?: string;
+  expected?: (stock: any) => string | null;
+  invalid?: (stock: any, value: unknown, priceStatsBySymbol: Map<string, any>) => string | null;
+};
 
 type CatalogSyncRunRecord = CatalogSyncRunStatusResponse & {
   activeKey: string;
@@ -392,6 +414,172 @@ export class MarketDataFoundationService {
       timestamp: new Date().toISOString(),
       region: options.region || 'GLOBAL',
       assetType: options.assetType || 'ALL',
+    };
+  }
+
+  async stockMissingDataDiagnostics(options: Pick<PaginationOptions, 'region' | 'assetType'> & { sampleLimit?: number } = {}): Promise<StockMissingDataDiagnostics> {
+    const scope = {
+      region: options.region?.trim().toUpperCase() || 'IN',
+      assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
+    };
+    const sampleLimit = Math.max(1, Math.min(Number(options.sampleLimit) || 5, 50));
+    const stocks = (await this.repository.listStocksForUniverseHealth(scope))
+      .filter((stock) => stock.isActive !== false && stock.isDelisted !== true);
+    const identitySymbols = [...new Set(stocks.flatMap((stock) => [
+      stock.symbol,
+      stock.providerSymbol,
+      stock.sourceSymbol,
+      stock.displaySymbol,
+    ]).filter((value): value is string => typeof value === 'string' && value.trim().length > 0))];
+    const warnings: string[] = [];
+    const repositoryAny = this.repository as any;
+    const priceStatsBySymbol: Map<string, any> = typeof repositoryAny.priceReadinessStatsForSymbols === 'function'
+      ? await repositoryAny.priceReadinessStatsForSymbols(identitySymbols)
+      : new Map();
+    if (typeof repositoryAny.priceReadinessStatsForSymbols !== 'function') {
+      warnings.push('Price identity diagnostics are limited because price readiness stats are unavailable.');
+    }
+
+    const columns = this.stockMissingDataColumnConfigs(scope).map((config) =>
+      this.stockColumnMissingDataDiagnostic(config, stocks, priceStatsBySymbol, sampleLimit)
+    );
+    const expectedNullColumns = columns
+      .filter((column) => column.expectedNullCount > 0)
+      .map((column): StockExpectedNullColumnDiagnostic => ({
+        column: column.column,
+        reason: column.expectedNullReason || 'Column is expected to remain null for at least one active scoped stock.',
+        expectedNullCount: column.expectedNullCount,
+        unexpectedNonNullCount: column.unexpectedNonNullCount,
+        samples: column.samples.filter((sample) => sample.issue === 'UNEXPECTED_NON_NULL').slice(0, sampleLimit),
+      }));
+    const { diagnostics: identityMismatches, affectedRows: identityMismatchRows } = this.stockIdentityMismatchDiagnostics(stocks, priceStatsBySymbol, sampleLimit);
+    const counts = this.stockMissingDataCounts(stocks, columns, priceStatsBySymbol, identityMismatchRows);
+    const actionCounts = this.stockMissingDataActionCounts(counts);
+    const identityMismatchWarnings = this.stockIdentityMismatchWarnings(identityMismatches, sampleLimit);
+
+    return {
+      scope,
+      generatedAt: new Date().toISOString(),
+      activeStockCount: stocks.length,
+      sampleLimit,
+      columns,
+      expectedNullColumns,
+      identityMismatches,
+      identityMismatchWarnings,
+      counts,
+      actionCounts,
+      totals: {
+        columnsAudited: columns.length,
+        columnsWithIssues: columns.filter((column) => column.affectedCount > 0).length,
+        nullCount: columns.reduce((sum, column) => sum + column.nullCount, 0),
+        blankCount: columns.reduce((sum, column) => sum + column.blankCount, 0),
+        nullEquivalentCount: columns.reduce((sum, column) => sum + column.nullEquivalentCount, 0),
+        invalidCount: columns.reduce((sum, column) => sum + column.invalidCount, 0),
+        unexpectedNonNullCount: columns.reduce((sum, column) => sum + column.unexpectedNonNullCount, 0),
+        affectedColumnValues: columns.reduce((sum, column) => sum + column.affectedCount, 0),
+        identityMismatchRows,
+      },
+      warnings,
+    };
+  }
+
+  async repairPriceIdentity(options: MarketDataRepairRequest & { dryRun?: boolean } = {}): Promise<MarketDataPriceIdentityRepairSummary> {
+    const scope = {
+      region: options.region?.trim().toUpperCase() || 'IN',
+      assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
+    };
+    const batchSize = Math.max(1, Math.min(options.batchSize ?? options.limit ?? 25, 100));
+    const offset = Math.max(0, options.offset ?? 0);
+    const dryRun = options.dryRun !== false;
+    const stocks = (await this.repository.listStocksForUniverseHealth(scope))
+      .filter((stock) => stock.isActive !== false && stock.isDelisted !== true);
+    const symbols = [...new Set(stocks.flatMap((stock) => [stock.symbol, stock.providerSymbol]).filter((value): value is string => typeof value === 'string' && value.trim().length > 0))];
+    const priceStatsBySymbol = await this.repository.priceReadinessStatsForSymbols(symbols);
+    const providerOwnerCounts = new Map<string, number>();
+    const baseOwnerCounts = new Map<string, Set<string>>();
+    for (const stock of stocks) {
+      const providerSymbol = this.trimmedUpper(stock.providerSymbol);
+      if (providerSymbol) providerOwnerCounts.set(providerSymbol, (providerOwnerCounts.get(providerSymbol) || 0) + 1);
+      for (const value of [stock.symbol, stock.providerSymbol, stock.sourceSymbol, stock.displaySymbol]) {
+        const base = this.baseSymbolFromProviderSymbol(String(value || ''));
+        if (!base) continue;
+        const owners = baseOwnerCounts.get(base) || new Set<string>();
+        owners.add(String(stock.id || stock.symbol || base));
+        baseOwnerCounts.set(base, owners);
+      }
+    }
+
+    const candidates = stocks
+      .map((stock) => this.priceIdentityRepairCandidate(stock, priceStatsBySymbol, providerOwnerCounts, baseOwnerCounts))
+      .filter((candidate): candidate is MarketDataPriceIdentityRepairCandidate => Boolean(candidate));
+    const batch = candidates.slice(offset, offset + batchSize);
+    const samples: MarketDataPriceIdentityRepairCandidate[] = [];
+    const warnings: string[] = [];
+    let repaired = 0;
+    let skipped = 0;
+    let priceRowsMoved = 0;
+    let latestPricesMoved = 0;
+    const skipReasonCounts: Record<string, number> = {};
+    const recordSkip = (candidate: MarketDataPriceIdentityRepairCandidate, code = candidate.skippedReasonCode || 'UNKNOWN_SKIP') => {
+      skipped += 1;
+      skipReasonCounts[code] = (skipReasonCounts[code] || 0) + 1;
+    };
+
+    for (const candidate of batch) {
+      if (candidate.skippedReason) {
+        recordSkip(candidate);
+        samples.push({ ...candidate, action: 'SKIPPED' });
+        continue;
+      }
+      if (dryRun) {
+        samples.push({ ...candidate, action: 'DRY_RUN' });
+        continue;
+      }
+      try {
+        if (await this.repository.latestPriceExists(candidate.symbol)) {
+          const skippedCandidate = { ...candidate, action: 'SKIPPED' as const, skippedReasonCode: 'TARGET_LATEST_PRICE_COLLISION', skippedReason: 'Target latest price already exists.' };
+          recordSkip(skippedCandidate);
+          samples.push(skippedCandidate);
+          continue;
+        }
+        const result = await this.repository.reassignPriceRowsToCanonicalSymbol({
+          stockId: candidate.stockId,
+          fromSymbol: candidate.providerSymbol as string,
+          toSymbol: candidate.symbol,
+        });
+        repaired += 1;
+        priceRowsMoved += result.priceRowsMoved;
+        latestPricesMoved += result.latestPricesMoved;
+        samples.push({
+          ...candidate,
+          action: 'REPAIRED',
+          priceRowsMoved: result.priceRowsMoved,
+          latestPricesMoved: result.latestPricesMoved,
+        });
+      } catch (error: any) {
+        const message = error?.message || 'Price identity reassignment failed.';
+        const code = typeof message === 'string' && message.includes(':') ? message.split(':')[0] : 'REASSIGN_FAILED';
+        const skippedCandidate = { ...candidate, action: 'SKIPPED' as const, skippedReasonCode: code, skippedReason: message };
+        recordSkip(skippedCandidate, code);
+        samples.push(skippedCandidate);
+      }
+    }
+
+    if (candidates.length > offset + batchSize) warnings.push(`${candidates.length - offset - batchSize} price identity candidates remain after this bounded batch.`);
+    if (dryRun) warnings.push('Dry run only; no price rows were reassigned.');
+
+    return {
+      scope,
+      generatedAt: new Date().toISOString(),
+      dryRun,
+      totalCandidates: candidates.length,
+      repaired,
+      skipped,
+      priceRowsMoved,
+      latestPricesMoved,
+      skipReasonCounts,
+      samples,
+      warnings,
     };
   }
 
@@ -4439,6 +4627,584 @@ export class MarketDataFoundationService {
     if (mode === 'NO_REVIEW') return nextAction && nextAction.code !== 'WAIT' ? 'REPAIR_DATA' : 'WAIT';
     if (blockers.some((blocker) => blocker.severity === 'HARD_BLOCKER' && blocker.category !== 'INSUFFICIENT_TRUSTED_UNIVERSE')) return 'REPAIR_DATA';
     return 'PROCEED_LIMITED';
+  }
+
+  private stockMissingDataColumnConfigs(scope: { region: string; assetType: string }): StockMissingDataColumnConfig[] {
+    const isInStockScope = scope.region === 'IN' && scope.assetType === 'STOCK';
+    const expectedNullDerivativeReason = 'Cash STOCK instruments should not carry derivative contract fields.';
+    const derivativeExpectedNull = (stock: any) => isInStockScope && !this.isDerivativeLikeInstrument(stock);
+    return [
+      { column: 'id', label: 'Stock ID', nullable: false, value: (stock) => stock.id },
+      { column: 'symbol', label: 'Canonical symbol', nullable: false, value: (stock) => stock.symbol },
+      { column: 'name', label: 'Company name', nullable: false, value: (stock) => stock.name },
+      {
+        column: 'region',
+        label: 'Region',
+        nullable: false,
+        value: (stock) => stock.region,
+        expected: () => scope.region,
+        invalid: (_stock, value) => String(value || '').trim().toUpperCase() !== scope.region ? `Expected scoped region ${scope.region}.` : null,
+      },
+      {
+        column: 'exchange',
+        label: 'Exchange',
+        nullable: true,
+        value: (stock) => stock.exchange,
+        expected: () => scope.region === 'IN' ? 'NSE or BSE' : null,
+        invalid: (_stock, value) => scope.region === 'IN' && !['NSE', 'BSE'].includes(String(value || '').trim().toUpperCase()) ? 'Expected NSE or BSE for IN scope.' : null,
+      },
+      {
+        column: 'country',
+        label: 'Country',
+        nullable: true,
+        value: (stock) => stock.country,
+        expected: () => scope.region === 'IN' ? 'India' : null,
+        invalid: (_stock, value) => scope.region === 'IN' && !['INDIA', 'IN'].includes(String(value || '').trim().toUpperCase()) ? 'Expected India for IN scope.' : null,
+      },
+      { column: 'sector', label: 'Sector', nullable: true, value: (stock) => stock.sector },
+      { column: 'industry', label: 'Industry', nullable: true, value: (stock) => stock.industry },
+      {
+        column: 'currency',
+        label: 'Currency',
+        nullable: true,
+        value: (stock) => stock.currency,
+        expected: () => scope.region === 'IN' ? 'INR' : null,
+        invalid: (_stock, value) => scope.region === 'IN' && String(value || '').trim().toUpperCase() !== 'INR' ? 'Expected INR for IN scope.' : null,
+      },
+      {
+        column: 'marketCap',
+        label: 'Market cap',
+        nullable: true,
+        value: (stock) => stock.marketCap,
+        invalid: (_stock, value) => !this.hasValidMarketCap(value) ? 'Expected a positive numeric market cap.' : null,
+      },
+      {
+        column: 'assetType',
+        label: 'Asset type',
+        nullable: true,
+        value: (stock) => stock.assetType,
+        expected: () => scope.assetType,
+        invalid: (_stock, value) => this.normalizeInstrumentAssetType(String(value || ''), '', '').toUpperCase() !== scope.assetType ? `Expected scoped asset type ${scope.assetType}.` : null,
+      },
+      {
+        column: 'instrumentSegment',
+        label: 'Instrument segment',
+        nullable: true,
+        value: (stock) => stock.instrumentSegment,
+        expected: () => isInStockScope ? 'CASH' : null,
+        invalid: (_stock, value) => isInStockScope && String(value || '').trim().toUpperCase() !== 'CASH' ? 'Expected CASH segment for IN/STOCK scope.' : null,
+      },
+      { column: 'displaySymbol', label: 'Display symbol', nullable: true, value: (stock) => stock.displaySymbol },
+      {
+        column: 'providerSymbol',
+        label: 'Provider symbol',
+        nullable: true,
+        value: (stock) => stock.providerSymbol,
+        expected: (stock) => this.expectedProviderSuffixForStock(stock) ? `suffix ${this.expectedProviderSuffixForStock(stock)}` : null,
+        invalid: (stock, value) => {
+          const suffix = this.expectedProviderSuffixForStock(stock);
+          return suffix && !String(value || '').trim().toUpperCase().endsWith(suffix) ? `Provider symbol should end with ${suffix}.` : null;
+        },
+      },
+      { column: 'sourceSymbol', label: 'Source symbol', nullable: true, value: (stock) => stock.sourceSymbol },
+      { column: 'catalogSource', label: 'Catalog source', nullable: true, value: (stock) => stock.catalogSource },
+      {
+        column: 'providerSupportStatus',
+        label: 'Provider support status',
+        nullable: true,
+        value: (stock) => stock.providerSupportStatus,
+        invalid: (_stock, value) => ['SUPPORTED', 'UNSUPPORTED', 'UNKNOWN', 'VALIDATION_FAILED'].includes(String(value || '').trim().toUpperCase()) ? null : 'Expected SUPPORTED, UNSUPPORTED, UNKNOWN, or VALIDATION_FAILED.',
+      },
+      {
+        column: 'providerError',
+        label: 'Provider error',
+        nullable: true,
+        value: (stock) => stock.providerError,
+        expectedNull: (stock) => !['VALIDATION_FAILED', 'UNSUPPORTED'].includes(normalizeProviderStatus(stock.providerSupportStatus)),
+        expectedNullReason: 'Provider error is expected to be null unless provider validation failed or classified the symbol as unsupported.',
+      },
+      { column: 'derivativesEligible', label: 'Derivatives eligible', nullable: false, value: (stock) => stock.derivativesEligible },
+      {
+        column: 'underlyingSymbol',
+        label: 'Underlying symbol',
+        nullable: true,
+        value: (stock) => stock.underlyingSymbol,
+        expectedNull: derivativeExpectedNull,
+        expectedNullReason: expectedNullDerivativeReason,
+      },
+      {
+        column: 'expiryDate',
+        label: 'Expiry date',
+        nullable: true,
+        value: (stock) => stock.expiryDate,
+        expectedNull: derivativeExpectedNull,
+        expectedNullReason: expectedNullDerivativeReason,
+      },
+      {
+        column: 'contractMonth',
+        label: 'Contract month',
+        nullable: true,
+        value: (stock) => stock.contractMonth,
+        expectedNull: derivativeExpectedNull,
+        expectedNullReason: expectedNullDerivativeReason,
+      },
+      {
+        column: 'lotSize',
+        label: 'Lot size',
+        nullable: true,
+        value: (stock) => stock.lotSize,
+        expectedNull: derivativeExpectedNull,
+        expectedNullReason: expectedNullDerivativeReason,
+        invalid: (stock, value) => this.isDerivativeLikeInstrument(stock) && Number(value) <= 0 ? 'Derivative-like instruments require a positive lot size.' : null,
+      },
+      {
+        column: 'contractStatus',
+        label: 'Contract status',
+        nullable: true,
+        value: (stock) => stock.contractStatus,
+        expectedNull: derivativeExpectedNull,
+        expectedNullReason: expectedNullDerivativeReason,
+      },
+      {
+        column: 'isDelisted',
+        label: 'Delisted flag',
+        nullable: false,
+        value: (stock) => stock.isDelisted,
+        invalid: (_stock, value) => value === true ? 'Active diagnostics exclude delisted stocks; active scoped rows should be false.' : null,
+      },
+      {
+        column: 'ipoDate',
+        label: 'Listing date',
+        nullable: true,
+        value: (stock) => stock.ipoDate,
+        invalid: (_stock, value) => value instanceof Date && value.getTime() > Date.now() ? 'Listing date is in the future.' : null,
+      },
+      {
+        column: 'isin',
+        label: 'ISIN',
+        nullable: true,
+        value: (stock) => stock.isin,
+        invalid: (_stock, value) => scope.region === 'IN' && !/^IN[A-Z0-9]{10}$/i.test(String(value || '').trim()) ? 'Expected a 12-character Indian ISIN beginning with IN.' : null,
+      },
+      { column: 'source', label: 'Source', nullable: false, value: (stock) => stock.source },
+      {
+        column: 'dataStatus',
+        label: 'Data status',
+        nullable: false,
+        value: (stock) => stock.dataStatus,
+        invalid: (_stock, value) => ['COMPLETE', 'PARTIAL', 'DELAYED', 'MISSING', 'ERROR'].includes(String(value || '').trim().toUpperCase()) ? null : 'Expected COMPLETE, PARTIAL, DELAYED, MISSING, or ERROR.',
+      },
+      {
+        column: 'lastSuccessfulDataLoadTimestamp',
+        label: 'Last successful data load timestamp',
+        nullable: true,
+        value: (stock) => stock.lastSuccessfulDataLoadTimestamp,
+        invalid: (stock, value, priceStatsBySymbol) => {
+          const bars = this.priceBarsForSymbol(priceStatsBySymbol, stock.symbol);
+          if (value && bars === 0) {
+            const providerBars = this.priceBarsForSymbol(priceStatsBySymbol, stock.providerSymbol);
+            return providerBars > 0
+              ? 'Data load timestamp exists, but price rows are stored under provider symbol instead of Stock.symbol.'
+              : 'Data load timestamp exists, but no canonical price rows were found.';
+          }
+          return bars > 0 && !value ? 'Price rows exist but last successful data load timestamp is missing.' : null;
+        },
+      },
+    ];
+  }
+
+  private stockColumnMissingDataDiagnostic(
+    config: StockMissingDataColumnConfig,
+    stocks: any[],
+    priceStatsBySymbol: Map<string, any>,
+    sampleLimit: number
+  ): StockColumnMissingDataDiagnostic {
+    const diagnostic: StockColumnMissingDataDiagnostic = {
+      column: config.column,
+      label: config.label,
+      nullable: config.nullable,
+      expectedNull: false,
+      expectedNullReason: config.expectedNullReason,
+      totalRows: stocks.length,
+      nullCount: 0,
+      blankCount: 0,
+      nullEquivalentCount: 0,
+      invalidCount: 0,
+      expectedNullCount: 0,
+      unexpectedNonNullCount: 0,
+      affectedCount: 0,
+      samples: [],
+    };
+
+    for (const stock of stocks) {
+      const value = config.value(stock);
+      const expectedNull = Boolean(config.expectedNull?.(stock));
+      if (expectedNull) diagnostic.expectedNull = true;
+      const expected = expectedNull ? 'null' : config.expected?.(stock) ?? null;
+      const addSample = (issue: StockMissingDataIssueKind, reason: string) => {
+        if (diagnostic.samples.length >= sampleLimit) return;
+        diagnostic.samples.push(this.stockMissingDataSample(stock, {
+          column: config.column,
+          issue,
+          value,
+          expected,
+          reason,
+        }));
+      };
+
+      if (value === null || value === undefined) {
+        diagnostic.nullCount += 1;
+        if (expectedNull) {
+          diagnostic.expectedNullCount += 1;
+        } else {
+          diagnostic.affectedCount += 1;
+          addSample('NULL', `${config.label} is null.`);
+        }
+        continue;
+      }
+
+      if (typeof value === 'string' && value.trim().length === 0) {
+        diagnostic.blankCount += 1;
+        diagnostic.affectedCount += 1;
+        if (expectedNull) diagnostic.unexpectedNonNullCount += 1;
+        addSample(expectedNull ? 'UNEXPECTED_NON_NULL' : 'BLANK', expectedNull ? `${config.label} should be null, not blank.` : `${config.label} is blank.`);
+        continue;
+      }
+
+      if (this.isNullEquivalentValue(value)) {
+        diagnostic.nullEquivalentCount += 1;
+        diagnostic.affectedCount += 1;
+        if (expectedNull) diagnostic.unexpectedNonNullCount += 1;
+        addSample(expectedNull ? 'UNEXPECTED_NON_NULL' : 'NULL_EQUIVALENT', expectedNull ? `${config.label} should be null, not a null-equivalent value.` : `${config.label} uses a null-equivalent value.`);
+        continue;
+      }
+
+      if (expectedNull) {
+        diagnostic.unexpectedNonNullCount += 1;
+        diagnostic.affectedCount += 1;
+        addSample('UNEXPECTED_NON_NULL', `${config.label} is expected to be null for this stock.`);
+        continue;
+      }
+
+      const invalidReason = config.invalid?.(stock, value, priceStatsBySymbol);
+      if (invalidReason) {
+        diagnostic.invalidCount += 1;
+        diagnostic.affectedCount += 1;
+        addSample('INVALID', invalidReason);
+      }
+    }
+
+    return diagnostic;
+  }
+
+  private stockIdentityMismatchDiagnostics(
+    stocks: any[],
+    priceStatsBySymbol: Map<string, any>,
+    sampleLimit: number
+  ): { diagnostics: StockIdentityMismatchDiagnostic[]; affectedRows: number } {
+    const diagnosticsByCode = new Map<string, StockIdentityMismatchDiagnostic>();
+    const affectedRows = new Set<string>();
+    const add = (code: string, label: string, stock: any, reason: string, extra: Partial<StockMissingDataSample> = {}) => {
+      let diagnostic = diagnosticsByCode.get(code);
+      if (!diagnostic) {
+        diagnostic = { code, label, count: 0, samples: [] };
+        diagnosticsByCode.set(code, diagnostic);
+      }
+      diagnostic.count += 1;
+      affectedRows.add(stock.id || stock.symbol);
+      if (diagnostic.samples.length < sampleLimit) {
+        diagnostic.samples.push(this.stockMissingDataSample(stock, {
+          issue: 'IDENTITY_MISMATCH',
+          reason,
+          ...extra,
+        }));
+      }
+    };
+
+    for (const stock of stocks) {
+      const providerSymbol = this.trimmedUpper(stock.providerSymbol);
+      const sourceSymbol = this.trimmedUpper(stock.sourceSymbol);
+      const displaySymbol = this.trimmedUpper(stock.displaySymbol);
+      const canonicalSymbol = this.trimmedUpper(stock.symbol);
+      const expectedSuffix = this.expectedProviderSuffixForStock(stock);
+      const canonicalBars = this.priceBarsForSymbol(priceStatsBySymbol, stock.symbol);
+
+      if (!providerSymbol) {
+        add('PROVIDER_SYMBOL_MISSING', 'Provider symbol is missing', stock, 'Provider validation and price backfill need a provider symbol.');
+      } else if (expectedSuffix && !providerSymbol.endsWith(expectedSuffix)) {
+        add('PROVIDER_SYMBOL_SUFFIX_MISMATCH', 'Provider symbol suffix does not match exchange', stock, `Expected provider symbol suffix ${expectedSuffix}.`, { expected: `*${expectedSuffix}`, value: providerSymbol });
+      }
+
+      if (expectedSuffix && canonicalSymbol && !canonicalSymbol.endsWith(expectedSuffix)) {
+        add('STOCK_SYMBOL_SUFFIX_MISMATCH', 'Canonical symbol suffix does not match exchange', stock, `Expected canonical symbol to end with ${expectedSuffix}.`, { expected: `*${expectedSuffix}`, value: canonicalSymbol });
+      }
+
+      if (providerSymbol && sourceSymbol && this.baseSymbolFromProviderSymbol(providerSymbol) !== this.baseSymbolFromProviderSymbol(sourceSymbol)) {
+        add('SOURCE_PROVIDER_BASE_MISMATCH', 'Source/provider symbol bases differ', stock, 'Provider symbol base should match the source symbol base.', { expected: sourceSymbol, value: providerSymbol });
+      }
+
+      if (displaySymbol && sourceSymbol && this.baseSymbolFromProviderSymbol(displaySymbol) !== this.baseSymbolFromProviderSymbol(sourceSymbol)) {
+        add('DISPLAY_SOURCE_BASE_MISMATCH', 'Display/source symbol bases differ', stock, 'Display symbol should match the source symbol base.', { expected: sourceSymbol, value: displaySymbol });
+      }
+
+      const alternateSymbols = [stock.providerSymbol, stock.sourceSymbol, stock.displaySymbol]
+        .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+        .filter((value) => value.trim().toUpperCase() !== canonicalSymbol);
+      const alternateWithPrices = alternateSymbols
+        .map((symbol) => ({ symbol, bars: this.priceBarsForSymbol(priceStatsBySymbol, symbol) }))
+        .find((item) => item.bars > 0);
+      if (canonicalBars === 0 && alternateWithPrices) {
+        add('PRICE_ROWS_UNDER_ALTERNATE_SYMBOL', 'Price rows exist under alternate identity only', stock, 'Stock has no price rows under its canonical symbol, but an alternate identity has price rows.', {
+          priceHistoryBars: canonicalBars,
+          alternateSymbol: alternateWithPrices.symbol,
+          alternatePriceHistoryBars: alternateWithPrices.bars,
+        });
+      }
+
+      if (normalizeProviderStatus(stock.providerSupportStatus) === 'SUPPORTED' && canonicalBars === 0) {
+        add('SUPPORTED_WITHOUT_CANONICAL_PRICES', 'Provider-supported stock has no canonical price rows', stock, 'Provider-supported stock has no price history under Stock.symbol.', { priceHistoryBars: canonicalBars });
+      }
+    }
+
+    return {
+      diagnostics: [...diagnosticsByCode.values()].sort((left, right) => right.count - left.count || left.code.localeCompare(right.code)),
+      affectedRows: affectedRows.size,
+    };
+  }
+
+  private priceIdentityRepairCandidate(
+    stock: any,
+    priceStatsBySymbol: Map<string, any>,
+    providerOwnerCounts: Map<string, number>,
+    baseOwnerCounts: Map<string, Set<string>>
+  ): MarketDataPriceIdentityRepairCandidate | null {
+    const symbol = typeof stock.symbol === 'string' ? stock.symbol.trim() : '';
+    const providerSymbol = typeof stock.providerSymbol === 'string' ? stock.providerSymbol.trim() : '';
+    if (!symbol || !providerSymbol || symbol.toUpperCase() === providerSymbol.toUpperCase()) return null;
+
+    const canonicalPriceHistoryBars = this.priceBarsForSymbol(priceStatsBySymbol, symbol);
+    const providerPriceHistoryBars = this.priceBarsForSymbol(priceStatsBySymbol, providerSymbol);
+    if (canonicalPriceHistoryBars > 0 || providerPriceHistoryBars <= 0) return null;
+
+    const candidate: MarketDataPriceIdentityRepairCandidate = {
+      stockId: String(stock.id || ''),
+      symbol,
+      providerSymbol,
+      sourceSymbol: stock.sourceSymbol ?? null,
+      exchange: stock.exchange ?? null,
+      providerSupportStatus: stock.providerSupportStatus ?? null,
+      canonicalPriceHistoryBars,
+      providerPriceHistoryBars,
+      action: 'DRY_RUN',
+      skippedReasonCode: null,
+      skippedReason: null,
+    };
+    const skip = (skippedReasonCode: string, skippedReason: string): MarketDataPriceIdentityRepairCandidate => ({
+      ...candidate,
+      skippedReasonCode,
+      skippedReason,
+    });
+
+    const expectedSuffix = this.expectedProviderSuffixForStock(stock);
+    if (!expectedSuffix || !providerSymbol.toUpperCase().endsWith(expectedSuffix)) {
+      return skip('SUFFIX_EXCHANGE_MISMATCH', expectedSuffix ? `Provider symbol must end with ${expectedSuffix}.` : 'Exchange suffix cannot be determined.');
+    }
+
+    const providerBase = this.baseSymbolFromProviderSymbol(providerSymbol);
+    const sourceBase = this.baseSymbolFromProviderSymbol(stock.sourceSymbol || symbol);
+    const canonicalBase = this.baseSymbolFromProviderSymbol(symbol);
+    if (providerBase !== sourceBase || canonicalBase !== providerBase) {
+      return skip('BASE_SYMBOL_MISMATCH', 'Provider, source, and canonical symbol bases are not unambiguous.');
+    }
+
+    const ownerCount = providerOwnerCounts.get(providerSymbol.toUpperCase()) || 0;
+    if (ownerCount !== 1) {
+      return skip('PROVIDER_SYMBOL_NOT_UNIQUE', `Provider symbol is owned by ${ownerCount} active scoped stocks.`);
+    }
+
+    const baseOwnerCount = baseOwnerCounts.get(providerBase)?.size || 0;
+    if (baseOwnerCount !== 1) {
+      return skip('AMBIGUOUS_SCOPED_IDENTITY', `Base symbol is owned by ${baseOwnerCount} active scoped stocks.`);
+    }
+
+    if (normalizeProviderStatus(stock.providerSupportStatus) !== 'SUPPORTED') {
+      return skip('UNSUPPORTED_SCOPE', 'Stock is not provider-supported.');
+    }
+
+    return candidate;
+  }
+
+  private stockMissingDataCounts(
+    stocks: any[],
+    columns: StockColumnMissingDataDiagnostic[],
+    priceStatsBySymbol: Map<string, any>,
+    identityMismatchRows: number
+  ): StockMissingDataDiagnosticsCountMap {
+    const byColumn = new Map(columns.map((column) => [column.column, column]));
+    const affected = (column: string) => byColumn.get(column)?.affectedCount ?? 0;
+    let providerUnknown = 0;
+    let providerRetryValidationNeeded = 0;
+    let supportedCatalogIdentityRepairNeeded = 0;
+    let supportedBusinessMetadataRepairNeeded = 0;
+    let supportedPriceBackfillNeeded = 0;
+    let priceBackfillNeeded = 0;
+    let missingOrInadequatePriceHistory = 0;
+
+    for (const stock of stocks) {
+      const providerStatus = normalizeProviderStatus(stock.providerSupportStatus);
+      const supported = providerStatus === 'SUPPORTED';
+      if (providerStatus === 'UNKNOWN') providerUnknown += 1;
+      if (providerStatus === 'VALIDATION_FAILED') providerRetryValidationNeeded += 1;
+
+      const identityGap = !stock.providerSymbol || !stock.exchange || !stock.sourceSymbol || !stock.displaySymbol || !stock.catalogSource || !stock.isin || !stock.ipoDate;
+      const businessGap = !this.hasValidMetadataValue(stock.sector) || !this.hasValidMetadataValue(stock.industry) || !this.hasValidMarketCap(stock.marketCap);
+      const priceBars = this.priceBarsForSymbol(priceStatsBySymbol, stock.symbol);
+      const priceGap = priceBars <= 0;
+      if (identityGap && supported) supportedCatalogIdentityRepairNeeded += 1;
+      if (businessGap && supported) supportedBusinessMetadataRepairNeeded += 1;
+      if (priceGap) priceBackfillNeeded += 1;
+      if (priceGap && supported) supportedPriceBackfillNeeded += 1;
+      if (priceBars > 0 && priceBars < STANDARD_REVIEW_MIN_BARS) missingOrInadequatePriceHistory += 1;
+    }
+
+    const catalogIdentityRepairNeeded = stocks.filter((stock) =>
+      !stock.providerSymbol || !stock.exchange || !stock.sourceSymbol || !stock.displaySymbol || !stock.catalogSource || !stock.isin || !stock.ipoDate
+    ).length;
+    const businessMetadataRepairNeeded = stocks.filter((stock) =>
+      !this.hasValidMetadataValue(stock.sector) || !this.hasValidMetadataValue(stock.industry) || !this.hasValidMarketCap(stock.marketCap)
+    ).length;
+
+    return {
+      activeStocks: stocks.length,
+      providerUnknown,
+      providerRetryValidationNeeded,
+      providerValidationNeeded: providerUnknown + providerRetryValidationNeeded,
+      missingProviderSymbol: affected('providerSymbol'),
+      missingSourceSymbol: affected('sourceSymbol'),
+      missingDisplaySymbol: affected('displaySymbol'),
+      missingExchange: affected('exchange'),
+      missingCurrency: affected('currency'),
+      missingIsin: affected('isin'),
+      missingListingDate: affected('ipoDate'),
+      missingSector: affected('sector'),
+      missingIndustry: affected('industry'),
+      missingMarketCap: affected('marketCap'),
+      missingLatestPrice: priceBackfillNeeded,
+      missingOrInadequatePriceHistory,
+      catalogIdentityRepairNeeded,
+      supportedCatalogIdentityRepairNeeded,
+      businessMetadataRepairNeeded,
+      businessMetadataAutoRepairable: supportedBusinessMetadataRepairNeeded,
+      manualBusinessMetadataRequired: businessMetadataRepairNeeded,
+      priceBackfillNeeded,
+      supportedPriceBackfillNeeded,
+      identityMismatches: identityMismatchRows,
+    };
+  }
+
+  private stockMissingDataActionCounts(counts: StockMissingDataDiagnosticsCountMap): StockMissingDataDiagnosticsActionCounts {
+    return {
+      providerValidationNeeded: counts.providerValidationNeeded,
+      catalogIdentityRepairNeeded: counts.supportedCatalogIdentityRepairNeeded || counts.catalogIdentityRepairNeeded,
+      providerBusinessMetadataRepairNeeded: counts.businessMetadataAutoRepairable,
+      manualMetadataImportNeeded: counts.manualBusinessMetadataRequired,
+      priceBackfillNeeded: counts.supportedPriceBackfillNeeded || counts.priceBackfillNeeded,
+    };
+  }
+
+  private stockIdentityMismatchWarnings(
+    diagnostics: StockIdentityMismatchDiagnostic[],
+    sampleLimit: number
+  ): StockIdentityMismatchWarning[] {
+    const warnings: StockIdentityMismatchWarning[] = [];
+    for (const diagnostic of diagnostics) {
+      for (const sample of diagnostic.samples) {
+        if (warnings.length >= sampleLimit) return warnings;
+        warnings.push({
+          symbol: sample.symbol,
+          issue: diagnostic.label,
+          severity: diagnostic.code === 'PRICE_ROWS_UNDER_ALTERNATE_SYMBOL' || diagnostic.code === 'SUPPORTED_WITHOUT_CANONICAL_PRICES' ? 'critical' : 'warning',
+          providerSymbol: sample.providerSymbol ?? null,
+          expectedProviderSymbol: diagnostic.code.includes('PROVIDER') ? sample.expected ?? null : null,
+          sourceSymbol: sample.sourceSymbol ?? null,
+          expectedSourceSymbol: diagnostic.code.includes('SOURCE') ? sample.expected ?? null : null,
+          displaySymbol: sample.displaySymbol ?? null,
+          expectedDisplaySymbol: diagnostic.code.includes('DISPLAY') ? sample.expected ?? null : null,
+          exchange: sample.exchange ?? null,
+          expectedExchange: null,
+          alternateSymbol: sample.alternateSymbol ?? null,
+          alternatePriceHistoryBars: sample.alternatePriceHistoryBars,
+          priceHistoryBars: sample.priceHistoryBars,
+        });
+      }
+    }
+    return warnings;
+  }
+
+  private stockMissingDataSample(
+    stock: any,
+    details: {
+      issue: StockMissingDataIssueKind;
+      reason: string;
+      column?: string;
+      value?: unknown;
+      expected?: string | null;
+      priceHistoryBars?: number;
+      alternateSymbol?: string | null;
+      alternatePriceHistoryBars?: number;
+    }
+  ): StockMissingDataSample {
+    return {
+      id: String(stock.id || ''),
+      symbol: String(stock.symbol || ''),
+      name: stock.name ?? null,
+      exchange: stock.exchange ?? null,
+      providerSymbol: stock.providerSymbol ?? null,
+      sourceSymbol: stock.sourceSymbol ?? null,
+      displaySymbol: stock.displaySymbol ?? null,
+      column: details.column,
+      issue: details.issue,
+      value: details.value === undefined ? undefined : this.formatDiagnosticValue(details.value),
+      expected: details.expected ?? null,
+      reason: details.reason,
+      priceHistoryBars: details.priceHistoryBars,
+      alternateSymbol: details.alternateSymbol,
+      alternatePriceHistoryBars: details.alternatePriceHistoryBars,
+    };
+  }
+
+  private isNullEquivalentValue(value: unknown): boolean {
+    if (typeof value !== 'string') return false;
+    return ['UNKNOWN', 'N/A', 'NA', 'NONE', 'NULL', '-', '--'].includes(value.trim().toUpperCase());
+  }
+
+  private trimmedUpper(value: unknown): string {
+    return typeof value === 'string' ? value.trim().toUpperCase() : '';
+  }
+
+  private formatDiagnosticValue(value: unknown): string | null {
+    if (value === null || value === undefined) return null;
+    if (value instanceof Date) return value.toISOString();
+    return String(value);
+  }
+
+  private priceBarsForSymbol(priceStatsBySymbol: Map<string, any>, symbol: unknown): number {
+    if (typeof symbol !== 'string' || !symbol.trim()) return 0;
+    return Number(priceStatsBySymbol.get(symbol)?.priceHistoryBars || 0);
+  }
+
+  private expectedProviderSuffixForStock(stock: any): '.NS' | '.BO' | null {
+    const exchange = String(stock.exchange || '').trim().toUpperCase();
+    if (exchange === 'NSE') return '.NS';
+    if (exchange === 'BSE') return '.BO';
+    return null;
+  }
+
+  private isDerivativeLikeInstrument(stock: any): boolean {
+    const assetType = String(stock.assetType || '').trim().toUpperCase();
+    const segment = String(stock.instrumentSegment || '').trim().toUpperCase();
+    return ['FUTURE', 'FUTURES', 'OPTION', 'OPTIONS', 'DERIVATIVE', 'DERIVATIVES'].includes(assetType)
+      || ['FUTURE', 'FUTURES', 'OPTION', 'OPTIONS', 'DERIVATIVE', 'DERIVATIVES'].includes(segment);
   }
 
   private buildRepairLane(input: {

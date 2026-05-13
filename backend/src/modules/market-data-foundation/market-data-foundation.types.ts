@@ -481,6 +481,180 @@ export interface MarketDataUniverseHealth {
   universeSignoff: MarketDataUniverseSignoff;
 }
 
+export type StockMissingDataIssueKind =
+  | 'NULL'
+  | 'BLANK'
+  | 'NULL_EQUIVALENT'
+  | 'INVALID'
+  | 'EXPECTED_NULL'
+  | 'UNEXPECTED_NON_NULL'
+  | 'IDENTITY_MISMATCH';
+
+export interface StockMissingDataSample {
+  id: string;
+  symbol: string;
+  name?: string | null;
+  exchange?: string | null;
+  providerSymbol?: string | null;
+  sourceSymbol?: string | null;
+  displaySymbol?: string | null;
+  column?: string;
+  issue: StockMissingDataIssueKind;
+  value?: string | null;
+  expected?: string | null;
+  reason: string;
+  priceHistoryBars?: number;
+  alternateSymbol?: string | null;
+  alternatePriceHistoryBars?: number;
+}
+
+export interface StockColumnMissingDataDiagnostic {
+  column: string;
+  label: string;
+  nullable: boolean;
+  expectedNull: boolean;
+  expectedNullReason?: string;
+  totalRows: number;
+  nullCount: number;
+  blankCount: number;
+  nullEquivalentCount: number;
+  invalidCount: number;
+  expectedNullCount: number;
+  unexpectedNonNullCount: number;
+  affectedCount: number;
+  samples: StockMissingDataSample[];
+}
+
+export interface StockExpectedNullColumnDiagnostic {
+  column: string;
+  reason: string;
+  expectedNullCount: number;
+  unexpectedNonNullCount: number;
+  samples: StockMissingDataSample[];
+}
+
+export interface StockIdentityMismatchDiagnostic {
+  code: string;
+  label: string;
+  count: number;
+  samples: StockMissingDataSample[];
+}
+
+export interface StockMissingDataDiagnosticsCountMap {
+  activeStocks: number;
+  providerUnknown: number;
+  providerRetryValidationNeeded: number;
+  providerValidationNeeded: number;
+  missingProviderSymbol: number;
+  missingSourceSymbol: number;
+  missingDisplaySymbol: number;
+  missingExchange: number;
+  missingCurrency: number;
+  missingIsin: number;
+  missingListingDate: number;
+  missingSector: number;
+  missingIndustry: number;
+  missingMarketCap: number;
+  missingLatestPrice: number;
+  missingOrInadequatePriceHistory: number;
+  catalogIdentityRepairNeeded: number;
+  supportedCatalogIdentityRepairNeeded: number;
+  businessMetadataRepairNeeded: number;
+  businessMetadataAutoRepairable: number;
+  manualBusinessMetadataRequired: number;
+  priceBackfillNeeded: number;
+  supportedPriceBackfillNeeded: number;
+  identityMismatches: number;
+}
+
+export interface StockMissingDataDiagnosticsActionCounts {
+  providerValidationNeeded: number;
+  catalogIdentityRepairNeeded: number;
+  providerBusinessMetadataRepairNeeded: number;
+  manualMetadataImportNeeded: number;
+  priceBackfillNeeded: number;
+}
+
+export interface StockIdentityMismatchWarning {
+  symbol: string;
+  issue: string;
+  severity: 'warning' | 'critical';
+  providerSymbol?: string | null;
+  expectedProviderSymbol?: string | null;
+  sourceSymbol?: string | null;
+  expectedSourceSymbol?: string | null;
+  displaySymbol?: string | null;
+  expectedDisplaySymbol?: string | null;
+  exchange?: string | null;
+  expectedExchange?: string | null;
+  alternateSymbol?: string | null;
+  alternatePriceHistoryBars?: number;
+  priceHistoryBars?: number;
+}
+
+export interface StockMissingDataDiagnostics {
+  scope: {
+    region: string;
+    assetType: string;
+  };
+  generatedAt: string;
+  activeStockCount: number;
+  sampleLimit: number;
+  columns: StockColumnMissingDataDiagnostic[];
+  expectedNullColumns: StockExpectedNullColumnDiagnostic[];
+  identityMismatches: StockIdentityMismatchDiagnostic[];
+  identityMismatchWarnings: StockIdentityMismatchWarning[];
+  counts: StockMissingDataDiagnosticsCountMap;
+  actionCounts: StockMissingDataDiagnosticsActionCounts;
+  totals: {
+    columnsAudited: number;
+    columnsWithIssues: number;
+    nullCount: number;
+    blankCount: number;
+    nullEquivalentCount: number;
+    invalidCount: number;
+    unexpectedNonNullCount: number;
+    affectedColumnValues: number;
+    identityMismatchRows: number;
+  };
+  warnings: string[];
+}
+
+export type MarketDataPriceIdentityRepairAction = 'DRY_RUN' | 'REPAIRED' | 'SKIPPED';
+
+export interface MarketDataPriceIdentityRepairCandidate {
+  stockId: string;
+  symbol: string;
+  providerSymbol: string | null;
+  sourceSymbol: string | null;
+  exchange: string | null;
+  providerSupportStatus: string | null;
+  canonicalPriceHistoryBars: number;
+  providerPriceHistoryBars: number;
+  action: MarketDataPriceIdentityRepairAction;
+  skippedReasonCode?: string | null;
+  skippedReason?: string | null;
+  priceRowsMoved?: number;
+  latestPricesMoved?: number;
+}
+
+export interface MarketDataPriceIdentityRepairSummary {
+  scope: {
+    region: string;
+    assetType: string;
+  };
+  generatedAt: string;
+  dryRun: boolean;
+  totalCandidates: number;
+  repaired: number;
+  skipped: number;
+  priceRowsMoved: number;
+  latestPricesMoved: number;
+  skipReasonCounts: Record<string, number>;
+  samples: MarketDataPriceIdentityRepairCandidate[];
+  warnings: string[];
+}
+
 export interface TrustedReviewUniverseExcludedCounts {
   providerUnknown: number;
   providerRetryFailed: number;

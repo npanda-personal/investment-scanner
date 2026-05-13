@@ -368,6 +368,20 @@ export class MarketDataFoundationController {
     }
   };
 
+  stockMissingDataDiagnostics = async (req: Request, res: Response) => {
+    try {
+      const { region, assetType } = this.getMarketFilter(req);
+      return res.json(await this.service.stockMissingDataDiagnostics({
+        region,
+        assetType,
+        sampleLimit: this.numberParam(req, 'sampleLimit') ?? this.numberParam(req, 'limit'),
+      }));
+    } catch (error) {
+      console.error('Stock missing-data diagnostics error:', error);
+      return res.status(500).json({ error: 'Stock missing-data diagnostics failed' });
+    }
+  };
+
   trustedReviewUniverseHealth = async (req: Request, res: Response) => {
     try {
       const { region, assetType } = this.getMarketFilter(req);
@@ -543,6 +557,22 @@ export class MarketDataFoundationController {
     } catch (error) {
       console.error('Provider business metadata repair error:', error);
       return res.status(500).json({ error: 'Provider business metadata repair failed' });
+    }
+  };
+
+  repairPriceIdentity = async (req: Request, res: Response) => {
+    try {
+      const { region, assetType } = this.getMarketFilter(req);
+      return res.json(await this.service.repairPriceIdentity({
+        region,
+        assetType,
+        batchSize: this.numberParam(req, 'batchSize') ?? this.numberParam(req, 'limit'),
+        offset: this.numberParam(req, 'offset'),
+        dryRun: this.parseOptionalBoolean(req.query.dryRun ?? req.body?.dryRun),
+      }));
+    } catch (error: any) {
+      console.error('Price identity repair error:', error);
+      return res.status(500).json({ error: error.message || 'Price identity repair failed' });
     }
   };
 
