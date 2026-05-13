@@ -72,15 +72,37 @@ QA validates:
 - No downstream module workaround was introduced.
 - Documentation and handoff mention data availability improvement, not validation-message-only work.
 
-## Later Packets Parked Behind MD-A1
+## MD-A2 - Sync Catalog Progress And Bulk Performance
 
-1. **MD-A2 - Deep Price Backfill For Supported Shallow Rows**
+State: `Ready for Architecture`
+Mode: `Architecture Planning Mode`
+Owner: Solution Architect / Orchestrator intake
+Lane/module: Lane 1, `market-data-foundation`
+
+### Product Goal
+
+Sync Catalog must not run for hours behind one frontend button without a progress bar. The user must see immediate feedback, bounded progress, partial results, and a safe way for the system to continue through batches without blocking the UI on one long request.
+
+### Acceptance Direction
+
+- Audit the current Sync Catalog frontend and backend path end to end.
+- Identify why the operation can run for hours.
+- Replace or wrap long synchronous work with bounded batches, a worker/job run, or resumable status polling.
+- Show immediate button feedback, determinate progress when totals are known, counts for processed/inserted/updated/skipped/no-op/failed/warnings, and final/partial summary.
+- Use safe parallelism only through one coordinated strategy. Provider-facing throttles remain server-owned.
+- Do not start unbounded full-universe provider calls from a single UI request.
+- Preserve `region` and `assetType` scope on every request.
+- QA must verify progress behavior and that the operation cannot silently run for hours without user-visible state.
+
+## Later Packets Parked Behind MD-A2
+
+1. **MD-A3 - Deep Price Backfill For Supported Shallow Rows**
    Ensure supported rows with shallow history fetch enough OHLCV depth for Trusted Review Lite and 200/252-bar downstream users.
-2. **MD-A3 - Provider Validation Drain And Retry Classification**
+2. **MD-A4 - Provider Validation Drain And Retry Classification**
    Drain `UNKNOWN` and retryable provider rows into clear supported/unsupported/retry states.
-3. **MD-A4 - Catalog Identity And Manual CSV Repair Hardening**
+3. **MD-A5 - Catalog Identity And Manual CSV Repair Hardening**
    Fix deterministic provider symbol, ISIN, listing-date, and exchange identity gaps using public/local sources.
-4. **MD-A5 - Holiday/Session Accuracy**
+4. **MD-A6 - Holiday/Session Accuracy**
    Prevent false stale-EOD blockers caused by missing local holiday knowledge.
-5. **MD-A6 - Adjusted-Close And Volume Coverage Honesty**
+5. **MD-A7 - Adjusted-Close And Volume Coverage Honesty**
    Preserve volume and adjusted-close provenance so trusted review uses reliable OHLCV.

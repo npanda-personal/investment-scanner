@@ -206,6 +206,7 @@ Before a developer handoff can move to `Ready for QA`, the developer must run, a
 - frontend build or typecheck for UI/type changes,
 - focused Playwright smoke tests for changed UI workflows when practical,
 - route/API contract checks for changed endpoints,
+- API responsiveness and frontend button progress checks for changed workflows,
 - module docs verification for changed routes, response shapes, calculations, or workflows,
 - authenticated local-data validation for data-bearing UI/API changes, or a concrete blocker explaining why it could not be completed.
 

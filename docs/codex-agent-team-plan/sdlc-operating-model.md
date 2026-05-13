@@ -203,6 +203,8 @@ Every module should expose enough diagnostic behavior for a local user to unders
 
 - APIs should return useful error messages without leaking secrets.
 - Long-running or batch workflows should expose status, progress, partial failure, next action, and retryability.
+- Slow API calls and slow frontend button workflows are product defects. Every implementation and QA gate must check whether changed API calls return promptly or use bounded worker/batch/status orchestration with visible progress.
+- Bulk operations must not hold one frontend request open for minutes or hours. Use batches, workers, resumable run records, or status polling with explicit progress and partial completion evidence.
 - UI should show meaningful empty/error states, not generic success-looking blanks.
 - Data-quality or readiness blockers should be visible and specific.
 - Logs should identify module, operation, input scope, and failure reason where practical.

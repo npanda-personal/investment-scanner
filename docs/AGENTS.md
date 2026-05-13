@@ -155,6 +155,8 @@ When a task asks to harden, polish, audit, verify, or continue work on a module,
 
 Do not claim a module is verified only because the page loads. Verification must include data correctness, scope correctness, batch behavior, visible empty/error states, and the connection to upstream/downstream modules where applicable.
 
+Performance is a product correctness requirement. Any module audit, hardening pass, or bug fix must identify slow API calls, slow button-triggered workflows, long synchronous request paths, missing progress indicators, and unbounded bulk operations. If a frontend button starts an API call or workflow that can take more than a few seconds, the task must either make it fast, make it bounded with visible progress, or record a blocker with a concrete follow-up owner. Do not treat multi-minute or hour-long button actions as acceptable because they eventually finish.
+
 For every data-bearing module UI/API change, perform an authenticated live-data validation pass after the automated tests. This is mandatory even when UI tests use mocked responses. The pass must check the real local API/browser data for:
 
 - scoped totals and row counts,
@@ -521,10 +523,11 @@ Frontend:
 # Batch Orchestration Standard
 
 - Backend endpoints must process bounded batches, not an entire universe, unless an explicit backend worker/job system owns that workflow.
+- API handlers should return quickly. Long-running bulk work must move into bounded batch orchestration, a module-owned worker/job, or a resumable run endpoint with status polling instead of holding a single UI request open.
 - Backend batch responses must return `totalCount`, `processedCount`, `batchSize`, `offset`/`cursor`, `nextOffset`/`nextCursor`, `hasMore`, count summaries, `warnings`, and `durationMs`.
 - Frontend owns orchestration across batches unless a backend worker/job system is explicitly implemented.
 - Frontend must continue until `hasMore=false` for user-triggered "run all" actions.
-- When using parallel processing, use a single coordinated strategy for the workflow: define module-owned worker/request-pool config, keep provider-facing throttles server-owned, avoid exposing raw concurrency controls to normal users, and ensure backend and frontend parallelism do not multiply into uncontrolled provider or database pressure.
+- Bulk operations should use workers, batches, or a bounded request pool to improve throughput. When using parallel processing, use a single coordinated strategy for the workflow: define module-owned worker/request-pool config, keep provider-facing throttles server-owned, avoid exposing raw concurrency controls to normal users, and ensure backend and frontend parallelism do not multiply into uncontrolled provider or database pressure.
 - `region` and `assetType` must be passed to every batch request.
 - Batch size defaults should be safe, usually `25`.
 - Batch size max should usually be `100` unless documented by the owning module.
@@ -557,6 +560,7 @@ Example response:
 # Batch Progress UI Standard
 
 - Every user-triggered batch operation must show progress.
+- Button clicks must show immediate feedback: disabled state, spinner/loading state, and a visible status/progress area within the same workflow surface.
 - Frontend must not fire one batch and stop when backend returns `hasMore=true`.
 - Use backend `processedCount`, `totalCount`, `nextOffset`, and `hasMore` to drive progress.
 - Use a determinate progress bar when `totalCount` is known.
@@ -571,6 +575,7 @@ Example response:
 - Display and send `region` and `assetType` on every batch request.
 - Do not fake progress.
 - Do not process an entire universe in one backend request just to simplify progress.
+- Do not leave users staring at a long-running button action without progress, cancellation/retry guidance, or a partial completion summary.
 - Future modules must follow this pattern.
 
 # Responsive Filter And Batch Action Layout Standard

@@ -338,6 +338,7 @@ A module work item is done when:
 - module docs are updated for changed routes, response shapes, calculations, batching, or workflows,
 - relevant backend tests, frontend build, and UI smoke tests have passed or blockers are recorded,
 - data-bearing UI/API changes have completed the live-data validation pass required by `docs/AGENTS.md`,
+- changed API calls and frontend button workflows meet the performance/progress standard in `docs/AGENTS.md`; long-running bulk operations must use bounded batches, workers, or status polling with visible progress,
 - the final behavior reflects the latest Product Owner requirements, not stale roadmap assumptions,
 - the implementation uses no paid libraries, tools, services, providers, or hosted verification,
 - Senior Fullstack Lead and QA signoff are recorded,
@@ -360,6 +361,7 @@ Required developer evidence before `Ready for QA`:
 - frontend build or typecheck for UI/type changes,
 - focused Playwright smoke tests for changed UI workflows when practical,
 - route/API checks for changed endpoints,
+- API/button responsiveness and progress evidence for changed workflows, especially bulk operations,
 - module docs checked or updated for changed routes, response shapes, calculations, batching, or workflows,
 - authenticated local-data validation for data-bearing UI/API changes, or an explicit blocker.
 
