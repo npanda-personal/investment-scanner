@@ -20,6 +20,22 @@ type ProofBlockerDefinition = {
   status: PaperReadinessProofStageStatus;
 };
 
+const DEFAULT_BATCH_GENERATION_BATCH_SIZE = 25;
+const MAX_BATCH_GENERATION_BATCH_SIZE = 100;
+const DEFAULT_BATCH_GENERATION_WORKER_CONCURRENCY = 8;
+const MAX_BATCH_GENERATION_WORKER_CONCURRENCY = 10;
+
+type TradePlanGenerationCache = {
+  backtestSummaries: Map<string, Promise<any | null>>;
+  instruments: Map<string, Promise<any | null>>;
+  latestStoredCandleInfo: Map<string, Promise<any | null>>;
+};
+
+type GenerateTradePlanExecutionContext = {
+  decision?: any | null;
+  cache?: TradePlanGenerationCache;
+};
+
 export class TradePlanRiskEngineService {
   private repository = new TradePlanRiskEngineRepository();
   private strategyDecisionService = new StrategyDecisionEngineService();
@@ -145,7 +161,7 @@ export class TradePlanRiskEngineService {
     return { paperReadinessStatus, paperReadinessReasons: reasons, paperReadinessBlockers: blockers };
   }
 
-  async generatePlan(request: GenerateTradePlanRequest): Promise<TradePlanResultDto> {
+  async generatePlan(request: GenerateTradePlanRequest, executionContext: GenerateTradePlanExecutionContext = {}): Promise<TradePlanResultDto> {
     const { instrumentId, symbol, strategyDecisionId, portfolioId, riskPercent, capitalBase, targetRewardRisk } = request;
     const rules = this.getModelRules();
     const region = request.region || 'IN';
@@ -183,7 +199,9 @@ export class TradePlanRiskEngineService {
     try {
       // 1. Fetch Decision
       let decision: any = null;
-      if (strategyDecisionId) {
+      if (executionContext.decision !== undefined) {
+        decision = executionContext.decision;
+      } else if (strategyDecisionId) {
         const history = await this.strategyDecisionService.history(instrumentId);
         decision = history.find((d: any) => d.id === strategyDecisionId);
       } else {
@@ -194,7 +212,7 @@ export class TradePlanRiskEngineService {
         result.planStatus = 'INSUFFICIENT_DATA';
         result.blockers.push('No Strategy Decision found for instrument.');
         result.dataGaps.push('strategy_decision');
-        return this.finalizeAndPersist(result, { request, decision: null, latestPriceResult: null, pricesDto: null, prices: [], dataQuality: null, backtestSummary: null });
+        return this.finalizeAndPersist(result, { request, decision: null, latestPriceResult: null, pricesDto: null, prices: [], dataQuality: null, backtestSummary: null, cache: executionContext.cache });
       }
 
       result.strategy = decision.strategy;
@@ -248,7 +266,7 @@ export class TradePlanRiskEngineService {
         result.planStatus = 'INSUFFICIENT_DATA';
         result.blockers.push('Missing latest price.');
         result.dataGaps.push('latest_price');
-        return this.finalizeAndPersist(result, { request, decision, latestPriceResult, pricesDto: null, prices: [], dataQuality: null, backtestSummary: null });
+        return this.finalizeAndPersist(result, { request, decision, latestPriceResult, pricesDto: null, prices: [], dataQuality: null, backtestSummary: null, cache: executionContext.cache });
       }
 
       const currentPrice = Number(latestPriceResult.latest.close);
@@ -260,7 +278,7 @@ export class TradePlanRiskEngineService {
         result.planStatus = 'INSUFFICIENT_DATA';
         result.blockers.push('Insufficient historical price data (< 10 bars).');
         result.dataGaps.push('price_history');
-        return this.finalizeAndPersist(result, { request, decision, latestPriceResult, pricesDto, prices, dataQuality: null, backtestSummary: null });
+        return this.finalizeAndPersist(result, { request, decision, latestPriceResult, pricesDto, prices, dataQuality: null, backtestSummary: null, cache: executionContext.cache });
       }
       
       let sma50 = null;
@@ -614,17 +632,19 @@ export class TradePlanRiskEngineService {
          result.invalidationRules.push('Plan is currently blocked. Consider review later.');
       }
 
-      const backtestSummary = await this.latestBacktestSummary(result.strategy, region, assetType, request.backtestTimeframe);
-      return this.finalizeAndPersist(canonicalizeTradePlanReadiness(result), { request, decision, latestPriceResult, pricesDto, prices, dataQuality, backtestSummary });
+      const backtestSummary = await this.latestBacktestSummary(result.strategy, region, assetType, request.backtestTimeframe, executionContext.cache);
+      return this.finalizeAndPersist(canonicalizeTradePlanReadiness(result), { request, decision, latestPriceResult, pricesDto, prices, dataQuality, backtestSummary, cache: executionContext.cache });
     } catch (e: any) {
       result.planStatus = 'BLOCKED';
       result.blockers.push(`Error generating plan: ${e.message}`);
-      return this.finalizeAndPersist(canonicalizeTradePlanReadiness(result), { request, decision: null, latestPriceResult: null, pricesDto: null, prices: [], dataQuality: null, backtestSummary: null });
+      return this.finalizeAndPersist(canonicalizeTradePlanReadiness(result), { request, decision: null, latestPriceResult: null, pricesDto: null, prices: [], dataQuality: null, backtestSummary: null, cache: executionContext.cache });
     }
   }
 
   async batchGenerate(request: BatchGenerateTradePlanRequest): Promise<BatchGenerateTradePlanResponse> {
-    const { batchSize = 25, offset = 0, region, assetType } = request;
+    const batchSize = this.batchGenerationBatchSize(request.batchSize);
+    const offset = this.batchGenerationOffset(request.offset);
+    const { region, assetType } = request;
     const query = { limit: batchSize, offset, region, assetType, strategy: request.strategyCode, decision: 'TRADE_CANDIDATE' };
     const candidates = await this.strategyDecisionService.candidates(query as any);
     
@@ -633,7 +653,8 @@ export class TradePlanRiskEngineService {
     let generatedCount = 0;
     let failedCount = 0;
 
-    const concurrencyLimit = 5;
+    const cache = this.createGenerationCache();
+    const concurrencyLimit = this.batchGenerationWorkerConcurrency(request.workerConcurrency, candidates.results.length);
     
     const chunkArray = <T>(arr: T[], size: number): T[][] => {
       const chunks = [];
@@ -654,7 +675,7 @@ export class TradePlanRiskEngineService {
           backtestTimeframe: request.backtestTimeframe,
         };
         if (!req.instrumentId || !req.symbol) throw new Error('Missing instrumentId or symbol');
-        return this.generatePlan(req);
+        return this.generatePlan(req, { decision: candidate, cache });
       });
 
       const results = await Promise.allSettled(promises);
@@ -1263,9 +1284,62 @@ export class TradePlanRiskEngineService {
      return this.repository.getHealthStats();
   }
 
-  private async latestBacktestSummary(strategy: string, region: string, assetType: string, timeframe?: string) {
-    const summaries = await this.strategyFrameworkService.performance(strategy, { region, assetType, timeframe: timeframe as any }).catch(() => []);
-    return summaries[0] || null;
+  private createGenerationCache(): TradePlanGenerationCache {
+    return {
+      backtestSummaries: new Map(),
+      instruments: new Map(),
+      latestStoredCandleInfo: new Map(),
+    };
+  }
+
+  private batchGenerationBatchSize(value?: number) {
+    const parsed = Number(value);
+    const configured = Number.isFinite(parsed) ? Math.floor(parsed) : DEFAULT_BATCH_GENERATION_BATCH_SIZE;
+    return Math.max(1, Math.min(configured, MAX_BATCH_GENERATION_BATCH_SIZE));
+  }
+
+  private batchGenerationOffset(value?: number) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0;
+  }
+
+  private batchGenerationWorkerConcurrency(value: number | undefined, candidateCount: number) {
+    const parsed = Number(value ?? process.env.TRADE_PLAN_BATCH_WORKERS_COUNT);
+    const configured = Number.isFinite(parsed) ? Math.floor(parsed) : DEFAULT_BATCH_GENERATION_WORKER_CONCURRENCY;
+    const capped = Math.max(1, Math.min(configured, MAX_BATCH_GENERATION_WORKER_CONCURRENCY));
+    return Math.min(capped, Math.max(1, candidateCount));
+  }
+
+  private async latestBacktestSummary(strategy: string, region: string, assetType: string, timeframe?: string, cache?: TradePlanGenerationCache) {
+    const key = [strategy, region, assetType, timeframe || 'DEFAULT'].join('|');
+    const load = async () => {
+      const summaries = await this.strategyFrameworkService.performance(strategy, { region, assetType, timeframe: timeframe as any }).catch(() => []);
+      return summaries[0] || null;
+    };
+    return cache ? this.cached(cache.backtestSummaries, key, load) : load();
+  }
+
+  private async instrumentForProof(instrumentId: string, region: string, assetType: string, cache?: TradePlanGenerationCache) {
+    if (typeof (this.marketDataService as any).getInstrument !== 'function') return null;
+    const key = [instrumentId, region, assetType].join('|');
+    const load = () => Promise.resolve((this.marketDataService as any).getInstrument(instrumentId, { region, assetType })).catch(() => null);
+    return cache ? this.cached(cache.instruments, key, load) : load();
+  }
+
+  private async latestStoredCandleInfoForProof(region: string, assetType: string, cache?: TradePlanGenerationCache) {
+    if (typeof (this.marketDataService as any).latestStoredCandleInfo !== 'function') return null;
+    const key = [region, assetType].join('|');
+    const load = () => Promise.resolve((this.marketDataService as any).latestStoredCandleInfo(region, assetType)).catch(() => null);
+    return cache ? this.cached(cache.latestStoredCandleInfo, key, load) : load();
+  }
+
+  private cached<T>(store: Map<string, Promise<T>>, key: string, load: () => Promise<T>) {
+    let value = store.get(key);
+    if (!value) {
+      value = load();
+      store.set(key, value);
+    }
+    return value;
   }
 
   private async finalizeAndPersist(
@@ -1278,25 +1352,20 @@ export class TradePlanRiskEngineService {
       prices: any[];
       dataQuality: any | null;
       backtestSummary: any | null;
+      cache?: TradePlanGenerationCache;
     }
   ): Promise<TradePlanResultDto> {
     const region = context.request.region || result.region || 'IN';
     const assetType = context.request.assetType || result.assetType || 'STOCK';
     const backtestSummary = context.backtestSummary || (
       result.strategy !== 'UNKNOWN'
-        ? await this.latestBacktestSummary(result.strategy, region, assetType, context.request.backtestTimeframe)
+        ? await this.latestBacktestSummary(result.strategy, region, assetType, context.request.backtestTimeframe, context.cache)
         : null
     );
 
-    const instrumentPromise = typeof (this.marketDataService as any).getInstrument === 'function'
-      ? Promise.resolve((this.marketDataService as any).getInstrument(result.instrumentId, { region, assetType })).catch(() => null)
-      : Promise.resolve(null);
-    const latestStoredPromise = typeof (this.marketDataService as any).latestStoredCandleInfo === 'function'
-      ? Promise.resolve((this.marketDataService as any).latestStoredCandleInfo(region, assetType)).catch(() => null)
-      : Promise.resolve(null);
     const [instrument, latestStoredInfo] = await Promise.all([
-      instrumentPromise,
-      latestStoredPromise,
+      this.instrumentForProof(result.instrumentId, region, assetType, context.cache),
+      this.latestStoredCandleInfoForProof(region, assetType, context.cache),
     ]);
 
     const backtestSnapshot = this.toBacktestSummarySnapshot(backtestSummary);

@@ -86,7 +86,44 @@ describe('data quality engine service', () => {
     });
     const result = await setup.instance.evaluate({ batchSize: 1, offset: 1 });
     expect(setup.marketDataService.listInstruments).toHaveBeenCalledWith({ page: 2, pageSize: 1, region: undefined, assetType: undefined });
+    expect(setup.marketDataService.listInstruments).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({ processedCount: 1, totalCount: 3, batchSize: 1, offset: 1, nextOffset: 2, hasMore: true, evaluatedCount: 1 });
+  });
+
+  it('evaluates batch instruments with bounded parallelism', async () => {
+    const previousConcurrency = process.env.DATA_QUALITY_EVALUATION_CONCURRENCY;
+    process.env.DATA_QUALITY_EVALUATION_CONCURRENCY = '3';
+    let activePriceReads = 0;
+    let maxActivePriceReads = 0;
+    const listPricesByInstrumentId = jest.fn(async () => {
+      activePriceReads += 1;
+      maxActivePriceReads = Math.max(maxActivePriceReads, activePriceReads);
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        return { prices: prices(260) };
+      } finally {
+        activePriceReads -= 1;
+      }
+    });
+    const batch = Array.from({ length: 8 }, (_value, index) => instrument({ id: `stock-${index}`, symbol: `STOCK${index}` }));
+    const setup = service({
+      marketDataService: {
+        listInstruments: jest.fn().mockResolvedValue({ instruments: batch, pagination: { total: batch.length } }),
+        listPricesByInstrumentId,
+      },
+    });
+
+    try {
+      const result = await setup.instance.evaluate({ batchSize: 8, offset: 0 });
+
+      expect(result).toMatchObject({ processedCount: 8, evaluatedCount: 8, failedCount: 0, hasMore: false });
+      expect(listPricesByInstrumentId).toHaveBeenCalledTimes(8);
+      expect(maxActivePriceReads).toBeGreaterThan(1);
+      expect(maxActivePriceReads).toBeLessThanOrEqual(3);
+    } finally {
+      if (previousConcurrency === undefined) delete process.env.DATA_QUALITY_EVALUATION_CONCURRENCY;
+      else process.env.DATA_QUALITY_EVALUATION_CONCURRENCY = previousConcurrency;
+    }
   });
 
   it('uses stored context during evaluation without triggering live provider fetches', async () => {

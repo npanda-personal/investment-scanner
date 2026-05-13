@@ -16,6 +16,8 @@ import type {
 
 const DAY_MS = 86_400_000;
 const STALE_PRICE_DAYS = 7;
+const DEFAULT_EVALUATION_CONCURRENCY = 6;
+const MAX_EVALUATION_CONCURRENCY = 10;
 
 export class DataQualityEngineService {
   constructor(
@@ -113,21 +115,13 @@ export class DataQualityEngineService {
 
   async evaluate(request: DataQualityEvaluateRequest): Promise<DataQualityEvaluateResponse> {
     const started = Date.now();
-    const warnings: string[] = [];
-    const instruments = await this.resolveInstruments(request);
-    const totalCount = request.instrumentId || request.symbol ? instruments.length : await this.instrumentCount(request);
-    let evaluatedCount = 0;
-    let failedCount = 0;
-
-    for (const instrument of instruments) {
-      try {
-        await this.evaluateAndPersistInstrument(instrument);
-        evaluatedCount += 1;
-      } catch (error: any) {
-        failedCount += 1;
-        warnings.push(`${instrument.symbol || instrument.id}: ${error?.message || 'evaluation failed'}`);
-      }
-    }
+    const { instruments, totalCount } = await this.resolveEvaluationScope(request);
+    const outcomes = await this.evaluateInstrumentBatch(instruments, this.evaluationConcurrency(request));
+    const evaluatedCount = outcomes.filter((outcome) => outcome.ok).length;
+    const failedCount = outcomes.length - evaluatedCount;
+    const warnings = outcomes
+      .filter((outcome): outcome is { ok: false; warning: string } => !outcome.ok)
+      .map((outcome) => outcome.warning);
 
     const processedCount = instruments.length;
     const nextOffset = request.offset + processedCount;
@@ -160,6 +154,22 @@ export class DataQualityEngineService {
     const actions = actionsResponse?.actions || [];
     const evaluated = this.evaluateInstrument(instrument, prices, latest, fundamentals, actions, latestSignal.length > 0);
     return this.repository.upsertEvaluation(evaluated);
+  }
+
+  private async evaluateInstrumentBatch(instruments: any[], concurrency: number): Promise<Array<{ ok: true } | { ok: false; warning: string }>> {
+    const outcomes: Array<{ ok: true } | { ok: false; warning: string }> = new Array(instruments.length);
+    await this.eachWithConcurrency(instruments, concurrency, async (instrument, index) => {
+      try {
+        await this.evaluateAndPersistInstrument(instrument);
+        outcomes[index] = { ok: true };
+      } catch (error: any) {
+        outcomes[index] = {
+          ok: false,
+          warning: `${instrument.symbol || instrument.id}: ${error?.message || 'evaluation failed'}`,
+        };
+      }
+    });
+    return outcomes;
   }
 
   evaluateInstrument(
@@ -235,15 +245,17 @@ export class DataQualityEngineService {
     };
   }
 
-  private async resolveInstruments(request: DataQualityEvaluateRequest): Promise<any[]> {
+  private async resolveEvaluationScope(request: DataQualityEvaluateRequest): Promise<{ instruments: any[]; totalCount: number }> {
     if (request.instrumentId) {
       const instrument = await this.marketDataService.getInstrument(request.instrumentId);
-      return instrument ? [instrument] : [];
+      const instruments = instrument ? [instrument] : [];
+      return { instruments, totalCount: instruments.length };
     }
     if (request.symbol) {
       const result = await this.marketDataService.listInstruments({ search: request.symbol, pageSize: 25, region: request.region });
       const match = result.instruments.find((instrument: any) => instrument.symbol.toUpperCase() === request.symbol);
-      return match ? [match] : [];
+      const instruments = match ? [match] : [];
+      return { instruments, totalCount: instruments.length };
     }
     const page = Math.floor(request.offset / request.batchSize) + 1;
     const result = await this.marketDataService.listInstruments({ 
@@ -252,7 +264,10 @@ export class DataQualityEngineService {
       region: request.region, 
       assetType: request.assetType 
     });
-    return result.instruments;
+    return {
+      instruments: result.instruments,
+      totalCount: Number.isFinite(result.pagination?.total) ? result.pagination.total : result.instruments.length,
+    };
   }
 
   private async instrumentCount(query: Partial<DataQualityQuery> = {}): Promise<number> {
@@ -340,6 +355,31 @@ export class DataQualityEngineService {
     if (value === null || value === undefined || value === '') return null;
     const numeric = Number(value);
     return Number.isFinite(numeric) ? numeric : null;
+  }
+
+  private evaluationConcurrency(request: DataQualityEvaluateRequest): number {
+    if (request.instrumentId || request.symbol) return 1;
+    const requestedBatchSize = Math.max(1, Number(request.batchSize) || 1);
+    const configured = this.positiveNumber(process.env.DATA_QUALITY_EVALUATION_CONCURRENCY, DEFAULT_EVALUATION_CONCURRENCY);
+    return Math.max(1, Math.min(configured, requestedBatchSize, MAX_EVALUATION_CONCURRENCY));
+  }
+
+  private positiveNumber(value: unknown, fallback: number): number {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) && numeric > 0 ? Math.trunc(numeric) : fallback;
+  }
+
+  private async eachWithConcurrency<T>(items: T[], concurrency: number, worker: (item: T, index: number) => Promise<void>) {
+    if (items.length === 0) return;
+    let nextIndex = 0;
+    const workerCount = Math.max(1, Math.min(concurrency, items.length));
+    await Promise.all(Array.from({ length: workerCount }, async () => {
+      while (nextIndex < items.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        await worker(items[index], index);
+      }
+    }));
   }
 
   private average(values: number[]): number | null {

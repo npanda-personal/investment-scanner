@@ -27,7 +27,8 @@ import type {
 } from './strategy-decision-engine.types';
 
 const MODEL_VERSION = 'strategy-decision-v1';
-const EVALUATION_WORKER_CONCURRENCY = 5;
+const DEFAULT_EVALUATION_WORKER_CONCURRENCY = 5;
+const MAX_EVALUATION_WORKER_CONCURRENCY = 8;
 const REVIEW_STRATEGY_CATEGORIES = new Set(['ENTRY', 'EXIT']);
 
 export class StrategyDecisionEngineService {
@@ -79,6 +80,15 @@ export class StrategyDecisionEngineService {
       };
     }
 
+    return this.marketGateFromSummary(summary, regime, breadth);
+  }
+
+  private marketGateFromSummary(summary: any, regime: any, breadth: any): MarketGateResponse {
+    const reasons: string[] = [];
+    const blockers: string[] = [];
+    let marketCondition: MarketCondition = 'UNKNOWN';
+    let marketGate: MarketGate = 'UNKNOWN';
+    let allowedActions: AllowedAction[] = ['MANAGE_EXISTING_POSITIONS_ONLY'];
     const score = regime?.score ?? 0;
     const isRiskOn = regime?.regime === 'RISK_ON';
     const isRiskOff = regime?.regime === 'RISK_OFF';
@@ -109,33 +119,47 @@ export class StrategyDecisionEngineService {
       marketScore: score,
       reasons,
       blockers,
-      dataStatus: summary.dataStatus,
+      dataStatus: summary?.dataStatus || 'MISSING',
       updatedAt: new Date().toISOString(),
     };
+  }
+
+  private canBuildMarketGateFromSummary(summary: any): boolean {
+    return Boolean(summary && summary.dataStatus !== 'MISSING' && summary.regime && summary.breadth);
+  }
+
+  private evaluationWorkerConcurrency(request: StrategyEvaluateRequest): number {
+    const configured = request.workerConcurrency ?? Number(process.env.STRATEGY_DECISION_ENGINE_WORKERS_COUNT);
+    if (!Number.isFinite(configured)) return DEFAULT_EVALUATION_WORKER_CONCURRENCY;
+    return Math.min(MAX_EVALUATION_WORKER_CONCURRENCY, Math.max(1, Math.floor(configured)));
   }
 
   async evaluate(request: StrategyEvaluateRequest): Promise<StrategyEvaluateResponse> {
     const started = Date.now();
     const batchSize = request.batchSize || 25;
     const offset = request.offset || 0;
+    const workerConcurrency = this.evaluationWorkerConcurrency(request);
     const universe = await this.resolveEvaluationUniverse(request, batchSize, offset);
     const instrumentIds = universe.instrumentIds;
     
     const results: StrategyDecisionDto[] = [];
-    const [gate, marketSummary] = await Promise.all([
-      this.marketGate(request.region),
-      this.latestPersistedMarketSummary(request.region),
-    ]);
+    const marketSummary = await this.latestPersistedMarketSummary(request.region);
+    const gate = this.canBuildMarketGateFromSummary(marketSummary)
+      ? this.marketGateFromSummary(marketSummary, marketSummary.regime, marketSummary.breadth)
+      : await this.marketGate(request.region);
     const instruments = await this.getEvaluationInstruments(instrumentIds);
     const instrumentsById = new Map(instruments.map((instrument: any) => [instrument.id, instrument]));
+    const strategies = this.strategiesForRequest(request);
+    const portfolio = request.portfolioId
+      ? await this.portfolioService.getPortfolioDetail(request.portfolioId).catch(() => null)
+      : null;
     const strategyRatings = new Map<string, Promise<StrategyDecisionDto['strategyRating']>>();
     let failedCount = 0;
 
-    for (let i = 0; i < instrumentIds.length; i += EVALUATION_WORKER_CONCURRENCY) {
-      const chunk = instrumentIds.slice(i, i + EVALUATION_WORKER_CONCURRENCY);
+    for (let i = 0; i < instrumentIds.length; i += workerConcurrency) {
+      const chunk = instrumentIds.slice(i, i + workerConcurrency);
       const chunkResults = await Promise.all(chunk.map(async (instrumentId) => {
         try {
-          const strategies = this.strategiesForRequest(request);
           const rawSignal = universe.rawSignalsByInstrumentId.get(instrumentId);
           const instrumentResults: StrategyDecisionDto[] = [];
           const decisions = await this.evaluateInstrumentStrategies(instrumentId, strategies, gate, {
@@ -144,6 +168,7 @@ export class StrategyDecisionEngineService {
             marketSummary,
             rawSignal,
             instrument: instrumentsById.get(instrumentId),
+            portfolio,
             strategyRatings,
           });
           await Promise.all(decisions.map(async (decision) => {
@@ -293,6 +318,7 @@ export class StrategyDecisionEngineService {
       marketSummary?: any;
       rawSignal?: SignalResultDto;
       instrument?: any;
+      portfolio?: any;
       strategyRatings?: Map<string, Promise<StrategyDecisionDto['strategyRating']>>;
     } = {}
   ): Promise<StrategyDecisionDto[]> {

@@ -113,6 +113,7 @@ export class SignalGenerationEngineService {
     const resolved = await this.resolveRunUniverse(request, batchSize, offset);
     const resolvedInstrumentIds = resolved.instrumentIds;
     let instrumentIds = resolvedInstrumentIds;
+    let filteredDataQualityResult: Awaited<ReturnType<DataQualityEngineService['filterEligibleInstruments']>> | null = null;
     let dataQuality: SignalRunResponse['dataQuality'] = {
       filterApplied: Boolean(request.useDataQualityFilter),
       beforeFilter: resolvedInstrumentIds.length,
@@ -135,6 +136,7 @@ export class SignalGenerationEngineService {
         return null;
       });
       if (filtered) {
+        filteredDataQualityResult = filtered;
         instrumentIds = filtered.eligibleInstrumentIds;
         warnings.push(...filtered.warnings);
         dataQuality = {
@@ -163,11 +165,8 @@ export class SignalGenerationEngineService {
       totalCount: resolved.totalCount,
       warnings,
     });
-    const dataQualityEvaluationsByInstrumentId = request.useDataQualityFilter
-      ? await this.getDataQualityEligibilityMap(resolvedInstrumentIds, request).catch((error: any) => {
-        warnings.push(`Data quality audit snapshot unavailable: ${error?.message || 'unknown error'}`);
-        return {};
-      })
+    const dataQualityEvaluationsByInstrumentId = request.useDataQualityFilter && filteredDataQualityResult
+      ? this.getDataQualityEligibilityMap(resolvedInstrumentIds, filteredDataQualityResult)
       : {};
     const researchContextMode: NonNullable<SignalRunRequest['researchContextMode']> = request.instrumentId || request.symbol ? 'FULL' : 'LIGHTWEIGHT';
     const generationRequest = {
@@ -1011,15 +1010,11 @@ export class SignalGenerationEngineService {
     };
   }
 
-  private async getDataQualityEligibilityMap(instrumentIds: string[], request: SignalRunRequest): Promise<Record<string, SignalDataQualityEligibility>> {
-    const filtered = await this.dataQualityService.filterEligibleInstruments(instrumentIds, {
-      minSignalReadinessScore: request.minSignalReadinessScore ?? 70,
-      allowedReadinessStatuses: request.allowedReadinessStatuses,
-      includeLimited: request.includeLimited,
-      skipUnusable: request.skipUnusable ?? true,
-      missingQualityBehavior: request.missingQualityBehavior ?? 'WARN_AND_PROCESS',
-    });
-    const evaluations = (filtered as any).evaluationsByInstrumentId || {};
+  private getDataQualityEligibilityMap(
+    instrumentIds: string[],
+    filtered: Awaited<ReturnType<DataQualityEngineService['filterEligibleInstruments']>>
+  ): Record<string, SignalDataQualityEligibility> {
+    const evaluations = filtered.evaluationsByInstrumentId || {};
     const excluded = new Set(filtered.excludedInstrumentIds);
     const eligible = new Set(filtered.eligibleInstrumentIds);
     return Object.fromEntries(instrumentIds.map((instrumentId) => {

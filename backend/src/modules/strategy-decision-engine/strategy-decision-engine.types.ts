@@ -127,6 +127,7 @@ export interface StrategyEvaluateRequest {
   assetType?: string;
   batchSize?: number;
   offset?: number;
+  workerConcurrency?: number;
 }
 
 export interface StrategyEvaluateResponse {

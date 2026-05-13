@@ -24,6 +24,7 @@ import type {
 } from './signal-quality-lab.types';
 
 const HORIZON_DAYS: Record<QualityHorizon, number> = { '1D': 1, '5D': 5, '10D': 10, '20D': 20, '60D': 60 };
+const ANALYSIS_SIGNAL_LIMIT = 10000;
 const SCORE_BUCKETS = [
   { label: '0-39', min: 0, max: 39 },
   { label: '40-69', min: 40, max: 69 },
@@ -292,7 +293,7 @@ export class SignalQualityLabService {
   }
 
   private analysisQuery(query: QualityQuery): QualityQuery {
-    return { ...query, limit: Math.max(query.limit || 0, 5000) };
+    return { ...query, limit: Math.max(query.limit || 0, ANALYSIS_SIGNAL_LIMIT) };
   }
 
   private async dataQualityFilterSummaryFrom(before: SignalResultDto[], after: SignalResultDto[], query: QualityQuery): Promise<DataQualityFilterSummary> {
@@ -698,9 +699,11 @@ export class SignalQualityLabService {
   private recommendedAction(total: number, evaluated: number, insufficient: number, missing: number, dataQuality: DataQualityFilterSummary): string {
     if (total === 0 && dataQuality.filterApplied && dataQuality.excludedByDataQuality > 0) return '0 signals remain after data-quality filters. Reset filters or use a less restrictive readiness filter.';
     if (total === 0) return 'Run Signal Generation for the selected market scope, then return after price data exists.';
-    if (evaluated > 0) return 'Review evaluated historical forward returns and keep market data current.';
     if (missing >= total) return 'Sync historical market data for these instruments before measuring outcomes.';
+    if (missing > 0 && insufficient > 0) return `Only ${evaluated} of ${total} signals are evaluated. Sync missing Market Data Foundation price history, then use a shorter horizon or wait for future trading rows.`;
+    if (missing > 0) return `Only ${evaluated} of ${total} signals are evaluated. Sync missing Market Data Foundation price history before relying on this sample.`;
     if (insufficient > 0) return 'Try a shorter horizon such as 1D or 5D, sync latest market data, or wait until enough future trading days exist.';
+    if (evaluated > 0) return 'Review evaluated historical forward returns and keep market data current.';
     return 'Check whether signal dates, filters, and market scope match available price history.';
   }
 

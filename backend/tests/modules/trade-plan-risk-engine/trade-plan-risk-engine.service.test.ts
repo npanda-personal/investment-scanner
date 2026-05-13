@@ -640,6 +640,87 @@ describe('TradePlanRiskEngineService', () => {
       ]));
       expect(res.backtestTimeframe).toBe('10Y');
     });
+
+    it('uses candidate decisions directly and shares same-scope proof lookups', async () => {
+      const candidates = [1, 2, 3].map((index) => ({
+        id: `dec-${index}`,
+        instrumentId: `INST-${index}`,
+        symbol: `TEST${index}`,
+        strategy: 'TREND_MOMENTUM',
+        strategyVersion: '1.0.0',
+        decision: 'TRADE_CANDIDATE',
+        marketGateStatus: 'OPEN',
+        strategyRating: 'GOOD',
+        readinessLabel: 'PAPER_TEST_CANDIDATE',
+        frameworkBacked: true,
+        confidence: 'HIGH',
+        reasons: ['Candidate from strategy decision batch.'],
+        blockers: [],
+        dataGaps: [],
+      }));
+      const prices = Array.from({ length: 60 }, (_, index) => ({
+        close: 100 - index * 0.1,
+        low: 98 - index * 0.1,
+        high: 102 - index * 0.1,
+        date: `2026-05-${String(Math.max(1, 6 - Math.min(index, 5))).padStart(2, '0')}T00:00:00.000Z`,
+      }));
+      mockStrategyService.candidates.mockResolvedValue({ results: candidates, total: candidates.length } as any);
+      mockStrategyService.history.mockResolvedValue([]);
+      mockStrategyService.latestForInstrument.mockResolvedValue(null as any);
+      mockMarketDataService.latestPriceByInstrumentId.mockImplementation(async (instrumentId: string) => ({
+        symbol: instrumentId,
+        latest: { close: 100, date: '2026-05-07T00:00:00.000Z' },
+        source: 'local-db',
+      }) as any);
+      mockMarketDataService.listPricesByInstrumentId.mockResolvedValue({ prices, source: 'local-db' } as any);
+
+      const res = await service.batchGenerate({ batchSize: 25, offset: 0, region: 'IN', assetType: 'STOCK', backtestTimeframe: '3Y' });
+
+      expect(res.generatedCount).toBe(3);
+      expect(mockStrategyService.history).not.toHaveBeenCalled();
+      expect(mockStrategyService.latestForInstrument).not.toHaveBeenCalled();
+      expect((service as any).strategyFrameworkService.performance).toHaveBeenCalledTimes(1);
+      expect((mockMarketDataService as any).latestStoredCandleInfo).toHaveBeenCalledTimes(1);
+    });
+
+    it('caps batch size and bounds worker concurrency', async () => {
+      const candidates = Array.from({ length: 12 }, (_, index) => ({
+        id: `dec-${index + 1}`,
+        instrumentId: `INST-${index + 1}`,
+        symbol: `TEST${index + 1}`,
+      }));
+      mockStrategyService.candidates.mockResolvedValue({ results: candidates, total: candidates.length } as any);
+
+      let active = 0;
+      let maxActive = 0;
+      jest.spyOn(service, 'generatePlan').mockImplementation(async () => {
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        await Promise.resolve();
+        active -= 1;
+        return {
+          paperReadinessStatus: 'READY_FOR_PAPER_REVIEW',
+          paperReadinessBlockers: [],
+          blockers: [],
+          planStatus: 'VALID',
+          riskGrade: 'LOW',
+          rewardRiskRatio: 2,
+          region: 'IN',
+          assetType: 'STOCK',
+        } as any;
+      });
+
+      const res = await service.batchGenerate({ batchSize: 250, offset: -5, region: 'IN', workerConcurrency: 99 });
+
+      expect(mockStrategyService.candidates).toHaveBeenCalledWith(expect.objectContaining({
+        limit: 100,
+        offset: 0,
+      }));
+      expect(maxActive).toBeLessThanOrEqual(10);
+      expect(res.batchSize).toBe(100);
+      expect(res.offset).toBe(0);
+      expect(res.generatedCount).toBe(12);
+    });
   });
 
   describe('funnelDiagnostics', () => {

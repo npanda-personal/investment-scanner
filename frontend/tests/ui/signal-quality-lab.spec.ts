@@ -115,7 +115,7 @@ test.describe('Signal Quality Lab UI', () => {
   test('exposes horizon controls and recalculation workflow', async ({ page }) => {
     await routeDashboard(page);
     await visitModule(page, '/signals/quality', 'Signal Quality Lab');
-    await expect(page.getByRole('button', { name: 'Recalculate' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Refresh Diagnostics' })).toBeVisible();
     await expect(page.getByText('Horizon').first()).toBeVisible();
     await page.getByRole('tab', { name: 'Performance' }).click();
     await expect(page.getByText('Horizon Availability')).toBeVisible();
@@ -162,7 +162,7 @@ test.describe('Signal Quality Lab UI', () => {
     await expect(page.getByLabel('Model version')).toHaveValue('signal-engine-v1');
     await expect.poll(() => dashboardUrls.some((url) => url.includes('modelVersion=signal-engine-v1'))).toBe(true);
 
-    await page.getByRole('button', { name: 'Recalculate' }).click();
+    await page.getByRole('button', { name: 'Refresh Diagnostics' }).click();
     await expect.poll(() => recalculatePayload).toMatchObject({ modelVersion: 'signal-engine-v1' });
   });
 
@@ -198,7 +198,7 @@ test.describe('Signal Quality Lab UI', () => {
     });
 
     await visitModule(page, '/signals/quality', 'Signal Quality Lab');
-    await page.getByRole('button', { name: 'Recalculate' }).click();
+    await page.getByRole('button', { name: 'Refresh Diagnostics' }).click();
 
     await expect.poll(() => recalculatePayload).toMatchObject({
       batchSize: 100,
@@ -208,6 +208,7 @@ test.describe('Signal Quality Lab UI', () => {
       assetType: 'STOCK',
     });
     await expect(page.getByText('Signal quality refresh complete. Processed 1 / 1 signal records.')).toBeVisible();
+    await expect(page.getByText('insufficient future price rows 0, missing local price history 0')).toBeVisible();
   });
 
   test('direct entry and hard reload settle into dashboard content instead of a generic spinner', async ({ page }) => {
@@ -227,9 +228,11 @@ test.describe('Signal Quality Lab UI', () => {
     await visitModule(page, '/signals/quality', 'Signal Quality Lab');
 
     await expect(page.getByText('Evidence usability is UNAVAILABLE')).toBeVisible();
+    await expect(page.getByText('Missing local price history affects 1 signal, and 2 signals do not yet have 20 future trading rows.')).toBeVisible();
     await expect(page.getByText('Evidence Usability', { exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'UNAVAILABLE' })).toBeVisible();
     await expect(page.getByText('Mature / Evaluable')).toBeVisible();
+    await expect(page.getByText('Insufficient Future Rows')).toBeVisible();
     await expect(page.getByText('Missing Price History')).toBeVisible();
     await expect(page.getByText('Bullish Win Rate')).toHaveCount(0);
 

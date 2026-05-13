@@ -322,10 +322,14 @@ describe('SignalGenerationEngineService', () => {
         excludedInstrumentIds: ['blocked'],
         missingQualityEvaluationCount: 1,
         warnings: ['missing: missing data quality evaluation'],
+        evaluationsByInstrumentId: {
+          ready: { instrumentId: 'ready', eligibleForSignals: true, coverageStatus: 'GOOD', signalReadinessStatus: 'READY', liquidityStatus: 'LIQUID', signalReadinessScore: 90 },
+          blocked: { instrumentId: 'blocked', eligibleForSignals: false, coverageStatus: 'UNUSABLE', signalReadinessStatus: 'NOT_READY', liquidityStatus: 'UNKNOWN', signalReadinessScore: 10 },
+        },
       }),
     };
     const service = new SignalGenerationEngineService(repository as any, marketDataService as any, {} as any, dataQualityService as any);
-    jest.spyOn(service, 'generateForInstrument').mockImplementation(async (instrumentId) => ({
+    const generateForInstrument = jest.spyOn(service, 'generateForInstrument').mockImplementation(async (instrumentId) => ({
       instrument_id: instrumentId,
       symbol: instrumentId,
       company_name: null,
@@ -361,6 +365,24 @@ describe('SignalGenerationEngineService', () => {
     });
     expect(result).toMatchObject({ eligibleInstrumentCount: 2, attemptedGenerationCount: 2, skippedCount: 1 });
     expect(result.warnings[0]).toContain('missing data quality');
+    expect(dataQualityService.filterEligibleInstruments).toHaveBeenCalledTimes(1);
+    const generationOptions = generateForInstrument.mock.calls[0][1] as any;
+    expect(generationOptions.dataQualityEvaluationsByInstrumentId.ready).toMatchObject({
+      filterApplied: true,
+      eligible: true,
+      coverageStatus: 'GOOD',
+      signalReadinessStatus: 'READY',
+      liquidityStatus: 'LIQUID',
+    });
+    expect(generationOptions.dataQualityEvaluationsByInstrumentId.blocked).toMatchObject({
+      filterApplied: true,
+      eligible: false,
+    });
+    expect(generationOptions.dataQualityEvaluationsByInstrumentId.missing).toMatchObject({
+      filterApplied: true,
+      eligible: true,
+      excludedReason: 'Missing data quality evaluation; configured behavior allowed processing.',
+    });
   });
 
   it('runs one bounded batch and returns progress metadata', async () => {

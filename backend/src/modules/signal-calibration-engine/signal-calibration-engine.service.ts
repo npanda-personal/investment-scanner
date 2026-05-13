@@ -1,7 +1,7 @@
 import { HistoricalContextSnapshotsService } from '../historical-context-snapshots';
 import { SignalGenerationEngineService, type SignalResultDto } from '../signal-generation-engine';
 import { SignalQualityLabService, type NoisySignalItem, type QualityHorizon, type QualityMetricGroup, type SignalTypePerformance } from '../signal-quality-lab';
-import { DataQualityEngineService } from '../data-quality-engine';
+import { DataQualityEngineService, type DataQualityEvaluationDto } from '../data-quality-engine';
 import { SignalCalibrationEngineRepository } from './signal-calibration-engine.repository';
 import type {
   CalibrationAdjustment,
@@ -43,13 +43,29 @@ const CAPS = {
 };
 
 const TOTAL_DELTA_CAP = 25;
+const RUN_CONCURRENCY = 4;
 
 type BatchQualityMetrics = {
   byType: SignalTypePerformance[];
   byScore: QualityMetricGroup[];
   bySector: QualityMetricGroup[];
   noisy: NoisySignalItem[];
+  signalTypeMetrics: Map<string, { winRate: number | null; averageForwardReturn: number | null; sampleSize: number }>;
+  scoreBucketMetrics: Map<string, QualityMetricGroup>;
+  sectorMetrics: Map<string, QualityMetricGroup>;
+  noisyIssueTypesByInstrumentId: Map<string, string[]>;
 };
+
+type BatchLookupCache = {
+  qualityMetrics: BatchQualityMetrics;
+  dataQualityEvaluationsByInstrumentId?: Map<string, DataQualityEvaluationDto>;
+  historicalContextLookups: Map<string, Promise<any | null>>;
+};
+
+type CalibrationRunItemOutcome =
+  | { type: 'calibrated'; result: SignalCalibrationResultDto }
+  | { type: 'skipped'; warning: string }
+  | { type: 'failed'; error: string };
 
 export class SignalCalibrationEngineService {
   constructor(
@@ -112,22 +128,39 @@ export class SignalCalibrationEngineService {
     const qualityWarning = 'Signal Quality diagnostics unavailable; using raw score because calibration evidence is missing.';
     const globalSummary = await this.qualityService.summary(summaryQuery).catch(() => null);
     const batchQualityMetrics = await this.batchQualityMetrics(summaryQuery);
+    const batchLookupCache: BatchLookupCache = {
+      qualityMetrics: batchQualityMetrics,
+      dataQualityEvaluationsByInstrumentId: await this.batchDataQualityEvaluations(signals),
+      historicalContextLookups: new Map(),
+    };
 
-    for (const signal of signals) {
+    const outcomes = await this.mapWithConcurrency(signals, this.runConcurrency(signals.length, request), async (signal): Promise<CalibrationRunItemOutcome> => {
       try {
         if (await this.outsideRequestedScope(signal.instrument_id, request)) {
-          outOfScopeSkipped += 1;
-          warnings.push(`${signal.instrument_id}: outside requested market scope (${request.region} / ${request.assetType || 'ALL'}).`);
-          continue;
+          return {
+            type: 'skipped',
+            warning: `${signal.instrument_id}: outside requested market scope (${request.region} / ${request.assetType || 'ALL'}).`,
+          };
         }
-        const calibrated = await this.calibrateAndPersist(signal, horizon, globalSummary, { region: request.region, assetType: request.assetType }, batchQualityMetrics);
+        const calibrated = await this.calibrateAndPersist(signal, horizon, globalSummary, { region: request.region, assetType: request.assetType }, batchLookupCache);
         if (!globalSummary) {
           calibrated.dataGaps.push(qualityWarning);
           calibrated.calibrationEvidence?.evidenceWarnings.push(qualityWarning);
         }
-        results.push(calibrated);
+        return { type: 'calibrated', result: calibrated };
       } catch (error: any) {
-        errors.push(`${signal.instrument_id}: ${error?.message || 'calibration failed'}`);
+        return { type: 'failed', error: `${signal.instrument_id}: ${error?.message || 'calibration failed'}` };
+      }
+    });
+
+    for (const outcome of outcomes) {
+      if (outcome.type === 'calibrated') {
+        results.push(outcome.result);
+      } else if (outcome.type === 'skipped') {
+        outOfScopeSkipped += 1;
+        warnings.push(outcome.warning);
+      } else {
+        errors.push(outcome.error);
       }
     }
     
@@ -421,12 +454,12 @@ export class SignalCalibrationEngineService {
     horizon: QualityHorizon = DEFAULT_HORIZON,
     globalSummary: any = null,
     scope: { region?: string; assetType?: string } = {},
-    batchQualityMetrics?: BatchQualityMetrics
+    batchLookupCache?: BatchLookupCache
   ): Promise<SignalCalibrationResultDto> {
-    return this.repository.create(this.calibrate(signal, await this.context(signal, horizon, globalSummary, scope, batchQualityMetrics)));
+    return this.repository.create(this.calibrate(signal, await this.context(signal, horizon, globalSummary, scope, batchLookupCache)));
   }
 
-  private async context(signal: SignalResultDto, horizon: QualityHorizon, globalSummary: any, scope: { region?: string; assetType?: string }, batchQualityMetrics?: BatchQualityMetrics): Promise<CalibrationContext> {
+  private async context(signal: SignalResultDto, horizon: QualityHorizon, globalSummary: any, scope: { region?: string; assetType?: string }, batchLookupCache?: BatchLookupCache): Promise<CalibrationContext> {
     const query = {
       horizon,
       limit: 1000,
@@ -436,27 +469,22 @@ export class SignalCalibrationEngineService {
       region: scope.region,
       assetType: scope.assetType,
     };
-    const [byType, byScore, bySector, noisy, lookup, dataQualityEvaluation] = await Promise.all([
-      batchQualityMetrics ? Promise.resolve(batchQualityMetrics.byType) : this.qualityService.byType(query).catch(() => []),
-      batchQualityMetrics ? Promise.resolve(batchQualityMetrics.byScore) : this.qualityService.byScoreBucket(query).catch(() => []),
-      batchQualityMetrics ? Promise.resolve(batchQualityMetrics.bySector) : this.qualityService.bySector(query).catch(() => []),
-      batchQualityMetrics ? Promise.resolve(batchQualityMetrics.noisy) : this.qualityService.noisy({ ...query, limit: 250 }).catch(() => []),
-      this.contextService.lookup(new Date(signal.generated_at), 7, { instrumentId: signal.instrument_id, sector: signal.sector || undefined, country: signal.country || undefined }).catch(() => null),
-      this.dataQualityService.getLatestEvaluationForInstrument(signal.instrument_id).catch(() => null),
+    const [qualityMetrics, lookup, dataQualityEvaluation] = await Promise.all([
+      batchLookupCache?.qualityMetrics ? Promise.resolve(batchLookupCache.qualityMetrics) : this.qualityMetrics(query),
+      this.historicalContextLookup(signal, batchLookupCache).catch(() => null),
+      this.dataQualityEvaluation(signal.instrument_id, batchLookupCache).catch(() => null),
     ]);
-    const typeMetrics = new Map<string, { winRate: number | null; averageForwardReturn: number | null; sampleSize: number }>();
-    for (const metric of byType as SignalTypePerformance[]) typeMetrics.set(metric.signalType, metric);
     const bucket = this.scoreBucket(signal.score);
     return {
-      signalTypeMetrics: typeMetrics,
-      scoreBucketMetric: (byScore as QualityMetricGroup[]).find((item) => item.group === bucket) || null,
-      sectorMetric: (bySector as QualityMetricGroup[]).find((item) => item.group === (signal.sector || 'Unknown')) || null,
+      signalTypeMetrics: qualityMetrics.signalTypeMetrics,
+      scoreBucketMetric: qualityMetrics.scoreBucketMetrics.get(bucket) || null,
+      sectorMetric: qualityMetrics.sectorMetrics.get(signal.sector || 'Unknown') || null,
       regime: lookup?.market?.regime ?? null,
       sectorLeadership: lookup?.sector?.leadershipStatus ?? null,
       smartMoneyStatus: lookup?.smartMoney?.status ?? null,
       dataQuality: lookup?.dataQuality ?? null,
       dataQualityEvaluation,
-      noisyIssueTypes: (noisy || []).filter((item) => item.instrumentId === signal.instrument_id).map((item) => item.issueType),
+      noisyIssueTypes: qualityMetrics.noisyIssueTypesByInstrumentId.get(signal.instrument_id) || [],
       dataGaps: lookup?.gaps?.length ? [...lookup.gaps] : lookup ? [] : ['Historical context lookup unavailable.'],
       horizonAvailability: globalSummary?.horizonAvailability || null,
       evaluationDiagnostics: globalSummary?.evaluationDiagnostics || null,
@@ -471,12 +499,63 @@ export class SignalCalibrationEngineService {
       this.qualityService.bySector(query).catch(() => []),
       this.qualityService.noisy({ ...query, limit: 5000 }).catch(() => []),
     ]);
-    return {
-      byType: byType as SignalTypePerformance[],
-      byScore: byScore as QualityMetricGroup[],
-      bySector: bySector as QualityMetricGroup[],
-      noisy: noisy as NoisySignalItem[],
-    };
+    return this.prepareQualityMetrics(byType as SignalTypePerformance[], byScore as QualityMetricGroup[], bySector as QualityMetricGroup[], noisy as NoisySignalItem[]);
+  }
+
+  private async qualityMetrics(query: { horizon: QualityHorizon; limit: number; minSampleSize: number; sector?: string; country?: string; region?: string; assetType?: string }): Promise<BatchQualityMetrics> {
+    const [byType, byScore, bySector, noisy] = await Promise.all([
+      this.qualityService.byType(query).catch(() => []),
+      this.qualityService.byScoreBucket(query).catch(() => []),
+      this.qualityService.bySector(query).catch(() => []),
+      this.qualityService.noisy({ ...query, limit: 250 }).catch(() => []),
+    ]);
+    return this.prepareQualityMetrics(byType as SignalTypePerformance[], byScore as QualityMetricGroup[], bySector as QualityMetricGroup[], noisy as NoisySignalItem[]);
+  }
+
+  private prepareQualityMetrics(
+    byType: SignalTypePerformance[],
+    byScore: QualityMetricGroup[],
+    bySector: QualityMetricGroup[],
+    noisy: NoisySignalItem[]
+  ): BatchQualityMetrics {
+    const signalTypeMetrics = new Map<string, { winRate: number | null; averageForwardReturn: number | null; sampleSize: number }>();
+    for (const metric of byType) signalTypeMetrics.set(metric.signalType, metric);
+    const scoreBucketMetrics = new Map(byScore.map((item) => [item.group, item]));
+    const sectorMetrics = new Map(bySector.map((item) => [item.group, item]));
+    const noisyIssueTypesByInstrumentId = new Map<string, string[]>();
+    for (const item of noisy) {
+      const existing = noisyIssueTypesByInstrumentId.get(item.instrumentId) || [];
+      existing.push(item.issueType);
+      noisyIssueTypesByInstrumentId.set(item.instrumentId, existing);
+    }
+    return { byType, byScore, bySector, noisy, signalTypeMetrics, scoreBucketMetrics, sectorMetrics, noisyIssueTypesByInstrumentId };
+  }
+
+  private async batchDataQualityEvaluations(signals: SignalResultDto[]): Promise<Map<string, DataQualityEvaluationDto> | undefined> {
+    const instrumentIds = [...new Set(signals.map((signal) => signal.instrument_id).filter(Boolean))];
+    const serviceAny = this.dataQualityService as any;
+    if (instrumentIds.length === 0 || typeof serviceAny.getEvaluationsForInstruments !== 'function') return undefined;
+    const evaluations = await serviceAny.getEvaluationsForInstruments(instrumentIds).catch(() => []);
+    return new Map((evaluations as DataQualityEvaluationDto[]).map((evaluation) => [evaluation.instrumentId, evaluation]));
+  }
+
+  private async dataQualityEvaluation(instrumentId: string, batchLookupCache?: BatchLookupCache): Promise<DataQualityEvaluationDto | null> {
+    if (batchLookupCache?.dataQualityEvaluationsByInstrumentId) {
+      return batchLookupCache.dataQualityEvaluationsByInstrumentId.get(instrumentId) || null;
+    }
+    return this.dataQualityService.getLatestEvaluationForInstrument(instrumentId).catch(() => null);
+  }
+
+  private historicalContextLookup(signal: SignalResultDto, batchLookupCache?: BatchLookupCache): Promise<any | null> {
+    const date = new Date(signal.generated_at);
+    const filters = { instrumentId: signal.instrument_id, sector: signal.sector || undefined, country: signal.country || undefined };
+    if (!batchLookupCache) return this.contextService.lookup(date, 7, filters).catch(() => null);
+
+    const key = `${date.toISOString().slice(0, 10)}|${signal.instrument_id}|${signal.sector || ''}|${signal.country || ''}`;
+    if (!batchLookupCache.historicalContextLookups.has(key)) {
+      batchLookupCache.historicalContextLookups.set(key, this.contextService.lookup(date, 7, filters).catch(() => null));
+    }
+    return batchLookupCache.historicalContextLookups.get(key)!;
   }
 
   private withEvidenceFromSummary(item: SignalCalibrationResultDto, horizon: QualityHorizon, summary: any): SignalCalibrationResultDto {
@@ -800,6 +879,28 @@ export class SignalCalibrationEngineService {
       region: request.region,
       assetType: request.assetType,
     });
+  }
+
+  private runConcurrency(signalCount: number, request: CalibrationRunRequest): number {
+    if (request.instrumentId || request.symbol || signalCount <= 1) return 1;
+    return Math.min(RUN_CONCURRENCY, signalCount);
+  }
+
+  private async mapWithConcurrency<T, R>(items: T[], limit: number, worker: (item: T, index: number) => Promise<R>): Promise<R[]> {
+    if (items.length === 0) return [];
+    const results = new Array<R>(items.length);
+    let nextIndex = 0;
+    const workerCount = Math.max(1, Math.min(limit, items.length));
+
+    await Promise.all(Array.from({ length: workerCount }, async () => {
+      while (nextIndex < items.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        results[index] = await worker(items[index], index);
+      }
+    }));
+
+    return results;
   }
 
   private async outsideRequestedScope(instrumentId: string, request: CalibrationRunRequest): Promise<boolean> {

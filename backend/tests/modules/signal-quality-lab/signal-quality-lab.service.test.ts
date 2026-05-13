@@ -405,7 +405,7 @@ describe('signal quality lab service', () => {
       { regimeForDate: jest.fn().mockResolvedValue(null) } as any
     );
     const summary = await service.summary({ horizon: '1D', limit: 10, minSampleSize: 0 });
-    expect(signalHistory).toHaveBeenCalledWith(expect.objectContaining({ limit: 5000 }));
+    expect(signalHistory).toHaveBeenCalledWith(expect.objectContaining({ limit: 10000 }));
     expect(summary.totalSignals).toBe(200);
     expect(summary.evaluatedSignals).toBe(200);
   });
@@ -434,6 +434,38 @@ describe('signal quality lab service', () => {
     expect(outcomes).toHaveLength(2);
     expect(bulkLoader).toHaveBeenCalledTimes(1);
     expect((service as any).marketDataService.listPricesByInstrumentId).not.toHaveBeenCalled();
+  });
+
+  it('prioritizes market-data gaps in recommendations even when a small sample is evaluated', async () => {
+    const service = new SignalQualityLabService(
+      {} as any,
+      {
+        signalHistory: jest.fn().mockResolvedValue([
+          baseSignal({ id: 'evaluated', instrument_id: 'evaluated' }),
+          baseSignal({ id: 'insufficient', instrument_id: 'insufficient' }),
+          baseSignal({ id: 'missing', instrument_id: 'missing' }),
+        ]),
+        signalHistoryCount: jest.fn().mockResolvedValue(3),
+      } as any,
+      {
+        listPricesByInstrumentId: jest.fn().mockImplementation((instrumentId: string) => {
+          if (instrumentId === 'missing') return Promise.resolve({ prices: [] });
+          const rows = instrumentId === 'insufficient' ? prices.slice(0, 1) : prices;
+          return Promise.resolve({ prices: rows.map((price) => ({ date: price.date, adjusted_close: price.adjustedClose })) });
+        }),
+      } as any,
+      { regimeForDate: jest.fn().mockResolvedValue(null) } as any
+    );
+
+    const summary = await service.summary({ horizon: '5D', limit: 10, minSampleSize: 0 });
+
+    expect(summary.evaluationDiagnostics).toMatchObject({
+      evaluatedSignals: 1,
+      insufficientFuturePriceCount: 1,
+      missingPriceHistoryCount: 1,
+    });
+    expect(summary.recommendedAction).toContain('Only 1 of 3 signals are evaluated');
+    expect(summary.recommendedAction).toContain('Sync missing Market Data Foundation price history');
   });
 
   it('increments missing price history diagnostics safely', async () => {

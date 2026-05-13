@@ -2,6 +2,7 @@ import type { QualityHorizon, QualityQuery } from './signal-quality-lab.types';
 
 export const QUALITY_HORIZONS: QualityHorizon[] = ['1D', '5D', '10D', '20D', '60D'];
 export const QUALITY_DIRECTIONS = ['BULLISH', 'NEUTRAL', 'BEARISH'] as const;
+export const QUALITY_ANALYSIS_LIMIT = 10000;
 
 export function parseQualityQuery(query: any): QualityQuery {
   return {
@@ -14,7 +15,7 @@ export function parseQualityQuery(query: any): QualityQuery {
     modelVersion: parseModelVersion(query.modelVersion),
     from: validDate(query.from) ? query.from : undefined,
     to: validDate(query.to) ? query.to : undefined,
-    limit: clampInt(query.limit, 1000, 1, 5000),
+    limit: clampInt(query.limit, 1000, 1, QUALITY_ANALYSIS_LIMIT),
     minSampleSize: clampInt(query.minSampleSize, 0, 0, 1000),
     readinessStatus: parseEnum(query.readinessStatus, ['READY', 'LIMITED', 'NOT_READY']),
     coverageStatus: parseEnum(query.coverageStatus, ['GOOD', 'PARTIAL', 'POOR', 'UNUSABLE']),

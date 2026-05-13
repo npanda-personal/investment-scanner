@@ -99,14 +99,14 @@ Response fields:
 - `warnings`
 - `durationMs`
 
-Outcomes are still calculated on demand in this MVP, so the endpoint pages through signal records, reports progress metadata, and returns `inserted = 0`, `updated = 0`, `skipped = 0`, `outcomesPersisted = false`, and evaluated/not-yet-evaluable/missing-price-history counts for the selected horizon. Do not label non-persisted on-demand records as skipped; skipped is reserved for records that were intentionally not processed. Malformed or unsupported future cached-outcome work should return warnings without turning completed batches into a full failure.
+Outcomes are still calculated on demand in this MVP, so the endpoint pages through signal records, reports progress metadata, and returns `inserted = 0`, `updated = 0`, `skipped = 0`, `outcomesPersisted = false`, and evaluated/insufficient-future-price/missing-price-history counts for the selected horizon. Do not label non-persisted on-demand records as skipped; skipped is reserved for records that were intentionally not processed. Malformed or unsupported future cached-outcome work should return warnings without turning completed batches into a full failure.
 
 Frontend behavior:
 
-- The `/signals/quality` Recalculate button uses the shared batch runner and module-owned frontend config.
+- The `/signals/quality` Refresh Diagnostics button uses the shared batch runner and module-owned frontend config.
 - The frontend sends `region` and `assetType` on every batch request.
 - The button shows a spinner and remains disabled while the loop is active.
-- Progress uses the shared `BatchProgressBar` and reports processed, evaluated, not-yet-evaluable, missing-price-history, warning, batch, and completion counts.
+- Progress uses the shared `BatchProgressBar` and reports processed, evaluated, insufficient-future-price, missing-price-history, warning, batch, and completion counts.
 - After every successful batch, the dashboard refetches summary, type, sector, regime, and noisy-signal data.
 - If one batch fails, the loop stops and leaves already completed batches intact.
 

@@ -1,5 +1,8 @@
 import type { GenerateTradePlanRequest, BatchGenerateTradePlanRequest, TradePlanListQuery, TradePlanFunnelQuery } from './trade-plan-risk-engine.types';
 
+const MAX_BATCH_GENERATE_BATCH_SIZE = 100;
+const MAX_BATCH_GENERATE_WORKER_CONCURRENCY = 10;
+
 export function parseGenerateRequest(body: unknown): GenerateTradePlanRequest {
   const req = body as any;
   if (!req || typeof req !== 'object') throw new Error('Invalid request body');
@@ -23,12 +26,15 @@ export function parseGenerateRequest(body: unknown): GenerateTradePlanRequest {
 export function parseBatchGenerateRequest(body: unknown): BatchGenerateTradePlanRequest {
   const req = (body || {}) as any;
   return {
-    batchSize: typeof req.batchSize === 'number' ? Math.max(1, Math.min(req.batchSize, 100)) : 25,
-    offset: typeof req.offset === 'number' ? Math.max(0, req.offset) : 0,
+    batchSize: typeof req.batchSize === 'number' ? Math.max(1, Math.min(Math.floor(req.batchSize), MAX_BATCH_GENERATE_BATCH_SIZE)) : 25,
+    offset: typeof req.offset === 'number' ? Math.max(0, Math.floor(req.offset)) : 0,
     region: typeof req.region === 'string' ? req.region : undefined,
     assetType: typeof req.assetType === 'string' ? req.assetType : undefined,
     strategyCode: typeof req.strategyCode === 'string' ? req.strategyCode : undefined,
     backtestTimeframe: typeof req.backtestTimeframe === 'string' ? req.backtestTimeframe : undefined,
+    workerConcurrency: typeof req.workerConcurrency === 'number'
+      ? Math.max(1, Math.min(Math.floor(req.workerConcurrency), MAX_BATCH_GENERATE_WORKER_CONCURRENCY))
+      : undefined,
   };
 }
 

@@ -36,6 +36,7 @@ import { Link } from 'react-router-dom';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 
 const STRATEGY_DECISION_BATCH_SIZE = 100;
+const STRATEGY_DECISION_BATCH_REQUEST_WORKERS = 4;
 
 type CandidatePresetKey = 'TRADE_CANDIDATE' | 'FRAMEWORK_BACKED' | 'GOOD_EXCELLENT' | 'PAPER_OR_WATCHLIST';
 
@@ -188,9 +189,7 @@ const StrategyDecisionDashboard: React.FC = () => {
     setEvaluationSummary(null);
     setError(null);
     try {
-      let offset = 0;
       const batchSize = STRATEGY_DECISION_BATCH_SIZE;
-      let hasMore = true;
       let processedCount = 0;
       let generatedCount = 0;
       let failedCount = 0;
@@ -198,30 +197,50 @@ const StrategyDecisionDashboard: React.FC = () => {
       let totalCount = 0;
       let batches = 0;
 
-      while (hasMore) {
-        const response = await evaluateStrategy({ 
-          strategy: evalStrategy as any, 
-          batchSize, 
-          offset,
-          region: scope.region,
-          assetType: scope.assetType,
-        });
-
+      const recordBatch = (response: any) => {
         batches += 1;
         processedCount += response.processedCount;
         generatedCount += response.generatedCount;
         failedCount += response.failedCount;
         warningCount += response.warnings.length;
-        totalCount = response.totalCount;
-        offset = response.nextOffset ?? offset + response.processedCount;
-        hasMore = response.hasMore;
-        
-        const currentProgress = response.totalCount > 0 ? (Math.min(offset, response.totalCount) / response.totalCount) * 100 : 100;
-        setProgress(hasMore ? currentProgress : 100);
+        totalCount = Math.max(totalCount, response.totalCount || 0);
+        const currentProgress = response.totalCount > 0 ? (Math.min(processedCount, response.totalCount) / response.totalCount) * 100 : 100;
+        setProgress(response.hasMore ? currentProgress : 100);
         setEvaluationSummary(`Processed ${processedCount} / ${response.totalCount}. Generated ${generatedCount}, failed ${failedCount}, warnings ${warningCount}.`);
-        
-        if (!hasMore) break;
+      };
+
+      const runBatch = (offset: number) =>
+        evaluateStrategy({
+          strategy: evalStrategy as any,
+          batchSize,
+          offset,
+          region: scope.region,
+          assetType: scope.assetType,
+        });
+
+      const firstResponse = await runBatch(0);
+      recordBatch(firstResponse);
+
+      if (firstResponse.hasMore && firstResponse.nextOffset !== null && firstResponse.nextOffset !== undefined) {
+        const offsets: number[] = [];
+        for (let nextOffset = firstResponse.nextOffset; nextOffset < firstResponse.totalCount; nextOffset += batchSize) {
+          offsets.push(nextOffset);
+        }
+
+        let nextOffsetIndex = 0;
+        const worker = async () => {
+          while (nextOffsetIndex < offsets.length) {
+            const workerOffset = offsets[nextOffsetIndex];
+            nextOffsetIndex += 1;
+            const response = await runBatch(workerOffset);
+            recordBatch(response);
+          }
+        };
+
+        await Promise.all(Array.from({ length: Math.min(STRATEGY_DECISION_BATCH_REQUEST_WORKERS, offsets.length) }, worker));
       }
+
+      setProgress(100);
       setEvaluationSummary(`Complete. Processed ${processedCount} / ${totalCount} in ${batches} batch${batches === 1 ? '' : 'es'}. Generated ${generatedCount}, failed ${failedCount}, warnings ${warningCount}.`);
       await loadData();
     } catch (err: any) {

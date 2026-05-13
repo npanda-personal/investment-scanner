@@ -188,6 +188,7 @@ export interface BatchGenerateTradePlanRequest {
   assetType?: string;
   strategyCode?: string;
   backtestTimeframe?: string;
+  workerConcurrency?: number;
 }
 
 export interface BatchGenerateFailure {

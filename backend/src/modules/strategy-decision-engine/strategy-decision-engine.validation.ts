@@ -49,6 +49,7 @@ export function parseStrategyQuery(query: Record<string, unknown>): StrategyQuer
 export function parseEvaluateRequest(body: any): StrategyEvaluateRequest {
   const batchSize = Number(body?.batchSize);
   const offset = Number(body?.offset);
+  const workerConcurrency = Number(body?.workerConcurrency);
 
   return {
     strategy: body?.strategy === 'ALL' ? 'ALL' : normalizeStrategy(body?.strategy) || 'TREND_MOMENTUM',
@@ -60,6 +61,7 @@ export function parseEvaluateRequest(body: any): StrategyEvaluateRequest {
     assetType: typeof body?.assetType === 'string' ? body.assetType.trim() || undefined : undefined,
     batchSize: Number.isFinite(batchSize) ? Math.min(100, Math.max(1, Math.floor(batchSize))) : 25,
     offset: Number.isFinite(offset) ? Math.max(0, Math.floor(offset)) : 0,
+    workerConcurrency: Number.isFinite(workerConcurrency) ? Math.min(8, Math.max(1, Math.floor(workerConcurrency))) : undefined,
   };
 }
 

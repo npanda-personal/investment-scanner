@@ -87,12 +87,15 @@ function service(overrides: Record<string, any> = {}) {
   };
   const dataQualityService = {
     getLatestEvaluationForInstrument: jest.fn().mockResolvedValue(null),
+    getEvaluationsForInstruments: jest.fn().mockResolvedValue([]),
     ...overrides.dataQualityService,
   };
   return {
     repository,
     signalService,
     qualityService,
+    contextService,
+    dataQualityService,
     instance: new SignalCalibrationEngineService(repository as any, signalService as any, qualityService as any, contextService as any, dataQualityService as any),
   };
 }
@@ -390,6 +393,71 @@ describe('signal calibration engine service', () => {
     expect(setup.qualityService.byScoreBucket).toHaveBeenCalledTimes(1);
     expect(setup.qualityService.bySector).toHaveBeenCalledTimes(1);
     expect(setup.qualityService.noisy).toHaveBeenCalledTimes(1);
+  });
+
+  it('batch-loads Data Quality evaluations once for calibration run signals', async () => {
+    const setup = service({
+      signalService: {
+        latestSignalUniverse: jest.fn().mockResolvedValue([
+          rawSignal({ instrument_id: 'stock-1' }),
+          rawSignal({ instrument_id: 'stock-2', symbol: 'MSFT' }),
+          rawSignal({ instrument_id: 'stock-3', symbol: 'GOOG' }),
+        ]),
+        latestSignalUniverseCount: jest.fn().mockResolvedValue(3),
+      },
+      dataQualityService: {
+        getEvaluationsForInstruments: jest.fn().mockResolvedValue([
+          { instrumentId: 'stock-1', coverageStatus: 'GOOD', signalReadinessStatus: 'READY', liquidityStatus: 'LIQUID', eligibleForSignals: true, eligibleForCalibration: true, warnings: [], readinessBlockers: [] },
+          { instrumentId: 'stock-2', coverageStatus: 'GOOD', signalReadinessStatus: 'READY', liquidityStatus: 'LIQUID', eligibleForSignals: true, eligibleForCalibration: true, warnings: [], readinessBlockers: [] },
+        ]),
+        getLatestEvaluationForInstrument: jest.fn().mockResolvedValue(null),
+      },
+    });
+
+    await setup.instance.run({ batchSize: 3, offset: 0, region: 'IN', assetType: 'STOCK' });
+
+    expect(setup.dataQualityService.getEvaluationsForInstruments).toHaveBeenCalledTimes(1);
+    expect(setup.dataQualityService.getEvaluationsForInstruments).toHaveBeenCalledWith(['stock-1', 'stock-2', 'stock-3']);
+    expect(setup.dataQualityService.getLatestEvaluationForInstrument).not.toHaveBeenCalled();
+  });
+
+  it('processes calibration run signals with bounded concurrency', async () => {
+    let activeLookups = 0;
+    let maxActiveLookups = 0;
+    const delayedLookup = jest.fn().mockImplementation(async () => {
+      activeLookups += 1;
+      maxActiveLookups = Math.max(maxActiveLookups, activeLookups);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      activeLookups -= 1;
+      return {
+        market: { regime: 'RISK_ON' },
+        sector: { leadershipStatus: 'LEADING' },
+        smartMoney: { status: 'ACCUMULATION' },
+        dataQuality: { hasLatestPrice: true, priceHistoryDays: 260, hasFundamentals: true },
+        gaps: [],
+      };
+    });
+    const signals = Array.from({ length: 10 }, (_, index) => rawSignal({
+      id: `signal-${index + 1}`,
+      instrument_id: `stock-${index + 1}`,
+      symbol: `SYM${index + 1}`,
+    }));
+    const setup = service({
+      signalService: {
+        latestSignalUniverse: jest.fn().mockResolvedValue(signals),
+        latestSignalUniverseCount: jest.fn().mockResolvedValue(signals.length),
+      },
+      contextService: {
+        lookup: delayedLookup,
+      },
+    });
+
+    const result = await setup.instance.run({ batchSize: 10, offset: 0, region: 'IN', assetType: 'STOCK' });
+
+    expect(result.processedCount).toBe(10);
+    expect(delayedLookup).toHaveBeenCalledTimes(10);
+    expect(maxActiveLookups).toBeGreaterThan(1);
+    expect(maxActiveLookups).toBeLessThanOrEqual(4);
   });
 
   it('keeps single instrument calibration behavior working', async () => {

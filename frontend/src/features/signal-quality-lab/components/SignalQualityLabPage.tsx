@@ -40,6 +40,7 @@ const qualityTabs = ['overview', 'performance', 'noise', 'instrument'] as const;
 type QualityTab = typeof qualityTabs[number];
 const percent = (value: number | null | undefined) => value === null || value === undefined ? 'N/A' : `${(value * 100).toFixed(2)}%`;
 const number = (value: number | null | undefined) => value === null || value === undefined ? 'N/A' : value.toLocaleString();
+const plural = (count: number, singular: string, pluralLabel = `${singular}s`) => `${number(count)} ${count === 1 ? singular : pluralLabel}`;
 const evidenceTone = (value: string | undefined): 'success' | 'warning' | 'error' | undefined => (
   value === 'USABLE' ? 'success' : value === 'LIMITED' ? 'warning' : value === 'UNAVAILABLE' ? 'error' : undefined
 );
@@ -122,6 +123,18 @@ const SignalQualityLabPage: React.FC = () => {
   const selectedAvailability = availability?.[horizon];
   const evidenceUsability = summary?.evidenceUsability ?? (diagnostics ? (diagnostics.evaluatedSignals > 0 ? 'LIMITED' : 'UNAVAILABLE') : undefined);
   const hasEvaluableEvidence = Boolean(diagnostics && diagnostics.evaluatedSignals > 0);
+  const insufficientFutureRowsText = diagnostics
+    ? `${plural(diagnostics.insufficientFuturePriceCount, 'signal')} ${diagnostics.insufficientFuturePriceCount === 1 ? 'does' : 'do'} not yet have ${diagnostics.minimumRequiredFutureRows} future trading rows`
+    : '';
+  const unavailableEvidenceReason = diagnostics
+    ? diagnostics.missingPriceHistoryCount > 0 && diagnostics.insufficientFuturePriceCount > 0
+      ? `Missing local price history affects ${plural(diagnostics.missingPriceHistoryCount, 'signal')}, and ${insufficientFutureRowsText}.`
+      : diagnostics.missingPriceHistoryCount > 0
+        ? `Missing local price history affects ${plural(diagnostics.missingPriceHistoryCount, 'signal')}.`
+        : diagnostics.insufficientFuturePriceCount > 0
+          ? `${insufficientFutureRowsText}.`
+          : diagnostics.recommendedAction
+    : '';
 
   const loadInstrument = async () => {
     setFormError(null);
@@ -152,10 +165,10 @@ const SignalQualityLabPage: React.FC = () => {
       });
       if (result) {
         await reload();
-        setActionMessage(`Signal quality refresh complete. Processed ${result.aggregate.processedCount} / ${result.aggregate.totalCount ?? result.aggregate.processedCount} signal records. Evaluated ${result.aggregate.evaluatedCount}, not yet evaluable ${result.aggregate.unevaluatedCount}, missing price history ${result.aggregate.missingPriceHistoryCount}. Outcomes are calculated on demand and not persisted.`);
+        setActionMessage(`Signal quality refresh complete. Processed ${result.aggregate.processedCount} / ${result.aggregate.totalCount ?? result.aggregate.processedCount} signal records. Evaluated ${result.aggregate.evaluatedCount}, insufficient future price rows ${result.aggregate.unevaluatedCount}, missing local price history ${result.aggregate.missingPriceHistoryCount}. Outcomes are calculated on demand and not persisted.`);
       }
     } catch (err: any) {
-      setFormError(err.response?.data?.error || err.message || 'Signal quality recalculation failed');
+      setFormError(err.response?.data?.error || err.message || 'Signal quality diagnostics refresh failed');
     }
   };
 
@@ -171,7 +184,7 @@ const SignalQualityLabPage: React.FC = () => {
             disabled={batchRunner.running}
             startIcon={batchRunner.running ? <CircularProgress size={16} /> : undefined}
           >
-            {batchRunner.running ? 'Recalculating' : 'Recalculate'}
+            {batchRunner.running ? 'Refreshing' : 'Refresh Diagnostics'}
           </Button>
         }
         secondaryActions={
@@ -204,7 +217,7 @@ const SignalQualityLabPage: React.FC = () => {
         running={batchRunner.running}
         complete={batchRunner.complete}
         error={batchRunner.error}
-        label="Signal quality recalculation"
+        label="Signal quality diagnostics refresh"
         processedCount={batchRunner.processedCount}
         totalCount={batchRunner.totalCount}
         batchCount={batchRunner.batchCount}
@@ -234,7 +247,7 @@ const SignalQualityLabPage: React.FC = () => {
       {diagnostics && diagnostics.totalSignals > 0 && diagnostics.evaluatedSignals === 0 && (
         <Alert severity="warning" sx={{ mb: 2 }}>
           Evidence usability is UNAVAILABLE. {diagnostics.totalSignals} signals found, but 0 can be evaluated for the selected {diagnostics.selectedHorizon} horizon.
-          {' '}{diagnostics.insufficientFuturePriceCount > 0 ? `Most signals do not yet have ${diagnostics.minimumRequiredFutureRows} future trading days of price data.` : diagnostics.recommendedAction}
+          {' '}{unavailableEvidenceReason}
           {' '}Try 1D/5D, sync market data, or wait for more trading days. Historical measurement only; not prediction or trading advice.
         </Alert>
       )}
@@ -297,8 +310,7 @@ const SignalQualityLabPage: React.FC = () => {
           <MetricCard label="Total Signals" value={number(summary.totalSignals)} />
           <MetricCard label="Eligible Signals" value={number(diagnostics?.signalsAfterFilters)} />
           <MetricCard label="Mature / Evaluable" value={number(diagnostics?.matureSignals ?? summary.matureSignals ?? summary.evaluatedSignals)} />
-          <MetricCard label="Not Yet Mature" value={number(diagnostics?.notYetMatureSignals ?? summary.notYetMatureSignals ?? summary.unevaluatedSignals)} tone={(diagnostics?.notYetMatureSignals ?? summary.notYetMatureSignals ?? summary.unevaluatedSignals) > 0 ? 'warning' : undefined} />
-          <MetricCard label="Insufficient Future Price" value={number(diagnostics?.insufficientFuturePriceCount)} tone={diagnostics?.insufficientFuturePriceCount ? 'warning' : undefined} />
+          <MetricCard label="Insufficient Future Rows" value={number(diagnostics?.insufficientFuturePriceCount ?? summary.notYetMatureSignals ?? summary.unevaluatedSignals)} tone={(diagnostics?.insufficientFuturePriceCount ?? summary.notYetMatureSignals ?? summary.unevaluatedSignals) > 0 ? 'warning' : undefined} />
           <MetricCard label="Missing Price History" value={number(diagnostics?.missingPriceHistoryCount)} tone={diagnostics?.missingPriceHistoryCount ? 'error' : undefined} />
           {hasEvaluableEvidence && <MetricCard label="Bullish Win Rate" value={percent(summary.overallBullishWinRate)} tone="success" />}
           {hasEvaluableEvidence && <MetricCard label="Bearish Win Rate" value={percent(summary.overallBearishWinRate)} tone="warning" />}
