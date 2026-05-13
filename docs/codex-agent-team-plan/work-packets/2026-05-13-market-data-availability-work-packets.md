@@ -138,8 +138,8 @@ Forbidden scope:
 
 ## MD-A3 - Deep Price Backfill For Supported Shallow Rows
 
-State: `GitHub Check-In`
-Mode: `GitHub Check-In`
+State: `Released`
+Mode: `Released`
 Owner: Senior Fullstack Lead / Orchestrator
 Lane/module: Lane 1, `market-data-foundation`
 
@@ -151,6 +151,7 @@ QA evidence: [MD-A3 QA evidence](../qa-evidence/2026-05-13-md-a3-deep-price-back
 Lead validation: [MD-A3 Lead validation](../lead-validation/2026-05-13-md-a3-lead-validation.md)
 Architect signoff: [MD-A3 Architect signoff](../architecture-signoff/2026-05-13-md-a3-architect-signoff.md)
 PO acceptance: [MD-A3 PO acceptance](../po-acceptance/2026-05-13-md-a3-po-acceptance.md)
+GitHub check-in: [MD-A3 GitHub check-in](../github-check-in/2026-05-13-md-a3-github-check-in.md)
 
 ### Product Goal
 
