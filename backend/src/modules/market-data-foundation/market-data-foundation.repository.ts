@@ -714,6 +714,72 @@ export class MarketDataFoundationRepository {
     });
   }
 
+  async listBlockedPriceBackfillStockIds(options: Pick<PaginationOptions, 'region' | 'assetType'> & { now?: Date }) {
+    const now = options.now ?? new Date();
+    const rows = await (this.prisma as any).marketDataRepairState.findMany({
+      where: {
+        region: options.region,
+        assetType: options.assetType,
+        repairType: 'PRICE_BACKFILL',
+        OR: [
+          { status: 'MANUAL_REQUIRED' },
+          { status: 'RETRY_COOLDOWN' },
+          { status: 'FAILED_RETRYABLE', nextRetryAt: { gt: now } },
+        ],
+        stock: {
+          is: {
+            AND: [
+              this.stockWhere(options),
+              { isActive: true },
+              { isDelisted: false },
+              { providerSupportStatus: { equals: 'SUPPORTED', mode: 'insensitive' } },
+            ],
+          },
+        },
+      },
+      select: { stockId: true },
+    });
+    return rows.map((row: { stockId: string }) => row.stockId);
+  }
+
+  async countPriceBackfillRepairStates(options: Pick<PaginationOptions, 'region' | 'assetType'> & {
+    statuses: MarketDataRepairStateStatus[];
+    retryTiming?: 'blocked' | 'eligible';
+    now?: Date;
+  }) {
+    const now = options.now ?? new Date();
+    const stateFilters: Prisma.MarketDataRepairStateWhereInput[] = [
+      { status: { in: options.statuses } },
+    ] as any;
+    if (options.retryTiming === 'blocked') {
+      stateFilters.push({ status: 'FAILED_RETRYABLE' } as any, { nextRetryAt: { gt: now } } as any);
+    }
+    if (options.retryTiming === 'eligible') {
+      stateFilters.push(
+        { status: 'FAILED_RETRYABLE' } as any,
+        { OR: [{ nextRetryAt: null }, { nextRetryAt: { lte: now } }] } as any
+      );
+    }
+    return (this.prisma as any).marketDataRepairState.count({
+      where: {
+        region: options.region,
+        assetType: options.assetType,
+        repairType: 'PRICE_BACKFILL',
+        AND: stateFilters,
+        stock: {
+          is: {
+            AND: [
+              this.stockWhere(options),
+              { isActive: true },
+              { isDelisted: false },
+              { providerSupportStatus: { equals: 'SUPPORTED', mode: 'insensitive' } },
+            ],
+          },
+        },
+      },
+    });
+  }
+
   async countProviderValidationRepairStates(options: Pick<PaginationOptions, 'region' | 'assetType'> & {
     status?: 'eligible' | 'blocked' | 'manual';
     now?: Date;

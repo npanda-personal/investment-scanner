@@ -593,6 +593,7 @@ export class MarketDataFoundationService {
     const validationWindow = this.providerValidationWindow(scope);
     const latestStoredEodDate = this.latestDateFromReadiness(readinessBySymbol);
     const expectedLatestTradingDate = latestCompletedTradingDateForRegion(scope.region);
+    const priceBackfillBlockedStockIds = await this.blockedPriceBackfillStockIds(scope);
     const generatedAt = new Date().toISOString();
     const counts = this.emptyUniverseCounts();
     const blockerCounts = new Map<string, number>();
@@ -610,6 +611,18 @@ export class MarketDataFoundationService {
       else counts.activeInstruments += 1;
       const providerStatus = normalizeProviderStatus(stock.providerSupportStatus);
       if (!isInactiveOrDelisted) {
+        const priceBackfillFallbackRequired = providerStatus === 'SUPPORTED' && priceBackfillBlockedStockIds.has(stock.id);
+        let priceBackfillFallbackCounted = false;
+        const recordSupportedPriceBackfillNeed = () => {
+          if (priceBackfillFallbackRequired) {
+            if (!priceBackfillFallbackCounted) {
+              counts.historyCoverageFallbackRequired = (counts.historyCoverageFallbackRequired || 0) + 1;
+              priceBackfillFallbackCounted = true;
+            }
+            return;
+          }
+          counts.supportedPriceBackfillNeeded += 1;
+        };
         if (providerStatus === 'SUPPORTED') counts.providerSupported += 1;
         if (providerStatus === 'UNKNOWN') {
           counts.providerUnknown += 1;
@@ -632,14 +645,14 @@ export class MarketDataFoundationService {
           counts.supportedBusinessMetadataRepairNeeded += 1;
         }
         if (providerStatus === 'SUPPORTED' && readiness.priceReadiness !== 'READY') {
-          counts.supportedPriceBackfillNeeded += 1;
+          recordSupportedPriceBackfillNeed();
         }
         if (providerStatus === 'SUPPORTED') {
           const historyDiagnostics = this.requiredHistoryDiagnostics(stock, validationWindow, statsBySymbol.get(stock.symbol));
           if (!historyDiagnostics.requiredHistoryComplete) {
             hasRequiredHistoryCoverage = false;
             counts.historyCoverageIncomplete = (counts.historyCoverageIncomplete || 0) + 1;
-            if (readiness.priceReadiness === 'READY') counts.supportedPriceBackfillNeeded += 1;
+            if (readiness.priceReadiness === 'READY') recordSupportedPriceBackfillNeed();
           }
           if (historyDiagnostics.listingDateMissing) {
             counts.historyCoverageListingDateMissing = (counts.historyCoverageListingDateMissing || 0) + 1;
@@ -1124,6 +1137,7 @@ export class MarketDataFoundationService {
     const stocks = await this.repository.listStocksForUniverseHealth(scope);
     const { readinessBySymbol, statsBySymbol } = await this.universeReadinessAndStatsForStocks(stocks, scope);
     const validationWindow = this.providerValidationWindow(scope);
+    const priceBackfillBlockedStockIds = await this.blockedPriceBackfillStockIds(scope);
     let providerUnknownValidationNeeded = 0;
     let providerRetryValidationNeeded = 0;
     let providerUnsupportedExcluded = 0;
@@ -1179,19 +1193,30 @@ export class MarketDataFoundationService {
         providerUnsupportedExcluded += 1;
         unsupportedExcluded += 1;
       }
+      const priceBackfillFallbackRequired = isProviderSupported && priceBackfillBlockedStockIds.has(stock.id);
+      let priceBackfillFallbackCounted = false;
+      const recordPriceBackfillNeed = () => {
+        if (priceBackfillFallbackRequired) {
+          if (!priceBackfillFallbackCounted) {
+            historyCoverageFallbackRequired += 1;
+            priceBackfillFallbackCounted = true;
+          }
+          return;
+        }
+        priceBackfillNeeded += 1;
+        supportedPriceBackfillNeeded += 1;
+      };
       if (this.needsCatalogIdentityRepair(stock)) catalogIdentityRepairNeeded += 1;
       if (isProviderSupported && this.needsCatalogIdentityRepair(stock)) supportedCatalogIdentityRepairNeeded += 1;
       if (isProviderSupported && readiness?.priceReadiness !== 'READY') {
-        priceBackfillNeeded += 1;
-        supportedPriceBackfillNeeded += 1;
+        recordPriceBackfillNeed();
       }
       if (isProviderSupported) {
         const historyDiagnostics = this.requiredHistoryDiagnostics(stock, validationWindow, statsBySymbol.get(stock.symbol));
         if (!historyDiagnostics.requiredHistoryComplete) {
           historyCoverageIncomplete += 1;
           if (readiness?.priceReadiness === 'READY') {
-            priceBackfillNeeded += 1;
-            supportedPriceBackfillNeeded += 1;
+            recordPriceBackfillNeed();
           }
         }
         if (historyDiagnostics.listingDateMissing) historyCoverageListingDateMissing += 1;
@@ -1274,6 +1299,7 @@ export class MarketDataFoundationService {
     if (providerManualRepairRequired > 0) warnings.push(`${providerManualRepairRequired} provider validations require manual symbol/source repair.`);
     if (supportedCatalogIdentityRepairNeeded > 0) warnings.push(`${supportedCatalogIdentityRepairNeeded} provider-supported instruments need catalog identity repair for ISIN, listing date, exchange, or provider symbol.`);
     if (supportedPriceBackfillNeeded > 0) warnings.push(`${supportedPriceBackfillNeeded} provider-supported instruments need price backfill or latest EOD repair.`);
+    if (historyCoverageFallbackRequired > 0) warnings.push(`${historyCoverageFallbackRequired} provider-supported instruments require approved free official/public exchange fallback for price history.`);
     if (historyCoverageIncomplete > 0) warnings.push(`${historyCoverageIncomplete} provider-supported instruments do not yet have the required 15-year/listing-date daily OHLCV window.`);
     if (historyCoverageListingDateMissing > 0) warnings.push(`${historyCoverageListingDateMissing} provider-supported instruments are missing listing date, so the 15-year target remains required and listing-date repair stays visible.`);
     if (businessMetadataAutoRepairable > 0) warnings.push(`${businessMetadataAutoRepairable} instruments are auto-repairable through provider business metadata repair.`);
@@ -2361,6 +2387,13 @@ export class MarketDataFoundationService {
           summary.zeroRowProviderReturns = (summary.zeroRowProviderReturns || 0) + 1;
           summary.historyCoverageFallbackRequired = (summary.historyCoverageFallbackRequired || 0) + 1;
           summary.skipped += 1;
+          const manualRequiredReason = 'Yahoo returned zero usable price rows; approved free official/public exchange fallback is required before accepting missing history.';
+          await this.recordPriceBackfillRepairAttempt(stock, scope, 'YAHOO_ZERO_ROWS', {
+            rowsReceived: result.rowsReceived,
+            rowsInserted: result.rowsInserted,
+            rowsUpdated: result.rowsUpdated,
+            rowsNoOp: result.rowsNoOp || 0,
+          }, null, manualRequiredReason, 'MANUAL_REQUIRED');
           summary.warnings.push(`${stock.symbol}: provider returned zero usable price rows; approved free official/public exchange fallback is required before accepting missing history.`);
           this.addPriceBackfillCoverageSample(summary, candidate, 'YAHOO_ZERO_ROWS');
         } else if (result.rowsInserted > 0 || result.rowsUpdated > 0) {
@@ -2373,7 +2406,9 @@ export class MarketDataFoundationService {
       } catch (error) {
         summary.failed += 1;
         summary.historyCoverageFallbackRequired = (summary.historyCoverageFallbackRequired || 0) + 1;
-        summary.warnings.push(`${stock.symbol}: ${error instanceof Error ? error.message : 'price backfill failed'}`);
+        const errorMessage = error instanceof Error ? error.message : 'price backfill failed';
+        await this.recordPriceBackfillRepairAttempt(stock, scope, 'YAHOO_PROVIDER_ERROR', {}, errorMessage, null, 'FAILED_RETRYABLE');
+        summary.warnings.push(`${stock.symbol}: ${errorMessage}`);
         this.addPriceBackfillCoverageSample(summary, candidate, 'YAHOO_PROVIDER_ERROR');
       }
     }
@@ -5613,6 +5648,7 @@ export class MarketDataFoundationService {
       businessMetadataRetryEligible: 0,
       manualBusinessMetadataRequired: counts.supportedBusinessMetadataRepairNeeded ?? Math.max(counts.missingSector, counts.missingIndustry, counts.missingMarketCap),
       priceBackfillNeeded: counts.supportedPriceBackfillNeeded ?? counts.staleOrIncomplete,
+      historyCoverageFallbackRequired: counts.historyCoverageFallbackRequired ?? 0,
     };
     return this.buildUniverseSignoff({
       providerUnknown: counts.providerUnknown,
@@ -5621,6 +5657,7 @@ export class MarketDataFoundationService {
       businessMetadataAutoRepairable: planLike.businessMetadataAutoRepairable,
       businessMetadataRetryEligible: planLike.businessMetadataRetryEligible,
       priceBackfillNeeded: planLike.priceBackfillNeeded,
+      historyCoverageFallbackRequired: planLike.historyCoverageFallbackRequired,
       latestStoredEodDate: health.latestStoredEodDate,
       expectedLatestTradingDate: health.expectedLatestTradingDate,
       reviewReadyActual: counts.reviewReady,
@@ -5641,6 +5678,7 @@ export class MarketDataFoundationService {
       | 'manualBusinessMetadataRequired'
       | 'priceBackfillNeeded'
       | 'supportedPriceBackfillNeeded'
+      | 'historyCoverageFallbackRequired'
       | 'totalCatalogInstruments'>,
     evidence: {
       activeInstruments: number;
@@ -5671,6 +5709,7 @@ export class MarketDataFoundationService {
       businessMetadataAutoRepairable: plan.businessMetadataAutoRepairable,
       businessMetadataRetryEligible: plan.businessMetadataRetryEligible,
       priceBackfillNeeded: supportedPriceBackfillNeeded,
+      historyCoverageFallbackRequired: plan.historyCoverageFallbackRequired ?? 0,
       latestStoredEodDate: evidence.latestStoredEodDate,
       expectedLatestTradingDate: evidence.expectedLatestTradingDate,
       reviewReadyActual: evidence.reviewReadyActual,
@@ -5687,6 +5726,7 @@ export class MarketDataFoundationService {
     businessMetadataAutoRepairable: number;
     businessMetadataRetryEligible: number;
     priceBackfillNeeded: number;
+    historyCoverageFallbackRequired?: number;
     latestStoredEodDate: string | null;
     expectedLatestTradingDate: string | null;
     reviewReadyActual: number;
@@ -5712,6 +5752,7 @@ export class MarketDataFoundationService {
     addBlocker('BUSINESS_METADATA_AUTO_REPAIRABLE_REMAINING', input.businessMetadataAutoRepairable, 0, 'PROVIDER_BUSINESS_METADATA_REPAIR');
     addBlocker('BUSINESS_METADATA_RETRY_ELIGIBLE_REMAINING', input.businessMetadataRetryEligible, 0, 'PROVIDER_BUSINESS_METADATA_REPAIR');
     addBlocker('PRICE_BACKFILL_REMAINING', input.priceBackfillNeeded, 0, 'BACKFILL_PRICES');
+    addBlocker('PRICE_BACKFILL_FALLBACK_REQUIRED', input.historyCoverageFallbackRequired ?? 0, 0, null);
     addBlocker('MANUAL_BUSINESS_METADATA_REQUIRED', input.manualBusinessMetadataRequired, 0, 'MANUAL_METADATA_IMPORT');
     if (!input.latestStoredEodDate || !input.expectedLatestTradingDate || input.latestStoredEodDate < input.expectedLatestTradingDate) {
       blockers.push({
@@ -5719,7 +5760,7 @@ export class MarketDataFoundationService {
         severity: 'critical',
         count: 1,
         required: input.expectedLatestTradingDate || 'known expected trading date',
-        nextAction: 'BACKFILL_PRICES',
+        nextAction: input.priceBackfillNeeded > 0 ? 'BACKFILL_PRICES' : null,
       });
     }
     if (input.reviewReadyActual < minReviewReadyRequired) {
@@ -6586,6 +6627,45 @@ export class MarketDataFoundationService {
     return 'MANUAL_REQUIRED';
   }
 
+  private async recordPriceBackfillRepairAttempt(
+    stock: any,
+    scope: { region: string; assetType: string },
+    status: string,
+    fieldsFilled: Record<string, number>,
+    error?: string | null,
+    manualRequiredReason?: string | null,
+    stateStatus: MarketDataRepairStateStatus = 'FAILED_RETRYABLE'
+  ) {
+    const repositoryAny = this.repository as any;
+    if (typeof repositoryAny.recordRepairAttempt !== 'function') return;
+    const attempt = await repositoryAny.recordRepairAttempt({
+      stockId: stock.id,
+      region: scope.region,
+      assetType: scope.assetType,
+      repairType: 'PRICE_BACKFILL',
+      status,
+      provider: 'yahoo',
+      fieldsFilledJson: fieldsFilled,
+      error,
+      manualRequiredReason,
+    });
+    if (typeof repositoryAny.upsertRepairState !== 'function') return;
+    await repositoryAny.upsertRepairState({
+      stockId: stock.id,
+      region: scope.region,
+      assetType: scope.assetType,
+      repairType: 'PRICE_BACKFILL',
+      status: stateStatus,
+      provider: 'yahoo',
+      lastAttemptId: attempt?.id ?? null,
+      fieldsFilledJson: fieldsFilled,
+      error,
+      manualRequiredReason,
+      nextRetryAt: stateStatus === 'FAILED_RETRYABLE' ? new Date(Date.now() + 12 * 60 * 60 * 1000) : null,
+      resolvedAt: stateStatus === 'RESOLVED' ? new Date() : null,
+    });
+  }
+
   private async recordManualMetadataRepairSuccess(stock: any, scope: { region: string; assetType: string }, filledFields: string[]) {
     const repositoryAny = this.repository as any;
     if (typeof repositoryAny.recordRepairAttempt !== 'function') return;
@@ -6667,10 +6747,12 @@ export class MarketDataFoundationService {
     const stocks = await this.repository.listStocksForUniverseHealth(scope);
     const { readinessBySymbol, statsBySymbol } = await this.universeReadinessAndStatsForStocks(stocks, scope);
     const validationWindow = this.providerValidationWindow(scope);
+    const blockedStockIds = await this.blockedPriceBackfillStockIds(scope);
     return stocks
       .flatMap((stock): PriceBackfillCandidate[] => {
         if (stock.isActive === false || stock.isDelisted === true) return [];
         if (normalizeProviderStatus(stock.providerSupportStatus) !== 'SUPPORTED') return [];
+        if (blockedStockIds.has(stock.id)) return [];
         const readiness = readinessBySymbol.get(stock.symbol);
         if (!readiness) return [];
         const historyDiagnostics = this.requiredHistoryDiagnostics(stock, validationWindow, statsBySymbol.get(stock.symbol));
@@ -6683,6 +6765,13 @@ export class MarketDataFoundationService {
         if (leftPriority !== rightPriority) return leftPriority - rightPriority;
         return String(left.stock.symbol).localeCompare(String(right.stock.symbol));
       });
+  }
+
+  private async blockedPriceBackfillStockIds(scope: { region: string; assetType: string }): Promise<Set<string>> {
+    const repositoryAny = this.repository as any;
+    if (typeof repositoryAny.listBlockedPriceBackfillStockIds !== 'function') return new Set();
+    const ids = await repositoryAny.listBlockedPriceBackfillStockIds(scope);
+    return new Set(ids);
   }
 
   private priceBackfillCandidatePriority(readiness: InstrumentUniverseReadiness): number {

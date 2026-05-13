@@ -47,6 +47,48 @@ describe('MarketDataFoundationService syncV1', () => {
     });
   });
 
+  it('keeps price fallback-blocked rows out of universe-health automatic backfill counts', async () => {
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue([
+        {
+          id: 'stock-blocked',
+          symbol: 'BLOCKED.NS',
+          providerSupportStatus: 'SUPPORTED',
+          isActive: true,
+          isDelisted: false,
+          providerSymbol: 'BLOCKED.NS',
+          sector: 'Tech',
+          industry: 'Software',
+          marketCap: 100000000,
+          country: 'India',
+          currency: 'INR',
+          isin: 'INE000A01000',
+          ipoDate: new Date('2020-01-01T00:00:00.000Z'),
+          assetType: 'STOCK',
+        },
+      ]),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['BLOCKED.NS', { priceHistoryBars: 0, firstPriceDate: null, latestPriceDate: null, latestVolume: null, latestAdjustedClose: null, latestClose: null }],
+      ])),
+      listBlockedPriceBackfillStockIds: jest.fn().mockResolvedValue(['stock-blocked']),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+
+    const result = await service.universeHealth({ region: 'IN', assetType: 'STOCK' });
+
+    expect(result.counts.supportedPriceBackfillNeeded).toBe(0);
+    expect(result.counts.historyCoverageFallbackRequired).toBe(1);
+    expect(result.universeSignoff.blockers).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'PRICE_BACKFILL_FALLBACK_REQUIRED',
+        nextAction: null,
+      }),
+    ]));
+    expect(result.universeSignoff.blockers).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'PRICE_BACKFILL_REMAINING' }),
+    ]));
+  });
+
   it('rejects sync requests without symbol or instrumentId', async () => {
     const service = new MarketDataFoundationService({} as any, {} as any);
 
@@ -3719,6 +3761,7 @@ describe('MarketDataFoundationService syncV1', () => {
     const repository = {
       listStocksForUniverseHealth: jest.fn().mockResolvedValue([
         {
+          id: 'stock-empty',
           symbol: 'EMPTY.NS',
           providerSupportStatus: 'SUPPORTED',
           isActive: true,
@@ -3760,6 +3803,214 @@ describe('MarketDataFoundationService syncV1', () => {
       symbol: 'EMPTY.NS',
       sourceFallbackReason: 'YAHOO_ZERO_ROWS',
     });
+  });
+
+  it('records Yahoo zero-row price backfill as manual official fallback required', async () => {
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue([
+        {
+          id: 'stock-empty',
+          symbol: 'EMPTY.NS',
+          providerSupportStatus: 'SUPPORTED',
+          isActive: true,
+          isDelisted: false,
+          providerSymbol: 'EMPTY.NS',
+          sector: 'Tech',
+          industry: 'Software',
+          country: 'India',
+          currency: 'INR',
+        },
+      ]),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['EMPTY.NS', { priceHistoryBars: 0, firstPriceDate: null, latestPriceDate: null, latestVolume: null, latestAdjustedClose: null, latestClose: null }],
+      ])),
+      listBlockedPriceBackfillStockIds: jest.fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce(['stock-empty']),
+      recordRepairAttempt: jest.fn().mockResolvedValue({ id: 'attempt-empty' }),
+      upsertRepairState: jest.fn().mockResolvedValue({}),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+    jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
+      rowsReceived: 0,
+      rowsInserted: 0,
+      rowsUpdated: 0,
+      rowsSkipped: 0,
+      rowsNoOp: 0,
+      warningCount: 1,
+      warnings: ['Provider returned zero usable historical price rows.'],
+    });
+
+    const result = await service.backfillPrices({ region: 'IN', assetType: 'STOCK', batchSize: 1 });
+
+    expect(repository.recordRepairAttempt).toHaveBeenCalledWith(expect.objectContaining({
+      stockId: 'stock-empty',
+      repairType: 'PRICE_BACKFILL',
+      status: 'YAHOO_ZERO_ROWS',
+      provider: 'yahoo',
+      manualRequiredReason: expect.stringContaining('official/public exchange fallback'),
+    }));
+    expect(repository.upsertRepairState).toHaveBeenCalledWith(expect.objectContaining({
+      stockId: 'stock-empty',
+      repairType: 'PRICE_BACKFILL',
+      status: 'MANUAL_REQUIRED',
+      provider: 'yahoo',
+      lastAttemptId: 'attempt-empty',
+      manualRequiredReason: expect.stringContaining('official/public exchange fallback'),
+      nextRetryAt: null,
+    }));
+    expect(result).toMatchObject({
+      zeroRowProviderReturns: 1,
+      historyCoverageFallbackRequired: 1,
+      remainingCandidates: 0,
+      hasMore: false,
+    });
+  });
+
+  it('records Yahoo provider-error price backfill as retryable repair state', async () => {
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue([
+        {
+          id: 'stock-error',
+          symbol: 'ERROR.NS',
+          providerSupportStatus: 'SUPPORTED',
+          isActive: true,
+          isDelisted: false,
+          providerSymbol: 'ERROR.NS',
+          sector: 'Tech',
+          industry: 'Software',
+          country: 'India',
+          currency: 'INR',
+        },
+      ]),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['ERROR.NS', { priceHistoryBars: 0, firstPriceDate: null, latestPriceDate: null, latestVolume: null, latestAdjustedClose: null, latestClose: null }],
+      ])),
+      listBlockedPriceBackfillStockIds: jest.fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce(['stock-error']),
+      recordRepairAttempt: jest.fn().mockResolvedValue({ id: 'attempt-error' }),
+      upsertRepairState: jest.fn().mockResolvedValue({}),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+    jest.spyOn(service, 'ingestSymbol').mockRejectedValue(new Error('provider timeout'));
+
+    const result = await service.backfillPrices({ region: 'IN', assetType: 'STOCK', batchSize: 1 });
+
+    expect(repository.recordRepairAttempt).toHaveBeenCalledWith(expect.objectContaining({
+      stockId: 'stock-error',
+      repairType: 'PRICE_BACKFILL',
+      status: 'YAHOO_PROVIDER_ERROR',
+      provider: 'yahoo',
+      error: 'provider timeout',
+    }));
+    expect(repository.upsertRepairState).toHaveBeenCalledWith(expect.objectContaining({
+      stockId: 'stock-error',
+      repairType: 'PRICE_BACKFILL',
+      status: 'FAILED_RETRYABLE',
+      provider: 'yahoo',
+      lastAttemptId: 'attempt-error',
+      error: 'provider timeout',
+      nextRetryAt: expect.any(Date),
+    }));
+    expect(result).toMatchObject({
+      failed: 1,
+      historyCoverageFallbackRequired: 1,
+      remainingCandidates: 0,
+      hasMore: false,
+    });
+  });
+
+  it('skips blocked price backfill rows so supported candidates can keep draining', async () => {
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue([
+        {
+          id: 'stock-blocked',
+          symbol: 'BLOCKED.NS',
+          providerSupportStatus: 'SUPPORTED',
+          isActive: true,
+          isDelisted: false,
+          providerSymbol: 'BLOCKED.NS',
+          sector: 'Tech',
+          industry: 'Software',
+          country: 'India',
+          currency: 'INR',
+        },
+        {
+          id: 'stock-next',
+          symbol: 'NEXT.NS',
+          providerSupportStatus: 'SUPPORTED',
+          isActive: true,
+          isDelisted: false,
+          providerSymbol: 'NEXT.NS',
+          sector: 'Tech',
+          industry: 'Software',
+          country: 'India',
+          currency: 'INR',
+        },
+      ]),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['BLOCKED.NS', { priceHistoryBars: 0, firstPriceDate: null, latestPriceDate: null, latestVolume: null, latestAdjustedClose: null, latestClose: null }],
+        ['NEXT.NS', { priceHistoryBars: 0, firstPriceDate: null, latestPriceDate: null, latestVolume: null, latestAdjustedClose: null, latestClose: null }],
+      ])),
+      listBlockedPriceBackfillStockIds: jest.fn().mockResolvedValue(['stock-blocked']),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+    jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
+      rowsReceived: 1,
+      rowsInserted: 1,
+      rowsUpdated: 0,
+      rowsSkipped: 0,
+      rowsNoOp: 0,
+      warningCount: 0,
+      warnings: [],
+    });
+
+    await service.backfillPrices({ region: 'IN', assetType: 'STOCK', batchSize: 1 });
+
+    expect((service.ingestSymbol as jest.Mock).mock.calls.map((call) => call[0])).toEqual(['NEXT.NS']);
+  });
+
+  it('keeps blocked price fallback rows out of the automatic backfill action count', async () => {
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue([
+        {
+          id: 'stock-blocked',
+          symbol: 'BLOCKED.NS',
+          providerSupportStatus: 'SUPPORTED',
+          isActive: true,
+          isDelisted: false,
+          providerSymbol: 'BLOCKED.NS',
+          sector: 'Tech',
+          industry: 'Software',
+          marketCap: 100000000,
+          country: 'India',
+          currency: 'INR',
+          isin: 'INE000A01000',
+          ipoDate: new Date('2020-01-01T00:00:00.000Z'),
+        },
+      ]),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['BLOCKED.NS', { priceHistoryBars: 0, firstPriceDate: null, latestPriceDate: null, latestVolume: null, latestAdjustedClose: null, latestClose: null }],
+      ])),
+      listBlockedPriceBackfillStockIds: jest.fn().mockResolvedValue(['stock-blocked']),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+
+    const plan = await service.repairPlan({ region: 'IN', assetType: 'STOCK' });
+
+    expect(plan).toMatchObject({
+      supportedPriceBackfillNeeded: 0,
+      priceBackfillNeeded: 0,
+      historyCoverageFallbackRequired: 1,
+    });
+    expect(plan.topActions.map((action) => action.action)).not.toContain('BACKFILL_PRICES');
+    expect(plan.universeSignoff.blockers).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'PRICE_BACKFILL_FALLBACK_REQUIRED',
+        nextAction: null,
+      }),
+    ]));
   });
 
   it('uses incremental catch-up for stale rows that already have complete required history coverage', async () => {

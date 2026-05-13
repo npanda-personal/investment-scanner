@@ -764,6 +764,44 @@ describe('MarketDataFoundationRepository', () => {
     expect(eligibleWhere).toContain('nextRetryAt');
   });
 
+  it('lists only blocked price-backfill repair states for automatic candidate exclusion', async () => {
+    const prisma = {
+      marketDataRepairState: {
+        findMany: jest.fn().mockResolvedValue([
+          { stockId: 'stock-manual' },
+          { stockId: 'stock-cooldown' },
+          { stockId: 'stock-failed-future' },
+        ]),
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+    const now = new Date('2026-05-12T00:00:00.000Z');
+
+    const ids = await repository.listBlockedPriceBackfillStockIds({
+      region: 'IN',
+      assetType: 'STOCK',
+      now,
+    });
+
+    expect(ids).toEqual(['stock-manual', 'stock-cooldown', 'stock-failed-future']);
+    expect(prisma.marketDataRepairState.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        repairType: 'PRICE_BACKFILL',
+        OR: expect.arrayContaining([
+          { status: 'MANUAL_REQUIRED' },
+          { status: 'RETRY_COOLDOWN' },
+          { status: 'FAILED_RETRYABLE', nextRetryAt: { gt: now } },
+        ]),
+      }),
+      select: { stockId: true },
+    }));
+    const whereJson = JSON.stringify(prisma.marketDataRepairState.findMany.mock.calls[0][0].where);
+    expect(whereJson).toContain('SUPPORTED');
+    expect(whereJson).toContain('isActive');
+    expect(whereJson).toContain('isDelisted');
+    expect(whereJson).not.toContain('lte');
+  });
+
   it('repairs catalog identity only for the provided stock id', async () => {
     const update = jest.fn().mockImplementation(({ data }) => Promise.resolve(data));
     const prisma = {
