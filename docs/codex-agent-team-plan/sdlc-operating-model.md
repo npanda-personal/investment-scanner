@@ -10,10 +10,12 @@ The process stays personal/local-first. Do not add paid services, paid tooling, 
 
 - Work in small vertical slices that deliver user-visible or module-verifiable value.
 - Keep the Top 5 priority pipeline moving; do not wait for a full roadmap before starting useful work.
+- Keep a minimum refined product backlog of five candidate requirements, bugs, enhancements, or app-review findings so the Product Owner lane does not stop after one requirement batch.
 - Keep one active implementation task per developer agent.
 - Use the single-writer rule for files/modules.
 - Preserve module boundaries and public contracts.
 - Treat tests, live-data checks, and docs as delivery artifacts, not optional cleanup.
+- Clean up repo-local Node/Vite/Playwright/backend services after completed or interrupted work when memory is above 90%.
 - Final completion requires QA evidence, post-QA Lead validation, post-QA Architect signoff after Lead validation, Product Owner acceptance, and a scoped GitHub check-in.
 
 ## Work States

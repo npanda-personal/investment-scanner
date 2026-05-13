@@ -89,6 +89,85 @@ QA scaling rules:
 - A QA rejection must name the failed criterion, missing evidence, exact observed behavior, and recommended revision owner type; the Orchestrator assigns the revision to an available qualified developer.
 - Final QA signoff for an item must be traceable to one QA owner, even if another QA worker supplied supporting evidence.
 
+### Central Runtime Evidence Lane
+
+Runtime evidence that requires local servers, browser automation, Playwright, database mutation, or long-running Node processes is a centralized Orchestrator-owned lane. QA, developers, Product Owner, and Architect agents may review code, contracts, docs, and existing validation in parallel, but they must not each start their own runtime stack unless the Orchestrator explicitly assigns that resource slot.
+
+Use the central runtime lane when:
+
+- multiple QA items are blocked only on browser/API/runtime evidence,
+- previous Playwright or dev-server runs caused high memory, orphaned Node processes, or user interruption,
+- the same backend/frontend server can satisfy several verification items,
+- evidence collection needs ordered cleanup after each spec or API probe.
+
+Central runtime lane rules:
+
+- The Orchestrator checks memory and stale repo-local Node processes before starting runtime work.
+- Run the smallest useful runtime check first, preferably one Playwright spec or one API proof at a time.
+- Do not start broad multi-spec UI runs while several workers are also active unless memory and process state are clearly safe.
+- After each runtime check, record pass/fail evidence against the specific QA item and clean up repo-local processes that are no longer needed.
+- While runtime evidence is blocked or running, the Product Owner continues backlog refinement, the Architect continues non-authorizing planning/signoff work, and developers pull non-conflicting revision/discovery/implementation-prep work from the active board.
+- A QA item blocked only by runtime evidence stays in `Blocked` or `QA Verification Mode` with owner `Orchestrator runtime validation`, not with an idle QA worker.
+
+### Flow Monitor / Deputy Orchestrator
+
+When active execution has multiple agents, the Orchestrator must keep a Flow Monitor / Deputy Orchestrator active unless there are no parallel lanes available or the agent/thread/resource gate prevents it.
+
+The Flow Monitor is not a passive one-shot reviewer. Its job is to keep the team honest about the plan while the Orchestrator handles integration and runtime work.
+
+The Flow Monitor:
+
+- audits whether PO, Architect, developers, QA, and Orchestrator have valid current work,
+- compares active-board state with agent state, known blockers, and reserved scopes,
+- identifies idle, silent, blocked, or over-assigned agents,
+- recommends exact next assignments, closures, reassignments, and board updates,
+- checks whether the Orchestrator has drifted into single-threaded execution while safe parallel work exists,
+- triggers an Orchestrator correction by reporting the deviation, the impacted roles, and the recovery plan.
+
+Deputy enforcement triggers:
+
+- any agent shows `awaiting instruction`,
+- any active agent has no handoff, blocker, or progress report after a status sweep,
+- an agent completes with an incomplete handoff such as only `handoff completed`,
+- an agent is assigned an output path whose parent directory does not exist,
+- the Orchestrator keeps doing delegable work locally while safe parallel lanes are available,
+- the active board says a role is active but the agent is closed, silent, or blocked.
+
+When a trigger is seen, the Deputy must write a `Plan Deviation Alert` in its operations report with the agent id/name, deviation, expected action, and recommended Orchestrator correction. The Orchestrator must address the alert in the same orchestration cycle by giving work, closing/reassigning, creating missing folders/artifacts, or recording why no safe action exists.
+
+The Flow Monitor may own and update only flow-control artifacts explicitly assigned by the Orchestrator, such as an occupancy report or active-board operations section. It must not edit production source, approve QA/Lead/Architect/PO gates, make product decisions, make architecture decisions, start runtime processes, or commit/push.
+
+The Orchestrator remains accountable for final assignments, board updates, gate decisions, runtime process control, and GitHub check-in. The monitor is a deputy for flow visibility and plan adherence, not a replacement for the Orchestrator.
+
+### Continuous Team Utilization
+
+No role should become idle only because another role is waiting on a gate, environment evidence, or long-running validation.
+
+- Product Owner works ahead on the next priority batch unless an active product/domain clarification is needed.
+- Architect works ahead on pre-architecture, contract risk, dependency analysis, or signoff reviews that do not authorize premature implementation.
+- Developers who completed a valid QA handoff may take a new Orchestrator-assigned task, revision, or discovery item with non-conflicting write scope.
+- QA agents produce evidence or explicit blockers; they are closed or reassigned after handoff so they do not occupy capacity while waiting for runtime evidence owned by the central lane.
+- The Orchestrator performs occupancy sweeps and refills free capacity from active revisions, eligible implementation, discovery, QA support, Product planning, and Architecture planning in that order.
+
+### Continuous Product Backlog Replenishment
+
+The Product Owner Agent must not stop after producing one set of requirements. The Orchestrator tracks the refined backlog during status sweeps and keeps the Product Owner lane moving in parallel with architecture, implementation, QA, and release work.
+
+Backlog threshold:
+
+- Maintain at least five refined candidate items that are ready or nearly ready for Orchestrator intake.
+- Count only items with a product problem, user value, domain assumptions, acceptance criteria or clear acceptance questions, target lane/module guess, dependencies, and priority rationale.
+- Bugs, enhancements, app-review findings, technical-product risks, and roadmap opportunities all count when they are written at product-brief quality.
+
+If the refined backlog drops below five items:
+
+- The Orchestrator assigns the Product Owner Agent to `Product Planning Mode` immediately, subject to the laptop resource gate for new agents.
+- The Product Owner refines and prioritizes new requirements, bugs, enhancements, and discovered usability/data-trust gaps until at least five candidate items are available again.
+- The Product Owner continues this work without waiting for the current Top 5 to finish, unless a product/domain blocker for active work requires immediate PO clarification.
+- New backlog work must not change active implementation scope silently; priority or acceptance changes follow the Product Owner change protocol and active-board update rule.
+
+The Product Owner may maintain a broader backlog above five items when useful. Five is the minimum buffer, not the target maximum.
+
 ### Developer One-Task WIP And Revision Ownership
 
 A lane developer owns one implementation or revision task at a time. After the developer completes the implementation handoff and the Orchestrator moves the item to `Ready for QA`, that developer may pull the next eligible implementation task if the active board shows WIP availability and file reservations do not conflict.
@@ -396,12 +475,69 @@ The Senior Fullstack Lead / Orchestrator must actively monitor worker flow inste
 - If an agent is genuinely free, refill from this order: active `Needs Revision` item matching their skills, same-lane `Ready for Implementation`, interruptible read-only discovery, QA/support evidence that does not require source edits, next-batch Product/Architecture planning. Never refill with a task that conflicts with reserved files.
 - Record persistent stuck states in `docs/codex-agent-team-plan/blocker-register.md` with owner, decision needed, next action, review date, and safe parallel work.
 
+### Orchestrator Proactive Execution Rules
+
+The Orchestrator is responsible for keeping the Codex-agent team moving. The user should not need to repeatedly notice idle agents, stale board rows, missing handoffs, or blocked workers before the Orchestrator acts.
+
+Required Orchestrator behavior:
+
+- After assigning or spawning an agent, verify in the same orchestration cycle that the agent has a clear task, owned write scope, and expected output.
+- Before assigning an artifact path to an agent, create or verify the parent directory.
+- If an agent is idle, waiting, or silent after a reasonable work interval, send a status prompt requiring one of three outcomes: handoff, continue unblocked work, or blocker report.
+- If the agent still waits after one prompt, interrupt once with a direct action request; if it still does not produce, close/reassign and update the board.
+- If a spawned agent cannot work because of thread limits, missing context, or unclear ownership, close/reassign quickly and record the corrected owner on the active board.
+- When a gate blocks one role, immediately identify safe parallel work for the other roles instead of letting the whole team wait.
+- Keep the active board aligned with reality before assigning new work: owner, state, mode, blocker, next action, reserved files, and evidence links must match actual agent status.
+- Convert repeated user corrections into plan updates during the same session so the operating model improves and the same issue is less likely to recur.
+- Use the Operations Monitor when coordination load is high, but do not delegate accountability for board accuracy, gate flow, runtime process control, or final decisions.
+- Prefer decisive Orchestrator action inside the approved plan over asking the user for approval on routine flow-control decisions.
+- Ask the user only for true product preference changes, unsafe/destructive actions, paid-tool/provider exceptions, secrets, external account actions, or decisions the plan explicitly reserves for the user.
+
+### Plan Deviation Guardrail
+
+The Orchestrator must actively prevent drift from the parallel team plan.
+
+Deviation examples:
+
+- Orchestrator does feature, QA, PO, Architect, or discovery work locally while qualified agents are free and safe parallel work exists.
+- A completed QA/developer/PO/Architect handoff does not update the active board in the same orchestration cycle.
+- Agents remain in an awaiting-instruction state after assignment or after finishing work.
+- Runtime evidence blocks the whole team instead of moving into the central runtime lane while other roles work ahead.
+- The Flow Monitor is not active during multi-agent execution without a recorded reason.
+
+Required correction:
+
+- Stop assigning new work until the board reflects reality.
+- Either delegate the work to the correct role or record why delegation is not possible.
+- Add/update a plan artifact when the deviation reveals a reusable process gap.
+- If the Orchestrator must temporarily single-thread a task, record the reason, expected duration, and safe parallel work that remains blocked or available.
+- Re-run an occupancy sweep after the correction.
+
+Orchestrator self-check before any final/status response:
+
+- Which roles are active, blocked, or free?
+- Which work item is at each gate?
+- Are any agents awaiting instruction?
+- Is the Flow Monitor active or is there a documented reason it is not?
+- Are any blockers missing an owner or next action?
+- Are developers free while eligible revision/discovery/prep work exists?
+- Is PO keeping the next backlog ready?
+- Is Architect working ahead without authorizing premature implementation?
+- Is runtime evidence centralized and resource-safe?
+- Does the active board reflect the real state?
+
 ### Laptop Resource Gate
 
 The Orchestrator must check laptop memory utilization before starting new local processes or adding new workers when active execution is already running.
 
 - Do not start new local dev servers, test runs, browser/Playwright runs, Docker services, build processes, or new Codex worker agents when memory utilization is at or above 95%.
 - Once memory utilization reaches 95% or higher, pause new process/worker starts until memory utilization drops below 90%.
+- When memory utilization is above 90%, every worker and the Orchestrator must stop repo-local Node/Vite/Playwright/backend services they started if those services are no longer needed for their active task.
+- A worker that has completed implementation, validation, or handoff must clean up its own task-specific Node services before reporting done when memory is above 90%.
+- The Orchestrator owns cleanup of orphaned or stale repo-local Node/npm/npx processes after interrupted tests, closed workers, completed handoffs, or aborted validation runs.
+- Cleanup must target only repo-local processes or known app ports. Do not kill unrelated editor, browser, OS, Docker, or user-owned processes.
+- Persistent monitor ports are exempt from routine cleanup: backend on `http://127.0.0.1:3000` and frontend on `http://127.0.0.1:5173` should stay running so the user can monitor progress. Only the Orchestrator may restart or stop these services, and only for a health issue, port replacement, explicit user request, or severe resource pressure.
+- Workers must not stop services on ports `3000` or `5173` as part of task cleanup. They may stop only task-specific Node/Vite/Playwright/backend services they started on other ports, or ask the Orchestrator to recycle the monitor services.
 - Existing in-flight work can finish unless it is clearly causing instability; prefer waiting for current processes to complete before starting more.
 - Lightweight documentation edits, board updates, and status messages may continue while the memory gate is closed.
 - Every status sweep should include a resource check before starting process-heavy validation or spawning additional workers.

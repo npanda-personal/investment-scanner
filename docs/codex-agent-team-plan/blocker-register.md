@@ -4,7 +4,10 @@ Use this register for blockers that stop or materially delay a work item.
 
 | ID | Date | Work Item | Blocker Type | Owner | Escalation Path | Next Action | Review Date | Parallel Work Available | Status |
 |---|---|---|---|---|---|---|---|---|---|
-| BLK-0001 |  |  |  |  |  |  |  |  | Open |
+| BLK-0002 | 2026-05-13 | C2-WP-01 Trusted Universe Repair Workbench | `QA_ENVIRONMENT` | Senior Fullstack Lead / Orchestrator runtime validation | QA -> Orchestrator -> Lane 1 developer if runtime proof fails | Runtime UI/API evidence completed; C2-WP-01 moved through QA, Lead validation, Architect signoff, and PO acceptance | 2026-05-13 | None needed for this blocker | Closed |
+| BLK-0003 | 2026-05-13 | C2-WP-02 Raw Signal Generation Scope And Model-Version Audit | `QA_ENVIRONMENT` | Senior Fullstack Lead / Orchestrator runtime validation | QA -> Orchestrator -> Lane 2A or Signal Quality developer if runtime proof fails | Runtime UI/API/migration evidence completed; C2-WP-02 moved through QA, Lead validation, Architect signoff, and PO acceptance | 2026-05-13 | C2-WP-05 schema slot can be reconsidered after accepted C2-WP-01 through C2-WP-04 check-in | Closed |
+| BLK-0004 | 2026-05-13 | C2-WP-03 Strategy Proof Registry And Evidence Index | `QA_ENVIRONMENT` | Senior Fullstack Lead / Orchestrator runtime validation | QA -> Orchestrator -> Lane 2B developer if runtime proof fails | Runtime UI evidence completed; C2-WP-03 moved through QA, Lead validation, Architect signoff, and PO acceptance | 2026-05-13 | None needed for this blocker | Closed |
+| BLK-0005 | 2026-05-13 | C2-WP-04 Today Review Explainability And Exclusion Reasons | `QA_ENVIRONMENT` | Senior Fullstack Lead / Orchestrator runtime validation | QA -> Orchestrator -> Lane 3A developer if runtime proof fails | Runtime UI/API evidence completed; C2-WP-04 moved through QA, Lead validation, Architect signoff, and PO acceptance | 2026-05-13 | None needed for this blocker | Closed |
 
 ## Blocker Types
 
