@@ -22,6 +22,18 @@ export type TodayReviewGrade = 'A' | 'B' | 'C' | 'D' | 'UNPROVEN';
 export type TodayReviewTrustStatus = 'OK' | 'PARTIAL' | 'STALE' | 'FAILED';
 export type TodayReviewUniverseMode = 'FULL_REVIEW' | 'LIMITED_REVIEW' | 'NO_REVIEW';
 export type TodayReviewTrustedLoadStatus = 'COMPLETE' | 'CONFIGURED_PARTIAL' | 'LOAD_FAILED';
+export type TodayReviewReasonCategory =
+  | 'READINESS'
+  | 'DATA_QUALITY'
+  | 'SIGNAL_MATURITY'
+  | 'CALIBRATION'
+  | 'STRATEGY_PROOF'
+  | 'STRATEGY_DECISION'
+  | 'TRADE_PLAN_PROOF_CHAIN'
+  | 'MARKET_GATE'
+  | 'OUTSIDE_SCOPE'
+  | 'NO_SETUP';
+export type TodayReviewReasonSeverity = 'INFO' | 'WATCH' | 'BLOCKER';
 
 export interface TodayReviewRunRequest {
   region?: string;
@@ -43,6 +55,7 @@ export interface TodayReviewSourceSnapshot {
   marketGate?: Record<string, unknown> | null;
   marketContext?: MarketContextSummary | null;
   rawSignalUniverse?: Record<string, unknown> | null;
+  explainability?: TodayReviewExplainability | null;
   generatedAt: string;
 }
 
@@ -90,8 +103,80 @@ export interface TodayReviewCandidateDto {
   strategyProofSnapshot: Record<string, unknown> | null;
   tradePlanSnapshot: TradePlanResultDto | Record<string, unknown> | null;
   sourceSignalSnapshot: Record<string, unknown> | null;
+  explainability?: TodayReviewCandidateExplainability;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface TodayReviewCandidateReason {
+  category: TodayReviewReasonCategory;
+  code: string;
+  label: string;
+  severity: TodayReviewReasonSeverity;
+  sourceModule: string;
+  evidenceDate?: string | null;
+  targetRoute?: string;
+}
+
+export interface TodayReviewCandidateExplainability {
+  candidateId: string;
+  state: TodayReviewCandidateState;
+  rankingComponents: {
+    strategyProof: number;
+    tradePlan: number;
+    marketRegime: number;
+    sectorAlignment: number;
+    signalCalibration: number;
+    dataQuality: number;
+    smartMoney: number;
+    hardBlockerOverride: boolean;
+  };
+  promotionReasons: TodayReviewCandidateReason[];
+  watchReasons: TodayReviewCandidateReason[];
+  blockers: TodayReviewCandidateReason[];
+  upstreamEvidence: {
+    readiness?: unknown;
+    signalEvidence?: unknown;
+    calibrationReadiness?: unknown;
+    strategyProof?: unknown;
+    tradePlanProofChain?: unknown;
+  };
+}
+
+export interface ExclusionReasonSummary {
+  category: TodayReviewReasonCategory;
+  code: string;
+  label: string;
+  count: number;
+  blocking: boolean;
+  sourceModule: string;
+  targetRoute?: string;
+}
+
+export interface TodayReviewExcludedExample {
+  instrumentId: string;
+  symbol: string;
+  companyName?: string | null;
+  primaryReasonCode: string;
+  primaryReasonLabel: string;
+  reasonCategories: TodayReviewReasonCategory[];
+  promoted: false;
+}
+
+export interface TodayReviewExplainability {
+  runId: string;
+  scope: { region: string; assetType: string };
+  reviewMode: TodayReviewUniverseMode;
+  trustedUniverseCount: number;
+  scannedCount: number;
+  promotedCount: number;
+  watchCount: number;
+  blockedCount: number;
+  unprovenCount: number;
+  insufficientDataCount: number;
+  excludedCount: number;
+  exclusionSummaries: ExclusionReasonSummary[];
+  inspectableExcludedExamples: TodayReviewExcludedExample[];
 }
 
 export interface TodayReviewRunDto {
@@ -112,6 +197,7 @@ export interface TodayReviewRunDto {
   catalogCount?: number;
   coverageWarnings?: string[];
   scanFunnel?: TodayReviewScanFunnel | null;
+  explainability?: TodayReviewExplainability;
   createdAt: string;
   updatedAt: string;
   candidates: TodayReviewCandidateDto[];

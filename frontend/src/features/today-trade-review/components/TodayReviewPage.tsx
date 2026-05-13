@@ -105,6 +105,7 @@ export function TodayReviewPage() {
             <SummaryCard label="Blocked" value={totals.blocked} tone="error" />
             <SummaryCard label="Data gaps/warnings" value={totals.warnings} tone="default" />
           </Grid>
+          <ExclusionExplainabilityPanel run={run} />
 
           <Alert severity="info">
             Signals and calibration are supporting evidence only. Promoted review candidates require trusted price data, enough OHLCV history, and valid trade-plan geometry.
@@ -224,6 +225,71 @@ function CoveragePanel({ run }: { run: TodayReviewRun }) {
           {warnings.slice(0, 3).map((warning: string) => (
             <Typography key={warning} variant="caption" color="text.secondary">{warning}</Typography>
           ))}
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ExclusionExplainabilityPanel({ run }: { run: TodayReviewRun }) {
+  const explainability = run.explainability || (run.sourceSnapshot as any)?.explainability;
+  if (!explainability) return null;
+  const summaries = explainability.exclusionSummaries || [];
+  const examples = explainability.inspectableExcludedExamples || [];
+  return (
+    <Card variant="outlined">
+      <CardContent>
+        <Stack spacing={2}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} useFlexGap flexWrap="wrap" alignItems={{ xs: 'flex-start', md: 'center' }}>
+            <Typography variant="h6">Exclusion reasons</Typography>
+            <Chip label={`Excluded ${formatNumber(explainability.excludedCount)}`} color="warning" />
+            <Chip label={`Promoted ${formatNumber(explainability.promotedCount)}`} color="success" variant="outlined" />
+            <Chip label={`Watch ${formatNumber(explainability.watchCount)}`} color="info" variant="outlined" />
+            <Chip label={`Blocked ${formatNumber(explainability.blockedCount)}`} color="error" variant="outlined" />
+            <Chip label={`Unproven ${formatNumber(explainability.unprovenCount)}`} variant="outlined" />
+            <Chip label={`Insufficient data ${formatNumber(explainability.insufficientDataCount)}`} variant="outlined" />
+          </Stack>
+          {summaries.length === 0 ? (
+            <Typography color="text.secondary">No exclusion summary was stored for this run.</Typography>
+          ) : (
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} useFlexGap flexWrap="wrap">
+              {summaries.slice(0, 8).map((summary: any) => (
+                <Chip
+                  key={`${summary.category}:${summary.code}`}
+                  label={`${summary.category}: ${summary.count} - ${summary.label}`}
+                  color={summary.blocking ? 'warning' : 'default'}
+                  variant={summary.blocking ? 'filled' : 'outlined'}
+                />
+              ))}
+            </Stack>
+          )}
+          {examples.length > 0 && (
+            <TableContainer>
+              <Table size="small" aria-label="Today review excluded examples">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Excluded example</TableCell>
+                    <TableCell>Primary reason</TableCell>
+                    <TableCell>Categories</TableCell>
+                    <TableCell>Promotion</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {examples.map((example: any) => (
+                    <TableRow key={`${example.instrumentId}:${example.primaryReasonCode}`}>
+                      <TableCell>
+                        <Typography fontWeight={700}>{example.symbol}</Typography>
+                        <Typography variant="caption" color="text.secondary">{example.companyName || example.instrumentId}</Typography>
+                      </TableCell>
+                      <TableCell>{example.primaryReasonLabel}</TableCell>
+                      <TableCell>{(example.reasonCategories || []).join(', ')}</TableCell>
+                      <TableCell>{example.promoted ? 'Promoted' : 'Not promoted'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
         </Stack>
       </CardContent>
     </Card>

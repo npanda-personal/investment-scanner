@@ -62,6 +62,7 @@ class MemoryTodayReviewRepository implements TodayReviewRepository {
       catalogCount: reviewUniverse.catalogCount,
       coverageWarnings: Array.isArray(reviewUniverse.warnings) ? reviewUniverse.warnings : [],
       scanFunnel: sourceSnapshot.scanFunnel || null,
+      explainability: sourceSnapshot.explainability || null,
       updatedAt: input.finishedAt.toISOString(),
       candidates,
     };
@@ -349,6 +350,10 @@ describe('TodayTradeReviewService', () => {
     expect(result.run?.sourceSnapshot).toEqual(expect.objectContaining({
       rawSignalUniverse: expect.objectContaining({ supportOnly: true, sampleCount: 1 }),
     }));
+    expect(result.run?.explainability).toEqual(expect.objectContaining({
+      promotedCount: 0,
+      excludedCount: expect.any(Number),
+    }));
   });
 
   it('publishes zero candidates when Trusted Review Universe is unavailable', async () => {
@@ -369,6 +374,13 @@ describe('TodayTradeReviewService', () => {
         trustedLoadStatus: 'LOAD_FAILED',
         membershipLoadFailureReason: 'Trusted Review Universe unavailable or not ready; Today Review cannot publish candidates.',
       }),
+    }));
+    expect(result.run?.explainability).toEqual(expect.objectContaining({
+      reviewMode: 'NO_REVIEW',
+      promotedCount: 0,
+      exclusionSummaries: expect.arrayContaining([
+        expect.objectContaining({ category: 'READINESS', code: 'NO_REVIEW_UNIVERSE', blocking: true }),
+      ]),
     }));
     expect(result.run?.warnings).toEqual(expect.arrayContaining([
       'Trusted Review Universe unavailable or not ready; Today Review cannot publish candidates.',
@@ -517,10 +529,25 @@ describe('TodayTradeReviewService', () => {
       strategyCandidatesExcluded: 1,
       outsideTrustedUniverse: 1,
     }));
+    expect(result.run?.explainability?.inspectableExcludedExamples[0]).toEqual(expect.objectContaining({
+      symbol: 'ALPHA.NS',
+      primaryReasonCode: 'OUTSIDE_TRUSTED_UNIVERSE',
+      promoted: false,
+    }));
   });
 
   it('allows Strategy Decision candidates inside the trusted universe to be considered', async () => {
-    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services(), () => fixedNow);
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      strategyDecisionService: {
+        marketGate: jest.fn().mockResolvedValue({ marketGate: 'OPEN', marketCondition: 'HEALTHY' }),
+        candidates: jest.fn().mockResolvedValue({ results: [decision({ warnings: ['Calibration readiness is LIMITED.'] })], total: 1 }),
+        exits: jest.fn().mockResolvedValue([]),
+      },
+      dataQualityService: {
+        getLatestEvaluationForInstrument: jest.fn().mockResolvedValue(dataQuality({ signalReadinessStatus: 'LIMITED' })),
+        getEvaluationsForInstruments: jest.fn().mockResolvedValue([dataQuality({ signalReadinessStatus: 'LIMITED' })]),
+      },
+    }), () => fixedNow);
 
     const result = await service.run();
 
@@ -533,6 +560,22 @@ describe('TodayTradeReviewService', () => {
       symbol: 'ALPHA.NS',
       strategyCode: 'TREND_MOMENTUM',
     }));
+    expect(result.groups.longReview[0].explainability).toEqual(expect.objectContaining({
+      state: 'LONG_REVIEW',
+      rankingComponents: expect.objectContaining({ hardBlockerOverride: false }),
+      promotionReasons: expect.arrayContaining([
+        expect.objectContaining({ category: 'READINESS', sourceModule: 'Market Data Foundation' }),
+      ]),
+      upstreamEvidence: expect.objectContaining({
+        readiness: expect.any(Object),
+        strategyProof: expect.any(Object),
+        tradePlanProofChain: expect.any(Object),
+      }),
+    }));
+    expect(result.run?.explainability?.exclusionSummaries).toEqual(expect.arrayContaining([
+      expect.objectContaining({ category: 'SIGNAL_MATURITY', code: 'SIGNAL_READINESS_IS_LIMITED' }),
+      expect.objectContaining({ category: 'CALIBRATION', code: 'CALIBRATION_READINESS_IS_LIMITED' }),
+    ]));
   });
 
   it('snapshots and uses Market Data review readiness summary mode', async () => {
@@ -797,6 +840,12 @@ describe('TodayTradeReviewService', () => {
     expect(candidate.confidenceScore).toBe(0);
     expect(candidate.blockers).toContain(blockedPlan.blockers[0]);
     expect(candidate.reasonSummary).toContain('Blocked');
+    expect(candidate.explainability).toEqual(expect.objectContaining({
+      rankingComponents: expect.objectContaining({ hardBlockerOverride: true }),
+      blockers: expect.arrayContaining([
+        expect.objectContaining({ category: 'TRADE_PLAN_PROOF_CHAIN', severity: 'BLOCKER', sourceModule: 'Trade Plan Risk Engine' }),
+      ]),
+    }));
   });
 
   it('blocks new long review candidates when the market gate is CLOSED', async () => {

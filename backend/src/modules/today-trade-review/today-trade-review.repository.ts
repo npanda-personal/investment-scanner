@@ -2,6 +2,8 @@ import { Prisma } from '@prisma/client';
 import prisma from '../../db/prisma';
 import type {
   TodayReviewCandidateDto,
+  TodayReviewCandidateReason,
+  TodayReviewExplainability,
   TodayReviewRepository as TodayReviewRepositoryContract,
   TodayReviewRunDto,
   TodayReviewRunStatus,
@@ -154,6 +156,8 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
     const sourceSnapshot = this.jsonObject(record.sourceSnapshot);
     const reviewUniverse = this.jsonObject(sourceSnapshot.reviewUniverse);
     const scanFunnel = this.nullableJson(sourceSnapshot.scanFunnel) as any;
+    const warnings = this.jsonArray(record.warnings);
+    if (!sourceSnapshot.explainability && !warnings.includes('LEGACY_MISSING_EXPLAINABILITY')) warnings.push('LEGACY_MISSING_EXPLAINABILITY');
     return {
       id: record.id,
       runDate: record.runDate.toISOString(),
@@ -164,7 +168,7 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
       dataThroughDate: record.dataThroughDate ? record.dataThroughDate.toISOString() : null,
       startedAt: record.startedAt.toISOString(),
       finishedAt: record.finishedAt ? record.finishedAt.toISOString() : null,
-      warnings: this.jsonArray(record.warnings),
+      warnings,
       candidateCounts: this.jsonObject(record.candidateCounts),
       sourceSnapshot,
       reviewUniverseMode: reviewUniverse.mode,
@@ -172,6 +176,7 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
       catalogCount: reviewUniverse.catalogCount,
       coverageWarnings: Array.isArray(reviewUniverse.warnings) ? reviewUniverse.warnings.map(String) : [],
       scanFunnel,
+      explainability: this.runExplainability(record.id, record.region, record.assetType, sourceSnapshot, candidates, warnings),
       createdAt: record.createdAt.toISOString(),
       updatedAt: record.updatedAt.toISOString(),
       candidates,
@@ -179,7 +184,7 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
   }
 
   private toCandidateDto(record: any): TodayReviewCandidateDto {
-    return {
+    const dto: TodayReviewCandidateDto = {
       id: record.id,
       runId: record.runId,
       instrumentId: record.instrumentId,
@@ -203,6 +208,80 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
       sourceSignalSnapshot: this.nullableJson(record.sourceSignalSnapshot),
       createdAt: record.createdAt?.toISOString(),
       updatedAt: record.updatedAt?.toISOString(),
+    };
+    return { ...dto, explainability: this.candidateExplainability(dto) };
+  }
+
+  private runExplainability(
+    runId: string,
+    region: string,
+    assetType: string,
+    sourceSnapshot: Record<string, any>,
+    candidates: TodayReviewCandidateDto[],
+    warnings: unknown
+  ): TodayReviewExplainability {
+    const existing = this.nullableJson(sourceSnapshot.explainability) as TodayReviewExplainability | null;
+    if (existing) return existing;
+    const scanFunnel = this.nullableJson(sourceSnapshot.scanFunnel) as any;
+    const reviewUniverse = this.jsonObject(sourceSnapshot.reviewUniverse);
+    const legacyWarnings = this.jsonArray(warnings);
+    if (!legacyWarnings.includes('LEGACY_MISSING_EXPLAINABILITY')) legacyWarnings.push('LEGACY_MISSING_EXPLAINABILITY');
+    return {
+      runId,
+      scope: { region, assetType },
+      reviewMode: reviewUniverse.mode || 'NO_REVIEW',
+      trustedUniverseCount: Number(scanFunnel?.trustedUniverseCount || reviewUniverse.trustedCount || 0),
+      scannedCount: Number(scanFunnel?.trustedInstrumentsScanned || 0),
+      promotedCount: candidates.filter((candidate) => ['LONG_REVIEW', 'SHORT_REVIEW', 'EXIT_RISK_REVIEW'].includes(candidate.state)).length,
+      watchCount: candidates.filter((candidate) => candidate.state === 'WATCH_ONLY').length,
+      blockedCount: candidates.filter((candidate) => candidate.state === 'BLOCKED' || candidate.state === 'AVOID').length,
+      unprovenCount: candidates.filter((candidate) => candidate.state === 'UNPROVEN').length,
+      insufficientDataCount: candidates.filter((candidate) => candidate.state === 'INSUFFICIENT_DATA').length,
+      excludedCount: Number(scanFunnel?.outsideTrustedUniverse || 0) + Number(scanFunnel?.noSetup || 0),
+      exclusionSummaries: [],
+      inspectableExcludedExamples: [],
+    };
+  }
+
+  private candidateExplainability(candidate: TodayReviewCandidateDto) {
+    const reasons = (items: string[], severity: 'WATCH' | 'BLOCKER'): TodayReviewCandidateReason[] => items.map((label) => ({
+      category: label.toLowerCase().includes('data') || label.toLowerCase().includes('coverage') ? 'DATA_QUALITY' : label.toLowerCase().includes('trade') || label.toLowerCase().includes('reward') || label.toLowerCase().includes('stop') ? 'TRADE_PLAN_PROOF_CHAIN' : 'STRATEGY_PROOF',
+      code: label.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 64) || 'TODAY_REVIEW_REASON',
+      label,
+      severity,
+      sourceModule: label.toLowerCase().includes('data') ? 'Market Data Foundation' : label.toLowerCase().includes('trade') ? 'Trade Plan Risk Engine' : 'Strategy Framework',
+      evidenceDate: null,
+    }));
+    return {
+      candidateId: candidate.id || `${candidate.runId || 'run'}:${candidate.instrumentId}`,
+      state: candidate.state,
+      rankingComponents: {
+        strategyProof: candidate.strategyProofSnapshot ? 8 : 0,
+        tradePlan: candidate.tradePlanSnapshot ? 8 : 0,
+        marketRegime: candidate.marketContextSnapshot ? 5 : 0,
+        sectorAlignment: (candidate.dataQualitySnapshot as any)?.sector ? 5 : 0,
+        signalCalibration: (candidate.sourceSignalSnapshot as any)?.calibration ? 5 : 0,
+        dataQuality: candidate.dataQualitySnapshot ? 8 : 0,
+        smartMoney: (candidate.sourceSignalSnapshot as any)?.smartMoney ? 5 : 0,
+        hardBlockerOverride: candidate.blockers.length > 0,
+      },
+      promotionReasons: ['LONG_REVIEW', 'SHORT_REVIEW', 'EXIT_RISK_REVIEW'].includes(candidate.state) ? [{
+        category: 'READINESS' as const,
+        code: 'TODAY_REVIEW_PROMOTED',
+        label: candidate.reasonSummary,
+        severity: 'INFO' as const,
+        sourceModule: 'Today Review',
+        evidenceDate: null,
+      }] : [],
+      watchReasons: reasons(candidate.watchReasons, 'WATCH'),
+      blockers: reasons(candidate.blockers, 'BLOCKER'),
+      upstreamEvidence: {
+        readiness: candidate.dataQualitySnapshot,
+        signalEvidence: (candidate.sourceSignalSnapshot as any)?.rawSignal || (candidate.sourceSignalSnapshot as any)?.setup || null,
+        calibrationReadiness: (candidate.sourceSignalSnapshot as any)?.calibration || null,
+        strategyProof: candidate.strategyProofSnapshot,
+        tradePlanProofChain: candidate.tradePlanSnapshot,
+      },
     };
   }
 

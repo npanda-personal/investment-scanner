@@ -77,6 +77,34 @@ const candidate = {
     calibration: { calibratedDirection: 'BULLISH', calibratedScore: 80, calibratedConfidence: 'HIGH', supportOnly: true },
     smartMoney: { status: 'ACCUMULATION', score: 70, confidence: 'MEDIUM', supportOnly: true },
   },
+  explainability: {
+    candidateId: 'candidate-1',
+    state: 'LONG_REVIEW',
+    rankingComponents: {
+      strategyProof: 22,
+      tradePlan: 19.6,
+      marketRegime: 15,
+      sectorAlignment: 10,
+      signalCalibration: 10,
+      dataQuality: 15,
+      smartMoney: 5,
+      hardBlockerOverride: false,
+    },
+    promotionReasons: [
+      { category: 'READINESS', code: 'TRUSTED_REVIEW_READY', label: 'Trusted review data is available for this candidate.', severity: 'INFO', sourceModule: 'Market Data Foundation', evidenceDate: '2026-05-10T16:00:00.000Z' },
+      { category: 'STRATEGY_PROOF', code: 'STRATEGY_PROOF_USABLE', label: 'Strategy proof is usable for research review.', severity: 'INFO', sourceModule: 'Strategy Framework', evidenceDate: '2026-05-11T06:30:00.000Z' },
+      { category: 'TRADE_PLAN_PROOF_CHAIN', code: 'TRADE_PLAN_REVIEW_READY', label: 'Trade-plan proof-chain snapshot supports paper-review research.', severity: 'INFO', sourceModule: 'Trade Plan Risk Engine', evidenceDate: '2026-05-11T06:30:00.000Z' },
+    ],
+    watchReasons: [],
+    blockers: [],
+    upstreamEvidence: {
+      readiness: { coverageStatus: 'GOOD', signalReadinessStatus: 'READY' },
+      signalEvidence: { direction: 'BULLISH', supportOnly: true },
+      calibrationReadiness: { calibratedDirection: 'BULLISH', supportOnly: true },
+      strategyProof: { frameworkBacked: true, strategyRating: { ratingGrade: 'GOOD' } },
+      tradePlanProofChain: { planStatus: 'VALID', paperReadinessStatus: 'READY_FOR_PAPER_REVIEW' },
+    },
+  },
   createdAt: '2026-05-11T06:30:00.000Z',
   updatedAt: '2026-05-11T06:30:00.000Z',
 };
@@ -94,6 +122,16 @@ const blockedCandidate = {
   confidenceScore: 0,
   reasonSummary: 'Blocked: Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.',
   blockers: ['Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.'],
+  explainability: {
+    ...candidate.explainability,
+    candidateId: 'candidate-2',
+    state: 'BLOCKED',
+    rankingComponents: { ...candidate.explainability.rankingComponents, hardBlockerOverride: true },
+    promotionReasons: [],
+    blockers: [
+      { category: 'TRADE_PLAN_PROOF_CHAIN', code: 'STOP_LOSS_BLOCKED', label: 'Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.', severity: 'BLOCKER', sourceModule: 'Trade Plan Risk Engine', evidenceDate: '2026-05-11T06:30:00.000Z' },
+    ],
+  },
   tradePlanSnapshot: {
     ...candidate.tradePlanSnapshot,
     id: 'plan-2',
@@ -124,6 +162,15 @@ const unprovenCandidate = {
   reasonSummary: 'Unproven: Strategy Framework proof is missing or weak.',
   blockers: [],
   watchReasons: ['Strategy Framework proof is missing or weak.'],
+  explainability: {
+    ...candidate.explainability,
+    candidateId: 'candidate-3',
+    state: 'UNPROVEN',
+    promotionReasons: [],
+    watchReasons: [
+      { category: 'STRATEGY_PROOF', code: 'STRATEGY_FRAMEWORK_PROOF_MISSING_OR_WEAK', label: 'Strategy Framework proof is missing or weak.', severity: 'WATCH', sourceModule: 'Strategy Framework', evidenceDate: '2026-05-11T06:30:00.000Z' },
+    ],
+  },
   strategyProofSnapshot: {
     ...candidate.strategyProofSnapshot,
     frameworkBacked: false,
@@ -238,6 +285,35 @@ const completedResponse = {
       noSetup: 132,
       topNoPromotionReasons: { 'historical evidence unproven': 1 },
     },
+    explainability: {
+      runId: 'run-1',
+      scope: { region: 'IN', assetType: 'STOCK' },
+      reviewMode: 'LIMITED_REVIEW',
+      trustedUniverseCount: 144,
+      scannedCount: 144,
+      promotedCount: 1,
+      watchCount: 0,
+      blockedCount: 1,
+      unprovenCount: 1,
+      insufficientDataCount: 0,
+      excludedCount: 139,
+      exclusionSummaries: [
+        { category: 'NO_SETUP', code: 'NO_PRICE_ACTION_SETUP', label: 'Trusted instruments had no Today Review setup.', count: 132, blocking: false, sourceModule: 'Today Review' },
+        { category: 'OUTSIDE_SCOPE', code: 'OUTSIDE_TRUSTED_UNIVERSE', label: 'Strategy candidates were outside the trusted review universe.', count: 6, blocking: true, sourceModule: 'Market Data Foundation' },
+        { category: 'STRATEGY_PROOF', code: 'UNPROVEN_EVIDENCE', label: 'Strategy or lite historical evidence is unproven.', count: 1, blocking: false, sourceModule: 'Strategy Framework' },
+      ],
+      inspectableExcludedExamples: [
+        {
+          instrumentId: 'stock-x',
+          symbol: 'OUTSIDE.NS',
+          companyName: 'Outside Ltd',
+          primaryReasonCode: 'OUTSIDE_TRUSTED_UNIVERSE',
+          primaryReasonLabel: 'Strategy Decision candidate is outside the trusted review universe.',
+          reasonCategories: ['OUTSIDE_SCOPE'],
+          promoted: false,
+        },
+      ],
+    },
     createdAt: '2026-05-11T06:30:00.000Z',
     updatedAt: '2026-05-11T06:31:00.000Z',
     candidates: [candidate, blockedCandidate, unprovenCandidate],
@@ -304,6 +380,11 @@ test.describe('Today Trade Review UI', () => {
     await expect(page.getByText('Membership load: COMPLETE')).toBeVisible();
     await expect(page.getByText('Trusted universe membership unavailable')).toHaveCount(0);
     await expect(page.getByText('Strategy outside trusted universe: 6')).toBeVisible();
+    await expect(page.getByText('Exclusion reasons')).toBeVisible();
+    await expect(page.getByText('Excluded 139')).toBeVisible();
+    await expect(page.getByText('OUTSIDE_SCOPE: 6 - Strategy candidates were outside the trusted review universe.')).toBeVisible();
+    await expect(page.getByText('OUTSIDE.NS')).toBeVisible();
+    await expect(page.getByText('Not promoted')).toBeVisible();
     await expect(page.getByRole('link', { name: 'ALPHA.NS' })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Long Review (1)' })).toBeVisible();
     await page.getByRole('tab', { name: /Watch Only/ }).click();
@@ -342,7 +423,15 @@ test.describe('Today Trade Review UI', () => {
     await expect(page.getByRole('heading', { name: 'Market context' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Data quality' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Trade plan' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Ranking components' })).toBeVisible();
+    const rankingComponentsPanel = page.getByRole('heading', { name: 'Ranking components' }).locator('xpath=..');
+    await expect(rankingComponentsPanel.getByText('Strategy proof', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Reason categories' })).toBeVisible();
+    await expect(page.getByText('READINESS / INFO')).toBeVisible();
+    await expect(page.getByText('Source: Market Data Foundation')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Supporting evidence' })).toBeVisible();
+    const supportingEvidencePanel = page.getByRole('heading', { name: 'Supporting evidence' }).locator('xpath=..');
+    await expect(supportingEvidencePanel.getByText('Trade-plan proof-chain', { exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Research Hub stock view' })).toHaveAttribute('href', '/research/stocks/stock-1');
 
     const body = await page.locator('body').innerText();

@@ -10,11 +10,15 @@ import { TradePlanRiskEngineService, type TradePlanResultDto } from '../trade-pl
 import { TodayTradeReviewRepository } from './today-trade-review.repository';
 import type {
   TodayReviewCandidateDto,
+  TodayReviewCandidateReason,
   TodayReviewCandidateSource,
   TodayReviewCandidateState,
   TodayReviewDirection,
+  TodayReviewExcludedExample,
+  TodayReviewExplainability,
   TodayReviewGrade,
   TodayReviewGroupedCandidates,
+  TodayReviewReasonCategory,
   TodayReviewQuery,
   TodayReviewRepository,
   TodayReviewRunDto,
@@ -43,6 +47,14 @@ interface TrustedLoadResult {
   scanComplete: boolean;
   scanOrdering: string;
   failureReason?: string;
+}
+
+interface StrategyFunnelStats {
+  strategyCandidatesSeen: number;
+  strategyCandidatesEligible: number;
+  strategyCandidatesExcluded: number;
+  outsideTrustedUniverse: number;
+  excludedExamples: TodayReviewExcludedExample[];
 }
 
 export class TodayTradeReviewService {
@@ -95,6 +107,7 @@ export class TodayTradeReviewService {
       const strategyCandidates = candidateSources.map((candidateSource) => this.mapCandidate(candidateSource));
       const candidates = this.rankCandidates(this.mergeCandidates([...liteResult.candidates, ...strategyCandidates]));
       const candidateCounts = this.countCandidates(candidates);
+      sourceSnapshot.explainability = this.buildRunExplainability(startedRun.id, scope, sources.reviewUniverse, liteResult.scanFunnel, candidates, sources.strategyFunnel.excludedExamples);
       const status: TodayReviewRunStatus = warnings.length > 0 || sources.reviewUniverse?.mode === 'NO_REVIEW' || sources.reviewUniverse?.mode === 'LIMITED_REVIEW' || !sources.scanEvidence.scanComplete ? 'PARTIAL' : 'COMPLETED';
       const completed = await this.repository.completeRun({
         runId: startedRun.id,
@@ -376,6 +389,18 @@ export class TodayTradeReviewService {
       const symbol = this.normalizedMembershipKey(decision.symbol);
       return Boolean((id && trustedIds.has(id)) || (symbol && trustedSymbols.has(symbol)));
     });
+    const excludedExamples = all
+      .filter(({ decision }) => !eligible.some((item) => item.decision === decision))
+      .slice(0, 8)
+      .map(({ decision }) => ({
+        instrumentId: decision.instrumentId || 'UNKNOWN',
+        symbol: decision.symbol || 'UNKNOWN',
+        companyName: null,
+        primaryReasonCode: 'OUTSIDE_TRUSTED_UNIVERSE',
+        primaryReasonLabel: 'Strategy Decision candidate is outside the trusted review universe.',
+        reasonCategories: ['OUTSIDE_SCOPE' as TodayReviewReasonCategory],
+        promoted: false as const,
+      }));
     const strategyCandidatesSeen = all.length;
     const strategyCandidatesEligible = eligible.length;
     const strategyCandidatesExcluded = strategyCandidatesSeen - strategyCandidatesEligible;
@@ -387,6 +412,7 @@ export class TodayTradeReviewService {
         strategyCandidatesEligible,
         strategyCandidatesExcluded,
         outsideTrustedUniverse: strategyCandidatesExcluded,
+        excludedExamples,
       },
     };
   }
@@ -517,7 +543,7 @@ export class TodayTradeReviewService {
       trustedLoadStatus: TodayReviewTrustedLoadStatus;
       membershipLoadFailureReason: string | null;
     },
-    strategyFunnel: { strategyCandidatesSeen: number; strategyCandidatesEligible: number; strategyCandidatesExcluded: number; outsideTrustedUniverse: number }
+    strategyFunnel: StrategyFunnelStats
   ): { candidates: TodayReviewCandidateDto[]; scanFunnel: TodayReviewScanFunnel } {
     const scanFunnel: TodayReviewScanFunnel = {
       trustedUniverseCount: scanEvidence.trustedUniverseCount,
@@ -1170,7 +1196,175 @@ export class TodayTradeReviewService {
     return [...candidates]
       .sort((a, b) => statePriority[a.state] - statePriority[b.state] || b.confidenceScore - a.confidenceScore || a.symbol.localeCompare(b.symbol))
       .slice(0, 40)
-      .map((candidate, index) => ({ ...candidate, rank: index + 1 }));
+      .map((candidate, index) => this.withCandidateExplainability({ ...candidate, rank: index + 1 }));
+  }
+
+  private withCandidateExplainability(candidate: TodayReviewCandidateDto): TodayReviewCandidateDto {
+    const blockers = candidate.blockers.map((label) => this.reasonFromText(label, 'BLOCKER', candidate));
+    const watchReasons = candidate.watchReasons.map((label) => this.reasonFromText(label, 'WATCH', candidate));
+    const promotionReasons = candidate.state === 'LONG_REVIEW' || candidate.state === 'SHORT_REVIEW' || candidate.state === 'EXIT_RISK_REVIEW'
+      ? [
+        this.reason('READINESS', 'TRUSTED_REVIEW_READY', 'Trusted review data is available for this candidate.', 'INFO', 'Market Data Foundation', candidate.dataQualitySnapshot as any, '/market-data'),
+        this.reason('STRATEGY_PROOF', 'STRATEGY_PROOF_USABLE', 'Strategy proof is usable for research review.', 'INFO', 'Strategy Framework', candidate.strategyProofSnapshot as any, '/strategy'),
+        this.reason('TRADE_PLAN_PROOF_CHAIN', 'TRADE_PLAN_REVIEW_READY', 'Trade-plan proof-chain snapshot supports paper-review research.', 'INFO', 'Trade Plan Risk Engine', candidate.tradePlanSnapshot as any, `/trade-plans/${candidate.instrumentId}`),
+      ]
+      : [];
+    const sourceSignal = candidate.sourceSignalSnapshot as any;
+    const explainability = {
+      candidateId: candidate.id || `${candidate.runId || 'pending'}:${candidate.instrumentId}:${candidate.strategyCode}`,
+      state: candidate.state,
+      rankingComponents: {
+        strategyProof: this.componentScoreFromCandidate(candidate, 'strategyProof'),
+        tradePlan: this.componentScoreFromCandidate(candidate, 'tradePlan'),
+        marketRegime: this.componentScoreFromCandidate(candidate, 'marketRegime'),
+        sectorAlignment: this.componentScoreFromCandidate(candidate, 'sectorAlignment'),
+        signalCalibration: this.componentScoreFromCandidate(candidate, 'signalCalibration'),
+        dataQuality: this.componentScoreFromCandidate(candidate, 'dataQuality'),
+        smartMoney: this.componentScoreFromCandidate(candidate, 'smartMoney'),
+        hardBlockerOverride: blockers.length > 0,
+      },
+      promotionReasons,
+      watchReasons,
+      blockers,
+      upstreamEvidence: {
+        readiness: candidate.dataQualitySnapshot,
+        signalEvidence: sourceSignal?.rawSignal || sourceSignal?.setup || null,
+        calibrationReadiness: sourceSignal?.calibration || null,
+        strategyProof: candidate.strategyProofSnapshot,
+        tradePlanProofChain: candidate.tradePlanSnapshot,
+      },
+    };
+    return { ...candidate, explainability };
+  }
+
+  private componentScoreFromCandidate(
+    candidate: TodayReviewCandidateDto,
+    component: 'strategyProof' | 'tradePlan' | 'marketRegime' | 'sectorAlignment' | 'signalCalibration' | 'dataQuality' | 'smartMoney' | 'hardBlockerOverride'
+  ) {
+    if (component === 'hardBlockerOverride') return 0;
+    const anyCandidate = candidate as any;
+    const source = anyCandidate.__sourceForExplainability as TodayReviewCandidateSource | undefined;
+    if (source) {
+      if (component === 'strategyProof') return this.proofScore(source);
+      if (component === 'tradePlan') return source.sourceKind === 'EXIT' ? 12 : this.tradePlanScore(source.tradePlan);
+      if (component === 'marketRegime') return this.marketScore(source);
+      if (component === 'sectorAlignment') return this.sectorScore(source);
+      if (component === 'signalCalibration') return this.signalScore(source);
+      if (component === 'dataQuality') return this.dataQualityScore(source);
+      if (component === 'smartMoney') return this.smartMoneyScore(source);
+    }
+    const plan = candidate.tradePlanSnapshot as any;
+    const proof = candidate.strategyProofSnapshot as any;
+    const dataQuality = candidate.dataQualitySnapshot as any;
+    const signal = candidate.sourceSignalSnapshot as any;
+    if (component === 'strategyProof') return proof?.evidenceLabel === 'STRONG' ? 25 : proof?.frameworkBacked ? 22 : proof?.evidenceLabel === 'UNPROVEN' ? 0 : 8;
+    if (component === 'tradePlan') return plan?.planStatus === 'VALID' ? Math.min(20, 10 + Number(plan.rewardRiskRatio || 0) * 4) : 0;
+    if (component === 'marketRegime') return candidate.marketContextSnapshot ? 10 : 0;
+    if (component === 'sectorAlignment') return dataQuality?.sector ? 10 : 5;
+    if (component === 'signalCalibration') return signal?.calibration || signal?.setup ? 5 : 0;
+    if (component === 'dataQuality') return dataQuality?.coverageStatus === 'GOOD' || dataQuality?.dataStatus === 'PRICE_ACTION_READY' ? 15 : dataQuality ? 6 : 0;
+    if (component === 'smartMoney') return signal?.smartMoney ? 5 : 0;
+    return 0;
+  }
+
+  private reasonFromText(label: string, severity: 'WATCH' | 'BLOCKER', candidate: TodayReviewCandidateDto): TodayReviewCandidateReason {
+    const text = label.toLowerCase();
+    if (text.includes('trade-plan') || text.includes('trade plan') || text.includes('reward/risk') || text.includes('stop loss') || text.includes('paper review')) {
+      return this.reason('TRADE_PLAN_PROOF_CHAIN', this.reasonCode(label), label, severity, 'Trade Plan Risk Engine', candidate.tradePlanSnapshot as any, `/trade-plans/${candidate.instrumentId}`);
+    }
+    if (text.includes('market gate')) return this.reason('MARKET_GATE', this.reasonCode(label), label, severity, 'Strategy Decision Engine', candidate.strategyProofSnapshot as any, '/strategy');
+    if (text.includes('strategy') || text.includes('framework') || text.includes('proof')) return this.reason('STRATEGY_PROOF', this.reasonCode(label), label, severity, 'Strategy Framework', candidate.strategyProofSnapshot as any, '/strategy');
+    if (text.includes('signal')) return this.reason('SIGNAL_MATURITY', this.reasonCode(label), label, severity, 'Signal Quality', candidate.sourceSignalSnapshot as any, '/signals/quality');
+    if (text.includes('calibration')) return this.reason('CALIBRATION', this.reasonCode(label), label, severity, 'Signal Calibration Engine', candidate.sourceSignalSnapshot as any, '/signals/calibration');
+    if (text.includes('data') || text.includes('coverage') || text.includes('liquidity') || text.includes('context gaps')) return this.reason('DATA_QUALITY', this.reasonCode(label), label, severity, 'Market Data Foundation', candidate.dataQualitySnapshot as any, '/market-data');
+    return this.reason('STRATEGY_DECISION', this.reasonCode(label), label, severity, 'Strategy Decision Engine', candidate.strategyProofSnapshot as any, '/strategy');
+  }
+
+  private reason(category: TodayReviewReasonCategory, code: string, label: string, severity: 'INFO' | 'WATCH' | 'BLOCKER', sourceModule: string, evidence?: Record<string, any> | null, targetRoute?: string): TodayReviewCandidateReason {
+    return {
+      category,
+      code,
+      label,
+      severity,
+      sourceModule,
+      evidenceDate: evidence?.generatedAt || evidence?.lastEvaluatedAt || evidence?.latestPriceDate || null,
+      targetRoute,
+    };
+  }
+
+  private reasonCode(label: string) {
+    const code = label.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 64);
+    return code || 'TODAY_REVIEW_REASON';
+  }
+
+  private buildRunExplainability(
+    runId: string,
+    scope: { region: string; assetType: string },
+    reviewUniverse: TrustedReviewUniverseHealth | null,
+    scanFunnel: TodayReviewScanFunnel,
+    candidates: TodayReviewCandidateDto[],
+    excludedExamples: TodayReviewExcludedExample[]
+  ): TodayReviewExplainability {
+    const summaries = new Map<string, { category: TodayReviewReasonCategory; code: string; label: string; count: number; blocking: boolean; sourceModule: string; targetRoute?: string }>();
+    const add = (category: TodayReviewReasonCategory, code: string, label: string, count: number, blocking: boolean, sourceModule: string, targetRoute?: string) => {
+      if (count <= 0) return;
+      const key = `${category}:${code}`;
+      const current = summaries.get(key);
+      summaries.set(key, current ? { ...current, count: current.count + count } : { category, code, label, count, blocking, sourceModule, targetRoute });
+    };
+    add('READINESS', 'NO_REVIEW_UNIVERSE', 'Trusted review universe is not ready for Today Review.', reviewUniverse?.mode === 'NO_REVIEW' ? Math.max(1, scanFunnel.trustedUniverseCount) : 0, true, 'Market Data Foundation', '/market-data');
+    add('OUTSIDE_SCOPE', 'OUTSIDE_TRUSTED_UNIVERSE', 'Strategy candidates were outside the trusted review universe.', scanFunnel.outsideTrustedUniverse, true, 'Market Data Foundation', '/market-data');
+    add('NO_SETUP', 'NO_PRICE_ACTION_SETUP', 'Trusted instruments had no Today Review setup.', scanFunnel.noSetup, false, 'Today Review', '/today-review');
+    add('STRATEGY_PROOF', 'UNPROVEN_EVIDENCE', 'Strategy or lite historical evidence is unproven.', scanFunnel.unproven, false, 'Strategy Framework', '/strategy');
+    add('TRADE_PLAN_PROOF_CHAIN', 'HARD_BLOCKER', 'Trade-plan or review geometry produced a hard blocker.', scanFunnel.blocked, true, 'Trade Plan Risk Engine', '/trade-plans');
+    add('DATA_QUALITY', 'INSUFFICIENT_DATA', 'Required data quality evidence is missing or insufficient.', candidates.filter((candidate) => candidate.state === 'INSUFFICIENT_DATA').length, true, 'Market Data Foundation', '/market-data');
+    for (const candidate of candidates) {
+      for (const reason of [...(candidate.explainability?.blockers || []), ...(candidate.explainability?.watchReasons || [])]) {
+        if (reason.category === 'SIGNAL_MATURITY' || reason.category === 'CALIBRATION') {
+          add(reason.category, reason.code, reason.label, 1, reason.severity === 'BLOCKER', reason.sourceModule, reason.targetRoute);
+        }
+      }
+    }
+    for (const [key, count] of Object.entries(reviewUniverse?.excludedCounts || {})) {
+      const category = key.toLowerCase().includes('provider') ? 'OUTSIDE_SCOPE' : 'DATA_QUALITY';
+      add(category, this.reasonCode(key), this.exclusionLabel(key), Number(count), true, 'Market Data Foundation', '/market-data');
+    }
+    const watchCount = candidates.filter((candidate) => candidate.state === 'WATCH_ONLY').length;
+    const promotedCount = candidates.filter((candidate) => ['LONG_REVIEW', 'SHORT_REVIEW', 'EXIT_RISK_REVIEW'].includes(candidate.state)).length;
+    const examples = [
+      ...excludedExamples,
+      ...candidates
+        .filter((candidate) => ['BLOCKED', 'AVOID', 'INSUFFICIENT_DATA', 'UNPROVEN'].includes(candidate.state))
+        .slice(0, Math.max(0, 8 - excludedExamples.length))
+        .map((candidate) => ({
+          instrumentId: candidate.instrumentId,
+          symbol: candidate.symbol,
+          companyName: candidate.companyName,
+          primaryReasonCode: candidate.state,
+          primaryReasonLabel: candidate.reasonSummary,
+          reasonCategories: candidate.explainability?.blockers[0]?.category ? [candidate.explainability.blockers[0].category] : candidate.explainability?.watchReasons[0]?.category ? [candidate.explainability.watchReasons[0].category] : ['STRATEGY_DECISION' as TodayReviewReasonCategory],
+          promoted: false as const,
+        })),
+    ].slice(0, 8);
+    return {
+      runId,
+      scope,
+      reviewMode: reviewUniverse?.mode || 'NO_REVIEW',
+      trustedUniverseCount: scanFunnel.trustedUniverseCount,
+      scannedCount: scanFunnel.trustedInstrumentsScanned,
+      promotedCount,
+      watchCount,
+      blockedCount: candidates.filter((candidate) => candidate.state === 'BLOCKED' || candidate.state === 'AVOID').length,
+      unprovenCount: candidates.filter((candidate) => candidate.state === 'UNPROVEN').length + scanFunnel.unproven,
+      insufficientDataCount: candidates.filter((candidate) => candidate.state === 'INSUFFICIENT_DATA').length,
+      excludedCount: scanFunnel.outsideTrustedUniverse + scanFunnel.noSetup + candidates.filter((candidate) => ['BLOCKED', 'AVOID', 'INSUFFICIENT_DATA', 'UNPROVEN'].includes(candidate.state)).length,
+      exclusionSummaries: [...summaries.values()].sort((a, b) => b.count - a.count || a.code.localeCompare(b.code)),
+      inspectableExcludedExamples: examples,
+    };
+  }
+
+  private exclusionLabel(key: string) {
+    return key.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase()).trim();
   }
 
   private countCandidates(candidates: TodayReviewCandidateDto[]) {

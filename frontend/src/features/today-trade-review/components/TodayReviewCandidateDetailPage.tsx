@@ -56,6 +56,7 @@ export function TodayReviewCandidateDetailPage() {
   const market = candidate.marketContextSnapshot as any;
   const dataQuality = candidate.dataQualitySnapshot as any;
   const signals = candidate.sourceSignalSnapshot as any;
+  const explainability = candidate.explainability;
 
   return (
     <Stack spacing={3}>
@@ -93,6 +94,26 @@ export function TodayReviewCandidateDetailPage() {
         <Alert severity={candidate.blockers.length > 0 ? 'error' : 'warning'}>
           {[...candidate.blockers, ...candidate.watchReasons].join(' ')}
         </Alert>
+      )}
+
+      {explainability && (
+        <Grid container spacing={2}>
+          <Panel title="Ranking components">
+            <FactStack items={[
+              ['Strategy proof', formatNumber(explainability.rankingComponents.strategyProof)],
+              ['Trade plan', formatNumber(explainability.rankingComponents.tradePlan)],
+              ['Market regime', formatNumber(explainability.rankingComponents.marketRegime)],
+              ['Sector alignment', formatNumber(explainability.rankingComponents.sectorAlignment)],
+              ['Signal calibration', formatNumber(explainability.rankingComponents.signalCalibration)],
+              ['Data quality', formatNumber(explainability.rankingComponents.dataQuality)],
+              ['Smart money', formatNumber(explainability.rankingComponents.smartMoney)],
+              ['Hard blocker override', explainability.rankingComponents.hardBlockerOverride ? 'Yes' : 'No'],
+            ]} />
+          </Panel>
+          <Panel title="Reason categories">
+            <ReasonList reasons={[...explainability.blockers, ...explainability.watchReasons, ...explainability.promotionReasons]} />
+          </Panel>
+        </Grid>
       )}
 
       <Grid container spacing={2}>
@@ -135,11 +156,14 @@ export function TodayReviewCandidateDetailPage() {
         </Panel>
       </Grid>
 
-      <Panel title="Supporting evidence">
+        <Panel title="Supporting evidence">
         <FactStack items={[
           ['Raw signal support', signals?.rawSignal?.direction || 'Unavailable'],
           ['Calibration support', signals?.calibration?.calibratedDirection || 'Unavailable'],
           ['Smart-money support', signals?.smartMoney?.status || 'Unavailable'],
+          ['Readiness evidence', explainability?.upstreamEvidence?.readiness ? 'Available' : 'Unavailable'],
+          ['Strategy proof evidence', explainability?.upstreamEvidence?.strategyProof ? 'Available' : 'Unavailable'],
+          ['Trade-plan proof-chain', explainability?.upstreamEvidence?.tradePlanProofChain ? 'Available' : 'Unavailable'],
         ]} />
       </Panel>
 
@@ -187,6 +211,23 @@ function FactStack({ items }: { items: Array<[string, string]> }) {
       {items.map(([label, value]) => (
         <ListItem key={label} disableGutters>
           <ListItemText primary={label} secondary={value} secondaryTypographyProps={{ sx: { overflowWrap: 'anywhere' } }} />
+        </ListItem>
+      ))}
+    </List>
+  );
+}
+
+function ReasonList({ reasons }: { reasons: Array<{ code: string; label: string; category: string; severity: string; sourceModule: string; evidenceDate?: string | null }> }) {
+  if (reasons.length === 0) return <Typography color="text.secondary">No candidate reasons were stored for this panel.</Typography>;
+  return (
+    <List dense disablePadding>
+      {reasons.map((reason) => (
+        <ListItem key={`${reason.severity}:${reason.code}`} disableGutters>
+          <ListItemText
+            primary={`${reason.category} / ${reason.severity}`}
+            secondary={`${reason.label} Source: ${reason.sourceModule}${reason.evidenceDate ? `; Evidence: ${formatDateTime(reason.evidenceDate)}` : ''}`}
+            secondaryTypographyProps={{ sx: { overflowWrap: 'anywhere' } }}
+          />
         </ListItem>
       ))}
     </List>
