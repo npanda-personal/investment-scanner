@@ -1,10 +1,10 @@
-# MD-A5 15-Year History And Free-Source Fallback Architecture Contract
+﻿# MD-A5 15-Year History And Free-Source Fallback Architecture Contract
 
-Date: 2026-05-13  
-Mode: Architecture Planning Mode  
-Owner: MD-A5 Solution Architect Agent  
-Lane/module: Lane 1, `market-data-foundation`  
-Work item: MD-A5 - 15-Year History And Free-Source Fallback  
+Date: 2026-05-13
+Mode: Architecture Planning Mode
+Owner: MD-A5 Solution Architect Agent
+Lane/module: Lane 1, `market-data-foundation`
+Work item: MD-A5 - 15-Year History And Free-Source Fallback
 Owned artifact: `docs/codex-agent-team-plan/architecture-contracts/2026-05-13-md-a5-15-year-history-and-free-source-fallback-contract.md`
 
 ## 1. Architecture Verdict And Root Cause
@@ -373,7 +373,7 @@ No-progress detection:
 
 Packet MD-A5-BE-1: Required history-window computation and coverage diagnostics.
 
-Owner: backend market-data price coverage developer.  
+Owner: backend market-data price coverage developer.
 Write scope:
 
 - `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`
@@ -397,7 +397,7 @@ Forbidden:
 
 Packet MD-A5-BE-2: Official exchange EOD source adapters and local cache.
 
-Owner: backend source-adapter developer after MD-A5-BE-1 field names stabilize.  
+Owner: backend source-adapter developer after MD-A5-BE-1 field names stabilize.
 Write scope:
 
 - New source adapter/cache files under `backend/src/modules/market-data-foundation/`
@@ -423,7 +423,7 @@ Forbidden:
 
 Packet MD-A5-BE-3: Repair-run integration and no-progress/provenance persistence.
 
-Owner: backend repair-run developer after BE-1/BE-2.  
+Owner: backend repair-run developer after BE-1/BE-2.
 Write scope:
 
 - `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`
@@ -438,7 +438,7 @@ Expected output:
 
 Packet MD-A5-FE-1: Market Data UI evidence for full-window coverage and fallback.
 
-Owner: frontend market-data owner after backend fields stabilize.  
+Owner: frontend market-data owner after backend fields stabilize.
 Write scope:
 
 - `frontend/src/features/market-data-foundation/types.ts`
@@ -462,7 +462,7 @@ Forbidden:
 
 Packet MD-A5-QA-1: Validation evidence.
 
-Owner: QA/Orchestrator assigned agent after implementation.  
+Owner: QA/Orchestrator assigned agent after implementation.
 Write scope:
 
 - Assigned QA evidence document under `docs/codex-agent-team-plan/qa-evidence/`

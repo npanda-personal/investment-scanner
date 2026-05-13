@@ -1,8 +1,8 @@
-# MD-A4 GitHub Check-In - Provider Validation Drain And Retry Classification
+﻿# MD-A4 GitHub Check-In - Provider Validation Drain And Retry Classification
 
-Date: 2026-05-13  
-Mode: `GitHub Check-In`  
-Owner: Senior Fullstack Lead / Orchestrator  
+Date: 2026-05-13
+Mode: `GitHub Check-In`
+Owner: Senior Fullstack Lead / Orchestrator
 Work item: MD-A4 - Provider Validation Drain And Retry Classification
 
 ## Check-In Result

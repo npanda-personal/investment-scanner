@@ -1,9 +1,9 @@
-# MD-A5 15-Year History And Free-Source Fallback QA Plan - 2026-05-13
+﻿# MD-A5 15-Year History And Free-Source Fallback QA Plan - 2026-05-13
 
-Mode: `QA Planning Mode`  
-Owner: MD-A5 QA Planner  
-Work item: MD-A5 - 15-Year History And Free-Source Fallback  
-Lane/module: Lane 1, `market-data-foundation`  
+Mode: `QA Planning Mode`
+Owner: MD-A5 QA Planner
+Work item: MD-A5 - 15-Year History And Free-Source Fallback
+Lane/module: Lane 1, `market-data-foundation`
 Write scope for this QA pass: this file only.
 
 ## Sources Read
