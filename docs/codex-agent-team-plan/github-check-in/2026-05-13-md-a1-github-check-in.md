@@ -77,6 +77,6 @@ Rollback:
 
 - Branch: `dev`
 - Remote: `origin`
-- Commit SHA: pending until commit
-- Push status: pending until push
+- Commit SHA: `1a1690a`
+- Push status: pushed to `origin/dev`
 - CI status/link: not available locally
