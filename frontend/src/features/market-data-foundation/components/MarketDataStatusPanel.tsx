@@ -265,6 +265,7 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
       offset: boundedRequest?.offset ?? (action === 'CATALOG_IDENTITY_REPAIR' ? catalogIdentityOffset : action === 'MANUAL_METADATA_IMPORT' ? manualMetadataOffset : 0),
       providerValidationQueue: boundedRequest?.queueMode === 'RETRY_FAILED' || action === 'RETRY_FAILED_PROVIDERS' ? 'RETRY_FAILED' as const : 'UNKNOWN_FIRST' as const,
       force: action === 'VALIDATE_PROVIDERS' || action === 'RETRY_FAILED_PROVIDERS' || action === 'PROVIDER_BUSINESS_METADATA_REPAIR' ? false : true,
+      workerConcurrency: action === 'PROVIDER_BUSINESS_METADATA_REPAIR' ? 4 : undefined,
     };
     const catalogIdentityRequest = {
       ...request,
@@ -308,6 +309,7 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
         assetType,
         batchSize: REPAIR_BATCH_SIZE,
         maxBatchesPerAction: drain ? 50 : 20,
+        workerConcurrency: 4,
         dryRun,
         mode: drain ? 'DRAIN_UNTIL_BLOCKED' : undefined,
         actions: drain ? undefined : [

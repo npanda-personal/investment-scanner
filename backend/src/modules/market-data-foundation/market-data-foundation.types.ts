@@ -808,6 +808,7 @@ export interface MarketDataRepairRequest {
   force?: boolean;
   fullReload?: boolean;
   policy?: 'AUTO_DEEP_FOR_SHALLOW' | 'FORCE_DEEP';
+  workerConcurrency?: number;
   csvText?: string;
   catalogSource?: CatalogSource | string;
   importMode?: 'MANUAL_CSV' | 'CONFIGURED_URL';
@@ -993,6 +994,7 @@ export interface MarketDataRepairSummary {
   processedCount: number;
   totalCount: number;
   batchSize: number;
+  workerConcurrency?: number;
   offset: number;
   nextOffset: number | null;
   hasMore: boolean;

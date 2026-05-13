@@ -2355,6 +2355,74 @@ describe('MarketDataFoundationService syncV1', () => {
     expect(provider.fetchCompanyMasterData).toHaveBeenCalledTimes(2);
   });
 
+  it('repairs provider business metadata with bounded parallel workers', async () => {
+    let activeCalls = 0;
+    let maxActiveCalls = 0;
+    const stocks = Array.from({ length: 4 }, (_unused, index) => ({
+      id: `stock-${index}`,
+      symbol: `FAST${index}.NS`,
+      providerSymbol: `FAST${index}.NS`,
+      name: `Fast ${index}`,
+      region: 'IN',
+      exchange: 'NSE',
+      country: 'India',
+      currency: 'INR',
+      sector: null,
+      industry: null,
+      marketCap: null,
+      assetType: 'STOCK',
+      isActive: true,
+      isDelisted: false,
+    }));
+    const repository = {
+      listStocksForBusinessMetadataRepair: jest.fn().mockResolvedValue({ total: stocks.length, stocks }),
+      countStocksForBusinessMetadataRepair: jest.fn().mockResolvedValue(0),
+      countBusinessMetadataRepairStates: jest.fn().mockResolvedValue(0),
+      recordRepairAttempt: jest.fn().mockImplementation(async () => ({ id: `attempt-${repository.recordRepairAttempt.mock.calls.length}` })),
+      upsertRepairState: jest.fn().mockResolvedValue({}),
+      updateCompanyMasterData: jest.fn().mockResolvedValue({}),
+    };
+    const provider = {
+      fetchCompanyMasterData: jest.fn(async () => {
+        activeCalls += 1;
+        maxActiveCalls = Math.max(maxActiveCalls, activeCalls);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        activeCalls -= 1;
+        return {
+          sector: 'Industrials',
+          industry: 'Electrical Equipment',
+          marketCap: 1000,
+          dataStatus: 'PARTIAL',
+        };
+      }),
+    };
+    const service = new MarketDataFoundationService(repository as any, provider as any);
+
+    const result = await service.repairProviderBusinessMetadata({
+      region: 'IN',
+      assetType: 'STOCK',
+      batchSize: 4,
+      workerConcurrency: 3,
+    });
+
+    expect(result.workerConcurrency).toBe(3);
+    expect(maxActiveCalls).toBeGreaterThan(1);
+    expect(maxActiveCalls).toBeLessThanOrEqual(3);
+    expect(provider.fetchCompanyMasterData).toHaveBeenCalledTimes(4);
+    expect(repository.updateCompanyMasterData).toHaveBeenCalledTimes(4);
+    expect(result).toMatchObject({
+      processedCount: 4,
+      updated: 4,
+      failed: 0,
+      providerBusinessMetadataRepaired: 4,
+      fieldsFilled: {
+        sector: 4,
+        industry: 4,
+        marketCap: 4,
+      },
+    });
+  });
+
   it('provider business metadata no-op is not success and is marked manual-required', async () => {
     const repository = {
       listStocksForBusinessMetadataRepair: jest.fn().mockResolvedValue({
@@ -4179,6 +4247,53 @@ describe('MarketDataFoundationService operational repair run', () => {
     expect(repository.updateRepairRun).toHaveBeenCalledWith('run-1', expect.objectContaining({
       status: 'PARTIAL',
       afterHealthJson: expect.objectContaining({ counts: expect.objectContaining({ providerSupported: 2 }) }),
+    }));
+  });
+
+  it('passes worker concurrency through operational provider business metadata repair runs', async () => {
+    const repository = {
+      createRepairRun: jest.fn().mockResolvedValue({ id: 'run-provider-metadata' }),
+      updateRepairRun: jest.fn().mockResolvedValue({}),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+    (service as any).repairRunSourceFingerprints = jest.fn().mockResolvedValue({});
+    jest.spyOn(service, 'universeHealth')
+      .mockResolvedValueOnce(health())
+      .mockResolvedValueOnce(health({ counts: { providerSupported: 1, reviewReady: 1 } }));
+    jest.spyOn(service, 'repairPlan')
+      .mockResolvedValueOnce(plan({
+        providerValidationNeeded: 0,
+        catalogIdentityRepairNeeded: 0,
+        businessMetadataAutoRepairable: 1,
+        priceBackfillNeeded: 0,
+        manualBusinessMetadataRequired: 0,
+      }))
+      .mockResolvedValueOnce(plan({
+        providerValidationNeeded: 0,
+        catalogIdentityRepairNeeded: 0,
+        businessMetadataAutoRepairable: 0,
+        priceBackfillNeeded: 0,
+        manualBusinessMetadataRequired: 0,
+      }));
+    const repairSpy = jest.spyOn(service, 'repairProviderBusinessMetadata').mockResolvedValue(summary({
+      processedCount: 1,
+      updated: 1,
+      providerBusinessMetadataRepaired: 1,
+    }));
+
+    await service.repairRun({
+      region: 'IN',
+      assetType: 'STOCK',
+      actions: ['PROVIDER_BUSINESS_METADATA_REPAIR'],
+      batchSize: 50,
+      workerConcurrency: 5,
+    });
+
+    expect(repairSpy).toHaveBeenCalledWith(expect.objectContaining({
+      region: 'IN',
+      assetType: 'STOCK',
+      batchSize: 50,
+      workerConcurrency: 5,
     }));
   });
 

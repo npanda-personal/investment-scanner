@@ -1974,6 +1974,7 @@ export class MarketDataFoundationService {
     const started = Date.now();
     const scope = this.repairScope(request);
     const batch = this.mutatingRepairBatch(request);
+    const workerConcurrency = this.providerBusinessMetadataRepairConcurrency(request);
     const repositoryAny = this.repository as any;
     const { stocks, total } = await repositoryAny.listStocksForBusinessMetadataRepair({
       ...scope,
@@ -1982,6 +1983,7 @@ export class MarketDataFoundationService {
       includeRetryable: Boolean(request.force),
     });
     const summary = this.emptyRepairSummary(scope, batch, total, true);
+    summary.workerConcurrency = workerConcurrency;
     summary.fieldsFilled = {};
     summary.fieldProvenance = [];
     if (!request.force && typeof repositoryAny.countBusinessMetadataRepairStates === 'function') {
@@ -1996,9 +1998,11 @@ export class MarketDataFoundationService {
     }
     summary.remainingManualRequired = summary.skippedRecentAttempt;
 
-    for (const stock of stocks) {
+    await this.eachWithConcurrency(stocks as any[], workerConcurrency, async (stock: any) => {
       summary.processedCount += 1;
       const providerSymbol = stock.providerSymbol || stock.symbol;
+      const fieldsFilledSummary = summary.fieldsFilled as Record<string, number>;
+      const fieldProvenance = summary.fieldProvenance as NonNullable<MarketDataRepairSummary['fieldProvenance']>;
       try {
         const missingBefore = this.missingBusinessMetadataFields(stock);
         const providerData = await this.marketDataProvider.fetchCompanyMasterData(providerSymbol);
@@ -2009,7 +2013,7 @@ export class MarketDataFoundationService {
           summary.manualRequired = (summary.manualRequired || 0) + 1;
           summary.warnings.push(`${stock.symbol}: provider returned no usable business metadata; manual metadata is required for ${missingBefore.join(', ')}.`);
           await this.recordProviderBusinessRepairAttempt(stock, scope, 'NO_PROVIDER_DATA', {}, 'Provider returned no usable sector, industry, or market cap.', 'Provider business metadata was unavailable.');
-          continue;
+          return;
         }
 
         const update = this.providerBusinessMetadataUpdate(stock, providerData);
@@ -2021,7 +2025,7 @@ export class MarketDataFoundationService {
           summary.manualRequired = (summary.manualRequired || 0) + 1;
           summary.warnings.push(`${stock.symbol}: provider metadata did not fill any missing business fields; manual metadata is required for ${missingBefore.join(', ')}.`);
           await this.recordProviderBusinessRepairAttempt(stock, scope, 'NO_FIELDS_FILLED', {}, 'Provider data did not improve missing business metadata.', 'Provider business metadata did not fill required fields.');
-          continue;
+          return;
         }
 
         await this.repository.updateCompanyMasterData(stock.id, update);
@@ -2037,10 +2041,10 @@ export class MarketDataFoundationService {
         }
         const fieldsFilled: Record<string, number> = {};
         for (const field of filledFields) {
-          summary.fieldsFilled[field] = (summary.fieldsFilled[field] || 0) + 1;
+          fieldsFilledSummary[field] = (fieldsFilledSummary[field] || 0) + 1;
           fieldsFilled[field] = 1;
         }
-        summary.fieldProvenance.push({
+        fieldProvenance.push({
           instrumentId: stock.id,
           symbol: stock.symbol,
           sectorSource: filledFields.includes('sector') ? 'yahoo' : stock.sector ? 'existing_db' : null,
@@ -2063,7 +2067,7 @@ export class MarketDataFoundationService {
         summary.warnings.push(`${stock.symbol}: ${message}`);
         await this.recordProviderBusinessRepairAttempt(stock, scope, 'FAILED', {}, message);
       }
-    }
+    });
 
     if (typeof repositoryAny.countStocksForBusinessMetadataRepair === 'function') {
       summary.remainingAutoRepairable = await repositoryAny.countStocksForBusinessMetadataRepair({
@@ -6026,6 +6030,7 @@ export class MarketDataFoundationService {
     if (action === 'PROVIDER_BUSINESS_METADATA_REPAIR') {
       return this.repairProviderBusinessMetadata({
         ...base,
+        workerConcurrency: request.workerConcurrency,
         force: Boolean(request.force),
       });
     }
@@ -6230,6 +6235,10 @@ export class MarketDataFoundationService {
       batchSize: Math.min(Math.max(Number(request.batchSize ?? request.limit) || 50, 1), 100),
       offset: 0,
     };
+  }
+
+  private providerBusinessMetadataRepairConcurrency(request: Pick<MarketDataRepairRequest, 'workerConcurrency'>) {
+    return Math.max(1, Math.min(Number(request.workerConcurrency) || this.readPositiveNumber(process.env.MARKET_DATA_PROVIDER_METADATA_REPAIR_CONCURRENCY, 4), 6));
   }
 
   private stableSourceRepairBatch(request: Pick<MarketDataRepairRequest, 'batchSize' | 'limit' | 'offset'>) {

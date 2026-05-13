@@ -949,6 +949,7 @@ test.describe('Market Data Foundation UI', () => {
       assetType: 'STOCK',
       batchSize: 50,
       maxBatchesPerAction: 20,
+      workerConcurrency: 4,
       dryRun: true,
       actions: [
         'VALIDATE_PROVIDERS',
@@ -963,6 +964,7 @@ test.describe('Market Data Foundation UI', () => {
     await expect.poll(() => repairRunPayloads[1]).toMatchObject({
       region: 'IN',
       assetType: 'STOCK',
+      workerConcurrency: 4,
       dryRun: false,
     });
     await expect(page.getByText(/Repair run PARTIAL/)).toBeVisible();
@@ -980,6 +982,7 @@ test.describe('Market Data Foundation UI', () => {
     await expect.poll(() => repairRunPayloads[2]).toMatchObject({
       region: 'IN',
       assetType: 'STOCK',
+      workerConcurrency: 4,
       dryRun: false,
       mode: 'DRAIN_UNTIL_BLOCKED',
     });
@@ -1073,6 +1076,7 @@ test.describe('Market Data Foundation UI', () => {
       batchSize: 50,
       offset: 0,
       force: false,
+      workerConcurrency: 4,
     });
     await expect(page.getByText(/updated 50, skipped 0, failed 0, no-op 0, manual required 50/)).toBeVisible();
     await expect(page.getByText(/Partial metadata repairs: 50/)).toBeVisible();

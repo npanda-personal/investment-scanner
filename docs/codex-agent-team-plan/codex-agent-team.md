@@ -47,6 +47,20 @@ For Codex runs, this means:
 
 Deep-thinking mode applies even when implementation agents are working in parallel. Fast lane implementation must not outrun Product Owner domain decisions or Architect contract decisions.
 
+## Model Selection Policy
+
+Use the smallest model and reasoning effort that can safely complete the assigned role without weakening product, architecture, or verification quality. Do not default every agent to the highest-cost model.
+
+Default assignment:
+
+- Product Owner and Solution Architect: use the strongest available model with high or highest reasoning for domain, quant, roadmap, architecture, shared-contract, schema, data-provider, or signoff decisions.
+- Senior Fullstack Lead / Orchestrator: use the strongest model for integration decisions, conflict resolution, release gates, and risky cross-module changes; use a smaller coding model for routine board updates, status sweeps, and mechanical docs edits.
+- Module developers: use a coding-optimized model for implementation and focused debugging; use a smaller/fast coding model for bounded tests, simple UI copy, small docs, or one-file mechanical changes.
+- QA agents: use a smaller/fast model for checklist creation, static evidence review, and test-result summarization; use a stronger model only for complex cross-module risk analysis or ambiguous acceptance decisions.
+- Flow Monitor / Deputy Orchestrator: use a smaller/fast model by default because it audits occupancy, blockers, and process drift rather than making product or architecture decisions.
+
+If a task escalates from simple execution to product/architecture judgment, the Orchestrator must either switch to a stronger model for the next agent assignment or route the decision to the Product Owner or Solution Architect lane.
+
 ## Agent Operating Modes
 
 Agent operating modes describe what a Codex agent is allowed to do for a work item at a specific stage. These are project workflow modes, not the platform-level chat collaboration mode.
@@ -85,6 +99,7 @@ QA scaling rules:
 - Assign one QA worker to one work item at a time.
 - Each QA worker must own a separate evidence file or active-board evidence row to avoid write conflicts.
 - QA workers may run tests in parallel only when the commands do not compete for the same browser state, ports, database mutation, generated output, or Playwright worker state. Use one worker for Playwright unless the suite is explicitly isolated.
+- Playwright is an Orchestrator-owned serialized resource by default. Only one Playwright invocation may run at a time unless the Orchestrator records that the suites use isolated users, storage state, ports, databases, and artifact directories.
 - QA workers must not edit production source unless a work packet explicitly assigns test-code changes.
 - A QA rejection must name the failed criterion, missing evidence, exact observed behavior, and recommended revision owner type; the Orchestrator assigns the revision to an available qualified developer.
 - Final QA signoff for an item must be traceable to one QA owner, even if another QA worker supplied supporting evidence.
@@ -146,6 +161,7 @@ No role should become idle only because another role is waiting on a gate, envir
 - Product Owner works ahead on the next priority batch unless an active product/domain clarification is needed.
 - Architect works ahead on pre-architecture, contract risk, dependency analysis, or signoff reviews that do not authorize premature implementation.
 - Developers who completed a valid QA handoff may take a new Orchestrator-assigned task, revision, or discovery item with non-conflicting write scope.
+- If QA reports two unrelated bugs with non-overlapping write scopes, the Orchestrator assigns them to two different available developers in parallel. If the bugs share files, module state, or test fixtures, the Orchestrator serializes them or assigns one owner.
 - QA agents produce evidence or explicit blockers; they are closed or reassigned after handoff so they do not occupy capacity while waiting for runtime evidence owned by the central lane.
 - The Orchestrator performs occupancy sweeps and refills free capacity from active revisions, eligible implementation, discovery, QA support, Product planning, and Architecture planning in that order.
 

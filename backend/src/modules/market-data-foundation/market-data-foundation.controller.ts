@@ -457,6 +457,7 @@ export class MarketDataFoundationController {
         assetType,
         batchSize: this.numberParam(req, 'batchSize') ?? this.numberParam(req, 'limit'),
         maxBatchesPerAction: this.numberParam(req, 'maxBatchesPerAction'),
+        workerConcurrency: this.numberParam(req, 'workerConcurrency'),
         actions: this.parseRepairRunActions(req.body?.actions),
         dryRun: this.parseOptionalBoolean(req.query.dryRun ?? req.body?.dryRun),
         mode: req.body?.mode === 'DRAIN_UNTIL_BLOCKED' || req.query.mode === 'DRAIN_UNTIL_BLOCKED' ? 'DRAIN_UNTIL_BLOCKED' : undefined,
@@ -552,6 +553,7 @@ export class MarketDataFoundationController {
         assetType,
         batchSize: this.numberParam(req, 'batchSize') ?? this.numberParam(req, 'limit'),
         offset: this.numberParam(req, 'offset'),
+        workerConcurrency: this.numberParam(req, 'workerConcurrency'),
         force: this.parseOptionalBoolean(req.query.force ?? req.body?.force),
       }));
     } catch (error) {

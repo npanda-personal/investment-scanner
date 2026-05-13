@@ -467,6 +467,7 @@ export interface MarketDataRepairRequest {
   batchSize?: number;
   offset?: number;
   maxBatchesPerAction?: number;
+  workerConcurrency?: number;
   includeRetryFailed?: boolean;
   providerValidationQueue?: 'UNKNOWN_FIRST' | 'RETRY_FAILED';
   force?: boolean;
@@ -599,6 +600,7 @@ export interface MarketDataRepairSummary {
   processedCount: number;
   totalCount: number;
   batchSize: number;
+  workerConcurrency?: number;
   offset: number;
   nextOffset: number | null;
   hasMore: boolean;

@@ -29,6 +29,15 @@ Product Owner and Solution Architect decisions must always be made in deep-think
 - For Codex agents, use high or highest available reasoning effort for these two roles when supported.
 - Deep-thinking outputs should state assumptions, options considered, tradeoffs, risks, and the final decision. They should not publish private scratchwork.
 
+## Model Selection
+
+The Orchestrator should choose agent models deliberately instead of using the highest-cost model for every role.
+
+- Use the strongest available model for Product Owner, Solution Architect, risky integration, release-gate decisions, and ambiguous cross-module defects.
+- Use coding-optimized models for implementation, debugging, tests, and module-level refactors.
+- Use smaller or fast models for QA checklist drafting, static evidence review, flow monitoring, status sweeps, board updates, and mechanical documentation edits.
+- If a smaller-model assignment discovers a product or architecture decision, route that decision to the Product Owner or Solution Architect instead of letting the smaller model decide.
+
 ## Agent Operating Modes
 
 For Codex-agent execution, use the operating modes defined in `docs/codex-agent-team-plan/codex-agent-team.md`.
@@ -111,6 +120,7 @@ QA should scale with the verification backlog. The Orchestrator may add QA worke
 - Assign one QA worker to one work item at a time.
 - Give each QA worker a separate evidence file, issue section, or active-board evidence row.
 - Do not run competing Playwright/browser/database-mutating checks in parallel unless the tests are isolated.
+- Treat Playwright as one serialized Orchestrator-owned runtime slot unless isolated users, storage state, ports, databases, and artifact directories are explicitly recorded.
 - Keep final QA signoff traceable to one QA owner per work item.
 - QA workers may reject incomplete developer handoffs under the pre-QA validation gate and must provide clear missing evidence or failed acceptance criteria.
 - QA planning or review workers must report `complete`, `blocked`, or `needs reassignment` at the end of every assignment. A completed QA planner must not remain in an awaiting-instruction state; the Orchestrator either gives a new explicit post-start assignment or closes the worker.
@@ -158,6 +168,7 @@ The Orchestrator is accountable for team flow. The user should not need to repea
 - If an agent is idle, waiting, or silent after a reasonable work interval, send a status prompt requiring one of three responses: structured handoff, continued unblocked work, or blocker report.
 - If the agent still waits after one prompt, interrupt once with a direct action request; if it still does not produce, close/reassign and update the active board.
 - If a spawned agent cannot work because of thread limits, missing context, or unclear ownership, close or reassign quickly and record the corrected owner on the active board.
+- When QA reports unrelated bugs with non-overlapping write scopes, split them across different available developers in parallel. When bugs share files, fixtures, or module state, serialize the work or assign one owner.
 - When one gate is blocked, immediately find safe parallel work for the other roles instead of letting the full team wait.
 - Keep `active-work-board.md` aligned with reality before assigning new work: owner, state, mode, blocker, next action, reserved files, and evidence links must match actual agent status.
 - Convert repeated user corrections into operating-model updates during the same session when they reveal a real process gap.

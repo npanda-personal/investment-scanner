@@ -6,6 +6,12 @@ This track is the active priority before Cycle 3 feature backlog work. The goal 
 
 Cycle 3 backlog is parked until this track reaches Product Owner acceptance or the Product Owner explicitly releases it.
 
+Market Data is the active release blocker. After Market Data Foundation reaches PO acceptance, QA must run the Data Quality Engine validation gate before downstream Signals, Decisions, Backtests, Today Review, Research, or Trade Plan work reopens. The Data Quality Engine gate proves the repaired OHLCV and metadata are usable for downstream scoring instead of merely present in storage.
+
+Current accepted remediation:
+
+- Provider business metadata repair parallelism evidence: [QA](../qa-evidence/2026-05-13-market-data-provider-metadata-parallelism-qa-evidence.md), [Lead validation](../lead-validation/2026-05-13-market-data-provider-metadata-parallelism-lead-validation.md), [Architect signoff](../architecture-signoff/2026-05-13-market-data-provider-metadata-parallelism-architect-signoff.md), [PO acceptance](../po-acceptance/2026-05-13-market-data-provider-metadata-parallelism-po-acceptance.md).
+
 Inputs:
 
 - [PO market data audit](../po-audits/2026-05-13-market-data-data-availability-audit.md)

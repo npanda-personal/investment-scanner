@@ -4,6 +4,7 @@ import {
   createMarketDataFoundationRouter,
   createMarketDataStocksRouter,
   createMarketDataV1Router,
+  MarketDataFoundationController,
 } from '../../../src/modules/market-data-foundation';
 
 const controller = {
@@ -132,5 +133,43 @@ describe('market data routers', () => {
     );
 
     expect(createMarketDataFoundationRouter(controller).stack.length).toBeGreaterThan(0);
+  });
+});
+
+describe('market data controller', () => {
+  it('passes repair-run worker concurrency from request to service', async () => {
+    const service = {
+      repairRun: jest.fn().mockResolvedValue({ status: 'COMPLETED' }),
+    };
+    const controller = new MarketDataFoundationController(service as any);
+    const req = {
+      query: {
+        region: 'IN',
+        assetType: 'STOCK',
+        workerConcurrency: '6',
+      },
+      body: {
+        batchSize: 50,
+        dryRun: true,
+        actions: ['PROVIDER_BUSINESS_METADATA_REPAIR'],
+      },
+      originalUrl: '/api/v1/market-data/universe/repair-run',
+    } as any;
+    const res = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+    } as any;
+
+    await controller.repairRun(req, res);
+
+    expect(service.repairRun).toHaveBeenCalledWith(expect.objectContaining({
+      region: 'IN',
+      assetType: 'STOCK',
+      batchSize: 50,
+      workerConcurrency: 6,
+      dryRun: true,
+      actions: ['PROVIDER_BUSINESS_METADATA_REPAIR'],
+    }));
+    expect(res.json).toHaveBeenCalledWith({ status: 'COMPLETED' });
   });
 });

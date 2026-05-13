@@ -25,6 +25,7 @@ Use this file as the live source of truth for active Codex-agent work. The Senio
 - QA planning/review agents must end every assignment with a structured handoff that states `complete`, `blocked`, or `needs reassignment`. If complete and no safe next QA task is explicitly assigned, the Orchestrator must close the agent instead of letting it wait.
 - Laptop resource gate: before starting new local servers, builds, tests, Playwright/browser runs, Docker services, or new Codex worker agents, check memory utilization. Do not start new process-heavy work at or above 95%; after the gate closes, wait until memory drops below 90% before starting more.
 - Node cleanup rule: when memory is above 90%, workers and Orchestrator must stop repo-local Node/Vite/Playwright/backend services that are done, orphaned, or no longer needed. Cleanup must avoid unrelated user/editor/system processes.
+- Model selection rule: assign the smallest safe model for each task. Strongest models stay reserved for Product Owner, Solution Architect, risky integration, ambiguous cross-module defects, and release gates; smaller or coding-optimized models should handle routine QA planning, status sweeps, board/docs updates, and bounded implementation support.
 
 ## Resource Snapshot
 
