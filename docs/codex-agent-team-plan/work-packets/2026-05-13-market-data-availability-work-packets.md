@@ -10,7 +10,7 @@ Market Data is the active release blocker. After Market Data Foundation reaches 
 
 Current accepted remediation:
 
-- Provider business metadata repair parallelism evidence: [QA](../qa-evidence/2026-05-13-market-data-provider-metadata-parallelism-qa-evidence.md), [Lead validation](../lead-validation/2026-05-13-market-data-provider-metadata-parallelism-lead-validation.md), [Architect signoff](../architecture-signoff/2026-05-13-market-data-provider-metadata-parallelism-architect-signoff.md), [PO acceptance](../po-acceptance/2026-05-13-market-data-provider-metadata-parallelism-po-acceptance.md).
+- Provider business metadata repair parallelism evidence: [QA](../qa-evidence/2026-05-13-market-data-provider-metadata-parallelism-qa-evidence.md), [Lead validation](../lead-validation/2026-05-13-market-data-provider-metadata-parallelism-lead-validation.md), [Architect signoff](../architecture-signoff/2026-05-13-market-data-provider-metadata-parallelism-architect-signoff.md), [PO acceptance](../po-acceptance/2026-05-13-market-data-provider-metadata-parallelism-po-acceptance.md), [GitHub check-in](../github-check-in/2026-05-13-market-data-provider-metadata-parallelism-github-check-in.md).
 
 Inputs:
 
