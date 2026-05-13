@@ -18,9 +18,11 @@ import {
   repairMarketDataCatalogIdentity,
   repairMarketDataProviderBusinessMetadata,
   runMarketDataUniverseRepair,
+  fetchTrustedUniverseRepairWorkbench,
   validateMarketDataProviders,
   type MarketDataHealth,
   type MarketDataRepairPlan,
+  type MarketDataRepairRequest,
   type MarketDataRepairRunRecord,
   type MarketDataRepairRunResponse,
   type MarketDataRepairSummary,
@@ -28,6 +30,8 @@ import {
   type TrustedReviewUniverseHealth,
   type MarketDataSchedulerRegionStatus,
   type ReviewReadinessSummary,
+  type MarketDataRepairLane,
+  type TrustedUniverseRepairWorkbench,
 } from '../api/marketDataFoundationService';
 import { normalizeMarketForApi } from '../api/marketScopeApi';
 
@@ -86,6 +90,7 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
   const [reviewReadiness, setReviewReadiness] = useState<ReviewReadinessSummary | null>(null);
   const [trustedReviewUniverse, setTrustedReviewUniverse] = useState<TrustedReviewUniverseHealth | null>(null);
   const [repairPlan, setRepairPlan] = useState<MarketDataRepairPlan | null>(null);
+  const [repairWorkbench, setRepairWorkbench] = useState<TrustedUniverseRepairWorkbench | null>(null);
   const [repairSummary, setRepairSummary] = useState<MarketDataRepairSummary | null>(null);
   const [repairRunResult, setRepairRunResult] = useState<MarketDataRepairRunResponse | null>(null);
   const [latestRepairRun, setLatestRepairRun] = useState<MarketDataRepairRunRecord | null>(null);
@@ -113,16 +118,18 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
       fetchReviewReadinessSummary({ region, assetType }).catch(() => null),
       fetchTrustedReviewUniverseHealth({ region, assetType }),
       fetchMarketDataRepairPlan({ region, assetType }),
+      fetchTrustedUniverseRepairWorkbench({ region, assetType }).catch(() => null),
       fetchLatestMarketDataRepairRun({ region, assetType }).catch(() => null),
       fetchMarketDataSchedulerStatus().catch(() => null),
     ])
-      .then(([result, universeResult, reviewReadinessResult, trustedReviewResult, repairPlanResult, latestRepairRunResult, schedulerStatus]) => {
+      .then(([result, universeResult, reviewReadinessResult, trustedReviewResult, repairPlanResult, repairWorkbenchResult, latestRepairRunResult, schedulerStatus]) => {
         if (!mounted) return;
         setStatus(result);
         setUniverseHealth(universeResult);
         setReviewReadiness(reviewReadinessResult);
         setTrustedReviewUniverse(trustedReviewResult);
         setRepairPlan(repairPlanResult);
+        setRepairWorkbench(repairWorkbenchResult);
         setLatestRepairRun(latestRepairRunResult);
         const normalizedRegion = normalizeMarketForApi(region);
         setCandleStatus(schedulerStatus?.regionStatuses.find((item) => item.region === normalizedRegion) ?? null);
@@ -178,15 +185,15 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
     return 'info' as const;
   })();
 
-  const runRepair = async (action: RepairAction) => {
+  const runRepair = async (action: RepairAction, boundedRequest?: MarketDataRepairLane['nextAction']['request']) => {
     setRepairRunning(action);
     setRepairError(null);
-    const request = {
-      region,
-      assetType,
-      batchSize: REPAIR_BATCH_SIZE,
-      offset: action === 'CATALOG_IDENTITY_REPAIR' ? catalogIdentityOffset : action === 'MANUAL_METADATA_IMPORT' ? manualMetadataOffset : 0,
-      providerValidationQueue: action === 'RETRY_FAILED_PROVIDERS' ? 'RETRY_FAILED' as const : 'UNKNOWN_FIRST' as const,
+    const request: MarketDataRepairRequest = {
+      region: boundedRequest?.region || region,
+      assetType: boundedRequest?.assetType || assetType,
+      batchSize: boundedRequest?.batchSize || REPAIR_BATCH_SIZE,
+      offset: boundedRequest?.offset ?? (action === 'CATALOG_IDENTITY_REPAIR' ? catalogIdentityOffset : action === 'MANUAL_METADATA_IMPORT' ? manualMetadataOffset : 0),
+      providerValidationQueue: boundedRequest?.queueMode === 'RETRY_FAILED' || action === 'RETRY_FAILED_PROVIDERS' ? 'RETRY_FAILED' as const : 'UNKNOWN_FIRST' as const,
       force: action === 'PROVIDER_BUSINESS_METADATA_REPAIR' ? false : true,
     };
     const catalogIdentityRequest = {
@@ -282,6 +289,16 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
     } catch (err: any) {
       setRepairError(err.response?.data?.error || err.message || 'Manual metadata template export failed.');
     }
+  };
+
+  const laneRepairAction = (lane: MarketDataRepairLane): RepairAction | null => {
+    if (lane.nextAction.actionCode === 'VALIDATE_PROVIDERS') return 'VALIDATE_PROVIDERS';
+    if (lane.nextAction.actionCode === 'RETRY_FAILED_PROVIDERS') return 'RETRY_FAILED_PROVIDERS';
+    if (lane.nextAction.actionCode === 'CATALOG_IDENTITY_REPAIR') return 'CATALOG_IDENTITY_REPAIR';
+    if (lane.nextAction.actionCode === 'PROVIDER_BUSINESS_METADATA_REPAIR') return 'PROVIDER_BUSINESS_METADATA_REPAIR';
+    if (lane.nextAction.actionCode === 'MANUAL_METADATA_IMPORT') return 'MANUAL_METADATA_IMPORT';
+    if (lane.nextAction.actionCode === 'BACKFILL_PRICES') return 'BACKFILL_PRICES';
+    return null;
   };
 
   if (loading) {
@@ -450,6 +467,79 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
             <Typography variant="caption">Scan ordering: {trustedReviewUniverse?.scanPolicy?.scanOrdering || 'not published'}</Typography>
           </Box>
           {(trustedReviewUniverse?.warnings || []).slice(0, 3).map((warning) => (
+            <Typography key={warning} variant="caption" color="text.secondary">{warning}</Typography>
+          ))}
+        </Stack>
+      </Box>
+
+      <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 2 }}>
+        <Stack spacing={1.5}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} justifyContent="space-between">
+            <Box>
+              <Typography variant="subtitle1" fontWeight={700}>Trusted Universe Repair Workbench</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Normalized IN / STOCK repair lanes with bounded actions and latest run evidence.
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+              <Chip
+                label={`Recommended: ${repairWorkbench?.recommendedNextLane || 'none'}`}
+                color={repairWorkbench?.recommendedNextLane ? 'warning' : 'success'}
+                variant="outlined"
+              />
+              <Chip label={`Scope: ${repairWorkbench?.scope.region || 'IN'} / ${repairWorkbench?.scope.assetType || 'STOCK'}`} variant="outlined" />
+            </Stack>
+          </Stack>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'repeat(2, minmax(0, 1fr))' }, gap: 1 }}>
+            {(repairWorkbench?.lanes || []).map((lane) => {
+              const action = laneRepairAction(lane);
+              const disabled = Boolean(repairRunning || repairRunRunning) || !lane.nextAction.enabled || !action;
+              return (
+                <Box key={lane.code} sx={{ p: 1.5, border: '1px solid', borderColor: lane.code === repairWorkbench?.recommendedNextLane ? 'warning.main' : 'divider', borderRadius: 1 }}>
+                  <Stack spacing={1}>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} justifyContent="space-between">
+                      <Box>
+                        <Typography variant="subtitle2" fontWeight={700}>{lane.label}</Typography>
+                        <Typography variant="caption" color="text.secondary">{lane.code}</Typography>
+                      </Box>
+                      <Chip size="small" label={`Batch ${lane.boundedBatchSize}`} variant="outlined" />
+                    </Stack>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(5, 1fr)' }, gap: 1 }}>
+                      <Typography variant="caption">Affected {formatCount(lane.affectedCount)}</Typography>
+                      <Typography variant="caption">Eligible {formatCount(lane.eligibleNowCount)}</Typography>
+                      <Typography variant="caption">Retryable {formatCount(lane.retryableFailureCount)}</Typography>
+                      <Typography variant="caption">Manual {formatCount(lane.manualRequiredCount)}</Typography>
+                      <Typography variant="caption">Skipped {formatCount(lane.skippedRecentAttemptCount)}</Typography>
+                    </Box>
+                    <Typography variant="caption" color="text.secondary">{lane.expectedEffect}</Typography>
+                    {lane.lastRun ? (
+                      <Typography variant="caption">
+                        Latest run {lane.lastRun.status}: success {formatCount(lane.lastRun.successCount)}, failed {formatCount(lane.lastRun.failureCount)}, skipped {formatCount(lane.lastRun.skippedCount)}, warnings {formatCount(lane.lastRun.warningCount)}.
+                      </Typography>
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">No latest run evidence for this lane.</Typography>
+                    )}
+                    <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap">
+                      <Button
+                        variant={lane.code === repairWorkbench?.recommendedNextLane ? 'contained' : 'outlined'}
+                        size="small"
+                        disabled={disabled}
+                        onClick={() => action && void runRepair(action, lane.nextAction.request)}
+                      >
+                        {lane.nextAction.actionCode}
+                      </Button>
+                      <Typography variant="caption" color={lane.nextAction.enabled ? 'text.secondary' : 'warning.main'}>
+                        {lane.nextAction.enabled
+                          ? `${lane.nextAction.method} ${lane.nextAction.endpoint}; ${lane.nextAction.request.region}/${lane.nextAction.request.assetType}; batch ${lane.nextAction.request.batchSize}`
+                          : lane.nextAction.disabledReason}
+                      </Typography>
+                    </Stack>
+                  </Stack>
+                </Box>
+              );
+            })}
+          </Box>
+          {(repairWorkbench?.warnings || []).slice(0, 3).map((warning) => (
             <Typography key={warning} variant="caption" color="text.secondary">{warning}</Typography>
           ))}
         </Stack>

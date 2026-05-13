@@ -57,6 +57,7 @@ export const createMarketDataV1Router = (
   router.get('/market-data/review-universe', controller.trustedReviewUniverseHealth);
   router.get('/market-data/review-universe/instruments', controller.trustedReviewUniverseInstruments);
   router.get('/market-data/universe/repair-plan', controller.repairPlan);
+  router.get('/market-data/universe/repair-workbench', controller.repairWorkbench);
   router.get('/market-data/universe/repair-runs/latest', controller.latestRepairRun);
   router.post('/market-data/universe/repair-run', controller.repairRun);
   router.get('/market-data/metadata/manual-template', controller.manualMetadataTemplate);

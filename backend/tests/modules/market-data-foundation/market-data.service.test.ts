@@ -2244,6 +2244,192 @@ describe('MarketDataFoundationService syncV1', () => {
     ]));
   });
 
+  it('normalizes trusted universe repair workbench lanes with bounded IN/STOCK actions', async () => {
+    const service = new MarketDataFoundationService({} as any, {} as any);
+    jest.spyOn(service, 'reviewReadinessSummary').mockResolvedValue({
+      scope: { region: 'IN', assetType: 'STOCK' },
+      generatedAt: '2026-05-13T00:00:00.000Z',
+      reviewMode: 'NO_REVIEW',
+      trustStatus: 'NOT_TRUSTWORTHY',
+      userDecision: 'REPAIR_DATA',
+      reviewUniverse: {
+        catalogCount: 10,
+        providerSupportedCount: 3,
+        trustedCount: 1,
+        targetTradingDate: '2026-05-12',
+        requiredDataThroughDate: '2026-05-12',
+        storedDataThroughDate: '2026-05-10',
+      },
+      readinessCounts: {
+        priceReady: 1,
+        contextReady: 1,
+        reviewReady: 1,
+        missingLatestPrice: 2,
+        staleLatestPrice: 2,
+        inadequateHistory: 1,
+        missingRecentVolume: 1,
+        providerUnknown: 4,
+        providerValidationFailedRetryable: 1,
+        unsupportedExcluded: 0,
+      },
+      blockers: [
+        {
+          category: 'PROVIDER_VALIDATION',
+          severity: 'HARD_BLOCKER',
+          affectedCount: 5,
+          explanation: 'Provider support is not proven.',
+          nextActionCode: 'VALIDATE_PROVIDERS',
+          nextActionLabel: 'Validate unknown providers',
+          boundedRequest: { region: 'IN', assetType: 'STOCK', batchSize: 50 },
+        },
+        {
+          category: 'INSUFFICIENT_TRUSTED_UNIVERSE',
+          severity: 'HARD_BLOCKER',
+          affectedCount: 99,
+          explanation: 'Below minimum trusted universe.',
+          nextActionCode: 'REVIEW_REPAIR_PLAN',
+          nextActionLabel: 'Review bounded repair plan',
+          boundedRequest: { region: 'IN', assetType: 'STOCK', batchSize: 50 },
+        },
+      ],
+      nextAction: {
+        code: 'VALIDATE_PROVIDERS',
+        label: 'Validate unknown providers',
+        boundedRequest: { region: 'IN', assetType: 'STOCK', batchSize: 50 },
+      },
+      warnings: ['Today Review remains NO_REVIEW.'],
+    });
+    jest.spyOn(service, 'repairPlan').mockResolvedValue({
+      scope: { region: 'IN', assetType: 'STOCK' },
+      generatedAt: '2026-05-13T00:00:00.000Z',
+      totalCatalogInstruments: 10,
+      providerUnknownValidationNeeded: 4,
+      providerRetryValidationNeeded: 1,
+      providerUnsupportedExcluded: 0,
+      providerValidationFailed: 1,
+      providerValidationNeeded: 4,
+      retryFailedValidations: 1,
+      supportedCatalogIdentityRepairNeeded: 2,
+      supportedBusinessMetadataRepairNeeded: 3,
+      supportedPriceBackfillNeeded: 2,
+      unsupportedExcluded: 0,
+      catalogIdentityRepairNeeded: 2,
+      priceBackfillNeeded: 2,
+      businessMetadataRepairNeeded: 3,
+      businessMetadataAutoRepairable: 1,
+      businessMetadataManualRequired: 1,
+      businessMetadataRetryBlocked: 1,
+      businessMetadataRetryEligible: 1,
+      businessMetadataRecentlyAttempted: 2,
+      metadataEnrichmentNeeded: 3,
+      manualMetadataRequired: 1,
+      manualBusinessMetadataRequired: 1,
+      missingIsin: 2,
+      missingListingDate: 2,
+      missingSector: 1,
+      missingIndustry: 1,
+      missingMarketCap: 1,
+      manualSectorIndustryRequired: 1,
+      topActions: [],
+      warnings: ['Repair lanes available.'],
+      universeSignoff: {
+        status: 'FAIL',
+        minReviewReadyRequired: 300,
+        reviewReadyActual: 1,
+        blockers: [],
+        nextAction: 'VALIDATE_PROVIDERS',
+        downstreamAllowed: false,
+      },
+    });
+    jest.spyOn(service, 'latestRepairRun').mockResolvedValue({
+      id: 'run-1',
+      scope: { region: 'IN', assetType: 'STOCK' },
+      status: 'PARTIAL',
+      startedAt: '2026-05-13T01:00:00.000Z',
+      completedAt: '2026-05-13T01:01:00.000Z',
+      beforeHealth: null,
+      afterHealth: null,
+      beforeRepairPlan: null,
+      afterRepairPlan: null,
+      actions: [
+        {
+          action: 'VALIDATE_PROVIDERS',
+          label: 'Validate unknown providers',
+          estimatedTotal: 5,
+          estimatedBatchCount: 1,
+          batchesPlanned: 1,
+          batchesExecuted: 1,
+          dryRun: false,
+          hasMore: false,
+          anotherRunNeeded: false,
+          totals: { processedCount: 5, updated: 4, skipped: 0, failed: 1, noOp: 0, manualRequired: 0 },
+          summaries: [],
+          warnings: ['One provider failed.'],
+        },
+      ],
+      summary: {
+        actionsRequested: ['VALIDATE_PROVIDERS'],
+        batchesExecuted: 1,
+        updated: 4,
+        skipped: 0,
+        failed: 1,
+        noOp: 0,
+        manualRequired: 0,
+      },
+      warnings: ['One provider failed.'],
+      anotherRunNeeded: true,
+      hardBlockersRemaining: [],
+      expectedNextAction: 'CATALOG_IDENTITY_REPAIR',
+      afterTrustStatus: 'NOT_TRUSTWORTHY',
+      universeSignoff: null,
+    });
+
+    const result = await service.trustedUniverseRepairWorkbench({ region: 'US', assetType: 'ETF' });
+
+    expect(result.scope).toEqual({ region: 'IN', assetType: 'STOCK' });
+    expect(result.recommendedNextLane).toBe('PROVIDER_VALIDATION');
+    expect(result.lanes.map((lane) => lane.code)).toEqual([
+      'PROVIDER_VALIDATION',
+      'PRICE_BACKFILL',
+      'STALE_EOD',
+      'CATALOG_IDENTITY',
+      'PROVIDER_BUSINESS_METADATA',
+      'MANUAL_METADATA_IMPORT',
+      'INSUFFICIENT_TRUSTED_UNIVERSE',
+    ]);
+    expect(result.lanes[0]).toMatchObject({
+      affectedCount: 5,
+      eligibleNowCount: 5,
+      retryableFailureCount: 1,
+      boundedBatchSize: 50,
+      lastRun: {
+        id: 'run-1',
+        status: 'PARTIAL',
+        successCount: 4,
+        failureCount: 1,
+        skippedCount: 0,
+        warningCount: 1,
+      },
+      nextAction: {
+        enabled: true,
+        actionCode: 'VALIDATE_PROVIDERS',
+        endpoint: '/api/v1/market-data/provider/validate',
+        request: { region: 'IN', assetType: 'STOCK', batchSize: 50, offset: 0, queueMode: 'UNKNOWN_FIRST' },
+      },
+    });
+    expect(result.lanes.find((lane) => lane.code === 'MANUAL_METADATA_IMPORT')).toMatchObject({
+      manualRequiredCount: 1,
+      nextAction: {
+        enabled: false,
+        disabledReason: 'Requires explicit manual metadata CSV payload.',
+      },
+    });
+    expect(result.lanes.find((lane) => lane.code === 'INSUFFICIENT_TRUSTED_UNIVERSE')).toMatchObject({
+      affectedCount: 99,
+      nextAction: { enabled: false },
+    });
+  });
+
   it('repair plan counts market-cap-only gaps in the manual business metadata path', async () => {
     const service = new MarketDataFoundationService({
       listStocksForUniverseHealth: jest.fn().mockResolvedValue([

@@ -349,6 +349,16 @@ export class MarketDataFoundationController {
     }
   };
 
+  repairWorkbench = async (req: Request, res: Response) => {
+    try {
+      const { region, assetType } = this.getMarketFilter(req);
+      return res.json(await this.service.trustedUniverseRepairWorkbench({ region, assetType }));
+    } catch (error) {
+      console.error('Market data repair workbench error:', error);
+      return res.status(500).json({ error: 'Market data repair workbench failed' });
+    }
+  };
+
   manualMetadataTemplate = async (req: Request, res: Response) => {
     try {
       const { region, assetType } = this.getMarketFilter(req);

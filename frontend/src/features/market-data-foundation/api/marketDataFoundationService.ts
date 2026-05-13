@@ -16,6 +16,7 @@ import type {
   MarketDataRepairSummary,
   MarketDataManualMetadataTemplate,
   MarketDataUniverseHealth,
+  TrustedUniverseRepairWorkbench,
   MarketDataSchedulerStatus,
   ReviewReadinessSummary,
   TrustedReviewUniverseHealth,
@@ -48,6 +49,7 @@ export type {
   BulkSyncResponse,
   MarketDataHealth,
   MarketDataRepairPlan,
+  MarketDataRepairLane,
   MarketDataRepairRequest,
   MarketDataRepairRunAction,
   MarketDataRepairRunRecord,
@@ -56,6 +58,7 @@ export type {
   MarketDataRepairSummary,
   MarketDataManualMetadataTemplate,
   MarketDataUniverseHealth,
+  TrustedUniverseRepairWorkbench,
   MarketDataSchedulerStatus,
   ReviewReadinessSummary,
   TrustedReviewUniverseHealth,
@@ -244,6 +247,15 @@ export async function fetchMarketDataRepairPlan(options: MarketScopedApiOptions 
     assetType: normalizeAssetTypeForMarketDataApi(options.assetType) || 'STOCK',
   };
   const response = await axios.get<MarketDataRepairPlan>(`${API_BASE}/v1/market-data/universe/repair-plan`, { params });
+  return response.data;
+}
+
+export async function fetchTrustedUniverseRepairWorkbench(_options: MarketScopedApiOptions = {}): Promise<TrustedUniverseRepairWorkbench> {
+  const params = {
+    region: 'IN',
+    assetType: 'STOCK',
+  };
+  const response = await axios.get<TrustedUniverseRepairWorkbench>(`${API_BASE}/v1/market-data/universe/repair-workbench`, { params });
   return response.data;
 }
 

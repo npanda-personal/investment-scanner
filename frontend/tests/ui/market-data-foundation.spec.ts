@@ -280,6 +280,124 @@ test.describe('Market Data Foundation UI', () => {
         },
       });
     });
+    await page.route('**/api/v1/market-data/universe/repair-workbench**', async (route) => {
+      await route.fulfill({
+        json: {
+          scope: { region: 'IN', assetType: 'STOCK' },
+          generatedAt: '2026-05-12T00:00:00.000Z',
+          readinessSummary: {},
+          repairRun: {
+            id: 'repair-run-last',
+            scope: { region: 'IN', assetType: 'STOCK' },
+            status: 'COMPLETED',
+            startedAt: '2026-05-12T06:00:00.000Z',
+            completedAt: '2026-05-12T06:01:00.000Z',
+          },
+          recommendedNextLane: 'PROVIDER_VALIDATION',
+          warnings: ['2909 instruments need provider validation before review workflows can trust them.'],
+          lanes: [
+            {
+              code: 'PROVIDER_VALIDATION',
+              label: 'Provider validation',
+              scope: { region: 'IN', assetType: 'STOCK' },
+              affectedCount: 2916,
+              eligibleNowCount: 2916,
+              retryableFailureCount: 7,
+              manualRequiredCount: 0,
+              skippedRecentAttemptCount: 0,
+              boundedBatchSize: 50,
+              expectedEffect: 'Validates UNKNOWN and retry-failed provider support before instruments can enter downstream price and identity repair lanes.',
+              lastRun: { id: 'repair-run-last', status: 'COMPLETED', startedAt: '2026-05-12T06:00:00.000Z', completedAt: '2026-05-12T06:01:00.000Z', successCount: 45, failureCount: 5, skippedCount: 0, warningCount: 1 },
+              nextAction: { enabled: true, actionCode: 'VALIDATE_PROVIDERS', method: 'POST', endpoint: '/api/v1/market-data/provider/validate', request: { region: 'IN', assetType: 'STOCK', batchSize: 50, offset: 0, queueMode: 'UNKNOWN_FIRST' } },
+            },
+            {
+              code: 'PRICE_BACKFILL',
+              label: 'Price backfill',
+              scope: { region: 'IN', assetType: 'STOCK' },
+              affectedCount: 585,
+              eligibleNowCount: 585,
+              retryableFailureCount: 0,
+              manualRequiredCount: 0,
+              skippedRecentAttemptCount: 0,
+              boundedBatchSize: 50,
+              expectedEffect: 'Backfills bounded EOD price history for provider-supported stocks.',
+              lastRun: null,
+              nextAction: { enabled: true, actionCode: 'BACKFILL_PRICES', method: 'POST', endpoint: '/api/v1/market-data/prices/backfill', request: { region: 'IN', assetType: 'STOCK', batchSize: 50, offset: 0 } },
+            },
+            {
+              code: 'STALE_EOD',
+              label: 'Stale EOD',
+              scope: { region: 'IN', assetType: 'STOCK' },
+              affectedCount: 200,
+              eligibleNowCount: 200,
+              retryableFailureCount: 0,
+              manualRequiredCount: 0,
+              skippedRecentAttemptCount: 0,
+              boundedBatchSize: 50,
+              expectedEffect: 'Refreshes stale daily candles toward the required data-through date.',
+              lastRun: null,
+              nextAction: { enabled: true, actionCode: 'BACKFILL_PRICES', method: 'POST', endpoint: '/api/v1/market-data/prices/backfill', request: { region: 'IN', assetType: 'STOCK', batchSize: 50, offset: 0 } },
+            },
+            {
+              code: 'CATALOG_IDENTITY',
+              label: 'Catalog identity',
+              scope: { region: 'IN', assetType: 'STOCK' },
+              affectedCount: 1,
+              eligibleNowCount: 1,
+              retryableFailureCount: 0,
+              manualRequiredCount: 0,
+              skippedRecentAttemptCount: 0,
+              boundedBatchSize: 50,
+              expectedEffect: 'Repairs provider symbol, ISIN, listing date, and exchange identity.',
+              lastRun: null,
+              nextAction: { enabled: true, actionCode: 'CATALOG_IDENTITY_REPAIR', method: 'POST', endpoint: '/api/v1/market-data/catalog/identity-repair', request: { region: 'IN', assetType: 'STOCK', batchSize: 50, offset: 0 } },
+            },
+            {
+              code: 'PROVIDER_BUSINESS_METADATA',
+              label: 'Provider business metadata',
+              scope: { region: 'IN', assetType: 'STOCK' },
+              affectedCount: 1,
+              eligibleNowCount: 12,
+              retryableFailureCount: 12,
+              manualRequiredCount: 2910,
+              skippedRecentAttemptCount: 149,
+              boundedBatchSize: 50,
+              expectedEffect: 'Fills business metadata when provider data is available.',
+              lastRun: null,
+              nextAction: { enabled: true, actionCode: 'PROVIDER_BUSINESS_METADATA_REPAIR', method: 'POST', endpoint: '/api/v1/market-data/metadata/provider-business/repair', request: { region: 'IN', assetType: 'STOCK', batchSize: 50, offset: 0 } },
+            },
+            {
+              code: 'MANUAL_METADATA_IMPORT',
+              label: 'Manual metadata import',
+              scope: { region: 'IN', assetType: 'STOCK' },
+              affectedCount: 2801,
+              eligibleNowCount: 0,
+              retryableFailureCount: 0,
+              manualRequiredCount: 2801,
+              skippedRecentAttemptCount: 0,
+              boundedBatchSize: 50,
+              expectedEffect: 'Imports operator-curated business metadata from an explicit CSV payload.',
+              lastRun: null,
+              nextAction: { enabled: false, actionCode: 'MANUAL_METADATA_IMPORT', method: 'POST', endpoint: '/api/v1/market-data/metadata/manual-import', request: { region: 'IN', assetType: 'STOCK', batchSize: 50, offset: 0 }, disabledReason: 'Requires explicit manual metadata CSV payload.' },
+            },
+            {
+              code: 'INSUFFICIENT_TRUSTED_UNIVERSE',
+              label: 'Insufficient trusted universe',
+              scope: { region: 'IN', assetType: 'STOCK' },
+              affectedCount: 156,
+              eligibleNowCount: 0,
+              retryableFailureCount: 0,
+              manualRequiredCount: 0,
+              skippedRecentAttemptCount: 0,
+              boundedBatchSize: 50,
+              expectedEffect: 'Reconciles trusted count, blocker counts, and review mode after concrete repairs.',
+              lastRun: { id: 'repair-run-last', status: 'COMPLETED', startedAt: '2026-05-12T06:00:00.000Z', completedAt: '2026-05-12T06:01:00.000Z', successCount: 45, failureCount: 5, skippedCount: 0, warningCount: 1 },
+              nextAction: { enabled: false, actionCode: 'REVIEW_REPAIR_PLAN', method: 'POST', endpoint: '/api/v1/market-data/universe/repair-plan', request: { region: 'IN', assetType: 'STOCK', batchSize: 50 }, disabledReason: 'Run a concrete provider, catalog, metadata, or price lane first.' },
+            },
+          ],
+        },
+      });
+    });
     await page.route('**/api/v1/market-data/universe/repair-runs/latest**', async (route) => {
       await route.fulfill({
         json: {
@@ -681,6 +799,21 @@ test.describe('Market Data Foundation UI', () => {
     });
     await expect(page.getByText(/Universe signoff FAIL; downstream allowed: no; next action VALIDATE_PROVIDERS/)).toBeVisible();
     await expect(page.getByText('Universe Repair Workflow')).toBeVisible();
+    await expect(page.getByText('Trusted Universe Repair Workbench')).toBeVisible();
+    await expect(page.getByText('Recommended: PROVIDER_VALIDATION')).toBeVisible();
+    await expect(page.locator('span').filter({ hasText: /^PROVIDER_VALIDATION$/ })).toBeVisible();
+    await expect(page.locator('span').filter({ hasText: /^PRICE_BACKFILL$/ })).toBeVisible();
+    await expect(page.locator('span').filter({ hasText: /^STALE_EOD$/ })).toBeVisible();
+    await expect(page.locator('span').filter({ hasText: /^CATALOG_IDENTITY$/ })).toBeVisible();
+    await expect(page.locator('span').filter({ hasText: /^PROVIDER_BUSINESS_METADATA$/ })).toBeVisible();
+    await expect(page.locator('span').filter({ hasText: /^MANUAL_METADATA_IMPORT$/ })).toBeVisible();
+    await expect(page.locator('span').filter({ hasText: /^INSUFFICIENT_TRUSTED_UNIVERSE$/ })).toBeVisible();
+    const providerValidationLane = page
+      .getByRole('heading', { name: 'Provider validation' })
+      .locator('xpath=ancestor::div[contains(@class, "MuiBox-root")][2]');
+    await expect(providerValidationLane.getByText('Latest run COMPLETED: success 45, failed 5, skipped 0, warnings 1.', { exact: true })).toBeVisible();
+    await expect(page.getByText('POST /api/v1/market-data/provider/validate; IN/STOCK; batch 50')).toBeVisible();
+    await expect(page.getByText('Requires explicit manual metadata CSV payload.')).toBeVisible();
     await expect(page.getByText('Provider unknown', { exact: true })).toBeVisible();
     await expect(page.locator('span').filter({ hasText: /^Retry failed providers$/ })).toBeVisible();
     await expect(page.getByText('Unsupported excluded', { exact: true })).toBeVisible();

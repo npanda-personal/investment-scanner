@@ -615,6 +615,68 @@ export type MarketDataRepairRunAction =
 
 export type MarketDataRepairRunStatus = 'RUNNING' | 'COMPLETED' | 'PARTIAL' | 'PARTIAL_BLOCKED' | 'PARTIAL_MANUAL_REQUIRED' | 'FAILED';
 
+export type MarketDataRepairLaneCode =
+  | 'PROVIDER_VALIDATION'
+  | 'PRICE_BACKFILL'
+  | 'STALE_EOD'
+  | 'CATALOG_IDENTITY'
+  | 'PROVIDER_BUSINESS_METADATA'
+  | 'MANUAL_METADATA_IMPORT'
+  | 'INSUFFICIENT_TRUSTED_UNIVERSE';
+
+export interface MarketDataRepairLane {
+  code: MarketDataRepairLaneCode;
+  label: string;
+  scope: {
+    region: 'IN';
+    assetType: 'STOCK';
+  };
+  affectedCount: number;
+  eligibleNowCount: number;
+  retryableFailureCount: number;
+  manualRequiredCount: number;
+  skippedRecentAttemptCount: number;
+  boundedBatchSize: number;
+  expectedEffect: string;
+  lastRun: {
+    id: string;
+    status: MarketDataRepairRunStatus;
+    startedAt: string;
+    completedAt: string | null;
+    successCount: number;
+    failureCount: number;
+    skippedCount: number;
+    warningCount: number;
+  } | null;
+  nextAction: {
+    enabled: boolean;
+    actionCode: string;
+    method: 'POST';
+    endpoint: string;
+    request: {
+      region: 'IN';
+      assetType: 'STOCK';
+      batchSize: number;
+      offset?: number;
+      queueMode?: string;
+    };
+    disabledReason?: string;
+  };
+}
+
+export interface TrustedUniverseRepairWorkbench {
+  scope: {
+    region: 'IN';
+    assetType: 'STOCK';
+  };
+  generatedAt: string;
+  readinessSummary: ReviewReadinessSummary;
+  repairRun: MarketDataRepairRunRecord | null;
+  lanes: MarketDataRepairLane[];
+  recommendedNextLane: MarketDataRepairLaneCode | null;
+  warnings: string[];
+}
+
 export interface MarketDataRepairRunRequest extends MarketDataRepairRequest {
   maxBatchesPerAction?: number;
   actions?: MarketDataRepairRunAction[];
