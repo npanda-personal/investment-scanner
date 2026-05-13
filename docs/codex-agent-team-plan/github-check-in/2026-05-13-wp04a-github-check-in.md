@@ -42,7 +42,8 @@ Rollback by reverting the WP-04A commit. This removes the additive Research Hub 
 
 ## Remote Evidence
 
-- Commit SHA: recorded by the Orchestrator after commit creation and push.
+- Commit SHA: `e0bdcb5`
 - Pushed remote: `origin`
 - Pushed branch: `dev`
+- Push result: `a4771d0..e0bdcb5  dev -> dev`
 - CI status/link: not available in the local execution context at check-in time.

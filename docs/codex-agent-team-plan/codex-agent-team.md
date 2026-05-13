@@ -64,7 +64,7 @@ Agent operating modes describe what a Codex agent is allowed to do for a work it
 | `PO Acceptance Mode` | Product Owner Agent | Accept/reject delivered behavior against latest requirement and acceptance criteria | Code edits, architecture rewrites inside acceptance step | PO accepts or sends item to revision |
 | `GitHub Check-In Mode` | Senior Fullstack Lead / Orchestrator | Stage only accepted requirement files, commit, push to `origin` on the active branch, record evidence | Committing unrelated local changes, rejected work, unaccepted requirements, secrets, `.env` files, database dumps, or generated artifacts unless explicitly accepted | Commit and push succeed and evidence is recorded |
 | `Clarification Mode` | Blocked role plus escalation owner | Ask/answer unclear requirement, architecture, shared-file, or implementation questions | Continuing on guessed behavior when material ambiguity exists | Clarification is written back to the source artifact |
-| `Revision Mode` | Responsible owner from rejection | Fix the same rejected item, update evidence/tests/docs, return to rejecting gate | Pulling unrelated implementation work before correction | Corrected item returns to rejecting gate |
+| `Revision Mode` | Orchestrator-assigned qualified owner | Fix the same rejected item, update evidence/tests/docs, return to rejecting gate | Pulling another task while owning the active revision, editing unreserved files | Corrected item returns to rejecting gate |
 
 Role-to-mode matrix:
 
@@ -73,8 +73,66 @@ Role-to-mode matrix:
 | Product Owner Agent | `Product Planning Mode`, `PO Acceptance Mode`, `Clarification Mode` | Usually stays in planning/acceptance modes and deep-thinking mode; keeps the next priority batch moving |
 | Solution Architect Agent | `Architecture Planning Mode`, `Architect Signoff Mode`, `Clarification Mode`, `Discovery Mode` | Switches between planning and signoff; uses deep-thinking mode for decisions |
 | Senior Fullstack Lead / Orchestrator | `Discovery Mode`, `Orchestrator Intake Mode`, `Lead Validation Mode`, `GitHub Check-In Mode`, `Clarification Mode` plus integration coordination | Owns intake, work packets, reservations, shared-file integration, post-QA Lead validation, and GitHub check-in |
-| Lane Developer Agent | `Discovery Mode`, `Implementation Mode`, `Revision Mode`, `Clarification Mode` | One active implementation item only; rejected item remains active WIP |
+| Lane Developer Agent | `Discovery Mode`, `Implementation Mode`, `Revision Mode`, `Clarification Mode` | One active implementation or revision item only; rejected items are assigned by Orchestrator to an available qualified developer |
 | QA Agent | `QA Verification Mode`, `Discovery Mode`, `Clarification Mode` | Can plan early from PO brief and update after architecture |
+
+### Elastic QA Capacity
+
+QA capacity can scale when the verification backlog would otherwise block flow. The Orchestrator may add QA workers when two or more items are in `Ready for QA`, `QA Verification Mode`, or QA evidence collection, or when one QA item is waiting on environment/live-data evidence while another item is ready for normal verification.
+
+QA scaling rules:
+
+- Assign one QA worker to one work item at a time.
+- Each QA worker must own a separate evidence file or active-board evidence row to avoid write conflicts.
+- QA workers may run tests in parallel only when the commands do not compete for the same browser state, ports, database mutation, generated output, or Playwright worker state. Use one worker for Playwright unless the suite is explicitly isolated.
+- QA workers must not edit production source unless a work packet explicitly assigns test-code changes.
+- A QA rejection must name the failed criterion, missing evidence, exact observed behavior, and recommended revision owner type; the Orchestrator assigns the revision to an available qualified developer.
+- Final QA signoff for an item must be traceable to one QA owner, even if another QA worker supplied supporting evidence.
+
+### Developer One-Task WIP And Revision Ownership
+
+A lane developer owns one implementation or revision task at a time. After the developer completes the implementation handoff and the Orchestrator moves the item to `Ready for QA`, that developer may pull the next eligible implementation task if the active board shows WIP availability and file reservations do not conflict.
+
+QA rejection does not require the original developer to abandon a newer active task. The Orchestrator assigns the rejected item in `Revision Mode` to an available qualified developer based on:
+
+- current WIP availability,
+- lane/module knowledge,
+- reserved file ownership,
+- urgency and dependency order,
+- whether the original developer is free or already active on another implementation item.
+
+If the original developer is available, prefer the original developer because they have context. If the original developer is busy, assign the revision to another available qualified developer or hold it until one is free. No developer may hold two active implementation/revision tasks at once.
+
+Allowed after handoff to QA:
+
+- pull the next eligible implementation task when the Orchestrator assigns it,
+- answer lightweight QA or Orchestrator questions about the handed-off item,
+- provide evidence notes that do not require source edits,
+- return to the handed-off item only if the Orchestrator assigns it back in `Revision Mode`.
+
+Forbidden after handoff to QA:
+
+- editing the QA item while actively owning another implementation task,
+- starting a new implementation task without Orchestrator assignment and board update,
+- letting a rejected item remain unassigned when a qualified developer is available,
+- assigning a revision to a developer whose current active task would be interrupted without explicit Orchestrator decision.
+
+### Developer Pre-QA Validation Gate
+
+Developers must test and validate their own changes before handing work to QA. QA is not the first place basic build, unit, route, or UI-smoke failures should be discovered.
+
+Before a developer handoff can move to `Ready for QA`, the developer must run, at minimum:
+
+- focused backend tests for changed backend modules,
+- frontend build or typecheck for UI/type changes,
+- focused Playwright smoke tests for changed UI workflows when practical,
+- route/API contract checks for changed endpoints,
+- module docs verification for changed routes, response shapes, calculations, or workflows,
+- authenticated local-data validation for data-bearing UI/API changes, or a concrete blocker explaining why it could not be completed.
+
+If a check cannot run, the handoff must record the exact skipped command, blocker reason, risk, and next owner. The Orchestrator must keep the item in `In Implementation`, `Clarification Mode`, or `Blocked` instead of moving it to `Ready for QA` when basic validation is missing without a valid blocker.
+
+QA should reject a handoff that lacks required developer-run validation evidence unless the blocker is explicit and accepted in the work packet or active board.
 
 Mode flow:
 
@@ -87,7 +145,7 @@ Flow labels map to their documented modes: `PO Product Planning` -> `Product Pla
 If rejected:
 
 ```text
-Rejecting role records reason -> same item enters Revision Mode -> responsible owner fixes -> item returns to rejecting gate
+Rejecting role records reason -> same item enters Revision Mode -> Orchestrator assigns an available qualified owner -> owner fixes one task at a time -> item returns to rejecting gate
 ```
 
 Clarification path remains:
@@ -186,7 +244,7 @@ If rejected:
 - record the rejecting role, rejection date, affected requirement, failed acceptance criterion or architecture ask, exact evidence, and expected correction,
 - set the item to `Needs Revision`,
 - assign the same item back to the responsible role or developer,
-- the responsible developer keeps the item as their active WIP and fixes it as the next iteration on the same item before pulling new implementation work,
+- the Orchestrator assigns the same item in `Revision Mode` to an available qualified developer; the original developer is preferred only when available and not already active on another implementation task,
 - update tests/docs/contracts when the rejection exposes a missing requirement or unclear contract,
 - return the item to the rejecting gate after the correction is complete.
 
@@ -250,7 +308,7 @@ Minimum non-idle expectations:
 - Product Owner Agent: maintain the next priority batch, answer domain questions, refine acceptance criteria, and update roadmap direction.
 - Solution Architect Agent: produce architecture contracts, review shared-contract risks, and perform post-QA signoff after Lead validation on completed items.
 - QA Agent: prepare verification scenarios early, review test gaps, and verify completed slices.
-- Lane Developer Agents: inspect assigned modules, implement `Ready for Implementation` items, write/update tests, prepare handoffs, and resolve same-item rejection iterations before pulling new implementation work.
+- Lane Developer Agents: inspect assigned modules, implement `Ready for Implementation` items, write/update tests, prepare handoffs, answer lightweight QA questions, and pick up Orchestrator-assigned revision work only when they have no other active implementation or revision task.
 - Orchestrator: maintain work packets, reservations, dependency status, shared-file ownership, integration order, clarification routing, and post-QA Lead validation.
 
 ## Live Work Board
@@ -313,6 +371,41 @@ A valid handoff must include:
 - GitHub check-in evidence when the handoff is from check-in or release work.
 
 If any required field is missing, the item returns to the responsible role in `Revision Mode` or `Clarification Mode`; the next gate does not start.
+
+### Handoff Response SLA
+
+Agents must not sit in a silent waiting state after finishing work or receiving a status request.
+
+- When implementation, discovery, QA verification, architecture, or PO planning is complete, the agent must immediately return the structured handoff.
+- When blocked, the agent must immediately report the blocker, the exact decision needed, the escalation owner, and the same-item work that can continue without violating the blocker.
+- When the Orchestrator sends a status-check instruction, the agent must either hand off, continue unblocked work, or report the blocker. Waiting for informal approval is not a valid state unless the plan artifact records the explicit gate.
+- The Orchestrator must update `docs/codex-agent-team-plan/active-work-board.md` in the same orchestration cycle after receiving a handoff, rejection, blocker, or assignment change.
+- If the board and actual worker state differ, the board is corrected first before new work is assigned.
+
+### Orchestrator Status Cadence
+
+The Senior Fullstack Lead / Orchestrator must actively monitor worker flow instead of assuming agents will self-report perfectly.
+
+- Check all active agents whenever a handoff is expected, a board row has not changed after meaningful work time, or the user reports idle workers.
+- During long-running work, perform a status sweep before assigning any new work and after every completed handoff, QA rejection/signoff, blocker report, or scope change.
+- A status sweep must compare the active board against actual worker state, current `git status --short`, reserved write scopes, and known gate dependencies.
+- If an agent appears idle while its board row says active, send a status-check instruction requiring one of three responses: structured handoff, continue unblocked work, or blocker/clarification report.
+- If an agent is done but the board still shows active implementation, move the item to the correct next gate before assigning new work.
+- If an item is in QA and its developer has completed a valid handoff, the developer is free for the next eligible Orchestrator-assigned implementation task unless the board explicitly reserves them for same-item support.
+- If QA rejects an item while the original developer is busy, assign the revision to another available qualified developer with a non-conflicting write scope, or hold it until such a developer is available.
+- If an agent is genuinely free, refill from this order: active `Needs Revision` item matching their skills, same-lane `Ready for Implementation`, interruptible read-only discovery, QA/support evidence that does not require source edits, next-batch Product/Architecture planning. Never refill with a task that conflicts with reserved files.
+- Record persistent stuck states in `docs/codex-agent-team-plan/blocker-register.md` with owner, decision needed, next action, review date, and safe parallel work.
+
+### Laptop Resource Gate
+
+The Orchestrator must check laptop memory utilization before starting new local processes or adding new workers when active execution is already running.
+
+- Do not start new local dev servers, test runs, browser/Playwright runs, Docker services, build processes, or new Codex worker agents when memory utilization is at or above 95%.
+- Once memory utilization reaches 95% or higher, pause new process/worker starts until memory utilization drops below 90%.
+- Existing in-flight work can finish unless it is clearly causing instability; prefer waiting for current processes to complete before starting more.
+- Lightweight documentation edits, board updates, and status messages may continue while the memory gate is closed.
+- Every status sweep should include a resource check before starting process-heavy validation or spawning additional workers.
+- If memory cannot be measured because the OS denies access, treat process-heavy starts as blocked until the Orchestrator obtains a reliable reading or the user explicitly permits continuing.
 
 ## Blocker And Conflict SLA
 
@@ -446,8 +539,8 @@ If an agent discovers that it must edit an unreserved file, it must stop before 
 - Start implementation only after the orchestrator assigns disjoint write scopes and file/module reservations.
 - A lane agent should always own a full vertical slice for one module: backend, frontend, tests, and docs.
 - Each lane developer agent has a WIP limit of one active implementation task.
-- A lane developer agent must finish the assigned task end to end before pulling another implementation task.
-- End to end means implementation, module tests/docs updates, structured handoff, and support for QA/orchestrator follow-up until the item is ready for QA or explicitly reassigned.
+- A lane developer agent must finish the assigned task implementation handoff before pulling another implementation task.
+- End to end for the active developer means implementation, module tests/docs updates, structured handoff, and any source-edit revision work explicitly assigned while they have no other active implementation/revision item.
 - Do not split developer focus across two active implementation items, even when both are in the same lane.
 - Never allow two agents to edit the same module, file, test spec, migration, route registry, generated type, or shared component in the same implementation pass.
 - If a lane is waiting on a contract, it should continue with local inspection, test planning, fixture review, or module documentation gaps instead of idling.

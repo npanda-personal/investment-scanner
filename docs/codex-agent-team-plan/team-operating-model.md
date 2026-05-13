@@ -95,7 +95,7 @@ Cross-cutting account modules, such as `auth-identity` and `subscription-billing
 - Assign each work item to one lane and one directly responsible module developer.
 - A work item should include backend, frontend, tests, docs, and acceptance criteria for that module slice.
 - Each module developer has a WIP limit of one active implementation task.
-- A module developer must complete the current vertical slice end to end before pulling the next implementation task.
+- A module developer must complete the current vertical slice implementation handoff before pulling the next implementation task.
 - Do not split one module change into separate backend-only and frontend-only owners unless the API contract is already stable and documented.
 - No developer should edit another lane's module files without coordination in the work item.
 - Use a single-writer rule for each implementation pass: one owner per file, module, test spec, migration, route registry, shared component, or generated type.
@@ -103,6 +103,26 @@ Cross-cutting account modules, such as `auth-identity` and `subscription-billing
 - The Solution Architect defines cross-module contracts before implementation starts when a change affects more than one module.
 - QA prepares acceptance and regression scenarios while implementation is active, not after code is complete.
 - For Codex-agent work, every assigned agent must receive a clear work packet and return a structured handoff before integration.
+
+## Elastic QA Capacity
+
+QA should scale with the verification backlog. The Orchestrator may add QA workers when multiple items are waiting for QA, when one item is blocked on live-data/environment evidence, or when QA would otherwise become the throughput bottleneck.
+
+- Assign one QA worker to one work item at a time.
+- Give each QA worker a separate evidence file, issue section, or active-board evidence row.
+- Do not run competing Playwright/browser/database-mutating checks in parallel unless the tests are isolated.
+- Keep final QA signoff traceable to one QA owner per work item.
+- QA workers may reject incomplete developer handoffs under the pre-QA validation gate and must provide clear missing evidence or failed acceptance criteria.
+
+## Laptop Resource Gate
+
+The Orchestrator must protect the user's laptop during continuous team execution.
+
+- Check memory utilization before starting new local servers, builds, tests, Playwright/browser runs, Docker services, or new Codex worker agents.
+- If memory utilization is at or above 95%, do not start new process-heavy work or new workers.
+- After the gate closes at 95%, wait until memory utilization drops below 90% before starting new process-heavy work or new workers.
+- Continue lightweight planning, status updates, board edits, and evidence review while the resource gate is closed.
+- If memory cannot be measured reliably, treat new process-heavy work as blocked until a reliable reading is available or the user explicitly permits continuing.
 
 ## Delivery Workflow
 
@@ -194,7 +214,7 @@ Every review gate can reject an item, but every rejection must produce clear cor
 
 - Rejection reasons must name the failed acceptance criterion, Architect ask, test expectation, business rule, contract, or integration concern.
 - The rejected item stays the same work item and moves to `Needs Revision`.
-- The responsible team member fixes the rejected item as the next iteration before pulling new implementation work.
+- The Orchestrator assigns the rejected item as `Revision Mode` work to an available qualified developer. Prefer the original developer when free, but do not interrupt another active implementation task unless the Orchestrator explicitly decides the revision is more urgent.
 - If a developer is unclear, they ask the Senior Fullstack Lead / Orchestrator.
 - If the Lead cannot answer, the Lead asks the Solution Architect.
 - If the Architect needs product/domain clarification, the Architect asks the Product Owner.
@@ -258,11 +278,32 @@ A module work item is done when:
 - release/rollback impact is recorded when the change is release-relevant,
 - technical debt and blockers are recorded in the shared registers when not resolved.
 
+## Developer Pre-QA Validation
+
+Before a developer hands an item to QA, the developer must run the basic validation for the changed slice. This is a required gate, not optional QA work.
+
+Required developer evidence before `Ready for QA`:
+
+- focused backend tests for changed backend modules,
+- frontend build or typecheck for UI/type changes,
+- focused Playwright smoke tests for changed UI workflows when practical,
+- route/API checks for changed endpoints,
+- module docs checked or updated for changed routes, response shapes, calculations, batching, or workflows,
+- authenticated local-data validation for data-bearing UI/API changes, or an explicit blocker.
+
+The Orchestrator should not move an item to `Ready for QA` when developer-run validation is missing without a concrete blocker. QA should reject incomplete handoffs and send them back to implementation or clarification with specific missing evidence.
+
 ## Handoff And Blocker Quality
 
 Every handoff must identify work item, state, mode, owner, lane/module, exact files changed or inspected, behavior/docs/contracts changed, checks run or skipped, assumptions, risks, blockers, shared-file requests, next gate, and evidence notes.
 
 The Orchestrator rejects incomplete handoffs before integration, QA, post-QA Architect signoff after Lead validation, PO acceptance, or GitHub check-in. Missing handoff evidence sends the item back to the responsible role in `Revision Mode` or `Clarification Mode`.
+
+The Orchestrator must actively check worker status throughout execution. Status checks are required when a handoff is expected, a board row appears stale, a user reports idle workers, a QA/review gate completes, or a blocker is reported. Each status check must reconcile the active board, worker state, dirty files, reserved write scopes, and next eligible gate before new work is assigned.
+
+Workers must answer an Orchestrator status check with one of three outcomes: structured handoff, continued unblocked work, or blocker/clarification report. Silent waiting is treated as a process issue, not an acceptable work state.
+
+After a developer hands work to QA, that developer may pull the next eligible implementation task if the Orchestrator updates the active board and confirms no file-scope conflict. If QA rejects the handed-off item, the Orchestrator assigns the revision to an available qualified developer. The original developer is preferred only when available; if already active on another task, another qualified idle developer can pick up the revision from the QA comments and work packet. No developer may own two active implementation or revision tasks at once.
 
 Blockers and conflicts must be routed before lower-priority work:
 
@@ -277,7 +318,7 @@ Blockers and conflicts must be routed before lower-priority work:
 
 - Run up to three active implementation lanes by default.
 - Add a fourth module developer only when the fourth task is independent and does not touch shared contracts.
-- Each developer works on one active task at a time until end-to-end handoff is complete.
+- Each developer works on one active implementation or revision task at a time until the structured handoff is complete.
 - Do not run parallel work against the same module unless file-level ownership is disjoint, documented, and agreed before work starts.
 - If two developers need the same file or shared contract, pause one task and assign that file to the Senior Fullstack Lead / Orchestrator as an integration task.
 - If two lanes need the same shared type, route registry, Prisma model, or shared UI component, promote that change into a small integration task owned by the Senior Fullstack Lead.

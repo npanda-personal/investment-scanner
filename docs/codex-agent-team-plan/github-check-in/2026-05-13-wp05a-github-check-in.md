@@ -41,7 +41,8 @@ Rollback by reverting the WP-05A commit. This removes the additive Trade Plan `p
 
 ## Remote Evidence
 
-- Commit SHA: recorded by the Orchestrator after commit creation and push.
+- Commit SHA: `f051d12`
 - Pushed remote: `origin`
 - Pushed branch: `dev`
+- Push result: `e0bdcb5..f051d12  dev -> dev`
 - CI status/link: not available in the local execution context at check-in time.

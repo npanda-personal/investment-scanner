@@ -19,6 +19,8 @@
 
 - `backend/src/modules/signal-calibration-engine/*`
 - `backend/tests/modules/signal-calibration-engine/*`
+- `frontend/src/features/signal-calibration-engine/*`
+- `frontend/tests/ui/signal-calibration-engine.spec.ts`
 - This check-in evidence file.
 
 ## Exclusion Confirmation
@@ -41,7 +43,10 @@ Rollback by reverting the WP-03A commit. This removes the additive Signal Calibr
 
 ## Remote Evidence
 
-- Commit SHA: recorded by the Orchestrator after commit creation and push.
+- Primary commit SHA: `a4771d0`
+- Supplemental accepted frontend commit SHA: `10cc418`
 - Pushed remote: `origin`
 - Pushed branch: `dev`
+- Push result: `f771644..a4771d0  dev -> dev`
+- Supplemental push result: `f051d12..10cc418  dev -> dev`
 - CI status/link: not available in the local execution context at check-in time.

@@ -43,6 +43,8 @@ Rollback by reverting the WP-02 commit. This removes the additive selected-horiz
 
 ## Remote Evidence
 
-- Commit SHA: recorded by the Orchestrator after commit creation and push.
+- Commit SHA: `f771644`
 - Pushed remote: `origin`
+- Pushed branch: `dev`
+- Push result: `207766a..f771644  dev -> dev`
 - CI status/link: not available in the local execution context at check-in time.

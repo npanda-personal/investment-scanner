@@ -50,6 +50,8 @@ Rollback by reverting the WP-01 commit. This removes the additive review-readine
 
 ## Remote Evidence
 
-- Commit SHA: recorded by the Orchestrator after commit creation and push.
+- Commit SHA: `207766a`
 - Pushed remote: `origin`
+- Pushed branch: `dev`
+- Push result: `2079c35..207766a  dev -> dev`
 - CI status/link: not available in the local execution context at check-in time.
