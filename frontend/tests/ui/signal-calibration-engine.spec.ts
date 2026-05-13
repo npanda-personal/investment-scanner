@@ -48,7 +48,21 @@ const calibratedRow = {
     evidenceStatus: 'LOW_SAMPLE',
     evidenceReasons: ['Overall evidence is available.'],
     evidenceWarnings: ['Group sample is below calibration threshold.'],
+    warnings: ['Group sample is below calibration threshold.'],
   },
+  calibrationReadiness: {
+    status: 'LIMITED',
+    confidenceTier: 'LOW',
+    calibrationApplied: true,
+    adjustmentCapApplied: 6,
+    downstreamInfluence: 'LIMITED',
+    authoritativeScore: 'CALIBRATED_SCORE',
+    reasons: ['Group sample is below calibration threshold.'],
+    blockers: [],
+  },
+  confidenceTier: 'LOW',
+  downstreamInfluence: 'LIMITED',
+  authoritativeScore: 'CALIBRATED_SCORE',
 };
 
 async function mockCalibrationApi(page: Page) {
@@ -68,6 +82,7 @@ async function mockCalibrationApi(page: Page) {
         totalDeltaCap: 25,
         rules: ['Preserve raw signal when samples are insufficient.'],
         sampleSafetyRules: ['Require enough overall and group evidence before applying larger adjustments.'],
+        calibrationReadinessRules: ['Unavailable evidence sets downstream influence to NONE.'],
         fallbackBehavior: 'Preserve raw score when evidence is insufficient.',
       }),
     });
@@ -138,11 +153,18 @@ test.describe('Signal Calibration Engine UI', () => {
     await expect(page.getByText('Calibration uses historical evidence and context snapshots for research support only.')).toBeVisible();
     await expect(page.getByText('Calibration Sample Warning')).toBeVisible();
     await expect(page.getByText('Group sample is below calibration threshold.')).toBeVisible();
+    await expect(page.getByText('Readiness', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Downstream Influence', { exact: true })).toBeVisible();
+    await expect(page.getByText('Limited Evidence on Page', { exact: true })).toBeVisible();
     expect(await page.getByRole('columnheader', { name: 'Raw' }).count()).toBeGreaterThan(0);
     expect(await page.getByRole('columnheader', { name: 'Calibrated' }).count()).toBeGreaterThan(0);
     expect(await page.getByRole('columnheader', { name: 'Evidence' }).count()).toBeGreaterThan(0);
+    expect(await page.getByRole('columnheader', { name: 'Readiness' }).count()).toBeGreaterThan(0);
+    expect(await page.getByRole('columnheader', { name: 'Influence' }).count()).toBeGreaterThan(0);
     await expect(page.getByText('RELIANCE.NS')).toBeVisible();
     await expect(page.getByText('LOW_SAMPLE')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'LIMITED' }).first()).toBeVisible();
+    await expect(page.getByText('CALIBRATED_SCORE')).toBeVisible();
     await expect(page.getByText('110 / 18')).toBeVisible();
 
     await page.getByRole('button', { name: 'Run Calibration' }).click();

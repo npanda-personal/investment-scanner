@@ -4,6 +4,7 @@ export * from './hooks';
 export type {
   CalibrationAdjustment,
   CalibrationComparison,
+  CalibrationReadiness,
   CalibrationModelInfo,
   CalibrationRunResponse,
   SignalCalibrationResult,

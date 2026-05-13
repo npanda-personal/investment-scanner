@@ -34,10 +34,14 @@ const ConfidenceChip: React.FC<{ value: string }> = ({ value }) => (
   <Chip size="small" label={value} color={value === 'HIGH' ? 'success' : value === 'MEDIUM' ? 'primary' : value === 'LOW' ? 'warning' : 'error'} />
 );
 
-const MetricCard: React.FC<{ label: string; value: string | number }> = ({ label, value }) => (
+const readinessTone = (value: string | undefined): 'success' | 'warning' | 'error' | undefined => (
+  value === 'USABLE' ? 'success' : value === 'LIMITED' ? 'warning' : value === 'UNAVAILABLE' ? 'error' : undefined
+);
+
+const MetricCard: React.FC<{ label: string; value: string | number; tone?: 'success' | 'warning' | 'error' }> = ({ label, value, tone }) => (
   <Paper sx={{ p: 2 }}>
     <Typography color="text.secondary" variant="body2">{label}</Typography>
-    <Typography variant="h5">{value}</Typography>
+    <Typography variant="h5" color={tone ? `${tone}.main` : 'text.primary'}>{value}</Typography>
   </Paper>
 );
 
@@ -61,6 +65,8 @@ const SignalCalibrationEnginePage: React.FC = () => {
     const upgraded = items.filter((item) => item.scoreDelta > 0).length;
     const downgraded = items.filter((item) => item.scoreDelta < 0).length;
     const avgDelta = items.length ? items.reduce((sum, item) => sum + item.scoreDelta, 0) / items.length : 0;
+    const unavailable = items.filter((item) => item.calibrationReadiness?.status === 'UNAVAILABLE' || item.downstreamInfluence === 'NONE').length;
+    const limited = items.filter((item) => item.calibrationReadiness?.status === 'LIMITED' || item.downstreamInfluence === 'LIMITED').length;
     return {
       calibrated: health?.calibratedSignals ?? data.totalCount,
       upgraded,
@@ -70,6 +76,10 @@ const SignalCalibrationEnginePage: React.FC = () => {
       dataGaps: items.reduce((sum, item) => sum + item.dataGaps.length, 0),
       applied: items.filter((item) => item.calibrationApplied).length,
       passthrough: items.filter((item) => item.calibrationApplied === false || item.calibratedConfidence === 'INSUFFICIENT_SAMPLE').length,
+      unavailable,
+      limited,
+      firstReadiness: items[0]?.calibrationReadiness?.status || 'UNAVAILABLE',
+      firstInfluence: items[0]?.calibrationReadiness?.downstreamInfluence || items[0]?.downstreamInfluence || 'NONE',
     };
   }, [health, data]);
 
@@ -115,6 +125,9 @@ const SignalCalibrationEnginePage: React.FC = () => {
     { id: 'calibratedDirection', label: 'Direction', render: (row) => <DirectionChip value={row.calibratedDirection} /> },
     { id: 'rawConfidence', label: 'Confidence', render: (row) => <ConfidenceChip value={row.rawConfidence} /> },
     { id: 'calibratedConfidence', label: 'Calibration Confidence', render: (row) => <ConfidenceChip value={row.calibratedConfidence} /> },
+    { id: 'readiness', label: 'Readiness', render: (row) => <Chip size="small" variant="outlined" label={row.calibrationReadiness?.status || 'UNAVAILABLE'} color={readinessTone(row.calibrationReadiness?.status) || 'default'} /> },
+    { id: 'authoritativeScore', label: 'Authoritative', render: (row) => row.calibrationReadiness?.authoritativeScore || row.authoritativeScore || 'RAW_SCORE' },
+    { id: 'downstreamInfluence', label: 'Influence', render: (row) => <Chip size="small" label={row.calibrationReadiness?.downstreamInfluence || row.downstreamInfluence || 'NONE'} color={(row.calibrationReadiness?.downstreamInfluence || row.downstreamInfluence) === 'NORMAL' ? 'success' : (row.calibrationReadiness?.downstreamInfluence || row.downstreamInfluence) === 'LIMITED' ? 'warning' : 'error'} variant="outlined" /> },
     { id: 'evidenceStatus', label: 'Evidence', render: (row) => <Chip size="small" variant="outlined" label={row.evidenceStatus || 'UNKNOWN'} color={row.evidenceStatus === 'SUFFICIENT' ? 'success' : row.evidenceStatus === 'LOW_SAMPLE' ? 'warning' : 'error'} /> },
     { id: 'overallEvaluatedSamples', label: 'Samples', render: (row) => `${row.overallEvaluatedSamples ?? 0} / ${row.groupEvaluatedSamples ?? 0}` },
     { id: 'topBoost', label: 'Top Boost', render: (row) => row.boosts[0]?.label || '-' },
@@ -134,6 +147,7 @@ const SignalCalibrationEnginePage: React.FC = () => {
   if (loading && !model && data.items.length === 0) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>;
 
   const firstWarnings = data.items.find((item) => item.calibrationEvidence?.evidenceWarnings?.length)?.calibrationEvidence?.evidenceWarnings || [];
+  const firstBlockers = data.items.find((item) => item.calibrationReadiness?.blockers?.length)?.calibrationReadiness?.blockers || [];
   const scopeLabel = `${region === 'GLOBAL' ? 'Global' : region} / ${assetType || 'ALL'}`;
 
   return (
@@ -162,6 +176,12 @@ const SignalCalibrationEnginePage: React.FC = () => {
           {firstWarnings.map((w, i) => <Typography key={i} variant="body2">{w}</Typography>)}
         </Alert>
       )}
+      {firstBlockers.length > 0 && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          <Typography variant="subtitle2" fontWeight={700}>Calibration Readiness Blocked</Typography>
+          {firstBlockers.map((w, i) => <Typography key={i} variant="body2">{w}</Typography>)}
+        </Alert>
+      )}
 
       {(error || formError) && <Alert severity="error" sx={{ mb: 2 }}>{error || formError}</Alert>}
       {actionMessage && <Alert severity="success" sx={{ mb: 2 }}>{actionMessage}</Alert>}
@@ -185,11 +205,14 @@ const SignalCalibrationEnginePage: React.FC = () => {
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(6, 1fr)' }, gap: 2, mb: 3 }}>
         <MetricCard label="Selected Horizon" value={horizon} />
+        <MetricCard label="Readiness" value={summary.firstReadiness} tone={readinessTone(summary.firstReadiness)} />
+        <MetricCard label="Downstream Influence" value={summary.firstInfluence} tone={summary.firstInfluence === 'NONE' ? 'error' : summary.firstInfluence === 'LIMITED' ? 'warning' : 'success'} />
         <MetricCard label="Calibrated Signals" value={summary.calibrated} />
         <MetricCard label="Page Avg Delta" value={summary.avgDelta} />
         <MetricCard label="Applied on Page" value={summary.applied} />
         <MetricCard label="Passthrough on Page" value={summary.passthrough} />
-        <MetricCard label="High Confidence on Page" value={summary.highConfidence} />
+        <MetricCard label="Limited Evidence on Page" value={summary.limited} tone={summary.limited > 0 ? 'warning' : undefined} />
+        <MetricCard label="Unavailable Evidence on Page" value={summary.unavailable} tone={summary.unavailable > 0 ? 'error' : undefined} />
       </Box>
 
       <Box sx={{ mb: 3 }}>
@@ -269,6 +292,7 @@ const SignalCalibrationEnginePage: React.FC = () => {
                 <Typography variant="subtitle1" fontWeight={700}>Calibrated Signal</Typography>
                 <Typography>{comparison.calibratedSignal.calibratedScore} ({delta(comparison.calibratedSignal.scoreDelta)}) / {comparison.calibratedSignal.calibratedDirection} / <ConfidenceChip value={comparison.calibratedSignal.calibratedConfidence} /></Typography>
                 <Typography variant="body2" sx={{ mt: 1 }}><strong>Evidence Status:</strong> {comparison.calibratedSignal.evidenceStatus} ({comparison.calibratedSignal.overallEvaluatedSamples} samples)</Typography>
+                <Typography variant="body2" sx={{ mt: 1 }}><strong>Readiness:</strong> {comparison.calibratedSignal.calibrationReadiness?.status || 'UNAVAILABLE'} / {comparison.calibratedSignal.calibrationReadiness?.downstreamInfluence || 'NONE'} / {comparison.calibratedSignal.calibrationReadiness?.authoritativeScore || 'RAW_SCORE'}</Typography>
                 <Typography variant="body2" sx={{ mt: 1 }}><strong>Boosts:</strong> {comparison.calibratedSignal.boosts.map((item) => item.label).join('; ') || 'None'}</Typography>
                 <Typography variant="body2"><strong>Penalties:</strong> {comparison.calibratedSignal.penalties.map((item) => item.label).join('; ') || 'None'}</Typography>
                 

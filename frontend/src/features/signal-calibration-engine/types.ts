@@ -8,6 +8,9 @@ export interface CalibrationAdjustment {
 }
 
 export type CalibrationEvidenceStatus = 'SUFFICIENT' | 'LOW_SAMPLE' | 'INSUFFICIENT' | 'MISSING';
+export type CalibrationReadinessStatus = 'USABLE' | 'LIMITED' | 'UNAVAILABLE';
+export type CalibrationDownstreamInfluence = 'NORMAL' | 'LIMITED' | 'NONE';
+export type CalibrationAuthoritativeScore = 'CALIBRATED_SCORE' | 'RAW_SCORE' | 'NO_SCORE';
 
 export interface CalibrationEvidence {
   horizon: string;
@@ -15,11 +18,25 @@ export interface CalibrationEvidence {
   groupEvaluatedSamples: number;
   minimumOverallSamples: number;
   minimumGroupSamples: number;
+  requiredOverallSamples: number;
+  requiredGroupSamples: number;
   horizonAvailability: Record<string, { eligible: number; evaluated: number; insufficientFuturePrice: number }>;
   dataStatus: string;
   evidenceStatus: CalibrationEvidenceStatus;
   evidenceReasons: string[];
   evidenceWarnings: string[];
+  warnings: string[];
+}
+
+export interface CalibrationReadiness {
+  status: CalibrationReadinessStatus;
+  confidenceTier: SignalConfidence | 'INSUFFICIENT_SAMPLE';
+  calibrationApplied: boolean;
+  adjustmentCapApplied: number;
+  downstreamInfluence: CalibrationDownstreamInfluence;
+  authoritativeScore: CalibrationAuthoritativeScore;
+  reasons: string[];
+  blockers: string[];
 }
 
 export interface SignalCalibrationResult {
@@ -67,9 +84,13 @@ export interface SignalCalibrationResult {
   adjustmentCapApplied?: number;
   sampleSizePenaltyApplied?: boolean;
   calibrationEvidence?: CalibrationEvidence | null;
+  calibrationReadiness?: CalibrationReadiness | null;
   overallEvaluatedSamples?: number;
   groupEvaluatedSamples?: number;
   evidenceStatus?: CalibrationEvidenceStatus;
+  confidenceTier?: SignalConfidence | 'INSUFFICIENT_SAMPLE';
+  downstreamInfluence?: CalibrationDownstreamInfluence;
+  authoritativeScore?: CalibrationAuthoritativeScore;
   warningsCount?: number;
 }
 
@@ -85,6 +106,9 @@ export interface CalibrationRunResponse {
   offset: number;
   nextOffset: number | null;
   hasMore: boolean;
+  selectedHorizon?: string;
+  calibrationEvidence?: CalibrationEvidence | null;
+  calibrationReadiness?: CalibrationReadiness | null;
   calibratedCount: number;
   passthroughCount: number;
   skippedCount: number;
@@ -122,6 +146,7 @@ export interface CalibrationModelInfo {
   };
   rules: string[];
   sampleSafetyRules?: string[];
+  calibrationReadinessRules?: string[];
   fallbackBehavior?: string;
   safeLanguageRules?: string[];
 }
