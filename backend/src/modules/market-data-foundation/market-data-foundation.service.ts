@@ -2991,6 +2991,21 @@ export class MarketDataFoundationService {
       actions = await this.repository.listCorporateActions(stock.id);
     }
 
+    return this.formatCorporateActionsResponse(stock, actions);
+  }
+
+  async storedCorporateActionsByInstrumentId(instrumentId: string, options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
+    const stock = await this.repository.findStockByIdInScope(instrumentId, options);
+    if (!stock) {
+      return null;
+    }
+
+    await this.repository.dedupeCorporateActions(stock.id);
+    const actions = await this.repository.listCorporateActions(stock.id);
+    return this.formatCorporateActionsResponse(stock, actions);
+  }
+
+  private formatCorporateActionsResponse(stock: any, actions: any[]) {
     return {
       instrument_id: stock.id,
       symbol: stock.symbol,

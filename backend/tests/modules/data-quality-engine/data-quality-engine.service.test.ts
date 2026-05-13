@@ -33,7 +33,9 @@ function service(overrides: Record<string, any> = {}) {
     listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: prices(260) }),
     latestPriceByInstrumentId: jest.fn().mockResolvedValue({ latest: prices(1)[0] }),
     fundamentalsByInstrumentId: jest.fn().mockResolvedValue({ records: [{ eps: 1 }] }),
+    storedFundamentalsByInstrumentId: jest.fn().mockResolvedValue({ records: [{ eps: 1 }] }),
     corporateActionsByInstrumentId: jest.fn().mockResolvedValue({ actions: [{ action_type: 'dividend' }] }),
+    storedCorporateActionsByInstrumentId: jest.fn().mockResolvedValue({ actions: [{ action_type: 'dividend' }] }),
     ...overrides.marketDataService,
   };
   const signalService = {
@@ -85,6 +87,17 @@ describe('data quality engine service', () => {
     const result = await setup.instance.evaluate({ batchSize: 1, offset: 1 });
     expect(setup.marketDataService.listInstruments).toHaveBeenCalledWith({ page: 2, pageSize: 1, region: undefined, assetType: undefined });
     expect(result).toMatchObject({ processedCount: 1, totalCount: 3, batchSize: 1, offset: 1, nextOffset: 2, hasMore: true, evaluatedCount: 1 });
+  });
+
+  it('uses stored context during evaluation without triggering live provider fetches', async () => {
+    const setup = service();
+
+    await setup.instance.evaluateAndPersistInstrument(instrument());
+
+    expect(setup.marketDataService.storedFundamentalsByInstrumentId).toHaveBeenCalledWith('stock-1');
+    expect(setup.marketDataService.storedCorporateActionsByInstrumentId).toHaveBeenCalledWith('stock-1');
+    expect(setup.marketDataService.fundamentalsByInstrumentId).not.toHaveBeenCalled();
+    expect(setup.marketDataService.corporateActionsByInstrumentId).not.toHaveBeenCalled();
   });
 
   it('returns paginated list metadata', async () => {

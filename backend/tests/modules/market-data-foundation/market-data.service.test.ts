@@ -179,6 +179,27 @@ describe('MarketDataFoundationService syncV1', () => {
     });
   });
 
+  it('reads stored corporate actions without fetching provider data', async () => {
+    const repository = {
+      findStockByIdInScope: jest.fn().mockResolvedValue(stock),
+      dedupeCorporateActions: jest.fn().mockResolvedValue(undefined),
+      listCorporateActions: jest.fn().mockResolvedValue([]),
+      upsertCorporateActions: jest.fn(),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+    const fetchSpy = jest.spyOn(service, 'fetchCorporateActions');
+
+    await expect(service.storedCorporateActionsByInstrumentId('stock-1')).resolves.toMatchObject({
+      instrument_id: 'stock-1',
+      symbol: 'AAPL',
+      data_status: 'MISSING',
+      actions: [],
+    });
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(repository.upsertCorporateActions).not.toHaveBeenCalled();
+  });
+
   it('returns FX rates from the repository', async () => {
     const service = new MarketDataFoundationService({
       listFxRates: jest.fn().mockResolvedValue([

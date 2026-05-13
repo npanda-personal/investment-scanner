@@ -150,8 +150,8 @@ export class DataQualityEngineService {
     const [pricesResponse, latestResponse, fundamentalsResponse, actionsResponse, latestSignal] = await Promise.all([
       this.marketDataService.listPricesByInstrumentId(instrument.id, 300).catch(() => null),
       this.marketDataService.latestPriceByInstrumentId(instrument.id).catch(() => null),
-      this.marketDataService.fundamentalsByInstrumentId(instrument.id).catch(() => null),
-      this.marketDataService.corporateActionsByInstrumentId(instrument.id).catch(() => null),
+      this.marketDataService.storedFundamentalsByInstrumentId(instrument.id).catch(() => null),
+      this.marketDataService.storedCorporateActionsByInstrumentId(instrument.id).catch(() => null),
       this.signalService?.signalHistory({ instrumentId: instrument.id, limit: 1 }).catch(() => []) ?? Promise.resolve([]),
     ]);
     const prices = this.normalizePrices(pricesResponse?.prices || []);
