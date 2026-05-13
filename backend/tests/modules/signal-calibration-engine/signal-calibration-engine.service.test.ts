@@ -19,9 +19,9 @@ const rawSignal = (overrides: Partial<SignalLikeForCalibration> = {}): SignalLik
 });
 
 const context = (overrides: Partial<CalibrationContext> = {}): CalibrationContext => ({
-  signalTypeMetrics: new Map([['PRICE_ABOVE_SMA50', { winRate: 0.65, averageForwardReturn: 0.04, sampleSize: 30 }]]),
-  scoreBucketMetric: { winRate: 0.62, averageForwardReturn: 0.03, sampleSize: 25 },
-  sectorMetric: { winRate: 0.61, averageForwardReturn: 0.02, sampleSize: 20 },
+  signalTypeMetrics: new Map([['PRICE_ABOVE_SMA50', { winRate: 0.65, averageForwardReturn: 0.04, sampleSize: 60 }]]),
+  scoreBucketMetric: { winRate: 0.62, averageForwardReturn: 0.03, sampleSize: 55 },
+  sectorMetric: { winRate: 0.61, averageForwardReturn: 0.02, sampleSize: 50 },
   regime: 'RISK_ON',
   sectorLeadership: 'LEADING',
   smartMoneyStatus: 'ACCUMULATION',
@@ -58,9 +58,9 @@ function service(overrides: Record<string, any> = {}) {
     ...overrides.signalService,
   };
   const qualityService = {
-    byType: jest.fn().mockResolvedValue([{ signalType: 'PRICE_ABOVE_SMA50', winRate: 0.65, averageForwardReturn: 0.04, sampleSize: 30 }]),
-    byScoreBucket: jest.fn().mockResolvedValue([{ group: '70-84', winRate: 0.62, averageForwardReturn: 0.03, sampleSize: 25 }]),
-    bySector: jest.fn().mockResolvedValue([{ group: 'Technology', winRate: 0.61, averageForwardReturn: 0.02, sampleSize: 20 }]),
+    byType: jest.fn().mockResolvedValue([{ signalType: 'PRICE_ABOVE_SMA50', winRate: 0.65, averageForwardReturn: 0.04, sampleSize: 60 }]),
+    byScoreBucket: jest.fn().mockResolvedValue([{ group: '70-84', winRate: 0.62, averageForwardReturn: 0.03, sampleSize: 55 }]),
+    bySector: jest.fn().mockResolvedValue([{ group: 'Technology', winRate: 0.61, averageForwardReturn: 0.02, sampleSize: 50 }]),
     noisy: jest.fn().mockResolvedValue([]),
     summary: jest.fn().mockResolvedValue({
       dataStatus: 'PARTIAL',
@@ -103,6 +103,19 @@ describe('signal calibration engine service', () => {
     expect(result.calibratedScore).toBeGreaterThan(result.rawScore);
     expect(result.boosts.map((item) => item.type)).toEqual(expect.arrayContaining(['SIGNAL_TYPE', 'REGIME', 'SECTOR', 'SMART_MONEY']));
     expect(result.calibratedConfidence).toBe('HIGH');
+    expect(result.calibrationReadiness).toMatchObject({
+      status: 'USABLE',
+      confidenceTier: 'HIGH',
+      downstreamInfluence: 'NORMAL',
+      authoritativeScore: 'CALIBRATED_SCORE',
+      calibrationApplied: true,
+    });
+    expect(result.calibrationEvidence).toMatchObject({
+      horizon: '20D',
+      evidenceStatus: 'SUFFICIENT',
+      requiredOverallSamples: 50,
+      requiredGroupSamples: 20,
+    });
   });
 
   it('penalizes weak signal quality, risk-off conflict, distribution, data quality, and noise', () => {
@@ -167,7 +180,49 @@ describe('signal calibration engine service', () => {
 
   it('returns model and health metadata', async () => {
     expect(service().instance.model()).toMatchObject({ calibrationModelVersion: 'signal-calibration-v2', totalDeltaCap: 25, minOverallSamples: 50, minGroupSamples: 20 });
-    await expect(service().instance.health()).resolves.toMatchObject({ module: 'signal-calibration-engine', dataStatus: 'MISSING' });
+    await expect(service().instance.health()).resolves.toMatchObject({
+      module: 'signal-calibration-engine',
+      dataStatus: 'MISSING',
+      calibrationEvidence: {
+        horizon: '20D',
+        evidenceStatus: 'INSUFFICIENT',
+        overallEvaluatedSamples: 0,
+        groupEvaluatedSamples: 0,
+        requiredOverallSamples: 50,
+        requiredGroupSamples: 20,
+      },
+      calibrationReadiness: {
+        status: 'UNAVAILABLE',
+        confidenceTier: 'INSUFFICIENT_SAMPLE',
+        calibrationApplied: false,
+        downstreamInfluence: 'NONE',
+        authoritativeScore: 'NO_SCORE',
+      },
+    });
+  });
+
+  it('adds health evidence for persisted rows that still lack stored readiness evidence', async () => {
+    const setup = service({ repository: { count: jest.fn().mockResolvedValue({ total: 4, latestGeneratedAt: new Date('2026-05-13T09:30:00.000Z') }) } });
+    await expect(setup.instance.health()).resolves.toMatchObject({
+      calibratedSignals: 4,
+      latestGeneratedAt: '2026-05-13T09:30:00.000Z',
+      dataStatus: 'PARTIAL',
+      calibrationEvidence: {
+        horizon: '20D',
+        evidenceStatus: 'MISSING',
+        overallEvaluatedSamples: 0,
+        groupEvaluatedSamples: 0,
+        requiredOverallSamples: 50,
+        requiredGroupSamples: 20,
+      },
+      calibrationReadiness: {
+        status: 'UNAVAILABLE',
+        confidenceTier: 'INSUFFICIENT_SAMPLE',
+        calibrationApplied: false,
+        downstreamInfluence: 'NONE',
+        authoritativeScore: 'RAW_SCORE',
+      },
+    });
   });
 
   it('marks 5D with zero evaluated samples as insufficient and skips adjustments', () => {
@@ -186,6 +241,14 @@ describe('signal calibration engine service', () => {
     expect(result.evidenceStatus).toBe('INSUFFICIENT');
     expect(result.calibrationApplied).toBe(false);
     expect(result.calibratedScore).toBe(result.rawScore);
+    expect(result.calibrationReadiness).toMatchObject({
+      status: 'UNAVAILABLE',
+      confidenceTier: 'INSUFFICIENT_SAMPLE',
+      downstreamInfluence: 'NONE',
+      authoritativeScore: 'RAW_SCORE',
+      calibrationApplied: false,
+    });
+    expect(result.calibrationReadiness?.blockers).toContain('Selected horizon has 0 evaluated outcome samples.');
   });
 
   it('treats 1D with 27 evaluated samples as insufficient sample evidence', () => {
@@ -203,6 +266,34 @@ describe('signal calibration engine service', () => {
     expect(result.calibratedConfidence).toBe('INSUFFICIENT_SAMPLE');
     expect(result.evidenceStatus).toBe('INSUFFICIENT');
     expect(result.scoreDelta).toBe(0);
+    expect(result.calibrationReadiness).toMatchObject({
+      status: 'UNAVAILABLE',
+      downstreamInfluence: 'NONE',
+      authoritativeScore: 'RAW_SCORE',
+    });
+  });
+
+  it('marks low sample evidence as limited downstream influence', () => {
+    const result = service().instance.calibrate(rawSignal(), context({
+      signalTypeMetrics: new Map([['PRICE_ABOVE_SMA50', { winRate: 0.65, averageForwardReturn: 0.04, sampleSize: 22 }]]),
+      scoreBucketMetric: { winRate: 0.62, averageForwardReturn: 0.03, sampleSize: 22 },
+      sectorMetric: { winRate: 0.61, averageForwardReturn: 0.02, sampleSize: 22 },
+      evaluationDiagnostics: { evaluatedSignals: 70 },
+      horizonAvailability: {
+        '1D': { eligible: 70, evaluated: 70, insufficientFuturePrice: 0 },
+        '5D': { eligible: 70, evaluated: 70, insufficientFuturePrice: 0 },
+        '10D': { eligible: 70, evaluated: 70, insufficientFuturePrice: 0 },
+        '20D': { eligible: 70, evaluated: 70, insufficientFuturePrice: 0 },
+        '60D': { eligible: 70, evaluated: 60, insufficientFuturePrice: 10 },
+      },
+    }));
+    expect(result.evidenceStatus).toBe('LOW_SAMPLE');
+    expect(result.calibrationReadiness).toMatchObject({
+      status: 'LIMITED',
+      confidenceTier: 'LOW',
+      downstreamInfluence: 'LIMITED',
+      authoritativeScore: 'CALIBRATED_SCORE',
+    });
   });
 
   it('caps low, medium, and high confidence adjustments', () => {
@@ -222,6 +313,12 @@ describe('signal calibration engine service', () => {
     expect(result.skippedCount).toBe(0);
     expect(result.warnings.join(' ')).toContain('Signal Quality diagnostics unavailable');
     expect(result.results[0].calibratedConfidence).toBe('INSUFFICIENT_SAMPLE');
+    expect(result.results[0].calibrationReadiness).toMatchObject({
+      status: 'UNAVAILABLE',
+      downstreamInfluence: 'NONE',
+      authoritativeScore: 'RAW_SCORE',
+    });
+    expect(result.calibrationReadiness).toMatchObject({ status: 'UNAVAILABLE', downstreamInfluence: 'NONE' });
   });
 
   it('runs calibration for one latest-signal batch with progress metadata', async () => {
@@ -244,7 +341,37 @@ describe('signal calibration engine service', () => {
       passthroughCount: 0,
       skippedCount: 0,
       failedCount: 0,
+      selectedHorizon: '20D',
     });
+    expect(result.calibrationEvidence).toMatchObject({ horizon: '20D', evidenceStatus: 'SUFFICIENT' });
+    expect(result.calibrationReadiness).toMatchObject({ status: 'USABLE', downstreamInfluence: 'NORMAL' });
+  });
+
+  it('attaches conservative readiness to existing persisted rows without stored evidence', async () => {
+    const setup = service({
+      repository: {
+        latestForInstrument: jest.fn().mockResolvedValue({
+          ...service().instance.calibrate(rawSignal(), context()),
+          calibrationEvidence: null,
+          calibrationReadiness: null,
+        }),
+      },
+      qualityService: {
+        summary: jest.fn().mockResolvedValue({
+          dataStatus: 'PARTIAL',
+          evaluationDiagnostics: { evaluatedSignals: 0 },
+          horizonAvailability: { '20D': { eligible: 10, evaluated: 0, insufficientFuturePrice: 10 } },
+        }),
+      },
+    });
+    const latest = await setup.instance.latestForInstrument('stock-1');
+    expect(latest?.calibrationReadiness).toMatchObject({
+      status: 'UNAVAILABLE',
+      downstreamInfluence: 'NONE',
+      authoritativeScore: 'RAW_SCORE',
+      calibrationApplied: false,
+    });
+    expect(latest?.calibratedConfidence).toBe('INSUFFICIENT_SAMPLE');
   });
 
   it('loads Signal Quality grouping metrics once per batch instead of once per signal', async () => {

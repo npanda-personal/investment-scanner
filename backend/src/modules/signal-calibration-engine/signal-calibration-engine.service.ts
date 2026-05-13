@@ -7,12 +7,16 @@ import type {
   CalibrationAdjustment,
   CalibrationComparison,
   CalibrationContext,
+  CalibrationDataStatus,
+  CalibrationHealthResponse,
   CalibrationModelInfo,
   CalibrationQuery,
   CalibrationRunRequest,
   CalibrationRunResponse,
   CalibrationEvidenceStatus,
   CalibrationConfidenceLevel,
+  CalibrationEvidence,
+  CalibrationReadiness,
   SignalCalibrationResultDto,
   SignalLikeForCalibration,
   PaginatedCalibrationResponse,
@@ -58,13 +62,17 @@ export class SignalCalibrationEngineService {
 
   async latestForInstrument(instrumentId: string): Promise<SignalCalibrationResultDto | null> {
     const existing = await this.repository.latestForInstrument(instrumentId);
-    if (existing) return existing;
+    if (existing) {
+      const summary = await this.qualityService.summary({ horizon: DEFAULT_HORIZON, limit: 1, minSampleSize: 0 }).catch(() => null);
+      return this.withEvidenceFromSummary(existing, DEFAULT_HORIZON, summary);
+    }
     const raw = await this.signalService.latestForInstrument(instrumentId);
     return raw ? this.calibrateAndPersist(raw) : null;
   }
 
   async latestPersistedForInstrument(instrumentId: string): Promise<SignalCalibrationResultDto | null> {
-    return this.repository.latestForInstrument(instrumentId);
+    const existing = await this.repository.latestForInstrument(instrumentId);
+    return existing ? this.withEvidenceFromSummary(existing, DEFAULT_HORIZON, null) : null;
   }
 
   async compare(instrumentId: string, region?: string, assetType?: string, horizonInput?: string): Promise<CalibrationComparison | null> {
@@ -127,6 +135,8 @@ export class SignalCalibrationEngineService {
     const nextOffset = offset + processedCount;
     const passthroughCount = results.filter((result) => !result.calibrationApplied).length;
     const skipped = Math.max(0, signals.length - results.length - errors.length);
+    const runEvidence = this.runEvidenceFromSummary(horizon, globalSummary, results);
+    const runReadiness = this.aggregateReadiness(results, horizon, runEvidence, Boolean(globalSummary));
     return {
       generated: results.length,
       skipped,
@@ -139,6 +149,9 @@ export class SignalCalibrationEngineService {
       offset,
       nextOffset: nextOffset < totalCount ? nextOffset : null,
       hasMore: nextOffset < totalCount,
+      selectedHorizon: horizon,
+      calibrationEvidence: runEvidence,
+      calibrationReadiness: runReadiness,
       calibratedCount: results.filter((result) => result.calibrationApplied).length,
       passthroughCount,
       skippedCount: skipped,
@@ -167,16 +180,29 @@ export class SignalCalibrationEngineService {
     };
   }
 
-  async health() {
+  async health(): Promise<CalibrationHealthResponse> {
     const count = await this.repository.count();
+    const hasPersistedRows = count.total > 0;
+    const dataStatus: CalibrationDataStatus = hasPersistedRows ? 'PARTIAL' : 'MISSING';
+    const evidenceReason = hasPersistedRows
+      ? 'Existing persisted calibration rows do not store readiness evidence; refresh calibration to attach source evidence.'
+      : 'No calibrated signal results persisted yet.';
     return {
       status: 'ok',
       module: 'signal-calibration-engine',
       calibrationModelVersion: MODEL_VERSION,
       calibratedSignals: count.total,
       latestGeneratedAt: count.latestGeneratedAt?.toISOString() ?? null,
-      dataStatus: count.total > 0 ? 'PARTIAL' : 'MISSING',
-      gaps: count.total === 0 ? ['No calibrated signal results persisted yet.'] : [],
+      dataStatus,
+      gaps: hasPersistedRows ? [] : [evidenceReason],
+      calibrationEvidence: this.healthCalibrationEvidence({
+        dataStatus,
+        evidenceStatus: hasPersistedRows ? 'MISSING' : 'INSUFFICIENT',
+        reason: evidenceReason,
+      }),
+      calibrationReadiness: hasPersistedRows
+        ? this.missingPersistedReadiness(evidenceReason)
+        : this.noScoreReadiness(evidenceReason),
     };
   }
 
@@ -203,6 +229,12 @@ export class SignalCalibrationEngineService {
         'Each group must meet minimum sample size; fallback to broader group or skip if insufficient.',
         'Maximum adjustment delta is capped dynamically based on overall calibration confidence.',
         'If horizon has 0 evaluated samples, calibration is conservative or passthrough.',
+      ],
+      calibrationReadinessRules: [
+        'USABLE evidence allows normal downstream influence and calibrated score authority.',
+        'LIMITED evidence caps downstream influence and exposes low-sample reasons.',
+        'UNAVAILABLE or missing evidence sets downstream influence to NONE and preserves raw score authority.',
+        'Existing persisted rows without derived source evidence fail conservative until refreshed.',
       ],
       fallbackBehavior: 'When samples are missing or extremely low, a zero or tiny +/-1 adjustment is applied to preserve raw score.',
       safeLanguageRules: [
@@ -248,7 +280,7 @@ export class SignalCalibrationEngineService {
       evidenceWarnings.push(`Horizon ${context.horizon} has ${overallEvaluatedSamples} evaluated samples overall. Calibration confidence is ${baseConfidence}.`);
     }
 
-    const adjustmentCap = CAPS[baseConfidence] || CAPS.INSUFFICIENT_SAMPLE;
+    let adjustmentCap = CAPS[baseConfidence] || CAPS.INSUFFICIENT_SAMPLE;
 
     const add = (adjustment: CalibrationAdjustment, groupSampleSize?: number) => {
       if (baseConfidence === 'INSUFFICIENT_SAMPLE') {
@@ -283,6 +315,10 @@ export class SignalCalibrationEngineService {
       if ((metric.winRate ?? 1) <= 0.45 || (metric.averageForwardReturn ?? 0) < 0) add({ type: 'SIGNAL_TYPE', label: `${item.code} has weak historical quality.`, delta: -5, evidence: metric }, metric.sampleSize);
     }
 
+    const sourceEvidenceStatus = this.finalEvidenceStatus(evidenceStatus, groupEvaluatedSamples);
+    const sourceConfidenceTier = this.confidenceTier(overallEvaluatedSamples, groupEvaluatedSamples, evaluatedForHorizon, sourceEvidenceStatus);
+    adjustmentCap = CAPS[sourceConfidenceTier] || CAPS.INSUFFICIENT_SAMPLE;
+
     this.metricAdjustment(context.scoreBucketMetric, 'SCORE_BUCKET', 'Raw score bucket', add);
     this.metricAdjustment(context.sectorMetric, 'SECTOR', 'Sector history', add);
     
@@ -300,10 +336,34 @@ export class SignalCalibrationEngineService {
     const scoreDelta = Math.round(this.clamp(rawDelta, -TOTAL_DELTA_CAP, TOTAL_DELTA_CAP));
     const calibratedScore = this.clamp(Math.round(signal.score + scoreDelta), 0, 100);
     const calibratedDirection = this.directionForScore(calibratedScore);
-    const calibratedConfidence = this.confidence(signal.confidence, baseConfidence, boosts, penalties, context);
+    const finalEvidenceStatus = this.finalEvidenceStatus(evidenceStatus, groupEvaluatedSamples);
+    const confidenceTier = this.confidenceTier(overallEvaluatedSamples, groupEvaluatedSamples, evaluatedForHorizon, finalEvidenceStatus);
+    const calibratedConfidence = this.confidence(signal.confidence, confidenceTier, boosts, penalties, context);
 
     const calibrationApplied = boosts.length > 0 || penalties.length > 0;
-    const sampleSizePenaltyApplied = baseConfidence === 'INSUFFICIENT_SAMPLE' || baseConfidence === 'LOW';
+    const sampleSizePenaltyApplied = confidenceTier === 'INSUFFICIENT_SAMPLE' || confidenceTier === 'LOW';
+    const calibrationEvidence = this.calibrationEvidence({
+      horizon: context.horizon,
+      overallEvaluatedSamples,
+      groupEvaluatedSamples,
+      horizonAvailability: context.horizonAvailability || {},
+      dataStatus: context.dataGaps.length > 0 ? 'PARTIAL' : 'COMPLETE',
+      evidenceStatus: finalEvidenceStatus,
+      evidenceReasons: reasons,
+      evidenceWarnings,
+    });
+    const calibrationReadiness = this.calibrationReadiness({
+      evidenceStatus: finalEvidenceStatus,
+      confidenceTier,
+      calibrationApplied,
+      adjustmentCapApplied: adjustmentCap,
+      rawScoreAvailable: Number.isFinite(signal.score),
+      evaluatedForHorizon,
+      overallEvaluatedSamples,
+      groupEvaluatedSamples,
+      evidenceWarnings,
+      dataGaps: context.dataGaps,
+    });
 
     return {
       signalResultId: signal.id || '',
@@ -346,20 +406,13 @@ export class SignalCalibrationEngineService {
       sampleSizePenaltyApplied,
       overallEvaluatedSamples,
       groupEvaluatedSamples,
-      evidenceStatus,
+      evidenceStatus: finalEvidenceStatus,
+      confidenceTier,
+      downstreamInfluence: calibrationReadiness.downstreamInfluence,
+      authoritativeScore: calibrationReadiness.authoritativeScore,
       warningsCount: evidenceWarnings.length + context.dataGaps.length,
-      calibrationEvidence: {
-        horizon: context.horizon,
-        overallEvaluatedSamples,
-        groupEvaluatedSamples,
-        minimumOverallSamples: MIN_OVERALL_SAMPLES,
-        minimumGroupSamples: MIN_GROUP_SAMPLES,
-        horizonAvailability: context.horizonAvailability || {},
-        dataStatus: context.dataGaps.length > 0 ? 'PARTIAL' : 'COMPLETE',
-        evidenceStatus,
-        evidenceReasons: reasons,
-        evidenceWarnings,
-      }
+      calibrationEvidence,
+      calibrationReadiness,
     };
   }
 
@@ -427,7 +480,7 @@ export class SignalCalibrationEngineService {
   }
 
   private withEvidenceFromSummary(item: SignalCalibrationResultDto, horizon: QualityHorizon, summary: any): SignalCalibrationResultDto {
-    if (item.calibrationEvidence) return item;
+    if (item.calibrationEvidence && item.calibrationReadiness) return item;
     const overallEvaluatedSamples = summary?.evaluationDiagnostics?.evaluatedSignals ?? 0;
     const evaluatedForHorizon = summary?.horizonAvailability?.[horizon]?.evaluated ?? overallEvaluatedSamples;
     const groupEvaluatedSamples = Math.max(
@@ -435,30 +488,247 @@ export class SignalCalibrationEngineService {
       ...[...item.boosts, ...item.penalties].map((adjustment) => Number((adjustment.evidence as any)?.sampleSize || 0))
     );
     const confidence = this.sampleConfidence(overallEvaluatedSamples, groupEvaluatedSamples, evaluatedForHorizon);
-    const evidenceStatus = this.evidenceStatusForSamples(overallEvaluatedSamples, evaluatedForHorizon, Boolean(summary));
+    const evidenceStatus = this.finalEvidenceStatus(this.evidenceStatusForSamples(overallEvaluatedSamples, evaluatedForHorizon, Boolean(summary)), groupEvaluatedSamples);
     const warnings = summary ? this.sampleWarnings(horizon, overallEvaluatedSamples, groupEvaluatedSamples, evaluatedForHorizon) : ['Signal Quality diagnostics unavailable for this scope.'];
+    const calibrationApplied = evidenceStatus === 'SUFFICIENT' || evidenceStatus === 'LOW_SAMPLE' ? item.scoreDelta !== 0 : false;
+    const calibrationEvidence = this.calibrationEvidence({
+      horizon,
+      overallEvaluatedSamples,
+      groupEvaluatedSamples,
+      horizonAvailability: summary?.horizonAvailability || {},
+      dataStatus: summary?.dataStatus || 'MISSING',
+      evidenceStatus,
+      evidenceReasons: item.calibrationReasons,
+      evidenceWarnings: warnings,
+    });
+    const calibrationReadiness = this.calibrationReadiness({
+      evidenceStatus,
+      confidenceTier: confidence,
+      calibrationApplied,
+      adjustmentCapApplied: CAPS[confidence],
+      rawScoreAvailable: Number.isFinite(item.rawScore),
+      evaluatedForHorizon,
+      overallEvaluatedSamples,
+      groupEvaluatedSamples,
+      evidenceWarnings: warnings,
+      dataGaps: item.dataGaps,
+    });
     return {
       ...item,
-      calibrationApplied: item.scoreDelta !== 0,
+      calibrationApplied,
       adjustmentCapApplied: CAPS[confidence],
       sampleSizePenaltyApplied: confidence === 'LOW' || confidence === 'INSUFFICIENT_SAMPLE',
       calibratedConfidence: confidence === 'INSUFFICIENT_SAMPLE' ? 'INSUFFICIENT_SAMPLE' : item.calibratedConfidence,
       overallEvaluatedSamples,
       groupEvaluatedSamples,
       evidenceStatus,
+      confidenceTier: confidence,
+      downstreamInfluence: calibrationReadiness.downstreamInfluence,
+      authoritativeScore: calibrationReadiness.authoritativeScore,
       warningsCount: warnings.length + item.dataGaps.length,
-      calibrationEvidence: {
+      calibrationEvidence,
+      calibrationReadiness,
+    };
+  }
+
+  private calibrationEvidence(input: {
+    horizon: QualityHorizon | string;
+    overallEvaluatedSamples: number;
+    groupEvaluatedSamples: number;
+    horizonAvailability: Record<string, { eligible: number; evaluated: number; insufficientFuturePrice: number }>;
+    dataStatus: string;
+    evidenceStatus: CalibrationEvidenceStatus;
+    evidenceReasons: string[];
+    evidenceWarnings: string[];
+  }): CalibrationEvidence {
+    return {
+      horizon: input.horizon,
+      overallEvaluatedSamples: input.overallEvaluatedSamples,
+      groupEvaluatedSamples: input.groupEvaluatedSamples,
+      minimumOverallSamples: MIN_OVERALL_SAMPLES,
+      minimumGroupSamples: MIN_GROUP_SAMPLES,
+      requiredOverallSamples: MIN_OVERALL_SAMPLES,
+      requiredGroupSamples: MIN_GROUP_SAMPLES,
+      horizonAvailability: input.horizonAvailability,
+      dataStatus: input.dataStatus,
+      evidenceStatus: input.evidenceStatus,
+      evidenceReasons: input.evidenceReasons,
+      evidenceWarnings: input.evidenceWarnings,
+      warnings: input.evidenceWarnings,
+    };
+  }
+
+  private healthCalibrationEvidence(input: {
+    dataStatus: CalibrationDataStatus;
+    evidenceStatus: CalibrationEvidenceStatus;
+    reason: string;
+  }): CalibrationEvidence {
+    return this.calibrationEvidence({
+      horizon: DEFAULT_HORIZON,
+      overallEvaluatedSamples: 0,
+      groupEvaluatedSamples: 0,
+      horizonAvailability: Object.fromEntries(SUPPORTED_HORIZONS.map((horizon) => [
         horizon,
-        overallEvaluatedSamples,
-        groupEvaluatedSamples,
-        minimumOverallSamples: MIN_OVERALL_SAMPLES,
-        minimumGroupSamples: MIN_GROUP_SAMPLES,
-        horizonAvailability: summary?.horizonAvailability || {},
-        dataStatus: summary?.dataStatus || 'MISSING',
-        evidenceStatus,
-        evidenceReasons: item.calibrationReasons,
-        evidenceWarnings: warnings,
-      },
+        { eligible: 0, evaluated: 0, insufficientFuturePrice: 0 },
+      ])),
+      dataStatus: input.dataStatus,
+      evidenceStatus: input.evidenceStatus,
+      evidenceReasons: [input.reason],
+      evidenceWarnings: [input.reason],
+    });
+  }
+
+  private calibrationReadiness(input: {
+    evidenceStatus: CalibrationEvidenceStatus;
+    confidenceTier: CalibrationConfidenceLevel;
+    calibrationApplied: boolean;
+    adjustmentCapApplied: number;
+    rawScoreAvailable: boolean;
+    evaluatedForHorizon: number;
+    overallEvaluatedSamples: number;
+    groupEvaluatedSamples: number;
+    evidenceWarnings: string[];
+    dataGaps: string[];
+  }): CalibrationReadiness {
+    const blockers: string[] = [];
+    const reasons: string[] = [];
+    if (!input.rawScoreAvailable) blockers.push('Raw signal score is unavailable.');
+    if (input.evidenceStatus === 'MISSING') blockers.push('Signal Quality evidence is missing.');
+    if (input.evaluatedForHorizon === 0) blockers.push('Selected horizon has 0 evaluated outcome samples.');
+    if (input.overallEvaluatedSamples < MIN_OVERALL_SAMPLES) blockers.push(`Overall evaluated samples ${input.overallEvaluatedSamples} are below required ${MIN_OVERALL_SAMPLES}.`);
+    if (input.groupEvaluatedSamples > 0 && input.groupEvaluatedSamples < MIN_GROUP_SAMPLES) reasons.push(`Group evaluated samples ${input.groupEvaluatedSamples} are below preferred ${MIN_GROUP_SAMPLES}.`);
+    reasons.push(...input.evidenceWarnings, ...input.dataGaps);
+
+    if (!input.rawScoreAvailable) {
+      return {
+        status: 'UNAVAILABLE',
+        confidenceTier: 'INSUFFICIENT_SAMPLE',
+        calibrationApplied: false,
+        adjustmentCapApplied: 0,
+        downstreamInfluence: 'NONE',
+        authoritativeScore: 'NO_SCORE',
+        reasons: [...new Set(reasons)],
+        blockers: [...new Set(blockers)],
+      };
+    }
+
+    if (input.evidenceStatus === 'MISSING' || input.evidenceStatus === 'INSUFFICIENT' || input.confidenceTier === 'INSUFFICIENT_SAMPLE' || input.evaluatedForHorizon === 0) {
+      return {
+        status: 'UNAVAILABLE',
+        confidenceTier: 'INSUFFICIENT_SAMPLE',
+        calibrationApplied: false,
+        adjustmentCapApplied: input.adjustmentCapApplied,
+        downstreamInfluence: 'NONE',
+        authoritativeScore: 'RAW_SCORE',
+        reasons: [...new Set(reasons)],
+        blockers: [...new Set(blockers)],
+      };
+    }
+
+    if (input.evidenceStatus === 'LOW_SAMPLE' || input.confidenceTier === 'LOW') {
+      return {
+        status: 'LIMITED',
+        confidenceTier: input.confidenceTier,
+        calibrationApplied: input.calibrationApplied,
+        adjustmentCapApplied: input.adjustmentCapApplied,
+        downstreamInfluence: 'LIMITED',
+        authoritativeScore: input.calibrationApplied ? 'CALIBRATED_SCORE' : 'RAW_SCORE',
+        reasons: [...new Set(reasons)],
+        blockers: [...new Set(blockers)],
+      };
+    }
+
+    return {
+      status: 'USABLE',
+      confidenceTier: input.confidenceTier,
+      calibrationApplied: input.calibrationApplied,
+      adjustmentCapApplied: input.adjustmentCapApplied,
+      downstreamInfluence: 'NORMAL',
+      authoritativeScore: 'CALIBRATED_SCORE',
+      reasons: [...new Set(reasons)],
+      blockers: [],
+    };
+  }
+
+  private runEvidenceFromSummary(horizon: QualityHorizon, summary: any, results: SignalCalibrationResultDto[]): CalibrationEvidence | null {
+    const firstEvidence = results.find((result) => result.calibrationEvidence)?.calibrationEvidence;
+    if (firstEvidence) return firstEvidence;
+    if (!summary) {
+      return this.calibrationEvidence({
+        horizon,
+        overallEvaluatedSamples: 0,
+        groupEvaluatedSamples: 0,
+        horizonAvailability: {},
+        dataStatus: 'MISSING',
+        evidenceStatus: 'MISSING',
+        evidenceReasons: [],
+        evidenceWarnings: ['Signal Quality diagnostics unavailable for this scope.'],
+      });
+    }
+    const overallEvaluatedSamples = summary.evaluationDiagnostics?.evaluatedSignals ?? 0;
+    const evaluatedForHorizon = summary.horizonAvailability?.[horizon]?.evaluated ?? overallEvaluatedSamples;
+    return this.calibrationEvidence({
+      horizon,
+      overallEvaluatedSamples,
+      groupEvaluatedSamples: Math.max(0, ...results.map((result) => result.groupEvaluatedSamples ?? 0)),
+      horizonAvailability: summary.horizonAvailability || {},
+      dataStatus: summary.dataStatus || 'MISSING',
+      evidenceStatus: this.evidenceStatusForSamples(overallEvaluatedSamples, evaluatedForHorizon, true),
+      evidenceReasons: [],
+      evidenceWarnings: this.sampleWarnings(horizon, overallEvaluatedSamples, Math.max(0, ...results.map((result) => result.groupEvaluatedSamples ?? 0)), evaluatedForHorizon),
+    });
+  }
+
+  private aggregateReadiness(results: SignalCalibrationResultDto[], horizon: QualityHorizon, evidence: CalibrationEvidence | null, hasSummary: boolean): CalibrationReadiness {
+    if (results.length === 0) return this.noScoreReadiness(`No calibrated results were produced for ${horizon}.`);
+    const resultReadiness = results.map((result) => result.calibrationReadiness).filter((item): item is CalibrationReadiness => Boolean(item));
+    if (resultReadiness.some((item) => item.status === 'UNAVAILABLE')) {
+      return this.calibrationReadiness({
+        evidenceStatus: evidence?.evidenceStatus ?? (hasSummary ? 'INSUFFICIENT' : 'MISSING'),
+        confidenceTier: 'INSUFFICIENT_SAMPLE',
+        calibrationApplied: false,
+        adjustmentCapApplied: CAPS.INSUFFICIENT_SAMPLE,
+        rawScoreAvailable: true,
+        evaluatedForHorizon: evidence?.horizonAvailability?.[horizon]?.evaluated ?? 0,
+        overallEvaluatedSamples: evidence?.overallEvaluatedSamples ?? 0,
+        groupEvaluatedSamples: evidence?.groupEvaluatedSamples ?? 0,
+        evidenceWarnings: evidence?.warnings ?? [],
+        dataGaps: ['At least one result has unavailable calibration evidence.'],
+      });
+    }
+    if (resultReadiness.some((item) => item.status === 'LIMITED')) {
+      return {
+        ...resultReadiness.find((item) => item.status === 'LIMITED')!,
+        status: 'LIMITED',
+        downstreamInfluence: 'LIMITED',
+      };
+    }
+    return resultReadiness[0] ?? this.noScoreReadiness(`No readiness evidence was attached for ${horizon}.`);
+  }
+
+  private noScoreReadiness(reason: string): CalibrationReadiness {
+    return {
+      status: 'UNAVAILABLE',
+      confidenceTier: 'INSUFFICIENT_SAMPLE',
+      calibrationApplied: false,
+      adjustmentCapApplied: 0,
+      downstreamInfluence: 'NONE',
+      authoritativeScore: 'NO_SCORE',
+      reasons: [reason],
+      blockers: [reason],
+    };
+  }
+
+  private missingPersistedReadiness(reason: string): CalibrationReadiness {
+    return {
+      status: 'UNAVAILABLE',
+      confidenceTier: 'INSUFFICIENT_SAMPLE',
+      calibrationApplied: false,
+      adjustmentCapApplied: CAPS.INSUFFICIENT_SAMPLE,
+      downstreamInfluence: 'NONE',
+      authoritativeScore: 'RAW_SCORE',
+      reasons: [reason],
+      blockers: [reason],
     };
   }
 
@@ -469,11 +739,23 @@ export class SignalCalibrationEngineService {
     return 'LOW';
   }
 
+  private confidenceTier(overall: number, group: number, evaluatedForHorizon: number, evidenceStatus: CalibrationEvidenceStatus): CalibrationConfidenceLevel {
+    if (evidenceStatus === 'MISSING' || evidenceStatus === 'INSUFFICIENT' || evaluatedForHorizon === 0 || overall < MIN_OVERALL_SAMPLES) return 'INSUFFICIENT_SAMPLE';
+    if (overall >= THRESHOLDS.HIGH.overall && group >= THRESHOLDS.HIGH.group) return 'HIGH';
+    if (overall >= THRESHOLDS.MEDIUM.overall && group >= THRESHOLDS.MEDIUM.group) return 'MEDIUM';
+    return 'LOW';
+  }
+
   private evidenceStatusForSamples(overall: number, evaluatedForHorizon: number, hasSummary: boolean): CalibrationEvidenceStatus {
     if (!hasSummary) return 'MISSING';
     if (evaluatedForHorizon === 0 || overall < MIN_OVERALL_SAMPLES) return 'INSUFFICIENT';
     if (overall < THRESHOLDS.MEDIUM.overall) return 'LOW_SAMPLE';
     return 'SUFFICIENT';
+  }
+
+  private finalEvidenceStatus(status: CalibrationEvidenceStatus, groupEvaluatedSamples: number): CalibrationEvidenceStatus {
+    if (status === 'SUFFICIENT' && groupEvaluatedSamples > 0 && groupEvaluatedSamples < MIN_GROUP_SAMPLES) return 'LOW_SAMPLE';
+    return status;
   }
 
   private sampleWarnings(horizon: QualityHorizon, overall: number, group: number, evaluatedForHorizon: number): string[] {

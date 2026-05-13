@@ -5,6 +5,9 @@ export type CalibrationDataStatus = 'COMPLETE' | 'PARTIAL' | 'MISSING' | 'ERROR'
 export type CalibrationAdjustmentType = 'SIGNAL_TYPE' | 'SCORE_BUCKET' | 'REGIME' | 'SECTOR' | 'SMART_MONEY' | 'DATA_QUALITY' | 'NOISE';
 export type CalibrationConfidenceLevel = SignalConfidence | 'INSUFFICIENT_SAMPLE';
 export type CalibrationEvidenceStatus = 'SUFFICIENT' | 'LOW_SAMPLE' | 'INSUFFICIENT' | 'MISSING';
+export type CalibrationReadinessStatus = 'USABLE' | 'LIMITED' | 'UNAVAILABLE';
+export type CalibrationDownstreamInfluence = 'NORMAL' | 'LIMITED' | 'NONE';
+export type CalibrationAuthoritativeScore = 'CALIBRATED_SCORE' | 'RAW_SCORE' | 'NO_SCORE';
 
 export interface CalibrationAdjustment {
   type: CalibrationAdjustmentType;
@@ -19,11 +22,25 @@ export interface CalibrationEvidence {
   groupEvaluatedSamples: number;
   minimumOverallSamples: number;
   minimumGroupSamples: number;
+  requiredOverallSamples: number;
+  requiredGroupSamples: number;
   horizonAvailability: Record<string, { eligible: number; evaluated: number; insufficientFuturePrice: number }>;
   dataStatus: string;
   evidenceStatus: CalibrationEvidenceStatus;
   evidenceReasons: string[];
   evidenceWarnings: string[];
+  warnings: string[];
+}
+
+export interface CalibrationReadiness {
+  status: CalibrationReadinessStatus;
+  confidenceTier: CalibrationConfidenceLevel;
+  calibrationApplied: boolean;
+  adjustmentCapApplied: number;
+  downstreamInfluence: CalibrationDownstreamInfluence;
+  authoritativeScore: CalibrationAuthoritativeScore;
+  reasons: string[];
+  blockers: string[];
 }
 
 export interface SignalCalibrationResultDto {
@@ -63,9 +80,13 @@ export interface SignalCalibrationResultDto {
   adjustmentCapApplied?: number;
   sampleSizePenaltyApplied?: boolean;
   calibrationEvidence?: CalibrationEvidence | null;
+  calibrationReadiness?: CalibrationReadiness | null;
   overallEvaluatedSamples?: number;
   groupEvaluatedSamples?: number;
   evidenceStatus?: CalibrationEvidenceStatus;
+  confidenceTier?: CalibrationConfidenceLevel;
+  downstreamInfluence?: CalibrationDownstreamInfluence;
+  authoritativeScore?: CalibrationAuthoritativeScore;
   warningsCount?: number;
 }
 
@@ -127,6 +148,9 @@ export interface CalibrationRunResponse {
   offset: number;
   nextOffset: number | null;
   hasMore: boolean;
+  selectedHorizon?: string;
+  calibrationEvidence?: CalibrationEvidence | null;
+  calibrationReadiness?: CalibrationReadiness | null;
   calibratedCount: number;
   passthroughCount: number;
   skippedCount: number;
@@ -134,6 +158,18 @@ export interface CalibrationRunResponse {
   outOfScopeSkipped?: number;
   warnings: string[];
   durationMs: number;
+}
+
+export interface CalibrationHealthResponse {
+  status: 'ok';
+  module: 'signal-calibration-engine';
+  calibrationModelVersion: string;
+  calibratedSignals: number;
+  latestGeneratedAt: string | null;
+  dataStatus: CalibrationDataStatus;
+  gaps: string[];
+  calibrationEvidence: CalibrationEvidence;
+  calibrationReadiness: CalibrationReadiness;
 }
 
 export interface CalibrationComparison {
@@ -164,6 +200,7 @@ export interface CalibrationModelInfo {
   };
   rules: string[];
   sampleSafetyRules: string[];
+  calibrationReadinessRules: string[];
   fallbackBehavior: string;
   safeLanguageRules: string[];
 }

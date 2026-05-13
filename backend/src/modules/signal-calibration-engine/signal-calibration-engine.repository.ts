@@ -219,9 +219,13 @@ export class SignalCalibrationEngineRepository {
       adjustmentCapApplied: result.adjustmentCapApplied,
       sampleSizePenaltyApplied: result.sampleSizePenaltyApplied,
       calibrationEvidence: result.calibrationEvidence,
+      calibrationReadiness: result.calibrationReadiness,
       overallEvaluatedSamples: result.overallEvaluatedSamples,
       groupEvaluatedSamples: result.groupEvaluatedSamples,
       evidenceStatus: result.evidenceStatus,
+      confidenceTier: result.confidenceTier,
+      downstreamInfluence: result.downstreamInfluence,
+      authoritativeScore: result.authoritativeScore,
       warningsCount: result.warningsCount,
     };
   }

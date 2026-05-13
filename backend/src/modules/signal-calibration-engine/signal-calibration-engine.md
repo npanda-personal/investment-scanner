@@ -19,7 +19,7 @@ Mounted under `/api/v1`:
 | GET | `/signals/calibration/top` | Paginated calibrated results by scope, calibrated score, and filters |
 | GET | `/signals/calibration/compare/:instrumentId` | Raw vs calibrated latest signal |
 | GET | `/signals/calibration/model` | Model version, rules, horizons, and sample thresholds |
-| GET | `/signals/calibration/health` | Calibration count, latest timestamp, and gaps |
+| GET | `/signals/calibration/health` | Calibration count, latest timestamp, health-level calibration evidence, readiness, and gaps |
 
 ## Batch Calibration
 
@@ -51,6 +51,9 @@ Response fields include the previous compatibility fields plus progress metadata
 - `offset`
 - `nextOffset`
 - `hasMore`
+- `selectedHorizon`
+- `calibrationEvidence`
+- `calibrationReadiness`
 - `calibratedCount`
 - `passthroughCount`
 - `skippedCount`
@@ -109,9 +112,38 @@ The calibration UI clearly displays:
 - Evidence warnings (e.g., "Horizon 5D has insufficient evaluated outcomes.")
 - Evidence Status (`SUFFICIENT`, `LOW_SAMPLE`, `INSUFFICIENT`, `MISSING`)
 - Overall and group evaluated samples
+- Readiness status, downstream influence, and authoritative score
 - Adjustment cap and whether sample-size fallback/passthrough was used
 
 Response DTOs add `calibrationEvidence`, `calibrationConfidence`, `calibrationApplied`, `adjustmentCapApplied`, `sampleSizePenaltyApplied`, `overallEvaluatedSamples`, `groupEvaluatedSamples`, `evidenceStatus`, and `warningsCount`.
+
+Source-module readiness guardrails are additive and are not persisted in this slice. Calibration-owned responses also expose:
+
+- `calibrationEvidence.requiredOverallSamples`
+- `calibrationEvidence.requiredGroupSamples`
+- `calibrationEvidence.warnings`
+- `calibrationReadiness.status`: `USABLE`, `LIMITED`, or `UNAVAILABLE`
+- `calibrationReadiness.confidenceTier`: `HIGH`, `MEDIUM`, `LOW`, or `INSUFFICIENT_SAMPLE`
+- `calibrationReadiness.calibrationApplied`
+- `calibrationReadiness.adjustmentCapApplied`
+- `calibrationReadiness.downstreamInfluence`: `NORMAL`, `LIMITED`, or `NONE`
+- `calibrationReadiness.authoritativeScore`: `CALIBRATED_SCORE`, `RAW_SCORE`, or `NO_SCORE`
+- `calibrationReadiness.reasons`
+- `calibrationReadiness.blockers`
+
+The health response exposes the same standardized guardrail shape. When no calibration rows exist, health returns
+`calibrationEvidence.evidenceStatus=INSUFFICIENT`, zero evaluated samples, required thresholds, and
+`calibrationReadiness.status=UNAVAILABLE` with `downstreamInfluence=NONE`. When persisted rows exist but do not carry
+source readiness evidence, health returns `calibrationEvidence.evidenceStatus=MISSING` and keeps calibration influence
+disabled until calibration is refreshed with source evidence.
+
+Readiness rules:
+
+- `USABLE` requires sufficient selected-horizon evidence and allows normal downstream influence.
+- `LIMITED` means evidence exists but is low-sample or has data gaps; downstream influence is limited.
+- `UNAVAILABLE` means evidence is missing, selected-horizon evaluated samples are zero, or raw score is unavailable; downstream influence is `NONE`.
+- When selected-horizon evaluated samples are zero, calibration is not applied, confidence tier is `INSUFFICIENT_SAMPLE`, and raw score is authoritative when a raw score exists.
+- Existing persisted rows without stored readiness evidence are treated conservatively on read. The source module derives current readiness from Signal Quality diagnostics when available; if diagnostics are missing, downstream influence is `NONE`.
 
 ## Adjustment Categories
 
