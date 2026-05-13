@@ -10,6 +10,8 @@ export type StrategyDirection = 'BULLISH' | 'BEARISH' | 'NEUTRAL';
 export type StrategyTimeframe = '1Y' | '3Y' | '5Y' | '10Y' | '15Y';
 export type StrategyCategory = 'ENTRY' | 'EXIT' | 'FILTER' | 'GATE';
 export type StrategyRuleKind = 'REQUIRES' | 'BLOCKS' | 'SCORES' | 'WARNS';
+export type StrategyProofStatus = 'PROVEN' | 'LIMITED' | 'UNPROVEN' | 'BLOCKED' | 'MISSING';
+export type StrategySampleSufficiency = 'SUFFICIENT' | 'LOW_SAMPLE' | 'INSUFFICIENT' | 'NOT_APPLICABLE';
 
 export interface StrategyRuleDeclaration {
   code: string;
@@ -196,6 +198,60 @@ export interface StrategyPerformanceSummaryDto {
   generatedAt: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface StrategyProofRegistryRow {
+  strategyCode: string;
+  strategyVersion: string;
+  strategyName: string;
+  category: StrategyCategory | 'DRAFT';
+  status: StrategyProofStatus;
+  scope: {
+    region: string;
+    assetType: string;
+    universeKey: string;
+  };
+  selectedTimeframe: StrategyTimeframe;
+  latestEvaluationDate: string | null;
+  sample: {
+    tradeCount: number;
+    requiredTradeCount: number;
+    sampleSufficiency: StrategySampleSufficiency;
+  };
+  performance: {
+    cagr: number | null;
+    maxDrawdown: number | null;
+    sharpe: number | null;
+    winRate: number | null;
+    profitFactor: number | null;
+    dataCoveragePercent: number | null;
+    benchmarkCagr: number | null;
+    excessCagr: number | null;
+  };
+  rating: {
+    ratingGrade: StrategyRatingGrade | null;
+    readinessLabel: StrategyReadinessLabel | null;
+    reasons: string[];
+    warnings: string[];
+    capsApplied: string[];
+  };
+  missingEvidenceReason: string | null;
+  nextAction: {
+    label: string;
+    targetRoute: string;
+    sourceModule: 'backtesting-strategy-lab' | 'strategy-framework';
+  } | null;
+}
+
+export interface StrategyProofRegistryResponse {
+  rows: StrategyProofRegistryRow[];
+  statusCounts: Record<StrategyProofStatus, number>;
+  scope: {
+    region: string;
+    assetType: string;
+    universeKey: string;
+  };
+  selectedTimeframe: StrategyTimeframe;
 }
 
 export interface StrategyListQuery {

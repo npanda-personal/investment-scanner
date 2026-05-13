@@ -3,6 +3,8 @@ export type StrategyAutomationStatus = 'NOT_ELIGIBLE' | 'WATCHLIST_ONLY' | 'PAPE
 export type StrategyReadinessLabel = 'RESEARCH_ONLY' | 'WATCHLIST_CANDIDATE' | 'PAPER_TEST_CANDIDATE' | 'NOT_AUTOMATION_READY';
 export type StrategyRatingGrade = 'EXCELLENT' | 'GOOD' | 'AVERAGE' | 'WEAK' | 'UNPROVEN';
 export type StrategyTimeframe = '1Y' | '3Y' | '5Y' | '10Y' | '15Y';
+export type StrategyProofStatus = 'PROVEN' | 'LIMITED' | 'UNPROVEN' | 'BLOCKED' | 'MISSING';
+export type StrategySampleSufficiency = 'SUFFICIENT' | 'LOW_SAMPLE' | 'INSUFFICIENT' | 'NOT_APPLICABLE';
 
 export interface StrategyRuleDeclaration {
   code: string;
@@ -71,6 +73,60 @@ export interface StrategyDefinition {
   examples: { triggers: string[]; blocks: string[] };
   latestPerformance?: StrategyPerformanceSummary | null;
   latestPerformanceSummaries?: StrategyPerformanceSummary[];
+}
+
+export interface StrategyProofRegistryRow {
+  strategyCode: string;
+  strategyVersion: string;
+  strategyName: string;
+  category: string;
+  status: StrategyProofStatus;
+  scope: {
+    region: string;
+    assetType: string;
+    universeKey: string;
+  };
+  selectedTimeframe: StrategyTimeframe;
+  latestEvaluationDate: string | null;
+  sample: {
+    tradeCount: number;
+    requiredTradeCount: number;
+    sampleSufficiency: StrategySampleSufficiency;
+  };
+  performance: {
+    cagr: number | null;
+    maxDrawdown: number | null;
+    sharpe: number | null;
+    winRate: number | null;
+    profitFactor: number | null;
+    dataCoveragePercent: number | null;
+    benchmarkCagr: number | null;
+    excessCagr: number | null;
+  };
+  rating: {
+    ratingGrade: StrategyRatingGrade | null;
+    readinessLabel: StrategyReadinessLabel | null;
+    reasons: string[];
+    warnings: string[];
+    capsApplied: string[];
+  };
+  missingEvidenceReason: string | null;
+  nextAction: {
+    label: string;
+    targetRoute: string;
+    sourceModule: 'backtesting-strategy-lab' | 'strategy-framework';
+  } | null;
+}
+
+export interface StrategyProofRegistryResponse {
+  rows: StrategyProofRegistryRow[];
+  statusCounts: Record<StrategyProofStatus, number>;
+  scope: {
+    region: string;
+    assetType: string;
+    universeKey: string;
+  };
+  selectedTimeframe: StrategyTimeframe;
 }
 
 export interface StrategyEvaluationResult {

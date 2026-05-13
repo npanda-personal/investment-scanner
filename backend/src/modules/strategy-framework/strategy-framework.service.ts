@@ -16,6 +16,10 @@ import type {
   StrategyModelResponse,
   StrategyPerformanceQuery,
   StrategyPerformanceSummaryDto,
+  StrategyProofRegistryResponse,
+  StrategyProofRegistryRow,
+  StrategyProofStatus,
+  StrategySampleSufficiency,
   StrategyRankingsQuery,
   StrategySignalOutput,
   StrategyTimeframe,
@@ -56,6 +60,34 @@ export class StrategyFrameworkService {
 
   async performance(code: string, query: StrategyPerformanceQuery = {}) {
     return this.repository.performance(code, query).catch(() => []);
+  }
+
+  async proofRegistry(query: StrategyPerformanceQuery = {}): Promise<StrategyProofRegistryResponse> {
+    const scope = this.proofScope(query);
+    const strategies = this.registry.list().filter((strategy) => this.matches(strategy, { region: scope.region, assetType: scope.assetType }));
+    const summaries = await this.repository.latestPerformanceForStrategies(strategies.map((strategy) => strategy.code), scope).catch(() => []);
+    const latestByCode = new Map<string, StrategyPerformanceSummaryDto>();
+    for (const summary of summaries) {
+      if (!latestByCode.has(summary.strategyCode)) latestByCode.set(summary.strategyCode, summary);
+    }
+    const rows = strategies.map((strategy) => this.proofRow(strategy, latestByCode.get(strategy.code) ?? null, scope));
+    return {
+      rows,
+      statusCounts: this.proofStatusCounts(rows),
+      scope: {
+        region: scope.region,
+        assetType: scope.assetType,
+        universeKey: scope.universeKey || 'ALL_ELIGIBLE',
+      },
+      selectedTimeframe: scope.timeframe || '3Y',
+    };
+  }
+
+  async proofDetail(code: string, query: StrategyPerformanceQuery = {}): Promise<StrategyProofRegistryRow> {
+    const strategy = this.requireStrategy(code);
+    const scope = this.proofScope(query);
+    const [summary] = await this.repository.performance(strategy.code, scope).catch(() => []);
+    return this.proofRow(strategy, summary ?? null, scope);
   }
 
   async rankings(query: StrategyRankingsQuery = {}) {
@@ -214,6 +246,47 @@ export class StrategyFrameworkService {
 
   strategyToBacktestConfig(input: RegisteredBacktestInput) {
     return new StrategyFrameworkEvaluator(this.requireStandaloneBacktestStrategy(input.strategyCode)).getBacktestConfig(input);
+  }
+
+  proofRow(strategy: StrategyDefinition, summary: StrategyPerformanceSummaryDto | null, query: StrategyPerformanceQuery = {}): StrategyProofRegistryRow {
+    const scope = this.proofScope(query);
+    const sample = this.sample(summary?.tradeCount ?? 0, scope.timeframe || '3Y', strategy);
+    const status = this.proofStatus(strategy, summary, sample);
+    const missingEvidenceReason = this.missingEvidenceReason(strategy, summary, sample, status, scope.timeframe || '3Y');
+    return {
+      strategyCode: strategy.code,
+      strategyVersion: summary?.strategyVersion || strategy.version,
+      strategyName: strategy.name,
+      category: strategy.status === 'DRAFT' ? 'DRAFT' : strategy.category,
+      status,
+      scope: {
+        region: scope.region,
+        assetType: scope.assetType,
+        universeKey: summary?.universeKey || scope.universeKey || 'ALL_ELIGIBLE',
+      },
+      selectedTimeframe: scope.timeframe || '3Y',
+      latestEvaluationDate: summary?.generatedAt ?? null,
+      sample,
+      performance: {
+        cagr: summary?.cagr ?? null,
+        maxDrawdown: summary?.maxDrawdown ?? null,
+        sharpe: summary?.sharpe ?? null,
+        winRate: summary?.winRate ?? null,
+        profitFactor: summary?.profitFactor ?? null,
+        dataCoveragePercent: summary?.dataCoveragePercent ?? null,
+        benchmarkCagr: summary?.benchmarkCagr ?? null,
+        excessCagr: summary?.excessCagr ?? null,
+      },
+      rating: {
+        ratingGrade: summary?.ratingGrade ?? null,
+        readinessLabel: summary?.readinessLabel ?? null,
+        reasons: summary?.ratingReasons ?? [],
+        warnings: summary?.ratingWarnings ?? [],
+        capsApplied: summary?.ratingCapsApplied ?? [],
+      },
+      missingEvidenceReason,
+      nextAction: this.nextProofAction(strategy, status, scope.timeframe || '3Y', scope.region, scope.assetType),
+    };
   }
 
   private async buildContext(request: StrategyEvaluateRequest): Promise<StrategyContext> {
@@ -403,5 +476,80 @@ export class StrategyFrameworkService {
   private optionalNumber(value: unknown) {
     const numeric = Number(value);
     return Number.isFinite(numeric) ? numeric : null;
+  }
+
+  private proofScope(query: StrategyPerformanceQuery): Required<Pick<StrategyPerformanceQuery, 'timeframe' | 'region' | 'assetType'>> & { universeKey?: string } {
+    return {
+      timeframe: query.timeframe || '3Y',
+      region: query.region || 'IN',
+      assetType: query.assetType || 'STOCK',
+      universeKey: query.universeKey || 'ALL_ELIGIBLE',
+    };
+  }
+
+  private proofStatus(strategy: StrategyDefinition, summary: StrategyPerformanceSummaryDto | null, sample: StrategyProofRegistryRow['sample']): StrategyProofStatus {
+    if (strategy.status === 'DISABLED' || strategy.status === 'DEPRECATED' || (strategy.status === 'ACTIVE' && strategy.category !== 'ENTRY')) return 'BLOCKED';
+    if (strategy.status === 'DRAFT') return 'UNPROVEN';
+    if (!summary) return 'MISSING';
+    if (summary.ratingGrade === 'WEAK' || summary.ratingGrade === 'UNPROVEN' || sample.sampleSufficiency === 'INSUFFICIENT') return 'UNPROVEN';
+    if (
+      summary.ratingGrade === 'AVERAGE' ||
+      sample.sampleSufficiency === 'LOW_SAMPLE' ||
+      (summary.ratingWarnings || []).length > 0 ||
+      (summary.ratingCapsApplied || []).length > 0 ||
+      (typeof summary.dataCoveragePercent === 'number' && summary.dataCoveragePercent < 0.8) ||
+      typeof summary.benchmarkCagr !== 'number' ||
+      Math.abs(summary.maxDrawdown ?? 0) >= 0.35
+    ) return 'LIMITED';
+    if ((summary.ratingGrade === 'GOOD' || summary.ratingGrade === 'EXCELLENT') && sample.sampleSufficiency === 'SUFFICIENT') return 'PROVEN';
+    return 'LIMITED';
+  }
+
+  private sample(tradeCount: number, timeframe: StrategyTimeframe, strategy: StrategyDefinition): StrategyProofRegistryRow['sample'] {
+    if (strategy.category !== 'ENTRY' || strategy.status === 'DISABLED' || strategy.status === 'DEPRECATED') {
+      return { tradeCount, requiredTradeCount: 0, sampleSufficiency: 'NOT_APPLICABLE' };
+    }
+    const requiredTradeCount = this.requiredTradeCount(timeframe);
+    return {
+      tradeCount,
+      requiredTradeCount,
+      sampleSufficiency: this.sampleSufficiency(tradeCount, requiredTradeCount),
+    };
+  }
+
+  private requiredTradeCount(timeframe: StrategyTimeframe): number {
+    return { '1Y': 30, '3Y': 60, '5Y': 90, '10Y': 120, '15Y': 150 }[timeframe];
+  }
+
+  private sampleSufficiency(tradeCount: number, requiredTradeCount: number): StrategySampleSufficiency {
+    if (requiredTradeCount === 0) return 'NOT_APPLICABLE';
+    if (tradeCount >= requiredTradeCount) return 'SUFFICIENT';
+    if (tradeCount >= Math.ceil(requiredTradeCount / 2)) return 'LOW_SAMPLE';
+    return 'INSUFFICIENT';
+  }
+
+  private missingEvidenceReason(strategy: StrategyDefinition, summary: StrategyPerformanceSummaryDto | null, sample: StrategyProofRegistryRow['sample'], status: StrategyProofStatus, timeframe: StrategyTimeframe): string | null {
+    if (status === 'BLOCKED') return strategy.category !== 'ENTRY' ? `${strategy.category} strategies are support rules and cannot be standalone registered backtests in this slice.` : `${strategy.status} strategies are not eligible for proof promotion.`;
+    if (strategy.status === 'DRAFT') return 'Draft strategy requires promotion and bounded backtest evidence before proof can be accepted.';
+    if (!summary) return `No compact StrategyPerformanceSummary exists for ${timeframe} in the selected scope.`;
+    if (sample.sampleSufficiency === 'INSUFFICIENT') return `Only ${sample.tradeCount} trades are available; ${sample.requiredTradeCount} are required for this timeframe.`;
+    if (summary.ratingGrade === 'WEAK' || summary.ratingGrade === 'UNPROVEN') return `Rating grade ${summary.ratingGrade} does not satisfy proof criteria.`;
+    return null;
+  }
+
+  private nextProofAction(strategy: StrategyDefinition, status: StrategyProofStatus, timeframe: StrategyTimeframe, region: string, assetType: string): StrategyProofRegistryRow['nextAction'] {
+    if (status === 'PROVEN') {
+      return { label: 'Inspect proof details', targetRoute: `/strategies?strategyCode=${encodeURIComponent(strategy.code)}`, sourceModule: 'strategy-framework' };
+    }
+    if (strategy.status === 'ACTIVE' && strategy.category === 'ENTRY') {
+      return { label: 'Inspect or run bounded backtest', targetRoute: `/backtests?mode=registered&strategyCode=${encodeURIComponent(strategy.code)}&timeframe=${timeframe}&region=${region}&assetType=${assetType}`, sourceModule: 'backtesting-strategy-lab' };
+    }
+    return { label: 'Review strategy definition', targetRoute: `/strategies?strategyCode=${encodeURIComponent(strategy.code)}`, sourceModule: 'strategy-framework' };
+  }
+
+  private proofStatusCounts(rows: StrategyProofRegistryRow[]): Record<StrategyProofStatus, number> {
+    const counts: Record<StrategyProofStatus, number> = { PROVEN: 0, LIMITED: 0, UNPROVEN: 0, BLOCKED: 0, MISSING: 0 };
+    for (const row of rows) counts[row.status] += 1;
+    return counts;
   }
 }

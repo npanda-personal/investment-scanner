@@ -26,8 +26,8 @@ import { DataTable, PageHeader } from '@/shared/components';
 import { InstrumentSearchSelect } from '@/shared/components/EntitySearchSelect';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import type { V1Instrument } from '@/features/market-data-foundation';
-import { evaluateStrategy, fetchStrategies, fetchStrategy, fetchStrategyPerformance, fetchStrategyRankings } from '../api/strategyFrameworkApi';
-import type { StrategyDefinition, StrategyEvaluationResult, StrategyPerformanceSummary, StrategyTimeframe } from '../types';
+import { evaluateStrategy, fetchStrategies, fetchStrategy, fetchStrategyPerformance, fetchStrategyProof, fetchStrategyProofRegistry, fetchStrategyRankings } from '../api/strategyFrameworkApi';
+import type { StrategyDefinition, StrategyEvaluationResult, StrategyPerformanceSummary, StrategyProofRegistryResponse, StrategyProofRegistryRow, StrategyTimeframe } from '../types';
 
 const timeframes: StrategyTimeframe[] = ['1Y', '3Y', '5Y', '10Y', '15Y'];
 const categoryFilters = ['ALL', 'ENTRY', 'EXIT', 'GATE', 'FILTER', 'DRAFT'] as const;
@@ -42,6 +42,8 @@ const StrategyFrameworkPage: React.FC = () => {
   const [timeframe, setTimeframe] = React.useState<StrategyTimeframe>('1Y');
   const [performance, setPerformance] = React.useState<StrategyPerformanceSummary[]>([]);
   const [rankings, setRankings] = React.useState<StrategyPerformanceSummary[]>([]);
+  const [proofRegistry, setProofRegistry] = React.useState<StrategyProofRegistryResponse | null>(null);
+  const [selectedProof, setSelectedProof] = React.useState<StrategyProofRegistryRow | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [running, setRunning] = React.useState(false);
@@ -78,16 +80,22 @@ const StrategyFrameworkPage: React.FC = () => {
       fetchStrategy(selectedCode, { region: scope.region, assetType: scope.assetType }),
       fetchStrategyPerformance(selectedCode, { region: scope.region, assetType: scope.assetType }),
       fetchStrategyRankings({ timeframe, region: scope.region, assetType: scope.assetType }),
+      fetchStrategyProofRegistry({ timeframe, region: scope.region, assetType: scope.assetType }),
+      fetchStrategyProof(selectedCode, { timeframe, region: scope.region, assetType: scope.assetType }),
     ])
-      .then(([detail, perf, ranks]) => {
+      .then(([detail, perf, ranks, registry, proof]) => {
         setSelected(detail);
         setPerformance(perf);
         setRankings(ranks);
+        setProofRegistry(registry);
+        setSelectedProof(proof);
       })
       .catch(() => {
         setSelected(null);
         setPerformance([]);
         setRankings([]);
+        setProofRegistry(null);
+        setSelectedProof(null);
       });
   }, [selectedCode, timeframe, scope.region, scope.assetType]);
 
@@ -122,7 +130,7 @@ const StrategyFrameworkPage: React.FC = () => {
         assetType: scope.assetType,
       });
       setEvaluation(result.results);
-      setTab(4);
+      setTab(5);
     } catch (err: any) {
       setEvaluation([]);
       setEvaluationError(err?.response?.data?.error || 'Strategy evaluation failed.');
@@ -144,6 +152,7 @@ const StrategyFrameworkPage: React.FC = () => {
       <Paper variant="outlined" sx={{ mb: 2 }}>
         <Tabs value={tab} onChange={(_event, value) => setTab(value)} variant="scrollable" scrollButtons="auto">
           <Tab label="Catalog" />
+          <Tab label="Proof Registry" />
           <Tab label="Detail" />
           <Tab label="Performance" />
           <Tab label="Rankings" />
@@ -175,7 +184,7 @@ const StrategyFrameworkPage: React.FC = () => {
               { id: 'style', label: 'Style', render: (row) => row.style },
               { id: 'rating', label: 'Latest rating', render: (row) => <Stack direction="row" spacing={1} alignItems="center">{ratingChip(row.latestPerformance?.ratingGrade)}{hasWarnings(row.latestPerformance) && <Chip size="small" label="Warnings" color="warning" />}</Stack> },
               { id: 'readiness', label: 'Readiness', render: (row) => readinessChip(row.latestPerformance?.readinessLabel) },
-              { id: 'action', label: 'Actions', render: (row) => <StrategyActions strategy={row} region={scope.region} assetType={scope.assetType} onView={() => { setSelectedCode(row.code); setTab(1); }} /> },
+              { id: 'action', label: 'Actions', render: (row) => <StrategyActions strategy={row} region={scope.region} assetType={scope.assetType} onView={() => { setSelectedCode(row.code); setTab(2); }} /> },
             ]}
             rows={visibleStrategies}
             getRowId={(row) => row.code}
@@ -191,16 +200,28 @@ const StrategyFrameworkPage: React.FC = () => {
         </Stack>
       )}
 
-      {tab === 1 && selected && <StrategyDetail strategy={selected} onStrategyChange={setSelectedCode} strategies={strategies} region={scope.region} assetType={scope.assetType} />}
+      {tab === 1 && (
+        <StrategyProofRegistryView
+          registry={proofRegistry}
+          timeframe={timeframe}
+          onTimeframeChange={setTimeframe}
+          onSelect={(code) => {
+            setSelectedCode(code);
+            setTab(2);
+          }}
+        />
+      )}
 
-      {tab === 2 && (
+      {tab === 2 && selected && <StrategyDetail strategy={selected} proof={selectedProof} onStrategyChange={setSelectedCode} strategies={strategies} region={scope.region} assetType={scope.assetType} />}
+
+      {tab === 3 && (
         <Stack spacing={2}>
           <ToolbarSelector strategies={strategies} selectedCode={selectedCode} onStrategyChange={setSelectedCode} timeframe={timeframe} onTimeframeChange={setTimeframe} />
           <PerformanceMatrix summaries={performance} selected={selected} region={scope.region} assetType={scope.assetType} />
         </Stack>
       )}
 
-      {tab === 3 && (
+      {tab === 4 && (
         <Stack spacing={2}>
           <ToolbarSelector strategies={strategies} selectedCode={selectedCode} onStrategyChange={setSelectedCode} timeframe={timeframe} onTimeframeChange={setTimeframe} />
           <DataTable
@@ -229,7 +250,7 @@ const StrategyFrameworkPage: React.FC = () => {
         </Stack>
       )}
 
-      {tab === 4 && (
+      {tab === 5 && (
         <Stack spacing={2}>
           <Paper variant="outlined" sx={{ p: 2 }}>
             <Grid container spacing={2} alignItems="center">
@@ -281,10 +302,51 @@ function ToolbarStrategySelect({ strategies, selectedCode, onStrategyChange }: {
   );
 }
 
-function StrategyDetail({ strategy, onStrategyChange, strategies, region, assetType }: { strategy: StrategyDefinition; onStrategyChange: (value: string) => void; strategies: StrategyDefinition[]; region: string; assetType: string }) {
+function StrategyProofRegistryView({ registry, timeframe, onTimeframeChange, onSelect }: { registry: StrategyProofRegistryResponse | null; timeframe: StrategyTimeframe; onTimeframeChange: (value: StrategyTimeframe) => void; onSelect: (code: string) => void }) {
+  const rows = registry?.rows ?? [];
+  const counts = registry?.statusCounts ?? { PROVEN: 0, LIMITED: 0, UNPROVEN: 0, BLOCKED: 0, MISSING: 0 };
+  return (
+    <Stack spacing={2}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'center' }} justifyContent="space-between">
+        <FormControl size="small" sx={{ minWidth: 140 }}>
+          <InputLabel>Timeframe</InputLabel>
+          <Select label="Timeframe" value={timeframe} onChange={(event) => onTimeframeChange(event.target.value as StrategyTimeframe)}>
+            {timeframes.map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          {(['PROVEN', 'LIMITED', 'UNPROVEN', 'BLOCKED', 'MISSING'] as const).map((status) => <Chip key={status} size="small" label={`${status} ${counts[status] || 0}`} color={proofStatusColor(status)} variant={status === 'MISSING' ? 'outlined' : 'filled'} />)}
+        </Stack>
+      </Stack>
+      <DataTable
+        columns={[
+          { id: 'strategyCode', label: 'Strategy', render: (row) => <Stack spacing={0.5}><Typography fontWeight={700}>{row.strategyName}</Typography><Typography variant="caption">{row.strategyCode} v{row.strategyVersion}</Typography></Stack> },
+          { id: 'status', label: 'Proof', render: (row) => proofStatusChip(row.status) },
+          { id: 'scope', label: 'Scope', render: (row) => `${row.scope.region} / ${row.scope.assetType} / ${row.selectedTimeframe}` },
+          { id: 'sample', label: 'Sample', render: (row) => <Stack spacing={0.5}><Typography>{row.sample.tradeCount}/{row.sample.requiredTradeCount || 'N/A'} trades</Typography><Chip size="small" label={row.sample.sampleSufficiency} variant="outlined" /></Stack> },
+          { id: 'performance', label: 'Performance', render: (row) => <Stack spacing={0.5}><Typography variant="body2">CAGR {percent(row.performance.cagr)}</Typography><Typography variant="body2">DD {percent(row.performance.maxDrawdown)} Win {percent(row.performance.winRate)}</Typography></Stack> },
+          { id: 'rating', label: 'Rating', render: (row) => <Stack spacing={0.5}>{ratingChip(row.rating.ratingGrade)}{readinessChip(row.rating.readinessLabel)}{(row.rating.warnings.length > 0 || row.rating.capsApplied.length > 0) && <Chip size="small" label="Warnings/Caps" color="warning" />}</Stack> },
+          { id: 'reason', label: 'Evidence Gap', render: (row) => row.missingEvidenceReason || row.rating.warnings[0] || row.rating.capsApplied[0] || 'Compact proof criteria satisfied.' },
+          { id: 'action', label: 'Next Action', render: (row) => <Stack direction="row" spacing={1}><Button size="small" onClick={() => onSelect(row.strategyCode)}>Details</Button>{row.nextAction && <Button size="small" href={row.nextAction.targetRoute}>{row.nextAction.label}</Button>}</Stack> },
+        ]}
+        rows={rows}
+        getRowId={(row) => `${row.strategyCode}-${row.selectedTimeframe}-${row.scope.region}-${row.scope.assetType}`}
+        page={0}
+        pageSize={10}
+        totalCount={rows.length}
+        onPageChange={() => undefined}
+        onPageSizeChange={() => undefined}
+        emptyMessage="No strategy proof rows found for the selected scope."
+      />
+    </Stack>
+  );
+}
+
+function StrategyDetail({ strategy, proof, onStrategyChange, strategies, region, assetType }: { strategy: StrategyDefinition; proof: StrategyProofRegistryRow | null; onStrategyChange: (value: string) => void; strategies: StrategyDefinition[]; region: string; assetType: string }) {
   return (
     <Stack spacing={2}>
       <ToolbarStrategySelect strategies={strategies} selectedCode={strategy.code} onStrategyChange={onStrategyChange} />
+      {proof && <StrategyProofPanel proof={proof} />}
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Stack spacing={1}>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between">
@@ -303,6 +365,38 @@ function StrategyDetail({ strategy, onStrategyChange, strategies, region, assetT
       </Paper>
     </Stack>
   );
+}
+
+function StrategyProofPanel({ proof }: { proof: StrategyProofRegistryRow }) {
+  return (
+    <Paper variant="outlined" sx={{ p: 2 }}>
+      <Stack spacing={1}>
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+          <Typography variant="h6">Proof Evidence</Typography>
+          {proofStatusChip(proof.status)}
+          <Chip size="small" label={`${proof.scope.region} / ${proof.scope.assetType} / ${proof.selectedTimeframe}`} />
+          <Chip size="small" label={`${proof.sample.tradeCount}/${proof.sample.requiredTradeCount || 'N/A'} trades`} variant="outlined" />
+        </Stack>
+        <Grid container spacing={2}>
+          <Grid item xs={12} md={4}><MetricBlock label="CAGR" value={percent(proof.performance.cagr)} /></Grid>
+          <Grid item xs={12} md={4}><MetricBlock label="Max Drawdown" value={percent(proof.performance.maxDrawdown)} /></Grid>
+          <Grid item xs={12} md={4}><MetricBlock label="Win Rate" value={percent(proof.performance.winRate)} /></Grid>
+        </Grid>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          {ratingChip(proof.rating.ratingGrade)}
+          {readinessChip(proof.rating.readinessLabel)}
+          {proof.rating.warnings.map((warning) => <Chip key={warning} size="small" label={warning} color="warning" />)}
+          {proof.rating.capsApplied.map((cap) => <Chip key={cap} size="small" label={cap} color="warning" variant="outlined" />)}
+        </Stack>
+        {proof.missingEvidenceReason && <Alert severity={proof.status === 'BLOCKED' ? 'warning' : 'info'}>{proof.missingEvidenceReason}</Alert>}
+        {proof.nextAction && <Button size="small" sx={{ alignSelf: 'flex-start' }} href={proof.nextAction.targetRoute}>{proof.nextAction.label}</Button>}
+      </Stack>
+    </Paper>
+  );
+}
+
+function MetricBlock({ label, value }: { label: string; value: string }) {
+  return <Box><Typography variant="caption" color="text.secondary">{label}</Typography><Typography fontWeight={700}>{value}</Typography></Box>;
 }
 
 function RuleSection({ title, rules }: { title: string; rules: Array<{ code: string; label: string }> }) {
@@ -369,6 +463,17 @@ function EvaluationList({ results, instrument }: { results: StrategyEvaluationRe
 
 function ratingChip(grade?: string | null) {
   return <Chip size="small" label={grade || 'UNPROVEN'} color={grade === 'EXCELLENT' ? 'success' : grade === 'GOOD' ? 'primary' : grade === 'WEAK' ? 'warning' : 'default'} />;
+}
+
+function proofStatusChip(status: StrategyProofRegistryRow['status']) {
+  return <Chip size="small" label={status} color={proofStatusColor(status)} variant={status === 'MISSING' ? 'outlined' : 'filled'} />;
+}
+
+function proofStatusColor(status: StrategyProofRegistryRow['status']) {
+  if (status === 'PROVEN') return 'success' as const;
+  if (status === 'LIMITED') return 'primary' as const;
+  if (status === 'UNPROVEN' || status === 'BLOCKED') return 'warning' as const;
+  return 'default' as const;
 }
 
 function StrategyActions({ strategy, region, assetType, onView }: { strategy: StrategyDefinition; region: string; assetType: string; onView: () => void }) {

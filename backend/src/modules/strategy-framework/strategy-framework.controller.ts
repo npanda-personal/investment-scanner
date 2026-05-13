@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { StrategyFrameworkService } from './strategy-framework.service';
-import { getCode, parseBacktestRequest, parseEvaluateRequest, parseListQuery, parsePerformanceQuery, parseRankingsQuery } from './strategy-framework.validation';
+import { getCode, parseBacktestRequest, parseEvaluateRequest, parseListQuery, parsePerformanceQuery, parseProofQuery, parseRankingsQuery } from './strategy-framework.validation';
 
 const currentUserId = (req: Request) => (req as any).user?.id || 'default-user';
 
@@ -10,6 +10,8 @@ export class StrategyFrameworkController {
   list = async (req: Request, res: Response) => this.respond(res, () => this.service.list(parseListQuery(req.query)));
   detail = async (req: Request, res: Response) => this.respond(res, () => this.service.detail(getCode(req.params.code), parsePerformanceQuery(req.query)));
   performance = async (req: Request, res: Response) => this.respond(res, () => this.service.performance(getCode(req.params.code), parsePerformanceQuery(req.query)));
+  proofRegistry = async (req: Request, res: Response) => this.respond(res, () => this.service.proofRegistry(parseProofQuery(req.query)));
+  proofDetail = async (req: Request, res: Response) => this.respond(res, () => this.service.proofDetail(getCode(req.params.code), parseProofQuery(req.query)));
   rankings = async (req: Request, res: Response) => this.respond(res, () => this.service.rankings(parseRankingsQuery(req.query)));
   model = async (_req: Request, res: Response) => this.respond(res, () => this.service.model());
   health = async (_req: Request, res: Response) => this.respond(res, () => this.service.health());

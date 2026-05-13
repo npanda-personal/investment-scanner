@@ -29,6 +29,15 @@ export function parsePerformanceQuery(query: Record<string, unknown>): StrategyP
   };
 }
 
+export function parseProofQuery(query: Record<string, unknown>): StrategyPerformanceQuery {
+  const parsed = parsePerformanceQuery(query);
+  return {
+    ...parsed,
+    timeframe: parsed.timeframe || '3Y',
+    universeKey: text(query.universeKey) || 'ALL_ELIGIBLE',
+  };
+}
+
 export function parseRankingsQuery(query: Record<string, unknown>): StrategyRankingsQuery {
   return { ...parsePerformanceQuery(query), minRating: text(query.minRating) as any };
 }

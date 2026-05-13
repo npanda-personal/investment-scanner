@@ -33,6 +33,84 @@ const strategies = [
   strategy('QUALITY_TREND', 'Quality Trend', 'ENTRY', 'DRAFT'),
 ];
 
+const proofRows = [
+  {
+    strategyCode: 'TREND_MOMENTUM',
+    strategyVersion: '1.0.0',
+    strategyName: 'Trend Momentum',
+    category: 'ENTRY',
+    status: 'PROVEN',
+    scope: { region: 'IN', assetType: 'STOCK', universeKey: 'ALL_ELIGIBLE' },
+    selectedTimeframe: '3Y',
+    latestEvaluationDate: '2026-05-13T00:00:00.000Z',
+    sample: { tradeCount: 72, requiredTradeCount: 60, sampleSufficiency: 'SUFFICIENT' },
+    performance: { cagr: 0.12, maxDrawdown: -0.14, sharpe: 1.2, winRate: 0.58, profitFactor: 1.5, dataCoveragePercent: 0.96, benchmarkCagr: 0.07, excessCagr: 0.05 },
+    rating: { ratingGrade: 'GOOD', readinessLabel: 'WATCHLIST_CANDIDATE', reasons: ['Sufficient sample.'], warnings: [], capsApplied: [] },
+    missingEvidenceReason: null,
+    nextAction: { label: 'Inspect proof details', targetRoute: '/strategies?strategyCode=TREND_MOMENTUM', sourceModule: 'strategy-framework' },
+  },
+  {
+    strategyCode: 'BREAKOUT_CONFIRMATION',
+    strategyVersion: '1.0.0',
+    strategyName: 'Breakout Confirmation',
+    category: 'ENTRY',
+    status: 'LIMITED',
+    scope: { region: 'IN', assetType: 'STOCK', universeKey: 'ALL_ELIGIBLE' },
+    selectedTimeframe: '3Y',
+    latestEvaluationDate: '2026-05-13T00:00:00.000Z',
+    sample: { tradeCount: 36, requiredTradeCount: 60, sampleSufficiency: 'LOW_SAMPLE' },
+    performance: { cagr: 0.05, maxDrawdown: -0.22, sharpe: 0.7, winRate: 0.51, profitFactor: 1.1, dataCoveragePercent: 0.74, benchmarkCagr: 0.07, excessCagr: -0.02 },
+    rating: { ratingGrade: 'GOOD', readinessLabel: 'WATCHLIST_CANDIDATE', reasons: [], warnings: ['Coverage cap applied.'], capsApplied: ['LOW_COVERAGE'] },
+    missingEvidenceReason: null,
+    nextAction: { label: 'Inspect or run bounded backtest', targetRoute: '/backtests?mode=registered&strategyCode=BREAKOUT_CONFIRMATION&timeframe=3Y&region=IN&assetType=STOCK', sourceModule: 'backtesting-strategy-lab' },
+  },
+  {
+    strategyCode: 'QUALITY_TREND',
+    strategyVersion: '1.0.0',
+    strategyName: 'Quality Trend',
+    category: 'DRAFT',
+    status: 'UNPROVEN',
+    scope: { region: 'IN', assetType: 'STOCK', universeKey: 'ALL_ELIGIBLE' },
+    selectedTimeframe: '3Y',
+    latestEvaluationDate: null,
+    sample: { tradeCount: 0, requiredTradeCount: 60, sampleSufficiency: 'INSUFFICIENT' },
+    performance: { cagr: null, maxDrawdown: null, sharpe: null, winRate: null, profitFactor: null, dataCoveragePercent: null, benchmarkCagr: null, excessCagr: null },
+    rating: { ratingGrade: null, readinessLabel: null, reasons: [], warnings: [], capsApplied: [] },
+    missingEvidenceReason: 'Draft strategy requires promotion and bounded backtest evidence before proof can be accepted.',
+    nextAction: { label: 'Review strategy definition', targetRoute: '/strategies?strategyCode=QUALITY_TREND', sourceModule: 'strategy-framework' },
+  },
+  {
+    strategyCode: 'LOW_QUALITY_DATA_REJECTION',
+    strategyVersion: '1.0.0',
+    strategyName: 'Low Quality Data Rejection',
+    category: 'FILTER',
+    status: 'BLOCKED',
+    scope: { region: 'IN', assetType: 'STOCK', universeKey: 'ALL_ELIGIBLE' },
+    selectedTimeframe: '3Y',
+    latestEvaluationDate: null,
+    sample: { tradeCount: 0, requiredTradeCount: 0, sampleSufficiency: 'NOT_APPLICABLE' },
+    performance: { cagr: null, maxDrawdown: null, sharpe: null, winRate: null, profitFactor: null, dataCoveragePercent: null, benchmarkCagr: null, excessCagr: null },
+    rating: { ratingGrade: null, readinessLabel: null, reasons: [], warnings: [], capsApplied: [] },
+    missingEvidenceReason: 'FILTER strategies are support rules and cannot be standalone registered backtests in this slice.',
+    nextAction: { label: 'Review strategy definition', targetRoute: '/strategies?strategyCode=LOW_QUALITY_DATA_REJECTION', sourceModule: 'strategy-framework' },
+  },
+  {
+    strategyCode: 'SMART_MONEY_ACCUMULATION',
+    strategyVersion: '1.0.0',
+    strategyName: 'Smart Money Accumulation',
+    category: 'ENTRY',
+    status: 'MISSING',
+    scope: { region: 'IN', assetType: 'STOCK', universeKey: 'ALL_ELIGIBLE' },
+    selectedTimeframe: '3Y',
+    latestEvaluationDate: null,
+    sample: { tradeCount: 0, requiredTradeCount: 60, sampleSufficiency: 'INSUFFICIENT' },
+    performance: { cagr: null, maxDrawdown: null, sharpe: null, winRate: null, profitFactor: null, dataCoveragePercent: null, benchmarkCagr: null, excessCagr: null },
+    rating: { ratingGrade: null, readinessLabel: null, reasons: [], warnings: [], capsApplied: [] },
+    missingEvidenceReason: 'No compact StrategyPerformanceSummary exists for 3Y in the selected scope.',
+    nextAction: { label: 'Inspect or run bounded backtest', targetRoute: '/backtests?mode=registered&strategyCode=SMART_MONEY_ACCUMULATION&timeframe=3Y&region=IN&assetType=STOCK', sourceModule: 'backtesting-strategy-lab' },
+  },
+];
+
 async function mockStrategyFrameworkApi(page: Page) {
   await page.route('**/api/v1/strategies**', async (route: Route) => {
     const url = new URL(route.request().url());
@@ -40,6 +118,27 @@ async function mockStrategyFrameworkApi(page: Page) {
 
     if (path.endsWith('/rankings')) {
       await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+      return;
+    }
+
+    if (path.endsWith('/proof-registry')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          rows: proofRows,
+          statusCounts: { PROVEN: 1, LIMITED: 1, UNPROVEN: 1, BLOCKED: 1, MISSING: 1 },
+          scope: { region: 'IN', assetType: 'STOCK', universeKey: 'ALL_ELIGIBLE' },
+          selectedTimeframe: '3Y',
+        }),
+      });
+      return;
+    }
+
+    const proofMatch = path.match(/\/api\/v1\/strategies\/([^/]+)\/proof$/);
+    if (proofMatch) {
+      const found = proofRows.find((item) => item.strategyCode === proofMatch[1]) || proofRows[0];
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(found) });
       return;
     }
 
@@ -95,5 +194,20 @@ test.describe('Strategy Framework UI', () => {
     await page.getByTestId('strategy-category-draft').click();
     const draftRow = page.getByRole('row').filter({ hasText: 'Quality Trend' });
     await expect(draftRow.getByRole('button', { name: 'Backtest in Lab' })).toBeDisabled();
+  });
+
+  test('shows proof registry statuses, evidence gaps, and next actions', async ({ page }) => {
+    await visitModule(page, '/strategies', 'Strategy Framework');
+
+    await page.getByRole('tab', { name: 'Proof Registry' }).click();
+    await expect(page.getByText(/^PROVEN\s+1$/)).toBeVisible();
+    await expect(page.getByText(/^LIMITED\s+1$/)).toBeVisible();
+    await expect(page.getByText(/^UNPROVEN\s+1$/)).toBeVisible();
+    await expect(page.getByText(/^BLOCKED\s+1$/)).toBeVisible();
+    await expect(page.getByText(/^MISSING\s+1$/)).toBeVisible();
+    await expect(page.getByRole('row').filter({ hasText: 'Trend Momentum' }).getByText('PROVEN')).toBeVisible();
+    await expect(page.getByRole('row').filter({ hasText: 'Breakout Confirmation' }).getByText('Warnings/Caps')).toBeVisible();
+    await expect(page.getByText('No compact StrategyPerformanceSummary exists for 3Y in the selected scope.')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inspect or run bounded backtest' }).first()).toHaveAttribute('href', /backtests\?mode=registered/);
   });
 });

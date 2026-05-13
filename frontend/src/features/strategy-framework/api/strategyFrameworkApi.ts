@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { StrategyBacktestResponse, StrategyDefinition, StrategyEvaluateResponse, StrategyPerformanceSummary, StrategyTimeframe } from '../types';
+import type { StrategyBacktestResponse, StrategyDefinition, StrategyEvaluateResponse, StrategyPerformanceSummary, StrategyProofRegistryResponse, StrategyProofRegistryRow, StrategyTimeframe } from '../types';
 
 const API_BASE = '/api/v1/strategies';
 
@@ -20,6 +20,16 @@ export async function fetchStrategyPerformance(code: string, params: { timeframe
 
 export async function fetchStrategyRankings(params: { timeframe?: StrategyTimeframe; region?: string; assetType?: string } = {}): Promise<StrategyPerformanceSummary[]> {
   const response = await axios.get<StrategyPerformanceSummary[]>(`${API_BASE}/rankings`, { params });
+  return response.data;
+}
+
+export async function fetchStrategyProofRegistry(params: { timeframe?: StrategyTimeframe; region?: string; assetType?: string; universeKey?: string } = {}): Promise<StrategyProofRegistryResponse> {
+  const response = await axios.get<StrategyProofRegistryResponse>(`${API_BASE}/proof-registry`, { params });
+  return response.data;
+}
+
+export async function fetchStrategyProof(code: string, params: { timeframe?: StrategyTimeframe; region?: string; assetType?: string; universeKey?: string } = {}): Promise<StrategyProofRegistryRow> {
+  const response = await axios.get<StrategyProofRegistryRow>(`${API_BASE}/${code}/proof`, { params });
   return response.data;
 }
 
