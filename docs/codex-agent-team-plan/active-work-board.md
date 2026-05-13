@@ -58,6 +58,7 @@ Use this file as the live source of truth for active Codex-agent work. The Senio
 |---|---:|---|---|---|
 | 2026-05-13 | 10 | [Cycle 3 discovery backlog](po-roadmap-backlog-2026-05-13-cycle3-discovery.md); [Cycle 3 Top 5 proposal](po-roadmap-backlog-2026-05-13-cycle3-top5.md) | Open | Cycle 3 Top 5 proposal created by Orchestrator after silent PO agent was closed; PO lane can resume later for product clarification or acceptance. |
 | 2026-05-13 | 10 | [Cycle 3 PO review](po-roadmap-backlog-2026-05-13-cycle3-top5-po-review.md) | Parked | Preserve Cycle 3 priority order, but do not start backlog implementation until the Market Data data-availability audit/fix track is completed or explicitly released by PO. |
+| 2026-05-14 | Strategic roadmap | [Lead PO autonomous strategy roadmap](po-roadmaps/2026-05-14-lead-po-autonomous-strategy-roadmap.md) with four [Associate PO inputs](po-roadmaps/) | Active roadmap direction | Current backlog remains parked unless it supports trusted data, canonical trade permission, strategy-native math, side-aware proof, paper execution, or guarded Angel One automation. |
 
 ## Active Non-Implementation Lanes
 

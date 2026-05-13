@@ -22,7 +22,8 @@ This is the realistic communication path for Codex work: task brief -> independe
 
 | Agent | Role | Main output | Default write scope |
 |---|---|---|---|
-| Product Owner Agent | Converts latest user direction into workflow, domain assumptions, market/quant rules, and acceptance criteria | Product brief and acceptance criteria | Docs, issue/task text, module docs sections |
+| Lead Product Owner Agent | Converts latest user direction and Associate PO inputs into final roadmap, priority, domain assumptions, market/quant rules, and acceptance criteria | Final roadmap, product brief, priority decision, PO acceptance | Docs, issue/task text, module docs sections |
+| Associate Product Owner Agents | Analyze one product domain or module group in parallel and propose roadmap items, gaps, risks, and acceptance criteria | Associate PO analysis and recommendation | Assigned PO roadmap/audit/brief artifact only |
 | Solution Architect Agent | Defines architecture, contracts, module boundaries, data flow, scalability, and free/local compliance | Architecture brief and contract notes | Architecture docs, module contract notes |
 | Senior Fullstack Lead / Orchestrator Agent | Coordinates agents, owns integration, reviews shared changes, resolves conflicts, and keeps work moving | Assignment packet, integration patch, final review | Shared files, route registries, integration edits |
 | Data/Foundation Module Developer Agent | Implements complete vertical slices for market data and data-quality work | Backend/frontend/tests/docs for assigned data module | Lane 1 modules only |
@@ -30,11 +31,27 @@ This is the realistic communication path for Codex work: task brief -> independe
 | Portfolio/UX Module Developer Agent | Implements complete vertical slices for portfolio, watchlist, alerts, notifications, and research UX work | Backend/frontend/tests/docs for assigned portfolio/UX module | Lane 3 modules only |
 | QA Agent | Builds verification plan, reviews acceptance coverage, runs relevant tests, and records blockers | QA checklist, test evidence, regression risks | Test files only when assigned; otherwise verification notes |
 
-The user remains the final source of Product Owner direction. The Product Owner Agent can make explicit assumptions to keep work moving, but must label them as assumptions when the user has not decided.
+The user remains the final source of Product Owner direction. Product Owner agents can make explicit assumptions to keep work moving, but must label them as assumptions when the user has not decided.
+
+### Product Owner Council
+
+Strategic roadmap work uses a Product Owner Council instead of one Product Owner agent doing all domain analysis.
+
+- The **Lead Product Owner Agent** owns final roadmap synthesis, priority order, product signoff, and PO acceptance.
+- **Associate Product Owner Agents** each own one module group or product domain, such as Market Regime, Strategy Math, Data Foundation, Risk/Execution, Portfolio, UX, or Broker Automation.
+- Associate POs work in parallel in `Product Planning Mode` and write only their assigned analysis artifact.
+- Associate PO artifacts are recommendations, not implementation authorization.
+- The Lead PO reviews all Associate PO inputs, performs independent domain/market/quant analysis, resolves conflicts, and publishes the final roadmap or product brief.
+- The Orchestrator may send final Lead PO roadmap items to intake only after Lead PO approval is recorded.
+- Roadmaps are living artifacts. The Lead PO may revise them as app evidence, market-data quality, strategy proof, user direction, or architecture constraints change.
+
+Product Owner Council flow:
+
+`User direction -> Orchestrator assigns Associate POs -> Associate PO domain artifacts -> Lead PO synthesis/review -> final roadmap approval -> Orchestrator intake for selected item`
 
 ## Deep-Thinking Decision Standard
 
-The Product Owner Agent and Solution Architect Agent must always work in deep-thinking mode.
+Lead Product Owner, Associate Product Owner, and Solution Architect agents must always work in deep-thinking mode.
 
 For Codex runs, this means:
 
@@ -68,14 +85,14 @@ Agent operating modes describe what a Codex agent is allowed to do for a work it
 | Mode | Primary owner | Allowed actions | Forbidden actions | Exit condition |
 |---|---|---|---|---|
 | `Discovery Mode` | Any assigned agent | Read docs/code/tests, inspect contracts, identify gaps, propose scope | Editing files or claiming implementation completion | Findings or work-packet input is recorded |
-| `Product Planning Mode` | Product Owner Agent | Create/refine requirements, user workflow, domain rules, priority, acceptance criteria | Architecture decisions, code edits, final QA claims | Product brief is ready for Orchestrator intake |
+| `Product Planning Mode` | Lead or Associate Product Owner Agent | Create/refine requirements, roadmap, user workflow, domain rules, priority, acceptance criteria | Architecture decisions, code edits, final QA claims | Associate analysis or Lead PO product brief is ready for Orchestrator intake |
 | `Orchestrator Intake Mode` | Senior Fullstack Lead / Orchestrator | Verify product brief completeness, record/update active board row, assign intake owner, move item to `Ready for Architecture` | Architecture decisions, implementation edits, bypassing incomplete acceptance criteria | Item is `Ready for Architecture` or returned for Product Owner revision/clarification |
 | `Architecture Planning Mode` | Solution Architect Agent | Define module ownership, contracts, data flow, schema/shared impact, constraints, tradeoffs | Product acceptance, implementation edits unless explicitly assigned | Architecture contract is ready |
 | `Implementation Mode` | Lane Developer Agent | Implement one reserved vertical slice, update module tests/docs, prepare handoff | Pulling a second task, editing unreserved files, changing PO intent | Developer handoff is complete and item is ready for QA |
 | `QA Verification Mode` | QA Agent | Verify acceptance criteria, run/review tests, inspect evidence, record blockers | Product acceptance, architecture approval, production-code edits unless assigned | QA signs off or rejects with clear reasons |
 | `Lead Validation Mode` | Senior Fullstack Lead / Orchestrator | Validate Architect asks, integration quality, shared files, public contracts after QA | Product acceptance, changing architecture intent without Architect | Lead validates or rejects with clear reasons |
 | `Architect Signoff Mode` | Solution Architect Agent | Confirm business rules, architecture contract, solution quality, and local/free constraints after Lead validation | PO acceptance, developer implementation work unless reassigned | Architect signs off or rejects with clear reasons |
-| `PO Acceptance Mode` | Product Owner Agent | Accept/reject delivered behavior against latest requirement and acceptance criteria | Code edits, architecture rewrites inside acceptance step | PO accepts or sends item to revision |
+| `PO Acceptance Mode` | Lead Product Owner Agent | Accept/reject delivered behavior against latest requirement and acceptance criteria | Code edits, architecture rewrites inside acceptance step | PO accepts or sends item to revision |
 | `GitHub Check-In Mode` | Senior Fullstack Lead / Orchestrator | Stage only accepted requirement files, commit, push to `origin` on the active branch, record evidence | Committing unrelated local changes, rejected work, unaccepted requirements, secrets, `.env` files, database dumps, or generated artifacts unless explicitly accepted | Commit and push succeed and evidence is recorded |
 | `Clarification Mode` | Blocked role plus escalation owner | Ask/answer unclear requirement, architecture, shared-file, or implementation questions | Continuing on guessed behavior when material ambiguity exists | Clarification is written back to the source artifact |
 | `Revision Mode` | Orchestrator-assigned qualified owner | Fix the same rejected item, update evidence/tests/docs, return to rejecting gate | Pulling another task while owning the active revision, editing unreserved files | Corrected item returns to rejecting gate |
@@ -84,7 +101,8 @@ Role-to-mode matrix:
 
 | Agent | Default modes | Notes |
 |---|---|---|
-| Product Owner Agent | `Product Planning Mode`, `PO Acceptance Mode`, `Clarification Mode` | Usually stays in planning/acceptance modes and deep-thinking mode; keeps the next priority batch moving |
+| Lead Product Owner Agent | `Product Planning Mode`, `PO Acceptance Mode`, `Clarification Mode` | Synthesizes Associate PO inputs, signs off final roadmap/briefs, keeps the next priority batch moving, and owns final product acceptance |
+| Associate Product Owner Agents | `Product Planning Mode`, `Discovery Mode`, `Clarification Mode` | Work in parallel by module/domain group and produce recommendation artifacts; they do not authorize implementation or final acceptance |
 | Solution Architect Agent | `Architecture Planning Mode`, `Architect Signoff Mode`, `Clarification Mode`, `Discovery Mode` | Switches between planning and signoff; uses deep-thinking mode for decisions |
 | Senior Fullstack Lead / Orchestrator | `Discovery Mode`, `Orchestrator Intake Mode`, `Lead Validation Mode`, `GitHub Check-In Mode`, `Clarification Mode` plus integration coordination | Owns intake, work packets, reservations, shared-file integration, post-QA Lead validation, and GitHub check-in |
 | Lane Developer Agent | `Discovery Mode`, `Implementation Mode`, `Revision Mode`, `Clarification Mode` | One active implementation or revision item only; rejected items are assigned by Orchestrator to an available qualified developer |
