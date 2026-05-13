@@ -196,8 +196,8 @@ Forbidden scope:
 
 ## MD-A4 - Provider Validation Drain And Retry Classification
 
-State: `PO Accepted`
-Mode: `GitHub Check-In Mode`
+State: `Released`
+Mode: none
 Owner: Lane 1 backend and frontend workers, coordinated by Senior Fullstack Lead / Orchestrator
 Lane/module: Lane 1, `market-data-foundation`
 
@@ -209,6 +209,7 @@ QA evidence: [MD-A4 QA evidence](../qa-evidence/2026-05-13-md-a4-provider-valida
 Lead validation: [MD-A4 Lead validation](../lead-validation/2026-05-13-md-a4-lead-validation.md)
 Architect signoff: [MD-A4 Architect signoff](../architecture-signoff/2026-05-13-md-a4-architect-signoff.md)
 PO acceptance: [MD-A4 PO acceptance](../po-acceptance/2026-05-13-md-a4-po-acceptance.md)
+GitHub check-in: [MD-A4 GitHub check-in](../github-check-in/2026-05-13-md-a4-github-check-in.md)
 
 ### Product Goal
 
@@ -262,7 +263,7 @@ Forbidden scope:
 - Frontend build passed.
 - Focused Market Data UI smoke passed: 8/8.
 - `git diff --check` passed with line-ending warnings only.
-- PO accepted MD-A4 for GitHub check-in. MD-A5 remains the next required implementation to actually populate 15-year/listing-date OHLCV and free-source fallback data.
+- PO accepted MD-A4 and the scoped implementation commit was pushed to `origin/dev` at `89ebe8e`. MD-A5 remains the next required implementation to actually populate 15-year/listing-date OHLCV and free-source fallback data.
 
 ## Later Packets Parked Behind MD-A4
 
