@@ -11,6 +11,8 @@ Use this file as the live source of truth for active Codex-agent work. The Senio
 - Product Owner priority changes must update the affected row before downstream agents continue.
 - Product Owner backlog buffer must stay at five or more refined candidate items. If the buffer drops below five, the Orchestrator assigns Product Owner planning work for new requirements, bugs, enhancements, and app-review findings before the PO lane becomes idle.
 - Released items must include GitHub check-in evidence.
+- Released items must also include a pushed documentation check-in for every task-owned artifact and evidence file created or updated for that accepted requirement.
+- The Orchestrator must keep unrelated future-backlog docs, preimplementation discovery, rejected work, and unaccepted scope out of a task check-in until those items reach their own acceptance gate.
 - Orchestrator must run status sweeps during active execution: reconcile worker state, board state, dirty files, reserved scopes, and gate dependencies; stale or silent workers must be prompted for handoff, continued unblocked work, or blocker report.
 - After spawning or resuming any agent, the Orchestrator must send an explicit post-start assignment message confirming current mode, work item, owned scope, forbidden actions, expected artifact or handoff, and what to do if blocked. A board row is not considered truly active until this post-start instruction is sent.
 - After a valid handoff to QA, a developer may pull the next Orchestrator-assigned implementation task. If QA rejects the prior item, an available qualified developer picks up the revision; no developer may own two active implementation/revision tasks at once.

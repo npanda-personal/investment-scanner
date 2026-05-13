@@ -211,6 +211,8 @@ The Orchestrator must protect the user's laptop during continuous team execution
    Confirm the implemented workflow against the acceptance criteria using product language and real user outcomes.
 10. **GitHub check-in**
    Senior Fullstack Lead / Orchestrator stages only the accepted requirement's scoped files, commits them, pushes to `origin` on the active branch, and records branch, commit SHA, pushed remote, committed files, scoped-staging confirmation, unsafe/unaccepted-file exclusion confirmation, rollback notes, and CI status/link when available.
+   The scoped files include all task-owned docs and evidence created or updated for that accepted requirement. The Orchestrator must not mark the item `Released` while its work packet, handoff, QA evidence, Lead validation, Architect signoff, PO acceptance, GitHub check-in note, active-board update, blocker entry, decision record, or release checklist entry is still unpushed.
+   Docs for unrelated future backlog, preimplementation discovery, rejected work, or unaccepted scope remain unstaged until those items reach their own acceptance gate.
 
 ## Agile Priority Pipeline
 
@@ -273,6 +275,7 @@ The requirement flow is Product Owner to Product Owner, followed by GitHub check
 12. Product Owner Agent reviews the delivered behavior.
 13. Product Owner accepts the requirement or sends a revised requirement back into the same flow.
 14. Senior Fullstack Lead / Orchestrator commits and pushes the accepted requirement's scoped files to `origin` on the active branch.
+15. Senior Fullstack Lead / Orchestrator verifies all task-owned docs and evidence for that accepted requirement are included in the pushed check-in, while excluding unrelated future/backlog docs and unaccepted work.
 
 Passing tests are necessary evidence, not final acceptance. Final completion requires QA evidence, post-QA Lead validation, post-QA Architect signoff after Lead validation, Product Owner acceptance against the latest requirement, and GitHub check-in evidence.
 
@@ -342,6 +345,7 @@ A module work item is done when:
 - post-QA Solution Architect signoff after Lead validation is recorded for business-rule fit, architecture contract integrity, and solution quality,
 - Product Owner acceptance is recorded for user-facing behavior,
 - the accepted requirement's scoped files are committed and pushed to `origin` on the active branch by the Senior Fullstack Lead / Orchestrator,
+- every task-owned documentation and evidence artifact for that accepted requirement is committed and pushed in the same check-in cycle,
 - branch name, commit SHA, pushed remote, committed files, scoped-staging confirmation, unsafe/unaccepted-file exclusion confirmation, rollback notes, and CI status/link when available are recorded,
 - release/rollback impact is recorded when the change is release-relevant,
 - technical debt and blockers are recorded in the shared registers when not resolved.

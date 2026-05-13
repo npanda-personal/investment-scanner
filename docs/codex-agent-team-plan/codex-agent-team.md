@@ -301,6 +301,7 @@ Every requirement starts with Product Owner intent, lands back with Product Owne
     Mark accepted when criteria are met. If not met, return a revised requirement or explicit change request to step 1.
 14. **Senior Fullstack Lead / Orchestrator checks in the accepted requirement**
      Stage only the accepted requirement's scoped files, including validated shared/integration files, commit the requirement, push to `origin` on the active branch, and record branch name, commit SHA, pushed remote, committed files, scoped-staging confirmation, unsafe/unaccepted-file exclusion confirmation, rollback notes, and CI status/link when available.
+     Include every task-owned documentation and evidence file for that accepted requirement in the same check-in cycle. This includes product briefs, work packets, architecture notes, QA plans/evidence, developer handoffs, Lead validation, Architect signoff, PO acceptance, GitHub check-in notes, release checklist entries, active-board updates, blocker entries, and decision records. Do not stage unrelated future-backlog docs, preimplementation discovery, rejected work, or unaccepted scope.
 
 No work is considered complete only because code is merged or tests pass. It is complete when QA evidence is recorded, the Senior Fullstack Lead validates after QA, the Solution Architect signs off after Lead validation, Product Owner acceptance confirms the delivered behavior matches the latest requirement, and the accepted requirement's scoped files are committed and pushed to GitHub.
 
@@ -877,7 +878,8 @@ Each agent finishes with a handoff that another agent can act on without guessin
 13. **Product Owner Agent checks acceptance**
     Confirm behavior against latest Product Owner direction and record any changed requirements for the next pass.
 14. **Senior Fullstack Lead checks in accepted work**
-    Stage only the accepted requirement's scoped files, commit them, push to `origin` on the active branch, and record GitHub check-in evidence before marking the item released.
+    Stage only the accepted requirement's scoped files, including task-owned docs and evidence, commit them, push to `origin` on the active branch, and record GitHub check-in evidence before marking the item released.
+    Leave unrelated future-backlog docs, preimplementation discovery, rejected work, and unaccepted scope unstaged until those items are accepted through their own flow.
 
 ## Anti-Blocking Policy
 
@@ -903,4 +905,6 @@ Only block when a choice changes product intent, architecture contract, schema d
 - Rejection reasons must be clear enough for the responsible role to fix the same item in the next iteration.
 - Never hide skipped tests or live-data blockers.
 - Never mark an accepted requirement as released until its scoped files are committed and pushed to `origin`.
+- Never mark an accepted requirement as released while task-owned docs or evidence for that requirement remain unpushed.
+- Never stage unrelated future-backlog docs, preimplementation discovery, rejected work, or unaccepted scope in a task check-in.
 - Never introduce paid dependencies, paid services, paid data providers, paid AI services, paid hosted testing, or paid hosted infrastructure.

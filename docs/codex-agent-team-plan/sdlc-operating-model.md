@@ -94,6 +94,8 @@ No item may skip gates unless the Product Owner explicitly changes scope and the
    PO accepts, rejects, or revises based on latest acceptance criteria.
 10. **GitHub Check-In Gate**
    Senior Fullstack Lead / Orchestrator stages only the accepted requirement's scoped files, commits them, pushes to `origin` on the active branch, and records branch, commit SHA, pushed remote, committed files, scoped-staging confirmation, unsafe/unaccepted-file exclusion confirmation, rollback notes, and CI status/link when available.
+   The scoped files must include all task-owned documentation and evidence for the accepted requirement: product brief, work packet, architecture contract or addendum, QA plan/evidence, developer handoff, Lead validation, Architect signoff, PO acceptance, GitHub check-in note, release checklist entry, active-board update, and blocker or decision records created for that task.
+   Unrelated future-backlog, preimplementation, rejected, or unaccepted docs must stay unstaged unless the Product Owner explicitly accepts them as part of the same requirement.
 11. **Release Gate**
    Orchestrator confirms build/test evidence, docs, migration/data safety, and rollback notes.
 
@@ -133,6 +135,7 @@ Every work item must leave evidence, even when blocked.
 - QA evidence: commands/checks run, result, logs/screenshots when useful, and skipped-test reasons.
 - Data evidence: live-data validation for data-bearing UI/API changes.
 - GitHub check-in evidence: active branch, pushed remote, commit SHA, committed files, scoped-staging confirmation, unsafe/unaccepted-file exclusion confirmation, rollback notes, and CI status/link when available.
+- Documentation check-in evidence: confirmation that every task-owned doc/evidence file for the accepted requirement was committed and pushed with the task, or an explicit reason a doc was excluded because it belongs to unrelated future work, rejected work, or unaccepted scope.
 - Release evidence: release checklist, GitHub check-in evidence, and rollback notes.
 - Decision evidence: decision record for material product, architecture, schema, dependency, or module-boundary decisions.
 
