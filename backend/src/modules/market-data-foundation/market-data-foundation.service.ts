@@ -317,6 +317,11 @@ type RepairRunSourceSnapshot = {
   warnings?: string[];
 };
 
+type PriceBackfillCandidate = {
+  stock: any;
+  readiness: InstrumentUniverseReadiness;
+};
+
 export class MarketDataFoundationService {
   private static lastIngestionAt = 0;
   private static catalogSyncRuns = new Map<string, CatalogSyncRunRecord>();
@@ -1816,26 +1821,52 @@ export class MarketDataFoundationService {
     const candidates = await this.priceBackfillCandidates(scope);
     const page = candidates.slice(0, batch.batchSize);
     const summary = this.emptyRepairSummary(scope, batch, candidates.length, true);
+    summary.priceRowsReceived = 0;
+    summary.priceRowsInserted = 0;
+    summary.priceRowsUpdated = 0;
+    summary.priceRowsNoOp = 0;
+    summary.zeroRowProviderReturns = 0;
+    summary.deepReloaded = 0;
+    summary.incrementalCaughtUp = 0;
     const latestCompletedDate = latestCompletedTradingDateForRegion(scope.region);
-    const safeEndDate = this.endOfTradingDateUtc(latestCompletedDate);
+    summary.latestCompletedEodDate = latestCompletedDate;
 
-    for (const stock of page) {
+    if (!latestCompletedDate) {
+      summary.remainingCandidates = candidates.length;
+      this.assignPriceBackfillDepthDiagnostics(summary, candidates);
+      summary.warnings.push(`MARKET_CALENDAR_UNCERTAIN: latest completed EOD is unavailable for ${scope.region}.`);
+      this.finishRepairSummary(summary, started);
+      return summary;
+    }
+
+    const safeEndDate = this.endOfTradingDateUtc(latestCompletedDate);
+    summary.targetEndDate = safeEndDate.toISOString();
+
+    for (const candidate of page) {
+      const { stock, mode, startDate } = this.priceBackfillFetchPlan(candidate, latestCompletedDate, request);
       summary.processedCount += 1;
+      if (mode === 'DEEP') summary.deepReloaded = (summary.deepReloaded || 0) + 1;
+      else summary.incrementalCaughtUp = (summary.incrementalCaughtUp || 0) + 1;
       try {
-        const result = await this.ingestSymbol(stock.symbol, undefined, safeEndDate, Boolean(request.fullReload), {
+        const result = await this.ingestSymbol(stock.symbol, startDate, safeEndDate, Boolean(request.fullReload), {
           force: request.force !== false,
           region: scope.region,
           assetType: scope.assetType,
           skipFreshnessGate: true,
+          preserveProviderSupportOnZeroRows: true,
         });
         summary.priceRowsReceived = (summary.priceRowsReceived || 0) + result.rowsReceived;
         summary.priceRowsInserted = (summary.priceRowsInserted || 0) + result.rowsInserted;
         summary.priceRowsUpdated = (summary.priceRowsUpdated || 0) + result.rowsUpdated;
         summary.priceRowsNoOp = (summary.priceRowsNoOp || 0) + (result.rowsNoOp || 0);
-        summary.updated += result.rowsInserted > 0 || result.rowsUpdated > 0 || (result.rowsNoOp || 0) > 0 ? 1 : 0;
         if (result.rowsReceived === 0 && !result.noNewData) {
+          summary.zeroRowProviderReturns = (summary.zeroRowProviderReturns || 0) + 1;
           summary.skipped += 1;
           summary.warnings.push(`${stock.symbol}: provider returned zero usable price rows.`);
+        } else if (result.rowsInserted > 0 || result.rowsUpdated > 0) {
+          summary.updated += 1;
+        } else if ((result.rowsNoOp || 0) > 0) {
+          summary.noOp = (summary.noOp || 0) + 1;
         }
       } catch (error) {
         summary.failed += 1;
@@ -1843,6 +1874,11 @@ export class MarketDataFoundationService {
       }
     }
 
+    const remainingCandidates = await this.priceBackfillCandidates(scope);
+    summary.remainingCandidates = remainingCandidates.length;
+    summary.hasMore = remainingCandidates.length > 0;
+    summary.nextOffset = summary.hasMore ? 0 : null;
+    this.assignPriceBackfillDepthDiagnostics(summary, remainingCandidates);
     this.finishRepairSummary(summary, started);
     return summary;
   }
@@ -2603,6 +2639,7 @@ export class MarketDataFoundationService {
     region?: string;
     assetType?: string;
     skipFreshnessGate?: boolean;
+    preserveProviderSupportOnZeroRows?: boolean;
   } = {}): Promise<SyncSummary> {
     console.log(`Ingesting ${symbol}...`);
 
@@ -2694,7 +2731,7 @@ export class MarketDataFoundationService {
         lastCheckedAt: now,
         lastProviderFetchAt: now,
       });
-      if (stock && typeof (this.repository as any).updateProviderSupportStatus === 'function') {
+      if (!options.preserveProviderSupportOnZeroRows && stock && typeof (this.repository as any).updateProviderSupportStatus === 'function') {
         await this.repository.updateProviderSupportStatus(symbol, 'UNSUPPORTED', 'Provider returned zero usable historical price rows.').catch(() => null);
       }
       return emptySummary;
@@ -5052,15 +5089,72 @@ export class MarketDataFoundationService {
     return overrides;
   }
 
-  private async priceBackfillCandidates(scope: { region: string; assetType: string }) {
+  private async priceBackfillCandidates(scope: { region: string; assetType: string }): Promise<PriceBackfillCandidate[]> {
     const stocks = await this.repository.listStocksForUniverseHealth(scope);
     const readinessBySymbol = await this.universeReadinessForStocks(stocks, scope);
-    return stocks.filter((stock) => {
-      if (stock.isActive === false || stock.isDelisted === true) return false;
-      if (normalizeProviderStatus(stock.providerSupportStatus) !== 'SUPPORTED') return false;
-      const readiness = readinessBySymbol.get(stock.symbol);
-      return readiness?.priceReadiness !== 'READY';
-    });
+    return stocks
+      .flatMap((stock): PriceBackfillCandidate[] => {
+        if (stock.isActive === false || stock.isDelisted === true) return [];
+        if (normalizeProviderStatus(stock.providerSupportStatus) !== 'SUPPORTED') return [];
+        const readiness = readinessBySymbol.get(stock.symbol);
+        if (!readiness || readiness.priceReadiness === 'READY') return [];
+        return [{ stock, readiness }];
+      })
+      .sort((left, right) => {
+        const leftPriority = this.priceBackfillCandidatePriority(left.readiness);
+        const rightPriority = this.priceBackfillCandidatePriority(right.readiness);
+        if (leftPriority !== rightPriority) return leftPriority - rightPriority;
+        return String(left.stock.symbol).localeCompare(String(right.stock.symbol));
+      });
+  }
+
+  private priceBackfillCandidatePriority(readiness: InstrumentUniverseReadiness): number {
+    if (!readiness.latestPriceDate) return 0;
+    if (readiness.priceHistoryBars < 120) return 1;
+    if (readiness.priceHistoryBars < 200) return 2;
+    if (readiness.priceHistoryBars < 252) return 3;
+    if (readiness.readinessBlockers.includes('STALE_LATEST_PRICE')) return 4;
+    return 5;
+  }
+
+  private priceBackfillFetchPlan(
+    candidate: PriceBackfillCandidate,
+    latestCompletedDate: string,
+    request: MarketDataRepairRequest
+  ): { stock: any; mode: 'DEEP' | 'INCREMENTAL'; startDate: Date } {
+    const forceDeep = request.fullReload === true || request.policy === 'FORCE_DEEP';
+    const needsDeepHistory = forceDeep
+      || !candidate.readiness.latestPriceDate
+      || candidate.readiness.priceHistoryBars < 252;
+
+    if (needsDeepHistory) {
+      return {
+        stock: candidate.stock,
+        mode: 'DEEP',
+        startDate: this.defaultBackfillStartDate(latestCompletedDate),
+      };
+    }
+
+    const latestStoredMinusOverlap = new Date(`${candidate.readiness.latestPriceDate}T00:00:00.000Z`);
+    latestStoredMinusOverlap.setUTCDate(latestStoredMinusOverlap.getUTCDate() - 7);
+    const latestCompletedMinusCatchUpWindow = new Date(`${latestCompletedDate}T00:00:00.000Z`);
+    latestCompletedMinusCatchUpWindow.setUTCDate(latestCompletedMinusCatchUpWindow.getUTCDate() - 30);
+    const startDate = latestStoredMinusOverlap > latestCompletedMinusCatchUpWindow
+      ? latestStoredMinusOverlap
+      : latestCompletedMinusCatchUpWindow;
+    startDate.setUTCHours(0, 0, 0, 0);
+
+    return {
+      stock: candidate.stock,
+      mode: 'INCREMENTAL',
+      startDate,
+    };
+  }
+
+  private assignPriceBackfillDepthDiagnostics(summary: MarketDataRepairSummary, candidates: PriceBackfillCandidate[]) {
+    summary.stillUnder120 = candidates.filter((candidate) => candidate.readiness.priceHistoryBars < 120).length;
+    summary.stillUnder200 = candidates.filter((candidate) => candidate.readiness.priceHistoryBars < 200).length;
+    summary.stillUnder252 = candidates.filter((candidate) => candidate.readiness.priceHistoryBars < 252).length;
   }
 
   private endOfTradingDateUtc(tradingDate: string | null): Date {
@@ -5774,10 +5868,14 @@ export class MarketDataFoundationService {
     return 'US';
   }
 
-  private defaultBackfillStartDate(): Date {
-    const date = new Date();
-    date.setFullYear(date.getFullYear() - 15);
-    date.setHours(0, 0, 0, 0);
+  private defaultBackfillStartDate(anchorDate?: string | Date): Date {
+    const date = anchorDate instanceof Date
+      ? new Date(anchorDate)
+      : anchorDate
+        ? new Date(`${anchorDate}T00:00:00.000Z`)
+        : new Date();
+    date.setUTCFullYear(date.getUTCFullYear() - 15);
+    date.setUTCHours(0, 0, 0, 0);
     return date;
   }
 

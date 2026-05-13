@@ -9,13 +9,15 @@ Cycle 3 backlog is parked until this track reaches Product Owner acceptance or t
 Inputs:
 
 - [PO market data audit](../po-audits/2026-05-13-market-data-data-availability-audit.md)
+- [PO missing-data root-cause audit](../po-audits/2026-05-13-market-data-missing-data-root-cause-audit.md)
 - [Architect root-cause notes](../architecture-contracts/2026-05-13-market-data-availability-root-cause-notes.md)
+- [Architect missing-data root-cause audit](../architecture-contracts/2026-05-13-market-data-missing-data-architecture-audit.md)
 
 ## MD-A1 - Latest Completed EOD Catch-Up Gate
 
-State: `Ready for Implementation`
-Mode: `Implementation Mode`
-Owner: Lane 1 Market Data developer
+State: `Released`
+Mode: `Released`
+Owner: Senior Fullstack Lead / Orchestrator
 Lane/module: Lane 1, `market-data-foundation`
 
 ### Product Goal
@@ -134,15 +136,70 @@ Forbidden scope:
 - Frontend: focused mocked UI tests for progress/cancel/partial/continue plus build validation when resource limits allow.
 - Handoff must include exact commands, results, skipped checks, and performance/progress evidence.
 
-## Later Packets Parked Behind MD-A2
+## MD-A3 - Deep Price Backfill For Supported Shallow Rows
 
-1. **MD-A3 - Deep Price Backfill For Supported Shallow Rows**
-   Ensure supported rows with shallow history fetch enough OHLCV depth for Trusted Review Lite and 200/252-bar downstream users.
-2. **MD-A4 - Provider Validation Drain And Retry Classification**
+State: `GitHub Check-In`
+Mode: `GitHub Check-In`
+Owner: Senior Fullstack Lead / Orchestrator
+Lane/module: Lane 1, `market-data-foundation`
+
+Product brief: [MD-A3 product brief](../po-briefs/2026-05-13-md-a3-deep-price-backfill-product-brief.md)
+Architecture contract: [MD-A3 architecture contract](../architecture-contracts/2026-05-13-md-a3-deep-price-backfill-contract.md)
+QA plan: [MD-A3 QA plan](../qa-plans/2026-05-13-md-a3-deep-price-backfill-qa-plan.md)
+Developer handoff: [MD-A3 developer handoff](../developer-handoffs/2026-05-13-md-a3-developer-handoff.md)
+QA evidence: [MD-A3 QA evidence](../qa-evidence/2026-05-13-md-a3-deep-price-backfill-qa-evidence.md)
+Lead validation: [MD-A3 Lead validation](../lead-validation/2026-05-13-md-a3-lead-validation.md)
+Architect signoff: [MD-A3 Architect signoff](../architecture-signoff/2026-05-13-md-a3-architect-signoff.md)
+PO acceptance: [MD-A3 PO acceptance](../po-acceptance/2026-05-13-md-a3-po-acceptance.md)
+
+### Product Goal
+
+Provider-supported shallow rows must be deep-backfilled to useful OHLCV depth without requiring the operator to know or set `fullReload`. The repair action must make data available for Trusted Review Lite and deeper 200/252-bar consumers while staying bounded and capped to latest completed EOD.
+
+### Acceptance Direction
+
+- Harden the existing bounded `BACKFILL_PRICES` repair lane; do not add a second price-backfill subsystem.
+- Automatically use deep history repair for supported rows below required depth.
+- Preserve latest completed EOD cap and avoid in-progress daily candles.
+- Expose machine-readable diagnostics for rows received/inserted/updated/no-op, zero-row provider returns, deep reloads, incremental catch-up, remaining candidates, target EOD/end date, and still-under-120/200/252 counts.
+- Keep UI action simple: `Backfill prices` remains the normal workflow and must not expose a normal `fullReload` toggle.
+- QA must prove the fix with automated tests and bounded live/local evidence.
+
+### Reserved Write Scope
+
+Backend policy/diagnostics:
+
+- `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.types.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.provider.ts`
+- Focused backend tests under `backend/tests/modules/market-data-foundation/`
+
+Frontend evidence display:
+
+- `frontend/src/features/market-data-foundation/types.ts`
+- `frontend/src/features/market-data-foundation/api/marketDataFoundationService.ts`
+- `frontend/src/features/market-data-foundation/components/MarketDataStatusPanel.tsx`
+- `frontend/tests/ui/market-data-foundation.spec.ts`
+
+Forbidden scope:
+
+- Prisma schema/migrations unless architecture is reopened.
+- Paid providers, paid services, hosted queues, broker APIs, or live trading integrations.
+- Downstream Signals, Strategy, Today Review, Trade Plan, Portfolio, Watchlist, or Alert gate relaxation.
+
+### Developer Validation Before QA
+
+- Backend: focused Market Data tests covering deep repair without `fullReload`, latest completed EOD cap, zero-row diagnostics, and adjusted-close honesty.
+- Frontend: focused UI tests proving normal payload excludes `fullReload` and repair summary shows deep-backfill diagnostics.
+- Build validation for touched projects when resource limits allow.
+
+## Next Market Data Missing-Data Packets
+
+1. **MD-A4 - Provider Validation Drain And Retry Classification**
    Drain `UNKNOWN` and retryable provider rows into clear supported/unsupported/retry states.
-3. **MD-A5 - Catalog Identity And Manual CSV Repair Hardening**
+2. **MD-A5 - Catalog Identity And Manual CSV Repair Hardening**
    Fix deterministic provider symbol, ISIN, listing-date, and exchange identity gaps using public/local sources.
-4. **MD-A6 - Holiday/Session Accuracy**
+3. **MD-A6 - Holiday/Session Accuracy**
    Prevent false stale-EOD blockers caused by missing local holiday knowledge.
-5. **MD-A7 - Adjusted-Close And Volume Coverage Honesty**
+4. **MD-A7 - Adjusted-Close And Volume Coverage Honesty**
    Preserve volume and adjusted-close provenance so trusted review uses reliable OHLCV.

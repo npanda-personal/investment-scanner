@@ -165,16 +165,19 @@ export class YahooFinanceIngestionService {
     try {
       const result = await this.yahooFinance.chart(symbol, { ...queryOptions, return: 'array' });
       const quotes = Array.isArray(result?.quotes) ? result.quotes : [];
-      const prices = quotes.map((item: any) => ({
-        symbol,
-        date: this.toDate(item.date),
-        open: item.open,
-        high: item.high,
-        low: item.low,
-        close: item.close,
-        adjustedClose: item.adjClose ?? item.adjclose ?? item.adjustedClose ?? item.close ?? null,
-        volume: item.volume,
-      }));
+      const prices = quotes.map((item: any) => {
+        const providerAdjustedClose = item.adjClose ?? item.adjclose ?? item.adjustedClose ?? null;
+        return {
+          symbol,
+          date: this.toDate(item.date),
+          open: item.open,
+          high: item.high,
+          low: item.low,
+          close: item.close,
+          adjustedClose: providerAdjustedClose,
+          volume: item.volume,
+        };
+      });
       const validation = partitionHistoricalPrices(prices);
       if (validation.invalid.length > 0) {
         console.warn(

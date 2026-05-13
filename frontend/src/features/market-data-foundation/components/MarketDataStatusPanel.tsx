@@ -52,6 +52,7 @@ const formatCandleStatus = (status: MarketDataSchedulerRegionStatus | null) => {
 const formatCount = (value?: number) => new Intl.NumberFormat().format(value ?? 0);
 const formatPercent = (value?: number) => `${Number(value ?? 0).toFixed(1)}%`;
 const REPAIR_BATCH_SIZE = 50;
+const hasNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 
 type RepairAction =
   | 'VALIDATE_PROVIDERS'
@@ -177,8 +178,17 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
   const repairSummarySeverity = (() => {
     if (!repairSummary) return 'info' as const;
     if (repairSummary.failed > 0) return 'error' as const;
+    const priceRowsChanged = (repairSummary.priceRowsInserted ?? 0) + (repairSummary.priceRowsUpdated ?? 0) + (repairSummary.priceRowsNoOp ?? 0);
+    const hasPriceDiagnostics =
+      hasNumber(repairSummary.priceRowsReceived) ||
+      hasNumber(repairSummary.priceRowsInserted) ||
+      hasNumber(repairSummary.priceRowsUpdated) ||
+      hasNumber(repairSummary.priceRowsNoOp) ||
+      hasNumber(repairSummary.zeroRowProviderReturns);
+    if (hasPriceDiagnostics && ((repairSummary.zeroRowProviderReturns ?? 0) > 0 || priceRowsChanged === 0)) return 'warning' as const;
     if ((repairSummary.partialSuccess || 0) > 0 || (repairSummary.manualRequired || 0) > 0 || (repairSummary.providerNotFound || 0) > 0 || (repairSummary.noOp || 0) > 0) return 'warning' as const;
     if ((repairSummary.skippedRecentAttempt || 0) > 0 && repairSummary.updated === 0) return 'info' as const;
+    if (repairSummary.hasMore) return 'warning' as const;
     if (repairSummary.updated > 0) {
       return universeHealth?.universeSignoff?.status === 'PASS' ? 'success' as const : 'warning' as const;
     }
@@ -459,6 +469,10 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
             <Typography variant="caption">Provider unknown excluded: {formatCount(trustedReviewUniverse?.excludedCounts.providerUnknown)}</Typography>
             <Typography variant="caption">Stale latest price excluded: {formatCount(trustedReviewUniverse?.excludedCounts.staleLatestPrice)}</Typography>
             <Typography variant="caption">Under 120 bars excluded: {formatCount(trustedReviewUniverse?.excludedCounts.insufficientBarsUnder120)}</Typography>
+            {hasNumber(trustedReviewUniverse?.excludedCounts.insufficientBarsUnder200) && (
+              <Typography variant="caption">Under 200 bars excluded: {formatCount(trustedReviewUniverse?.excludedCounts.insufficientBarsUnder200)}</Typography>
+            )}
+            <Typography variant="caption">Under 252 bars excluded: {formatCount(trustedReviewUniverse?.excludedCounts.insufficientBarsUnder252)}</Typography>
             <Typography variant="caption">Missing volume excluded: {formatCount(trustedReviewUniverse?.excludedCounts.missingRecentVolume)}</Typography>
             <Typography variant="caption">Missing sector context gaps: {formatCount(trustedReviewUniverse?.contextGapCounts.missingSector)}</Typography>
             <Typography variant="caption">Missing industry context gaps: {formatCount(trustedReviewUniverse?.contextGapCounts.missingIndustry)}</Typography>
@@ -657,7 +671,7 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
             <Box>
               <Typography variant="subtitle1" fontWeight={700}>Universe Repair Workflow</Typography>
               <Typography variant="body2" color="text.secondary">
-                Each action runs one bounded batch. Refresh health after each batch to confirm whether coverage actually improved.
+                Each action runs one bounded batch. Price backfill repairs shallow supported rows and catches up completed EOD candles.
               </Typography>
             </Box>
             <Typography variant="caption" color="text.secondary">
@@ -809,23 +823,59 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
           {repairError && <Alert severity="error">{repairError}</Alert>}
           {repairSummary && (
             <Alert severity={repairSummarySeverity}>
-              Last repair batch processed {formatCount(repairSummary.processedCount)} of {formatCount(repairSummary.totalCount)}; updated {formatCount(repairSummary.updated)}, skipped {formatCount(repairSummary.skipped)}, failed {formatCount(repairSummary.failed)}, no-op {formatCount(repairSummary.noOp)}, manual required {formatCount(repairSummary.manualRequired)}.
-              {repairSummary.providerValidationQueue ? ` Provider queue: ${repairSummary.providerValidationQueue}.` : ''}
-              {repairSummary.partialSuccess ? ` Partial metadata repairs: ${formatCount(repairSummary.partialSuccess)}.` : ''}
-              {repairSummary.providerNotFound ? ` Provider not found/useful for ${formatCount(repairSummary.providerNotFound)} rows.` : ''}
-              {repairSummary.skippedRecentAttempt ? ` Recently attempted/skipped: ${formatCount(repairSummary.skippedRecentAttempt)}.` : ''}
-              {repairSummary.remainingAutoRepairable !== undefined ? ` Remaining auto-repairable: ${formatCount(repairSummary.remainingAutoRepairable)}.` : ''}
-              {repairSummary.remainingManualRequired !== undefined ? ` Remaining manual-required: ${formatCount(repairSummary.remainingManualRequired)}.` : ''}
-              {repairSummary.catalogIdentityRepaired ? ` Catalog identity repaired for ${formatCount(repairSummary.catalogIdentityRepaired)} rows.` : ''}
-              {repairSummary.matchedExistingRows ? ` Matched existing rows: ${formatCount(repairSummary.matchedExistingRows)}.` : ''}
-              {repairSummary.unmatchedCatalogRows ? ` Unmatched catalog rows: ${formatCount(repairSummary.unmatchedCatalogRows)}.` : ''}
-              {repairSummary.fieldsFilled ? ` Fields repaired: ${Object.entries(repairSummary.fieldsFilled).map(([field, count]) => `${field} ${formatCount(count)}`).join(', ')}.` : ''}
-              {repairSummary.hasMore
-                ? lastRepairAction === 'CATALOG_IDENTITY_REPAIR' || lastRepairAction === 'MANUAL_METADATA_IMPORT'
-                  ? ` More source rows remain; next offset ${formatCount(repairSummary.nextOffset ?? 0)}.`
-                  : ' More rows remain; rerun this batch action from offset 0.'
-                : ' No more rows in this repair queue.'}
-              {(repairSummary.warnings || []).slice(0, 2).map((warning) => ` ${warning}`).join('')}
+              <Stack spacing={0.5}>
+                <Typography variant="body2">
+                  Last repair batch processed {formatCount(repairSummary.processedCount)} of {formatCount(repairSummary.totalCount)}; updated {formatCount(repairSummary.updated)}, skipped {formatCount(repairSummary.skipped)}, failed {formatCount(repairSummary.failed)}, no-op {formatCount(repairSummary.noOp)}, manual required {formatCount(repairSummary.manualRequired)}.
+                </Typography>
+                <Typography variant="caption">
+                  {repairSummary.hasMore
+                    ? lastRepairAction === 'CATALOG_IDENTITY_REPAIR' || lastRepairAction === 'MANUAL_METADATA_IMPORT'
+                      ? `More source rows remain; next offset ${formatCount(repairSummary.nextOffset ?? 0)}.`
+                      : 'Another bounded run is needed; rerun this batch action from offset 0.'
+                    : 'No more rows in this repair queue.'}
+                </Typography>
+                {(hasNumber(repairSummary.priceRowsReceived) ||
+                  hasNumber(repairSummary.priceRowsInserted) ||
+                  hasNumber(repairSummary.priceRowsUpdated) ||
+                  hasNumber(repairSummary.priceRowsNoOp)) && (
+                  <Typography variant="caption">
+                    Price rows received {formatCount(repairSummary.priceRowsReceived)}, inserted {formatCount(repairSummary.priceRowsInserted)}, updated {formatCount(repairSummary.priceRowsUpdated)}, no-op {formatCount(repairSummary.priceRowsNoOp)}.
+                  </Typography>
+                )}
+                {(hasNumber(repairSummary.zeroRowProviderReturns) ||
+                  hasNumber(repairSummary.deepReloaded) ||
+                  hasNumber(repairSummary.incrementalCaughtUp) ||
+                  hasNumber(repairSummary.remainingCandidates)) && (
+                  <Typography variant="caption">
+                    Zero-row provider returns {formatCount(repairSummary.zeroRowProviderReturns)}; deep reloaded {formatCount(repairSummary.deepReloaded)}; incremental caught up {formatCount(repairSummary.incrementalCaughtUp)}; remaining candidates {formatCount(repairSummary.remainingCandidates)}.
+                  </Typography>
+                )}
+                {(repairSummary.latestCompletedEodDate || repairSummary.targetEndDate) && (
+                  <Typography variant="caption">
+                    Latest completed EOD {repairSummary.latestCompletedEodDate || 'unknown'}; target end {repairSummary.targetEndDate || 'unknown'}.
+                  </Typography>
+                )}
+                {(hasNumber(repairSummary.stillUnder120) ||
+                  hasNumber(repairSummary.stillUnder200) ||
+                  hasNumber(repairSummary.stillUnder252)) && (
+                  <Typography variant="caption">
+                    Still under 120 {formatCount(repairSummary.stillUnder120)}, under 200 {formatCount(repairSummary.stillUnder200)}, under 252 {formatCount(repairSummary.stillUnder252)}.
+                  </Typography>
+                )}
+                {repairSummary.providerValidationQueue && <Typography variant="caption">Provider queue: {repairSummary.providerValidationQueue}.</Typography>}
+                {repairSummary.partialSuccess ? <Typography variant="caption">Partial metadata repairs: {formatCount(repairSummary.partialSuccess)}.</Typography> : null}
+                {repairSummary.providerNotFound ? <Typography variant="caption">Provider not found/useful for {formatCount(repairSummary.providerNotFound)} rows.</Typography> : null}
+                {repairSummary.skippedRecentAttempt ? <Typography variant="caption">Recently attempted/skipped: {formatCount(repairSummary.skippedRecentAttempt)}.</Typography> : null}
+                {repairSummary.remainingAutoRepairable !== undefined ? <Typography variant="caption">Remaining auto-repairable: {formatCount(repairSummary.remainingAutoRepairable)}.</Typography> : null}
+                {repairSummary.remainingManualRequired !== undefined ? <Typography variant="caption">Remaining manual-required: {formatCount(repairSummary.remainingManualRequired)}.</Typography> : null}
+                {repairSummary.catalogIdentityRepaired ? <Typography variant="caption">Catalog identity repaired for {formatCount(repairSummary.catalogIdentityRepaired)} rows.</Typography> : null}
+                {repairSummary.matchedExistingRows ? <Typography variant="caption">Matched existing rows: {formatCount(repairSummary.matchedExistingRows)}.</Typography> : null}
+                {repairSummary.unmatchedCatalogRows ? <Typography variant="caption">Unmatched catalog rows: {formatCount(repairSummary.unmatchedCatalogRows)}.</Typography> : null}
+                {repairSummary.fieldsFilled ? <Typography variant="caption">Fields repaired: {Object.entries(repairSummary.fieldsFilled).map(([field, count]) => `${field} ${formatCount(count)}`).join(', ')}.</Typography> : null}
+                {(repairSummary.warnings || []).slice(0, 2).map((warning) => (
+                  <Typography key={warning} variant="caption">{warning}</Typography>
+                ))}
+              </Stack>
             </Alert>
           )}
           {catalogIdentityOffset > 0 && (

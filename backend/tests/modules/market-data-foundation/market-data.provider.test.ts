@@ -2,7 +2,7 @@
 import { YahooFinanceIngestionService } from '../../../src/modules/market-data-foundation';
 
 describe('YahooFinanceIngestionService provider', () => {
-  it('maps chart quotes into historical OHLCV rows and falls adjusted close back to close', async () => {
+  it('maps chart quotes into historical OHLCV rows without faking adjusted close', async () => {
     const provider = new YahooFinanceIngestionService(undefined, 0);
     const chart = jest.fn().mockResolvedValue({
       quotes: [
@@ -32,7 +32,7 @@ describe('YahooFinanceIngestionService provider', () => {
     expect(chart).toHaveBeenCalledWith('AAPL', expect.objectContaining({ interval: '1d', return: 'array' }));
     expect(rows).toHaveLength(2);
     expect(rows[0]).toMatchObject({ symbol: 'AAPL', open: 100, high: 110, low: 95, close: 105, adjustedClose: 104, volume: 1000 });
-    expect(rows[1]).toMatchObject({ close: 110, adjustedClose: 110 });
+    expect(rows[1]).toMatchObject({ close: 110, adjustedClose: null });
   });
 
   it('skips malformed chart rows safely', async () => {

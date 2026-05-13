@@ -371,9 +371,11 @@ export async function enrichMarketDataMetadata(data: MarketDataRepairRequest): P
 }
 
 export async function backfillMarketDataPrices(data: MarketDataRepairRequest): Promise<MarketDataRepairSummary> {
+  const normalBackfillRequest = scopedRepairPayload(data);
+  delete normalBackfillRequest.fullReload;
   const response = await axios.post<MarketDataRepairSummary>(
     `${API_BASE}/v1/market-data/prices/backfill`,
-    scopedRepairPayload(data)
+    normalBackfillRequest
   );
   return response.data;
 }

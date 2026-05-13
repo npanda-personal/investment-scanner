@@ -722,16 +722,26 @@ test.describe('Market Data Foundation UI', () => {
           offset: pricePayload.offset,
           nextOffset: 50,
           hasMore: true,
-          updated: 40,
-          skipped: 10,
+          updated: 0,
+          skipped: 50,
           failed: 0,
           noOp: 0,
           manualRequired: 0,
-          warnings: [],
+          warnings: ['Zero rows returned by provider for 2 supported symbols.'],
           durationMs: 1,
-          priceRowsReceived: 12000,
-          priceRowsInserted: 8000,
-          priceRowsUpdated: 4000,
+          priceRowsReceived: 0,
+          priceRowsInserted: 0,
+          priceRowsUpdated: 0,
+          priceRowsNoOp: 0,
+          zeroRowProviderReturns: 2,
+          deepReloaded: 0,
+          incrementalCaughtUp: 0,
+          remainingCandidates: 585,
+          latestCompletedEodDate: '2026-05-12',
+          targetEndDate: '2026-05-12T23:59:59.999Z',
+          stillUnder120: 30,
+          stillUnder200: 75,
+          stillUnder252: 144,
         },
       });
     });
@@ -800,6 +810,9 @@ test.describe('Market Data Foundation UI', () => {
     await expect(page.getByText('Required data-through: 2026-05-11').first()).toBeVisible();
     await expect(page.getByText('Stored data-through: 2026-05-11').first()).toBeVisible();
     await expect(page.getByText('Stale latest price excluded: 200')).toBeVisible();
+    await expect(page.getByText('Under 120 bars excluded: 30')).toBeVisible();
+    await expect(page.getByText('Under 252 bars excluded: 144')).toBeVisible();
+    await expect(page.getByText('Missing volume excluded: 20')).toBeVisible();
     await expect(page.getByText('Missing sector context gaps: 140')).toBeVisible();
     await expect(page.getByText('Scan ordering: recentVolumeDesc_priceHistoryCompleteness_latestFreshness_symbol')).toBeVisible();
     await expect(page.getByText('Missing metadata is shown as context gap, not a hard blocker for price-action review.').first()).toBeVisible();
@@ -965,7 +978,16 @@ test.describe('Market Data Foundation UI', () => {
       offset: 0,
       force: true,
     });
+    expect(pricePayload).not.toHaveProperty('fullReload');
     await expect(page.getByText(/Last repair batch processed 50 of 585/)).toBeVisible();
+    await expect(page.getByText('Another bounded run is needed; rerun this batch action from offset 0.')).toBeVisible();
+    await expect(page.getByText('Price rows received 0, inserted 0, updated 0, no-op 0.')).toBeVisible();
+    await expect(page.getByText('Zero-row provider returns 2; deep reloaded 0; incremental caught up 0; remaining candidates 585.')).toBeVisible();
+    await expect(page.getByText('Latest completed EOD 2026-05-12; target end 2026-05-12T23:59:59.999Z.')).toBeVisible();
+    await expect(page.getByText('Still under 120 30, under 200 75, under 252 144.')).toBeVisible();
+    await expect(page.getByText('Zero rows returned by provider for 2 supported symbols.')).toBeVisible();
+    const priceRepairAlertClass = await page.getByRole('alert').filter({ hasText: 'Zero-row provider returns 2' }).getAttribute('class');
+    expect(priceRepairAlertClass).toContain('MuiAlert-standardWarning');
   });
 
   test('data health tab remains usable when review readiness summary is unavailable', async ({ page }) => {

@@ -2933,19 +2933,255 @@ describe('MarketDataFoundationService syncV1', () => {
     const result = await service.backfillPrices({ region: 'IN', assetType: 'STOCK', batchSize: 1, offset: 0 });
 
     const ingestCall = (service.ingestSymbol as jest.Mock).mock.calls[0];
+    const deepStartDate = ingestCall[1] as Date;
     const cappedEndDate = ingestCall[2] as Date;
+    const latestCompletedEod = latestCompletedTradingDateForRegion('IN');
+    const expectedDeepStart = new Date(`${latestCompletedEod}T00:00:00.000Z`);
+    expectedDeepStart.setUTCFullYear(expectedDeepStart.getUTCFullYear() - 15);
     expect(cappedEndDate.toISOString().slice(0, 10)).toBe(latestCompletedTradingDateForRegion('IN'));
-    expect(service.ingestSymbol).toHaveBeenCalledWith('PRICE.NS', undefined, cappedEndDate, false, expect.objectContaining({
+    expect(deepStartDate.toISOString()).toBe(expectedDeepStart.toISOString());
+    expect(service.ingestSymbol).toHaveBeenCalledWith('PRICE.NS', deepStartDate, cappedEndDate, false, expect.objectContaining({
       force: true,
       region: 'IN',
       assetType: 'STOCK',
       skipFreshnessGate: true,
+      preserveProviderSupportOnZeroRows: true,
     }));
     expect(result).toMatchObject({
       processedCount: 1,
       updated: 1,
       priceRowsReceived: 252,
       priceRowsInserted: 252,
+      deepReloaded: 1,
+      incrementalCaughtUp: 0,
+      latestCompletedEodDate: latestCompletedEod,
+      targetEndDate: cappedEndDate.toISOString(),
+      remainingCandidates: 1,
+      hasMore: true,
+      nextOffset: 0,
+      stillUnder120: 1,
+      stillUnder200: 1,
+      stillUnder252: 1,
+    });
+  });
+
+  it('deep-backfills shallow supported rows without operator fullReload despite recent load timestamp', async () => {
+    const latestCompletedEod = latestCompletedTradingDateForRegion('IN');
+    const repository = {
+      listStocksForUniverseHealth: jest.fn()
+        .mockResolvedValueOnce([
+          {
+            symbol: 'SHALLOW.NS',
+            providerSupportStatus: 'SUPPORTED',
+            isActive: true,
+            isDelisted: false,
+            providerSymbol: 'SHALLOW.NS',
+            lastSuccessfulDataLoadTimestamp: new Date('2026-05-11T00:00:00.000Z'),
+            sector: 'Tech',
+            industry: 'Software',
+            country: 'India',
+            currency: 'INR',
+          },
+        ])
+        .mockResolvedValueOnce([]),
+      priceReadinessStatsForSymbols: jest.fn()
+        .mockResolvedValueOnce(new Map([
+          ['SHALLOW.NS', { priceHistoryBars: 20, latestPriceDate: '2026-05-11', latestVolume: 100, latestAdjustedClose: null, latestClose: 10, rollingWindowBars: 20, recentVolumeCoveragePercent: 100 }],
+        ]))
+        .mockResolvedValueOnce(new Map()),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+    jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
+      rowsReceived: 300,
+      rowsInserted: 280,
+      rowsUpdated: 0,
+      rowsSkipped: 0,
+      rowsNoOp: 20,
+      warningCount: 0,
+      warnings: [],
+    });
+
+    const result = await service.backfillPrices({ region: 'IN', assetType: 'STOCK', batchSize: 1, fullReload: false });
+
+    const ingestCall = (service.ingestSymbol as jest.Mock).mock.calls[0];
+    const startDate = ingestCall[1] as Date;
+    const expectedDeepStart = new Date(`${latestCompletedEod}T00:00:00.000Z`);
+    expectedDeepStart.setUTCFullYear(expectedDeepStart.getUTCFullYear() - 15);
+    expect(startDate.toISOString()).toBe(expectedDeepStart.toISOString());
+    expect(ingestCall[3]).toBe(false);
+    expect(result).toMatchObject({
+      deepReloaded: 1,
+      incrementalCaughtUp: 0,
+      remainingCandidates: 0,
+      stillUnder120: 0,
+      stillUnder200: 0,
+      stillUnder252: 0,
+    });
+  });
+
+  it('uses incremental catch-up for stale rows that already have 252 bars', async () => {
+    const latestCompletedEod = latestCompletedTradingDateForRegion('IN')!;
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue([
+        { symbol: 'STALE.NS', providerSupportStatus: 'SUPPORTED', isActive: true, isDelisted: false, providerSymbol: 'STALE.NS', sector: 'Tech', industry: 'Software', country: 'India', currency: 'INR' },
+      ]),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['STALE.NS', { priceHistoryBars: 300, latestPriceDate: '2026-01-01', latestVolume: 100, latestAdjustedClose: 10, latestClose: 10, rollingWindowBars: 252, rollingWindowCoveragePercent: 100, recentVolumeCoveragePercent: 100 }],
+      ])),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+    jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
+      rowsReceived: 5,
+      rowsInserted: 5,
+      rowsUpdated: 0,
+      rowsSkipped: 0,
+      rowsNoOp: 0,
+      warningCount: 0,
+      warnings: [],
+    });
+
+    const result = await service.backfillPrices({ region: 'IN', assetType: 'STOCK', batchSize: 1 });
+
+    const ingestCall = (service.ingestSymbol as jest.Mock).mock.calls[0];
+    const startDate = ingestCall[1] as Date;
+    const expectedStart = new Date(`${latestCompletedEod}T00:00:00.000Z`);
+    expectedStart.setUTCDate(expectedStart.getUTCDate() - 30);
+    expect(startDate.toISOString()).toBe(expectedStart.toISOString());
+    expect(result).toMatchObject({ deepReloaded: 0, incrementalCaughtUp: 1 });
+  });
+
+  it('forces deep repair for all selected candidates when fullReload is true', async () => {
+    const latestCompletedEod = latestCompletedTradingDateForRegion('IN')!;
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue([
+        { symbol: 'FORCE.NS', providerSupportStatus: 'SUPPORTED', isActive: true, isDelisted: false, providerSymbol: 'FORCE.NS', sector: 'Tech', industry: 'Software', country: 'India', currency: 'INR' },
+      ]),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['FORCE.NS', { priceHistoryBars: 300, latestPriceDate: '2026-01-01', latestVolume: 100, latestAdjustedClose: 10, latestClose: 10, rollingWindowBars: 252, rollingWindowCoveragePercent: 100, recentVolumeCoveragePercent: 100 }],
+      ])),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+    jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
+      rowsReceived: 1,
+      rowsInserted: 0,
+      rowsUpdated: 1,
+      rowsSkipped: 0,
+      rowsNoOp: 0,
+      warningCount: 0,
+      warnings: [],
+    });
+
+    await service.backfillPrices({ region: 'IN', assetType: 'STOCK', batchSize: 1, fullReload: true });
+
+    const ingestCall = (service.ingestSymbol as jest.Mock).mock.calls[0];
+    const expectedDeepStart = new Date(`${latestCompletedEod}T00:00:00.000Z`);
+    expectedDeepStart.setUTCFullYear(expectedDeepStart.getUTCFullYear() - 15);
+    expect((ingestCall[1] as Date).toISOString()).toBe(expectedDeepStart.toISOString());
+    expect(ingestCall[3]).toBe(true);
+  });
+
+  it('orders price backfill candidates by missing latest, shallow depth, stale latest, then symbol', async () => {
+    const rows = [
+      ['STALE.NS', 300, '2026-01-01'],
+      ['U230.NS', 230, '2026-05-11'],
+      ['MISSING.NS', 0, null],
+      ['U180.NS', 180, '2026-05-11'],
+      ['U119.NS', 119, '2026-05-11'],
+    ] as const;
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue(rows.map(([symbol]) => ({
+        symbol,
+        providerSupportStatus: 'SUPPORTED',
+        isActive: true,
+        isDelisted: false,
+        providerSymbol: symbol,
+        sector: 'Tech',
+        industry: 'Software',
+        country: 'India',
+        currency: 'INR',
+      }))),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map(rows.map(([symbol, bars, latestPriceDate]) => [
+        symbol,
+        { priceHistoryBars: bars, latestPriceDate, latestVolume: 100, latestAdjustedClose: 10, latestClose: 10, rollingWindowBars: Math.min(bars, 252), rollingWindowCoveragePercent: Math.min(100, (bars / 252) * 100), recentVolumeCoveragePercent: 100 },
+      ]))),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+    jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
+      rowsReceived: 1,
+      rowsInserted: 0,
+      rowsUpdated: 0,
+      rowsSkipped: 0,
+      rowsNoOp: 1,
+      warningCount: 0,
+      warnings: [],
+    });
+
+    await service.backfillPrices({ region: 'IN', assetType: 'STOCK', batchSize: 5 });
+
+    expect((service.ingestSymbol as jest.Mock).mock.calls.map((call) => call[0])).toEqual([
+      'MISSING.NS',
+      'U119.NS',
+      'U180.NS',
+      'U230.NS',
+      'STALE.NS',
+    ]);
+  });
+
+  it('skips provider fetch and reports MARKET_CALENDAR_UNCERTAIN when no latest completed EOD is available', async () => {
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue([
+        { symbol: 'GLOBAL', providerSupportStatus: 'SUPPORTED', isActive: true, isDelisted: false, providerSymbol: 'GLOBAL', sector: 'Tech', industry: 'Software', country: 'US', currency: 'USD' },
+      ]),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['GLOBAL', { priceHistoryBars: 20, latestPriceDate: '2026-05-11', latestVolume: 100, latestAdjustedClose: null, latestClose: 10, rollingWindowBars: 20, recentVolumeCoveragePercent: 100 }],
+      ])),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+    const ingestSpy = jest.spyOn(service, 'ingestSymbol');
+
+    const result = await service.backfillPrices({ region: 'GLOBAL', assetType: 'STOCK', batchSize: 1 });
+
+    expect(ingestSpy).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      processedCount: 0,
+      latestCompletedEodDate: null,
+      remainingCandidates: 1,
+      stillUnder120: 1,
+      stillUnder200: 1,
+      stillUnder252: 1,
+    });
+    expect(result.warnings.join('\n')).toContain('MARKET_CALENDAR_UNCERTAIN');
+  });
+
+  it('reports zero-row provider returns without preserving them as successful repairs', async () => {
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue([
+        { symbol: 'EMPTY.NS', providerSupportStatus: 'SUPPORTED', isActive: true, isDelisted: false, providerSymbol: 'EMPTY.NS', sector: 'Tech', industry: 'Software', country: 'India', currency: 'INR' },
+      ]),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['EMPTY.NS', { priceHistoryBars: 20, latestPriceDate: '2026-05-11', latestVolume: 100, latestAdjustedClose: null, latestClose: 10, rollingWindowBars: 20, recentVolumeCoveragePercent: 100 }],
+      ])),
+      findStockBySymbol: jest.fn().mockResolvedValue({ symbol: 'EMPTY.NS', providerSymbol: 'EMPTY.NS', region: 'IN', assetType: 'STOCK', lastSuccessfulDataLoadTimestamp: new Date('2026-05-11T00:00:00.000Z') }),
+      upsertSyncState: jest.fn().mockResolvedValue({}),
+      updateProviderSupportStatus: jest.fn().mockResolvedValue({}),
+    };
+    const provider = {
+      inferRegion: jest.fn().mockReturnValue({ region: 'IN', exchange: 'NSE' }),
+      fetchHistorical: jest.fn().mockResolvedValue([]),
+    };
+    const service = new MarketDataFoundationService(repository as any, provider as any);
+
+    const result = await service.backfillPrices({ region: 'IN', assetType: 'STOCK', batchSize: 1 });
+
+    expect(repository.updateProviderSupportStatus).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      processedCount: 1,
+      updated: 0,
+      skipped: 1,
+      zeroRowProviderReturns: 1,
+      priceRowsReceived: 0,
+      hasMore: true,
+      nextOffset: 0,
     });
   });
 

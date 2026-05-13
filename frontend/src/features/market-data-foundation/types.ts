@@ -190,6 +190,7 @@ export interface TrustedReviewUniverseHealth {
     noLatestPrice: number;
     staleLatestPrice: number;
     insufficientBarsUnder120: number;
+    insufficientBarsUnder200?: number;
     insufficientBarsUnder252: number;
     missingRecentVolume: number;
     corporateActionBlocked: number;
@@ -470,6 +471,15 @@ export interface MarketDataRepairSummary {
   priceRowsInserted?: number;
   priceRowsUpdated?: number;
   priceRowsNoOp?: number;
+  zeroRowProviderReturns?: number;
+  deepReloaded?: number;
+  incrementalCaughtUp?: number;
+  remainingCandidates?: number;
+  latestCompletedEodDate?: string | null;
+  targetEndDate?: string | null;
+  stillUnder120?: number;
+  stillUnder200?: number;
+  stillUnder252?: number;
   fieldProvenance?: Array<{
     instrumentId: string;
     symbol: string;

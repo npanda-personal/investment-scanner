@@ -598,6 +598,7 @@ export interface MarketDataRepairRequest {
   providerValidationQueue?: ProviderValidationQueue;
   force?: boolean;
   fullReload?: boolean;
+  policy?: 'AUTO_DEEP_FOR_SHALLOW' | 'FORCE_DEEP';
   csvText?: string;
   catalogSource?: CatalogSource | string;
   importMode?: 'MANUAL_CSV' | 'CONFIGURED_URL';
@@ -805,6 +806,15 @@ export interface MarketDataRepairSummary {
   priceRowsInserted?: number;
   priceRowsUpdated?: number;
   priceRowsNoOp?: number;
+  zeroRowProviderReturns?: number;
+  deepReloaded?: number;
+  incrementalCaughtUp?: number;
+  stillUnder120?: number;
+  stillUnder200?: number;
+  stillUnder252?: number;
+  latestCompletedEodDate?: string | null;
+  targetEndDate?: string | null;
+  remainingCandidates?: number;
   fieldProvenance?: Array<{
     instrumentId: string;
     symbol: string;
