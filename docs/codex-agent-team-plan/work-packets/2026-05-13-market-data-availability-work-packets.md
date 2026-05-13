@@ -1,0 +1,86 @@
+# Market Data Availability Work Packets - 2026-05-13
+
+## Scope
+
+This track is the active priority before Cycle 3 feature backlog work. The goal is to make missing market data available inside Market Data Foundation so downstream Signals, Signal Quality, Strategy Decision, Today Review, and Trade Plans consume real current data instead of receiving missing/insufficient-data states.
+
+Cycle 3 backlog is parked until this track reaches Product Owner acceptance or the Product Owner explicitly releases it.
+
+Inputs:
+
+- [PO market data audit](../po-audits/2026-05-13-market-data-data-availability-audit.md)
+- [Architect root-cause notes](../architecture-contracts/2026-05-13-market-data-availability-root-cause-notes.md)
+
+## MD-A1 - Latest Completed EOD Catch-Up Gate
+
+State: `Ready for Implementation`
+Mode: `Implementation Mode`
+Owner: Lane 1 Market Data developer
+Lane/module: Lane 1, `market-data-foundation`
+
+### Product Goal
+
+When the latest completed daily candle is missing, Market Data must fetch the missing completed EOD data even if the current market session cannot produce a useful new daily candle. The system must not stay stale just because the current session is before open, during market hours with in-progress candles disabled, or otherwise not useful for today's incomplete candle.
+
+### Architecture Contract
+
+- Compare latest stored trading date with `latestCompletedTradingDateForRegion(region, now)`.
+- If latest stored trading date is older than the latest completed trading date, the freshness gate must allow a bounded provider fetch capped to the latest completed trading date.
+- Preserve the rule that EOD review workflows do not fetch in-progress current-session candles.
+- Preserve `FINAL_CANDLE_CONFIRMED`, cooldown, weekend/holiday, and explicit force semantics when the latest completed candle is already current.
+- Do not change downstream Signal, Strategy, Today Review, or Trade Plan logic in this packet.
+- Do not add paid providers, paid services, hosted tooling, broker integrations, or advice wording.
+
+### Reserved Write Scope
+
+- `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.market-session.ts` only if a helper is needed
+- `backend/tests/modules/market-data-foundation/market-data.service.test.ts`
+- `backend/tests/modules/market-data-foundation/market-data.market-session.test.ts` only if session helper behavior changes
+- `backend/src/modules/market-data-foundation/market-data-foundation.md`
+- Task evidence docs under `docs/codex-agent-team-plan`
+
+Forbidden scope:
+
+- Downstream module code
+- Prisma schema/migrations
+- Frontend UI unless QA finds the backend contract cannot be observed
+- Package/dependency changes
+
+### Acceptance Criteria
+
+- A manual or scheduled sync does not skip provider fetches with `MARKET_CLOSED_NO_NEW_DAILY_DATA`, `MARKET_OPEN`, or `BEFORE_MARKET_OPEN` when `latestStoredTradingDate < latestCompletedTradingDateForRegion(region, now)`.
+- The provider fetch end date is capped to the latest completed trading date for catch-up, not the current in-progress trading day.
+- Final-confirmed current candles still skip.
+- Recent cooldown still skips when the latest completed candle is already stored.
+- Weekends/holidays remain skipped unless the prior completed candle is genuinely missing and the selected function is explicitly allowed to catch up safely.
+- Tests cover before-open, market-open, and market-closed-no-sync catch-up cases for `IN / STOCK`.
+- Existing market-data service/session tests pass.
+- Handoff explains how this fixes the observed case: latest completed candle `2026-05-12` missing while latest stored candle was `2026-05-11`.
+
+### Developer Validation Before QA
+
+- `npm test -- market-data.service.test.ts market-data.market-session.test.ts --runInBand`
+- If the focused test command is not available, run the closest market-data backend test subset and record the exact command.
+
+### QA Gate
+
+QA validates:
+
+- Focused tests prove fetch is allowed for missing completed EOD catch-up.
+- Regression tests prove final-confirmed/recently-synced/no-in-progress behavior still holds.
+- No downstream module workaround was introduced.
+- Documentation and handoff mention data availability improvement, not validation-message-only work.
+
+## Later Packets Parked Behind MD-A1
+
+1. **MD-A2 - Deep Price Backfill For Supported Shallow Rows**
+   Ensure supported rows with shallow history fetch enough OHLCV depth for Trusted Review Lite and 200/252-bar downstream users.
+2. **MD-A3 - Provider Validation Drain And Retry Classification**
+   Drain `UNKNOWN` and retryable provider rows into clear supported/unsupported/retry states.
+3. **MD-A4 - Catalog Identity And Manual CSV Repair Hardening**
+   Fix deterministic provider symbol, ISIN, listing-date, and exchange identity gaps using public/local sources.
+4. **MD-A5 - Holiday/Session Accuracy**
+   Prevent false stale-EOD blockers caused by missing local holiday knowledge.
+5. **MD-A6 - Adjusted-Close And Volume Coverage Honesty**
+   Preserve volume and adjusted-close provenance so trusted review uses reliable OHLCV.

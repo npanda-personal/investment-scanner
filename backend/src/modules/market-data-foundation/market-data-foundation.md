@@ -459,6 +459,8 @@ Manual catalog and instrument syncs use a freshness cooldown before provider fet
 - `lastCheckedAt`
 - `nextEligibleSyncAt`
 
+The cooldown and market-session no-new-data skips apply only when the latest completed daily candle is already stored. If `latestStoredTradingDate` is older than `latestCompletedTradingDate`, manual and scheduled EOD workflows allow a bounded provider catch-up even before open, during market hours with in-progress candles disabled, or on closed sessions. The catch-up `endDate` is capped to `latestCompletedTradingDate`, so EOD review workflows do not request the current in-progress daily candle.
+
 Current skip reasons:
 
 - `RECENTLY_SYNCED`

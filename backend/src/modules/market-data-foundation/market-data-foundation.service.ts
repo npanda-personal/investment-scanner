@@ -2507,6 +2507,7 @@ export class MarketDataFoundationService {
       return summary;
     }
 
+    const providerEndDate = gate.providerEndDate ?? now;
     const batchSize = Math.max(1, Math.min(options.batchSize ?? 25, 250));
     const lookbackTradingDays = Math.max(1, Math.min(options.lookbackTradingDays ?? 3, 10));
     const startDate = new Date(now);
@@ -2534,7 +2535,7 @@ export class MarketDataFoundationService {
     for (const task of tasks) {
       try {
         await this.throttleIngestion(250);
-        const result = await this.ingestSymbol(task.symbol, startDate, now, false, {
+        const result = await this.ingestSymbol(task.symbol, startDate, providerEndDate, false, {
           region,
           assetType,
           skipFreshnessGate: true,
@@ -2594,6 +2595,7 @@ export class MarketDataFoundationService {
     const assetType = options.assetType || stock?.assetType || 'STOCK';
     const providerSymbol = stock?.providerSymbol || symbol;
     const now = endDate || new Date();
+    let providerEndDate = now;
     const tradingDate = tradingDateForRegion(region, now) || now.toISOString().slice(0, 10);
 
     if (!fullReload && !options.force && !options.skipFreshnessGate) {
@@ -2623,6 +2625,7 @@ export class MarketDataFoundationService {
         });
         return summary;
       }
+      providerEndDate = gate.providerEndDate ?? now;
     }
 
     let effectiveStartDate = startDate;
@@ -2641,7 +2644,7 @@ export class MarketDataFoundationService {
       }
     }
 
-    const effectiveEndDate = now;
+    const effectiveEndDate = providerEndDate;
 
     if (effectiveStartDate >= effectiveEndDate) {
       console.log(`  Skipping ${symbol}: already up to date (last load: ${stock?.lastSuccessfulDataLoadTimestamp})`);
@@ -5299,6 +5302,7 @@ export class MarketDataFoundationService {
     reason: MarketDataSyncSkipReason;
     message: string;
     nextEligibleSyncAt?: string;
+    providerEndDate?: Date;
   }> {
     if (input.force) {
       return { shouldSkip: false, reason: 'RECENTLY_SYNCED', message: 'Force sync requested.' };
@@ -5312,8 +5316,13 @@ export class MarketDataFoundationService {
         timeframe: '1D',
       }),
     ]);
+    const latestCompletedTradingDate = latestCompletedTradingDateForRegion(input.region, input.now);
+    const latestCompletedCandleMissing = this.isLatestCompletedCandleMissing(latestTradingDate, latestCompletedTradingDate);
+    const completedCatchUpEndDate = latestCompletedCandleMissing
+      ? this.endOfTradingDateUtc(latestCompletedTradingDate)
+      : undefined;
 
-    if (syncState?.status === 'FINAL_CONFIRMED') {
+    if (syncState?.status === 'FINAL_CONFIRMED' && !latestCompletedCandleMissing) {
       return {
         shouldSkip: true,
         reason: 'FINAL_CANDLE_CONFIRMED',
@@ -5321,7 +5330,7 @@ export class MarketDataFoundationService {
       };
     }
 
-    if (syncState?.lastCheckedAt && syncState.status !== 'FAILED') {
+    if (syncState?.lastCheckedAt && syncState.status !== 'FAILED' && !latestCompletedCandleMissing) {
       const lastCheckedAt = new Date(syncState.lastCheckedAt);
       const nextEligibleAt = this.addMinutes(lastCheckedAt, input.cooldownMinutes);
       if (input.now < nextEligibleAt) {
@@ -5346,6 +5355,14 @@ export class MarketDataFoundationService {
 
     const marketReason = this.marketDecisionToSkipReason(decision.reasonCode);
     if (marketReason && !decision.shouldRun) {
+      if (latestCompletedCandleMissing) {
+        return {
+          shouldSkip: false,
+          reason: 'RECENTLY_SYNCED',
+          message: `Latest completed daily candle ${latestCompletedTradingDate} is missing; completed EOD catch-up is eligible.`,
+          providerEndDate: completedCatchUpEndDate,
+        };
+      }
       return {
         shouldSkip: true,
         reason: marketReason,
@@ -5354,7 +5371,18 @@ export class MarketDataFoundationService {
       };
     }
 
-    return { shouldSkip: false, reason: 'RECENTLY_SYNCED', message: 'Sync is eligible.' };
+    return {
+      shouldSkip: false,
+      reason: 'RECENTLY_SYNCED',
+      message: 'Sync is eligible.',
+      providerEndDate: completedCatchUpEndDate,
+    };
+  }
+
+  private isLatestCompletedCandleMissing(latestTradingDate: string | null | undefined, latestCompletedTradingDate: string | null): boolean {
+    if (!latestCompletedTradingDate) return false;
+    if (!latestTradingDate) return true;
+    return latestTradingDate < latestCompletedTradingDate;
   }
 
   private marketDecisionToSkipReason(reasonCode: string): MarketDataSyncSkipReason | null {
