@@ -146,6 +146,36 @@ const completedResponse = {
     candidateCounts: { LONG_REVIEW: 1, BLOCKED: 1, UNPROVEN: 1 },
     sourceSnapshot: {
       rawSignalUniverse: { supportOnly: true, sampleCount: 25 },
+      reviewReadiness: {
+        scope: { region: 'IN', assetType: 'STOCK' },
+        generatedAt: '2026-05-11T06:30:00.000Z',
+        reviewMode: 'LIMITED_REVIEW',
+        trustStatus: 'PARTIAL',
+        userDecision: 'PROCEED_LIMITED',
+        reviewUniverse: {
+          catalogCount: 2910,
+          providerSupportedCount: 585,
+          trustedCount: 144,
+          targetTradingDate: '2026-05-12',
+          requiredDataThroughDate: '2026-05-11',
+          storedDataThroughDate: '2026-05-11',
+        },
+        readinessCounts: {
+          priceReady: 144,
+          contextReady: 0,
+          reviewReady: 0,
+          missingLatestPrice: 0,
+          staleLatestPrice: 0,
+          inadequateHistory: 0,
+          missingRecentVolume: 0,
+          providerUnknown: 2325,
+          providerValidationFailedRetryable: 7,
+          unsupportedExcluded: 0,
+        },
+        blockers: [],
+        nextAction: { code: 'REVIEW_REPAIR_PLAN', label: 'Review bounded repair plan', boundedRequest: { batchSize: 50, region: 'IN', assetType: 'STOCK' } },
+        warnings: [],
+      },
       reviewUniverse: {
         mode: 'LIMITED_REVIEW',
         trustedCount: 144,
@@ -262,6 +292,9 @@ test.describe('Today Trade Review UI', () => {
     await expect(page.getByText('Long review candidates', { exact: true })).toBeVisible();
     await expect(page.getByText('Signals and calibration are supporting evidence only.').first()).toBeVisible();
     await expect(page.getByText('Review mode: LIMITED_REVIEW').first()).toBeVisible();
+    await expect(page.getByText('Readiness decision: PROCEED_LIMITED')).toBeVisible();
+    await expect(page.getByText('Market Data summary mode: LIMITED_REVIEW')).toBeVisible();
+    await expect(page.getByText('Next bounded action: Review bounded repair plan')).toBeVisible();
     await expect(page.getByText('Target session: 2026-05-12')).toBeVisible();
     await expect(page.getByText('Required data-through: 2026-05-11')).toBeVisible();
     await expect(page.getByText('Stored data-through: 2026-05-11')).toBeVisible();
@@ -331,6 +364,20 @@ test.describe('Today Trade Review UI', () => {
             candidateCounts: {},
             sourceSnapshot: {
               ...completedResponse.run.sourceSnapshot,
+              reviewReadiness: {
+                ...completedResponse.run.sourceSnapshot.reviewReadiness,
+                reviewMode: 'NO_REVIEW',
+                trustStatus: 'NOT_TRUSTWORTHY',
+                userDecision: 'REPAIR_DATA',
+                reviewUniverse: {
+                  catalogCount: 2910,
+                  providerSupportedCount: 585,
+                  trustedCount: 0,
+                  targetTradingDate: '2026-05-12',
+                  requiredDataThroughDate: '2026-05-11',
+                  storedDataThroughDate: '2026-05-10',
+                },
+              },
               reviewUniverse: {
                 mode: 'NO_REVIEW',
                 trustedCount: 0,

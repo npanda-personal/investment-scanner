@@ -10,6 +10,7 @@ import {
   fetchMarketDataHealth,
   fetchMarketDataRepairPlan,
   fetchTrustedReviewUniverseHealth,
+  fetchReviewReadinessSummary,
   fetchMarketDataUniverseHealth,
   fetchMarketDataSchedulerStatus,
   fetchManualMetadataTemplate,
@@ -26,6 +27,7 @@ import {
   type MarketDataUniverseHealth,
   type TrustedReviewUniverseHealth,
   type MarketDataSchedulerRegionStatus,
+  type ReviewReadinessSummary,
 } from '../api/marketDataFoundationService';
 import { normalizeMarketForApi } from '../api/marketScopeApi';
 
@@ -81,6 +83,7 @@ interface MarketDataStatusPanelProps {
 const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, assetType }) => {
   const [status, setStatus] = useState<MarketDataHealth | null>(null);
   const [universeHealth, setUniverseHealth] = useState<MarketDataUniverseHealth | null>(null);
+  const [reviewReadiness, setReviewReadiness] = useState<ReviewReadinessSummary | null>(null);
   const [trustedReviewUniverse, setTrustedReviewUniverse] = useState<TrustedReviewUniverseHealth | null>(null);
   const [repairPlan, setRepairPlan] = useState<MarketDataRepairPlan | null>(null);
   const [repairSummary, setRepairSummary] = useState<MarketDataRepairSummary | null>(null);
@@ -107,15 +110,17 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
     Promise.all([
       fetchMarketDataHealth({ region, assetType }),
       fetchMarketDataUniverseHealth({ region, assetType }),
+      fetchReviewReadinessSummary({ region, assetType }).catch(() => null),
       fetchTrustedReviewUniverseHealth({ region, assetType }),
       fetchMarketDataRepairPlan({ region, assetType }),
       fetchLatestMarketDataRepairRun({ region, assetType }).catch(() => null),
       fetchMarketDataSchedulerStatus().catch(() => null),
     ])
-      .then(([result, universeResult, trustedReviewResult, repairPlanResult, latestRepairRunResult, schedulerStatus]) => {
+      .then(([result, universeResult, reviewReadinessResult, trustedReviewResult, repairPlanResult, latestRepairRunResult, schedulerStatus]) => {
         if (!mounted) return;
         setStatus(result);
         setUniverseHealth(universeResult);
+        setReviewReadiness(reviewReadinessResult);
         setTrustedReviewUniverse(trustedReviewResult);
         setRepairPlan(repairPlanResult);
         setLatestRepairRun(latestRepairRunResult);
@@ -363,6 +368,45 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
           {(repairPlan?.universeSignoff?.blockers || universeHealth?.universeSignoff?.blockers || []).slice(0, 5).map((blocker) => (
             <Typography key={blocker.code} variant="caption" color="text.secondary">
               {blocker.code}: {formatCount(typeof blocker.count === 'number' ? blocker.count : 0)}; required {blocker.required}; next {blocker.nextAction || 'none'}.
+            </Typography>
+          ))}
+        </Stack>
+      </Box>
+
+      <Box sx={{ border: '1px solid', borderColor: reviewReadiness?.reviewMode === 'FULL_REVIEW' ? 'success.main' : reviewReadiness?.reviewMode === 'LIMITED_REVIEW' ? 'warning.main' : 'error.main', borderRadius: 1, p: 2 }}>
+        <Stack spacing={1.5}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} justifyContent="space-between">
+            <Box>
+              <Typography variant="subtitle1" fontWeight={700}>Review Readiness Summary</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Canonical scoped readiness used by Today Review for mode, counts, blockers, and the next bounded repair action.
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+              <Chip
+                label={`Mode: ${reviewReadiness?.reviewMode || 'NO_REVIEW'}`}
+                color={reviewReadiness?.reviewMode === 'FULL_REVIEW' ? 'success' : reviewReadiness?.reviewMode === 'LIMITED_REVIEW' ? 'warning' : 'error'}
+              />
+              <Chip label={`Decision: ${reviewReadiness?.userDecision || 'WAIT'}`} variant="outlined" />
+            </Stack>
+          </Stack>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 1 }}>
+            <Typography variant="caption">Trusted / catalog: {formatCount(reviewReadiness?.reviewUniverse.trustedCount)} / {formatCount(reviewReadiness?.reviewUniverse.catalogCount)}</Typography>
+            <Typography variant="caption">Provider-supported: {formatCount(reviewReadiness?.reviewUniverse.providerSupportedCount)}</Typography>
+            <Typography variant="caption">Price-ready: {formatCount(reviewReadiness?.readinessCounts.priceReady)}</Typography>
+            <Typography variant="caption">Review-ready: {formatCount(reviewReadiness?.readinessCounts.reviewReady)}</Typography>
+            <Typography variant="caption">Missing latest price: {formatCount(reviewReadiness?.readinessCounts.missingLatestPrice)}</Typography>
+            <Typography variant="caption">Stale latest price: {formatCount(reviewReadiness?.readinessCounts.staleLatestPrice)}</Typography>
+            <Typography variant="caption">Inadequate history: {formatCount(reviewReadiness?.readinessCounts.inadequateHistory)}</Typography>
+            <Typography variant="caption">Missing recent volume: {formatCount(reviewReadiness?.readinessCounts.missingRecentVolume)}</Typography>
+            <Typography variant="caption">Required data-through: {reviewReadiness?.reviewUniverse.requiredDataThroughDate || 'unknown'}</Typography>
+            <Typography variant="caption">Stored data-through: {reviewReadiness?.reviewUniverse.storedDataThroughDate || 'none'}</Typography>
+            <Typography variant="caption">Next action: {reviewReadiness?.nextAction?.label || 'none'}</Typography>
+            <Typography variant="caption">Bounded request: {reviewReadiness?.nextAction?.boundedRequest ? `batch ${reviewReadiness.nextAction.boundedRequest.batchSize}` : 'not required'}</Typography>
+          </Box>
+          {reviewReadiness?.blockers.slice(0, 4).map((blocker) => (
+            <Typography key={`${blocker.category}-${blocker.nextActionCode}`} variant="caption" color="text.secondary">
+              {blocker.category}: {formatCount(blocker.affectedCount)} {blocker.severity}; next {blocker.nextActionLabel}.
             </Typography>
           ))}
         </Stack>

@@ -1,6 +1,6 @@
 import type { DataQualityEvaluationDto } from '../data-quality-engine';
 import type { MarketContextSummary } from '../market-context-intelligence';
-import type { TrustedReviewUniverseHealth, TrustedReviewUniverseInstrument } from '../market-data-foundation';
+import type { ReviewReadinessSummary, TrustedReviewUniverseHealth, TrustedReviewUniverseInstrument } from '../market-data-foundation';
 import type { SignalCalibrationResultDto } from '../signal-calibration-engine';
 import type { SignalResultDto } from '../signal-generation-engine';
 import type { SmartMoneyStockSummary } from '../smart-money-intelligence';
@@ -37,6 +37,7 @@ export interface TodayReviewQuery {
 
 export interface TodayReviewSourceSnapshot {
   marketData?: Record<string, unknown> | null;
+  reviewReadiness?: ReviewReadinessSummary | null;
   reviewUniverse?: TrustedReviewUniverseHealth | null;
   scanFunnel?: TodayReviewScanFunnel | null;
   marketGate?: Record<string, unknown> | null;
@@ -184,6 +185,7 @@ export interface TodayReviewUpstreamServices {
   };
   marketDataService: {
     latestStoredCandleInfo(region: string, assetType?: string, now?: Date): Promise<Record<string, unknown>>;
+    reviewReadinessSummary?(options: { region?: string; assetType?: string }): Promise<ReviewReadinessSummary>;
     trustedReviewUniverseHealth?(options: { region?: string; assetType?: string }): Promise<TrustedReviewUniverseHealth>;
     listTrustedReviewUniverseInstruments?(options: { region?: string; assetType?: string; limit?: number; offset?: number }): Promise<TrustedReviewUniverseInstrument[]>;
   };

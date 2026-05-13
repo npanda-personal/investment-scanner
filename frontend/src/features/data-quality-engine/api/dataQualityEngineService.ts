@@ -1,10 +1,15 @@
 import axios from 'axios';
-import type { DataQualityEvaluateResponse, DataQualityEvaluation, DataQualityFilters, DataQualityListResponse, DataQualitySummary } from '../types';
+import type { DataQualityEvaluateResponse, DataQualityEvaluation, DataQualityFilters, DataQualityListResponse, DataQualityReviewReadinessSummary, DataQualitySummary } from '../types';
 
 const API_BASE = '/api/v1/data-quality';
 
 export async function fetchDataQualitySummary(params: { region?: string; assetType?: string } = {}): Promise<DataQualitySummary> {
   const response = await axios.get<DataQualitySummary>(`${API_BASE}/summary`, { params });
+  return response.data;
+}
+
+export async function fetchDataQualityReviewReadiness(params: { region?: string; assetType?: string } = {}): Promise<DataQualityReviewReadinessSummary> {
+  const response = await axios.get<DataQualityReviewReadinessSummary>('/api/v1/market-data/review-readiness-summary', { params });
   return response.data;
 }
 

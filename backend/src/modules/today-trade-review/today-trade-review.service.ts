@@ -81,6 +81,7 @@ export class TodayTradeReviewService {
     try {
       const sources = await this.loadRunSources(scope, warnings);
       sourceSnapshot.marketData = sources.marketData;
+      sourceSnapshot.reviewReadiness = sources.reviewReadiness;
       sourceSnapshot.reviewUniverse = sources.reviewUniverse;
       sourceSnapshot.marketGate = sources.marketGate;
       sourceSnapshot.marketContext = sources.marketContext;
@@ -169,8 +170,11 @@ export class TodayTradeReviewService {
   }
 
   private async loadRunSources(scope: { region: string; assetType: string }, warnings: string[]) {
-    const [marketData, reviewUniverseResult, marketContext, marketGate, rawSignalUniverse, entryCandidates, exitCandidates] = await Promise.all([
+    const [marketData, reviewReadiness, reviewUniverseResult, marketContext, marketGate, rawSignalUniverse, entryCandidates, exitCandidates] = await Promise.all([
       this.safe(() => this.services.marketDataService.latestStoredCandleInfo(scope.region, scope.assetType, this.clock()), 'Market data freshness is unavailable.', warnings),
+      this.services.marketDataService.reviewReadinessSummary
+        ? this.safe(() => this.services.marketDataService.reviewReadinessSummary!({ region: scope.region, assetType: scope.assetType }), TRUSTED_REVIEW_UNAVAILABLE_WARNING, warnings)
+        : Promise.resolve(null),
       this.services.marketDataService.trustedReviewUniverseHealth
         ? this.safe(() => this.services.marketDataService.trustedReviewUniverseHealth!({ region: scope.region, assetType: scope.assetType }), TRUSTED_REVIEW_UNAVAILABLE_WARNING, warnings)
         : Promise.resolve(null),
@@ -190,6 +194,21 @@ export class TodayTradeReviewService {
     ]);
     const reviewUniverseUnavailable = !reviewUniverseResult;
     let reviewUniverse = reviewUniverseResult || this.noReviewUniverse(scope, TRUSTED_REVIEW_UNAVAILABLE_WARNING);
+    if (reviewReadiness) {
+      reviewUniverse = {
+        ...reviewUniverse,
+        mode: reviewReadiness.reviewMode,
+        status: reviewReadiness.reviewMode === 'FULL_REVIEW' ? 'READY' : reviewReadiness.reviewMode === 'LIMITED_REVIEW' ? 'LIMITED' : 'NOT_READY',
+        catalogCount: reviewReadiness.reviewUniverse.catalogCount,
+        providerSupportedCount: reviewReadiness.reviewUniverse.providerSupportedCount,
+        trustedCount: reviewReadiness.reviewUniverse.trustedCount,
+        targetTradingDate: reviewReadiness.reviewUniverse.targetTradingDate,
+        requiredDataThroughDate: reviewReadiness.reviewUniverse.requiredDataThroughDate,
+        storedDataThroughDate: reviewReadiness.reviewUniverse.storedDataThroughDate,
+        dataThroughDate: reviewReadiness.reviewUniverse.storedDataThroughDate,
+        warnings: [...new Set([...(reviewUniverse.warnings || []), ...reviewReadiness.warnings])],
+      };
+    }
     if (reviewUniverseUnavailable || reviewUniverse.mode === 'NO_REVIEW') this.addWarning(warnings, TRUSTED_REVIEW_UNAVAILABLE_WARNING);
     let trustedLoad: TrustedLoadResult = {
       status: reviewUniverseUnavailable ? 'LOAD_FAILED' : 'COMPLETE',
@@ -231,6 +250,7 @@ export class TodayTradeReviewService {
 
     return {
       marketData,
+      reviewReadiness,
       reviewUniverse,
       trustedInstruments: trustedLoad.instruments,
       scanEvidence: {

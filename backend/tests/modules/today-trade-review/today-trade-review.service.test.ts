@@ -535,6 +535,73 @@ describe('TodayTradeReviewService', () => {
     }));
   });
 
+  it('snapshots and uses Market Data review readiness summary mode', async () => {
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      marketDataService: {
+        latestStoredCandleInfo: jest.fn().mockResolvedValue({ latestTradingDate: '2026-05-10', finalConfirmed: true }),
+        reviewReadinessSummary: jest.fn().mockResolvedValue({
+          scope: { region: 'IN', assetType: 'STOCK' },
+          generatedAt: fixedNow.toISOString(),
+          reviewMode: 'LIMITED_REVIEW',
+          trustStatus: 'PARTIAL',
+          userDecision: 'PROCEED_LIMITED',
+          reviewUniverse: {
+            catalogCount: 2906,
+            providerSupportedCount: 585,
+            trustedCount: 1,
+            targetTradingDate: '2026-05-12',
+            requiredDataThroughDate: '2026-05-11',
+            storedDataThroughDate: '2026-05-11',
+          },
+          readinessCounts: {
+            priceReady: 1,
+            contextReady: 0,
+            reviewReady: 0,
+            missingLatestPrice: 0,
+            staleLatestPrice: 0,
+            inadequateHistory: 0,
+            missingRecentVolume: 0,
+            providerUnknown: 0,
+            providerValidationFailedRetryable: 0,
+            unsupportedExcluded: 0,
+          },
+          blockers: [
+            {
+              category: 'INSUFFICIENT_TRUSTED_UNIVERSE',
+              severity: 'LIMITED_REVIEW',
+              affectedCount: 299,
+              explanation: 'Limited review.',
+              nextActionCode: 'REVIEW_REPAIR_PLAN',
+              nextActionLabel: 'Review bounded repair plan',
+              boundedRequest: { batchSize: 50, region: 'IN', assetType: 'STOCK' },
+            },
+          ],
+          nextAction: {
+            code: 'REVIEW_REPAIR_PLAN',
+            label: 'Review bounded repair plan',
+            boundedRequest: { batchSize: 50, region: 'IN', assetType: 'STOCK' },
+          },
+          warnings: ['Limited review from Market Data summary.'],
+        }),
+        trustedReviewUniverseHealth: jest.fn().mockResolvedValue(trustedHealth({ trustedCount: 1, status: 'READY', mode: 'FULL_REVIEW', warnings: [] })),
+        listTrustedReviewUniverseInstruments: jest.fn().mockResolvedValue([trustedDecisionInstrument()]),
+      },
+    }), () => fixedNow);
+
+    const result = await service.run();
+
+    expect(result.run?.sourceSnapshot).toEqual(expect.objectContaining({
+      reviewReadiness: expect.objectContaining({ reviewMode: 'LIMITED_REVIEW', userDecision: 'PROCEED_LIMITED' }),
+      reviewUniverse: expect.objectContaining({
+        mode: 'LIMITED_REVIEW',
+        trustedCount: 1,
+        storedDataThroughDate: '2026-05-11',
+      }),
+    }));
+    expect(result.run?.reviewUniverseMode).toBe('LIMITED_REVIEW');
+    expect(result.run?.warnings).toEqual(expect.arrayContaining(['Limited review from Market Data summary.']));
+  });
+
   it('uses the trusted review universe even when full catalog signoff remains failed', async () => {
     const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
       strategyDecisionService: {

@@ -312,6 +312,16 @@ export class MarketDataFoundationController {
     }
   };
 
+  reviewReadinessSummary = async (req: Request, res: Response) => {
+    try {
+      const { region, assetType } = this.getMarketFilter(req);
+      return res.json(await this.service.reviewReadinessSummary({ region, assetType }));
+    } catch (error) {
+      console.error('Review readiness summary error:', error);
+      return res.status(500).json({ error: 'Review readiness summary failed' });
+    }
+  };
+
   trustedReviewUniverseInstruments = async (req: Request, res: Response) => {
     try {
       const { region, assetType } = this.getMarketFilter(req);

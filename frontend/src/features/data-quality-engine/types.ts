@@ -91,3 +91,44 @@ export interface DataQualityListResponse {
     hasMore: boolean;
   };
 }
+
+export interface DataQualityReviewReadinessSummary {
+  scope: {
+    region: string;
+    assetType: string;
+  };
+  reviewMode: 'FULL_REVIEW' | 'LIMITED_REVIEW' | 'NO_REVIEW';
+  trustStatus: 'OK' | 'PARTIAL' | 'NOT_TRUSTWORTHY';
+  userDecision: 'WAIT' | 'REPAIR_DATA' | 'PROCEED_LIMITED' | 'READY_FOR_REVIEW';
+  reviewUniverse: {
+    catalogCount: number;
+    providerSupportedCount: number;
+    trustedCount: number;
+    targetTradingDate: string | null;
+    requiredDataThroughDate: string | null;
+    storedDataThroughDate: string | null;
+  };
+  readinessCounts: {
+    priceReady: number;
+    reviewReady: number;
+    missingLatestPrice: number;
+    staleLatestPrice: number;
+    inadequateHistory: number;
+    missingRecentVolume: number;
+  };
+  nextAction: {
+    code: string;
+    label: string;
+    boundedRequest?: {
+      batchSize: number;
+      region: string;
+      assetType: string;
+    };
+  } | null;
+  blockers: Array<{
+    category: string;
+    severity: string;
+    affectedCount: number;
+    nextActionLabel: string;
+  }>;
+}

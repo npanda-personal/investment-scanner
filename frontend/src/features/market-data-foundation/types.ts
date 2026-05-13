@@ -204,6 +204,71 @@ export interface TrustedReviewUniverseHealth {
   warnings: string[];
 }
 
+export interface ReviewReadinessBlocker {
+  category:
+    | 'PROVIDER_VALIDATION'
+    | 'CATALOG_IDENTITY'
+    | 'BUSINESS_METADATA'
+    | 'PRICE_BACKFILL'
+    | 'STALE_EOD'
+    | 'INSUFFICIENT_TRUSTED_UNIVERSE'
+    | 'MARKET_CALENDAR_UNCERTAIN';
+  severity: 'HARD_BLOCKER' | 'LIMITED_REVIEW' | 'CONTEXT_GAP';
+  affectedCount: number;
+  explanation: string;
+  nextActionCode: string;
+  nextActionLabel: string;
+  actionRoute?: string;
+  boundedRequest?: {
+    batchSize: number;
+    region: string;
+    assetType: string;
+  };
+}
+
+export interface ReviewReadinessSummary {
+  scope: {
+    region: string;
+    assetType: string;
+  };
+  generatedAt: string;
+  reviewMode: 'FULL_REVIEW' | 'LIMITED_REVIEW' | 'NO_REVIEW';
+  trustStatus: 'OK' | 'PARTIAL' | 'NOT_TRUSTWORTHY';
+  userDecision: 'WAIT' | 'REPAIR_DATA' | 'PROCEED_LIMITED' | 'READY_FOR_REVIEW';
+  reviewUniverse: {
+    catalogCount: number;
+    providerSupportedCount: number;
+    trustedCount: number;
+    targetTradingDate: string | null;
+    requiredDataThroughDate: string | null;
+    storedDataThroughDate: string | null;
+  };
+  readinessCounts: {
+    priceReady: number;
+    contextReady: number;
+    reviewReady: number;
+    missingLatestPrice: number;
+    staleLatestPrice: number;
+    inadequateHistory: number;
+    missingRecentVolume: number;
+    providerUnknown: number;
+    providerValidationFailedRetryable: number;
+    unsupportedExcluded: number;
+  };
+  blockers: ReviewReadinessBlocker[];
+  nextAction: {
+    code: string;
+    label: string;
+    actionRoute?: string;
+    boundedRequest?: {
+      batchSize: number;
+      region: string;
+      assetType: string;
+    };
+  } | null;
+  warnings: string[];
+}
+
 export interface MarketDataRepairPlan {
   scope: {
     region: string;

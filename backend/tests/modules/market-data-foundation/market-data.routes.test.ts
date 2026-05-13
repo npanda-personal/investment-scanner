@@ -9,6 +9,7 @@ import {
 const controller = {
   health: jest.fn(),
   universeHealth: jest.fn(),
+  reviewReadinessSummary: jest.fn(),
   trustedReviewUniverseHealth: jest.fn(),
   trustedReviewUniverseInstruments: jest.fn(),
   repairPlan: jest.fn(),
@@ -64,6 +65,7 @@ describe('market data routers', () => {
       expect.arrayContaining([
         'GET /market-data/health',
         'GET /market-data/universe/health',
+        'GET /market-data/review-readiness-summary',
         'GET /market-data/review-universe',
         'GET /market-data/review-universe/instruments',
         'GET /market-data/universe/repair-plan',

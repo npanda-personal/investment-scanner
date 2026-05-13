@@ -159,6 +159,7 @@ function RunStatusPanel({ run }: { run: TodayReviewRun | null }) {
 
 function CoveragePanel({ run }: { run: TodayReviewRun }) {
   const reviewUniverse = (run.sourceSnapshot as any)?.reviewUniverse || {};
+  const reviewReadiness = (run.sourceSnapshot as any)?.reviewReadiness || {};
   const scanFunnel = run.scanFunnel || (run.sourceSnapshot as any)?.scanFunnel || {};
   const warnings = run.coverageWarnings || reviewUniverse.warnings || [];
   const trustedLoadStatus = scanFunnel.trustedLoadStatus || (scanFunnel.scanComplete === false ? 'CONFIGURED_PARTIAL' : 'COMPLETE');
@@ -174,7 +175,21 @@ function CoveragePanel({ run }: { run: TodayReviewRun }) {
             <Chip label={`Target session: ${reviewUniverse.targetTradingDate || 'Unavailable'}`} variant="outlined" />
             <Chip label={`Required data-through: ${reviewUniverse.requiredDataThroughDate || 'Unavailable'}`} variant="outlined" />
             <Chip label={`Stored data-through: ${reviewUniverse.storedDataThroughDate || reviewUniverse.dataThroughDate || formatDate(run.dataThroughDate)}`} variant="outlined" />
+            <Chip label={`Readiness decision: ${reviewReadiness.userDecision || 'WAIT'}`} variant="outlined" />
           </Stack>
+          {reviewReadiness.reviewMode && reviewReadiness.reviewMode !== coverageValue(run, 'mode') && (
+            <Alert severity="error">
+              Today Review readiness mode does not match the Market Data summary snapshot.
+            </Alert>
+          )}
+          {reviewReadiness.reviewMode && (
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} useFlexGap flexWrap="wrap">
+              <Typography variant="caption">Market Data summary mode: {reviewReadiness.reviewMode}</Typography>
+              <Typography variant="caption">Trust status: {reviewReadiness.trustStatus || 'UNKNOWN'}</Typography>
+              <Typography variant="caption">Next bounded action: {reviewReadiness.nextAction?.label || 'none'}</Typography>
+              <Typography variant="caption">Batch size: {reviewReadiness.nextAction?.boundedRequest?.batchSize || 'n/a'}</Typography>
+            </Stack>
+          )}
           {coverageValue(run, 'mode') === 'LIMITED_REVIEW' && (
             <Alert severity="warning">
               Limited review mode: candidates are generated only from stocks with current price, sufficient OHLCV history, and recent volume. Missing sector/market-cap data is shown as context gaps.

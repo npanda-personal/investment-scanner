@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { fetchDataQualityEvaluations, fetchDataQualitySummary } from '../api/dataQualityEngineService';
-import type { DataQualityEvaluation, DataQualityFilters, DataQualitySummary } from '../types';
+import { fetchDataQualityEvaluations, fetchDataQualityReviewReadiness, fetchDataQualitySummary } from '../api/dataQualityEngineService';
+import type { DataQualityEvaluation, DataQualityFilters, DataQualityReviewReadinessSummary, DataQualitySummary } from '../types';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 
 export function useDataQualityEngine(filters: DataQualityFilters = {}) {
   const { scope } = useMarketScope();
   const [summary, setSummary] = useState<DataQualitySummary | null>(null);
+  const [reviewReadiness, setReviewReadiness] = useState<DataQualityReviewReadinessSummary | null>(null);
   const [items, setItems] = useState<DataQualityEvaluation[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -15,11 +16,13 @@ export function useDataQualityEngine(filters: DataQualityFilters = {}) {
     setLoading(true);
     setError(null);
     try {
-      const [nextSummary, nextItems] = await Promise.all([
+      const [nextSummary, nextReviewReadiness, nextItems] = await Promise.all([
         fetchDataQualitySummary({ region: scope.region, assetType: scope.assetType }),
+        fetchDataQualityReviewReadiness({ region: scope.region, assetType: scope.assetType }).catch(() => null),
         fetchDataQualityEvaluations({ ...filters, region: scope.region, assetType: scope.assetType }),
       ]);
       setSummary(nextSummary);
+      setReviewReadiness(nextReviewReadiness);
       setItems(nextItems.items);
       setTotal(nextItems.pagination.total);
     } catch (err: any) {
@@ -33,5 +36,5 @@ export function useDataQualityEngine(filters: DataQualityFilters = {}) {
     void reload();
   }, [reload]);
 
-  return { summary, items, total, loading, error, reload };
+  return { summary, reviewReadiness, items, total, loading, error, reload };
 }

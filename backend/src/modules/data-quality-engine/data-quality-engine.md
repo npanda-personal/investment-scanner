@@ -131,6 +131,7 @@ The backend remains bounded at a maximum `batchSize` of 100. The frontend overla
 
 - Page header with primary `Evaluate Scope` action.
 - Region/asset scope message.
+- Market Data Foundation review-readiness summary display for the same `region / assetType`, including review mode, trust status, trusted/catalog counts, data-through date, and the next bounded Market Data repair action. Data Quality only displays this Market Data-owned contract and does not recalculate provider, price, or Trusted Review Universe state.
 - Summary cards for evaluated coverage, signal-ready count, blocked count, and data issues.
 - `Quality Views` tab strip for common workflows:
   - All

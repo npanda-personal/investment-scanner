@@ -109,7 +109,7 @@ const DataQualityEnginePage: React.FC = () => {
     sortOrder: sortDirection,
   }), [country, coverageStatus, eligibleForBacktesting, eligibleForSignals, liquidityStatus, page, pageSize, readinessStatus, search, sector, sortBy, sortDirection]);
 
-  const { summary, items, total, loading, error, reload } = useDataQualityEngine(filters);
+  const { summary, reviewReadiness, items, total, loading, error, reload } = useDataQualityEngine(filters);
 
   const resetFilters = () => {
     setSearch('');
@@ -281,6 +281,26 @@ const DataQualityEnginePage: React.FC = () => {
           <MetricCard label="Blocked Or Limited" value={blockedCount} detail="Not ready for signal generation" />
           <MetricCard label="Issue Flags" value={summary.stalePriceCount + summary.missingVolumeCount + summary.lowLiquidityCount} detail="Overlapping stale, volume, and liquidity flags" />
         </Box>
+      )}
+
+      {reviewReadiness && (
+        <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+          <Stack spacing={1.25}>
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} useFlexGap flexWrap="wrap" alignItems={{ xs: 'flex-start', md: 'center' }}>
+              <Typography variant="subtitle2" fontWeight={700}>Review Readiness Summary</Typography>
+              <Chip size="small" label={`Mode: ${reviewReadiness.reviewMode}`} color={reviewReadiness.reviewMode === 'FULL_REVIEW' ? 'success' : reviewReadiness.reviewMode === 'LIMITED_REVIEW' ? 'warning' : 'error'} />
+              <Chip size="small" label={`Decision: ${reviewReadiness.userDecision}`} variant="outlined" />
+              <Chip size="small" label={`Trust: ${reviewReadiness.trustStatus}`} variant="outlined" />
+            </Stack>
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} useFlexGap flexWrap="wrap">
+              <Typography variant="caption">Trusted / catalog: {reviewReadiness.reviewUniverse.trustedCount} / {reviewReadiness.reviewUniverse.catalogCount}</Typography>
+              <Typography variant="caption">Provider-supported: {reviewReadiness.reviewUniverse.providerSupportedCount}</Typography>
+              <Typography variant="caption">Stored data-through: {reviewReadiness.reviewUniverse.storedDataThroughDate || 'none'}</Typography>
+              <Typography variant="caption">Next bounded action: {reviewReadiness.nextAction?.label || 'none'}</Typography>
+              <Typography variant="caption">Batch size: {reviewReadiness.nextAction?.boundedRequest?.batchSize || 'n/a'}</Typography>
+            </Stack>
+          </Stack>
+        </Paper>
       )}
 
       <Paper variant="outlined" sx={{ mb: 2, px: 1, overflow: 'hidden' }}>

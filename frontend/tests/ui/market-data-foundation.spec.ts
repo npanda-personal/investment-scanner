@@ -197,6 +197,43 @@ test.describe('Market Data Foundation UI', () => {
         },
       });
     });
+    await page.route('**/api/v1/market-data/review-readiness-summary**', async (route) => {
+      await route.fulfill({
+        json: {
+          scope: { region: 'IN', assetType: 'STOCK' },
+          generatedAt: '2026-05-12T00:00:00.000Z',
+          reviewMode: 'LIMITED_REVIEW',
+          trustStatus: 'NOT_TRUSTWORTHY',
+          userDecision: 'REPAIR_DATA',
+          reviewUniverse: {
+            catalogCount: 2910,
+            providerSupportedCount: 585,
+            trustedCount: 144,
+            targetTradingDate: '2026-05-12',
+            requiredDataThroughDate: '2026-05-11',
+            storedDataThroughDate: '2026-05-11',
+          },
+          readinessCounts: {
+            priceReady: 144,
+            contextReady: 0,
+            reviewReady: 0,
+            missingLatestPrice: 2325,
+            staleLatestPrice: 200,
+            inadequateHistory: 30,
+            missingRecentVolume: 20,
+            providerUnknown: 2909,
+            providerValidationFailedRetryable: 7,
+            unsupportedExcluded: 0,
+          },
+          blockers: [
+            { category: 'PROVIDER_VALIDATION', severity: 'HARD_BLOCKER', affectedCount: 2916, explanation: 'Provider support is not proven.', nextActionCode: 'VALIDATE_PROVIDERS', nextActionLabel: 'Validate unknown providers', boundedRequest: { batchSize: 50, region: 'IN', assetType: 'STOCK' } },
+            { category: 'INSUFFICIENT_TRUSTED_UNIVERSE', severity: 'LIMITED_REVIEW', affectedCount: 156, explanation: 'Below full review threshold.', nextActionCode: 'REVIEW_REPAIR_PLAN', nextActionLabel: 'Review bounded repair plan', boundedRequest: { batchSize: 50, region: 'IN', assetType: 'STOCK' } },
+          ],
+          nextAction: { code: 'VALIDATE_PROVIDERS', label: 'Validate unknown providers', boundedRequest: { batchSize: 50, region: 'IN', assetType: 'STOCK' } },
+          warnings: ['Limited review mode.'],
+        },
+      });
+    });
     await page.route('**/api/v1/market-data/universe/repair-plan**', async (route) => {
       await route.fulfill({
         json: {
@@ -581,13 +618,18 @@ test.describe('Market Data Foundation UI', () => {
     await expect(page.getByText('Downstream allowed: no')).toBeVisible();
     await expect(page.getByText('Review-ready: 0 / 300')).toBeVisible();
     await expect(page.getByText('Next action: VALIDATE_PROVIDERS')).toBeVisible();
+    await expect(page.getByText('Review Readiness Summary')).toBeVisible();
+    await expect(page.getByText('Decision: REPAIR_DATA')).toBeVisible();
+    await expect(page.getByText('Trusted / catalog: 144 / 2,910')).toBeVisible();
+    await expect(page.getByText('Next action: Validate unknown providers')).toBeVisible();
+    await expect(page.getByText('Bounded request: batch 50')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Trusted Review Universe' })).toBeVisible();
     await expect(page.getByText('Status: LIMITED')).toBeVisible();
-    await expect(page.getByText('Mode: LIMITED_REVIEW')).toBeVisible();
+    await expect(page.getByText('Mode: LIMITED_REVIEW').first()).toBeVisible();
     await expect(page.getByText('Trusted review universe: 144')).toBeVisible();
     await expect(page.getByText('Target session: 2026-05-12')).toBeVisible();
-    await expect(page.getByText('Required data-through: 2026-05-11')).toBeVisible();
-    await expect(page.getByText('Stored data-through: 2026-05-11')).toBeVisible();
+    await expect(page.getByText('Required data-through: 2026-05-11').first()).toBeVisible();
+    await expect(page.getByText('Stored data-through: 2026-05-11').first()).toBeVisible();
     await expect(page.getByText('Stale latest price excluded: 200')).toBeVisible();
     await expect(page.getByText('Missing sector context gaps: 140')).toBeVisible();
     await expect(page.getByText('Scan ordering: recentVolumeDesc_priceHistoryCompleteness_latestFreshness_symbol')).toBeVisible();
@@ -740,6 +782,183 @@ test.describe('Market Data Foundation UI', () => {
       force: true,
     });
     await expect(page.getByText(/Last repair batch processed 50 of 585/)).toBeVisible();
+  });
+
+  test('data health tab remains usable when review readiness summary is unavailable', async ({ page }) => {
+    const signoffFail = {
+      status: 'FAIL',
+      minReviewReadyRequired: 300,
+      reviewReadyActual: 0,
+      blockers: [{ code: 'PROVIDER_UNKNOWN_REMAINING', severity: 'critical', count: 2, required: 0, nextAction: 'VALIDATE_PROVIDERS' }],
+      nextAction: 'VALIDATE_PROVIDERS',
+      downstreamAllowed: false,
+    };
+    await page.route('**/api/v1/instruments**', async (route) => {
+      await route.fulfill({ json: { instruments: [], pagination: { page: 1, pageSize: 25, total: 0, totalPages: 0 } } });
+    });
+    await page.route('**/api/v1/market-data/catalog/sources', async (route) => {
+      await route.fulfill({ json: { sources: [] } });
+    });
+    await page.route('**/api/v1/market-data/health**', async (route) => {
+      await route.fulfill({
+        json: {
+          status: 'ok',
+          module: 'market-data-foundation',
+          instrumentCount: 2,
+          latestDataTimestamp: null,
+          source: 'database',
+          ingestion_timestamp: '2026-05-11T00:00:00.000Z',
+          last_updated_timestamp: null,
+          data_status: 'PARTIAL',
+          timestamp: '2026-05-11T00:00:00.000Z',
+          region: 'IN',
+          assetType: 'STOCK',
+        },
+      });
+    });
+    await page.route('**/api/v1/market-data/universe/health**', async (route) => {
+      await route.fulfill({
+        json: {
+          scope: { region: 'IN', assetType: 'STOCK' },
+          generatedAt: '2026-05-11T00:00:00.000Z',
+          latestStoredEodDate: null,
+          expectedLatestTradingDate: '2026-05-11',
+          counts: {
+            totalCatalogInstruments: 2,
+            activeInstruments: 2,
+            inactiveOrDelistedInstruments: 0,
+            providerSupported: 0,
+            providerUnknown: 2,
+            providerUnknownValidationNeeded: 2,
+            providerRetryValidationNeeded: 0,
+            providerUnsupportedExcluded: 0,
+            providerValidationFailed: 0,
+            unsupported: 0,
+            unsupportedExcluded: 0,
+            supportedCatalogIdentityRepairNeeded: 0,
+            supportedBusinessMetadataRepairNeeded: 0,
+            supportedPriceBackfillNeeded: 0,
+            catalogOnly: 2,
+            priceReady: 0,
+            contextReady: 0,
+            reviewReady: 0,
+            staleOrIncomplete: 0,
+            missingLatestPrice: 2,
+            staleLatestPrice: 0,
+            missingOrInadequatePriceHistory: 2,
+            missingRecentVolume: 2,
+            missingSector: 0,
+            missingIndustry: 0,
+            missingCountry: 0,
+            missingCurrency: 0,
+            missingMarketCap: 0,
+            missingIsin: 0,
+            missingListingDate: 0,
+            byUniverseState: { CATALOG_ONLY: 2, PROVIDER_SUPPORTED: 0, PRICE_READY: 0, CONTEXT_READY: 0, REVIEW_READY: 0, UNSUPPORTED: 0, STALE_OR_INCOMPLETE: 0, DELISTED_OR_INACTIVE: 0 },
+            readiness: { priceReady: 0, contextReady: 0, reviewReady: 0 },
+          },
+          coverage: { priceCoveragePercentage: 0, metadataCoveragePercentage: 0, reviewReadyPercentage: 0 },
+          topBlockers: [{ code: 'PROVIDER_UNKNOWN', label: 'Provider support not validated', count: 2, severity: 'critical' }],
+          warnings: ['Provider UNKNOWN for scoped instruments.'],
+          trustStatus: 'NOT_TRUSTWORTHY',
+          trustReasons: ['2 active instruments still need provider validation.'],
+          universeSignoff: signoffFail,
+        },
+      });
+    });
+    await page.route('**/api/v1/market-data/review-readiness-summary**', async (route) => {
+      await route.fulfill({ status: 500, json: { error: 'Review readiness summary failed' } });
+    });
+    await page.route('**/api/v1/market-data/review-universe**', async (route) => {
+      await route.fulfill({
+        json: {
+          scope: { region: 'IN', assetType: 'STOCK' },
+          asOfDate: '2026-05-12',
+          targetTradingDate: '2026-05-12',
+          requiredDataThroughDate: '2026-05-11',
+          storedDataThroughDate: null,
+          catalogCount: 2,
+          providerSupportedCount: 0,
+          trustedCount: 0,
+          status: 'NOT_READY',
+          mode: 'NO_REVIEW',
+          minLiteCount: 100,
+          minFullCount: 300,
+          dataThroughDate: null,
+          scanPolicy: { scanLimit: 0, scanComplete: true, scanOrdering: 'recentVolumeDesc_priceHistoryCompleteness_latestFreshness_symbol' },
+          excludedCounts: { providerUnknown: 2, providerRetryFailed: 0, providerUnsupported: 0, inactiveOrDelisted: 0, noLatestPrice: 0, staleLatestPrice: 0, insufficientBarsUnder120: 0, insufficientBarsUnder252: 0, missingRecentVolume: 0, corporateActionBlocked: 0 },
+          contextGapCounts: { missingSector: 0, missingIndustry: 0, missingMarketCap: 0, missingIsin: 0, missingListingDate: 0 },
+          warnings: ['Trusted review universe is not ready.'],
+        },
+      });
+    });
+    await page.route('**/api/v1/market-data/universe/repair-plan**', async (route) => {
+      await route.fulfill({
+        json: {
+          scope: { region: 'IN', assetType: 'STOCK' },
+          generatedAt: '2026-05-11T00:00:00.000Z',
+          totalCatalogInstruments: 2,
+          providerUnknownValidationNeeded: 2,
+          providerRetryValidationNeeded: 0,
+          providerUnsupportedExcluded: 0,
+          providerValidationFailed: 0,
+          providerValidationNeeded: 2,
+          retryFailedValidations: 0,
+          supportedCatalogIdentityRepairNeeded: 0,
+          supportedBusinessMetadataRepairNeeded: 0,
+          supportedPriceBackfillNeeded: 0,
+          unsupportedExcluded: 0,
+          catalogIdentityRepairNeeded: 0,
+          priceBackfillNeeded: 0,
+          businessMetadataRepairNeeded: 0,
+          businessMetadataAutoRepairable: 0,
+          businessMetadataManualRequired: 0,
+          businessMetadataRetryBlocked: 0,
+          businessMetadataRetryEligible: 0,
+          businessMetadataRecentlyAttempted: 0,
+          metadataEnrichmentNeeded: 0,
+          manualMetadataRequired: 0,
+          manualBusinessMetadataRequired: 0,
+          missingIsin: 0,
+          missingListingDate: 0,
+          missingSector: 0,
+          missingIndustry: 0,
+          missingMarketCap: 0,
+          manualSectorIndustryRequired: 0,
+          topActions: [{ action: 'VALIDATE_PROVIDERS', label: 'Validate unknown providers', count: 2 }],
+          warnings: ['2 UNKNOWN instruments need provider validation before review workflows can trust them.'],
+          universeSignoff: signoffFail,
+        },
+      });
+    });
+    await page.route('**/api/v1/market-data/universe/repair-runs/latest**', async (route) => {
+      await route.fulfill({ json: null });
+    });
+    await page.route('**/api/v1/market-data/scheduler/status', async (route) => {
+      await route.fulfill({
+        json: {
+          enabled: false,
+          intervalMinutes: 15,
+          regions: ['IN'],
+          assetType: 'STOCK',
+          activeRun: false,
+          lastRunAt: null,
+          nextSuggestedRunAt: null,
+          regionStatuses: [],
+        },
+      });
+    });
+
+    await visitModule(page, '/market-data-foundation', 'Market Data Foundation');
+    await page.getByRole('tab', { name: 'Data Health' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Universe Health' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Trusted Review Universe' })).toBeVisible();
+    await expect(page.getByText('Review Readiness Summary')).toBeVisible();
+    await expect(page.getByText('Decision: WAIT')).toBeVisible();
+    await expect(page.getByText('Trusted / catalog: 0 / 0')).toBeVisible();
+    await expect(page.getByText('Next action: none')).toBeVisible();
+    await expect(page.getByText('Unable to load market data status')).toHaveCount(0);
   });
 
   test('catalog table exposes scoped instrument fields and compact filters', async ({ page }) => {

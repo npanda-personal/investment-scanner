@@ -397,6 +397,83 @@ describe('Market Data Foundation universe readiness', () => {
       mode: 'FULL_REVIEW',
     });
   });
+
+  it('builds a canonical review readiness summary with one bounded repair action', async () => {
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue([
+        stockRow('catalog', 'CATALOG.NS', 'UNKNOWN'),
+        stockRow('stale', 'STALE.NS', 'SUPPORTED'),
+      ]),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['CATALOG.NS', { priceHistoryBars: 0, latestPriceDate: null, latestVolume: null, latestAdjustedClose: null, latestClose: null }],
+        ['STALE.NS', { ...readyPriceStats, latestPriceDate: '2020-01-01' }],
+      ])),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+
+    const result = await service.reviewReadinessSummary({ region: 'IN', assetType: 'STOCK' });
+
+    expect(result).toMatchObject({
+      scope: { region: 'IN', assetType: 'STOCK' },
+      reviewMode: 'NO_REVIEW',
+      userDecision: 'REPAIR_DATA',
+      reviewUniverse: {
+        catalogCount: 2,
+        trustedCount: 0,
+      },
+      readinessCounts: {
+        providerUnknown: 1,
+        staleLatestPrice: 1,
+      },
+      nextAction: {
+        code: 'VALIDATE_PROVIDERS',
+        label: 'Validate unknown providers',
+        boundedRequest: { batchSize: 50, region: 'IN', assetType: 'STOCK' },
+      },
+    });
+    expect(result.blockers).toEqual(expect.arrayContaining([
+      expect.objectContaining({ category: 'PROVIDER_VALIDATION', severity: 'HARD_BLOCKER', affectedCount: 1 }),
+      expect.objectContaining({ category: 'PRICE_BACKFILL', nextActionCode: 'BACKFILL_PRICES' }),
+      expect.objectContaining({ category: 'INSUFFICIENT_TRUSTED_UNIVERSE', severity: 'HARD_BLOCKER' }),
+    ]));
+  });
+
+  it('marks the review readiness summary ready when trusted and strict signoff are both healthy', async () => {
+    const originalMinLite = process.env.TRUSTED_REVIEW_MIN_LITE;
+    const originalMinFull = process.env.TRUSTED_REVIEW_MIN_FULL;
+    const originalSignoffMin = process.env.MARKET_DATA_SIGNOFF_MIN_REVIEW_READY;
+    process.env.TRUSTED_REVIEW_MIN_LITE = '1';
+    process.env.TRUSTED_REVIEW_MIN_FULL = '1';
+    process.env.MARKET_DATA_SIGNOFF_MIN_REVIEW_READY = '1';
+    try {
+      const repository = {
+        listStocksForUniverseHealth: jest.fn().mockResolvedValue([
+          {
+            ...stockRow('ready', 'READY.NS', 'SUPPORTED'),
+            sourceSymbol: 'READY',
+            displaySymbol: 'READY',
+            catalogSource: 'NSE_EQUITY_SECURITIES',
+          },
+        ]),
+        priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+          ['READY.NS', { ...readyPriceStats, latestPriceDate: '2099-01-01' }],
+        ])),
+      };
+      const service = new MarketDataFoundationService(repository as any, {} as any);
+
+      const result = await service.reviewReadinessSummary({ region: 'IN', assetType: 'STOCK' });
+
+      expect(result.reviewMode).toBe('FULL_REVIEW');
+      expect(result.trustStatus).toBe('OK');
+      expect(result.userDecision).toBe('READY_FOR_REVIEW');
+      expect(result.nextAction).toBeNull();
+      expect(result.blockers).toEqual([]);
+    } finally {
+      process.env.TRUSTED_REVIEW_MIN_LITE = originalMinLite;
+      process.env.TRUSTED_REVIEW_MIN_FULL = originalMinFull;
+      process.env.MARKET_DATA_SIGNOFF_MIN_REVIEW_READY = originalSignoffMin;
+    }
+  });
 });
 
 function stockRow(id: string, symbol: string, providerSupportStatus: string) {

@@ -22,6 +22,16 @@ export type UniverseState =
 export type UniverseTrustStatus = 'OK' | 'PARTIAL' | 'NOT_TRUSTWORTHY';
 export type TrustedReviewUniverseStatus = 'READY' | 'LIMITED' | 'NOT_READY';
 export type TrustedReviewUniverseMode = 'FULL_REVIEW' | 'LIMITED_REVIEW' | 'NO_REVIEW';
+export type ReviewReadinessUserDecision = 'WAIT' | 'REPAIR_DATA' | 'PROCEED_LIMITED' | 'READY_FOR_REVIEW';
+export type ReviewReadinessBlockerCategory =
+  | 'PROVIDER_VALIDATION'
+  | 'CATALOG_IDENTITY'
+  | 'BUSINESS_METADATA'
+  | 'PRICE_BACKFILL'
+  | 'STALE_EOD'
+  | 'INSUFFICIENT_TRUSTED_UNIVERSE'
+  | 'MARKET_CALENDAR_UNCERTAIN';
+export type ReviewReadinessBlockerSeverity = 'HARD_BLOCKER' | 'LIMITED_REVIEW' | 'CONTEXT_GAP';
 export type CatalogSource =
   | 'MANUAL'
   | 'LEGACY_NIFTY500'
@@ -484,6 +494,66 @@ export interface TrustedReviewUniverseHealth {
   scanPolicy: TrustedReviewUniverseScanPolicy;
   excludedCounts: TrustedReviewUniverseExcludedCounts;
   contextGapCounts: TrustedReviewUniverseContextGapCounts;
+  warnings: string[];
+}
+
+export interface ReviewReadinessBlocker {
+  category: ReviewReadinessBlockerCategory;
+  severity: ReviewReadinessBlockerSeverity;
+  affectedCount: number;
+  explanation: string;
+  nextActionCode: string;
+  nextActionLabel: string;
+  actionRoute?: string;
+  boundedRequest?: {
+    batchSize: number;
+    region: string;
+    assetType: string;
+  };
+}
+
+export interface ReviewReadinessNextAction {
+  code: string;
+  label: string;
+  actionRoute?: string;
+  boundedRequest?: {
+    batchSize: number;
+    region: string;
+    assetType: string;
+  };
+}
+
+export interface ReviewReadinessSummary {
+  scope: {
+    region: string;
+    assetType: string;
+  };
+  generatedAt: string;
+  reviewMode: TrustedReviewUniverseMode;
+  trustStatus: UniverseTrustStatus;
+  userDecision: ReviewReadinessUserDecision;
+  reviewUniverse: {
+    catalogCount: number;
+    providerSupportedCount: number;
+    trustedCount: number;
+    targetTradingDate: string | null;
+    requiredDataThroughDate: string | null;
+    storedDataThroughDate: string | null;
+  };
+  readinessCounts: {
+    priceReady: number;
+    contextReady: number;
+    reviewReady: number;
+    missingLatestPrice: number;
+    staleLatestPrice: number;
+    inadequateHistory: number;
+    missingRecentVolume: number;
+    providerUnknown: number;
+    providerValidationFailedRetryable: number;
+    unsupportedExcluded: number;
+  };
+  blockers: ReviewReadinessBlocker[];
+  nextAction: ReviewReadinessNextAction | null;
   warnings: string[];
 }
 

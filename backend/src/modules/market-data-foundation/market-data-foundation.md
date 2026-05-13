@@ -204,6 +204,8 @@ Full Catalog Health remains the strict data-ops contract. Trusted Review Univers
 
 `GET /api/v1/market-data/review-universe?region=IN&assetType=STOCK` returns catalog count, provider-supported count, trusted count, status (`READY`, `LIMITED`, `NOT_READY`), mode (`FULL_REVIEW`, `LIMITED_REVIEW`, `NO_REVIEW`), target session (`targetTradingDate`), required EOD data date (`requiredDataThroughDate`), stored EOD data date (`storedDataThroughDate`), excluded counts, context-gap counts, scan policy, thresholds, and warnings. Defaults are `TRUSTED_REVIEW_MIN_LITE=100` and `TRUSTED_REVIEW_MIN_FULL=300`.
 
+`GET /api/v1/market-data/review-readiness-summary?region=IN&assetType=STOCK` is the canonical Today Review readiness contract. It composes strict universe health, Trusted Review Universe health, and the bounded repair plan into one additive DTO with `reviewMode`, `trustStatus`, `userDecision`, trusted/catalog/provider-supported counts, required/stored data-through dates, readiness counts, blocker categories, warnings, and one top `nextAction`. The `nextAction` includes a bounded request with `batchSize=50`, `region`, and `assetType` when a repair action is available; it never starts provider or full-universe work by itself.
+
 `GET /api/v1/market-data/review-universe/instruments?region=IN&assetType=STOCK&limit=100` returns trusted instruments and recent OHLCV history for Lite setup/evidence evaluation.
 
 Trusted inclusion rules for `IN / STOCK`:
@@ -379,6 +381,7 @@ For the current India catalog scope, `.NS`, `.BO`, NSE, and BSE cash equity rows
 | --- | --- | --- |
 | `GET /api/v1/market-data/health` | Market data health, instrument count, freshness, trust metadata | Implemented |
 | `GET /api/v1/market-data/universe/health` | Strict scoped universe readiness health and review-ready counts | Implemented |
+| `GET /api/v1/market-data/review-readiness-summary` | Canonical scoped review-readiness summary and bounded next action for Today Review/Data Quality displays | Implemented |
 | `GET /api/v1/market-data/review-universe` | Trusted Review Universe health for Today Review Lite | Implemented |
 | `GET /api/v1/market-data/review-universe/instruments` | Trusted Review Universe instruments and recent OHLCV history | Implemented |
 | `GET /api/v1/market-data/universe/repair-plan` | Bounded repair queue counts for provider validation, catalog identity, provider business metadata, manual metadata, and price backfill | Implemented |
