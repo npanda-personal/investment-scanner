@@ -311,6 +311,42 @@ Guarantee that every active `IN / STOCK` has daily OHLCV for the required histor
 - Shared files must have one writing owner at a time. BE-1 and BE-3 overlap on service/repository/types and must be serialized or assigned to the same backend owner.
 - The hard product rule is not negotiable: every active `IN / STOCK` must have 15 years of daily OHLCV, or listing-date-to-latest daily OHLCV if listed more recently; Yahoo insufficiency requires a free official/public fallback path before missing data is accepted.
 
+## Market Data Catalog Metadata Backfill Source Scope And Parallelism Hotfix
+
+State: `Released`
+Mode: none
+Owner: Senior Fullstack Lead / Orchestrator
+Lane/module: Lane 1, `market-data-foundation`
+
+QA evidence: [Catalog metadata backfill QA evidence](../qa-evidence/2026-05-13-market-data-catalog-metadata-backfill-qa-evidence.md)
+Lead validation: [Catalog metadata backfill Lead validation](../lead-validation/2026-05-13-market-data-catalog-metadata-backfill-lead-validation.md)
+Architect signoff: [Catalog metadata backfill Architect signoff](../architecture-signoff/2026-05-13-market-data-catalog-metadata-backfill-architect-signoff.md)
+PO acceptance: [Catalog metadata backfill PO acceptance](../po-acceptance/2026-05-13-market-data-catalog-metadata-backfill-po-acceptance.md)
+GitHub check-in: [Catalog metadata backfill GitHub check-in](../github-check-in/2026-05-13-market-data-catalog-metadata-backfill-github-check-in.md)
+
+### Product Goal
+
+The Import & Backfill Catalog Source dropdown must control the catalog metadata backfill scope. Selecting an ETF, index, or other catalog source must not silently run a whole `IN / STOCK` metadata backfill. Backfill metadata must also avoid row-by-row serial execution for large local batches.
+
+### Accepted Implementation
+
+- Frontend payload uses the selected catalog source's `region`, `assetType`, and `catalogSource`.
+- Backend request/response types include `catalogSource` and `workerConcurrency`.
+- Repository backfill selection applies a case-insensitive `catalogSource` filter when present.
+- Backend backfill processing uses bounded workers:
+  - DB-only default concurrency: `16`, capped at `24`.
+  - Provider-validation default concurrency: `4`, capped at `8`.
+- Provider validation remains optional and bounded.
+- No paid provider, hosted worker service, paid queue, broker API, or schema migration was introduced.
+
+### Acceptance Evidence
+
+- Backend focused tests passed: `153/153`.
+- Backend build passed.
+- Frontend build passed.
+- Focused UI smoke passed: `1/1`, proving `NSE ETF Securities` sends `assetType: ETF` and `catalogSource: NSE_ETF_SECURITIES`.
+- Implementation commit pushed to `origin/dev` at `8452e3b`.
+
 ## Later Packets Parked Behind MD-A5
 
 1. **MD-A6 - Catalog Identity And Manual CSV Repair Hardening**
