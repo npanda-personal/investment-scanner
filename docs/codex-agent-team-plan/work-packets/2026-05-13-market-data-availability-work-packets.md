@@ -194,13 +194,87 @@ Forbidden scope:
 - Frontend: focused UI tests proving normal payload excludes `fullReload` and repair summary shows deep-backfill diagnostics.
 - Build validation for touched projects when resource limits allow.
 
-## Next Market Data Missing-Data Packets
+## MD-A4 - Provider Validation Drain And Retry Classification
 
-1. **MD-A4 - Provider Validation Drain And Retry Classification**
-   Drain `UNKNOWN` and retryable provider rows into clear supported/unsupported/retry states.
-2. **MD-A5 - Catalog Identity And Manual CSV Repair Hardening**
+State: `PO Accepted`
+Mode: `GitHub Check-In Mode`
+Owner: Lane 1 backend and frontend workers, coordinated by Senior Fullstack Lead / Orchestrator
+Lane/module: Lane 1, `market-data-foundation`
+
+Product brief: [MD-A4 product brief](../po-briefs/2026-05-13-md-a4-provider-validation-drain-product-brief.md)
+Architecture contract: [MD-A4 architecture contract](../architecture-contracts/2026-05-13-md-a4-provider-validation-drain-contract.md)
+QA plan: [MD-A4 QA plan](../qa-plans/2026-05-13-md-a4-provider-validation-drain-qa-plan.md)
+Developer handoff: [MD-A4 developer handoff](../developer-handoffs/2026-05-13-md-a4-developer-handoff.md)
+QA evidence: [MD-A4 QA evidence](../qa-evidence/2026-05-13-md-a4-provider-validation-drain-qa-evidence.md)
+Lead validation: [MD-A4 Lead validation](../lead-validation/2026-05-13-md-a4-lead-validation.md)
+Architect signoff: [MD-A4 Architect signoff](../architecture-signoff/2026-05-13-md-a4-architect-signoff.md)
+PO acceptance: [MD-A4 PO acceptance](../po-acceptance/2026-05-13-md-a4-po-acceptance.md)
+
+### Product Goal
+
+Provider validation must classify `IN / STOCK` rows into useful states so valid stocks can enter MD-A3 price backfill and invalid or blocked stocks stop hiding inside generic unknown/retry counts.
+
+### Acceptance Direction
+
+- Drain `UNKNOWN_FIRST` before retrying failed provider validations.
+- Use durable provider-validation repair attempts/states for retryable, retry-blocked, manual-required, unsupported, and supported outcomes.
+- Validate over a completed-EOD-safe wide window for Indian stocks.
+- If Yahoo is insufficient, switch to or surface a required approved free source fallback before accepting missing data. Preferred fallback direction is NSE/BSE official/public EOD bhavcopy data; paid providers and paid-provider free tiers are not approved.
+- Treat 15 years of daily OHLCV as the default required history window for every active stock. For companies listed less than 15 years ago, require full daily OHLCV from listing date through latest completed EOD.
+- Keep provider calls bounded, timed, and visible with progress/result diagnostics.
+- Exclude unsupported/manual/retry-blocked rows from supported-only metadata and price blockers.
+- Preserve fail-closed downstream trust gates.
+
+### Reserved Write Scope
+
+Backend provider taxonomy/state:
+
+- `backend/src/modules/market-data-foundation/market-data-foundation.provider.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.repository.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.types.ts`
+- focused backend tests under `backend/tests/modules/market-data-foundation/`
+
+Frontend evidence display:
+
+- `frontend/src/features/market-data-foundation/types.ts`
+- `frontend/src/features/market-data-foundation/api/marketDataFoundationService.ts`
+- `frontend/src/features/market-data-foundation/components/MarketDataStatusPanel.tsx`
+- `frontend/src/features/market-data-foundation/components/MarketDataFoundationPage.tsx` only if row evidence display is needed
+- `frontend/tests/ui/market-data-foundation.spec.ts`
+
+Forbidden scope:
+
+- Prisma schema/migrations unless architecture is reopened.
+- Paid providers, paid services, hosted queues, broker APIs, or live trading integrations.
+- Downstream gate relaxation.
+
+### Developer Validation Before QA
+
+- Backend: focused Market Data service/repository/provider tests plus backend build.
+- Frontend: focused mocked UI tests plus frontend build.
+- Handoff must include exact commands, results, skipped checks, and performance/progress evidence.
+
+### Acceptance Evidence
+
+- Backend focused tests passed: 3 suites / 138 tests.
+- Backend build passed.
+- Frontend build passed.
+- Focused Market Data UI smoke passed: 8/8.
+- `git diff --check` passed with line-ending warnings only.
+- PO accepted MD-A4 for GitHub check-in. MD-A5 remains the next required implementation to actually populate 15-year/listing-date OHLCV and free-source fallback data.
+
+## Later Packets Parked Behind MD-A4
+
+1. **MD-A5 - 15-Year History And Free-Source Fallback**
+   Guarantee 15 years of daily OHLCV for every active stock, or listing-date-to-latest completed EOD when the company is younger. If Yahoo cannot provide sufficient reliable history, use approved official/public free exchange EOD sources before accepting missing data; paid providers, paid APIs, broker APIs, paid hosted services, and commercial free-tier providers are not approved by default.
+   Product brief: [MD-A5 product brief](../po-briefs/2026-05-13-md-a5-15-year-history-and-free-source-fallback-product-brief.md)
+   Architecture contract: [MD-A5 architecture contract](../architecture-contracts/2026-05-13-md-a5-15-year-history-and-free-source-fallback-contract.md)
+   QA plan: [MD-A5 QA plan](../qa-plans/2026-05-13-md-a5-15-year-history-and-free-source-fallback-qa-plan.md)
+   State: `QA Planning Completed`; parked behind MD-A4 implementation/signoff to avoid market-data write-scope conflicts.
+2. **MD-A6 - Catalog Identity And Manual CSV Repair Hardening**
    Fix deterministic provider symbol, ISIN, listing-date, and exchange identity gaps using public/local sources.
-3. **MD-A6 - Holiday/Session Accuracy**
+3. **MD-A7 - Holiday/Session Accuracy**
    Prevent false stale-EOD blockers caused by missing local holiday knowledge.
-4. **MD-A7 - Adjusted-Close And Volume Coverage Honesty**
+4. **MD-A8 - Adjusted-Close And Volume Coverage Honesty**
    Preserve volume and adjusted-close provenance so trusted review uses reliable OHLCV.

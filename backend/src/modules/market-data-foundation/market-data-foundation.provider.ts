@@ -7,6 +7,7 @@ import type {
   CoreFundamentals,
   FxRateInput,
   HistoricalPrice,
+  ProviderValidationResult,
   RegionInfo,
   SearchResult,
 } from './market-data-foundation.types';
@@ -18,6 +19,7 @@ export type {
   CoreFundamentals,
   FxRateInput,
   HistoricalPrice,
+  ProviderValidationResult,
   RegionInfo,
   SearchResult,
 } from './market-data-foundation.types';
@@ -191,25 +193,98 @@ export class YahooFinanceIngestionService {
     }
   }
 
-  async validateProviderSymbol(symbol: string): Promise<{ supported: boolean; message?: string; failed?: boolean }> {
+  async validateProviderSymbol(symbol: string, options: {
+    region?: string;
+    assetType?: string;
+    validationWindowStartDate?: Date;
+    validationWindowEndDate?: Date;
+    timeoutMs?: number;
+  } = {}): Promise<ProviderValidationResult> {
+    const started = Date.now();
+    const timeoutMs = Math.min(Math.max(Number(options.timeoutMs) || 8000, 1000), 15000);
+    const validationWindowEndDate = options.validationWindowEndDate || new Date();
+    const validationWindowStartDate = options.validationWindowStartDate || new Date(validationWindowEndDate.getTime() - 45 * 24 * 60 * 60 * 1000);
+    const windowStart = validationWindowStartDate.toISOString().slice(0, 10);
+    const windowEnd = validationWindowEndDate.toISOString().slice(0, 10);
     try {
-      const result = await this.yahooFinance.chart(symbol, {
-        period1: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-        period2: new Date(),
+      const result: any = await this.withTimeout(this.yahooFinance.chart(symbol, {
+        period1: validationWindowStartDate,
+        period2: validationWindowEndDate,
         interval: '1d',
         return: 'array',
-      });
+      }), timeoutMs);
       const quotes = Array.isArray(result?.quotes) ? result.quotes : [];
-      return quotes.length > 0
-        ? { supported: true }
-        : { supported: false, message: 'Provider returned no daily candles.' };
+      const providerCallMs = Date.now() - started;
+      if (quotes.length > 0) {
+        return {
+          supported: true,
+          classification: 'SUPPORTED_WITH_CANDLES',
+          provider: 'yahoo',
+          providerSymbol: symbol,
+          candlesFound: quotes.length,
+          providerCallMs,
+          validationWindowStartDate: windowStart,
+          validationWindowEndDate: windowEnd,
+          sourceName: 'YAHOO_CHART',
+        };
+      }
+      const isIndianStock = options.region?.toUpperCase() === 'IN' && (options.assetType?.toUpperCase() || 'STOCK') === 'STOCK';
+      return {
+        supported: false,
+        failed: isIndianStock,
+        classification: isIndianStock ? 'FREE_FALLBACK_REQUIRED' : 'UNSUPPORTED_NO_CANDLES_WIDE_WINDOW',
+        provider: 'yahoo',
+        providerSymbol: symbol,
+        candlesFound: 0,
+        providerCallMs,
+        validationWindowStartDate: windowStart,
+        validationWindowEndDate: windowEnd,
+        sourceName: 'YAHOO_CHART',
+        fallbackSourceAttempted: null,
+        freeFallbackRequired: isIndianStock,
+        message: isIndianStock
+          ? 'Yahoo returned no daily candles over the completed-EOD validation window; approved free exchange EOD fallback is required before marking unsupported.'
+          : 'Provider returned no daily candles over the validation window.',
+      };
     } catch (error) {
+      const providerCallMs = Date.now() - started;
+      const message = error instanceof Error ? error.message : 'Provider validation failed.';
+      const isTimeout = error instanceof Error && error.name === 'ProviderValidationTimeoutError';
+      const isRateLimit = /rate|429|too many requests|throttle/i.test(message);
       return {
         supported: false,
         failed: true,
-        message: error instanceof Error ? error.message : 'Provider validation failed.',
+        classification: isTimeout ? 'RETRYABLE_TIMEOUT' : isRateLimit ? 'RETRYABLE_RATE_LIMITED' : 'RETRYABLE_PROVIDER_ERROR',
+        provider: 'yahoo',
+        providerSymbol: symbol,
+        candlesFound: 0,
+        providerCallMs,
+        validationWindowStartDate: windowStart,
+        validationWindowEndDate: windowEnd,
+        sourceName: 'YAHOO_CHART',
+        message,
       };
     }
+  }
+
+  private async withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timeout = globalThis.setTimeout(() => {
+        const error = new Error(`Provider validation timed out after ${timeoutMs}ms.`);
+        error.name = 'ProviderValidationTimeoutError';
+        reject(error);
+      }, timeoutMs);
+      promise.then(
+        (value) => {
+          globalThis.clearTimeout(timeout);
+          resolve(value);
+        },
+        (error) => {
+          globalThis.clearTimeout(timeout);
+          reject(error);
+        }
+      );
+    });
   }
 
   async fetchCoreFundamentals(symbol: string): Promise<CoreFundamentals> {

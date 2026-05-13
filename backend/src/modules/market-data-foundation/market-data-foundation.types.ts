@@ -47,6 +47,17 @@ export type CatalogSource =
   | 'UNKNOWN';
 
 export type ProviderSupportStatus = 'SUPPORTED' | 'UNSUPPORTED' | 'UNKNOWN' | 'VALIDATION_FAILED';
+export type ProviderValidationClassification =
+  | 'SUPPORTED_WITH_CANDLES'
+  | 'SUPPORTED_FROM_STORED_PRICES'
+  | 'UNSUPPORTED_NO_PROVIDER_SYMBOL'
+  | 'UNSUPPORTED_NO_CANDLES_WIDE_WINDOW'
+  | 'FREE_FALLBACK_REQUIRED'
+  | 'RETRYABLE_TIMEOUT'
+  | 'RETRYABLE_PROVIDER_ERROR'
+  | 'RETRYABLE_RATE_LIMITED'
+  | 'MANUAL_SYMBOL_REPAIR_REQUIRED'
+  | 'VALIDATION_SKIPPED_CALENDAR_UNCERTAIN';
 export type InstrumentSegmentClass = 'CASH' | 'ETF' | 'INDEX' | 'FUTURES' | 'CURRENCY' | 'COMMODITY' | 'CRYPTO' | 'FUND' | 'OTHER' | 'UNKNOWN';
 export type MarketDataRepairType =
   | 'PROVIDER_BUSINESS_METADATA'
@@ -202,6 +213,22 @@ export interface SearchResult {
   type?: string;
   exchange?: string;
   region?: string;
+}
+
+export interface ProviderValidationResult {
+  supported: boolean;
+  failed?: boolean;
+  message?: string;
+  classification: ProviderValidationClassification;
+  provider?: string;
+  providerSymbol?: string;
+  candlesFound?: number;
+  providerCallMs?: number;
+  validationWindowStartDate?: string;
+  validationWindowEndDate?: string;
+  sourceName?: string;
+  fallbackSourceAttempted?: string | null;
+  freeFallbackRequired?: boolean;
 }
 
 export interface CompanyMasterData {
@@ -411,6 +438,9 @@ export interface MarketDataUniverseHealth {
     providerUnknown: number;
     providerUnknownValidationNeeded: number;
     providerRetryValidationNeeded: number;
+    providerRetryBlocked?: number;
+    providerManualRepairRequired?: number;
+    nextProviderRetryAtMin?: string | null;
     providerUnsupportedExcluded: number;
     providerValidationFailed: number;
     unsupported: number;
@@ -710,6 +740,9 @@ export interface MarketDataRepairPlan {
   providerValidationFailed: number;
   providerValidationNeeded: number;
   retryFailedValidations: number;
+  providerRetryBlocked?: number;
+  providerManualRepairRequired?: number;
+  nextProviderRetryAtMin?: string | null;
   supportedCatalogIdentityRepairNeeded: number;
   supportedBusinessMetadataRepairNeeded: number;
   supportedPriceBackfillNeeded: number;
@@ -801,6 +834,57 @@ export interface MarketDataRepairSummary {
   providerSupported?: number;
   providerUnsupported?: number;
   validationFailed?: number;
+  supportedFromStoredPrices?: number;
+  unsupportedNoProviderSymbol?: number;
+  unsupportedNoCandlesWideWindow?: number;
+  retryableTimeout?: number;
+  retryableProviderError?: number;
+  retryableRateLimited?: number;
+  manualSymbolRepairRequired?: number;
+  retryCooldownSkipped?: number;
+  manualRequiredSkipped?: number;
+  providerCalls?: number;
+  providerTimeouts?: number;
+  providerRetryableFailures?: number;
+  freeFallbackRequired?: number;
+  fallbackSourceAttempted?: string | null;
+  slowProviderCalls?: number;
+  maxProviderCallMs?: number;
+  p95ProviderCallMs?: number;
+  validationWindowStartDate?: string | null;
+  validationWindowEndDate?: string | null;
+  requiredHistoryStartDate?: string | null;
+  requiredHistoryCoverageStatus?: 'COMPLETE' | 'NEEDS_BACKFILL' | 'FALLBACK_REQUIRED' | string | null;
+  listingDate?: string | null;
+  listingDateMissing?: boolean;
+  storedHistoryStartDate?: string | null;
+  storedHistoryEndDate?: string | null;
+  storedHistoryBars?: number;
+  requiredHistoryComplete?: boolean;
+  remainingUnknown?: number;
+  remainingRetryEligible?: number;
+  remainingRetryBlocked?: number;
+  nextRetryAtMin?: string | null;
+  sampleResults?: Array<{
+    symbol: string;
+    providerSymbol?: string | null;
+    status: ProviderSupportStatus | string;
+    classification: ProviderValidationClassification;
+    candlesFound?: number;
+    providerCallMs?: number;
+    nextRetryAt?: string | null;
+    message?: string | null;
+    validationWindowStartDate?: string | null;
+    validationWindowEndDate?: string | null;
+    requiredHistoryStartDate?: string | null;
+    listingDate?: string | null;
+    listingDateMissing?: boolean;
+    storedHistoryStartDate?: string | null;
+    storedHistoryEndDate?: string | null;
+    storedHistoryBars?: number;
+    requiredHistoryComplete?: boolean;
+    sourceName?: string | null;
+  }>;
   metadataEnriched?: number;
   priceRowsReceived?: number;
   priceRowsInserted?: number;

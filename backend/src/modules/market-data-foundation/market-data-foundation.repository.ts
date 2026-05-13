@@ -550,17 +550,18 @@ export class MarketDataFoundationRepository {
     batchSize: number;
     includeRetryFailed?: boolean;
     providerValidationQueue?: ProviderValidationQueue;
+    force?: boolean;
   }) {
     const unknownWhere = this.providerValidationWhere(options, 'UNKNOWN_FIRST');
-    const retryWhere = this.providerValidationWhere(options, 'RETRY_FAILED');
+    const retryWhere = this.providerValidationWhere(options, 'RETRY_FAILED', { force: options.force });
     const queue = options.providerValidationQueue || (options.includeRetryFailed ? null : 'UNKNOWN_FIRST');
 
     if (queue === 'RETRY_FAILED') {
       const [stocks, total] = await Promise.all([
         this.prisma.stock.findMany({
           where: retryWhere,
-          orderBy: { symbol: 'asc' },
-          skip: options.offset,
+          orderBy: [{ providerSymbol: 'asc' }, { symbol: 'asc' }],
+          skip: 0,
           take: options.batchSize,
         }),
         this.prisma.stock.count({ where: retryWhere }),
@@ -572,8 +573,8 @@ export class MarketDataFoundationRepository {
       const [stocks, total] = await Promise.all([
         this.prisma.stock.findMany({
           where: unknownWhere,
-          orderBy: { symbol: 'asc' },
-          skip: options.offset,
+          orderBy: [{ providerSymbol: 'asc' }, { symbol: 'asc' }],
+          skip: 0,
           take: options.batchSize,
         }),
         this.prisma.stock.count({ where: unknownWhere }),
@@ -589,8 +590,8 @@ export class MarketDataFoundationRepository {
     if (options.offset < unknownTotal) {
       const unknownStocks = await this.prisma.stock.findMany({
         where: unknownWhere,
-        orderBy: { symbol: 'asc' },
-        skip: options.offset,
+        orderBy: [{ providerSymbol: 'asc' }, { symbol: 'asc' }],
+        skip: 0,
         take: options.batchSize,
       });
       stocks.push(...unknownStocks);
@@ -599,7 +600,7 @@ export class MarketDataFoundationRepository {
       const retrySkip = Math.max(options.offset - unknownTotal, 0);
       const retryStocks = await this.prisma.stock.findMany({
         where: retryWhere,
-        orderBy: { symbol: 'asc' },
+        orderBy: [{ providerSymbol: 'asc' }, { symbol: 'asc' }],
         skip: retrySkip,
         take: options.batchSize - stocks.length,
       });
@@ -713,6 +714,67 @@ export class MarketDataFoundationRepository {
     });
   }
 
+  async countProviderValidationRepairStates(options: Pick<PaginationOptions, 'region' | 'assetType'> & {
+    status?: 'eligible' | 'blocked' | 'manual';
+    now?: Date;
+  }) {
+    const now = options.now ?? new Date();
+    const providerStatusFilter = options.status === 'manual'
+      ? {}
+      : { providerSupportStatus: { equals: 'VALIDATION_FAILED', mode: 'insensitive' } };
+    const stateWhere: Prisma.MarketDataRepairStateWhereInput = {
+      region: options.region,
+      assetType: options.assetType,
+      repairType: 'PROVIDER_VALIDATION',
+      stock: {
+        is: {
+          AND: [
+            this.stockWhere(options),
+            { isActive: true },
+            { isDelisted: false },
+            providerStatusFilter,
+          ],
+        },
+      },
+    } as any;
+    if (options.status === 'manual') {
+      (stateWhere as any).status = 'MANUAL_REQUIRED';
+    } else if (options.status === 'blocked') {
+      (stateWhere as any).status = { in: ['FAILED_RETRYABLE', 'RETRY_COOLDOWN'] };
+      (stateWhere as any).nextRetryAt = { gt: now };
+    } else if (options.status === 'eligible') {
+      (stateWhere as any).status = { in: ['FAILED_RETRYABLE', 'RETRY_COOLDOWN'] };
+      (stateWhere as any).OR = [{ nextRetryAt: null }, { nextRetryAt: { lte: now } }];
+    }
+    return (this.prisma as any).marketDataRepairState.count({ where: stateWhere });
+  }
+
+  async nextProviderValidationRetryAt(options: Pick<PaginationOptions, 'region' | 'assetType'> & { now?: Date }) {
+    const now = options.now ?? new Date();
+    const row = await (this.prisma as any).marketDataRepairState.findFirst({
+      where: {
+        region: options.region,
+        assetType: options.assetType,
+        repairType: 'PROVIDER_VALIDATION',
+        status: { in: ['FAILED_RETRYABLE', 'RETRY_COOLDOWN'] },
+        nextRetryAt: { gt: now },
+        stock: {
+          is: {
+            AND: [
+              this.stockWhere(options),
+              { isActive: true },
+              { isDelisted: false },
+              { providerSupportStatus: { equals: 'VALIDATION_FAILED', mode: 'insensitive' } },
+            ],
+          },
+        },
+      },
+      orderBy: { nextRetryAt: 'asc' },
+      select: { nextRetryAt: true },
+    });
+    return row?.nextRetryAt ?? null;
+  }
+
   async recordRepairAttempt(input: {
     stockId: string;
     region: string;
@@ -740,6 +802,18 @@ export class MarketDataFoundationRepository {
         fieldsFilledJson: input.fieldsFilledJson ?? undefined,
         error: input.error ?? null,
         manualRequiredReason: input.manualRequiredReason ?? null,
+      },
+    });
+  }
+
+  async countRepairAttempts(input: {
+    stockId: string;
+    repairType: MarketDataRepairType;
+  }) {
+    return (this.prisma as any).marketDataRepairAttempt.count({
+      where: {
+        stockId: input.stockId,
+        repairType: input.repairType,
       },
     });
   }
@@ -874,6 +948,7 @@ export class MarketDataFoundationRepository {
       by: ['symbol'],
       where: { symbol: { in: uniqueSymbols } },
       _count: { _all: true },
+      _min: { timestamp: true },
       _max: { timestamp: true },
     });
     const latestRows: Array<{
@@ -909,12 +984,13 @@ export class MarketDataFoundationRepository {
       const quality = this.priceQualityStats(recentQualityBySymbol.get(aggregate.symbol) || []);
       emptyStats.set(aggregate.symbol, {
         priceHistoryBars: aggregate._count._all,
+        firstPriceDate: aggregate._min?.timestamp ? aggregate._min.timestamp.toISOString().slice(0, 10) : null,
         latestPriceDate: latestTimestamp ? latestTimestamp.toISOString().slice(0, 10) : null,
         latestVolume: latest?.volume ?? null,
         latestAdjustedClose: latest?.adjustedClose ?? null,
         latestClose: latest?.close ?? null,
         ...quality,
-      });
+      } as UniversePriceStats & { firstPriceDate: string | null });
     }
 
     return emptyStats;
@@ -1715,15 +1791,41 @@ export class MarketDataFoundationRepository {
 
   private providerValidationWhere(
     options: Pick<PaginationOptions, 'region' | 'assetType'>,
-    queue: ProviderValidationQueue
+    queue: ProviderValidationQueue,
+    stateOptions: { force?: boolean } = {}
   ): Prisma.StockWhereInput {
+    const now = new Date();
+    const retryStateWhere: Prisma.MarketDataRepairStateWhereInput = {
+      repairType: 'PROVIDER_VALIDATION',
+    } as any;
+    if (!stateOptions.force) {
+      (retryStateWhere as any).OR = [{ nextRetryAt: null }, { nextRetryAt: { lte: now } }];
+    }
     return {
       AND: [
         this.stockWhere(options),
         { isActive: true },
         { isDelisted: false },
         queue === 'RETRY_FAILED'
-          ? { providerSupportStatus: { equals: 'VALIDATION_FAILED', mode: 'insensitive' } }
+          ? {
+            AND: [
+              { providerSupportStatus: { equals: 'VALIDATION_FAILED', mode: 'insensitive' } },
+              {
+                OR: [
+                  { marketDataRepairStates: { none: { repairType: 'PROVIDER_VALIDATION' } } } as any,
+                  {
+                    marketDataRepairStates: {
+                      some: {
+                        ...retryStateWhere,
+                        status: { in: ['FAILED_RETRYABLE', 'RETRY_COOLDOWN'] },
+                      } as any,
+                    },
+                  } as any,
+                ],
+              },
+              { marketDataRepairStates: { none: { repairType: 'PROVIDER_VALIDATION', status: 'MANUAL_REQUIRED' } } } as any,
+            ],
+          }
           : {
             OR: [
               { providerSupportStatus: null },

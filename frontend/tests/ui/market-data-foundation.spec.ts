@@ -285,17 +285,21 @@ test.describe('Market Data Foundation UI', () => {
         },
       });
     });
+    let unknownProvidersDrained = false;
     await page.route('**/api/v1/market-data/universe/repair-plan**', async (route) => {
       await route.fulfill({
         json: {
           scope: { region: 'IN', assetType: 'STOCK' },
           generatedAt: '2026-05-11T00:00:00.000Z',
           totalCatalogInstruments: 2910,
-          providerUnknownValidationNeeded: 2909,
+          providerUnknownValidationNeeded: unknownProvidersDrained ? 0 : 2909,
           providerRetryValidationNeeded: 7,
+          providerRetryBlocked: 8,
+          providerManualRepairRequired: 5,
+          nextProviderRetryAtMin: '2026-05-13T12:45:00.000Z',
           providerUnsupportedExcluded: 0,
           providerValidationFailed: 7,
-          providerValidationNeeded: 2909,
+          providerValidationNeeded: unknownProvidersDrained ? 0 : 2909,
           retryFailedValidations: 7,
           supportedCatalogIdentityRepairNeeded: 1,
           supportedBusinessMetadataRepairNeeded: 1,
@@ -586,6 +590,7 @@ test.describe('Market Data Foundation UI', () => {
     let pricePayload: any = null;
     await page.route('**/api/v1/market-data/provider/validate', async (route) => {
       providerPayload = route.request().postDataJSON();
+      if (providerPayload.providerValidationQueue === 'UNKNOWN_FIRST') unknownProvidersDrained = true;
       await route.fulfill({
         json: {
           scope: { region: 'IN', assetType: 'STOCK' },
@@ -605,7 +610,40 @@ test.describe('Market Data Foundation UI', () => {
           providerValidationQueue: providerPayload.providerValidationQueue,
           providerValidated: providerPayload.providerValidationQueue === 'RETRY_FAILED' ? 7 : 50,
           providerSupported: providerPayload.providerValidationQueue === 'RETRY_FAILED' ? 0 : 45,
+          providerUnsupported: providerPayload.providerValidationQueue === 'RETRY_FAILED' ? 0 : 3,
           validationFailed: providerPayload.providerValidationQueue === 'RETRY_FAILED' ? 7 : 5,
+          supportedFromStoredPrices: providerPayload.providerValidationQueue === 'RETRY_FAILED' ? 0 : 1,
+          unsupportedNoProviderSymbol: 1,
+          unsupportedNoCandlesWideWindow: 2,
+          retryableTimeout: 1,
+          retryableProviderError: 3,
+          retryableRateLimited: 1,
+          manualSymbolRepairRequired: 2,
+          retryCooldownSkipped: providerPayload.providerValidationQueue === 'RETRY_FAILED' ? 8 : 0,
+          manualRequiredSkipped: 5,
+          providerCalls: 49,
+          providerTimeouts: 1,
+          providerRetryableFailures: 5,
+          freeFallbackRequired: 1,
+          fallbackSourceAttempted: 'NSE_CM_UDIFF_BHAVCOPY',
+          slowProviderCalls: 3,
+          maxProviderCallMs: 4500,
+          p95ProviderCallMs: 2800,
+          validationWindowStartDate: '2026-03-28',
+          validationWindowEndDate: '2026-05-12',
+          requiredHistoryStartDate: '2011-05-12',
+          requiredHistoryCoverageStatus: 'FALLBACK_REQUIRED',
+          listingDate: '2018-08-10',
+          latestCompletedEodDate: '2026-05-12',
+          remainingUnknown: providerPayload.providerValidationQueue === 'RETRY_FAILED' ? 0 : 2859,
+          remainingRetryEligible: providerPayload.providerValidationQueue === 'RETRY_FAILED' ? 0 : 12,
+          remainingRetryBlocked: 8,
+          remainingManualRequired: 5,
+          nextRetryAtMin: '2026-05-13T12:45:00.000Z',
+          sampleResults: [
+            { symbol: 'ABC.NS', providerSymbol: 'ABC.NS', status: 'SUPPORTED', classification: 'SUPPORTED_WITH_CANDLES', candlesFound: 32, providerCallMs: 820, nextRetryAt: null, message: null },
+            { symbol: 'TIMEOUT.NS', providerSymbol: 'TIMEOUT.NS', status: 'VALIDATION_FAILED', classification: 'RETRYABLE_TIMEOUT', candlesFound: 0, providerCallMs: 4500, nextRetryAt: '2026-05-13T12:45:00.000Z', message: 'Provider timeout' },
+          ],
         },
       });
     });
@@ -879,7 +917,11 @@ test.describe('Market Data Foundation UI', () => {
     await expect(page.getByText('POST /api/v1/market-data/provider/validate; IN/STOCK; batch 50')).toBeVisible();
     await expect(page.getByText('Requires explicit manual metadata CSV payload.')).toBeVisible();
     await expect(page.getByText('Provider unknown', { exact: true })).toBeVisible();
-    await expect(page.locator('span').filter({ hasText: /^Retry failed providers$/ })).toBeVisible();
+    await expect(page.getByText('Retry eligible providers', { exact: true })).toBeVisible();
+    await expect(page.getByText('Retry cooldown providers', { exact: true })).toBeVisible();
+    await expect(page.getByText('Manual provider repair', { exact: true })).toBeVisible();
+    await expect(page.getByText('Retry blocked until 2,909 unknown provider rows drain.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Retry failed providers' })).toBeVisible();
     await expect(page.getByText('Unsupported excluded', { exact: true })).toBeVisible();
     await expect(page.getByText('Supported identity gaps', { exact: true })).toBeVisible();
     await expect(page.getByText('Supported price backfill needed', { exact: true })).toBeVisible();
@@ -892,6 +934,7 @@ test.describe('Market Data Foundation UI', () => {
     await expect(page.getByText('Manual business metadata required')).toBeVisible();
     await expect(page.getByText('Manual sector/industry required')).toHaveCount(0);
     await expect(page.getByRole('heading', { name: '2,801' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Retry failed providers' })).toBeDisabled();
     await page.getByRole('button', { name: 'Validate unknown providers' }).click();
     await expect.poll(() => providerPayload).toMatchObject({
       region: 'IN',
@@ -899,10 +942,20 @@ test.describe('Market Data Foundation UI', () => {
       batchSize: 50,
       offset: 0,
       providerValidationQueue: 'UNKNOWN_FIRST',
+      force: false,
     });
     await expect(page.getByText(/Last repair batch processed 50 of 2,909/)).toBeVisible();
     await expect(page.getByText(/Provider queue: UNKNOWN_FIRST/)).toBeVisible();
+    await expect(page.getByText(/Provider validation: validated 50, supported 45, unsupported 3, failed 5/)).toBeVisible();
+    await expect(page.getByText(/Provider classifications: stored-price supported 1, no provider symbol 1, no candles in wide window 2, manual symbol repair 2/)).toBeVisible();
+    await expect(page.getByText(/Retry diagnostics: timeout 1, provider error 3, rate limit 1, cooldown skipped 0, manual skipped 5/)).toBeVisible();
+    await expect(page.getByText(/Remaining provider queues: unknown 2,859, retry eligible 12, retry blocked 8, manual 5/)).toBeVisible();
+    await expect(page.getByText(/Provider timing: calls 49, timeouts 1, retryable failures 5, slow calls 3, max 4,500 ms, p95 2,800 ms/)).toBeVisible();
+    await expect(page.getByText(/Validation window 2026-03-28 to 2026-05-12; free fallback required 1; source attempted NSE_CM_UDIFF_BHAVCOPY; paid providers forbidden/)).toBeVisible();
+    await expect(page.getByText(/Coverage target: 15-year\/listing-date daily OHLCV from 2011-05-12 through latest completed EOD 2026-05-12; listing date 2018-08-10; status FALLBACK_REQUIRED/)).toBeVisible();
+    await expect(page.getByText(/Sample ABC\.NS: SUPPORTED_WITH_CANDLES via ABC\.NS; candles 32; 820 ms/)).toBeVisible();
 
+    await expect(page.getByRole('button', { name: 'Retry failed providers' })).toBeEnabled();
     await page.getByRole('button', { name: 'Retry failed providers' }).click();
     await expect.poll(() => providerPayload).toMatchObject({
       region: 'IN',
@@ -910,6 +963,7 @@ test.describe('Market Data Foundation UI', () => {
       batchSize: 50,
       offset: 0,
       providerValidationQueue: 'RETRY_FAILED',
+      force: false,
     });
 
     await page.getByRole('button', { name: 'Repair catalog identity' }).click();

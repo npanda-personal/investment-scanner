@@ -27,6 +27,9 @@ import type {
   MarketDataProviderBusinessRepairStatus,
   MarketDataRepairStateStatus,
   MarketDataUniverseHealth,
+  ProviderSupportStatus,
+  ProviderValidationClassification,
+  ProviderValidationResult,
   ReviewReadinessBlocker,
   ReviewReadinessNextAction,
   ReviewReadinessSummary,
@@ -449,6 +452,7 @@ export class MarketDataFoundationService {
     }
 
     const activeDenominator = counts.activeInstruments || counts.totalCatalogInstruments || 1;
+    await this.assignProviderValidationQueueCounts(counts, scope);
     const coverage = {
       priceCoveragePercentage: this.percent(counts.priceReady, activeDenominator),
       metadataCoveragePercentage: this.percent(metadataCompleteCount, activeDenominator),
@@ -891,6 +895,9 @@ export class MarketDataFoundationService {
     let providerValidationFailed = 0;
     let providerValidationNeeded = 0;
     let retryFailedValidations = 0;
+    let providerRetryBlocked = 0;
+    let providerManualRepairRequired = 0;
+    let nextProviderRetryAtMin: string | null = null;
     let supportedCatalogIdentityRepairNeeded = 0;
     let supportedBusinessMetadataRepairNeeded = 0;
     let supportedPriceBackfillNeeded = 0;
@@ -993,10 +1000,29 @@ export class MarketDataFoundationService {
       businessMetadataRecentlyAttempted = Math.max(businessMetadataRepairNeeded - businessMetadataAutoRepairable, 0);
       businessMetadataManualRequired = businessMetadataRecentlyAttempted;
     }
+    if (typeof repositoryAny.countProviderValidationRepairStates === 'function') {
+      const [retryEligible, retryBlocked, manualRequired, nextRetryAt] = await Promise.all([
+        repositoryAny.countProviderValidationRepairStates({ ...scope, status: 'eligible' }),
+        repositoryAny.countProviderValidationRepairStates({ ...scope, status: 'blocked' }),
+        repositoryAny.countProviderValidationRepairStates({ ...scope, status: 'manual' }),
+        typeof repositoryAny.nextProviderValidationRetryAt === 'function'
+          ? repositoryAny.nextProviderValidationRetryAt(scope)
+          : Promise.resolve(null),
+      ]);
+      const knownStateTotal = retryEligible + retryBlocked + manualRequired;
+      const retryWithoutState = Math.max(providerValidationFailed - knownStateTotal, 0);
+      providerRetryBlocked = retryBlocked;
+      providerManualRepairRequired = manualRequired;
+      providerRetryValidationNeeded = retryEligible + retryWithoutState;
+      retryFailedValidations = providerRetryValidationNeeded;
+      nextProviderRetryAtMin = nextRetryAt ? nextRetryAt.toISOString() : null;
+    }
 
     const warnings: string[] = [];
     if (providerValidationNeeded > 0) warnings.push(`${providerValidationNeeded} UNKNOWN instruments need provider validation before review workflows can trust them.`);
     if (retryFailedValidations > 0) warnings.push(`${retryFailedValidations} failed provider validations need explicit retry or provider diagnosis.`);
+    if (providerRetryBlocked > 0) warnings.push(`${providerRetryBlocked} provider validations are retry-blocked until cooldown expires.`);
+    if (providerManualRepairRequired > 0) warnings.push(`${providerManualRepairRequired} provider validations require manual symbol/source repair.`);
     if (supportedCatalogIdentityRepairNeeded > 0) warnings.push(`${supportedCatalogIdentityRepairNeeded} provider-supported instruments need catalog identity repair for ISIN, listing date, exchange, or provider symbol.`);
     if (supportedPriceBackfillNeeded > 0) warnings.push(`${supportedPriceBackfillNeeded} provider-supported instruments need price backfill or latest EOD repair.`);
     if (businessMetadataAutoRepairable > 0) warnings.push(`${businessMetadataAutoRepairable} instruments are auto-repairable through provider business metadata repair.`);
@@ -1024,6 +1050,9 @@ export class MarketDataFoundationService {
       providerValidationFailed,
       providerValidationNeeded,
       retryFailedValidations,
+      providerRetryBlocked,
+      providerManualRepairRequired,
+      nextProviderRetryAtMin,
       supportedCatalogIdentityRepairNeeded,
       supportedBusinessMetadataRepairNeeded,
       supportedPriceBackfillNeeded,
@@ -1354,16 +1383,94 @@ export class MarketDataFoundationService {
     const scope = this.repairScope(request);
     const batch = this.mutatingRepairBatch(request);
     const providerValidationQueue = request.providerValidationQueue === 'RETRY_FAILED' ? 'RETRY_FAILED' : 'UNKNOWN_FIRST';
+    const validationWindow = this.providerValidationWindow(scope);
+    const retryQueueOptions = providerValidationQueue === 'RETRY_FAILED' ? { force: Boolean(request.force) } : {};
     const { stocks, total } = await this.repository.listStocksForProviderValidation({
       ...scope,
       ...batch,
       providerValidationQueue,
+      ...retryQueueOptions,
     });
     const summary = this.emptyRepairSummary(scope, batch, total, true);
     summary.providerValidationQueue = providerValidationQueue;
+    summary.providerValidated = 0;
+    summary.providerSupported = 0;
+    summary.providerUnsupported = 0;
+    summary.validationFailed = 0;
+    summary.supportedFromStoredPrices = 0;
+    summary.unsupportedNoProviderSymbol = 0;
+    summary.unsupportedNoCandlesWideWindow = 0;
+    summary.retryableTimeout = 0;
+    summary.retryableProviderError = 0;
+    summary.retryableRateLimited = 0;
+    summary.manualSymbolRepairRequired = 0;
+    summary.retryCooldownSkipped = 0;
+    summary.manualRequiredSkipped = 0;
+    summary.providerCalls = 0;
+    summary.providerTimeouts = 0;
+    summary.providerRetryableFailures = 0;
+    summary.freeFallbackRequired = 0;
+    summary.fallbackSourceAttempted = null;
+    summary.slowProviderCalls = 0;
+    summary.maxProviderCallMs = 0;
+    summary.p95ProviderCallMs = 0;
+    summary.latestCompletedEodDate = validationWindow.latestCompletedEodDate;
+    summary.validationWindowStartDate = validationWindow.startDateIso;
+    summary.validationWindowEndDate = validationWindow.endDateIso;
+    summary.requiredHistoryStartDate = validationWindow.defaultRequiredHistoryStartDateIso;
+    summary.requiredHistoryCoverageStatus = stocks.length > 0 ? 'COMPLETE' : 'NEEDS_BACKFILL';
+    summary.sampleResults = [];
+    const providerCallDurations: number[] = [];
+    let requiredHistoryIncomplete = stocks.length > 0 ? false : true;
+    const priceStatsBySymbol: Map<string, any> = stocks.length > 0 && typeof (this.repository as any).priceReadinessStatsForSymbols === 'function'
+      ? await (this.repository as any).priceReadinessStatsForSymbols(stocks.map((stock: any) => stock.symbol))
+      : new Map<string, any>();
 
     for (const stock of stocks) {
       summary.processedCount += 1;
+      const storedStats = priceStatsBySymbol.get(stock.symbol);
+      const historyDiagnostics = this.requiredHistoryDiagnostics(stock, validationWindow, storedStats);
+      summary.requiredHistoryStartDate = summary.requiredHistoryStartDate || historyDiagnostics.requiredHistoryStartDate;
+      if (historyDiagnostics.listingDate) summary.listingDate = summary.listingDate || historyDiagnostics.listingDate;
+      if (historyDiagnostics.listingDateMissing) summary.listingDateMissing = true;
+      if (historyDiagnostics.storedHistoryStartDate) summary.storedHistoryStartDate = summary.storedHistoryStartDate || historyDiagnostics.storedHistoryStartDate;
+      if (historyDiagnostics.storedHistoryEndDate) summary.storedHistoryEndDate = summary.storedHistoryEndDate || historyDiagnostics.storedHistoryEndDate;
+      summary.storedHistoryBars = Math.max(summary.storedHistoryBars || 0, historyDiagnostics.storedHistoryBars || 0);
+      summary.requiredHistoryComplete = Boolean(summary.requiredHistoryComplete) || historyDiagnostics.requiredHistoryComplete;
+      if (!historyDiagnostics.requiredHistoryComplete) requiredHistoryIncomplete = true;
+      if (
+        normalizeProviderStatus(stock.providerSupportStatus) === 'UNKNOWN'
+        && storedStats?.latestPriceDate
+        && Number(storedStats.priceHistoryBars || 0) > 0
+      ) {
+        await this.repository.markProviderSupportedFromStoredPrices([stock.symbol]);
+        summary.updated += 1;
+        summary.providerSupported = (summary.providerSupported || 0) + 1;
+        summary.supportedFromStoredPrices = (summary.supportedFromStoredPrices || 0) + 1;
+        await this.recordProviderValidationAttempt(stock, scope, {
+          status: 'SUPPORTED',
+          classification: 'SUPPORTED_FROM_STORED_PRICES',
+          stateStatus: 'RESOLVED',
+          evidence: {
+            candlesFound: Number(storedStats.priceHistoryBars || 0),
+            latestPriceDate: storedStats.latestPriceDate,
+            sourceName: 'STORED_PRICE_TICKS',
+            ...historyDiagnostics,
+          },
+        });
+        this.addProviderValidationSample(summary, {
+          stock,
+          providerSymbol: stock.providerSymbol || stock.symbol,
+          status: 'SUPPORTED',
+          classification: 'SUPPORTED_FROM_STORED_PRICES',
+          candlesFound: Number(storedStats.priceHistoryBars || 0),
+          message: null,
+          historyDiagnostics,
+          sourceName: 'STORED_PRICE_TICKS',
+        });
+        continue;
+      }
+
       const providerSymbol = stock.providerSymbol || this.normalizeCatalogSymbol({
         symbol: stock.symbol,
         sourceSymbol: stock.sourceSymbol,
@@ -1372,33 +1479,164 @@ export class MarketDataFoundationService {
         exchange: stock.exchange,
       }).providerSymbol;
       if (!providerSymbol) {
-        await this.repository.updateProviderSupportStatus(stock.symbol, 'UNSUPPORTED', 'Provider symbol could not be mapped.');
+        const message = 'Provider symbol could not be mapped.';
+        await this.repository.updateProviderSupportStatus(stock.symbol, 'UNSUPPORTED', message);
         summary.updated += 1;
         summary.providerUnsupported = (summary.providerUnsupported || 0) + 1;
+        summary.unsupportedNoProviderSymbol = (summary.unsupportedNoProviderSymbol || 0) + 1;
+        summary.manualSymbolRepairRequired = (summary.manualSymbolRepairRequired || 0) + 1;
+        await this.recordProviderValidationAttempt(stock, scope, {
+          status: 'UNSUPPORTED',
+          classification: 'UNSUPPORTED_NO_PROVIDER_SYMBOL',
+          stateStatus: 'MANUAL_REQUIRED',
+          error: message,
+          manualRequiredReason: message,
+          evidence: historyDiagnostics,
+        });
+        this.addProviderValidationSample(summary, {
+          stock,
+          providerSymbol: null,
+          status: 'UNSUPPORTED',
+          classification: 'UNSUPPORTED_NO_PROVIDER_SYMBOL',
+          message,
+          historyDiagnostics,
+          sourceName: null,
+        });
+        continue;
+      }
+
+      if (!validationWindow.latestCompletedEodDate) {
+        const message = `Latest completed EOD could not be resolved for ${scope.region}; provider validation skipped.`;
+        await this.repository.updateProviderSupportStatus(stock.symbol, 'VALIDATION_FAILED', message);
+        const nextRetryAt = await this.nextProviderValidationRetryAt(stock);
+        summary.updated += 1;
+        summary.failed += 1;
+        summary.validationFailed = (summary.validationFailed || 0) + 1;
+        summary.retryableProviderError = (summary.retryableProviderError || 0) + 1;
+        summary.providerRetryableFailures = (summary.providerRetryableFailures || 0) + 1;
+        await this.recordProviderValidationAttempt(stock, scope, {
+          status: 'VALIDATION_FAILED',
+          classification: 'VALIDATION_SKIPPED_CALENDAR_UNCERTAIN',
+          stateStatus: 'FAILED_RETRYABLE',
+          error: message,
+          nextRetryAt,
+          evidence: historyDiagnostics,
+        });
+        this.addProviderValidationSample(summary, {
+          stock,
+          providerSymbol,
+          status: 'VALIDATION_FAILED',
+          classification: 'VALIDATION_SKIPPED_CALENDAR_UNCERTAIN',
+          message,
+          nextRetryAt,
+          historyDiagnostics,
+          sourceName: 'MARKET_CALENDAR',
+        });
         continue;
       }
 
       try {
-        const validation = await this.marketDataProvider.validateProviderSymbol(providerSymbol);
+        const validation = await this.marketDataProvider.validateProviderSymbol(providerSymbol, {
+          region: scope.region,
+          assetType: scope.assetType,
+          validationWindowStartDate: validationWindow.startDate,
+          validationWindowEndDate: validationWindow.endDate,
+          timeoutMs: 8000,
+        });
         summary.providerValidated = (summary.providerValidated || 0) + 1;
-        const status = validation.supported ? 'SUPPORTED' : validation.failed ? 'VALIDATION_FAILED' : 'UNSUPPORTED';
+        summary.providerCalls = (summary.providerCalls || 0) + 1;
+        if (validation.providerCallMs !== undefined) {
+          providerCallDurations.push(validation.providerCallMs);
+          summary.maxProviderCallMs = Math.max(summary.maxProviderCallMs || 0, validation.providerCallMs);
+          if (validation.providerCallMs >= 3000) summary.slowProviderCalls = (summary.slowProviderCalls || 0) + 1;
+        }
+        const classification = validation.classification || this.compatibleProviderValidationClassification(validation);
+        const status = this.providerStatusForValidation(validation, classification);
+        const nextRetryAt = this.isRetryableProviderValidation(classification) ? await this.nextProviderValidationRetryAt(stock) : null;
         await this.repository.updateProviderSupportStatus(stock.symbol, status, validation.message);
         summary.updated += 1;
-        if (status === 'SUPPORTED') summary.providerSupported = (summary.providerSupported || 0) + 1;
-        if (status === 'UNSUPPORTED') summary.providerUnsupported = (summary.providerUnsupported || 0) + 1;
+        this.addProviderValidationCounts(summary, status, classification);
+        await this.recordProviderValidationAttempt(stock, scope, {
+          status,
+          classification,
+          stateStatus: this.providerValidationStateStatus(classification),
+          error: status === 'VALIDATION_FAILED' ? validation.message : undefined,
+          manualRequiredReason: classification === 'MANUAL_SYMBOL_REPAIR_REQUIRED' ? validation.message : undefined,
+          nextRetryAt,
+          evidence: {
+            provider: validation.provider || 'yahoo',
+            providerSymbol,
+            candlesFound: validation.candlesFound ?? 0,
+            providerCallMs: validation.providerCallMs,
+            validationWindowStartDate: validation.validationWindowStartDate || validationWindow.startDateIso,
+            validationWindowEndDate: validation.validationWindowEndDate || validationWindow.endDateIso,
+            fallbackSourceAttempted: validation.fallbackSourceAttempted ?? null,
+            freeFallbackRequired: validation.freeFallbackRequired || classification === 'FREE_FALLBACK_REQUIRED',
+            sourceName: validation.sourceName || 'YAHOO_CHART',
+            ...historyDiagnostics,
+          },
+        });
+        this.addProviderValidationSample(summary, {
+          stock,
+          providerSymbol,
+          status,
+          classification,
+          candlesFound: validation.candlesFound,
+          providerCallMs: validation.providerCallMs,
+          nextRetryAt,
+          message: validation.message ?? null,
+          historyDiagnostics,
+          sourceName: validation.sourceName || 'YAHOO_CHART',
+        });
         if (status === 'VALIDATION_FAILED') {
-          summary.validationFailed = (summary.validationFailed || 0) + 1;
           summary.failed += 1;
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Provider validation failed.';
+        const classification: ProviderValidationClassification = /timeout/i.test(message) ? 'RETRYABLE_TIMEOUT' : 'RETRYABLE_PROVIDER_ERROR';
+        const nextRetryAt = await this.nextProviderValidationRetryAt(stock);
         await this.repository.updateProviderSupportStatus(stock.symbol, 'VALIDATION_FAILED', message);
         summary.failed += 1;
         summary.validationFailed = (summary.validationFailed || 0) + 1;
+        summary.retryableProviderError = (summary.retryableProviderError || 0) + (classification === 'RETRYABLE_PROVIDER_ERROR' ? 1 : 0);
+        summary.retryableTimeout = (summary.retryableTimeout || 0) + (classification === 'RETRYABLE_TIMEOUT' ? 1 : 0);
+        summary.providerTimeouts = (summary.providerTimeouts || 0) + (classification === 'RETRYABLE_TIMEOUT' ? 1 : 0);
+        summary.providerRetryableFailures = (summary.providerRetryableFailures || 0) + 1;
         summary.warnings.push(`${stock.symbol}: ${message}`);
+        await this.recordProviderValidationAttempt(stock, scope, {
+          status: 'VALIDATION_FAILED',
+          classification,
+          stateStatus: this.providerValidationStateStatus(classification),
+          error: message,
+          nextRetryAt,
+          evidence: {
+            provider: 'yahoo',
+            providerSymbol,
+            validationWindowStartDate: validationWindow.startDateIso,
+            validationWindowEndDate: validationWindow.endDateIso,
+            ...historyDiagnostics,
+          },
+        });
+        this.addProviderValidationSample(summary, {
+          stock,
+          providerSymbol,
+          status: 'VALIDATION_FAILED',
+          classification,
+          nextRetryAt,
+          message,
+          historyDiagnostics,
+          sourceName: 'YAHOO_CHART',
+        });
       }
     }
 
+    summary.p95ProviderCallMs = this.percentile(providerCallDurations, 0.95);
+    summary.requiredHistoryCoverageStatus = (summary.freeFallbackRequired || 0) > 0
+      ? 'FALLBACK_REQUIRED'
+      : requiredHistoryIncomplete
+        ? 'NEEDS_BACKFILL'
+        : 'COMPLETE';
+    await this.assignProviderValidationRemaining(summary, scope);
     this.finishRepairSummary(summary, started);
     return summary;
   }
@@ -2045,12 +2283,15 @@ export class MarketDataFoundationService {
         }
 
         if (request.validateProvider && row.providerSymbol) {
-          const validation = await this.marketDataProvider.validateProviderSymbol(row.providerSymbol);
+          const validation = await this.marketDataProvider.validateProviderSymbol(row.providerSymbol, {
+            region: row.region,
+            assetType: row.assetType || undefined,
+          });
           summary.providerValidated += 1;
           if (!validation.supported) summary.providerUnsupported += 1;
           await this.repository.updateProviderSupportStatus(
             row.symbol,
-            validation.supported ? 'SUPPORTED' : validation.failed ? 'VALIDATION_FAILED' : 'UNSUPPORTED',
+            this.providerStatusForValidation(validation, validation.classification || this.compatibleProviderValidationClassification(validation)),
             validation.message
           );
         }
@@ -2156,12 +2397,15 @@ export class MarketDataFoundationService {
       if (result.action === 'noOp') summary.noOp += 1;
 
       if (request.validateProvider && normalized.providerSymbol) {
-        const validation = await this.marketDataProvider.validateProviderSymbol(normalized.providerSymbol);
+        const validation = await this.marketDataProvider.validateProviderSymbol(normalized.providerSymbol, {
+          region: normalized.region,
+          assetType: normalized.assetType || undefined,
+        });
         summary.validated += 1;
         if (!validation.supported) summary.providerUnsupported += 1;
         await this.repository.updateProviderSupportStatus(
           normalized.symbol,
-          validation.supported ? 'SUPPORTED' : validation.failed ? 'VALIDATION_FAILED' : 'UNSUPPORTED',
+          this.providerStatusForValidation(validation, validation.classification || this.compatibleProviderValidationClassification(validation)),
           validation.message
         );
       }
@@ -3691,6 +3935,9 @@ export class MarketDataFoundationService {
       providerUnknown: 0,
       providerUnknownValidationNeeded: 0,
       providerRetryValidationNeeded: 0,
+      providerRetryBlocked: 0,
+      providerManualRepairRequired: 0,
+      nextProviderRetryAtMin: null,
       providerUnsupportedExcluded: 0,
       providerValidationFailed: 0,
       unsupported: 0,
@@ -3994,6 +4241,265 @@ export class MarketDataFoundationService {
     if (value === null || value === undefined) return null;
     const numeric = Number(value);
     return Number.isFinite(numeric) ? numeric : null;
+  }
+
+  private providerValidationWindow(scope: { region: string; assetType: string }) {
+    const latestCompletedEodDate = latestCompletedTradingDateForRegion(scope.region);
+    const endDate = latestCompletedEodDate ? this.endOfTradingDateUtc(latestCompletedEodDate) : new Date();
+    const startDate = new Date(endDate);
+    startDate.setUTCDate(startDate.getUTCDate() - (scope.region === 'IN' && scope.assetType === 'STOCK' ? 45 : 30));
+    startDate.setUTCHours(0, 0, 0, 0);
+    const defaultRequiredHistoryStartDate = new Date(endDate);
+    defaultRequiredHistoryStartDate.setUTCFullYear(defaultRequiredHistoryStartDate.getUTCFullYear() - 15);
+    defaultRequiredHistoryStartDate.setUTCHours(0, 0, 0, 0);
+    return {
+      latestCompletedEodDate,
+      startDate,
+      endDate,
+      startDateIso: startDate.toISOString().slice(0, 10),
+      endDateIso: latestCompletedEodDate,
+      defaultRequiredHistoryStartDate,
+      defaultRequiredHistoryStartDateIso: defaultRequiredHistoryStartDate.toISOString().slice(0, 10),
+    };
+  }
+
+  private requiredHistoryDiagnostics(stock: any, validationWindow: ReturnType<MarketDataFoundationService['providerValidationWindow']>, storedStats?: any) {
+    const listingDate = stock.ipoDate ? new Date(stock.ipoDate).toISOString().slice(0, 10) : null;
+    const requiredHistoryStartDate = listingDate && listingDate > validationWindow.defaultRequiredHistoryStartDateIso
+      ? listingDate
+      : validationWindow.defaultRequiredHistoryStartDateIso;
+    const storedHistoryStartDate = storedStats?.firstPriceDate ?? null;
+    const storedHistoryEndDate = storedStats?.latestPriceDate ?? null;
+    const storedHistoryBars = Number(storedStats?.priceHistoryBars || 0);
+    const requiredHistoryComplete = Boolean(
+      storedHistoryStartDate
+      && storedHistoryEndDate
+      && storedHistoryStartDate <= requiredHistoryStartDate
+      && (!validationWindow.latestCompletedEodDate || storedHistoryEndDate >= validationWindow.latestCompletedEodDate)
+    );
+    return {
+      requiredHistoryStartDate,
+      listingDate,
+      listingDateMissing: !listingDate,
+      latestCompletedEodDate: validationWindow.latestCompletedEodDate,
+      storedHistoryStartDate,
+      storedHistoryEndDate,
+      storedHistoryBars,
+      requiredHistoryComplete,
+    };
+  }
+
+  private providerStatusForValidation(
+    validation: ProviderValidationResult,
+    classification: ProviderValidationClassification
+  ): ProviderSupportStatus {
+    if (validation.supported || classification === 'SUPPORTED_WITH_CANDLES' || classification === 'SUPPORTED_FROM_STORED_PRICES') return 'SUPPORTED';
+    if (classification === 'UNSUPPORTED_NO_PROVIDER_SYMBOL' || classification === 'UNSUPPORTED_NO_CANDLES_WIDE_WINDOW') return 'UNSUPPORTED';
+    return 'VALIDATION_FAILED';
+  }
+
+  private compatibleProviderValidationClassification(validation: Partial<ProviderValidationResult>): ProviderValidationClassification {
+    if (validation.supported) return 'SUPPORTED_WITH_CANDLES';
+    if (validation.failed) return 'RETRYABLE_PROVIDER_ERROR';
+    return 'UNSUPPORTED_NO_CANDLES_WIDE_WINDOW';
+  }
+
+  private providerValidationStateStatus(classification: ProviderValidationClassification): MarketDataRepairStateStatus {
+    if (classification === 'SUPPORTED_WITH_CANDLES' || classification === 'SUPPORTED_FROM_STORED_PRICES' || classification === 'UNSUPPORTED_NO_CANDLES_WIDE_WINDOW') return 'RESOLVED';
+    if (classification === 'UNSUPPORTED_NO_PROVIDER_SYMBOL' || classification === 'MANUAL_SYMBOL_REPAIR_REQUIRED') return 'MANUAL_REQUIRED';
+    if (classification === 'RETRYABLE_RATE_LIMITED') return 'RETRY_COOLDOWN';
+    return 'FAILED_RETRYABLE';
+  }
+
+  private isRetryableProviderValidation(classification: ProviderValidationClassification): boolean {
+    return [
+      'FREE_FALLBACK_REQUIRED',
+      'RETRYABLE_TIMEOUT',
+      'RETRYABLE_PROVIDER_ERROR',
+      'RETRYABLE_RATE_LIMITED',
+      'VALIDATION_SKIPPED_CALENDAR_UNCERTAIN',
+    ].includes(classification);
+  }
+
+  private async nextProviderValidationRetryAt(stock: any): Promise<Date | null> {
+    const repositoryAny = this.repository as any;
+    const previousAttempts = typeof repositoryAny.countRepairAttempts === 'function'
+      ? await repositoryAny.countRepairAttempts({ stockId: stock.id, repairType: 'PROVIDER_VALIDATION' })
+      : 0;
+    const minutes = previousAttempts <= 0 ? 30 : previousAttempts === 1 ? 120 : previousAttempts === 2 ? 720 : 1440;
+    return this.addMinutes(new Date(), minutes);
+  }
+
+  private addProviderValidationCounts(
+    summary: MarketDataRepairSummary,
+    status: ProviderSupportStatus,
+    classification: ProviderValidationClassification
+  ) {
+    if (status === 'SUPPORTED') summary.providerSupported = (summary.providerSupported || 0) + 1;
+    if (status === 'UNSUPPORTED') summary.providerUnsupported = (summary.providerUnsupported || 0) + 1;
+    if (status === 'VALIDATION_FAILED') summary.validationFailed = (summary.validationFailed || 0) + 1;
+    if (classification === 'UNSUPPORTED_NO_CANDLES_WIDE_WINDOW') summary.unsupportedNoCandlesWideWindow = (summary.unsupportedNoCandlesWideWindow || 0) + 1;
+    if (classification === 'FREE_FALLBACK_REQUIRED') {
+      summary.freeFallbackRequired = (summary.freeFallbackRequired || 0) + 1;
+      summary.providerRetryableFailures = (summary.providerRetryableFailures || 0) + 1;
+    }
+    if (classification === 'RETRYABLE_TIMEOUT') {
+      summary.retryableTimeout = (summary.retryableTimeout || 0) + 1;
+      summary.providerTimeouts = (summary.providerTimeouts || 0) + 1;
+      summary.providerRetryableFailures = (summary.providerRetryableFailures || 0) + 1;
+    }
+    if (classification === 'RETRYABLE_PROVIDER_ERROR' || classification === 'VALIDATION_SKIPPED_CALENDAR_UNCERTAIN') {
+      summary.retryableProviderError = (summary.retryableProviderError || 0) + 1;
+      summary.providerRetryableFailures = (summary.providerRetryableFailures || 0) + 1;
+    }
+    if (classification === 'RETRYABLE_RATE_LIMITED') {
+      summary.retryableRateLimited = (summary.retryableRateLimited || 0) + 1;
+      summary.providerRetryableFailures = (summary.providerRetryableFailures || 0) + 1;
+    }
+    if (classification === 'MANUAL_SYMBOL_REPAIR_REQUIRED') summary.manualSymbolRepairRequired = (summary.manualSymbolRepairRequired || 0) + 1;
+  }
+
+  private async recordProviderValidationAttempt(
+    stock: any,
+    scope: { region: string; assetType: string },
+    input: {
+      status: ProviderSupportStatus;
+      classification: ProviderValidationClassification;
+      stateStatus: MarketDataRepairStateStatus;
+      error?: string | null;
+      manualRequiredReason?: string | null;
+      nextRetryAt?: Date | null;
+      evidence?: Record<string, unknown>;
+    }
+  ) {
+    const repositoryAny = this.repository as any;
+    if (typeof repositoryAny.recordRepairAttempt !== 'function') return;
+    const attempt = await repositoryAny.recordRepairAttempt({
+      stockId: stock.id,
+      region: scope.region,
+      assetType: scope.assetType,
+      repairType: 'PROVIDER_VALIDATION',
+      status: input.classification,
+      provider: 'yahoo',
+      fieldsFilledJson: {
+        status: input.status,
+        classification: input.classification,
+        ...(input.evidence || {}),
+      },
+      error: input.error,
+      manualRequiredReason: input.manualRequiredReason,
+    });
+    if (typeof repositoryAny.upsertRepairState !== 'function') return;
+    await repositoryAny.upsertRepairState({
+      stockId: stock.id,
+      region: scope.region,
+      assetType: scope.assetType,
+      repairType: 'PROVIDER_VALIDATION',
+      status: input.stateStatus,
+      provider: 'yahoo',
+      lastAttemptId: attempt?.id ?? null,
+      fieldsFilledJson: {
+        status: input.status,
+        classification: input.classification,
+        ...(input.evidence || {}),
+      },
+      error: input.error ?? null,
+      manualRequiredReason: input.manualRequiredReason ?? null,
+      nextRetryAt: input.nextRetryAt ?? null,
+      resolvedAt: input.stateStatus === 'RESOLVED' ? new Date() : null,
+    });
+  }
+
+  private addProviderValidationSample(
+    summary: MarketDataRepairSummary,
+    input: {
+      stock: any;
+      providerSymbol?: string | null;
+      status: ProviderSupportStatus;
+      classification: ProviderValidationClassification;
+      candlesFound?: number;
+      providerCallMs?: number;
+      nextRetryAt?: Date | null;
+      message?: string | null;
+      historyDiagnostics: {
+        requiredHistoryStartDate: string;
+        listingDate: string | null;
+        listingDateMissing: boolean;
+        storedHistoryStartDate?: string | null;
+        storedHistoryEndDate?: string | null;
+        storedHistoryBars?: number;
+        requiredHistoryComplete?: boolean;
+      };
+      sourceName?: string | null;
+    }
+  ) {
+    if (!summary.sampleResults) summary.sampleResults = [];
+    if (summary.sampleResults.length >= 20) return;
+    summary.sampleResults.push({
+      symbol: input.stock.symbol,
+      providerSymbol: input.providerSymbol ?? null,
+      status: input.status,
+      classification: input.classification,
+      candlesFound: input.candlesFound,
+      providerCallMs: input.providerCallMs,
+      nextRetryAt: input.nextRetryAt ? input.nextRetryAt.toISOString() : null,
+      message: input.message ?? null,
+      validationWindowStartDate: summary.validationWindowStartDate ?? null,
+      validationWindowEndDate: summary.validationWindowEndDate ?? null,
+      requiredHistoryStartDate: input.historyDiagnostics.requiredHistoryStartDate,
+      listingDate: input.historyDiagnostics.listingDate,
+      listingDateMissing: input.historyDiagnostics.listingDateMissing,
+      storedHistoryStartDate: input.historyDiagnostics.storedHistoryStartDate ?? null,
+      storedHistoryEndDate: input.historyDiagnostics.storedHistoryEndDate ?? null,
+      storedHistoryBars: input.historyDiagnostics.storedHistoryBars ?? 0,
+      requiredHistoryComplete: Boolean(input.historyDiagnostics.requiredHistoryComplete),
+      sourceName: input.sourceName ?? null,
+    });
+  }
+
+  private percentile(values: number[], percentile: number): number {
+    if (values.length === 0) return 0;
+    const sorted = [...values].sort((left, right) => left - right);
+    const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * percentile) - 1));
+    return sorted[index];
+  }
+
+  private async assignProviderValidationRemaining(summary: MarketDataRepairSummary, scope: { region: string; assetType: string }) {
+    const repositoryAny = this.repository as any;
+    const [unknown, retryEligible, retryBlocked, manualRequired, nextRetryAtMin] = await Promise.all([
+      this.repository.listStocksForProviderValidation({ ...scope, batchSize: 1, offset: 0, providerValidationQueue: 'UNKNOWN_FIRST' }).then((result) => result.total).catch(() => 0),
+      typeof repositoryAny.countProviderValidationRepairStates === 'function' ? repositoryAny.countProviderValidationRepairStates({ ...scope, status: 'eligible' }) : Promise.resolve(0),
+      typeof repositoryAny.countProviderValidationRepairStates === 'function' ? repositoryAny.countProviderValidationRepairStates({ ...scope, status: 'blocked' }) : Promise.resolve(0),
+      typeof repositoryAny.countProviderValidationRepairStates === 'function' ? repositoryAny.countProviderValidationRepairStates({ ...scope, status: 'manual' }) : Promise.resolve(0),
+      typeof repositoryAny.nextProviderValidationRetryAt === 'function' ? repositoryAny.nextProviderValidationRetryAt(scope) : Promise.resolve(null),
+    ]);
+    summary.remainingUnknown = unknown;
+    summary.remainingRetryEligible = retryEligible;
+    summary.remainingRetryBlocked = retryBlocked;
+    summary.remainingManualRequired = manualRequired;
+    summary.nextRetryAtMin = nextRetryAtMin ? nextRetryAtMin.toISOString() : null;
+  }
+
+  private async assignProviderValidationQueueCounts(
+    counts: MarketDataUniverseHealth['counts'],
+    scope: { region: string; assetType: string }
+  ) {
+    const repositoryAny = this.repository as any;
+    if (typeof repositoryAny.countProviderValidationRepairStates !== 'function') return;
+    const [retryEligible, retryBlocked, manualRequired, nextRetryAt] = await Promise.all([
+      repositoryAny.countProviderValidationRepairStates({ ...scope, status: 'eligible' }),
+      repositoryAny.countProviderValidationRepairStates({ ...scope, status: 'blocked' }),
+      repositoryAny.countProviderValidationRepairStates({ ...scope, status: 'manual' }),
+      typeof repositoryAny.nextProviderValidationRetryAt === 'function'
+        ? repositoryAny.nextProviderValidationRetryAt(scope)
+        : Promise.resolve(null),
+    ]);
+    const knownStateTotal = retryEligible + retryBlocked + manualRequired;
+    const retryWithoutState = Math.max((counts.providerValidationFailed || 0) - knownStateTotal, 0);
+    counts.providerRetryValidationNeeded = retryEligible + retryWithoutState;
+    counts.providerRetryBlocked = retryBlocked;
+    counts.providerManualRepairRequired = manualRequired;
+    counts.nextProviderRetryAtMin = nextRetryAt ? nextRetryAt.toISOString() : null;
   }
 
   private async repairProviderSupportFromStoredPrices(stocks: any[], statsBySymbol: Map<string, { priceHistoryBars?: number; latestPriceDate?: string | null }>) {

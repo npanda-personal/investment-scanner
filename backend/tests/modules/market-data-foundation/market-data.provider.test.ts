@@ -100,4 +100,56 @@ describe('YahooFinanceIngestionService provider', () => {
       assetType: 'STOCK',
     });
   });
+
+  it('classifies Indian stock Yahoo no-candle validation as free fallback required', async () => {
+    const provider = new YahooFinanceIngestionService(undefined, 0);
+    const chart = jest.fn().mockResolvedValue({ quotes: [] });
+    (provider as any).yahooFinance = { chart };
+
+    const result = await provider.validateProviderSymbol('NODATA.NS', {
+      region: 'IN',
+      assetType: 'STOCK',
+      validationWindowStartDate: new Date('2026-03-28T00:00:00.000Z'),
+      validationWindowEndDate: new Date('2026-05-12T23:59:59.999Z'),
+    });
+
+    expect(chart).toHaveBeenCalledWith('NODATA.NS', expect.objectContaining({
+      period1: new Date('2026-03-28T00:00:00.000Z'),
+      period2: new Date('2026-05-12T23:59:59.999Z'),
+      interval: '1d',
+      return: 'array',
+    }));
+    expect(result).toMatchObject({
+      supported: false,
+      failed: true,
+      classification: 'FREE_FALLBACK_REQUIRED',
+      freeFallbackRequired: true,
+      candlesFound: 0,
+      validationWindowStartDate: '2026-03-28',
+      validationWindowEndDate: '2026-05-12',
+    });
+  });
+
+  it('classifies slow provider validation as retryable timeout', async () => {
+    jest.useFakeTimers();
+    const provider = new YahooFinanceIngestionService(undefined, 0);
+    (provider as any).yahooFinance = {
+      chart: jest.fn().mockReturnValue(new Promise(() => undefined)),
+    };
+
+    const promise = provider.validateProviderSymbol('SLOW.NS', {
+      region: 'IN',
+      assetType: 'STOCK',
+      timeoutMs: 1000,
+    });
+    await jest.advanceTimersByTimeAsync(1000);
+    const result = await promise;
+
+    expect(result).toMatchObject({
+      supported: false,
+      failed: true,
+      classification: 'RETRYABLE_TIMEOUT',
+    });
+    jest.useRealTimers();
+  });
 });

@@ -1443,6 +1443,114 @@ describe('MarketDataFoundationService syncV1', () => {
     });
   });
 
+  it('keeps Yahoo no-candle IN stock results visible as FREE_FALLBACK_REQUIRED', async () => {
+    const nextRetry = new Date('2026-05-13T12:30:00.000Z');
+    const repository = {
+      listStocksForProviderValidation: jest.fn().mockResolvedValue({
+        total: 1,
+        stocks: [{ id: 'stock-free-fallback', symbol: 'NODATA.NS', providerSymbol: 'NODATA.NS', isActive: true, isDelisted: false, providerSupportStatus: 'UNKNOWN' }],
+      }),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([['NODATA.NS', { priceHistoryBars: 0, firstPriceDate: null, latestPriceDate: null }]])),
+      updateProviderSupportStatus: jest.fn().mockResolvedValue({}),
+      countRepairAttempts: jest.fn().mockResolvedValue(0),
+      recordRepairAttempt: jest.fn().mockResolvedValue({ id: 'attempt-free-fallback' }),
+      upsertRepairState: jest.fn().mockResolvedValue({}),
+      countProviderValidationRepairStates: jest.fn().mockResolvedValue(0),
+      nextProviderValidationRetryAt: jest.fn().mockResolvedValue(nextRetry),
+    };
+    const provider = {
+      validateProviderSymbol: jest.fn().mockResolvedValue({
+        supported: false,
+        failed: true,
+        classification: 'FREE_FALLBACK_REQUIRED',
+        message: 'Yahoo returned no daily candles over the completed-EOD validation window.',
+        candlesFound: 0,
+        providerCallMs: 42,
+      }),
+    };
+    const service = new MarketDataFoundationService(repository as any, provider as any);
+
+    const result = await service.validateProviders({ region: 'IN', assetType: 'STOCK', batchSize: 1 });
+
+    expect(repository.updateProviderSupportStatus).toHaveBeenCalledWith(
+      'NODATA.NS',
+      'VALIDATION_FAILED',
+      expect.stringContaining('Yahoo returned no daily candles')
+    );
+    expect(repository.upsertRepairState).toHaveBeenCalledWith(expect.objectContaining({
+      repairType: 'PROVIDER_VALIDATION',
+      status: 'FAILED_RETRYABLE',
+      nextRetryAt: expect.any(Date),
+      fieldsFilledJson: expect.objectContaining({
+        classification: 'FREE_FALLBACK_REQUIRED',
+        freeFallbackRequired: true,
+        requiredHistoryStartDate: expect.any(String),
+        latestCompletedEodDate: expect.any(String),
+        storedHistoryStartDate: null,
+        storedHistoryEndDate: null,
+      }),
+    }));
+    expect(result).toMatchObject({
+      validationFailed: 1,
+      freeFallbackRequired: 1,
+      providerRetryableFailures: 1,
+      requiredHistoryCoverageStatus: 'FALLBACK_REQUIRED',
+      latestCompletedEodDate: expect.any(String),
+      requiredHistoryStartDate: expect.any(String),
+      storedHistoryBars: 0,
+    });
+    expect(result.sampleResults?.[0]).toMatchObject({
+      classification: 'FREE_FALLBACK_REQUIRED',
+      status: 'VALIDATION_FAILED',
+      requiredHistoryStartDate: expect.any(String),
+      storedHistoryStartDate: null,
+      storedHistoryEndDate: null,
+    });
+  });
+
+  it('marks UNKNOWN provider rows supported from stored OHLCV without a provider call', async () => {
+    const repository = {
+      listStocksForProviderValidation: jest.fn().mockResolvedValue({
+        total: 1,
+        stocks: [{ id: 'stock-stored', symbol: 'STORED.NS', providerSymbol: 'STORED.NS', isActive: true, isDelisted: false, providerSupportStatus: 'UNKNOWN' }],
+      }),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([[
+        'STORED.NS',
+        { priceHistoryBars: 3820, firstPriceDate: '2011-05-13', latestPriceDate: '2026-05-12' },
+      ]])),
+      markProviderSupportedFromStoredPrices: jest.fn().mockResolvedValue({ count: 1 }),
+      recordRepairAttempt: jest.fn().mockResolvedValue({ id: 'attempt-stored' }),
+      upsertRepairState: jest.fn().mockResolvedValue({}),
+      countProviderValidationRepairStates: jest.fn().mockResolvedValue(0),
+      nextProviderValidationRetryAt: jest.fn().mockResolvedValue(null),
+    };
+    const provider = { validateProviderSymbol: jest.fn() };
+    const service = new MarketDataFoundationService(repository as any, provider as any);
+
+    const result = await service.validateProviders({ region: 'IN', assetType: 'STOCK', batchSize: 1 });
+
+    expect(provider.validateProviderSymbol).not.toHaveBeenCalled();
+    expect(repository.markProviderSupportedFromStoredPrices).toHaveBeenCalledWith(['STORED.NS']);
+    expect(repository.upsertRepairState).toHaveBeenCalledWith(expect.objectContaining({
+      repairType: 'PROVIDER_VALIDATION',
+      status: 'RESOLVED',
+      fieldsFilledJson: expect.objectContaining({
+        classification: 'SUPPORTED_FROM_STORED_PRICES',
+        storedHistoryStartDate: '2011-05-13',
+        storedHistoryEndDate: '2026-05-12',
+      }),
+    }));
+    expect(result).toMatchObject({
+      processedCount: 1,
+      providerSupported: 1,
+      supportedFromStoredPrices: 1,
+      providerCalls: 0,
+      requiredHistoryCoverageStatus: 'NEEDS_BACKFILL',
+      storedHistoryStartDate: '2011-05-13',
+      storedHistoryEndDate: '2026-05-12',
+    });
+  });
+
   it('validates UNKNOWN provider rows by default instead of retry-failed rows', async () => {
     const repository = {
       listStocksForProviderValidation: jest.fn().mockResolvedValue({

@@ -53,6 +53,7 @@ const formatCount = (value?: number) => new Intl.NumberFormat().format(value ?? 
 const formatPercent = (value?: number) => `${Number(value ?? 0).toFixed(1)}%`;
 const REPAIR_BATCH_SIZE = 50;
 const hasNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+const hasPositive = (value: unknown): value is number => hasNumber(value) && value > 0;
 
 type RepairAction =
   | 'VALIDATE_PROVIDERS'
@@ -178,6 +179,15 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
   const repairSummarySeverity = (() => {
     if (!repairSummary) return 'info' as const;
     if (repairSummary.failed > 0) return 'error' as const;
+    if (
+      hasPositive(repairSummary.freeFallbackRequired) ||
+      hasPositive(repairSummary.manualSymbolRepairRequired) ||
+      hasPositive(repairSummary.remainingManualRequired) ||
+      hasPositive(repairSummary.remainingRetryEligible) ||
+      hasPositive(repairSummary.remainingRetryBlocked) ||
+      hasPositive(repairSummary.validationFailed) ||
+      repairSummary.hasMore
+    ) return 'warning' as const;
     const priceRowsChanged = (repairSummary.priceRowsInserted ?? 0) + (repairSummary.priceRowsUpdated ?? 0) + (repairSummary.priceRowsNoOp ?? 0);
     const hasPriceDiagnostics =
       hasNumber(repairSummary.priceRowsReceived) ||
@@ -188,7 +198,6 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
     if (hasPriceDiagnostics && ((repairSummary.zeroRowProviderReturns ?? 0) > 0 || priceRowsChanged === 0)) return 'warning' as const;
     if ((repairSummary.partialSuccess || 0) > 0 || (repairSummary.manualRequired || 0) > 0 || (repairSummary.providerNotFound || 0) > 0 || (repairSummary.noOp || 0) > 0) return 'warning' as const;
     if ((repairSummary.skippedRecentAttempt || 0) > 0 && repairSummary.updated === 0) return 'info' as const;
-    if (repairSummary.hasMore) return 'warning' as const;
     if (repairSummary.updated > 0) {
       return universeHealth?.universeSignoff?.status === 'PASS' ? 'success' as const : 'warning' as const;
     }
@@ -204,7 +213,7 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
       batchSize: boundedRequest?.batchSize || REPAIR_BATCH_SIZE,
       offset: boundedRequest?.offset ?? (action === 'CATALOG_IDENTITY_REPAIR' ? catalogIdentityOffset : action === 'MANUAL_METADATA_IMPORT' ? manualMetadataOffset : 0),
       providerValidationQueue: boundedRequest?.queueMode === 'RETRY_FAILED' || action === 'RETRY_FAILED_PROVIDERS' ? 'RETRY_FAILED' as const : 'UNKNOWN_FIRST' as const,
-      force: action === 'PROVIDER_BUSINESS_METADATA_REPAIR' ? false : true,
+      force: action === 'VALIDATE_PROVIDERS' || action === 'RETRY_FAILED_PROVIDERS' || action === 'PROVIDER_BUSINESS_METADATA_REPAIR' ? false : true,
     };
     const catalogIdentityRequest = {
       ...request,
@@ -311,6 +320,22 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
     return null;
   };
 
+  const providerUnknownRemaining = repairPlan?.providerUnknownValidationNeeded ?? repairPlan?.providerValidationNeeded ?? universeHealth?.counts.providerUnknownValidationNeeded ?? universeHealth?.counts.providerUnknown ?? 0;
+  const providerRetryEligible = repairPlan?.providerRetryValidationNeeded ?? repairPlan?.retryFailedValidations ?? universeHealth?.counts.providerRetryValidationNeeded ?? 0;
+  const providerRetryBlocked = repairPlan?.providerRetryBlocked ?? 0;
+  const providerManualRequired = repairPlan?.providerManualRepairRequired ?? 0;
+  const retryDisabledReason = providerUnknownRemaining > 0
+    ? `Retry blocked until ${formatCount(providerUnknownRemaining)} unknown provider rows drain.`
+    : providerRetryEligible === 0 && (providerRetryBlocked > 0 || providerManualRequired > 0)
+      ? `Retry blocked: ${formatCount(providerRetryBlocked)} cooldown and ${formatCount(providerManualRequired)} manual rows remain.`
+      : null;
+  const coverageStatus = (summary: MarketDataRepairSummary) => {
+    if (summary.requiredHistoryCoverageStatus) return summary.requiredHistoryCoverageStatus;
+    if (hasPositive(summary.freeFallbackRequired)) return 'FALLBACK_REQUIRED';
+    if (hasPositive(summary.remainingCandidates) || hasPositive(summary.stillUnder252)) return 'NEEDS_BACKFILL';
+    return 'COMPLETE_OR_NOT_REPORTED';
+  };
+
   if (loading) {
     return (
       <Paper sx={{ p: 2, mb: 3 }}>
@@ -383,13 +408,16 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
           </Stack>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 1 }}>
             <Typography variant="caption">Review-ready: {formatCount(universeHealth?.universeSignoff?.reviewReadyActual)} / {formatCount(universeHealth?.universeSignoff?.minReviewReadyRequired)}</Typography>
-            <Typography variant="caption">Provider unknown: {formatCount(repairPlan?.providerUnknownValidationNeeded ?? repairPlan?.providerValidationNeeded ?? universeHealth?.counts.providerUnknownValidationNeeded ?? universeHealth?.counts.providerUnknown)}</Typography>
-            <Typography variant="caption">Retry failed providers: {formatCount(repairPlan?.providerRetryValidationNeeded ?? repairPlan?.retryFailedValidations ?? universeHealth?.counts.providerRetryValidationNeeded)}</Typography>
+            <Typography variant="caption">Provider unknown: {formatCount(providerUnknownRemaining)}</Typography>
+            <Typography variant="caption">Retry eligible providers: {formatCount(providerRetryEligible)}</Typography>
+            <Typography variant="caption">Retry cooldown providers: {formatCount(providerRetryBlocked)}</Typography>
+            <Typography variant="caption">Manual provider repair: {formatCount(providerManualRequired)}</Typography>
             <Typography variant="caption">Supported identity gaps: {formatCount(repairPlan?.supportedCatalogIdentityRepairNeeded ?? universeHealth?.counts.supportedCatalogIdentityRepairNeeded)}</Typography>
             <Typography variant="caption">Business auto-repairable: {formatCount(repairPlan?.businessMetadataAutoRepairable)}</Typography>
             <Typography variant="caption">Manual business metadata: {formatCount(repairPlan?.manualBusinessMetadataRequired)}</Typography>
             <Typography variant="caption">Supported price backfill: {formatCount(repairPlan?.supportedPriceBackfillNeeded ?? repairPlan?.priceBackfillNeeded)}</Typography>
             <Typography variant="caption">Latest EOD: {universeHealth?.latestStoredEodDate || 'none'} / {universeHealth?.expectedLatestTradingDate || 'unknown'}</Typography>
+            <Typography variant="caption">Next provider retry: {repairPlan?.nextProviderRetryAtMin || 'none'}</Typography>
             <Typography variant="caption">Next action: {universeHealth?.universeSignoff?.nextAction || repairPlan?.universeSignoff?.nextAction || 'none'}</Typography>
           </Box>
           {(repairPlan?.universeSignoff?.blockers || universeHealth?.universeSignoff?.blockers || []).slice(0, 5).map((blocker) => (
@@ -682,11 +710,20 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 1 }}>
             <Box sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
               <Typography variant="caption" color="text.secondary">Provider unknown</Typography>
-              <Typography variant="h6">{formatCount(repairPlan?.providerUnknownValidationNeeded ?? repairPlan?.providerValidationNeeded)}</Typography>
+              <Typography variant="h6">{formatCount(providerUnknownRemaining)}</Typography>
             </Box>
             <Box sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-              <Typography variant="caption" color="text.secondary">Retry failed providers</Typography>
-              <Typography variant="h6">{formatCount(repairPlan?.providerRetryValidationNeeded ?? repairPlan?.retryFailedValidations)}</Typography>
+              <Typography variant="caption" color="text.secondary">Retry eligible providers</Typography>
+              <Typography variant="h6">{formatCount(providerRetryEligible)}</Typography>
+            </Box>
+            <Box sx={{ p: 1.5, border: '1px solid', borderColor: providerRetryBlocked > 0 ? 'warning.main' : 'divider', borderRadius: 1 }}>
+              <Typography variant="caption" color="text.secondary">Retry cooldown providers</Typography>
+              <Typography variant="h6">{formatCount(providerRetryBlocked)}</Typography>
+              {repairPlan?.nextProviderRetryAtMin && <Typography variant="caption" color="text.secondary">Next {repairPlan.nextProviderRetryAtMin}</Typography>}
+            </Box>
+            <Box sx={{ p: 1.5, border: '1px solid', borderColor: providerManualRequired > 0 ? 'warning.main' : 'divider', borderRadius: 1 }}>
+              <Typography variant="caption" color="text.secondary">Manual provider repair</Typography>
+              <Typography variant="h6">{formatCount(providerManualRequired)}</Typography>
             </Box>
             <Box sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
               <Typography variant="caption" color="text.secondary">Unsupported excluded</Typography>
@@ -735,7 +772,7 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
               variant="contained"
               size="small"
               startIcon={repairRunning === 'VALIDATE_PROVIDERS' ? <CircularProgress size={16} color="inherit" /> : <FactCheckIcon />}
-              disabled={Boolean(repairRunning) || ((repairPlan?.providerUnknownValidationNeeded ?? repairPlan?.providerValidationNeeded ?? 0) === 0)}
+              disabled={Boolean(repairRunning) || providerUnknownRemaining === 0}
               onClick={() => void runRepair('VALIDATE_PROVIDERS')}
             >
               Validate unknown providers
@@ -744,7 +781,7 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
               variant="outlined"
               size="small"
               startIcon={repairRunning === 'RETRY_FAILED_PROVIDERS' ? <CircularProgress size={16} /> : <FactCheckIcon />}
-              disabled={Boolean(repairRunning) || ((repairPlan?.providerRetryValidationNeeded ?? repairPlan?.retryFailedValidations ?? 0) === 0)}
+              disabled={Boolean(repairRunning) || providerUnknownRemaining > 0 || providerRetryEligible === 0}
               onClick={() => void runRepair('RETRY_FAILED_PROVIDERS')}
             >
               Retry failed providers
@@ -798,6 +835,7 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
               Refresh health
             </Button>
           </Stack>
+          {retryDisabledReason && <Typography variant="caption" color="warning.main">{retryDisabledReason}</Typography>}
 
           <TextField
             label="Manual metadata CSV"
@@ -863,6 +901,70 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
                   </Typography>
                 )}
                 {repairSummary.providerValidationQueue && <Typography variant="caption">Provider queue: {repairSummary.providerValidationQueue}.</Typography>}
+                {(hasNumber(repairSummary.providerValidated) ||
+                  hasNumber(repairSummary.providerSupported) ||
+                  hasNumber(repairSummary.providerUnsupported) ||
+                  hasNumber(repairSummary.validationFailed)) && (
+                  <Typography variant="caption">
+                    Provider validation: validated {formatCount(repairSummary.providerValidated)}, supported {formatCount(repairSummary.providerSupported)}, unsupported {formatCount(repairSummary.providerUnsupported)}, failed {formatCount(repairSummary.validationFailed)}.
+                  </Typography>
+                )}
+                {(hasNumber(repairSummary.supportedFromStoredPrices) ||
+                  hasNumber(repairSummary.unsupportedNoProviderSymbol) ||
+                  hasNumber(repairSummary.unsupportedNoCandlesWideWindow) ||
+                  hasNumber(repairSummary.manualSymbolRepairRequired)) && (
+                  <Typography variant="caption">
+                    Provider classifications: stored-price supported {formatCount(repairSummary.supportedFromStoredPrices)}, no provider symbol {formatCount(repairSummary.unsupportedNoProviderSymbol)}, no candles in wide window {formatCount(repairSummary.unsupportedNoCandlesWideWindow)}, manual symbol repair {formatCount(repairSummary.manualSymbolRepairRequired)}.
+                  </Typography>
+                )}
+                {(hasNumber(repairSummary.retryableTimeout) ||
+                  hasNumber(repairSummary.retryableProviderError) ||
+                  hasNumber(repairSummary.retryableRateLimited) ||
+                  hasNumber(repairSummary.retryCooldownSkipped) ||
+                  hasNumber(repairSummary.manualRequiredSkipped)) && (
+                  <Typography variant="caption">
+                    Retry diagnostics: timeout {formatCount(repairSummary.retryableTimeout)}, provider error {formatCount(repairSummary.retryableProviderError)}, rate limit {formatCount(repairSummary.retryableRateLimited)}, cooldown skipped {formatCount(repairSummary.retryCooldownSkipped)}, manual skipped {formatCount(repairSummary.manualRequiredSkipped)}.
+                  </Typography>
+                )}
+                {(hasNumber(repairSummary.remainingUnknown) ||
+                  hasNumber(repairSummary.remainingRetryEligible) ||
+                  hasNumber(repairSummary.remainingRetryBlocked) ||
+                  hasNumber(repairSummary.remainingManualRequired) ||
+                  repairSummary.nextRetryAtMin) && (
+                  <Typography variant="caption">
+                    Remaining provider queues: unknown {formatCount(repairSummary.remainingUnknown)}, retry eligible {formatCount(repairSummary.remainingRetryEligible)}, retry blocked {formatCount(repairSummary.remainingRetryBlocked)}, manual {formatCount(repairSummary.remainingManualRequired)}, next retry {repairSummary.nextRetryAtMin || 'none'}.
+                  </Typography>
+                )}
+                {(hasNumber(repairSummary.providerCalls) ||
+                  hasNumber(repairSummary.providerTimeouts) ||
+                  hasNumber(repairSummary.providerRetryableFailures) ||
+                  hasNumber(repairSummary.slowProviderCalls) ||
+                  hasNumber(repairSummary.maxProviderCallMs) ||
+                  hasNumber(repairSummary.p95ProviderCallMs)) && (
+                  <Typography variant="caption">
+                    Provider timing: calls {formatCount(repairSummary.providerCalls)}, timeouts {formatCount(repairSummary.providerTimeouts)}, retryable failures {formatCount(repairSummary.providerRetryableFailures)}, slow calls {formatCount(repairSummary.slowProviderCalls)}, max {formatCount(repairSummary.maxProviderCallMs)} ms, p95 {formatCount(repairSummary.p95ProviderCallMs)} ms.
+                  </Typography>
+                )}
+                {(repairSummary.validationWindowStartDate ||
+                  repairSummary.validationWindowEndDate ||
+                  repairSummary.fallbackSourceAttempted ||
+                  hasNumber(repairSummary.freeFallbackRequired)) && (
+                  <Typography variant="caption">
+                    Validation window {repairSummary.validationWindowStartDate || 'unknown'} to {repairSummary.validationWindowEndDate || 'unknown'}; free fallback required {formatCount(repairSummary.freeFallbackRequired)}; source attempted {repairSummary.fallbackSourceAttempted || 'none'}; paid providers forbidden.
+                  </Typography>
+                )}
+                {(repairSummary.requiredHistoryStartDate ||
+                  repairSummary.listingDate ||
+                  repairSummary.latestCompletedEodDate ||
+                  repairSummary.targetEndDate ||
+                  repairSummary.requiredHistoryCoverageStatus ||
+                  hasNumber(repairSummary.stillUnder252) ||
+                  hasNumber(repairSummary.freeFallbackRequired) ||
+                  hasNumber(repairSummary.remainingCandidates)) && (
+                  <Typography variant="caption">
+                    Coverage target: 15-year/listing-date daily OHLCV from {repairSummary.requiredHistoryStartDate || repairSummary.listingDate || 'target start unknown'} through latest completed EOD {repairSummary.latestCompletedEodDate || repairSummary.targetEndDate || 'unknown'}; listing date {repairSummary.listingDate || 'unknown'}; status {coverageStatus(repairSummary)}.
+                  </Typography>
+                )}
                 {repairSummary.partialSuccess ? <Typography variant="caption">Partial metadata repairs: {formatCount(repairSummary.partialSuccess)}.</Typography> : null}
                 {repairSummary.providerNotFound ? <Typography variant="caption">Provider not found/useful for {formatCount(repairSummary.providerNotFound)} rows.</Typography> : null}
                 {repairSummary.skippedRecentAttempt ? <Typography variant="caption">Recently attempted/skipped: {formatCount(repairSummary.skippedRecentAttempt)}.</Typography> : null}
@@ -874,6 +976,11 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
                 {repairSummary.fieldsFilled ? <Typography variant="caption">Fields repaired: {Object.entries(repairSummary.fieldsFilled).map(([field, count]) => `${field} ${formatCount(count)}`).join(', ')}.</Typography> : null}
                 {(repairSummary.warnings || []).slice(0, 2).map((warning) => (
                   <Typography key={warning} variant="caption">{warning}</Typography>
+                ))}
+                {(repairSummary.sampleResults || []).slice(0, 3).map((sample) => (
+                  <Typography key={`${sample.symbol}-${sample.classification || sample.status || 'result'}`} variant="caption">
+                    Sample {sample.symbol}: {sample.classification || sample.status || 'unclassified'}{sample.providerSymbol ? ` via ${sample.providerSymbol}` : ''}{hasNumber(sample.candlesFound) ? `; candles ${formatCount(sample.candlesFound)}` : ''}{hasNumber(sample.providerCallMs) ? `; ${formatCount(sample.providerCallMs)} ms` : ''}{sample.nextRetryAt ? `; next retry ${sample.nextRetryAt}` : ''}{sample.message ? `; ${sample.message}` : ''}.
+                  </Typography>
                 ))}
               </Stack>
             </Alert>

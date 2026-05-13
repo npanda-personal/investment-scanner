@@ -503,6 +503,35 @@ describe('MarketDataFoundationRepository', () => {
     const whereJson = JSON.stringify(prisma.stock.findMany.mock.calls[0][0].where);
     expect(whereJson).toContain('VALIDATION_FAILED');
     expect(whereJson).not.toContain('UNKNOWN');
+    expect(whereJson).toContain('PROVIDER_VALIDATION');
+    expect(whereJson).toContain('MANUAL_REQUIRED');
+    expect(whereJson).toContain('nextRetryAt');
+  });
+
+  it('can force retry-failed provider rows past cooldown while still excluding manual-required rows', async () => {
+    const prisma = {
+      stock: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await repository.listStocksForProviderValidation({
+      region: 'IN',
+      assetType: 'STOCK',
+      offset: 50,
+      batchSize: 25,
+      providerValidationQueue: 'RETRY_FAILED',
+      force: true,
+    });
+
+    const call = prisma.stock.findMany.mock.calls[0][0];
+    const whereJson = JSON.stringify(call.where);
+    expect(call.skip).toBe(0);
+    expect(whereJson).toContain('VALIDATION_FAILED');
+    expect(whereJson).toContain('MANUAL_REQUIRED');
+    expect(whereJson).not.toContain('lte');
   });
 
   it('orders legacy combined provider validation as UNKNOWN rows before retry-failed rows', async () => {
