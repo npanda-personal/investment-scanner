@@ -1,5 +1,56 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { visitModule } from './support/moduleAssertions';
+
+async function mockCatalogPageShell(page: Page) {
+  await page.route('**/api/v1/instruments**', async (route) => {
+    await route.fulfill({
+      json: {
+        instruments: [],
+        pagination: { page: 1, pageSize: 25, total: 0, totalPages: 0 },
+      },
+    });
+  });
+  await page.route('**/api/v1/market-data/catalog/sources', async (route) => {
+    await route.fulfill({ json: { sources: [] } });
+  });
+}
+
+const catalogSyncStatus = (overrides: Record<string, unknown> = {}) => ({
+  success: true,
+  runId: 'catalog-sync-test',
+  status: 'RUNNING',
+  message: 'Catalog sync is running.',
+  region: 'IN',
+  assetType: 'STOCK',
+  scopeType: 'CATALOG',
+  batchSize: 25,
+  workerCount: 1,
+  workerConcurrency: 2,
+  delayBetweenBatchesMs: 3000,
+  maxBatches: 20,
+  totalCount: 100,
+  processedCount: 0,
+  currentBatchNumber: 1,
+  batchesPlanned: 4,
+  batchesExecuted: 0,
+  succeededCount: 0,
+  failedCount: 0,
+  skippedCount: 0,
+  noOpCount: 0,
+  rowsReceived: 0,
+  rowsInserted: 0,
+  rowsUpdated: 0,
+  rowsSkipped: 0,
+  warningCount: 0,
+  warnings: [],
+  recentErrors: [],
+  hasMore: true,
+  percentComplete: 0,
+  startedAt: '2026-05-13T10:15:00.000Z',
+  updatedAt: '2026-05-13T10:15:00.000Z',
+  completedAt: null,
+  ...overrides,
+});
 
 test.describe('Market Data Foundation UI', () => {
   test('data health tab renders universe readiness counts and blockers', async ({ page }) => {
@@ -1067,6 +1118,9 @@ test.describe('Market Data Foundation UI', () => {
     await page.route('**/api/v1/market-data/universe/repair-runs/latest**', async (route) => {
       await route.fulfill({ json: null });
     });
+    await page.route('**/api/v1/market-data/universe/repair-workbench**', async (route) => {
+      await route.fulfill({ json: null });
+    });
     await page.route('**/api/v1/market-data/scheduler/status', async (route) => {
       await route.fulfill({
         json: {
@@ -1103,6 +1157,232 @@ test.describe('Market Data Foundation UI', () => {
     await expect(page.getByText('Segment/Class').first()).toBeVisible();
     await expect(page.getByText('Provider Support').first()).toBeVisible();
     await expect(page.getByText('No configured URL for this source')).toHaveCount(0);
+  });
+
+  test('sync catalog starts a run, shows progress, and never posts sync-all', async ({ page }) => {
+    await mockCatalogPageShell(page);
+    let startPayload: any = null;
+    let syncAllPosted = false;
+    let schedulerRefreshCount = 0;
+    let pollCount = 0;
+
+    await page.route('**/api/market-data-foundation/stocks/sync-all**', async (route) => {
+      if (route.request().method() === 'POST') syncAllPosted = true;
+      await route.fulfill({ status: 500, json: { success: false, message: 'Legacy sync-all should not be called.' } });
+    });
+    await page.route('**/api/market-data-foundation/stocks/sync-runs', async (route) => {
+      startPayload = route.request().postDataJSON();
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      await route.fulfill({
+        status: 202,
+        json: catalogSyncStatus({ runId: 'catalog-sync-progress', message: 'Catalog sync started.' }),
+      });
+    });
+    await page.route('**/api/market-data-foundation/stocks/sync-runs/catalog-sync-progress', async (route) => {
+      pollCount += 1;
+      await route.fulfill({
+        json: pollCount === 1
+          ? catalogSyncStatus({
+              runId: 'catalog-sync-progress',
+              processedCount: 25,
+              succeededCount: 22,
+              failedCount: 1,
+              skippedCount: 2,
+              noOpCount: 5,
+              rowsInserted: 40,
+              rowsUpdated: 4,
+              rowsSkipped: 8,
+              warningCount: 1,
+              currentBatchNumber: 1,
+              batchesExecuted: 1,
+              percentComplete: 25,
+              message: 'Processing batch 1 of 4.',
+            })
+          : catalogSyncStatus({
+              runId: 'catalog-sync-progress',
+              status: 'COMPLETED',
+              processedCount: 100,
+              succeededCount: 95,
+              failedCount: 1,
+              skippedCount: 4,
+              noOpCount: 12,
+              rowsInserted: 120,
+              rowsUpdated: 9,
+              rowsSkipped: 18,
+              warningCount: 1,
+              currentBatchNumber: 4,
+              batchesExecuted: 4,
+              hasMore: false,
+              percentComplete: 100,
+              completedAt: '2026-05-13T10:16:00.000Z',
+              message: 'Catalog sync completed.',
+            }),
+      });
+    });
+    await page.route('**/api/v1/market-data/scheduler/status', async (route) => {
+      schedulerRefreshCount += 1;
+      await route.fulfill({
+        json: {
+          enabled: false,
+          intervalMinutes: 15,
+          regions: ['IN'],
+          assetType: 'STOCK',
+          activeRun: false,
+          lastRunAt: null,
+          nextSuggestedRunAt: null,
+          regionStatuses: [],
+        },
+      });
+    });
+
+    await visitModule(page, '/market-data-foundation', 'Market Data Foundation');
+    await page.getByRole('button', { name: 'Sync Catalog' }).click();
+
+    await expect(page.getByRole('button', { name: 'Syncing Catalog...' })).toBeDisabled();
+    await expect(page.getByRole('progressbar', { name: 'Catalog sync progress' })).toBeVisible();
+    await expect(page.getByText('Scope: IN/STOCK; status PENDING')).toBeVisible();
+    await expect.poll(() => startPayload).toMatchObject({
+      region: 'IN',
+      assetType: 'STOCK',
+      batchSize: 25,
+      workerCount: 1,
+      workerConcurrency: 2,
+      delayBetweenBatchesMs: 3000,
+      maxBatches: 20,
+    });
+    await expect(page.getByText('Processed 25 / 100')).toBeVisible();
+    await expect(page.getByText('Rows inserted 40')).toBeVisible();
+    await expect(page.locator('.MuiChip-label').filter({ hasText: /^Batch 1 of 4$/ })).toBeVisible();
+    await expect(page.getByText('Catalog sync COMPLETED for IN/STOCK: processed 100 of 100')).toBeVisible();
+    expect(syncAllPosted).toBe(false);
+    expect(schedulerRefreshCount).toBeGreaterThan(0);
+  });
+
+  test('partial catalog sync offers continue for the same scope', async ({ page }) => {
+    await mockCatalogPageShell(page);
+    const startPayloads: any[] = [];
+    let pollCount = 0;
+
+    await page.route('**/api/market-data-foundation/stocks/sync-all**', async (route) => {
+      await route.fulfill({ status: 500, json: { success: false, message: 'Legacy sync-all should not be called.' } });
+    });
+    await page.route('**/api/market-data-foundation/stocks/sync-runs', async (route) => {
+      const payload = route.request().postDataJSON();
+      startPayloads.push(payload);
+      await route.fulfill({
+        status: 202,
+        json: catalogSyncStatus({
+          runId: startPayloads.length === 1 ? 'catalog-sync-partial' : 'catalog-sync-continued',
+          region: payload.region,
+          assetType: payload.assetType,
+          message: 'Catalog sync started.',
+        }),
+      });
+    });
+    await page.route('**/api/market-data-foundation/stocks/sync-runs/catalog-sync-partial', async (route) => {
+      pollCount += 1;
+      await route.fulfill({
+        json: catalogSyncStatus({
+          runId: 'catalog-sync-partial',
+          status: pollCount === 1 ? 'PARTIAL' : 'RUNNING',
+          processedCount: 50,
+          succeededCount: 48,
+          failedCount: 1,
+          skippedCount: 1,
+          rowsInserted: 80,
+          rowsUpdated: 6,
+          rowsSkipped: 3,
+          currentBatchNumber: 2,
+          batchesExecuted: 2,
+          hasMore: true,
+          percentComplete: 50,
+          completedAt: '2026-05-13T10:18:00.000Z',
+          message: 'Max batches reached; more rows remain.',
+        }),
+      });
+    });
+    await page.route('**/api/v1/market-data/scheduler/status', async (route) => {
+      await route.fulfill({
+        json: {
+          enabled: false,
+          intervalMinutes: 15,
+          regions: ['IN'],
+          assetType: 'STOCK',
+          activeRun: false,
+          lastRunAt: null,
+          nextSuggestedRunAt: null,
+          regionStatuses: [],
+        },
+      });
+    });
+
+    await visitModule(page, '/market-data-foundation', 'Market Data Foundation');
+    await page.getByRole('button', { name: 'Sync Catalog' }).click();
+
+    await expect(page.getByText('Catalog sync PARTIAL for IN/STOCK: processed 50 of 100')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Continue catalog sync' })).toBeVisible();
+    await page.getByRole('button', { name: 'Continue catalog sync' }).click();
+    await expect.poll(() => startPayloads.length).toBe(2);
+    expect(startPayloads[1]).toMatchObject({
+      region: 'IN',
+      assetType: 'STOCK',
+      batchSize: 25,
+      workerCount: 1,
+      workerConcurrency: 2,
+    });
+  });
+
+  test('active catalog sync can be canceled', async ({ page }) => {
+    await mockCatalogPageShell(page);
+    let cancelPosted = false;
+
+    await page.route('**/api/market-data-foundation/stocks/sync-runs', async (route) => {
+      await route.fulfill({
+        status: 202,
+        json: catalogSyncStatus({ runId: 'catalog-sync-cancel', processedCount: 10, percentComplete: 10 }),
+      });
+    });
+    await page.route('**/api/market-data-foundation/stocks/sync-runs/catalog-sync-cancel/cancel', async (route) => {
+      cancelPosted = route.request().method() === 'POST';
+      await route.fulfill({
+        json: catalogSyncStatus({
+          runId: 'catalog-sync-cancel',
+          status: 'PARTIAL',
+          processedCount: 10,
+          succeededCount: 9,
+          skippedCount: 1,
+          hasMore: true,
+          percentComplete: 10,
+          completedAt: '2026-05-13T10:19:00.000Z',
+          message: 'Cancellation requested. The current batch will finish before the run stops.',
+        }),
+      });
+    });
+    await page.route('**/api/market-data-foundation/stocks/sync-runs/catalog-sync-cancel', async (route) => {
+      await route.fulfill({ json: catalogSyncStatus({ runId: 'catalog-sync-cancel', processedCount: 10, percentComplete: 10 }) });
+    });
+    await page.route('**/api/v1/market-data/scheduler/status', async (route) => {
+      await route.fulfill({
+        json: {
+          enabled: false,
+          intervalMinutes: 15,
+          regions: ['IN'],
+          assetType: 'STOCK',
+          activeRun: false,
+          lastRunAt: null,
+          nextSuggestedRunAt: null,
+          regionStatuses: [],
+        },
+      });
+    });
+
+    await visitModule(page, '/market-data-foundation', 'Market Data Foundation');
+    await page.getByRole('button', { name: 'Sync Catalog' }).click();
+    await page.getByRole('button', { name: 'Cancel catalog sync' }).click();
+
+    await expect.poll(() => cancelPosted).toBe(true);
+    await expect(page.getByText('status PARTIAL')).toBeVisible();
+    await expect(page.locator('p').filter({ hasText: /^Cancellation requested\. The current batch will finish before the run stops\.$/ })).toBeVisible();
   });
 
   test('import and backfill panel exposes usable catalog actions', async ({ page }) => {

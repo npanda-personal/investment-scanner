@@ -202,6 +202,72 @@ export class MarketDataFoundationController {
     }
   };
 
+  startStockCatalogSyncRun = async (req: Request, res: Response) => {
+    try {
+      const { region, assetType } = this.getMarketFilter(req);
+      const result = await this.service.startCatalogSyncRun({
+        region: region || req.body?.region,
+        assetType: assetType || req.body?.assetType || req.body?.asset_type,
+        batchSize: this.numberParam(req, 'batchSize'),
+        workerCount: this.numberParam(req, 'workerCount'),
+        workerConcurrency: this.numberParam(req, 'workerConcurrency'),
+        delayBetweenBatchesMs: this.numberParam(req, 'delayBetweenBatchesMs'),
+        maxBatches: this.numberParam(req, 'maxBatches'),
+        force: this.parseOptionalBoolean(req.query.force ?? req.body?.force),
+        fullReload: this.parseOptionalBoolean(req.query.fullReload ?? req.body?.fullReload),
+      });
+      return res.status(202).json(result);
+    } catch (error: any) {
+      console.error('Error starting catalog sync run:', error);
+      return res.status(500).json({
+        success: false,
+        message: `Catalog sync run failed to start: ${error.message}`,
+      });
+    }
+  };
+
+  getStockCatalogSyncRun = async (req: Request, res: Response) => {
+    try {
+      const runId = this.getParam(req.params.runId);
+      const result = this.service.getCatalogSyncRun(runId);
+      if (!result) {
+        return res.status(404).json({
+          success: false,
+          code: 'RUN_NOT_FOUND',
+          message: 'Catalog sync run was not found. It may have expired or the server restarted.',
+        });
+      }
+      return res.json(result);
+    } catch (error: any) {
+      console.error('Error reading catalog sync run:', error);
+      return res.status(500).json({
+        success: false,
+        message: `Catalog sync run lookup failed: ${error.message}`,
+      });
+    }
+  };
+
+  cancelStockCatalogSyncRun = async (req: Request, res: Response) => {
+    try {
+      const runId = this.getParam(req.params.runId);
+      const result = this.service.cancelCatalogSyncRun(runId);
+      if (!result) {
+        return res.status(404).json({
+          success: false,
+          code: 'RUN_NOT_FOUND',
+          message: 'Catalog sync run was not found. It may have expired or the server restarted.',
+        });
+      }
+      return res.json(result);
+    } catch (error: any) {
+      console.error('Error canceling catalog sync run:', error);
+      return res.status(500).json({
+        success: false,
+        message: `Catalog sync run cancellation failed: ${error.message}`,
+      });
+    }
+  };
+
   searchMarketData = async (req: Request, res: Response) => {
     const { q } = req.query;
     if (!q || typeof q !== 'string') {

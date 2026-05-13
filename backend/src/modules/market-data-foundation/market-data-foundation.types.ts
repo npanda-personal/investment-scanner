@@ -1126,6 +1126,7 @@ export interface ValidationResult<T> {
 export interface StockSyncTask {
   id: string;
   symbol: string;
+  providerSymbol?: string | null;
   lastSuccessfulDataLoadTimestamp: Date | null;
 }
 
@@ -1135,4 +1136,77 @@ export interface WorkerResult {
   message: string;
   timestamp: string;
   workerId: number;
+  rowsReceived?: number;
+  rowsInserted?: number;
+  rowsUpdated?: number;
+  rowsSkipped?: number;
+  rowsNoOp?: number;
+  noNewData?: boolean;
+  warningCount?: number;
+  warnings?: string[];
+}
+
+export type CatalogSyncRunStatus =
+  | 'PENDING'
+  | 'RUNNING'
+  | 'PARTIAL'
+  | 'COMPLETED'
+  | 'FAILED'
+  | 'CANCELED';
+
+export interface CatalogSyncRunRequest {
+  region?: string;
+  assetType?: string;
+  batchSize?: number;
+  workerCount?: number;
+  workerConcurrency?: number;
+  delayBetweenBatchesMs?: number;
+  force?: boolean;
+  fullReload?: boolean;
+  maxBatches?: number;
+}
+
+export interface CatalogSyncRunError {
+  symbol?: string;
+  message: string;
+  timestamp: string;
+}
+
+export interface CatalogSyncRunStatusResponse {
+  success: boolean;
+  runId: string;
+  status: CatalogSyncRunStatus;
+  message: string;
+  region: string;
+  assetType: string;
+  scopeType: 'CATALOG';
+  batchSize: number;
+  workerCount: number;
+  workerConcurrency: number;
+  delayBetweenBatchesMs: number;
+  maxBatches: number;
+  totalCount: number;
+  processedCount: number;
+  currentBatchNumber: number;
+  batchesPlanned: number;
+  batchesExecuted: number;
+  succeededCount: number;
+  failedCount: number;
+  skippedCount: number;
+  noOpCount: number;
+  rowsReceived: number;
+  rowsInserted: number;
+  rowsUpdated: number;
+  rowsSkipped: number;
+  warningCount: number;
+  warnings: string[];
+  recentErrors: CatalogSyncRunError[];
+  hasMore: boolean;
+  percentComplete: number;
+  startedAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+  statusUrl: string;
+  alreadyRunning?: boolean;
+  cancelRequested?: boolean;
 }

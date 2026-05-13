@@ -216,10 +216,15 @@ export class MarketDataFoundationRepository {
     });
   }
 
-  listActiveStockSyncTasks(options: Pick<PaginationOptions, 'region' | 'assetType' | 'instrumentSegment'> = {}, take?: number) {
+  listActiveStockSyncTasks(
+    options: Pick<PaginationOptions, 'region' | 'assetType' | 'instrumentSegment'> = {},
+    take?: number,
+    excludeIds: string[] = []
+  ) {
     return this.prisma.stock.findMany({
       where: {
         ...this.stockWhere(options),
+        ...(excludeIds.length > 0 ? { id: { notIn: excludeIds } } : {}),
         isActive: true,
         OR: [
           { providerSupportStatus: null },
@@ -232,6 +237,19 @@ export class MarketDataFoundationRepository {
         { lastSuccessfulDataLoadTimestamp: { sort: 'asc', nulls: 'first' } },
         { symbol: 'asc' },
       ],
+    });
+  }
+
+  countActiveStockSyncTasks(options: Pick<PaginationOptions, 'region' | 'assetType' | 'instrumentSegment'> = {}) {
+    return this.prisma.stock.count({
+      where: {
+        ...this.stockWhere(options),
+        isActive: true,
+        OR: [
+          { providerSupportStatus: null },
+          { providerSupportStatus: { in: ['SUPPORTED', 'UNKNOWN'], mode: 'insensitive' } },
+        ],
+      },
     });
   }
 

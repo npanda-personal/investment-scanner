@@ -74,10 +74,18 @@ QA validates:
 
 ## MD-A2 - Sync Catalog Progress And Bulk Performance
 
-State: `Ready for Architecture`
-Mode: `Architecture Planning Mode`
-Owner: Solution Architect / Orchestrator intake
+State: `PO Accepted`
+Mode: `GitHub Check-In`
+Owner: Senior Fullstack Lead / Orchestrator
 Lane/module: Lane 1, `market-data-foundation`
+
+Architecture contract: [MD-A2 sync catalog performance contract](../architecture-contracts/2026-05-13-md-a2-sync-catalog-performance-contract.md)
+Developer handoff: [MD-A2 developer handoff](../developer-handoffs/2026-05-13-md-a2-developer-handoff.md)
+QA plan: [MD-A2 QA plan](../qa-plans/2026-05-13-md-a2-sync-catalog-performance-qa-plan.md)
+QA evidence: [MD-A2 QA evidence](../qa-evidence/2026-05-13-md-a2-qa-evidence.md)
+Lead validation: [MD-A2 Lead validation](../lead-validation/2026-05-13-md-a2-lead-validation.md)
+Architect signoff: [MD-A2 Architect signoff](../architecture-signoff/2026-05-13-md-a2-architect-signoff.md)
+PO acceptance: [MD-A2 PO acceptance](../po-acceptance/2026-05-13-md-a2-po-acceptance.md)
 
 ### Product Goal
 
@@ -93,6 +101,37 @@ Sync Catalog must not run for hours behind one frontend button without a progres
 - Do not start unbounded full-universe provider calls from a single UI request.
 - Preserve `region` and `assetType` scope on every request.
 - QA must verify progress behavior and that the operation cannot silently run for hours without user-visible state.
+
+### Reserved Write Scope
+
+Backend coordinator/API:
+
+- `backend/src/modules/market-data-foundation/market-data-foundation.types.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.controller.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.router.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.worker.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.repository.ts`
+- Focused backend tests under `backend/tests/modules/market-data-foundation/`
+
+Frontend progress UX:
+
+- `frontend/src/features/market-data-foundation/types.ts`
+- `frontend/src/features/market-data-foundation/api/marketDataFoundationService.ts`
+- `frontend/src/features/market-data-foundation/components/MarketDataFoundationPage.tsx`
+- `frontend/tests/ui/market-data-foundation.spec.ts`
+
+Forbidden scope:
+
+- Prisma schema/migrations unless architecture is reopened.
+- Paid libraries, paid providers, paid hosted queues, broker APIs, or external worker services.
+- Downstream Signals, Strategy, Today Review, Trade Plan, Portfolio, Watchlist, or Alert module behavior.
+
+### Developer Validation Before QA
+
+- Backend: focused market-data backend tests for sync-run start/status/cancel and bounds.
+- Frontend: focused mocked UI tests for progress/cancel/partial/continue plus build validation when resource limits allow.
+- Handoff must include exact commands, results, skipped checks, and performance/progress evidence.
 
 ## Later Packets Parked Behind MD-A2
 

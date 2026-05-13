@@ -27,12 +27,16 @@ import SyncIcon from '@mui/icons-material/Sync';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import {
   backfillCatalogMetadata,
+  cancelCatalogSyncRun,
+  fetchCatalogSyncRunStatus,
   fetchCatalogSources,
   fetchInstruments,
   fetchMarketDataSchedulerStatus,
   importCatalog,
-  syncAllStocks,
+  startCatalogSyncRun,
   syncMarketData,
+  type MarketDataCatalogSyncRunResponse,
+  type MarketDataCatalogSyncRunStatus,
   type MarketDataSchedulerRegionStatus,
   type CatalogSourceInfo,
   type V1Instrument,
@@ -40,7 +44,7 @@ import {
 import MarketDataStatusPanel from './MarketDataStatusPanel';
 import { DataTable, FilterBar, PageHeader, StatusBadge, type DataTableColumn, type SortDirection } from '@/shared/components';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
-import { normalizeMarketForApi } from '../api/marketScopeApi';
+import { normalizeAssetTypeForMarketDataApi, normalizeMarketForApi } from '../api/marketScopeApi';
 
 const formatTimestamp = (timestamp: string) => new Date(timestamp).toLocaleString();
 const formatMarketCap = (value: number | null) => value === null ? 'N/A' : new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(value);
@@ -206,6 +210,29 @@ const buildCandleStatusMessage = (status?: MarketDataSchedulerRegionStatus) => {
   return '';
 };
 
+const CATALOG_SYNC_DEFAULTS = {
+  batchSize: 25,
+  workerCount: 1,
+  workerConcurrency: 2,
+  delayBetweenBatchesMs: 3000,
+  maxBatches: 20,
+};
+
+const activeCatalogSyncStatuses: MarketDataCatalogSyncRunStatus[] = ['PENDING', 'RUNNING'];
+const terminalCatalogSyncStatuses: MarketDataCatalogSyncRunStatus[] = ['PARTIAL', 'COMPLETED', 'FAILED', 'CANCELED'];
+
+const isCatalogSyncActive = (status?: MarketDataCatalogSyncRunStatus) => Boolean(status && activeCatalogSyncStatuses.includes(status));
+const isCatalogSyncTerminal = (status?: MarketDataCatalogSyncRunStatus) => Boolean(status && terminalCatalogSyncStatuses.includes(status));
+const countValue = (value?: number) => value ?? 0;
+const formatCount = (value?: number) => new Intl.NumberFormat().format(countValue(value));
+
+const formatCatalogSyncSummary = (run: MarketDataCatalogSyncRunResponse) => {
+  const scope = `${run.region}/${run.assetType}`;
+  const processed = formatCount(run.processedCount);
+  const total = run.totalCount !== undefined ? formatCount(run.totalCount) : 'unknown';
+  return `Catalog sync ${run.status} for ${scope}: processed ${processed} of ${total}, succeeded ${formatCount(run.succeededCount)}, failed ${formatCount(run.failedCount)}, skipped ${formatCount(run.skippedCount)}, no-op ${formatCount(run.noOpCount)}.`;
+};
+
 const MarketDataFoundationPage: React.FC = () => {
   const navigate = useNavigate();
   const { scope } = useMarketScope();
@@ -236,7 +263,10 @@ const MarketDataFoundationPage: React.FC = () => {
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [catalogSyncing, setCatalogSyncing] = useState(false);
+  const [catalogSyncStarting, setCatalogSyncStarting] = useState(false);
+  const [catalogSyncCanceling, setCatalogSyncCanceling] = useState(false);
+  const [catalogSyncRun, setCatalogSyncRun] = useState<MarketDataCatalogSyncRunResponse | null>(null);
+  const [catalogSyncError, setCatalogSyncError] = useState<string | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -326,32 +356,119 @@ const MarketDataFoundationPage: React.FC = () => {
     }
   };
 
-  const handleCatalogSync = async () => {
-    setCatalogSyncing(true);
+  const refreshCatalogAfterTerminalSync = useCallback(async (run: MarketDataCatalogSyncRunResponse) => {
+    const schedulerStatus = await fetchMarketDataSchedulerStatus().catch(() => null);
+    const regionStatus = schedulerStatus?.regionStatuses.find((item) => item.region === run.region || item.region === normalizedMarket);
+    const candleStatusMessage = buildCandleStatusMessage(regionStatus);
+    const summary = `${formatCatalogSyncSummary(run)}${candleStatusMessage}`;
+    if (run.status === 'FAILED') {
+      setError(run.message ? `${summary} ${run.message}` : summary);
+    } else {
+      setSuccess(run.message ? `${summary} ${run.message}` : summary);
+    }
+    await loadInstruments();
+  }, [loadInstruments, normalizedMarket]);
+
+  const buildCatalogSyncRequest = (run?: MarketDataCatalogSyncRunResponse | null) => ({
+    ...CATALOG_SYNC_DEFAULTS,
+    region: run?.region || normalizeMarketForApi(scope.region) || 'GLOBAL',
+    assetType: run?.assetType || normalizeAssetTypeForMarketDataApi(assetType.trim() || scope.assetType) || 'STOCK',
+  });
+
+  const handleCatalogSync = async (runToContinue?: MarketDataCatalogSyncRunResponse | null) => {
+    const request = buildCatalogSyncRequest(runToContinue);
+    setCatalogSyncStarting(true);
+    setCatalogSyncError(null);
     setError(null);
     setSuccess(null);
+    setCatalogSyncRun({
+      success: true,
+      runId: 'starting',
+      status: 'PENDING',
+      message: 'Starting catalog sync run.',
+      region: request.region,
+      assetType: request.assetType,
+      scopeType: 'CATALOG',
+      processedCount: 0,
+      totalCount: runToContinue?.totalCount,
+      succeededCount: 0,
+      failedCount: 0,
+      skippedCount: 0,
+      noOpCount: 0,
+      rowsInserted: 0,
+      rowsUpdated: 0,
+      rowsSkipped: 0,
+      warningCount: 0,
+      hasMore: runToContinue?.hasMore ?? true,
+      ...CATALOG_SYNC_DEFAULTS,
+    });
     try {
-      const result = await syncAllStocks(4, 4, 3000, { region: scope.region, assetType: assetType.trim() || undefined });
+      const result = await startCatalogSyncRun(request);
       if (!result.success) {
         setError(result.message || 'Catalog sync failed');
       } else {
-        const schedulerStatus = await fetchMarketDataSchedulerStatus().catch(() => null);
-        const regionStatus = schedulerStatus?.regionStatuses.find((item) => item.region === normalizedMarket);
-        const candleStatusMessage = buildCandleStatusMessage(regionStatus);
-        const summary = [
-          result.noNewData ? null : result.succeeded !== undefined ? `${result.succeeded} succeeded` : null,
-          result.noNewData ? null : result.failed !== undefined ? `${result.failed} failed` : null,
-          result.providerFetchSkippedCount !== undefined ? `${result.providerFetchSkippedCount} provider fetches skipped` : null,
-        ].filter(Boolean).join(', ');
-        setSuccess(`${result.message}${candleStatusMessage}${summary ? ` (${summary})` : ''}`);
-        await loadInstruments();
+        const nextRun = { ...request, ...result };
+        setCatalogSyncRun(nextRun);
+        if (result.alreadyRunning && result.message) {
+          setCatalogSyncError(result.message);
+        }
+        if (isCatalogSyncTerminal(result.status)) {
+          await refreshCatalogAfterTerminalSync(nextRun);
+        }
       }
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Catalog sync failed');
     } finally {
-      setCatalogSyncing(false);
+      setCatalogSyncStarting(false);
     }
   };
+
+  const handleCancelCatalogSync = async () => {
+    if (!catalogSyncRun?.runId || catalogSyncRun.runId === 'starting') return;
+    setCatalogSyncCanceling(true);
+    setCatalogSyncError(null);
+    try {
+      const result = await cancelCatalogSyncRun(catalogSyncRun.runId);
+      const nextRun = { ...catalogSyncRun, ...result };
+      setCatalogSyncRun(nextRun);
+      if (isCatalogSyncTerminal(nextRun.status)) {
+        await refreshCatalogAfterTerminalSync(nextRun);
+      }
+    } catch (err: any) {
+      setCatalogSyncError(err.response?.data?.message || err.message || 'Cancel catalog sync failed');
+    } finally {
+      setCatalogSyncCanceling(false);
+    }
+  };
+
+  useEffect(() => {
+    if (catalogSyncStarting || !catalogSyncRun?.runId || catalogSyncRun.runId === 'starting' || !isCatalogSyncActive(catalogSyncRun.status)) return;
+    let canceled = false;
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const result = await fetchCatalogSyncRunStatus(catalogSyncRun.runId);
+        if (canceled) return;
+        const nextRun = { ...catalogSyncRun, ...result };
+        setCatalogSyncRun(nextRun);
+        setCatalogSyncError(null);
+        if (isCatalogSyncTerminal(nextRun.status)) {
+          await refreshCatalogAfterTerminalSync(nextRun);
+        }
+      } catch (err: any) {
+        if (canceled) return;
+        const responseData = err.response?.data;
+        const message = responseData?.code === 'RUN_NOT_FOUND'
+          ? responseData.message || 'Catalog sync run state was lost. It may have expired or the server restarted.'
+          : err.message || 'Unable to load catalog sync status';
+        setCatalogSyncError(message);
+        setCatalogSyncRun((current) => current ? { ...current, status: 'FAILED', message } : current);
+      }
+    }, 1500);
+    return () => {
+      canceled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [catalogSyncRun, catalogSyncStarting, refreshCatalogAfterTerminalSync]);
 
   const handleCatalogImport = async () => {
     setImportingCatalog(true);
@@ -640,6 +757,14 @@ const MarketDataFoundationPage: React.FC = () => {
   const emptyMessage = hasLocalFilters
     ? `No instruments match ${activeFilters.join(', ')} in ${scopeLabel}.`
     : `No instruments found for ${scopeLabel}.`;
+  const catalogSyncActive = catalogSyncStarting || isCatalogSyncActive(catalogSyncRun?.status);
+  const catalogSyncTotal = catalogSyncRun?.totalCount ?? 0;
+  const catalogSyncProcessed = catalogSyncRun?.processedCount ?? 0;
+  const catalogSyncPercent = catalogSyncRun?.percentComplete ?? (catalogSyncTotal > 0 ? (catalogSyncProcessed / catalogSyncTotal) * 100 : 0);
+  const catalogSyncDeterminate = catalogSyncTotal > 0;
+  const catalogSyncScope = catalogSyncRun ? `${catalogSyncRun.region}/${catalogSyncRun.assetType}` : '';
+  const catalogSyncBatch = catalogSyncRun?.currentBatchNumber || catalogSyncRun?.batchesExecuted;
+  const showCatalogSyncContinue = catalogSyncRun?.status === 'PARTIAL' && catalogSyncRun.hasMore === true;
 
   return (
     <Box sx={{ p: 3, maxWidth: 1400, width: '100%', minWidth: 0, boxSizing: 'border-box', mx: 'auto', overflowX: 'hidden' }}>
@@ -655,11 +780,11 @@ const MarketDataFoundationPage: React.FC = () => {
           <>
           <Button
             variant="outlined"
-            startIcon={catalogSyncing ? <CircularProgress size={18} /> : <SyncIcon />}
-            onClick={handleCatalogSync}
-            disabled={catalogSyncing}
+            startIcon={catalogSyncActive ? <CircularProgress size={18} /> : <SyncIcon />}
+            onClick={() => void handleCatalogSync()}
+            disabled={catalogSyncActive}
           >
-            {catalogSyncing ? 'Syncing Catalog...' : 'Sync Catalog'}
+            {catalogSyncActive ? 'Syncing Catalog...' : 'Sync Catalog'}
           </Button>
           <Button variant="outlined" startIcon={<SyncIcon />} onClick={() => navigate('/market-data-foundation/ingestion')}>
             Ingestion
@@ -697,6 +822,77 @@ const MarketDataFoundationPage: React.FC = () => {
               variant={batchProgress.total && batchProgress.total > 0 ? 'determinate' : 'indeterminate'}
               value={batchProgress.total && batchProgress.total > 0 ? Math.min(100, (batchProgress.processed / batchProgress.total) * 100) : undefined}
             />
+          </Stack>
+        </Alert>
+      )}
+      {catalogSyncRun && (
+        <Alert
+          severity={catalogSyncRun.status === 'FAILED' ? 'error' : showCatalogSyncContinue ? 'warning' : isCatalogSyncTerminal(catalogSyncRun.status) ? 'success' : 'info'}
+          sx={{ mb: 2 }}
+        >
+          <Stack spacing={1.25}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between">
+              <Box>
+                <Typography variant="subtitle2">Catalog sync progress</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Scope: {catalogSyncScope}; status {catalogSyncRun.status}; batch size {catalogSyncRun.batchSize ?? CATALOG_SYNC_DEFAULTS.batchSize}; provider concurrency {(catalogSyncRun.workerCount ?? CATALOG_SYNC_DEFAULTS.workerCount) * (catalogSyncRun.workerConcurrency ?? CATALOG_SYNC_DEFAULTS.workerConcurrency)}
+                </Typography>
+              </Box>
+              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                {catalogSyncActive && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="inherit"
+                    aria-label="Cancel catalog sync"
+                    onClick={() => void handleCancelCatalogSync()}
+                    disabled={catalogSyncCanceling || catalogSyncRun.runId === 'starting'}
+                  >
+                    {catalogSyncCanceling ? 'Canceling...' : 'Cancel'}
+                  </Button>
+                )}
+                {showCatalogSyncContinue && (
+                  <Button
+                    size="small"
+                    variant="contained"
+                    aria-label="Continue catalog sync"
+                    onClick={() => void handleCatalogSync(catalogSyncRun)}
+                    disabled={catalogSyncStarting}
+                  >
+                    Continue Sync
+                  </Button>
+                )}
+              </Stack>
+            </Stack>
+            <LinearProgress
+              aria-label="Catalog sync progress"
+              variant={catalogSyncDeterminate ? 'determinate' : 'indeterminate'}
+              value={catalogSyncDeterminate ? Math.min(100, Math.max(0, catalogSyncPercent)) : undefined}
+            />
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+              <Chip size="small" label={`Processed ${formatCount(catalogSyncRun.processedCount)} / ${catalogSyncRun.totalCount !== undefined ? formatCount(catalogSyncRun.totalCount) : 'unknown'}`} />
+              <Chip size="small" label={`Succeeded ${formatCount(catalogSyncRun.succeededCount)}`} />
+              <Chip size="small" label={`Failed ${formatCount(catalogSyncRun.failedCount)}`} />
+              <Chip size="small" label={`Skipped ${formatCount(catalogSyncRun.skippedCount)}`} />
+              <Chip size="small" label={`No-op ${formatCount(catalogSyncRun.noOpCount)}`} />
+              <Chip size="small" label={`Rows inserted ${formatCount(catalogSyncRun.rowsInserted)}`} />
+              <Chip size="small" label={`Rows updated ${formatCount(catalogSyncRun.rowsUpdated)}`} />
+              <Chip size="small" label={`Rows skipped ${formatCount(catalogSyncRun.rowsSkipped)}`} />
+              <Chip size="small" label={`Warnings ${formatCount(catalogSyncRun.warningCount ?? catalogSyncRun.warnings?.length)}`} />
+              {catalogSyncBatch && <Chip size="small" label={`Batch ${catalogSyncBatch}${catalogSyncRun.batchesPlanned ? ` of ${catalogSyncRun.batchesPlanned}` : ''}`} />}
+            </Stack>
+            {(catalogSyncRun.message || catalogSyncError || catalogSyncRun.warnings?.length || catalogSyncRun.recentErrors?.length) && (
+              <Box>
+                {catalogSyncRun.message && <Typography variant="body2">{catalogSyncRun.message}</Typography>}
+                {catalogSyncError && <Typography variant="body2">{catalogSyncError}</Typography>}
+                {catalogSyncRun.warnings?.slice(0, 2).map((warning) => <Typography key={warning} variant="body2">Warning: {warning}</Typography>)}
+                {catalogSyncRun.recentErrors?.slice(0, 2).map((item) => (
+                  <Typography key={`${item.symbol || 'run'}-${item.timestamp || item.message}`} variant="body2">
+                    Error{item.symbol ? ` ${item.symbol}` : ''}: {item.message}
+                  </Typography>
+                ))}
+              </Box>
+            )}
           </Stack>
         </Alert>
       )}

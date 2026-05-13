@@ -26,6 +26,9 @@ export const createMarketDataStocksRouter = (
   router.delete('/:id', controller.deleteStock);
   router.post('/:id/toggle-active', controller.toggleStockActive);
   router.post('/:id/sync', controller.syncStock);
+  router.post('/sync-runs', controller.startStockCatalogSyncRun);
+  router.get('/sync-runs/:runId', controller.getStockCatalogSyncRun);
+  router.post('/sync-runs/:runId/cancel', controller.cancelStockCatalogSyncRun);
   router.post('/sync-all', controller.syncAllStocks);
 
   return router;

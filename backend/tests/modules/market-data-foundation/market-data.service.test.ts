@@ -27,6 +27,11 @@ const stock = {
   dataStatus: 'COMPLETE',
 };
 
+const resetCatalogSyncRuns = () => {
+  (MarketDataFoundationService as any).catalogSyncRuns?.clear();
+  (MarketDataFoundationService as any).activeCatalogSyncRuns?.clear();
+};
+
 describe('MarketDataFoundationService syncV1', () => {
   it('returns health metadata', async () => {
     const service = new MarketDataFoundationService({
@@ -970,6 +975,177 @@ describe('MarketDataFoundationService syncV1', () => {
       providerFetchSkippedCount: 1,
       skippedReasonCounts: { RECENTLY_SYNCED: 1 },
     });
+  });
+
+  it('starts catalog sync runs quickly with hard caps and no immediate provider loop', async () => {
+    resetCatalogSyncRuns();
+    const timeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation((() => 0) as any);
+    const repository = {
+      countActiveStockSyncTasks: jest.fn().mockResolvedValue(2916),
+      listActiveStockSyncTasks: jest.fn(),
+      upsertSyncState: jest.fn(),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+    const ingestSpy = jest.spyOn(service, 'ingestSymbol');
+
+    try {
+      const result = await service.startCatalogSyncRun({
+        region: 'IN',
+        assetType: 'STOCK',
+        batchSize: 500,
+        workerCount: 10,
+        workerConcurrency: 9,
+        delayBetweenBatchesMs: 100,
+        maxBatches: 500,
+      });
+
+      expect(result).toMatchObject({
+        success: true,
+        status: 'RUNNING',
+        region: 'IN',
+        assetType: 'STOCK',
+        batchSize: 50,
+        workerCount: 2,
+        workerConcurrency: 3,
+        delayBetweenBatchesMs: 1000,
+        maxBatches: 100,
+        totalCount: 2916,
+        processedCount: 0,
+      });
+      expect(result.runId).toMatch(/^catalog-sync-/);
+      expect(result.warningCount).toBeGreaterThanOrEqual(5);
+      expect(repository.listActiveStockSyncTasks).not.toHaveBeenCalled();
+      expect(ingestSpy).not.toHaveBeenCalled();
+    } finally {
+      timeoutSpy.mockRestore();
+      resetCatalogSyncRuns();
+    }
+  });
+
+  it('returns the active same-scope catalog sync run instead of starting overlap', async () => {
+    resetCatalogSyncRuns();
+    const timeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation((() => 0) as any);
+    const repository = {
+      countActiveStockSyncTasks: jest.fn().mockResolvedValue(3),
+      listActiveStockSyncTasks: jest.fn(),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+
+    try {
+      const first = await service.startCatalogSyncRun({ region: 'IN', assetType: 'STOCK' });
+      const second = await service.startCatalogSyncRun({ region: 'IN', assetType: 'STOCK' });
+
+      expect(second).toMatchObject({
+        runId: first.runId,
+        status: 'RUNNING',
+        alreadyRunning: true,
+        message: 'A catalog sync is already running for IN/STOCK.',
+      });
+      expect(repository.countActiveStockSyncTasks).toHaveBeenCalledTimes(1);
+    } finally {
+      timeoutSpy.mockRestore();
+      resetCatalogSyncRuns();
+    }
+  });
+
+  it('processes only bounded catalog sync batches and reports partial progress/errors', async () => {
+    resetCatalogSyncRuns();
+    const timeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation((() => 0) as any);
+    const tasks = [
+      { id: 'stock-1', symbol: 'AAA', providerSymbol: 'AAA', lastSuccessfulDataLoadTimestamp: null },
+      { id: 'stock-2', symbol: 'BBB', providerSymbol: 'BBB', lastSuccessfulDataLoadTimestamp: null },
+      { id: 'stock-3', symbol: 'CCC', providerSymbol: 'CCC', lastSuccessfulDataLoadTimestamp: null },
+    ];
+    const repository = {
+      countActiveStockSyncTasks: jest.fn().mockResolvedValue(tasks.length),
+      listActiveStockSyncTasks: jest.fn().mockImplementation((_options, take, excludeIds = []) =>
+        Promise.resolve(tasks.filter((task) => !excludeIds.includes(task.id)).slice(0, take))
+      ),
+      upsertSyncState: jest.fn().mockResolvedValue({}),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+    jest.spyOn(service, 'ingestSymbol').mockImplementation((symbol: string) => {
+      if (symbol === 'BBB') {
+        return Promise.reject(new Error('provider timeout'));
+      }
+      return Promise.resolve({
+        rowsReceived: 3,
+        rowsInserted: 2,
+        rowsUpdated: 1,
+        rowsSkipped: 0,
+        rowsNoOp: 0,
+        warningCount: 0,
+        warnings: [],
+      });
+    });
+
+    try {
+      const start = await service.startCatalogSyncRun({
+        region: 'IN',
+        assetType: 'STOCK',
+        batchSize: 2,
+        workerCount: 2,
+        workerConcurrency: 3,
+        delayBetweenBatchesMs: 1000,
+        maxBatches: 1,
+        force: true,
+      });
+
+      await (service as any).processCatalogSyncRun(start.runId);
+      const status = service.getCatalogSyncRun(start.runId);
+
+      expect(repository.listActiveStockSyncTasks).toHaveBeenCalledWith(
+        { region: 'IN', assetType: 'STOCK' },
+        2,
+        []
+      );
+      expect(status).toMatchObject({
+        status: 'PARTIAL',
+        processedCount: 2,
+        succeededCount: 1,
+        failedCount: 1,
+        batchesExecuted: 1,
+        rowsReceived: 3,
+        rowsInserted: 2,
+        rowsUpdated: 1,
+        hasMore: true,
+      });
+      expect(status?.recentErrors).toEqual([
+        expect.objectContaining({ symbol: 'BBB', message: 'provider timeout' }),
+      ]);
+      expect(repository.upsertSyncState).toHaveBeenCalledWith(expect.objectContaining({
+        region: 'IN',
+        assetType: 'STOCK',
+        scopeType: 'CATALOG',
+        status: 'FAILED',
+      }));
+    } finally {
+      timeoutSpy.mockRestore();
+      resetCatalogSyncRuns();
+    }
+  });
+
+  it('marks active catalog sync runs for cancellation without aborting the current batch', async () => {
+    resetCatalogSyncRuns();
+    const timeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation((() => 0) as any);
+    const service = new MarketDataFoundationService({
+      countActiveStockSyncTasks: jest.fn().mockResolvedValue(2),
+    } as any, {} as any);
+
+    try {
+      const start = await service.startCatalogSyncRun({ region: 'IN', assetType: 'STOCK' });
+      const canceled = service.cancelCatalogSyncRun(start.runId);
+
+      expect(canceled).toMatchObject({
+        runId: start.runId,
+        status: 'PARTIAL',
+        cancelRequested: true,
+        message: 'Cancellation requested. The current batch will finish before the run stops.',
+      });
+    } finally {
+      timeoutSpy.mockRestore();
+      resetCatalogSyncRuns();
+    }
   });
 
   it('force instrument sync bypasses recent freshness gate and still allows no-op storage', async () => {

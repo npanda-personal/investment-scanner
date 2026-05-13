@@ -8,6 +8,8 @@ import type {
   CatalogSourceInfo,
   CreateStockRequest,
   BulkSyncResponse,
+  MarketDataCatalogSyncRunRequest,
+  MarketDataCatalogSyncRunResponse,
   MarketDataHealth,
   MarketDataRepairPlan,
   MarketDataRepairRequest,
@@ -47,6 +49,9 @@ export type {
   CatalogImportRequest,
   CatalogImportResponse,
   BulkSyncResponse,
+  MarketDataCatalogSyncRunRequest,
+  MarketDataCatalogSyncRunResponse,
+  MarketDataCatalogSyncRunStatus,
   MarketDataHealth,
   MarketDataRepairPlan,
   MarketDataRepairLane,
@@ -183,6 +188,38 @@ export async function syncAllStocks(workerCount?: number, workerConcurrency?: nu
 export interface MarketScopedApiOptions {
   region?: string;
   assetType?: string;
+}
+
+function scopedCatalogSyncPayload(data: MarketDataCatalogSyncRunRequest): MarketDataCatalogSyncRunRequest {
+  return {
+    ...data,
+    region: normalizeMarketForApi(data.region) || 'GLOBAL',
+    assetType: normalizeAssetTypeForMarketDataApi(data.assetType) || 'STOCK',
+  };
+}
+
+export async function startCatalogSyncRun(data: MarketDataCatalogSyncRunRequest): Promise<MarketDataCatalogSyncRunResponse> {
+  const payload = scopedCatalogSyncPayload(data);
+  logMarketDataApi(payload.region || 'GLOBAL', payload.region, { ...payload }, 'catalog-sync-run-start');
+  const response = await axios.post<MarketDataCatalogSyncRunResponse>(
+    `${API_BASE}/market-data-foundation/stocks/sync-runs`,
+    payload
+  );
+  return response.data;
+}
+
+export async function fetchCatalogSyncRunStatus(runId: string): Promise<MarketDataCatalogSyncRunResponse> {
+  const response = await axios.get<MarketDataCatalogSyncRunResponse>(
+    `${API_BASE}/market-data-foundation/stocks/sync-runs/${encodeURIComponent(runId)}`
+  );
+  return response.data;
+}
+
+export async function cancelCatalogSyncRun(runId: string): Promise<MarketDataCatalogSyncRunResponse> {
+  const response = await axios.post<MarketDataCatalogSyncRunResponse>(
+    `${API_BASE}/market-data-foundation/stocks/sync-runs/${encodeURIComponent(runId)}/cancel`
+  );
+  return response.data;
 }
 
 /**

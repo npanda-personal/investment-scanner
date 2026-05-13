@@ -929,6 +929,70 @@ export interface BulkSyncResponse {
   timestamp?: string;
 }
 
+export type MarketDataCatalogSyncRunStatus = 'PENDING' | 'RUNNING' | 'PARTIAL' | 'COMPLETED' | 'FAILED' | 'CANCELED';
+
+export interface MarketDataCatalogSyncRunRequest {
+  region?: string;
+  assetType?: string;
+  batchSize?: number;
+  workerCount?: number;
+  workerConcurrency?: number;
+  delayBetweenBatchesMs?: number;
+  force?: boolean;
+  fullReload?: boolean;
+  maxBatches?: number;
+}
+
+export interface MarketDataCatalogSyncRunRecentError {
+  symbol?: string;
+  message: string;
+  timestamp?: string;
+}
+
+export interface MarketDataCatalogSyncRunResponse {
+  success: boolean;
+  runId: string;
+  status: MarketDataCatalogSyncRunStatus;
+  message?: string;
+  region: string;
+  assetType: string;
+  scopeType?: 'CATALOG' | string;
+  batchSize?: number;
+  workerCount?: number;
+  workerConcurrency?: number;
+  delayBetweenBatchesMs?: number;
+  maxBatches?: number;
+  totalCount?: number;
+  processedCount?: number;
+  currentBatchNumber?: number;
+  batchesPlanned?: number;
+  batchesExecuted?: number;
+  succeededCount?: number;
+  failedCount?: number;
+  skippedCount?: number;
+  noOpCount?: number;
+  rowsReceived?: number;
+  rowsInserted?: number;
+  rowsUpdated?: number;
+  rowsSkipped?: number;
+  warningCount?: number;
+  warnings?: string[];
+  recentErrors?: MarketDataCatalogSyncRunRecentError[];
+  hasMore?: boolean;
+  percentComplete?: number;
+  startedAt?: string;
+  updatedAt?: string;
+  completedAt?: string | null;
+  statusUrl?: string;
+  alreadyRunning?: boolean;
+}
+
+export interface MarketDataCatalogSyncRunNotFoundResponse {
+  success: false;
+  code: 'RUN_NOT_FOUND' | string;
+  message: string;
+}
+
 export interface MarketDataSchedulerRegionStatus {
   region: string;
   assetType: string;

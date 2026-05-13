@@ -47,6 +47,9 @@ const controller = {
   deleteStock: jest.fn(),
   toggleStockActive: jest.fn(),
   syncStock: jest.fn(),
+  startStockCatalogSyncRun: jest.fn(),
+  getStockCatalogSyncRun: jest.fn(),
+  cancelStockCatalogSyncRun: jest.fn(),
   syncAllStocks: jest.fn(),
   searchMarketData: jest.fn(),
   ingestSymbol: jest.fn(),
@@ -108,6 +111,9 @@ describe('market data routers', () => {
         'GET /yahoo-search',
         'POST /',
         'POST /:id/sync',
+        'POST /sync-runs',
+        'GET /sync-runs/:runId',
+        'POST /sync-runs/:runId/cancel',
       ])
     );
 

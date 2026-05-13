@@ -45,7 +45,11 @@ import type {
   CatalogImportRequest,
   CatalogImportSummary,
   CatalogSource,
+  CatalogSyncRunRequest,
+  CatalogSyncRunStatus,
+  CatalogSyncRunStatusResponse,
   SearchResult,
+  StockSyncTask,
   SyncSummary,
   UpdateStockRequest,
   V1CreateInstrumentRequest,
@@ -65,6 +69,16 @@ import {
 const TRUSTED_REVIEW_SCAN_ORDERING = 'recentVolumeDesc_priceHistoryCompleteness_latestFreshness_symbol';
 
 type TrustedReviewUniverseOptions = Pick<PaginationOptions, 'region' | 'assetType'> & { now?: Date };
+
+type CatalogSyncRunRecord = CatalogSyncRunStatusResponse & {
+  activeKey: string;
+  cancelRequested: boolean;
+  force: boolean;
+  fullReload: boolean;
+  tradingDate: string;
+  providerEndDate?: Date;
+  processedTaskIds: Set<string>;
+};
 
 const KNOWN_NSE_FNO_STOCK_UNDERLYINGS = new Set([
   '360ONE',
@@ -305,6 +319,8 @@ type RepairRunSourceSnapshot = {
 
 export class MarketDataFoundationService {
   private static lastIngestionAt = 0;
+  private static catalogSyncRuns = new Map<string, CatalogSyncRunRecord>();
+  private static activeCatalogSyncRuns = new Map<string, string>();
   private readonly manualSyncCooldownMinutes = this.readPositiveNumber(
     process.env.MARKET_DATA_MANUAL_SYNC_COOLDOWN_MINUTES,
     15
@@ -2876,6 +2892,496 @@ export class MarketDataFoundationService {
         console.error(`Ingestion failed for ${symbol}:`, error);
       }
     }
+  }
+
+  async startCatalogSyncRun(request: CatalogSyncRunRequest = {}): Promise<CatalogSyncRunStatusResponse> {
+    const region = this.normalizeRunRegion(request.region);
+    const assetType = this.normalizeAssetType(request.assetType || 'STOCK');
+    const activeKey = this.catalogSyncActiveKey(region, assetType);
+    const activeRunId = MarketDataFoundationService.activeCatalogSyncRuns.get(activeKey);
+    if (activeRunId) {
+      const activeRun = MarketDataFoundationService.catalogSyncRuns.get(activeRunId);
+      if (activeRun && !activeRun.completedAt) {
+        return this.toCatalogSyncRunResponse(activeRun, {
+          alreadyRunning: true,
+          message: `A catalog sync is already running for ${region}/${assetType}.`,
+        });
+      }
+      MarketDataFoundationService.activeCatalogSyncRuns.delete(activeKey);
+    }
+
+    const now = new Date();
+    const clamped = this.normalizeCatalogSyncRunRequest(request);
+    const totalCount = await this.countActiveStockSyncTasks({ region, assetType });
+    const runId = this.createCatalogSyncRunId(now);
+    const warnings = [...clamped.warnings];
+    const run: CatalogSyncRunRecord = {
+      success: true,
+      runId,
+      status: 'RUNNING',
+      message: 'Catalog sync started.',
+      region,
+      assetType,
+      scopeType: 'CATALOG',
+      batchSize: clamped.batchSize,
+      workerCount: clamped.workerCount,
+      workerConcurrency: clamped.workerConcurrency,
+      delayBetweenBatchesMs: clamped.delayBetweenBatchesMs,
+      maxBatches: clamped.maxBatches,
+      totalCount,
+      processedCount: 0,
+      currentBatchNumber: 0,
+      batchesPlanned: Math.min(clamped.maxBatches, Math.ceil(totalCount / clamped.batchSize)),
+      batchesExecuted: 0,
+      succeededCount: 0,
+      failedCount: 0,
+      skippedCount: 0,
+      noOpCount: 0,
+      rowsReceived: 0,
+      rowsInserted: 0,
+      rowsUpdated: 0,
+      rowsSkipped: 0,
+      warningCount: warnings.length,
+      warnings,
+      recentErrors: [],
+      hasMore: totalCount > 0,
+      percentComplete: totalCount > 0 ? 0 : 100,
+      startedAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+      completedAt: null,
+      statusUrl: `/api/market-data-foundation/stocks/sync-runs/${runId}`,
+      activeKey,
+      cancelRequested: false,
+      force: request.force === true || request.fullReload === true,
+      fullReload: request.fullReload === true,
+      tradingDate: tradingDateForRegion(region, now) || now.toISOString().slice(0, 10),
+      processedTaskIds: new Set<string>(),
+    };
+
+    MarketDataFoundationService.catalogSyncRuns.set(runId, run);
+    MarketDataFoundationService.activeCatalogSyncRuns.set(activeKey, runId);
+    this.pruneCatalogSyncRuns();
+
+    setTimeout(() => {
+      void this.processCatalogSyncRun(runId);
+    }, 0);
+
+    return this.toCatalogSyncRunResponse(run);
+  }
+
+  getCatalogSyncRun(runId: string): CatalogSyncRunStatusResponse | null {
+    const run = MarketDataFoundationService.catalogSyncRuns.get(runId);
+    return run ? this.toCatalogSyncRunResponse(run) : null;
+  }
+
+  cancelCatalogSyncRun(runId: string): CatalogSyncRunStatusResponse | null {
+    const run = MarketDataFoundationService.catalogSyncRuns.get(runId);
+    if (!run) return null;
+    if (this.isCatalogSyncTerminal(run.status)) {
+      return this.toCatalogSyncRunResponse(run);
+    }
+    run.cancelRequested = true;
+    run.status = 'PARTIAL';
+    run.message = 'Cancellation requested. The current batch will finish before the run stops.';
+    this.touchCatalogSyncRun(run);
+    return this.toCatalogSyncRunResponse(run);
+  }
+
+  private async processCatalogSyncRun(runId: string): Promise<void> {
+    const run = MarketDataFoundationService.catalogSyncRuns.get(runId);
+    if (!run) return;
+
+    try {
+      const now = new Date();
+      if (!run.force) {
+        const gate = await this.evaluateSyncFreshnessGate({
+          region: run.region,
+          assetType: run.assetType,
+          scopeType: 'CATALOG',
+          scopeKey: run.region,
+          tradingDate: run.tradingDate,
+          now,
+          force: false,
+          cooldownMinutes: this.manualSyncCooldownMinutes,
+        });
+        if (gate.shouldSkip) {
+          run.processedCount = run.totalCount;
+          run.skippedCount = run.totalCount;
+          run.hasMore = false;
+          run.percentComplete = 100;
+          run.status = 'COMPLETED';
+          run.message = gate.message;
+          this.addCatalogSyncWarning(run, gate.message);
+          await this.persistCatalogSyncRunState(run, gate.reason === 'FINAL_CANDLE_CONFIRMED' ? 'FINAL_CONFIRMED' : 'SYNCED', now);
+          this.completeCatalogSyncRun(run);
+          return;
+        }
+        run.providerEndDate = gate.providerEndDate;
+      }
+
+      while (run.batchesExecuted < run.maxBatches) {
+        if (run.cancelRequested) {
+          run.status = 'CANCELED';
+          run.message = 'Catalog sync canceled after the current batch.';
+          run.hasMore = run.processedCount < run.totalCount;
+          await this.persistCatalogSyncRunState(run, 'FAILED', new Date());
+          this.completeCatalogSyncRun(run);
+          return;
+        }
+
+        const tasks = await this.repository.listActiveStockSyncTasks(
+          { region: run.region, assetType: run.assetType },
+          run.batchSize,
+          Array.from(run.processedTaskIds)
+        );
+        if (tasks.length === 0) {
+          run.hasMore = false;
+          run.percentComplete = 100;
+          run.status = run.failedCount > 0 ? 'PARTIAL' : 'COMPLETED';
+          run.message = run.failedCount > 0
+            ? 'Catalog sync completed with errors.'
+            : 'Catalog sync completed.';
+          await this.persistCatalogSyncRunState(run, run.failedCount > 0 ? 'FAILED' : 'SYNCED', new Date());
+          this.completeCatalogSyncRun(run);
+          return;
+        }
+
+        run.currentBatchNumber = run.batchesExecuted + 1;
+        run.message = `Processing batch ${run.currentBatchNumber} of ${run.batchesPlanned || run.maxBatches}.`;
+        this.touchCatalogSyncRun(run);
+
+        const processedBeforeBatch = run.processedCount;
+        const results = await this.processCatalogSyncBatch(run, tasks);
+        run.batchesExecuted += 1;
+        for (const task of tasks) {
+          run.processedTaskIds.add(task.id);
+        }
+        this.applyCatalogSyncBatchResults(run, results);
+        run.hasMore = run.processedCount < run.totalCount;
+        run.percentComplete = this.catalogSyncPercent(run);
+        this.touchCatalogSyncRun(run);
+
+        if (run.processedCount === processedBeforeBatch && run.hasMore) {
+          this.addCatalogSyncWarning(run, 'Catalog sync made no progress while more eligible rows appeared to remain.');
+          run.status = 'PARTIAL';
+          run.message = 'Catalog sync stopped because the last batch made no progress.';
+          await this.persistCatalogSyncRunState(run, 'FAILED', new Date());
+          this.completeCatalogSyncRun(run);
+          return;
+        }
+
+        if (run.cancelRequested) {
+          run.status = 'CANCELED';
+          run.message = 'Catalog sync canceled after the current batch.';
+          run.hasMore = run.processedCount < run.totalCount;
+          await this.persistCatalogSyncRunState(run, 'FAILED', new Date());
+          this.completeCatalogSyncRun(run);
+          return;
+        }
+
+        if (!run.hasMore) {
+          run.status = run.failedCount > 0 ? 'PARTIAL' : 'COMPLETED';
+          run.message = run.failedCount > 0
+            ? 'Catalog sync completed with errors.'
+            : 'Catalog sync completed.';
+          await this.persistCatalogSyncRunState(run, run.failedCount > 0 ? 'FAILED' : 'SYNCED', new Date());
+          this.completeCatalogSyncRun(run);
+          return;
+        }
+
+        if (run.batchesExecuted < run.maxBatches) {
+          await new Promise(resolve => setTimeout(resolve, run.delayBetweenBatchesMs));
+        }
+      }
+
+      run.status = 'PARTIAL';
+      run.hasMore = run.processedCount < run.totalCount;
+      run.message = run.hasMore
+        ? 'Catalog sync reached the maximum batch limit. More eligible rows remain.'
+        : 'Catalog sync completed within the maximum batch limit.';
+      if (run.hasMore) {
+        this.addCatalogSyncWarning(run, 'Max batches reached before the catalog sync queue drained.');
+      }
+      await this.persistCatalogSyncRunState(run, run.failedCount > 0 || run.hasMore ? 'FAILED' : 'SYNCED', new Date());
+      this.completeCatalogSyncRun(run);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown catalog sync failure';
+      this.addCatalogSyncError(run, undefined, message);
+      run.status = run.batchesExecuted === 0 && run.processedCount === 0 ? 'FAILED' : 'PARTIAL';
+      run.message = `Catalog sync failed: ${message}`;
+      await this.persistCatalogSyncRunState(run, 'FAILED', new Date()).catch(() => null);
+      this.completeCatalogSyncRun(run);
+    }
+  }
+
+  private async processCatalogSyncBatch(run: CatalogSyncRunRecord, tasks: StockSyncTask[]) {
+    const chunks = this.chunkArray(tasks, Math.ceil(tasks.length / run.workerCount));
+    const workerResults = await Promise.all(chunks.map((chunk) =>
+      this.processCatalogSyncWorkerChunk(run, chunk, run.workerConcurrency)
+    ));
+    return workerResults.flat();
+  }
+
+  private async processCatalogSyncWorkerChunk(run: CatalogSyncRunRecord, tasks: StockSyncTask[], concurrency: number) {
+    const results: Array<{ task: StockSyncTask; success: boolean; summary?: SyncSummary; message: string }> = [];
+    for (const chunk of this.chunkArray(tasks, concurrency)) {
+      const chunkResults = await Promise.all(chunk.map(async (task) => {
+        try {
+          const summary = await this.ingestSymbol(task.symbol, undefined, run.providerEndDate || new Date(), run.fullReload, {
+            force: run.force,
+            region: run.region,
+            assetType: run.assetType,
+            skipFreshnessGate: true,
+          });
+          return {
+            task,
+            success: true,
+            summary,
+            message: summary.noNewData
+              ? `No new data to ingest: ${summary.skippedReasons?.join(', ') || 'skipped'}`
+              : `Sync completed: ${summary.rowsInserted} inserted, ${summary.rowsUpdated} updated, ${summary.rowsSkipped} skipped`,
+          };
+        } catch (error) {
+          return {
+            task,
+            success: false,
+            message: error instanceof Error ? error.message : 'Unknown provider sync failure',
+          };
+        }
+      }));
+      results.push(...chunkResults);
+    }
+    return results;
+  }
+
+  private normalizeCatalogSyncRunRequest(request: CatalogSyncRunRequest) {
+    const warnings: string[] = [];
+    const batchSize = this.clampCatalogSyncNumber(request.batchSize, 25, 1, 50, 'batchSize', warnings);
+    const workerCount = this.clampCatalogSyncNumber(request.workerCount, 1, 1, 2, 'workerCount', warnings);
+    const workerConcurrency = this.clampCatalogSyncNumber(request.workerConcurrency, 2, 1, 3, 'workerConcurrency', warnings);
+    const delayBetweenBatchesMs = this.clampCatalogSyncNumber(request.delayBetweenBatchesMs, 3000, 1000, 30000, 'delayBetweenBatchesMs', warnings);
+    const maxBatches = this.clampCatalogSyncNumber(request.maxBatches, 20, 1, 100, 'maxBatches', warnings);
+    return { batchSize, workerCount, workerConcurrency, delayBetweenBatchesMs, maxBatches, warnings };
+  }
+
+  private clampCatalogSyncNumber(
+    value: number | undefined,
+    fallback: number,
+    min: number,
+    max: number,
+    field: string,
+    warnings: string[]
+  ): number {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return fallback;
+    const integer = Math.floor(parsed);
+    const clamped = Math.max(min, Math.min(max, integer));
+    if (clamped !== integer) {
+      warnings.push(`${field} was capped to ${clamped}.`);
+    }
+    return clamped;
+  }
+
+  private normalizeRunRegion(value?: string | null): string {
+    const normalized = value?.trim().toUpperCase();
+    if (!normalized || normalized === 'ALL') return 'GLOBAL';
+    if (['IN', 'US', 'EU', 'GLOBAL'].includes(normalized)) return normalized;
+    return normalized;
+  }
+
+  private catalogSyncActiveKey(region: string, assetType: string): string {
+    return `${region}:${assetType}:CATALOG`;
+  }
+
+  private createCatalogSyncRunId(now: Date): string {
+    const stamp = now.toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
+    const suffix = Math.random().toString(36).slice(2, 8);
+    return `catalog-sync-${stamp}-${suffix}`;
+  }
+
+  private isCatalogSyncTerminal(status: CatalogSyncRunStatus): boolean {
+    return ['PARTIAL', 'COMPLETED', 'FAILED', 'CANCELED'].includes(status);
+  }
+
+  private async countActiveStockSyncTasks(options: Pick<PaginationOptions, 'region' | 'assetType'>): Promise<number> {
+    const repository = this.repository as any;
+    if (typeof repository.countActiveStockSyncTasks === 'function') {
+      return repository.countActiveStockSyncTasks(options);
+    }
+    if (typeof repository.listActiveStockSyncTasks === 'function') {
+      const tasks = await repository.listActiveStockSyncTasks(options);
+      return Array.isArray(tasks) ? tasks.length : 0;
+    }
+    if (typeof repository.instrumentCount === 'function') {
+      return repository.instrumentCount(options);
+    }
+    return 0;
+  }
+
+  private applyCatalogSyncBatchResults(
+    run: CatalogSyncRunRecord,
+    results: Array<{ task: StockSyncTask; success: boolean; summary?: SyncSummary; message: string }>
+  ): void {
+    for (const result of results) {
+      run.processedCount += 1;
+      if (!result.success) {
+        run.failedCount += 1;
+        this.addCatalogSyncError(run, result.task.symbol, result.message);
+        continue;
+      }
+
+      run.succeededCount += 1;
+      const summary = result.summary;
+      if (!summary) continue;
+      run.rowsReceived += summary.rowsReceived || 0;
+      run.rowsInserted += summary.rowsInserted || 0;
+      run.rowsUpdated += summary.rowsUpdated || 0;
+      run.rowsSkipped += summary.rowsSkipped || 0;
+      run.noOpCount += summary.rowsNoOp || 0;
+      if (summary.noNewData || (summary.providerFetchSkippedCount || 0) > 0) {
+        run.skippedCount += 1;
+      }
+      if ((summary.warningCount || 0) > 0) {
+        run.warningCount += summary.warningCount || 0;
+        for (const warning of summary.warnings || []) {
+          this.addCatalogSyncWarning(run, `${result.task.symbol}: ${warning}`, false);
+        }
+      }
+    }
+  }
+
+  private addCatalogSyncWarning(run: CatalogSyncRunRecord, warning: string, incrementCount = true): void {
+    if (incrementCount) run.warningCount += 1;
+    run.warnings.push(warning);
+    if (run.warnings.length > 20) {
+      run.warnings.splice(0, run.warnings.length - 20);
+    }
+  }
+
+  private addCatalogSyncError(run: CatalogSyncRunRecord, symbol: string | undefined, message: string): void {
+    run.recentErrors.push({ symbol, message, timestamp: new Date().toISOString() });
+    if (run.recentErrors.length > 20) {
+      run.recentErrors.splice(0, run.recentErrors.length - 20);
+    }
+  }
+
+  private catalogSyncPercent(run: CatalogSyncRunRecord): number {
+    if (run.totalCount <= 0) return 100;
+    return Math.min(100, Number(((run.processedCount / run.totalCount) * 100).toFixed(1)));
+  }
+
+  private touchCatalogSyncRun(run: CatalogSyncRunRecord): void {
+    run.updatedAt = new Date().toISOString();
+  }
+
+  private completeCatalogSyncRun(run: CatalogSyncRunRecord): void {
+    const now = new Date().toISOString();
+    run.percentComplete = this.catalogSyncPercent(run);
+    run.updatedAt = now;
+    run.completedAt = now;
+    MarketDataFoundationService.activeCatalogSyncRuns.delete(run.activeKey);
+    this.pruneCatalogSyncRuns();
+  }
+
+  private toCatalogSyncRunResponse(
+    run: CatalogSyncRunRecord,
+    overrides: Partial<CatalogSyncRunStatusResponse> = {}
+  ): CatalogSyncRunStatusResponse {
+    return {
+      success: true,
+      runId: run.runId,
+      status: run.status,
+      message: run.message,
+      region: run.region,
+      assetType: run.assetType,
+      scopeType: 'CATALOG',
+      batchSize: run.batchSize,
+      workerCount: run.workerCount,
+      workerConcurrency: run.workerConcurrency,
+      delayBetweenBatchesMs: run.delayBetweenBatchesMs,
+      maxBatches: run.maxBatches,
+      totalCount: run.totalCount,
+      processedCount: run.processedCount,
+      currentBatchNumber: run.currentBatchNumber,
+      batchesPlanned: run.batchesPlanned,
+      batchesExecuted: run.batchesExecuted,
+      succeededCount: run.succeededCount,
+      failedCount: run.failedCount,
+      skippedCount: run.skippedCount,
+      noOpCount: run.noOpCount,
+      rowsReceived: run.rowsReceived,
+      rowsInserted: run.rowsInserted,
+      rowsUpdated: run.rowsUpdated,
+      rowsSkipped: run.rowsSkipped,
+      warningCount: run.warningCount,
+      warnings: [...run.warnings],
+      recentErrors: [...run.recentErrors],
+      hasMore: run.hasMore,
+      percentComplete: run.percentComplete,
+      startedAt: run.startedAt,
+      updatedAt: run.updatedAt,
+      completedAt: run.completedAt,
+      statusUrl: run.statusUrl,
+      cancelRequested: run.cancelRequested,
+      ...overrides,
+    };
+  }
+
+  private async persistCatalogSyncRunState(
+    run: CatalogSyncRunRecord,
+    status: 'PENDING' | 'SYNCED' | 'FINAL_CONFIRMED' | 'FAILED',
+    now: Date
+  ): Promise<void> {
+    const repository = this.repository as any;
+    if (typeof repository.upsertSyncState !== 'function') return;
+    const summary: ScheduledRegionSyncSummary = {
+      region: run.region,
+      assetType: run.assetType,
+      tradingDate: run.tradingDate,
+      instrumentsProcessed: run.processedCount,
+      rowsReceived: run.rowsReceived,
+      rowsInserted: run.rowsInserted,
+      rowsUpdated: run.rowsUpdated,
+      rowsSkipped: run.rowsSkipped,
+      rowsNoOp: run.noOpCount,
+      warningCount: run.warningCount,
+      warnings: run.warnings.slice(-10),
+      errors: run.recentErrors.map((error) => `${error.symbol ? `${error.symbol}: ` : ''}${error.message}`).slice(-10),
+    };
+    await repository.upsertSyncState({
+      region: run.region,
+      assetType: run.assetType,
+      scopeType: 'CATALOG',
+      scopeKey: run.region,
+      tradingDate: run.tradingDate,
+      timeframe: '1D',
+      status,
+      summary,
+      lastCheckedAt: now,
+      lastProviderFetchAt: run.processedCount > 0 ? now : undefined,
+    });
+  }
+
+  private pruneCatalogSyncRuns(): void {
+    const terminalRuns = Array.from(MarketDataFoundationService.catalogSyncRuns.values())
+      .filter((run) => run.completedAt)
+      .sort((a, b) => Date.parse(b.completedAt || b.updatedAt) - Date.parse(a.completedAt || a.updatedAt));
+    const keepIds = new Set(terminalRuns.slice(0, 10).map((run) => run.runId));
+    const cutoff = Date.now() - 30 * 60_000;
+    for (const run of terminalRuns) {
+      if (!keepIds.has(run.runId) && Date.parse(run.completedAt || run.updatedAt) < cutoff) {
+        MarketDataFoundationService.catalogSyncRuns.delete(run.runId);
+      }
+    }
+  }
+
+  private chunkArray<T>(array: T[], size: number): T[][] {
+    const chunkSize = Math.max(1, size);
+    const chunks: T[][] = [];
+    for (let i = 0; i < array.length; i += chunkSize) {
+      chunks.push(array.slice(i, i + chunkSize));
+    }
+    return chunks;
   }
 
   async syncAll(
