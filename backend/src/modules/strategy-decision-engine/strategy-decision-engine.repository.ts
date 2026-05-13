@@ -96,6 +96,63 @@ export class StrategyDecisionEngineRepository {
     return this.toDto(record);
   }
 
+  async replaceMany(items: StrategyDecisionDto[]): Promise<StrategyDecisionDto[]> {
+    if (items.length === 0) return [];
+    const rows: Prisma.StrategyDecisionResultCreateManyInput[] = items.map((data) => {
+      const generatedDate = this.normalizeUtcDay(data.generatedAt);
+      return {
+        instrumentId: data.instrumentId || null,
+        portfolioId: data.portfolioId || null,
+        holdingId: data.holdingId || null,
+        symbol: data.symbol || null,
+        country: data.country || null,
+        exchange: data.exchange || null,
+        strategy: data.strategy,
+        decision: data.decision,
+        action: data.action,
+        decisionScore: data.decisionScore,
+        scoreBreakdown: (data.scoreBreakdown as any) || Prisma.JsonNull,
+        confidence: data.confidence,
+        marketCondition: data.marketCondition,
+        marketGate: data.marketGate,
+        entryZone: this.serializeEntryZone(data.entryZone),
+        riskPlan: (data.riskPlan as any) || Prisma.JsonNull,
+        reasons: data.reasons as any,
+        blockers: data.blockers as any,
+        warnings: data.warnings as any,
+        dataGaps: data.dataGaps as any,
+        strategyVersion: data.strategyVersion || null,
+        frameworkBacked: Boolean(data.frameworkBacked),
+        frameworkDecision: data.frameworkDecision || null,
+        frameworkAction: data.frameworkAction || null,
+        entryRulesPassed: (data.entryRulesPassed as any) || Prisma.JsonNull,
+        exitRulesTriggered: (data.exitRulesTriggered as any) || Prisma.JsonNull,
+        noiseFiltersTriggered: (data.noiseFiltersTriggered as any) || Prisma.JsonNull,
+        strategyRating: (data.strategyRating as any) || Prisma.JsonNull,
+        readinessLabel: data.readinessLabel || null,
+        modelVersion: data.modelVersion,
+        generatedAt: new Date(data.generatedAt),
+        generatedDate,
+      };
+    });
+
+    await this.db.$transaction([
+      this.db.strategyDecisionResult.deleteMany({
+        where: {
+          OR: rows.map((row) => ({
+            instrumentId: row.instrumentId || null,
+            strategy: row.strategy,
+            modelVersion: row.modelVersion,
+            generatedDate: row.generatedDate,
+          })),
+        },
+      }),
+      this.db.strategyDecisionResult.createMany({ data: rows }),
+    ]);
+
+    return items;
+  }
+
   async latestForInstrument(instrumentId: string, strategy?: string): Promise<StrategyDecisionDto | null> {
     const record = await this.db.strategyDecisionResult.findFirst({
       where: { instrumentId, strategy },

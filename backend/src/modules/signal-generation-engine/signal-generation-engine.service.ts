@@ -33,6 +33,14 @@ const TECHNICAL_WEIGHT = 0.4;
 const MOMENTUM_WEIGHT = 0.35;
 const FUNDAMENTAL_WEIGHT = 0.25;
 const MODEL_VERSION = 'signal-engine-v1';
+const SIGNAL_GENERATION_PRICE_WINDOW = 520;
+
+type SignalGenerationBatchContext = {
+  instrumentsById: Map<string, any>;
+  priceWindowsByInstrumentId: Map<string, any[]>;
+  fundamentalsByInstrumentId: Map<string, any>;
+  strategyPerformanceCache: Map<string, Promise<StrategyPerformanceSummaryDto | null>>;
+};
 
 export class SignalGenerationEngineService {
   constructor(
@@ -181,7 +189,8 @@ export class SignalGenerationEngineService {
       dataQualityEvaluationsByInstrumentId: Record<string, SignalDataQualityEligibility>;
     };
     const effectiveProviderThrottleMs = researchContextMode === 'LIGHTWEIGHT' ? 0 : providerThrottleMs;
-    const generatedResults = await this.generateBatchWithConcurrency(instrumentIds, generationRequest, maxConcurrency, effectiveProviderThrottleMs);
+    const batchContext = await this.loadSignalGenerationBatchContext(instrumentIds, generationRequest);
+    const generatedResults = await this.generateBatchWithConcurrency(instrumentIds, generationRequest, maxConcurrency, effectiveProviderThrottleMs, batchContext);
     const results = generatedResults
       .map((item) => item.result)
       .filter((result): result is SignalResultDto => Boolean(result));
@@ -292,13 +301,20 @@ export class SignalGenerationEngineService {
   async generateForInstrument(instrumentId: string, options: Pick<SignalRunRequest, 'strategyCode' | 'includeStrategyMatches' | 'onlyStrategyEligible' | 'excludeNoiseFiltered' | 'researchContextMode' | 'region' | 'assetType' | 'modelVersion' | 'rulesetVersion' | 'useDataQualityFilter'> & {
     generationRunId?: string;
     dataQualityEvaluationsByInstrumentId?: Record<string, SignalDataQualityEligibility>;
+    batchContext?: SignalGenerationBatchContext;
   } = {}): Promise<SignalResultDto | null> {
     const useFullResearchContext = options.researchContextMode !== 'LIGHTWEIGHT';
     const marketScope = { region: options.region, assetType: options.assetType };
     const [instrument, pricesResponse, fundamentalsResponse, research] = await Promise.all([
-      this.marketDataService.getInstrument(instrumentId, marketScope),
-      this.marketDataService.listPricesByInstrumentId(instrumentId, 5000, undefined, undefined, marketScope),
-      this.getFundamentalsForGeneration(instrumentId, marketScope, useFullResearchContext),
+      options.batchContext?.instrumentsById.has(instrumentId)
+        ? Promise.resolve(options.batchContext.instrumentsById.get(instrumentId))
+        : this.marketDataService.getInstrument(instrumentId, marketScope),
+      options.batchContext?.priceWindowsByInstrumentId.has(instrumentId)
+        ? Promise.resolve({ prices: options.batchContext.priceWindowsByInstrumentId.get(instrumentId) || [] })
+        : this.marketDataService.listPricesByInstrumentId(instrumentId, SIGNAL_GENERATION_PRICE_WINDOW, undefined, undefined, marketScope),
+      options.batchContext?.fundamentalsByInstrumentId.has(instrumentId)
+        ? Promise.resolve(options.batchContext.fundamentalsByInstrumentId.get(instrumentId))
+        : this.getFundamentalsForGeneration(instrumentId, marketScope, useFullResearchContext),
       useFullResearchContext ? this.researchService.workbench(instrumentId, '3M') : Promise.resolve(null),
     ]);
 
@@ -370,7 +386,7 @@ export class SignalGenerationEngineService {
     };
 
     if (options.includeStrategyMatches || options.strategyCode || options.onlyStrategyEligible || options.excludeNoiseFiltered) {
-      result = await this.attachStrategyMatches(result, prices, instrument, options);
+      result = await this.attachStrategyMatches(result, prices, instrument, options, options.batchContext?.strategyPerformanceCache);
       if (!this.signalPassesStrategyFilters(result, options)) return null;
     }
 
@@ -961,7 +977,8 @@ export class SignalGenerationEngineService {
       dataQualityEvaluationsByInstrumentId?: Record<string, SignalDataQualityEligibility>;
     },
     maxConcurrency: number,
-    providerThrottleMs: number
+    providerThrottleMs: number,
+    batchContext?: SignalGenerationBatchContext
   ): Promise<Array<{ instrumentId: string; result: SignalResultDto | null; error?: string }>> {
     const results: Array<{ instrumentId: string; result: SignalResultDto | null; error?: string }> = new Array(instrumentIds.length);
     let nextIndex = 0;
@@ -982,7 +999,7 @@ export class SignalGenerationEngineService {
         const instrumentId = instrumentIds[index];
         try {
           await acquireStartSlot();
-          results[index] = { instrumentId, result: await this.generateForInstrument(instrumentId, request) };
+          results[index] = { instrumentId, result: await this.generateForInstrument(instrumentId, { ...request, batchContext }) };
         } catch (error: any) {
           results[index] = { instrumentId, result: null, error: error?.message || 'signal generation failed' };
         }
@@ -991,6 +1008,32 @@ export class SignalGenerationEngineService {
 
     await Promise.all(Array.from({ length: Math.min(maxConcurrency, instrumentIds.length) }, worker));
     return results.filter(Boolean);
+  }
+
+  private async loadSignalGenerationBatchContext(
+    instrumentIds: string[],
+    request: Pick<SignalRunRequest, 'region' | 'assetType' | 'researchContextMode'>
+  ): Promise<SignalGenerationBatchContext | undefined> {
+    if (instrumentIds.length <= 1) return undefined;
+    const serviceAny = this.marketDataService as any;
+    const marketScope = { region: request.region, assetType: request.assetType };
+    const [instruments, priceWindows, fundamentals] = await Promise.all([
+      typeof serviceAny.getInstrumentsByIds === 'function'
+        ? serviceAny.getInstrumentsByIds(instrumentIds).catch(() => [])
+        : Promise.resolve([]),
+      typeof serviceAny.listRecentPriceWindowsByInstrumentIds === 'function'
+        ? serviceAny.listRecentPriceWindowsByInstrumentIds(instrumentIds, SIGNAL_GENERATION_PRICE_WINDOW, marketScope).catch(() => new Map())
+        : Promise.resolve(new Map()),
+      request.researchContextMode === 'LIGHTWEIGHT' && typeof serviceAny.storedFundamentalsByInstrumentIds === 'function'
+        ? serviceAny.storedFundamentalsByInstrumentIds(instrumentIds, marketScope).catch(() => new Map())
+        : Promise.resolve(new Map()),
+    ]);
+    return {
+      instrumentsById: new Map((instruments as any[]).map((instrument) => [instrument.id, instrument])),
+      priceWindowsByInstrumentId: priceWindows instanceof Map ? priceWindows : new Map(),
+      fundamentalsByInstrumentId: fundamentals instanceof Map ? fundamentals : new Map(),
+      strategyPerformanceCache: new Map(),
+    };
   }
 
   private getFundamentalsForGeneration(instrumentId: string, marketScope: Pick<SignalRunRequest, 'region' | 'assetType'>, useFullResearchContext: boolean) {

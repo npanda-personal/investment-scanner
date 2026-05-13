@@ -421,6 +421,50 @@ describe('signal calibration engine service', () => {
     expect(setup.dataQualityService.getLatestEvaluationForInstrument).not.toHaveBeenCalled();
   });
 
+  it('skips expensive quality grouping and historical context lookups when the selected horizon has no evaluated outcomes', async () => {
+    const signals = [
+      rawSignal({ instrument_id: 'stock-1' }),
+      rawSignal({ instrument_id: 'stock-2', symbol: 'MSFT' }),
+    ];
+    const setup = service({
+      signalService: {
+        latestSignalUniverse: jest.fn().mockResolvedValue(signals),
+        latestSignalUniverseCount: jest.fn().mockResolvedValue(signals.length),
+      },
+      qualityService: {
+        summary: jest.fn().mockResolvedValue({
+          dataStatus: 'PARTIAL',
+          evaluationDiagnostics: { evaluatedSignals: 0 },
+          horizonAvailability: {
+            '20D': { eligible: 2, evaluated: 0, insufficientFuturePrice: 2 },
+          },
+        }),
+        byType: jest.fn().mockResolvedValue([]),
+        byScoreBucket: jest.fn().mockResolvedValue([]),
+        bySector: jest.fn().mockResolvedValue([]),
+        noisy: jest.fn().mockResolvedValue([]),
+      },
+      contextService: {
+        lookup: jest.fn(),
+      },
+      dataQualityService: {
+        getEvaluationsForInstruments: jest.fn().mockResolvedValue([]),
+        getLatestEvaluationForInstrument: jest.fn().mockResolvedValue(null),
+      },
+    });
+
+    const result = await setup.instance.run({ batchSize: 2, offset: 0, region: 'IN', assetType: 'STOCK', horizon: '20D' });
+
+    expect(result.processedCount).toBe(2);
+    expect(result.passthroughCount).toBe(2);
+    expect(setup.qualityService.byType).not.toHaveBeenCalled();
+    expect(setup.qualityService.byScoreBucket).not.toHaveBeenCalled();
+    expect(setup.qualityService.bySector).not.toHaveBeenCalled();
+    expect(setup.qualityService.noisy).not.toHaveBeenCalled();
+    expect(setup.contextService.lookup).not.toHaveBeenCalled();
+    expect(setup.dataQualityService.getEvaluationsForInstruments).toHaveBeenCalledWith(['stock-1', 'stock-2']);
+  });
+
   it('processes calibration run signals with bounded concurrency', async () => {
     let activeLookups = 0;
     let maxActiveLookups = 0;

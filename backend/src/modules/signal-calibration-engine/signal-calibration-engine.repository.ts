@@ -50,6 +50,17 @@ export class SignalCalibrationEngineRepository {
     return result ? this.toDto(result) : null;
   }
 
+  async latestForInstruments(instrumentIds: string[]): Promise<SignalCalibrationResultDto[]> {
+    const uniqueIds = [...new Set(instrumentIds.filter(Boolean))];
+    if (uniqueIds.length === 0) return [];
+    const rows = await this.db.signalCalibrationResult.findMany({
+      where: { instrumentId: { in: uniqueIds } },
+      orderBy: [{ instrumentId: 'asc' }, { generatedAt: 'desc' }],
+      distinct: ['instrumentId'],
+    });
+    return rows.map((row) => this.toDto(row));
+  }
+
   async top(query: CalibrationQuery): Promise<PaginatedCalibrationResponse> {
     const where: Prisma.SignalCalibrationResultWhereInput = {
       calibratedDirection: query.direction,

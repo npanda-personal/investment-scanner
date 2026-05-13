@@ -12,6 +12,19 @@ const readyPriceStats = {
   latestClose: 100,
 };
 
+const completeHistoryPriceStats = (overrides: Record<string, unknown> = {}): any => ({
+  ...readyPriceStats,
+  firstPriceDate: '2000-01-01',
+  priceHistoryBars: 4000,
+  rollingWindowBars: 252,
+  rollingWindowCoveragePercent: 100,
+  maxPriceGapDays: 1,
+  recentVolumeCoveragePercent: 100,
+  adjustedCloseCoveragePercent: 100,
+  usesAdjustedCloseFallback: false,
+  ...overrides,
+});
+
 const baseInstrument = {
   isActive: true,
   isDelisted: false,
@@ -195,10 +208,10 @@ describe('Market Data Foundation universe readiness', () => {
       ]),
       priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
         ['CATALOG.NS', { priceHistoryBars: 0, latestPriceDate: null, latestVolume: null, latestAdjustedClose: null, latestClose: null }],
-        ['READY.NS', { ...readyPriceStats, latestPriceDate: '2099-01-01' }],
-        ['STALE.NS', { ...readyPriceStats, latestPriceDate: '2020-01-01' }],
-        ['UNSUPPORTED.NS', { ...readyPriceStats, latestPriceDate: '2099-01-01' }],
-        ['INACTIVE.NS', { ...readyPriceStats, latestPriceDate: '2099-01-01' }],
+        ['READY.NS', completeHistoryPriceStats({ latestPriceDate: '2099-01-01' })],
+        ['STALE.NS', completeHistoryPriceStats({ latestPriceDate: '2020-01-01' })],
+        ['UNSUPPORTED.NS', completeHistoryPriceStats({ latestPriceDate: '2099-01-01' })],
+        ['INACTIVE.NS', completeHistoryPriceStats({ latestPriceDate: '2099-01-01' })],
       ])),
     };
     const service = new MarketDataFoundationService(repository as any, {} as any);
@@ -270,7 +283,7 @@ describe('Market Data Foundation universe readiness', () => {
         { ...stockRow('lite-ready', 'LITE.NS', 'SUPPORTED'), sector: null, industry: null, marketCap: null, isin: null, ipoDate: null },
       ]),
       priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
-        ['LITE.NS', { ...readyPriceStats, priceHistoryBars: 120, rollingWindowBars: 120, latestPriceDate: '2099-01-01' }],
+        ['LITE.NS', completeHistoryPriceStats({ latestPriceDate: '2099-01-01' })],
       ])),
     };
     const service = new MarketDataFoundationService(repository as any, {} as any);
@@ -295,7 +308,7 @@ describe('Market Data Foundation universe readiness', () => {
         stockRow('lite-ready', 'LITE.NS', 'SUPPORTED'),
       ]),
       priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
-        ['LITE.NS', { ...readyPriceStats, priceHistoryBars: 120, rollingWindowBars: 120, latestPriceDate: '2026-05-11' }],
+        ['LITE.NS', completeHistoryPriceStats({ latestPriceDate: '2026-05-11' })],
       ])),
     };
     const service = new MarketDataFoundationService(repository as any, {} as any);
@@ -318,7 +331,7 @@ describe('Market Data Foundation universe readiness', () => {
         stockRow('lite-ready', 'LITE.NS', 'SUPPORTED'),
       ]),
       priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
-        ['LITE.NS', { ...readyPriceStats, priceHistoryBars: 120, rollingWindowBars: 120, latestPriceDate: '2026-05-12' }],
+        ['LITE.NS', completeHistoryPriceStats({ latestPriceDate: '2026-05-12' })],
       ])),
     };
     const service = new MarketDataFoundationService(repository as any, {} as any);
@@ -348,12 +361,12 @@ describe('Market Data Foundation universe readiness', () => {
       listStocksForUniverseHealth: jest.fn().mockResolvedValue(rows),
       priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
         ['UNKNOWN.NS', { priceHistoryBars: 0, latestPriceDate: null, latestVolume: null }],
-        ['RETRY.NS', { ...readyPriceStats, latestPriceDate: '2099-01-01' }],
-        ['UNSUPPORTED.NS', { ...readyPriceStats, latestPriceDate: '2099-01-01' }],
-        ['STALE.NS', { ...readyPriceStats, latestPriceDate: '2020-01-01' }],
-        ['NOPRICE.NS', { priceHistoryBars: 252, latestPriceDate: null, latestVolume: null }],
-        ['SHORT.NS', { ...readyPriceStats, priceHistoryBars: 119, latestPriceDate: '2099-01-01' }],
-        ['NOVOLUME.NS', { ...readyPriceStats, latestPriceDate: '2099-01-01', latestVolume: null }],
+        ['RETRY.NS', completeHistoryPriceStats({ latestPriceDate: '2099-01-01' })],
+        ['UNSUPPORTED.NS', completeHistoryPriceStats({ latestPriceDate: '2099-01-01' })],
+        ['STALE.NS', completeHistoryPriceStats({ latestPriceDate: '2020-01-01' })],
+        ['NOPRICE.NS', completeHistoryPriceStats({ latestPriceDate: null, latestVolume: null })],
+        ['SHORT.NS', completeHistoryPriceStats({ priceHistoryBars: 119, latestPriceDate: '2099-01-01' })],
+        ['NOVOLUME.NS', completeHistoryPriceStats({ latestPriceDate: '2099-01-01', latestVolume: null })],
       ])),
     };
     const service = new MarketDataFoundationService(repository as any, {} as any);
@@ -374,7 +387,7 @@ describe('Market Data Foundation universe readiness', () => {
 
   it('reports LIMITED and READY trusted review statuses from configurable thresholds', async () => {
     const makeRows = (count: number) => Array.from({ length: count }, (_, index) => stockRow(`ready-${index}`, `READY${index}.NS`, 'SUPPORTED'));
-    const makeStats = (rows: any[]) => new Map(rows.map((row) => [row.symbol, { ...readyPriceStats, priceHistoryBars: 120, rollingWindowBars: 120, latestPriceDate: '2099-01-01' }]));
+    const makeStats = (rows: any[]) => new Map(rows.map((row) => [row.symbol, completeHistoryPriceStats({ latestPriceDate: '2099-01-01' })]));
     const limitedRows = makeRows(100);
     const readyRows = makeRows(300);
     const limitedService = new MarketDataFoundationService({
@@ -456,7 +469,7 @@ describe('Market Data Foundation universe readiness', () => {
           },
         ]),
         priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
-          ['READY.NS', { ...readyPriceStats, latestPriceDate: '2099-01-01' }],
+          ['READY.NS', completeHistoryPriceStats({ latestPriceDate: '2099-01-01' })],
         ])),
       };
       const service = new MarketDataFoundationService(repository as any, {} as any);

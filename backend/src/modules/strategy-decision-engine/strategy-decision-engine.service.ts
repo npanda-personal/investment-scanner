@@ -31,6 +31,13 @@ const DEFAULT_EVALUATION_WORKER_CONCURRENCY = 5;
 const MAX_EVALUATION_WORKER_CONCURRENCY = 8;
 const REVIEW_STRATEGY_CATEGORIES = new Set(['ENTRY', 'EXIT']);
 
+type StrategyEvaluationBatchContext = {
+  pricesByInstrumentId: Map<string, any[]>;
+  calibrationByInstrumentId: Map<string, any>;
+  dataQualityByInstrumentId: Map<string, any>;
+  smartMoneyByInstrumentId: Map<string, any>;
+};
+
 export class StrategyDecisionEngineService {
   constructor(
     private readonly repository = new StrategyDecisionEngineRepository(),
@@ -153,7 +160,9 @@ export class StrategyDecisionEngineService {
     const portfolio = request.portfolioId
       ? await this.portfolioService.getPortfolioDetail(request.portfolioId).catch(() => null)
       : null;
+    const batchContext = await this.loadEvaluationBatchContext(instrumentIds, request);
     const strategyRatings = new Map<string, Promise<StrategyDecisionDto['strategyRating']>>();
+    const decisionsToPersist: StrategyDecisionDto[] = [];
     let failedCount = 0;
 
     for (let i = 0; i < instrumentIds.length; i += workerConcurrency) {
@@ -161,7 +170,6 @@ export class StrategyDecisionEngineService {
       const chunkResults = await Promise.all(chunk.map(async (instrumentId) => {
         try {
           const rawSignal = universe.rawSignalsByInstrumentId.get(instrumentId);
-          const instrumentResults: StrategyDecisionDto[] = [];
           const decisions = await this.evaluateInstrumentStrategies(instrumentId, strategies, gate, {
             portfolioId: request.portfolioId,
             region: request.region,
@@ -169,15 +177,13 @@ export class StrategyDecisionEngineService {
             rawSignal,
             instrument: instrumentsById.get(instrumentId),
             portfolio,
+            prices: batchContext.pricesByInstrumentId.get(instrumentId),
+            calibrated: batchContext.calibrationByInstrumentId.get(instrumentId) ?? null,
+            quality: batchContext.dataQualityByInstrumentId.get(instrumentId) ?? null,
+            smartMoney: batchContext.smartMoneyByInstrumentId.get(instrumentId) ?? null,
             strategyRatings,
           });
-          await Promise.all(decisions.map(async (decision) => {
-            if (decision) {
-              const persisted = await this.repository.create(decision);
-              instrumentResults.push(persisted);
-            }
-          }));
-          return instrumentResults;
+          return decisions.filter((decision): decision is StrategyDecisionDto => Boolean(decision));
         } catch (error: any) {
           console.error(`Evaluation failed for ${instrumentId}:`, error);
           failedCount += 1;
@@ -186,7 +192,16 @@ export class StrategyDecisionEngineService {
       }));
 
       const chunkResultsFlattened = chunkResults.flat();
-      results.push(...chunkResultsFlattened);
+      decisionsToPersist.push(...chunkResultsFlattened);
+    }
+
+    if (decisionsToPersist.length > 0) {
+      try {
+        results.push(...await this.persistDecisionBatch(decisionsToPersist));
+      } catch (error: any) {
+        console.error('Strategy decision persistence failed:', error);
+        failedCount += decisionsToPersist.length;
+      }
     }
 
     const totalCount = universe.totalCount;
@@ -319,6 +334,10 @@ export class StrategyDecisionEngineService {
       rawSignal?: SignalResultDto;
       instrument?: any;
       portfolio?: any;
+      prices?: any[];
+      calibrated?: any | null;
+      quality?: any | null;
+      smartMoney?: any | null;
       strategyRatings?: Map<string, Promise<StrategyDecisionDto['strategyRating']>>;
     } = {}
   ): Promise<StrategyDecisionDto[]> {
@@ -357,15 +376,19 @@ export class StrategyDecisionEngineService {
       rawSignal?: SignalResultDto;
       instrument?: any;
       portfolio?: any;
+      prices?: any[];
+      calibrated?: any | null;
+      quality?: any | null;
+      smartMoney?: any | null;
     } = {}
   ): Promise<any | null> {
     const [instrument, pricesRes, rawSignal, calibrated, quality, smartMoney, marketSummary, portfolio] = await Promise.all([
       options.instrument ? Promise.resolve(options.instrument) : this.marketDataService.getInstrument(instrumentId, { region: options.region }).catch(() => null),
-      this.marketDataService.listPricesByInstrumentId(instrumentId, 500, undefined, undefined, { region: options.region }).catch(() => ({ prices: [] })),
+      options.prices !== undefined ? Promise.resolve({ prices: options.prices }) : this.marketDataService.listPricesByInstrumentId(instrumentId, 500, undefined, undefined, { region: options.region }).catch(() => ({ prices: [] })),
       options.rawSignal ? Promise.resolve(options.rawSignal) : this.signalService.latestForInstrument(instrumentId).catch(() => null),
-      this.latestPersistedCalibration(instrumentId),
-      this.latestPersistedDataQuality(instrumentId),
-      this.latestPersistedSmartMoney(instrumentId),
+      options.calibrated !== undefined ? Promise.resolve(options.calibrated) : this.latestPersistedCalibration(instrumentId),
+      options.quality !== undefined ? Promise.resolve(options.quality) : this.latestPersistedDataQuality(instrumentId),
+      options.smartMoney !== undefined ? Promise.resolve(options.smartMoney) : this.latestPersistedSmartMoney(instrumentId),
       options.marketSummary !== undefined ? Promise.resolve(options.marketSummary) : this.contextService.summary({ region: options.region }).catch(() => null),
       options.portfolio ? Promise.resolve(options.portfolio) : options.portfolioId ? this.portfolioService.getPortfolioDetail(options.portfolioId).catch(() => null) : Promise.resolve(null),
     ]);
@@ -603,6 +626,41 @@ export class StrategyDecisionEngineService {
       return service.latestPersistedSummary(region).catch(() => null);
     }
     return service.summary({ region }).catch(() => null);
+  }
+
+  private async loadEvaluationBatchContext(instrumentIds: string[], request: Pick<StrategyEvaluateRequest, 'region' | 'assetType'>): Promise<StrategyEvaluationBatchContext> {
+    const marketScope = { region: request.region, assetType: request.assetType };
+    const marketDataAny = this.marketDataService as any;
+    const calibrationAny = this.calibrationService as any;
+    const smartMoneyAny = this.smartMoneyService as any;
+    const [prices, calibrations, dataQuality, smartMoney] = await Promise.all([
+      typeof marketDataAny.listRecentPriceWindowsByInstrumentIds === 'function'
+        ? marketDataAny.listRecentPriceWindowsByInstrumentIds(instrumentIds, 500, marketScope).catch(() => new Map())
+        : Promise.resolve(new Map()),
+      typeof calibrationAny.latestPersistedForInstruments === 'function'
+        ? calibrationAny.latestPersistedForInstruments(instrumentIds).catch(() => [])
+        : Promise.resolve([]),
+      typeof (this.dataQualityService as any).getEvaluationsForInstruments === 'function'
+        ? (this.dataQualityService as any).getEvaluationsForInstruments(instrumentIds).catch(() => [])
+        : Promise.resolve([]),
+      typeof smartMoneyAny.latestPersistedStocks === 'function'
+        ? smartMoneyAny.latestPersistedStocks(instrumentIds, '3M').catch(() => [])
+        : Promise.resolve([]),
+    ]);
+    return {
+      pricesByInstrumentId: prices instanceof Map ? prices : new Map(),
+      calibrationByInstrumentId: new Map((calibrations as any[]).map((item) => [item.instrumentId, item])),
+      dataQualityByInstrumentId: new Map((dataQuality as any[]).map((item) => [item.instrumentId, item])),
+      smartMoneyByInstrumentId: new Map((smartMoney as any[]).map((item) => [item.instrumentId, item])),
+    };
+  }
+
+  private async persistDecisionBatch(decisions: StrategyDecisionDto[]): Promise<StrategyDecisionDto[]> {
+    const repositoryAny = this.repository as any;
+    if (typeof repositoryAny.replaceMany === 'function') {
+      return repositoryAny.replaceMany(decisions);
+    }
+    return Promise.all(decisions.map((decision) => this.repository.create(decision)));
   }
 
   private getEvaluationInstruments(instrumentIds: string[]) {

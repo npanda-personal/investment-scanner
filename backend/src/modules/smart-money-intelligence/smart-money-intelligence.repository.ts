@@ -61,6 +61,23 @@ export class SmartMoneyIntelligenceRepository {
     return this.mapSnapshotToSummary(row);
   }
 
+  async latestStockSnapshots(instrumentIds: string[], range: SmartMoneyRange): Promise<SmartMoneyStockSummary[]> {
+    const uniqueIds = [...new Set(instrumentIds.filter(Boolean))];
+    if (uniqueIds.length === 0) return [];
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+
+    const rows = await this.db.smartMoneyContextSnapshot.findMany({
+      where: {
+        snapshotDate: today,
+        instrumentId: { in: uniqueIds },
+        range,
+      },
+    });
+
+    return rows.map((row) => this.mapSnapshotToSummary(row));
+  }
+
   async latestSectorSnapshots(range: SmartMoneyRange, query: Pick<SmartMoneyListQuery, 'region' | 'assetType'> = {}): Promise<SectorSmartMoneySummary[]> {
      const today = new Date();
      today.setUTCHours(0, 0, 0, 0);

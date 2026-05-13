@@ -439,6 +439,64 @@ describe('SignalGenerationEngineService', () => {
     expect(result.directionCountsGenerated).toEqual({ BULLISH: 1, NEUTRAL: 1, BEARISH: 0 });
   });
 
+  it('uses batch-loaded market context and shared strategy ratings for signal runs', async () => {
+    const repository = {
+      createSignalResult: jest.fn(async (result) => ({ ...result, id: `${result.instrument_id}-signal` })),
+      ...runAuditRepository(),
+    };
+    const instruments = [
+      { id: 'stock-1', symbol: 'AAA.NS', company_name: 'AAA Ltd', sector: 'Technology', country: 'IN', currency: 'INR', asset_type: 'STOCK' },
+      { id: 'stock-2', symbol: 'BBB.NS', company_name: 'BBB Ltd', sector: 'Technology', country: 'IN', currency: 'INR', asset_type: 'STOCK' },
+    ];
+    const pricesByInstrumentId = new Map(instruments.map((instrument) => [
+      instrument.id,
+      Array.from({ length: 260 }, (_, index) => freshPrice(index, 180 - index * 0.1, 1000)),
+    ]));
+    const fundamentalsByInstrumentId = new Map(instruments.map((instrument) => [instrument.id, {
+      records: [{ eps: 3, net_income: 1000000, pe_ratio: 18, dividend_yield: 0.01, market_cap: 1000000000 }],
+    }]));
+    const marketDataService = {
+      listInstruments: jest.fn().mockResolvedValue({ instruments, pagination: { total: 2 } }),
+      getInstrumentsByIds: jest.fn().mockResolvedValue(instruments),
+      listRecentPriceWindowsByInstrumentIds: jest.fn().mockResolvedValue(pricesByInstrumentId),
+      storedFundamentalsByInstrumentIds: jest.fn().mockResolvedValue(fundamentalsByInstrumentId),
+      getInstrument: jest.fn(),
+      listPricesByInstrumentId: jest.fn(),
+      storedFundamentalsByInstrumentId: jest.fn(),
+      fundamentalsByInstrumentId: jest.fn(),
+    };
+    const strategyFrameworkService = {
+      performance: jest.fn().mockResolvedValue([{ ratingScore: 66, ratingGrade: 'GOOD', readinessLabel: 'PAPER_TEST_CANDIDATE' }]),
+    };
+    const service = new SignalGenerationEngineService(
+      repository as any,
+      marketDataService as any,
+      { workbench: jest.fn() } as any,
+      {} as any,
+      new StrategyFrameworkRegistry(),
+      strategyFrameworkService as any
+    );
+
+    const result = await service.run({
+      batchSize: 2,
+      offset: 0,
+      region: 'IN',
+      assetType: 'STOCK',
+      includeStrategyMatches: true,
+      strategyCode: 'TREND_MOMENTUM',
+      maxConcurrency: 2,
+    });
+
+    expect(result.processedCount).toBe(2);
+    expect(marketDataService.getInstrumentsByIds).toHaveBeenCalledWith(['stock-1', 'stock-2']);
+    expect(marketDataService.listRecentPriceWindowsByInstrumentIds).toHaveBeenCalledWith(['stock-1', 'stock-2'], 520, { region: 'IN', assetType: 'STOCK' });
+    expect(marketDataService.storedFundamentalsByInstrumentIds).toHaveBeenCalledWith(['stock-1', 'stock-2'], { region: 'IN', assetType: 'STOCK' });
+    expect(marketDataService.getInstrument).not.toHaveBeenCalled();
+    expect(marketDataService.listPricesByInstrumentId).not.toHaveBeenCalled();
+    expect(marketDataService.fundamentalsByInstrumentId).not.toHaveBeenCalled();
+    expect(strategyFrameworkService.performance).toHaveBeenCalledTimes(1);
+  });
+
   it('marks the last bounded batch as complete', async () => {
     const marketDataService = {
       listInstruments: jest.fn().mockResolvedValue({

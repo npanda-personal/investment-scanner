@@ -141,6 +141,10 @@ export class SmartMoneyIntelligenceService {
     return this.repository.latestStockSnapshot(instrumentId, range);
   }
 
+  async latestPersistedStocks(instrumentIds: string[], range: SmartMoneyRange = '3M'): Promise<SmartMoneyStockSummary[]> {
+    return (this.repository as any).latestStockSnapshots(instrumentIds, range);
+  }
+
   async top(query: SmartMoneyListQuery) {
     return this.repository.latestSnapshots(query, false);
   }

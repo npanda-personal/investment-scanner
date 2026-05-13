@@ -984,6 +984,7 @@ export class MarketDataFoundationService {
     const stocks = await this.repository.listStocksForUniverseHealth(scope);
     const { readinessBySymbol, statsBySymbol } = await this.universeReadinessAndStatsForStocks(stocks, scope);
     const reviewDatePolicy = this.trustedReviewDatePolicy(scope.region, now);
+    const validationWindow = this.providerValidationWindow(scope, now);
     const expectedLatestTradingDate = reviewDatePolicy.requiredDataThroughDate;
     const minLiteCount = Math.max(this.readPositiveNumber(process.env.TRUSTED_REVIEW_MIN_LITE, 100), 1);
     const minFullCount = Math.max(this.readPositiveNumber(process.env.TRUSTED_REVIEW_MIN_FULL, 300), minLiteCount);
@@ -1025,11 +1026,6 @@ export class MarketDataFoundationService {
       }
 
       providerSupportedCount += 1;
-      const historyDiagnostics = this.requiredHistoryDiagnostics(stock, this.providerValidationWindow(scope), stats);
-      if (!historyDiagnostics.requiredHistoryComplete) {
-        excludedCounts.requiredHistoryIncomplete += 1;
-        continue;
-      }
       if (!readiness.latestPriceDate) {
         excludedCounts.noLatestPrice += 1;
         continue;
@@ -1049,6 +1045,11 @@ export class MarketDataFoundationService {
       }
       if (readiness.readinessBlockers.includes('CRITICAL_CORPORATE_ACTION_PRICE_WARNING')) {
         excludedCounts.corporateActionBlocked += 1;
+        continue;
+      }
+      const historyDiagnostics = this.requiredHistoryDiagnostics(stock, validationWindow, stats);
+      if (!historyDiagnostics.requiredHistoryComplete) {
+        excludedCounts.requiredHistoryIncomplete += 1;
         continue;
       }
       if (readiness.priceHistoryBars < 252) excludedCounts.insufficientBarsUnder252 += 1;
@@ -2766,6 +2767,88 @@ export class MarketDataFoundationService {
       adjusted_close: price.adjustedClose !== null ? Number(price.adjustedClose) : Number(price.close),
       timestamp: price.timestamp,
     }));
+  }
+
+  async listRecentPriceWindowsByInstrumentIds(
+    instrumentIds: string[],
+    limit = 500,
+    _options: Pick<PaginationOptions, 'region' | 'assetType'> = {}
+  ) {
+    const uniqueIds = [...new Set(instrumentIds.filter(Boolean))];
+    if (uniqueIds.length === 0) return new Map<string, any[]>();
+
+    const stocks = await this.repository.prisma.stock.findMany({
+      where: { id: { in: uniqueIds } },
+      select: { id: true, symbol: true },
+    });
+    if (stocks.length === 0) return new Map<string, any[]>();
+
+    const safeLimit = Math.max(1, Math.min(Math.floor(Number(limit) || 500), 5000));
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - Math.max(365, safeLimit * 3));
+    const instrumentIdBySymbol = new Map(stocks.map((stock) => [stock.symbol, stock.id]));
+    const prices = await this.repository.prisma.priceTick.findMany({
+      where: {
+        symbol: { in: stocks.map((stock) => stock.symbol) },
+        timestamp: { gte: cutoff },
+      },
+      orderBy: [{ symbol: 'asc' }, { timestamp: 'desc' }],
+      select: {
+        symbol: true,
+        timestamp: true,
+        open: true,
+        high: true,
+        low: true,
+        close: true,
+        adjustedClose: true,
+        volume: true,
+        source: true,
+        ingestionTimestamp: true,
+        lastUpdatedTimestamp: true,
+        dataStatus: true,
+      },
+    });
+
+    const byInstrumentId = new Map(uniqueIds.map((id) => [id, [] as any[]]));
+    for (const price of prices) {
+      const instrumentId = instrumentIdBySymbol.get(price.symbol);
+      if (!instrumentId) continue;
+      const bucket = byInstrumentId.get(instrumentId);
+      if (!bucket || bucket.length >= safeLimit) continue;
+      bucket.push({
+        date: price.timestamp,
+        open: Number(price.open),
+        high: Number(price.high),
+        low: Number(price.low),
+        close: Number(price.close),
+        adjusted_close: price.adjustedClose !== null ? Number(price.adjustedClose) : Number(price.close),
+        volume: price.volume !== null ? Number(price.volume) : null,
+        source: price.source || 'database',
+        ingestion_timestamp: price.ingestionTimestamp instanceof Date ? price.ingestionTimestamp.toISOString() : new Date().toISOString(),
+        last_updated_timestamp: price.lastUpdatedTimestamp instanceof Date ? price.lastUpdatedTimestamp.toISOString() : new Date().toISOString(),
+        data_status: price.dataStatus || 'COMPLETE',
+      });
+    }
+    return byInstrumentId;
+  }
+
+  async storedFundamentalsByInstrumentIds(instrumentIds: string[], _options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
+    const uniqueIds = [...new Set(instrumentIds.filter(Boolean))];
+    if (uniqueIds.length === 0) return new Map<string, any>();
+    const stocks = await this.repository.prisma.stock.findMany({
+      where: { id: { in: uniqueIds } },
+    });
+    const records = await this.repository.prisma.fundamental.findMany({
+      where: { stockId: { in: stocks.map((stock) => stock.id) } },
+      orderBy: [{ stockId: 'asc' }, { periodEndDate: 'desc' }],
+    });
+    const recordsByStockId = new Map<string, any[]>();
+    for (const record of records) {
+      const bucket = recordsByStockId.get(record.stockId) || [];
+      bucket.push(record);
+      recordsByStockId.set(record.stockId, bucket);
+    }
+    return new Map(stocks.map((stock) => [stock.id, this.formatFundamentalsResponse(stock, recordsByStockId.get(stock.id) || [])]));
   }
 
   async createInstrument(data: V1CreateInstrumentRequest) {
@@ -5366,8 +5449,8 @@ export class MarketDataFoundationService {
     return Number.isFinite(numeric) ? numeric : null;
   }
 
-  private providerValidationWindow(scope: { region: string; assetType: string }) {
-    const latestCompletedEodDate = latestCompletedTradingDateForRegion(scope.region);
+  private providerValidationWindow(scope: { region: string; assetType: string }, now = new Date()) {
+    const latestCompletedEodDate = latestCompletedTradingDateForRegion(scope.region, now);
     const endDate = latestCompletedEodDate ? this.endOfTradingDateUtc(latestCompletedEodDate) : new Date();
     const startDate = new Date(endDate);
     startDate.setUTCDate(startDate.getUTCDate() - (scope.region === 'IN' && scope.assetType === 'STOCK' ? 45 : 30));

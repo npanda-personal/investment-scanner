@@ -60,6 +60,7 @@ type BatchLookupCache = {
   qualityMetrics: BatchQualityMetrics;
   dataQualityEvaluationsByInstrumentId?: Map<string, DataQualityEvaluationDto>;
   historicalContextLookups: Map<string, Promise<any | null>>;
+  skipHistoricalContext?: boolean;
 };
 
 type CalibrationRunItemOutcome =
@@ -89,6 +90,14 @@ export class SignalCalibrationEngineService {
   async latestPersistedForInstrument(instrumentId: string): Promise<SignalCalibrationResultDto | null> {
     const existing = await this.repository.latestForInstrument(instrumentId);
     return existing ? this.withEvidenceFromSummary(existing, DEFAULT_HORIZON, null) : null;
+  }
+
+  async latestPersistedForInstruments(instrumentIds: string[]): Promise<SignalCalibrationResultDto[]> {
+    const repositoryAny = this.repository as any;
+    const existing = typeof repositoryAny.latestForInstruments === 'function'
+      ? await repositoryAny.latestForInstruments(instrumentIds).catch(() => [])
+      : [];
+    return (existing as SignalCalibrationResultDto[]).map((item) => this.withEvidenceFromSummary(item, DEFAULT_HORIZON, null));
   }
 
   async compare(instrumentId: string, region?: string, assetType?: string, horizonInput?: string): Promise<CalibrationComparison | null> {
@@ -127,11 +136,13 @@ export class SignalCalibrationEngineService {
     const summaryQuery = { horizon, limit: 1, minSampleSize: 0, sector: request.sector, country: request.country, region: request.region, assetType: request.assetType };
     const qualityWarning = 'Signal Quality diagnostics unavailable; using raw score because calibration evidence is missing.';
     const globalSummary = await this.qualityService.summary(summaryQuery).catch(() => null);
-    const batchQualityMetrics = await this.batchQualityMetrics(summaryQuery);
+    const skipCalibrationEvidenceWork = this.shouldSkipCalibrationEvidenceWork(globalSummary, horizon);
+    const batchQualityMetrics = skipCalibrationEvidenceWork ? this.emptyQualityMetrics() : await this.batchQualityMetrics(summaryQuery);
     const batchLookupCache: BatchLookupCache = {
       qualityMetrics: batchQualityMetrics,
       dataQualityEvaluationsByInstrumentId: await this.batchDataQualityEvaluations(signals),
       historicalContextLookups: new Map(),
+      skipHistoricalContext: skipCalibrationEvidenceWork,
     };
 
     const outcomes = await this.mapWithConcurrency(signals, this.runConcurrency(signals.length, request), async (signal): Promise<CalibrationRunItemOutcome> => {
@@ -531,6 +542,16 @@ export class SignalCalibrationEngineService {
     return { byType, byScore, bySector, noisy, signalTypeMetrics, scoreBucketMetrics, sectorMetrics, noisyIssueTypesByInstrumentId };
   }
 
+  private emptyQualityMetrics(): BatchQualityMetrics {
+    return this.prepareQualityMetrics([], [], [], []);
+  }
+
+  private shouldSkipCalibrationEvidenceWork(globalSummary: any, horizon: QualityHorizon): boolean {
+    if (!globalSummary) return true;
+    const evaluatedForHorizon = Number(globalSummary?.horizonAvailability?.[horizon]?.evaluated ?? globalSummary?.evaluationDiagnostics?.evaluatedSignals ?? 0);
+    return !Number.isFinite(evaluatedForHorizon) || evaluatedForHorizon <= 0;
+  }
+
   private async batchDataQualityEvaluations(signals: SignalResultDto[]): Promise<Map<string, DataQualityEvaluationDto> | undefined> {
     const instrumentIds = [...new Set(signals.map((signal) => signal.instrument_id).filter(Boolean))];
     const serviceAny = this.dataQualityService as any;
@@ -547,6 +568,7 @@ export class SignalCalibrationEngineService {
   }
 
   private historicalContextLookup(signal: SignalResultDto, batchLookupCache?: BatchLookupCache): Promise<any | null> {
+    if (batchLookupCache?.skipHistoricalContext) return Promise.resolve(null);
     const date = new Date(signal.generated_at);
     const filters = { instrumentId: signal.instrument_id, sector: signal.sector || undefined, country: signal.country || undefined };
     if (!batchLookupCache) return this.contextService.lookup(date, 7, filters).catch(() => null);
