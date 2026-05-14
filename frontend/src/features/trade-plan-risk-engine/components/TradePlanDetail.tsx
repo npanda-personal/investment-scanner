@@ -7,6 +7,7 @@ import { useMarketScope } from '@/contexts/MarketScopeContext';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 const fmtPercent = (value: number | null | undefined) => value === null || value === undefined ? 'N/A' : `${(value * 100).toFixed(1)}%`;
 const fmtNumber = (value: number | null | undefined) => value === null || value === undefined ? 'N/A' : value.toFixed(2);
@@ -101,6 +102,10 @@ export const TradePlanDetail: React.FC = () => {
 
   return (
     <Box>
+      <Button startIcon={<ArrowBackIcon />} component={Link} to="/trade-plans" sx={{ mb: 2 }}>
+        Back to Trade Plans
+      </Button>
+
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="h4">Trade Plan: {plan.symbol}</Typography>
         <Button variant="outlined" onClick={handleGenerate} disabled={generating}>

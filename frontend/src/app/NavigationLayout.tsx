@@ -21,80 +21,16 @@ import {
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import InventoryIcon from '@mui/icons-material/Inventory';
-import InsightsIcon from '@mui/icons-material/Insights';
-import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
-import StarBorderIcon from '@mui/icons-material/StarBorder';
-import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
-import PublicIcon from '@mui/icons-material/Public';
-import TimelineIcon from '@mui/icons-material/Timeline';
-import AccountTreeIcon from '@mui/icons-material/AccountTree';
-import PsychologyIcon from '@mui/icons-material/Psychology';
-import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
-import MarkEmailReadIcon from '@mui/icons-material/MarkEmailRead';
-import FactCheckIcon from '@mui/icons-material/FactCheck';
-import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
-import TuneIcon from '@mui/icons-material/Tune';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import { useThemeMode } from './ThemeContext';
 import { useAuthIdentity } from '@/features/auth-identity';
 import { MarketScopeSelector } from '@/shared/components/MarketScopeSelector';
+import { isNavItemActive, navGroups, resolveNavItem } from './navigationMetadata';
 
 const drawerWidth = 260;
 const collapsedWidth = 72;
-
-const navGroups = [
-  {
-    group: 'Overview',
-    items: [
-      { path: '/today-review', label: 'Today’s Review', icon: <CalendarMonthIcon /> },
-      { path: '/', label: 'Dashboard', icon: <DashboardIcon /> },
-      { path: '/market-data-foundation', label: 'Market Data Foundation', icon: <InventoryIcon /> },
-    ],
-  },
-  {
-    group: 'Research',
-    items: [
-      { path: '/research', label: 'Overview', icon: <DashboardIcon /> },
-      { path: '/signals', label: 'Raw Signals', icon: <InsightsIcon /> },
-      { path: '/strategies', label: 'Strategies', icon: <AccountTreeIcon /> },
-      { path: '/strategy', label: 'Strategy', icon: <FactCheckIcon /> },
-      { path: '/smart-money', label: 'Smart Money', icon: <AccountTreeIcon /> },
-      { path: '/market-context', label: 'Market Context', icon: <PublicIcon /> },
-    ],
-  },
-  {
-    group: 'Portfolio',
-    items: [
-      { path: '/portfolios', label: 'Portfolios', icon: <AccountBalanceWalletIcon /> },
-      { path: '/trade-plans', label: 'Trade Plans', icon: <FactCheckIcon /> },
-      { path: '/watchlists', label: 'Watchlists', icon: <StarBorderIcon /> },
-      { path: '/alerts', label: 'Alerts', icon: <NotificationsNoneIcon /> },
-    ],
-  },
-  {
-    group: 'Intelligence Lab',
-    items: [
-      { path: '/signals/quality', label: 'Signal Quality', icon: <FactCheckIcon /> },
-      { path: '/signals/calibration', label: 'Signal Calibration', icon: <TuneIcon /> },
-      { path: '/data-quality', label: 'Data Quality', icon: <FactCheckIcon /> },
-      { path: '/backtests', label: 'Backtests', icon: <TimelineIcon /> },
-      { path: '/context-snapshots', label: 'Context Snapshots', icon: <CalendarMonthIcon /> },
-    ],
-  },
-  {
-    group: 'Account',
-    items: [
-      { path: '/copilot', label: 'AI Copilot', icon: <PsychologyIcon /> },
-      { path: '/billing', label: 'Billing', icon: <WorkspacePremiumIcon /> },
-      { path: '/notifications', label: 'Notifications', icon: <MarkEmailReadIcon /> },
-      { path: '/account', label: 'Account', icon: <AccountCircleIcon /> },
-    ],
-  },
-];
 
 export default function NavigationLayout() {
   const theme = useTheme();
@@ -105,7 +41,7 @@ export default function NavigationLayout() {
   const location = useLocation();
 
   const handleDrawerToggle = () => setOpen(!open);
-  const activeLabel = navGroups.flatMap(g => g.items).find((item) => item.path === location.pathname)?.label || 'Investment Scanner';
+  const activeLabel = resolveNavItem(location.pathname)?.label || 'Investment Scanner';
 
   const drawer = (
     <>
@@ -129,7 +65,7 @@ export default function NavigationLayout() {
               </Typography>
             )}
             {group.items.map((item) => {
-              const isActive = location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path));
+              const isActive = isNavItemActive(location.pathname, item);
               return (
                 <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }}>
                   <ListItemButton component={Link} to={item.path} selected={isActive} sx={{ borderRadius: 2, py: 1 }}>

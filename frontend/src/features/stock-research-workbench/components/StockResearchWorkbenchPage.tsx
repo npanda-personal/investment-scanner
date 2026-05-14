@@ -104,8 +104,8 @@ const StockResearchWorkbenchPage: React.FC = () => {
 
   return (
     <Box sx={{ p: 3, maxWidth: 1500, mx: 'auto' }}>
-      <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(`/market-data-foundation/${overview.instrument_id}`)} sx={{ mb: 2 }}>
-        Back to Market Data
+      <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/research')} sx={{ mb: 2 }}>
+        Back to Research Command Center
       </Button>
 
       <Paper sx={{ p: 3, mb: 3 }}>
