@@ -24,6 +24,7 @@ describe('data quality engine validation', () => {
       offset: 8,
     });
     expect(parseDataQualityEvaluateRequest({ batchSize: 0 })).toMatchObject({ batchSize: 1, offset: 0 });
+    expect(parseDataQualityEvaluateRequest({ batchSize: '-500', offset: '-20' })).toMatchObject({ batchSize: 1, offset: 0 });
   });
 
   it('requires instrument id', () => {

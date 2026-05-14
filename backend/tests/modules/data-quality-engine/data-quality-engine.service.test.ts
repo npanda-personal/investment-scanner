@@ -52,13 +52,66 @@ function service(overrides: Record<string, any> = {}) {
 
 describe('data quality engine service', () => {
   it('calculates strong coverage, readiness, liquidity, and eligibility', () => {
-    const result = service().instance.evaluateInstrument(instrument(), prices(260), prices(1)[0], [{ eps: 1 }], [{ action_type: 'dividend' }], true);
+    const result = service().instance.evaluateInstrument(
+      instrument({
+        required_history_status: 'COMPLETE',
+        listing_date_status: 'PRESENT_OLDER_THAN_15Y_USED_15Y',
+      }),
+      prices(260),
+      prices(1)[0],
+      [{ eps: 1 }],
+      [{ action_type: 'dividend' }],
+      true
+    );
     expect(result.coverageStatus).toBe('GOOD');
     expect(result.signalReadinessStatus).toBe('READY');
     expect(result.liquidityStatus).toBe('LIQUID');
     expect(result.eligibleForSignals).toBe(true);
     expect(result.eligibleForBacktesting).toBe(true);
     expect(result.eligibleForCalibration).toBe(true);
+    expect(result.useCaseTiers?.dailyReview.status).toBe('READY');
+    expect(result.useCaseTiers?.signal.status).toBe('READY');
+    expect(result.useCaseTiers?.backtest.status).toBe('READY');
+    expect(result.useCaseTiers?.calibration.status).toBe('READY');
+    expect(result.useCaseTiers?.automation).toMatchObject({
+      status: 'BLOCKED',
+      reasons: ['PHASE0_AUTOMATION_NOT_AUTHORIZED'],
+    });
+  });
+
+  it('fails closed when high-score instruments have no trusted-baseline fields', () => {
+    const result = service().instance.evaluateInstrument(
+      instrument(),
+      prices(260),
+      prices(1)[0],
+      [{ eps: 1 }],
+      [{ action_type: 'dividend' }],
+      true
+    );
+
+    expect(result.signalReadinessStatus).toBe('READY');
+    expect(result.eligibleForBacktesting).toBe(true);
+    expect(result.eligibleForCalibration).toBe(true);
+    expect(result.useCaseTiers?.dailyReview).toMatchObject({
+      status: 'LIMITED',
+      reasons: expect.arrayContaining(['TRUST_CONTEXT_MISSING', 'LISTING_DATE_CONFIDENCE_MISSING']),
+    });
+    expect(result.useCaseTiers?.signal).toMatchObject({
+      status: 'LIMITED',
+      reasons: expect.arrayContaining(['TRUST_CONTEXT_MISSING', 'LISTING_DATE_CONFIDENCE_MISSING']),
+    });
+    expect(result.useCaseTiers?.backtest).toMatchObject({
+      status: 'BLOCKED',
+      reasons: expect.arrayContaining(['TRUST_CONTEXT_MISSING', 'LISTING_DATE_CONFIDENCE_MISSING']),
+    });
+    expect(result.useCaseTiers?.calibration).toMatchObject({
+      status: 'BLOCKED',
+      reasons: expect.arrayContaining(['TRUST_CONTEXT_MISSING', 'LISTING_DATE_CONFIDENCE_MISSING']),
+    });
+    expect(result.useCaseTiers?.automation).toMatchObject({
+      status: 'BLOCKED',
+      reasons: ['PHASE0_AUTOMATION_NOT_AUTHORIZED'],
+    });
   });
 
   it('detects missing metadata, stale price, poor history, and missing volume', () => {
@@ -186,5 +239,35 @@ describe('data quality engine service', () => {
     expect(result.eligibleInstrumentIds).toEqual(['ready']);
     expect(result.excludedInstrumentIds).toEqual(['blocked', 'missing']);
     expect(result.missingQualityEvaluationCount).toBe(1);
+  });
+
+  it('keeps daily review limited while blocking backtest and calibration on shallow trusted-baseline history', () => {
+    const result = service().instance.evaluateInstrument(
+      instrument({
+        required_history_status: 'INCOMPLETE',
+        listing_date_status: 'MISSING_USED_15_YEAR_TARGET',
+      }),
+      prices(260),
+      prices(1)[0],
+      [{ eps: 1 }],
+      [{ action_type: 'dividend' }],
+      true
+    );
+
+    expect(result.eligibleForBacktesting).toBe(true);
+    expect(result.eligibleForCalibration).toBe(true);
+    expect(result.useCaseTiers?.dailyReview.status).toBe('LIMITED');
+    expect(result.useCaseTiers?.backtest).toMatchObject({
+      status: 'BLOCKED',
+      reasons: expect.arrayContaining(['TRUSTED_BASELINE_HISTORY_INCOMPLETE', 'LISTING_DATE_CONFIDENCE_MISSING']),
+    });
+    expect(result.useCaseTiers?.calibration).toMatchObject({
+      status: 'BLOCKED',
+      reasons: expect.arrayContaining(['TRUSTED_BASELINE_HISTORY_INCOMPLETE', 'LISTING_DATE_CONFIDENCE_MISSING']),
+    });
+    expect(result.useCaseTiers?.automation).toMatchObject({
+      status: 'BLOCKED',
+      reasons: ['PHASE0_AUTOMATION_NOT_AUTHORIZED'],
+    });
   });
 });

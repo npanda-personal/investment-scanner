@@ -2,6 +2,28 @@ export type CoverageStatus = 'GOOD' | 'PARTIAL' | 'POOR' | 'UNUSABLE';
 export type SignalReadinessStatus = 'READY' | 'LIMITED' | 'NOT_READY';
 export type LiquidityStatus = 'LIQUID' | 'THIN' | 'ILLIQUID' | 'UNKNOWN';
 export type DataQualityStatus = CoverageStatus | SignalReadinessStatus | LiquidityStatus;
+export type DataQualityUseCaseTierStatus = 'READY' | 'LIMITED' | 'BLOCKED';
+
+export interface DataQualityUseCaseTier {
+  status: DataQualityUseCaseTierStatus;
+  reasons: string[];
+}
+
+export interface DataQualityUseCaseTiers {
+  dailyReview: DataQualityUseCaseTier;
+  signal: DataQualityUseCaseTier;
+  backtest: DataQualityUseCaseTier;
+  calibration: DataQualityUseCaseTier;
+  automation: DataQualityUseCaseTier;
+}
+
+export interface DataQualityTierEvidence {
+  trustedBaselineResidualState?: string | null;
+  requiredHistoryStatus?: string | null;
+  listingDateStatus?: string | null;
+  trustedBaselineBlockerCodes?: string[];
+  hasSignalHistory?: boolean;
+}
 
 export interface DataQualityQuery {
   search?: string;
@@ -54,6 +76,8 @@ export interface DataQualityEvaluationDto {
   readinessReasons: string[];
   readinessBlockers: string[];
   recommendedFixes: string[];
+  useCaseTiers?: DataQualityUseCaseTiers;
+  tierEvidence?: DataQualityTierEvidence;
   lastEvaluatedAt: string;
   researchUrl: string;
 }
