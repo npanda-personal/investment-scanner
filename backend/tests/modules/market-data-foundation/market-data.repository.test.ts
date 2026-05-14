@@ -231,6 +231,51 @@ describe('MarketDataFoundationRepository', () => {
     }));
   });
 
+  it('uses a set-based timestamp query for scoped latest data timestamp', async () => {
+    const latestDate = new Date('2026-05-12T00:00:00.000Z');
+    const prisma = {
+      stock: {
+        findMany: jest.fn(),
+      },
+      priceTick: {
+        findFirst: jest.fn(),
+      },
+      $queryRaw: jest.fn().mockResolvedValue([{ timestamp: latestDate }]),
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    const result = await repository.latestDataTimestamp({ region: 'IN', assetType: 'STOCK' });
+
+    expect(result).toBe(latestDate);
+    expect(prisma.stock.findMany).not.toHaveBeenCalled();
+    expect(prisma.priceTick.findFirst).not.toHaveBeenCalled();
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    const query = prisma.$queryRaw.mock.calls[0][0];
+    expect(query.text).toContain('MAX(price_ticks.timestamp)');
+    expect(query.text).toContain('INNER JOIN stocks ON stocks.symbol = price_ticks.symbol');
+    expect(query.text).toContain('UPPER(stocks."assetType") IN');
+    expect(query.text).toContain('stocks."assetType" IS NULL');
+    expect(query.text).toContain('stocks.symbol ILIKE');
+  });
+
+  it('derives latest stored trading date from the set-based timestamp query', async () => {
+    const prisma = {
+      stock: {
+        findMany: jest.fn(),
+      },
+      priceTick: {
+        findFirst: jest.fn(),
+      },
+      $queryRaw: jest.fn().mockResolvedValue([{ timestamp: new Date('2026-05-12T00:00:00.000Z') }]),
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await expect(repository.latestStoredTradingDateForRegion('IN', 'STOCK')).resolves.toBe('2026-05-12');
+    expect(prisma.stock.findMany).not.toHaveBeenCalled();
+    expect(prisma.priceTick.findFirst).not.toHaveBeenCalled();
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+
   it('groups repair states by stock id for trusted baseline classification', async () => {
     const prisma = {
       marketDataRepairState: {
@@ -305,12 +350,13 @@ describe('MarketDataFoundationRepository', () => {
     expect(prisma.priceTick.findMany).not.toHaveBeenCalled();
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
     const qualityQuery = prisma.$queryRaw.mock.calls[0][0];
-    expect(qualityQuery.text).toContain('ROW_NUMBER() OVER (PARTITION BY recent.symbol ORDER BY recent.timestamp DESC)');
-    expect(qualityQuery.text).toContain('LAG(recent.timestamp) OVER (PARTITION BY recent.symbol ORDER BY recent.timestamp DESC)');
+    expect(qualityQuery.text).toContain('ORDER BY price_ticks.timestamp ASC');
+    expect(qualityQuery.text).toContain('ROW_NUMBER() OVER (ORDER BY sampled.timestamp DESC)');
+    expect(qualityQuery.text).toContain('LAG(sampled.timestamp) OVER (ORDER BY sampled.timestamp DESC)');
     expect(qualityQuery.text).toContain('CROSS JOIN LATERAL');
     expect(qualityQuery.text).toContain('FROM price_ticks');
     expect(qualityQuery.text).toContain('LIMIT $3');
-    expect(qualityQuery.text).toContain('ORDER BY aggregates.symbol ASC');
+    expect(qualityQuery.text).toContain('ORDER BY input_symbols.symbol ASC');
     expect(qualityQuery.values).toEqual(['READY.NS', 'CATALOG.NS', 252]);
   });
 

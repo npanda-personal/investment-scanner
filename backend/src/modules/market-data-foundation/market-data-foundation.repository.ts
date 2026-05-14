@@ -21,7 +21,7 @@ import type {
 } from './market-data-foundation.types';
 import { partitionHistoricalPrices } from './market-data-foundation.validation';
 import type { YahooFinanceIngestionService } from './market-data-foundation.provider';
-import { resolveMarketRegionFilter } from '../../shared/utils/market-scope';
+import { normalizeMarketRegion, resolveMarketRegionFilter } from '../../shared/utils/market-scope';
 import { knownNseFnoStockUnderlyingSymbols } from './market-data-foundation.fno-underlyings';
 import { STANDARD_REVIEW_MIN_BARS, type UniversePriceStats } from './market-data-foundation.universe';
 
@@ -530,18 +530,14 @@ export class MarketDataFoundationRepository {
   }
 
   async latestDataTimestamp(options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
-    const stocks = await this.prisma.stock.findMany({
-      where: this.stockWhere(options),
-      select: { symbol: true },
-    });
-    const symbols = stocks.map((stock) => stock.symbol);
-    const latestPrice = await this.prisma.priceTick.findFirst({
-      where: symbols.length > 0 ? { symbol: { in: symbols } } : undefined,
-      orderBy: { timestamp: 'desc' },
-      select: { timestamp: true },
-    });
+    const rows = await this.prisma.$queryRaw<Array<{ timestamp: Date | null }>>(Prisma.sql`
+      SELECT MAX(price_ticks.timestamp) AS timestamp
+      FROM price_ticks
+      INNER JOIN stocks ON stocks.symbol = price_ticks.symbol
+      WHERE ${this.scopedStockSqlWhere(options)}
+    `);
 
-    return latestPrice?.timestamp ?? null;
+    return rows[0]?.timestamp ?? null;
   }
 
   listStocksForUniverseHealth(options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
@@ -1183,15 +1179,18 @@ export class MarketDataFoundationRepository {
       WITH input_symbols(symbol) AS (
         SELECT unnest(ARRAY[${Prisma.join(symbols)}]::text[])
       ),
-      aggregates AS (
+      oldest AS (
         SELECT
-          price_ticks.symbol,
-          COUNT(*)::int AS "priceHistoryBars",
-          MIN(price_ticks.timestamp) AS "firstTimestamp",
-          MAX(price_ticks.timestamp) AS "latestTimestamp"
-        FROM price_ticks
-        INNER JOIN input_symbols ON input_symbols.symbol = price_ticks.symbol
-        GROUP BY price_ticks.symbol
+          input_symbols.symbol,
+          first_price.timestamp AS "firstTimestamp"
+        FROM input_symbols
+        LEFT JOIN LATERAL (
+          SELECT price_ticks.timestamp
+          FROM price_ticks
+          WHERE price_ticks.symbol = input_symbols.symbol
+          ORDER BY price_ticks.timestamp ASC
+          LIMIT 1
+        ) first_price ON TRUE
       ),
       recent_ranked AS (
         SELECT
@@ -1200,25 +1199,32 @@ export class MarketDataFoundationRepository {
           recent.volume,
           recent."adjustedClose",
           recent.close,
-          ROW_NUMBER() OVER (PARTITION BY recent.symbol ORDER BY recent.timestamp DESC) AS row_num,
-          LAG(recent.timestamp) OVER (PARTITION BY recent.symbol ORDER BY recent.timestamp DESC) AS previous_timestamp
+          recent.row_num,
+          recent.previous_timestamp
         FROM input_symbols
         CROSS JOIN LATERAL (
           SELECT
-            price_ticks.symbol,
-            price_ticks.timestamp,
-            price_ticks.volume,
-            price_ticks."adjustedClose",
-            price_ticks.close
-          FROM price_ticks
-          WHERE price_ticks.symbol = input_symbols.symbol
-          ORDER BY price_ticks.timestamp DESC
-          LIMIT ${STANDARD_REVIEW_MIN_BARS}
+            sampled.*,
+            ROW_NUMBER() OVER (ORDER BY sampled.timestamp DESC) AS row_num,
+            LAG(sampled.timestamp) OVER (ORDER BY sampled.timestamp DESC) AS previous_timestamp
+          FROM (
+            SELECT
+              price_ticks.symbol,
+              price_ticks.timestamp,
+              price_ticks.volume,
+              price_ticks."adjustedClose",
+              price_ticks.close
+            FROM price_ticks
+            WHERE price_ticks.symbol = input_symbols.symbol
+            ORDER BY price_ticks.timestamp DESC
+            LIMIT ${STANDARD_REVIEW_MIN_BARS}
+          ) sampled
         ) recent
       ),
       latest AS (
         SELECT
           symbol,
+          timestamp AS "latestTimestamp",
           volume AS "latestVolume",
           "adjustedClose" AS "latestAdjustedClose",
           close AS "latestClose"
@@ -1239,10 +1245,10 @@ export class MarketDataFoundationRepository {
         GROUP BY symbol
       )
       SELECT
-        aggregates.symbol,
-        aggregates."priceHistoryBars",
-        aggregates."firstTimestamp",
-        aggregates."latestTimestamp",
+        input_symbols.symbol,
+        COALESCE(quality."rollingWindowBars", 0)::int AS "priceHistoryBars",
+        oldest."firstTimestamp",
+        latest."latestTimestamp",
         latest."latestVolume",
         latest."latestAdjustedClose",
         latest."latestClose",
@@ -1250,10 +1256,11 @@ export class MarketDataFoundationRepository {
         COALESCE(quality."volumeRows", 0)::int AS "volumeRows",
         COALESCE(quality."adjustedCloseRows", 0)::int AS "adjustedCloseRows",
         COALESCE(quality."maxPriceGapDays", 0)::float AS "maxPriceGapDays"
-      FROM aggregates
-      LEFT JOIN latest ON latest.symbol = aggregates.symbol
-      LEFT JOIN quality ON quality.symbol = aggregates.symbol
-      ORDER BY aggregates.symbol ASC
+      FROM input_symbols
+      LEFT JOIN oldest ON oldest.symbol = input_symbols.symbol
+      LEFT JOIN latest ON latest.symbol = input_symbols.symbol
+      LEFT JOIN quality ON quality.symbol = input_symbols.symbol
+      ORDER BY input_symbols.symbol ASC
     `);
   }
 
@@ -1421,18 +1428,8 @@ export class MarketDataFoundationRepository {
   }
 
   async latestStoredTradingDateForRegion(region: string, assetType: string): Promise<string | null> {
-    const stocks = await this.prisma.stock.findMany({
-      where: this.stockWhere({ region, assetType }),
-      select: { symbol: true },
-    });
-    const symbols = stocks.map((stock) => stock.symbol);
-    if (symbols.length === 0) return null;
-    const latest = await this.prisma.priceTick.findFirst({
-      where: { symbol: { in: symbols } },
-      orderBy: { timestamp: 'desc' },
-      select: { timestamp: true },
-    });
-    return latest?.timestamp.toISOString().slice(0, 10) ?? null;
+    const latest = await this.latestDataTimestamp({ region, assetType });
+    return latest?.toISOString().slice(0, 10) ?? null;
   }
 
   async getSyncState(
@@ -2025,6 +2022,67 @@ export class MarketDataFoundationRepository {
         { [field]: { equals: 'NULL', mode: 'insensitive' } } as Prisma.StockWhereInput,
       ],
     };
+  }
+
+  private scopedStockSqlWhere(options: Pick<PaginationOptions, 'region' | 'assetType'> = {}): Prisma.Sql {
+    const filters: Prisma.Sql[] = [];
+    const normalizedRegion = normalizeMarketRegion(options.region);
+    if (normalizedRegion) {
+      switch (normalizedRegion) {
+        case 'IN':
+          filters.push(Prisma.sql`(
+            stocks.region = ${'IN'}
+            OR UPPER(stocks.country) IN (${Prisma.join(['IN', 'INDIA'])})
+            OR UPPER(stocks.exchange) IN (${Prisma.join(['NSE', 'BSE'])})
+          )`);
+          break;
+        case 'US':
+          filters.push(Prisma.sql`(
+            stocks.region = ${'US'}
+            OR UPPER(stocks.country) IN (${Prisma.join(['US', 'USA', 'UNITED STATES'])})
+            OR UPPER(stocks.exchange) IN (${Prisma.join(['NASDAQ', 'NYSE', 'AMEX'])})
+          )`);
+          break;
+        case 'EU':
+          filters.push(Prisma.sql`(
+            stocks.region = ${'EU'}
+            OR UPPER(stocks.country) IN (${Prisma.join(['UK', 'UNITED KINGDOM', 'DE', 'GERMANY', 'FR', 'FRANCE', 'IT', 'ITALY', 'ES', 'SPAIN', 'NL', 'NETHERLANDS'])})
+            OR UPPER(stocks.exchange) IN (${Prisma.join(['LSE', 'XETRA', 'EURONEXT', 'BME'])})
+          )`);
+          break;
+        default:
+          filters.push(Prisma.sql`stocks.region = ${normalizedRegion}`);
+          break;
+      }
+    }
+
+    const normalizedAssetType = options.assetType?.trim().toUpperCase();
+    if (normalizedAssetType) {
+      if (normalizedAssetType === 'STOCK' || normalizedAssetType === 'EQUITY') {
+        filters.push(Prisma.sql`(
+          (
+            UPPER(stocks."assetType") IN (${Prisma.join(['STOCK', 'EQUITY'])})
+            OR stocks."assetType" IS NULL
+          )
+          AND NOT (
+            stocks.symbol ILIKE ${'%FUT%'}
+            OR stocks.name ILIKE ${'%future%'}
+          )
+        )`);
+      } else if (normalizedAssetType === 'FUTURE' || normalizedAssetType === 'FUTURES') {
+        filters.push(Prisma.sql`(
+          UPPER(stocks."assetType") IN (${Prisma.join(['FUTURE', 'FUTURES'])})
+          OR stocks.symbol ILIKE ${'%FUT%'}
+          OR stocks.name ILIKE ${'%future%'}
+        )`);
+      } else if (normalizedAssetType === 'FOREX' || normalizedAssetType === 'FX' || normalizedAssetType === 'CURRENCY') {
+        filters.push(Prisma.sql`UPPER(stocks."assetType") IN (${Prisma.join(['FOREX', 'FX', 'CURRENCY'])})`);
+      } else {
+        filters.push(Prisma.sql`UPPER(stocks."assetType") = ${normalizedAssetType}`);
+      }
+    }
+
+    return filters.length > 0 ? Prisma.join(filters, ' AND ') : Prisma.sql`TRUE`;
   }
 
   private stockWhere(options: Pick<PaginationOptions, 'region' | 'assetType' | 'instrumentSegment'>): Prisma.StockWhereInput {

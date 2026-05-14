@@ -89,6 +89,8 @@ model Stock {
   marketDataRepairAttempts      MarketDataRepairAttempt[]
   marketDataRepairStates        MarketDataRepairState[]
 
+  @@index([region, assetType, symbol], map: "stocks_region_assetType_symbol_idx")
+  @@index([region, assetType, providerSupportStatus, isActive, isDelisted], map: "stocks_region_assetType_providerSupport_active_delisted_idx")
   @@map("stocks")
 }
 
