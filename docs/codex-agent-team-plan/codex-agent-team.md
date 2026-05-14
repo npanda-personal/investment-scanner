@@ -916,6 +916,7 @@ Each agent finishes with a handoff that another agent can act on without guessin
 14. **Senior Fullstack Lead checks in accepted work**
     Stage only the accepted requirement's scoped files, including task-owned docs and evidence, commit them, push to `origin` on the active branch, and record GitHub check-in evidence before marking the item released.
     Leave unrelated future-backlog docs, preimplementation discovery, rejected work, and unaccepted scope unstaged until those items are accepted through their own flow.
+    If Git check-in fails because `.git/index.lock` cannot be created or removed and idle `git.exe` processes are present, the Orchestrator is authorized to stop all `git.exe` processes and retry the scoped Git command. This is a standing recovery rule for this workspace; do not pause for repeated approval on the same Git index issue.
 
 ## Anti-Blocking Policy
 

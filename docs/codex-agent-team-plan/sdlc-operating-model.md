@@ -241,6 +241,7 @@ GitHub check-in rules:
 - Do not stage unrelated local changes, rejected work, unaccepted requirements, secrets, `.env` files, database dumps, generated artifacts, or build outputs unless explicitly part of the accepted requirement.
 - Push the commit to `origin` on the active branch.
 - Move the work item from `GitHub Check-In` to `Released` only after the push succeeds and rollback notes are recorded.
+- If Git check-in fails with `.git/index.lock` creation/removal permission errors and idle `git.exe` processes are present, the Senior Fullstack Lead / Orchestrator may stop all `git.exe` processes and retry the scoped Git command without another approval loop. This standing rule applies only to this recurring Git index issue; scoped staging and unrelated-change exclusions still apply.
 
 Rollback does not need to be enterprise-grade, but it must be explicit:
 
