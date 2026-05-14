@@ -19,6 +19,7 @@ import type React from 'react';
 import { Link as RouterLink, useParams } from 'react-router-dom';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { useTodayReviewCandidate } from '../hooks/useTodayReview';
+import type { TodayReviewCandidateDataQualitySnapshot } from '../types';
 
 export function TodayReviewCandidateDetailPage() {
   const { candidateId } = useParams();
@@ -54,9 +55,11 @@ export function TodayReviewCandidateDetailPage() {
   const plan = candidate.tradePlanSnapshot as any;
   const proof = candidate.strategyProofSnapshot as any;
   const market = candidate.marketContextSnapshot as any;
-  const dataQuality = candidate.dataQualitySnapshot as any;
+  const dataQuality = candidate.dataQualitySnapshot as TodayReviewCandidateDataQualitySnapshot | null;
   const signals = candidate.sourceSignalSnapshot as any;
   const explainability = candidate.explainability;
+  const dqTierContext = detailTierContext(dataQuality);
+  const confidence = detailConfidenceDisplay(candidate.confidenceScore, dqTierContext.missingTierContext);
 
   return (
     <Stack spacing={3}>
@@ -78,7 +81,7 @@ export function TodayReviewCandidateDetailPage() {
             <Grid container spacing={2}>
               <Fact label="Direction" value={stateLabel(candidate.direction)} />
               <Fact label="Setup type" value={candidate.setupType || candidate.strategyCode} />
-              <Fact label="Confidence score" value={String(candidate.confidenceScore)} />
+              <Fact label="Confidence score (conservative view)" value={confidence} />
               <Fact label="Preferred entry zone" value={formatEntry(plan)} />
               <Fact label="Stop / invalidation" value={formatStop(plan)} />
               <Fact label="Target 1 / Target 2 or reward range" value={formatTarget(plan)} />
@@ -95,6 +98,19 @@ export function TodayReviewCandidateDetailPage() {
           {[...candidate.blockers, ...candidate.watchReasons].join(' ')}
         </Alert>
       )}
+      {dqTierContext.missingTierContext && (
+        <Alert severity="warning">
+          Data Quality use-case tier context is missing for this candidate snapshot. This detail view applies conservative read-only confidence downgrade and does not assume readiness.
+        </Alert>
+      )}
+      {(dqTierContext.dailyReview.status === 'LIMITED' || dqTierContext.dailyReview.status === 'BLOCKED') && (
+        <Alert severity={dqTierContext.dailyReview.status === 'BLOCKED' ? 'error' : 'warning'}>
+          Daily review tier constraint: {dqTierContext.dailyReview.reason || `Daily review tier is ${dqTierContext.dailyReview.status}.`}
+        </Alert>
+      )}
+      <Alert severity={dqTierContext.automation.status === 'BLOCKED' ? 'info' : 'warning'}>
+        Automation is policy-blocked in Today Review and is never broker-authorized in this phase.
+      </Alert>
 
       {explainability && (
         <Grid container spacing={2}>
@@ -143,6 +159,20 @@ export function TodayReviewCandidateDetailPage() {
             ['Liquidity', dataQuality?.liquidityStatus || 'Missing'],
             ['Context gaps', Array.isArray(dataQuality?.contextGaps) ? dataQuality.contextGaps.join(', ') || 'None' : 'Unavailable'],
             ['Last evaluated', formatDateTime(dataQuality?.lastEvaluatedAt)],
+          ]} />
+        </Panel>
+        <Panel title="Use-case tiers (read-only)">
+          <FactStack items={[
+            ['Daily review tier', tierDetailLabel(dqTierContext.dailyReview.status, dqTierContext.dailyReview.reason)],
+            ['Signal tier', tierDetailLabel(dqTierContext.signal.status, dqTierContext.signal.reason)],
+            ['Backtest tier', tierDetailLabel(dqTierContext.backtest.status, dqTierContext.backtest.reason)],
+            ['Calibration tier', tierDetailLabel(dqTierContext.calibration.status, dqTierContext.calibration.reason)],
+            ['Automation tier', tierDetailLabel(dqTierContext.automation.status, dqTierContext.automation.reason)],
+            ['Trusted baseline residual', dataQuality?.tierEvidence?.trustedBaselineResidualState || 'Unavailable'],
+            ['Required history status', dataQuality?.tierEvidence?.requiredHistoryStatus || 'Unavailable'],
+            ['Listing-date status', dataQuality?.tierEvidence?.listingDateStatus || 'Unavailable'],
+            ['Signal history present', typeof dataQuality?.tierEvidence?.hasSignalHistory === 'boolean' ? (dataQuality.tierEvidence.hasSignalHistory ? 'Yes' : 'No') : 'Unavailable'],
+            ['Trusted baseline blocker codes', dataQuality?.tierEvidence?.trustedBaselineBlockerCodes?.join(', ') || 'Unavailable'],
           ]} />
         </Panel>
         <Panel title="Trade plan">
@@ -232,6 +262,61 @@ function ReasonList({ reasons }: { reasons: Array<{ code: string; label: string;
       ))}
     </List>
   );
+}
+
+type DetailTierStatus = 'READY' | 'LIMITED' | 'BLOCKED' | 'MISSING';
+
+interface DetailTier {
+  status: DetailTierStatus;
+  reason: string | null;
+}
+
+interface DetailTierContext {
+  dailyReview: DetailTier;
+  signal: DetailTier;
+  backtest: DetailTier;
+  calibration: DetailTier;
+  automation: DetailTier;
+  missingTierContext: boolean;
+}
+
+function detailTierContext(dataQuality: TodayReviewCandidateDataQualitySnapshot | null): DetailTierContext {
+  const tiers = dataQuality?.useCaseTiers;
+  const missingTierContext = !tiers?.dailyReview || !tiers?.automation;
+
+  const normalizeTier = (
+    tier: { status: 'READY' | 'LIMITED' | 'BLOCKED'; reasons: string[] } | undefined,
+  ): DetailTier => ({
+    status: tier?.status || 'MISSING',
+    reason: tier?.reasons?.[0] || (tier ? null : 'Missing from snapshot'),
+  });
+
+  const automationTier = normalizeTier(tiers?.automation);
+  return {
+    dailyReview: normalizeTier(tiers?.dailyReview),
+    signal: normalizeTier(tiers?.signal),
+    backtest: normalizeTier(tiers?.backtest),
+    calibration: normalizeTier(tiers?.calibration),
+    automation: {
+      status: tiers?.automation ? 'BLOCKED' : 'MISSING',
+      reason: !tiers?.automation
+        ? 'Missing from snapshot; policy remains blocked.'
+        : tiers.automation.status !== 'BLOCKED'
+          ? `Upstream status ${tiers.automation.status}; Today Review policy remains BLOCKED (PHASE0_AUTOMATION_NOT_AUTHORIZED).`
+          : automationTier.reason || 'PHASE0_AUTOMATION_NOT_AUTHORIZED',
+    },
+    missingTierContext,
+  };
+}
+
+function detailConfidenceDisplay(score: number, missingTierContext: boolean) {
+  if (!missingTierContext) return String(score);
+  const conservative = Math.max(0, Math.round(Number(score || 0) * 0.8));
+  return `${conservative} (from ${score}; conservative due to missing DQ tiers)`;
+}
+
+function tierDetailLabel(status: DetailTierStatus, reason: string | null) {
+  return reason ? `${status} (${reason})` : status;
 }
 
 function stateLabel(value: string) {

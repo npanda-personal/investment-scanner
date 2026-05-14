@@ -24,7 +24,14 @@ import { useMemo, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { useTodayReview } from '../hooks/useTodayReview';
-import type { TodayReviewCandidate, TodayReviewGroups, TodayReviewRun } from '../types';
+import type {
+  TodayReviewCandidate,
+  TodayReviewCandidateDataQualitySnapshot,
+  TodayReviewGroups,
+  TodayReviewRun,
+  TodayReviewScanFunnel,
+  TodayReviewSourceSnapshot,
+} from '../types';
 
 const groupTabs: Array<{ key: keyof TodayReviewGroups; label: string }> = [
   { key: 'longReview', label: 'Long Review' },
@@ -45,6 +52,16 @@ export function TodayReviewPage() {
     watch: groups.watchOnly.length + groups.unproven.length + groups.insufficientData.length,
     blocked: groups.blocked.length + groups.avoid.length,
     warnings: run?.warnings.length || 0,
+    missingTierContext: [
+      ...groups.longReview,
+      ...groups.shortReview,
+      ...groups.exitRiskReview,
+      ...groups.watchOnly,
+      ...groups.blocked,
+      ...groups.avoid,
+      ...groups.insufficientData,
+      ...groups.unproven,
+    ].filter(hasMissingTierContext).length,
   }), [groups, run?.warnings.length]);
 
   return (
@@ -106,16 +123,20 @@ export function TodayReviewPage() {
             <SummaryCard label="Watch only" value={totals.watch} tone="info" />
             <SummaryCard label="Blocked" value={totals.blocked} tone="error" />
             <SummaryCard label="Data gaps/warnings" value={totals.warnings} tone="default" />
+            <SummaryCard label="Missing DQ tier context" value={totals.missingTierContext} tone="warning" />
           </Grid>
           <ExclusionExplainabilityPanel run={run} />
 
           <Alert severity="info">
             Signals and calibration are supporting evidence only. Promoted review candidates require trusted price data, enough OHLCV history, and valid trade-plan geometry.
           </Alert>
+          <Alert severity="info">
+            Data Quality tiers are read-only context from Data Quality Engine and never change Today Review ranking or promotion in this view.
+          </Alert>
 
           {groups.longReview.length === 0 && (
             <Alert severity="warning">
-              No long review candidates are currently promoted. Trusted instruments scanned: {formatNumber(run.scanFunnel?.trustedInstrumentsScanned ?? (run.sourceSnapshot as any)?.scanFunnel?.trustedInstrumentsScanned ?? 0)}; setups detected: {formatNumber(run.scanFunnel?.setupsDetected ?? (run.sourceSnapshot as any)?.scanFunnel?.setupsDetected ?? 0)}; watch/unproven: {formatNumber((run.scanFunnel?.watchOnly ?? (run.sourceSnapshot as any)?.scanFunnel?.watchOnly ?? 0) + (run.scanFunnel?.unproven ?? (run.sourceSnapshot as any)?.scanFunnel?.unproven ?? 0))}.
+              No long review candidates are currently promoted. Trusted instruments scanned: {formatNumber(run.scanFunnel?.trustedInstrumentsScanned ?? sourceSnapshotForRun(run).scanFunnel?.trustedInstrumentsScanned ?? 0)}; setups detected: {formatNumber(run.scanFunnel?.setupsDetected ?? sourceSnapshotForRun(run).scanFunnel?.setupsDetected ?? 0)}; watch/unproven: {formatNumber((run.scanFunnel?.watchOnly ?? sourceSnapshotForRun(run).scanFunnel?.watchOnly ?? 0) + (run.scanFunnel?.unproven ?? sourceSnapshotForRun(run).scanFunnel?.unproven ?? 0))}.
             </Alert>
           )}
 
@@ -144,17 +165,23 @@ export function TodayReviewPage() {
 
 function RunStatusPanel({ run }: { run: TodayReviewRun | null }) {
   if (!run) return null;
+  const sourceSnapshot = sourceSnapshotForRun(run);
+  const reviewReadiness = sourceSnapshot.reviewReadiness || {};
+  const reviewUniverse = sourceSnapshot.reviewUniverse || {};
   return (
     <Card variant="outlined">
       <CardContent>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} useFlexGap flexWrap="wrap" alignItems={{ xs: 'flex-start', md: 'center' }}>
           <Chip label={`Run status: ${run.status}`} color={run.status === 'COMPLETED' ? 'success' : run.status === 'PARTIAL' ? 'warning' : 'error'} />
           <Chip label={`Trust: ${run.trustStatus}`} color={run.trustStatus === 'OK' ? 'success' : run.trustStatus === 'FAILED' ? 'error' : 'warning'} variant="outlined" />
+          <Chip label={`Market Data trust: ${reviewReadiness.trustStatus || 'UNKNOWN'}`} variant="outlined" />
           <Typography variant="body2" color="text.secondary">Last run: {formatDateTime(run.finishedAt || run.startedAt)}</Typography>
           <Typography variant="body2" color="text.secondary">Data-through: {formatDate(run.dataThroughDate)}</Typography>
           <Typography variant="body2" color="text.secondary">Scope: {run.region} / {run.assetType}</Typography>
           <Typography variant="body2" color="text.secondary">Review mode: {coverageValue(run, 'mode')}</Typography>
           <Typography variant="body2" color="text.secondary">Trusted universe: {formatNumber(Number(coverageValue(run, 'trustedCount') || 0))} / Catalog {formatNumber(Number(coverageValue(run, 'catalogCount') || 0))}</Typography>
+          <Typography variant="body2" color="text.secondary">Required data-through: {reviewUniverse.requiredDataThroughDate || reviewReadiness.requiredDataThroughDate || 'Unavailable'}</Typography>
+          <Typography variant="body2" color="text.secondary">Stored data-through: {reviewUniverse.storedDataThroughDate || reviewReadiness.storedDataThroughDate || reviewUniverse.dataThroughDate || 'Unavailable'}</Typography>
         </Stack>
       </CardContent>
     </Card>
@@ -162,16 +189,20 @@ function RunStatusPanel({ run }: { run: TodayReviewRun | null }) {
 }
 
 function CoveragePanel({ run }: { run: TodayReviewRun }) {
-  const reviewUniverse = (run.sourceSnapshot as any)?.reviewUniverse || {};
-  const reviewReadiness = (run.sourceSnapshot as any)?.reviewReadiness || {};
-  const scanFunnel = run.scanFunnel || (run.sourceSnapshot as any)?.scanFunnel || {};
+  const sourceSnapshot = sourceSnapshotForRun(run);
+  const reviewUniverse = sourceSnapshot.reviewUniverse || {};
+  const reviewReadiness = sourceSnapshot.reviewReadiness || {};
+  const scanFunnel: Partial<TodayReviewScanFunnel> = run.scanFunnel || sourceSnapshot.scanFunnel || {};
   const warnings = run.coverageWarnings || reviewUniverse.warnings || [];
   const trustedLoadStatus = scanFunnel.trustedLoadStatus || (scanFunnel.scanComplete === false ? 'CONFIGURED_PARTIAL' : 'COMPLETE');
   const membershipFailureReason = scanFunnel.membershipLoadFailureReason;
+  const reviewModeMismatch = Boolean(reviewReadiness.reviewMode && reviewReadiness.reviewMode !== coverageValue(run, 'mode'));
+  const missingReadiness = !reviewReadiness.reviewMode;
   return (
     <Card variant="outlined">
       <CardContent>
         <Stack spacing={1.5}>
+          <Typography variant="subtitle2">Trusted baseline context (read-only source: Market Data Foundation)</Typography>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} useFlexGap flexWrap="wrap">
             <Chip label={`Review mode: ${coverageValue(run, 'mode')}`} color={coverageValue(run, 'mode') === 'FULL_REVIEW' ? 'success' : coverageValue(run, 'mode') === 'LIMITED_REVIEW' ? 'warning' : 'default'} />
             <Chip label={`Trusted universe: ${formatNumber(Number(coverageValue(run, 'trustedCount') || 0))}`} variant="outlined" />
@@ -181,7 +212,12 @@ function CoveragePanel({ run }: { run: TodayReviewRun }) {
             <Chip label={`Stored data-through: ${reviewUniverse.storedDataThroughDate || reviewUniverse.dataThroughDate || formatDate(run.dataThroughDate)}`} variant="outlined" />
             <Chip label={`Readiness decision: ${reviewReadiness.userDecision || 'WAIT'}`} variant="outlined" />
           </Stack>
-          {reviewReadiness.reviewMode && reviewReadiness.reviewMode !== coverageValue(run, 'mode') && (
+          {missingReadiness && (
+            <Alert severity="warning">
+              Market Data readiness snapshot is missing from this run. Conservative context mode is active for run-level evidence.
+            </Alert>
+          )}
+          {reviewModeMismatch && (
             <Alert severity="error">
               Today Review readiness mode does not match the Market Data summary snapshot.
             </Alert>
@@ -215,7 +251,7 @@ function CoveragePanel({ run }: { run: TodayReviewRun }) {
             </Alert>
           )}
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} useFlexGap flexWrap="wrap">
-            <Typography variant="caption">Trusted available: {formatNumber(scanFunnel.trustedUniverseCount ?? coverageValue(run, 'trustedCount'))}</Typography>
+            <Typography variant="caption">Trusted available: {formatNumber(Number(scanFunnel.trustedUniverseCount ?? coverageValue(run, 'trustedCount') ?? 0))}</Typography>
             <Typography variant="caption">Scanned: {formatNumber(scanFunnel.trustedInstrumentsScanned)}</Typography>
             <Typography variant="caption">Scan complete: {scanFunnel.scanComplete === false ? 'no' : 'yes'}</Typography>
             <Typography variant="caption">Membership load: {trustedLoadStatus}</Typography>
@@ -235,7 +271,7 @@ function CoveragePanel({ run }: { run: TodayReviewRun }) {
 }
 
 function ExclusionExplainabilityPanel({ run }: { run: TodayReviewRun }) {
-  const explainability = run.explainability || (run.sourceSnapshot as any)?.explainability;
+  const explainability = run.explainability || sourceSnapshotForRun(run).explainability;
   if (!explainability) return null;
   const summaries = explainability.exclusionSummaries || [];
   const examples = explainability.inspectableExcludedExamples || [];
@@ -329,6 +365,8 @@ function CandidateTable({ candidates }: { candidates: TodayReviewCandidate[] }) 
             <TableCell>Reward/risk</TableCell>
             <TableCell>Confidence</TableCell>
             <TableCell>Grade</TableCell>
+            <TableCell>Daily review tier</TableCell>
+            <TableCell>Automation tier</TableCell>
             <TableCell>Data freshness</TableCell>
             <TableCell>Data quality</TableCell>
             <TableCell>Proof rating</TableCell>
@@ -341,9 +379,11 @@ function CandidateTable({ candidates }: { candidates: TodayReviewCandidate[] }) 
         <TableBody>
           {candidates.map((candidate) => {
             const plan = candidate.tradePlanSnapshot as any;
-            const dq = candidate.dataQualitySnapshot as any;
+            const dq = candidate.dataQualitySnapshot as TodayReviewCandidateDataQualitySnapshot | null;
             const proof = candidate.strategyProofSnapshot as any;
             const market = candidate.marketContextSnapshot as any;
+            const context = tierContextForCandidate(candidate);
+            const confidence = confidenceDisplay(candidate);
             return (
               <TableRow key={candidate.id} hover>
                 <TableCell>{candidate.rank}</TableCell>
@@ -359,15 +399,44 @@ function CandidateTable({ candidates }: { candidates: TodayReviewCandidate[] }) 
                 <TableCell>{formatStop(plan, candidate)}</TableCell>
                 <TableCell>{formatTarget(plan)}</TableCell>
                 <TableCell>{formatRatio(plan?.rewardRiskRatio)}</TableCell>
-                <TableCell>{candidate.confidenceScore}</TableCell>
+                <TableCell>
+                  <Typography fontWeight={600}>{confidence.label}</Typography>
+                  {confidence.note && <Typography variant="caption" color="warning.main">{confidence.note}</Typography>}
+                </TableCell>
                 <TableCell><Chip label={candidate.grade} size="small" color={gradeColor(candidate.grade) as any} /></TableCell>
+                <TableCell>
+                  <Chip
+                    size="small"
+                    label={context.dailyReview.label}
+                    color={tierColor(context.dailyReview.status)}
+                    variant={context.dailyReview.status === 'READY' ? 'outlined' : 'filled'}
+                  />
+                  {context.dailyReview.reason && (
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      {context.dailyReview.reason}
+                    </Typography>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <Chip
+                    size="small"
+                    label={context.automation.label}
+                    color={tierColor(context.automation.status)}
+                    variant={context.automation.status === 'BLOCKED' ? 'filled' : 'outlined'}
+                  />
+                  {context.automation.reason && (
+                    <Typography variant="caption" color={context.automation.status === 'BLOCKED' ? 'text.secondary' : 'warning.main'} display="block">
+                      {context.automation.reason}
+                    </Typography>
+                  )}
+                </TableCell>
                 <TableCell>{formatDate(plan?.marketDataSnapshot?.latestStoredTradingDate || plan?.latestPriceTimestamp)}</TableCell>
                 <TableCell>{dq?.coverageStatus || dq?.signalReadinessStatus || 'Missing'}</TableCell>
                 <TableCell>{proof?.strategyRating?.ratingGrade || plan?.strategyRating || 'Unproven'}</TableCell>
                 <TableCell>{market?.regime?.regime || 'Unknown'}</TableCell>
                 <TableCell>{sectorAlignment(candidate)}</TableCell>
                 <TableCell>{candidate.reasonSummary}</TableCell>
-                <TableCell>{candidate.blockers[0] || '-'}</TableCell>
+                <TableCell>{context.blocker || candidate.blockers[0] || '-'}</TableCell>
               </TableRow>
             );
           })}
@@ -375,6 +444,66 @@ function CandidateTable({ candidates }: { candidates: TodayReviewCandidate[] }) 
       </Table>
     </TableContainer>
   );
+}
+
+type TierStatus = 'READY' | 'LIMITED' | 'BLOCKED' | 'MISSING';
+
+interface TierCellContext {
+  status: TierStatus;
+  label: string;
+  reason: string | null;
+}
+
+interface CandidateTierContext {
+  dailyReview: TierCellContext;
+  automation: TierCellContext;
+  blocker: string | null;
+}
+
+function sourceSnapshotForRun(run: TodayReviewRun): TodayReviewSourceSnapshot {
+  return (run.sourceSnapshot || {}) as TodayReviewSourceSnapshot;
+}
+
+function tierContextForCandidate(candidate: TodayReviewCandidate): CandidateTierContext {
+  const dq = candidate.dataQualitySnapshot as TodayReviewCandidateDataQualitySnapshot | null;
+  const tiers = dq?.useCaseTiers;
+  const dailyReview = tiers?.dailyReview;
+  const automation = tiers?.automation;
+
+  const dailyReviewStatus: TierStatus = dailyReview?.status || 'MISSING';
+  const automationStatus: TierStatus = automation ? 'BLOCKED' : 'MISSING';
+  const missingTierBlocker = 'Data Quality use-case tier context is missing; confidence view is conservatively downgraded.';
+  const upstreamAutomationStatus = automation?.status || null;
+
+  return {
+    dailyReview: {
+      status: dailyReviewStatus,
+      label: dailyReview ? `Daily: ${dailyReview.status}` : 'Daily: Missing',
+      reason: dailyReview?.reasons?.[0] || (dailyReview ? null : 'No dailyReview tier payload was stored in this run snapshot.'),
+    },
+    automation: {
+      status: automationStatus,
+      label: automation ? 'Automation: BLOCKED' : 'Automation: Missing',
+      reason: !automation
+        ? 'Automation tier payload missing; execution remains policy-blocked.'
+        : upstreamAutomationStatus !== 'BLOCKED'
+          ? `Upstream tier reported ${upstreamAutomationStatus}; Today Review keeps automation policy-blocked (PHASE0_AUTOMATION_NOT_AUTHORIZED).`
+          : automation.reasons?.[0] || 'PHASE0_AUTOMATION_NOT_AUTHORIZED',
+    },
+    blocker: !tiers
+      ? missingTierBlocker
+      : dailyReviewStatus === 'LIMITED' || dailyReviewStatus === 'BLOCKED'
+        ? dailyReview?.reasons?.[0] || `Daily review tier is ${dailyReviewStatus}.`
+        : null,
+  };
+}
+
+function confidenceDisplay(candidate: TodayReviewCandidate) {
+  const score = Number(candidate.confidenceScore || 0);
+  const hasContext = !hasMissingTierContext(candidate);
+  if (hasContext) return { label: String(score), note: null as string | null };
+  const conservative = Math.max(0, Math.round(score * 0.8));
+  return { label: `${conservative} (from ${score})`, note: 'Conservative display-only downgrade: missing DQ tier context' };
 }
 
 function candidatesForTab(groups: TodayReviewGroups, tab: keyof TodayReviewGroups) {
@@ -416,7 +545,7 @@ function formatNumber(value?: number | null) {
 }
 
 function coverageValue(run: TodayReviewRun, key: 'mode' | 'trustedCount' | 'catalogCount') {
-  const reviewUniverse = (run.sourceSnapshot as any)?.reviewUniverse || {};
+  const reviewUniverse = sourceSnapshotForRun(run).reviewUniverse || {};
   if (key === 'mode') return run.reviewUniverseMode || reviewUniverse.mode || 'NO_REVIEW';
   if (key === 'trustedCount') return run.trustedUniverseCount ?? reviewUniverse.trustedCount ?? 0;
   return run.catalogCount ?? reviewUniverse.catalogCount ?? 0;
@@ -457,6 +586,18 @@ function gradeColor(grade: string) {
 }
 
 function sectorAlignment(candidate: TodayReviewCandidate) {
-  const sector = (candidate.dataQualitySnapshot as any)?.sector || (candidate.sourceSignalSnapshot as any)?.rawSignal?.sector;
+  const sector = (candidate.dataQualitySnapshot as TodayReviewCandidateDataQualitySnapshot | null)?.sector || (candidate.sourceSignalSnapshot as any)?.rawSignal?.sector;
   return sector || 'Unknown';
+}
+
+function hasMissingTierContext(candidate: TodayReviewCandidate) {
+  const dq = candidate.dataQualitySnapshot as TodayReviewCandidateDataQualitySnapshot | null;
+  return !dq?.useCaseTiers?.dailyReview || !dq?.useCaseTiers?.automation;
+}
+
+function tierColor(status: TierStatus): 'success' | 'warning' | 'error' | 'default' {
+  if (status === 'READY') return 'success';
+  if (status === 'LIMITED') return 'warning';
+  if (status === 'BLOCKED' || status === 'MISSING') return 'error';
+  return 'default';
 }

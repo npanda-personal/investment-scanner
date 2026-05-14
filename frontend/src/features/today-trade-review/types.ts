@@ -1,4 +1,8 @@
-import type { DataQualityEvaluation } from '@/features/data-quality-engine/types';
+import type {
+  DataQualityEvaluation,
+  DataQualityTierEvidence,
+  DataQualityUseCaseTiers,
+} from '@/features/data-quality-engine/types';
 import type { TradePlanResultDto } from '@/features/trade-plan-risk-engine/types';
 
 export type TodayReviewRunStatus = 'RUNNING' | 'COMPLETED' | 'PARTIAL' | 'FAILED';
@@ -50,6 +54,50 @@ export interface TodayReviewScanFunnel {
   topNoPromotionReasons: Record<string, number>;
 }
 
+export interface TodayReviewReadinessNextAction {
+  code: string;
+  label: string;
+  boundedRequest?: {
+    batchSize?: number;
+    region?: string;
+    assetType?: string;
+  } | null;
+}
+
+export interface TodayReviewReadinessSnapshot {
+  reviewMode?: string | null;
+  trustStatus?: string | null;
+  userDecision?: string | null;
+  requiredDataThroughDate?: string | null;
+  storedDataThroughDate?: string | null;
+  nextAction?: TodayReviewReadinessNextAction | null;
+}
+
+export interface TodayReviewUniverseSnapshot {
+  mode?: TodayReviewUniverseMode | null;
+  trustedCount?: number | null;
+  catalogCount?: number | null;
+  targetTradingDate?: string | null;
+  requiredDataThroughDate?: string | null;
+  storedDataThroughDate?: string | null;
+  dataThroughDate?: string | null;
+  warnings?: string[];
+}
+
+export interface TodayReviewSourceSnapshot {
+  reviewReadiness?: TodayReviewReadinessSnapshot | null;
+  reviewUniverse?: TodayReviewUniverseSnapshot | null;
+  scanFunnel?: TodayReviewScanFunnel | null;
+  explainability?: TodayReviewExplainability | null;
+  [key: string]: unknown;
+}
+
+export interface TodayReviewCandidateDataQualitySnapshot extends Partial<DataQualityEvaluation> {
+  useCaseTiers?: DataQualityUseCaseTiers;
+  tierEvidence?: DataQualityTierEvidence;
+  [key: string]: unknown;
+}
+
 export interface TodayReviewCandidate {
   id: string;
   runId: string;
@@ -67,7 +115,7 @@ export interface TodayReviewCandidate {
   reasonSummary: string;
   blockers: string[];
   watchReasons: string[];
-  dataQualitySnapshot: DataQualityEvaluation | Record<string, any> | null;
+  dataQualitySnapshot: TodayReviewCandidateDataQualitySnapshot | null;
   marketContextSnapshot: Record<string, any> | null;
   strategyProofSnapshot: Record<string, any> | null;
   tradePlanSnapshot: TradePlanResultDto | Record<string, any> | null;
@@ -156,7 +204,7 @@ export interface TodayReviewRun {
   finishedAt: string | null;
   warnings: string[];
   candidateCounts: Record<string, number>;
-  sourceSnapshot: Record<string, any>;
+  sourceSnapshot: TodayReviewSourceSnapshot;
   reviewUniverseMode?: TodayReviewUniverseMode;
   trustedUniverseCount?: number;
   catalogCount?: number;

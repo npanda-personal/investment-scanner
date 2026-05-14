@@ -1,5 +1,26 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { visitAuthenticated } from './support/auth';
+
+async function mockAuthenticatedUser(page: Page) {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('investment_scanner_auth_token', 'playwright-today-review-token');
+  });
+  await page.route('**/api/v1/auth/me', async (route) => {
+    await route.fulfill({
+      json: {
+        id: 'playwright-today-review-user',
+        email: 'codex.test@example.com',
+        name: 'Codex Test',
+        createdAt: '2026-05-14T00:00:00.000Z',
+        updatedAt: '2026-05-14T00:00:00.000Z',
+        lastLoginAt: '2026-05-14T00:00:00.000Z',
+      },
+    });
+  });
+  await page.route('**/api/v1/auth/logout', async (route) => {
+    await route.fulfill({ json: { success: true } });
+  });
+}
 
 const candidate = {
   id: 'candidate-1',
@@ -29,6 +50,20 @@ const candidate = {
     coverageScore: 92,
     signalReadinessScore: 88,
     liquidityScore: 84,
+    useCaseTiers: {
+      dailyReview: { status: 'READY', reasons: ['TRUSTED_BASELINE_READY'] },
+      signal: { status: 'READY', reasons: ['SIGNAL_HISTORY_AVAILABLE'] },
+      backtest: { status: 'LIMITED', reasons: ['REQUIRED_HISTORY_PARTIAL'] },
+      calibration: { status: 'LIMITED', reasons: ['CALIBRATION_WINDOW_THIN'] },
+      automation: { status: 'BLOCKED', reasons: ['PHASE0_AUTOMATION_NOT_AUTHORIZED'] },
+    },
+    tierEvidence: {
+      trustedBaselineResidualState: 'TRUSTED_READY',
+      requiredHistoryStatus: 'PARTIAL',
+      listingDateStatus: 'LISTED_LONG_ENOUGH',
+      trustedBaselineBlockerCodes: ['NONE'],
+      hasSignalHistory: true,
+    },
     lastEvaluatedAt: '2026-05-10T16:00:00.000Z',
   },
   marketContextSnapshot: {
@@ -146,6 +181,26 @@ const blockedCandidate = {
     paperReadinessReasons: [],
     paperReadinessBlockers: ['Trade-plan snapshot has hard blockers.'],
   },
+  dataQualitySnapshot: {
+    ...candidate.dataQualitySnapshot,
+    instrumentId: 'stock-2',
+    symbol: 'BLOCKED.NS',
+    companyName: 'Blocked Ltd',
+    useCaseTiers: {
+      dailyReview: { status: 'BLOCKED', reasons: ['DAILY_REVIEW_BLOCKED_BY_HISTORY'] },
+      signal: { status: 'LIMITED', reasons: ['SIGNAL_HISTORY_PARTIAL'] },
+      backtest: { status: 'BLOCKED', reasons: ['BACKTEST_BLOCKED_REQUIRED_HISTORY'] },
+      calibration: { status: 'BLOCKED', reasons: ['CALIBRATION_BLOCKED_REQUIRED_HISTORY'] },
+      automation: { status: 'BLOCKED', reasons: ['PHASE0_AUTOMATION_NOT_AUTHORIZED'] },
+    },
+    tierEvidence: {
+      trustedBaselineResidualState: 'LIMITED_HISTORY',
+      requiredHistoryStatus: 'INSUFFICIENT',
+      listingDateStatus: 'LISTED_RECENTLY',
+      trustedBaselineBlockerCodes: ['INSUFFICIENT_HISTORY'],
+      hasSignalHistory: false,
+    },
+  },
 };
 
 const unprovenCandidate = {
@@ -175,6 +230,14 @@ const unprovenCandidate = {
     ...candidate.strategyProofSnapshot,
     frameworkBacked: false,
     strategyRating: { ratingGrade: 'UNPROVEN', ratingScore: 0 },
+  },
+  dataQualitySnapshot: {
+    ...candidate.dataQualitySnapshot,
+    instrumentId: 'stock-3',
+    symbol: 'UNPROVEN.NS',
+    companyName: 'Unproven Ltd',
+    useCaseTiers: undefined,
+    tierEvidence: undefined,
   },
 };
 
@@ -332,6 +395,10 @@ const completedResponse = {
 };
 
 test.describe('Today Trade Review UI', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockAuthenticatedUser(page);
+  });
+
   test('deep link settles, no-run state offers manual run, and completed run shows grouped shortlist', async ({ page }) => {
     let manualRunCompleted = false;
     await page.route('**/api/v1/today-review/latest**', async (route) => {
@@ -371,9 +438,10 @@ test.describe('Today Trade Review UI', () => {
     await expect(page.getByText('Readiness decision: PROCEED_LIMITED')).toBeVisible();
     await expect(page.getByText('Market Data summary mode: LIMITED_REVIEW')).toBeVisible();
     await expect(page.getByText('Next bounded action: Review bounded repair plan')).toBeVisible();
-    await expect(page.getByText('Target session: 2026-05-12')).toBeVisible();
-    await expect(page.getByText('Required data-through: 2026-05-11')).toBeVisible();
-    await expect(page.getByText('Stored data-through: 2026-05-11')).toBeVisible();
+    await expect(page.getByText('Data Quality tiers are read-only context from Data Quality Engine and never change Today Review ranking or promotion in this view.')).toBeVisible();
+    await expect(page.getByText('Target session: 2026-05-12').first()).toBeVisible();
+    await expect(page.getByText('Required data-through: 2026-05-11').first()).toBeVisible();
+    await expect(page.getByText('Stored data-through: 2026-05-11').first()).toBeVisible();
     await expect(page.getByText('Limited review mode: candidates are generated only from stocks with current price, sufficient OHLCV history, and recent volume. Missing sector/market-cap data is shown as context gaps.')).toBeVisible();
     await expect(page.getByText('Scanned: 144')).toBeVisible();
     await expect(page.getByText('Scan complete: yes')).toBeVisible();
@@ -386,18 +454,27 @@ test.describe('Today Trade Review UI', () => {
     await expect(page.getByText('OUTSIDE.NS')).toBeVisible();
     await expect(page.getByText('Not promoted')).toBeVisible();
     await expect(page.getByRole('link', { name: 'ALPHA.NS' })).toBeVisible();
+    await expect(page.getByText('Daily: READY').first()).toBeVisible();
+    await expect(page.getByText('Automation: BLOCKED').first()).toBeVisible();
+    await expect(page.getByText('PHASE0_AUTOMATION_NOT_AUTHORIZED').first()).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Long Review (1)' })).toBeVisible();
     await page.getByRole('tab', { name: /Watch Only/ }).click();
     await expect(page.getByText('UNPROVEN.NS')).toBeVisible();
     await expect(page.getByRole('cell', { name: 'Unproven', exact: true })).toBeVisible();
+    await expect(page.getByText('Daily: Missing').first()).toBeVisible();
+    await expect(page.getByText('Conservative display-only downgrade: missing DQ tier context').first()).toBeVisible();
+    await expect(page.getByText('Data Quality use-case tier context is missing; confidence view is conservatively downgraded.').first()).toBeVisible();
     await page.getByRole('tab', { name: /Blocked/ }).click();
     await expect(page.getByText('BLOCKED.NS')).toBeVisible();
     await expect(page.getByText('Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.').first()).toBeVisible();
+    await expect(page.getByText('Daily: BLOCKED').first()).toBeVisible();
+    await expect(page.getByText('DAILY_REVIEW_BLOCKED_BY_HISTORY').first()).toBeVisible();
 
     await page.reload();
     await expect(page.getByRole('heading', { name: "Today's Trade Review" })).toBeVisible();
     await expect(page.getByRole('progressbar')).toHaveCount(0);
     await expect(page.getByRole('link', { name: 'ALPHA.NS' })).toBeVisible();
+    await expect(page.getByText('Missing DQ tier context')).toBeVisible();
 
     const body = await page.locator('body').innerText();
     expect(body).not.toMatch(/buy now|sell now|guaranteed|place order|execute order|live trade|financial advice|execution/i);
@@ -422,7 +499,15 @@ test.describe('Today Trade Review UI', () => {
     await expect(page.getByRole('heading', { name: 'Strategy proof' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Market context' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Data quality' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Use-case tiers (read-only)' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Trade plan' })).toBeVisible();
+    await expect(page.getByText('Daily review tier')).toBeVisible();
+    await expect(page.getByText('READY (TRUSTED_BASELINE_READY)')).toBeVisible();
+    await expect(page.getByText('Backtest tier')).toBeVisible();
+    await expect(page.getByText('LIMITED (REQUIRED_HISTORY_PARTIAL)')).toBeVisible();
+    await expect(page.getByText('Automation tier')).toBeVisible();
+    await expect(page.getByText('BLOCKED (PHASE0_AUTOMATION_NOT_AUTHORIZED)')).toBeVisible();
+    await expect(page.getByText('Automation is policy-blocked in Today Review and is never broker-authorized in this phase.')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Ranking components' })).toBeVisible();
     const rankingComponentsPanel = page.getByRole('heading', { name: 'Ranking components' }).locator('xpath=..');
     await expect(rankingComponentsPanel.getByText('Strategy proof', { exact: true })).toBeVisible();
@@ -436,6 +521,23 @@ test.describe('Today Trade Review UI', () => {
 
     const body = await page.locator('body').innerText();
     expect(body).not.toMatch(/buy now|sell now|guaranteed|place order|execute order|live trade|financial advice|execution/i);
+  });
+
+  test('candidate detail shows conservative fallback when use-case tiers are missing', async ({ page }) => {
+    await page.route('**/api/v1/today-review/candidates/candidate-3', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(unprovenCandidate) });
+    });
+
+    await visitAuthenticated(page, '/today-review/candidates/candidate-3');
+
+    await expect(page.getByRole('heading', { name: 'UNPROVEN.NS research support' })).toBeVisible();
+    await expect(page.getByText('Confidence score (conservative view)')).toBeVisible();
+    await expect(page.getByText('28 (from 35; conservative due to missing DQ tiers)')).toBeVisible();
+    await expect(page.getByText('Data Quality use-case tier context is missing for this candidate snapshot.')).toBeVisible();
+    await expect(page.getByText('MISSING (Missing from snapshot)').first()).toBeVisible();
+    await expect(page.getByText('Automation tier')).toBeVisible();
+    await expect(page.getByText('MISSING (Missing from snapshot; policy remains blocked.)')).toBeVisible();
+    await expect(page.getByText('Automation is policy-blocked in Today Review and is never broker-authorized in this phase.')).toBeVisible();
   });
 
   test('NO_REVIEW explains trusted-universe gating and scan evidence', async ({ page }) => {
@@ -534,9 +636,9 @@ test.describe('Today Trade Review UI', () => {
 
     await expect(page.getByText('Review mode: NO_REVIEW').first()).toBeVisible();
     await expect(page.getByText('No review mode: trusted price-action universe is unavailable or below the lite threshold. Today review cannot publish candidates until the trusted-universe evidence is ready.')).toBeVisible();
-    await expect(page.getByText('Target session: 2026-05-12')).toBeVisible();
-    await expect(page.getByText('Required data-through: 2026-05-11')).toBeVisible();
-    await expect(page.getByText('Stored data-through: 2026-05-10')).toBeVisible();
+    await expect(page.getByText('Target session: 2026-05-12').first()).toBeVisible();
+    await expect(page.getByText('Required data-through: 2026-05-11').first()).toBeVisible();
+    await expect(page.getByText('Stored data-through: 2026-05-10').first()).toBeVisible();
     await expect(page.getByText('Trusted universe membership unavailable. Trusted universe membership page failed at offset 250.')).toBeVisible();
     await expect(page.getByText('Membership load: LOAD_FAILED')).toBeVisible();
     await expect(page.getByText('Strategy outside trusted universe: 8')).toBeVisible();
