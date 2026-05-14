@@ -122,6 +122,12 @@ Clarification path:
 - Architect asks Product Owner if the answer requires product intent, market/quant/domain judgment, workflow priority, or acceptance criteria.
 - Final answers must be written back into the relevant work packet, architecture contract, acceptance criteria, module docs, decision record, or blocker entry.
 
+Assumption control:
+
+- Implementation cannot start from an inferred next step. It must be tied to Product Owner priority, an active-board row, or recorded Product Owner / Architect clarification.
+- Conflicts between roadmap, board, packet, evidence, or runtime state must be resolved through the clarification path before code edits continue.
+- Read-only discovery can proceed with labeled tentative assumptions, but tentative assumptions cannot authorize implementation, acceptance, release, or GitHub check-in.
+
 Priority changes follow the same governance. When Product Owner changes priority, scope, or acceptance criteria, the Orchestrator updates `docs/codex-agent-team-plan/active-work-board.md`, identifies affected items, and moves each item to the earliest invalidated gate before downstream work continues.
 
 ## Evidence Rules

@@ -38,6 +38,15 @@ The Orchestrator should choose agent models deliberately instead of using the hi
 - Use smaller or fast models for QA checklist drafting, static evidence review, flow monitoring, status sweeps, board updates, and mechanical documentation edits.
 - If a smaller-model assignment discovers a product or architecture decision, route that decision to the Product Owner or Solution Architect instead of letting the smaller model decide.
 
+## Assumption Control
+
+The Orchestrator must not choose the next implementation target from inference alone.
+
+- The next work item must come from an explicit Product Owner priority, an active-board row, or a recorded Product Owner / Architect clarification.
+- If the roadmap, active board, work packet, or runtime evidence conflict, pause implementation, record the conflict, and ask the Product Owner or Solution Architect role to resolve it.
+- If the Orchestrator makes a temporary assumption to continue safe read-only discovery, the assumption must be labeled as tentative and cannot authorize code edits, QA acceptance, PO acceptance, or GitHub check-in.
+- Repeated user corrections are treated as process gaps. The Orchestrator updates the operating model, active board, or blocker register in the same session before continuing affected implementation.
+
 ## Agent Operating Modes
 
 For Codex-agent execution, use the operating modes defined in `docs/codex-agent-team-plan/codex-agent-team.md`.
