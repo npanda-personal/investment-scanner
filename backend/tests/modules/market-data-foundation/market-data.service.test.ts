@@ -290,6 +290,113 @@ describe('MarketDataFoundationService syncV1', () => {
     ]);
   });
 
+  it('adds trusted baseline residual states and keeps Yahoo insufficiency distinct from fallback attempted exhaustion', async () => {
+    const latestCompleted = latestCompletedTradingDateForRegion('IN') as string;
+    const baseStock = {
+      ...stock,
+      region: 'IN',
+      exchange: 'NSE',
+      country: 'India',
+      currency: 'INR',
+      assetType: 'STOCK',
+      isActive: true,
+      isDelisted: false,
+      providerSupportStatus: 'SUPPORTED',
+      providerSymbol: 'BASE.NS',
+      sourceSymbol: 'BASE',
+      displaySymbol: 'BASE',
+      catalogSource: 'NSE_EQUITY_SECURITIES',
+      isin: 'INE000A01000',
+      sector: 'Tech',
+      industry: 'Software',
+      marketCap: 100000000,
+      ipoDate: new Date('2010-01-01T00:00:00.000Z'),
+    };
+    const stocks = [
+      { ...baseStock, id: 's-ready', symbol: 'READY.NS', providerSymbol: 'READY.NS' },
+      { ...baseStock, id: 's-history', symbol: 'HISTORY.NS', providerSymbol: 'HISTORY.NS' },
+      { ...baseStock, id: 's-listing', symbol: 'LISTING.NS', providerSymbol: 'LISTING.NS', ipoDate: null },
+      { ...baseStock, id: 's-zero', symbol: 'ZERO.NS', providerSymbol: 'ZERO.NS' },
+      { ...baseStock, id: 's-partial-zero', symbol: 'PARTIALZERO.NS', providerSymbol: 'PARTIALZERO.NS' },
+      { ...baseStock, id: 's-fallback', symbol: 'FALLBACK.NS', providerSymbol: 'FALLBACK.NS' },
+      { ...baseStock, id: 's-identity', symbol: 'IDENTITY.NS', providerSymbol: null, isin: null },
+      { ...baseStock, id: 's-retry', symbol: 'RETRY.NS', providerSymbol: 'RETRY.NS', providerSupportStatus: 'VALIDATION_FAILED' },
+      { ...baseStock, id: 's-unsupported', symbol: 'UNSUPPORTED.NS', providerSymbol: 'UNSUPPORTED.NS', providerSupportStatus: 'UNSUPPORTED' },
+    ];
+    const repository = {
+      listStocks: jest.fn().mockResolvedValue({
+        stocks,
+        pagination: { page: 1, pageSize: 25, total: stocks.length, totalPages: 1 },
+      }),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['READY.NS', { priceHistoryBars: 3800, firstPriceDate: '2010-01-01', latestPriceDate: latestCompleted, latestVolume: 1000, latestAdjustedClose: 10, latestClose: 10, rollingWindowBars: 252, rollingWindowCoveragePercent: 100, recentVolumeCoveragePercent: 100 }],
+        ['HISTORY.NS', { priceHistoryBars: 300, firstPriceDate: '2025-01-01', latestPriceDate: latestCompleted, latestVolume: 1000, latestAdjustedClose: 10, latestClose: 10, rollingWindowBars: 252, rollingWindowCoveragePercent: 100, recentVolumeCoveragePercent: 100 }],
+        ['LISTING.NS', { priceHistoryBars: 3800, firstPriceDate: '2010-01-01', latestPriceDate: latestCompleted, latestVolume: 1000, latestAdjustedClose: 10, latestClose: 10, rollingWindowBars: 252, rollingWindowCoveragePercent: 100, recentVolumeCoveragePercent: 100 }],
+        ['ZERO.NS', { priceHistoryBars: 0, firstPriceDate: null, latestPriceDate: null, latestVolume: null, latestAdjustedClose: null, latestClose: null }],
+        ['PARTIALZERO.NS', { priceHistoryBars: 300, firstPriceDate: '2020-01-01', latestPriceDate: latestCompleted, latestVolume: 1000, latestAdjustedClose: 10, latestClose: 10, rollingWindowBars: 252, rollingWindowCoveragePercent: 100, recentVolumeCoveragePercent: 100 }],
+        ['FALLBACK.NS', { priceHistoryBars: 1500, firstPriceDate: '2020-01-01', latestPriceDate: latestCompleted, latestVolume: 1000, latestAdjustedClose: 10, latestClose: 10, rollingWindowBars: 252, rollingWindowCoveragePercent: 100, recentVolumeCoveragePercent: 100 }],
+        ['IDENTITY.NS', { priceHistoryBars: 3800, firstPriceDate: '2010-01-01', latestPriceDate: latestCompleted, latestVolume: 1000, latestAdjustedClose: 10, latestClose: 10, rollingWindowBars: 252, rollingWindowCoveragePercent: 100, recentVolumeCoveragePercent: 100 }],
+        ['RETRY.NS', { priceHistoryBars: 0, firstPriceDate: null, latestPriceDate: null, latestVolume: null, latestAdjustedClose: null, latestClose: null }],
+        ['UNSUPPORTED.NS', { priceHistoryBars: 0, firstPriceDate: null, latestPriceDate: null, latestVolume: null, latestAdjustedClose: null, latestClose: null }],
+      ])),
+      listRepairStatesForStocks: jest.fn().mockResolvedValue(new Map([
+        ['s-zero', [{ repairType: 'PRICE_BACKFILL', status: 'MANUAL_REQUIRED', manualRequiredReason: 'Yahoo returned zero usable price rows; approved free official/public exchange fallback is required before accepting missing history.', fieldsFilledJson: {} }]],
+        ['s-partial-zero', [{ repairType: 'PRICE_BACKFILL', status: 'MANUAL_REQUIRED', manualRequiredReason: 'Yahoo returned zero usable price rows; approved free official/public exchange fallback is required before accepting missing history.', fieldsFilledJson: {} }]],
+        ['s-fallback', [{ repairType: 'PRICE_BACKFILL', status: 'MANUAL_REQUIRED', manualRequiredReason: 'Approved free official/public exchange fallback attempted but required history remains incomplete.', fieldsFilledJson: {} }]],
+        ['s-retry', [{ repairType: 'PROVIDER_VALIDATION', status: 'RETRY_COOLDOWN', nextRetryAt: new Date(Date.now() + 60 * 60 * 1000) }]],
+      ])),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+
+    const result = await service.listInstruments({ page: 1, pageSize: 25, region: 'IN', assetType: 'STOCK' });
+    const bySymbol = new Map(result.instruments.map((item) => [item.symbol, item]));
+
+    expect(bySymbol.get('READY.NS')).toMatchObject({
+      trusted_baseline_residual_state: 'REVIEW_READY',
+      required_history_status: 'COMPLETE',
+      listing_date_status: 'PRESENT_OLDER_THAN_15Y_USED_15Y',
+      latest_completed_eod_date: latestCompleted,
+      provider_fallback_state: 'PROVIDER_SUPPORTED',
+    });
+    expect(bySymbol.get('HISTORY.NS')).toMatchObject({
+      trusted_baseline_residual_state: 'REQUIRED_HISTORY_INCOMPLETE',
+      required_history_status: 'INCOMPLETE',
+    });
+    expect(bySymbol.get('LISTING.NS')).toMatchObject({
+      trusted_baseline_residual_state: 'LISTING_DATE_MISSING_REQUIRED_15Y',
+      listing_date_status: 'MISSING_USED_15_YEAR_TARGET',
+    });
+    expect(bySymbol.get('ZERO.NS')).toMatchObject({
+      trusted_baseline_residual_state: 'FALLBACK_REQUIRED_AFTER_YAHOO_ZERO_ROWS',
+      required_history_status: 'FALLBACK_REQUIRED',
+      provider_fallback_state: 'YAHOO_INSUFFICIENT_FALLBACK_REQUIRED',
+      source_fallback_reason: 'YAHOO_ZERO_ROWS',
+    });
+    expect(bySymbol.get('PARTIALZERO.NS')).toMatchObject({
+      trusted_baseline_residual_state: 'FALLBACK_REQUIRED_AFTER_YAHOO_ZERO_ROWS',
+      required_history_status: 'FALLBACK_REQUIRED',
+      provider_fallback_state: 'YAHOO_INSUFFICIENT_FALLBACK_REQUIRED',
+      source_fallback_reason: 'YAHOO_ZERO_ROWS',
+    });
+    expect(bySymbol.get('FALLBACK.NS')).toMatchObject({
+      trusted_baseline_residual_state: 'FALLBACK_ATTEMPTED_STILL_INCOMPLETE',
+      required_history_status: 'FALLBACK_REQUIRED',
+      provider_fallback_state: 'FALLBACK_ATTEMPTED_STILL_INCOMPLETE',
+      source_fallback_reason: 'OFFICIAL_FALLBACK_ATTEMPTED_STILL_INCOMPLETE',
+    });
+    expect(bySymbol.get('IDENTITY.NS')).toMatchObject({
+      trusted_baseline_residual_state: 'CATALOG_IDENTITY_REPAIR_REQUIRED',
+    });
+    expect(bySymbol.get('RETRY.NS')).toMatchObject({
+      trusted_baseline_residual_state: 'RETRY_BLOCKED_PROVIDER_VALIDATION',
+      provider_fallback_state: 'RETRY_BLOCKED_PROVIDER_VALIDATION',
+    });
+    expect(bySymbol.get('UNSUPPORTED.NS')).toMatchObject({
+      trusted_baseline_residual_state: 'UNSUPPORTED_OR_INACTIVE_EXCLUDED',
+      provider_fallback_state: 'PROVIDER_UNSUPPORTED_OR_INACTIVE',
+    });
+  });
+
   it('imports NSE equity securities as STOCK/CASH with Yahoo provider symbols', async () => {
     const upsertCatalogInstrument = jest.fn().mockResolvedValue({ action: 'inserted', stock: {} });
     const service = new MarketDataFoundationService({

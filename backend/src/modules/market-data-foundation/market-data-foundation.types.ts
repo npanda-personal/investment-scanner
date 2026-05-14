@@ -23,6 +23,29 @@ export type UniverseState =
 export type UniverseTrustStatus = 'OK' | 'PARTIAL' | 'NOT_TRUSTWORTHY';
 export type TrustedReviewUniverseStatus = 'READY' | 'LIMITED' | 'NOT_READY';
 export type TrustedReviewUniverseMode = 'FULL_REVIEW' | 'LIMITED_REVIEW' | 'NO_REVIEW';
+export type TrustedBaselineRequiredHistoryStatus = 'COMPLETE' | 'INCOMPLETE' | 'FALLBACK_REQUIRED';
+export type TrustedBaselineListingDateStatus =
+  | 'PRESENT_USED_LISTING_DATE'
+  | 'PRESENT_OLDER_THAN_15Y_USED_15Y'
+  | 'MISSING_USED_15_YEAR_TARGET';
+export type TrustedBaselineProviderFallbackState =
+  | 'PROVIDER_SUPPORTED'
+  | 'PROVIDER_UNKNOWN'
+  | 'PROVIDER_VALIDATION_FAILED'
+  | 'RETRY_BLOCKED_PROVIDER_VALIDATION'
+  | 'PROVIDER_UNSUPPORTED_OR_INACTIVE'
+  | 'YAHOO_INSUFFICIENT_FALLBACK_REQUIRED'
+  | 'FALLBACK_ATTEMPTED_STILL_INCOMPLETE';
+export type TrustedBaselineResidualState =
+  | 'REVIEW_READY'
+  | 'REQUIRED_HISTORY_INCOMPLETE'
+  | 'LISTING_DATE_MISSING_REQUIRED_15Y'
+  | 'FALLBACK_REQUIRED_AFTER_YAHOO_ZERO_ROWS'
+  | 'FALLBACK_ATTEMPTED_STILL_INCOMPLETE'
+  | 'CATALOG_IDENTITY_REPAIR_REQUIRED'
+  | 'RETRY_BLOCKED_PROVIDER_VALIDATION'
+  | 'PROVIDER_VALIDATION_PENDING'
+  | 'UNSUPPORTED_OR_INACTIVE_EXCLUDED';
 export type ReviewReadinessUserDecision = 'WAIT' | 'REPAIR_DATA' | 'PROCEED_LIMITED' | 'READY_FOR_REVIEW';
 export type ReviewReadinessBlockerCategory =
   | 'PROVIDER_VALIDATION'
@@ -344,6 +367,19 @@ export interface V1Instrument {
   price_readiness?: InstrumentUniverseReadiness['priceReadiness'];
   metadata_readiness?: InstrumentUniverseReadiness['metadataReadiness'];
   review_readiness?: InstrumentUniverseReadiness['reviewReadiness'];
+  trusted_baseline_residual_state?: TrustedBaselineResidualState;
+  trusted_baseline_blocker_codes?: string[];
+  latest_completed_eod_date?: string | null;
+  latest_completed_eod_present?: boolean;
+  stored_data_through_date?: string | null;
+  required_history_start_date?: string | null;
+  required_history_end_date?: string | null;
+  required_history_status?: TrustedBaselineRequiredHistoryStatus;
+  listing_date_status?: TrustedBaselineListingDateStatus;
+  provider_fallback_state?: TrustedBaselineProviderFallbackState;
+  primary_source_attempted?: 'YAHOO' | null;
+  fallback_sources_attempted?: string[];
+  source_fallback_reason?: string | null;
   is_active: boolean;
   is_delisted: boolean;
   ipo_date: string | null;
@@ -792,6 +828,20 @@ export interface TrustedReviewUniverseInstrument {
   latestVolume: number | null;
   adjustedCloseAvailable: boolean;
   usesAdjustedCloseFallback: boolean;
+  trustedBaselineResidualState: TrustedBaselineResidualState;
+  trustedBaselineBlockerCodes: string[];
+  latestCompletedEodDate: string | null;
+  latestCompletedEodPresent: boolean;
+  storedDataThroughDate: string | null;
+  requiredHistoryStartDate: string | null;
+  requiredHistoryEndDate: string | null;
+  requiredHistoryStatus: TrustedBaselineRequiredHistoryStatus;
+  listingDate: string | null;
+  listingDateStatus: TrustedBaselineListingDateStatus;
+  providerFallbackState: TrustedBaselineProviderFallbackState;
+  primarySourceAttempted: 'YAHOO' | null;
+  fallbackSourcesAttempted: string[];
+  sourceFallbackReason: string | null;
   contextGaps: string[];
   warnings: string[];
   priceHistory: TrustedReviewUniversePriceRow[];

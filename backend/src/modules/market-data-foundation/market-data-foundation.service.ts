@@ -51,6 +51,10 @@ import type {
   TrustedUniverseRepairWorkbench,
   TrustedReviewUniverseMode,
   TrustedReviewUniverseStatus,
+  TrustedBaselineListingDateStatus,
+  TrustedBaselineProviderFallbackState,
+  TrustedBaselineRequiredHistoryStatus,
+  TrustedBaselineResidualState,
   UniverseTrustStatus,
   ScheduledRegionSyncSummary,
   PaginationOptions,
@@ -361,6 +365,29 @@ type PriceBackfillCandidate = {
     storedHistoryCoveragePercent: number;
     requiredHistoryComplete: boolean;
   };
+};
+
+type TrustedBaselineSnapshot = {
+  trustedBaselineResidualState: TrustedBaselineResidualState;
+  trustedBaselineBlockerCodes: string[];
+  latestCompletedEodDate: string | null;
+  latestCompletedEodPresent: boolean;
+  storedDataThroughDate: string | null;
+  requiredHistoryStartDate: string | null;
+  requiredHistoryEndDate: string | null;
+  requiredHistoryStatus: TrustedBaselineRequiredHistoryStatus;
+  listingDate: string | null;
+  listingDateStatus: TrustedBaselineListingDateStatus;
+  providerFallbackState: TrustedBaselineProviderFallbackState;
+  primarySourceAttempted: 'YAHOO' | null;
+  fallbackSourcesAttempted: string[];
+  sourceFallbackReason: string | null;
+};
+
+type RepairStateLookup = {
+  providerValidation: any | null;
+  priceBackfill: any | null;
+  catalogIdentity: any | null;
 };
 
 type IndianExchangeFallbackResult = {
@@ -949,6 +976,14 @@ export class MarketDataFoundationService {
     const offset = Math.max(Number(options.offset) || 0, 0);
     const evaluation = await this.trustedReviewUniverseEvaluation(options);
     const selected = evaluation.trustedStocks.slice(offset, offset + limit);
+    const selectedReadinessBySymbol = new Map(selected.map((item) => [item.stock.symbol, item.readiness]));
+    const selectedStatsBySymbol = new Map(selected.map((item) => [item.stock.symbol, item.stats]));
+    const baselineByStockId = await this.trustedBaselineByStockId(
+      selected.map((item) => item.stock),
+      selectedReadinessBySymbol,
+      selectedStatsBySymbol,
+      evaluation.health.scope
+    );
     const historyBySymbol = typeof (this.repository as any).priceHistoryForSymbols === 'function'
       ? await (this.repository as any).priceHistoryForSymbols(selected.map((item) => item.stock.symbol), { perSymbolLimit: 320 })
       : new Map<string, never[]>();
@@ -969,6 +1004,20 @@ export class MarketDataFoundationService {
       latestVolume: this.numericOrNull(stats?.latestVolume),
       adjustedCloseAvailable: !readiness.usesAdjustedCloseFallback,
       usesAdjustedCloseFallback: readiness.usesAdjustedCloseFallback,
+      trustedBaselineResidualState: baselineByStockId.get(stock.id)?.trustedBaselineResidualState ?? 'REVIEW_READY',
+      trustedBaselineBlockerCodes: baselineByStockId.get(stock.id)?.trustedBaselineBlockerCodes ?? [],
+      latestCompletedEodDate: baselineByStockId.get(stock.id)?.latestCompletedEodDate ?? null,
+      latestCompletedEodPresent: baselineByStockId.get(stock.id)?.latestCompletedEodPresent ?? false,
+      storedDataThroughDate: baselineByStockId.get(stock.id)?.storedDataThroughDate ?? readiness.latestPriceDate,
+      requiredHistoryStartDate: baselineByStockId.get(stock.id)?.requiredHistoryStartDate ?? null,
+      requiredHistoryEndDate: baselineByStockId.get(stock.id)?.requiredHistoryEndDate ?? null,
+      requiredHistoryStatus: baselineByStockId.get(stock.id)?.requiredHistoryStatus ?? 'INCOMPLETE',
+      listingDate: baselineByStockId.get(stock.id)?.listingDate ?? null,
+      listingDateStatus: baselineByStockId.get(stock.id)?.listingDateStatus ?? 'MISSING_USED_15_YEAR_TARGET',
+      providerFallbackState: baselineByStockId.get(stock.id)?.providerFallbackState ?? 'PROVIDER_SUPPORTED',
+      primarySourceAttempted: baselineByStockId.get(stock.id)?.primarySourceAttempted ?? 'YAHOO',
+      fallbackSourcesAttempted: baselineByStockId.get(stock.id)?.fallbackSourcesAttempted ?? [],
+      sourceFallbackReason: baselineByStockId.get(stock.id)?.sourceFallbackReason ?? null,
       contextGaps,
       warnings,
       priceHistory: historyBySymbol.get(stock.symbol) || [],
@@ -2496,10 +2545,15 @@ export class MarketDataFoundationService {
       search: options.search,
     };
     const result = await this.list(requestOptions);
-    const readinessBySymbol = await this.universeReadinessForStocks(result.stocks, requestOptions);
+    const { readinessBySymbol, statsBySymbol } = await this.universeReadinessAndStatsForStocks(result.stocks, requestOptions);
+    const baselineByStockId = await this.trustedBaselineByStockId(result.stocks, readinessBySymbol, statsBySymbol, requestOptions);
 
     return {
-      instruments: result.stocks.map((stock) => this.toV1Instrument({ ...stock, universeReadiness: readinessBySymbol.get(stock.symbol) })),
+      instruments: result.stocks.map((stock) => this.toV1Instrument({
+        ...stock,
+        universeReadiness: readinessBySymbol.get(stock.symbol),
+        trustedBaseline: baselineByStockId.get(stock.id),
+      })),
       pagination: result.pagination,
     };
   }
@@ -2507,8 +2561,13 @@ export class MarketDataFoundationService {
   async getInstrument(id: string, options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
     const stock = await this.repository.findStockByIdInScope(id, options);
     if (!stock) return null;
-    const readinessBySymbol = await this.universeReadinessForStocks([stock], options);
-    return this.toV1Instrument({ ...stock, universeReadiness: readinessBySymbol.get(stock.symbol) });
+    const { readinessBySymbol, statsBySymbol } = await this.universeReadinessAndStatsForStocks([stock], options);
+    const baselineByStockId = await this.trustedBaselineByStockId([stock], readinessBySymbol, statsBySymbol, options);
+    return this.toV1Instrument({
+      ...stock,
+      universeReadiness: readinessBySymbol.get(stock.symbol),
+      trustedBaseline: baselineByStockId.get(stock.id),
+    });
   }
 
   async importCatalog(request: CatalogImportRequest): Promise<CatalogImportSummary> {
@@ -4502,13 +4561,6 @@ export class MarketDataFoundationService {
     return this.repository.prisma.$disconnect();
   }
 
-  private async universeReadinessForStocks(
-    stocks: any[],
-    options: Pick<PaginationOptions, 'region' | 'assetType'> = {}
-  ): Promise<Map<string, InstrumentUniverseReadiness>> {
-    return (await this.universeReadinessAndStatsForStocks(stocks, options)).readinessBySymbol;
-  }
-
   private async universeReadinessAndStatsForStocks(
     stocks: any[],
     options: Pick<PaginationOptions, 'region' | 'assetType'> = {}
@@ -4542,6 +4594,231 @@ export class MarketDataFoundationService {
       return [stock.symbol, readiness];
     }));
     return { readinessBySymbol, statsBySymbol };
+  }
+
+  private async trustedBaselineByStockId(
+    stocks: any[],
+    readinessBySymbol: Map<string, InstrumentUniverseReadiness>,
+    statsBySymbol: Map<string, any>,
+    options: Pick<PaginationOptions, 'region' | 'assetType'> = {}
+  ): Promise<Map<string, TrustedBaselineSnapshot>> {
+    if (stocks.length === 0) return new Map();
+    const scope = {
+      region: options.region?.trim().toUpperCase() || 'IN',
+      assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
+    };
+    const validationWindow = this.providerValidationWindow(scope);
+    const repositoryAny = this.repository as any;
+    const repairStatesByStockId = typeof repositoryAny.listRepairStatesForStocks === 'function'
+      ? await repositoryAny.listRepairStatesForStocks(
+        stocks.map((stock) => stock.id),
+        { ...scope, repairTypes: ['PROVIDER_VALIDATION', 'PRICE_BACKFILL', 'CATALOG_IDENTITY'] }
+      )
+      : new Map<string, any[]>();
+    const baselineByStockId = new Map<string, TrustedBaselineSnapshot>();
+
+    for (const stock of stocks) {
+      const readiness = readinessBySymbol.get(stock.symbol);
+      if (!readiness) continue;
+      const historyDiagnostics = this.requiredHistoryDiagnostics(stock, validationWindow, statsBySymbol.get(stock.symbol));
+      const repairStates = this.repairStateLookup(repairStatesByStockId.get(stock.id));
+      const sourceFallbackReason = this.sourceFallbackReasonForBaseline(repairStates.priceBackfill);
+      const requiredHistoryStatus = this.requiredHistoryStatusForBaseline(historyDiagnostics, sourceFallbackReason);
+      const listingDateStatus = this.listingDateStatusForBaseline(historyDiagnostics, validationWindow.defaultRequiredHistoryStartDateIso);
+      const providerFallbackState = this.providerFallbackStateForBaseline(
+        stock,
+        repairStates.providerValidation,
+        sourceFallbackReason,
+        requiredHistoryStatus
+      );
+      const residualState = this.residualStateForBaseline(
+        stock,
+        readiness,
+        historyDiagnostics,
+        listingDateStatus,
+        providerFallbackState,
+        requiredHistoryStatus,
+        sourceFallbackReason
+      );
+      const fallbackSourcesAttempted = this.fallbackSourcesAttemptedForBaseline(repairStates.priceBackfill, sourceFallbackReason);
+      const blockerCodes = this.trustedBaselineBlockerCodes(
+        stock,
+        readiness,
+        residualState,
+        requiredHistoryStatus,
+        listingDateStatus,
+        providerFallbackState,
+        sourceFallbackReason
+      );
+      baselineByStockId.set(stock.id, {
+        trustedBaselineResidualState: residualState,
+        trustedBaselineBlockerCodes: blockerCodes,
+        latestCompletedEodDate: historyDiagnostics.latestCompletedEodDate,
+        latestCompletedEodPresent: Boolean(
+          historyDiagnostics.latestCompletedEodDate
+          && historyDiagnostics.storedHistoryEndDate
+          && historyDiagnostics.storedHistoryEndDate >= historyDiagnostics.latestCompletedEodDate
+        ),
+        storedDataThroughDate: historyDiagnostics.storedHistoryEndDate || readiness.latestPriceDate,
+        requiredHistoryStartDate: historyDiagnostics.requiredHistoryStartDate,
+        requiredHistoryEndDate: historyDiagnostics.latestCompletedEodDate,
+        requiredHistoryStatus,
+        listingDate: historyDiagnostics.listingDate,
+        listingDateStatus,
+        providerFallbackState,
+        primarySourceAttempted: 'YAHOO',
+        fallbackSourcesAttempted,
+        sourceFallbackReason,
+      });
+    }
+
+    return baselineByStockId;
+  }
+
+  private repairStateLookup(states: any[] | undefined): RepairStateLookup {
+    const byType = new Map<string, any>();
+    for (const state of states || []) {
+      const repairType = String(state?.repairType || '').toUpperCase();
+      if (!repairType || byType.has(repairType)) continue;
+      byType.set(repairType, state);
+    }
+    return {
+      providerValidation: byType.get('PROVIDER_VALIDATION') || null,
+      priceBackfill: byType.get('PRICE_BACKFILL') || null,
+      catalogIdentity: byType.get('CATALOG_IDENTITY') || null,
+    };
+  }
+
+  private listingDateStatusForBaseline(
+    historyDiagnostics: ReturnType<MarketDataFoundationService['requiredHistoryDiagnostics']>,
+    defaultRequiredHistoryStartDateIso: string
+  ): TrustedBaselineListingDateStatus {
+    if (!historyDiagnostics.listingDate) return 'MISSING_USED_15_YEAR_TARGET';
+    if (historyDiagnostics.listingDate > defaultRequiredHistoryStartDateIso) return 'PRESENT_USED_LISTING_DATE';
+    return 'PRESENT_OLDER_THAN_15Y_USED_15Y';
+  }
+
+  private requiredHistoryStatusForBaseline(
+    historyDiagnostics: ReturnType<MarketDataFoundationService['requiredHistoryDiagnostics']>,
+    sourceFallbackReason: string | null
+  ): TrustedBaselineRequiredHistoryStatus {
+    if (sourceFallbackReason) return 'FALLBACK_REQUIRED';
+    return historyDiagnostics.requiredHistoryComplete ? 'COMPLETE' : 'INCOMPLETE';
+  }
+
+  private providerFallbackStateForBaseline(
+    stock: any,
+    providerValidationState: any,
+    sourceFallbackReason: string | null,
+    requiredHistoryStatus: TrustedBaselineRequiredHistoryStatus
+  ): TrustedBaselineProviderFallbackState {
+    if (stock.isActive === false || stock.isDelisted === true || normalizeProviderStatus(stock.providerSupportStatus) === 'UNSUPPORTED') {
+      return 'PROVIDER_UNSUPPORTED_OR_INACTIVE';
+    }
+    const providerStatus = normalizeProviderStatus(stock.providerSupportStatus);
+    if (providerStatus === 'UNKNOWN') return 'PROVIDER_UNKNOWN';
+    if (providerStatus === 'VALIDATION_FAILED') {
+      const retryBlocked = this.isProviderValidationRetryBlocked(providerValidationState);
+      return retryBlocked ? 'RETRY_BLOCKED_PROVIDER_VALIDATION' : 'PROVIDER_VALIDATION_FAILED';
+    }
+    if (sourceFallbackReason === 'YAHOO_ZERO_ROWS') return 'YAHOO_INSUFFICIENT_FALLBACK_REQUIRED';
+    if (sourceFallbackReason || requiredHistoryStatus === 'FALLBACK_REQUIRED') return 'FALLBACK_ATTEMPTED_STILL_INCOMPLETE';
+    return 'PROVIDER_SUPPORTED';
+  }
+
+  private residualStateForBaseline(
+    stock: any,
+    readiness: InstrumentUniverseReadiness,
+    historyDiagnostics: ReturnType<MarketDataFoundationService['requiredHistoryDiagnostics']>,
+    listingDateStatus: TrustedBaselineListingDateStatus,
+    providerFallbackState: TrustedBaselineProviderFallbackState,
+    requiredHistoryStatus: TrustedBaselineRequiredHistoryStatus,
+    sourceFallbackReason: string | null
+  ): TrustedBaselineResidualState {
+    if (stock.isActive === false || stock.isDelisted === true || normalizeProviderStatus(stock.providerSupportStatus) === 'UNSUPPORTED') {
+      return 'UNSUPPORTED_OR_INACTIVE_EXCLUDED';
+    }
+    if (providerFallbackState === 'RETRY_BLOCKED_PROVIDER_VALIDATION') return 'RETRY_BLOCKED_PROVIDER_VALIDATION';
+    if (providerFallbackState === 'PROVIDER_UNKNOWN' || providerFallbackState === 'PROVIDER_VALIDATION_FAILED') return 'PROVIDER_VALIDATION_PENDING';
+    if (sourceFallbackReason === 'YAHOO_ZERO_ROWS') return 'FALLBACK_REQUIRED_AFTER_YAHOO_ZERO_ROWS';
+    if (providerFallbackState === 'FALLBACK_ATTEMPTED_STILL_INCOMPLETE') return 'FALLBACK_ATTEMPTED_STILL_INCOMPLETE';
+    if (listingDateStatus === 'MISSING_USED_15_YEAR_TARGET') return 'LISTING_DATE_MISSING_REQUIRED_15Y';
+    if (requiredHistoryStatus !== 'COMPLETE') return 'REQUIRED_HISTORY_INCOMPLETE';
+    if (this.needsCatalogIdentityRepair(stock)) return 'CATALOG_IDENTITY_REPAIR_REQUIRED';
+    if (readiness.priceReadiness !== 'READY' || !historyDiagnostics.requiredHistoryComplete) return 'REQUIRED_HISTORY_INCOMPLETE';
+    return 'REVIEW_READY';
+  }
+
+  private trustedBaselineBlockerCodes(
+    stock: any,
+    readiness: InstrumentUniverseReadiness,
+    residualState: TrustedBaselineResidualState,
+    requiredHistoryStatus: TrustedBaselineRequiredHistoryStatus,
+    listingDateStatus: TrustedBaselineListingDateStatus,
+    providerFallbackState: TrustedBaselineProviderFallbackState,
+    sourceFallbackReason: string | null
+  ): string[] {
+    const blockers = new Set<string>(readiness.readinessBlockers);
+    if (requiredHistoryStatus !== 'COMPLETE') blockers.add('REQUIRED_HISTORY_INCOMPLETE');
+    if (listingDateStatus === 'MISSING_USED_15_YEAR_TARGET') blockers.add('LISTING_DATE_MISSING_REQUIRED_15Y');
+    if (sourceFallbackReason === 'YAHOO_ZERO_ROWS') blockers.add('FALLBACK_REQUIRED_AFTER_YAHOO_ZERO_ROWS');
+    if (providerFallbackState === 'FALLBACK_ATTEMPTED_STILL_INCOMPLETE') blockers.add('FALLBACK_ATTEMPTED_STILL_INCOMPLETE');
+    if (providerFallbackState === 'RETRY_BLOCKED_PROVIDER_VALIDATION') blockers.add('RETRY_BLOCKED_PROVIDER_VALIDATION');
+    if (providerFallbackState === 'PROVIDER_UNKNOWN' || providerFallbackState === 'PROVIDER_VALIDATION_FAILED') blockers.add('PROVIDER_VALIDATION_PENDING');
+    if (this.needsCatalogIdentityRepair(stock)) blockers.add('CATALOG_IDENTITY_REPAIR_REQUIRED');
+    if (residualState !== 'REVIEW_READY') blockers.add(residualState);
+    return Array.from(blockers);
+  }
+
+  private sourceFallbackReasonForBaseline(priceBackfillState: any): string | null {
+    if (!priceBackfillState) return null;
+    const fields = this.asJsonObject(priceBackfillState.fieldsFilledJson);
+    const fromFields = typeof fields?.sourceFallbackReason === 'string' && fields.sourceFallbackReason.trim().length > 0
+      ? fields.sourceFallbackReason.trim().toUpperCase()
+      : null;
+    if (fromFields) return fromFields;
+    const manualReason = String(priceBackfillState.manualRequiredReason || '').trim();
+    if (!this.isOfficialFallbackManualReason(manualReason)) return null;
+    const yahooZeroRows = /zero usable price rows/i.test(manualReason);
+    if (yahooZeroRows) return 'YAHOO_ZERO_ROWS';
+    return 'OFFICIAL_FALLBACK_ATTEMPTED_STILL_INCOMPLETE';
+  }
+
+  private fallbackSourcesAttemptedForBaseline(priceBackfillState: any, sourceFallbackReason: string | null): string[] {
+    const fields = this.asJsonObject(priceBackfillState?.fieldsFilledJson);
+    const attempted = new Set<string>();
+    if (Array.isArray(fields?.fallbackSourcesAttempted)) {
+      for (const item of fields.fallbackSourcesAttempted) {
+        if (typeof item === 'string' && item.trim().length > 0) attempted.add(item.trim().toUpperCase());
+      }
+    }
+    if (typeof fields?.fallbackSourceAttempted === 'string' && fields.fallbackSourceAttempted.trim().length > 0) {
+      attempted.add(fields.fallbackSourceAttempted.trim().toUpperCase());
+    }
+    if (attempted.size === 0 && sourceFallbackReason) {
+      attempted.add(sourceFallbackReason === 'YAHOO_ZERO_ROWS' ? 'OFFICIAL_PUBLIC_EXCHANGE_PENDING' : 'OFFICIAL_PUBLIC_EXCHANGE_ATTEMPTED');
+    }
+    return Array.from(attempted);
+  }
+
+  private isProviderValidationRetryBlocked(providerValidationState: any): boolean {
+    if (!providerValidationState) return false;
+    const status = String(providerValidationState.status || '').toUpperCase();
+    if (status === 'RETRY_COOLDOWN') return true;
+    if (status !== 'FAILED_RETRYABLE') return false;
+    if (!providerValidationState.nextRetryAt) return false;
+    const retryAt = new Date(providerValidationState.nextRetryAt);
+    return Number.isFinite(retryAt.getTime()) && retryAt.getTime() > Date.now();
+  }
+
+  private asJsonObject(value: unknown): Record<string, any> | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    return value as Record<string, any>;
+  }
+
+  private isOfficialFallbackManualReason(reason: string): boolean {
+    if (!reason) return false;
+    return /official\/public exchange fallback/i.test(reason);
   }
 
   private emptyUniverseCounts(): MarketDataUniverseHealth['counts'] {
@@ -7038,6 +7315,7 @@ export class MarketDataFoundationService {
     });
     const derivativesEligible = Boolean(stock.derivativesEligible) || (assetType === 'STOCK' && this.isKnownNseDerivativesEligibleStock(symbolParts.sourceSymbol));
     const readiness = stock.universeReadiness as InstrumentUniverseReadiness | undefined;
+    const trustedBaseline = stock.trustedBaseline as TrustedBaselineSnapshot | undefined;
     const missingFields = this.missingMetadataFields({
       companyName: overrides?.company_name || stock.name,
       exchange: overrides?.exchange || stock.exchange,
@@ -7095,6 +7373,19 @@ export class MarketDataFoundationService {
       price_readiness: readiness?.priceReadiness,
       metadata_readiness: readiness?.metadataReadiness,
       review_readiness: readiness?.reviewReadiness,
+      trusted_baseline_residual_state: trustedBaseline?.trustedBaselineResidualState,
+      trusted_baseline_blocker_codes: trustedBaseline?.trustedBaselineBlockerCodes,
+      latest_completed_eod_date: trustedBaseline?.latestCompletedEodDate ?? null,
+      latest_completed_eod_present: trustedBaseline?.latestCompletedEodPresent,
+      stored_data_through_date: trustedBaseline?.storedDataThroughDate ?? readiness?.latestPriceDate ?? null,
+      required_history_start_date: trustedBaseline?.requiredHistoryStartDate ?? null,
+      required_history_end_date: trustedBaseline?.requiredHistoryEndDate ?? null,
+      required_history_status: trustedBaseline?.requiredHistoryStatus,
+      listing_date_status: trustedBaseline?.listingDateStatus,
+      provider_fallback_state: trustedBaseline?.providerFallbackState,
+      primary_source_attempted: trustedBaseline?.primarySourceAttempted,
+      fallback_sources_attempted: trustedBaseline?.fallbackSourcesAttempted,
+      source_fallback_reason: trustedBaseline?.sourceFallbackReason ?? null,
       is_active: stock.isActive ?? true,
       is_delisted: stock.isDelisted ?? false,
       ipo_date: stock.ipoDate instanceof Date ? stock.ipoDate.toISOString() : stock.ipoDate ? new Date(stock.ipoDate).toISOString() : null,

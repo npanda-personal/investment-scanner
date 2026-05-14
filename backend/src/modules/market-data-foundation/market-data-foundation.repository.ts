@@ -551,6 +551,39 @@ export class MarketDataFoundationRepository {
     });
   }
 
+  async listRepairStatesForStocks(
+    stockIds: string[],
+    options: Pick<PaginationOptions, 'region' | 'assetType'> & { repairTypes?: MarketDataRepairType[] } = {}
+  ) {
+    const uniqueStockIds = [...new Set(stockIds.filter((id) => typeof id === 'string' && id.trim().length > 0))];
+    if (uniqueStockIds.length === 0) return new Map<string, any[]>();
+    const rows = await (this.prisma as any).marketDataRepairState.findMany({
+      where: {
+        stockId: { in: uniqueStockIds },
+        ...(options.region ? { region: options.region } : {}),
+        ...(options.assetType ? { assetType: options.assetType } : {}),
+        ...(options.repairTypes?.length ? { repairType: { in: options.repairTypes } } : {}),
+      },
+      select: {
+        stockId: true,
+        repairType: true,
+        status: true,
+        provider: true,
+        error: true,
+        manualRequiredReason: true,
+        nextRetryAt: true,
+        fieldsFilledJson: true,
+      },
+    });
+    const grouped = new Map<string, any[]>();
+    for (const row of rows) {
+      const existing = grouped.get(row.stockId);
+      if (existing) existing.push(row);
+      else grouped.set(row.stockId, [row]);
+    }
+    return grouped;
+  }
+
   async listStocksForProviderValidation(options: Pick<PaginationOptions, 'region' | 'assetType'> & {
     offset: number;
     batchSize: number;

@@ -231,6 +231,35 @@ describe('MarketDataFoundationRepository', () => {
     }));
   });
 
+  it('groups repair states by stock id for trusted baseline classification', async () => {
+    const prisma = {
+      marketDataRepairState: {
+        findMany: jest.fn().mockResolvedValue([
+          { stockId: 'stock-1', repairType: 'PRICE_BACKFILL', status: 'MANUAL_REQUIRED' },
+          { stockId: 'stock-1', repairType: 'PROVIDER_VALIDATION', status: 'RETRY_COOLDOWN' },
+          { stockId: 'stock-2', repairType: 'CATALOG_IDENTITY', status: 'MANUAL_REQUIRED' },
+        ]),
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    const result = await repository.listRepairStatesForStocks(['stock-1', 'stock-2'], {
+      region: 'IN',
+      assetType: 'STOCK',
+      repairTypes: ['PRICE_BACKFILL', 'PROVIDER_VALIDATION', 'CATALOG_IDENTITY'],
+    });
+
+    expect(prisma.marketDataRepairState.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        stockId: { in: ['stock-1', 'stock-2'] },
+        region: 'IN',
+        assetType: 'STOCK',
+      }),
+    }));
+    expect(result.get('stock-1')).toHaveLength(2);
+    expect(result.get('stock-2')).toHaveLength(1);
+  });
+
   it('summarizes price readiness stats by symbol for universe classification', async () => {
     const latestTimestamp = new Date('2026-05-08T00:00:00.000Z');
     const qualityRows = Array.from({ length: 252 }).map((_, index) => ({

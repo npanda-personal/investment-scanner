@@ -1,5 +1,5 @@
 /// <reference types="@types/jest" />
-import { MarketDataFoundationService, classifyInstrumentUniverseReadiness } from '../../../src/modules/market-data-foundation';
+import { MarketDataFoundationService, classifyInstrumentUniverseReadiness, latestCompletedTradingDateForRegion } from '../../../src/modules/market-data-foundation';
 
 const freshDate = '2026-05-11';
 const expectedDate = '2026-05-11';
@@ -300,6 +300,42 @@ describe('Market Data Foundation universe readiness', () => {
     });
     expect(result.excludedCounts.insufficientBarsUnder120).toBe(0);
     expect(result.warnings).toEqual(expect.arrayContaining(['Missing metadata is shown as context gap, not a hard blocker for price-action review.']));
+  });
+
+  it('exposes additive trusted-baseline fields on trusted review instruments', async () => {
+    const latestCompleted = latestCompletedTradingDateForRegion('IN') as string;
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue([
+        {
+          ...stockRow('trusted-1', 'TRUSTED.NS', 'SUPPORTED'),
+          sourceSymbol: 'TRUSTED',
+          displaySymbol: 'TRUSTED',
+          catalogSource: 'NSE_EQUITY_SECURITIES',
+        },
+      ]),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['TRUSTED.NS', completeHistoryPriceStats({ latestPriceDate: latestCompleted })],
+      ])),
+      priceHistoryForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['TRUSTED.NS', [{ date: latestCompleted, open: 1, high: 2, low: 1, close: 2, adjustedClose: 2, volume: 100 }]],
+      ])),
+      listRepairStatesForStocks: jest.fn().mockResolvedValue(new Map()),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+
+    const rows = await service.listTrustedReviewUniverseInstruments({ region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      symbol: 'TRUSTED.NS',
+      trustedBaselineResidualState: 'REVIEW_READY',
+      requiredHistoryStatus: 'COMPLETE',
+      listingDateStatus: 'PRESENT_OLDER_THAN_15Y_USED_15Y',
+      providerFallbackState: 'PROVIDER_SUPPORTED',
+      latestCompletedEodDate: latestCompleted,
+      primarySourceAttempted: 'YAHOO',
+    });
+    expect(Array.isArray(rows[0].trustedBaselineBlockerCodes)).toBe(true);
   });
 
   it('publishes the pre-market target session with the previous completed EOD requirement', async () => {
