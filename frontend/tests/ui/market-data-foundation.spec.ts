@@ -74,6 +74,10 @@ const catalogSyncStatus = (overrides: Record<string, unknown> = {}) => ({
 });
 
 test.describe('Market Data Foundation UI', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockAuthenticatedUser(page);
+  });
+
   test('data health tab renders universe readiness counts and blockers', async ({ page }) => {
     const signoffFail = {
       status: 'FAIL',
@@ -915,27 +919,37 @@ test.describe('Market Data Foundation UI', () => {
     await visitModule(page, '/market-data-foundation', 'Market Data Foundation');
     await page.getByRole('tab', { name: 'Data Health' }).click();
 
+    await expect(page.getByText('Downstream Gate')).toBeVisible();
+    await expect(page.getByText('Gate: LIMITED')).toBeVisible();
+    await expect(page.getByText('Required data-through: 2026-05-11').first()).toBeVisible();
+    await expect(page.getByText('Stored data-through: 2026-05-11').first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /Next bounded action: VALIDATE_PROVIDERS/ })).toBeVisible();
+    await expect(page.getByText('PROVIDER_UNKNOWN: Provider support not validated (2,909)')).toBeVisible();
+    await expect(page.getByText('Latest run outcome: Completed')).toBeVisible();
+    const topBandOutcomeChipClass = await page.locator('.MuiChip-root', { hasText: 'Latest run outcome: Completed' }).getAttribute('class');
+    expect(topBandOutcomeChipClass).toContain('MuiChip-colorWarning');
+
     await expect(page.getByRole('heading', { name: 'Universe Health' })).toBeVisible();
-    await expect(page.getByText('Trust: NOT_TRUSTWORTHY')).toBeVisible();
+    await expect(page.getByText('Trust: NOT_TRUSTWORTHY').first()).toBeVisible();
     await expect(page.getByText('2,910 / 0')).toBeVisible();
     await expect(page.getByText('2,909 unknown, 7 retry failed, 0 unsupported excluded')).toBeVisible();
     await expect(page.getByRole('heading', { name: '0.0%' }).first()).toBeVisible();
     await expect(page.getByRole('heading', { name: '0.1%' }).first()).toBeVisible();
-    await expect(page.getByText('Latest EOD price is stale')).toBeVisible();
-    await expect(page.getByText('Latest EOD price missing')).toBeVisible();
-    await expect(page.getByText('Less than 252 daily bars')).toBeVisible();
-    await expect(page.getByText('Recent volume missing')).toBeVisible();
-    await expect(page.getByText('Sector metadata missing')).toBeVisible();
-    await expect(page.getByText('Industry metadata missing')).toBeVisible();
+    await expect(page.getByText('Latest EOD price is stale', { exact: true })).toBeVisible();
+    await expect(page.getByText('Latest EOD price missing', { exact: true })).toBeVisible();
+    await expect(page.getByText('Less than 252 daily bars', { exact: true })).toBeVisible();
+    await expect(page.getByText('Recent volume missing', { exact: true })).toBeVisible();
+    await expect(page.getByText('Sector metadata missing', { exact: true })).toBeVisible();
+    await expect(page.getByText('Industry metadata missing', { exact: true })).toBeVisible();
     await expect(page.getByText(/Today's Plan remains blocked/)).toBeVisible();
     await expect(page.getByText('Universe Signoff')).toBeVisible();
-    await expect(page.getByText('Signoff: FAIL')).toBeVisible();
-    await expect(page.getByText('Downstream allowed: no')).toBeVisible();
-    await expect(page.getByText('Review-ready: 0 / 300')).toBeVisible();
+    await expect(page.getByText('Signoff: FAIL').first()).toBeVisible();
+    await expect(page.getByText('Downstream allowed: no').first()).toBeVisible();
+    await expect(page.getByText('Review-ready: 0 / 300').first()).toBeVisible();
     await expect(page.getByText('15-year/listing-date coverage incomplete: 144')).toBeVisible();
     await expect(page.getByText('Listing date missing for coverage: 140')).toBeVisible();
     await expect(page.getByText('History fallback required: 2')).toBeVisible();
-    await expect(page.getByText('Next action: VALIDATE_PROVIDERS')).toBeVisible();
+    await expect(page.getByText('Next action: VALIDATE_PROVIDERS').first()).toBeVisible();
     await expect(page.getByText('Stock Missing Data Diagnostics')).toBeVisible();
     await expect(page.getByText('Identity mismatch warnings: 3')).toBeVisible();
     await expect(page.getByText('BAD.NS: Provider symbol suffix mismatch; provider BAD -> BAD.NS; source BAD; exchange NSE.')).toBeVisible();
@@ -946,10 +960,10 @@ test.describe('Market Data Foundation UI', () => {
     await expect(page.getByText('Next action: Validate unknown providers')).toBeVisible();
     await expect(page.getByText('Bounded request: batch 50')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Trusted Review Universe' })).toBeVisible();
-    await expect(page.getByText('Status: LIMITED')).toBeVisible();
+    await expect(page.getByText('Status: LIMITED').first()).toBeVisible();
     await expect(page.getByText('Mode: LIMITED_REVIEW').first()).toBeVisible();
     await expect(page.getByText('Trusted review universe: 144')).toBeVisible();
-    await expect(page.getByText('Target session: 2026-05-12')).toBeVisible();
+    await expect(page.getByText('Target session: 2026-05-12').first()).toBeVisible();
     await expect(page.getByText('Required data-through: 2026-05-11').first()).toBeVisible();
     await expect(page.getByText('Stored data-through: 2026-05-11').first()).toBeVisible();
     await expect(page.getByText('Stale latest price excluded: 200')).toBeVisible();
@@ -1022,13 +1036,14 @@ test.describe('Market Data Foundation UI', () => {
       .getByRole('heading', { name: 'Provider validation' })
       .locator('xpath=ancestor::div[contains(@class, "MuiBox-root")][2]');
     await expect(providerValidationLane.getByText('Latest run COMPLETED: success 45, failed 5, skipped 0, warnings 1.', { exact: true })).toBeVisible();
-    await expect(page.getByText('POST /api/v1/market-data/provider/validate; IN/STOCK; batch 50')).toBeVisible();
+    await expect(page.getByText('POST /api/v1/market-data/provider/validate; IN/STOCK; batch 50').first()).toBeVisible();
     await expect(page.getByText('Requires explicit manual metadata CSV payload.')).toBeVisible();
     await expect(page.getByText('Provider unknown', { exact: true })).toBeVisible();
     await expect(page.getByText('Retry eligible providers', { exact: true })).toBeVisible();
     await expect(page.getByText('Retry cooldown providers', { exact: true })).toBeVisible();
     await expect(page.getByText('Manual provider repair', { exact: true })).toBeVisible();
     await expect(page.getByText('Retry blocked until 2,909 unknown provider rows drain.')).toBeVisible();
+    await expect(page.getByText('Retry failed providers disabled: UNKNOWN queue still has 2,909 rows.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Retry failed providers' })).toBeVisible();
     await expect(page.getByText('Unsupported excluded', { exact: true })).toBeVisible();
     await expect(page.getByText('Supported identity gaps', { exact: true })).toBeVisible();
@@ -1112,7 +1127,7 @@ test.describe('Market Data Foundation UI', () => {
     await expect(page.getByText(/Manual metadata template loaded with 2 unresolved rows/)).toBeVisible();
     await expect(page.getByLabel('Manual metadata CSV')).toHaveValue(/symbol,providerSymbol,companyName/);
     await page.getByLabel('Manual metadata CSV').fill('symbol,sector,industry\nABB,Industrials,Electrical Equipment\n');
-    await expect(page.getByText('CSV must include marketCap.')).toBeVisible();
+    await expect(page.getByText('CSV must include marketCap.', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Import manual metadata' })).toBeDisabled();
     await page.getByLabel('Manual metadata CSV').fill('symbol,sector,industry,marketCap\nABB,Industrials,Electrical Equipment,1000\n');
     await expect(page.getByText('marketCap is required to fully resolve business metadata')).toHaveCount(0);
@@ -1134,7 +1149,7 @@ test.describe('Market Data Foundation UI', () => {
     await expect(page.getByText(/No more rows in this repair queue/)).toBeVisible();
 
     await page.getByLabel('Manual metadata CSV').fill('symbol,sector,industry,marketCap\nABB,Unknown,N/A,0\n');
-    await expect(page.getByText('Sector cannot be Unknown, N/A, NA, None, Null, or blank.')).toBeVisible();
+    await expect(page.getByText('Sector cannot be Unknown, N/A, NA, None, Null, or blank.', { exact: true })).toBeVisible();
     await expect(page.getByText('marketCap must be a positive number.', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Import manual metadata' })).toBeDisabled();
 
@@ -1334,6 +1349,10 @@ test.describe('Market Data Foundation UI', () => {
     await visitModule(page, '/market-data-foundation', 'Market Data Foundation');
     await page.getByRole('tab', { name: 'Data Health' }).click();
 
+    await expect(page.getByText('Downstream Gate')).toBeVisible();
+    await expect(page.getByText('Gate: BLOCKED')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Next bounded action: NONE/ })).toBeDisabled();
+    await expect(page.getByText('Disabled: no bounded lane action is available for this scope.')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Universe Health' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Trusted Review Universe' })).toBeVisible();
     await expect(page.getByText('Review Readiness Summary')).toBeVisible();

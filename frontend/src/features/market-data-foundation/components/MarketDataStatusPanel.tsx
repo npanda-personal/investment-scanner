@@ -126,6 +126,25 @@ const repairRunColor = (run?: Pick<MarketDataRepairRunResponse, 'status' | 'anot
   return 'default';
 };
 
+type DownstreamGateState = 'ALLOWED' | 'LIMITED' | 'BLOCKED';
+
+const gateStateColor = (state: DownstreamGateState): 'success' | 'warning' | 'error' => {
+  if (state === 'ALLOWED') return 'success';
+  if (state === 'LIMITED') return 'warning';
+  return 'error';
+};
+
+const repairOutcomeLabel = (runStatus?: MarketDataRepairRunRecord['status'] | null) => {
+  if (!runStatus) return 'No latest run';
+  if (runStatus === 'PARTIAL_MANUAL_REQUIRED') return 'Partial - Manual Required';
+  if (runStatus === 'PARTIAL_BLOCKED') return 'Partial - Blocked';
+  if (runStatus === 'PARTIAL') return 'Partial - Another Run Needed';
+  if (runStatus === 'COMPLETED') return 'Completed';
+  if (runStatus === 'RUNNING') return 'Running';
+  if (runStatus === 'FAILED') return 'Failed';
+  return runStatus;
+};
+
 interface MarketDataStatusPanelProps {
   region?: string;
   assetType?: string;
@@ -385,6 +404,53 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
     : providerRetryEligible === 0 && (providerRetryBlocked > 0 || providerManualRequired > 0)
       ? `Retry blocked: ${formatCount(providerRetryBlocked)} cooldown and ${formatCount(providerManualRequired)} manual rows remain.`
       : null;
+  const gateState: DownstreamGateState = (() => {
+    const signoffPass = universeHealth?.universeSignoff?.status === 'PASS';
+    const downstreamAllowed = Boolean(universeHealth?.universeSignoff?.downstreamAllowed);
+    const trustedOk = universeHealth?.trustStatus === 'OK';
+    if (signoffPass && downstreamAllowed && trustedOk) return 'ALLOWED';
+    if (reviewReadiness?.reviewMode === 'LIMITED_REVIEW' || trustedReviewUniverse?.status === 'LIMITED' || universeHealth?.trustStatus === 'PARTIAL') return 'LIMITED';
+    return 'BLOCKED';
+  })();
+  const topGateBlockers = (universeHealth?.topBlockers || []).slice(0, 3);
+  const primaryBoundedAction = repairWorkbench?.lanes.find((lane) => lane.code === repairWorkbench?.recommendedNextLane)
+    || repairWorkbench?.lanes.find((lane) => lane.nextAction.enabled)
+    || null;
+  const primaryActionCode = primaryBoundedAction ? laneRepairAction(primaryBoundedAction) : null;
+  const primaryActionDisabledReason = (() => {
+    if (!primaryBoundedAction) return 'Disabled: no bounded lane action is available for this scope.';
+    if (repairRunning || repairRunRunning) return 'Disabled: another repair action is already running.';
+    if (!primaryActionCode) return `Disabled: unsupported next action ${primaryBoundedAction.nextAction.actionCode}.`;
+    if (!primaryBoundedAction.nextAction.enabled) return `Disabled: ${primaryBoundedAction.nextAction.disabledReason || 'lane prerequisites are not met.'}`;
+    return null;
+  })();
+  const primaryActionDisabled = Boolean(primaryActionDisabledReason);
+  const primaryActionSummary = primaryBoundedAction
+    ? `${primaryBoundedAction.nextAction.method} ${primaryBoundedAction.nextAction.endpoint}; ${primaryBoundedAction.nextAction.request.region}/${primaryBoundedAction.nextAction.request.assetType}; batch ${primaryBoundedAction.nextAction.request.batchSize}`
+    : 'No bounded action published.';
+  const latestRunOutcomeLabel = repairOutcomeLabel(latestRepairRun?.status);
+  const latestRunOutcomeColor = latestRepairRun
+    ? latestRepairRun.status === 'FAILED'
+      ? 'error'
+      : latestRepairRun.status === 'PARTIAL' || latestRepairRun.status === 'PARTIAL_BLOCKED' || latestRepairRun.status === 'PARTIAL_MANUAL_REQUIRED'
+        ? 'warning'
+        : repairRunColor(latestRepairRun)
+    : 'default';
+
+  const validateUnknownDisabled = Boolean(repairRunning) || providerUnknownRemaining === 0;
+  const retryFailedDisabled = Boolean(repairRunning) || providerUnknownRemaining > 0 || providerRetryEligible === 0;
+  const catalogIdentityDisabled = Boolean(repairRunning) || ((repairPlan?.supportedCatalogIdentityRepairNeeded ?? repairPlan?.catalogIdentityRepairNeeded ?? 0) === 0);
+  const businessMetadataDisabled = Boolean(repairRunning) || (((repairPlan?.businessMetadataAutoRepairable ?? repairPlan?.businessMetadataRepairNeeded ?? repairPlan?.metadataEnrichmentNeeded) || 0) + (repairPlan?.businessMetadataRetryEligible || 0)) === 0;
+  const manualMetadataDisabled = Boolean(repairRunning) || !manualMetadataCsv.trim() || manualMetadataErrors.length > 0;
+  const backfillPricesDisabled = Boolean(repairRunning) || ((repairPlan?.supportedPriceBackfillNeeded ?? repairPlan?.priceBackfillNeeded ?? 0) === 0);
+  const workflowDisabledReasons = [
+    validateUnknownDisabled ? `Validate unknown providers disabled: ${repairRunning ? 'another repair action is running.' : 'no UNKNOWN providers remain in queue.'}` : null,
+    retryFailedDisabled ? `Retry failed providers disabled: ${repairRunning ? 'another repair action is running.' : providerUnknownRemaining > 0 ? `UNKNOWN queue still has ${formatCount(providerUnknownRemaining)} rows.` : 'no retry-eligible providers remain.'}` : null,
+    catalogIdentityDisabled ? `Repair catalog identity disabled: ${repairRunning ? 'another repair action is running.' : 'no supported catalog identity gaps remain.'}` : null,
+    businessMetadataDisabled ? `Enrich provider business metadata disabled: ${repairRunning ? 'another repair action is running.' : 'no auto-repairable metadata rows remain.'}` : null,
+    manualMetadataDisabled ? `Import manual metadata disabled: ${repairRunning ? 'another repair action is running.' : !manualMetadataCsv.trim() ? 'manual CSV is empty.' : manualMetadataErrors[0] || 'manual CSV validation failed.'}` : null,
+    backfillPricesDisabled ? `Backfill prices disabled: ${repairRunning ? 'another repair action is running.' : 'no supported price-backfill queue remains.'}` : null,
+  ].filter(Boolean) as string[];
   const coverageStatus = (summary: MarketDataRepairSummary) => {
     if (summary.requiredHistoryCoverageStatus) return summary.requiredHistoryCoverageStatus;
     if (hasPositive(summary.historyCoverageFallbackRequired) || hasPositive(summary.freeFallbackRequired)) return 'FALLBACK_REQUIRED';
@@ -488,6 +554,79 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
 
   return (
     <Stack spacing={2} sx={{ mb: 3 }}>
+      <Box
+        sx={{
+          border: '1px solid',
+          borderColor: gateStateColor(gateState) === 'success' ? 'success.main' : gateStateColor(gateState) === 'warning' ? 'warning.main' : 'error.main',
+          borderRadius: 1,
+          p: 2,
+          bgcolor: gateState === 'ALLOWED' ? 'success.50' : gateState === 'LIMITED' ? 'warning.50' : 'error.50',
+        }}
+      >
+        <Stack spacing={1.5}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} justifyContent="space-between">
+            <Box>
+              <Typography variant="subtitle1" fontWeight={700}>Downstream Gate</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Gate-first status for downstream review workflows.
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+              <Chip label={`Gate: ${gateState}`} color={gateStateColor(gateState)} />
+              <Chip
+                label={`Signoff: ${universeHealth?.universeSignoff?.status || 'FAIL'}`}
+                color={universeHealth?.universeSignoff?.status === 'PASS' ? 'success' : 'error'}
+                variant="outlined"
+              />
+              <Chip
+                label={`Trust: ${universeHealth?.trustStatus || 'UNKNOWN'}`}
+                color={trustColor(universeHealth?.trustStatus)}
+                variant="outlined"
+              />
+            </Stack>
+          </Stack>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 1 }}>
+            <Typography variant="caption">Downstream allowed: {universeHealth?.universeSignoff?.downstreamAllowed ? 'yes' : 'no'}</Typography>
+            <Typography variant="caption">Review-ready: {formatCount(universeHealth?.universeSignoff?.reviewReadyActual)} / {formatCount(universeHealth?.universeSignoff?.minReviewReadyRequired)}</Typography>
+            <Typography variant="caption">Required data-through: {trustedReviewUniverse?.requiredDataThroughDate || reviewReadiness?.reviewUniverse.requiredDataThroughDate || 'unknown'}</Typography>
+            <Typography variant="caption">Stored data-through: {trustedReviewUniverse?.storedDataThroughDate || reviewReadiness?.reviewUniverse.storedDataThroughDate || 'none'}</Typography>
+          </Box>
+          <Stack spacing={0.5}>
+            <Typography variant="caption" fontWeight={700}>Top blockers</Typography>
+            {topGateBlockers.length ? topGateBlockers.map((blocker) => (
+              <Typography key={blocker.code} variant="caption" color={blocker.severity === 'critical' ? 'error.main' : 'warning.main'}>
+                {blocker.code}: {blocker.label} ({formatCount(blocker.count)})
+              </Typography>
+            )) : (
+              <Typography variant="caption" color="text.secondary">No active top blockers reported.</Typography>
+            )}
+          </Stack>
+          <Stack spacing={0.5}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'flex-start', sm: 'center' }} useFlexGap flexWrap="wrap">
+              <Button
+                variant="contained"
+                size="small"
+                color={gateState === 'ALLOWED' ? 'success' : 'warning'}
+                disabled={primaryActionDisabled}
+                onClick={() => primaryBoundedAction && primaryActionCode && void runRepair(primaryActionCode, primaryBoundedAction.nextAction.request)}
+              >
+                Next bounded action: {primaryBoundedAction?.nextAction.actionCode || 'NONE'}
+              </Button>
+              <Typography variant="caption" color="text.secondary">{primaryActionSummary}</Typography>
+            </Stack>
+            {primaryActionDisabledReason && (
+              <Typography variant="caption" color="warning.main">{primaryActionDisabledReason}</Typography>
+            )}
+          </Stack>
+          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+            <Chip label={`Latest run outcome: ${latestRunOutcomeLabel}`} color={latestRunOutcomeColor} />
+            {latestRepairRun?.anotherRunNeeded && <Chip label="Another run needed" color="warning" variant="outlined" />}
+            {latestRepairRun?.status === 'PARTIAL_MANUAL_REQUIRED' && <Chip label="Manual required" color="warning" variant="outlined" />}
+            {latestRepairRun?.status === 'PARTIAL_BLOCKED' && <Chip label="Blocked outcome" color="warning" variant="outlined" />}
+          </Stack>
+        </Stack>
+      </Box>
+
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'center' }} justifyContent="space-between">
         <Box>
           <Typography variant="h6">Universe Health</Typography>
@@ -675,6 +814,13 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
             {(repairWorkbench?.lanes || []).map((lane) => {
               const action = laneRepairAction(lane);
               const disabled = Boolean(repairRunning || repairRunRunning) || !lane.nextAction.enabled || !action;
+              const laneDisabledReason = disabled
+                ? repairRunning || repairRunRunning
+                  ? 'Disabled: another repair action is already running.'
+                  : !action
+                    ? `Disabled: unsupported lane action ${lane.nextAction.actionCode}.`
+                    : `Disabled: ${lane.nextAction.disabledReason || 'lane prerequisites are not met.'}`
+                : null;
               return (
                 <Box key={lane.code} sx={{ p: 1.5, border: '1px solid', borderColor: lane.code === repairWorkbench?.recommendedNextLane ? 'warning.main' : 'divider', borderRadius: 1 }}>
                   <Stack spacing={1}>
@@ -710,7 +856,9 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
                         {lane.nextAction.actionCode}
                       </Button>
                       <Typography variant="caption" color={lane.nextAction.enabled ? 'text.secondary' : 'warning.main'}>
-                        {lane.nextAction.enabled
+                        {disabled
+                          ? laneDisabledReason
+                          : lane.nextAction.enabled
                           ? `${lane.nextAction.method} ${lane.nextAction.endpoint}; ${lane.nextAction.request.region}/${lane.nextAction.request.assetType}; batch ${lane.nextAction.request.batchSize}`
                           : lane.nextAction.disabledReason}
                       </Typography>
@@ -788,6 +936,15 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
                   {repairRunResult.dryRun ? 'Dry-run expected actions' : `Repair run ${repairRunResult.status}`}:
                   {' '}updated {formatCount(repairRunResult.summary.updated)}, skipped {formatCount(repairRunResult.summary.skipped)}, failed {formatCount(repairRunResult.summary.failed)}, manual-required {formatCount(repairRunResult.summary.manualRequired)}.
                 </Typography>
+                <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                  <Chip
+                    size="small"
+                    label={`Outcome: ${repairOutcomeLabel(repairRunResult.status)}`}
+                    color={repairRunResult.status === 'FAILED' ? 'error' : repairRunResult.status === 'PARTIAL' || repairRunResult.status === 'PARTIAL_BLOCKED' || repairRunResult.status === 'PARTIAL_MANUAL_REQUIRED' ? 'warning' : 'default'}
+                  />
+                  {repairRunResult.anotherRunNeeded && <Chip size="small" label="Another run needed" color="warning" variant="outlined" />}
+                  {repairRunResult.status === 'PARTIAL_MANUAL_REQUIRED' && <Chip size="small" label="Manual required" color="warning" variant="outlined" />}
+                </Stack>
                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 1 }}>
                   <Typography variant="caption">Review-ready: {formatCount(repairRunResult.beforeHealth.counts.reviewReady)}{' -> '}{formatCount(repairRunResult.afterHealth.counts.reviewReady)}</Typography>
                   <Typography variant="caption">Provider-supported: {formatCount(repairRunResult.beforeHealth.counts.providerSupported)}{' -> '}{formatCount(repairRunResult.afterHealth.counts.providerSupported)}</Typography>
@@ -929,7 +1086,7 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
               variant="contained"
               size="small"
               startIcon={repairRunning === 'VALIDATE_PROVIDERS' ? <CircularProgress size={16} color="inherit" /> : <FactCheckIcon />}
-              disabled={Boolean(repairRunning) || providerUnknownRemaining === 0}
+              disabled={validateUnknownDisabled}
               onClick={() => void runRepair('VALIDATE_PROVIDERS')}
             >
               Validate unknown providers
@@ -938,7 +1095,7 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
               variant="outlined"
               size="small"
               startIcon={repairRunning === 'RETRY_FAILED_PROVIDERS' ? <CircularProgress size={16} /> : <FactCheckIcon />}
-              disabled={Boolean(repairRunning) || providerUnknownRemaining > 0 || providerRetryEligible === 0}
+              disabled={retryFailedDisabled}
               onClick={() => void runRepair('RETRY_FAILED_PROVIDERS')}
             >
               Retry failed providers
@@ -947,7 +1104,7 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
               variant="outlined"
               size="small"
               startIcon={repairRunning === 'CATALOG_IDENTITY_REPAIR' ? <CircularProgress size={16} /> : <ManageSearchIcon />}
-              disabled={Boolean(repairRunning) || ((repairPlan?.supportedCatalogIdentityRepairNeeded ?? repairPlan?.catalogIdentityRepairNeeded ?? 0) === 0)}
+              disabled={catalogIdentityDisabled}
               onClick={() => void runRepair('CATALOG_IDENTITY_REPAIR')}
             >
               Repair catalog identity
@@ -956,7 +1113,7 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
               variant="outlined"
               size="small"
               startIcon={repairRunning === 'PROVIDER_BUSINESS_METADATA_REPAIR' ? <CircularProgress size={16} /> : <ManageSearchIcon />}
-              disabled={Boolean(repairRunning) || (((repairPlan?.businessMetadataAutoRepairable ?? repairPlan?.businessMetadataRepairNeeded ?? repairPlan?.metadataEnrichmentNeeded) || 0) + (repairPlan?.businessMetadataRetryEligible || 0)) === 0}
+              disabled={businessMetadataDisabled}
               onClick={() => void runRepair('PROVIDER_BUSINESS_METADATA_REPAIR')}
             >
               Enrich provider business metadata
@@ -965,7 +1122,7 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
               variant="outlined"
               size="small"
               startIcon={repairRunning === 'MANUAL_METADATA_IMPORT' ? <CircularProgress size={16} /> : <ManageSearchIcon />}
-              disabled={Boolean(repairRunning) || !manualMetadataCsv.trim() || manualMetadataErrors.length > 0}
+              disabled={manualMetadataDisabled}
               onClick={() => void runRepair('MANUAL_METADATA_IMPORT')}
             >
               Import manual metadata
@@ -983,7 +1140,7 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
               variant="outlined"
               size="small"
               startIcon={repairRunning === 'BACKFILL_PRICES' ? <CircularProgress size={16} /> : <SyncIcon />}
-              disabled={Boolean(repairRunning) || ((repairPlan?.supportedPriceBackfillNeeded ?? repairPlan?.priceBackfillNeeded ?? 0) === 0)}
+              disabled={backfillPricesDisabled}
               onClick={() => void runRepair('BACKFILL_PRICES')}
             >
               Backfill prices
@@ -992,6 +1149,9 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
               Refresh health
             </Button>
           </Stack>
+          {workflowDisabledReasons.map((reason) => (
+            <Typography key={reason} variant="caption" color="warning.main">{reason}</Typography>
+          ))}
           {retryDisabledReason && <Typography variant="caption" color="warning.main">{retryDisabledReason}</Typography>}
 
           <TextField
