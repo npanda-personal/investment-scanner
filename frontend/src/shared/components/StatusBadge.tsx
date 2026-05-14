@@ -1,4 +1,5 @@
 import Chip from '@mui/material/Chip';
+import { alpha } from '@mui/material/styles';
 
 type StatusBadgeProps = {
   label: string | number | null | undefined;
@@ -20,5 +21,47 @@ export function statusColor(value: string | number | null | undefined): 'success
 
 export function StatusBadge({ label, size = 'small', variant = 'outlined' }: StatusBadgeProps) {
   const text = label === null || label === undefined || label === '' ? 'N/A' : String(label);
-  return <Chip size={size} variant={variant} label={text} color={statusColor(text)} />;
+  const color = statusColor(text);
+  const resolvedVariant = variant === 'outlined' && color === 'error' ? 'filled' : variant;
+
+  return (
+    <Chip
+      size={size}
+      variant={resolvedVariant}
+      label={text}
+      color={resolvedVariant === 'filled' ? color : 'default'}
+      sx={(theme) => {
+        if (resolvedVariant === 'filled') return {};
+
+        if (color === 'success') {
+          return {
+            color: theme.palette.success.dark,
+            borderColor: alpha(theme.palette.success.main, 0.55),
+            backgroundColor: alpha(theme.palette.success.main, theme.palette.mode === 'dark' ? 0.2 : 0.1),
+          };
+        }
+        if (color === 'warning') {
+          return {
+            color: theme.palette.warning.dark,
+            borderColor: alpha(theme.palette.warning.main, 0.6),
+            backgroundColor: alpha(theme.palette.warning.main, theme.palette.mode === 'dark' ? 0.22 : 0.12),
+          };
+        }
+        if (color === 'error') {
+          return {
+            color: theme.palette.error.dark,
+            borderColor: alpha(theme.palette.error.main, 0.6),
+            backgroundColor: alpha(theme.palette.error.main, theme.palette.mode === 'dark' ? 0.24 : 0.1),
+          };
+        }
+        return {
+          color: theme.palette.text.secondary,
+          borderColor: theme.palette.divider,
+          backgroundColor: theme.palette.mode === 'dark'
+            ? alpha(theme.palette.common.white, 0.04)
+            : alpha(theme.palette.common.black, 0.02),
+        };
+      }}
+    />
+  );
 }

@@ -769,7 +769,7 @@ const MarketDataFoundationPage: React.FC = () => {
   const showCatalogSyncContinue = catalogSyncRun?.status === 'PARTIAL' && catalogSyncRun.hasMore === true;
 
   return (
-    <Box sx={{ p: 3, maxWidth: 1400, width: '100%', minWidth: 0, boxSizing: 'border-box', mx: 'auto', overflowX: 'hidden' }}>
+    <Box className="page-container page-container--workspace" sx={{ minWidth: 0 }}>
       <PageHeader
         title="Market Data Foundation"
         subtitle="Explore instruments, prices, fundamentals, corporate actions, and manual data sync status."
@@ -910,8 +910,7 @@ const MarketDataFoundationPage: React.FC = () => {
         sx={{
           p: 2,
           mb: 2,
-          width: { xs: 'calc(100vw - 48px)', sm: 'calc(100vw - 96px)', md: '100%' },
-          maxWidth: '100%',
+          width: '100%',
           boxSizing: 'border-box',
           overflow: 'visible',
         }}
@@ -1007,7 +1006,7 @@ const MarketDataFoundationPage: React.FC = () => {
 
       {activeTab === 'catalog' && (
         <>
-      <Box sx={{ mb: 2, width: { xs: 'calc(100vw - 48px)', sm: 'calc(100vw - 96px)', md: '100%' }, maxWidth: '100%', boxSizing: 'border-box' }}>
+      <Box sx={{ mb: 2, width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
         <Paper
           variant="outlined"
           sx={{
@@ -1022,7 +1021,7 @@ const MarketDataFoundationPage: React.FC = () => {
             <Typography
               variant="caption"
               color="text.secondary"
-              sx={{ px: 1, pt: { xs: 1, md: 0 }, flexShrink: 0, textTransform: 'uppercase', letterSpacing: 0.6 }}
+              sx={{ px: 1, pt: { xs: 1, md: 0 }, flexShrink: 0, fontWeight: 600 }}
             >
               Catalog Views
             </Typography>

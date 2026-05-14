@@ -112,9 +112,11 @@ export default function NavigationLayout() {
       <Drawer variant={isMobile ? 'temporary' : 'persistent'} open={open} onClose={() => setOpen(false)} sx={{ width: open ? drawerWidth : collapsedWidth, flexShrink: 0, '& .MuiDrawer-paper': { width: open ? drawerWidth : collapsedWidth, boxSizing: 'border-box', borderRight: '1px solid', borderColor: 'divider' } }}>
         {drawer}
       </Drawer>
-      <Box component="main" sx={{ flexGrow: 1, p: 3, width: { md: `calc(100% - ${open ? drawerWidth : collapsedWidth}px)` } }}>
+      <Box component="main" sx={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
         <Toolbar />
-        <Outlet />
+        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+          <Outlet />
+        </Box>
       </Box>
     </Box>
   );

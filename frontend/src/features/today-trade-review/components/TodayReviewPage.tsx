@@ -1,6 +1,7 @@
 import RefreshIcon from '@mui/icons-material/Refresh';
 import {
   Alert,
+  Box,
   Button,
   Card,
   CardContent,
@@ -47,7 +48,8 @@ export function TodayReviewPage() {
   }), [groups, run?.warnings.length]);
 
   return (
-    <Stack spacing={3}>
+    <Box className="page-container page-container--workspace">
+      <Stack spacing={3}>
       <PageHeader
         title="Today's Trade Review"
         subtitle="Before-market research support shortlist built from trusted OHLCV coverage, supporting evidence, and trade-plan geometry."
@@ -135,7 +137,8 @@ export function TodayReviewPage() {
           </Card>
         </>
       )}
-    </Stack>
+      </Stack>
+    </Box>
   );
 }
 

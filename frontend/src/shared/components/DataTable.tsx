@@ -28,6 +28,7 @@ type DataTableProps<T> = {
   columns: DataTableColumn<T>[];
   rows: T[];
   getRowId: (row: T) => string;
+  density?: 'compact' | 'comfortable';
   loading?: boolean;
   error?: string | null;
   emptyMessage?: string;
@@ -47,6 +48,7 @@ export function DataTable<T>({
   columns,
   rows,
   getRowId,
+  density = 'compact',
   loading = false,
   error,
   emptyMessage = 'No records found.',
@@ -62,23 +64,28 @@ export function DataTable<T>({
   onRowClick,
 }: DataTableProps<T>) {
   const colSpan = Math.max(columns.length, 1);
+  const isCompact = density === 'compact';
 
   return (
     <Paper variant="outlined" sx={{ maxWidth: '100%', overflow: 'hidden' }}>
       <TableContainer sx={{ maxHeight: 720, maxWidth: '100%', overflowX: 'auto' }}>
         <Table
           stickyHeader
-          size="small"
+          size={isCompact ? 'small' : 'medium'}
           sx={{
             minWidth: 900,
             '& .MuiTableCell-root': {
-              fontSize: 13,
-              lineHeight: 1.35,
+              py: isCompact ? 1 : 1.35,
             },
             '& .MuiTableHead-root .MuiTableCell-root': {
-              fontSize: 12,
-              fontWeight: 700,
-              textTransform: 'none',
+              py: isCompact ? 1 : 1.25,
+              borderBottom: '1px solid',
+              borderColor: 'divider',
+            },
+            '& .MuiTableBody-root .MuiTableRow-root': {
+              '&:last-of-type .MuiTableCell-root': {
+                borderBottom: 'none',
+              },
             },
           }}
         >
@@ -125,10 +132,15 @@ export function DataTable<T>({
                 key={getRowId(row)}
                 hover={Boolean(onRowClick)}
                 onClick={() => onRowClick?.(row)}
-                sx={{ cursor: onRowClick ? 'pointer' : 'default' }}
+                sx={{
+                  cursor: onRowClick ? 'pointer' : 'default',
+                  '& .MuiTableCell-root': {
+                    py: isCompact ? 0.95 : 1.2,
+                  },
+                }}
               >
                 {columns.map((column) => (
-                  <TableCell key={column.id} align={column.align} sx={{ py: 1.1 }}>{column.render(row)}</TableCell>
+                  <TableCell key={column.id} align={column.align}>{column.render(row)}</TableCell>
                 ))}
               </TableRow>
             ))}
@@ -143,6 +155,10 @@ export function DataTable<T>({
         rowsPerPageOptions={pageSizeOptions}
         onPageChange={(_event, nextPage) => onPageChange(nextPage)}
         onRowsPerPageChange={(event) => onPageSizeChange(Number(event.target.value))}
+        sx={{
+          borderTop: '1px solid',
+          borderColor: 'divider',
+        }}
       />
     </Paper>
   );

@@ -11,6 +11,43 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  min-width: 0;
+}
+
+#root {
+  min-width: 0;
+}
+
+.page-container {
+  width: 100%;
+  min-width: 0;
+  margin: 0 auto;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+@media (min-width: 900px) {
+  .page-container {
+    padding: 24px;
+  }
+}
+
+.page-container--hub {
+  max-width: 1600px;
+}
+
+.page-container--workspace {
+  max-width: 1500px;
+}
+
+.page-container--detail {
+  max-width: 1200px;
+}
+
+.page-scroll-x {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 * {

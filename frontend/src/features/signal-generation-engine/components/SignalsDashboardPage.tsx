@@ -177,7 +177,7 @@ const SignalsDashboardPage: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 3, width: '100%', maxWidth: 1500, mx: 'auto', boxSizing: 'border-box', overflowX: 'hidden' }}>
+    <Box className="page-container page-container--workspace" sx={{ minWidth: 0 }}>
       <PageHeader
         title="Signal Generation Engine"
         subtitle="Raw bullish, neutral, and bearish confirmation inputs with Strategy Framework match context."

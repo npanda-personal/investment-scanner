@@ -103,7 +103,7 @@ const ResearchOverviewPage: React.FC = () => {
   } = data;
 
   return (
-    <Box sx={{ p: 3, maxWidth: 1600, mx: 'auto' }}>
+    <Box className="page-container page-container--hub">
       <PageHeader
         title="Research Command Center"
         subtitle={`Prioritized market intelligence for ${scope.region} / ${scope.assetType}.`}
@@ -266,7 +266,7 @@ const MarketReadinessHero: React.FC<{
             <Box sx={{ color: `${gateColor}.main`, display: 'flex' }}>
               {gateIcon}
             </Box>
-            <Typography variant="h4" fontWeight={800} sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>
+            <Typography variant="h5" fontWeight={700}>
               Market is {readiness?.marketGate || 'UNKNOWN'}
             </Typography>
           </Stack>
@@ -296,7 +296,7 @@ const MarketReadinessHero: React.FC<{
         </Grid>
         
         <Grid item xs={12} md={4}>
-          <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase' }}>
+          <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 700, color: 'text.secondary' }}>
             Recommended Next Actions
           </Typography>
           <Stack spacing={1}>
@@ -352,7 +352,7 @@ const PriorityCard: React.FC<{ title: string; items: ResearchPriorityCandidate[]
   return (
     <Paper variant="outlined" sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Box sx={{ p: 1.5, bgcolor: 'background.paper', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="subtitle2" fontWeight={800} sx={{ color: getHeaderColor(), textTransform: 'uppercase' }}>
+        <Typography variant="subtitle2" fontWeight={700} sx={{ color: getHeaderColor() }}>
           {title}
         </Typography>
         <Chip size="small" label={items.length} />

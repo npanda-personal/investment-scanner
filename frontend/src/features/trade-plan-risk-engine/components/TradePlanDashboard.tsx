@@ -229,9 +229,9 @@ export const TradePlanDashboard: React.FC = () => {
   ] : [];
 
   return (
-    <Box sx={{ py: 3 }}>
+    <Box className="page-container page-container--workspace">
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4">Trade Plans</Typography>
+        <Typography variant="h5">Trade Plans</Typography>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'stretch', sm: 'center' }}>
           <FormControl size="small" sx={{ minWidth: 190 }}>
             <InputLabel>Backtest Proof</InputLabel>

@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useMemo, useState } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+import { createComponentOverrides } from '@/shared/theme/componentOverrides';
+import { createVisualThemeOptions } from '@/shared/theme/visualTokens';
 
 type ThemeMode = 'light' | 'dark';
 
@@ -13,7 +15,10 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 export const CustomThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [themeMode, setThemeMode] = useState<ThemeMode>('dark');
-  const theme = useMemo(() => createTheme({ palette: { mode: themeMode } }), [themeMode]);
+  const theme = useMemo(() => {
+    const baseTheme = createTheme(createVisualThemeOptions(themeMode));
+    return createTheme(baseTheme, { components: createComponentOverrides(baseTheme) });
+  }, [themeMode]);
 
   const value = useMemo(() => ({
     themeMode,
@@ -35,4 +40,3 @@ export function useThemeMode() {
   if (!context) throw new Error('useThemeMode must be used within CustomThemeProvider');
   return context;
 }
-

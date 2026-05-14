@@ -229,7 +229,7 @@ const DataQualityEnginePage: React.FC = () => {
   const blockedCount = summary ? summary.notSignalReadyCount : 0;
 
   return (
-    <Box sx={{ p: 3, maxWidth: 1500, width: '100%', mx: 'auto', boxSizing: 'border-box', overflowX: 'hidden' }}>
+    <Box className="page-container page-container--workspace" sx={{ minWidth: 0 }}>
       <PageHeader
         title="Data Quality Engine"
         subtitle="Coverage, readiness, and liquidity checks for downstream research modules."
@@ -305,7 +305,7 @@ const DataQualityEnginePage: React.FC = () => {
 
       <Paper variant="outlined" sx={{ mb: 2, px: 1, overflow: 'hidden' }}>
         <Stack direction={{ xs: 'column', md: 'row' }} alignItems={{ xs: 'stretch', md: 'center' }} spacing={{ xs: 0.5, md: 1 }}>
-          <Typography variant="caption" color="text.secondary" sx={{ px: 1, pt: { xs: 1, md: 0 }, flexShrink: 0, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ px: 1, pt: { xs: 1, md: 0 }, flexShrink: 0, fontWeight: 600 }}>
             Quality Views
           </Typography>
           <Tabs
