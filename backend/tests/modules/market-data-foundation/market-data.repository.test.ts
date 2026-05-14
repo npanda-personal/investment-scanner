@@ -261,24 +261,27 @@ describe('MarketDataFoundationRepository', () => {
   });
 
   it('summarizes price readiness stats by symbol for universe classification', async () => {
+    const firstTimestamp = new Date('2025-09-01T00:00:00.000Z');
     const latestTimestamp = new Date('2026-05-08T00:00:00.000Z');
-    const qualityRows = Array.from({ length: 252 }).map((_, index) => ({
-      timestamp: new Date(Date.UTC(2026, 4, 8 - index)),
-      volume: BigInt(index < 250 ? 1000 : 0),
-      adjustedClose: index < 251 ? '100' : null,
-      close: '100',
-    }));
+    const readinessRows = [{
+      symbol: 'READY.NS',
+      priceHistoryBars: 252,
+      firstTimestamp,
+      latestTimestamp,
+      latestVolume: BigInt(1000),
+      latestAdjustedClose: '100',
+      latestClose: '100',
+      rollingWindowBars: 252,
+      volumeRows: 250,
+      adjustedCloseRows: 251,
+      maxPriceGapDays: 1,
+    }];
     const prisma = {
       priceTick: {
-        groupBy: jest.fn().mockResolvedValue([
-          { symbol: 'READY.NS', _count: { _all: 252 }, _max: { timestamp: latestTimestamp } },
-        ]),
-        findMany: jest.fn()
-          .mockResolvedValueOnce([
-            { symbol: 'READY.NS', timestamp: latestTimestamp, volume: BigInt(1000), adjustedClose: '100', close: '100' },
-          ])
-          .mockResolvedValueOnce(qualityRows),
+        groupBy: jest.fn(),
+        findMany: jest.fn(),
       },
+      $queryRaw: jest.fn().mockResolvedValue(readinessRows),
     };
     const repository = new MarketDataFoundationRepository(prisma as any);
 
@@ -298,6 +301,35 @@ describe('MarketDataFoundationRepository', () => {
       priceHistoryBars: 0,
       latestPriceDate: null,
     });
+    expect(prisma.priceTick.groupBy).not.toHaveBeenCalled();
+    expect(prisma.priceTick.findMany).not.toHaveBeenCalled();
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    const qualityQuery = prisma.$queryRaw.mock.calls[0][0];
+    expect(qualityQuery.text).toContain('ROW_NUMBER() OVER (PARTITION BY recent.symbol ORDER BY recent.timestamp DESC)');
+    expect(qualityQuery.text).toContain('LAG(recent.timestamp) OVER (PARTITION BY recent.symbol ORDER BY recent.timestamp DESC)');
+    expect(qualityQuery.text).toContain('CROSS JOIN LATERAL');
+    expect(qualityQuery.text).toContain('FROM price_ticks');
+    expect(qualityQuery.text).toContain('LIMIT $3');
+    expect(qualityQuery.text).toContain('ORDER BY aggregates.symbol ASC');
+    expect(qualityQuery.values).toEqual(['READY.NS', 'CATALOG.NS', 252]);
+  });
+
+  it('skips price readiness queries when no usable symbols are provided', async () => {
+    const prisma = {
+      priceTick: {
+        groupBy: jest.fn(),
+        findMany: jest.fn(),
+      },
+      $queryRaw: jest.fn(),
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    const result = await repository.priceReadinessStatsForSymbols(['', null as any, undefined as any]);
+
+    expect(result.size).toBe(0);
+    expect(prisma.priceTick.groupBy).not.toHaveBeenCalled();
+    expect(prisma.priceTick.findMany).not.toHaveBeenCalled();
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
   });
 
   it('maps CASH segment filtering to cash stock, legacy equity, and null asset type rows', async () => {

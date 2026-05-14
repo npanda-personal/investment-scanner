@@ -92,6 +92,20 @@ import {
 const TRUSTED_REVIEW_SCAN_ORDERING = 'recentVolumeDesc_priceHistoryCompleteness_latestFreshness_symbol';
 
 type TrustedReviewUniverseOptions = Pick<PaginationOptions, 'region' | 'assetType'> & { now?: Date };
+type UniverseComputationSnapshot = {
+  scope: { region: string; assetType: string };
+  stocks: any[];
+  readinessBySymbol: Map<string, InstrumentUniverseReadiness>;
+  statsBySymbol: Map<string, any>;
+  validationWindow: ReturnType<MarketDataFoundationService['providerValidationWindow']>;
+  priceBackfillBlockedStockIds: Set<string>;
+  repairStatesByStockId?: Map<string, any[]>;
+};
+type UniverseComputationSnapshotCacheEntry = {
+  expiresAt: number;
+  snapshot?: UniverseComputationSnapshot;
+  promise?: Promise<UniverseComputationSnapshot>;
+};
 type StockMissingDataColumnConfig = {
   column: string;
   label: string;
@@ -407,6 +421,11 @@ export class MarketDataFoundationService {
     process.env.MARKET_DATA_MANUAL_SYNC_COOLDOWN_MINUTES,
     15
   );
+  private readonly universeSnapshotCacheTtlMs = Math.max(
+    this.readPositiveNumber(process.env.MARKET_DATA_UNIVERSE_SNAPSHOT_CACHE_TTL_MS, 60000),
+    1000
+  );
+  private readonly universeSnapshotCache = new Map<string, UniverseComputationSnapshotCacheEntry>();
 
   constructor(
     private readonly repository = new MarketDataFoundationRepository(),
@@ -610,17 +629,23 @@ export class MarketDataFoundationService {
     };
   }
 
-  async universeHealth(options: Pick<PaginationOptions, 'region' | 'assetType'> = {}): Promise<MarketDataUniverseHealth> {
+  async universeHealth(
+    options: Pick<PaginationOptions, 'region' | 'assetType'> = {},
+    snapshot?: UniverseComputationSnapshot
+  ): Promise<MarketDataUniverseHealth> {
     const scope = {
       region: options.region?.trim().toUpperCase() || 'IN',
       assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
     };
-    const stocks = await this.repository.listStocksForUniverseHealth(scope);
-    const { readinessBySymbol, statsBySymbol } = await this.universeReadinessAndStatsForStocks(stocks, scope);
-    const validationWindow = this.providerValidationWindow(scope);
+    const activeSnapshot = snapshot ?? await this.tryUniverseComputationSnapshot(scope);
+    const stocks = activeSnapshot?.stocks ?? await this.repository.listStocksForUniverseHealth(scope);
+    const readinessAndStats = activeSnapshot ? null : await this.universeReadinessAndStatsForStocks(stocks, scope);
+    const readinessBySymbol = activeSnapshot?.readinessBySymbol ?? readinessAndStats!.readinessBySymbol;
+    const statsBySymbol = activeSnapshot?.statsBySymbol ?? readinessAndStats!.statsBySymbol;
+    const validationWindow = activeSnapshot?.validationWindow ?? this.providerValidationWindow(scope);
     const latestStoredEodDate = this.latestDateFromReadiness(readinessBySymbol);
     const expectedLatestTradingDate = latestCompletedTradingDateForRegion(scope.region);
-    const priceBackfillBlockedStockIds = await this.blockedPriceBackfillStockIds(scope);
+    const priceBackfillBlockedStockIds = activeSnapshot?.priceBackfillBlockedStockIds ?? await this.blockedPriceBackfillStockIds(scope);
     const generatedAt = new Date().toISOString();
     const counts = this.emptyUniverseCounts();
     const blockerCounts = new Map<string, number>();
@@ -718,7 +743,7 @@ export class MarketDataFoundationService {
     }
 
     const activeDenominator = counts.activeInstruments || counts.totalCatalogInstruments || 1;
-    await this.assignProviderValidationQueueCounts(counts, scope);
+    await this.assignProviderValidationQueueCounts(counts, scope, activeSnapshot);
     const coverage = {
       priceCoveragePercentage: this.percent(counts.priceReady, activeDenominator),
       metadataCoveragePercentage: this.percent(metadataCompleteCount, activeDenominator),
@@ -756,7 +781,12 @@ export class MarketDataFoundationService {
   }
 
   async trustedReviewUniverseHealth(options: TrustedReviewUniverseOptions = {}): Promise<TrustedReviewUniverseHealth> {
-    return (await this.trustedReviewUniverseEvaluation(options)).health;
+    const scope = {
+      region: options.region?.trim().toUpperCase() || 'IN',
+      assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
+    };
+    const snapshot = await this.tryUniverseComputationSnapshot(scope, options.now);
+    return (await this.trustedReviewUniverseEvaluation(options, snapshot ?? undefined)).health;
   }
 
   async reviewReadinessSummary(options: TrustedReviewUniverseOptions = {}): Promise<ReviewReadinessSummary> {
@@ -764,10 +794,13 @@ export class MarketDataFoundationService {
       region: options.region?.trim().toUpperCase() || 'IN',
       assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
     };
+    const snapshot = await this.tryUniverseComputationSnapshot(scope, options.now);
     const [health, reviewUniverse, repairPlan] = await Promise.all([
-      this.universeHealth(scope),
-      this.trustedReviewUniverseHealth({ ...scope, now: options.now }),
-      this.repairPlan(scope),
+      this.universeHealth(scope, snapshot ?? undefined),
+      snapshot
+        ? this.trustedReviewUniverseEvaluation({ ...scope, now: options.now }, snapshot).then((result) => result.health)
+        : this.trustedReviewUniverseHealth({ ...scope, now: options.now }),
+      this.repairPlan(scope, snapshot ?? undefined),
     ]);
     const readinessCounts = {
       priceReady: health.counts.priceReady,
@@ -1024,16 +1057,21 @@ export class MarketDataFoundationService {
     }));
   }
 
-  private async trustedReviewUniverseEvaluation(options: TrustedReviewUniverseOptions = {}) {
+  private async trustedReviewUniverseEvaluation(
+    options: TrustedReviewUniverseOptions = {},
+    snapshot?: UniverseComputationSnapshot
+  ) {
     const scope = {
       region: options.region?.trim().toUpperCase() || 'IN',
       assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
     };
     const now = options.now instanceof Date && Number.isFinite(options.now.getTime()) ? options.now : new Date();
-    const stocks = await this.repository.listStocksForUniverseHealth(scope);
-    const { readinessBySymbol, statsBySymbol } = await this.universeReadinessAndStatsForStocks(stocks, scope);
+    const stocks = snapshot?.stocks ?? await this.repository.listStocksForUniverseHealth(scope);
+    const readinessAndStats = snapshot ? null : await this.universeReadinessAndStatsForStocks(stocks, scope);
+    const readinessBySymbol = snapshot?.readinessBySymbol ?? readinessAndStats!.readinessBySymbol;
+    const statsBySymbol = snapshot?.statsBySymbol ?? readinessAndStats!.statsBySymbol;
     const reviewDatePolicy = this.trustedReviewDatePolicy(scope.region, now);
-    const validationWindow = this.providerValidationWindow(scope, now);
+    const validationWindow = snapshot?.validationWindow ?? this.providerValidationWindow(scope, now);
     const expectedLatestTradingDate = reviewDatePolicy.requiredDataThroughDate;
     const minLiteCount = Math.max(this.readPositiveNumber(process.env.TRUSTED_REVIEW_MIN_LITE, 100), 1);
     const minFullCount = Math.max(this.readPositiveNumber(process.env.TRUSTED_REVIEW_MIN_FULL, 300), minLiteCount);
@@ -1179,15 +1217,21 @@ export class MarketDataFoundationService {
     };
   }
 
-  async repairPlan(options: Pick<PaginationOptions, 'region' | 'assetType'> = {}): Promise<MarketDataRepairPlan> {
+  async repairPlan(
+    options: Pick<PaginationOptions, 'region' | 'assetType'> = {},
+    snapshot?: UniverseComputationSnapshot
+  ): Promise<MarketDataRepairPlan> {
     const scope = {
       region: options.region?.trim().toUpperCase() || 'IN',
       assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
     };
-    const stocks = await this.repository.listStocksForUniverseHealth(scope);
-    const { readinessBySymbol, statsBySymbol } = await this.universeReadinessAndStatsForStocks(stocks, scope);
-    const validationWindow = this.providerValidationWindow(scope);
-    const priceBackfillBlockedStockIds = await this.blockedPriceBackfillStockIds(scope);
+    const activeSnapshot = snapshot ?? await this.tryUniverseComputationSnapshot(scope);
+    const stocks = activeSnapshot?.stocks ?? await this.repository.listStocksForUniverseHealth(scope);
+    const readinessAndStats = activeSnapshot ? null : await this.universeReadinessAndStatsForStocks(stocks, scope);
+    const readinessBySymbol = activeSnapshot?.readinessBySymbol ?? readinessAndStats!.readinessBySymbol;
+    const statsBySymbol = activeSnapshot?.statsBySymbol ?? readinessAndStats!.statsBySymbol;
+    const validationWindow = activeSnapshot?.validationWindow ?? this.providerValidationWindow(scope);
+    const priceBackfillBlockedStockIds = activeSnapshot?.priceBackfillBlockedStockIds ?? await this.blockedPriceBackfillStockIds(scope);
     let providerUnknownValidationNeeded = 0;
     let providerRetryValidationNeeded = 0;
     let providerUnsupportedExcluded = 0;
@@ -1288,7 +1332,22 @@ export class MarketDataFoundationService {
 
     const repositoryAny = this.repository as any;
     let businessMetadataQueueRepairable = 0;
-    if (typeof repositoryAny.countStocksForBusinessMetadataRepair === 'function') {
+    const snapshotRepairCounts = activeSnapshot?.repairStatesByStockId
+      ? this.repairPlanCountsFromSnapshot(activeSnapshot)
+      : null;
+    if (snapshotRepairCounts) {
+      businessMetadataQueueRepairable = snapshotRepairCounts.businessMetadataQueueRepairable;
+      businessMetadataAutoRepairable = snapshotRepairCounts.businessMetadataAutoRepairable;
+      businessMetadataManualRequired = snapshotRepairCounts.businessMetadataManualRequired;
+      businessMetadataRetryBlocked = snapshotRepairCounts.businessMetadataRetryBlocked;
+      businessMetadataRetryEligible = snapshotRepairCounts.businessMetadataRetryEligible;
+      businessMetadataRecentlyAttempted = snapshotRepairCounts.businessMetadataRecentlyAttempted;
+      providerRetryBlocked = snapshotRepairCounts.providerRetryBlocked;
+      providerManualRepairRequired = snapshotRepairCounts.providerManualRepairRequired;
+      nextProviderRetryAtMin = snapshotRepairCounts.nextProviderRetryAtMin;
+      providerRetryValidationNeeded = snapshotRepairCounts.providerRetryValidationNeeded(providerValidationFailed);
+      retryFailedValidations = providerRetryValidationNeeded;
+    } else if (typeof repositoryAny.countStocksForBusinessMetadataRepair === 'function') {
       businessMetadataQueueRepairable = await repositoryAny.countStocksForBusinessMetadataRepair({
         ...scope,
         includeManualRequired: false,
@@ -1299,7 +1358,7 @@ export class MarketDataFoundationService {
       businessMetadataAutoRepairable = businessMetadataRepairNeeded;
       businessMetadataQueueRepairable = businessMetadataAutoRepairable;
     }
-    if (typeof repositoryAny.countBusinessMetadataRepairStates === 'function') {
+    if (!snapshotRepairCounts && typeof repositoryAny.countBusinessMetadataRepairStates === 'function') {
       businessMetadataManualRequired = await repositoryAny.countBusinessMetadataRepairStates({
         ...scope,
         statuses: ['MANUAL_REQUIRED'],
@@ -1324,7 +1383,7 @@ export class MarketDataFoundationService {
       businessMetadataRecentlyAttempted = Math.max(businessMetadataRepairNeeded - businessMetadataAutoRepairable, 0);
       businessMetadataManualRequired = businessMetadataRecentlyAttempted;
     }
-    if (typeof repositoryAny.countProviderValidationRepairStates === 'function') {
+    if (!snapshotRepairCounts && typeof repositoryAny.countProviderValidationRepairStates === 'function') {
       const [retryEligible, retryBlocked, manualRequired, nextRetryAt] = await Promise.all([
         repositoryAny.countProviderValidationRepairStates({ ...scope, status: 'eligible' }),
         repositoryAny.countProviderValidationRepairStates({ ...scope, status: 'blocked' }),
@@ -1488,8 +1547,9 @@ export class MarketDataFoundationService {
     const maxBatchesPerAction = Math.min(Math.max(Number(request.maxBatchesPerAction) || 20, 1), 100);
     const drainMode = request.mode === 'DRAIN_UNTIL_BLOCKED';
     const actions = this.normalizeRepairRunActions(request.actions, request.mode, request.csvText);
-    const beforeHealth = await this.universeHealth(scope);
-    const beforeRepairPlan = await this.repairPlan(scope);
+    const beforeSnapshot = await this.tryUniverseComputationSnapshot(scope);
+    const beforeHealth = await this.universeHealth(scope, beforeSnapshot ?? undefined);
+    const beforeRepairPlan = await this.repairPlan(scope, beforeSnapshot ?? undefined);
     const dryRun = Boolean(request.dryRun);
     const plannedActions = actions.map((action) => this.createRepairRunActionResult(
       action,
@@ -1570,6 +1630,7 @@ export class MarketDataFoundationService {
       try {
         const beforeActionCount = this.repairRunActionCount(action, actionPlan);
         await this.executeRepairRunAction(action, request, scope, batchSize, maxBatchesPerAction, result, result.resumeOffset || 0, sourceFingerprint);
+        this.invalidateUniverseComputationSnapshot(scope);
         if (drainMode && beforeActionCount <= 0) {
           continue;
         }
@@ -1602,6 +1663,7 @@ export class MarketDataFoundationService {
       warnings.push(...result.warnings);
     }
 
+    this.invalidateUniverseComputationSnapshot(scope);
     const afterHealth = await this.universeHealth(scope);
     const afterRepairPlan = await this.repairPlan(scope);
     const completedAt = new Date();
@@ -5982,8 +6044,17 @@ export class MarketDataFoundationService {
 
   private async assignProviderValidationQueueCounts(
     counts: MarketDataUniverseHealth['counts'],
-    scope: { region: string; assetType: string }
+    scope: { region: string; assetType: string },
+    snapshot?: UniverseComputationSnapshot | null
   ) {
+    if (snapshot?.repairStatesByStockId) {
+      const snapshotCounts = this.repairPlanCountsFromSnapshot(snapshot);
+      counts.providerRetryValidationNeeded = snapshotCounts.providerRetryValidationNeeded(counts.providerValidationFailed || 0);
+      counts.providerRetryBlocked = snapshotCounts.providerRetryBlocked;
+      counts.providerManualRepairRequired = snapshotCounts.providerManualRepairRequired;
+      counts.nextProviderRetryAtMin = snapshotCounts.nextProviderRetryAtMin;
+      return;
+    }
     const repositoryAny = this.repository as any;
     if (typeof repositoryAny.countProviderValidationRepairStates !== 'function') return;
     const [retryEligible, retryBlocked, manualRequired, nextRetryAt] = await Promise.all([
@@ -6532,6 +6603,84 @@ export class MarketDataFoundationService {
       }
     }
     return fingerprints;
+  }
+
+  private async universeComputationSnapshot(
+    scope: { region: string; assetType: string },
+    now?: Date
+  ): Promise<UniverseComputationSnapshot> {
+    const stocks = await this.repository.listStocksForUniverseHealth(scope);
+    const [readinessAndStats, repairStatesByStockId] = await Promise.all([
+      this.universeReadinessAndStatsForStocks(stocks, scope),
+      this.repairStatesByStockId(scope, stocks),
+    ]);
+    return {
+      scope,
+      stocks,
+      readinessBySymbol: readinessAndStats.readinessBySymbol,
+      statsBySymbol: readinessAndStats.statsBySymbol,
+      validationWindow: this.providerValidationWindow(scope, now),
+      priceBackfillBlockedStockIds: this.blockedPriceBackfillStockIdsFromStates(repairStatesByStockId, now)
+        ?? await this.blockedPriceBackfillStockIds(scope),
+      repairStatesByStockId,
+    };
+  }
+
+  private universeSnapshotCacheKey(scope: { region: string; assetType: string }) {
+    return `${scope.region.trim().toUpperCase()}|${scope.assetType.trim().toUpperCase()}`;
+  }
+
+  private invalidateUniverseComputationSnapshot(scope?: { region: string; assetType: string }) {
+    if (!scope) {
+      this.universeSnapshotCache.clear();
+      return;
+    }
+    this.universeSnapshotCache.delete(this.universeSnapshotCacheKey(scope));
+  }
+
+  private async cachedUniverseComputationSnapshot(
+    scope: { region: string; assetType: string },
+    now?: Date
+  ): Promise<UniverseComputationSnapshot> {
+    if (now) return this.universeComputationSnapshot(scope, now);
+    const key = this.universeSnapshotCacheKey(scope);
+    const currentTime = Date.now();
+    const cached = this.universeSnapshotCache.get(key);
+    if (cached?.snapshot && cached.expiresAt > currentTime) return cached.snapshot;
+    if (cached?.promise && cached.expiresAt > currentTime) return cached.promise;
+
+    const promise = this.universeComputationSnapshot(scope)
+      .then((snapshot) => {
+        this.universeSnapshotCache.set(key, {
+          snapshot,
+          expiresAt: Date.now() + this.universeSnapshotCacheTtlMs,
+        });
+        return snapshot;
+      })
+      .catch((error) => {
+        const active = this.universeSnapshotCache.get(key);
+        if (active?.promise === promise) this.universeSnapshotCache.delete(key);
+        throw error;
+      });
+    this.universeSnapshotCache.set(key, {
+      promise,
+      expiresAt: currentTime + Math.max(this.universeSnapshotCacheTtlMs, 30000),
+    });
+    return promise;
+  }
+
+  private async tryUniverseComputationSnapshot(
+    scope: { region: string; assetType: string },
+    now?: Date
+  ): Promise<UniverseComputationSnapshot | null> {
+    const repositoryAny = this.repository as any;
+    if (
+      typeof repositoryAny.listStocksForUniverseHealth !== 'function'
+      || typeof repositoryAny.priceReadinessStatsForSymbols !== 'function'
+    ) {
+      return null;
+    }
+    return this.cachedUniverseComputationSnapshot(scope, now);
   }
 
   private repairRunSourceFingerprintMetadata(
@@ -7175,6 +7324,124 @@ export class MarketDataFoundationService {
         if (leftPriority !== rightPriority) return leftPriority - rightPriority;
         return String(left.stock.symbol).localeCompare(String(right.stock.symbol));
       });
+  }
+
+  private async repairStatesByStockId(
+    scope: { region: string; assetType: string },
+    stocks: any[]
+  ): Promise<Map<string, any[]> | undefined> {
+    const repositoryAny = this.repository as any;
+    if (typeof repositoryAny.listRepairStatesForStocks !== 'function') return undefined;
+    return repositoryAny.listRepairStatesForStocks(
+      stocks.map((stock) => stock.id),
+      {
+        ...scope,
+        repairTypes: ['PROVIDER_VALIDATION', 'PROVIDER_BUSINESS_METADATA', 'PRICE_BACKFILL'],
+      }
+    );
+  }
+
+  private blockedPriceBackfillStockIdsFromStates(
+    repairStatesByStockId: Map<string, any[]> | undefined,
+    now = new Date()
+  ): Set<string> | null {
+    if (!repairStatesByStockId) return null;
+    const blocked = new Set<string>();
+    for (const [stockId, states] of repairStatesByStockId.entries()) {
+      const priceState = states.find((state) => state.repairType === 'PRICE_BACKFILL');
+      if (!priceState) continue;
+      if (
+        priceState.status === 'MANUAL_REQUIRED'
+        || priceState.status === 'RETRY_COOLDOWN'
+        || (priceState.status === 'FAILED_RETRYABLE' && priceState.nextRetryAt instanceof Date && priceState.nextRetryAt > now)
+      ) {
+        blocked.add(stockId);
+      }
+    }
+    return blocked;
+  }
+
+  private repairStateForStock(
+    repairStatesByStockId: Map<string, any[]> | undefined,
+    stockId: string,
+    repairType: string
+  ) {
+    return repairStatesByStockId?.get(stockId)?.find((state) => state.repairType === repairType) || null;
+  }
+
+  private retryStateBucket(state: any, now = new Date()): 'manual' | 'blocked' | 'eligible' | 'cooldown' | null {
+    if (!state) return null;
+    if (state.status === 'MANUAL_REQUIRED') return 'manual';
+    if (state.status === 'RETRY_COOLDOWN') return 'cooldown';
+    if (state.status === 'FAILED_RETRYABLE') {
+      return state.nextRetryAt instanceof Date && state.nextRetryAt > now ? 'blocked' : 'eligible';
+    }
+    return null;
+  }
+
+  private repairPlanCountsFromSnapshot(snapshot: UniverseComputationSnapshot) {
+    const now = new Date();
+    let businessMetadataQueueRepairable = 0;
+    let businessMetadataManualRequired = 0;
+    let businessMetadataRetryBlocked = 0;
+    let businessMetadataRetryEligible = 0;
+    let businessMetadataRetryCooldown = 0;
+    let providerRetryEligible = 0;
+    let providerRetryBlocked = 0;
+    let providerManualRepairRequired = 0;
+    let nextProviderRetryAt: Date | null = null;
+
+    for (const stock of snapshot.stocks) {
+      if (stock.isActive === false || stock.isDelisted === true) continue;
+      const providerStatus = normalizeProviderStatus(stock.providerSupportStatus);
+      const providerState = this.repairStateForStock(snapshot.repairStatesByStockId, stock.id, 'PROVIDER_VALIDATION');
+      const providerBucket = this.retryStateBucket(providerState, now);
+      if (providerBucket === 'manual') providerManualRepairRequired += 1;
+      if (providerStatus === 'VALIDATION_FAILED') {
+        if (providerBucket === 'blocked' || providerBucket === 'cooldown') providerRetryBlocked += 1;
+        if (providerBucket === 'eligible') providerRetryEligible += 1;
+        if (providerState?.nextRetryAt instanceof Date && providerState.nextRetryAt > now) {
+          nextProviderRetryAt = !nextProviderRetryAt || providerState.nextRetryAt < nextProviderRetryAt
+            ? providerState.nextRetryAt
+            : nextProviderRetryAt;
+        }
+      }
+
+      if (providerStatus !== 'SUPPORTED' || !this.needsBusinessMetadataRepair(stock)) continue;
+      const businessState = this.repairStateForStock(snapshot.repairStatesByStockId, stock.id, 'PROVIDER_BUSINESS_METADATA');
+      const businessBucket = this.retryStateBucket(businessState, now);
+      if (businessBucket === 'manual') {
+        businessMetadataManualRequired += 1;
+        continue;
+      }
+      if (businessBucket === 'blocked') {
+        businessMetadataRetryBlocked += 1;
+        continue;
+      }
+      if (businessBucket === 'cooldown') {
+        businessMetadataRetryCooldown += 1;
+        continue;
+      }
+      businessMetadataQueueRepairable += 1;
+      if (businessBucket === 'eligible') businessMetadataRetryEligible += 1;
+    }
+
+    const businessMetadataAutoRepairable = Math.max(businessMetadataQueueRepairable - businessMetadataRetryEligible, 0);
+    return {
+      businessMetadataQueueRepairable,
+      businessMetadataAutoRepairable,
+      businessMetadataManualRequired,
+      businessMetadataRetryBlocked,
+      businessMetadataRetryEligible,
+      businessMetadataRecentlyAttempted: businessMetadataManualRequired + businessMetadataRetryBlocked + businessMetadataRetryCooldown,
+      providerRetryBlocked,
+      providerManualRepairRequired,
+      nextProviderRetryAtMin: nextProviderRetryAt ? nextProviderRetryAt.toISOString() : null,
+      providerRetryValidationNeeded: (providerValidationFailed: number) => {
+        const knownStateTotal = providerRetryEligible + providerRetryBlocked + providerManualRepairRequired;
+        return providerRetryEligible + Math.max(providerValidationFailed - knownStateTotal, 0);
+      },
+    };
   }
 
   private async blockedPriceBackfillStockIds(scope: { region: string; assetType: string }): Promise<Set<string>> {

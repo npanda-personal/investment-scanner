@@ -204,6 +204,7 @@ The Orchestrator must protect the user's laptop during continuous team execution
 - When memory is above 90%, individual workers and the Orchestrator must stop repo-local Node/Vite/Playwright/backend services that are no longer needed or whose task is done.
 - Completed workers should not leave dev servers, Playwright runners, or backend Node processes running after handoff when memory is above 90%.
 - The Orchestrator should clean up stale repo-local Node/npm/npx processes after interrupted validation runs, closed workers, or completed task phases, while avoiding unrelated user/editor/system processes.
+- The Orchestrator may stop orphaned or idle Codex helper, browser, or sandbox processes when they are clearly not the active session. Do not terminate the active Codex executor from inside the session; that can interrupt tool access and should be left running until the user or platform closes it.
 - Backend `http://127.0.0.1:3000` and frontend `http://127.0.0.1:5173` are persistent monitor services for the user. They stay running across the team session unless the Orchestrator restarts them for health, port replacement, explicit user request, or severe resource pressure.
 - Workers must not kill the persistent monitor services on ports `3000` and `5173`; they escalate to the Orchestrator when those services need recycling.
 - Continue lightweight planning, status updates, board edits, and evidence review while the resource gate is closed.

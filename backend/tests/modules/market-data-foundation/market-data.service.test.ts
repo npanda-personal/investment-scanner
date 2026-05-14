@@ -89,6 +89,56 @@ describe('MarketDataFoundationService syncV1', () => {
     ]));
   });
 
+  it('reuses one universe snapshot across review readiness summary computations', async () => {
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue([
+        {
+          id: 'stock-aaa',
+          symbol: 'AAA.NS',
+          providerSupportStatus: 'SUPPORTED',
+          isActive: true,
+          isDelisted: false,
+          providerSymbol: 'AAA.NS',
+          sector: 'Tech',
+          industry: 'Software',
+          marketCap: 100000000,
+          country: 'India',
+          currency: 'INR',
+          isin: 'INE000A01001',
+          ipoDate: new Date('2020-01-01T00:00:00.000Z'),
+          assetType: 'STOCK',
+          exchange: 'NSE',
+        },
+      ]),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['AAA.NS', {
+          priceHistoryBars: 400,
+          firstPriceDate: '2020-01-01',
+          latestPriceDate: latestCompletedTradingDateForRegion('IN'),
+          latestVolume: 1000,
+          latestAdjustedClose: 100,
+          latestClose: 100,
+          rollingWindowBars: 252,
+          rollingWindowCoveragePercent: 100,
+          recentVolumeCoveragePercent: 100,
+          adjustedCloseCoveragePercent: 100,
+          maxPriceGapDays: 0,
+        }],
+      ])),
+      listBlockedPriceBackfillStockIds: jest.fn().mockResolvedValue([]),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+
+    const result = await service.reviewReadinessSummary({ region: 'IN', assetType: 'STOCK' });
+    const cachedResult = await service.reviewReadinessSummary({ region: 'IN', assetType: 'STOCK' });
+
+    expect(result.scope).toEqual({ region: 'IN', assetType: 'STOCK' });
+    expect(cachedResult.scope).toEqual({ region: 'IN', assetType: 'STOCK' });
+    expect(repository.listStocksForUniverseHealth).toHaveBeenCalledTimes(1);
+    expect(repository.priceReadinessStatsForSymbols).toHaveBeenCalledTimes(1);
+    expect(repository.listBlockedPriceBackfillStockIds).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects sync requests without symbol or instrumentId', async () => {
     const service = new MarketDataFoundationService({} as any, {} as any);
 
@@ -4639,6 +4689,57 @@ describe('MarketDataFoundationService operational repair run', () => {
       'BACKFILL_PRICES',
     ]);
     expect(result.actions[0]).toMatchObject({ estimatedTotal: 2, estimatedBatchCount: 1 });
+    expect(service.universeHealth).toHaveBeenCalledTimes(1);
+    expect(service.repairPlan).toHaveBeenCalledTimes(1);
+  });
+
+  it('dry-run reuses one universe snapshot for before health and plan', async () => {
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue([{
+        id: 'stock-aaa',
+        symbol: 'AAA.NS',
+        providerSupportStatus: 'SUPPORTED',
+        isActive: true,
+        isDelisted: false,
+        providerSymbol: 'AAA.NS',
+        sector: 'Tech',
+        industry: 'Software',
+        marketCap: 100000000,
+        country: 'India',
+        currency: 'INR',
+        isin: 'INE000A01001',
+        ipoDate: new Date('2020-01-01T00:00:00.000Z'),
+        assetType: 'STOCK',
+        exchange: 'NSE',
+      }]),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['AAA.NS', {
+          priceHistoryBars: 350,
+          firstPriceDate: '2020-01-01',
+          latestPriceDate: '2026-05-11',
+          latestVolume: 1200,
+          latestAdjustedClose: 100,
+          latestClose: 100,
+          rollingWindowBars: 252,
+          rollingWindowCoveragePercent: 100,
+          recentVolumeCoveragePercent: 100,
+          adjustedCloseCoveragePercent: 100,
+          maxPriceGapDays: 0,
+        }],
+      ])),
+      listBlockedPriceBackfillStockIds: jest.fn().mockResolvedValue([]),
+      createRepairRun: jest.fn(),
+      updateRepairRun: jest.fn(),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+
+    await service.repairRun({ region: 'IN', assetType: 'STOCK', dryRun: true, batchSize: 50 });
+
+    expect(repository.createRepairRun).not.toHaveBeenCalled();
+    expect(repository.updateRepairRun).not.toHaveBeenCalled();
+    expect(repository.listStocksForUniverseHealth).toHaveBeenCalledTimes(1);
+    expect(repository.priceReadinessStatsForSymbols).toHaveBeenCalledTimes(1);
+    expect(repository.listBlockedPriceBackfillStockIds).toHaveBeenCalledTimes(1);
   });
 
   it('executes repair actions in dependency order', async () => {

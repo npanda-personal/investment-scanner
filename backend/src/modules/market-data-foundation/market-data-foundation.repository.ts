@@ -1097,52 +1097,25 @@ export class MarketDataFoundationRepository {
     } satisfies UniversePriceStats]));
     if (uniqueSymbols.length === 0) return emptyStats;
 
-    const aggregates = await this.prisma.priceTick.groupBy({
-      by: ['symbol'],
-      where: { symbol: { in: uniqueSymbols } },
-      _count: { _all: true },
-      _min: { timestamp: true },
-      _max: { timestamp: true },
-    });
-    const latestRows: Array<{
-      symbol: string;
-      timestamp: Date;
-      volume: bigint | null;
-      adjustedClose: Prisma.Decimal | null;
-      close: Prisma.Decimal;
-    }> = [];
-    const latestConditions = aggregates
-      .filter((item) => item._max.timestamp)
-      .map((item) => ({ symbol: item.symbol, timestamp: item._max.timestamp as Date }));
-    const chunkSize = 250;
-    for (let index = 0; index < latestConditions.length; index += chunkSize) {
-      latestRows.push(...await this.prisma.priceTick.findMany({
-        where: { OR: latestConditions.slice(index, index + chunkSize) },
-        select: {
-          symbol: true,
-          timestamp: true,
-          volume: true,
-          adjustedClose: true,
-          close: true,
-        },
-      }));
-    }
-    const latestByKey = new Map(latestRows.map((row) => [`${row.symbol}|${row.timestamp.toISOString()}`, row]));
-
-    const recentQualityBySymbol = await this.priceQualityRowsForSymbols(aggregates.map((aggregate) => aggregate.symbol));
-
-    for (const aggregate of aggregates) {
-      const latestTimestamp = aggregate._max.timestamp;
-      const latest = latestTimestamp ? latestByKey.get(`${aggregate.symbol}|${latestTimestamp.toISOString()}`) : null;
-      const quality = this.priceQualityStats(recentQualityBySymbol.get(aggregate.symbol) || []);
-      emptyStats.set(aggregate.symbol, {
-        priceHistoryBars: aggregate._count._all,
-        firstPriceDate: aggregate._min?.timestamp ? aggregate._min.timestamp.toISOString().slice(0, 10) : null,
-        latestPriceDate: latestTimestamp ? latestTimestamp.toISOString().slice(0, 10) : null,
-        latestVolume: latest?.volume ?? null,
-        latestAdjustedClose: latest?.adjustedClose ?? null,
-        latestClose: latest?.close ?? null,
-        ...quality,
+    const rows = await this.priceReadinessRowsForSymbols(uniqueSymbols);
+    for (const row of rows) {
+      const priceHistoryBars = Number(row.priceHistoryBars || 0);
+      const rollingWindowBars = Number(row.rollingWindowBars || 0);
+      const volumeRows = Number(row.volumeRows || 0);
+      const adjustedCloseRows = Number(row.adjustedCloseRows || 0);
+      emptyStats.set(row.symbol, {
+        priceHistoryBars,
+        firstPriceDate: row.firstTimestamp ? row.firstTimestamp.toISOString().slice(0, 10) : null,
+        latestPriceDate: row.latestTimestamp ? row.latestTimestamp.toISOString().slice(0, 10) : null,
+        latestVolume: row.latestVolume ?? null,
+        latestAdjustedClose: row.latestAdjustedClose ?? null,
+        latestClose: row.latestClose ?? null,
+        rollingWindowBars,
+        rollingWindowCoveragePercent: this.percent(rollingWindowBars, STANDARD_REVIEW_MIN_BARS),
+        maxPriceGapDays: rollingWindowBars > 1 ? Math.round(Number(row.maxPriceGapDays || 0)) : null,
+        recentVolumeCoveragePercent: this.percent(volumeRows, Math.max(rollingWindowBars, 1)),
+        adjustedCloseCoveragePercent: this.percent(adjustedCloseRows, Math.max(rollingWindowBars, 1)),
+        usesAdjustedCloseFallback: adjustedCloseRows < rollingWindowBars,
       } as UniversePriceStats & { firstPriceDate: string | null });
     }
 
@@ -1193,58 +1166,95 @@ export class MarketDataFoundationRepository {
     return rowsBySymbol;
   }
 
-  private async priceQualityRowsForSymbols(symbols: string[]) {
-    const rowsBySymbol = new Map<string, Array<{
-      timestamp: Date;
-      volume: bigint | null;
-      adjustedClose: Prisma.Decimal | null;
-      close: Prisma.Decimal;
-    }>>();
-    const uniqueSymbols = [...new Set(symbols.filter(Boolean))];
-    const chunkSize = 25;
-    for (let index = 0; index < uniqueSymbols.length; index += chunkSize) {
-      const chunk = uniqueSymbols.slice(index, index + chunkSize);
-      const chunkRows = await Promise.all(chunk.map(async (symbol) => {
-        const rows = await this.prisma.priceTick.findMany({
-          where: { symbol },
-          orderBy: { timestamp: 'desc' },
-          take: STANDARD_REVIEW_MIN_BARS,
-          select: {
-            timestamp: true,
-            volume: true,
-            adjustedClose: true,
-            close: true,
-          },
-        });
-        return [symbol, rows] as const;
-      }));
-      for (const [symbol, rows] of chunkRows) rowsBySymbol.set(symbol, rows);
-    }
-    return rowsBySymbol;
-  }
-
-  private priceQualityStats(rows: Array<{
-    timestamp: Date;
-    volume: bigint | null;
-    adjustedClose: Prisma.Decimal | null;
-    close: Prisma.Decimal;
-  }>): Pick<UniversePriceStats, 'rollingWindowBars' | 'rollingWindowCoveragePercent' | 'maxPriceGapDays' | 'recentVolumeCoveragePercent' | 'adjustedCloseCoveragePercent' | 'usesAdjustedCloseFallback'> {
-    const rollingWindowBars = rows.length;
-    let maxPriceGapDays = 0;
-    for (let index = 1; index < rows.length; index += 1) {
-      const gapDays = Math.round(Math.abs(rows[index - 1].timestamp.getTime() - rows[index].timestamp.getTime()) / 86_400_000);
-      maxPriceGapDays = Math.max(maxPriceGapDays, gapDays);
-    }
-    const rowsWithVolume = rows.filter((row) => row.volume !== null && Number(row.volume) > 0).length;
-    const rowsWithAdjustedClose = rows.filter((row) => row.adjustedClose !== null && row.adjustedClose !== undefined).length;
-    return {
-      rollingWindowBars,
-      rollingWindowCoveragePercent: this.percent(rollingWindowBars, STANDARD_REVIEW_MIN_BARS),
-      maxPriceGapDays: rollingWindowBars > 1 ? maxPriceGapDays : null,
-      recentVolumeCoveragePercent: this.percent(rowsWithVolume, Math.max(rollingWindowBars, 1)),
-      adjustedCloseCoveragePercent: this.percent(rowsWithAdjustedClose, Math.max(rollingWindowBars, 1)),
-      usesAdjustedCloseFallback: rowsWithAdjustedClose < rollingWindowBars,
-    };
+  private async priceReadinessRowsForSymbols(symbols: string[]) {
+    return this.prisma.$queryRaw<Array<{
+      symbol: string;
+      priceHistoryBars: number | bigint;
+      firstTimestamp: Date | null;
+      latestTimestamp: Date | null;
+      latestVolume: bigint | null;
+      latestAdjustedClose: Prisma.Decimal | null;
+      latestClose: Prisma.Decimal | null;
+      rollingWindowBars: number | bigint;
+      volumeRows: number | bigint;
+      adjustedCloseRows: number | bigint;
+      maxPriceGapDays: number | null;
+    }>>(Prisma.sql`
+      WITH input_symbols(symbol) AS (
+        SELECT unnest(ARRAY[${Prisma.join(symbols)}]::text[])
+      ),
+      aggregates AS (
+        SELECT
+          price_ticks.symbol,
+          COUNT(*)::int AS "priceHistoryBars",
+          MIN(price_ticks.timestamp) AS "firstTimestamp",
+          MAX(price_ticks.timestamp) AS "latestTimestamp"
+        FROM price_ticks
+        INNER JOIN input_symbols ON input_symbols.symbol = price_ticks.symbol
+        GROUP BY price_ticks.symbol
+      ),
+      recent_ranked AS (
+        SELECT
+          recent.symbol,
+          recent.timestamp,
+          recent.volume,
+          recent."adjustedClose",
+          recent.close,
+          ROW_NUMBER() OVER (PARTITION BY recent.symbol ORDER BY recent.timestamp DESC) AS row_num,
+          LAG(recent.timestamp) OVER (PARTITION BY recent.symbol ORDER BY recent.timestamp DESC) AS previous_timestamp
+        FROM input_symbols
+        CROSS JOIN LATERAL (
+          SELECT
+            price_ticks.symbol,
+            price_ticks.timestamp,
+            price_ticks.volume,
+            price_ticks."adjustedClose",
+            price_ticks.close
+          FROM price_ticks
+          WHERE price_ticks.symbol = input_symbols.symbol
+          ORDER BY price_ticks.timestamp DESC
+          LIMIT ${STANDARD_REVIEW_MIN_BARS}
+        ) recent
+      ),
+      latest AS (
+        SELECT
+          symbol,
+          volume AS "latestVolume",
+          "adjustedClose" AS "latestAdjustedClose",
+          close AS "latestClose"
+        FROM recent_ranked
+        WHERE row_num = 1
+      ),
+      quality AS (
+        SELECT
+          symbol,
+          COUNT(*)::int AS "rollingWindowBars",
+          SUM(CASE WHEN volume IS NOT NULL AND volume > 0 THEN 1 ELSE 0 END)::int AS "volumeRows",
+          SUM(CASE WHEN "adjustedClose" IS NOT NULL THEN 1 ELSE 0 END)::int AS "adjustedCloseRows",
+          MAX(CASE
+            WHEN previous_timestamp IS NOT NULL THEN ABS(EXTRACT(EPOCH FROM (previous_timestamp - timestamp)) / 86400.0)
+            ELSE 0
+          END)::float AS "maxPriceGapDays"
+        FROM recent_ranked
+        GROUP BY symbol
+      )
+      SELECT
+        aggregates.symbol,
+        aggregates."priceHistoryBars",
+        aggregates."firstTimestamp",
+        aggregates."latestTimestamp",
+        latest."latestVolume",
+        latest."latestAdjustedClose",
+        latest."latestClose",
+        COALESCE(quality."rollingWindowBars", 0)::int AS "rollingWindowBars",
+        COALESCE(quality."volumeRows", 0)::int AS "volumeRows",
+        COALESCE(quality."adjustedCloseRows", 0)::int AS "adjustedCloseRows",
+        COALESCE(quality."maxPriceGapDays", 0)::float AS "maxPriceGapDays"
+      FROM aggregates
+      LEFT JOIN latest ON latest.symbol = aggregates.symbol
+      LEFT JOIN quality ON quality.symbol = aggregates.symbol
+      ORDER BY aggregates.symbol ASC
+    `);
   }
 
   private percent(value: number, denominator: number) {

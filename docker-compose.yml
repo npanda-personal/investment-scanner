@@ -1,10 +1,23 @@
-version: '3.8'
-
 services:
   postgres:
     image: timescale/timescaledb:latest-pg16
     container_name: investment_scanner_postgres
     restart: unless-stopped
+    mem_limit: 1g
+    memswap_limit: 1g
+    shm_size: 128mb
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - effective_cache_size=768MB
+      - -c
+      - maintenance_work_mem=64MB
+      - -c
+      - work_mem=2MB
+      - -c
+      - max_connections=25
     environment:
       POSTGRES_DB: investment_scanner
       POSTGRES_USER: scanner
@@ -23,6 +36,8 @@ services:
       retries: 5
 
   redis:
+    profiles:
+      - cache
     image: redis:7-alpine
     container_name: investment_scanner_redis
     restart: unless-stopped
@@ -35,6 +50,8 @@ services:
     command: redis-server --appendonly yes
 
   pgadmin:
+    profiles:
+      - tools
     image: dpage/pgadmin4:latest
     container_name: investment_scanner_pgadmin
     restart: unless-stopped
