@@ -26,18 +26,58 @@ import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import { Link } from 'react-router-dom';
 import { evaluateDataQuality, fetchDataQualityDiagnostics } from '../api/dataQualityEngineService';
 import { useDataQualityEngine } from '../hooks';
-import type { CoverageStatus, DataQualityEvaluation, DataQualityFilters, LiquidityStatus, SignalReadinessStatus } from '../types';
+import type {
+  CoverageStatus,
+  DataQualityEvaluation,
+  DataQualityFilters,
+  DataQualityUseCaseTierStatus,
+  DataQualityUseCaseTiers,
+  LiquidityStatus,
+  SignalReadinessStatus,
+} from '../types';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { BatchProgressBar, DataTable, FilterBar, PageHeader, StatusBadge, type DataTableColumn, type SortDirection } from '@/shared/components';
 import { useBatchRunner } from '@/shared/hooks';
 import { data_quality_engine_batch_request_workers_count, data_quality_engine_batch_size } from '../config';
 
 type QualityView = 'all' | 'ready' | 'blocked' | 'coverage' | 'liquidity' | 'backtest';
+type QualityTierKey = 'dailyReview' | 'signal' | 'backtest' | 'calibration' | 'automation';
+
+const QUALITY_TIER_ORDER: QualityTierKey[] = ['dailyReview', 'signal', 'backtest', 'calibration', 'automation'];
+const QUALITY_TIER_LABELS: Record<QualityTierKey, string> = {
+  dailyReview: 'Daily Review',
+  signal: 'Signal',
+  backtest: 'Backtest',
+  calibration: 'Calibration',
+  automation: 'Automation',
+};
+
+const TIER_REASON_LABELS: Record<string, string> = {
+  PHASE0_AUTOMATION_NOT_AUTHORIZED: 'Policy gate: automation is blocked in Phase 0 and is not broker-authorized.',
+  TRUST_CONTEXT_MISSING: 'Trusted baseline context is missing.',
+  TRUSTED_BASELINE_HISTORY_INCOMPLETE: 'Trusted baseline history is incomplete.',
+  LISTING_DATE_CONFIDENCE_MISSING: 'Listing-date confidence is missing.',
+  SIGNAL_NOT_READY: 'Signal readiness is not ready.',
+  SIGNAL_LIMITED: 'Signal readiness is limited.',
+  SIGNAL_LEGACY_INELIGIBLE: 'Signal eligibility is blocked by legacy readiness checks.',
+  THIN_LIQUIDITY: 'Liquidity is thin or illiquid.',
+  STALE_PRICE: 'Latest price is stale.',
+  UNUSABLE_COVERAGE: 'Coverage is unusable.',
+  BACKTEST_LEGACY_INELIGIBLE: 'Backtesting is blocked by legacy readiness checks.',
+  CALIBRATION_SIGNAL_HISTORY_MISSING: 'Signal history is missing for calibration.',
+  CALIBRATION_LEGACY_INELIGIBLE: 'Calibration is blocked by legacy readiness checks.',
+};
+
+const normalizeTierReason = (reason: string): string => {
+  const normalized = String(reason || '').trim();
+  if (!normalized) return 'Unknown tier reason.';
+  return TIER_REASON_LABELS[normalized] || normalized.replace(/_/g, ' ').toLowerCase();
+};
 
 const statusColor = (value: string): 'success' | 'warning' | 'error' | 'default' => {
   if (['GOOD', 'READY', 'LIQUID'].includes(value)) return 'success';
   if (['PARTIAL', 'LIMITED', 'THIN', 'UNKNOWN'].includes(value)) return 'warning';
-  if (['POOR', 'UNUSABLE', 'NOT_READY', 'ILLIQUID'].includes(value)) return 'error';
+  if (['POOR', 'UNUSABLE', 'NOT_READY', 'ILLIQUID', 'BLOCKED'].includes(value)) return 'error';
   return 'default';
 };
 
@@ -47,6 +87,43 @@ const formatPercent = (value: number, total: number) => {
 };
 
 const formatDateTime = (value: string) => new Date(value).toLocaleString();
+
+const fallbackUseCaseTiers = (item: DataQualityEvaluation): DataQualityUseCaseTiers => {
+  const stale = item.dataGaps.some((gap) => gap.toLowerCase().includes('stale'));
+  const dailyReview: DataQualityUseCaseTiers['dailyReview'] = stale || item.coverageStatus === 'UNUSABLE'
+    ? { status: 'BLOCKED', reasons: [stale ? 'STALE_PRICE' : 'UNUSABLE_COVERAGE'] }
+    : item.signalReadinessStatus === 'LIMITED' || item.signalReadinessStatus === 'NOT_READY' || item.liquidityStatus === 'THIN' || item.liquidityStatus === 'ILLIQUID'
+      ? { status: 'LIMITED', reasons: [item.signalReadinessStatus === 'LIMITED' ? 'SIGNAL_LIMITED' : item.signalReadinessStatus === 'NOT_READY' ? 'SIGNAL_NOT_READY' : 'THIN_LIQUIDITY'] }
+      : { status: 'READY', reasons: [] };
+
+  const signal: DataQualityUseCaseTiers['signal'] = stale || item.signalReadinessStatus === 'NOT_READY'
+    ? { status: 'BLOCKED', reasons: [stale ? 'STALE_PRICE' : 'SIGNAL_NOT_READY'] }
+    : item.signalReadinessStatus === 'LIMITED' || !item.eligibleForSignals || item.liquidityStatus === 'THIN' || item.liquidityStatus === 'ILLIQUID'
+      ? { status: 'LIMITED', reasons: [item.signalReadinessStatus === 'LIMITED' ? 'SIGNAL_LIMITED' : !item.eligibleForSignals ? 'SIGNAL_LEGACY_INELIGIBLE' : 'THIN_LIQUIDITY'] }
+      : { status: 'READY', reasons: [] };
+
+  const backtest: DataQualityUseCaseTiers['backtest'] = !item.eligibleForBacktesting
+    ? { status: 'BLOCKED', reasons: ['BACKTEST_LEGACY_INELIGIBLE'] }
+    : signal.status === 'LIMITED' || item.liquidityStatus === 'THIN'
+      ? { status: 'LIMITED', reasons: [signal.status === 'LIMITED' ? 'SIGNAL_LIMITED' : 'THIN_LIQUIDITY'] }
+      : { status: 'READY', reasons: [] };
+
+  const calibration: DataQualityUseCaseTiers['calibration'] = !item.eligibleForCalibration
+    ? { status: 'BLOCKED', reasons: ['CALIBRATION_LEGACY_INELIGIBLE'] }
+    : signal.status === 'LIMITED'
+      ? { status: 'LIMITED', reasons: ['SIGNAL_LIMITED'] }
+      : { status: 'READY', reasons: [] };
+
+  return {
+    dailyReview,
+    signal,
+    backtest,
+    calibration,
+    automation: { status: 'BLOCKED', reasons: ['PHASE0_AUTOMATION_NOT_AUTHORIZED'] },
+  };
+};
+
+const resolvedUseCaseTiers = (item: DataQualityEvaluation): DataQualityUseCaseTiers => item.useCaseTiers || fallbackUseCaseTiers(item);
 
 const MetricCard: React.FC<{ label: string; value: number | string; detail?: string }> = ({ label, value, detail }) => (
   <Paper variant="outlined" sx={{ p: 2, minHeight: 92 }}>
@@ -73,6 +150,10 @@ const ScoreStatus: React.FC<{ score: number; status: string }> = ({ score, statu
     </Stack>
   );
 };
+
+const TierStatusChip: React.FC<{ status: DataQualityUseCaseTierStatus }> = ({ status }) => (
+  <Chip size="small" label={status} color={statusColor(status)} variant="outlined" sx={{ minWidth: 86 }} />
+);
 
 const DataQualityEnginePage: React.FC = () => {
   const { scope } = useMarketScope();
@@ -110,6 +191,15 @@ const DataQualityEnginePage: React.FC = () => {
   }), [country, coverageStatus, eligibleForBacktesting, eligibleForSignals, liquidityStatus, page, pageSize, readinessStatus, search, sector, sortBy, sortDirection]);
 
   const { summary, reviewReadiness, items, total, loading, error, reload } = useDataQualityEngine(filters);
+  const selectedTiers = useMemo<DataQualityUseCaseTiers | null>(() => (selected ? resolvedUseCaseTiers(selected) : null), [selected]);
+  const selectedTierBlockers = useMemo(() => {
+    if (!selectedTiers) return [] as string[];
+    return QUALITY_TIER_ORDER.flatMap((tierKey) => {
+      const tier = selectedTiers[tierKey];
+      if (tier.status !== 'BLOCKED') return [];
+      return tier.reasons.map((reason) => `${QUALITY_TIER_LABELS[tierKey]}: ${normalizeTierReason(reason)}`);
+    });
+  }, [selectedTiers]);
 
   const resetFilters = () => {
     setSearch('');
@@ -199,8 +289,11 @@ const DataQualityEnginePage: React.FC = () => {
     { id: 'coverageScore', label: 'Coverage', sortable: true, render: (item) => <ScoreStatus score={item.coverageScore} status={item.coverageStatus} /> },
     { id: 'signalReadinessScore', label: 'Signal Readiness', sortable: true, render: (item) => <ScoreStatus score={item.signalReadinessScore} status={item.signalReadinessStatus} /> },
     { id: 'liquidityScore', label: 'Liquidity', sortable: true, render: (item) => <ScoreStatus score={item.liquidityScore} status={item.liquidityStatus} /> },
-    { id: 'eligibleForSignals', label: 'Signals', render: (item) => item.eligibleForSignals ? 'YES' : 'NO' },
-    { id: 'eligibleForBacktesting', label: 'Backtests', render: (item) => item.eligibleForBacktesting ? 'YES' : 'NO' },
+    { id: 'dailyReviewTier', label: 'Daily Review', render: (item) => <TierStatusChip status={resolvedUseCaseTiers(item).dailyReview.status} /> },
+    { id: 'signalTier', label: 'Signal Tier', render: (item) => <TierStatusChip status={resolvedUseCaseTiers(item).signal.status} /> },
+    { id: 'backtestTier', label: 'Backtest Tier', render: (item) => <TierStatusChip status={resolvedUseCaseTiers(item).backtest.status} /> },
+    { id: 'calibrationTier', label: 'Calibration Tier', render: (item) => <TierStatusChip status={resolvedUseCaseTiers(item).calibration.status} /> },
+    { id: 'automationTier', label: 'Automation Tier', render: (item) => <TierStatusChip status={resolvedUseCaseTiers(item).automation.status} /> },
     { id: 'gaps', label: 'Gaps', align: 'right', render: (item) => item.dataGaps.length },
     { id: 'warnings', label: 'Warnings', align: 'right', render: (item) => item.warnings.length },
     { id: 'evaluatedAt', label: 'Last Evaluated', sortable: true, render: (item) => formatDateTime(item.lastEvaluatedAt) },
@@ -418,6 +511,11 @@ const DataQualityEnginePage: React.FC = () => {
               <StatusBadge label={selected.liquidityStatus} />
               <StatusBadge label={selected.eligibleForSignals ? 'SIGNALS YES' : 'SIGNALS NO'} />
             </Stack>
+            {selectedTiers?.automation.status === 'BLOCKED' && (
+              <Alert severity="warning">
+                Automation remains policy-blocked in Phase 0 and is not broker-authorized.
+              </Alert>
+            )}
             <Box>
               <Typography variant="subtitle2" gutterBottom>Scores</Typography>
               <Stack spacing={1.25}>
@@ -426,6 +524,22 @@ const DataQualityEnginePage: React.FC = () => {
                 <ScoreStatus score={selected.liquidityScore} status={selected.liquidityStatus} />
               </Stack>
             </Box>
+            {selectedTiers && (
+              <Box>
+                <Typography variant="subtitle2" gutterBottom>Use-case Readiness</Typography>
+                <Stack spacing={1}>
+                  {QUALITY_TIER_ORDER.map((tierKey) => {
+                    const tier = selectedTiers[tierKey];
+                    return (
+                      <Stack key={tierKey} direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                        <Typography variant="body2">{QUALITY_TIER_LABELS[tierKey]}</Typography>
+                        <TierStatusChip status={tier.status} />
+                      </Stack>
+                    );
+                  })}
+                </Stack>
+              </Box>
+            )}
             <Box>
               <Typography variant="subtitle2" gutterBottom>Eligibility</Typography>
               <Stack spacing={0.75}>
@@ -433,6 +547,23 @@ const DataQualityEnginePage: React.FC = () => {
                 <Typography variant="body2"><strong>Backtesting:</strong> {selected.eligibleForBacktesting ? 'YES' : 'NO'}</Typography>
                 <Typography variant="body2"><strong>Calibration:</strong> {selected.eligibleForCalibration ? 'YES' : 'NO'}</Typography>
               </Stack>
+            </Box>
+            {selected?.tierEvidence && (
+              <Box>
+                <Typography variant="subtitle2" gutterBottom>Tier Evidence</Typography>
+                <Stack spacing={0.75}>
+                  <Typography variant="body2"><strong>Trusted baseline:</strong> {selected.tierEvidence.trustedBaselineResidualState || 'n/a'}</Typography>
+                  <Typography variant="body2"><strong>Required history:</strong> {selected.tierEvidence.requiredHistoryStatus || 'n/a'}</Typography>
+                  <Typography variant="body2"><strong>Listing date status:</strong> {selected.tierEvidence.listingDateStatus || 'n/a'}</Typography>
+                  <Typography variant="body2"><strong>Signal history:</strong> {selected.tierEvidence.hasSignalHistory ? 'present' : 'missing'}</Typography>
+                </Stack>
+              </Box>
+            )}
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>Tier Blockers (blocker-first)</Typography>
+              {selectedTierBlockers.length
+                ? selectedTierBlockers.map((item) => <Typography key={item} variant="body2" color="text.secondary">- {item}</Typography>)
+                : <Typography color="text.secondary" variant="body2">No tier blockers detected.</Typography>}
             </Box>
             <Box>
               <Typography variant="subtitle2" gutterBottom>Data Gaps</Typography>
