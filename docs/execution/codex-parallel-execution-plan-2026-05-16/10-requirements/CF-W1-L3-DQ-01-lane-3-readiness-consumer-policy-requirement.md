@@ -90,7 +90,7 @@ Frontend files require separate UX approval and explicit reservation.
 
 ## Stop Conditions
 
-- Display-vs-action readiness policy remains unresolved.
+- Proposed child implementation contradicts the approved Option B display-vs-action readiness policy.
 - Implementation would require schema, route, shared utility, or shared UI edits.
 - Data Quality Engine output contract is insufficient for the proposed consumer behavior.
 - Tests would only freeze current fail-open behavior.

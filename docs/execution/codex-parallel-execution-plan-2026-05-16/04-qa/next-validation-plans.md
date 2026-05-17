@@ -8,6 +8,8 @@ Refresh note: docs-only QA refresh. No tests, builds, services, providers, UI ch
 
 Setup authorization note: standing branch/worktree/commit/push authorization changes execution mechanics only. It does not approve app-code work, tests, builds, Prisma commands, providers, Angel One, startup/backfill, UI smoke, live services, or Ready queue movement for any candidate below.
 
+Post-decision refresh note: Team 04 added `04-qa/post-decision-child-scenario-matrix-2026-05-17.md` after the resolved decisions for `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02` and Team 03 architecture refresh. This is planning evidence only and does not make any item app-code ready.
+
 ## Completed QA Planning / Evidence
 
 - `CF-W1-QA-01` focused command matrix is recorded in `04-qa/CF-W1-QA-01-focused-test-command-matrix.md`.
@@ -24,16 +26,36 @@ Setup authorization note: standing branch/worktree/commit/push authorization cha
 5. `CF-W1-L3-ALERT-01`: alert readiness suppression QA plan recorded in `04-qa/CF-W1-L3-ALERT-01-qa-plan.md`.
 6. `CF-W1-UX-02`: Copilot trust UX QA plan recorded in `04-qa/CF-W1-UX-02-qa-plan.md`.
 
+## Post-Decision Scenario Matrix Prepared
+
+- `CF-W1-L3-DQ-01`: child scenario matrix for portfolio/watchlist passive display, alerts/action-like workflows, portfolio-intelligence reliability, and copilot/research trust handoff.
+- `CF-W1-TP-01A`: backend-only scenario matrix for no-target compatibility, DQ hard blockers, `LIMITED` handling, target-shaped compatibility fields, and forbidden product-language checks.
+- `CF-W1-MD-02`: ADR QA checklist for companion durable readiness/evidence storage, natural key, provenance, DQE handoff, migration/rollback, query/test strategy, and local/free constraints.
+
+Matrix file: `04-qa/post-decision-child-scenario-matrix-2026-05-17.md`.
+
+## Child QA Plans Prepared After Team 03 Contracts
+
+- `CF-W1-L3-ALERT-01`: refreshed alert readiness suppression QA plan against child contract in `04-qa/CF-W1-L3-ALERT-01-qa-plan.md`.
+- `CF-W1-L3-PORT-01`: portfolio/watchlist readiness DTO QA plan recorded in `04-qa/CF-W1-L3-PORT-01-qa-plan.md`.
+- `CF-W1-TP-01B`: backend-only Trade Plan compatibility and DQ hard-block QA plan recorded in `04-qa/CF-W1-TP-01B-qa-plan.md`.
+- `CF-W1-NOTIF-02`: notification local log redaction QA plan recorded in `04-qa/CF-W1-NOTIF-02-qa-plan.md`.
+
+These child plans are not executable validation approval. Source/test execution still requires Team 00 Ready promotion, exact file reservations, and implementation handoff.
+
 ## Status Refresh After Setup Authorization
 
 | Work item | QA status | What changed after setup authorization | Required next gate |
 | --- | --- | --- | --- |
 | `CF-W1-MD-01` | QA-blocked for executable validation | No status change; docs-only QA plan remains usable for future policy review. | Product/Architect validation policy and implementation work packet. |
-| `CF-W1-L3-ALERT-01` | QA-blocked by missing child contract | Parent Lane 3 Option B policy is accepted; alert readiness suppression still needs child contract and implementation handoff. | Architecture contract/work packet for alert readiness suppression. |
+| `CF-W1-L3-ALERT-01` | Child QA plan refreshed; executable validation still blocked | Team 03 prepared child contract/work packet; Team 04 refreshed alert child scenarios. | Team 00 Ready promotion, exact file reservations, and implementation handoff. |
 | `CF-W1-UX-02` | QA-blocked by Product/UX/Architecture decisions | No status change; UI smoke remains excluded until approved UI scope and spec exist. | Product/UX/Architect trust contract and implementation packet. |
-| `CF-W1-L3-DQ-01` | Can proceed only to child architecture/QA refresh | Product Owner accepted Option B, but this does not approve app-code or QA execution. | Child module contracts, exact reservations, and scenario matrix. |
-| `CF-W1-TP-01A` | Can proceed only to backend-only architecture/QA refresh | Product Owner accepted Option B, but this does not approve app-code or QA execution. | Backend-only child packet, exact reservations, and scenario matrix. |
-| `CF-W1-MD-02` | Can proceed only to formal ADR and ADR QA checklist | Product Owner accepted Option B as ADR direction only, not schema/source/test execution. | Formal ADR before any separate Prisma/source/test slice. |
+| `CF-W1-L3-DQ-01` | Child QA scenario matrix prepared; executable validation still blocked | Product Owner accepted Option B; Team 03 refreshed architecture notes; Team 04 recorded child scenarios. This does not approve app-code or QA execution. | Child module contracts, exact reservations, and implementation handoffs. |
+| `CF-W1-TP-01A` | Backend-only QA scenario matrix prepared; executable validation still blocked | Product Owner accepted Option B; Team 03 refreshed architecture notes; Team 04 recorded backend-only scenarios. This does not approve app-code or QA execution. | Accepted backend-only child packet, exact reservations, and implementation handoff. |
+| `CF-W1-MD-02` | ADR QA checklist prepared; source/schema/test validation blocked | Product Owner accepted Option B as ADR direction only; Team 04 recorded ADR QA checklist. | Formal ADR before any separate Prisma/source/test slice. |
+| `CF-W1-L3-PORT-01` | Child QA plan prepared; executable validation still blocked | Team 03 prepared portfolio/watchlist readiness DTO child contract and work packet; Team 04 prepared backend scenario matrix. | Team 00 must select portfolio-only, watchlist-only, or approved combined backend pass and promote exact reservations. |
+| `CF-W1-TP-01B` | Child QA plan prepared; executable validation still blocked | Team 03 prepared backend-only Trade Plan child contract and work packet; Team 04 prepared scenario matrix. | Team 00 Ready promotion, exact Trade Plan file reservations, and implementation handoff. |
+| `CF-W1-NOTIF-02` | Focused QA plan prepared; executable validation still blocked | Requirement, architecture review, contract, and work packet exist; Team 04 recorded provider redaction scenarios. | Team 00 or Team 09 Ready promotion, exact notification file reservations, and implementation handoff. |
 
 ## Remaining Next QA Plans
 
@@ -74,7 +96,10 @@ Provider-adjacent, startup-adjacent, frontend build, backend build, UI smoke, li
 
 - `CF-W1-L3-DQ-01`: blocked from executable validation until child contracts, exact file reservations, and implementation handoff exist.
 - `CF-W1-TP-01A`: blocked from executable validation until backend-only child packet, exact file reservations, and implementation handoff exist; full target geometry migration remains separate.
-- `CF-W1-MD-02`: blocked from executable validation because Option B is ADR direction only; source/schema/test work needs separate approval.
+- `CF-W1-MD-02`: blocked from executable validation because Option B is ADR direction only; formal ADR and source/schema/test work need separate approval.
 - `CF-W1-MD-01`: executable validation remains blocked until future-date, adjusted-close, suspicious-volume, and spike policy are accepted and implementation scope exists.
-- `CF-W1-L3-ALERT-01`: blocked by Lane 3 readiness policy, alert readiness contract, and implementation handoff.
+- `CF-W1-L3-ALERT-01`: child QA plan is refreshed; blocked until Team 00 Ready promotion, exact reservations, and implementation handoff.
+- `CF-W1-L3-PORT-01`: child QA plan is prepared; blocked until Team 00 selects portfolio/watchlist split and promotes exact reservations.
+- `CF-W1-TP-01B`: child QA plan is prepared; blocked until Team 00 Ready promotion and exact backend-only implementation handoff.
+- `CF-W1-NOTIF-02`: focused QA plan is prepared; blocked until Team 00/Team 09 Ready promotion and exact notification provider/test/doc reservation.
 - `CF-W1-UX-02`: blocked by Copilot naming/trust-field/blocked-state decisions, shared-file reservation if needed, and implementation handoff.

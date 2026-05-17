@@ -4,9 +4,9 @@ Date: 2026-05-17
 
 Owner: Team 04 QA Factory
 
-Status: QA planning only. Alert readiness suppression validation is blocked until `CF-W1-L3-DQ-01` policy acceptance, alert readiness contract acceptance, and scoped implementation handoff.
+Status: Child QA plan refreshed against `CF-W1-L3-ALERT-01` contract. Executable QA remains blocked until Team 00 promotes exact file reservations and implementation handoff exists.
 
-Current status refresh: recent setup authorization does not unblock alert QA execution. `CF-W1-L3-ALERT-01` can only proceed after Team 03/Team 00 update the architecture/work-packet chain for Lane 3 readiness and alert readiness suppression.
+Current status refresh: Team 03 prepared the alert readiness child architecture contract and work packet on 2026-05-17. Team 04 accepts this child QA plan as planning evidence only; it does not approve source/test execution.
 
 ## Scope
 
@@ -25,10 +25,11 @@ This plan does not approve application source edits, test edits, Prisma changes,
 
 ## Dependencies
 
-- `CF-W1-L3-DQ-01` must define display-only versus action-like readiness policy.
-- Architect must define the alert readiness consumer contract.
-- Implementation handoff must state whether Alerts Monitoring receives Data Quality Engine public outputs directly or through approved module DTOs.
-- Product Owner must accept whether `LIMITED` readiness can ever create an alert. Conservative default: `LIMITED` blocks action-like alert event creation.
+- `CF-W1-L3-DQ-01` Option B policy is accepted: passive `LIMITED` display with action-like blocking.
+- `CF-W1-L3-ALERT-01` child architecture contract and work packet are prepared.
+- Implementation handoff must keep the approved backend-only file reservation.
+- Alerts Monitoring must consume `DataQualityEngineService` through the Data Quality public module export.
+- `LIMITED` blocks alert event creation in this child slice.
 
 ## Required QA Assertions
 
@@ -43,6 +44,8 @@ This plan does not approve application source edits, test edits, Prisma changes,
 - Suppressed rules produce auditable skip evidence where the accepted contract requires it.
 - Alert event copy remains research-support oriented and avoids direct financial advice.
 - Existing user ownership behavior from `CF-W1-L3-AUTH-02` remains protected.
+- Created events include `metadata.dataQuality` evidence.
+- Evaluation result includes additive readiness suppression evidence such as `skippedReadiness` and `readinessSuppressions`.
 
 ## Scenario Matrix
 
@@ -55,6 +58,19 @@ This plan does not approve application source edits, test edits, Prisma changes,
 | `BLOCKED` | Suppress | Suppress | Suppress | Suppress | Blockers visible in QA evidence. |
 | Stale hard blocker | Suppress | Suppress | Suppress | Suppress | Latest trusted timestamp or stale reason visible when available. |
 | Unsupported region/asset type or scope mismatch | Suppress | Suppress | Suppress | Suppress | Scope mismatch reason visible. |
+
+## Child Contract Scenarios
+
+| Scenario | Expected QA result |
+| --- | --- |
+| READY stock price/signal rule | Creates event only when rule condition matches and required alert readiness is `READY`; metadata includes Data Quality evidence. |
+| Missing DQ stock rule | Suppresses event; increments/adds readiness suppression evidence. |
+| LIMITED stock, portfolio, or watchlist rule | Suppresses event; limited reason remains auditable. |
+| NOT_READY, BLOCKED tier, UNUSABLE, stale, unsupported, scope mismatch, or provider gap | Suppresses event; blocker evidence is returned. |
+| Portfolio holding alert | Evaluates each holding by holding instrument readiness; no dependency on portfolio/watchlist readiness DTO child implementation. |
+| Watchlist item alert | Evaluates each item by item instrument readiness; no event from blocked item evidence. |
+| Duplicate suppression | Existing duplicate skip behavior and count remain unchanged. |
+| Ownership regression | Parent-rule owner filtering from `CF-W1-L3-AUTH-02` remains intact. |
 
 ## Focused Command Guidance
 

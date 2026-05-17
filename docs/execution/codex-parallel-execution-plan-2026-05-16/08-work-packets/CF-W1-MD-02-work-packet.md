@@ -8,9 +8,11 @@ Durable Market Data readiness evidence and natural-key decision preparation.
 
 ## State
 
-ADR direction accepted for formal ADR drafting.
+Formal ADR draft prepared.
 
 Application source, Prisma, migrations, providers, services, tests, generated types, Data Quality handoff, and route changes are blocked until separate implementation slices are approved.
+
+ADR draft: `03-architecture/CF-W1-MD-02-durable-readiness-evidence-adr.md`.
 
 ## Owner / Lane / Module
 
@@ -38,25 +40,36 @@ Only active execution documentation under:
 - generated Prisma types
 - provider, scheduler, startup, repair, backfill, Angel One, broker, or live-provider files
 
-## Decision Packet Inputs Needed Later
+## ADR Outcome
 
-The future Decision Packet / ADR should compare:
+The formal ADR draft compares:
 
 - expand `PriceTick` with durable provenance fields,
 - create companion OHLC evidence table,
 - create durable readiness evidence table,
 - keep current storage and limit claims to derived evidence.
 
-It must cover:
+It documents:
 
 - target natural key,
 - Prisma and migration impact,
-- backfill/migration plan,
+- migration/no-backfill plan,
 - rollback plan,
 - query and test strategy,
 - downstream DQ/signal/backtest/trade-plan impact,
 - local/free constraints,
 - provider and startup exclusions.
+
+This is planning evidence only. It does not approve source/schema/test implementation.
+
+## Future Split Packets
+
+| Packet | Purpose | Current state |
+| --- | --- | --- |
+| `CF-W1-MD-02A` | Additive Prisma/schema proposal for companion durable evidence storage. | Blocked by schema/migration approval. |
+| `CF-W1-MD-02B` | Market Data repository/service write and read model for companion evidence. | Blocked until schema packet acceptance. |
+| `CF-W1-MD-02C` | Data Quality Engine handoff from Market Data public evidence outputs. | Blocked until Market Data evidence read model acceptance. |
+| `CF-W1-MD-02D` | Downstream adoption through DQE public outputs. | Blocked until DQE contract acceptance. |
 
 ## Future Source Reservation After Decision
 
@@ -98,4 +111,4 @@ Exact current write scope for this Team 03 pass:
 
 Future source/schema implementation is not reserved. A later source packet must follow an accepted ADR and explicitly reserve Prisma/schema/migration/source/test files if needed.
 
-Current blocker: formal ADR, ADR QA checklist, and separate future implementation slice approvals are not yet recorded. Product claims remain limited to derived/read-path evidence until implementation is approved.
+Current blocker: formal ADR acceptance, ADR QA checklist acceptance, and separate future implementation slice approvals are not yet recorded. Product claims remain limited to derived/read-path evidence until implementation is approved.

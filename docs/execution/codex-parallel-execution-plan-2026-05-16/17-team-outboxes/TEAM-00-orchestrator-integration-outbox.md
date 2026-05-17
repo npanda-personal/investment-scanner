@@ -268,3 +268,115 @@ Team 03 should launch from:
 Prompt:
 
 `15-automation-prompts/AUTO-03-architecture-factory.md`
+
+---
+
+# Master Coordination Cycle
+
+Date: 2026-05-17
+
+State: Coordination checkpoint; Teams 01-10 assigned
+
+## Evidence Sync
+
+| Item | Result |
+| --- | --- |
+| Branch | `dev` |
+| Branch status | `dev...origin/dev [ahead 2]` before this coordination commit |
+| Recent log head | `d2a6eae docs: resolve daemon decision inbox items` |
+| Worktree safety | Safe for docs-only coordination only; dirty files are active execution docs and team outputs |
+
+Recent commits inspected:
+
+- `d2a6eae docs: resolve daemon decision inbox items`
+- `d5927d6 docs: initialize team 00 orchestrator intake`
+- `4ad0a39 docs: checkpoint daemon decision routing`
+- `1e882cd docs: authorize continuous codex factory execution`
+- `1a0c91b docs: checkpoint daemon requirement and qa prep`
+- `e2036dd docs: refresh daemon planning queues`
+- `f75808f docs: fix daemon checkpoint resume protocol`
+- `ae0b4cc docs: checkpoint daemon after resolved decisions`
+- `6ab3999 feat: add signal trigger contract projection`
+- `503bcd9 fix: scope alert events by rule owner`
+
+## Queue State
+
+| Queue | Depth | Notes |
+| --- | ---: | --- |
+| Open decisions | 5 | `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, and `CF-W1-MD-01` block only affected implementation workstreams. |
+| Ready queue | 0 | No active application-code item is Ready for Implementation. |
+| Refinement queue | 13 | Active unique refinement / near-ready items include Lane 3 readiness children, Trade Plan child, notification redaction, Market Data ADR/policy, UX, auth, and subscription items. |
+| Integration queue | 0 | No active application-code integration item is pending. |
+
+## Assignments Written
+
+Current Team 01-10 inbox assignments:
+
+- `16-team-inboxes/TEAM-01-current-assignment.md`
+- `16-team-inboxes/TEAM-02-current-assignment.md`
+- `16-team-inboxes/TEAM-03-current-assignment.md`
+- `16-team-inboxes/TEAM-04-current-assignment.md`
+- `16-team-inboxes/TEAM-05-current-assignment.md`
+- `16-team-inboxes/TEAM-06-current-assignment.md`
+- `16-team-inboxes/TEAM-07-current-assignment.md`
+- `16-team-inboxes/TEAM-08-current-assignment.md`
+- `16-team-inboxes/TEAM-09-current-assignment.md`
+- `16-team-inboxes/TEAM-10-current-assignment.md`
+
+## Team Routing
+
+| Team | Current state | Assignment result |
+| --- | --- | --- |
+| Team 01 | Active docs-only | Continue audits and stale-risk discovery. |
+| Team 02 | Active docs-only | Keep requirements, blocked queues, and top candidates synchronized. |
+| Team 03 | Active docs-only | Continue architecture/ADR prep and exact future reservations. |
+| Team 04 | Active docs-only | Continue QA-plan and evidence requirements; no executable QA. |
+| Team 05 | Active docs-only | Market Data/DQ audit and ADR/policy support; no source/schema/test edits. |
+| Team 06 | Active docs-only | Trade Plan/readiness evidence refresh; no implementation until `CF-W1-TP-01B` is promoted. |
+| Team 07 | Active docs-only | Lane 3 readiness/ownership refinement; no implementation until one child is promoted. |
+| Team 08 | Partially blocked | `CF-W1-UX-02` and `CF-W1-UX-05` implementation blocked; docs-only refinement may continue. |
+| Team 09 | Partially blocked | `CF-W1-AUTH-01` and `CF-W1-SUB-01` blocked; `CF-W1-NOTIF-02` readiness prep may continue. |
+| Team 10 | Active review-only | Monitor outboxes and integration queue; reject app-code release claims until gates exist. |
+
+## Worktree Recommendation
+
+Current assignments are documentation-only or review-only and can use shared `dev`.
+
+Use worktrees only after Team 00 promotes a specific implementation item:
+
+- Team 05: `codex/team05-md-dq/{requirement-id}`
+- Team 06: `codex/team06-strategy-signal/CF-W1-TP-01B`
+- Team 07: `codex/team07-portfolio-alerts/{requirement-id}`
+- Team 08: `codex/team08-ux-copilot/CF-W1-UX-02`
+- Team 09: `codex/team09-platform/CF-W1-NOTIF-02`
+- Team 10: `codex/team10-review-release/{requirement-id}` only for isolated implementation review
+
+## Implementation Readiness
+
+Implementation-ready items: none.
+
+Near-ready but not Ready:
+
+- `CF-W1-L3-PORT-01`
+- `CF-W1-L3-ALERT-01`
+- `CF-W1-TP-01B`
+- `CF-W1-NOTIF-02`
+
+Blocked by open decisions:
+
+- `CF-W1-AUTH-01`
+- `CF-W1-SUB-01`
+- `CF-W1-UX-02`
+- `CF-W1-UX-05`
+- `CF-W1-MD-01`
+
+## Next Coordination Action
+
+After this docs-only coordination commit, Team 00 should evaluate one child slice for Ready promotion. Preferred order:
+
+1. `CF-W1-L3-PORT-01A`
+2. `CF-W1-TP-01B`
+3. `CF-W1-NOTIF-02`
+4. `CF-W1-L3-ALERT-01`
+
+Do not promote any item that lacks exact file reservations, accepted QA plan, implementation handoff, and no unresolved blocker.

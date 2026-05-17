@@ -6,9 +6,13 @@ Owner: Team 03 Architecture Factory
 
 ## Status
 
-ADR direction accepted. Source, schema, migration, provider, route, service, startup, and test implementation are blocked.
+Formal ADR draft prepared. Source, schema, migration, provider, route, service, startup, and test implementation are blocked.
 
 Product Owner approved Option B as ADR direction only on 2026-05-17. This review now routes to formal ADR prep and later split implementation packets.
+
+Formal ADR draft:
+
+- `03-architecture/CF-W1-MD-02-durable-readiness-evidence-adr.md`
 
 ## Evidence Inspected
 
@@ -21,6 +25,7 @@ Product Owner approved Option B as ADR direction only on 2026-05-17. This review
 - `12-ready-queue/blocked-by-shared-file.md`
 - `06-contracts/CF-W1-MD-02-durable-readiness-evidence-contract.md`
 - `08-work-packets/CF-W1-MD-02-work-packet.md`
+- `03-architecture/CF-W1-MD-02-durable-readiness-evidence-adr.md`
 - `backend/prisma/schema.prisma` read-only lines for `PriceTick` and `LatestPrice`
 - current backend module/test structure for `market-data-foundation`
 
@@ -30,16 +35,18 @@ The current `PriceTick` natural key is `symbol + timestamp`, and `LatestPrice` i
 
 Durable readiness evidence cannot be safely implemented without deciding whether evidence belongs in existing price rows, a companion OHLC evidence table, a durable readiness evidence table, or remains derived/read-path only with limited product claims.
 
-## ADR Options To Present Later
+## ADR Result
 
-The future Decision Packet/ADR should compare:
+The formal ADR draft selects companion durable Market Data readiness/evidence storage as the future architecture direction while keeping all implementation approval gates closed.
+
+It compares:
 
 - expand existing `PriceTick`/latest-price records with durable provenance fields,
 - create a companion OHLC evidence table,
 - create a durable readiness evidence table,
 - keep current storage and explicitly limit product claims to derived/read-path evidence.
 
-The ADR must define natural key, append/upsert/derived semantics, Prisma impact, migration/backfill policy, rollback, query strategy, focused tests, downstream handoff, and local/free constraints.
+The draft defines natural key, append/upsert/derived semantics, Prisma impact, migration/no-backfill policy, rollback, query strategy, focused tests, downstream handoff, and local/free constraints at an architecture level. It does not reserve or approve source/schema/test work.
 
 ## File Reservations
 
@@ -70,13 +77,13 @@ Future source reservation is forbidden until ADR approval. If later approved, ex
 - frontend source, UI tests, and route files
 - `04-qa/**`, `10-requirements/**`, `00-control/**`, `12-ready-queue/**`, and decision inbox files for this Team 03 assignment
 
-## Blockers
+## Remaining Blockers
 
-- Formal ADR is not yet recorded.
 - Prisma/migration impact is not approved for implementation.
-- Migration/backfill/no-backfill and rollback approach are not accepted.
-- DQE handoff and downstream durable-vs-derived claims need ADR treatment.
+- Migration/no-backfill and rollback approach are documented only at ADR level and are not accepted for implementation.
+- DQE handoff and downstream durable-vs-derived claims still need split-packet acceptance before source work.
+- Formal ADR still needs Team 00 / Architect / QA acceptance before future implementation packets are promoted.
 
 ## Readiness Result
 
-Architecture-ready for formal ADR prep. Blocked for all source/schema/test implementation.
+Architecture-ready for future split-packet planning. Blocked for all source/schema/test implementation.

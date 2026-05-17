@@ -2,11 +2,19 @@
 
 Date: 2026-05-17
 
-No open decisions.
+## Current Open Decisions
 
-Product Owner action not required.
+| Decision ID | Title | Owner Needed | Severity | Affected Module | Status | Created Date | Blocks Which Work | Parallel Work Still Available |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| DECISION-20260517-platform-auth-default-user-fallback-policy | Authenticated route `default-user` fallback policy | Product Owner + Architect + QA | High | `subscription-billing`, `notifications-delivery` | Open | 2026-05-17 | `CF-W1-AUTH-01` controller fail-closed implementation | `CF-W1-NOTIF-02` redaction contract/QA prep; unrelated Lane 1/2/3 prep |
+| DECISION-20260517-local-manual-subscription-plan-change-policy | Local/manual subscription self-plan change policy | Product Owner + Architect + QA | Medium | `subscription-billing`, optional subscription UI | Open | 2026-05-17 | `CF-W1-SUB-01` subscription policy implementation | `CF-W1-NOTIF-02` redaction contract/QA prep; unrelated auth audit and docs-only refinement |
+| DECISION-20260517-copilot-trust-ux-policy | Copilot trust UX naming and blocked-summary policy | Product Owner + UX + Architect | Medium | `ai-investment-copilot`, optional `stock-research-workbench` | Open | 2026-05-17 | `CF-W1-UX-02` implementation and `CF-W1-QA-UI-01` Playwright trust-state validation | Team 08 docs-only audit/refinement; unrelated Lane 1/2/3/9 prep |
+| DECISION-20260517-ux-product-language-status-policy | First target for product-language and status-color cleanup | Product Owner + UX + Architect | Medium | `ai-investment-copilot`, `research-hub`, `market-data-foundation`, shared UI | Open | 2026-05-17 | `CF-W1-UX-05` implementation and shared status-color changes | Team 08 docs-only audit/refinement; unrelated Lane 1/2/3/9 prep |
+| DECISION-20260517-market-data-validation-hardening-policy | Market Data validation policy for future-dated candles, adjusted close, suspicious volume, and spike handling | Product Owner + Architect + QA | Medium | `market-data-foundation` | Open | 2026-05-17 | `CF-W1-MD-01` validation source/test implementation | `CF-W1-MD-02` ADR work; unrelated docs-only refinement |
 
-Daemon should continue autonomous work.
+Product Owner action is required for these policy blockers before related application-code work can move to Ready.
+
+Unrelated autonomous docs-only prep can continue.
 
 ## Resolved This Cycle
 
@@ -26,4 +34,3 @@ Push remains allowed only when all standing push gates pass. Force push and push
 
 - `DECISION-20260517-alert-event-ownership-model`: resolved as Option B, parent `AlertRule` owner for the first bounded backend slice.
 - `DECISION-20260517-trigger-object-contract-path`: resolved as Option A, optional module-local Signal Generation trigger DTO projection only.
-

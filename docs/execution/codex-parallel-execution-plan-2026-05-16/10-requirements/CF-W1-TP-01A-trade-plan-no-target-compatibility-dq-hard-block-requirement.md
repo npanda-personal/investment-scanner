@@ -93,8 +93,8 @@ Likely implementation files after accepted contract, QA plan, and work packet:
 
 ## Stop Conditions
 
-- Product semantics for replacing target fields remain ambiguous.
-- DQ hard-block policy for `LIMITED`, `NOT_READY`, missing DQ, stale data, or DQE blockers remains unresolved.
+- Proposed child implementation cannot stay within the approved backend-only compatibility direction or needs broader target-field migration.
+- Proposed child contract contradicts approved DQ hard-block semantics or attempts to narrow `LIMITED` behavior without a later Product Owner decision.
 - API compatibility requires cross-module or frontend migration beyond the reserved slice.
 - Shared/high-risk file changes become necessary.
 - Tests would only preserve current target-price behavior.

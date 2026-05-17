@@ -20,6 +20,23 @@ Product Owner resolved the three current Decision Inbox items on 2026-05-17:
 
 Those decisions remove the Decision Inbox blockers, but they are not app-code implementation handoffs. The affected items still need post-decision child contracts, refreshed QA scenarios, exact file reservations, and Team 00 Ready promotion before any app-code team can pull them.
 
+Post-decision child prep has advanced, but still has not produced an app-code Ready item:
+
+- `CF-W1-L3-PORT-01`: portfolio/watchlist readiness DTO child architecture contract, exact backend reservations, and child QA plan are prepared; still needs Team 00 child selection and Ready promotion.
+- `CF-W1-L3-ALERT-01`: alert readiness suppression child architecture contract, exact backend reservations, and child QA plan are prepared; still needs Team 00 Ready promotion.
+- `CF-W1-L3-AUTH-03`: alert rule target ownership requirement, architecture review, contract, work packet, and QA plan are prepared; still needs Team 00 Ready promotion.
+- `CF-W1-L3-INTEL-01`: portfolio-intelligence reliability requirement, architecture review, contract, work packet, QA plan, and Team 03 signoff are prepared; still blocked until `CF-W1-L3-PORT-01A` is accepted and Team 00 promotes the child.
+- `CF-W1-TP-01B`: Trade Plan backend-only compatibility/DQ hard-block child architecture contract, exact backend reservations, and child QA plan are prepared; still needs Team 00 Ready promotion.
+- `CF-W1-NOTIF-02`: notification log redaction requirement, architecture review, contract, work packet, and platform QA plan are prepared; still needs Team 00/Team 09 Ready promotion.
+
+Five policy/validation/UX items are blocked by open Decision Inbox entries and are not Ready:
+
+- `CF-W1-AUTH-01`: authenticated controller `default-user` fallback policy.
+- `CF-W1-SUB-01`: local/manual subscription plan-change policy.
+- `CF-W1-UX-02`: Copilot trust UX naming, blocked-summary visibility, trust-field requirements, and Stock Research inclusion policy.
+- `CF-W1-UX-05`: first product-language/status cleanup target and shared UI reservation policy.
+- `CF-W1-MD-01`: Market Data validation policy for future-dated candles, adjusted close, suspicious volume, and spike handling.
+
 ## Completed Slices Not Active For Pull
 
 The following are completed, superseded, or split and must not be treated as active implementation work:
@@ -58,20 +75,27 @@ Forcing implementation now would either preserve unsafe behavior with misleading
 
 Docs-only contract and QA preparation:
 
-- `CF-W1-TP-01A`
-- `CF-W1-L3-DQ-01`
+- `CF-W1-L3-PORT-01`
 - `CF-W1-L3-ALERT-01`
+- `CF-W1-L3-AUTH-03`
+- `CF-W1-L3-INTEL-01`
+- `CF-W1-TP-01B`
 - `CF-W1-UX-02`
 - `CF-W1-MD-02`
 - `CF-W1-MD-01`
+- `CF-W1-NOTIF-02`
 
-Next Team 03/04 work should convert the resolved decisions into child-ready artifacts:
+Next Team 00/owner work should evaluate the prepared child artifacts for Ready promotion:
 
-- `CF-W1-L3-DQ-01`: one module at a time readiness consumer child packet.
-- `CF-W1-TP-01A`: backend-only Trade Plan compatibility and DQ hard-block child packet.
+- `CF-W1-L3-PORT-01`: select and promote the portfolio/watchlist readiness DTO child if the prepared contract and QA plan pass Ready gates.
+- `CF-W1-L3-ALERT-01`: promote the alert readiness suppression child if the prepared contract and QA plan pass Ready gates.
+- `CF-W1-L3-AUTH-03`: promote the alert rule target ownership child if the prepared requirement, contract, work packet, and QA plan pass Ready gates.
+- `CF-W1-L3-INTEL-01`: keep queued behind `CF-W1-L3-PORT-01A`; promote only after portfolio readiness DTOs are implemented and accepted.
+- `CF-W1-TP-01B`: promote the backend-only Trade Plan compatibility and DQ hard-block child if the prepared contract and QA plan pass Ready gates.
+- `CF-W1-NOTIF-02`: promote the notification log redaction slice if the prepared requirement, contract, work packet, and platform QA plan pass Ready gates.
 - `CF-W1-MD-02`: formal ADR and later approval-gated source/schema split packets.
 
-No app-code item became Ready during decision resolution.
+No app-code item became Ready during decision resolution or post-decision child prep.
 
 ## Ready Criteria Reminder
 

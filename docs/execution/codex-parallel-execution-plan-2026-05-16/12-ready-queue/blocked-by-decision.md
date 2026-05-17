@@ -4,7 +4,15 @@ Date: 2026-05-17
 
 ## Decision Inbox State
 
-No active implementation item is blocked by an open Decision Inbox item.
+Five active implementation items are blocked by open Decision Inbox items.
+
+| ID | Open decision | Owner needed | State |
+| --- | --- | --- | --- |
+| CF-W1-AUTH-01 | `DECISION-20260517-platform-auth-default-user-fallback-policy` | Product Owner + Architect + QA | Do not edit platform controllers until policy is resolved and a bounded packet is promoted. |
+| CF-W1-SUB-01 | `DECISION-20260517-local-manual-subscription-plan-change-policy` | Product Owner + Architect + QA | Do not edit subscription source or UI until local/manual subscription policy is resolved and a bounded packet is promoted. |
+| CF-W1-UX-02 | `DECISION-20260517-copilot-trust-ux-policy` | Product Owner + UX + Architect | Do not edit Copilot UI/backend or Playwright trust states until naming, blocked-summary, trust-field, and scope policy is resolved. |
+| CF-W1-UX-05 | `DECISION-20260517-ux-product-language-status-policy` | Product Owner + UX + Architect | Do not edit Copilot/research/Market Data/shared status copy until first target surface and shared UI reservation are resolved. |
+| CF-W1-MD-01 | `DECISION-20260517-market-data-validation-hardening-policy` | Product Owner + Architect + QA | Do not edit Market Data validation source/tests until future-date, adjusted-close, suspicious-volume, and spike policy is resolved. |
 
 The three current Decision Inbox items were resolved on 2026-05-17:
 
@@ -16,17 +24,13 @@ The three current Decision Inbox items were resolved on 2026-05-17:
 
 | ID | Blocker | Owner |
 | --- | --- | --- |
-| CF-W1-UX-02 | Copilot naming, trust surface, blocked-state behavior, and UI scope | Product Owner + UX + Architect |
-| CF-W1-SUB-01 | Whether local self-plan changes are allowed during validation | Product Owner |
 | CF-W1-TP-01 | Broad Trade Plan target geometry/API/UI/stored-row migration beyond the approved backend-only compatibility direction | Product Owner + Architect + QA |
-| CF-W1-AUTH-01 | Whether authenticated platform routes may retain `default-user` fallback behavior | Product Owner + Architect |
 
 ## Moved Out Of Decision Blocker State
 
 | ID | New state |
 | --- | --- |
-| CF-W1-L3-DQ-01 | Decision resolved; needs child contracts, QA scenarios, exact file reservations, and implementation handoff before Ready. |
-| CF-W1-TP-01A | Decision resolved; needs refreshed backend-only child work packet, QA scenarios, exact file reservations, and implementation handoff before Ready. |
+| CF-W1-L3-DQ-01 | Decision resolved; PORT and ALERT child contracts and QA plans are prepared, but Team 00 Ready promotion is still needed before source work. |
+| CF-W1-TP-01A | Decision resolved; backend-only TP-01B child contract and QA plan are prepared, but Team 00 Ready promotion is still needed before source work. |
 | CF-W1-MD-02 | ADR direction resolved; source/schema/test work remains blocked by shared/high-risk file and separate implementation-slice gates. |
-| CF-W1-L3-ALERT-01 | No longer waiting on the parent policy decision, but still blocked by child alert-readiness contract, QA handoff, and exact file reservation. |
-
+| CF-W1-L3-ALERT-01 | No longer waiting on the parent policy decision; child alert-readiness contract and QA plan are prepared, but Team 00 Ready promotion is still needed before source work. |

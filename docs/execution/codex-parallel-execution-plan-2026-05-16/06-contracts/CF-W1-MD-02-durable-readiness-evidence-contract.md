@@ -4,9 +4,11 @@ Date: 2026-05-17
 
 ## Status
 
-ADR direction accepted for later formal ADR drafting.
+Formal ADR draft prepared for companion durable readiness/evidence storage.
 
 Product Owner approved Option B as ADR direction only on 2026-05-17. Resolution: `07-decisions/DECISION-20260517-market-data-durable-readiness-storage-adr-resolution.md`.
+
+Formal ADR draft: `03-architecture/CF-W1-MD-02-durable-readiness-evidence-adr.md`.
 
 Source, Prisma, migration, route, provider, scheduler, startup, repository, service, generated type, Data Quality handoff, and executable test implementation remain blocked until separate implementation slices are approved.
 
@@ -53,7 +55,7 @@ source
 source_symbol where provider identity can differ
 ```
 
-The exact key and whether it belongs on `PriceTick`, a companion evidence table, or a derived readiness evidence table require a later Product Owner and Architect decision.
+The formal ADR draft selects companion evidence storage as the future architecture direction, but the exact Prisma model and migration remain approval-gated.
 
 ## Current Evidence Limitation
 
@@ -76,7 +78,7 @@ Do not run live providers, Angel One, repair runs, backfills, services, or tests
 
 ## Decision Resolution Note
 
-The parent Decision Packet was resolved on 2026-05-17 as Option B ADR direction: companion durable readiness/evidence storage. The formal ADR must still cover migration path, rollback, Prisma impact, query/test strategy, downstream contract impact, and implementation slice boundaries. Source/schema/test implementation is not active now.
+The parent Decision Packet was resolved on 2026-05-17 as Option B ADR direction: companion durable readiness/evidence storage. The formal ADR draft now covers migration/no-backfill path, rollback, Prisma impact, query/test strategy, downstream contract impact, and implementation slice boundaries at architecture level. Source/schema/test implementation is not active now.
 
 ## Acceptance Criteria For Future Approval
 

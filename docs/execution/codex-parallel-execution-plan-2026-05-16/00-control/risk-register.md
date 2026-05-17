@@ -150,3 +150,11 @@
 - Trade Plan no-target/DQ hard-block policy is resolved as Option B: target-shaped fields remain compatibility-only and cannot support trusted paper-readiness; missing or blocked DQ hard-blocks trusted readiness; `LIMITED` remains blocked or limited-review-only until narrowed later.
 - Market Data durable readiness storage is resolved as Option B ADR direction only: companion durable readiness/evidence storage is the direction; no Prisma/schema/migration/source/test implementation is approved by this decision.
 - No application-code item became Ready from these resolutions because child contracts, QA scenario updates, exact file reservations, and implementation handoffs still need Team 03/04/00 routing.
+
+## Team 00 Coordination Cycle Risk Decisions
+
+- As of daemon iteration 17, five open Decision Inbox items exist: `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, and `CF-W1-MD-01`.
+- Only the affected workstreams are blocked. Team 01 audits, Team 02 requirement refinement, Team 03 architecture/ADR prep, Team 04 QA planning, Team 05/06/07 lane audits, Team 08 docs-only UX refinement, Team 09 notification redaction readiness prep, and Team 10 review monitoring can continue.
+- Ready queue remains zero for application code. Prepared child packets for `CF-W1-L3-PORT-01`, `CF-W1-L3-ALERT-01`, `CF-W1-TP-01B`, and `CF-W1-NOTIF-02` require Team 00 Ready promotion before source/test edits.
+- Implementation teams should use dedicated worktrees only after Ready promotion with exact file reservations. Current Team 01-10 assignments are docs-only or review-only and can use the shared `dev` worktree.
+- Push is not attempted while the workspace has uncommitted active-doc outputs and open decisions; local docs commit is allowed only after exact staged-scope verification.

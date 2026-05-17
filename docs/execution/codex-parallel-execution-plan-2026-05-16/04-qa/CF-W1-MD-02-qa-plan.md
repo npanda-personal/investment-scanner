@@ -8,6 +8,8 @@ Status: ADR direction accepted; QA planning only. `CF-W1-MD-02` remains an ADR/c
 
 Current status refresh: Product Owner approved Option B as ADR direction only on 2026-05-17. This does not approve schema/source/test execution, Prisma commands, provider checks, or Market Data readiness validation.
 
+Post-decision ADR QA checklist: `04-qa/post-decision-child-scenario-matrix-2026-05-17.md`.
+
 ## Scope
 
 QA plan for durable Market Data readiness evidence and natural-key ADR review.

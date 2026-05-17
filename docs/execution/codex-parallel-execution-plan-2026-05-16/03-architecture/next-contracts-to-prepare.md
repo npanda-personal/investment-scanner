@@ -8,13 +8,14 @@ Prepared by Team 03 Architecture Factory and refreshed after `CF-W1-L3-AUTH-02` 
 
 | Priority | Candidate | Architecture status | Implementation status | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | `CF-W1-L3-DQ-01` | Post-decision child contract prep can continue | Not architecture-ready for app code | Option B policy accepted; needs child DTO/file reservations and QA scenarios. |
-| 2 | `CF-W1-TP-01A` | Post-decision backend-only child contract prep can continue | Not architecture-ready for app code | Option B policy accepted; needs exact backend-only reservations and QA scenarios. |
-| 3 | `CF-W1-L3-ALERT-01` | Docs-only prep can proceed under accepted `CF-W1-L3-DQ-01` policy | Not architecture-ready for app code | Alert event ownership is committed; readiness suppression needs child contract and exact files. |
-| 4 | `CF-W1-UX-02` | Docs-only UX/architecture prep can continue | Not architecture-ready for app code | Needs Product Owner + UX + Architect decision on naming, trust surface, blocked states, and shared-file scope. |
-| 5 | `CF-W1-MD-02` | Formal ADR prep can continue | Source/schema implementation blocked | Option B ADR direction accepted; implementation remains split and approval-gated. |
-| 6 | `CF-W1-MD-01` | Docs-only validation policy prep can continue | Not architecture-ready for app code | Needs policy for future-dated candles, adjusted-close gaps, and suspicious price spikes. |
-| 7 | `CF-W1-UX-05` | Docs-only copy/shared-status inventory can continue | Not architecture-ready for app code | Needs Product Owner/UX copy and status-color decision plus shared UI reservation if code follows. |
+| 1 | `CF-W1-L3-PORT-01` | Child architecture contract prepared | Not Ready for Implementation | Portfolio/watchlist DTO contract and exact backend file reservations recorded; needs Team 04 child QA plan and Team 00 Ready promotion. |
+| 2 | `CF-W1-L3-ALERT-01` | Child architecture contract prepared | Not Ready for Implementation | Alert readiness suppression contract and exact backend file reservations recorded; needs Team 04 child QA plan refresh and Team 00 Ready promotion. |
+| 3 | `CF-W1-TP-01B` | Backend-only child architecture contract prepared | Not Ready for Implementation | Trade Plan compatibility/DQ hard-block contract and exact backend file reservations recorded; needs Team 04 child QA refresh and Team 00 Ready promotion. |
+| 4 | `CF-W1-L3-INTEL-01` | Child architecture signoff prepared | Not Ready for Implementation | Requirement, architecture review, contract, QA plan, work packet, and Team 03 signoff exist; blocked until `CF-W1-L3-PORT-01A` is implemented and accepted. |
+| 5 | `CF-W1-UX-02` | Docs-only UX/architecture prep can continue | Not architecture-ready for app code | Needs Product Owner + UX + Architect decision on naming, trust surface, blocked states, and shared-file scope. |
+| 6 | `CF-W1-MD-02` | Formal ADR draft prepared | Source/schema implementation blocked | ADR draft recorded at `03-architecture/CF-W1-MD-02-durable-readiness-evidence-adr.md`; needs acceptance before split source/schema packets. |
+| 7 | `CF-W1-MD-01` | Docs-only validation policy prep can continue | Not architecture-ready for app code | Needs policy for future-dated candles, adjusted-close gaps, and suspicious price spikes. |
+| 8 | `CF-W1-UX-05` | Docs-only copy/shared-status inventory can continue | Not architecture-ready for app code | Needs Product Owner/UX copy and status-color decision plus shared UI reservation if code follows. |
 
 ## Completed Or No Longer Next
 
@@ -32,17 +33,19 @@ Resolved decision inputs:
 
 | Candidate | Resolution | Remaining architecture blocker |
 | --- | --- | --- |
-| `CF-W1-L3-DQ-01` | Option B accepted. | Child DTO fields, module split, exact file reservations, and QA scenario matrix. |
-| `CF-W1-TP-01A` | Option B accepted. | Backend-only reservation, API/UI/stored-row exclusion proof, and QA scenario matrix. |
-| `CF-W1-MD-02` | Option B accepted as ADR direction only. | Formal ADR and separate approval-gated source/schema split. |
+| `CF-W1-L3-DQ-01` | Option B accepted. | Portfolio/watchlist, alert, and portfolio-intelligence child artifacts are prepared; Team 00 Ready promotion and upstream sequencing remain. |
+| `CF-W1-TP-01A` | Option B accepted. | Backend-only child contract is prepared as `CF-W1-TP-01B`; QA refresh and Team 00 Ready promotion remain. |
+| `CF-W1-MD-02` | Option B accepted as ADR direction only. | Formal ADR draft is prepared; separate approval-gated source/schema split remains blocked. |
 
 ## Docs-Only Architecture Prep Can Continue
 
-- `CF-W1-L3-DQ-01`: prepare child module contracts under approved Option B.
-- `CF-W1-TP-01A`: prepare backend-only child contract under approved Option B.
-- `CF-W1-L3-ALERT-01`: prepare only as a dependent alert readiness contract, not as implementation-ready work.
+- `CF-W1-L3-DQ-01`: continue child module contracts under approved Option B; portfolio/watchlist is prepared as `CF-W1-L3-PORT-01`.
+- `CF-W1-L3-PORT-01`: route to Team 04 for child QA plan before implementation promotion.
+- `CF-W1-TP-01B`: route to Team 04 for backend-only child QA refresh before implementation promotion.
+- `CF-W1-L3-ALERT-01`: route to Team 04 for alert child QA refresh before implementation promotion.
+- `CF-W1-L3-INTEL-01`: keep blocked until `CF-W1-L3-PORT-01A` implementation acceptance; do not promote before portfolio readiness DTOs exist.
 - `CF-W1-UX-02`: prepare UX trust architecture questions and shared-file stop conditions.
-- `CF-W1-MD-02`: prepare formal ADR only; no schema/source readiness.
+- `CF-W1-MD-02`: route formal ADR draft to Team 00 / Architect / QA acceptance; no schema/source readiness.
 - `CF-W1-MD-01`: prepare validation policy and QA alignment.
 - `CF-W1-UX-05`: prepare copy/status inventory and shared UI reservation needs.
 
@@ -50,7 +53,43 @@ Resolved decision inputs:
 
 No implementation item is architecture-ready now. Keep `12-ready-queue/ready-for-implementation.md` at zero app-code items until a candidate has an accepted requirement, accepted architecture contract, accepted QA plan, exact file reservations, and no open Product Owner, Architect, shared-file, schema, route, package, provider, or upstream blocker.
 
-Next Team 03 recommendation: prepare docs-only child contracts and file reservations for `CF-W1-L3-DQ-01` first, because the parent policy is now accepted and it unblocks multiple downstream Lane 3 candidates without requiring Prisma, route, package, or shared-file changes.
+Next Team 03 recommendation: route `CF-W1-L3-INTEL-01` signoff to Team 00 for sequencing behind `CF-W1-L3-PORT-01A`. After `CF-W1-MD-02` ADR acceptance, prepare `CF-W1-MD-02A` as a schema/migration proposal packet only if Team 00 and Architect explicitly authorize that approval-gated path.
+
+## Team 03 Trade Plan Contract Refresh - 2026-05-17
+
+Prepared `CF-W1-TP-01B` as the backend-only Trade Plan compatibility and DQ hard-block child under accepted parent policy `CF-W1-TP-01A`.
+
+New docs:
+
+- `03-architecture/CF-W1-TP-01B-architecture-review.md`
+- `06-contracts/CF-W1-TP-01B-backend-compatibility-dq-hard-block-contract.md`
+- `08-work-packets/CF-W1-TP-01B-work-packet.md`
+
+Readiness result: not ready for application code. The child has exact backend file reservations, but still needs Team 04 QA child-plan refresh and Team 00 Ready promotion.
+
+## Team 03 Child Contract Refresh - 2026-05-17
+
+Prepared `CF-W1-L3-PORT-01` as the first child under accepted parent policy `CF-W1-L3-DQ-01`.
+
+New docs:
+
+- `03-architecture/CF-W1-L3-PORT-01-architecture-review.md`
+- `06-contracts/CF-W1-L3-PORT-01-portfolio-watchlist-readiness-dto-contract.md`
+- `08-work-packets/CF-W1-L3-PORT-01-work-packet.md`
+
+Readiness result: not ready for application code. The child has exact backend file reservations, but still needs Team 04 QA child-plan acceptance and Team 00 Ready promotion.
+
+## Team 03 Alert Contract Refresh - 2026-05-17
+
+Prepared `CF-W1-L3-ALERT-01` as the alert readiness suppression child under accepted parent policy `CF-W1-L3-DQ-01`.
+
+New docs:
+
+- `03-architecture/CF-W1-L3-ALERT-01-architecture-review.md`
+- `06-contracts/CF-W1-L3-ALERT-01-alert-readiness-suppression-contract.md`
+- `08-work-packets/CF-W1-L3-ALERT-01-work-packet.md`
+
+Readiness result: not ready for application code. The child has exact backend file reservations, but still needs Team 04 QA child-plan refresh and Team 00 Ready promotion.
 
 ## Team 03 Relaunch Result - 2026-05-17
 
@@ -64,8 +103,34 @@ Current readiness result:
 
 | Candidate | Docs-only prep status | App-code readiness | Reason |
 | --- | --- | --- | --- |
-| `CF-W1-L3-DQ-01` | Parent policy accepted; child contract prep can continue | Blocked | Child DTO fields, QA scenarios, and exact file reservations are not accepted. |
-| `CF-W1-TP-01A` | Parent policy accepted; backend-only child prep can continue | Blocked | Exact backend-only file reservations and QA scenarios are not accepted. |
-| `CF-W1-MD-02` | ADR direction accepted; formal ADR prep can continue | Blocked from source/schema | Source/schema implementation remains separately approval-gated. |
+| `CF-W1-L3-DQ-01` | Parent policy accepted; child artifacts prepared for `CF-W1-L3-PORT-01`, `CF-W1-L3-ALERT-01`, and `CF-W1-L3-INTEL-01` | Blocked | Prepared children need Team 00 Ready promotion and sequencing; `CF-W1-L3-INTEL-01` must wait for `CF-W1-L3-PORT-01A` acceptance. |
+| `CF-W1-TP-01A` | Parent policy accepted; backend-only child contract prepared as `CF-W1-TP-01B` | Blocked | `CF-W1-TP-01B` needs QA child-plan refresh and Team 00 Ready promotion. |
+| `CF-W1-MD-02` | ADR draft prepared | Blocked from source/schema | Source/schema implementation remains separately approval-gated pending ADR acceptance and split-packet approval. |
 
-No candidate should be moved to `Ready for Implementation` from this Team 03 pass. The next Team 00 action is to launch Team 03 for post-decision child contracts and then Team 04 for QA scenario refresh.
+No candidate should be moved to `Ready for Implementation` from this Team 03 pass. The next Team 00 action is to route `CF-W1-L3-PORT-01`, `CF-W1-L3-ALERT-01`, and `CF-W1-TP-01B` to Team 04 for QA scenario refresh and route the `CF-W1-MD-02` ADR draft to acceptance review.
+
+## Team 03 Market Data ADR Refresh - 2026-05-17
+
+Prepared the formal `CF-W1-MD-02` ADR draft for companion durable Market Data readiness/evidence storage.
+
+New doc:
+
+- `03-architecture/CF-W1-MD-02-durable-readiness-evidence-adr.md`
+
+Updated docs:
+
+- `03-architecture/CF-W1-MD-02-architecture-review.md`
+- `06-contracts/CF-W1-MD-02-durable-readiness-evidence-contract.md`
+- `08-work-packets/CF-W1-MD-02-work-packet.md`
+
+Readiness result: not ready for application code. The ADR draft preserves the Product Owner-approved Option B direction, records natural-key and migration/rollback strategy, and keeps Prisma/schema/source/test work blocked pending separate acceptance and exact file reservations.
+
+## Team 03 Portfolio Intelligence Signoff - 2026-05-17
+
+Reviewed existing `CF-W1-L3-INTEL-01` drafts and prepared conditional Team 03 architecture signoff.
+
+New doc:
+
+- `03-architecture/CF-W1-L3-INTEL-01-architect-signoff.md`
+
+Readiness result: not ready for application code. The item has requirement, architecture review, contract, QA plan, and work packet drafts, but implementation must wait for `CF-W1-L3-PORT-01A` portfolio readiness DTO acceptance because current Portfolio Intelligence source has no `PortfolioSummaryDto.readinessSummary` or `HoldingValuationDto.readiness` fields to consume.

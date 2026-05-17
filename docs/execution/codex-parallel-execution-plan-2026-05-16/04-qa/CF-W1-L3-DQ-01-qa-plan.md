@@ -8,6 +8,8 @@ Status: Product policy accepted; QA planning only. Child implementation validati
 
 Current status refresh: Product Owner approved Option B on 2026-05-17. This does not make `CF-W1-L3-DQ-01` app-code ready and does not approve QA execution.
 
+Post-decision child scenario matrix: `04-qa/post-decision-child-scenario-matrix-2026-05-17.md`.
+
 ## Scope
 
 Validation plan for Lane 3 consumers of Data Quality readiness:

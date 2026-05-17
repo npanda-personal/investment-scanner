@@ -2,152 +2,136 @@
 
 Date: 2026-05-17
 
-Mode: docs-only requirement backlog refresh for daemon cycle; no application source, tests, architecture docs, QA docs, ready queues, active board, risk register, or decision inbox files changed.
+Mode: continued Team 02 docs-only requirement/queue refresh. No application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, providers, services, or frontend files changed.
 
-## Work Item
+## Team Heartbeat
 
-Continue requirement refinement for the daemon cycle using root `AGENTS.md` as authoritative instruction and treating `docs/codex-agent-team-plan/**` as historical evidence only.
+- Team id/name: TEAM-02 Requirement Factory
+- Current state: completed
+- Current assignment: resync requirements, top candidates, refinement queue, and blocked/ready queues after Team 07 and Team 08 planning artifacts
+- Input source: root `AGENTS.md`, runtime bootstrap, standing delegation, escalation rules, worktree/branch policy, heartbeat protocol, Team 02 charter, Team 02 automation prompt, team inboxes, ready/blocked queues, Decision Inbox, Team 07/08 outboxes and prepared artifacts
+- Output target: `10-requirements/`, `12-ready-queue/`, this outbox
+- Branch/worktree: `dev`; shared workspace, no separate Team 02 worktree created
+- Active requirement ids: `CF-W1-L3-AUTH-03`, `CF-W1-L3-INTEL-01`, `CF-W1-L3-PORT-01`, `CF-W1-L3-ALERT-01`, `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-MD-01`
+- Ready work pulled: none
+- Can continue without human approval: yes for docs-only requirement refinement; no for app-code implementation or decision-blocked work
 
-## State / Owner
+## Evidence Sync
 
-- Owner: Team 02 Requirement Factory
-- Active surface: `10-requirements/`
-- Current state: completed docs-only refresh after current-evidence cross-check
-- Implementation state: no application-code item moved to Ready for Implementation
+- `git branch --show-current`: `dev`
+- `git log --oneline -5`: latest commit `d2a6eae docs: resolve daemon decision inbox items`
+- `git status --short`: dirty shared docs workspace with concurrent Team 03/04/07/08/09/10 artifacts; Team 02 did not stage, revert, or overwrite unrelated files
 
-## Exact Outputs
+## Inputs Reviewed
 
-- Refreshed requirement status around:
-  - `CF-W1-L3-DQ-01`
-  - `CF-W1-TP-01A`
-  - `CF-W1-MD-02`
-- Confirmed all three remain refinement/architecture-prep only and must not be marked Ready by Team 02.
-- Identified the current five next architecture/QA prep candidates:
-  - `CF-W1-L3-DQ-01`
-  - `CF-W1-TP-01A`
-  - `CF-W1-MD-02`
-  - `CF-W1-MD-01`
-  - `CF-W1-UX-02`
-- Moved `CF-W1-L3-ALERT-01` behind its parent Lane 3 readiness policy dependency in top-candidate ordering.
-- Kept `CF-W1-UX-05` in refinement but behind `CF-W1-UX-02` because the copy checklist/shared UI reservation path is less mature.
-- Clarified that current contract/QA plans for the priority items are drafts, QA plans, or ADR prep artifacts, not implementation approval.
-- Clarified that future true consent blockers found by Team 02 should be recorded in this outbox and routed by Team 00, not opened directly by Team 02 under the current write scope.
-- Preserved `CF-W1-L3-AUTH-02` and `CF-W1-SIG-TRIGGER-01` as completed bounded slices, not active blockers.
+- `16-team-inboxes/README.md`
+- `16-team-inboxes/TEAM-03-post-decision-child-contracts.md`
+- `16-team-inboxes/TEAM-07-CF-W1-L3-AUTH-01.md`
+- `12-ready-queue/ready-for-implementation.md`
+- `12-ready-queue/blocked-by-decision.md`
+- `12-ready-queue/blocked-by-shared-file.md`
+- `12-ready-queue/blocked-by-upstream-dependency.md`
+- `99-decision-inbox/open-decisions.md`
+- `17-team-outboxes/TEAM-07-outbox.md`
+- `17-team-outboxes/TEAM-08-outbox.md`
+- `10-requirements/CF-W1-L3-AUTH-03-alert-rule-target-ownership-requirement.md`
+- `10-requirements/CF-W1-L3-INTEL-01-portfolio-intelligence-reliability-gate-requirement.md`
+- `10-requirements/CF-W1-MD-01-market-data-validation-hardening-policy-requirement.md`
+- `10-requirements/CF-W1-UX-05-product-language-trust-copy-requirement.md`
+- `03-architecture/CF-W1-L3-AUTH-03-architecture-review.md`
+- `03-architecture/CF-W1-L3-INTEL-01-architecture-review.md`
+- `06-contracts/CF-W1-L3-AUTH-03-alert-rule-target-ownership-contract.md`
+- `06-contracts/CF-W1-L3-INTEL-01-portfolio-intelligence-reliability-gate-contract.md`
+- `06-contracts/CF-W1-UX-05-product-language-status-contract.md`
+- `04-qa/CF-W1-L3-AUTH-03-qa-plan.md`
+- `04-qa/CF-W1-L3-INTEL-01-qa-plan.md`
+- `04-qa/CF-W1-MD-01-qa-plan.md`
+- `04-qa/CF-W1-UX-05-product-language-status-qa-plan.md`
+- `08-work-packets/CF-W1-L3-AUTH-03-work-packet.md`
+- `08-work-packets/CF-W1-L3-INTEL-01-work-packet.md`
+- `06-contracts/CF-W1-UX-02-copilot-trust-ux-contract.md`
+- `04-qa/CF-W1-QA-UI-01-copilot-research-trust-states-qa-plan.md`
+- `08-work-packets/CF-W1-UX-02-work-packet.md`
+- `08-work-packets/CF-W1-UX-05-work-packet.md`
+- `99-decision-inbox/DECISION-20260517-market-data-validation-hardening-policy.md`
+- `99-decision-inbox/DECISION-20260517-ux-product-language-status-policy.md`
+
+## Outputs
+
+- Confirmed no application-code item is Ready for Implementation.
+- Folded Team 07's prepared `CF-W1-L3-AUTH-03` alert rule target ownership slice into Team 02 queues as a P0 near-ready candidate, still blocked from implementation until Team 00 Ready promotion.
+- Folded Team 07's prepared `CF-W1-L3-INTEL-01` Portfolio Intelligence reliability gate into the backlog/refinement queues as upstream-blocked on accepted `CF-W1-L3-PORT-01A` portfolio readiness DTOs.
+- Refreshed `top-10-ready-candidates.md` and `next-top-10-candidates.md` so `CF-W1-L3-AUTH-03` replaces lower-maturity `CF-W1-UX-05` in the current top ten.
+- Refreshed `requirements-backlog.md` with an active `CF-W1-L3-AUTH-03` row and priority readiness checks.
+- Refreshed `requirements-backlog.md` and `refinement-queue.md` with current `CF-W1-MD-01` and `CF-W1-UX-05` Decision Inbox blockers.
+- Refreshed `refinement-queue.md` with `CF-W1-L3-AUTH-03`, `CF-W1-L3-INTEL-01`, `CF-W1-MD-01`, and `CF-W1-UX-05` architecture/QA/readiness status.
+- Refreshed `ready-for-implementation.md` to list `CF-W1-L3-AUTH-03` as prepared but not Ready.
+- Refreshed `blocked-by-upstream-dependency.md` to remove stale "QA refresh needed" wording for PORT, ALERT, TP-01B, and NOTIF where QA plans now exist.
+- Refreshed `blocked-by-decision.md` and `ready-for-implementation.md` to recognize five open Decision Inbox items, including `CF-W1-MD-01` and `CF-W1-UX-05`.
+- Recognized Team 08's `CF-W1-UX-02` contract/work packet/QA prep while keeping implementation blocked by the open UX/product decision.
 
 ## Files Changed
 
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
-
-## Files Inspected
-
-- `AGENTS.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/active-work-board.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/risk-register.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/next-validation-plans.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-L3-DQ-01-qa-plan.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-TP-01A-qa-plan.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-MD-02-qa-plan.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-L3-DQ-01-lane3-readiness-consumer-policy-contract.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-TP-01A-trade-plan-no-target-dq-hard-block-contract.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-MD-02-durable-readiness-evidence-contract.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-L3-DQ-01-work-packet.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-TP-01A-work-packet.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-MD-02-work-packet.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/09-summaries/daemon-cycle-latest.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-market-data-data-quality.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-strategy-signal-rules.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-backtesting-trade-risk.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-portfolio-watchlist-alerts.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-ux-research-copilot.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-platform-auth-subscription-notifications.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-qa-test-infrastructure.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/ready-for-implementation.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/blocked-by-decision.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/blocked-by-shared-file.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/blocked-by-upstream-dependency.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory-daemon-2026-05-17-iteration-4.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory-daemon-2026-05-17-iteration-4.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory-daemon-2026-05-17-iteration-4.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/99-decision-inbox/open-decisions.md`
-
-## Behavior / Contract Changes
-
-- Behavior changed: none.
-- Application code changed: none.
-- Tests changed: none.
-- Prisma, route registries, packages, generated files, shared utilities/UI changed: none.
-- Contract changed: no active contract file changed. Requirement queues now more precisely describe draft contract, draft QA, policy-decision, and ADR status for the focused priority items.
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/ready-for-implementation.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
 
 ## Implementation Readiness
 
-No current priority item is implementation-ready.
+No item was moved to Ready.
 
 | ID | Readiness result |
 | --- | --- |
-| CF-W1-L3-DQ-01 | Requirement, draft contract, and draft QA plan exist; Product/Architect display-vs-action policy and child file reservations are missing. |
-| CF-W1-TP-01A | Requirement, draft contract, and draft QA plan exist; Product/Architect no-target replacement, DQ hard-block semantics, compatibility scope, and file reservations are missing. |
-| CF-W1-MD-02 | Requirement, draft contract, and ADR QA plan exist; ADR/storage model/natural key approval and future source/schema packet are missing. |
+| CF-W1-L3-PORT-01 | Child architecture and QA plan prepared; blocked until Team 00 child selection and Ready promotion. |
+| CF-W1-L3-AUTH-03 | Requirement, architecture review, contract, work packet, and QA plan prepared; blocked until Team 00 Ready promotion. |
+| CF-W1-L3-ALERT-01 | Child architecture and QA plan prepared; blocked until Team 00 Ready promotion. |
+| CF-W1-TP-01B | Backend-only child architecture and QA plan prepared; blocked until Team 00 Ready promotion. |
+| CF-W1-NOTIF-02 | Requirement, architecture, contract, work packet, and platform QA plan prepared; blocked until Team 00/Team 09 Ready promotion. |
+| CF-W1-MD-02 | ADR direction accepted; blocked until formal ADR and later source/schema split approval. |
+| CF-W1-L3-INTEL-01 | Requirement, architecture review, contract, work packet, and QA plan prepared; blocked until `CF-W1-L3-PORT-01A` is accepted and Team 00 promotes. |
+| CF-W1-MD-01 | Requirement and QA plan prepared; blocked by open Product Owner/Architect/QA validation-policy decision. |
+| CF-W1-UX-02 | Contract/work packet/QA prep exists; blocked by open Product Owner/UX/Architect decision. |
+| CF-W1-UX-05 | Requirement, contract, work packet, and QA plan prepared; blocked by open Product Owner/UX/Architect policy decision. |
+| CF-W1-AUTH-01 | Blocked by open Decision Inbox item. |
+| CF-W1-SUB-01 | Blocked by open Decision Inbox item. |
 
-## Refined Candidates
+## Decisions
 
-| Rank | ID | Refinement result |
-| --- | --- | --- |
-| 1 | CF-W1-L3-DQ-01 | Keep as Product/Architect/QA refinement; highest unblock value for Lane 3 display-only versus action-like readiness behavior. |
-| 2 | CF-W1-TP-01A | Keep as Product/Architect/QA refinement; Strategy Decision no-target slice is complete, but Trade Plan target geometry and DQ hard-block semantics remain separate. |
-| 3 | CF-W1-MD-02 | Keep as ADR/decision prep only; source/schema/provider/startup/test execution remains blocked. |
-| 4 | CF-W1-MD-01 | Move toward validation-policy/QA refinement only; executable Market Data validation work remains blocked until policy and handoff. |
-| 5 | CF-W1-UX-02 | Move toward Product/UX/Architecture/QA refinement only; no UI/backend/shared-file work until naming, trust fields, blocked states, and reservations are accepted. |
+- Decisions opened by Team 02: none.
+- Existing open decisions recognized:
+  - `DECISION-20260517-platform-auth-default-user-fallback-policy`
+  - `DECISION-20260517-local-manual-subscription-plan-change-policy`
+  - `DECISION-20260517-copilot-trust-ux-policy`
+  - `DECISION-20260517-ux-product-language-status-policy`
+  - `DECISION-20260517-market-data-validation-hardening-policy`
 
-## Blockers
+## Validation
 
-- `CF-W1-L3-DQ-01`: Product/Architect Lane 3 display-vs-action readiness policy is not accepted.
-- `CF-W1-TP-01A`: Product/Architect Trade Plan no-target replacement and DQ hard-block policy are not accepted.
-- `CF-W1-MD-02`: Product/Architect storage model, natural key, and Prisma impact decision are not accepted.
-- `CF-W1-MD-02`: source/schema/test/provider/startup/backfill work remains blocked.
-- `CF-W1-L3-ALERT-01`: still blocked by `CF-W1-L3-DQ-01`, even though `CF-W1-L3-AUTH-02` is completed.
-
-## Recommended Decision Packets
-
-Product-policy ambiguity was found. Team 02 did not modify the Decision Inbox under this write scope. Team 00 should route decision packets if it wants formal Product Owner review.
-
-| ID | Recommended Team 00 packet | Decision needed |
-| --- | --- | --- |
-| CF-W1-L3-DQ-01 | Lane 3 readiness display-vs-action policy | Whether limited data may display while alerting, reliability claims, and action-like states remain blocked. |
-| CF-W1-TP-01A | Trade Plan no-target replacement and DQ hard-block policy | What replaces target-price geometry and how `LIMITED`, `NOT_READY`, stale, missing, or blocker DQ states affect paper-review readiness. |
-| CF-W1-MD-02 | Durable readiness evidence storage ADR | Which storage model, natural key, Prisma impact, migration/rollback path, and query/test strategy are accepted before source work. |
-
-## Stale Completed Item Check
-
-No stale completed bounded slices remain in the active top-ready pull path after this refresh. `CF-W1-L3-AUTH-01`, `CF-W1-L3-AUTH-02`, `CF-W1-SIG-TRIGGER-01`, `CF-W2-DQ-01`, `CF-W2-SIG-01A`, `CF-W1-SIG-01B`, `CF-W1-SIG-LATEST-01`, `CF-W1-STRAT-01`, and `CF-W1-QA-01` remain completed/split/superseded and must not be pulled as active implementation work.
-
-## Tests / Services
-
+- Stale wording scan: ran during close-out; remaining matches were intentional references to `CF-W1-UX-05` top-ten displacement, generic focused QA planning, or historical/future requirement text.
+- `git diff --check`: passed; Git reported normal Markdown CRLF conversion warnings.
 - Tests run: none.
 - Builds run: none.
 - UI checks run: none.
 - Live local data checks run: none.
 - Services/providers/Prisma commands run: none.
-- Skipped reason: task was docs-only and explicitly prohibited tests, providers, services, and app-code work.
+- Skipped reason: Team 02 task was docs-only requirement/queue work.
 
-## Assumptions
+## Risks / Blockers
 
-- `docs/AGENTS.md` remains absent/neutralized; root `AGENTS.md` is authoritative.
-- `docs/codex-agent-team-plan/**` remains historical evidence only and was not modified.
-- `12-ready-queue/ready-for-implementation.md` remains the implementation-readiness source of truth.
+- Shared worktree is dirty with concurrent docs from multiple teams. Team 02 did not stage or commit.
+- No app-code Ready item exists until Team 00 promotes a specific child with exact handoff/reservations.
+- `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-MD-01`, `CF-W1-AUTH-01`, and `CF-W1-SUB-01` remain blocked by open decisions.
+- `CF-W1-UX-05` remains valid but dropped out of the current top ten due to lower maturity than `CF-W1-L3-AUTH-03`.
 
-## Next Recommendations
+## Next Recommended Assignment
 
-1. Team 03 should prepare `CF-W1-L3-DQ-01` policy options first because it unblocks multiple Lane 3 downstream items.
-2. Team 03 and Team 04 should keep `CF-W1-TP-01A` in contract/QA refinement until Product Owner and Architect decide no-target replacement semantics and DQ hard-block states.
-3. Team 03 should prepare `CF-W1-MD-02` ADR option matrix; Team 04 should align the ADR QA checklist before any Prisma/source/test reservation is proposed.
-4. Team 00 should route the three recommended decision packets above if formal Product Owner consent is needed before Team 03 continues.
-5. Team 00 should keep `12-ready-queue/ready-for-implementation.md` empty for app-code work until it records accepted contracts, QA plans, exact reservations, and no blockers.
+1. Team 00: evaluate `CF-W1-L3-PORT-01`, `CF-W1-L3-AUTH-03`, `CF-W1-L3-ALERT-01`, `CF-W1-TP-01B`, and `CF-W1-NOTIF-02` for one-at-a-time Ready promotion.
+2. Team 00/Team 07: hold `CF-W1-L3-INTEL-01` until `CF-W1-L3-PORT-01A` portfolio readiness DTOs are accepted.
+3. Product Owner/Architect/QA: resolve `CF-W1-AUTH-01`, `CF-W1-SUB-01`, and `CF-W1-MD-01`.
+4. Product Owner/UX/Architect: resolve `CF-W1-UX-02` and `CF-W1-UX-05`.
+5. Team 03/04: continue formal `CF-W1-MD-02` ADR and ADR QA checklist prep.

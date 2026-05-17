@@ -8,6 +8,10 @@ Status: Product policy accepted; QA planning only. Implementation remains blocke
 
 Current status refresh: Product Owner approved Option B on 2026-05-17. This does not make `CF-W1-TP-01A` app-code ready and does not approve QA execution.
 
+Post-decision backend-only scenario matrix: `04-qa/post-decision-child-scenario-matrix-2026-05-17.md`.
+
+Backend-only child QA plan: `04-qa/CF-W1-TP-01B-qa-plan.md`.
+
 ## Scope
 
 Focused backend validation for Trade Plan Risk Engine contract behavior:

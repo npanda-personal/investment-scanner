@@ -5,29 +5,29 @@ Date: 2026-05-17
 ## Current Cycle
 
 - Cycle id: `DAEMON-20260517`
-- Rolling iteration count: 16
-- Current mode: runtime checkpoint after Product Owner resolved the three Decision Inbox items
+- Rolling iteration count: 17
+- Current mode: Team 00 master coordination after Teams 01-10 reports and assignment refresh
 - Daemon continuing: yes
-- Git status at checkpoint start: clean after Team 00 intake commit `d5927d6`
+- Git status at checkpoint start: dirty with active execution docs/team outputs only
 - Resume prompt path: `09-summaries/daemon-resume-prompt.md`
 - Resume prompt updated: yes
-- Product Owner action required: no
+- Product Owner action required: yes, only for five open Decision Inbox policy items
 
 ## Teams
 
 | Team | State | Current assignment | Next relaunch condition |
 | --- | --- | --- | --- |
-| Team 00 | checkpointing | Scheduler / integration after Product Owner decision resolution routing | Resume daemon from this checkpoint. |
-| Team 01 | queued | Audit refresh on stale/high-risk lanes | Relaunch when source/docs evidence is needed. |
-| Team 02 | completed | Requirement refresh for `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, `CF-W1-MD-02`, `CF-W1-MD-01`, `CF-W1-UX-02` | Relaunch when new audit findings or decisions change backlog. |
-| Team 03 | queued | Post-decision child contract/file reservation refresh for `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, `CF-W1-MD-02` | Relaunch immediately. |
-| Team 04 | queued | Post-decision QA scenario refresh for `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, `CF-W1-MD-02` | Relaunch after or alongside Team 03 if write scopes are isolated. |
-| Team 05 | idle | Market Data / DQ audit-refinement | Relaunch when MD/DQ ready work or ADR prep is available. |
-| Team 06 | completed | `CF-W1-SIG-TRIGGER-01` bounded DTO projection | Relaunch when Trade Plan or other signal/risk prep is available. |
-| Team 07 | completed | `CF-W1-L3-AUTH-02` bounded alert event ownership | Relaunch when next Lane 3 ready work exists; otherwise audit/refine Lane 3. |
-| Team 08 | idle | UX / Research / Copilot audit-refinement | Relaunch after UX trust contract prep. |
-| Team 09 | idle | Platform / Auth / Subscription / Notifications audit-refinement | Relaunch after auth/subscription/notification prep. |
-| Team 10 | completed | AUTH-01 code review / release-gate refresh | Relaunch when the next integration queue item appears. |
+| Team 00 | checkpointing | Scheduler / integration and Team 01-10 assignment refresh | Evaluate one child for Ready promotion after docs commit. |
+| Team 01 | assigned | Audit refresh on stale/high-risk lanes | Continue from `16-team-inboxes/TEAM-01-current-assignment.md`. |
+| Team 02 | assigned | Requirement and queue refinement | Continue from `16-team-inboxes/TEAM-02-current-assignment.md`. |
+| Team 03 | assigned | Architecture contracts, ADR prep, file reservations | Continue from `16-team-inboxes/TEAM-03-current-assignment.md`. |
+| Team 04 | assigned | QA plans and evidence requirements | Continue from `16-team-inboxes/TEAM-04-current-assignment.md`. |
+| Team 05 | assigned docs-only | Market Data / DQ audit-refinement | Continue from `16-team-inboxes/TEAM-05-current-assignment.md`. |
+| Team 06 | assigned docs-only | Trade Plan and Lane 2 readiness refresh | Continue from `16-team-inboxes/TEAM-06-current-assignment.md`. |
+| Team 07 | assigned docs-only | Lane 3 readiness child sequencing | Continue from `16-team-inboxes/TEAM-07-current-assignment.md`. |
+| Team 08 | assigned / partially blocked | UX/Copilot docs-only refinement; implementation blocked by decisions | Continue from `16-team-inboxes/TEAM-08-current-assignment.md`. |
+| Team 09 | assigned / partially blocked | Platform docs-only prep; auth/sub source work blocked | Continue from `16-team-inboxes/TEAM-09-current-assignment.md`. |
+| Team 10 | assigned review-only | Monitor outboxes and integration queue | Continue from `16-team-inboxes/TEAM-10-current-assignment.md`. |
 
 ## Queue Pressure
 
@@ -35,8 +35,8 @@ Date: 2026-05-17
 - Ready-work pressure: none
 - Blocked-work pressure: medium
 - Integration queue depth: 0 active application-code items after bounded commits
-- Decision inbox count: 0 open decisions
-- Refinement queue depth: 7 active policy/refinement candidates
+- Decision inbox count: 5 open decisions
+- Refinement queue depth: 13 active unique refinement / near-ready items
 
 ## Commits Since Last Update
 
@@ -61,14 +61,21 @@ Date: 2026-05-17
 - `DECISION-20260517-trade-plan-no-target-dq-hard-block`: Option B approved.
 - `DECISION-20260517-market-data-durable-readiness-storage-adr`: Option B approved as ADR direction only.
 
+## Current Open Decisions
+
+- `DECISION-20260517-platform-auth-default-user-fallback-policy`
+- `DECISION-20260517-local-manual-subscription-plan-change-policy`
+- `DECISION-20260517-copilot-trust-ux-policy`
+- `DECISION-20260517-ux-product-language-status-policy`
+- `DECISION-20260517-market-data-validation-hardening-policy`
+
 ## Next Assignments
 
-1. Keep `12-ready-queue/ready-for-implementation.md` empty for app-code work until child gates are complete.
-2. Relaunch Team 03 for child contracts/file reservations and formal ADR prep.
-3. Relaunch Team 04 for post-decision QA scenario refresh.
-4. Relaunch Team 02 to refresh next-ready candidates after the decision state changed.
-5. Continue Team 01, Team 05, Team 06, Team 07, Team 08, and Team 09 docs-only audit/refinement where scopes do not require app-code changes.
+1. Keep `12-ready-queue/ready-for-implementation.md` empty for app-code work until Team 00 promotes an exact child.
+2. Run Teams 01-10 from current inbox assignments.
+3. Block only the five affected decision workstreams.
+4. After the docs-only coordination commit, evaluate `CF-W1-L3-PORT-01A`, then `CF-W1-TP-01B`, then `CF-W1-NOTIF-02`, then `CF-W1-L3-ALERT-01` for possible Ready promotion.
 
 ## Stop State
 
-Runtime checkpoint after Product Owner resolved the three Decision Inbox items. This is not project completion. Product Owner action is not required; autonomous work should continue with post-decision architecture, QA, requirement, and lane refinement. No application-code item is Ready.
+Runtime checkpoint after Team 00 coordination assignment refresh. This is not project completion. Product Owner action is required only for the five open Decision Inbox items; autonomous work should continue for unrelated docs-only audit, refinement, architecture, QA, and review work. No application-code item is Ready.
