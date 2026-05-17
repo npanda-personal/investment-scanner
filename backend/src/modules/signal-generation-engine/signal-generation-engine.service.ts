@@ -21,6 +21,8 @@ import type {
   SignalStrategyMatchSummary,
   SignalDataQualityEligibility,
   SignalScoringInputSummary,
+  SignalTriggerContractDto,
+  SignalTriggerType,
 } from './signal-generation-engine.types';
 import {
   signal_generation_engine_batch_size,
@@ -404,12 +406,13 @@ export class SignalGenerationEngineService {
     }
 
     const saved = await this.persistSignalResult(result);
-    return {
+    const persisted = {
       ...saved.result,
       writeStatus: saved.status,
       strategyMatches: result.strategyMatches,
       blockedStrategies: result.blockedStrategies,
     };
+    return this.withTriggerContract(persisted, instrument);
   }
 
   async enrichSignals(signals: SignalResultDto[], options: Pick<SignalQuery, 'strategyCode' | 'includeStrategyMatches' | 'onlyStrategyEligible' | 'excludeNoiseFiltered' | 'hasStrategyMatch' | 'hasBlockedStrategies' | 'frameworkBackedDecisionAvailable'> = {}): Promise<SignalResultDto[]> {
@@ -446,7 +449,7 @@ export class SignalGenerationEngineService {
 
         const dailyChange = currentPrice !== null && previousClose !== null ? currentPrice - previousClose : null;
         
-        const result = {
+        let result: SignalResultDto = {
           ...signal,
           currentPrice,
           previousClose,
@@ -455,10 +458,11 @@ export class SignalGenerationEngineService {
           currency: instrument?.currency ?? signal.currency ?? null,
           priceTimestamp: (latest as any)?.date ? new Date((latest as any).date).toISOString() : null,
         };
-        if (!includeStrategyContext) return result;
+        if (!includeStrategyContext) return this.withTriggerContract(result, instrument);
         const history = await this.marketDataService.listPricesByInstrumentId(signal.instrument_id, 500).catch(() => null);
         const prices = this.toPricePoints(history?.prices || []);
-        return this.attachStrategyMatches(result, prices, instrument, options, ratingCache);
+        result = await this.attachStrategyMatches(result, prices, instrument, options, ratingCache);
+        return this.withTriggerContract(result, instrument);
       }));
       return enriched.filter((signal) => this.signalPassesStrategyFilters(signal, options));
     } catch (error) {
@@ -470,7 +474,7 @@ export class SignalGenerationEngineService {
         dailyChange: null,
         dailyChangePercent: null,
         priceTimestamp: null,
-      })).filter((signal) => this.signalPassesStrategyFilters(signal, options));
+      })).map((signal) => this.withTriggerContract(signal)).filter((signal) => this.signalPassesStrategyFilters(signal, options));
     }
   }
 
@@ -646,6 +650,94 @@ export class SignalGenerationEngineService {
     if (options.frameworkBackedDecisionAvailable && matchCount === 0) return false;
     if (options.excludeNoiseFiltered && matchCount === 0 && blocked.length > 0 && blocked.every((item) => item.noiseFiltersTriggered.length > 0)) return false;
     return true;
+  }
+
+  private withTriggerContract(signal: SignalResultDto, instrument?: any): SignalResultDto {
+    return {
+      ...signal,
+      triggerContract: this.triggerContractFor(signal, instrument),
+    };
+  }
+
+  private triggerContractFor(signal: SignalResultDto, instrument?: any): SignalTriggerContractDto {
+    const unavailable = new Set<string>();
+    const incompleteReasons: string[] = [];
+    const primaryStrategy = signal.strategyMatches?.[0] || null;
+    const assetClass = this.stringOrNull(instrument?.assetType ?? instrument?.asset_type);
+    const region = this.stringOrNull(instrument?.region);
+    const strategyId = primaryStrategy?.strategyCode ?? null;
+    const strategyVersion = primaryStrategy?.strategyVersion ?? null;
+    const triggerTimestamp = signal.sourcePriceDate ?? signal.sourceDataDate ?? null;
+    const dataQualityStatus = signal.dataQualityEligibility?.signalReadinessStatus ?? null;
+
+    const mark = (field: string, reason: string) => {
+      unavailable.add(field);
+      incompleteReasons.push(`${field}: ${reason}`);
+    };
+
+    if (!signal.id) mark('signal_id', 'persisted signal id is unavailable in this DTO.');
+    if (!assetClass) mark('asset_class', 'instrument asset class is unavailable from the current signal record.');
+    if (!region) mark('region', 'instrument market region is unavailable from the current signal record.');
+    if (!strategyId) mark('strategy_id', 'no Strategy Framework match is attached to this signal.');
+    if (!strategyVersion) mark('strategy_version', 'no Strategy Framework version is attached to this signal.');
+    mark('trigger_price', 'rule-defined trigger price is not persisted in the current signal record.');
+    if (!triggerTimestamp) mark('trigger_timestamp', 'source price/data timestamp is unavailable from the current signal record.');
+    mark('timeframe', 'rule timeframe is not persisted in the current signal record.');
+    mark('entry_rule_id', 'entry rule id is not persisted in the current signal record.');
+    mark('exit_rule_id', 'exit rule id is not persisted in the current signal record.');
+    mark('invalidation_rule_id', 'invalidation rule id is not persisted in the current signal record.');
+    if (!dataQualityStatus) mark('data_quality_status', 'Data Quality readiness snapshot is unavailable from the current signal record.');
+    mark('lifecycle_status', 'trigger lifecycle state is not persisted in the current signal record.');
+    mark('created_at', 'persistence created timestamp is not exposed by the current signal record.');
+    mark('updated_at', 'persistence updated timestamp is not exposed by the current signal record.');
+
+    const contractStatus = signal.auditStatus === 'LEGACY_MISSING'
+      ? 'LEGACY_INCOMPLETE'
+      : (unavailable.size > 0 ? 'CONTRACT_INCOMPLETE' : 'COMPLETE');
+
+    return {
+      contractVersion: 'TriggerObjectV1',
+      contractStatus,
+      signal_id: signal.id ?? null,
+      instrument_id: signal.instrument_id,
+      symbol: signal.symbol,
+      asset_class: assetClass,
+      region,
+      strategy_id: strategyId,
+      strategy_version: strategyVersion,
+      trigger_type: this.triggerTypeFor(signal.direction),
+      trigger_price: null,
+      trigger_timestamp: triggerTimestamp,
+      timeframe: null,
+      entry_rule_id: null,
+      exit_rule_id: null,
+      invalidation_rule_id: null,
+      reason_summary: signal.explanation,
+      passed_conditions: signal.triggered_signals.map((item) => ({ code: item.code, label: item.label, category: item.category })),
+      failed_conditions: signal.negative_signals.map((item) => ({ code: item.code, label: item.label, category: item.category })),
+      data_quality_status: dataQualityStatus,
+      lifecycle_status: null,
+      created_at: null,
+      updated_at: null,
+      audit: {
+        auditStatus: signal.auditStatus,
+        generationRunId: signal.generationRunId ?? null,
+        modelVersion: signal.modelVersion ?? null,
+        rulesetVersion: signal.rulesetVersion ?? null,
+      },
+      unavailable_fields: Array.from(unavailable),
+      incomplete_reasons: incompleteReasons,
+    };
+  }
+
+  private triggerTypeFor(direction: SignalDirection): SignalTriggerType {
+    if (direction === 'BULLISH') return 'bullish_entry_trigger';
+    if (direction === 'BEARISH') return 'bearish_trigger';
+    return 'risk_warning';
+  }
+
+  private stringOrNull(value: unknown): string | null {
+    return typeof value === 'string' && value.trim().length > 0 ? value : null;
   }
 
   private async attachStrategyMatches(

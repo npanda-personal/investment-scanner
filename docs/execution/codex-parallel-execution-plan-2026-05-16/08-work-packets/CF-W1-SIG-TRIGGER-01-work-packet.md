@@ -1,131 +1,78 @@
-# CF-W1-SIG-TRIGGER-01 Work Packet Draft
+# CF-W1-SIG-TRIGGER-01 Work Packet
 
 Date: 2026-05-17
 
 ## Work Item
 
-Full trigger object contract completion for Signal Generation Engine and downstream consumers.
+First bounded Signal Generation trigger object DTO projection.
 
 ## State
 
-Blocked after docs-only architecture and contract drafting.
-
-Implementation has not started.
+Accepted for implementation under Product Owner Option A and standing delegation.
 
 ## Owner / Lane / Modules
 
-- Owner: Team 06 Strategy / Signal / Risk implementation agent after assignment.
+- Owner: Team 06 Strategy / Signal / Risk implementation.
 - Lane: Lane 2.
 - Primary module: `signal-generation-engine`.
-- Consumers to coordinate later: signal quality, signal calibration, strategy decision, trade plan risk, alerts, research workbench, portfolio/watchlist context, and UI.
 
-## Dependencies
+## Approved Files
 
-- Product Owner acceptance of trigger language and lifecycle semantics.
-- Architect acceptance of persistence strategy: DTO projection, persisted JSON snapshot, or normalized trigger table.
-- QA plan for required fields, legacy contract-incomplete records, DQ status, rule provenance, and API compatibility.
-- Orchestrator file reservation for any source, test, Prisma, route, shared, or frontend files.
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.types.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.service.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.md`
+- `backend/tests/modules/signal-generation-engine/signal-generation-engine.service.test.ts`
+- `backend/tests/modules/signal-generation-engine/signal-generation-engine.trigger-contract.test.ts`
+- `backend/tests/modules/signal-generation-engine/signal-generation-engine.validation.test.ts`
+- `backend/tests/modules/signal-generation-engine/signal-generation-dq-enforcement.invariants.test.ts`
 
-## Current Allowed Files
+## Implementation Tasks
 
-Docs-only prep has already produced this work packet and the related contract/readiness draft.
+- Add optional `triggerContract` DTO projection without replacing existing response fields.
+- Derive only from current signal records and enrichment context.
+- Mark missing fields as unavailable with explicit reasons.
+- Mark legacy rows as `LEGACY_INCOMPLETE`.
+- Mark incomplete non-legacy rows as `CONTRACT_INCOMPLETE`.
+- Preserve existing Signal Generation DQ/read-path behavior.
+- Document projection limitations.
 
-No implementation files are allowed yet.
-
-## Forbidden Files Until Accepted
+## Forbidden Files
 
 - `backend/prisma/schema.prisma`
 - `backend/prisma/migrations/**`
 - generated Prisma/client types
-- `backend/src/api/routes.ts`
-- `frontend/src/app/routes.tsx`
-- `backend/src/shared/**`
-- `frontend/src/shared/**`
+- backend or frontend route registries
+- shared backend/frontend utilities or UI
+- frontend files
 - package manifests
-- provider, scheduler, startup, broker, Angel One, or live-market-provider files
-- broad downstream consumer files outside a later bounded slice
-
-## Future Implementation Slice Candidates
-
-### Slice 1 - Contract projection only
-
-Possible only if Product Owner and Architect accept DTO projection as the first step.
-
-Likely file reservation:
-
-- `backend/src/modules/signal-generation-engine/signal-generation-engine.types.ts`
-- `backend/src/modules/signal-generation-engine/signal-generation-engine.service.ts`
-- `backend/src/modules/signal-generation-engine/signal-generation-engine.repository.ts`
-- `backend/src/modules/signal-generation-engine/signal-generation-engine.md`
-- focused signal-generation tests
-
-Stop if a schema, route, shared type, or frontend change is needed.
-
-### Slice 2 - Persisted contract snapshot
-
-Possible only after schema/storage approval.
-
-Likely additional file reservation:
-
-- `backend/prisma/schema.prisma`
-- migration files
-- generated Prisma artifacts
-- signal generation repository/service files
-- focused migration and contract tests
-
-This slice requires Product Owner, Architect, Orchestrator, and QA approval before source work.
-
-### Slice 3 - Downstream consumer adoption
-
-Split by consumer. Do not implement all consumers at once.
-
-Potential future slices:
-
-- alerts trigger consumption,
-- strategy decision trigger consumption,
-- trade plan trigger consumption,
-- research/detail UI consumption,
-- quality/calibration trigger evidence.
-
-Each consumer slice needs its own file reservation and QA scope.
+- downstream consumer files
+- provider, scheduler, startup, broker, Angel One, paid/cloud, or live-market-provider files
 
 ## Stop Conditions
 
-Stop and return to Orchestrator/Architect if implementation requires:
-
-- Prisma schema or migration changes without accepted ADR/decision,
+Stop if implementation requires:
+- Prisma schema or migration changes,
 - changing public route paths,
 - replacing current signal API response shapes instead of additive compatibility,
-- inventing rule ids, trigger prices, lifecycle states, or data quality values,
+- inventing rule ids, trigger prices, lifecycle states, timestamps, DQ values, or audit evidence,
 - adding arbitrary target prices,
-- changing strategy meaning without versioning,
 - touching shared files without reservation,
+- touching downstream consumers,
 - adding paid/cloud/provider behavior.
 
-## Future Validation Commands
-
-Do not run during docs-only prep. Later implementation owner should run focused tests/builds after code changes.
-
-Minimum future validation expectation:
+## Validation Command
 
 ```powershell
 cd backend
-npm.cmd test -- signal-generation-engine --runInBand
+npm.cmd test -- signal-generation-engine.service.test.ts signal-generation-engine.trigger-contract.test.ts signal-generation-engine.validation.test.ts signal-generation-dq-enforcement.invariants.test.ts --runInBand
 ```
-
-The exact command must be confirmed by QA against existing test names before execution.
 
 ## Handoff Requirements
 
-Future implementation handoff must include:
-
-- exact files changed and inspected,
-- trigger fields added or intentionally marked unavailable,
-- persistence/API compatibility decision used,
-- DQ evidence mapping,
-- rule and strategy provenance mapping,
-- tests run and skipped,
-- contract gaps for legacy rows,
-- downstream consumers intentionally excluded,
-- QA, code review, Architect, and Product Owner next gates.
-
+- Exact files changed and inspected.
+- Trigger fields added or intentionally marked unavailable.
+- Persistence/API compatibility decision used.
+- Tests run and skipped.
+- Contract gaps for legacy rows.
+- Downstream consumers intentionally excluded.
+- QA, code review, Architect, and Product Owner acceptance packets.

@@ -46,9 +46,53 @@ export interface SignalResultDto {
   strategyMatches?: SignalStrategyMatchSummary[];
   blockedStrategies?: SignalBlockedStrategySummary[];
   writeStatus?: SignalWriteStatus;
+  triggerContract?: SignalTriggerContractDto;
 }
 
 export type SignalWriteStatus = 'CREATED' | 'UPDATED' | 'NO_OP';
+
+export type SignalTriggerContractStatus = 'COMPLETE' | 'CONTRACT_INCOMPLETE' | 'LEGACY_INCOMPLETE';
+export type SignalTriggerType = 'bullish_entry_trigger' | 'bearish_trigger' | 'risk_warning';
+
+export interface SignalTriggerConditionEvidence {
+  code: string;
+  label: string;
+  category: SignalCategory;
+}
+
+export interface SignalTriggerContractDto {
+  contractVersion: 'TriggerObjectV1';
+  contractStatus: SignalTriggerContractStatus;
+  signal_id: string | null;
+  instrument_id: string;
+  symbol: string;
+  asset_class: string | null;
+  region: string | null;
+  strategy_id: string | null;
+  strategy_version: string | null;
+  trigger_type: SignalTriggerType;
+  trigger_price: number | null;
+  trigger_timestamp: string | null;
+  timeframe: string | null;
+  entry_rule_id: string | null;
+  exit_rule_id: string | null;
+  invalidation_rule_id: string | null;
+  reason_summary: string;
+  passed_conditions: SignalTriggerConditionEvidence[];
+  failed_conditions: SignalTriggerConditionEvidence[];
+  data_quality_status: string | null;
+  lifecycle_status: null;
+  created_at: string | null;
+  updated_at: string | null;
+  audit: {
+    auditStatus: SignalResultDto['auditStatus'];
+    generationRunId: string | null;
+    modelVersion: string | null;
+    rulesetVersion: string | null;
+  };
+  unavailable_fields: string[];
+  incomplete_reasons: string[];
+}
 
 export interface SignalScoringInputSummary {
   priceBarsUsed: number;

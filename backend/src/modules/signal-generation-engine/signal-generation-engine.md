@@ -91,6 +91,17 @@ When enabled, signal results may include `strategyMatches[]` and `blockedStrateg
 
 `blockedStrategies[]` includes `strategyCode`, `strategyName`, `strategyVersion`, `blockers`, `warnings`, `dataGaps`, `noiseFiltersTriggered`, and a compact `reason`.
 
+## Trigger Contract Projection
+
+Signal responses add an optional module-local `triggerContract` projection for the first bounded `TriggerObjectV1` compatibility slice. The projection is derived only from current signal records and enrichment context.
+
+The projection includes explicit `contractStatus`, `unavailable_fields`, and `incomplete_reasons` markers. It does not invent rule versions, trigger prices, lifecycle states, Data Quality evidence, strategy versions, timestamps, source data, or audit evidence when the current record cannot prove them.
+
+Known limitations:
+- `trigger_price`, lifecycle status, rule IDs, timeframe, persistence `created_at`, and persistence `updated_at` remain unavailable unless future persistence work records them.
+- Legacy rows without current audit or Data Quality snapshots are marked `LEGACY_INCOMPLETE`.
+- Persisted trigger snapshots, normalized trigger tables, route changes, shared type changes, frontend changes, and downstream consumer adoption are separate future decisions.
+
 Filtering behavior:
 - `onlyStrategyEligible=true`: keeps signals with at least one Strategy Framework match.
 - `excludeNoiseFiltered=true`: removes signals where all considered strategies were blocked by noise filters.
@@ -118,6 +129,7 @@ Product language:
 ## Tests
 - `backend/tests/modules/signal-generation-engine/signal-generation-engine.repository.test.ts`: Verifies idempotent upsert, write status, latest-row filtering, direction counts, asset scope compatibility, and sort allowlisting.
 - `backend/tests/modules/signal-generation-engine/signal-generation-engine.service.test.ts`: Verifies scoring, thresholds, lightweight batch research context, batch metadata, data-quality counts, stale data warnings, confidence behavior, and Strategy Framework canonical region context.
+- `backend/tests/modules/signal-generation-engine/signal-generation-engine.trigger-contract.test.ts`: Verifies the optional trigger contract projection marks unavailable fields and legacy rows without inventing trigger evidence.
 - `backend/tests/modules/signal-generation-engine/signal-generation-engine.validation.test.ts`: Verifies query/run parsing, direction normalization, scope normalization, offset parsing, and sort allowlisting.
 
 Verification commands:
