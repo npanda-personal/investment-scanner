@@ -16,6 +16,12 @@ Team 02 refined the next requirement records for:
 
 - `CF-W1-TP-01A`
 - `CF-W1-L3-DQ-01`
+- `CF-W1-MD-02`
+
+Team 04 prepared docs-only QA plans for:
+
+- `CF-W1-MD-01`
+- `CF-W1-L3-ALERT-01`
 - `CF-W1-UX-02`
 
 Those records are planning artifacts only. They still need Product Owner, UX where applicable, Architect, QA, exact file reservation, and work-packet gates before any app-code team can pull them.
@@ -63,6 +69,8 @@ Docs-only contract and QA preparation:
 - `CF-W1-UX-02`
 - `CF-W1-MD-02`
 - `CF-W1-MD-01`
+
+Team 03 architecture prep for `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02` timed out this cycle and remains queued for the next daemon resume.
 
 ## Ready Criteria Reminder
 

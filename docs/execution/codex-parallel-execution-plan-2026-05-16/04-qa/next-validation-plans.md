@@ -2,7 +2,7 @@
 
 Date: 2026-05-17
 
-Prepared by Team 04 QA Factory and refreshed after the decision resolutions, bounded commits, and daemon checkpoint protocol fix.
+Prepared by Team 04 QA Factory and refreshed after docs-only QA plans for `CF-W1-MD-01`, `CF-W1-L3-ALERT-01`, and `CF-W1-UX-02`.
 
 Refresh note: docs-only QA refresh. No tests, builds, services, providers, UI checks, or application source/test edits were run or modified during this refresh.
 
@@ -18,12 +18,15 @@ Refresh note: docs-only QA refresh. No tests, builds, services, providers, UI ch
 1. `CF-W1-L3-DQ-01`: Lane 3 readiness consumer policy plan recorded in `04-qa/CF-W1-L3-DQ-01-qa-plan.md`.
 2. `CF-W1-TP-01A`: Trade Plan no-target compatibility and DQ hard-block plan recorded in `04-qa/CF-W1-TP-01A-qa-plan.md`.
 3. `CF-W1-MD-02`: durable Market Data readiness evidence ADR QA plan recorded in `04-qa/CF-W1-MD-02-qa-plan.md`.
+4. `CF-W1-MD-01`: Market Data validation hardening QA plan recorded in `04-qa/CF-W1-MD-01-qa-plan.md`.
+5. `CF-W1-L3-ALERT-01`: alert readiness suppression QA plan recorded in `04-qa/CF-W1-L3-ALERT-01-qa-plan.md`.
+6. `CF-W1-UX-02`: Copilot trust UX QA plan recorded in `04-qa/CF-W1-UX-02-qa-plan.md`.
 
 ## Remaining Next QA Plans
 
-1. `CF-W1-MD-01`: safest next QA plan gap. Prepare a docs-only Market Data validation hardening QA plan for future-date, adjusted-close, invalid OHLC, suspicious volume, and spike policy coverage. Do not run commands until Product Owner/Architect policy acceptance and implementation handoff.
-2. `CF-W1-L3-ALERT-01`: alert DQ readiness suppression tests after Lane 3 readiness policy is accepted.
-3. `CF-W1-UX-02`: copilot trust UX backend and UI-smoke plan after UX/product contract approval.
+1. `CF-W1-UX-05`: research-support copy QA checklist after Product/UX copy policy and shared-file reservation decisions.
+2. `CF-W1-BT-01`: backtesting DQ fail-closed characterization after upstream readiness policy and backtest use-case policy.
+3. `CF-W1-MD-03`: Market Data signoff threshold contract tests after signoff threshold policy and implementation scope are accepted.
 
 ## Focused Command Guidance
 
@@ -39,7 +42,12 @@ Commands below are guidance only. They were not run during this documentation-on
 | `CF-W1-L3-DQ-01` | `cd backend` then `npm.cmd test -- alerts-monitoring.service.test.ts alerts-monitoring.routes.test.ts alerts-monitoring.validation.test.ts --runInBand` | Blocked until alert readiness contract and implementation. |
 | `CF-W1-TP-01A` | `cd backend` then `npm.cmd test -- trade-plan-risk-engine.service.test.ts trade-plan-risk-engine.paper-readiness.test.ts --runInBand` | Blocked until Trade Plan contract and implementation handoff. |
 | `CF-W1-MD-02` | `cd backend` then `npm.cmd test -- market-data-readiness-evidence.invariants.test.ts market-data-storage-readiness.invariants.test.ts market-data.universe.test.ts market-data.validation.test.ts market-data.repository.test.ts --runInBand` | Blocked until ADR approval and scoped implementation. |
-| `CF-W1-MD-01` | `cd backend` then focused market-data validation tests after the plan defines exact existing filenames | Docs-only QA plan gap; blocked from execution until validation policy, contract, and implementation scope exist. |
+| `CF-W1-MD-01` | `cd backend` then `npm.cmd test -- market-data.validation.test.ts --runInBand` | Plan prepared; blocked from execution until validation policy and implementation handoff exist. |
+| `CF-W1-MD-01` | `cd backend` then `npm.cmd test -- market-data.validation.test.ts market-data-readiness-evidence.invariants.test.ts market-data.repository.test.ts --runInBand` | Approval-gated only if duplicate/readiness evidence or repository behavior is touched. |
+| `CF-W1-L3-ALERT-01` | `cd backend` then `npm.cmd test -- alerts-monitoring.service.test.ts alerts-monitoring.validation.test.ts --runInBand` | Plan prepared; blocked until `CF-W1-L3-DQ-01`, alert readiness contract, and implementation handoff. |
+| `CF-W1-L3-ALERT-01` | `cd backend` then `npm.cmd test -- alerts-monitoring.service.test.ts alerts-monitoring.ownership.test.ts alerts-monitoring.routes.test.ts --runInBand` | Approval-gated regression if alert event listing, mutation, or parent rule ownership is touched. |
+| `CF-W1-UX-02` | `cd backend` then `npm.cmd test -- ai-investment-copilot.service.test.ts ai-investment-copilot.validation.test.ts ai-investment-copilot.routes.test.ts --runInBand` | Plan prepared; blocked until Product/UX/Architect trust contract and implementation handoff. |
+| `CF-W1-UX-02` | `cd frontend` then `npm.cmd run test:ui -- ai-investment-copilot.spec.ts --workers=1` | Approval-gated only after UI implementation, local app startup plan, memory/resource check, and exact UI spec exists. Current spec is absent. |
 
 ## Safe Command Discipline
 
@@ -54,5 +62,6 @@ Provider-adjacent, startup-adjacent, frontend build, backend build, UI smoke, li
 - `CF-W1-L3-DQ-01`: blocked by Product Owner and Architect decision on Lane 3 display-vs-action readiness policy.
 - `CF-W1-TP-01A`: blocked by Trade Plan target/no-target and DQ hard-block contract acceptance; full target geometry migration remains separate.
 - `CF-W1-MD-02`: blocked from executable validation by ADR/Product/Architect approval for durable readiness evidence and Prisma/OHLC storage model.
-- `CF-W1-MD-01`: safest next docs-only QA plan gap; executable validation remains blocked until validation policy and implementation scope exist.
-- `CF-W1-L3-ALERT-01`: blocked by Lane 3 readiness policy and alert readiness contract.
+- `CF-W1-MD-01`: executable validation remains blocked until future-date, adjusted-close, suspicious-volume, and spike policy are accepted and implementation scope exists.
+- `CF-W1-L3-ALERT-01`: blocked by Lane 3 readiness policy, alert readiness contract, and implementation handoff.
+- `CF-W1-UX-02`: blocked by Copilot naming/trust-field/blocked-state decisions, shared-file reservation if needed, and implementation handoff.

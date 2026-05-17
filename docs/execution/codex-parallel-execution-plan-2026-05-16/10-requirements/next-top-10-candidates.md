@@ -2,7 +2,7 @@
 
 Date: 2026-05-17
 
-Prepared by Team 02 Requirement Factory in daemon scheduler mode after the two prior Decision Inbox items were resolved and committed.
+Prepared by Team 02 Requirement Factory in daemon scheduler mode after the two prior Decision Inbox items were resolved and committed. Refreshed for the current daemon cycle with focus on `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02`.
 
 ## Current Top Candidates
 
@@ -12,12 +12,22 @@ There are fewer than ten active candidates after removing completed bounded slic
 | --- | --- | --- | --- |
 | 1 | CF-W1-L3-DQ-01 | Product/Architect policy decision + architecture contract + QA plan | Parent Lane 3 display-vs-action readiness policy. High unblock value for alerts, portfolio/watchlist, portfolio intelligence, research, and copilot trust surfaces. |
 | 2 | CF-W1-TP-01A | Architecture contract + QA plan + Product decision | Trade Plan no-target compatibility and DQ hard-block requirement is refined, but not code-ready. |
-| 3 | CF-W1-L3-ALERT-01 | Wait for `CF-W1-L3-DQ-01`; then architecture + QA handoff | Alert ownership backend slice is committed; readiness suppression remains blocked by Lane 3 readiness policy. |
-| 4 | CF-W1-UX-02 | Product/UX decision + architecture contract + QA plan | Copilot/research trust UX requirement is refined, but not code-ready. |
-| 5 | CF-W1-MD-02 | ADR / architecture contract + ADR QA checklist | Durable Market Data readiness evidence ADR. |
+| 3 | CF-W1-MD-02 | ADR / architecture contract + ADR QA checklist | Durable Market Data readiness evidence ADR. Schema/source implementation remains blocked until storage model and natural key are accepted. |
+| 4 | CF-W1-L3-ALERT-01 | Wait for `CF-W1-L3-DQ-01`; then architecture + QA handoff | Alert ownership backend slice is committed; readiness suppression remains blocked by Lane 3 readiness policy. |
+| 5 | CF-W1-UX-02 | Product/UX decision + architecture contract + QA plan | Copilot/research trust UX requirement is refined, but not code-ready. |
 | 6 | CF-W1-MD-01 | Validation policy + QA plan | Market Data validation hardening policy and QA plan. |
 | 7 | CF-W1-UX-05 | Product/UX copy decision | Research-support copy pass contract. |
 | 8 | CF-W1-BT-01 | Upstream DQ and strategy trust policy | Backtesting DQ fail-closed characterization. |
+
+## Focused Priority Readiness Result
+
+These are the current Team 02 priorities. None is app-code ready.
+
+| ID | What is proven | What is missing | Current disposition |
+| --- | --- | --- | --- |
+| CF-W1-L3-DQ-01 | Requirement, draft contract, and draft QA plan exist. No open Decision Inbox item blocks docs-only prep. | Accepted display-vs-action policy, accepted consumer DTO fields, exact child-slice file reservations, accepted QA scenario matrix. | Keep in Product/Architect/QA refinement. |
+| CF-W1-TP-01A | Requirement, draft contract, and draft QA plan exist. It is independent of completed alert ownership and trigger DTO slices. | Accepted no-target replacement semantics, accepted DQ hard-block states including `LIMITED`, API/UI compatibility boundary, exact backend-only or split UI file reservations. | Keep in Product/Architect/QA refinement. |
+| CF-W1-MD-02 | Requirement, draft contract, and ADR QA plan exist. Docs-only ADR prep can proceed. | Accepted storage model, natural key, Prisma impact decision, migration/rollback/query/test strategy, and later source/schema work packet. | Keep in ADR/Decision prep; source blocked. |
 
 ## Next Non-Blocked Candidates For Architecture / QA Prep
 

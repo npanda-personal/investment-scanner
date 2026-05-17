@@ -2,14 +2,14 @@
 
 Date: 2026-05-17
 
-Status: Refreshed by Team 02 Requirement Factory after decision resolution, `CF-W1-L3-AUTH-02` commit `503bcd9`, `CF-W1-SIG-TRIGGER-01` commit `6ab3999`, and checkpoint protocol fix commit `f75808f`.
+Status: Refreshed by Team 02 Requirement Factory for the current daemon cycle after decision resolution, `CF-W1-L3-AUTH-02` commit `503bcd9`, `CF-W1-SIG-TRIGGER-01` commit `6ab3999`, and checkpoint protocol fix commit `f75808f`.
 
 ## Needs Product / UX / Architect Decision
 
 | ID | Question |
 | --- | --- |
-| CF-W1-TP-01A | What replaces Trade Plan target-price geometry in user-facing output, and which DQ states hard-block paper-review readiness? |
 | CF-W1-L3-DQ-01 | Should portfolio/watchlist surfaces display limited data while action-like alerts and reliability claims remain blocked? |
+| CF-W1-TP-01A | What replaces Trade Plan target-price geometry in user-facing output, and which DQ states hard-block paper-review readiness? |
 | CF-W1-MD-02 | Which durable OHLC/readiness evidence storage model and natural key should be accepted before Prisma or source changes? |
 | CF-W1-UX-02 | Should the product keep the `AI Investment Copilot` label, and should blocked summaries hide generated text or show diagnostic untrusted context? |
 | CF-W1-UX-05 | Which advisory-feeling labels and status colors should be replaced first, especially shared status labels? |
@@ -19,25 +19,25 @@ Status: Refreshed by Team 02 Requirement Factory after decision resolution, `CF-
 
 No items are currently blocked by an open Decision Inbox entry.
 
-If a future true consent blocker appears, create a Decision Packet under `99-decision-inbox/` and update `99-decision-inbox/open-decisions.md`.
+If a future true consent blocker appears during Team 02 docs-only work, record it in the Team 02 outbox and ask Team 00 to route the decision. Do not create a Decision Packet from the current Team 02 write scope.
 
-## Needs Architecture Contract
+## Needs Architecture Acceptance / Contract Finalization
 
-| ID | Contract needed |
+| ID | Contract status |
 | --- | --- |
-| CF-W1-TP-01A | Trade Plan no-target compatibility, DQ hard-block, API/UI migration boundary |
-| CF-W1-L3-DQ-01 | Lane 3 readiness consumer policy for portfolio, watchlist, alerts, and portfolio intelligence |
+| CF-W1-L3-DQ-01 | Draft exists; needs Product/Architect acceptance for Lane 3 readiness policy for portfolio, watchlist, alerts, and portfolio intelligence |
+| CF-W1-TP-01A | Draft exists; needs Product/Architect acceptance for Trade Plan no-target compatibility, DQ hard-block, and API/UI migration boundary |
+| CF-W1-MD-02 | Draft exists; needs ADR/decision packet for durable Market Data readiness evidence, natural key, and storage model |
 | CF-W1-L3-ALERT-01 | Alert readiness suppression contract after `CF-W1-L3-DQ-01` |
 | CF-W1-UX-02 | Copilot trust fields, blocked states, local deterministic proof, and UI scope |
-| CF-W1-MD-02 | Durable Market Data readiness evidence / natural key ADR and storage-model decision packet |
 
 ## Needs QA Plan
 
-| ID | QA focus |
+| ID | QA focus/status |
 | --- | --- |
-| CF-W1-TP-01A | Trade Plan no-target compatibility, DQ hard-block states, and API/frontend compatibility risks |
-| CF-W1-L3-DQ-01 | Lane 3 display-only versus action-like readiness scenarios |
-| CF-W1-MD-02 | ADR QA checklist for natural key, provenance, migration, rollback, DQE handoff, and no-source/no-provider constraints |
+| CF-W1-L3-DQ-01 | Draft exists; final Lane 3 display-only versus action-like readiness scenarios depend on accepted policy |
+| CF-W1-TP-01A | Draft exists; final Trade Plan no-target, DQ hard-block, and API/frontend compatibility scenarios depend on accepted semantics |
+| CF-W1-MD-02 | ADR QA checklist draft exists; no executable validation until storage/natural-key ADR is accepted |
 | CF-W1-L3-ALERT-01 | Alert event suppression and DQ evidence tests |
 | CF-W1-UX-02 | Copilot trusted, blocked, stale, scoped, deterministic-local, and safe empty states |
 | CF-W1-MD-01 | Market Data validation tests for future dates, adjusted close, and spike policy |
@@ -53,6 +53,14 @@ These items are not implementation-ready.
 | 3 | CF-W1-MD-02 | ADR packet and ADR QA checklist for durable readiness evidence and natural key. |
 | 4 | CF-W1-MD-01 | Validation-policy clarification and QA plan for future-dated, adjusted-close, and suspicious-spike behavior. |
 | 5 | CF-W1-UX-05 | Product/UX copy refinement and QA checklist for research-support labels and status language. |
+
+## Current Priority Refinement Output
+
+| ID | Useful next output | Owner to route |
+| --- | --- | --- |
+| CF-W1-L3-DQ-01 | Product/Architect policy options for display-only, limited-review, alert/action blocking, DTO fields, and child-slice split. | Team 03 with Team 00 decision routing if consent is needed |
+| CF-W1-TP-01A | Product/Architect options for target compatibility, replacement output fields, DQ hard blockers, `LIMITED` behavior, and backend-vs-frontend split. | Team 03 with Team 00 decision routing if consent is needed |
+| CF-W1-MD-02 | ADR option matrix for `PriceTick` expansion, companion OHLC evidence table, durable readiness evidence table, or explicitly limited derived-evidence claims. | Team 03 with Team 04 ADR QA checklist |
 
 ## Completed Or Split Out Of Active Refinement
 

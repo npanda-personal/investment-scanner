@@ -16,7 +16,7 @@ docs/codex-agent-team-plan/** is historical evidence only.
 Use the active execution folder:
 docs/execution/codex-parallel-execution-plan-2026-05-16/
 
-Resume Continuous Daemon Scheduler Mode from cycle DAEMON-20260517, rolling iteration 7.
+Resume Continuous Daemon Scheduler Mode from cycle DAEMON-20260517, rolling iteration 8.
 
 Team 00 is the master runtime orchestrator. The human Product Owner is not the mediator for routine gates.
 
@@ -51,12 +51,14 @@ Current ready queue:
 
 Current planning queues:
 - Requirement backlog and next-top candidates were refreshed after the resolved decision items were removed.
-- Next architecture prep should start with `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02`.
-- Next QA prep should start with `CF-W1-MD-01`, `CF-W1-L3-ALERT-01`, and `CF-W1-UX-02`.
+- Team 02 refreshed current priorities and readiness checks for `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02`.
+- Team 04 prepared QA plans for `CF-W1-MD-01`, `CF-W1-L3-ALERT-01`, and `CF-W1-UX-02`.
+- Team 03 architecture prep for `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02` timed out and should be relaunched first.
 
 Current committed daemon outputs include:
 - ae0b4cc docs: checkpoint daemon after resolved decisions
 - f75808f docs: fix daemon checkpoint resume protocol
+- e2036dd docs: refresh daemon planning queues
 - 6ab3999 feat: add signal trigger contract projection
 - 503bcd9 fix: scope alert events by rule owner
 - 8e38c2b docs: resolve daemon decision inbox items
@@ -66,11 +68,12 @@ Resume daemon operation:
 1. Keep Team 00 running as scheduler/integration owner.
 2. Relaunch teams as runtime slots become available.
 3. Continue audits, requirement refinement, architecture prep, QA planning, implementation only when Ready criteria pass, review, and release work.
-4. Keep Team 03 Architecture Factory and Team 04 QA Factory active when safe; relaunch Team 02 when new audit findings or decisions change the backlog.
-5. Launch Teams 05-09 only when matching ready work exists; otherwise assign module-domain audit/refinement/prep.
-6. Relaunch Team 10 when integration queue items appear.
-7. Update `99-decision-inbox/open-decisions.md` whenever a true consent blocker is created or resolved.
-8. If runtime ends again, update `09-summaries/daemon-cycle-latest.md` and this resume prompt, then return a checkpoint report.
+4. Relaunch Team 03 first for `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02` architecture contracts/work packets.
+5. Keep Team 04 queued for QA review after Team 03 outputs; relaunch Team 02 when new audit findings or decisions change the backlog.
+6. Launch Teams 05-09 only when matching ready work exists; otherwise assign module-domain audit/refinement/prep.
+7. Relaunch Team 10 when integration queue items appear.
+8. Update `99-decision-inbox/open-decisions.md` whenever a true consent blocker is created or resolved.
+9. If runtime ends again, update `09-summaries/daemon-cycle-latest.md` and this resume prompt, then return a checkpoint report.
 
 Stop only for:
 - true consent blockers,

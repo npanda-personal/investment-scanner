@@ -73,9 +73,9 @@ Operating rules:
 | Field | Current Value |
 | --- | --- |
 | Current daemon cycle id | `DAEMON-20260517` |
-| Current rolling iteration count | 7 |
-| Active teams | Team 00 checkpointing after docs-only Team 02/03/04 queue refresh |
-| Queued teams | Team 03 and Team 04 for next docs-only prep; Team 05-09 for audit/refinement if no ready implementation appears |
+| Current rolling iteration count | 8 |
+| Active teams | Team 00 checkpointing after Team 02 requirement refresh and Team 04 QA planning |
+| Queued teams | Team 03 for architecture prep; Team 04 for QA review after Team 03; Team 05-09 for audit/refinement if no ready implementation appears |
 | Idle teams | Team 01, Team 05, Team 08, Team 09, Team 10 |
 | Blocked teams | None fully blocked; implementation teams without ready work continue audit/refinement |
 | Teams relaunched this cycle | Team 02, Team 03, Team 04, Team 06, Team 07, Team 10 |
@@ -89,7 +89,7 @@ Operating rules:
 | Blocked-work pressure | medium-high |
 | Next team to launch | Team 02 Requirement Factory, Team 03 Architecture Factory, and Team 04 QA Factory |
 | Next item to assign | `CF-W1-MD-01` QA plan / validation policy prep, `CF-W1-L3-DQ-01` policy prep, and Trade Plan target-migration follow-up prep |
-| Last commit | `f75808f docs: fix daemon checkpoint resume protocol`; next docs commit records the docs-only queue refresh |
+| Last commit | `e2036dd docs: refresh daemon planning queues`; next docs commit records Team 02/04 outputs and checkpoint |
 | Daemon should continue | Yes, after runtime checkpoint resume |
 
 ## Sprint 0 Items
@@ -204,3 +204,4 @@ Old work items in `docs/codex-agent-team-plan/` may be used only as evidence or 
 | DAEMON-20260517-09 | `CF-W1-SIG-TRIGGER-01` implementation and gates | Teams 06, 04, 10, 03, 00 | Committed | Signal Generation source/tests and active evidence docs | Optional trigger contract DTO projection implemented, validated, reviewed, signed off, accepted, and committed as `6ab3999`. |
 | DAEMON-20260517-10 | Checkpoint resume protocol repair | Team 00 | Checkpointing | `98-orchestrator/`, `09-summaries/`, `00-control/`, `99-decision-inbox/` | Resume prompt existence verified and updated. Future checkpoint reports must include resume prompt path and update status. |
 | DAEMON-20260517-11 | Team 02/03/04 queue refresh | Teams 02, 03, 04, 00 | Checkpointing | `10-requirements/`, `03-architecture/`, `04-qa/`, `09-summaries/` | Removed stale resolved decision blockers from planning queues. No app-code item is ready. |
+| DAEMON-20260517-12 | Team 02/04 docs-only prep | Teams 02, 04, 00 | Checkpointing | `10-requirements/`, `04-qa/`, `17-team-outboxes/`, queue docs | Team 02 refined current requirements; Team 04 prepared `CF-W1-MD-01`, `CF-W1-L3-ALERT-01`, and `CF-W1-UX-02` QA plans. Team 03 timed out and remains queued. |
