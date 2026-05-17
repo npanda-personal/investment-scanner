@@ -75,6 +75,34 @@ A candidate may move to Ready for Implementation only when:
 - no QA decision is missing
 - no stop condition applies
 
+## Pre-Implementation Readiness Lock
+
+No source file may be modified until the workstream writes or verifies a readiness check.
+
+The readiness check must explicitly say:
+
+```text
+Implementation allowed: yes
+```
+
+The readiness check must list:
+- exact allowed files
+- exact forbidden files
+- current source files inspected
+- current tests inspected
+- Product Owner decision status
+- Architect decision status
+- QA plan status
+- stop conditions
+
+If readiness is not proven, the workstream must create requirements, contracts, QA plans, or a Decision Packet only.
+
+A stop condition must occur before source edits, not after source edits.
+
+If Codex accidentally modifies source before readiness is proven, the wave must stop and enter reconciliation mode.
+
+Reconciliation mode may inspect and classify dirty changes, run explicitly approved focused tests, and create reconciliation evidence. It must not stage, commit, revert, or continue implementation without Product Owner approval.
+
 ## Standing Stop Conditions
 
 Stop and ask for Product Owner or Architect decision if work needs:
@@ -98,4 +126,3 @@ Stop and ask for Product Owner or Architect decision if work needs:
 - paid services
 - cloud deployment
 - GitHub push
-
