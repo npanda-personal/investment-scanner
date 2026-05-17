@@ -28,20 +28,25 @@
 | Data Quality threshold ambiguity | High | Medium | Product Owner + DQE | thresholds differ between contract, tests, and UI | record exact threshold policy before implementation | update readiness contract |
 | UI scope creep risk | Medium | Medium | UX + Orchestrator | UI controls added before UX/QA criteria | keep UI minimal unless explicitly approved | mark frontend files read-only by default |
 | Test-only scope drift risk | Medium | Medium | Orchestrator + QA | implementation touches source while approved as test-only | reserve exactly one test file | stop and reject scope expansion |
+| Market Data durable evidence gap | High | High | Market Data Foundation + Architect | readiness evidence exists only transiently or without source/run/provenance fields | add contract-first storage/readiness characterization tests before source changes | propose backend-only storage/readiness test slice |
+| Downstream DQ optional-filter risk | High | High | Lane 2 module owners + Architect | signal/backtest/calibration paths run with DQ filtering disabled or warning-only | require fail-closed consumer contracts and focused tests | start with signal-generation-engine DQ enforcement tests |
+| User-facing untrusted data leak risk | High | High | Lane 3 module owners + QA | portfolio/watchlist/alert/copilot outputs omit readiness evidence | require Lane 3 readiness consumer contract | start with alerts-monitoring readiness tests |
 
 ## Current Blockers
 
-- Sprint 1B implementation is not approved.
-- Market Data trust and Data Quality readiness must be revalidated before downstream signal/strategy work.
+- Sprint 1B-02 human Product Owner acceptance is pending.
+- Sprint 1B Wave 1 is not committed because root `AGENTS.md` forbids committing unaccepted scope.
+- Market Data durable readiness evidence is incomplete for full contract compliance.
+- Lane 2 strategy/signal/risk modules still need fail-closed downstream DQ enforcement tests.
+- Lane 3 portfolio/watchlist/alerts/copilot modules still need readiness consumer contracts and tests.
 - Angel One remains excluded from implementation and live validation.
 - Startup scheduler/backfill behavior requires Architect approval before it can be changed or accepted as Sprint 1B scope.
-- QA has not run the approved validation subset because tests are not approved in Sprint 1B preparation.
-- First implementation can proceed only as Option A after explicit approval: backend-only Data Quality invariant tests.
+- Downstream modules remain blocked from treating Market Data / DQ as trusted input.
 
 ## Sprint 1B Preparation Risk Decisions
 
-- Dirty worktree risk is currently low because the worktree was clean before this preparation pass.
-- Source-control risk returns if implementation begins before file reservations are approved.
-- The first implementation should stay within Market Data Foundation and Data Quality module-owned files unless Architect reserves a shared file.
-- Any live provider call, paid dependency, broker-order path, secret exposure, or provider-heavy startup behavior is a stop condition.
-- Any source, UI, route registry, Prisma, shared utility, shared UI, package, startup, config, or provider edit during Option A is a stop condition.
+- Dirty worktree risk is controlled because current Wave 1 files are limited to one Market Data test file and active execution docs.
+- Source-control risk remains until Sprint 1B-02 receives human Product Owner acceptance and scoped staging/commit approval.
+- Future implementation should stay within Market Data Foundation and Data Quality module-owned files unless Architect reserves a shared file.
+- Any live provider call, paid dependency, broker-order path, secret exposure, or provider-heavy startup behavior remains a stop condition.
+- Any source, UI, route registry, Prisma, shared utility, shared UI, package, startup, config, or provider edit during test-only slices remains a stop condition.
