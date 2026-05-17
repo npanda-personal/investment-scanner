@@ -28,6 +28,10 @@ Root `AGENTS.md` is the only authoritative AGENTS instruction file.
 - `07-decisions/`: Product Owner and architecture decision proposals.
 - `08-work-packets/`: implementation or audit work packets.
 - `09-summaries/`: sprint and audit summaries.
+- `10-requirements/`: requirement backlog, refinement queue, and next candidates.
+- `11-module-audits/`: parallel module audit outputs.
+- `12-ready-queue/`: ready, blocked-by-decision, blocked-by-shared-file, and blocked-by-upstream queues.
+- `13-implementation-evidence/`: implementation factory evidence and no-pull decisions.
 
 Keep this `README.md` at the root as the navigation index.
 
@@ -59,6 +63,10 @@ Use the numbered folders only:
 - Angel One or provider policy decisions: `07-decisions/`
 - Work packets: `08-work-packets/`
 - Sprint summaries: `09-summaries/`
+- Requirement backlog and refinement: `10-requirements/`
+- Module audits: `11-module-audits/`
+- Ready/blocked queues: `12-ready-queue/`
+- Implementation evidence: `13-implementation-evidence/`
 
 Do not add new files to the old unnumbered `architecture/`, `contracts/`, `decisions/`, `qa/`, or `work-packets/` paths.
 

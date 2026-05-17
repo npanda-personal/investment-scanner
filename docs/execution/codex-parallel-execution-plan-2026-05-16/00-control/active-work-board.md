@@ -12,6 +12,27 @@ No historical active work items have been migrated as active.
 - Sprint 1B Waves are approved only when the Product Owner explicitly defines the bounded file scope.
 - GitHub push is disabled by default.
 
+## Active Board States
+
+- Backlog Candidate
+- Audit In Progress
+- Audit Complete
+- Needs Product Refinement
+- Needs Architecture Contract
+- Needs QA Plan
+- Ready for Implementation
+- Implementation In Progress
+- Developer Validation
+- QA Verification
+- Code Review
+- Architect Signoff
+- PO Acceptance Packet
+- Conditionally Accepted
+- Committed
+- Blocked
+- Rejected / Rework
+- Deferred
+
 ## Sprint 0 Items
 
 | ID | Work Item | Owner | State | Scope | Notes |
@@ -45,6 +66,22 @@ No historical active work items have been migrated as active.
 | S1B-W3-C | Alerts / portfolio / copilot deferral check | Orchestrator | Complete | `09-summaries/sprint-1b-wave3-downstream-deferral-check.md` | Confirms downstream user-facing modules remain blocked. Recommends signal-generation fail-closed decision next. |
 | S1B-W3-D | QA/review/Architect/PO evidence | QA + Review + Architect + Product Owner | Accepted under conditional approval | QA, review, signoff, and PO packet docs | Human Product Owner decision recorded under explicit Wave 3 conditional approval. |
 
+## Continuous Parallel Execution Factory Wave 1
+
+| ID | Work Item | Owner | State | Scope | Notes |
+|---|---|---|---|---|---|
+| CF-W1-SETUP | Create continuous factory folders and operating model | Orchestrator | Audit Complete | Active execution docs | Added requirement, module-audit, ready-queue, and implementation-evidence lanes. |
+| CF-W1-AUD-A | Market Data / Data Quality audit | Audit Team A | Audit Complete | `11-module-audits/audit-market-data-data-quality.md` | Found durable evidence, validation, threshold, DQ default, and provider/startup blockers. |
+| CF-W1-AUD-B | Strategy / Signal / Rules audit | Audit Team B | Audit Complete | `11-module-audits/audit-strategy-signal-rules.md` | Found signal contract, fail-open DQ, target-price, and strategy versioning gaps. |
+| CF-W1-AUD-C | Backtesting / Trade Plan / Risk audit | Audit Team C | Audit Complete | `11-module-audits/audit-backtesting-trade-risk.md` | Found optional DQ, target semantics, exit/invalidation, and overfit gaps. |
+| CF-W1-AUD-D | Portfolio / Watchlist / Alerts audit | Audit Team D | Audit Complete | `11-module-audits/audit-portfolio-watchlist-alerts.md` | Found DQ leakage and auth/user ownership gaps. |
+| CF-W1-AUD-E | UX / Research / Copilot audit | Audit Team E | Audit Complete | `11-module-audits/audit-ux-research-copilot.md` | Found trust explanation, advice-language, copilot proof, and UI smoke gaps. |
+| CF-W1-AUD-F | Platform / Auth / Subscription / Notifications audit | Audit Team F | Audit Complete | `11-module-audits/audit-platform-auth-subscription-notifications.md` | Found default-user, alert ownership, self-plan-change, and notification privacy risks. |
+| CF-W1-AUD-G | QA / Test Infrastructure audit | Orchestrator fallback | Audit Complete | `11-module-audits/audit-qa-test-infrastructure.md` | Subagent thread limit reached; audit completed locally. |
+| CF-W1-REQ | Requirement and ready-queue synthesis | Requirement Factory | Needs Product Refinement | `10-requirements/`, `12-ready-queue/` | No code item moved to Ready for Implementation. |
+| CF-W1-SIG-01 | Signal Generation DQ fail-closed trusted runs | Architecture + QA Factory | Blocked | `06-contracts/`, `03-architecture/`, `04-qa/`, `08-work-packets/` | Drafted contract, architecture review, QA plan, and blocked work packet. Requires PO + Architect decision before implementation. |
+| CF-W1-IMPL | Implementation Factory pull | Orchestrator | Deferred | `13-implementation-evidence/no-safe-implementation-selected-wave1.md` | No safe code item selected; forcing implementation would risk bad tests or unauthorized behavior changes. |
+
 ## Current Sprint 1B Readiness
 
 Sprint 1B Wave 3 completed the first downstream `signal-generation-engine` strict Data Quality filter characterization scope.
@@ -55,6 +92,7 @@ Blocking gates:
 - Downstream modules remain blocked until separate readiness enforcement tests, QA, review, Architect signoff, and Product Owner acceptance exist.
 - `signal-generation-engine` remains blocked for default trusted/fail-closed behavior because Wave 3 proves only the strict opt-in filter path.
 - Full Market Data durable readiness evidence still requires future Architect/Product Owner decisions before source or schema changes.
+- Continuous Factory Wave 1 found no code implementation item safe to pull without Product Owner/Architect decisions.
 
 ## Historical References
 

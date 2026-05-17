@@ -34,6 +34,11 @@
 | Market Data natural-key gap | High | Medium | Market Data Foundation + Architect | storage is characterized as symbol/date-centric only | require ADR before schema or storage-key changes | propose durable readiness evidence decision |
 | Storage characterization overclaim risk | Medium | Medium | Orchestrator + QA | tests treated as full contract compliance | preserve limitations in QA/PO evidence | keep downstream blocklist active |
 | Signal-generation strict-filter overclaim risk | High | Medium | Signal Generation + Architect + QA | Wave 3 strict-filter tests are treated as default fail-closed enforcement | preserve limitation that strict opt-in path only is proven | propose signal-generation fail-closed policy decision |
+| Strategy Decision target-price violation | High | High | Strategy Decision + Product Owner + Architect | `targetPrice` or target-price wording appears in trusted outputs | replace with rule-based exit/invalidation semantics after PO decision | refine CF-W1-STRAT-01 |
+| Alert ownership leakage risk | High | High | Alerts + Auth + Architect | alert events/list/read/dismiss are global or rule owner is not preserved | define ownership contract before alert implementation | refine CF-W1-L3-AUTH-02 |
+| Copilot trust overclaim risk | High | Medium | UX + Copilot + QA | summaries show complete/reliable without DQ readiness evidence | add trust UX contract and blocked states | refine CF-W1-UX-02 |
+| Subscription self-plan risk | Medium | Medium | Subscription Billing + Product Owner | ordinary user can self-select higher/admin plan in local mode | clarify local/manual billing policy | refine CF-W1-SUB-01 |
+| Implementation factory false-ready risk | High | Medium | Orchestrator | item enters Ready without PO/Architect/QA gates | enforce ready queue criteria and no-pull evidence | keep ready queue strict |
 
 ## Current Blockers
 
@@ -45,6 +50,9 @@
 - Angel One remains excluded from implementation and live validation.
 - Startup scheduler/backfill behavior requires Architect approval before it can be changed or accepted as Sprint 1B scope.
 - Downstream modules remain blocked from treating Market Data / DQ as trusted input.
+- Strategy Decision target-price semantics conflict with root no-arbitrary-target policy and require Product Owner decision.
+- Alert ownership and Lane 3 readiness consumer contracts remain unresolved.
+- Copilot/research trust UX remains unresolved.
 
 ## Sprint 1B Preparation Risk Decisions
 
@@ -53,3 +61,9 @@
 - Future implementation should stay within Market Data Foundation and Data Quality module-owned files unless Architect reserves a shared file.
 - Any live provider call, paid dependency, broker-order path, secret exposure, or provider-heavy startup behavior remains a stop condition.
 - Any source, UI, route registry, Prisma, shared utility, shared UI, package, startup, config, or provider edit during test-only slices remains a stop condition.
+
+## Continuous Factory Wave 1 Risk Decisions
+
+- No code implementation item was pulled because every high-value candidate had a Product Owner, Architect, QA, shared-file, or upstream dependency blocker.
+- Documentation-only factory artifacts were allowed under the approved active execution folder scope.
+- `CF-W1-SIG-01` is the recommended next decision path, but it is source-changing and blocked until Product Owner and Architect approval.
