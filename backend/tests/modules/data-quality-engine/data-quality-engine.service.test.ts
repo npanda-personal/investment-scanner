@@ -241,6 +241,23 @@ describe('data quality engine service', () => {
     expect(result.missingQualityEvaluationCount).toBe(1);
   });
 
+  it('fails closed for missing quality evaluations by default', async () => {
+    const setup = service({
+      repository: {
+        latestForInstruments: jest.fn().mockResolvedValue([
+          { instrumentId: 'ready', eligibleForSignals: true, signalReadinessScore: 90, signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID' },
+        ]),
+      },
+    });
+
+    const result = await setup.instance.filterEligibleInstruments(['ready', 'missing']);
+
+    expect(result.eligibleInstrumentIds).toEqual(['ready']);
+    expect(result.excludedInstrumentIds).toEqual(['missing']);
+    expect(result.missingQualityEvaluationCount).toBe(1);
+    expect(result.warnings).toEqual(['missing: missing data quality evaluation']);
+  });
+
   it('keeps daily review limited while blocking backtest and calibration on shallow trusted-baseline history', () => {
     const result = service().instance.evaluateInstrument(
       instrument({

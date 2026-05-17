@@ -82,6 +82,14 @@ No historical active work items have been migrated as active.
 | CF-W1-SIG-01 | Signal Generation DQ fail-closed trusted runs | Architecture + QA Factory | Blocked | `06-contracts/`, `03-architecture/`, `04-qa/`, `08-work-packets/` | Drafted contract, architecture review, QA plan, and blocked work packet. Requires PO + Architect decision before implementation. |
 | CF-W1-IMPL | Implementation Factory pull | Orchestrator | Deferred | `13-implementation-evidence/no-safe-implementation-selected-wave1.md` | No safe code item selected; forcing implementation would risk bad tests or unauthorized behavior changes. |
 
+## Continuous Parallel Execution Factory Wave 2 Reconciliation
+
+| ID | Work Item | Owner | State | Scope | Notes |
+|---|---|---|---|---|---|
+| CF-W2-RECON | Dirty DQ/SGE change reconciliation | Orchestrator | Blocked | `13-implementation-evidence/CF-W2-dirty-change-reconciliation-report.md` | Source/test changes occurred before readiness was fully proven. No staging, commit, revert, or downstream implementation allowed until Product Owner decision. |
+| CF-W2-DQ-01 | Data Quality fail-closed defaults | Data Quality Engine Team + QA + Architect | Conditionally Accepted | `backend/src/modules/data-quality-engine/**`, DQ tests | Readiness, focused tests, QA, code review, Architect signoff, and PO conditional acceptance completed. Local commit pending git staging availability. |
+| CF-W2-SIG-01 | Signal Generation DQ fail-closed behavior | Signal Generation Engine Team + QA + Architect | Blocked | `backend/src/modules/signal-generation-engine/**`, SGE tests | Dirty change partially resolves run-path fail-closed behavior, but explicit opt-out, read paths, trust classification, and trigger contract remain unresolved. |
+
 ## Current Sprint 1B Readiness
 
 Sprint 1B Wave 3 completed the first downstream `signal-generation-engine` strict Data Quality filter characterization scope.
@@ -90,9 +98,9 @@ Blocking gates:
 - Angel One remains excluded from implementation and live validation.
 - Provider-heavy startup behavior remains excluded by default.
 - Downstream modules remain blocked until separate readiness enforcement tests, QA, review, Architect signoff, and Product Owner acceptance exist.
-- `signal-generation-engine` remains blocked for default trusted/fail-closed behavior because Wave 3 proves only the strict opt-in filter path.
+- `signal-generation-engine` remains blocked for full trusted/fail-closed behavior. Wave 2 dirty changes partially address run-path defaults, but reconciliation is unresolved.
 - Full Market Data durable readiness evidence still requires future Architect/Product Owner decisions before source or schema changes.
-- Continuous Factory Wave 1 found no code implementation item safe to pull without Product Owner/Architect decisions.
+- Continuous Factory Wave 2 reconciliation must be resolved before any downstream implementation, staging, or commit.
 
 ## Historical References
 

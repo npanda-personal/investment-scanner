@@ -93,7 +93,7 @@ export class DataQualityEngineService {
     const allowed = options.allowedReadinessStatuses || (options.includeLimited ? ['READY', 'LIMITED'] : ['READY']);
     const minScore = options.minSignalReadinessScore ?? 70;
     const skipUnusable = options.skipUnusable ?? true;
-    const missingBehavior = options.missingQualityBehavior ?? (options.excludeMissingQuality ? 'SKIP' : 'WARN_AND_PROCESS');
+    const missingBehavior = options.missingQualityBehavior ?? 'SKIP';
     const eligible: string[] = [];
     const excluded: string[] = [];
     const warnings: string[] = [];

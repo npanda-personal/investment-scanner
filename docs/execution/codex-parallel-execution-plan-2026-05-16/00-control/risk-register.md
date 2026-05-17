@@ -39,6 +39,7 @@
 | Copilot trust overclaim risk | High | Medium | UX + Copilot + QA | summaries show complete/reliable without DQ readiness evidence | add trust UX contract and blocked states | refine CF-W1-UX-02 |
 | Subscription self-plan risk | Medium | Medium | Subscription Billing + Product Owner | ordinary user can self-select higher/admin plan in local mode | clarify local/manual billing policy | refine CF-W1-SUB-01 |
 | Implementation factory false-ready risk | High | Medium | Orchestrator | item enters Ready without PO/Architect/QA gates | enforce ready queue criteria and no-pull evidence | keep ready queue strict |
+| Premature source edit reconciliation risk | High | High | Orchestrator + Product Owner + Architect + QA | source/test files are dirty before readiness evidence, QA, review, signoff, and PO packet are complete | use Pre-Implementation Readiness Lock and reconciliation mode | split dirty DQ/SGE changes before any commit |
 
 ## Current Blockers
 
@@ -53,6 +54,9 @@
 - Strategy Decision target-price semantics conflict with root no-arbitrary-target policy and require Product Owner decision.
 - Alert ownership and Lane 3 readiness consumer contracts remain unresolved.
 - Copilot/research trust UX remains unresolved.
+- Continuous Factory Wave 2 dirty DQ/SGE changes are pending Product Owner decision.
+- No downstream implementation is allowed until Wave 2 reconciliation is resolved.
+- No Signal Generation commit is allowed until unresolved gaps are addressed or explicitly accepted as known limitations.
 
 ## Sprint 1B Preparation Risk Decisions
 
@@ -67,3 +71,12 @@
 - No code implementation item was pulled because every high-value candidate had a Product Owner, Architect, QA, shared-file, or upstream dependency blocker.
 - Documentation-only factory artifacts were allowed under the approved active execution folder scope.
 - `CF-W1-SIG-01` is the recommended next decision path, but it is source-changing and blocked until Product Owner and Architect approval.
+
+## Continuous Factory Wave 2 Reconciliation Risk Decisions
+
+- Wave 2 entered reconciliation mode because source/test files were modified before readiness was fully proven.
+- Current dirty files are limited to Data Quality Engine and Signal Generation Engine source/tests.
+- Data Quality fail-closed default changes completed readiness, QA, code review, Architect signoff, and Product Owner conditional acceptance as a separate evidence track.
+- Signal Generation changes remain blocked until Product Owner and Architect decide whether unresolved run opt-out, read-path, trusted/untrusted classification, and trigger-contract gaps are acceptable known limitations.
+- No staging, commit, push, revert, or downstream implementation is allowed until reconciliation is resolved.
+- No Signal Generation file may be staged with the Data Quality commit.
