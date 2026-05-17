@@ -37,6 +37,7 @@ Read:
 Current committed daemon outputs:
 - 74ba6dd fix: enforce portfolio watchlist child ownership
 - 7b6d25e docs: prepare daemon decision packets
+- 004d918 docs: checkpoint daemon iteration four
 
 Current open decisions:
 - DECISION-20260517-alert-event-ownership-model blocks only CF-W1-L3-AUTH-02 implementation and alert event inbox/digest ownership work.
@@ -48,15 +49,13 @@ Current ready queue:
 - no active application-code item is Ready for Implementation.
 
 Next autonomous work:
-1. Verify whether the iteration 4 docs-only checkpoint is already committed.
-2. If dirty files exist, classify them before staging. Only active execution docs are expected.
-3. Relaunch Team 02 for non-blocked requirement refinement.
-4. Relaunch Team 03 for non-blocked architecture prep, especially CF-W1-L3-DQ-01 decision packet / policy contract prep.
-5. Relaunch Team 04 for CF-W1-MD-01 Market Data validation hardening QA plan.
-6. Keep Teams 05-09 on audit/refinement unless a matching item enters Ready with exact file reservations and no decision/shared/upstream blockers.
-7. Do not implement application code unless Ready criteria and standing delegation conditions are fully proven.
-8. Do not push.
+1. Verify the worktree is clean.
+2. Relaunch Team 02 for non-blocked requirement refinement.
+3. Relaunch Team 03 for non-blocked architecture prep, especially CF-W1-L3-DQ-01 decision packet / policy contract prep.
+4. Relaunch Team 04 for CF-W1-MD-01 Market Data validation hardening QA plan.
+5. Keep Teams 05-09 on audit/refinement unless a matching item enters Ready with exact file reservations and no decision/shared/upstream blockers.
+6. Do not implement application code unless Ready criteria and standing delegation conditions are fully proven.
+7. Do not push.
 
 Stop only for true consent blockers, unsafe git state, all work blocked, resource/runtime limit, or explicit Product Owner stop.
 ```
-
