@@ -33,6 +33,8 @@ Codex may act autonomously only when all conditions are true:
 15. Staged scope is exact.
 16. No stop condition is hit.
 
+These conditions apply to each persistent team independently. A blocked Team 6 item must not stop Team 1 audits, Team 2 requirement refinement, Team 3 architecture prep, Team 4 QA planning, or unrelated implementation teams.
+
 When all conditions pass, Codex may record:
 
 ```text
@@ -57,6 +59,10 @@ Codex must not ask the human Product Owner for these routine gates when the work
 - next contract prep
 - next QA plan prep
 - routine docs cleanup inside active execution folder
+- one or two revision cycles inside approved files
+- ready queue update
+- team inbox/outbox update
+- integration queue update
 
 ## Commit Authority
 
@@ -75,3 +81,6 @@ Push remains disabled unless explicitly approved.
 
 This policy does not authorize Codex to touch forbidden/high-risk files, use live providers, introduce paid/cloud risk, make new product policy, or continue through ambiguity that requires human Product Owner, Architect, or QA judgment.
 
+## Multi-Team Rule
+
+Routine gates are handled by the assigned team and Review / Release Factory. Team 0 should coordinate and integrate; it should not become a human-style approval router.

@@ -43,6 +43,14 @@
 | Premature source edit reconciliation risk | High | High | Orchestrator + Product Owner + Architect + QA | source/test files are dirty before readiness evidence, QA, review, signoff, and PO packet are complete | use Pre-Implementation Readiness Lock and reconciliation mode | split dirty DQ/SGE changes before any commit |
 | Over-escalation bottleneck risk | Medium | High | Orchestrator | routine QA/review/PO packet/commit asks for human mediation | use standing delegation policy | route only true consent blockers to `99-decision-inbox/` |
 | Under-escalation consent risk | High | Medium | Orchestrator | Prisma, route, shared, package, provider, UI, target semantics, or threshold ambiguity proceeds without decision | enforce escalation rules | create Decision Packet before work continues |
+| False parallelism risk | High | Medium | Orchestrator | one Orchestrator prompt claims parallelism but all teams wait on one thread | use persistent team charters, automations, inboxes, outboxes, and worktrees | launch separate team automations |
+| Over-mediation risk | Medium | High | Orchestrator + Product Owner | human PO is asked for QA/review/signoff/commit routine gates | standing delegation and Decision Inbox only | route routine gates to Codex teams |
+| Stale ready queue risk | High | Medium | Requirement Factory + Orchestrator | ready items lack current source/test evidence or decisions | refresh queue from audits and current git state | remove stale items from Ready |
+| Worktree conflict risk | High | Medium | Orchestrator | two teams reserve same file/module | worktree/branch policy and one-writer rule | sequence or block one item |
+| No implementation item selected risk | Medium | Medium | Requirement + Architecture + QA Factories | implementation teams idle because prep is incomplete | continuous requirements/contracts/QA prep | keep next top candidates moving |
+| Single-thread context rot risk | Medium | High | Orchestrator | long prompt loses current state or merges unrelated work | split teams into dedicated threads/worktrees | use team heartbeat protocol |
+| Decision inbox ignored risk | High | Medium | Orchestrator + Product Owner | open decisions do not get reviewed and queues drift | make Decision Inbox only human-review surface | review `open-decisions.md` regularly |
+| Team automation drift risk | High | Medium | Orchestrator | team automation modifies wrong files or stale docs | team prompts and charters define allowed/forbidden scope | stop affected workstream and reconcile |
 
 ## Current Blockers
 

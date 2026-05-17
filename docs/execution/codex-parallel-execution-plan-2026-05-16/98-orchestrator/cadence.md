@@ -19,6 +19,21 @@ Expected activities:
 - exact scoped local commit,
 - next-ready queue refresh.
 
+This is not a single sequential thread. A continuous wave can include several team automations running at the same time and reporting through inboxes, outboxes, and the integration queue.
+
+## Recommended Team Cadences
+
+These are recommended patterns, not mandatory wall-clock schedules:
+
+- Team 0 Orchestrator / Integration: frequent heartbeat; monitor outboxes, integration queue, ready queue, and decision inbox.
+- Team 1 Audit Factory: recurring read-only audits by module lane.
+- Team 2 Requirement Factory: recurring backlog refinement and next-top-10 refresh.
+- Team 3 Architecture Factory: contract and file-reservation prep for near-ready items.
+- Team 4 QA Factory: QA-plan and validation-command prep for near-ready items.
+- Teams 5-9 Implementation: continuous pull when the ready queue has matching safe work.
+- Team 10 Review / Release: continuous review of team outboxes and integration queue.
+- Human Product Owner: review only `99-decision-inbox/` unless explicitly requesting another review surface.
+
 ## Daily Or Recurring Automation
 
 Refresh:
@@ -69,7 +84,9 @@ Future Codex app automations should use:
 - this active execution folder,
 - the standing delegation policy,
 - the escalation rules,
+- the multi-team topology,
+- team charters,
+- team automation prompts,
 - worktrees when parallel implementation is likely.
 
 Parallel implementation should prefer separate worktrees or clearly reserved disjoint file sets.
-

@@ -40,6 +40,25 @@ Codex must stop only the affected workstream and create a Decision Packet when a
 - two workstreams need the same file
 - memory/resource gate blocks process-heavy work
 
+## Not Consent Blockers
+
+Codex must not stop for these routine gates when work stays inside approved boundaries:
+
+- QA evidence needed
+- code review needed
+- Architect signoff needed
+- Product Owner packet needed
+- local commit needed
+- requirement reframing
+- split into smaller bounded slice
+- active board update
+- risk register update
+- ready queue update
+- routine active execution docs
+- one or two revision cycles inside approved files
+
+These are handled by the appropriate Codex team under standing delegation.
+
 ## Decision Packet Location
 
 Create Decision Packets under:
@@ -127,4 +146,3 @@ Required columns:
 - created date
 - blocks which work
 - parallel work still available
-

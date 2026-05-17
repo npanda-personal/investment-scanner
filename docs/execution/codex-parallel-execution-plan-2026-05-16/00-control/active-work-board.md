@@ -34,6 +34,40 @@ No historical active work items have been migrated as active.
 - Rejected / Rework
 - Deferred
 
+## Current Operating Model: Multi-Team Parallel Execution
+
+The active execution plan now uses persistent Codex teams, not a single sequential Orchestrator wave.
+
+| Team | Name | Active Surface | Default Role |
+| --- | --- | --- | --- |
+| Team 0 | Orchestrator / Integration | `00-control/`, `16-team-inboxes/`, `17-team-outboxes/`, `18-integration-queue/` | Coordinates and integrates; does not implement by default. |
+| Team 1 | Audit Factory | `11-module-audits/` | Runs read-only audits continuously. |
+| Team 2 | Requirement Factory | `10-requirements/` | Refines backlog and next-ready candidates continuously. |
+| Team 3 | Architecture Factory | `03-architecture/`, `06-contracts/`, `08-work-packets/` | Prepares contracts and file reservations. |
+| Team 4 | QA Factory | `04-qa/` | Prepares validation plans and evidence criteria. |
+| Team 5 | Market Data / Data Quality | Team 5 branch/worktree | Pulls ready Market Data/DQ implementation. |
+| Team 6 | Strategy / Signal / Risk | Team 6 branch/worktree | Pulls ready strategy/signal/risk implementation. |
+| Team 7 | Portfolio / Watchlists / Alerts | Team 7 branch/worktree | Pulls ready portfolio/watchlist/alerts implementation. |
+| Team 8 | UX / Research / Copilot | Team 8 branch/worktree | Pulls ready UX/research/copilot implementation. |
+| Team 9 | Platform / Auth / Subscription / Notifications | Team 9 branch/worktree | Pulls ready platform implementation. |
+| Team 10 | Review / Release Factory | `17-team-outboxes/`, `18-integration-queue/` | Reviews, signs off, and prepares integration. |
+
+Active queues:
+
+- Requirements: `10-requirements/`
+- Ready queue: `12-ready-queue/`
+- Team inboxes: `16-team-inboxes/`
+- Team outboxes: `17-team-outboxes/`
+- Integration queue: `18-integration-queue/`
+- Decision inbox: `99-decision-inbox/`
+
+Operating rules:
+
+- No open decisions means teams continue.
+- Active implementation teams should not wait for Orchestrator if the ready queue has safe matching work.
+- Team 0 integrates and resolves conflicts; it does not implement by default.
+- Human Product Owner reviews only true consent blockers in Decision Inbox.
+
 ## Sprint 0 Items
 
 | ID | Work Item | Owner | State | Scope | Notes |
