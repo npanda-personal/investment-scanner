@@ -73,23 +73,23 @@ Operating rules:
 | Field | Current Value |
 | --- | --- |
 | Current daemon cycle id | `DAEMON-20260517` |
-| Current rolling iteration count | 4 |
-| Active teams | Team 00 checkpointing after Team 02/03/04 completion |
-| Queued teams | Team 02 and Team 04 for next docs-only prep; Team 05-09 for audit/refinement if no ready implementation appears |
-| Idle teams | Team 01, Team 03, Team 05, Team 06, Team 07, Team 08, Team 09, Team 10 |
+| Current rolling iteration count | 5 |
+| Active teams | Team 00 checkpointing after decision resolution and bounded commits |
+| Queued teams | Team 02, Team 03, and Team 04 for next docs-only prep; Team 05-09 for audit/refinement if no ready implementation appears |
+| Idle teams | Team 01, Team 05, Team 08, Team 09, Team 10 |
 | Blocked teams | None fully blocked; implementation teams without ready work continue audit/refinement |
-| Teams relaunched this cycle | Team 02, Team 03, Team 04, Team 07, Team 10 |
+| Teams relaunched this cycle | Team 02, Team 03, Team 04, Team 06, Team 07, Team 10 |
 | Teams shut down due to no work | None permanently; Teams without ready implementation move to audit/refinement |
-| Teams re-added due to new work | Team 07 was re-added for `CF-W1-L3-AUTH-01` and completed the bounded slice |
-| Ready queue depth | 0 active application-code items after `CF-W1-L3-AUTH-01` commit |
+| Teams re-added due to new work | Team 07 completed `CF-W1-L3-AUTH-02`; Team 06 completed `CF-W1-SIG-TRIGGER-01` |
+| Ready queue depth | 0 active application-code items after `CF-W1-L3-AUTH-02` and `CF-W1-SIG-TRIGGER-01` commits |
 | Refinement queue depth | High; see `10-requirements/next-top-10-candidates.md` |
-| Integration queue depth | 0 active application-code items after `CF-W1-L3-AUTH-01` commit |
-| Decision inbox count | 2 open decisions |
+| Integration queue depth | 0 active application-code items after bounded commits |
+| Decision inbox count | 0 open decisions |
 | Ready-work pressure | low |
-| Blocked-work pressure | high |
-| Next team to launch | Team 02 Requirement Factory and Team 04 QA Factory |
-| Next item to assign | `CF-W1-MD-01` QA plan / validation policy prep and `CF-W1-L3-DQ-01` decision packet prep |
-| Last commit | Verify with `git log --oneline -5`; the latest checkpoint commit should be the top entry |
+| Blocked-work pressure | medium-high |
+| Next team to launch | Team 02 Requirement Factory, Team 03 Architecture Factory, and Team 04 QA Factory |
+| Next item to assign | `CF-W1-MD-01` QA plan / validation policy prep, `CF-W1-L3-DQ-01` policy prep, and Trade Plan target-migration follow-up prep |
+| Last commit | `6ab3999 feat: add signal trigger contract projection` |
 | Daemon should continue | Yes, after runtime checkpoint resume |
 
 ## Sprint 0 Items
@@ -196,6 +196,9 @@ Old work items in `docs/codex-agent-team-plan/` may be used only as evidence or 
 | DAEMON-20260517-01 | Daemon scheduler setup | Team 00 | Committed | `98-orchestrator/`, queue docs | Commit `4fee810`; daemon loop continues. |
 | DAEMON-20260517-02 | Requirements/contracts/QA prep | Teams 01-07, 10 | Audit Complete | Active execution docs | Prep docs created for Lane 3 auth, Lane 3 DQ, MD durable evidence, Trade Plan, UX, and trigger contract. |
 | DAEMON-20260517-03 | `CF-W1-L3-AUTH-01` readiness promotion | Team 00 | Ready for Implementation | `13-implementation-evidence/`, `16-team-inboxes/`, ready queue | Team 07 assigned bounded module-local implementation. |
-| DAEMON-20260517-04 | `CF-W1-L3-AUTH-01` implementation and gates | Teams 07, 04, 10, 03, 00 | PO Acceptance Packet | Portfolio/watchlist source/tests and active evidence docs | Focused tests pass. QA, code review, Architect, and delegated PO acceptance are recorded. Scoped local commit is pending staged-scope verification. |
+| DAEMON-20260517-04 | `CF-W1-L3-AUTH-01` implementation and gates | Teams 07, 04, 10, 03, 00 | Committed | Portfolio/watchlist source/tests and active evidence docs | Focused tests passed. QA, code review, Architect, delegated PO acceptance, and scoped local commit `74ba6dd` completed. |
 | DAEMON-20260517-05 | Next-candidate decision routing | Team 00 + Teams 03/04 | Decision Inbox Updated | `99-decision-inbox/`, active docs | Alert ownership and trigger-contract path decisions opened. Only affected workstreams are blocked; other factories continue. |
 | DAEMON-20260517-06 | Iteration 4 requirement/architecture/QA refresh | Teams 02, 03, 04 | Checkpointing | Active execution docs only | No app-code item is ready. Next non-blocked prep targets: `CF-W1-TP-01A`, `CF-W1-MD-02`, `CF-W1-MD-01`, `CF-W1-UX-05`, and `CF-W1-L3-DQ-01` decision prep. |
+| DAEMON-20260517-07 | Decision inbox resolution | Team 00 | Committed | `07-decisions/`, `99-decision-inbox/`, ready/blocked queues | Product Owner resolved alert ownership Option B and trigger projection Option A. Local docs commit `8e38c2b` completed. |
+| DAEMON-20260517-08 | `CF-W1-L3-AUTH-02` implementation and gates | Teams 07, 04, 10, 03, 00 | Committed | Alerts Monitoring source/tests and active evidence docs | Parent-rule alert event ownership implemented, validated, reviewed, signed off, accepted, and committed as `503bcd9`. |
+| DAEMON-20260517-09 | `CF-W1-SIG-TRIGGER-01` implementation and gates | Teams 06, 04, 10, 03, 00 | Committed | Signal Generation source/tests and active evidence docs | Optional trigger contract DTO projection implemented, validated, reviewed, signed off, accepted, and committed as `6ab3999`. |

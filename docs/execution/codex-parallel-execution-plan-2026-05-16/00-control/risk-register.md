@@ -36,7 +36,7 @@
 | Signal-generation strict-filter overclaim risk | Medium | Low | Signal Generation + Architect + QA | Wave 3 strict-filter tests or CF-W2-SIG-01A are treated as full read-path enforcement | preserve limitation that run path and trusted list read paths are separate | prepare latest-instrument gate requirement |
 | Signal latest auto-generation trust gap | Medium | Low | Signal Generation + Architect + QA | future edits bypass `run()` or trusted read predicate | preserve `CF-W1-SIG-LATEST-01` tests | keep latest-path tests in focused suites |
 | Strategy Decision target-price violation | High | High | Strategy Decision + Product Owner + Architect | `targetPrice` or target-price wording appears in trusted outputs | replace with rule-based exit/invalidation semantics after PO decision | refine CF-W1-STRAT-01 |
-| Alert ownership leakage risk | High | High | Alerts + Auth + Architect | alert events/list/read/dismiss are global or rule owner is not preserved | define ownership contract before alert implementation | refine CF-W1-L3-AUTH-02 |
+| Alert ownership leakage risk | High | Medium | Alerts + Auth + Architect | alert digest or future consumer bypasses parent rule owner | bounded event inbox/read/dismiss slice committed; keep future consumers contract-first | prepare notification/copilot alert consumer follow-up |
 | Copilot trust overclaim risk | High | Medium | UX + Copilot + QA | summaries show complete/reliable without DQ readiness evidence | add trust UX contract and blocked states | refine CF-W1-UX-02 |
 | Subscription self-plan risk | Medium | Medium | Subscription Billing + Product Owner | ordinary user can self-select higher/admin plan in local mode | clarify local/manual billing policy | refine CF-W1-SUB-01 |
 | Implementation factory false-ready risk | High | Medium | Orchestrator | item enters Ready without PO/Architect/QA gates | enforce ready queue criteria and no-pull evidence | keep ready queue strict |
@@ -67,12 +67,13 @@
 - Startup scheduler/backfill behavior requires Architect approval before it can be changed or accepted as Sprint 1B scope.
 - Downstream modules remain blocked from treating Market Data / DQ as trusted input.
 - Strategy Decision target-price semantics are resolved for the bounded Option B-Strict compatibility slice; Trade Plan target geometry remains a separate blocked migration.
-- Alert ownership and Lane 3 readiness consumer contracts remain unresolved.
+- Alert event ownership first backend slice is resolved and committed as `CF-W1-L3-AUTH-02`; notification/copilot digest consumers and Lane 3 readiness consumer policy remain separate.
 - Copilot/research trust UX remains unresolved.
 - Continuous Factory Wave 2 dirty DQ changes were accepted and committed as `CF-W2-DQ-01`.
 - Continuous Factory Wave 2 Signal Generation changes were reframed as bounded `CF-W2-SIG-01A`; `CF-W1-SIG-01B` adds trusted list read-path filtering.
 - No downstream Trade Plan, alert, portfolio, watchlist readiness, or copilot implementation is allowed until module-specific consumer gates and Trade Plan target migration are resolved.
-- Portfolio/watchlist child-resource ownership hardening is accepted as `CF-W1-L3-AUTH-01`, but this does not unblock alert ownership, copilot trust UX, Data Quality readiness consumer policy, or platform nullable-owner migration.
+- Portfolio/watchlist child-resource ownership hardening is accepted as `CF-W1-L3-AUTH-01`, and alert event ownership is accepted as `CF-W1-L3-AUTH-02`; copilot trust UX, Data Quality readiness consumer policy, notification/copilot alert consumers, and platform nullable-owner migration remain separate.
+- Signal trigger DTO projection is accepted and committed as `CF-W1-SIG-TRIGGER-01`; persisted trigger snapshots, normalized trigger tables, and downstream trigger consumer adoption remain separate.
 
 ## Sprint 1B Preparation Risk Decisions
 
@@ -124,4 +125,4 @@
 - Completed teams become reusable runtime slots.
 - If no implementation item is ready, Team 02, Team 03, and Team 04 continue requirements, contracts, and QA prep.
 - Human Product Owner review is not required while `open-decisions.md` has no open decision and standing delegation conditions are met.
-- As of daemon iteration 3, two workstreams have true consent blockers in `99-decision-inbox/`: alert event ownership model and signal trigger object contract path. Only those affected workstreams are blocked; other independent prep continues.
+- As of daemon iteration 5, the two prior decision blockers are resolved and committed. `99-decision-inbox/open-decisions.md` has no open decisions; other independent prep continues.

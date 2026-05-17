@@ -8,6 +8,10 @@ No active application-code item is currently Ready for Implementation.
 
 `CF-W1-L3-AUTH-01` was pulled by Team 07, implemented, validated, reviewed, accepted under standing delegation, committed locally as `74ba6dd`, and moved out of the live ready queue.
 
+`CF-W1-L3-AUTH-02` was unblocked by Product Owner Option B, implemented, validated, reviewed, accepted under standing delegation, committed locally as `503bcd9`, and moved out of the live ready queue.
+
+`CF-W1-SIG-TRIGGER-01` was unblocked by Product Owner Option A, implemented as an additive DTO projection, validated, reviewed, accepted under standing delegation, committed locally as `6ab3999`, and moved out of the live ready queue.
+
 Team 02 refined the next requirement records for:
 
 - `CF-W1-TP-01A`
@@ -27,6 +31,8 @@ The following are completed, superseded, or split and must not be treated as act
 - `CF-W1-STRAT-01`
 - `CF-W1-QA-01`
 - `CF-W1-L3-AUTH-01`
+- `CF-W1-L3-AUTH-02`
+- `CF-W1-SIG-TRIGGER-01`
 - legacy parent `CF-W1-SIG-01`
 - legacy parent/superseded `CF-W1-DQ-01`
 - legacy parent `CF-W1-TP-01`
@@ -53,12 +59,10 @@ Docs-only contract and QA preparation:
 
 - `CF-W1-TP-01A`
 - `CF-W1-L3-DQ-01`
-- `CF-W1-L3-AUTH-02`
 - `CF-W1-L3-ALERT-01`
 - `CF-W1-UX-02`
 - `CF-W1-MD-02`
 - `CF-W1-MD-01`
-- `CF-W1-SIG-TRIGGER-01`
 
 ## Ready Criteria Reminder
 

@@ -14,7 +14,7 @@ docs/codex-agent-team-plan/** is historical evidence only.
 Use the active execution folder:
 docs/execution/codex-parallel-execution-plan-2026-05-16/
 
-Resume Continuous Daemon Scheduler Mode from cycle DAEMON-20260517, rolling iteration 4.
+Resume Continuous Daemon Scheduler Mode from cycle DAEMON-20260517, rolling iteration 5.
 
 Start with evidence sync:
 - git status --short
@@ -38,13 +38,16 @@ Current committed daemon outputs:
 - 74ba6dd fix: enforce portfolio watchlist child ownership
 - 7b6d25e docs: prepare daemon decision packets
 - 004d918 docs: checkpoint daemon iteration four
+- 8e38c2b docs: resolve daemon decision inbox items
+- 503bcd9 fix: scope alert events by rule owner
+- 6ab3999 feat: add signal trigger contract projection
 - Verify the latest checkpoint-state commit with `git log --oneline -5`; the top entry may record this resume prompt and board checkpoint.
 
 Current open decisions:
-- DECISION-20260517-alert-event-ownership-model blocks only CF-W1-L3-AUTH-02 implementation and alert event inbox/digest ownership work.
-- DECISION-20260517-trigger-object-contract-path blocks only CF-W1-SIG-TRIGGER-01 implementation and downstream trigger-contract adoption.
+- None. `DECISION-20260517-alert-event-ownership-model` resolved as Option B and bounded `CF-W1-L3-AUTH-02` is committed.
+- None. `DECISION-20260517-trigger-object-contract-path` resolved as Option A and bounded `CF-W1-SIG-TRIGGER-01` is committed.
 
-Do not block unrelated work because these decisions are open.
+No human Product Owner review is required unless a new true consent blocker appears.
 
 Current ready queue:
 - no active application-code item is Ready for Implementation.
@@ -52,8 +55,8 @@ Current ready queue:
 Next autonomous work:
 1. Verify the worktree is clean.
 2. Relaunch Team 02 for non-blocked requirement refinement.
-3. Relaunch Team 03 for non-blocked architecture prep, especially CF-W1-L3-DQ-01 decision packet / policy contract prep.
-4. Relaunch Team 04 for CF-W1-MD-01 Market Data validation hardening QA plan.
+3. Relaunch Team 03 for non-blocked architecture prep, especially CF-W1-L3-DQ-01 policy contract prep, CF-W1-MD-02 durable evidence prep, and Trade Plan follow-up migration contracts.
+4. Relaunch Team 04 for CF-W1-MD-01 Market Data validation hardening QA plan and Lane 3 readiness validation planning.
 5. Keep Teams 05-09 on audit/refinement unless a matching item enters Ready with exact file reservations and no decision/shared/upstream blockers.
 6. Do not implement application code unless Ready criteria and standing delegation conditions are fully proven.
 7. Do not push.
