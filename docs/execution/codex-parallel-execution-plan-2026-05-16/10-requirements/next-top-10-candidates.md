@@ -4,9 +4,9 @@ Date: 2026-05-17
 
 Prepared by Continuous Product Agent while audit/refinement continued.
 
-1. `CF-W1-SIG-01` - Signal Generation DQ fail-closed trusted runs.
+1. `CF-W1-SIG-01B` - Signal Generation read-path DQ trust filtering and persisted trust classification.
 2. `CF-W1-STRAT-01` - Remove arbitrary target-price semantics.
-3. `CF-W1-DQ-01` - Data Quality fail-closed defaults.
+3. `CF-W1-SIG-LATEST-01` - Gate `latestForInstrument()` auto-generation through DQ readiness.
 4. `CF-W1-MD-02` - Durable Market Data readiness evidence ADR.
 5. `CF-W1-L3-AUTH-01` - Portfolio/watchlist child ownership tests and fix.
 6. `CF-W1-L3-ALERT-01` - Alert readiness consumer tests.
@@ -17,5 +17,4 @@ Prepared by Continuous Product Agent while audit/refinement continued.
 
 ## Product Agent Recommendation
 
-Do not move to alerts, portfolio, copilot, trade plans, strategy decisions, or backtesting implementation until `CF-W1-SIG-01` and `CF-W1-STRAT-01` decisions are handled.
-
+Do not move to alerts, portfolio, copilot, trade plans, strategy decisions, or backtesting implementation until Signal Generation read-path trust filtering and `CF-W1-STRAT-01` target-semantics decisions are handled.
