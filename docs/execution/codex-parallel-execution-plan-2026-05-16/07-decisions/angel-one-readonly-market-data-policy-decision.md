@@ -2,7 +2,7 @@
 
 Date: 2026-05-17
 
-Status: Decision proposal only. Angel One is not approved for Sprint 1 implementation by this document.
+Status: Sprint 1B preparation decision. Angel One is preserved but excluded from Sprint 1B implementation.
 
 ## 1. Decision Context
 
@@ -137,3 +137,30 @@ Product Owner must choose one:
 
 Until the decision is recorded in the active execution folder, Angel One remains excluded from implementation.
 
+## 11. Sprint 1B Recorded Decision
+
+Selected Sprint 1B status:
+
+```text
+preserved but excluded from Sprint 1B implementation
+```
+
+This status was selected because the Product Owner approved Sprint 1B preparation only and did not explicitly approve mocked-only validation or a read-only market-data exception.
+
+Sprint 1B rules:
+- Do not implement Angel One changes.
+- Do not run Angel One live provider calls.
+- Do not run provider-heavy tests.
+- Do not require Angel One credentials.
+- Do not enable Angel One startup behavior.
+- Do not treat historical old-plan Angel One approvals as active approval.
+
+Allowed in Sprint 1B preparation:
+- Cite current source inspection as risk evidence.
+- Keep `market-data-foundation.angel-one-provider.ts` as read-only unless a later implementation packet explicitly reserves it.
+- Recommend mocked-only validation as a future option, but do not run it.
+
+Decision still missing:
+- Whether Product Owner wants to approve mocked-only Angel One validation in a later step.
+- Whether Product Owner wants to approve a read-only live Angel One market-data exception in a later step.
+- Whether Architect accepts the no-orders/no-trading adapter boundary if either future option is approved.

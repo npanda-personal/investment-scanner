@@ -2,7 +2,7 @@
 
 Date: 2026-05-17
 
-Status: QA plan proposal. Tests were not run during Sprint 1A.
+Status: Sprint 1B preparation QA scope. Tests were not run during Sprint 1B preparation.
 
 ## 1. QA Position
 
@@ -183,3 +183,58 @@ QA must decide:
 - Whether any live provider validation is explicitly excluded or approved later.
 - Evidence format for Product Owner acceptance.
 
+## 17. Sprint 1B QA Scope Decision
+
+Recorded Sprint 1B preparation defaults:
+- Backend tests are required before Product Owner acceptance, but are not approved to run during preparation.
+- Angel One tests, if run later, must use mocked fetch only unless Product Owner explicitly approves live provider validation.
+- No live provider calls are allowed by default.
+- No provider-heavy tests are allowed by default.
+- No paid provider, cloud, broker execution, or secret exposure is allowed.
+- Frontend build/typecheck and Playwright smoke are required only if UI files are in the approved implementation scope.
+
+## 18. Required Validation Evidence For Future Sprint 1B
+
+Backend test subset, subject to approval:
+- `backend/tests/modules/market-data-foundation/market-data.provider.test.ts`
+- `backend/tests/modules/market-data-foundation/market-data.service.test.ts`
+- `backend/tests/modules/market-data-foundation/market-data.repository.test.ts`
+- `backend/tests/modules/market-data-foundation/market-data.routes.test.ts`
+- `backend/tests/modules/market-data-foundation/market-data.scheduler.test.ts`
+- `backend/tests/modules/market-data-foundation/market-data.validation.test.ts`
+- Data Quality Engine tests if Data Quality source changes are approved or added.
+
+Validation checks:
+- Mocked provider validation only.
+- No-live-provider validation.
+- No-paid-provider validation.
+- No-broker-execution validation.
+- No-secret validation.
+- Data Quality invariant checks.
+- Memory/resource gate before any build, test, server, browser, or provider validation.
+- Frontend build/typecheck only if UI scope is approved.
+- Playwright smoke only if UI scope is approved.
+- Live local provider validation only after explicit later approval.
+
+## 19. Data Quality Invariants For Acceptance
+
+QA must reject Sprint 1B if:
+- `NOT_TRUSTWORTHY` universe allows downstream automated use.
+- Instrument-level `NOT_READY` allows signal or strategy decisions.
+- `LIMITED` becomes action-ready.
+- Missing DQ evaluation is treated as passing.
+- Retry-cooldown state is hidden from readiness evidence.
+- Manual-required rows feed automated downstream use.
+- Unsupported instruments are counted as trusted.
+- Copilot or UI language implies financial advice or reliability without DQ evidence.
+
+## 20. QA Stop Conditions
+
+Stop validation if:
+- Test setup requires live Angel One credentials.
+- A test performs live provider calls without explicit approval.
+- A paid/cloud/broker dependency is needed.
+- Secrets appear in logs, fixtures, or output.
+- A broker order route or method is discovered.
+- Test runtime or memory exceeds the approved resource gate.
+- The approved file reservation is exceeded.

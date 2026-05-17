@@ -2,7 +2,7 @@
 
 Date: 2026-05-17
 
-Status: Sprint 1A read-only contract audit output. Not an implementation approval.
+Status: Sprint 1B preparation threshold policy. Not an implementation approval.
 
 Authoritative inputs:
 - Root `AGENTS.md`
@@ -388,10 +388,64 @@ Implementation or downstream use must stop if any of these occur:
 
 ## 23. Approval State
 
-This contract is not yet approved for implementation.
+This contract records the default threshold policy for the first Sprint 1B Market Data / Data Quality implementation candidate.
+
+It is not approval to implement.
 
 Required before Sprint 1B implementation:
 - Product Owner approves readiness thresholds and Angel One policy.
 - Solution Architect approves adapter boundaries, startup behavior, route/schema impact, storage behavior, and shared-file reservations.
 - QA approves validation plan and later executes approved tests.
 
+## 24. Sprint 1B Threshold Policy
+
+The first Sprint 1B implementation candidate must use this threshold policy unless the Product Owner changes it before implementation approval.
+
+| Area | Sprint 1B policy |
+| --- | --- |
+| Supported scope | `IN` only |
+| Supported asset class | `STOCK` only |
+| Data cadence | Daily EOD OHLCV only |
+| Instrument identity completeness | Internal id, display symbol, provider/source symbol when provider-backed, exchange, region/country, asset type, currency, active/listing status or conservative fallback, provider support status, and provenance must be present or explicitly classified as manual-required/unsupported |
+| Minimum OHLC history | Listing-date-to-latest-completed-session when listing date is available; otherwise 15-year target or full available provider history with `FALLBACK_REQUIRED` evidence; strategy/backtest/calibration consumers must additionally satisfy their own lookback windows |
+| Minimum price coverage | Universe-level full review target is at least `95%` price-ready among provider-supported active `IN/STOCK` instruments; instrument-level downstream use requires the individual instrument to be `READY` even if universe coverage passes |
+| Minimum metadata coverage | Universe-level target is at least `90%` required business metadata coverage among provider-supported active `IN/STOCK` instruments; instrument-level missing required business metadata blocks portfolio/context/copilot claims and any strategy that depends on the missing metadata |
+| Stale data rule | Missing latest completed EOD candle or unknown market calendar currentness blocks signals, strategy decisions, backtests requiring the date, action-like alerts, and copilot reliability claims |
+| Missing candle rule | Missing candles inside the relevant lookback/backtest/calibration window block the affected downstream use unless explained by market calendar, listing date, or approved provider limitation |
+| Duplicate candle rule | Duplicate instrument/date/source ambiguity blocks downstream use unless deterministic repository resolution is proven by QA |
+| Invalid OHLC rule | Any non-finite, non-positive, future-dated, or internally inconsistent OHLC row blocks the affected instrument and must be captured as evidence |
+| Zero/suspicious volume rule | Blocks volume-dependent strategies, liquidity gates, alerts, and reliability summaries; may display as limited review only with visible warning |
+| Retry-cooldown rule | Retry-cooldown or retryable provider validation states are not ready; they stay in repair/readiness evidence and block downstream reliability use |
+| Manual-required row rule | Manual-required identity, provider-symbol, or metadata rows are blocked from automated downstream use until repaired and revalidated |
+| Unsupported instrument rule | Unsupported, inactive, delisted, or unsupported-asset instruments are excluded from trusted universe counts and downstream automated use |
+| Data quality status values | `READY` is the only action-ready state; `LIMITED` is display/research-only with warnings; `BLOCKED`, `NOT_READY`, `NOT_TRUSTWORTHY`, `UNUSABLE`, `MISSING`, and `ERROR` block downstream automated use |
+| Downstream blocking | Signal generation, signal quality, calibration, strategy decisions, backtesting, trade-plan/risk, portfolio intelligence, watchlist action triggers, alerts, and copilot reliability summaries remain blocked unless the instrument and use-case tier pass |
+
+## 25. Sprint 1B Default Exclusions
+
+Excluded unless separately approved:
+- Angel One implementation, mocked validation, or live validation.
+- Read-only market-data broker exception.
+- Startup scheduler behavior changes.
+- Automatic startup backfill.
+- Provider-heavy startup workflows.
+- Broad UI workflow changes.
+- Prisma schema or migration changes.
+- Backend or frontend route registry changes.
+- Shared utilities or shared UI component changes.
+- Package manifest changes.
+
+## 26. Downstream Modules Blocked Until Acceptance
+
+The following modules remain blocked from consuming Market Data / DQ as trusted input until Sprint 1B or a later accepted requirement proves readiness:
+
+- `signal-generation-engine`
+- `signal-quality-lab`
+- `signal-calibration-engine`
+- `strategy-decision-engine`
+- `backtesting-strategy-lab`
+- `trade-plan-risk-engine`
+- `portfolio-intelligence`
+- `watchlist-management`
+- `alerts-monitoring`
+- `ai-investment-copilot`
