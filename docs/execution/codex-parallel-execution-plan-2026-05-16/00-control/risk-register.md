@@ -158,3 +158,11 @@
 - Ready queue remains zero for application code. Prepared child packets for `CF-W1-L3-PORT-01`, `CF-W1-L3-ALERT-01`, `CF-W1-TP-01B`, and `CF-W1-NOTIF-02` require Team 00 Ready promotion before source/test edits.
 - Implementation teams should use dedicated worktrees only after Ready promotion with exact file reservations. Current Team 01-10 assignments are docs-only or review-only and can use the shared `dev` worktree.
 - Push is not attempted while the workspace has uncommitted active-doc outputs and open decisions; local docs commit is allowed only after exact staged-scope verification.
+
+## Team 01 Audit Consumption Risk Decisions
+
+- As of 2026-05-18, Team 00 reconciled Team 01's readiness drift audit and confirmed the five Decision Inbox items are still open, not resolved, not stale, and not duplicated.
+- The five open decisions block only `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, and `CF-W1-MD-01`.
+- `CF-W1-L3-PORT-01A`, `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01` are not decision-blocked, but remain out of Ready until Team 02/03/04 and lane-team readiness inspections confirm exact implementation boundaries.
+- `CF-W1-L3-INTEL-01` must remain upstream-blocked until `CF-W1-L3-PORT-01A` is implemented, accepted, and committed.
+- The stale completed-work inbox `16-team-inboxes/TEAM-07-CF-W1-L3-AUTH-01.md` must not be used as a current Ready signal; Team 07 current routing is `16-team-inboxes/TEAM-07-current-assignment.md`.

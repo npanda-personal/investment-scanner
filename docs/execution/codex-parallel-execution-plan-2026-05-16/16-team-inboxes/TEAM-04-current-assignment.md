@@ -1,6 +1,6 @@
 # TEAM-04 Current Assignment
 
-Date: 2026-05-17
+Date: 2026-05-18
 
 Team: TEAM-04 - QA Factory
 
@@ -10,11 +10,16 @@ Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automat
 
 Prepare QA plans, focused command guidance, and validation evidence requirements. No executable QA is authorized until Team 00 promotes a bounded implementation handoff.
 
-Current priority:
+Current priority after Team 01 audit consumption:
 
-1. Accept or revise child QA readiness for `CF-W1-L3-PORT-01`, `CF-W1-L3-ALERT-01`, `CF-W1-TP-01B`, and `CF-W1-NOTIF-02`.
-2. Keep `CF-W1-MD-02` validation as ADR QA only.
-3. Keep `CF-W1-MD-01`, `CF-W1-UX-02`, `CF-W1-AUTH-01`, and `CF-W1-SUB-01` executable QA blocked until their decisions resolve.
+1. Prepare or revise QA plans and focused test commands for `CF-W1-L3-PORT-01A`.
+2. Prepare or revise QA plans and focused test commands for `CF-W1-TP-01B`.
+3. Prepare or revise QA plans and focused test commands for `CF-W1-NOTIF-02`.
+4. Prepare or revise QA plans and focused test commands for `CF-W1-L3-ALERT-01`.
+5. Keep `CF-W1-L3-INTEL-01` QA blocked behind accepted `CF-W1-L3-PORT-01A`.
+6. Keep `CF-W1-MD-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-AUTH-01`, and `CF-W1-SUB-01` executable QA blocked until their decisions resolve.
+
+No executable QA is authorized. Commands are guidance only until Team 00 promotes a bounded implementation handoff.
 
 ## Scope
 
@@ -40,6 +45,11 @@ Use shared `dev` for docs-only QA planning. For future executable QA tied to an 
 ## Blockers
 
 Executable QA is blocked for all current candidates because no app-code item is Ready.
+
+Decision reconciliation:
+
+- Five decisions remain open and scoped.
+- They do not block QA plan preparation for `CF-W1-L3-PORT-01A`, `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, or `CF-W1-L3-ALERT-01`.
 
 ## Expected Outbox
 

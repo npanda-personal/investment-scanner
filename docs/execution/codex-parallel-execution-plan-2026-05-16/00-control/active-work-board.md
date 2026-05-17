@@ -73,12 +73,12 @@ Operating rules:
 | Field | Current Value |
 | --- | --- |
 | Current daemon cycle id | `DAEMON-20260517` |
-| Current rolling iteration count | 17 |
-| Active teams | Team 00 coordination cycle; Teams 01-10 assigned through current inbox files |
-| Queued teams | Team 01 audit refresh; Team 02 requirement/queue refresh; Team 03 architecture/ADR prep; Team 04 QA readiness refresh; Teams 05-09 docs-only lane prep; Team 10 review/release monitoring |
+| Current rolling iteration count | 18 |
+| Active teams | Team 00 consumed Team 01 audit; Teams 02/03/04/06/07/09 assigned next parallel readiness work |
+| Queued teams | Team 02 requirement refinement; Team 03 architecture/file-reservation readiness; Team 04 QA readiness; Team 06 `CF-W1-TP-01B` inspection; Team 07 `CF-W1-L3-PORT-01A` inspection; Team 09 `CF-W1-NOTIF-02` inspection |
 | Idle teams | None fully idle; implementation lanes stay docs-only until Ready queue promotion |
 | Blocked teams | No team fully blocked; affected workstreams blocked by five open Decision Inbox items and by missing Team 00 Ready promotion for near-ready children |
-| Teams relaunched this cycle | Teams 01-10 assignment inboxes written for current coordination cycle |
+| Teams relaunched this cycle | Team 01 audit consumed; Teams 02, 03, 04, 06, 07, and 09 reassigned through current inbox files |
 | Teams shut down due to no work | None permanently; Teams without ready implementation move to audit/refinement |
 | Teams re-added due to new work | Team 07 completed `CF-W1-L3-AUTH-02`; Team 06 completed `CF-W1-SIG-TRIGGER-01` |
 | Ready queue depth | 0 active application-code items |
@@ -87,8 +87,8 @@ Operating rules:
 | Decision inbox count | 5 open decisions |
 | Ready-work pressure | none |
 | Blocked-work pressure | high |
-| Next team to launch | Team 01 Audit Factory from `16-team-inboxes/TEAM-01-current-assignment.md`; all Teams 01-10 now have current inbox assignments |
-| Next item to assign | No application-code item is ready; next Team 00 action is Ready-promotion evaluation for one child slice after docs commit |
+| Next team to launch | Team 02, Team 03, Team 04, Team 07, Team 06, and Team 09 in parallel from current inbox assignments |
+| Next item to assign | No application-code item is ready; next Team 00 action after these checks is possible Ready promotion for one exact child |
 | Last commit at Team 00 resume start | `d2a6eae docs: resolve daemon decision inbox items` |
 | Daemon should continue | Yes; stop only affected decision-blocked workstreams |
 
@@ -210,3 +210,4 @@ Old work items in `docs/codex-agent-team-plan/` may be used only as evidence or 
 | DAEMON-20260517-15 | Dedicated Team 00 master orchestration intake | Team 00 | Checkpointing | Active execution docs only | Branch `dev`; initial worktree clean; ready queue depth 0; refinement queue depth 7; integration queue depth 0; open decisions 3; next launch Team 03 docs-only architecture decision prep. |
 | DAEMON-20260517-16 | Product Owner decision resolution routing | Team 00 | Checkpointing | Active execution docs only | Resolved the three open Decision Inbox items: Lane 3 Option B, Trade Plan Option B, and Market Data durable readiness storage Option B as ADR direction only. Open decisions now 0; no app-code item is Ready. |
 | DAEMON-20260517-17 | Team 00 master coordination assignments | Team 00 | Checkpointing | `16-team-inboxes/`, active control/queue docs | Evidence sync complete on `dev`; five open Decision Inbox items now block only affected workstreams; Teams 01-10 assigned through current inbox files; Ready queue remains 0 app-code items. |
+| DAEMON-20260518-18 | Consume Team 01 readiness drift audit | Team 00 | Checkpointing | `16-team-inboxes/`, ready/blocked queues, Decision Inbox, active control docs | Team 01 audit consumed. Five open decisions verified still open and scoped. No stale or duplicate decisions closed. Teams 02/03/04/06/07/09 assigned parallel readiness work for `PORT-01A`, `TP-01B`, `NOTIF-02`, and `L3-ALERT-01`; Ready queue remains 0 app-code items. |

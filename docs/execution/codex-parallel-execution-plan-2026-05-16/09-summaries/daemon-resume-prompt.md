@@ -1,6 +1,6 @@
 # Daemon Resume Prompt
 
-Date: 2026-05-17
+Date: 2026-05-18
 
 Path: `docs/execution/codex-parallel-execution-plan-2026-05-16/09-summaries/daemon-resume-prompt.md`
 
@@ -16,7 +16,7 @@ docs/codex-agent-team-plan/** is historical evidence only.
 Use the active execution folder:
 docs/execution/codex-parallel-execution-plan-2026-05-16/
 
-Resume Continuous Daemon Scheduler Mode from cycle DAEMON-20260517, rolling iteration 17.
+Resume Continuous Daemon Scheduler Mode from cycle DAEMON-20260517, rolling iteration 18.
 
 Team 00 is the master runtime orchestrator. The human Product Owner is not the mediator for routine gates.
 
@@ -66,7 +66,7 @@ Latest Team 00 intake:
 - Integration queue depth: 0 active application-code items
 - Open decisions: 5
 - Current Team 01-10 assignment paths: `16-team-inboxes/TEAM-01-current-assignment.md` through `16-team-inboxes/TEAM-10-current-assignment.md`
-- Next Team 00 action: evaluate one child slice for Ready promotion after docs commit, starting with `CF-W1-L3-PORT-01A`
+- Next Team 00 action: consume Teams 02/03/04/06/07/09 readiness reports, then evaluate one exact child for Ready promotion
 
 Latest decision resolution:
 - `DECISION-20260517-lane3-readiness-consumer-policy`: Option B approved.
@@ -80,6 +80,7 @@ Current planning queues:
 - Team 04 refreshed QA plans for `CF-W1-MD-01`, `CF-W1-L3-ALERT-01`, `CF-W1-UX-02`, and status for Team 03 items.
 - Team 00 resolved the three Decision Inbox items after Product Owner approval and set open decisions to zero.
 - Team 00 later coordinated Teams 01-10, wrote current inbox assignments, and recorded five new open Decision Inbox policy blockers.
+- Team 00 consumed Team 01's 2026-05-18 readiness drift audit and dispatched Teams 02/03/04/06/07/09 to inspect near-ready children in parallel.
 
 Current committed daemon outputs include:
 - 1e882cd docs: authorize continuous codex factory execution
@@ -97,7 +98,7 @@ Resume daemon operation:
 2. Run Teams 01-10 from their current inbox assignments under `16-team-inboxes/`.
 3. Block only the five affected decision workstreams.
 4. Continue audits, requirement refinement, architecture prep, QA planning, implementation only when Ready criteria pass, review, and release work.
-5. Keep `CF-W1-L3-PORT-01`, `CF-W1-L3-ALERT-01`, `CF-W1-TP-01B`, and `CF-W1-NOTIF-02` out of implementation until Team 00 selects a child, confirms exact reservations, and moves it to Ready.
+5. Keep `CF-W1-L3-PORT-01A`, `CF-W1-L3-ALERT-01`, `CF-W1-TP-01B`, and `CF-W1-NOTIF-02` out of implementation until Teams 02/03/04 and the owning lane team report readiness, Team 00 selects a child, confirms exact reservations, and moves it to Ready.
 6. Keep `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, and `CF-W1-MD-01` out of implementation until their Decision Inbox items are resolved.
 7. Use worktrees for Teams 05-09 only after matching ready implementation work exists.
 8. Update `99-decision-inbox/open-decisions.md` whenever a true consent blocker is created or resolved.

@@ -380,3 +380,74 @@ After this docs-only coordination commit, Team 00 should evaluate one child slic
 4. `CF-W1-L3-ALERT-01`
 
 Do not promote any item that lacks exact file reservations, accepted QA plan, implementation handoff, and no unresolved blocker.
+
+---
+
+# Team 01 Audit Consumption
+
+Date: 2026-05-18
+
+State: Team 01 audit consumed; next parallel readiness work dispatched
+
+## Input Consumed
+
+- `17-team-outboxes/TEAM-01-outbox.md`
+- `11-module-audits/current-assignment-readiness-drift-audit-2026-05-18.md`
+- `99-decision-inbox/open-decisions.md`
+- `07-decisions/`
+- `00-control/active-work-board.md`
+- `00-control/risk-register.md`
+- `10-requirements/`
+- `12-ready-queue/`
+- `16-team-inboxes/`
+- `17-team-outboxes/`
+- `18-integration-queue/`
+- `09-summaries/daemon-cycle-latest.md`
+- `09-summaries/daemon-resume-prompt.md`
+
+## Decision Reconciliation
+
+| Decision | Classification | Blocks |
+| --- | --- | --- |
+| `DECISION-20260517-platform-auth-default-user-fallback-policy` | Still open | `CF-W1-AUTH-01` only |
+| `DECISION-20260517-local-manual-subscription-plan-change-policy` | Still open | `CF-W1-SUB-01` only |
+| `DECISION-20260517-copilot-trust-ux-policy` | Still open | `CF-W1-UX-02`, `CF-W1-QA-UI-01` only |
+| `DECISION-20260517-ux-product-language-status-policy` | Still open | `CF-W1-UX-05` only |
+| `DECISION-20260517-market-data-validation-hardening-policy` | Still open | `CF-W1-MD-01` only |
+
+Already resolved decisions found under `07-decisions/` remain resolved and are not duplicated in the open-decision table.
+
+Stale decisions closed: none.
+
+Duplicated decisions found: none.
+
+## Assignments Updated
+
+- `16-team-inboxes/TEAM-02-current-assignment.md`
+- `16-team-inboxes/TEAM-03-current-assignment.md`
+- `16-team-inboxes/TEAM-04-current-assignment.md`
+- `16-team-inboxes/TEAM-06-current-assignment.md`
+- `16-team-inboxes/TEAM-07-current-assignment.md`
+- `16-team-inboxes/TEAM-09-current-assignment.md`
+
+Dispatch:
+
+- Team 02 refines `CF-W1-L3-PORT-01A`, `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01`; keeps `CF-W1-L3-INTEL-01` dependent on accepted `PORT-01A`.
+- Team 03 prepares architecture/file-reservation readiness for the same four near-ready candidates.
+- Team 04 prepares QA readiness and focused command guidance for the same four near-ready candidates.
+- Team 07 inspects whether `CF-W1-L3-PORT-01A` can become module-local Ready.
+- Team 06 inspects whether `CF-W1-TP-01B` can become module-local Ready.
+- Team 09 inspects whether `CF-W1-NOTIF-02` can become module-local Ready.
+
+## Queue Result
+
+- Ready queue depth: 0 active application-code items.
+- Integration queue depth: 0 active application-code items.
+- Open decisions: 5, scoped only to affected workstreams.
+- `CF-W1-L3-INTEL-01` remains upstream-blocked behind accepted `CF-W1-L3-PORT-01A`.
+
+## Validation
+
+No application code was modified.
+
+No builds, tests, UI checks, services, providers, Prisma commands, or pushes were run during this routing pass.

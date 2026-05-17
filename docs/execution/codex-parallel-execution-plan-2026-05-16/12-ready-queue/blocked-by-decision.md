@@ -1,6 +1,6 @@
 # Blocked By Decision
 
-Date: 2026-05-17
+Date: 2026-05-18
 
 ## Decision Inbox State
 
@@ -13,6 +13,8 @@ Five active implementation items are blocked by open Decision Inbox items.
 | CF-W1-UX-02 | `DECISION-20260517-copilot-trust-ux-policy` | Product Owner + UX + Architect | Do not edit Copilot UI/backend or Playwright trust states until naming, blocked-summary, trust-field, and scope policy is resolved. |
 | CF-W1-UX-05 | `DECISION-20260517-ux-product-language-status-policy` | Product Owner + UX + Architect | Do not edit Copilot/research/Market Data/shared status copy until first target surface and shared UI reservation are resolved. |
 | CF-W1-MD-01 | `DECISION-20260517-market-data-validation-hardening-policy` | Product Owner + Architect + QA | Do not edit Market Data validation source/tests until future-date, adjusted-close, suspicious-volume, and spike policy is resolved. |
+
+Team 00 reconciliation on 2026-05-18 found no stale or duplicate open decisions. All five decisions remain open and block only their scoped workstreams.
 
 The three current Decision Inbox items were resolved on 2026-05-17:
 
@@ -34,3 +36,12 @@ The three current Decision Inbox items were resolved on 2026-05-17:
 | CF-W1-TP-01A | Decision resolved; backend-only TP-01B child contract and QA plan are prepared, but Team 00 Ready promotion is still needed before source work. |
 | CF-W1-MD-02 | ADR direction resolved; source/schema/test work remains blocked by shared/high-risk file and separate implementation-slice gates. |
 | CF-W1-L3-ALERT-01 | No longer waiting on the parent policy decision; child alert-readiness contract and QA plan are prepared, but Team 00 Ready promotion is still needed before source work. |
+
+## Not Blocked By Current Decision Inbox
+
+These items are not blocked by the five current open decisions, but they remain out of Ready until Team 00 promotes exact implementation handoffs:
+
+- `CF-W1-L3-PORT-01A`
+- `CF-W1-TP-01B`
+- `CF-W1-NOTIF-02`
+- `CF-W1-L3-ALERT-01`

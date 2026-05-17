@@ -230,3 +230,47 @@ Potential future decision: whether DQ missing/error should map to `UNAVAILABLE` 
 1. Pull `CF-W1-TP-01B` when Team 00 promotes it to Ready with reservations.
 2. If no implementation is promoted, advance `CF-W1-BT-01A` as a characterization-only packet because it can document current backtesting DQ behavior without changing policy.
 3. Prepare `CF-W1-CAL-01A` next only after Product/Architect decide DQ missing/error severity for calibration.
+
+## 2026-05-18 Status Check
+
+State: Queued / Docs-only prep.
+
+Input source:
+
+- Product Owner check request.
+- `16-team-inboxes/TEAM-06-current-assignment.md`
+- `12-ready-queue/ready-for-implementation.md`
+- active work board and Decision Inbox.
+
+Branch/worktree at check start:
+
+- Branch: `dev`
+- Latest commit: `bb73b72 docs: coordinate team 00 factory assignments`
+- Worktree: clean before this heartbeat update
+
+Result:
+
+- No Team 06 app-code item is Ready for Implementation.
+- Team 06 inbox keeps `CF-W1-TP-01B` as the next Strategy / Risk implementation candidate, but forbids source/test edits until Team 00 promotes it.
+- Ready queue depth remains 0 active application-code items.
+- `CF-W1-TP-01B` still needs Team 00 Ready promotion and exact Trade Plan file reservations copied into a new Team 06 implementation inbox.
+
+Work pulled:
+
+- None.
+
+Implementation:
+
+- None.
+
+Tests run:
+
+- None. Reason: status check only; no Ready implementation item.
+
+Decisions opened:
+
+- None.
+
+Next recommended assignment:
+
+- Wait for Team 00 to promote `CF-W1-TP-01B`, or continue docs-only evidence refresh inside the current Team 06 inbox scope.

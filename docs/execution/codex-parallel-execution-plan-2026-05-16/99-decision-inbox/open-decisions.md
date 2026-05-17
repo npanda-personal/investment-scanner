@@ -1,6 +1,6 @@
 # Open Decisions
 
-Date: 2026-05-17
+Date: 2026-05-18
 
 ## Current Open Decisions
 
@@ -15,6 +15,24 @@ Date: 2026-05-17
 Product Owner action is required for these policy blockers before related application-code work can move to Ready.
 
 Unrelated autonomous docs-only prep can continue.
+
+## Team 00 Reconciliation - 2026-05-18
+
+Team 00 consumed Team 01 audit output and cross-checked this index against `07-decisions/`, `00-control/active-work-board.md`, and `00-control/risk-register.md`.
+
+| Decision ID | Classification | Blocks specific work only | Notes |
+| --- | --- | --- | --- |
+| `DECISION-20260517-platform-auth-default-user-fallback-policy` | Still open | Yes, `CF-W1-AUTH-01` | No matching resolution doc exists under `07-decisions/`. |
+| `DECISION-20260517-local-manual-subscription-plan-change-policy` | Still open | Yes, `CF-W1-SUB-01` | No matching resolution doc exists under `07-decisions/`. |
+| `DECISION-20260517-copilot-trust-ux-policy` | Still open | Yes, `CF-W1-UX-02` and `CF-W1-QA-UI-01` | No matching resolution doc exists under `07-decisions/`. |
+| `DECISION-20260517-ux-product-language-status-policy` | Still open | Yes, `CF-W1-UX-05` | No matching resolution doc exists under `07-decisions/`. |
+| `DECISION-20260517-market-data-validation-hardening-policy` | Still open | Yes, `CF-W1-MD-01` | No matching resolution doc exists under `07-decisions/`. |
+
+Already resolved decisions remain in the resolved sections below and are not duplicated in the current open-decision table.
+
+Stale decisions closed this reconciliation: none.
+
+Duplicated decisions found this reconciliation: none.
 
 ## Resolved This Cycle
 

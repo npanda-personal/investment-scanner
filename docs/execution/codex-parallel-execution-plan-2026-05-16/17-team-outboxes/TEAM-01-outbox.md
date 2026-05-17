@@ -1,6 +1,6 @@
 # TEAM-01 Audit Factory Outbox
 
-Date: 2026-05-17
+Date: 2026-05-18
 
 ## Team
 
@@ -21,6 +21,7 @@ None.
 - `11-module-audits/post-decision-source-readiness-audit-2026-05-17.md`
 - `11-module-audits/child-contract-readiness-audit-2026-05-17.md`
 - `11-module-audits/runtime-queue-stale-doc-audit-2026-05-17.md`
+- `11-module-audits/current-assignment-readiness-drift-audit-2026-05-18.md`
 
 ## Requirements Refined
 
@@ -33,6 +34,8 @@ Candidate findings were recorded for:
 - `CF-W1-L3-ALERT-01`
 - `CF-W1-TP-01B`
 - `CF-W1-MD-02-ADR`
+- `CF-W1-NOTIF-02`
+- `CF-W1-L3-INTEL-01`
 
 ## Contracts Prepared
 
@@ -43,12 +46,14 @@ Team 01 audited existing Team 03 child contracts for:
 - `CF-W1-L3-PORT-01`
 - `CF-W1-L3-ALERT-01`
 - `CF-W1-TP-01B`
+- `CF-W1-NOTIF-02`
+- `CF-W1-L3-INTEL-01`
 
 ## QA Plans Prepared
 
 None by Team 01.
 
-Audit finding: `CF-W1-L3-PORT-01`, `CF-W1-L3-ALERT-01`, and `CF-W1-TP-01B` now have child QA plans. They still should not be promoted without Team 00 Ready queue entry, exact selected slice, and implementation handoff.
+Audit finding: `CF-W1-L3-PORT-01`, `CF-W1-L3-ALERT-01`, `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-INTEL-01` now have child QA plans. They still should not be promoted without Team 00 Ready queue entry, exact selected slice, and implementation handoff. `CF-W1-L3-INTEL-01` also waits for accepted `CF-W1-L3-PORT-01A`.
 
 ## Implementation Completed
 
@@ -66,13 +71,14 @@ Skipped because Team 01 work was docs-only read-only audit/refinement. No implem
 
 None.
 
-Reason: the worktree contains many uncommitted docs changes from other teams and Team 01 should not stage or commit from this mixed dirty state.
+Reason: the worktree contains an unrelated Team 06 outbox change. Team 01 should not stage or commit from this mixed state.
 
 ## Files Changed By Team 01
 
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/post-decision-source-readiness-audit-2026-05-17.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/child-contract-readiness-audit-2026-05-17.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/runtime-queue-stale-doc-audit-2026-05-17.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/current-assignment-readiness-drift-audit-2026-05-18.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-01-audit-factory-post-decision-2026-05-17.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-01-outbox.md`
 
@@ -93,19 +99,19 @@ These affect Team 05/08/09 scoped work only and do not block Team 01 audit work.
 ## Blockers
 
 - No app-code Ready queue item exists.
-- Dirty worktree includes active docs changes from other teams; Team 01 should not commit or push.
-- `CF-W1-L3-PORT-01`, `CF-W1-L3-ALERT-01`, and `CF-W1-TP-01B` have child QA plans but still need Team 00 Ready promotion and implementation handoff.
+- Dirty worktree includes an active Team 06 outbox change; Team 01 should not commit or push.
+- `CF-W1-L3-PORT-01`, `CF-W1-L3-ALERT-01`, `CF-W1-TP-01B`, and `CF-W1-NOTIF-02` have child QA/readiness plans but still need Team 00 Ready promotion and implementation handoff.
+- `CF-W1-L3-INTEL-01` is blocked behind accepted `CF-W1-L3-PORT-01A`.
 - `CF-W1-MD-02` remains ADR-only before any Prisma/source/test implementation.
 - `16-team-inboxes/TEAM-07-CF-W1-L3-AUTH-01.md` is stale and still advertises completed `CF-W1-L3-AUTH-01` work as Ready.
-- `09-summaries/daemon-cycle-latest.md` is stale on Decision Inbox count and Product Owner action state.
+- `09-summaries/daemon-cycle-latest.md` is no longer stale on Decision Inbox count; it now reports five open decisions.
 
 ## Next Recommended Assignment
 
-1. Team 00 / Team 07: retire or mark completed the stale `TEAM-07-CF-W1-L3-AUTH-01` inbox before relaunching Team 07.
-2. Team 00: refresh `daemon-cycle-latest.md` to match the five current open decisions.
-3. Team 00: promote at most one exact child slice when it is ready: `CF-W1-L3-PORT-01A`, `CF-W1-L3-PORT-01B`, `CF-W1-L3-ALERT-01`, or `CF-W1-TP-01B`.
-4. Team 03: continue `CF-W1-MD-02` formal ADR prep.
-5. Team 01: re-audit after Team 00 Ready promotion, inbox cleanup, decision resolution, or Market Data ADR draft.
+1. Team 00: evaluate one exact child for Ready promotion only after current dirty docs state is classified. Best candidates by dependency order: `CF-W1-L3-PORT-01A`, then `CF-W1-TP-01B`, then `CF-W1-NOTIF-02`, then `CF-W1-L3-ALERT-01`.
+2. Team 00 / Team 07: retire or mark completed the stale `TEAM-07-CF-W1-L3-AUTH-01` inbox before relying on older inbox files.
+3. Team 03: continue `CF-W1-MD-02` formal ADR prep.
+4. Team 01: re-audit after Ready promotion, inbox cleanup, decision resolution, or Market Data ADR draft.
 
 ## Can Continue Without Human Approval
 

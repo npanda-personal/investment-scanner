@@ -1,10 +1,12 @@
 # Ready For Implementation
 
-Date: 2026-05-17
+Date: 2026-05-18
 
 ## Current Ready Queue
 
 No active application-code item is currently Ready for Implementation.
+
+Team 00 consumed Team 01's 2026-05-18 readiness drift audit. Result: Ready queue remains closed for application code.
 
 `CF-W1-L3-AUTH-01` was pulled by Team 07, implemented, validated, reviewed, accepted under standing delegation, committed locally as `74ba6dd`, and moved out of the live ready queue.
 
@@ -96,6 +98,13 @@ Next Team 00/owner work should evaluate the prepared child artifacts for Ready p
 - `CF-W1-MD-02`: formal ADR and later approval-gated source/schema split packets.
 
 No app-code item became Ready during decision resolution or post-decision child prep.
+
+2026-05-18 routing result:
+
+- `CF-W1-L3-PORT-01A`, `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01` are assigned back to Teams 02/03/04 and their lane teams for readiness inspection.
+- `CF-W1-L3-INTEL-01` remains blocked behind accepted `CF-W1-L3-PORT-01A`.
+- The stale completed-work inbox `16-team-inboxes/TEAM-07-CF-W1-L3-AUTH-01.md` must not be used as current Ready evidence.
+- No application source/test implementation is authorized by this routing update.
 
 ## Ready Criteria Reminder
 
