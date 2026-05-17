@@ -6,7 +6,7 @@ Date: 2026-05-17
 
 No active application-code item is currently Ready for Implementation.
 
-`CF-W1-L3-AUTH-01` was pulled by Team 07, implemented, validated, reviewed, accepted under standing delegation, and moved out of the live ready queue. Team 00 is performing scoped local commit verification for that accepted slice.
+`CF-W1-L3-AUTH-01` was pulled by Team 07, implemented, validated, reviewed, accepted under standing delegation, committed locally as `74ba6dd`, and moved out of the live ready queue.
 
 Team 02 refined the next requirement records for:
 

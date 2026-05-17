@@ -124,3 +124,4 @@
 - Completed teams become reusable runtime slots.
 - If no implementation item is ready, Team 02, Team 03, and Team 04 continue requirements, contracts, and QA prep.
 - Human Product Owner review is not required while `open-decisions.md` has no open decision and standing delegation conditions are met.
+- As of daemon iteration 3, two workstreams have true consent blockers in `99-decision-inbox/`: alert event ownership model and signal trigger object contract path. Only those affected workstreams are blocked; other independent prep continues.
