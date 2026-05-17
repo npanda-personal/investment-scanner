@@ -51,6 +51,9 @@
 | Single-thread context rot risk | Medium | High | Orchestrator | long prompt loses current state or merges unrelated work | split teams into dedicated threads/worktrees | use team heartbeat protocol |
 | Decision inbox ignored risk | High | Medium | Orchestrator + Product Owner | open decisions do not get reviewed and queues drift | make Decision Inbox only human-review surface | review `open-decisions.md` regularly |
 | Team automation drift risk | High | Medium | Orchestrator | team automation modifies wrong files or stale docs | team prompts and charters define allowed/forbidden scope | stop affected workstream and reconcile |
+| Daemon stops after one cycle risk | High | High | Team 00 | Team reports are summarized once and no teams are relaunched | daemon scheduler policy and runtime pool recycling | keep Team 02/03/04 active |
+| Runtime slot idle risk | Medium | High | Team 00 | completed teams are closed without reassignment while safe prep work exists | team-runtime-pool policy | relaunch completed teams or next queued team |
+| Queue pressure opacity risk | Medium | Medium | Team 00 | ready/blocked/refinement queue depth is unclear | daemon heartbeat and cycle-latest checkpoint | update pressure indicators |
 
 ## Current Blockers
 
@@ -113,3 +116,10 @@
 - Copilot/research trust remains blocked by product-language and UX-scope decisions before UI or backend changes.
 - Subscription self-plan behavior remains a Product Owner policy blocker.
 - Notification log previews create a local privacy review item before notification QA can broaden.
+
+## Daemon Scheduler Mode Risk Decisions
+
+- A single consolidated report is not project completion. Team 00 must keep the rolling factory loop alive until a daemon stop condition exists.
+- Completed teams become reusable runtime slots.
+- If no implementation item is ready, Team 02, Team 03, and Team 04 continue requirements, contracts, and QA prep.
+- Human Product Owner review is not required while `open-decisions.md` has no open decision and standing delegation conditions are met.

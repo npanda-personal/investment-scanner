@@ -48,7 +48,12 @@ Each candidate should include:
 
 ## Operating Rules
 
+- Requirement Factory must not run only once per master cycle.
+- Requirement Factory should run repeatedly.
+- Requirement Factory should process new audit reports as they appear.
+- Requirement Factory should refine existing backlog items even when no new audits appear.
+- Requirement Factory should update top-10 candidates and ready queue candidates frequently.
 - Do not wait for implementation teams to finish before preparing the next batch.
 - Move items to Ready only when all ready criteria pass.
-- Create Decision Packets for ambiguous product policy.
+- Create Decision Packets only for true product policy blockers.
 - Do not implement application code.

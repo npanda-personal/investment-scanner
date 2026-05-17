@@ -81,3 +81,13 @@ If implementation is not ready:
 Active execution docs under `docs/execution/codex-parallel-execution-plan-2026-05-16/` are the operating record.
 
 Historical docs under `docs/codex-agent-team-plan/` may be evidence only and must not be modified.
+
+## Daemon Scheduler Mode
+
+Autonomous waves are snapshots of a daemon, not the daemon itself.
+
+Team 00 must not stop merely because one team cycle completed or one consolidated report was written. When a team returns a report, Team 00 consumes the report, updates queues, and either relaunches that team or fills the runtime slot with the next safe team.
+
+If no implementation item is ready, the daemon continues with audits, requirement refinement, architecture contracts, QA plans, ready queue cleanup, blocked queue cleanup, and decision inbox maintenance.
+
+The active daemon policy is `98-orchestrator/daemon-scheduler-policy.md`.

@@ -4,7 +4,7 @@ Date: 2026-05-17
 
 ## Continuous Factory Wave
 
-Runs until it completes safe work or hits a true consent blocker.
+Runs until it completes safe work, reaches a runtime/session checkpoint, or hits a true consent blocker.
 
 Expected activities:
 
@@ -21,6 +21,8 @@ Expected activities:
 
 This is not a single sequential thread. A continuous wave can include several team automations running at the same time and reporting through inboxes, outboxes, and the integration queue.
 
+A continuous wave is not the same as the daemon. The daemon keeps cycling after one wave report. Team 00 should write periodic checkpoints to `09-summaries/daemon-cycle-latest.md` instead of returning final reports when no stop condition exists.
+
 ## Recommended Team Cadences
 
 These are recommended patterns, not mandatory wall-clock schedules:
@@ -33,6 +35,19 @@ These are recommended patterns, not mandatory wall-clock schedules:
 - Teams 5-9 Implementation: continuous pull when the ready queue has matching safe work.
 - Team 10 Review / Release: continuous review of team outboxes and integration queue.
 - Human Product Owner: review only `99-decision-inbox/` unless explicitly requesting another review surface.
+
+## Daemon Cadence
+
+Recommended daemon rhythm:
+
+- Team 00: frequent scheduler loop over queues, outboxes, integration queue, and decision inbox.
+- Team 02: relaunch whenever new audits arrive, stale backlog is detected, or next-ready candidates are exhausted.
+- Team 03: relaunch whenever top candidates lack current contracts or file reservations.
+- Team 04: relaunch whenever top candidates lack focused validation plans.
+- Teams 05-09: pull implementation when ready work exists; otherwise audit/refine module domains.
+- Team 10: relaunch whenever integration queue or review-ready outboxes are non-empty.
+
+Do not specify mandatory wall-clock timing. Codex app automations may configure cadence manually.
 
 ## Daily Or Recurring Automation
 

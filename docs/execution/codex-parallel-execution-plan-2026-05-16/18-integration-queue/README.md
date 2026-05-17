@@ -29,6 +29,16 @@ Team 0 verifies:
 - release evidence exists,
 - downstream queues are updated.
 
+## Continuous Processing
+
+Review / Release Team processes the integration queue continuously.
+
+Team 00 does not wait for all teams before processing completed outbox items. Completed implementation should be reviewed as soon as evidence is available.
+
+If accepted, Team 00 or Team 10 creates the local commit under standing delegation when staged scope is exact. If rejected, route revision to the same or appropriate implementation team.
+
+If a true consent blocker appears, write a Decision Packet and continue other independent work.
+
 ## Conflict Handling
 
 If integration conflicts:

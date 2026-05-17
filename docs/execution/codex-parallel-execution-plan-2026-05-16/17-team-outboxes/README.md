@@ -29,3 +29,8 @@ Each outbox item should include:
 - Review / Release Factory pulls from here into the integration queue.
 - Rejected work must include rework instructions or a revert/rework plan.
 - Do not put human-only routine gates here; use Decision Inbox only for true consent blockers.
+- Team outboxes are live report queues.
+- Completed outbox reports must be consumed by Team 00 without ending the cycle.
+- Teams can be relaunched with new assignments after their outbox is consumed.
+- Teams can be shut down when idle and re-added when new matching work appears.
+- Teams should not wait for human prompts when standing delegation applies.

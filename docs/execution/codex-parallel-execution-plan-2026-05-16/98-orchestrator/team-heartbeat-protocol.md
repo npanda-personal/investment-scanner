@@ -11,16 +11,24 @@ Each persistent Codex team must publish lightweight progress so Team 0 can coord
 Each active team heartbeat should include:
 
 - team id and name,
+- current state: running / queued / idle / blocked / completed / relaunched,
+- current assignment,
+- input source,
+- output target,
 - current branch/worktree,
 - active requirement id,
-- state,
+- files inspected,
 - files reserved,
 - files changed,
 - tests or checks run,
+- commit SHA if any,
 - blockers,
 - Decision Packets created,
 - outbox artifact path,
-- next intended action.
+- next assignment recommendation,
+- can continue without human approval: yes/no,
+- reason if no,
+- next relaunch condition.
 
 ## Heartbeat Locations
 
@@ -78,3 +86,7 @@ Heartbeats are recommended after:
 - committing accepted work.
 
 Do not require a wall-clock schedule. Codex app automations may configure cadence manually.
+
+## Team 00 Requirement
+
+Team 00 must update the heartbeat state after every consumed team report. A completed team should be marked either `relaunched`, `queued`, `idle`, or `blocked`; it should not disappear from the runtime pool.

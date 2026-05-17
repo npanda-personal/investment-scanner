@@ -6,6 +6,8 @@ Date: 2026-05-17
 
 The ready queue is the implementation pull surface. Implementation teams should pull work from here instead of waiting for manual Product Owner prompts.
 
+The ready queue is live. Teams may pull matching ready work without waiting for human approval when standing delegation criteria pass.
+
 ## Ready For Implementation Criteria
 
 An item is Ready only when all are true:
@@ -36,6 +38,10 @@ An item is Ready only when all are true:
 ## Conflict Prevention
 
 Team 0 owns file reservations and confirms one writer per file. If two teams need the same file, one item is moved out of Ready or queued behind the other.
+
+When new work becomes ready, the relevant team is added to the runtime queue immediately.
+
+If the ready queue is empty, teams do not idle. They produce requirements, contracts, QA plans, audits, or blocked-queue cleanup.
 
 ## Blocked Items
 

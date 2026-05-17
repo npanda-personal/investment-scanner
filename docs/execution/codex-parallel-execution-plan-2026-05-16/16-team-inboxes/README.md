@@ -27,6 +27,10 @@ Each assignment should include:
 - Documentation-only teams may pull assigned audit, requirement, architecture, or QA tasks.
 - Teams must update their outbox when work completes, blocks, or needs review.
 - True consent blockers go to `99-decision-inbox/`.
+- Team inboxes are live assignment queues, not one-time wave inputs.
+- A completed team can be relaunched with a new inbox assignment.
+- A team shut down because no work existed must be re-added when matching ready work appears.
+- Teams should not wait for human prompts when standing delegation applies.
 
 ## Suggested File Names
 

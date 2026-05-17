@@ -68,6 +68,30 @@ Operating rules:
 - Team 0 integrates and resolves conflicts; it does not implement by default.
 - Human Product Owner reviews only true consent blockers in Decision Inbox.
 
+## Daemon Runtime State
+
+| Field | Current Value |
+| --- | --- |
+| Current daemon cycle id | `DAEMON-20260517` |
+| Current rolling iteration count | 1 |
+| Active teams | Team 00 |
+| Queued teams | Team 02, Team 03, Team 04 |
+| Idle teams | Team 01, Team 05, Team 06, Team 07, Team 08, Team 09 |
+| Blocked teams | None fully blocked; Teams 05-09 have no ready implementation item |
+| Teams relaunched this cycle | Pending after daemon setup commit |
+| Teams shut down due to no work | None permanently; Teams without ready implementation move to audit/refinement |
+| Teams re-added due to new work | Pending |
+| Ready queue depth | 0 application-code items |
+| Refinement queue depth | High; see `10-requirements/next-top-10-candidates.md` |
+| Integration queue depth | 0 application-code items |
+| Decision inbox count | 0 open decisions |
+| Ready-work pressure | none |
+| Blocked-work pressure | high |
+| Next team to launch | Team 02 Requirement Factory, Team 03 Architecture Factory, Team 04 QA Factory |
+| Next item to assign | `CF-W1-L3-AUTH-01`, `CF-W1-L3-DQ-01`, `CF-W1-MD-02`, `CF-W1-TP-01A` prep |
+| Last commit | `780e961 docs: record master orchestrator runtime cycle` |
+| Daemon should continue | Yes |
+
 ## Sprint 0 Items
 
 | ID | Work Item | Owner | State | Scope | Notes |
