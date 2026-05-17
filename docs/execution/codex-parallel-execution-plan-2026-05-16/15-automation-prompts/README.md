@@ -13,7 +13,8 @@ Rules for every automation:
 - Write results to team outboxes or integration queue.
 - Stop only affected workstreams for true consent blockers.
 - Create Decision Packets under `99-decision-inbox/`.
-- Do not push.
+- Push to `dev` only when the standing push gates in `98-orchestrator/standing-delegation-policy.md` pass.
+- Never force push and never push to `main` or `master`.
 
 Prompts:
 

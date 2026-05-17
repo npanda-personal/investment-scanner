@@ -32,7 +32,8 @@ Commit:
 
 - One local commit per accepted requirement or docs-only operating update.
 - Stage exact scope only.
-- Do not push.
+- Push to `dev` only when standing push gates pass.
+- Never force push and never push to `main` or `master`.
 
 Escalate:
 

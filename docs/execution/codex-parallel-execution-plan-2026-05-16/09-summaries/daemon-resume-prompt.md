@@ -16,9 +16,11 @@ docs/codex-agent-team-plan/** is historical evidence only.
 Use the active execution folder:
 docs/execution/codex-parallel-execution-plan-2026-05-16/
 
-Resume Continuous Daemon Scheduler Mode from cycle DAEMON-20260517, rolling iteration 8.
+Resume Continuous Daemon Scheduler Mode from cycle DAEMON-20260517, rolling iteration 9.
 
 Team 00 is the master runtime orchestrator. The human Product Owner is not the mediator for routine gates.
+
+Standing authorization is active for separate team branches/worktrees, local commits, and scoped push to `dev` when all gates in `98-orchestrator/standing-delegation-policy.md` pass. Never force push and never push to `main` or `master`.
 
 Start with evidence sync:
 - git status --short
@@ -56,6 +58,7 @@ Current planning queues:
 - Team 03 architecture prep for `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02` timed out and should be relaunched first.
 
 Current committed daemon outputs include:
+- 1a0c91b docs: checkpoint daemon requirement and qa prep
 - ae0b4cc docs: checkpoint daemon after resolved decisions
 - f75808f docs: fix daemon checkpoint resume protocol
 - e2036dd docs: refresh daemon planning queues
@@ -73,7 +76,8 @@ Resume daemon operation:
 6. Launch Teams 05-09 only when matching ready work exists; otherwise assign module-domain audit/refinement/prep.
 7. Relaunch Team 10 when integration queue items appear.
 8. Update `99-decision-inbox/open-decisions.md` whenever a true consent blocker is created or resolved.
-9. If runtime ends again, update `09-summaries/daemon-cycle-latest.md` and this resume prompt, then return a checkpoint report.
+9. If an accepted scoped commit is created on `dev` and push gates pass, push normally to `dev`.
+10. If runtime ends again, update `09-summaries/daemon-cycle-latest.md` and this resume prompt, then return a checkpoint report.
 
 Stop only for:
 - true consent blockers,
@@ -96,7 +100,6 @@ If a runtime/checkpoint boundary is reached, the final checkpoint report must in
 - daemon-resume-prompt.md updated: yes/no,
 - git status,
 - latest commits,
+- push status,
 - next autonomous action.
-
-Do not push.
 ```

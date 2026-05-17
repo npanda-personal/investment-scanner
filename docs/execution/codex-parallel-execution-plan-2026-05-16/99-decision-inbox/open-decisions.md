@@ -8,7 +8,9 @@ Date: 2026-05-17
 
 Product Owner action required: no.
 
-Last verified by daemon iteration 8: no open decisions.
+Last verified by daemon iteration 9 setup: no open decisions.
+
+Standing worktree, commit, and scoped push authorization to `dev` is recorded in `98-orchestrator/standing-delegation-policy.md`; it is not an open decision.
 
 Resolved this cycle:
 

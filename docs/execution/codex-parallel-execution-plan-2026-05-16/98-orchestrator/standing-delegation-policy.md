@@ -4,7 +4,7 @@ Date: 2026-05-17
 
 ## Authority
 
-Codex Orchestrator is delegated authority to approve, reject, revise, iterate, QA, code review, Architect sign off, create Product Owner acceptance packets, locally commit, and continue work without asking the human Product Owner when all delegation conditions pass.
+Codex Orchestrator is delegated authority to approve, reject, revise, iterate, QA, code review, Architect sign off, create Product Owner acceptance packets, locally commit, push accepted scoped commits to `dev`, and continue work without asking the human Product Owner when all delegation conditions pass.
 
 Root `AGENTS.md`, current repository state, active execution docs, current git state, and current Product Owner direction remain authoritative.
 
@@ -75,7 +75,31 @@ Codex may create one local commit per accepted requirement when:
 - staged files exactly match the approved scope,
 - no true consent blocker occurred.
 
-Push remains disabled unless explicitly approved.
+## Standing Push Authority
+
+As of 2026-05-17, the Product Owner explicitly approved scoped push to `dev` under strict gates.
+
+Codex may push a local commit to `dev` only when all conditions are true:
+
+1. The work item is accepted under standing delegation.
+2. The commit is scoped to one accepted requirement or one docs-only factory update.
+3. Staged files exactly match the approved scope.
+4. `git diff --cached --name-status` has been checked before commit.
+5. No forbidden files are staged.
+6. No secrets, `.env`, database dumps, generated logs, or unrelated files are staged.
+7. Focused tests or builds required by the work packet have passed.
+8. QA accepted.
+9. Code review accepted.
+10. Architect accepted when required.
+11. Product Owner packet records delegated acceptance when required.
+12. `git status --short` is clean after commit before push.
+13. The push target is the active `dev` branch.
+14. The push is not a force push.
+15. The push is not to `main` or `master`.
+16. No unresolved open decision affects the work item.
+17. There is no uncertainty about scope.
+
+If push fails, Codex records the failure and continues local autonomous work where safe.
 
 ## Limits
 

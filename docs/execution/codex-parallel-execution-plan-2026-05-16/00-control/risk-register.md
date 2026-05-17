@@ -19,7 +19,7 @@
 | Test coverage risk | High | Medium | QA | changed workflow lacks tests | QA baseline and required evidence | map tests |
 | Product-language risk | High | Medium | PO + QA | advice-like wording | research-support language gate | review copy/contracts |
 | B2B/B2C readiness risk | Medium | Medium | PO + Architect | unversioned contracts | contract inventory | document contracts |
-| Old GitHub workflow conflict | Medium | High | Release Auditor | push assumed by old docs | local-first checklist | make push optional |
+| Old GitHub workflow conflict | Medium | Medium | Release Auditor | push assumed without gates or to wrong branch | standing push authorization requires scoped non-force push to `dev` only | verify staged scope and branch before push |
 | PO acceptance bypass risk | High | Medium | Orchestrator | implementation asks PO before QA | enforce gates | reject handoff |
 | Inefficient model usage | Medium | Medium | Orchestrator | strong model used for scans | model routing matrix in future plan | route by task |
 | Extra-credit/spend risk | High | Low | Orchestrator | API key or credit request | ChatGPT sign-in only | do not use API key |
@@ -55,6 +55,8 @@
 | Runtime slot idle risk | Medium | High | Team 00 | completed teams are closed without reassignment while safe prep work exists | team-runtime-pool policy | relaunch completed teams or next queued team |
 | Queue pressure opacity risk | Medium | Medium | Team 00 | ready/blocked/refinement queue depth is unclear | daemon heartbeat and cycle-latest checkpoint | update pressure indicators |
 | Checkpoint resume ambiguity risk | Medium | Medium | Team 00 | checkpoint report omits resume prompt path or whether resume prompt was updated | checkpoint report protocol now requires resume prompt path and update status | keep `09-summaries/daemon-resume-prompt.md` current |
+| Unsafe push risk | High | Low | Team 00 + Review / Release | staged scope includes unrelated files, secrets, forbidden files, or branch is not `dev` | standing push gate, `git diff --cached --name-status`, clean post-commit status, no force push | stop push and record failure |
+| Worktree drift after push risk | Medium | Medium | Team 00 | team branch/worktree diverges from `dev` or rejected work remains isolated without record | worktree policy requires branch/worktree evidence and cleanup only after accepted push or safe rejection | record branch/worktree in outbox and integration queue |
 
 ## Current Blockers
 
@@ -96,7 +98,7 @@
 - Current dirty files are limited to Data Quality Engine and Signal Generation Engine source/tests.
 - Data Quality fail-closed default changes completed readiness, QA, code review, Architect signoff, and Product Owner conditional acceptance as a separate evidence track.
 - Signal Generation run-path changes are accepted only as `CF-W2-SIG-01A`; explicit opt-out, read-path, trusted/untrusted classification, latest auto-generation, and trigger-contract gaps remain tracked.
-- No push is allowed.
+- Historical Wave 2 reconciliation did not allow push; current standing push authority applies only prospectively under strict gates.
 - No downstream implementation is allowed from `CF-W2-SIG-01A` alone.
 
 ## Autonomous Orchestrator Setup Risk Decisions
@@ -104,7 +106,7 @@
 - Routine gates are delegated to Codex only when all standing delegation conditions pass.
 - True consent blockers must create a Decision Packet under `99-decision-inbox/`.
 - Human Product Owner review is concentrated on `99-decision-inbox/open-decisions.md`.
-- Push remains disabled.
+- Scoped push to `dev` is now authorized prospectively under strict standing gates.
 - Active execution docs are the only docs modified by this setup.
 
 ## Master Orchestrator Runtime Cycle - 2026-05-17 Risk Decisions
@@ -130,3 +132,4 @@
 - As of daemon iteration 6, `09-summaries/daemon-resume-prompt.md` exists and checkpoint reports must explicitly state whether it was updated.
 - As of daemon iteration 7, planning queues have been refreshed to remove the resolved alert ownership and trigger DTO blockers. Ready queue remains empty for app-code work.
 - As of daemon iteration 8, Team 03 architecture prep timed out without output. This is a runtime checkpoint issue, not a consent blocker; relaunch Team 03 first on resume.
+- As of daemon iteration 9, Product Owner authorized standing worktrees, local commits, and scoped push to `dev` under exact staged-scope and acceptance gates.

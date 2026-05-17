@@ -29,6 +29,16 @@ Team 00 is the runtime scheduler for the multi-team Codex factory. The scheduler
 19. Team 00 must escalate only true consent blockers to `99-decision-inbox/`.
 20. Team 00 must continue independent workstreams when one workstream is blocked.
 
+## Standing Worktree, Commit, And Push Authorization
+
+The Product Owner has approved continuous multi-team execution with standing worktree, commit, and push authorization to `dev` under strict gates.
+
+Team 00 may create or assign separate branches/worktrees for Teams 03-10 when work is isolated by requirement and one-writer-per-file is enforced.
+
+Team 00 may commit and push only when `98-orchestrator/standing-delegation-policy.md` push conditions pass. Push must be a normal non-force push to `dev`; push to `main` or `master` is forbidden.
+
+This authorization does not permit forbidden/high-risk files, live providers, paid/cloud work, unresolved product-policy decisions, or unsafe mixed-scope git state.
+
 ## Rolling Execution Algorithm
 
 1. Evidence sync:
@@ -127,6 +137,8 @@ Every daemon checkpoint report must explicitly include:
 - whether `daemon-resume-prompt.md` was created or updated in the checkpoint,
 - current git status,
 - latest relevant commits,
+- setup or work-item commit SHA when applicable,
+- push status when a push was attempted,
 - ready queue depth,
 - refinement queue depth,
 - integration queue depth,

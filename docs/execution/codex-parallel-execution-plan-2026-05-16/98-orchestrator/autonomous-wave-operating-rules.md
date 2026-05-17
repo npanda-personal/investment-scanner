@@ -32,7 +32,8 @@ These factories are persistent teams, not substeps inside one prompt. They may r
 - Use independent team threads, automations, worktrees, or subagents for read-only audits, requirements, contracts, QA plans, independent module-local implementation, and reviews.
 - Use one writer per file.
 - Use one commit per accepted requirement.
-- Push remains disabled unless explicitly approved.
+- Push to `dev` is allowed only under the standing push authority in `98-orchestrator/standing-delegation-policy.md`.
+- Force push and push to `main` or `master` are forbidden.
 - Prefer module-local, non-conflicting work.
 - Do not choose downstream implementation that depends on unresolved upstream trust gates.
 - Implementation teams pull from `12-ready-queue/` rather than waiting for human prompts.

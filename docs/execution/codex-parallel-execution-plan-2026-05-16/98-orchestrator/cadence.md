@@ -17,6 +17,7 @@ Expected activities:
 - focused validation,
 - review/signoff/acceptance packet,
 - exact scoped local commit,
+- exact scoped push to `dev` when standing push gates pass,
 - next-ready queue refresh.
 
 This is not a single sequential thread. A continuous wave can include several team automations running at the same time and reporting through inboxes, outboxes, and the integration queue.
@@ -78,7 +79,7 @@ Each item must have:
 
 ## Review Wave
 
-Perform QA, code review, Architect signoff, Product Owner packet, and local commit for accepted work.
+Perform QA, code review, Architect signoff, Product Owner packet, local commit, and scoped push to `dev` for accepted work when standing push gates pass.
 
 Codex handles these gates internally when the standing delegation conditions pass.
 

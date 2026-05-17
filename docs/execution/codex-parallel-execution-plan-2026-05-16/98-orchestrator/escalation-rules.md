@@ -39,6 +39,8 @@ Codex must stop only the affected workstream and create a Decision Packet when a
 - revert would affect committed work
 - two workstreams need the same file
 - memory/resource gate blocks process-heavy work
+- push would require force push or a non-`dev` branch
+- push scope is uncertain or includes unrelated files
 
 ## Not Consent Blockers
 
@@ -49,6 +51,7 @@ Codex must not stop for these routine gates when work stays inside approved boun
 - Architect signoff needed
 - Product Owner packet needed
 - local commit needed
+- push to `dev` when all standing push gates pass
 - requirement reframing
 - split into smaller bounded slice
 - active board update
