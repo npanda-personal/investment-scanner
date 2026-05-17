@@ -17,9 +17,15 @@ Status: Refreshed by Team 02 Requirement Factory for the current daemon cycle af
 
 ## Blocked By Decision Inbox
 
-No items are currently blocked by an open Decision Inbox entry.
+The following items are blocked from implementation by open Decision Inbox entries. Docs-only refinement, option framing, architecture prep, and QA planning may continue.
 
-If a future true consent blocker appears during Team 02 docs-only work, record it in the Team 02 outbox and ask Team 00 to route the decision. Do not create a Decision Packet from the current Team 02 write scope.
+| ID | Decision Inbox blocker | Implementation impact |
+| --- | --- | --- |
+| CF-W1-L3-DQ-01 | `DECISION-20260517-lane3-readiness-consumer-policy` | No portfolio/watchlist/alerts/portfolio-intelligence/copilot readiness consumer implementation until display-vs-action policy is accepted. |
+| CF-W1-TP-01A | `DECISION-20260517-trade-plan-no-target-dq-hard-block` | No Trade Plan source/API/UI compatibility work until no-target replacement semantics and DQ hard-block behavior are accepted. |
+| CF-W1-MD-02 | `DECISION-20260517-market-data-durable-readiness-storage-adr` | No Prisma, schema, source, provider, startup, or executable storage validation work until durable evidence storage direction is accepted. |
+
+If a new true consent blocker appears during Team 02 docs-only work, record it in the Team 02 outbox and ask Team 00 to route the decision.
 
 ## Needs Architecture Acceptance / Contract Finalization
 

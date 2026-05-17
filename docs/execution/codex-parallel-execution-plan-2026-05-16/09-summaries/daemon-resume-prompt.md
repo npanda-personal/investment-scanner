@@ -16,7 +16,7 @@ docs/codex-agent-team-plan/** is historical evidence only.
 Use the active execution folder:
 docs/execution/codex-parallel-execution-plan-2026-05-16/
 
-Resume Continuous Daemon Scheduler Mode from cycle DAEMON-20260517, rolling iteration 10.
+Resume Continuous Daemon Scheduler Mode from cycle DAEMON-20260517, rolling iteration 15.
 
 Team 00 is the master runtime orchestrator. The human Product Owner is not the mediator for routine gates.
 
@@ -53,6 +53,17 @@ Current open decisions:
 Current ready queue:
 - No active application-code item is Ready for Implementation.
 
+Latest Team 00 intake:
+- Summary path: `09-summaries/team-00-orchestrator-intake-summary.md`
+- Outbox path: `17-team-outboxes/TEAM-00-orchestrator-integration-outbox.md`
+- Branch at intake: `dev`
+- Initial worktree status at intake: clean
+- Ready queue depth: 0 active application-code items
+- Refinement queue depth: 7 active unique items
+- Integration queue depth: 0 active application-code items
+- Open decisions: 3
+- Next team to launch: Team 03 Architecture Factory with `15-automation-prompts/AUTO-03-architecture-factory.md`
+
 Current planning queues:
 - Team 02 refreshed requirement priorities and kept app-code Ready at zero.
 - Team 03 completed architecture prep for `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02`.
@@ -72,10 +83,10 @@ Current committed daemon outputs include:
 
 Resume daemon operation:
 1. Keep Team 00 running as scheduler/integration owner.
-2. Relaunch teams as runtime slots become available.
-3. Continue audits, requirement refinement, architecture prep, QA planning, implementation only when Ready criteria pass, review, and release work.
-4. Keep `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02` out of implementation until their Decision Inbox items are resolved.
-5. Relaunch Team 02/03/04 only for non-blocked refinement or after decisions change the backlog/contracts/QA plans.
+2. Launch Team 03 Architecture Factory first for docs-only decision/contract prep on `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02`.
+3. Relaunch Team 02 Requirement Factory and Team 04 QA Factory for docs-only refinement after Team 03 or in parallel if write scopes are isolated.
+4. Continue audits, requirement refinement, architecture prep, QA planning, implementation only when Ready criteria pass, review, and release work.
+5. Keep `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02` out of implementation until their Decision Inbox items are resolved.
 6. Launch Teams 05-09 only when matching ready work exists; otherwise assign module-domain audit/refinement/prep.
 7. Relaunch Team 10 when integration queue items appear.
 8. Update `99-decision-inbox/open-decisions.md` whenever a true consent blocker is created or resolved.

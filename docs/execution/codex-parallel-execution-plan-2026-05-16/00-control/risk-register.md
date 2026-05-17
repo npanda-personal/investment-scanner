@@ -134,3 +134,11 @@
 - As of daemon iteration 8, Team 03 architecture prep timed out without output. This is a runtime checkpoint issue, not a consent blocker; relaunch Team 03 first on resume.
 - As of daemon iteration 9, Product Owner authorized standing worktrees, local commits, and scoped push to `dev` under exact staged-scope and acceptance gates.
 - As of daemon iteration 10, Teams 02, 03, and 04 completed docs-only refinement and opened three true consent blockers for Lane 3 readiness policy, Trade Plan no-target/DQ hard-block policy, and Market Data durable readiness storage ADR. Affected workstreams wait; independent work continues.
+
+## Team 00 Intake Risk Decisions
+
+- As of the dedicated Team 00 intake on 2026-05-17, the initial worktree was clean and safe for a docs-only orchestration update.
+- The ready queue remains at zero active application-code items; forcing implementation would bypass open Decision Inbox gates.
+- The active refinement and architecture queue docs had stale wording that understated the three open Decision Inbox blockers; Team 00 corrected those active-doc references in this intake.
+- Push to `dev` is authorized by active docs only under strict standing gates, but this intake remains local-only because the user explicitly prohibited push.
+- Worktrees are authorized for isolated Teams 03-10 work, but no immediate worktree is needed until an application-code item reaches Ready with exact file reservations.

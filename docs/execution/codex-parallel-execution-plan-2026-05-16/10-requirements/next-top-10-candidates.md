@@ -25,9 +25,9 @@ These are the current Team 02 priorities. None is app-code ready.
 
 | ID | What is proven | What is missing | Current disposition |
 | --- | --- | --- | --- |
-| CF-W1-L3-DQ-01 | Requirement, draft contract, and draft QA plan exist. No open Decision Inbox item blocks docs-only prep. | Accepted display-vs-action policy, accepted consumer DTO fields, exact child-slice file reservations, accepted QA scenario matrix. | Keep in Product/Architect/QA refinement. |
-| CF-W1-TP-01A | Requirement, draft contract, and draft QA plan exist. It is independent of completed alert ownership and trigger DTO slices. | Accepted no-target replacement semantics, accepted DQ hard-block states including `LIMITED`, API/UI compatibility boundary, exact backend-only or split UI file reservations. | Keep in Product/Architect/QA refinement. |
-| CF-W1-MD-02 | Requirement, draft contract, and ADR QA plan exist. Docs-only ADR prep can proceed. | Accepted storage model, natural key, Prisma impact decision, migration/rollback/query/test strategy, and later source/schema work packet. | Keep in ADR/Decision prep; source blocked. |
+| CF-W1-L3-DQ-01 | Requirement, draft contract, draft QA plan, and Decision Packet exist. Docs-only prep can continue. | Accepted display-vs-action policy, accepted consumer DTO fields, exact child-slice file reservations, accepted QA scenario matrix. | Keep in Product/Architect/QA refinement; implementation blocked by Decision Inbox. |
+| CF-W1-TP-01A | Requirement, draft contract, draft QA plan, and Decision Packet exist. It is independent of completed alert ownership and trigger DTO slices. | Accepted no-target replacement semantics, accepted DQ hard-block states including `LIMITED`, API/UI compatibility boundary, exact backend-only or split UI file reservations. | Keep in Product/Architect/QA refinement; implementation blocked by Decision Inbox. |
+| CF-W1-MD-02 | Requirement, draft contract, ADR QA plan, and Decision Packet exist. Docs-only ADR prep can proceed. | Accepted storage model, natural key, Prisma impact decision, migration/rollback/query/test strategy, and later source/schema work packet. | Keep in ADR/Decision prep; source/schema work blocked by Decision Inbox. |
 
 ## Next Non-Blocked Candidates For Architecture / QA Prep
 

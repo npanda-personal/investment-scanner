@@ -8,9 +8,9 @@ Date: 2026-05-17
 | DECISION-20260517-trade-plan-no-target-dq-hard-block | Trade Plan no-target compatibility and DQ hard-block policy | Product Owner + Architect + QA | High | `trade-plan-risk-engine` | Open | 2026-05-17 | `CF-W1-TP-01A`, broader `CF-W1-TP-01` Trade Plan migration | Market Data, Lane 3 readiness, UX trust, audits, requirements, architecture, and QA prep. |
 | DECISION-20260517-market-data-durable-readiness-storage-adr | Durable Market Data readiness evidence storage ADR direction | Product Owner + Architect + QA | High | `market-data-foundation` / `data-quality-engine` handoff | Open | 2026-05-17 | `CF-W1-MD-02` source/schema/test implementation and downstream durable evidence claims | `CF-W1-MD-01` validation policy prep, Lane 3 readiness policy, Trade Plan docs, audits, requirements, QA prep. |
 
-Product Owner action required: yes.
+Product Owner action required: yes for the three affected workstreams only.
 
-Last verified by daemon iteration 10: three open decisions.
+Last verified by Team 00 master orchestration intake on 2026-05-17: three open decisions.
 
 Standing worktree, commit, and scoped push authorization to `dev` is recorded in `98-orchestrator/standing-delegation-policy.md`; it is not an open decision.
 

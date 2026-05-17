@@ -26,9 +26,13 @@ Prepared by Team 03 Architecture Factory and refreshed after `CF-W1-L3-AUTH-02` 
 
 ## Blocked By Open Decisions
 
-No current architecture candidate is blocked by an open Decision Inbox item.
+The following architecture candidates are blocked from application-code implementation by open Decision Inbox items. Docs-only option framing, contract refinement, and QA alignment may continue.
 
-Candidates still have Product/Architect policy questions, but no active Decision Packet is open as of this refresh.
+| Candidate | Open decision | Blocked scope |
+| --- | --- | --- |
+| `CF-W1-L3-DQ-01` | `DECISION-20260517-lane3-readiness-consumer-policy` | Lane 3 readiness consumer implementation and downstream alert/portfolio/copilot reliability claims. |
+| `CF-W1-TP-01A` | `DECISION-20260517-trade-plan-no-target-dq-hard-block` | Trade Plan source/API/UI compatibility work and paper-review readiness behavior. |
+| `CF-W1-MD-02` | `DECISION-20260517-market-data-durable-readiness-storage-adr` | Prisma/schema/source/provider/startup/executable storage validation work. |
 
 ## Docs-Only Architecture Prep Can Continue
 
