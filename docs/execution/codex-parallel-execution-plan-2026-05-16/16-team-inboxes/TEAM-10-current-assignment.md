@@ -14,7 +14,7 @@ Current priority:
 
 1. Review Team 00 coordination commit scope after staging if requested.
 2. Keep integration queue depth at zero for app-code unless a team submits accepted implementation evidence.
-3. Validate that open decisions block only affected workstreams.
+3. Validate that `open-decisions.md` remains at zero and no app-code release claim bypasses Ready promotion.
 
 ## Scope
 

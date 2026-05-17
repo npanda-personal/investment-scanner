@@ -65,10 +65,7 @@ Validation was documentation/source inspection only.
 
 No new Decision Packet opened.
 
-Open Decision Inbox items are Team 09 platform policy blockers and unrelated to this Team 03 pass:
-
-- `DECISION-20260517-platform-auth-default-user-fallback-policy`
-- `DECISION-20260517-local-manual-subscription-plan-change-policy`
+Former Team 09 platform policy blockers are now resolved by Product Owner Option A decisions and remain unrelated to this Team 03 ADR pass.
 
 Current blocker for `CF-W1-MD-02`: ADR acceptance and separate future implementation-slice approvals.
 
@@ -137,3 +134,86 @@ No new Decision Packet opened.
 ### Next Recommended Assignment
 
 Team 00 should evaluate `CF-W1-L3-PORT-01A` as the next upstream Lane 3 implementation candidate. Keep `CF-W1-L3-INTEL-01` queued behind it; promote INTEL only after portfolio readiness DTOs are implemented and accepted.
+
+## Continuation - Near-Ready File Reservation Matrix
+
+Date: 2026-05-18
+
+State: Docs-only architecture readiness inspection complete.
+
+### Assignment
+
+Continue Team 03 loop after Team 01 audit consumption and Team 00 routing. Inspect `CF-W1-L3-PORT-01A`, `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01` for exact file reservations, shared/high-risk risk, decision blockers, and implementation-readiness gaps.
+
+### Work Pulled
+
+No app-code work pulled.
+
+`12-ready-queue/ready-for-implementation.md` still reports no active application-code item is Ready for Implementation.
+
+### Architecture Evidence Prepared
+
+Created:
+
+- `03-architecture/team03-near-ready-file-reservation-matrix-2026-05-18.md`
+
+### Readiness Result
+
+| Candidate | Team 03 result |
+| --- | --- |
+| `CF-W1-L3-PORT-01A` | Architecture-ready for Team 00 Ready evaluation as portfolio-management-only. Exact allowed files are portfolio service/types/module doc/service test only. No shared/high-risk request found if it consumes DQE public outputs only. |
+| `CF-W1-TP-01B` | Architecture-ready for Team 00 Ready evaluation as backend-only Trade Plan service/types/docs/tests. Optional geometry file requires an Architect note. No Product Owner decision blocker found. |
+| `CF-W1-NOTIF-02` | Architecture-ready for Team 00/Team 09 Ready evaluation as local log provider redaction only. Auth/subscription policy items are now resolved but remain separate backend packets. |
+| `CF-W1-L3-ALERT-01` | Architecture-ready for Team 00 Ready evaluation as backend-only alert readiness suppression. No decision blocker found if `LIMITED` remains suppressed/blocked. |
+
+None of these items is Ready for Implementation until Team 00 promotes one bounded candidate and copies the exact implementation handoff.
+
+### Audits Completed
+
+Read current Team 03 assignment, ready/blocked queues, Decision Inbox, Team 02 requirement updates, Team 04 QA status, Team 06/07/09 readiness evidence, and prepared requirements/contracts/work packets/QA plans for all four candidates.
+
+### Requirements Refined
+
+None by Team 03. Team 02 prepared `CF-W1-L3-PORT-01A` as the first-class portfolio-only requirement.
+
+### Contracts Prepared
+
+No new contract file was needed. Existing contracts remain the current architecture source of truth for this pass.
+
+### QA Plans Prepared
+
+None by Team 03. Team 04 has prepared QA plans for all four candidates.
+
+### Implementation Completed
+
+None. Team 03 did not modify application source or tests.
+
+### Tests Run
+
+None. This was docs-only architecture readiness work.
+
+### Validation
+
+Scoped Markdown validation completed after edits:
+
+- `git diff --check` on Team 03 tracked docs passed; Git reported normal Markdown CRLF conversion warnings.
+- Trailing-whitespace scan with `rg -n "[ \t]+$"` across the Team 03 edited docs returned no matches.
+
+### Commits Created
+
+None.
+
+### Decisions Opened
+
+None.
+
+### Blockers
+
+- Ready queue remains closed for app-code work.
+- Team 00 must promote exactly one bounded implementation candidate before a module team edits source or tests.
+- Shared docs worktree is dirty with unrelated active changes from other teams; Team 03 did not stage, revert, or overwrite them.
+- `CF-W1-L3-INTEL-01` remains blocked behind accepted `CF-W1-L3-PORT-01A`.
+
+### Next Recommended Assignment
+
+Team 00 should evaluate `CF-W1-L3-PORT-01A` first for Ready promotion. Secondary candidates are `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01`, each as one bounded backend-only promotion with exact reservations copied from the matrix.

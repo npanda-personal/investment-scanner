@@ -47,9 +47,9 @@ These child plans are not executable validation approval. Source/test execution 
 
 | Work item | QA status | What changed after setup authorization | Required next gate |
 | --- | --- | --- | --- |
-| `CF-W1-MD-01` | QA-blocked for executable validation | No status change; docs-only QA plan remains usable for future policy review. | Product/Architect validation policy and implementation work packet. |
+| `CF-W1-MD-01` | QA-blocked for executable validation | Option A policy resolved; docs-only QA plan must be refreshed before source/test execution. | Market Data validation-only implementation work packet, exact reservations, and Team 00 Ready promotion. |
 | `CF-W1-L3-ALERT-01` | Child QA plan refreshed; executable validation still blocked | Team 03 prepared child contract/work packet; Team 04 refreshed alert child scenarios. | Team 00 Ready promotion, exact file reservations, and implementation handoff. |
-| `CF-W1-UX-02` | QA-blocked by Product/UX/Architecture decisions | No status change; UI smoke remains excluded until approved UI scope and spec exist. | Product/UX/Architect trust contract and implementation packet. |
+| `CF-W1-UX-02` | QA-blocked for executable validation | Option B policy resolved as Copilot-only; UI smoke remains excluded until exact spec, startup/resource plan, and Team 00 handoff exist. | Copilot-only trust contract refresh, exact reservations, and implementation packet. |
 | `CF-W1-L3-DQ-01` | Child QA scenario matrix prepared; executable validation still blocked | Product Owner accepted Option B; Team 03 refreshed architecture notes; Team 04 recorded child scenarios. This does not approve app-code or QA execution. | Child module contracts, exact reservations, and implementation handoffs. |
 | `CF-W1-TP-01A` | Backend-only QA scenario matrix prepared; executable validation still blocked | Product Owner accepted Option B; Team 03 refreshed architecture notes; Team 04 recorded backend-only scenarios. This does not approve app-code or QA execution. | Accepted backend-only child packet, exact reservations, and implementation handoff. |
 | `CF-W1-MD-02` | ADR QA checklist prepared; source/schema/test validation blocked | Product Owner accepted Option B as ADR direction only; Team 04 recorded ADR QA checklist. | Formal ADR before any separate Prisma/source/test slice. |
@@ -59,7 +59,7 @@ These child plans are not executable validation approval. Source/test execution 
 
 ## Remaining Next QA Plans
 
-1. `CF-W1-UX-05`: research-support copy QA checklist after Product/UX copy policy and shared-file reservation decisions.
+1. `CF-W1-UX-05`: Copilot-only research-support copy QA checklist after Option A packet refresh; shared-file reservation remains future.
 2. `CF-W1-BT-01`: backtesting DQ fail-closed characterization after upstream readiness policy and backtest use-case policy.
 3. `CF-W1-MD-03`: Market Data signoff threshold contract tests after signoff threshold policy and implementation scope are accepted.
 
@@ -77,11 +77,11 @@ Commands below are guidance only. They were not run during this documentation-on
 | `CF-W1-L3-DQ-01` | `cd backend` then `npm.cmd test -- alerts-monitoring.service.test.ts alerts-monitoring.routes.test.ts alerts-monitoring.validation.test.ts --runInBand` | Blocked until alert readiness contract and implementation. |
 | `CF-W1-TP-01A` | `cd backend` then `npm.cmd test -- trade-plan-risk-engine.service.test.ts trade-plan-risk-engine.paper-readiness.test.ts --runInBand` | Blocked until backend-only child implementation handoff. |
 | `CF-W1-MD-02` | `cd backend` then `npm.cmd test -- market-data-readiness-evidence.invariants.test.ts market-data-storage-readiness.invariants.test.ts market-data.universe.test.ts market-data.validation.test.ts market-data.repository.test.ts --runInBand` | Blocked until separate approved scoped implementation. |
-| `CF-W1-MD-01` | `cd backend` then `npm.cmd test -- market-data.validation.test.ts --runInBand` | Plan prepared; blocked from execution until validation policy and implementation handoff exist. |
+| `CF-W1-MD-01` | `cd backend` then `npm.cmd test -- market-data.validation.test.ts --runInBand` | Plan prepared; blocked from execution until Option A QA refresh and implementation handoff exist. |
 | `CF-W1-MD-01` | `cd backend` then `npm.cmd test -- market-data.validation.test.ts market-data-readiness-evidence.invariants.test.ts market-data.repository.test.ts --runInBand` | Approval-gated only if duplicate/readiness evidence or repository behavior is touched. |
 | `CF-W1-L3-ALERT-01` | `cd backend` then `npm.cmd test -- alerts-monitoring.service.test.ts alerts-monitoring.validation.test.ts --runInBand` | Plan prepared; blocked until `CF-W1-L3-DQ-01`, alert readiness contract, and implementation handoff. |
 | `CF-W1-L3-ALERT-01` | `cd backend` then `npm.cmd test -- alerts-monitoring.service.test.ts alerts-monitoring.ownership.test.ts alerts-monitoring.routes.test.ts --runInBand` | Approval-gated regression if alert event listing, mutation, or parent rule ownership is touched. |
-| `CF-W1-UX-02` | `cd backend` then `npm.cmd test -- ai-investment-copilot.service.test.ts ai-investment-copilot.validation.test.ts ai-investment-copilot.routes.test.ts --runInBand` | Plan prepared; blocked until Product/UX/Architect trust contract and implementation handoff. |
+| `CF-W1-UX-02` | `cd backend` then `npm.cmd test -- ai-investment-copilot.service.test.ts ai-investment-copilot.validation.test.ts ai-investment-copilot.routes.test.ts --runInBand` | Plan prepared; blocked until Copilot-only trust contract refresh and implementation handoff. |
 | `CF-W1-UX-02` | `cd frontend` then `npm.cmd run test:ui -- ai-investment-copilot.spec.ts --workers=1` | Approval-gated only after UI implementation, local app startup plan, memory/resource check, and exact UI spec exists. Current spec is absent. |
 
 ## Safe Command Discipline
@@ -97,9 +97,11 @@ Provider-adjacent, startup-adjacent, frontend build, backend build, UI smoke, li
 - `CF-W1-L3-DQ-01`: blocked from executable validation until child contracts, exact file reservations, and implementation handoff exist.
 - `CF-W1-TP-01A`: blocked from executable validation until backend-only child packet, exact file reservations, and implementation handoff exist; full target geometry migration remains separate.
 - `CF-W1-MD-02`: blocked from executable validation because Option B is ADR direction only; formal ADR and source/schema/test work need separate approval.
-- `CF-W1-MD-01`: executable validation remains blocked until future-date, adjusted-close, suspicious-volume, and spike policy are accepted and implementation scope exists.
+- `CF-W1-MD-01`: executable validation remains blocked until Option A QA refresh, exact validation source/test reservations, and implementation scope exist.
 - `CF-W1-L3-ALERT-01`: child QA plan is refreshed; blocked until Team 00 Ready promotion, exact reservations, and implementation handoff.
 - `CF-W1-L3-PORT-01`: child QA plan is prepared; blocked until Team 00 selects portfolio/watchlist split and promotes exact reservations.
 - `CF-W1-TP-01B`: child QA plan is prepared; blocked until Team 00 Ready promotion and exact backend-only implementation handoff.
 - `CF-W1-NOTIF-02`: focused QA plan is prepared; blocked until Team 00/Team 09 Ready promotion and exact notification provider/test/doc reservation.
-- `CF-W1-UX-02`: blocked by Copilot naming/trust-field/blocked-state decisions, shared-file reservation if needed, and implementation handoff.
+- `CF-W1-UX-02`: executable validation remains blocked until Copilot-only trust-field contract refresh, exact file reservations, and implementation handoff.
+- `CF-W1-AUTH-01`: executable validation remains blocked until Option A platform QA refresh, exact controller/test reservations, and implementation handoff.
+- `CF-W1-SUB-01`: executable validation remains blocked until Option A platform QA refresh, exact backend reservations, and implementation handoff.

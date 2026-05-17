@@ -17,7 +17,7 @@ Current priority after Team 01 audit consumption:
 3. Prepare or revise QA plans and focused test commands for `CF-W1-NOTIF-02`.
 4. Prepare or revise QA plans and focused test commands for `CF-W1-L3-ALERT-01`.
 5. Keep `CF-W1-L3-INTEL-01` QA blocked behind accepted `CF-W1-L3-PORT-01A`.
-6. Keep `CF-W1-MD-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-AUTH-01`, and `CF-W1-SUB-01` executable QA blocked until their decisions resolve.
+6. Refresh QA plans for `CF-W1-MD-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-AUTH-01`, and `CF-W1-SUB-01` against the resolved policies; executable QA remains blocked until Team 00 promotes exact implementation handoffs.
 
 No executable QA is authorized. Commands are guidance only until Team 00 promotes a bounded implementation handoff.
 
@@ -48,8 +48,9 @@ Executable QA is blocked for all current candidates because no app-code item is 
 
 Decision reconciliation:
 
-- Five decisions remain open and scoped.
-- They do not block QA plan preparation for `CF-W1-L3-PORT-01A`, `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, or `CF-W1-L3-ALERT-01`.
+- No open decisions remain.
+- Product Owner action is not required.
+- The former decision-blocked items now need QA refresh, exact file reservations, and Team 00 Ready promotion before executable QA.
 
 ## Expected Outbox
 

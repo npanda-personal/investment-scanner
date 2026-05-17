@@ -67,7 +67,7 @@ Mode: continued Team 02 docs-only requirement/queue refresh. No application sour
 - Refreshed `refinement-queue.md` with `CF-W1-L3-AUTH-03`, `CF-W1-L3-INTEL-01`, `CF-W1-MD-01`, and `CF-W1-UX-05` architecture/QA/readiness status.
 - Refreshed `ready-for-implementation.md` to list `CF-W1-L3-AUTH-03` as prepared but not Ready.
 - Refreshed `blocked-by-upstream-dependency.md` to remove stale "QA refresh needed" wording for PORT, ALERT, TP-01B, and NOTIF where QA plans now exist.
-- Refreshed `blocked-by-decision.md` and `ready-for-implementation.md` to recognize five open Decision Inbox items, including `CF-W1-MD-01` and `CF-W1-UX-05`.
+- Refreshed `blocked-by-decision.md` and `ready-for-implementation.md` to recognize five then-current Decision Inbox items, including `CF-W1-MD-01` and `CF-W1-UX-05`; superseded by the later 2026-05-18 decision-resolution reconciliation below.
 - Recognized Team 08's `CF-W1-UX-02` contract/work packet/QA prep while keeping implementation blocked by the open UX/product decision.
 
 ## Files Changed
@@ -94,16 +94,16 @@ No item was moved to Ready.
 | CF-W1-NOTIF-02 | Requirement, architecture, contract, work packet, and platform QA plan prepared; blocked until Team 00/Team 09 Ready promotion. |
 | CF-W1-MD-02 | ADR direction accepted; blocked until formal ADR and later source/schema split approval. |
 | CF-W1-L3-INTEL-01 | Requirement, architecture review, contract, work packet, and QA plan prepared; blocked until `CF-W1-L3-PORT-01A` is accepted and Team 00 promotes. |
-| CF-W1-MD-01 | Requirement and QA plan prepared; blocked by open Product Owner/Architect/QA validation-policy decision. |
-| CF-W1-UX-02 | Contract/work packet/QA prep exists; blocked by open Product Owner/UX/Architect decision. |
-| CF-W1-UX-05 | Requirement, contract, work packet, and QA plan prepared; blocked by open Product Owner/UX/Architect policy decision. |
-| CF-W1-AUTH-01 | Blocked by open Decision Inbox item. |
-| CF-W1-SUB-01 | Blocked by open Decision Inbox item. |
+| CF-W1-MD-01 | Requirement and QA plan prepared; Option A policy now resolved; post-decision packet refresh still needed. |
+| CF-W1-UX-02 | Contract/work packet/QA prep exists; Option B policy now resolved; Copilot-only packet refresh still needed. |
+| CF-W1-UX-05 | Requirement, contract, work packet, and QA plan prepared; Option A policy now resolved; Copilot-only sequencing still needed. |
+| CF-W1-AUTH-01 | Previously decision-blocked; superseded by 2026-05-18 Option A resolution and packet-refresh state. |
+| CF-W1-SUB-01 | Previously decision-blocked; superseded by 2026-05-18 Option A resolution and packet-refresh state. |
 
 ## Decisions
 
 - Decisions opened by Team 02: none.
-- Existing open decisions recognized:
+- Decisions recognized during the Team 02 pass, now resolved by Team 00:
   - `DECISION-20260517-platform-auth-default-user-fallback-policy`
   - `DECISION-20260517-local-manual-subscription-plan-change-policy`
   - `DECISION-20260517-copilot-trust-ux-policy`
@@ -125,7 +125,7 @@ No item was moved to Ready.
 
 - Shared worktree is dirty with concurrent docs from multiple teams. Team 02 did not stage or commit.
 - No app-code Ready item exists until Team 00 promotes a specific child with exact handoff/reservations.
-- `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-MD-01`, `CF-W1-AUTH-01`, and `CF-W1-SUB-01` remain blocked by open decisions.
+- `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-MD-01`, `CF-W1-AUTH-01`, and `CF-W1-SUB-01` moved out of Decision Inbox blocker state after Product Owner resolution; all still need post-decision packet refresh before source/test work.
 - `CF-W1-UX-05` remains valid but dropped out of the current top ten due to lower maturity than `CF-W1-L3-AUTH-03`.
 
 ## Next Recommended Assignment
@@ -135,3 +135,130 @@ No item was moved to Ready.
 3. Product Owner/Architect/QA: resolve `CF-W1-AUTH-01`, `CF-W1-SUB-01`, and `CF-W1-MD-01`.
 4. Product Owner/UX/Architect: resolve `CF-W1-UX-02` and `CF-W1-UX-05`.
 5. Team 03/04: continue formal `CF-W1-MD-02` ADR and ADR QA checklist prep.
+
+## 2026-05-18 Continuation - Team 01 Audit Consumption
+
+Mode: Team 02 monitor loop found a current Team 02 assignment and performed docs-only requirement refinement. No application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, providers, services, or frontend files changed.
+
+### Work Pulled
+
+Pulled docs-only Team 02 assignment from `16-team-inboxes/TEAM-02-current-assignment.md`.
+
+Ready work pulled: none.
+
+`12-ready-queue/ready-for-implementation.md` still reports no active application-code item is Ready for Implementation.
+
+### Queue Delta
+
+- Created first-class `CF-W1-L3-PORT-01A` portfolio-only readiness DTO requirement.
+- Reframed parent `CF-W1-L3-PORT-01` as split parent, with:
+  - `CF-W1-L3-PORT-01A`: portfolio-management readiness DTOs.
+  - `CF-W1-L3-PORT-01B`: future watchlist-management readiness DTOs.
+- Updated top-candidate and next-candidate queues to rank `CF-W1-L3-PORT-01A` as the first near-ready Lane 3 child.
+- Reordered near-ready candidates to match the 2026-05-18 Team 00 dispatch: `CF-W1-L3-PORT-01A`, `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, then `CF-W1-L3-ALERT-01`.
+- Updated backlog and refinement queue so `CF-W1-L3-PORT-01A` is the Ready-evaluation candidate and `CF-W1-L3-PORT-01B` remains future.
+- Updated ready/blocked queues to keep Ready depth at zero while reflecting the portfolio-only child split.
+- Rechecked `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01`; no new requirement file was needed because each already has a requirement, contract, QA plan, and work packet. All remain blocked until Team 00 Ready promotion.
+- Consumed Team 07 `CF-W1-L3-PORT-01A` readiness inspection and Team 06 `CF-W1-TP-01B` readiness inspection as supporting evidence. Both are stronger Ready candidates, but neither is Ready until Team 00 promotes it.
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-PORT-01A-portfolio-readiness-dto-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-PORT-01-portfolio-watchlist-readiness-dto-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/blocked-by-upstream-dependency.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/ready-for-implementation.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+### Implementation Readiness
+
+No item was moved to Ready.
+
+| ID | Result |
+| --- | --- |
+| CF-W1-L3-PORT-01A | Portfolio-only requirement and Team 07 readiness inspection prepared; blocked until Team 00 Ready promotion and implementation handoff. |
+| CF-W1-L3-PORT-01B | Future watchlist-only child; should not be combined with 01A without Team 00 exception. |
+| CF-W1-L3-INTEL-01 | Still blocked behind accepted `CF-W1-L3-PORT-01A`. |
+| CF-W1-TP-01B | Team 06 readiness inspection says the backend-only packet is aligned for handoff; still blocked until Team 00 Ready promotion. |
+| CF-W1-NOTIF-02 | Still near-ready and now third in Team 02 candidate ordering; blocked until Team 00/Team 09 Ready promotion. |
+| CF-W1-L3-ALERT-01 | Still near-ready and now fourth in Team 02 candidate ordering; blocked until Team 00 Ready promotion. |
+
+### Validation
+
+- Stale wording scan completed for parent-as-child `CF-W1-L3-PORT-01` queue references; remaining matches are intentional Ready-depth and outbox status statements.
+- `git diff --check` passed; Git reported normal Markdown CRLF conversion warnings.
+- Tests/builds/UI/live checks: none; docs-only requirement/queue update.
+
+### Next Recommended Assignment
+
+Team 00 should evaluate `CF-W1-L3-PORT-01A` for the next bounded Ready promotion before `CF-W1-L3-PORT-01B` or `CF-W1-L3-INTEL-01`.
+
+## 2026-05-18 Continuation - Team 03 Reservation Matrix Consumption
+
+Mode: Team 02 monitor loop consumed new architecture readiness evidence. No application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, providers, services, or frontend files changed.
+
+### Evidence Consumed
+
+- `03-architecture/team03-near-ready-file-reservation-matrix-2026-05-18.md`
+
+### Queue Delta
+
+- Added Team 03 matrix evidence to `CF-W1-L3-PORT-01A`, `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01` requirement/queue references.
+- Confirmed the matrix does not promote any item to Ready; it only verifies exact reservations and stop conditions for Team 00 Ready evaluation.
+- Kept top near-ready order unchanged: `CF-W1-L3-PORT-01A`, `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-L3-ALERT-01`, then `CF-W1-L3-AUTH-03`.
+
+### Implementation Readiness
+
+Ready work pulled: none.
+
+`12-ready-queue/ready-for-implementation.md` still reports no active application-code item is Ready for Implementation.
+
+### Next Recommended Assignment
+
+Team 00 should evaluate one candidate at a time for Ready promotion, starting with `CF-W1-L3-PORT-01A`, using Team 03's matrix as supporting file-reservation evidence.
+
+## 2026-05-18 Continuation - Decision Resolution Reconciliation
+
+Mode: Team 02 monitor loop consumed the 2026-05-18 Product Owner decision resolutions. No application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, providers, services, or frontend files changed.
+
+### Evidence Consumed
+
+- `99-decision-inbox/open-decisions.md`
+- `07-decisions/DECISION-20260517-platform-auth-default-user-fallback-policy-resolution.md`
+- `07-decisions/DECISION-20260517-local-manual-subscription-plan-change-policy-resolution.md`
+- `07-decisions/DECISION-20260517-copilot-trust-ux-policy-resolution.md`
+- `07-decisions/DECISION-20260517-ux-product-language-status-policy-resolution.md`
+- `07-decisions/DECISION-20260517-market-data-validation-hardening-policy-resolution.md`
+
+### Queue Delta
+
+- Confirmed Decision Inbox depth is now zero.
+- Reframed `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, and `CF-W1-MD-01` from decision-blocked to policy-resolved refinement / packet-refresh state.
+- Updated the requirement files for those five items with the accepted policy direction and next gate.
+- Updated `12-ready-queue/blocked-by-decision.md` to show no active decision blockers while preserving that none of the policy-resolved items is Ready.
+- Confirmed the first UX copy child should be Copilot-only and sequenced after or with `CF-W1-UX-02`; shared `StatusBadge`, Research Hub, and Market Data copy work remain future.
+
+### Implementation Readiness
+
+Ready work pulled: none.
+
+No policy-resolved item became implementation-ready. Each still needs architecture/QA refresh, exact file reservations, and Team 00 Ready promotion.
+
+### Next Recommended Assignment
+
+Teams 05, 08, and 09 should refresh module-local packets for `CF-W1-MD-01`, `CF-W1-UX-02` / `CF-W1-UX-05`, `CF-W1-AUTH-01`, and `CF-W1-SUB-01` while Team 00 continues one-at-a-time Ready evaluation for the already near-ready candidates.
+
+## 2026-05-18 Monitoring Heartbeat
+
+State: idle / watching queues after requirement reconciliation.
+
+Latest poll:
+
+- Ready queue depth remains zero.
+- Decision Inbox depth remains zero.
+- Team 02 inbox assignment was briefly stale in an earlier poll, but Team 00 has since refreshed it to the no-open-decisions / post-decision-refinement state.
+- Team 03 and Team 04 planning updates are consistent with Team 02 queues: no item is app-code Ready, and policy-resolved items still need packet/QA/file-reservation refresh.
+- No additional Team 02 requirement file was needed in this poll.

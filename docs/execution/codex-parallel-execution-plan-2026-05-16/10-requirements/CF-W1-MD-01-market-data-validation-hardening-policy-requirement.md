@@ -4,7 +4,7 @@ Date: 2026-05-17
 
 Owner: TEAM-05 - Market Data / Data Quality
 
-Status: Needs Product / Architect / QA Decision. Not Ready for Implementation.
+Status: Policy resolved. Not Ready for Implementation.
 
 ## Product Value
 
@@ -26,14 +26,15 @@ Current historical-price validation handles:
 - duplicate rows within the same fetched batch,
 - opt-in abnormal price spike rejection.
 
-Current historical-price validation does not yet have an accepted policy for:
+The accepted policy now covers:
 
 - future-dated candles,
 - invalid, non-positive, or out-of-range `adjustedClose`,
 - missing `adjustedClose`,
 - zero or suspicious volume,
-- default spike handling versus corporate-action-safe handling,
-- how validation findings become durable readiness evidence after `CF-W1-MD-02`.
+- default spike handling versus corporate-action-safe handling.
+
+How validation findings become durable readiness evidence remains separate under `CF-W1-MD-02`.
 
 ## Current Evidence
 
@@ -41,24 +42,23 @@ Current historical-price validation does not yet have an accepted policy for:
 - `backend/tests/modules/market-data-foundation/market-data.validation.test.ts`
 - `04-qa/CF-W1-MD-01-qa-plan.md`
 - `11-module-audits/TEAM-05-market-data-data-quality-domain-audit-2026-05-17.md`
+- `07-decisions/DECISION-20260517-market-data-validation-hardening-policy-resolution.md`
 
-## Required Decision
+## Approved Decision
 
-Decision Packet:
+Decision resolution:
 
-- `99-decision-inbox/DECISION-20260517-market-data-validation-hardening-policy.md`
+- `07-decisions/DECISION-20260517-market-data-validation-hardening-policy-resolution.md`
 
-Product Owner, Architect, and QA must choose the validation policy before source or test implementation.
+Product Owner approved Option A: conservative validation hardening without durable readiness storage implementation.
 
-## Candidate Policy Direction
+## Accepted Policy Direction
 
-Team 05 recommends a conservative but corporate-action-safe policy:
-
-- reject future-dated candles relative to the accepted evaluation or latest-completed market session date;
+- reject future-dated candles relative to the accepted evaluation date or latest completed market session date;
 - reject `adjustedClose` when it is present but non-finite, zero, negative, or outside accepted policy bounds;
 - permit missing `adjustedClose` as explicit fallback evidence, not as a trusted completeness claim;
 - keep negative volume invalid;
-- treat zero or suspicious volume as warning/readiness evidence unless the accepted scope says the asset class makes it invalid;
+- treat zero or suspicious volume as warning/readiness evidence unless a later asset-class-specific policy marks it invalid;
 - keep price-spike rejection opt-in until durable corporate-action evidence and provider source context can distinguish true bad rows from splits, bonuses, and other corporate actions;
 - emit stable validation reason strings suitable for later durable readiness evidence.
 
@@ -75,7 +75,7 @@ Team 05 recommends a conservative but corporate-action-safe policy:
 
 ## Future Allowed Files After Decision And Ready Promotion
 
-Only after policy acceptance and Ready promotion, a focused implementation packet may reserve exact files such as:
+Only after Ready promotion, a focused implementation packet may reserve exact files such as:
 
 - `backend/src/modules/market-data-foundation/market-data-foundation.validation.ts`
 - `backend/tests/modules/market-data-foundation/market-data.validation.test.ts`
@@ -107,6 +107,6 @@ No file is reserved by this requirement alone.
 
 ## Current Blockers
 
-- Product Owner / Architect / QA validation policy is unresolved.
+- Team 05, Team 03, and Team 04 still need exact validation-only reservations, architecture confirmation, and focused QA refresh.
 - `CF-W1-MD-02` durable evidence implementation is still ADR/source/schema blocked.
 - Team 05 has no app-code Ready queue item for this requirement.

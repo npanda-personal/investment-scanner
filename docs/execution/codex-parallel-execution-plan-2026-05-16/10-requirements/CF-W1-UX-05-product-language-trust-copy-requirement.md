@@ -4,7 +4,7 @@ Date: 2026-05-17
 
 Owner: Team 08 UX / Research / Copilot
 
-Status: Requirement draft. Not Ready for Implementation.
+Status: Policy resolved; first child is Copilot-only. Not Ready for Implementation.
 
 ## Product Value
 
@@ -17,6 +17,7 @@ Inputs:
 - `11-module-audits/CF-W1-UX-05-product-language-status-audit.md`
 - `11-module-audits/audit-ux-research-copilot.md`
 - `06-contracts/CF-W1-UX-02-copilot-trust-ux-contract.md`
+- `07-decisions/DECISION-20260517-ux-product-language-status-policy-resolution.md`
 
 Observed risks:
 
@@ -49,23 +50,29 @@ Future implementation must:
 - No new providers, AI services, telemetry, broker integration, or paid/cloud dependency.
 - No strategy/rule semantics changes.
 
-## Proposed Split
+## Approved First Split
 
-`CF-W1-UX-05A`: Copilot module-local copy changes after `CF-W1-UX-02` policy resolves.
+`CF-W1-UX-05A`: Copilot module-local copy changes after or together with the Copilot-only `CF-W1-UX-02` trust UX slice.
 
-`CF-W1-UX-05B`: Research Hub copy review after Copilot trust policy settles.
+Future split candidates:
 
-`CF-W1-UX-05C`: Market Data unsupported asset visibility policy and copy.
+- `CF-W1-UX-05B`: Research Hub copy review after Copilot trust policy settles.
+- `CF-W1-UX-05C`: Market Data unsupported asset visibility policy and copy.
+- `CF-W1-UX-05D`: Shared `StatusBadge` color/label semantics, requiring shared UI reservation.
 
-`CF-W1-UX-05D`: Shared `StatusBadge` color/label semantics, requiring shared UI reservation.
+Not approved in the first child:
+
+- shared `StatusBadge` changes;
+- Research Hub changes;
+- Market Data unsupported asset UI changes;
+- shared UI, route, navigation, package, provider, Prisma, or generated-file changes.
 
 ## Stop Conditions
 
-- Product/UX policy does not define first target surface.
 - Shared UI, route, navigation, or package changes become necessary without reservation.
 - Copy change would alter strategy, trigger, exit, invalidation, or DQ semantics.
 - Tests would only check page load instead of copy/trust behavior.
 
 ## Next Gate
 
-Resolve `DECISION-20260517-ux-product-language-status-policy`, then prepare the selected child packet.
+Prepare a Copilot-only `CF-W1-UX-05A` child packet sequenced after or together with `CF-W1-UX-02`; Team 00 must promote an exact handoff before implementation.

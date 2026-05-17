@@ -4,7 +4,7 @@ Date: 2026-05-17
 
 Owner: Team 09 Platform / Auth / Subscription / Notifications with QA Factory review
 
-Status: QA planning only; not executable until decisions and file reservations are accepted
+Status: QA planning only; not executable until Option A file reservations and implementation handoffs are accepted
 
 ## Scope
 
@@ -16,8 +16,8 @@ Validate the next Team 09 platform slices:
 
 ## Preconditions
 
-- `CF-W1-AUTH-01` tests require its Product Owner/Architect/QA decision to be resolved first.
-- `CF-W1-SUB-01` tests require its Product Owner/Architect/QA decision to be resolved first.
+- `CF-W1-AUTH-01` policy is resolved as Option A; tests still require exact controller/test reservations and Team 00 implementation handoff.
+- `CF-W1-SUB-01` policy is resolved as Option A; tests still require exact backend reservations and Team 00 implementation handoff.
 - `CF-W1-NOTIF-02` does not require the auth/subscription decisions, but does require exact notification provider/test/doc file reservations before source work.
 - No Prisma, route registry, package, shared UI, or external provider work is included.
 
@@ -33,18 +33,10 @@ Validate the next Team 09 platform slices:
 
 ### Subscription Policy
 
-Scenario set depends on the Product Owner decision:
-
-- Admin/manual only:
-  - normal `POST /subscription/change-plan` is rejected or disabled for ordinary users.
-  - admin `PATCH /subscription/users/:userId/plan` remains guarded by `ADMIN_API_KEY`.
-  - plan limits still read the authenticated user's current subscription.
-- Self-service `FREE`/`PRO`, admin-only `ADMIN`:
-  - ordinary users can select `FREE` and `PRO`.
-  - ordinary users cannot select `ADMIN`.
-  - admin endpoint can assign `ADMIN` with the configured key.
-- Current behavior retained:
-  - tests document that self-selection is local-validation-only and not production billing.
+- Ordinary users cannot self-change their own subscription plan.
+- Ordinary users cannot self-select `ADMIN`.
+- Admin/manual plan path remains guarded by `ADMIN_API_KEY` if already present and safe.
+- Plan limits still read the authenticated user's current subscription.
 
 ### Notification Redaction
 
@@ -95,6 +87,6 @@ npm.cmd test -- subscription-billing.routes notifications-delivery.routes --runI
 
 ## Current Blockers
 
-- `CF-W1-AUTH-01` Product Owner/Architect decision is open.
-- `CF-W1-SUB-01` Product Owner/Architect decision is open.
+- `CF-W1-AUTH-01` needs Option A QA refresh, exact controller/test reservations, and Team 00 Ready promotion.
+- `CF-W1-SUB-01` needs Option A QA refresh, exact backend reservations, frontend limitation handling, and Team 00 Ready promotion.
 - `CF-W1-NOTIF-02` needs Ready promotion and exact notification provider/test/doc file reservation before source work.

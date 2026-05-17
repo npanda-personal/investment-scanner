@@ -117,3 +117,26 @@ Readiness result: `CF-W1-MD-02` remains not Ready for Implementation. The ADR dr
 No tests, builds, Prisma commands, providers, servers, UI checks, commits, or pushes were run.
 
 Next action: route the ADR draft to Team 00 / Architect / QA acceptance. If review is pending, Team 03 can continue docs-only child contract prep with `CF-W1-L3-INTEL-01`.
+
+## Team 03 Near-Ready Matrix - 2026-05-18
+
+Prepared a consolidated architecture/file-reservation readiness matrix:
+
+- `03-architecture/team03-near-ready-file-reservation-matrix-2026-05-18.md`
+
+Current result:
+
+| Candidate | Architecture/file-reservation status | App-code status |
+| --- | --- | --- |
+| `CF-W1-L3-PORT-01A` | Portfolio-management-only reservation is exact and has no shared/high-risk request if DQE is consumed through public outputs. | Not Ready until Team 00 promotion. |
+| `CF-W1-TP-01B` | Backend-only Trade Plan reservation is exact; optional geometry file requires Architect note. | Not Ready until Team 00 promotion. |
+| `CF-W1-NOTIF-02` | Local notification log provider redaction reservation is exact and separated from auth/subscription decisions. | Not Ready until Team 00/Team 09 promotion. |
+| `CF-W1-L3-ALERT-01` | Backend-only alert readiness suppression reservation is exact; no decision blocker if `LIMITED` remains suppressed. | Not Ready until Team 00 promotion. |
+
+No new Decision Packet was opened.
+
+No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
+
+Scoped Markdown validation completed: `git diff --check` passed for the Team 03 tracked docs with normal CRLF warnings, and a trailing-whitespace scan over edited Team 03 docs returned no matches.
+
+Next action: Team 00 should evaluate one bounded candidate for Ready promotion, with `CF-W1-L3-PORT-01A` as the strongest first Lane 3 candidate and `CF-W1-L3-INTEL-01` held downstream until `PORT-01A` is accepted.

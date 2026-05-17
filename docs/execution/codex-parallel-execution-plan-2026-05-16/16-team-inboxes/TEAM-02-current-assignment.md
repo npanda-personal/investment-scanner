@@ -17,7 +17,7 @@ Current priority after Team 01 audit consumption:
 3. Refine `CF-W1-NOTIF-02` as a provider/service-doc notification log redaction candidate.
 4. Refine `CF-W1-L3-ALERT-01` as an alert readiness suppression candidate, still behind explicit Team 00 promotion.
 5. Keep `CF-W1-L3-INTEL-01` dependent on accepted `CF-W1-L3-PORT-01A`; do not frame it as independently Ready.
-6. Keep `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, and `CF-W1-MD-01` blocked by Decision Inbox policy.
+6. Refresh `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, and `CF-W1-MD-01` from decision-blocked to post-decision refinement. Do not mark them Ready.
 
 Do not move any application-code item to Ready. Team 00 owns Ready queue movement.
 
@@ -47,9 +47,9 @@ Do not duplicate existing Decision Packets. Report any new true consent blocker 
 
 Decision reconciliation:
 
-- Five open decisions remain open and scoped.
-- No decision was found already resolved, stale, or duplicated in this cycle.
-- These decisions block only `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, and `CF-W1-MD-01`.
+- No open decisions remain.
+- Product Owner action is not required.
+- The five former Decision Inbox items are policy-resolved but still need requirement/contract/QA/reservation refresh before source/test work.
 
 ## Expected Outbox
 

@@ -2,6 +2,19 @@
 
 Date: 2026-05-17
 
+## Heartbeat - 2026-05-18
+
+- State: idle / monitoring, no Team 09 app-code item Ready.
+- Current branch/worktree: `dev` / primary repository worktree.
+- Evidence sync: `git status --short`, `git branch --show-current`, and `git log --oneline -5` run.
+- Ready queue result: `12-ready-queue/ready-for-implementation.md` says no active application-code item is Ready.
+- Team 09 ready-candidate result: `CF-W1-NOTIF-02` is prepared but still needs Team 00/Team 09 Ready promotion.
+- Decision blockers: `CF-W1-AUTH-01` and `CF-W1-SUB-01` are resolved by Product Owner Option A decisions but still need Team 09/03/04 packet refresh and Team 00 Ready promotion before source work.
+- Source changes: none.
+- Tests run: none.
+- Commit: none.
+- Next relaunch condition: Team 00/ready queue promotes `CF-W1-NOTIF-02`, or Product Owner/Architect/QA resolves the auth/subscription policy decisions.
+
 ## Team
 
 - Team id: TEAM-09
@@ -110,7 +123,7 @@ No builds, focused tests, UI checks, live data checks, providers, migrations, or
 
 Promote `CF-W1-NOTIF-02` as the next small Team 09 implementation slice after QA accepts the work packet and exact file reservation is recorded.
 
-Keep `CF-W1-AUTH-01` and `CF-W1-SUB-01` blocked until the two open Decision Inbox items are resolved.
+Keep `CF-W1-AUTH-01` and `CF-W1-SUB-01` out of source work until Team 09/03/04 refresh exact backend packets and Team 00 promotes implementation handoffs.
 
 ## Can Continue Without Human Approval
 

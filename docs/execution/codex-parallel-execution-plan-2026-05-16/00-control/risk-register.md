@@ -71,7 +71,7 @@
 - Downstream modules remain blocked from treating Market Data / DQ as trusted input until module-specific consumer gates are implemented and tested.
 - Strategy Decision target-price semantics are resolved for the bounded Option B-Strict compatibility slice; Trade Plan no-target/DQ hard-block policy is resolved as Option B but backend implementation is not yet ready.
 - Alert event ownership first backend slice is resolved and committed as `CF-W1-L3-AUTH-02`; notification/copilot digest consumers and Lane 3 readiness consumer implementation remain separate.
-- Copilot/research trust UX remains unresolved.
+- Copilot trust UX policy is resolved as Option B; implementation remains blocked until Copilot-only contract/QA/file reservations and source-supported trust evidence are refreshed.
 - Continuous Factory Wave 2 dirty DQ changes were accepted and committed as `CF-W2-DQ-01`.
 - Continuous Factory Wave 2 Signal Generation changes were reframed as bounded `CF-W2-SIG-01A`; `CF-W1-SIG-01B` adds trusted list read-path filtering.
 - No downstream Trade Plan, alert, portfolio, watchlist readiness, or copilot implementation is allowed until module-specific consumer gates, child contracts, QA scenarios, and exact file reservations are recorded.
@@ -119,7 +119,7 @@
 - Market Data durable readiness evidence remains ADR-first because source implementation may require Prisma/storage policy decisions.
 - Alert event ownership remains a high-risk boundary because event inbox actions are global and direct event ownership may require Prisma changes.
 - Copilot/research trust remains blocked by product-language and UX-scope decisions before UI or backend changes.
-- Subscription self-plan behavior remains a Product Owner policy blocker.
+- Subscription self-plan behavior is resolved as Option A: ordinary users may not self-change plans or self-select `ADMIN`; backend implementation remains blocked until module-local contract/QA/reservation refresh.
 - Notification log previews create a local privacy review item before notification QA can broaden.
 
 ## Daemon Scheduler Mode Risk Decisions
@@ -166,3 +166,13 @@
 - `CF-W1-L3-PORT-01A`, `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01` are not decision-blocked, but remain out of Ready until Team 02/03/04 and lane-team readiness inspections confirm exact implementation boundaries.
 - `CF-W1-L3-INTEL-01` must remain upstream-blocked until `CF-W1-L3-PORT-01A` is implemented, accepted, and committed.
 - The stale completed-work inbox `16-team-inboxes/TEAM-07-CF-W1-L3-AUTH-01.md` must not be used as a current Ready signal; Team 07 current routing is `16-team-inboxes/TEAM-07-current-assignment.md`.
+
+## Decision Resolution Risk Decisions - 2026-05-18
+
+- Product Owner resolved all five current Decision Inbox items; open decisions are now zero and Product Owner action is not required.
+- `CF-W1-AUTH-01` is resolved as Option A: protected Team 09 controllers fail closed when `req.user.id` is missing. Risk remains if implementation needs auth middleware, routes, Prisma/schema, shared utilities, package, generated files, or frontend changes; keep those forbidden without a new decision.
+- `CF-W1-SUB-01` is resolved as Option A: ordinary users cannot self-change subscription plans or self-select `ADMIN`; admin/manual path may remain if present and safe. Risk remains if implementation needs frontend UI changes, payment providers, route registry, Prisma/schema, packages, or shared UI.
+- `CF-W1-UX-02` is resolved as Option B: first slice is Copilot-only, research-support naming, blocked narrative hidden, no Stock Research Workbench, no shared UI/navigation. Risk remains if current source cannot prove mandatory trust fields; create a contract work item or Decision Packet instead of inventing evidence.
+- `CF-W1-UX-05` is resolved as Option A: first copy cleanup is Copilot-only after or together with `CF-W1-UX-02`; shared `StatusBadge`, Research Hub, and Market Data UI changes remain future.
+- `CF-W1-MD-01` is resolved as Option A: future-dated candles and invalid adjusted close are rejected; missing adjusted close is fallback/incomplete evidence; zero/suspicious volume is warning evidence; spike rejection remains opt-in. Durable readiness storage, provider/startup behavior, schema, routes, shared utilities, frontend, packages, generated files, and live providers remain out of scope.
+- No application-code item became Ready from these policy resolutions. Ready queue depth remains zero until Team 00 promotes one exact implementation handoff.

@@ -451,3 +451,58 @@ Dispatch:
 No application code was modified.
 
 No builds, tests, UI checks, services, providers, Prisma commands, or pushes were run during this routing pass.
+
+---
+
+# Five-Decision Resolution Checkpoint
+
+Date: 2026-05-18
+
+State: Decision Inbox resolved; daemon checkpointing
+
+## Work Item
+
+Resolve the five current Decision Inbox items from Product Owner instruction and refresh active execution queues.
+
+## Decisions Resolved
+
+| Decision | Result |
+| --- | --- |
+| `DECISION-20260517-platform-auth-default-user-fallback-policy` | Option A approved. |
+| `DECISION-20260517-local-manual-subscription-plan-change-policy` | Option A approved. |
+| `DECISION-20260517-copilot-trust-ux-policy` | Option B approved. |
+| `DECISION-20260517-ux-product-language-status-policy` | Option A approved. |
+| `DECISION-20260517-market-data-validation-hardening-policy` | Option A approved. |
+
+## Queue Result
+
+- Open decisions: 0.
+- Product Owner action required: no.
+- Ready queue depth: 0 active application-code items.
+- Refinement queue depth: 13 active unique refinement / near-ready items.
+- Integration queue depth: 0 active application-code items.
+- Daemon should continue autonomous work.
+
+## Implementation Decision
+
+No application-code child item became Ready for Implementation.
+
+Reason:
+
+- `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, and `CF-W1-MD-01` moved out of Decision Inbox blocker state but still need module-specific packet refresh, exact file reservations, QA refresh, and Team 00 Ready promotion.
+- Existing near-ready candidates remain out of Ready until Team 00 promotes one exact child with an implementation handoff.
+
+## Assignments Updated
+
+- `16-team-inboxes/TEAM-02-current-assignment.md`
+- `16-team-inboxes/TEAM-03-current-assignment.md`
+- `16-team-inboxes/TEAM-04-current-assignment.md`
+- `16-team-inboxes/TEAM-05-current-assignment.md`
+- `16-team-inboxes/TEAM-08-current-assignment.md`
+- `16-team-inboxes/TEAM-09-current-assignment.md`
+
+## Validation
+
+- Evidence sync run at checkpoint start: `git status --short --branch`, `git branch --show-current`, `git log --oneline -10`.
+- No application code was modified.
+- No builds, tests, UI checks, services, providers, Prisma commands, migrations, or pushes were run during this docs-only routing pass.

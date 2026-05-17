@@ -24,20 +24,30 @@ Those decisions remove the Decision Inbox blockers, but they are not app-code im
 
 Post-decision child prep has advanced, but still has not produced an app-code Ready item:
 
-- `CF-W1-L3-PORT-01`: portfolio/watchlist readiness DTO child architecture contract, exact backend reservations, and child QA plan are prepared; still needs Team 00 child selection and Ready promotion.
-- `CF-W1-L3-ALERT-01`: alert readiness suppression child architecture contract, exact backend reservations, and child QA plan are prepared; still needs Team 00 Ready promotion.
+- `CF-W1-L3-PORT-01A`: portfolio-only readiness DTO child requirement, parent architecture contract, Team 03 near-ready file-reservation matrix, exact backend reservations, child QA plan, and Team 07 readiness inspection are prepared; still needs Team 00 Ready promotion.
+- `CF-W1-L3-ALERT-01`: alert readiness suppression child architecture contract, Team 03 near-ready file-reservation matrix, exact backend reservations, and child QA plan are prepared; still needs Team 00 Ready promotion.
 - `CF-W1-L3-AUTH-03`: alert rule target ownership requirement, architecture review, contract, work packet, and QA plan are prepared; still needs Team 00 Ready promotion.
 - `CF-W1-L3-INTEL-01`: portfolio-intelligence reliability requirement, architecture review, contract, work packet, QA plan, and Team 03 signoff are prepared; still blocked until `CF-W1-L3-PORT-01A` is accepted and Team 00 promotes the child.
-- `CF-W1-TP-01B`: Trade Plan backend-only compatibility/DQ hard-block child architecture contract, exact backend reservations, and child QA plan are prepared; still needs Team 00 Ready promotion.
-- `CF-W1-NOTIF-02`: notification log redaction requirement, architecture review, contract, work packet, and platform QA plan are prepared; still needs Team 00/Team 09 Ready promotion.
+- `CF-W1-TP-01B`: Trade Plan backend-only compatibility/DQ hard-block child architecture contract, Team 03 near-ready file-reservation matrix, exact backend reservations, child QA plan, and Team 06 readiness inspection are prepared; still needs Team 00 Ready promotion.
+- `CF-W1-NOTIF-02`: notification log redaction requirement, architecture review, contract, work packet, platform QA plan, and Team 03 near-ready file-reservation matrix are prepared; still needs Team 00/Team 09 Ready promotion.
 
-Five policy/validation/UX items are blocked by open Decision Inbox entries and are not Ready:
+Product Owner resolved the five current Decision Inbox items on 2026-05-18:
 
-- `CF-W1-AUTH-01`: authenticated controller `default-user` fallback policy.
-- `CF-W1-SUB-01`: local/manual subscription plan-change policy.
-- `CF-W1-UX-02`: Copilot trust UX naming, blocked-summary visibility, trust-field requirements, and Stock Research inclusion policy.
-- `CF-W1-UX-05`: first product-language/status cleanup target and shared UI reservation policy.
-- `CF-W1-MD-01`: Market Data validation policy for future-dated candles, adjusted close, suspicious volume, and spike handling.
+- `CF-W1-AUTH-01`: Option A, protected Team 09 controllers fail closed when `req.user.id` is missing.
+- `CF-W1-SUB-01`: Option A, ordinary users may not self-change plan or self-select `ADMIN`; plan changes are admin/manual only.
+- `CF-W1-UX-02`: Option B, first slice is Copilot-only with research-support naming and blocked narrative hidden.
+- `CF-W1-UX-05`: Option A, first product-language cleanup is Copilot-only after or with the Copilot trust slice; shared `StatusBadge` remains future.
+- `CF-W1-MD-01`: Option A, future-dated candles and invalid adjusted close are rejected; missing adjusted close is fallback/incomplete evidence; suspicious volume is warning evidence; spike rejection remains opt-in.
+
+Those decisions remove the Decision Inbox blockers, but they are not app-code implementation handoffs. The affected items still need module-specific contract/QA refresh, exact file reservations, source/test evidence, and Team 00 Ready promotion before any app-code team can pull them.
+
+Newly resolved but still not Ready:
+
+- `CF-W1-AUTH-01`: needs Team 09/Team 03/Team 04 module-local backend packet and controller/test reservations.
+- `CF-W1-SUB-01`: needs Team 09/Team 03/Team 04 backend-only packet and known frontend limitation handling.
+- `CF-W1-UX-02`: needs Team 08/Team 03/Team 04 Copilot-only trust contract refresh, source-supported trust-field mapping, focused QA plan, and exact backend/frontend/test reservations.
+- `CF-W1-UX-05`: needs Copilot-only child sequencing with `CF-W1-UX-02`; shared UI remains forbidden.
+- `CF-W1-MD-01`: needs Market Data validation-only work packet, focused QA refresh, and no storage/provider/schema scope.
 
 ## Completed Slices Not Active For Pull
 
@@ -60,13 +70,11 @@ The following are completed, superseded, or split and must not be treated as act
 
 The current top findings still require at least one of:
 
-- UX decision,
 - refreshed Architect child contract or ADR record,
 - exact module-level file reservation,
 - refreshed QA scenario matrix,
 - source-changing implementation packet,
 - schema/migration approval for future Market Data storage work,
-- UI product decision,
 - shared-file reservation,
 - upstream dependency completion,
 - focused QA plan.
@@ -77,7 +85,7 @@ Forcing implementation now would either preserve unsafe behavior with misleading
 
 Docs-only contract and QA preparation:
 
-- `CF-W1-L3-PORT-01`
+- `CF-W1-L3-PORT-01A`
 - `CF-W1-L3-ALERT-01`
 - `CF-W1-L3-AUTH-03`
 - `CF-W1-L3-INTEL-01`
@@ -89,13 +97,18 @@ Docs-only contract and QA preparation:
 
 Next Team 00/owner work should evaluate the prepared child artifacts for Ready promotion:
 
-- `CF-W1-L3-PORT-01`: select and promote the portfolio/watchlist readiness DTO child if the prepared contract and QA plan pass Ready gates.
+- `CF-W1-L3-PORT-01A`: promote the portfolio-only readiness DTO child if the prepared requirement, parent contract, and QA plan pass Ready gates.
+- `CF-W1-TP-01B`: promote the backend-only Trade Plan compatibility and DQ hard-block child if the prepared contract and QA plan pass Ready gates.
+- `CF-W1-NOTIF-02`: promote the notification log redaction slice if the prepared requirement, contract, work packet, and platform QA plan pass Ready gates.
 - `CF-W1-L3-ALERT-01`: promote the alert readiness suppression child if the prepared contract and QA plan pass Ready gates.
 - `CF-W1-L3-AUTH-03`: promote the alert rule target ownership child if the prepared requirement, contract, work packet, and QA plan pass Ready gates.
 - `CF-W1-L3-INTEL-01`: keep queued behind `CF-W1-L3-PORT-01A`; promote only after portfolio readiness DTOs are implemented and accepted.
-- `CF-W1-TP-01B`: promote the backend-only Trade Plan compatibility and DQ hard-block child if the prepared contract and QA plan pass Ready gates.
-- `CF-W1-NOTIF-02`: promote the notification log redaction slice if the prepared requirement, contract, work packet, and platform QA plan pass Ready gates.
 - `CF-W1-MD-02`: formal ADR and later approval-gated source/schema split packets.
+- `CF-W1-AUTH-01`: refresh Team 09 backend fail-closed controller packet after Option A.
+- `CF-W1-SUB-01`: refresh Team 09 backend manual/admin-only subscription packet after Option A.
+- `CF-W1-UX-02`: refresh Copilot-only trust UX packet after Option B.
+- `CF-W1-UX-05`: fold Copilot-only copy cleanup into or behind `CF-W1-UX-02`; keep shared status work future.
+- `CF-W1-MD-01`: refresh Market Data validation-only packet after Option A.
 
 No app-code item became Ready during decision resolution or post-decision child prep.
 
@@ -105,6 +118,13 @@ No app-code item became Ready during decision resolution or post-decision child 
 - `CF-W1-L3-INTEL-01` remains blocked behind accepted `CF-W1-L3-PORT-01A`.
 - The stale completed-work inbox `16-team-inboxes/TEAM-07-CF-W1-L3-AUTH-01.md` must not be used as current Ready evidence.
 - No application source/test implementation is authorized by this routing update.
+
+2026-05-18 decision resolution result:
+
+- Open decisions are zero.
+- Product Owner action is not required.
+- Daemon should continue autonomous work.
+- No application-code item became Ready from the five policy resolutions.
 
 ## Ready Criteria Reminder
 

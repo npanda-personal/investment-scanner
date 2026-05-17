@@ -19,6 +19,7 @@ Latest inputs:
 - `17-team-outboxes/TEAM-08-ux-research-copilot-2026-05-17.md`
 - `11-module-audits/audit-ux-research-copilot.md`
 - `00-control/risk-register.md`
+- `07-decisions/DECISION-20260517-copilot-trust-ux-policy-resolution.md`
 
 Observed gaps:
 
@@ -83,15 +84,18 @@ Accessibility/basic usability:
 - Labels should avoid advisory wording.
 - Dense evidence should be scannable without hiding blockers.
 
-## Required Decisions
+## Approved Decision
 
-Product Owner, UX, and Architect must decide:
+Product Owner approved Option B: Copilot-only trust UX slice with blocked narrative hidden.
 
-- whether to keep the `AI Investment Copilot` label or rename to a deterministic research-support label,
-- which trust fields are mandatory before a Copilot summary can be displayed as reliable,
-- whether blocked summaries should hide generated text or show it only as diagnostic/untrusted context,
-- whether shared status color/label behavior must change in this slice,
-- whether Stock Research Workbench trust surfaces are included or split to `CF-W1-UX-01`.
+Accepted policy:
+
+- Rename visible Copilot copy to `Local Research Copilot` or `Research Copilot`.
+- Hide generated narrative text in blocked states and show a blocked/trust explanation instead.
+- Keep the first implementation slice Copilot-only.
+- Split Stock Research Workbench trust surfaces to a separate requirement.
+- Exclude shared UI and navigation files.
+- Show mandatory trust fields only where current source supports them; do not invent evidence.
 
 ## Candidate Acceptance Criteria
 
@@ -110,7 +114,7 @@ Future accepted implementation must satisfy all approved UX and contract details
 - No application source or test change in this requirement refinement pass.
 - No route registry, shared UI, package, provider, startup, Prisma, or generated-file change.
 - No Copilot backend behavior change until architecture contract and QA plan exist.
-- No Stock Research implementation unless explicitly approved in this requirement or split to `CF-W1-UX-01`.
+- No Stock Research implementation in the first Copilot-only slice.
 - No external AI service or paid API.
 
 ## Future File Reservations After Approval
@@ -124,9 +128,7 @@ Likely implementation files after accepted contract, QA plan, UX approval, and w
 - `backend/src/modules/ai-investment-copilot/**`
 - `backend/tests/modules/ai-investment-copilot/**`
 - `frontend/src/features/ai-investment-copilot/**`
-- `frontend/src/features/stock-research-workbench/**` only if included by approved scope
 - `frontend/tests/ui/ai-investment-copilot.spec.ts`
-- `frontend/tests/ui/stock-research-workbench.spec.ts` only if included by approved scope
 
 ## Forbidden Without Separate Approval
 
@@ -141,7 +143,6 @@ Likely implementation files after accepted contract, QA plan, UX approval, and w
 
 ## Stop Conditions
 
-- Copilot naming decision remains unresolved and implementation depends on it.
 - Required trust fields are not available from approved backend contracts.
 - Shared UI or navigation changes are necessary but not reserved.
 - UI tests would only prove page load instead of trust/blocked behavior.
@@ -149,4 +150,4 @@ Likely implementation files after accepted contract, QA plan, UX approval, and w
 
 ## Next Gate
 
-Product/UX decision, architecture contract, and QA plan. Do not move to Ready for Implementation until exact trust fields, blocked-state behavior, file reservations, and verification plan are accepted.
+Team 08, Team 03, and Team 04 refresh the Copilot-only implementation contract, trust-field fallback behavior, focused QA plan, exact file reservations, and source-evidence constraints. Do not move to Ready for Implementation until Team 00 promotes an exact handoff.

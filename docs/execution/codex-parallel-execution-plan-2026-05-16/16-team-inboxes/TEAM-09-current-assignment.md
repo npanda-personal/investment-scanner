@@ -8,12 +8,12 @@ Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automat
 
 ## Assignment
 
-Keep auth and subscription source work blocked by policy decisions. Continue notification redaction readiness prep and queue hygiene.
+Auth and subscription policies are resolved, but source work remains blocked until module-local packets, exact file reservations, QA refresh, and Team 00 handoffs exist. Continue notification redaction readiness prep and queue hygiene.
 
 Current priority after Team 01 audit consumption:
 
-1. Keep `CF-W1-AUTH-01` blocked by `DECISION-20260517-platform-auth-default-user-fallback-policy`.
-2. Keep `CF-W1-SUB-01` blocked by `DECISION-20260517-local-manual-subscription-plan-change-policy`.
+1. Refresh `CF-W1-AUTH-01` after Option A: protected Team 09 controllers fail closed when `req.user.id` is missing; no auth middleware, routes, Prisma, shared utility, package, generated, or frontend changes.
+2. Refresh `CF-W1-SUB-01` after Option A: ordinary users may not self-change plan or self-select `ADMIN`; admin/manual path remains local if already present and safe; no frontend implementation.
 3. Inspect whether `CF-W1-NOTIF-02` can become module-local implementation-ready.
 4. Confirm whether the future write scope can stay inside notification delivery provider/service tests/module docs only.
 5. Report any need for auth/subscription policy changes, route changes, Prisma changes, shared utilities, frontend/UI, package changes, external providers, or paid/cloud behavior.
@@ -44,9 +44,9 @@ Use shared `dev` for docs-only platform prep. If `CF-W1-NOTIF-02` is promoted, u
 
 ## Blockers
 
-`CF-W1-AUTH-01` and `CF-W1-SUB-01` require Product Owner + Architect + QA decisions. `CF-W1-NOTIF-02` needs Team 00 Ready promotion.
+`CF-W1-AUTH-01` and `CF-W1-SUB-01` no longer require Product Owner decisions. They still need Team 09/03/04 packet refresh and Team 00 Ready promotion. `CF-W1-NOTIF-02` needs Team 00 Ready promotion.
 
-The open auth/subscription decisions do not block docs-only `CF-W1-NOTIF-02` readiness inspection. They do block auth fallback and subscription source work.
+No open auth/subscription decision blocks docs-only work. Auth fallback, subscription, and notification source work remain forbidden until Team 00 promotes exact implementation handoffs.
 
 ## Expected Outbox
 

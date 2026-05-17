@@ -8,13 +8,13 @@ Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automat
 
 ## Assignment
 
-`CF-W1-UX-02` implementation is blocked by open Product/UX/Architect decision. Continue docs-only UX and trust-state refinement.
+`CF-W1-UX-02` and `CF-W1-UX-05` policies are resolved, but implementation remains blocked until Copilot-only contracts, QA plans, exact file reservations, and Team 00 handoffs exist. Continue docs-only UX and trust-state refinement.
 
 Current priority:
 
-1. Refine trust-state UX questions for `DECISION-20260517-copilot-trust-ux-policy`.
-2. Keep first implementation slice Copilot-only unless the decision approves broader Stock Research/shared UI scope.
-3. Continue `CF-W1-UX-05` copy/status inventory as docs-only work.
+1. Refresh `CF-W1-UX-02` for Option B: `Local Research Copilot` / `Research Copilot`, hidden blocked narrative, Copilot-only first slice, source-supported trust fields only.
+2. Keep Stock Research Workbench, shared UI, navigation, route, package, provider, Prisma, and generated-file changes out of scope.
+3. Refresh `CF-W1-UX-05A` as Copilot-only copy cleanup after or together with `CF-W1-UX-02`; keep shared `StatusBadge`, Research Hub, and Market Data UI future.
 
 ## Scope
 
@@ -41,7 +41,7 @@ Use shared `dev` for docs-only UX prep. If `CF-W1-UX-02` is later promoted, use 
 
 ## Blockers
 
-`DECISION-20260517-copilot-trust-ux-policy` blocks implementation and Playwright trust-state validation.
+No UX Decision Inbox item remains open. Implementation and Playwright trust-state validation are still blocked until Team 00 promotes an exact Copilot-only handoff.
 
 ## Expected Outbox
 

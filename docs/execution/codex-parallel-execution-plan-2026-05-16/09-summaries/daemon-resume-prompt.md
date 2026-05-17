@@ -4,7 +4,7 @@ Date: 2026-05-18
 
 Path: `docs/execution/codex-parallel-execution-plan-2026-05-16/09-summaries/daemon-resume-prompt.md`
 
-This file exists and was updated by the daemon checkpoint protocol fix. The prompt below is directly usable as a copy-paste Codex prompt.
+This file exists and was updated after Team 00 resolved the five current Decision Inbox items. The prompt below is directly usable as a copy-paste Codex prompt.
 
 ```text
 You are Team 00 - Master Orchestrator / Integration.
@@ -16,7 +16,7 @@ docs/codex-agent-team-plan/** is historical evidence only.
 Use the active execution folder:
 docs/execution/codex-parallel-execution-plan-2026-05-16/
 
-Resume Continuous Daemon Scheduler Mode from cycle DAEMON-20260517, rolling iteration 18.
+Resume Continuous Daemon Scheduler Mode from cycle DAEMON-20260517, rolling iteration 19.
 
 Team 00 is the master runtime orchestrator. The human Product Owner is not the mediator for routine gates.
 
@@ -45,65 +45,37 @@ Read:
 - 18-integration-queue/
 
 Current open decisions:
-- `DECISION-20260517-platform-auth-default-user-fallback-policy`
-- `DECISION-20260517-local-manual-subscription-plan-change-policy`
-- `DECISION-20260517-copilot-trust-ux-policy`
-- `DECISION-20260517-ux-product-language-status-policy`
-- `DECISION-20260517-market-data-validation-hardening-policy`
-- Product Owner action is required only for these affected workstreams.
-- Daemon should continue unrelated autonomous docs-only work.
+- No open decisions.
+- Product Owner action not required.
+- Daemon should continue autonomous work.
+
+Latest decision resolution:
+- `DECISION-20260517-platform-auth-default-user-fallback-policy`: Option A approved.
+- `DECISION-20260517-local-manual-subscription-plan-change-policy`: Option A approved.
+- `DECISION-20260517-copilot-trust-ux-policy`: Option B approved.
+- `DECISION-20260517-ux-product-language-status-policy`: Option A approved.
+- `DECISION-20260517-market-data-validation-hardening-policy`: Option A approved.
+- Resolution docs are under `07-decisions/`.
 
 Current ready queue:
 - No active application-code item is Ready for Implementation.
 
-Latest Team 00 intake:
-- Summary path: `09-summaries/team-00-orchestrator-intake-summary.md`
-- Outbox path: `17-team-outboxes/TEAM-00-orchestrator-integration-outbox.md`
-- Branch at intake: `dev`
-- Initial worktree status at intake: clean
-- Ready queue depth: 0 active application-code items
-- Refinement queue depth: 13 active unique refinement / near-ready items
-- Integration queue depth: 0 active application-code items
-- Open decisions: 5
-- Current Team 01-10 assignment paths: `16-team-inboxes/TEAM-01-current-assignment.md` through `16-team-inboxes/TEAM-10-current-assignment.md`
-- Next Team 00 action: consume Teams 02/03/04/06/07/09 readiness reports, then evaluate one exact child for Ready promotion
-
-Latest decision resolution:
-- `DECISION-20260517-lane3-readiness-consumer-policy`: Option B approved.
-- `DECISION-20260517-trade-plan-no-target-dq-hard-block`: Option B approved.
-- `DECISION-20260517-market-data-durable-readiness-storage-adr`: Option B approved as ADR direction only.
-- Resolution docs are under `07-decisions/`.
-
 Current planning queues:
-- Team 02 refreshed requirement priorities and kept app-code Ready at zero.
-- Team 03 completed architecture prep for `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02`.
-- Team 04 refreshed QA plans for `CF-W1-MD-01`, `CF-W1-L3-ALERT-01`, `CF-W1-UX-02`, and status for Team 03 items.
-- Team 00 resolved the three Decision Inbox items after Product Owner approval and set open decisions to zero.
-- Team 00 later coordinated Teams 01-10, wrote current inbox assignments, and recorded five new open Decision Inbox policy blockers.
-- Team 00 consumed Team 01's 2026-05-18 readiness drift audit and dispatched Teams 02/03/04/06/07/09 to inspect near-ready children in parallel.
-
-Current committed daemon outputs include:
-- 1e882cd docs: authorize continuous codex factory execution
-- 1a0c91b docs: checkpoint daemon requirement and qa prep
-- ae0b4cc docs: checkpoint daemon after resolved decisions
-- f75808f docs: fix daemon checkpoint resume protocol
-- e2036dd docs: refresh daemon planning queues
-- 6ab3999 feat: add signal trigger contract projection
-- 503bcd9 fix: scope alert events by rule owner
-- 8e38c2b docs: resolve daemon decision inbox items
-- 74ba6dd fix: enforce portfolio watchlist child ownership
+- `CF-W1-L3-PORT-01A`, `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01` remain near-ready but need Team 00 Ready promotion and exact implementation handoffs.
+- `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, and `CF-W1-MD-01` moved out of Decision Inbox blocker state and into post-decision packet refresh.
+- `CF-W1-L3-INTEL-01` remains upstream-blocked behind accepted `CF-W1-L3-PORT-01A`.
+- `CF-W1-MD-02` remains ADR/source/schema split-gated.
 
 Resume daemon operation:
 1. Keep Team 00 running as scheduler/integration owner.
 2. Run Teams 01-10 from their current inbox assignments under `16-team-inboxes/`.
-3. Block only the five affected decision workstreams.
-4. Continue audits, requirement refinement, architecture prep, QA planning, implementation only when Ready criteria pass, review, and release work.
-5. Keep `CF-W1-L3-PORT-01A`, `CF-W1-L3-ALERT-01`, `CF-W1-TP-01B`, and `CF-W1-NOTIF-02` out of implementation until Teams 02/03/04 and the owning lane team report readiness, Team 00 selects a child, confirms exact reservations, and moves it to Ready.
-6. Keep `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, and `CF-W1-MD-01` out of implementation until their Decision Inbox items are resolved.
-7. Use worktrees for Teams 05-09 only after matching ready implementation work exists.
-8. Update `99-decision-inbox/open-decisions.md` whenever a true consent blocker is created or resolved.
-9. If an accepted scoped commit is created on `dev` and push gates pass, push normally to `dev`.
-10. If runtime ends again, update `09-summaries/daemon-cycle-latest.md` and this resume prompt, then return a checkpoint report.
+3. Continue audits, requirement refinement, architecture prep, QA planning, implementation only when Ready criteria pass, review, and release work.
+4. Keep `CF-W1-L3-PORT-01A`, `CF-W1-L3-ALERT-01`, `CF-W1-TP-01B`, and `CF-W1-NOTIF-02` out of implementation until Team 00 selects a child, confirms exact reservations, and moves it to Ready.
+5. Refresh `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, and `CF-W1-MD-01` packets under the resolved policies before any source/test work.
+6. Use worktrees for Teams 05-09 only after matching ready implementation work exists.
+7. Update `99-decision-inbox/open-decisions.md` whenever a true consent blocker is created or resolved.
+8. If an accepted scoped commit is created on `dev` and push gates pass, push normally to `dev`.
+9. If runtime ends again, update `09-summaries/daemon-cycle-latest.md` and this resume prompt, then return a checkpoint report.
 
 Stop only for:
 - true consent blockers,

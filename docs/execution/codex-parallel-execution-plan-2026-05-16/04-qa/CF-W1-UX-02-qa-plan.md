@@ -4,9 +4,9 @@ Date: 2026-05-17
 
 Owner: Team 04 QA Factory
 
-Status: QA planning only. Copilot trust UX validation is blocked until Product Owner, UX, and Architect accept naming, trust fields, blocked-state behavior, file reservations, and implementation scope.
+Status: QA planning only. Copilot trust UX validation remains blocked until Option B is reflected in a refreshed Copilot-only contract, exact file reservations, and implementation scope.
 
-Current status refresh: recent setup authorization does not unblock Copilot backend or UI validation. `CF-W1-UX-02` remains docs-only until Product/UX/Architecture decisions are accepted and Team 00 issues an implementation packet.
+Current status refresh: Product Owner approved Option B on 2026-05-18. `CF-W1-UX-02` remains docs-only until Team 08/03/04 refresh the Copilot-only trust packet and Team 00 issues an implementation handoff.
 
 ## Scope
 
@@ -24,17 +24,23 @@ Target surfaces after approval:
 
 This plan does not approve backend source edits, frontend source edits, test edits, Prisma changes, routes, shared utilities/UI, packages, generated files, providers, services, startup/backfill, UI implementation, Playwright, builds, broad suites, or live data checks.
 
-## Required Product, UX, And Architect Decisions
+## Approved Product / UX Policy
 
-Before implementation validation, the accepted contract must define:
+Product Owner approved:
 
-- whether the user-facing label remains `AI Investment Copilot` or changes to a deterministic research-support label,
-- required trust fields, such as DQ readiness, use-case tier, blocker reasons, latest trusted data date, source modules, data gaps, and local deterministic/no-external proof,
-- whether blocked summaries hide generated text or show diagnostic untrusted context,
-- whether `COMPLETE | PARTIAL | MISSING | ERROR` remains the public status or maps to readiness states,
-- whether Stock Research Workbench is included or split to a separate requirement,
-- whether shared status components, navigation metadata, or route registry changes are required and reserved,
-- how `region` and `assetType` scope are passed, displayed, and refreshed.
+- visible copy changes to `Local Research Copilot` or `Research Copilot`;
+- blocked summaries hide generated narrative and show blocked/trust explanation;
+- first implementation slice is Copilot-only;
+- Stock Research Workbench trust surfaces are split to a separate requirement;
+- shared status components, navigation metadata, and route registry changes are out of scope;
+- trust fields are mandatory where current source supports them and must not be invented.
+
+Before implementation validation, the refreshed contract must still define:
+
+- source-supported trust fields and fallback behavior when DQ evidence is missing;
+- whether current `COMPLETE | PARTIAL | MISSING | ERROR` maps to readiness states;
+- how `region` and `assetType` scope are passed, displayed, and refreshed;
+- exact backend, frontend, and test file reservations.
 
 ## Required QA Assertions
 
@@ -123,8 +129,7 @@ Do not run by default:
 
 Stop QA and return to Product Owner/UX/Architect if:
 
-- Copilot naming remains unresolved and implementation depends on it,
-- blocked-summary behavior is ambiguous,
+- source-supported trust-field mapping remains ambiguous,
 - required trust fields are unavailable from approved backend contracts,
 - UI smoke would only prove page load instead of trusted and blocked states,
 - implementation requires shared UI, navigation, route registry, Prisma, packages, providers, external AI, or generated files without reservation,
@@ -133,7 +138,7 @@ Stop QA and return to Product Owner/UX/Architect if:
 
 ## Evidence Required Later
 
-- Accepted Product/UX/Architect trust contract.
+- Refreshed Product/UX/Architect trust contract aligned to Option B.
 - Exact implementation handoff with changed files.
 - Backend scenario matrix results for trusted, missing, limited, blocked, stale, scoped, source-gap, and safe-language cases.
 - UI smoke evidence only after approved UI implementation.

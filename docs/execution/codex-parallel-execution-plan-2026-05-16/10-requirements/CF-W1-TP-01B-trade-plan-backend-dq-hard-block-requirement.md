@@ -19,6 +19,8 @@ Trade Plan paper-review readiness must fail closed when Data Quality evidence is
 - Architecture review: `03-architecture/CF-W1-TP-01B-architecture-review.md`.
 - Work packet draft: `08-work-packets/CF-W1-TP-01B-work-packet.md`.
 - QA plan: `04-qa/CF-W1-TP-01B-qa-plan.md`.
+- Team 03 2026-05-18 near-ready file-reservation matrix confirms this backend-only child is bounded, with exact Trade Plan file reservations and optional geometry-file use only with Architect note.
+- Team 06 2026-05-18 readiness inspection: child packet is aligned enough to become a bounded backend-only implementation handoff, but is not Ready until Team 00 promotes it and copies exact reservations into a Team 06 implementation inbox.
 - Ready queue still has no active app-code item.
 
 ## Acceptance Criteria
@@ -36,4 +38,4 @@ Trade Plan paper-review readiness must fail closed when Data Quality evidence is
 
 ## Next Gate
 
-Team 00 Ready evaluation and implementation handoff.
+Team 00 Ready evaluation and implementation handoff, including exact Trade Plan file reservations copied into a new Team 06 implementation inbox.

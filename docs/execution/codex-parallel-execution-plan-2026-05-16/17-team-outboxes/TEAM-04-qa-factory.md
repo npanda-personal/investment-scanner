@@ -1,19 +1,20 @@
 # TEAM-04 QA Factory Outbox
 
-Date: 2026-05-17
+Date: 2026-05-18
 
 Mode: docs-only QA planning.
 
 ## Current Heartbeat
 
 - Team: `TEAM-04` - QA Factory
-- State: Audit Complete / Needs Ready promotion for child implementation packets
-- Current assignment: focused QA refresh for `CF-W1-NOTIF-02` after child QA refresh for `CF-W1-L3-ALERT-01`, `CF-W1-L3-PORT-01`, and `CF-W1-TP-01B`
+- State: Idle / Watching queues / Needs Ready promotion for child implementation packets
+- Current assignment: current inbox priorities are fully covered by prepared QA plans; no executable QA is authorized until Team 00 promotes a bounded implementation handoff
+- Latest heartbeat: 2026-05-18 bounded queue check confirmed no active application-code Ready item; current portfolio priority is narrowed to `CF-W1-L3-PORT-01A`, which is covered by the prepared parent `CF-W1-L3-PORT-01` QA plan
 - Input source: runtime bootstrap, standing delegation, ready/blocked queues, Decision Inbox, Team 03 child contracts/work packets
 - Output target: `04-qa/` and this outbox
 - Branch/worktree: `dev` in `C:\work\repo\investment-scanner`
-- Active requirement ids: `CF-W1-NOTIF-02`, `CF-W1-L3-ALERT-01`, `CF-W1-L3-PORT-01`, `CF-W1-TP-01B`
-- Files reserved by Team 04 for this pass: `04-qa/CF-W1-NOTIF-02-qa-plan.md`, `04-qa/next-validation-plans.md`, this outbox
+- Active requirement ids: `CF-W1-NOTIF-02`, `CF-W1-L3-ALERT-01`, `CF-W1-L3-PORT-01A`, `CF-W1-TP-01B`
+- Files reserved by Team 04 for this pass: no active QA-plan write reservation remains; this heartbeat updates only the Team 04 outbox
 - Tests/checks run: targeted docs-only `git diff --check`, `git status --short -- <Team 04 paths>`, and `rg` line-reference checks; no executable tests
 - Commit SHA: none
 - Decision Packets created: none
@@ -28,7 +29,7 @@ Prepared and refreshed QA plans for:
 - `CF-W1-UX-02`: Copilot trust UX/backend validation after Product/UX/Architect trust contract.
 - `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02`: post-decision child scenario matrix and ADR QA checklist recorded after Team 03 architecture refresh.
 - `CF-W1-L3-ALERT-01`: refreshed child QA plan against the alert readiness suppression contract.
-- `CF-W1-L3-PORT-01`: prepared portfolio/watchlist readiness DTO child QA plan.
+- `CF-W1-L3-PORT-01`: prepared portfolio/watchlist readiness DTO child QA plan; this covers the current `CF-W1-L3-PORT-01A` portfolio-only priority.
 - `CF-W1-TP-01B`: prepared backend-only Trade Plan compatibility and DQ hard-block child QA plan.
 - `CF-W1-NOTIF-02`: prepared focused notification local log redaction QA plan.
 
@@ -177,10 +178,10 @@ Excluded by default:
 - `CF-W1-TP-01A`: backend-only scenario matrix is now recorded; QA execution is blocked until accepted backend-only child packet, exact source/test reservations, and implementation handoff.
 - `CF-W1-MD-02`: ADR QA checklist is now recorded; schema/source/test execution remains blocked until a formal storage/natural-key ADR and separate implementation slice approval.
 - `CF-W1-L3-ALERT-01`: child QA plan is refreshed; executable QA is blocked until Team 00 Ready promotion and implementation handoff.
-- `CF-W1-L3-PORT-01`: child QA plan is prepared; executable QA is blocked until Team 00 selects portfolio/watchlist split and promotes exact reservations.
+- `CF-W1-L3-PORT-01A`: portfolio-only coverage is prepared in the parent `CF-W1-L3-PORT-01` child QA plan; executable QA is blocked until Team 00 promotes exact portfolio-management reservations.
 - `CF-W1-TP-01B`: child QA plan is prepared; executable QA is blocked until Team 00 Ready promotion and backend-only implementation handoff.
 - `CF-W1-NOTIF-02`: focused QA plan is prepared; executable QA is blocked until Team 00/Team 09 Ready promotion and implementation handoff.
-- Team 09 auth/subscription decisions remain open in Decision Inbox and are unrelated to current Team 04 child-plan prep.
+- Team 09 auth/subscription decisions are resolved, but `CF-W1-AUTH-01` and `CF-W1-SUB-01` still need Option A QA refresh and exact implementation handoffs before executable QA.
 - Scoped commit/push is not attempted because the shared worktree contains many unrelated active docs changes from other teams.
 
 ## Next Recommendations

@@ -20,6 +20,7 @@ Alerts are action-like. Alerts Monitoring must not create trusted alert events f
 - Architecture review: `03-architecture/CF-W1-L3-ALERT-01-architecture-review.md`.
 - Work packet draft: `08-work-packets/CF-W1-L3-ALERT-01-work-packet.md`.
 - QA plan: `04-qa/CF-W1-L3-ALERT-01-qa-plan.md`.
+- Team 03 2026-05-18 near-ready file-reservation matrix confirms this child has exact backend reservations, no shared/high-risk request if it consumes Data Quality public service/types only, and should remain behind `CF-W1-L3-PORT-01A` unless Team 00 chooses otherwise.
 - Ready queue still has no active app-code item.
 
 ## Acceptance Criteria

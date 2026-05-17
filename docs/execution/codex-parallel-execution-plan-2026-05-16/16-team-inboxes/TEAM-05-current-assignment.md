@@ -13,8 +13,8 @@ No Market Data / Data Quality app-code item is Ready. Continue audit/refinement 
 Current priority:
 
 1. Support `CF-W1-MD-02` ADR acceptance with evidence, without source/schema/test implementation.
-2. Keep `CF-W1-MD-01` in policy-refinement until `DECISION-20260517-market-data-validation-hardening-policy` is resolved.
-3. Identify source-readiness gaps for later exact file reservations.
+2. Refresh `CF-W1-MD-01` after Option A validation policy resolution as a validation-only packet; do not edit source or tests.
+3. Identify source-readiness gaps and exact future file reservations for `market-data-foundation.validation.ts` and focused validation tests.
 
 ## Scope
 
@@ -39,7 +39,7 @@ Use shared `dev` for docs-only work. If Team 00 later promotes a Market Data imp
 
 ## Blockers
 
-`CF-W1-MD-01` is blocked by open validation-policy decision. `CF-W1-MD-02` is ADR-only and source/schema blocked.
+`CF-W1-MD-01` is no longer decision-blocked, but it still lacks a refreshed validation-only work packet, focused QA refresh, exact file reservations, and Team 00 Ready promotion. `CF-W1-MD-02` is ADR-only and source/schema blocked.
 
 ## Expected Outbox
 

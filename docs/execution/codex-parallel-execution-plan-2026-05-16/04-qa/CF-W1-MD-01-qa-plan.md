@@ -4,9 +4,9 @@ Date: 2026-05-17
 
 Owner: Team 04 QA Factory
 
-Status: QA planning only. Market Data validation hardening is blocked from executable validation until Product Owner and Architect accept the validation policy and a scoped implementation handoff exists.
+Status: QA planning only. Market Data validation hardening remains blocked from executable validation until Option A is reflected in a refreshed validation-only implementation handoff.
 
-Current status refresh: recent setup authorization does not change this candidate's QA gate. `CF-W1-MD-01` remains docs-only and QA-blocked for execution until a validation-policy decision and Team 00-owned work packet exist.
+Current status refresh: Product Owner approved Option A on 2026-05-18. `CF-W1-MD-01` remains docs-only and QA-blocked for execution until Team 05/03/04 refresh exact validation-only file reservations and Team 00 promotes a handoff.
 
 ## Scope
 
@@ -23,17 +23,18 @@ Target policy areas:
 
 This plan does not approve application source edits, test edits, Prisma changes, routes, shared utilities/UI, packages, generated files, providers, services, startup/backfill, UI implementation, builds, broad suites, or live data checks.
 
-## Required Policy Decisions
+## Approved Policy
 
-Product Owner and Architect must decide before source or test work:
+Product Owner approved:
 
-- whether future-dated candles are rejected, quarantined, or retained only as untrusted evidence,
-- whether `adjustedClose` is required when present, optional but validated if present, or explicitly absent for some providers,
-- whether non-positive, `NaN`, infinite, or out-of-range `adjustedClose` invalidates the row,
-- whether zero volume is valid for all supported asset classes or should become suspicious for `region=IN` and `assetType=STOCK`,
-- whether suspicious volume means warning-only or invalid row,
-- whether spike rejection remains opt-in or becomes an explicit policy with corporate-action exceptions,
-- how validation errors become durable readiness evidence after `CF-W1-MD-02`.
+- reject future-dated candles relative to accepted evaluation date or latest completed market session date;
+- reject `adjustedClose` when present but non-finite, zero, negative, or outside accepted policy bounds;
+- allow missing `adjustedClose` only as fallback/incomplete evidence, not trusted completeness;
+- keep negative volume invalid;
+- treat zero or suspicious volume as warning/readiness evidence unless a later asset-class policy marks it invalid;
+- keep spike rejection opt-in until durable corporate-action evidence and source context exist.
+
+Durable readiness evidence remains separate under `CF-W1-MD-02`.
 
 ## Required QA Assertions
 
@@ -104,7 +105,7 @@ Do not run by default:
 
 Stop QA and return to Product Owner/Architect if:
 
-- future-date, adjusted-close, suspicious-volume, or spike policy remains unresolved,
+- implementation asks for behavior outside the approved Option A validation policy,
 - implementation wants to change OHLC storage, Prisma schema, route registry, packages, provider behavior, scheduler/startup behavior, or shared utilities,
 - validation requires live provider data or generated provider credentials,
 - tests would preserve ambiguous behavior rather than proving accepted policy,

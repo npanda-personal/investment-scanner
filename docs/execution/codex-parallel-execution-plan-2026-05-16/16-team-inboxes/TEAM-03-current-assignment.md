@@ -17,6 +17,7 @@ Current priority after Team 01 audit consumption:
 3. Prepare architecture readiness for `CF-W1-NOTIF-02`.
 4. Prepare architecture readiness for `CF-W1-L3-ALERT-01`.
 5. Keep `CF-W1-L3-INTEL-01` explicitly downstream of accepted `CF-W1-L3-PORT-01A`.
+6. Refresh post-decision architecture/work-packet readiness for `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, and `CF-W1-MD-01` without moving them to Ready.
 
 Output should make it obvious whether any of the four near-ready candidates has exact allowed files, exact forbidden files, no shared/high-risk request, and no unresolved decision blocker.
 
@@ -45,12 +46,12 @@ Use shared `dev` for docs-only architecture work. If Team 00 later asks Team 03 
 
 ## Blockers
 
-`CF-W1-MD-02` source/schema work remains blocked by high-risk file gates. `CF-W1-UX-02` and `CF-W1-UX-05` architecture implementation scope is blocked by open UX policy decisions.
+`CF-W1-MD-02` source/schema work remains blocked by high-risk file gates. `CF-W1-UX-02` and `CF-W1-UX-05` policy is resolved, but architecture implementation scope still needs Copilot-only reservation refresh.
 
 Decision reconciliation:
 
-- No architecture decision was closed by Team 01's audit.
-- The five open decisions block only their scoped workstreams; they do not block `CF-W1-L3-PORT-01A`, `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, or `CF-W1-L3-ALERT-01` architecture prep.
+- No open Decision Inbox item remains.
+- The five resolved decisions remove Product Owner blockers only; they do not authorize source/test work without Team 00 Ready promotion.
 
 ## Expected Outbox
 

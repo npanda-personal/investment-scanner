@@ -1,16 +1,51 @@
 # TEAM-07 Portfolio / Watchlist / Alerts Outbox
 
-Date: 2026-05-17
+Date: 2026-05-18
 
 ## Heartbeat
 
 - Team: `TEAM-07` - Portfolio / Watchlist / Alerts
-- State: Audit Complete / Needs Ready promotion for implementation
-- Current assignment: Lane 3 portfolio, watchlist, alerts readiness and ownership intake
+- State: Inspection Complete / Idle for Ready promotion
+- Current assignment: Lane 3 `CF-W1-L3-PORT-01A` readiness inspection
 - Branch/worktree: `dev` in `C:\work\repo\investment-scanner`
-- Active requirement ids reviewed: `CF-W1-L3-PORT-01`, `CF-W1-L3-ALERT-01`, `CF-W1-L3-DQ-01`, `CF-W1-L3-INTEL-01`
+- Active requirement ids reviewed: `CF-W1-L3-PORT-01A`, `CF-W1-L3-PORT-01`, `CF-W1-L3-ALERT-01`, `CF-W1-L3-DQ-01`, `CF-W1-L3-INTEL-01`
 - New refinement candidates prepared: `CF-W1-L3-AUTH-03`, `CF-W1-L3-INTEL-01`
-- Can continue without human approval: yes for docs-only refinement; no for source/test implementation until Ready promotion
+- Can continue without human approval: yes for queue polling and outbox heartbeat; no for source/test implementation until Ready promotion
+
+## 2026-05-18 `CF-W1-L3-PORT-01A` Readiness Inspection
+
+Result: portfolio-only readiness DTO implementation appears eligible to become module-local after Team 00 Ready promotion, but it is not Ready now.
+
+Inspected:
+
+- `16-team-inboxes/TEAM-07-current-assignment.md`
+- `12-ready-queue/ready-for-implementation.md`
+- `10-requirements/CF-W1-L3-PORT-01A-portfolio-readiness-dto-requirement.md`
+- `03-architecture/CF-W1-L3-PORT-01-architecture-review.md`
+- `06-contracts/CF-W1-L3-PORT-01-portfolio-watchlist-readiness-dto-contract.md`
+- `04-qa/CF-W1-L3-PORT-01-qa-plan.md`
+- `08-work-packets/CF-W1-L3-PORT-01-work-packet.md`
+- `backend/src/modules/portfolio-management/portfolio-management.service.ts`
+- `backend/src/modules/portfolio-management/portfolio-management.types.ts`
+- `backend/tests/modules/portfolio-management/portfolio-management.service.test.ts`
+- `backend/src/modules/data-quality-engine/index.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.service.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
+
+Findings:
+
+- Future write scope can stay inside `portfolio-management` source/docs/tests: `portfolio-management.service.ts`, `portfolio-management.types.ts`, `portfolio-management.md`, and `portfolio-management.service.test.ts`.
+- No Prisma, route registry, shared utility, shared UI, package manifest, generated-file, provider, startup/backfill, frontend, watchlist, alerts, or portfolio-intelligence change appears required for `PORT-01A`.
+- Data Quality Engine public exports already provide `DataQualityEngineService` and `DataQualityEvaluationDto`; `DataQualityEngineService.getEvaluationsForInstruments()` supports a portfolio summary batch lookup.
+- The implementation should import only the Data Quality public service/type boundary and must not import `DataQualityEngineRepository`.
+- `DataQualityUseCaseTiers` is not re-exported from `data-quality-engine/index.ts`; the implementation can avoid a DQE export change by reading tier status through `DataQualityEvaluationDto.useCaseTiers`.
+- Existing portfolio response compatibility is feasible: `dataStatus`, valuation fields, price fields, and signal fields can remain unchanged while adding holding `readiness` and summary `readinessSummary`.
+- Constructor compatibility is feasible by adding the Data Quality service as an optional dependency after existing dependencies.
+
+Readiness recommendation:
+
+- Team 00 can promote `CF-W1-L3-PORT-01A` when the current Team 02 requirement draft is accepted, exact file reservations are copied into the Ready handoff, and the active worktree docs drift is reconciled or explicitly excluded.
+- Team 07 should remain idle for implementation until that promotion appears in the ready queue or current inbox.
 
 ## Ready Work Pulled
 
