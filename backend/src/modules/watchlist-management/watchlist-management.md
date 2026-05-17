@@ -86,6 +86,7 @@ The feature exposes a reusable `AddToWatchlistDialog` used by Signal Generation 
 ## Known Limitations
 
 - Auth Identity now protects watchlist routes. New watchlists are owned by the authenticated user. Existing nullable-owner watchlists remain readable during migration.
+- Watchlist updates and child item operations resolve the parent watchlist with the current user before validating child input or reading/mutating child records. Ownership misses return the same non-leaking `Watchlist not found` response used for absent watchlists.
 - Subscription Billing gates watchlist creation by plan limits.
 
 - No alerts, notification rules, conviction scoring, or idea-stage workflow yet.

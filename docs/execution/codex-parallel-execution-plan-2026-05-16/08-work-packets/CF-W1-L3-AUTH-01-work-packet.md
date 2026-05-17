@@ -8,9 +8,7 @@ Portfolio/watchlist child-resource ownership tests and fix.
 
 ## State
 
-Architecture-ready for bounded implementation after QA plan and Orchestrator acceptance.
-
-Implementation has not started.
+Implemented and accepted for scoped local commit after readiness, QA, code review, Architect signoff, and delegated Product Owner acceptance.
 
 ## Owner / Lane / Modules
 
@@ -92,4 +90,3 @@ Add route-focused tests only if controller/user propagation changes are covered 
 - Owned-user flows still pass.
 - No forbidden files are changed.
 - QA, code review, Architect, and Product Owner acceptance are recorded before release.
-

@@ -100,6 +100,7 @@ Realized P&L and FIFO accounting are intentionally out of scope for this MVP.
 ## Known Limitations
 
 - Auth Identity now protects portfolio routes. New portfolios are owned by the authenticated user. Existing nullable-owner portfolios remain readable during migration.
+- Portfolio updates and child holding/transaction operations resolve the parent portfolio with the current user before validating child input or reading/mutating child records. Ownership misses return the same non-leaking `Portfolio not found` response used for absent portfolios.
 - Subscription Billing gates portfolio creation by plan limits.
 
 - No multi-currency FX conversion is applied yet; values are calculated in the holding currency and portfolio base currency is metadata only.

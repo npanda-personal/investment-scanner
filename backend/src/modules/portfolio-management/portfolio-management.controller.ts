@@ -60,7 +60,7 @@ export class PortfolioManagementController {
 
   updateHolding = async (req: Request, res: Response) => {
     try {
-      return res.json(await this.service.updateHolding(getParam(req.params.id), getParam(req.params.holdingId), req.body));
+      return res.json(await this.service.updateHolding(getParam(req.params.id), getParam(req.params.holdingId), req.body, currentUserId(req)));
     } catch (error) {
       return this.error(res, error, 'Failed to update holding', 400);
     }
@@ -68,7 +68,7 @@ export class PortfolioManagementController {
 
   removeHolding = async (req: Request, res: Response) => {
     try {
-      await this.service.removeHolding(getParam(req.params.id), getParam(req.params.holdingId));
+      await this.service.removeHolding(getParam(req.params.id), getParam(req.params.holdingId), currentUserId(req));
       return res.status(204).send();
     } catch (error) {
       return this.error(res, error, 'Failed to remove holding');
@@ -97,7 +97,7 @@ export class PortfolioManagementController {
 
   listTransactions = async (req: Request, res: Response) => {
     try {
-      return res.json({ transactions: await this.service.listTransactions(getParam(req.params.id)) });
+      return res.json({ transactions: await this.service.listTransactions(getParam(req.params.id), currentUserId(req)) });
     } catch (error) {
       return this.error(res, error, 'Failed to list transactions');
     }
@@ -113,7 +113,8 @@ export class PortfolioManagementController {
 
   private error(res: Response, error: unknown, fallback: string, status = 500) {
     const message = error instanceof Error ? error.message : fallback;
+    const responseStatus = message.endsWith('not found') ? 404 : status;
     console.error(fallback, error);
-    return res.status(status).json({ error: message });
+    return res.status(responseStatus).json({ error: message });
   }
 }

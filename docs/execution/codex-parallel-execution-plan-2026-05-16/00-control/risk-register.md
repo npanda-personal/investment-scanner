@@ -62,7 +62,7 @@
 - `signal-generation-engine` run-path default/fail-closed behavior is accepted in bounded `CF-W2-SIG-01A`, and trusted list read-path filtering is committed in `CF-W1-SIG-01B` as `a5bc49a`.
 - `latestForInstrument()` is gated by committed `CF-W1-SIG-LATEST-01` as `e0a6788`.
 - Lane 2 strategy/signal/risk modules still need fail-closed downstream DQ enforcement tests beyond the accepted Signal Generation and Strategy Decision slices.
-- Lane 3 portfolio/watchlist/alerts/copilot modules still need readiness consumer contracts and tests.
+- Lane 3 portfolio/watchlist child ownership is accepted in bounded `CF-W1-L3-AUTH-01`; alerts, copilot, and Data Quality readiness consumer policy remain separate.
 - Angel One remains excluded from implementation and live validation.
 - Startup scheduler/backfill behavior requires Architect approval before it can be changed or accepted as Sprint 1B scope.
 - Downstream modules remain blocked from treating Market Data / DQ as trusted input.
@@ -71,7 +71,8 @@
 - Copilot/research trust UX remains unresolved.
 - Continuous Factory Wave 2 dirty DQ changes were accepted and committed as `CF-W2-DQ-01`.
 - Continuous Factory Wave 2 Signal Generation changes were reframed as bounded `CF-W2-SIG-01A`; `CF-W1-SIG-01B` adds trusted list read-path filtering.
-- No downstream Trade Plan, alert, portfolio, watchlist, or copilot implementation is allowed until module-specific consumer gates and Trade Plan target migration are resolved.
+- No downstream Trade Plan, alert, portfolio, watchlist readiness, or copilot implementation is allowed until module-specific consumer gates and Trade Plan target migration are resolved.
+- Portfolio/watchlist child-resource ownership hardening is accepted as `CF-W1-L3-AUTH-01`, but this does not unblock alert ownership, copilot trust UX, Data Quality readiness consumer policy, or platform nullable-owner migration.
 
 ## Sprint 1B Preparation Risk Decisions
 

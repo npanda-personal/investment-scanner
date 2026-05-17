@@ -4,9 +4,7 @@ Date: 2026-05-17
 
 ## Status
 
-Architecture-ready for a bounded module-local implementation after QA plan and Orchestrator acceptance.
-
-Implementation has not started.
+Accepted for the bounded module-local implementation after QA rerun, code review, Architect signoff, and delegated Product Owner acceptance.
 
 ## Contract Intent
 
@@ -63,4 +61,3 @@ Only authorization behavior changes: current-user parent ownership becomes requi
 - Existing owned-user child-resource flows continue to pass.
 - No Prisma, route registry, auth middleware, package, generated, shared utility/UI, provider, scheduler, or frontend files are changed.
 - QA, code review, Architect, and Product Owner acceptance are recorded before release.
-

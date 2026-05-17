@@ -73,23 +73,23 @@ Operating rules:
 | Field | Current Value |
 | --- | --- |
 | Current daemon cycle id | `DAEMON-20260517` |
-| Current rolling iteration count | 1 |
-| Active teams | Team 00 |
-| Queued teams | Team 02, Team 03, Team 04 |
-| Idle teams | Team 01, Team 05, Team 06, Team 07, Team 08, Team 09 |
-| Blocked teams | None fully blocked; Teams 05-09 have no ready implementation item |
-| Teams relaunched this cycle | Pending after daemon setup commit |
+| Current rolling iteration count | 3 |
+| Active teams | Team 00 integration; Team 10 release gates completed for `CF-W1-L3-AUTH-01` |
+| Queued teams | Team 02, Team 03, Team 04 for next-contract / next-QA refresh |
+| Idle teams | Team 01, Team 05, Team 06, Team 08, Team 09 |
+| Blocked teams | None fully blocked; implementation teams without ready work continue audit/refinement |
+| Teams relaunched this cycle | Team 02, Team 03, Team 04, Team 07, Team 10 |
 | Teams shut down due to no work | None permanently; Teams without ready implementation move to audit/refinement |
-| Teams re-added due to new work | Pending |
-| Ready queue depth | 1 application-code item |
+| Teams re-added due to new work | Team 07 was re-added for `CF-W1-L3-AUTH-01` and completed the bounded slice |
+| Ready queue depth | 0 active application-code items after `CF-W1-L3-AUTH-01` acceptance |
 | Refinement queue depth | High; see `10-requirements/next-top-10-candidates.md` |
-| Integration queue depth | 0 application-code items |
+| Integration queue depth | 1 release record accepted for scoped commit |
 | Decision inbox count | 0 open decisions |
 | Ready-work pressure | low |
 | Blocked-work pressure | high |
-| Next team to launch | Team 07 Portfolio / Watchlist / Alerts |
-| Next item to assign | `CF-W1-L3-AUTH-01` implementation |
-| Last commit | `4fee810 docs: enable continuous daemon scheduler mode` |
+| Next team to launch | Team 02 Requirement Factory, Team 03 Architecture Factory, Team 04 QA Factory |
+| Next item to assign | Refresh next ready candidate after `CF-W1-L3-AUTH-01` commit |
+| Last commit | `2552fbe docs: prepare daemon ready work for lane 3 ownership` |
 | Daemon should continue | Yes |
 
 ## Sprint 0 Items
@@ -196,3 +196,4 @@ Old work items in `docs/codex-agent-team-plan/` may be used only as evidence or 
 | DAEMON-20260517-01 | Daemon scheduler setup | Team 00 | Committed | `98-orchestrator/`, queue docs | Commit `4fee810`; daemon loop continues. |
 | DAEMON-20260517-02 | Requirements/contracts/QA prep | Teams 01-07, 10 | Audit Complete | Active execution docs | Prep docs created for Lane 3 auth, Lane 3 DQ, MD durable evidence, Trade Plan, UX, and trigger contract. |
 | DAEMON-20260517-03 | `CF-W1-L3-AUTH-01` readiness promotion | Team 00 | Ready for Implementation | `13-implementation-evidence/`, `16-team-inboxes/`, ready queue | Team 07 assigned bounded module-local implementation. |
+| DAEMON-20260517-04 | `CF-W1-L3-AUTH-01` implementation and gates | Teams 07, 04, 10, 03, 00 | PO Acceptance Packet | Portfolio/watchlist source/tests and active evidence docs | Focused tests pass. QA, code review, Architect, and delegated PO acceptance are recorded. Scoped local commit is pending staged-scope verification. |

@@ -47,6 +47,7 @@ export class PortfolioManagementService {
   }
 
   async updatePortfolio(id: string, input: UpdatePortfolioRequest, userId = 'default-user') {
+    await this.requirePortfolio(id, userId);
     this.throwIfErrors(validatePortfolioInput(input, true));
     return this.repository.updatePortfolio(id, input, userId);
   }
@@ -56,20 +57,21 @@ export class PortfolioManagementService {
   }
 
   async addHolding(portfolioId: string, input: CreateHoldingRequest, userId = 'default-user') {
+    await this.requirePortfolio(portfolioId, userId);
     this.throwIfErrors(validateHoldingInput(input));
-    const portfolio = await this.repository.getPortfolio(portfolioId, userId);
-    if (!portfolio) throw new Error('Portfolio not found');
     const instrument = await this.marketDataService.getInstrument(input.instrumentId);
     if (!instrument) throw new Error('Instrument not found');
     return this.repository.addHolding(portfolioId, input, instrument);
   }
 
-  async updateHolding(portfolioId: string, holdingId: string, input: UpdateHoldingRequest) {
+  async updateHolding(portfolioId: string, holdingId: string, input: UpdateHoldingRequest, userId = 'default-user') {
+    await this.requirePortfolio(portfolioId, userId);
     this.throwIfErrors(validateHoldingInput(input, true));
     return this.repository.updateHolding(portfolioId, holdingId, input);
   }
 
-  removeHolding(portfolioId: string, holdingId: string) {
+  async removeHolding(portfolioId: string, holdingId: string, userId = 'default-user') {
+    await this.requirePortfolio(portfolioId, userId);
     return this.repository.removeHolding(portfolioId, holdingId);
   }
 
@@ -119,14 +121,14 @@ export class PortfolioManagementService {
     };
   }
 
-  listTransactions(portfolioId: string) {
+  async listTransactions(portfolioId: string, userId = 'default-user') {
+    await this.requirePortfolio(portfolioId, userId);
     return this.repository.listTransactions(portfolioId);
   }
 
   async createTransaction(portfolioId: string, input: CreateTransactionRequest, userId = 'default-user') {
+    await this.requirePortfolio(portfolioId, userId);
     this.throwIfErrors(validateTransactionInput(input));
-    const portfolio = await this.repository.getPortfolio(portfolioId, userId);
-    if (!portfolio) throw new Error('Portfolio not found');
     if (input.instrumentId) {
       const instrument = await this.marketDataService.getInstrument(input.instrumentId);
       if (!instrument) throw new Error('Instrument not found');
@@ -183,6 +185,12 @@ export class PortfolioManagementService {
 
   private throwIfErrors(errors: string[]) {
     if (errors.length > 0) throw new Error(errors.join('; '));
+  }
+
+  private async requirePortfolio(portfolioId: string, userId: string) {
+    const portfolio = await this.repository.getPortfolio(portfolioId, userId);
+    if (!portfolio) throw new Error('Portfolio not found');
+    return portfolio;
   }
 
   private sum(values: number[]) {

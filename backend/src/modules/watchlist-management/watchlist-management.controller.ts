@@ -60,7 +60,7 @@ export class WatchlistManagementController {
 
   updateItem = async (req: Request, res: Response) => {
     try {
-      return res.json(await this.service.updateItem(getParam(req.params.id), getParam(req.params.itemId), req.body));
+      return res.json(await this.service.updateItem(getParam(req.params.id), getParam(req.params.itemId), req.body, currentUserId(req)));
     } catch (error) {
       return this.error(res, error, 'Failed to update watchlist item', 400);
     }
@@ -68,7 +68,7 @@ export class WatchlistManagementController {
 
   removeItem = async (req: Request, res: Response) => {
     try {
-      await this.service.removeItem(getParam(req.params.id), getParam(req.params.itemId));
+      await this.service.removeItem(getParam(req.params.id), getParam(req.params.itemId), currentUserId(req));
       return res.status(204).send();
     } catch (error) {
       return this.error(res, error, 'Failed to remove watchlist item');
@@ -77,7 +77,8 @@ export class WatchlistManagementController {
 
   private error(res: Response, error: unknown, fallback: string, status = 500) {
     const message = error instanceof Error ? error.message : fallback;
+    const responseStatus = message.endsWith('not found') ? 404 : status;
     console.error(fallback, error);
-    return res.status(status).json({ error: message });
+    return res.status(responseStatus).json({ error: message });
   }
 }

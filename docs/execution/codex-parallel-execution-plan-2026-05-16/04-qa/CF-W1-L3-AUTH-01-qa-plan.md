@@ -10,6 +10,8 @@ Status: QA planning only. Do not run commands until the ownership contract is ac
 
 Focused backend validation for portfolio and watchlist child-resource ownership.
 
+Post-implementation status: focused QA evidence is recorded in `04-qa/CF-W1-L3-AUTH-01-qa-evidence.md`; the accepted command passed with 4 suites and 24 tests.
+
 In scope after approval:
 - portfolio holding child-resource access,
 - portfolio transaction child-resource access,

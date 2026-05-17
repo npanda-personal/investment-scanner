@@ -49,6 +49,7 @@ export class WatchlistManagementService {
   }
 
   async updateWatchlist(id: string, input: UpdateWatchlistRequest, userId = 'default-user') {
+    await this.requireWatchlist(id, userId);
     this.throwIfErrors(validateWatchlistInput(input, true));
     return this.repository.updateWatchlist(id, input, userId);
   }
@@ -58,9 +59,8 @@ export class WatchlistManagementService {
   }
 
   async addItem(watchlistId: string, input: AddWatchlistItemRequest, userId = 'default-user') {
+    await this.requireWatchlist(watchlistId, userId);
     this.throwIfErrors(validateWatchlistItemInput(input));
-    const watchlist = await this.repository.getWatchlist(watchlistId, userId);
-    if (!watchlist) throw new Error('Watchlist not found');
     const duplicate = await this.repository.findItemByInstrument(watchlistId, input.instrumentId);
     if (duplicate) throw new Error('This stock already exists in this watchlist.');
     const instrument = await this.marketDataService.getInstrument(input.instrumentId);
@@ -68,12 +68,14 @@ export class WatchlistManagementService {
     return this.repository.addItem(watchlistId, input, instrument);
   }
 
-  async updateItem(watchlistId: string, itemId: string, input: UpdateWatchlistItemRequest) {
+  async updateItem(watchlistId: string, itemId: string, input: UpdateWatchlistItemRequest, userId = 'default-user') {
+    await this.requireWatchlist(watchlistId, userId);
     this.throwIfErrors(validateWatchlistItemInput(input, true));
     return this.repository.updateItem(watchlistId, itemId, input);
   }
 
-  removeItem(watchlistId: string, itemId: string) {
+  async removeItem(watchlistId: string, itemId: string, userId = 'default-user') {
+    await this.requireWatchlist(watchlistId, userId);
     return this.repository.removeItem(watchlistId, itemId);
   }
 
@@ -119,5 +121,11 @@ export class WatchlistManagementService {
 
   private throwIfErrors(errors: string[]) {
     if (errors.length > 0) throw new Error(errors.join('; '));
+  }
+
+  private async requireWatchlist(watchlistId: string, userId: string) {
+    const watchlist = await this.repository.getWatchlist(watchlistId, userId);
+    if (!watchlist) throw new Error('Watchlist not found');
+    return watchlist;
   }
 }
