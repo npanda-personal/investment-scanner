@@ -73,24 +73,24 @@ Operating rules:
 | Field | Current Value |
 | --- | --- |
 | Current daemon cycle id | `DAEMON-20260517` |
-| Current rolling iteration count | 3 |
-| Active teams | Team 00 integration; Team 02/03/04 next-candidate prep |
-| Queued teams | Team 05, Team 06, Team 07, Team 08, Team 09 for audit/refinement if no ready implementation appears |
-| Idle teams | Team 01, Team 05, Team 06, Team 08, Team 09 |
+| Current rolling iteration count | 4 |
+| Active teams | Team 00 checkpointing after Team 02/03/04 completion |
+| Queued teams | Team 02 and Team 04 for next docs-only prep; Team 05-09 for audit/refinement if no ready implementation appears |
+| Idle teams | Team 01, Team 03, Team 05, Team 06, Team 07, Team 08, Team 09, Team 10 |
 | Blocked teams | None fully blocked; implementation teams without ready work continue audit/refinement |
 | Teams relaunched this cycle | Team 02, Team 03, Team 04, Team 07, Team 10 |
 | Teams shut down due to no work | None permanently; Teams without ready implementation move to audit/refinement |
 | Teams re-added due to new work | Team 07 was re-added for `CF-W1-L3-AUTH-01` and completed the bounded slice |
-| Ready queue depth | 0 active application-code items after `CF-W1-L3-AUTH-01` acceptance |
+| Ready queue depth | 0 active application-code items after `CF-W1-L3-AUTH-01` commit |
 | Refinement queue depth | High; see `10-requirements/next-top-10-candidates.md` |
 | Integration queue depth | 0 active application-code items after `CF-W1-L3-AUTH-01` commit |
 | Decision inbox count | 2 open decisions |
 | Ready-work pressure | low |
 | Blocked-work pressure | high |
 | Next team to launch | Team 02 Requirement Factory and Team 04 QA Factory |
-| Next item to assign | Non-blocked requirement refinement while AUTH-02 and SIG-TRIGGER decisions wait |
-| Last commit | `74ba6dd fix: enforce portfolio watchlist child ownership` |
-| Daemon should continue | Yes |
+| Next item to assign | `CF-W1-MD-01` QA plan / validation policy prep and `CF-W1-L3-DQ-01` decision packet prep |
+| Last commit | `7b6d25e docs: prepare daemon decision packets`; iteration 4 docs pending checkpoint commit |
+| Daemon should continue | Yes, after runtime checkpoint resume |
 
 ## Sprint 0 Items
 
@@ -198,3 +198,4 @@ Old work items in `docs/codex-agent-team-plan/` may be used only as evidence or 
 | DAEMON-20260517-03 | `CF-W1-L3-AUTH-01` readiness promotion | Team 00 | Ready for Implementation | `13-implementation-evidence/`, `16-team-inboxes/`, ready queue | Team 07 assigned bounded module-local implementation. |
 | DAEMON-20260517-04 | `CF-W1-L3-AUTH-01` implementation and gates | Teams 07, 04, 10, 03, 00 | PO Acceptance Packet | Portfolio/watchlist source/tests and active evidence docs | Focused tests pass. QA, code review, Architect, and delegated PO acceptance are recorded. Scoped local commit is pending staged-scope verification. |
 | DAEMON-20260517-05 | Next-candidate decision routing | Team 00 + Teams 03/04 | Decision Inbox Updated | `99-decision-inbox/`, active docs | Alert ownership and trigger-contract path decisions opened. Only affected workstreams are blocked; other factories continue. |
+| DAEMON-20260517-06 | Iteration 4 requirement/architecture/QA refresh | Teams 02, 03, 04 | Checkpointing | Active execution docs only | No app-code item is ready. Next non-blocked prep targets: `CF-W1-TP-01A`, `CF-W1-MD-02`, `CF-W1-MD-01`, `CF-W1-UX-05`, and `CF-W1-L3-DQ-01` decision prep. |
