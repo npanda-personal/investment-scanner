@@ -4,9 +4,9 @@ Date: 2026-05-17
 
 ## Current Ready Queue
 
-No additional application-code implementation item is ready after `CF-W1-SIG-01B`.
+No additional application-code implementation item is ready after `CF-W1-SIG-LATEST-01`.
 
-`CF-W2-SIG-01A` completed the bounded run-path DQ fail-closed slice, and `CF-W1-SIG-01B` completed trusted list read-path filtering. The remaining high-value candidates require additional contract, Product Owner, Architect, or shared-file decisions before implementation.
+`CF-W2-SIG-01A` completed the bounded run-path DQ fail-closed slice, `CF-W1-SIG-01B` completed trusted list read-path filtering, and `CF-W1-SIG-LATEST-01` completed latest-instrument DQ gating. The remaining high-value candidates require additional contract, Product Owner, Architect, or shared-file decisions before implementation.
 
 ## Why No Code Item Was Pulled
 
@@ -29,4 +29,4 @@ Forcing implementation now would either preserve unsafe behavior with misleading
 - No package changes.
 - No tests run.
 
-This wave completed bounded trusted Signal Generation list read-path filtering after readiness was proven.
+This wave completed bounded trusted Signal Generation list read-path filtering and latest-instrument DQ gating after readiness was proven.

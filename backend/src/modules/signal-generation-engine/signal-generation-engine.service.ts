@@ -98,8 +98,9 @@ export class SignalGenerationEngineService {
 
   async latestForInstrument(instrumentId: string): Promise<SignalResultDto | null> {
     const latest = await this.repository.latestForInstrument(instrumentId);
-    if (latest) return this.enrichSignal(latest);
-    const generated = await this.generateForInstrument(instrumentId);
+    if (latest && this.isTrustedReadSignal(latest)) return this.enrichSignal(latest);
+    const run = await this.run({ instrumentId, missingQualityBehavior: 'SKIP' });
+    const generated = run.results[0] || null;
     return generated ? this.enrichSignal(generated) : null;
   }
 

@@ -456,6 +456,95 @@ describe('SignalGenerationEngineService', () => {
     expect(result.items?.map((signal) => signal.instrument_id)).toEqual(['trusted']);
   });
 
+  it('returns trusted persisted latest instrument signal without regeneration', async () => {
+    const repository = {
+      latestForInstrument: jest.fn().mockResolvedValue({
+        instrument_id: 'trusted',
+        symbol: 'TRUST',
+        company_name: 'Trusted Co',
+        sector: 'Technology',
+        country: 'IN',
+        currentPrice: null,
+        previousClose: null,
+        dailyChange: null,
+        dailyChangePercent: null,
+        currency: null,
+        priceTimestamp: null,
+        score: 80,
+        direction: 'BULLISH',
+        confidence: 'HIGH',
+        triggered_signals: [],
+        negative_signals: [],
+        explanation: 'Trusted.',
+        generated_at: '2026-04-28T00:00:00.000Z',
+        source: 'signal-generation-engine',
+        data_status: 'COMPLETE',
+        ...trustedReadEvidence,
+      }),
+    };
+    const marketDataService = {
+      getInstrumentsByIds: jest.fn().mockResolvedValue([{ id: 'trusted', currency: 'INR' }]),
+      getLatestPricesBySymbols: jest.fn().mockResolvedValue([]),
+      listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: [] }),
+    };
+    const service = new SignalGenerationEngineService(repository as any, marketDataService as any, {} as any);
+    const runSpy = jest.spyOn(service, 'run');
+
+    const result = await service.latestForInstrument('trusted');
+
+    expect(result?.instrument_id).toBe('trusted');
+    expect(runSpy).not.toHaveBeenCalled();
+  });
+
+  it('fails closed for untrusted latest instrument signal when DQ excludes the instrument', async () => {
+    const repository = {
+      latestForInstrument: jest.fn().mockResolvedValue({
+        instrument_id: 'legacy',
+        symbol: 'LEGACY',
+        company_name: 'Legacy Co',
+        sector: 'Technology',
+        country: 'IN',
+        currentPrice: null,
+        previousClose: null,
+        dailyChange: null,
+        dailyChangePercent: null,
+        currency: null,
+        priceTimestamp: null,
+        score: 80,
+        direction: 'BULLISH',
+        confidence: 'HIGH',
+        triggered_signals: [],
+        negative_signals: [],
+        explanation: 'Legacy.',
+        generated_at: '2026-04-28T00:00:00.000Z',
+        source: 'signal-generation-engine',
+        data_status: 'COMPLETE',
+        auditStatus: 'LEGACY_MISSING',
+        dataQualityEligibility: null,
+      }),
+      ...runAuditRepository(),
+    };
+    const dataQualityService = {
+      filterEligibleInstruments: jest.fn().mockResolvedValue({
+        eligibleInstrumentIds: [],
+        excludedInstrumentIds: ['legacy'],
+        missingQualityEvaluationCount: 1,
+        warnings: ['legacy: missing data quality evaluation'],
+        evaluationsByInstrumentId: {},
+      }),
+    };
+    const service = new SignalGenerationEngineService(repository as any, {} as any, {} as any, dataQualityService as any);
+    const generateSpy = jest.spyOn(service, 'generateForInstrument');
+
+    const result = await service.latestForInstrument('legacy');
+
+    expect(result).toBeNull();
+    expect(dataQualityService.filterEligibleInstruments).toHaveBeenCalledWith(['legacy'], expect.objectContaining({
+      missingQualityBehavior: 'SKIP',
+    }));
+    expect(generateSpy).not.toHaveBeenCalled();
+  });
+
   it('returns null price context when market data is unavailable', async () => {
     const service = new SignalGenerationEngineService({} as any, {
       getInstrumentsByIds: jest.fn().mockRejectedValue(new Error('missing')),
