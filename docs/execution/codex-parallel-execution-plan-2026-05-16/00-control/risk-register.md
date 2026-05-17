@@ -33,12 +33,14 @@
 | User-facing untrusted data leak risk | High | High | Lane 3 module owners + QA | portfolio/watchlist/alert/copilot outputs omit readiness evidence | require Lane 3 readiness consumer contract | start with alerts-monitoring readiness tests |
 | Market Data natural-key gap | High | Medium | Market Data Foundation + Architect | storage is characterized as symbol/date-centric only | require ADR before schema or storage-key changes | propose durable readiness evidence decision |
 | Storage characterization overclaim risk | Medium | Medium | Orchestrator + QA | tests treated as full contract compliance | preserve limitations in QA/PO evidence | keep downstream blocklist active |
+| Signal-generation strict-filter overclaim risk | High | Medium | Signal Generation + Architect + QA | Wave 3 strict-filter tests are treated as default fail-closed enforcement | preserve limitation that strict opt-in path only is proven | propose signal-generation fail-closed policy decision |
 
 ## Current Blockers
 
 - Market Data durable readiness evidence is incomplete for full contract compliance.
 - Current Market Data natural-key behavior is symbol/date-centric and narrower than the active contract target.
-- Lane 2 strategy/signal/risk modules still need fail-closed downstream DQ enforcement tests.
+- `signal-generation-engine` strict DQ-filtered runs are characterized, but default trusted/fail-closed behavior remains unapproved and unimplemented.
+- Lane 2 strategy/signal/risk modules still need fail-closed downstream DQ enforcement tests beyond the Wave 3 strict signal-generation path.
 - Lane 3 portfolio/watchlist/alerts/copilot modules still need readiness consumer contracts and tests.
 - Angel One remains excluded from implementation and live validation.
 - Startup scheduler/backfill behavior requires Architect approval before it can be changed or accepted as Sprint 1B scope.
@@ -46,8 +48,8 @@
 
 ## Sprint 1B Preparation Risk Decisions
 
-- Dirty worktree risk is controlled because current Wave 2 files are limited to one Market Data test file and active execution docs.
-- Wave 2 Product Owner acceptance is conditionally recorded only because all approved criteria passed.
+- Dirty worktree risk is controlled because current Wave 3 files are limited to one Signal Generation test file and active execution docs.
+- Wave 3 Product Owner acceptance is conditionally recorded only because all approved criteria passed.
 - Future implementation should stay within Market Data Foundation and Data Quality module-owned files unless Architect reserves a shared file.
 - Any live provider call, paid dependency, broker-order path, secret exposure, or provider-heavy startup behavior remains a stop condition.
 - Any source, UI, route registry, Prisma, shared utility, shared UI, package, startup, config, or provider edit during test-only slices remains a stop condition.

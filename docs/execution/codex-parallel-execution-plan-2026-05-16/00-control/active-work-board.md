@@ -40,15 +40,20 @@ No historical active work items have been migrated as active.
 | S1B-W2-B | Market Data storage characterization audit | Market Data Foundation Team + Architect | Complete | `09-summaries/sprint-1b-wave2-market-data-storage-characterization-audit.md` | Documents current symbol/date idempotency and durable provenance gaps. |
 | S1B-W2-C | Downstream blocklist refresh | Orchestrator | Complete | `09-summaries/sprint-1b-wave2-downstream-blocklist-refresh.md` | Confirms downstream modules remain blocked. Recommends narrow `signal-generation-engine` DQ enforcement test next. |
 | S1B-W2-D | QA/review/Architect/PO evidence | QA + Review + Architect + Product Owner | Accepted under conditional approval | QA, review, signoff, and PO packet docs | Human Product Owner decision recorded under explicit Wave 2 conditional approval. |
+| S1B-W3-A | Signal Generation DQ enforcement characterization tests | Signal Generation Engine Team + QA | Accepted under conditional approval | `backend/tests/modules/signal-generation-engine/signal-generation-dq-enforcement.invariants.test.ts` | Focused test passed. Strict DQ-filtered run generates only READY signals. |
+| S1B-W3-B | Signal Generation DQ enforcement audit | Strategy / Signals / Risk lane + Architect | Complete | `09-summaries/sprint-1b-wave3-signal-generation-dq-enforcement-audit.md` | Documents strict-path coverage and remaining default bypass/fail-open risks. |
+| S1B-W3-C | Alerts / portfolio / copilot deferral check | Orchestrator | Complete | `09-summaries/sprint-1b-wave3-downstream-deferral-check.md` | Confirms downstream user-facing modules remain blocked. Recommends signal-generation fail-closed decision next. |
+| S1B-W3-D | QA/review/Architect/PO evidence | QA + Review + Architect + Product Owner | Accepted under conditional approval | QA, review, signoff, and PO packet docs | Human Product Owner decision recorded under explicit Wave 3 conditional approval. |
 
 ## Current Sprint 1B Readiness
 
-Sprint 1B Wave 2 completed the approved upstream Market Data storage/readiness characterization scope.
+Sprint 1B Wave 3 completed the first downstream `signal-generation-engine` strict Data Quality filter characterization scope.
 
 Blocking gates:
 - Angel One remains excluded from implementation and live validation.
 - Provider-heavy startup behavior remains excluded by default.
 - Downstream modules remain blocked until separate readiness enforcement tests, QA, review, Architect signoff, and Product Owner acceptance exist.
+- `signal-generation-engine` remains blocked for default trusted/fail-closed behavior because Wave 3 proves only the strict opt-in filter path.
 - Full Market Data durable readiness evidence still requires future Architect/Product Owner decisions before source or schema changes.
 
 ## Historical References
