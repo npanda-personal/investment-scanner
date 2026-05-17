@@ -158,3 +158,14 @@ Old work items in `docs/codex-agent-team-plan/` may be used only as evidence or 
 | ORCH-SETUP-02 | Autonomous wave operating rules | Orchestrator | Committed after setup | `98-orchestrator/autonomous-wave-operating-rules.md` | Defines evidence sync, factories, one-writer rule, one commit per accepted requirement, and partial-slice reframing. |
 | ORCH-SETUP-03 | Decision inbox/outbox | Orchestrator | Committed after setup | `99-decision-inbox/`, `99-decision-outbox/` | Human Product Owner reviews only true consent blockers placed in decision inbox. |
 | ORCH-SETUP-04 | Cadence | Orchestrator | Committed after setup | `98-orchestrator/cadence.md` | Defines continuous factory, daily automation, implementation, review, and decision-review cadence. |
+
+## Master Orchestrator Runtime Cycle - 2026-05-17
+
+| ID | Work Item | Owner | State | Scope | Notes |
+|---|---|---|---|---|---|
+| MOR-20260517-00 | Evidence sync and queue read | Team 00 | Complete | `git status`, branch, recent log, active queues | Branch `dev`; worktree clean at cycle start; no open decisions. |
+| MOR-20260517-01 | Launch Teams 01-06 | Team 00 + Teams 01-06 | Audit Complete | Read-only team workstreams | Audit, Requirement, Architecture, QA, Market Data/DQ, and Strategy/Signal/Risk reported through outboxes. |
+| MOR-20260517-02 | Launch Teams 07-10 | Team 00 + Teams 07-10 | Audit Complete | Read-only team workstreams | Portfolio/Watchlist/Alerts, UX/Copilot, Platform, and Review/Release lanes reported through outboxes. |
+| MOR-20260517-03 | `CF-W1-QA-01` focused command matrix | Team 04 + Team 00 | Complete | `04-qa/CF-W1-QA-01-focused-test-command-matrix.md` | Documentation-only ready item integrated. No tests run. |
+| MOR-20260517-04 | Application-code pull decision | Team 00 | Deferred | Ready queue | No application-code item was pulled because none met readiness criteria. |
+| MOR-20260517-05 | Runtime cycle integration summary | Team 00 | Complete | `09-summaries/master-orchestrator-runtime-cycle-2026-05-17.md`, `18-integration-queue/` | No app-code integration item pending; next cycle is contract/QA preparation. |

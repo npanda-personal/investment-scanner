@@ -23,10 +23,22 @@ Forcing implementation now would either preserve unsafe behavior with misleading
 
 ## Documentation-Only Ready Item
 
-`CF-W1-QA-01` is ready as documentation-only factory work:
-- Create a focused test command matrix.
+`CF-W1-QA-01` was pulled by the QA Factory and integrated as documentation-only factory work:
+- Focused test command matrix recorded in `04-qa/CF-W1-QA-01-focused-test-command-matrix.md`.
 - No application source changes.
 - No package changes.
 - No tests run.
 
 This queue was refreshed after Strategy Decision Option B-Strict. Trade Plan target migration remains separate and is not ready for implementation.
+
+## Current Pull Status
+
+No ready application-code item is available for Teams 05-09.
+
+Next safe work is contract and QA preparation:
+
+- `CF-W1-L3-AUTH-01`
+- `CF-W1-L3-DQ-01`
+- `CF-W1-MD-02`
+- `CF-W1-TP-01A`
+- `CF-W1-UX-02`

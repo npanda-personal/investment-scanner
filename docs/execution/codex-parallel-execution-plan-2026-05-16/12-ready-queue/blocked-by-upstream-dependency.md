@@ -10,3 +10,5 @@ Date: 2026-05-17
 | CF-W1-L3-PORT-01 | Portfolio/watchlist readiness DTOs | Lane 3 readiness consumer contract |
 | CF-W1-L3-INTEL-01 | Portfolio Intelligence reliability gate | Portfolio context readiness contract |
 | CF-W1-QA-UI-01 | Copilot/research Playwright trust states | UX trust contract and approved UI scope |
+| CF-W1-UX-01 | Stock Research Workbench trust surfaces | Lane 3 readiness policy and UX trust contract |
+| CF-W1-NOTIF-02 | Notification log preview redaction validation | Notification privacy policy and focused QA plan |

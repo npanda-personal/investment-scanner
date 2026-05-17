@@ -100,3 +100,16 @@
 - Human Product Owner review is concentrated on `99-decision-inbox/open-decisions.md`.
 - Push remains disabled.
 - Active execution docs are the only docs modified by this setup.
+
+## Master Orchestrator Runtime Cycle - 2026-05-17 Risk Decisions
+
+- No application-code item was pulled because the ready queue had no current bounded item with exact file reservations, accepted contract, QA plan, and no blockers.
+- `CF-W1-QA-01` was completed as documentation-only focused command matrix work and does not unblock source changes by itself.
+- Teams 01-10 run as independent audit/refinement/review lanes in this cycle. Implementation teams without ready work audit/refine instead of idling.
+- Trade Plan target geometry remains blocked separately from the completed Strategy Decision Option B-Strict slice.
+- Lane 3 ownership/readiness and UX trust remain contract-first.
+- Market Data durable readiness evidence remains ADR-first because source implementation may require Prisma/storage policy decisions.
+- Alert event ownership remains a high-risk boundary because event inbox actions are global and direct event ownership may require Prisma changes.
+- Copilot/research trust remains blocked by product-language and UX-scope decisions before UI or backend changes.
+- Subscription self-plan behavior remains a Product Owner policy blocker.
+- Notification log previews create a local privacy review item before notification QA can broaden.
