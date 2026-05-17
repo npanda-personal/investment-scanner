@@ -101,6 +101,7 @@ Cross-feature entry points:
 ## Known Limitations
 
 - Auth Identity now protects alert routes. New alert rules are owned by the authenticated user. Existing nullable-owner alert rules remain readable during migration.
+- Alert event inbox/list/read/dismiss/mark-all-read/summary paths are scoped through the parent alert rule owner. Null-owner, orphaned, or unresolvable alert events are hidden from authenticated event paths in this bounded backend slice.
 - Subscription Billing gates alert rule creation by plan limits.
 
 - Manual evaluation only; no scheduler, WebSocket, or push. Email-style digest delivery is handled separately by `notifications-delivery`.

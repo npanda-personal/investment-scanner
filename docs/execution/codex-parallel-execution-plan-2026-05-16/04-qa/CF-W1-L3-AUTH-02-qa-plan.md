@@ -4,108 +4,70 @@ Date: 2026-05-17
 
 Owner: Team 04 QA Factory
 
-Status: QA planning only. Do not run commands until Product Owner and Architect accept the alert event ownership model and a scoped implementation handoff exists.
+Status: Accepted for bounded Option B backend validation.
 
 ## Scope
 
-Focused backend validation for alert rule and alert event ownership in Alerts Monitoring.
+Focused backend validation for alert event ownership through parent `AlertRule.userId`.
 
-In scope after approval:
+In scope:
 - current-user scoping for alert rule evaluation,
 - current-user scoping for alert event inbox listing,
-- current-user scoping for mark-read, dismiss, and mark-all-read actions,
-- two-user isolation in service and route tests,
-- ownership validation for portfolio/watchlist alert rule references,
-- compatibility behavior for any documented legacy nullable-owner alert rules or events.
+- current-user scoping for mark-read, dismiss, mark-all-read, and summary,
+- two-user isolation in controller/service/repository behavior,
+- ownership preservation for portfolio/watchlist alert rule references,
+- fail-closed handling for null-owner, orphaned, deleted-parent, or unresolvable events in authenticated event paths.
 
 Out of scope:
-- portfolio/watchlist child-resource ownership already owned by `CF-W1-L3-AUTH-01`,
-- alert data-quality suppression owned by `CF-W1-L3-ALERT-01`,
-- notification digest consumers unless explicitly pulled into the accepted contract,
-- copilot alert consumers unless explicitly pulled into the accepted contract,
+- direct `AlertEvent.userId` schema ownership,
+- notification digest consumers,
+- copilot alert consumers,
+- alert Data Quality readiness suppression,
 - frontend/UI checks,
 - provider/live market-data checks,
 - startup, scheduler, or backfill behavior,
-- route registry, package, shared UI, or shared fixture changes unless separately approved.
-
-## Ownership Model Decision Gate
-
-QA remains blocked until one model is accepted:
-
-- Direct event owner: `AlertEvent` stores a direct owner field. This requires explicit Prisma/schema/migration approval before implementation or executable QA.
-- Rule-owner join: `AlertEvent` ownership is enforced through its owned `AlertRule`. This requires an accepted repository/service contract for event queries and mutations to join through the rule owner.
-
-QA must reject any implementation that leaves `AlertEvent` list/read/dismiss/mark-all-read behavior globally scoped.
+- route registry, package, shared UI, shared utility, generated type, or fixture changes.
 
 ## Required QA Assertions
 
-- User A evaluating alerts creates or returns events only for User A owned enabled rules.
-- User A evaluation does not evaluate or create events for User B rules.
-- User A cannot list User B alert events.
+- User A event list does not include User B events.
 - User A cannot mark User B alert events as read.
 - User A cannot dismiss User B alert events.
 - User A mark-all-read affects only User A active events.
-- Cross-user event actions fail closed with not-found or forbidden behavior and do not leak event title, message, metadata, or rule existence.
-- Alert event duplicate suppression remains scoped to the current user's owned rule/event set.
-- Portfolio-scoped alert rules validate that the referenced portfolio belongs to the rule owner.
-- Watchlist-scoped alert rules validate that the referenced watchlist belongs to the rule owner.
-- Stock/instrument alert rules do not bypass rule ownership even when the instrument itself is globally visible.
-- Returned event DTOs preserve current public fields unless the accepted contract explicitly changes the response shape.
-- If legacy nullable-owner alert rules or events are preserved, their read/action behavior is documented and cannot allow new cross-user mutations.
-- No broker, paid/cloud, provider-heavy, live market-data, startup/backfill, UI, package, route-registry, or shared-component behavior is required.
+- User A summary counts only User A events.
+- Cross-user event actions fail closed with not-found behavior and do not leak event details.
+- Evaluation controller path evaluates only current-user enabled rules.
+- Portfolio-scoped and watchlist-scoped alert rule evaluation preserve the rule owner when calling child-resource services.
+- Returned event DTOs preserve current public fields.
+- No broker, paid/cloud, provider-heavy, live market-data, startup/backfill, UI, package, route-registry, shared-component, generated, or schema behavior is required.
 
-## Focused Command Guidance
-
-Commands below are guidance only. They were not run during this documentation-only planning task.
-
-Blocked until ownership decision, contract acceptance, and implementation handoff:
+## Focused Command
 
 ```powershell
 cd backend
-npm.cmd test -- alerts-monitoring.service.test.ts alerts-monitoring.routes.test.ts --runInBand
+npm.cmd test -- alerts-monitoring.service.test.ts alerts-monitoring.ownership.test.ts alerts-monitoring.routes.test.ts --runInBand
 ```
 
-Only if request/response validation changes are included in the approved implementation:
-
-```powershell
-cd backend
-npm.cmd test -- alerts-monitoring.validation.test.ts --runInBand
-```
-
-Approval-gated only if shared auth behavior is explicitly in scope:
-
-```powershell
-cd backend
-npm.cmd test -- auth-identity.ownership.test.ts auth-identity.routes.test.ts --runInBand
-```
+The combined daemon validation command may include adjacent accepted Signal Generation suites when both bounded tracks are being reconciled together, but AUTH-02 acceptance depends only on the alerts-monitoring suites above.
 
 ## Stop Conditions
 
 Stop QA and return to Orchestrator/Architect if validation requires:
-- choosing the alert event ownership model during QA,
-- Prisma schema or migration work without explicit approval,
+- Prisma schema or migration work,
 - route registry changes,
 - shared auth middleware changes,
 - shared test fixture rewrites,
-- notification or copilot consumer changes outside the accepted contract,
+- notification or copilot consumer changes,
 - package changes,
-- broad backend test runs,
+- broad backend suites,
 - frontend build, Playwright, or UI smoke tests,
 - live services, startup flows, schedulers, backfills, or providers.
 
-## Evidence Required Later
+## Evidence Required
 
-- Accepted Product Owner and Architect ownership decision.
-- Accepted architecture contract with the chosen ownership model.
-- Implementation handoff with exact changed files.
-- Exact focused command output.
-- Two-user alert rule/event isolation scenario notes.
+- Product Owner Option B resolution.
+- Exact changed files.
+- Focused command output.
+- Two-user alert event isolation notes.
 - Confirmation that forbidden scopes were not touched.
 - Skipped checks and reasons.
-
-## QA Blockers
-
-- Alert event ownership model is unresolved: direct event owner versus rule-owner join.
-- Direct event ownership may require Prisma schema approval.
-- Rule-owner join needs an accepted repository/query contract before implementation.
-- Alert readiness suppression remains separate and must not be treated as covered by this plan.

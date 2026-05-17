@@ -37,34 +37,34 @@ export class AlertsMonitoringController {
     } catch (error) { return this.error(res, error, 'Failed to delete alert rule'); }
   };
 
-  evaluate = async (_req: Request, res: Response) => {
-    try { return res.json(await this.service.evaluate()); }
+  evaluate = async (req: Request, res: Response) => {
+    try { return res.json(await this.service.evaluate(currentUserId(req))); }
     catch (error) { return this.error(res, error, 'Failed to evaluate alerts'); }
   };
 
-  listEvents = async (_req: Request, res: Response) => {
-    try { return res.json({ events: await this.service.listEvents() }); }
+  listEvents = async (req: Request, res: Response) => {
+    try { return res.json({ events: await this.service.listEvents(currentUserId(req)) }); }
     catch (error) { return this.error(res, error, 'Failed to list alert events'); }
   };
 
   markRead = async (req: Request, res: Response) => {
-    try { return res.json(await this.service.markRead(getParam(req.params.id))); }
+    try { return res.json(await this.service.markRead(getParam(req.params.id), currentUserId(req))); }
     catch (error) { return this.error(res, error, 'Failed to mark alert event read', 400); }
   };
 
   dismiss = async (req: Request, res: Response) => {
-    try { return res.json(await this.service.dismiss(getParam(req.params.id))); }
+    try { return res.json(await this.service.dismiss(getParam(req.params.id), currentUserId(req))); }
     catch (error) { return this.error(res, error, 'Failed to dismiss alert event', 400); }
   };
 
-  markAllRead = async (_req: Request, res: Response) => {
-    try { return res.json(await this.service.markAllRead()); }
+  markAllRead = async (req: Request, res: Response) => {
+    try { return res.json(await this.service.markAllRead(currentUserId(req))); }
     catch (error) { return this.error(res, error, 'Failed to mark all alerts read', 400); }
   };
 
-  summary = async (_req: Request, res: Response) => {
+  summary = async (req: Request, res: Response) => {
     try {
-      const events = await this.service.listEvents();
+      const events = await this.service.listEvents(currentUserId(req));
       return res.json({
         unreadCount: events.filter((event) => !event.readAt && !event.dismissedAt).length,
         criticalCount: events.filter((event) => event.severity === 'CRITICAL' && !event.dismissedAt).length,
@@ -74,7 +74,8 @@ export class AlertsMonitoringController {
 
   private error(res: Response, error: unknown, fallback: string, status = 500) {
     const message = error instanceof Error ? error.message : fallback;
+    const responseStatus = message.endsWith('not found') ? 404 : status;
     console.error(fallback, error);
-    return res.status(status).json({ error: message });
+    return res.status(responseStatus).json({ error: message });
   }
 }

@@ -16,8 +16,8 @@ export class AlertsMonitoringRepository {
     return rules.map(this.toRuleDto);
   }
 
-  async enabledRules(): Promise<AlertRuleDto[]> {
-    const rules = await this.db.alertRule.findMany({ where: { enabled: true }, orderBy: { updatedAt: 'desc' } });
+  async enabledRules(userId?: string): Promise<AlertRuleDto[]> {
+    const rules = await this.db.alertRule.findMany({ where: userId ? { enabled: true, userId } : { enabled: true }, orderBy: { updatedAt: 'desc' } });
     return rules.map(this.toRuleDto);
   }
 
@@ -89,28 +89,36 @@ export class AlertsMonitoringRepository {
     return this.toEventDto(event);
   }
 
-  async listEvents(): Promise<AlertEventDto[]> {
-    const events = await this.db.alertEvent.findMany({ orderBy: { triggeredAt: 'desc' }, take: 200 });
+  async listEvents(userId = 'default-user'): Promise<AlertEventDto[]> {
+    const events = await this.db.alertEvent.findMany({ where: this.ownedEventWhere(userId), orderBy: { triggeredAt: 'desc' }, take: 200 });
     return events.map(this.toEventDto);
   }
 
-  async markRead(id: string): Promise<AlertEventDto> {
-    const event = await this.db.alertEvent.update({ where: { id }, data: { readAt: new Date() } });
+  async markRead(id: string, userId = 'default-user'): Promise<AlertEventDto> {
+    const existing = await this.db.alertEvent.findFirst({ where: { id, ...this.ownedEventWhere(userId) } });
+    if (!existing) throw new Error('Alert event not found');
+    const event = await this.db.alertEvent.update({ where: { id: existing.id }, data: { readAt: new Date() } });
     return this.toEventDto(event);
   }
 
-  async dismiss(id: string): Promise<AlertEventDto> {
-    const event = await this.db.alertEvent.update({ where: { id }, data: { dismissedAt: new Date(), readAt: new Date() } });
+  async dismiss(id: string, userId = 'default-user'): Promise<AlertEventDto> {
+    const existing = await this.db.alertEvent.findFirst({ where: { id, ...this.ownedEventWhere(userId) } });
+    if (!existing) throw new Error('Alert event not found');
+    const event = await this.db.alertEvent.update({ where: { id: existing.id }, data: { dismissedAt: new Date(), readAt: new Date() } });
     return this.toEventDto(event);
   }
 
-  async markAllRead(): Promise<{ updated: number }> {
-    const result = await this.db.alertEvent.updateMany({ where: { readAt: null, dismissedAt: null }, data: { readAt: new Date() } });
+  async markAllRead(userId = 'default-user'): Promise<{ updated: number }> {
+    const result = await this.db.alertEvent.updateMany({ where: { readAt: null, dismissedAt: null, ...this.ownedEventWhere(userId) }, data: { readAt: new Date() } });
     return { updated: result.count };
   }
 
   private ownerWhere(userId: string) {
     return { OR: [{ userId }, { userId: null }] };
+  }
+
+  private ownedEventWhere(userId: string) {
+    return { alertRule: { is: { userId } } } as any;
   }
 
   private toRuleDto(record: any): AlertRuleDto {

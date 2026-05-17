@@ -95,11 +95,11 @@ describe('AlertsMonitoringService', () => {
 
   it('delegates read and dismiss actions', async () => {
     const { service, repository } = createService([]);
-    await service.markRead('event-1');
-    await service.dismiss('event-1');
-    await service.markAllRead();
-    expect(repository.markRead).toHaveBeenCalledWith('event-1');
-    expect(repository.dismiss).toHaveBeenCalledWith('event-1');
-    expect(repository.markAllRead).toHaveBeenCalled();
+    await service.markRead('event-1', 'user-a');
+    await service.dismiss('event-1', 'user-a');
+    await service.markAllRead('user-a');
+    expect(repository.markRead).toHaveBeenCalledWith('event-1', 'user-a');
+    expect(repository.dismiss).toHaveBeenCalledWith('event-1', 'user-a');
+    expect(repository.markAllRead).toHaveBeenCalledWith('user-a');
   });
 });

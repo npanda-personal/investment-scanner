@@ -25,10 +25,10 @@ export class AlertsMonitoringService {
 
   listRules(userId = 'default-user') { return this.repository.listRules(userId); }
   getRule(id: string, userId = 'default-user') { return this.repository.getRule(id, userId); }
-  listEvents() { return this.repository.listEvents(); }
-  markRead(id: string) { return this.repository.markRead(id); }
-  dismiss(id: string) { return this.repository.dismiss(id); }
-  markAllRead() { return this.repository.markAllRead(); }
+  listEvents(userId = 'default-user') { return this.repository.listEvents(userId); }
+  markRead(id: string, userId = 'default-user') { return this.repository.markRead(id, userId); }
+  dismiss(id: string, userId = 'default-user') { return this.repository.dismiss(id, userId); }
+  markAllRead(userId = 'default-user') { return this.repository.markAllRead(userId); }
 
   async createRule(input: CreateAlertRuleRequest, userId = 'default-user') {
     this.throwIfErrors(validateAlertRuleInput(input));
@@ -50,14 +50,14 @@ export class AlertsMonitoringService {
     return this.repository.deleteRule(id);
   }
 
-  async evaluate(): Promise<AlertEvaluationResult> {
-    const rules = await this.repository.enabledRules();
+  async evaluate(userId?: string): Promise<AlertEvaluationResult> {
+    const rules = await this.repository.enabledRules(userId);
     const events = [];
     const errors: string[] = [];
     let skippedDuplicates = 0;
     for (const rule of rules) {
       try {
-        const candidates = await this.evaluateRule(rule);
+        const candidates = await this.evaluateRule(rule, userId);
         for (const candidate of candidates) {
           const duplicate = await this.repository.hasActiveDuplicate(rule.id, candidate.metadata);
           if (duplicate) {
@@ -80,10 +80,10 @@ export class AlertsMonitoringService {
     };
   }
 
-  async evaluateRule(rule: AlertRuleDto): Promise<AlertEvaluationCandidate[]> {
+  async evaluateRule(rule: AlertRuleDto, userId?: string): Promise<AlertEvaluationCandidate[]> {
     if (rule.scope === 'STOCK') return this.evaluateStockRule(rule);
-    if (rule.scope === 'PORTFOLIO') return this.evaluatePortfolioRule(rule);
-    if (rule.scope === 'WATCHLIST') return this.evaluateWatchlistRule(rule);
+    if (rule.scope === 'PORTFOLIO') return this.evaluatePortfolioRule(rule, userId);
+    if (rule.scope === 'WATCHLIST') return this.evaluateWatchlistRule(rule, userId);
     return [];
   }
 
@@ -110,9 +110,9 @@ export class AlertsMonitoringService {
     return [];
   }
 
-  private async evaluatePortfolioRule(rule: AlertRuleDto): Promise<AlertEvaluationCandidate[]> {
+  private async evaluatePortfolioRule(rule: AlertRuleDto, userId?: string): Promise<AlertEvaluationCandidate[]> {
     if (!rule.portfolioId) return [];
-    const summary = await this.portfolioService.summary(rule.portfolioId);
+    const summary = await this.portfolioService.summary(rule.portfolioId, userId);
     if (!summary) return [];
     const threshold = Number(rule.condition.threshold);
     const events: AlertEvaluationCandidate[] = [];
@@ -127,9 +127,9 @@ export class AlertsMonitoringService {
     return events;
   }
 
-  private async evaluateWatchlistRule(rule: AlertRuleDto): Promise<AlertEvaluationCandidate[]> {
+  private async evaluateWatchlistRule(rule: AlertRuleDto, userId?: string): Promise<AlertEvaluationCandidate[]> {
     if (!rule.watchlistId) return [];
-    const detail = await this.watchlistService.detail(rule.watchlistId);
+    const detail = await this.watchlistService.detail(rule.watchlistId, 'recentlyAdded', userId);
     if (!detail) return [];
     const threshold = Number(rule.condition.threshold);
     const events: AlertEvaluationCandidate[] = [];
