@@ -16,7 +16,7 @@ docs/codex-agent-team-plan/** is historical evidence only.
 Use the active execution folder:
 docs/execution/codex-parallel-execution-plan-2026-05-16/
 
-Resume Continuous Daemon Scheduler Mode from cycle DAEMON-20260517, rolling iteration 6.
+Resume Continuous Daemon Scheduler Mode from cycle DAEMON-20260517, rolling iteration 7.
 
 Team 00 is the master runtime orchestrator. The human Product Owner is not the mediator for routine gates.
 
@@ -49,8 +49,14 @@ Current open decisions:
 Current ready queue:
 - No active application-code item is Ready for Implementation.
 
+Current planning queues:
+- Requirement backlog and next-top candidates were refreshed after the resolved decision items were removed.
+- Next architecture prep should start with `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02`.
+- Next QA prep should start with `CF-W1-MD-01`, `CF-W1-L3-ALERT-01`, and `CF-W1-UX-02`.
+
 Current committed daemon outputs include:
 - ae0b4cc docs: checkpoint daemon after resolved decisions
+- f75808f docs: fix daemon checkpoint resume protocol
 - 6ab3999 feat: add signal trigger contract projection
 - 503bcd9 fix: scope alert events by rule owner
 - 8e38c2b docs: resolve daemon decision inbox items
@@ -60,7 +66,7 @@ Resume daemon operation:
 1. Keep Team 00 running as scheduler/integration owner.
 2. Relaunch teams as runtime slots become available.
 3. Continue audits, requirement refinement, architecture prep, QA planning, implementation only when Ready criteria pass, review, and release work.
-4. Keep Team 02 Requirement Factory, Team 03 Architecture Factory, and Team 04 QA Factory active when safe.
+4. Keep Team 03 Architecture Factory and Team 04 QA Factory active when safe; relaunch Team 02 when new audit findings or decisions change the backlog.
 5. Launch Teams 05-09 only when matching ready work exists; otherwise assign module-domain audit/refinement/prep.
 6. Relaunch Team 10 when integration queue items appear.
 7. Update `99-decision-inbox/open-decisions.md` whenever a true consent blocker is created or resolved.

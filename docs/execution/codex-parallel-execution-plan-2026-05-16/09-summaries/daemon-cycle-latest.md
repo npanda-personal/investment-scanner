@@ -5,8 +5,8 @@ Date: 2026-05-17
 ## Current Cycle
 
 - Cycle id: `DAEMON-20260517`
-- Rolling iteration count: 6
-- Current mode: checkpoint protocol fix, then daemon resume boundary
+- Rolling iteration count: 7
+- Current mode: docs-only Team 02/03/04 queue refresh after checkpoint protocol fix
 - Daemon continuing: yes, resume required due current session runtime boundary
 - Git status at checkpoint start: clean
 - Resume prompt path: `09-summaries/daemon-resume-prompt.md`
@@ -36,7 +36,7 @@ Date: 2026-05-17
 - Blocked-work pressure: high
 - Integration queue depth: 0 active application-code items after bounded commits
 - Decision inbox count: 0 open decisions
-- Refinement queue depth: 8 listed candidates; 2 entries are stale/resolved decision references to be cleaned in the next Requirement Factory pass
+- Refinement queue depth: 6 active policy/refinement candidates after stale resolved decision references were removed
 
 ## Commits Since Last Update
 
@@ -50,14 +50,15 @@ Date: 2026-05-17
 - `503bcd9 fix: scope alert events by rule owner`
 - `6ab3999 feat: add signal trigger contract projection`
 - `ae0b4cc docs: checkpoint daemon after resolved decisions`
+- `f75808f docs: fix daemon checkpoint resume protocol`
 
 ## Next Assignments
 
 1. Resume daemon mode from `09-summaries/daemon-resume-prompt.md`.
 2. Verify the worktree is clean.
-3. Relaunch Team 02 for non-blocked requirement refinement and stale refinement queue cleanup.
-4. Relaunch Team 03 for `CF-W1-L3-DQ-01`, `CF-W1-MD-02`, and Trade Plan follow-up contract prep.
-5. Relaunch Team 04 for `CF-W1-MD-01` QA plan preparation and Lane 3 readiness validation planning.
+3. Relaunch Team 03 for `CF-W1-L3-DQ-01`, `CF-W1-MD-02`, and Trade Plan follow-up contract prep.
+4. Relaunch Team 04 for `CF-W1-MD-01` QA plan preparation and Lane 3 readiness validation planning.
+5. Relaunch Team 02 again when new audit findings arrive or Product/Architect decisions change the active backlog.
 6. Keep `CF-W1-L3-AUTH-02` and `CF-W1-SIG-TRIGGER-01` out of Ready because both bounded slices are committed.
 
 ## Stop State

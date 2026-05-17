@@ -128,3 +128,4 @@
 - Human Product Owner review is not required while `open-decisions.md` has no open decision and standing delegation conditions are met.
 - As of daemon iteration 5, the two prior decision blockers are resolved and committed. `99-decision-inbox/open-decisions.md` has no open decisions; other independent prep continues.
 - As of daemon iteration 6, `09-summaries/daemon-resume-prompt.md` exists and checkpoint reports must explicitly state whether it was updated.
+- As of daemon iteration 7, planning queues have been refreshed to remove the resolved alert ownership and trigger DTO blockers. Ready queue remains empty for app-code work.
