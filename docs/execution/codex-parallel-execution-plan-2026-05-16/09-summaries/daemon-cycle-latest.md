@@ -41,6 +41,7 @@ Date: 2026-05-17
 - `74ba6dd fix: enforce portfolio watchlist child ownership`
 - `7b6d25e docs: prepare daemon decision packets`
 - `004d918 docs: checkpoint daemon iteration four`
+- Latest checkpoint-state commit: verify with `git log --oneline -5` after resume.
 
 ## Next Assignments
 

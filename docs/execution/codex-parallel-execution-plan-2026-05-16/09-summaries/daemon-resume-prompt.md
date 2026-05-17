@@ -38,6 +38,7 @@ Current committed daemon outputs:
 - 74ba6dd fix: enforce portfolio watchlist child ownership
 - 7b6d25e docs: prepare daemon decision packets
 - 004d918 docs: checkpoint daemon iteration four
+- Verify the latest checkpoint-state commit with `git log --oneline -5`; the top entry may record this resume prompt and board checkpoint.
 
 Current open decisions:
 - DECISION-20260517-alert-event-ownership-model blocks only CF-W1-L3-AUTH-02 implementation and alert event inbox/digest ownership work.

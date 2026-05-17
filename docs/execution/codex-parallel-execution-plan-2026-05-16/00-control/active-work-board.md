@@ -89,7 +89,7 @@ Operating rules:
 | Blocked-work pressure | high |
 | Next team to launch | Team 02 Requirement Factory and Team 04 QA Factory |
 | Next item to assign | `CF-W1-MD-01` QA plan / validation policy prep and `CF-W1-L3-DQ-01` decision packet prep |
-| Last commit | `004d918 docs: checkpoint daemon iteration four` |
+| Last commit | Verify with `git log --oneline -5`; the latest checkpoint commit should be the top entry |
 | Daemon should continue | Yes, after runtime checkpoint resume |
 
 ## Sprint 0 Items
