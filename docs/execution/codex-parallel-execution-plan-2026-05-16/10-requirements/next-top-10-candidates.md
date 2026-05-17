@@ -2,7 +2,7 @@
 
 Date: 2026-05-17
 
-Prepared by Team 02 Requirement Factory in daemon scheduler mode after the two prior Decision Inbox items were resolved and committed. Refreshed for the current daemon cycle with focus on `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02`.
+Prepared by Team 02 Requirement Factory in daemon scheduler mode after the two prior Decision Inbox items were resolved and committed. Refreshed for the current daemon cycle after cross-checking module audits, active board, risk register, ready/blocked queues, next architecture contracts, and next validation plans.
 
 ## Current Top Candidates
 
@@ -13,9 +13,9 @@ There are fewer than ten active candidates after removing completed bounded slic
 | 1 | CF-W1-L3-DQ-01 | Product/Architect policy decision + architecture contract + QA plan | Parent Lane 3 display-vs-action readiness policy. High unblock value for alerts, portfolio/watchlist, portfolio intelligence, research, and copilot trust surfaces. |
 | 2 | CF-W1-TP-01A | Architecture contract + QA plan + Product decision | Trade Plan no-target compatibility and DQ hard-block requirement is refined, but not code-ready. |
 | 3 | CF-W1-MD-02 | ADR / architecture contract + ADR QA checklist | Durable Market Data readiness evidence ADR. Schema/source implementation remains blocked until storage model and natural key are accepted. |
-| 4 | CF-W1-L3-ALERT-01 | Wait for `CF-W1-L3-DQ-01`; then architecture + QA handoff | Alert ownership backend slice is committed; readiness suppression remains blocked by Lane 3 readiness policy. |
-| 5 | CF-W1-UX-02 | Product/UX decision + architecture contract + QA plan | Copilot/research trust UX requirement is refined, but not code-ready. |
-| 6 | CF-W1-MD-01 | Validation policy + QA plan | Market Data validation hardening policy and QA plan. |
+| 4 | CF-W1-MD-01 | Validation policy + QA plan | Market Data validation hardening QA plan exists; policy is still unresolved, and source/test execution remains blocked. |
+| 5 | CF-W1-UX-02 | Product/UX decision + architecture contract + QA plan | Copilot/research trust UX requirement and QA plan exist, but naming, trust fields, blocked states, and shared-file scope are unresolved. |
+| 6 | CF-W1-L3-ALERT-01 | Wait for `CF-W1-L3-DQ-01`; then architecture + QA handoff | Alert ownership backend slice is committed; readiness suppression remains blocked by Lane 3 readiness policy. |
 | 7 | CF-W1-UX-05 | Product/UX copy decision | Research-support copy pass contract. |
 | 8 | CF-W1-BT-01 | Upstream DQ and strategy trust policy | Backtesting DQ fail-closed characterization. |
 
@@ -39,6 +39,7 @@ These items are not app-code ready.
 | 2 | CF-W1-TP-01A | Architecture contract and QA plan | Product/Architect target replacement and DQ hard-block semantics still required before source work. |
 | 3 | CF-W1-MD-02 | ADR packet and ADR QA checklist | No Prisma, schema, source, provider, startup, or test changes until ADR approval. |
 | 4 | CF-W1-MD-01 | Validation policy and QA plan | No Market Data source/test changes until policy is accepted. |
+| 5 | CF-W1-UX-02 | Copilot trust UX contract and QA scenarios | No UI/backend/source/shared-file changes until Product/UX/Architect naming, trust-field, blocked-state, and file-reservation decisions are accepted. |
 
 ## Completed Or Removed From Active Top 10
 
@@ -55,4 +56,4 @@ These items are not app-code ready.
 
 ## Product Agent Recommendation
 
-Do not pull application-code work until a current item has an accepted requirement, accepted contract or architecture review, exact file reservation, QA plan, and no unresolved Product Owner, Architect, QA, shared-file, or upstream blocker.
+Do not pull application-code work until a current item has an accepted requirement, accepted contract or architecture review, exact file reservation, QA plan, and no unresolved Product Owner, Architect, QA, shared-file, schema, provider, UI, or upstream blocker. Team 00 remains the only owner for Ready queue updates.

@@ -78,3 +78,16 @@ Use child work items with one module owner per implementation pass:
 
 A Decision Packet is needed later if Product Owner acceptance is required for `LIMITED` passive display versus blocked action behavior. It was not created in this pass because this task is documentation-only contract preparation and no implementation gate is being opened now.
 
+## Team 03 Relaunch Architecture Notes - 2026-05-17
+
+Readiness result: docs-only policy contract remains valid, but app-code work is blocked.
+
+Current evidence confirms the Data Quality Engine exposes public readiness outputs, including `coverageStatus`, `signalReadinessStatus`, `liquidityStatus`, `eligibleForSignals`, readiness reasons/blockers, and use-case tiers. Lane 3 consumers must consume those outputs through public module boundaries and must not calculate their own readiness scores.
+
+Recommended decision posture:
+
+- `READY` can support trusted display and action-like workflows after module-specific contract checks.
+- `LIMITED` should be display-only with visible reasons unless Product Owner explicitly accepts a narrower exception.
+- `NOT_READY`, `UNUSABLE`, stale hard blockers, missing DQ, unsupported scope, and scope mismatch should block trusted display, alerts, reliability labels, and action-like workflow states.
+
+No app-code files are reserved by this contract. Future implementation must be split into child slices for portfolio/watchlist DTO readiness, alerts readiness suppression, portfolio-intelligence reliability gating, and UX-approved frontend display work.

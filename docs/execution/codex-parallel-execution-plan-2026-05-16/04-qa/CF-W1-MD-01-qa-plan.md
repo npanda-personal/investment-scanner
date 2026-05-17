@@ -6,6 +6,8 @@ Owner: Team 04 QA Factory
 
 Status: QA planning only. Market Data validation hardening is blocked from executable validation until Product Owner and Architect accept the validation policy and a scoped implementation handoff exists.
 
+Current status refresh: recent setup authorization does not change this candidate's QA gate. `CF-W1-MD-01` remains docs-only and QA-blocked for execution until a validation-policy decision and Team 00-owned work packet exist.
+
 ## Scope
 
 Validation plan for Market Data Foundation historical price validation hardening.
@@ -78,7 +80,7 @@ cd backend
 npm.cmd test -- market-data.validation.test.ts market-data-readiness-evidence.invariants.test.ts market-data.repository.test.ts --runInBand
 ```
 
-Approval-gated backend build after implementation and memory/resource check:
+Approval-gated backend build after accepted implementation, Team 00 validation approval, and memory/resource check:
 
 ```powershell
 cd backend
@@ -91,7 +93,7 @@ Do not run by default:
 
 - broad backend suites such as `npm.cmd test` with no file filters,
 - Playwright or UI smoke tests,
-- dev servers or provider services,
+- dev servers, live services, or provider services,
 - startup, scheduler, repair, sync, import, or backfill flows,
 - Prisma generate, migrate, db push, db execute, or any schema/data mutation,
 - provider tests unless explicitly mocked and approved,

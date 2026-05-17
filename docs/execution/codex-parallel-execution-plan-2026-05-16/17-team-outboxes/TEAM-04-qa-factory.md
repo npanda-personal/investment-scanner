@@ -6,13 +6,15 @@ Mode: docs-only QA planning.
 
 ## Completed Work
 
-Prepared QA plans for:
+Prepared and refreshed QA plans for:
 
 - `CF-W1-MD-01`: Market Data validation hardening policy and future focused validation.
 - `CF-W1-L3-ALERT-01`: alert readiness suppression validation after Lane 3 readiness policy.
 - `CF-W1-UX-02`: Copilot trust UX/backend validation after Product/UX/Architect trust contract.
 
-Updated `04-qa/next-validation-plans.md` so these three items are no longer listed as missing QA-plan gaps.
+Updated `04-qa/next-validation-plans.md` so these three items are no longer listed as missing QA-plan gaps and added status refresh notes for `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02` after setup authorization.
+
+Setup authorization interpretation: standing branch/worktree/commit/push authorization does not approve QA execution, app-code readiness, tests, builds, services, providers, Prisma commands, UI smoke, Angel One, startup/backfill, live services, or Ready queue movement.
 
 No application source, tests, Prisma, route registries, shared utilities/UI, packages, generated files, root `AGENTS.md`, `docs/AGENTS.md`, or `docs/codex-agent-team-plan/**` were modified.
 
@@ -22,6 +24,9 @@ No application source, tests, Prisma, route registries, shared utilities/UI, pac
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-MD-01-qa-plan.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-L3-ALERT-01-qa-plan.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-UX-02-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-L3-DQ-01-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-TP-01A-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-MD-02-qa-plan.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
 
 ## Files Inspected
@@ -32,6 +37,12 @@ Content inspected:
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/next-validation-plans.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-MD-02-qa-plan.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-L3-DQ-01-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-TP-01A-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/09-summaries/standing-worktree-push-authorization-summary.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/09-summaries/daemon-cycle-latest.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/09-summaries/daemon-resume-prompt.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/continuous-daemon-iteration-4-architecture-summary.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory-daemon-2026-05-17-iteration-4.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-UX-02-copilot-trust-ux-requirement.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
@@ -80,7 +91,7 @@ Directory/file lists inspected:
 
 ## Validation
 
-Commands run for validation: none.
+Commands run for validation: none. No tests were run.
 
 Tests, builds, services, providers, startup/backfill, Prisma commands, UI checks, Playwright, staging, commits, and pushes were not run.
 
@@ -91,9 +102,9 @@ The plans include focused future command guidance only. Each command remains blo
 Excluded by default:
 
 - broad `npm.cmd test` commands without file filters,
-- Playwright or UI smoke tests before UI scope, local startup plan, and memory/resource check,
+- Playwright or UI smoke tests before UI scope, exact focused spec, local startup plan, Team 00 validation approval, and memory/resource check,
 - backend/frontend builds before implementation and resource approval,
-- dev servers, provider services, startup flows, schedulers, repair/sync/import/backfill jobs,
+- dev servers, live services, provider services, startup flows, schedulers, repair/sync/import/backfill jobs,
 - Prisma generate, migrate, db push, db execute, or any schema/data mutation,
 - Angel One, live provider, paid/cloud, external AI, telemetry, broker, or real-money flows.
 
@@ -103,10 +114,14 @@ Excluded by default:
 - `CF-W1-L3-ALERT-01`: blocked by `CF-W1-L3-DQ-01`, alert readiness contract, and implementation handoff.
 - `CF-W1-UX-02`: blocked by Copilot naming, trust-field, blocked-summary, scope, shared-file, and implementation decisions.
 - `CF-W1-UX-02` UI smoke is also blocked because `frontend/tests/ui/ai-investment-copilot.spec.ts` and `frontend/tests/ui/stock-research-workbench.spec.ts` do not currently exist.
+- `CF-W1-L3-DQ-01`: setup authorization permits docs-only architecture prep only; QA execution is blocked until accepted Lane 3 readiness policy and work packet.
+- `CF-W1-TP-01A`: setup authorization permits docs-only architecture prep only; QA execution is blocked until accepted no-target/DQ hard-block contract and work packet.
+- `CF-W1-MD-02`: setup authorization permits ADR/work-packet prep only; schema/source/test execution remains blocked until accepted storage/natural-key ADR.
 
 ## Next Recommendations
 
 1. Product Owner and Architect should accept or revise the `CF-W1-MD-01` validation policy before any Market Data source/test work.
 2. Architect should prepare the `CF-W1-L3-ALERT-01` alert readiness suppression contract only after `CF-W1-L3-DQ-01` is accepted.
 3. Product Owner, UX, and Architect should decide `CF-W1-UX-02` naming, trust fields, and blocked-state behavior before backend or UI implementation.
-4. Orchestrator should keep all three items out of Ready for Implementation until accepted contracts, exact file reservations, and implementation handoffs exist.
+4. Orchestrator should keep all six reviewed candidates out of app-code Ready until accepted contracts/ADR, exact file reservations, implementation handoffs, and QA validation gates exist.
+5. Team 00 should relaunch Team 03 for `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02` architecture/work-packet updates, then return Team 04 to refresh QA if those contracts change.

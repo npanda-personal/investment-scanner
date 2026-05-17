@@ -16,7 +16,7 @@ docs/codex-agent-team-plan/** is historical evidence only.
 Use the active execution folder:
 docs/execution/codex-parallel-execution-plan-2026-05-16/
 
-Resume Continuous Daemon Scheduler Mode from cycle DAEMON-20260517, rolling iteration 9.
+Resume Continuous Daemon Scheduler Mode from cycle DAEMON-20260517, rolling iteration 10.
 
 Team 00 is the master runtime orchestrator. The human Product Owner is not the mediator for routine gates.
 
@@ -45,19 +45,22 @@ Read:
 - 18-integration-queue/
 
 Current open decisions:
-- None. `99-decision-inbox/open-decisions.md` states no open decisions.
-- Product Owner action is not required unless a new true consent blocker appears.
+- `DECISION-20260517-lane3-readiness-consumer-policy`
+- `DECISION-20260517-trade-plan-no-target-dq-hard-block`
+- `DECISION-20260517-market-data-durable-readiness-storage-adr`
+- Product Owner action is required for those affected workstreams. All unrelated autonomous work continues.
 
 Current ready queue:
 - No active application-code item is Ready for Implementation.
 
 Current planning queues:
-- Requirement backlog and next-top candidates were refreshed after the resolved decision items were removed.
-- Team 02 refreshed current priorities and readiness checks for `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02`.
-- Team 04 prepared QA plans for `CF-W1-MD-01`, `CF-W1-L3-ALERT-01`, and `CF-W1-UX-02`.
-- Team 03 architecture prep for `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02` timed out and should be relaunched first.
+- Team 02 refreshed requirement priorities and kept app-code Ready at zero.
+- Team 03 completed architecture prep for `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02`.
+- Team 04 refreshed QA plans for `CF-W1-MD-01`, `CF-W1-L3-ALERT-01`, `CF-W1-UX-02`, and status for Team 03 items.
+- Team 00 opened three Decision Packets for true consent blockers.
 
 Current committed daemon outputs include:
+- 1e882cd docs: authorize continuous codex factory execution
 - 1a0c91b docs: checkpoint daemon requirement and qa prep
 - ae0b4cc docs: checkpoint daemon after resolved decisions
 - f75808f docs: fix daemon checkpoint resume protocol
@@ -71,8 +74,8 @@ Resume daemon operation:
 1. Keep Team 00 running as scheduler/integration owner.
 2. Relaunch teams as runtime slots become available.
 3. Continue audits, requirement refinement, architecture prep, QA planning, implementation only when Ready criteria pass, review, and release work.
-4. Relaunch Team 03 first for `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02` architecture contracts/work packets.
-5. Keep Team 04 queued for QA review after Team 03 outputs; relaunch Team 02 when new audit findings or decisions change the backlog.
+4. Keep `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02` out of implementation until their Decision Inbox items are resolved.
+5. Relaunch Team 02/03/04 only for non-blocked refinement or after decisions change the backlog/contracts/QA plans.
 6. Launch Teams 05-09 only when matching ready work exists; otherwise assign module-domain audit/refinement/prep.
 7. Relaunch Team 10 when integration queue items appear.
 8. Update `99-decision-inbox/open-decisions.md` whenever a true consent blocker is created or resolved.

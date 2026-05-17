@@ -6,6 +6,8 @@ Owner: Team 04 QA Factory
 
 Status: QA planning only. Product Owner and Architect decision is required for Lane 3 display-vs-action readiness policy before implementation validation.
 
+Current status refresh: recent setup authorization permits Team 03/Team 00 to continue docs-only architecture and work-packet preparation, but it does not make `CF-W1-L3-DQ-01` app-code ready and does not approve QA execution.
+
 ## Scope
 
 Validation plan for Lane 3 consumers of Data Quality readiness:
@@ -16,6 +18,8 @@ Validation plan for Lane 3 consumers of Data Quality readiness:
 - copilot/research summaries only after a separate UX/trust contract.
 
 This plan does not approve source changes, tests, UI work, services, providers, builds, Prisma changes, route registry changes, or package changes.
+
+It also explicitly excludes Angel One, live services, startup/backfill flows, UI smoke, broad suites, Prisma mutation commands, and any live-provider or paid/cloud validation unless a future approved implementation packet requires and scopes them.
 
 ## Required QA Assertions
 
@@ -52,7 +56,7 @@ cd backend
 npm.cmd test -- alerts-monitoring.service.test.ts alerts-monitoring.routes.test.ts alerts-monitoring.validation.test.ts --runInBand
 ```
 
-UI smoke is excluded by default. It requires explicit UI scope approval, running-app plan, memory/resource check, and a focused Playwright spec.
+UI smoke is excluded by default. It requires explicit UI scope approval, running-app plan, exact focused Playwright spec, Team 00 validation approval, and memory/resource check.
 
 ## Stop Conditions
 
@@ -63,6 +67,7 @@ Stop QA and return to Product Owner/Architect if:
 - implementation requires Prisma, route registry, shared utilities, shared UI, package, provider, startup/backfill, or UI scope,
 - tests require live providers or services,
 - commands broaden beyond focused backend patterns.
+- any request tries to treat setup authorization as approval for app-code readiness or validation execution.
 
 ## Evidence Required Later
 

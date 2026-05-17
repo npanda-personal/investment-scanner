@@ -6,6 +6,8 @@ Prepared by Team 04 QA Factory and refreshed after docs-only QA plans for `CF-W1
 
 Refresh note: docs-only QA refresh. No tests, builds, services, providers, UI checks, or application source/test edits were run or modified during this refresh.
 
+Setup authorization note: standing branch/worktree/commit/push authorization changes execution mechanics only. It does not approve app-code work, tests, builds, Prisma commands, providers, Angel One, startup/backfill, UI smoke, live services, or Ready queue movement for any candidate below.
+
 ## Completed QA Planning / Evidence
 
 - `CF-W1-QA-01` focused command matrix is recorded in `04-qa/CF-W1-QA-01-focused-test-command-matrix.md`.
@@ -21,6 +23,17 @@ Refresh note: docs-only QA refresh. No tests, builds, services, providers, UI ch
 4. `CF-W1-MD-01`: Market Data validation hardening QA plan recorded in `04-qa/CF-W1-MD-01-qa-plan.md`.
 5. `CF-W1-L3-ALERT-01`: alert readiness suppression QA plan recorded in `04-qa/CF-W1-L3-ALERT-01-qa-plan.md`.
 6. `CF-W1-UX-02`: Copilot trust UX QA plan recorded in `04-qa/CF-W1-UX-02-qa-plan.md`.
+
+## Status Refresh After Setup Authorization
+
+| Work item | QA status | What changed after setup authorization | Required next gate |
+| --- | --- | --- | --- |
+| `CF-W1-MD-01` | QA-blocked for executable validation | No status change; docs-only QA plan remains usable for future policy review. | Product/Architect validation policy and implementation work packet. |
+| `CF-W1-L3-ALERT-01` | QA-blocked by upstream policy | No status change; alert readiness suppression remains dependent on `CF-W1-L3-DQ-01`. | Architecture contract/work packet after Lane 3 readiness policy. |
+| `CF-W1-UX-02` | QA-blocked by Product/UX/Architecture decisions | No status change; UI smoke remains excluded until approved UI scope and spec exist. | Product/UX/Architect trust contract and implementation packet. |
+| `CF-W1-L3-DQ-01` | Can proceed only to architecture/work-packet refresh | Setup authorization permits Team 03 docs-only prep, not app-code or QA execution. | Accepted Lane 3 readiness policy contract and exact implementation reservation. |
+| `CF-W1-TP-01A` | Can proceed only to architecture/work-packet refresh | Setup authorization permits Team 03 docs-only prep, not app-code or QA execution. | Accepted no-target/DQ hard-block contract and exact implementation reservation. |
+| `CF-W1-MD-02` | Can proceed only to ADR/work-packet refresh | Setup authorization permits ADR/decision-packet prep, not schema/source/test execution. | Accepted storage/natural-key ADR before any Prisma/source/test work. |
 
 ## Remaining Next QA Plans
 
@@ -51,9 +64,9 @@ Commands below are guidance only. They were not run during this documentation-on
 
 ## Safe Command Discipline
 
-Use focused backend Jest patterns only until broader test approval exists.
+Use focused backend Jest patterns only after the relevant candidate has an accepted policy/contract, scoped implementation handoff, and Team 00 approval to validate.
 
-Do not run Playwright, services, provider tests, live providers, broad backend suites, startup/backfill, Prisma mutation commands, Angel One, or paid/cloud flows without explicit approval and resource checks.
+Do not run Playwright, UI smoke, dev servers, live services, provider tests, live providers, broad backend suites, startup/backfill, Prisma mutation commands, Angel One, or paid/cloud flows without explicit approval and resource checks.
 
 Provider-adjacent, startup-adjacent, frontend build, backend build, UI smoke, live-provider, Prisma mutation, and broad-suite validation remain approval-gated and excluded from default QA execution.
 

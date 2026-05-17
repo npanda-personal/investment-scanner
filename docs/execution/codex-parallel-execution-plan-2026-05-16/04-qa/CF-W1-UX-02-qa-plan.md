@@ -6,6 +6,8 @@ Owner: Team 04 QA Factory
 
 Status: QA planning only. Copilot trust UX validation is blocked until Product Owner, UX, and Architect accept naming, trust fields, blocked-state behavior, file reservations, and implementation scope.
 
+Current status refresh: recent setup authorization does not unblock Copilot backend or UI validation. `CF-W1-UX-02` remains docs-only until Product/UX/Architecture decisions are accepted and Team 00 issues an implementation packet.
+
 ## Scope
 
 Validation plan for Copilot trust UX and supporting backend contract behavior.
@@ -78,7 +80,7 @@ cd backend
 npm.cmd test -- ai-investment-copilot.service.test.ts alerts-monitoring.service.test.ts portfolio-management.service.test.ts portfolio-intelligence.service.test.ts watchlist-management.service.test.ts stock-research-workbench.service.test.ts --runInBand
 ```
 
-UI smoke, approval-gated only after UI implementation, local app startup plan, and memory/resource check:
+UI smoke, approval-gated only after accepted UI implementation, local app startup plan, exact spec, Team 00 validation approval, and memory/resource check:
 
 ```powershell
 cd frontend
@@ -92,7 +94,7 @@ cd frontend
 npm.cmd run test:ui -- stock-research-workbench.spec.ts --workers=1
 ```
 
-Approval-gated builds after implementation and memory/resource check:
+Approval-gated builds after accepted implementation, Team 00 validation approval, and memory/resource check:
 
 ```powershell
 cd backend
@@ -110,7 +112,7 @@ Do not run by default:
 
 - broad backend or frontend test suites with no file filters,
 - Playwright before UI scope, local app startup plan, and memory/resource check,
-- dev servers or provider services,
+- dev servers, live services, or provider services,
 - startup, scheduler, repair, sync, import, or backfill flows,
 - Prisma generate, migrate, db push, db execute, or any schema/data mutation,
 - provider tests, Angel One, or live provider checks,

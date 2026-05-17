@@ -91,3 +91,17 @@ The Decision Packet must cover migration path, rollback, Prisma impact, query/te
 - Downstream consumers know which evidence is durable and which is derived.
 - QA has focused storage/evidence invariants before source work starts.
 
+## Team 03 Relaunch Architecture Notes - 2026-05-17
+
+Readiness result: ADR/decision-prep only. Source, schema, migration, provider, service, route, startup, repair, backfill, and test implementation remain blocked.
+
+Read-only schema inspection confirms the current `PriceTick` uniqueness is `symbol + timestamp`, and `LatestPrice` is keyed by `symbol`. That is narrower than the target natural key described by root policy because it does not prove region, asset type, timeframe, source, source symbol, or instrument identity as part of the uniqueness model.
+
+Recommended ADR posture:
+
+- compare expanding existing price rows, a companion OHLC evidence table, a durable readiness evidence table, and keeping current storage with explicitly limited claims,
+- define whether records are append-only, idempotent/upserted, derived, cached, provider-specific, normalized canonical, or a documented combination,
+- keep Data Quality Engine ownership of readiness evaluation,
+- specify migration/no-backfill, rollback, query, and focused-test strategy before any Prisma or source reservation.
+
+No source/schema files are reserved by this contract.

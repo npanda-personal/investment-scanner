@@ -133,3 +133,4 @@
 - As of daemon iteration 7, planning queues have been refreshed to remove the resolved alert ownership and trigger DTO blockers. Ready queue remains empty for app-code work.
 - As of daemon iteration 8, Team 03 architecture prep timed out without output. This is a runtime checkpoint issue, not a consent blocker; relaunch Team 03 first on resume.
 - As of daemon iteration 9, Product Owner authorized standing worktrees, local commits, and scoped push to `dev` under exact staged-scope and acceptance gates.
+- As of daemon iteration 10, Teams 02, 03, and 04 completed docs-only refinement and opened three true consent blockers for Lane 3 readiness policy, Trade Plan no-target/DQ hard-block policy, and Market Data durable readiness storage ADR. Affected workstreams wait; independent work continues.

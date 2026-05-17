@@ -6,6 +6,8 @@ Owner: Team 04 QA Factory
 
 Status: QA planning only. Implementation remains blocked until the Trade Plan no-target compatibility and DQ hard-block contract is accepted.
 
+Current status refresh: recent setup authorization permits docs-only architecture/work-packet preparation, but it does not make `CF-W1-TP-01A` app-code ready and does not approve QA execution.
+
 ## Scope
 
 Focused backend validation for Trade Plan Risk Engine contract behavior:
@@ -18,6 +20,7 @@ Out of scope:
 - frontend Today Review/UI display changes unless separately approved,
 - API shape migration beyond the accepted contract,
 - Prisma, route registry, shared utility, package, provider, startup/backfill, or UI test changes.
+- Angel One, live services, broad suites, Prisma mutation commands, paid/cloud flows, broker flows, and live-provider validation.
 
 ## Required QA Assertions
 
@@ -54,7 +57,7 @@ cd backend
 npm.cmd test -- today-trade-review.service.test.ts today-trade-review.controller.test.ts --runInBand
 ```
 
-Frontend build and Playwright/UI smoke are excluded by default and require separate UI scope approval.
+Frontend build and Playwright/UI smoke are excluded by default and require separate UI scope approval, exact focused spec, Team 00 validation approval, running-app plan, and memory/resource check.
 
 ## Stop Conditions
 
@@ -69,6 +72,7 @@ Stop QA and return to Orchestrator/Architect if validation requires:
 - startup/backfill behavior,
 - broad backend suites,
 - UI/Playwright checks.
+- any request treats setup authorization as approval for app-code readiness or executable validation.
 
 ## Evidence Required Later
 

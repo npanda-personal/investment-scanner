@@ -83,3 +83,18 @@ The Decision Packet was not created in this pass because implementation is not b
 - Tests prove missing/blocked DQ fails closed.
 - Tests prove forbidden wording is absent from trusted outputs.
 
+## Team 03 Relaunch Architecture Notes - 2026-05-17
+
+Readiness result: docs-only contract remains valid, but app-code work is blocked.
+
+Current source structure confirms Trade Plan still has target geometry and Data Quality snapshot fields. The architecture risk is not only wording; it includes API compatibility, persisted JSON interpretation, Today Review adjacency, and frontend display semantics.
+
+Recommended decision posture:
+
+- keep any `target` field as compatibility-only unless a separate migration removes or renames it,
+- exclude compatibility target data from trusted paper-readiness,
+- hard-block trusted paper-readiness on missing DQ, `coverageStatus = UNUSABLE`, `signalReadinessStatus = NOT_READY`, `liquidityStatus = ILLIQUID`, stale hard blockers, required use-case tier `BLOCKED`, and `eligibleForSignals = false`,
+- treat `LIMITED` as blocked or limited-review-only until Product Owner and Architect decide otherwise,
+- keep frontend and Today Review changes out of the first backend-only child slice unless explicitly reserved.
+
+No source, test, API, UI, Prisma, route, shared, package, generated, provider, startup, or live-data files are reserved by this contract.

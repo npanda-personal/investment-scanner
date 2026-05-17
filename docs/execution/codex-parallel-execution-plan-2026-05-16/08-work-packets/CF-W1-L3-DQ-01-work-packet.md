@@ -68,3 +68,18 @@ A Decision Packet should be created later if the Product Owner is ready to choos
 - Future work is split by module and single-writer ownership.
 - Shared-file stop conditions are explicit.
 
+## Team 03 Relaunch Update - 2026-05-17
+
+Current state remains docs-only and blocked from app-code implementation.
+
+Exact current write scope for this Team 03 pass:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `03-architecture/CF-W1-L3-DQ-01-architecture-review.md`
+- `06-contracts/CF-W1-L3-DQ-01-lane3-readiness-consumer-policy-contract.md`
+- `08-work-packets/CF-W1-L3-DQ-01-work-packet.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Future implementation is not reserved. When policy is accepted, Team 00 should create child work packets with one writer per module and exact file lists.
+
+Current blocker: Product Owner and Architect must accept the Lane 3 display-vs-action readiness policy, including `LIMITED` behavior, alert/action block behavior, DTO fields, and child slice boundaries.

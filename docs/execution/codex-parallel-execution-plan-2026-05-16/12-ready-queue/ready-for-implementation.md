@@ -12,7 +12,7 @@ No active application-code item is currently Ready for Implementation.
 
 `CF-W1-SIG-TRIGGER-01` was unblocked by Product Owner Option A, implemented as an additive DTO projection, validated, reviewed, accepted under standing delegation, committed locally as `6ab3999`, and moved out of the live ready queue.
 
-Team 02 refined the next requirement records for:
+Team 02 refined the next requirement records and Team 03/04 refreshed architecture/QA planning for:
 
 - `CF-W1-TP-01A`
 - `CF-W1-L3-DQ-01`
@@ -24,7 +24,7 @@ Team 04 prepared docs-only QA plans for:
 - `CF-W1-L3-ALERT-01`
 - `CF-W1-UX-02`
 
-Those records are planning artifacts only. They still need Product Owner, UX where applicable, Architect, QA, exact file reservation, and work-packet gates before any app-code team can pull them.
+Those records are planning artifacts only. Three true consent blockers were opened in Decision Inbox for Lane 3 readiness policy, Trade Plan no-target/DQ hard-block policy, and Market Data durable readiness storage ADR. They still need Product Owner, UX where applicable, Architect, QA, exact file reservation, and work-packet gates before any app-code team can pull them.
 
 ## Completed Slices Not Active For Pull
 
@@ -70,7 +70,7 @@ Docs-only contract and QA preparation:
 - `CF-W1-MD-02`
 - `CF-W1-MD-01`
 
-Team 03 architecture prep for `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02` timed out this cycle and remains queued for the next daemon resume.
+Team 03 architecture prep for `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02` completed as docs-only decision prep. No app-code item became Ready.
 
 ## Ready Criteria Reminder
 

@@ -91,3 +91,18 @@ npm.cmd test -- trade-plan-risk-engine.service.test.ts trade-plan-risk-engine.re
 - No source implementation is opened.
 - Future reservations are bounded and separated from frontend/Today Review unless approved.
 
+## Team 03 Relaunch Update - 2026-05-17
+
+Current state remains docs-only and blocked from app-code implementation.
+
+Exact current write scope for this Team 03 pass:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `03-architecture/CF-W1-TP-01A-architecture-review.md`
+- `06-contracts/CF-W1-TP-01A-trade-plan-no-target-dq-hard-block-contract.md`
+- `08-work-packets/CF-W1-TP-01A-work-packet.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Future implementation is not reserved. If Product Owner and Architect accept a backend-only child slice, reserve exact Trade Plan files only and keep frontend/Today Review files excluded unless explicitly approved.
+
+Current blocker: no accepted decision for target compatibility, `LIMITED` DQ behavior, API/UI migration boundary, or existing stored Trade Plan row interpretation.

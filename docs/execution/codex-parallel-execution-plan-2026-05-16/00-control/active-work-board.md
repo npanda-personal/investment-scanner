@@ -73,24 +73,24 @@ Operating rules:
 | Field | Current Value |
 | --- | --- |
 | Current daemon cycle id | `DAEMON-20260517` |
-| Current rolling iteration count | 9 |
-| Active teams | Team 00 recording standing worktree/commit/push authorization before daemon resume |
-| Queued teams | Team 03 for architecture prep; Team 04 for QA review after Team 03; Team 05-09 for audit/refinement if no ready implementation appears |
+| Current rolling iteration count | 10 |
+| Active teams | Team 00 checkpointing after Teams 02, 03, and 04 docs-only daemon work |
+| Queued teams | Team 01 audit refresh; Team 02/03/04 relaunch after decision responses; Team 05-09 audit/refinement if no ready implementation appears |
 | Idle teams | Team 01, Team 05, Team 08, Team 09, Team 10 |
 | Blocked teams | None fully blocked; implementation teams without ready work continue audit/refinement |
-| Teams relaunched this cycle | Team 02, Team 03, Team 04, Team 06, Team 07, Team 10 |
+| Teams relaunched this cycle | Team 02, Team 03, Team 04 |
 | Teams shut down due to no work | None permanently; Teams without ready implementation move to audit/refinement |
 | Teams re-added due to new work | Team 07 completed `CF-W1-L3-AUTH-02`; Team 06 completed `CF-W1-SIG-TRIGGER-01` |
 | Ready queue depth | 0 active application-code items after `CF-W1-L3-AUTH-02` and `CF-W1-SIG-TRIGGER-01` commits |
 | Refinement queue depth | High; see `10-requirements/next-top-10-candidates.md` |
 | Integration queue depth | 0 active application-code items after bounded commits |
-| Decision inbox count | 0 open decisions |
+| Decision inbox count | 3 open decisions |
 | Ready-work pressure | low |
-| Blocked-work pressure | medium-high |
-| Next team to launch | Team 03 Architecture Factory, then Team 02 Requirement Factory and Team 04 QA Factory |
-| Next item to assign | `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02` architecture prep |
-| Last commit | `1a0c91b docs: checkpoint daemon requirement and qa prep`; next docs commit records standing worktree/push authorization |
-| Daemon should continue | Yes, after setup commit and scoped push attempt |
+| Blocked-work pressure | high |
+| Next team to launch | Team 01 audit refresh or Team 02 requirement refinement on non-blocked candidates |
+| Next item to assign | Product Owner review of Decision Inbox; autonomous audit/refinement can continue in unrelated lanes |
+| Last commit | `1e882cd docs: authorize continuous codex factory execution`; next docs commit records Team 02/03/04 outputs and decision packets |
+| Daemon should continue | Yes for unrelated workstreams; affected decision-gated workstreams wait |
 
 ## Sprint 0 Items
 
@@ -205,4 +205,5 @@ Old work items in `docs/codex-agent-team-plan/` may be used only as evidence or 
 | DAEMON-20260517-10 | Checkpoint resume protocol repair | Team 00 | Checkpointing | `98-orchestrator/`, `09-summaries/`, `00-control/`, `99-decision-inbox/` | Resume prompt existence verified and updated. Future checkpoint reports must include resume prompt path and update status. |
 | DAEMON-20260517-11 | Team 02/03/04 queue refresh | Teams 02, 03, 04, 00 | Checkpointing | `10-requirements/`, `03-architecture/`, `04-qa/`, `09-summaries/` | Removed stale resolved decision blockers from planning queues. No app-code item is ready. |
 | DAEMON-20260517-12 | Team 02/04 docs-only prep | Teams 02, 04, 00 | Checkpointing | `10-requirements/`, `04-qa/`, `17-team-outboxes/`, queue docs | Team 02 refined current requirements; Team 04 prepared `CF-W1-MD-01`, `CF-W1-L3-ALERT-01`, and `CF-W1-UX-02` QA plans. Team 03 timed out and remains queued. |
-| DAEMON-20260517-13 | Standing worktree/commit/push authorization | Team 00 | In Progress | `98-orchestrator/`, `15-automation-prompts/`, `99-decision-inbox/`, `00-control/`, `09-summaries/` | Product Owner authorized worktrees, scoped local commits, and push to `dev` under strict gates. No app code changes. |
+| DAEMON-20260517-13 | Standing worktree/commit/push authorization | Team 00 | Committed and pushed | `98-orchestrator/`, `15-automation-prompts/`, `99-decision-inbox/`, `00-control/`, `09-summaries/` | Product Owner authorized worktrees, scoped local commits, and push to `dev` under strict gates. Commit `1e882cd` pushed to `origin/dev`. |
+| DAEMON-20260517-14 | Team 02/03/04 docs-only refinement and decision routing | Teams 02, 03, 04, 00 | Checkpointing | Requirements, architecture, QA, Decision Inbox, queues | Team 02 refined requirements, Team 03 completed architecture prep, Team 04 refreshed QA plans. Three true consent blockers opened; no app-code Ready item exists. |

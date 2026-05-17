@@ -6,6 +6,8 @@ Owner: Team 04 QA Factory
 
 Status: QA planning only. Alert readiness suppression validation is blocked until `CF-W1-L3-DQ-01` policy acceptance, alert readiness contract acceptance, and scoped implementation handoff.
 
+Current status refresh: recent setup authorization does not unblock alert QA execution. `CF-W1-L3-ALERT-01` can only proceed after Team 03/Team 00 update the architecture/work-packet chain for Lane 3 readiness and alert readiness suppression.
+
 ## Scope
 
 Validation plan for Alerts Monitoring suppression of trusted or action-like alert events when Data Quality readiness is missing, limited, stale, not ready, blocked, unsupported, or scope-mismatched.
@@ -79,7 +81,7 @@ cd backend
 npm.cmd test -- data-quality-engine.service.test.ts data-quality-engine.invariants.test.ts portfolio-management.service.test.ts watchlist-management.service.test.ts portfolio-intelligence.service.test.ts alerts-monitoring.service.test.ts --runInBand
 ```
 
-Approval-gated backend build after implementation and memory/resource check:
+Approval-gated backend build after accepted implementation, Team 00 validation approval, and memory/resource check:
 
 ```powershell
 cd backend
@@ -92,7 +94,7 @@ Do not run by default:
 
 - broad backend suites such as `npm.cmd test` with no file filters,
 - Playwright or UI smoke tests,
-- dev servers or provider services,
+- dev servers, live services, or provider services,
 - startup, scheduler, repair, sync, import, or backfill flows,
 - Prisma generate, migrate, db push, db execute, or any schema/data mutation,
 - provider tests, Angel One, or live provider checks,

@@ -84,3 +84,18 @@ Do not create live-provider, Angel One, startup/backfill, or repair-run work as 
 - No source/schema implementation is opened.
 - Future Decision Packet requirement is clear.
 
+## Team 03 Relaunch Update - 2026-05-17
+
+Current state remains ADR/decision-prep only and blocked from app-code implementation.
+
+Exact current write scope for this Team 03 pass:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `03-architecture/CF-W1-MD-02-architecture-review.md`
+- `06-contracts/CF-W1-MD-02-durable-readiness-evidence-contract.md`
+- `08-work-packets/CF-W1-MD-02-work-packet.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Future source/schema implementation is not reserved. A later source packet must follow an accepted ADR and explicitly reserve Prisma/schema/migration/source/test files if needed.
+
+Current blocker: Product Owner and Architect must accept storage model, natural key, Prisma impact, migration/backfill or no-backfill strategy, rollback, query/test strategy, and durable-vs-derived downstream claims.
