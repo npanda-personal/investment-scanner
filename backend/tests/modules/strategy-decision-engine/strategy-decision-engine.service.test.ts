@@ -96,6 +96,47 @@ describe('StrategyDecisionEngineService', () => {
       expect(result.action).toBe('CONSIDER_ENTRY');
     });
 
+    it('uses rule-based risk review instead of arbitrary target semantics', () => {
+      const ctx = {
+        instrument: { id: '1', symbol: 'ABC', sector: 'Tech' },
+        prices: new Array(220).fill(100),
+        latestPrice: 100,
+        sma50: 90,
+        sma200: 80,
+        rsi: 55,
+        calibrated: { calibratedScore: 85 },
+        smartMoney: { status: 'ACCUMULATION' },
+        quality: { eligibleForSignals: true },
+        gate: { marketGate: 'OPEN' },
+        sectors: [{ sector: 'Tech', relativeStrengthScore: 70 }],
+      };
+      const result = (service as any).evaluateTrendMomentum(ctx);
+      const riskPlan = result.riskPlan;
+      const userFacingRiskText = [
+        riskPlan?.targetPriceCompatibilityNote,
+        riskPlan?.rationale,
+        riskPlan?.reasonSummary,
+        ...(riskPlan?.exitRules || []),
+        ...(riskPlan?.invalidationRules || []),
+      ].join(' ');
+
+      expect(riskPlan?.targetPrice).toBeNull();
+      expect(riskPlan?.rewardRiskRatio).toBeNull();
+      expect(riskPlan?.riskReviewLevel).toBe('LOW');
+      expect(userFacingRiskText).toContain('rule-based');
+      expect(userFacingRiskText).toContain('Exit condition met: momentum evidence weakened.');
+      expect(userFacingRiskText).not.toContain('115.00');
+      expect(userFacingRiskText).not.toContain('Target price achieved.');
+      expect(userFacingRiskText).not.toContain('15%');
+      expect(userFacingRiskText.toLowerCase()).not.toContain('profit target');
+      expect(userFacingRiskText.toLowerCase()).not.toContain('buy target');
+      expect(userFacingRiskText.toLowerCase()).not.toContain('sell target');
+      expect(userFacingRiskText.toLowerCase()).not.toContain('guaranteed');
+      expect(userFacingRiskText.toLowerCase()).not.toContain('expected return');
+      expect(userFacingRiskText.toLowerCase()).not.toContain('must buy');
+      expect(userFacingRiskText.toLowerCase()).not.toContain('must sell');
+    });
+
     it('should return AVOID if price is below SMA50', () => {
       const ctx = {
         instrument: { id: 'test', symbol: 'TEST', sector: 'Tech' },
@@ -276,6 +317,9 @@ describe('StrategyDecisionEngineService', () => {
       expect(result?.action).toBeDefined();
       expect(result?.decisionScore).toBeGreaterThan(0);
       expect(result?.entryRulesPassed?.length).toBeGreaterThan(0);
+      expect(result?.riskPlan?.targetPrice).toBeNull();
+      expect(result?.riskPlan?.exitRules).not.toContain('Target price achieved.');
+      expect(result?.riskPlan?.rationale).toContain('rule-based');
     });
 
     it('uses Strategy Framework evaluator for PULLBACK_IN_UPTREND', async () => {

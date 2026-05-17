@@ -4,19 +4,15 @@ Date: 2026-05-17
 
 ## Status
 
-Draft only. Blocked by Product Owner and Architect decision.
-
-Decision packet:
-
-- `99-decision-inbox/DECISION-20260517-no-target-exit-invalidation-semantics.md`
+Approved for bounded Strategy Decision Option B-Strict implementation.
 
 ## Scope
 
-Future QA for the first approved Strategy Decision no-target slice.
+QA for the first approved Strategy Decision no-target / exit-invalidation compatibility slice.
 
 ## Focused Test Targets
 
-Use focused backend tests only after an implementation work packet is approved. Candidate command:
+Use focused backend tests only:
 
 ```powershell
 cd backend
@@ -28,10 +24,13 @@ If exact test filenames differ, use the smallest Jest pattern that runs only Str
 ## QA Assertions
 
 - Trusted Strategy Decision outputs do not contain arbitrary target-price claims.
+- Trusted Strategy Decision outputs do not derive `riskPlan.targetPrice` from `latestPrice * 1.15`.
 - Exit rules use rule/evidence language and do not include `Target price achieved.`
 - Invalidation rules remain explicit.
 - Rationale text avoids fixed expected upside language.
 - Compatibility fields, if retained, are documented as non-advice limitations.
+- Replacement output uses candidate/review/risk/evidence wording.
+- Forbidden language is not introduced.
 - No Data Quality, Market Data, Trade Plan, frontend, Prisma, route, shared utility, shared UI, package, generated/common fixture, provider, Angel One, live provider, startup, or UI behavior is required.
 
 ## Limitations

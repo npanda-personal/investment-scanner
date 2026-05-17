@@ -44,6 +44,7 @@ export type DecisionAction =
 export type DecisionConfidence = 'LOW' | 'MEDIUM' | 'HIGH';
 
 export type EntryZoneType = 'BREAKOUT' | 'PULLBACK' | 'REVERSAL' | 'UNKNOWN';
+export type RiskReviewLevel = 'LOW' | 'MEDIUM' | 'HIGH';
 
 export interface EntryZonePreview {
   type: EntryZoneType;
@@ -69,10 +70,13 @@ export interface TradePlanPreview {
   entryZone: EntryZonePreview;
   riskPlan: {
     stopLoss: string;
-    targetPrice: string;
-    rewardRiskRatio: number;
+    targetPrice: string | null;
+    targetPriceCompatibilityNote?: string;
+    rewardRiskRatio: number | null;
+    riskReviewLevel?: RiskReviewLevel;
     maxRiskNote?: string;
     rationale: string;
+    reasonSummary?: string;
     invalidationRules: string[];
     exitRules: string[];
   };

@@ -98,7 +98,7 @@ No historical active work items have been migrated as active.
 |---|---|---|---|---|---|
 | CF-W1-SIG-01B | Signal Generation read-path DQ trust filtering | Signal Generation Engine Team + QA + Architect | Committed | `signal-generation-engine` source/tests | Focused tests passed. QA, review, Architect, delegated PO acceptance, and local commit `a5bc49a` completed. |
 | CF-W1-SIG-LATEST-01 | Latest signal DQ gate | Signal Generation Engine Team + QA + Architect | Committed | `signal-generation-engine` service/test | Focused tests passed. QA, review, Architect, delegated PO acceptance, and local commit `e0a6788` completed. |
-| CF-W1-STRAT-01 | No-target / exit-invalidation semantics | Product + Architecture Factory | Blocked | `strategy-decision-engine`, `trade-plan-risk-engine` future files | True product/architecture semantics decision required. Decision packet `DECISION-20260517-no-target-exit-invalidation-semantics` opened. |
+| CF-W1-STRAT-01 | No-target / exit-invalidation semantics | Strategy Decision Team + QA + Architect | Committed | `strategy-decision-engine` source/tests | Product Owner approved Option B-Strict. Focused tests, QA, review, Architect, and PO packet completed. Trade Plan target migration remains separate. |
 
 ## Current Sprint 1B Readiness
 

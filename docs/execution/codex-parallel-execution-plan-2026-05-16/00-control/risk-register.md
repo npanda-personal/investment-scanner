@@ -50,17 +50,17 @@
 - Current Market Data natural-key behavior is symbol/date-centric and narrower than the active contract target.
 - `signal-generation-engine` run-path default/fail-closed behavior is accepted in bounded `CF-W2-SIG-01A`, and trusted list read-path filtering is committed in `CF-W1-SIG-01B` as `a5bc49a`.
 - `latestForInstrument()` is gated by committed `CF-W1-SIG-LATEST-01` as `e0a6788`.
-- Lane 2 strategy/signal/risk modules still need fail-closed downstream DQ enforcement tests beyond the Wave 3 strict signal-generation path.
+- Lane 2 strategy/signal/risk modules still need fail-closed downstream DQ enforcement tests beyond the accepted Signal Generation and Strategy Decision slices.
 - Lane 3 portfolio/watchlist/alerts/copilot modules still need readiness consumer contracts and tests.
 - Angel One remains excluded from implementation and live validation.
 - Startup scheduler/backfill behavior requires Architect approval before it can be changed or accepted as Sprint 1B scope.
 - Downstream modules remain blocked from treating Market Data / DQ as trusted input.
-- Strategy Decision target-price semantics conflict with root no-arbitrary-target policy and require Product Owner + Architect decision packet `DECISION-20260517-no-target-exit-invalidation-semantics`.
+- Strategy Decision target-price semantics are resolved for the bounded Option B-Strict compatibility slice; Trade Plan target geometry remains a separate blocked migration.
 - Alert ownership and Lane 3 readiness consumer contracts remain unresolved.
 - Copilot/research trust UX remains unresolved.
 - Continuous Factory Wave 2 dirty DQ changes were accepted and committed as `CF-W2-DQ-01`.
 - Continuous Factory Wave 2 Signal Generation changes were reframed as bounded `CF-W2-SIG-01A`; `CF-W1-SIG-01B` adds trusted list read-path filtering.
-- No downstream implementation is allowed until strategy target-semantics risks and module-specific consumer gates are resolved.
+- No downstream Trade Plan, alert, portfolio, watchlist, or copilot implementation is allowed until module-specific consumer gates and Trade Plan target migration are resolved.
 
 ## Sprint 1B Preparation Risk Decisions
 

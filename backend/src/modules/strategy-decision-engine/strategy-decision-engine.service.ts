@@ -24,6 +24,7 @@ import type {
   StrategyEvaluateResponse,
   StrategyName,
   StrategyQuery,
+  RiskReviewLevel,
 } from './strategy-decision-engine.types';
 
 const MODEL_VERSION = 'strategy-decision-v1';
@@ -997,11 +998,10 @@ export class StrategyDecisionEngineService {
     if (strategy === 'TREND_MOMENTUM' || strategy === 'PULLBACK_IN_UPTREND') {
       invalidationRules.push('Price closes below SMA50 for 2 consecutive days.');
       invalidationRules.push('Calibrated score drops below 40.');
-      exitRules.push('Target price achieved.');
-      exitRules.push('Smart money status turns to DISTRIBUTION.');
+      exitRules.push('Exit condition met: momentum evidence weakened.');
+      exitRules.push('Risk review required when smart money status turns to DISTRIBUTION.');
     }
 
-    const latestPrice = ctx.latestPrice;
     const sma50 = ctx.sma50;
     const entryZoneType = this.entryZoneTypeForStrategy(strategy);
     
@@ -1015,9 +1015,12 @@ export class StrategyDecisionEngineService {
 
     const riskPlan = entryZoneType && sma50 ? {
       stopLoss: (sma50 * 0.96).toFixed(2),
-      targetPrice: (latestPrice * 1.15).toFixed(2),
-      rewardRiskRatio: 3.5,
-      rationale: 'Stop loss placed below SMA50. Target based on 15% standard momentum expectation.',
+      targetPrice: null,
+      targetPriceCompatibilityNote: 'Deprecated compatibility field. No projected price is produced; Strategy Decision uses rule-based exit and invalidation review.',
+      rewardRiskRatio: null,
+      riskReviewLevel: this.riskReviewLevel(decision, blockers, warnings, dataGaps),
+      rationale: 'Risk review uses SMA50 support, market gate, data quality, calibrated score, and smart-money evidence. Exit and invalidation are rule-based review conditions.',
+      reasonSummary: 'Candidate review is based on rule evidence, not a projected price.',
       invalidationRules,
       exitRules,
     } : undefined;
@@ -1045,6 +1048,17 @@ export class StrategyDecisionEngineService {
       entryZone,
       riskPlan,
     };
+  }
+
+  private riskReviewLevel(
+    decision: StrategyDecision,
+    blockers: string[],
+    warnings: string[],
+    dataGaps: string[]
+  ): RiskReviewLevel {
+    if (blockers.length > 0 || ['AVOID', 'EXIT_CANDIDATE', 'REDUCE_RISK'].includes(decision)) return 'HIGH';
+    if (warnings.length > 0 || dataGaps.length > 0 || decision === 'WATCH') return 'MEDIUM';
+    return 'LOW';
   }
 
   private calculateConfidence(ctx: any, dataGaps: string[]): DecisionConfidence {

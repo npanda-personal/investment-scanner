@@ -4,7 +4,7 @@ Date: 2026-05-17
 
 | ID | Blocker | Decision owner |
 | --- | --- | --- |
-| CF-W1-STRAT-01 | Replacement for target-price semantics and exit/invalidation language; decision packet `DECISION-20260517-no-target-exit-invalidation-semantics` | Product Owner + Architect |
 | CF-W1-UX-02 | Copilot naming, trust surface, and blocked-state behavior | Product Owner + UX + Architect |
 | CF-W1-L3-DQ-01 | Lane 3 display-vs-action readiness policy | Product Owner + Architect |
 | CF-W1-SUB-01 | Whether local self-plan changes are allowed during validation | Product Owner |
+| CF-W1-TP-01 | Trade Plan target geometry migration and no-target semantics | Product Owner + Architect |
