@@ -73,8 +73,8 @@ Operating rules:
 | Field | Current Value |
 | --- | --- |
 | Current daemon cycle id | `DAEMON-20260517` |
-| Current rolling iteration count | 5 |
-| Active teams | Team 00 checkpointing after decision resolution and bounded commits |
+| Current rolling iteration count | 6 |
+| Active teams | Team 00 checkpointing after daemon resume protocol fix |
 | Queued teams | Team 02, Team 03, and Team 04 for next docs-only prep; Team 05-09 for audit/refinement if no ready implementation appears |
 | Idle teams | Team 01, Team 05, Team 08, Team 09, Team 10 |
 | Blocked teams | None fully blocked; implementation teams without ready work continue audit/refinement |
@@ -89,7 +89,7 @@ Operating rules:
 | Blocked-work pressure | medium-high |
 | Next team to launch | Team 02 Requirement Factory, Team 03 Architecture Factory, and Team 04 QA Factory |
 | Next item to assign | `CF-W1-MD-01` QA plan / validation policy prep, `CF-W1-L3-DQ-01` policy prep, and Trade Plan target-migration follow-up prep |
-| Last commit | `6ab3999 feat: add signal trigger contract projection` |
+| Last commit | `ae0b4cc docs: checkpoint daemon after resolved decisions`; next docs commit records the checkpoint protocol fix |
 | Daemon should continue | Yes, after runtime checkpoint resume |
 
 ## Sprint 0 Items
@@ -202,3 +202,4 @@ Old work items in `docs/codex-agent-team-plan/` may be used only as evidence or 
 | DAEMON-20260517-07 | Decision inbox resolution | Team 00 | Committed | `07-decisions/`, `99-decision-inbox/`, ready/blocked queues | Product Owner resolved alert ownership Option B and trigger projection Option A. Local docs commit `8e38c2b` completed. |
 | DAEMON-20260517-08 | `CF-W1-L3-AUTH-02` implementation and gates | Teams 07, 04, 10, 03, 00 | Committed | Alerts Monitoring source/tests and active evidence docs | Parent-rule alert event ownership implemented, validated, reviewed, signed off, accepted, and committed as `503bcd9`. |
 | DAEMON-20260517-09 | `CF-W1-SIG-TRIGGER-01` implementation and gates | Teams 06, 04, 10, 03, 00 | Committed | Signal Generation source/tests and active evidence docs | Optional trigger contract DTO projection implemented, validated, reviewed, signed off, accepted, and committed as `6ab3999`. |
+| DAEMON-20260517-10 | Checkpoint resume protocol repair | Team 00 | Checkpointing | `98-orchestrator/`, `09-summaries/`, `00-control/`, `99-decision-inbox/` | Resume prompt existence verified and updated. Future checkpoint reports must include resume prompt path and update status. |

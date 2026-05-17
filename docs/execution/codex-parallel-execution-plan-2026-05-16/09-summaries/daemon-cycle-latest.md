@@ -5,15 +5,19 @@ Date: 2026-05-17
 ## Current Cycle
 
 - Cycle id: `DAEMON-20260517`
-- Rolling iteration count: 5
-- Current mode: runtime checkpoint after decision resolution and two bounded implementation commits
+- Rolling iteration count: 6
+- Current mode: checkpoint protocol fix, then daemon resume boundary
 - Daemon continuing: yes, resume required due current session runtime boundary
+- Git status at checkpoint start: clean
+- Resume prompt path: `09-summaries/daemon-resume-prompt.md`
+- Resume prompt updated: yes
+- Product Owner action required: no
 
 ## Teams
 
 | Team | State | Current assignment | Next relaunch condition |
 | --- | --- | --- | --- |
-| Team 00 | checkpointing | Scheduler / integration after bounded commits | Resume daemon from this checkpoint. |
+| Team 00 | checkpointing | Scheduler / integration after checkpoint protocol fix | Resume daemon from this checkpoint. |
 | Team 01 | queued | Audit refresh on stale/high-risk lanes | Relaunch when source/docs evidence is needed. |
 | Team 02 | completed | Requirement refresh after AUTH-01 acceptance | Relaunch for non-blocked requirement refinement. |
 | Team 03 | completed | AUTH-02 and SIG-TRIGGER decision-ready contract drafts; iteration 4 architecture refresh | Relaunch for non-blocked contract candidates. |
@@ -32,6 +36,7 @@ Date: 2026-05-17
 - Blocked-work pressure: high
 - Integration queue depth: 0 active application-code items after bounded commits
 - Decision inbox count: 0 open decisions
+- Refinement queue depth: 8 listed candidates; 2 entries are stale/resolved decision references to be cleaned in the next Requirement Factory pass
 
 ## Commits Since Last Update
 
@@ -44,16 +49,17 @@ Date: 2026-05-17
 - `8e38c2b docs: resolve daemon decision inbox items`
 - `503bcd9 fix: scope alert events by rule owner`
 - `6ab3999 feat: add signal trigger contract projection`
+- `ae0b4cc docs: checkpoint daemon after resolved decisions`
 
 ## Next Assignments
 
 1. Resume daemon mode from `09-summaries/daemon-resume-prompt.md`.
 2. Verify the worktree is clean.
-3. Relaunch Team 02 for non-blocked requirement refinement.
+3. Relaunch Team 02 for non-blocked requirement refinement and stale refinement queue cleanup.
 4. Relaunch Team 03 for `CF-W1-L3-DQ-01`, `CF-W1-MD-02`, and Trade Plan follow-up contract prep.
 5. Relaunch Team 04 for `CF-W1-MD-01` QA plan preparation and Lane 3 readiness validation planning.
 6. Keep `CF-W1-L3-AUTH-02` and `CF-W1-SIG-TRIGGER-01` out of Ready because both bounded slices are committed.
 
 ## Stop State
 
-Runtime/session checkpoint. This is not project completion and not a consent blocker. No human Product Owner action is required because there are no open decisions.
+Runtime/session checkpoint after protocol repair. This is not project completion and not a consent blocker. No human Product Owner action is required because there are no open decisions.

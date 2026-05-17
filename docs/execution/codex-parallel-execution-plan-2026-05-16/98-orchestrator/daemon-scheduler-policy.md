@@ -115,6 +115,28 @@ If runtime/session limit is reached:
 - write a resume prompt to `09-summaries/daemon-resume-prompt.md`,
 - return the resume prompt path and current stop reason.
 
+## Checkpoint Report Protocol
+
+Every daemon checkpoint report must explicitly include:
+
+- stop reason,
+- whether the stop is a true consent blocker, runtime/resource limit, unsafe git state, all-work-blocked state, or explicit Product Owner stop,
+- Product Owner action required: `yes` or `no`,
+- open decisions path: `99-decision-inbox/open-decisions.md`,
+- resume prompt path: `09-summaries/daemon-resume-prompt.md`,
+- whether `daemon-resume-prompt.md` was created or updated in the checkpoint,
+- current git status,
+- latest relevant commits,
+- ready queue depth,
+- refinement queue depth,
+- integration queue depth,
+- teams active, queued, idle, and blocked,
+- exact next autonomous action.
+
+If `09-summaries/daemon-resume-prompt.md` is missing, Team 00 must create it before returning a checkpoint report. If it exists, Team 00 must refresh it with the latest cycle id, iteration, open-decision state, queue state, stop conditions, and next autonomous action.
+
+Checkpoint reports must not imply project completion unless all available work is complete and no audit/refinement/prep remains.
+
 ## Pressure Indicators
 
 Ready-work pressure:

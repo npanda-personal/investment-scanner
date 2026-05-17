@@ -54,6 +54,7 @@
 | Daemon stops after one cycle risk | High | High | Team 00 | Team reports are summarized once and no teams are relaunched | daemon scheduler policy and runtime pool recycling | keep Team 02/03/04 active |
 | Runtime slot idle risk | Medium | High | Team 00 | completed teams are closed without reassignment while safe prep work exists | team-runtime-pool policy | relaunch completed teams or next queued team |
 | Queue pressure opacity risk | Medium | Medium | Team 00 | ready/blocked/refinement queue depth is unclear | daemon heartbeat and cycle-latest checkpoint | update pressure indicators |
+| Checkpoint resume ambiguity risk | Medium | Medium | Team 00 | checkpoint report omits resume prompt path or whether resume prompt was updated | checkpoint report protocol now requires resume prompt path and update status | keep `09-summaries/daemon-resume-prompt.md` current |
 
 ## Current Blockers
 
@@ -126,3 +127,4 @@
 - If no implementation item is ready, Team 02, Team 03, and Team 04 continue requirements, contracts, and QA prep.
 - Human Product Owner review is not required while `open-decisions.md` has no open decision and standing delegation conditions are met.
 - As of daemon iteration 5, the two prior decision blockers are resolved and committed. `99-decision-inbox/open-decisions.md` has no open decisions; other independent prep continues.
+- As of daemon iteration 6, `09-summaries/daemon-resume-prompt.md` exists and checkpoint reports must explicitly state whether it was updated.
