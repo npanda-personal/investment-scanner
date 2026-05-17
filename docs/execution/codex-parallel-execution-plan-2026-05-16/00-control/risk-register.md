@@ -27,6 +27,7 @@
 | Provider-heavy startup risk | High | Medium | Architect + QA | backend startup calls scheduler/backfill/provider paths | exclude startup backfill and live providers by default | reserve `backend/src/server.ts` only if needed |
 | Data Quality threshold ambiguity | High | Medium | Product Owner + DQE | thresholds differ between contract, tests, and UI | record exact threshold policy before implementation | update readiness contract |
 | UI scope creep risk | Medium | Medium | UX + Orchestrator | UI controls added before UX/QA criteria | keep UI minimal unless explicitly approved | mark frontend files read-only by default |
+| Test-only scope drift risk | Medium | Medium | Orchestrator + QA | implementation touches source while approved as test-only | reserve exactly one test file | stop and reject scope expansion |
 
 ## Current Blockers
 
@@ -35,6 +36,7 @@
 - Angel One remains excluded from implementation and live validation.
 - Startup scheduler/backfill behavior requires Architect approval before it can be changed or accepted as Sprint 1B scope.
 - QA has not run the approved validation subset because tests are not approved in Sprint 1B preparation.
+- First implementation can proceed only as Option A after explicit approval: backend-only Data Quality invariant tests.
 
 ## Sprint 1B Preparation Risk Decisions
 
@@ -42,3 +44,4 @@
 - Source-control risk returns if implementation begins before file reservations are approved.
 - The first implementation should stay within Market Data Foundation and Data Quality module-owned files unless Architect reserves a shared file.
 - Any live provider call, paid dependency, broker-order path, secret exposure, or provider-heavy startup behavior is a stop condition.
+- Any source, UI, route registry, Prisma, shared utility, shared UI, package, startup, config, or provider edit during Option A is a stop condition.

@@ -307,3 +307,46 @@ Stop future implementation if:
 - Data Quality thresholds are unclear or contradicted by code.
 - UI scope is unclear.
 - Product Owner, Architect, or QA decision evidence is missing.
+
+## 20. Final Go/No-Go Architecture Decision
+
+Selected first implementation slice:
+
+```text
+Option A: Backend-only Data Quality invariant tests
+```
+
+Architecture decision:
+- GO for Option A only after explicit implementation approval.
+- Scope is backend test-only.
+- No application source files are approved.
+- No Market Data provider, scheduler, startup, route, storage, repository, service, UI, Prisma, shared utility, shared UI, package, config, or generated type changes are approved.
+
+Allowed future write file:
+- `backend/tests/modules/data-quality-engine/data-quality-engine.invariants.test.ts`
+
+Read-only future inspection:
+- `backend/src/modules/data-quality-engine/**`
+- `backend/tests/modules/data-quality-engine/**`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/**`
+
+Forbidden for Option A:
+- `backend/src/modules/**`
+- `frontend/src/**`
+- `backend/src/server.ts`
+- `backend/.env.example`
+- `.gitignore`
+- `prisma/schema.prisma`
+- `prisma/migrations/**`
+- Backend route registry
+- Frontend route registry
+- Shared backend utilities
+- Shared UI components
+- Package manifests
+- Generated types
+- Common fixtures
+- `docs/codex-agent-team-plan/**`
+
+Architect review required:
+- Confirm the test asserts active readiness contract behavior without changing implementation.
+- Confirm any source change request stops the task and returns to Product Owner/Architect.

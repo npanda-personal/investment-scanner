@@ -164,3 +164,19 @@ Decision still missing:
 - Whether Product Owner wants to approve mocked-only Angel One validation in a later step.
 - Whether Product Owner wants to approve a read-only live Angel One market-data exception in a later step.
 - Whether Architect accepts the no-orders/no-trading adapter boundary if either future option is approved.
+
+## 12. Sprint 1B Final Slice Angel Decision
+
+Selected first implementation slice:
+
+```text
+Option A: Backend-only Data Quality invariant tests
+```
+
+Angel One decision for Option A:
+- Angel One remains excluded.
+- Mocked Angel One validation is not approved because it is not needed for the chosen slice.
+- Live Angel One calls are not approved.
+- Broker credentials are not approved.
+- Provider-heavy tests are not approved.
+- Angel One source files are read-only and out of scope.

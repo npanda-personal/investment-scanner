@@ -58,3 +58,18 @@ Recommended first implementation task after approval:
 I approve a smaller Sprint 1B implementation task only.
 
 Implement or harden Market Data / Data Quality readiness enforcement for `IN/STOCK` using the active readiness contract. Keep Angel One excluded. Do not run live providers. Do not change Prisma schema or migrations. Do not modify backend or frontend route registries. Do not modify shared utilities, shared UI, or package manifests. Keep UI out of scope unless already approved. Use only the file reservations in the Sprint 1B work packet. Run only the QA-approved focused tests and stop on any listed stop condition.
+
+## 8. Final Go/No-Go Update
+
+Final decision:
+- GO for Option A only.
+- Option A is backend-only Data Quality invariant tests.
+- Implementation execution is not approved by this summary; it requires the next explicit Product Owner prompt.
+
+All previous exclusions remain active:
+- Angel One excluded.
+- Live providers excluded.
+- Startup scheduler/backfill excluded.
+- UI excluded.
+- Shared files excluded.
+- Downstream modules blocked.

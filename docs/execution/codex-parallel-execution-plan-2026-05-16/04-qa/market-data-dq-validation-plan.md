@@ -238,3 +238,51 @@ Stop validation if:
 - A broker order route or method is discovered.
 - Test runtime or memory exceeds the approved resource gate.
 - The approved file reservation is exceeded.
+
+## 21. Final Go/No-Go QA Decision
+
+Selected first implementation slice:
+
+```text
+Option A: Backend-only Data Quality invariant tests
+```
+
+QA decision:
+- GO for a focused backend test-only slice after explicit implementation approval.
+- Do not run tests during this go/no-go decision step.
+- Do not run live providers.
+- Do not run provider-heavy tests.
+- Do not start services.
+
+Allowed future test file:
+- `backend/tests/modules/data-quality-engine/data-quality-engine.invariants.test.ts`
+
+Required future test command:
+
+```text
+cd backend
+npm test -- data-quality-engine.invariants.test.ts
+```
+
+Allowed follow-up regression command only if the focused test passes and Product Owner approval allows it:
+
+```text
+cd backend
+npm test -- data-quality-engine.service.test.ts data-quality-engine.repository.test.ts data-quality-engine.validation.test.ts data-quality-engine.routes.test.ts
+```
+
+Tests not allowed for Option A:
+- Any Angel One live or mocked-provider test.
+- Any Market Data provider-heavy test.
+- Any Playwright test.
+- Any frontend build or UI smoke test.
+- Any live local provider validation.
+- Any command that starts backend or frontend services.
+
+QA evidence required:
+- `git status --short` before implementation.
+- Exact changed file list.
+- Focused test output.
+- Confirmation no source files changed.
+- Confirmation Angel One, live providers, startup/backfill, UI, Prisma, route registries, shared files, and package manifests were untouched.
+- Skipped checks list with reason.

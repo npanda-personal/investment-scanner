@@ -128,3 +128,25 @@ Sprint 1B should be split into smaller implementation tasks.
 
 Recommended first task after approval:
 - Implement or harden Market Data / Data Quality readiness enforcement for `IN/STOCK` without Angel One, without startup provider-heavy behavior, and without UI changes unless separately approved.
+
+## 13. Final Go/No-Go Decision
+
+Selected option:
+
+```text
+Option A: Backend-only Data Quality invariant tests
+```
+
+Decision:
+- Sprint 1B implementation is ready only for this very small test-only slice.
+- This decision does not approve implementation execution by itself.
+- The next implementation prompt must explicitly approve Option A.
+
+Purpose:
+- Lock down Data Quality invariants before changing source behavior.
+- Prove `READY`, `LIMITED`, `BLOCKED`, `NOT_READY`, `UNUSABLE`, stale, missing evaluation, and downstream eligibility behavior are protected by tests.
+
+Allowed future write file:
+- `backend/tests/modules/data-quality-engine/data-quality-engine.invariants.test.ts`
+
+Everything else is read-only or forbidden unless a later approval changes the scope.

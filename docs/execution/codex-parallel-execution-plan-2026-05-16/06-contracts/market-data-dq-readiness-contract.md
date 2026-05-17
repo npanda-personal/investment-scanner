@@ -449,3 +449,18 @@ The following modules remain blocked from consuming Market Data / DQ as trusted 
 - `watchlist-management`
 - `alerts-monitoring`
 - `ai-investment-copilot`
+
+## 27. Sprint 1B Final Slice Contract Decision
+
+Selected first implementation slice:
+
+```text
+Option A: Backend-only Data Quality invariant tests
+```
+
+Contract decision:
+- No threshold revision is required before Option A.
+- Option A tests must assert the existing threshold policy from this contract.
+- If the tests reveal ambiguity in `READY`, `LIMITED`, `BLOCKED`, `NOT_READY`, `UNUSABLE`, stale, missing evaluation, or downstream eligibility behavior, implementation must stop and return to Product Owner and Architect.
+
+The tests must not approve downstream module use. All downstream modules listed above remain blocked until implementation, QA, review, Architect signoff, and Product Owner acceptance are complete.
