@@ -81,15 +81,15 @@ Operating rules:
 | Teams relaunched this cycle | Pending after daemon setup commit |
 | Teams shut down due to no work | None permanently; Teams without ready implementation move to audit/refinement |
 | Teams re-added due to new work | Pending |
-| Ready queue depth | 0 application-code items |
+| Ready queue depth | 1 application-code item |
 | Refinement queue depth | High; see `10-requirements/next-top-10-candidates.md` |
 | Integration queue depth | 0 application-code items |
 | Decision inbox count | 0 open decisions |
-| Ready-work pressure | none |
+| Ready-work pressure | low |
 | Blocked-work pressure | high |
-| Next team to launch | Team 02 Requirement Factory, Team 03 Architecture Factory, Team 04 QA Factory |
-| Next item to assign | `CF-W1-L3-AUTH-01`, `CF-W1-L3-DQ-01`, `CF-W1-MD-02`, `CF-W1-TP-01A` prep |
-| Last commit | `780e961 docs: record master orchestrator runtime cycle` |
+| Next team to launch | Team 07 Portfolio / Watchlist / Alerts |
+| Next item to assign | `CF-W1-L3-AUTH-01` implementation |
+| Last commit | `4fee810 docs: enable continuous daemon scheduler mode` |
 | Daemon should continue | Yes |
 
 ## Sprint 0 Items
@@ -193,3 +193,6 @@ Old work items in `docs/codex-agent-team-plan/` may be used only as evidence or 
 | MOR-20260517-03 | `CF-W1-QA-01` focused command matrix | Team 04 + Team 00 | Complete | `04-qa/CF-W1-QA-01-focused-test-command-matrix.md` | Documentation-only ready item integrated. No tests run. |
 | MOR-20260517-04 | Application-code pull decision | Team 00 | Deferred | Ready queue | No application-code item was pulled because none met readiness criteria. |
 | MOR-20260517-05 | Runtime cycle integration summary | Team 00 | Complete | `09-summaries/master-orchestrator-runtime-cycle-2026-05-17.md`, `18-integration-queue/` | No app-code integration item pending; next cycle is contract/QA preparation. |
+| DAEMON-20260517-01 | Daemon scheduler setup | Team 00 | Committed | `98-orchestrator/`, queue docs | Commit `4fee810`; daemon loop continues. |
+| DAEMON-20260517-02 | Requirements/contracts/QA prep | Teams 01-07, 10 | Audit Complete | Active execution docs | Prep docs created for Lane 3 auth, Lane 3 DQ, MD durable evidence, Trade Plan, UX, and trigger contract. |
+| DAEMON-20260517-03 | `CF-W1-L3-AUTH-01` readiness promotion | Team 00 | Ready for Implementation | `13-implementation-evidence/`, `16-team-inboxes/`, ready queue | Team 07 assigned bounded module-local implementation. |
