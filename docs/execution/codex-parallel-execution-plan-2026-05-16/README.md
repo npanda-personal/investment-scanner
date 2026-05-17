@@ -1,39 +1,67 @@
 # Codex Parallel Execution Plan - 2026-05-16
 
-This folder is the active Sprint 0 planning area for Codex parallel execution.
+This folder is the active execution-control area for Codex planning, governance, audits, contracts, QA plans, work packets, and release gates.
 
-Authority order:
+It is not application source. Product behavior changes require a separate approved implementation scope.
 
-1. Current Product Owner direction
+## Source Of Truth Order
+
+1. Latest Product Owner direction in the current thread
 2. Root `AGENTS.md`
-3. Current repository state
-4. Planning artifacts in this folder
+3. Current repository source code and git state
+4. Active execution artifacts in this folder
 5. Historical docs used only as evidence
 
-The historical `docs/codex-agent-team-plan/` folder is not authoritative for new work. It remains preserved as historical evidence only.
+Root `AGENTS.md` is the only authoritative AGENTS instruction file.
 
-## Sprint 0 Scope
+`docs/codex-agent-team-plan/` is historical evidence only. Do not treat its active boards, QA evidence, signoffs, work packets, GitHub check-in rules, or PO acceptance docs as current authority unless they are revalidated into this active execution folder.
 
-Sprint 0 prepares disciplined parallel Codex execution. It does not change product behavior, application code, Prisma schema, route registries, shared UI, shared backend utilities, package manifests, commits, or remote state.
+## Folder Map
 
-## Artifacts
+- `00-control/`: active board, local-first release checklist, risk register.
+- `01-governance/`: instruction authority, dirty worktree inventory, governance cleanup, docs/AGENTS neutralization proposal.
+- `02-audits/`: current-state, legacy, delta, and readiness audits.
+- `03-architecture/`: ownership map, dependency graph, shared-file control, architect decision checklists.
+- `04-qa/`: QA baseline and validation plans.
+- `05-sprints/`: sprint plans and sprint candidate lists.
+- `06-contracts/`: contract inventory and active contract drafts.
+- `07-decisions/`: Product Owner and architecture decision proposals.
+- `08-work-packets/`: implementation or audit work packets.
+- `09-summaries/`: sprint and audit summaries.
 
-- `instruction-authority-report.md`: confirms instruction source handling.
-- `current-state-audit.md`: summarizes source-code reality.
-- `dirty-worktree-inventory.md`: records current source-control risk.
-- `module-ownership-map.md`: maps teams to current modules.
-- `shared-file-control.md`: controls high-risk files and folders.
-- `dependency-graph.md`: documents dependency ordering.
-- `contract-inventory.md`: lists contracts needed before safe parallel work.
-- `qa-baseline-plan.md`: records validation strategy.
-- `risk-register.md`: captures Sprint 0 risks and mitigations.
-- `sprint-0-plan.md`: Sprint 0 work plan.
-- `sprint-1-candidates.md`: proposed Sprint 1 only, not approved implementation.
-- `active-work-board.md`: Sprint-0-only board.
-- `release-checklist.md`: local-first release gate checklist.
-- `legacy-*`: bias-control review of old docs.
-- `docs-agents-neutralization-proposal.md`: future proposal only; no change made.
+Keep this `README.md` at the root as the navigation index.
+
+## Check First Before Planning
+
+Before any new planning or implementation proposal, inspect:
+
+1. Root `AGENTS.md`
+2. Latest Product Owner prompt
+3. `00-control/active-work-board.md`
+4. `01-governance/instruction-authority-report.md`
+5. `01-governance/dirty-worktree-inventory.md`
+6. `02-audits/current-state-audit.md`
+7. `03-architecture/shared-file-control.md`
+8. `06-contracts/contract-inventory.md`
+9. `00-control/risk-register.md`
+10. `00-control/release-checklist.md`
+11. Relevant sprint, contract, decision, QA, and work-packet files for the requested scope
+
+## Future Sprint 1A File Locations
+
+Use the numbered folders only:
+
+- Read-only audits: `02-audits/`
+- Architecture checklists and shared-file decisions: `03-architecture/`
+- QA validation plans: `04-qa/`
+- Sprint plans and candidate lists: `05-sprints/`
+- Market Data / Data Quality contracts: `06-contracts/`
+- Angel One or provider policy decisions: `07-decisions/`
+- Work packets: `08-work-packets/`
+- Sprint summaries: `09-summaries/`
+
+Do not add new files to the old unnumbered `architecture/`, `contracts/`, `decisions/`, `qa/`, or `work-packets/` paths.
 
 ## Current Recommendation
 
-Refactor the current project in place. The repo has enough modular structure, tests, and working domain code to preserve, but it needs a clean execution control plane before parallel implementation resumes.
+Refactor the current project in place. The repository has enough modular structure, tests, and working domain code to preserve, but it needs strict execution control before parallel implementation continues.
