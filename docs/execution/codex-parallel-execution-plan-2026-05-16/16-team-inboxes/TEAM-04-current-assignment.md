@@ -8,18 +8,18 @@ Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automat
 
 ## Assignment
 
-Prepare QA plans, focused command guidance, and validation evidence requirements. No executable QA is authorized until Team 00 promotes a bounded implementation handoff.
+Prepare QA plans, focused command guidance, and validation evidence requirements. `CF-W1-L3-PORT-01A` has been promoted; executable QA for that slice begins only after Team 07 implementation handoff exists.
 
 Current priority after Team 01 audit consumption:
 
-1. Prepare or revise QA plans and focused test commands for `CF-W1-L3-PORT-01A`.
+1. Stand by for `CF-W1-L3-PORT-01A` QA after Team 07 implementation; use `04-qa/CF-W1-L3-PORT-01-qa-plan.md`.
 2. Prepare or revise QA plans and focused test commands for `CF-W1-TP-01B`.
 3. Prepare or revise QA plans and focused test commands for `CF-W1-NOTIF-02`.
 4. Prepare or revise QA plans and focused test commands for `CF-W1-L3-ALERT-01`.
 5. Keep `CF-W1-L3-INTEL-01` QA blocked behind accepted `CF-W1-L3-PORT-01A`.
 6. Refresh QA plans for `CF-W1-MD-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-AUTH-01`, and `CF-W1-SUB-01` against the resolved policies; executable QA remains blocked until Team 00 promotes exact implementation handoffs.
 
-No executable QA is authorized. Commands are guidance only until Team 00 promotes a bounded implementation handoff.
+No executable QA is authorized until the matching implementation exists. For `CF-W1-L3-PORT-01A`, Team 00 has promoted the handoff, but Team 04 must wait for Team 07's implementation outbox before running or reviewing executable QA.
 
 ## Scope
 
@@ -44,7 +44,7 @@ Use shared `dev` for docs-only QA planning. For future executable QA tied to an 
 
 ## Blockers
 
-Executable QA is blocked for all current candidates because no app-code item is Ready.
+Executable QA is blocked until implementation output exists. `CF-W1-L3-PORT-01A` is Ready for Team 07 implementation, but QA is not executable before Team 07 changes and developer validation.
 
 Decision reconciliation:
 

@@ -6,7 +6,7 @@ Owner: Team 03 Architecture Factory
 
 ## Status
 
-Architecture child contract prepared. Not Ready for Implementation.
+Architecture child contract prepared. `CF-W1-L3-PORT-01A` portfolio-only child promoted by Team 00 on 2026-05-18.
 
 This is the first child slice under `CF-W1-L3-DQ-01` after Product Owner approval of Option B: passive `LIMITED` display with action-like blocking.
 
@@ -127,4 +127,6 @@ Team 04 should refresh a child QA plan before implementation is pulled. Minimum 
 
 Architecture child contract is prepared for `CF-W1-L3-PORT-01`.
 
-Do not move this item to `Ready for Implementation` until Team 04 accepts the child QA plan, Team 00 selects either portfolio or watchlist as the first implementation slice, and exact file reservations are copied into the ready queue or implementation handoff.
+Team 00 selected the portfolio-only child, `CF-W1-L3-PORT-01A`, and copied exact file reservations into the ready queue and Team 07 inbox on 2026-05-18.
+
+The watchlist child, `CF-W1-L3-PORT-01B`, remains out of Ready until Team 00 creates a separate implementation handoff.

@@ -506,3 +506,57 @@ Reason:
 - Evidence sync run at checkpoint start: `git status --short --branch`, `git branch --show-current`, `git log --oneline -10`.
 - No application code was modified.
 - No builds, tests, UI checks, services, providers, Prisma commands, migrations, or pushes were run during this docs-only routing pass.
+
+---
+
+# `CF-W1-L3-PORT-01A` Ready Promotion
+
+Date: 2026-05-18
+
+State: Ready queue updated; Team 07 implementation handoff written
+
+## Gate Result
+
+`CF-W1-L3-PORT-01A` passes Ready promotion as a bounded portfolio-management-only implementation slice.
+
+Verified gates:
+
+- requirement exists with acceptance criteria;
+- architecture review and child contract exist;
+- QA plan and focused command guidance exist;
+- Team 03 exact file reservations exist;
+- Team 07 source/readiness evidence confirms module-local implementation is feasible;
+- open decisions count is zero;
+- shared/high-risk blockers are absent if the implementation stays inside the reserved files;
+- current dirty git state is active execution docs/team outputs only, so implementation must use a dedicated worktree.
+
+## Assignment Written
+
+Team 07 current inbox was updated:
+
+- `16-team-inboxes/TEAM-07-current-assignment.md`
+
+Implementation branch/worktree:
+
+- Branch: `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A`
+- Worktree: `../investment-scanner-worktrees/team07-CF-W1-L3-PORT-01A`
+
+Allowed files:
+
+- `backend/src/modules/portfolio-management/portfolio-management.service.ts`
+- `backend/src/modules/portfolio-management/portfolio-management.types.ts`
+- `backend/src/modules/portfolio-management/portfolio-management.md`
+- `backend/tests/modules/portfolio-management/portfolio-management.service.test.ts`
+
+## Queue Result
+
+- Ready queue depth: 1 active application-code item.
+- Open decisions: 0.
+- Product Owner action required: no.
+- `CF-W1-L3-PORT-01B` remains upstream-blocked behind accepted `CF-W1-L3-PORT-01A`.
+- `CF-W1-L3-INTEL-01` remains blocked until `CF-W1-L3-PORT-01A` is implemented, validated, reviewed, accepted, and committed.
+
+## Validation
+
+- No application code was modified.
+- No tests, builds, services, providers, migrations, package installs, live calls, or pushes were run.

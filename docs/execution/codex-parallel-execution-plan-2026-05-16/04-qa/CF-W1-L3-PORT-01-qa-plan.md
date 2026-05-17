@@ -4,7 +4,7 @@ Date: 2026-05-17
 
 Owner: Team 04 QA Factory
 
-Status: Child QA plan prepared. Not executable until Team 00 selects `CF-W1-L3-PORT-01A` portfolio or `CF-W1-L3-PORT-01B` watchlist, records exact file reservations, and implementation handoff exists.
+Status: Child QA plan prepared. Team 00 selected `CF-W1-L3-PORT-01A` portfolio on 2026-05-18 and recorded exact file reservations in the ready queue and Team 07 inbox. The portfolio focused command becomes executable after Team 07 implementation exists.
 
 ## Scope
 

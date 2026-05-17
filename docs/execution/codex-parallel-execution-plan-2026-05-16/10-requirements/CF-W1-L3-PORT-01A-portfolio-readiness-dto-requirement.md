@@ -4,9 +4,9 @@ Date: 2026-05-18
 
 ## Status
 
-Requirement refined by Team 02. Not Ready for Implementation.
+Requirement refined by Team 02 and promoted by Team 00. Ready for Team 07 bounded implementation.
 
-This is the first bounded child slice under `CF-W1-L3-PORT-01`. It narrows the broader portfolio/watchlist readiness DTO work to portfolio-management only. Team 00 still owns Ready promotion and implementation handoff.
+This is the first bounded child slice under `CF-W1-L3-PORT-01`. It narrows the broader portfolio/watchlist readiness DTO work to portfolio-management only. Team 00 promoted the item on 2026-05-18 and copied the implementation handoff into `12-ready-queue/ready-for-implementation.md` and `16-team-inboxes/TEAM-07-current-assignment.md`.
 
 ## Product Value
 
@@ -22,7 +22,7 @@ Portfolio holdings and summaries must not imply trustworthy market context from 
 - Team 01 2026-05-18 audit recommends `CF-W1-L3-PORT-01A` as the first Lane 3 readiness slice.
 - Team 03 2026-05-18 near-ready file-reservation matrix confirms the portfolio-only child is bounded and implementation-eligible for Ready review, with no shared/high-risk request if implementation consumes only Data Quality public service/types.
 - Team 07 2026-05-18 readiness inspection found the slice eligible to become module-local after Team 00 Ready promotion, with no apparent need for Prisma, routes, shared utilities/UI, providers, frontend, watchlist, alerts, or portfolio-intelligence changes.
-- Ready queue still has no active app-code item.
+- Ready queue now contains `CF-W1-L3-PORT-01A` as the active Team 07 app-code item.
 
 ## Future Owner / Module
 
@@ -32,7 +32,7 @@ Portfolio holdings and summaries must not imply trustworthy market context from 
 
 ## Candidate File Reservation After Ready Promotion
 
-Allowed files after Team 00 Ready promotion:
+Allowed files:
 
 - `backend/src/modules/portfolio-management/portfolio-management.service.ts`
 - `backend/src/modules/portfolio-management/portfolio-management.types.ts`
@@ -88,4 +88,4 @@ Future accepted implementation must:
 
 ## Next Gate
 
-Team 00 Ready evaluation and implementation handoff for the portfolio-only child slice, including exact portfolio-management file reservations copied into a Team 07 inbox or Ready handoff.
+Team 07 implementation in branch `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A` and worktree `../investment-scanner-worktrees/team07-CF-W1-L3-PORT-01A`, followed by developer validation, QA verification, code review, Architect signoff, Product Owner acceptance packet under standing delegation, and scoped local commit only if gates pass.

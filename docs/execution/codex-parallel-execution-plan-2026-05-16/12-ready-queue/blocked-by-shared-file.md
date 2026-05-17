@@ -19,7 +19,7 @@ Date: 2026-05-18
 
 Current near-ready inspection targets are expected to avoid shared/high-risk files:
 
-- `CF-W1-L3-PORT-01A` should stay inside portfolio-management module files if it becomes Ready.
+- `CF-W1-L3-PORT-01A` is promoted to Ready only within the reserved portfolio-management module files and remains blocked from any shared/high-risk file.
 - `CF-W1-TP-01B` should stay inside trade-plan-risk-engine module files if it becomes Ready.
 - `CF-W1-NOTIF-02` should stay inside notifications-delivery provider/service test/module docs if it becomes Ready.
 - `CF-W1-L3-ALERT-01` should stay inside alerts-monitoring module files if it becomes Ready.

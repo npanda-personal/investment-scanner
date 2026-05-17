@@ -7,7 +7,6 @@ Date: 2026-05-18
 | CF-W1-BT-01 | Backtesting DQ fail-closed behavior | DQ fail-closed policy and signal/strategy trust policy |
 | CF-W1-TP-01 | Trade Plan DQ hard blockers and no-target migration | Backend-only child contract, Team 03 reservation matrix, Team 06 inspection, and child QA plan are prepared as `CF-W1-TP-01B`; still needs Team 00 Ready promotion |
 | CF-W1-L3-ALERT-01 | Alert readiness consumer tests | Child architecture contract, Team 03 reservation matrix, exact backend file reservations, and child QA plan are prepared; still needs Team 00 Ready promotion |
-| CF-W1-L3-PORT-01A | Portfolio readiness DTOs | Portfolio-only requirement, parent architecture contract, Team 03 reservation matrix, Team 07 inspection, exact backend file reservations, and child QA plan are prepared; still needs Team 00 Ready promotion |
 | CF-W1-L3-PORT-01B | Watchlist readiness DTOs | Parent contract and QA plan exist, but this child waits behind the first portfolio-only slice unless Team 00 records a combined backend-only exception |
 | CF-W1-L3-AUTH-03 | Alert rule target ownership implementation | Requirement, architecture review, contract, QA plan, and work packet are prepared; still needs Team 00 Ready promotion |
 | CF-W1-L3-INTEL-01 | Portfolio Intelligence reliability gate | Requirement, architecture review, contract, work packet, QA plan, and Team 03 architecture signoff are prepared, but implementation must wait for accepted `CF-W1-L3-PORT-01A` portfolio readiness DTOs and Team 00 Ready promotion |
@@ -38,3 +37,9 @@ The five former Decision Inbox items are resolved. They are no longer Product Ow
 - `CF-W1-AUTH-01` and `CF-W1-SUB-01`: Team 09 backend policy packets.
 - `CF-W1-UX-02` and `CF-W1-UX-05`: Team 08 Copilot-only trust/copy packet refresh.
 - `CF-W1-MD-01`: Team 05 Market Data validation-only packet refresh.
+
+## Team 00 Ready Promotion Note - 2026-05-18
+
+`CF-W1-L3-PORT-01A` is no longer blocked by upstream readiness gates. Team 00 promoted it to `Ready for Implementation` after verifying the requirement, architecture review, contract, QA plan, Team 03 exact reservations, Team 07 readiness evidence, and open-decision state.
+
+`CF-W1-L3-PORT-01B` remains upstream-blocked behind the accepted portfolio-only slice. `CF-W1-L3-INTEL-01` remains blocked until `CF-W1-L3-PORT-01A` is implemented, validated, reviewed, accepted, and committed.

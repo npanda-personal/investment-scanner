@@ -4,9 +4,76 @@ Date: 2026-05-18
 
 ## Current Ready Queue
 
-No active application-code item is currently Ready for Implementation.
+One active application-code item is currently Ready for Implementation.
 
-Team 00 consumed Team 01's 2026-05-18 readiness drift audit. Result: Ready queue remains closed for application code.
+| ID | Owner | Branch | Worktree | Scope | Status |
+| --- | --- | --- | --- | --- | --- |
+| `CF-W1-L3-PORT-01A` | Team 07 - Portfolio / Watchlist / Alerts | `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A` | `../investment-scanner-worktrees/team07-CF-W1-L3-PORT-01A` | Backend-only portfolio-management readiness DTOs | Ready for implementation handoff |
+
+## Active Ready Handoff - `CF-W1-L3-PORT-01A`
+
+Date promoted: 2026-05-18
+
+Team 00 evaluated `CF-W1-L3-PORT-01A` against the Ready gates and promoted it as the first Lane 3 readiness implementation slice.
+
+Gate evidence:
+
+- Requirement: `10-requirements/CF-W1-L3-PORT-01A-portfolio-readiness-dto-requirement.md`
+- Architecture review: `03-architecture/CF-W1-L3-PORT-01-architecture-review.md`
+- Contract: `06-contracts/CF-W1-L3-PORT-01-portfolio-watchlist-readiness-dto-contract.md`
+- Work packet: `08-work-packets/CF-W1-L3-PORT-01-work-packet.md`
+- QA plan: `04-qa/CF-W1-L3-PORT-01-qa-plan.md`
+- Team 03 reservation matrix: `03-architecture/team03-near-ready-file-reservation-matrix-2026-05-18.md`
+- Team 07 readiness evidence: `17-team-outboxes/TEAM-07-outbox.md`
+- Open decisions: none.
+- Shared/high-risk blocker: none if the implementation stays within the reserved portfolio-management files and consumes Data Quality through public service outputs only.
+
+Allowed files:
+
+- `backend/src/modules/portfolio-management/portfolio-management.service.ts`
+- `backend/src/modules/portfolio-management/portfolio-management.types.ts`
+- `backend/src/modules/portfolio-management/portfolio-management.md`
+- `backend/tests/modules/portfolio-management/portfolio-management.service.test.ts`
+
+Forbidden files:
+
+- Prisma schema or migrations
+- backend or frontend route registries
+- shared backend utilities or shared DTOs
+- shared frontend components
+- package manifests
+- generated files
+- Data Quality Engine source or public exports
+- watchlist-management source/tests
+- alerts-monitoring source/tests
+- portfolio-intelligence source/tests
+- frontend files
+- providers, startup/backfill, Angel One, broker, live-provider, paid/cloud, or telemetry flows
+
+Required behavior:
+
+- Add module-local readiness DTO fields to portfolio holding valuation output.
+- Add portfolio-level readiness summary to portfolio summary output.
+- Preserve existing portfolio response fields, route paths, `dataStatus`, price, valuation, and signal fields.
+- Consume `DataQualityEngineService` and `DataQualityEvaluationDto` only through Data Quality public exports.
+- Do not duplicate Data Quality scoring, stale thresholds, liquidity scoring, or coverage scoring.
+- Treat `READY` as trusted display/action eligibility only as defined by the accepted contract.
+- Treat `LIMITED` as passive display only with visible reasons and blocked action eligibility.
+- Treat missing, `NOT_READY`, `UNUSABLE`, stale hard blocker, unsupported, scope mismatch, or blocked tier evidence as blocked/untrusted.
+- Ensure `dataStatus = COMPLETE` does not imply Data Quality trust.
+
+Focused validation command:
+
+```powershell
+cd backend
+npm.cmd test -- portfolio-management.service.test.ts --runInBand
+```
+
+Stop and return to Team 00 if implementation requires any forbidden file, Data Quality export/source changes, shared DTO/helper changes, watchlist scope, frontend/UI work, route/schema/package/generated changes, provider/startup/live-data behavior, or treating `LIMITED` as action-ready.
+
+## Current Queue Notes
+
+Team 00 consumed Team 01's 2026-05-18 readiness drift audit. That initial routing kept the ready queue closed, then this Team 00 Ready evaluation promoted `CF-W1-L3-PORT-01A` as the first active application-code item.
 
 `CF-W1-L3-AUTH-01` was pulled by Team 07, implemented, validated, reviewed, accepted under standing delegation, committed locally as `74ba6dd`, and moved out of the live ready queue.
 
@@ -22,9 +89,9 @@ Product Owner resolved the three current Decision Inbox items on 2026-05-17:
 
 Those decisions remove the Decision Inbox blockers, but they are not app-code implementation handoffs. The affected items still need post-decision child contracts, refreshed QA scenarios, exact file reservations, and Team 00 Ready promotion before any app-code team can pull them.
 
-Post-decision child prep has advanced, but still has not produced an app-code Ready item:
+Post-decision child prep has advanced. Team 00 promoted one child item to Ready; the rest remain out of Ready:
 
-- `CF-W1-L3-PORT-01A`: portfolio-only readiness DTO child requirement, parent architecture contract, Team 03 near-ready file-reservation matrix, exact backend reservations, child QA plan, and Team 07 readiness inspection are prepared; still needs Team 00 Ready promotion.
+- `CF-W1-L3-PORT-01A`: promoted to Ready as the portfolio-only readiness DTO child. Team 07 owns the bounded implementation in the dedicated branch/worktree recorded above.
 - `CF-W1-L3-ALERT-01`: alert readiness suppression child architecture contract, Team 03 near-ready file-reservation matrix, exact backend reservations, and child QA plan are prepared; still needs Team 00 Ready promotion.
 - `CF-W1-L3-AUTH-03`: alert rule target ownership requirement, architecture review, contract, work packet, and QA plan are prepared; still needs Team 00 Ready promotion.
 - `CF-W1-L3-INTEL-01`: portfolio-intelligence reliability requirement, architecture review, contract, work packet, QA plan, and Team 03 signoff are prepared; still blocked until `CF-W1-L3-PORT-01A` is accepted and Team 00 promotes the child.
@@ -66,9 +133,9 @@ The following are completed, superseded, or split and must not be treated as act
 - legacy parent/superseded `CF-W1-DQ-01`
 - legacy parent `CF-W1-TP-01`
 
-## Why No Code Item Was Pulled
+## Why Other Code Items Were Not Pulled
 
-The current top findings still require at least one of:
+The remaining top findings still require at least one of:
 
 - refreshed Architect child contract or ADR record,
 - exact module-level file reservation,
@@ -95,9 +162,8 @@ Docs-only contract and QA preparation:
 - `CF-W1-MD-01`
 - `CF-W1-NOTIF-02`
 
-Next Team 00/owner work should evaluate the prepared child artifacts for Ready promotion:
+Next Team 00/owner work should evaluate the remaining prepared child artifacts for Ready promotion:
 
-- `CF-W1-L3-PORT-01A`: promote the portfolio-only readiness DTO child if the prepared requirement, parent contract, and QA plan pass Ready gates.
 - `CF-W1-TP-01B`: promote the backend-only Trade Plan compatibility and DQ hard-block child if the prepared contract and QA plan pass Ready gates.
 - `CF-W1-NOTIF-02`: promote the notification log redaction slice if the prepared requirement, contract, work packet, and platform QA plan pass Ready gates.
 - `CF-W1-L3-ALERT-01`: promote the alert readiness suppression child if the prepared contract and QA plan pass Ready gates.
@@ -110,7 +176,13 @@ Next Team 00/owner work should evaluate the prepared child artifacts for Ready p
 - `CF-W1-UX-05`: fold Copilot-only copy cleanup into or behind `CF-W1-UX-02`; keep shared status work future.
 - `CF-W1-MD-01`: refresh Market Data validation-only packet after Option A.
 
-No app-code item became Ready during decision resolution or post-decision child prep.
+No app-code item became Ready during decision resolution itself. `CF-W1-L3-PORT-01A` was later promoted by Team 00 after requirement, architecture, QA, reservation, and Team 07 readiness gates passed.
+
+2026-05-18 Ready promotion result:
+
+- `CF-W1-L3-PORT-01A` is Ready for Team 07 implementation in `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A`.
+- Team 07 must use `../investment-scanner-worktrees/team07-CF-W1-L3-PORT-01A`.
+- The shared `dev` workspace currently contains unrelated active-doc changes from other teams; Team 07 must not implement in the shared worktree.
 
 2026-05-18 routing result:
 

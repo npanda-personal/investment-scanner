@@ -4,6 +4,8 @@ Date: 2026-05-18
 
 Status: Refreshed by Team 00 after Product Owner resolved the five current Decision Inbox items. This queue is refinement-only; Team 00 owns Ready queue movement.
 
+Team 00 promoted `CF-W1-L3-PORT-01A` to Ready on 2026-05-18. It is no longer a refinement item.
+
 ## Decision Inbox State
 
 No open decisions.
@@ -39,7 +41,7 @@ The former Decision Inbox items moved to refinement / Ready-evaluation prep:
 
 | ID | Contract status |
 | --- | --- |
-| CF-W1-L3-PORT-01A | Portfolio-only child requirement, parent contract, Team 03 reservation matrix, backend reservations, QA plan, and Team 07 inspection prepared; needs Team 00 Ready evaluation. |
+| CF-W1-L3-PORT-01A | Promoted to Ready by Team 00 on 2026-05-18; implementation handoff copied to Team 07. |
 | CF-W1-L3-PORT-01B | Watchlist-only child remains future after portfolio slice; do not combine without Team 00 exception. |
 | CF-W1-L3-AUTH-03 | Requirement, architecture review, contract, work packet, and QA plan prepared; needs Team 00 Ready evaluation. |
 | CF-W1-L3-ALERT-01 | Child contract, Team 03 reservation matrix, backend reservations, and QA plan prepared; needs Team 00 Ready evaluation. |
@@ -57,7 +59,7 @@ The former Decision Inbox items moved to refinement / Ready-evaluation prep:
 
 | ID | QA focus/status |
 | --- | --- |
-| CF-W1-L3-PORT-01A | Child QA plan prepared; executable validation blocked until Team 00 Ready promotion and portfolio-only implementation handoff. |
+| CF-W1-L3-PORT-01A | Child QA plan prepared; executable validation begins after Team 07 implementation in the dedicated worktree. |
 | CF-W1-L3-PORT-01B | Child QA plan covers future watchlist slice; executable validation blocked until separate Team 00 handoff. |
 | CF-W1-L3-AUTH-03 | QA plan prepared; executable validation blocked until Team 00 Ready promotion and implementation handoff. |
 | CF-W1-L3-ALERT-01 | Child QA plan prepared; executable validation blocked until Team 00 Ready promotion and implementation handoff. |
@@ -77,23 +79,21 @@ These items are not implementation-ready.
 
 | Rank | ID | Prep needed |
 | --- | --- | --- |
-| 1 | CF-W1-L3-PORT-01A | Team 00 Ready evaluation for portfolio-only child. |
-| 2 | CF-W1-TP-01B | Team 00 Ready evaluation. |
-| 3 | CF-W1-NOTIF-02 | Team 00/Team 09 Ready evaluation and implementation handoff. |
-| 4 | CF-W1-L3-ALERT-01 | Team 00 Ready evaluation. |
-| 5 | CF-W1-L3-AUTH-03 | Team 00 Ready evaluation. |
-| 6 | CF-W1-MD-02 | Formal ADR and future slice plan under approved Option B ADR direction. |
-| 7 | CF-W1-AUTH-01 | Refresh Team 09 fail-closed backend packet after Option A. |
-| 8 | CF-W1-SUB-01 | Refresh Team 09 admin/manual-only backend packet after Option A. |
-| 9 | CF-W1-MD-01 | Refresh Market Data validation-only packet after Option A. |
-| 10 | CF-W1-UX-02 | Refresh Copilot-only trust UX packet after Option B. |
-| 11 | CF-W1-UX-05 | Refresh Copilot-only copy cleanup as child of or companion to `CF-W1-UX-02`. |
+| 1 | CF-W1-TP-01B | Team 00 Ready evaluation. |
+| 2 | CF-W1-NOTIF-02 | Team 00/Team 09 Ready evaluation and implementation handoff. |
+| 3 | CF-W1-L3-ALERT-01 | Team 00 Ready evaluation. |
+| 4 | CF-W1-L3-AUTH-03 | Team 00 Ready evaluation. |
+| 5 | CF-W1-MD-02 | Formal ADR and future slice plan under approved Option B ADR direction. |
+| 6 | CF-W1-AUTH-01 | Refresh Team 09 fail-closed backend packet after Option A. |
+| 7 | CF-W1-SUB-01 | Refresh Team 09 admin/manual-only backend packet after Option A. |
+| 8 | CF-W1-MD-01 | Refresh Market Data validation-only packet after Option A. |
+| 9 | CF-W1-UX-02 | Refresh Copilot-only trust UX packet after Option B. |
+| 10 | CF-W1-UX-05 | Refresh Copilot-only copy cleanup as child of or companion to `CF-W1-UX-02`. |
 
 ## Current Priority Refinement Output
 
 | ID | Useful next output | Owner to route |
 | --- | --- | --- |
-| CF-W1-L3-PORT-01A | Ready-promotion check for portfolio-only readiness DTO implementation. | Team 00 |
 | CF-W1-TP-01B | Ready-promotion check for backend-only Trade Plan DQ hard-block implementation. | Team 00 |
 | CF-W1-NOTIF-02 | Ready-promotion check and implementation handoff for notification log redaction. | Team 00 + Team 09 |
 | CF-W1-L3-ALERT-01 | Ready-promotion check for alert readiness suppression implementation. | Team 00 |

@@ -58,10 +58,13 @@ Latest decision resolution:
 - Resolution docs are under `07-decisions/`.
 
 Current ready queue:
-- No active application-code item is Ready for Implementation.
+- `CF-W1-L3-PORT-01A` is Ready for Team 07 implementation.
+- Branch: `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A`.
+- Worktree: `../investment-scanner-worktrees/team07-CF-W1-L3-PORT-01A`.
+- Allowed files: `backend/src/modules/portfolio-management/portfolio-management.service.ts`, `backend/src/modules/portfolio-management/portfolio-management.types.ts`, `backend/src/modules/portfolio-management/portfolio-management.md`, and `backend/tests/modules/portfolio-management/portfolio-management.service.test.ts`.
 
 Current planning queues:
-- `CF-W1-L3-PORT-01A`, `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01` remain near-ready but need Team 00 Ready promotion and exact implementation handoffs.
+- `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01` remain near-ready but need Team 00 Ready promotion and exact implementation handoffs.
 - `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, and `CF-W1-MD-01` moved out of Decision Inbox blocker state and into post-decision packet refresh.
 - `CF-W1-L3-INTEL-01` remains upstream-blocked behind accepted `CF-W1-L3-PORT-01A`.
 - `CF-W1-MD-02` remains ADR/source/schema split-gated.
@@ -70,12 +73,13 @@ Resume daemon operation:
 1. Keep Team 00 running as scheduler/integration owner.
 2. Run Teams 01-10 from their current inbox assignments under `16-team-inboxes/`.
 3. Continue audits, requirement refinement, architecture prep, QA planning, implementation only when Ready criteria pass, review, and release work.
-4. Keep `CF-W1-L3-PORT-01A`, `CF-W1-L3-ALERT-01`, `CF-W1-TP-01B`, and `CF-W1-NOTIF-02` out of implementation until Team 00 selects a child, confirms exact reservations, and moves it to Ready.
-5. Refresh `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, and `CF-W1-MD-01` packets under the resolved policies before any source/test work.
-6. Use worktrees for Teams 05-09 only after matching ready implementation work exists.
-7. Update `99-decision-inbox/open-decisions.md` whenever a true consent blocker is created or resolved.
-8. If an accepted scoped commit is created on `dev` and push gates pass, push normally to `dev`.
-9. If runtime ends again, update `09-summaries/daemon-cycle-latest.md` and this resume prompt, then return a checkpoint report.
+4. Launch Team 07 on `CF-W1-L3-PORT-01A` in the dedicated worktree and keep all implementation strictly within the allowed files.
+5. Keep `CF-W1-L3-ALERT-01`, `CF-W1-TP-01B`, and `CF-W1-NOTIF-02` out of implementation until Team 00 selects a child, confirms exact reservations, and moves it to Ready.
+6. Refresh `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, and `CF-W1-MD-01` packets under the resolved policies before any source/test work.
+7. Use worktrees for Teams 05-09 only after matching ready implementation work exists.
+8. Update `99-decision-inbox/open-decisions.md` whenever a true consent blocker is created or resolved.
+9. If an accepted scoped commit is created on `dev` and push gates pass, push normally to `dev`.
+10. If runtime ends again, update `09-summaries/daemon-cycle-latest.md` and this resume prompt, then return a checkpoint report.
 
 Stop only for:
 - true consent blockers,

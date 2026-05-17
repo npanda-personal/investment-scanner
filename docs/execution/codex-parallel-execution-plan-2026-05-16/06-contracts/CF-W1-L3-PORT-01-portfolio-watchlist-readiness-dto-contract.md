@@ -6,7 +6,7 @@ Owner: Team 03 Architecture Factory
 
 ## Status
 
-Child architecture contract prepared. Not Ready for Implementation.
+Child architecture contract prepared. Portfolio child `CF-W1-L3-PORT-01A` promoted by Team 00 on 2026-05-18.
 
 Parent policy: `CF-W1-L3-DQ-01`
 
@@ -153,7 +153,7 @@ This slice adds explicit readiness metadata so downstream code no longer infers 
 
 Default implementation order:
 
-1. `CF-W1-L3-PORT-01A`: portfolio-management DTO readiness.
+1. `CF-W1-L3-PORT-01A`: portfolio-management DTO readiness. Promoted to Ready for Team 07 implementation on 2026-05-18.
 2. `CF-W1-L3-PORT-01B`: watchlist-management DTO readiness.
 
 Both may share this contract, but each implementation pass should reserve only one module's files unless Team 00 records a combined backend-only exception.

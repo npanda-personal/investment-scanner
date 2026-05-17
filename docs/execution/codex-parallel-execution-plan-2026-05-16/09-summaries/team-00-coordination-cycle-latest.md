@@ -10,10 +10,10 @@ Team: TEAM-00 - Master Orchestrator / Integration
 | --- | --- |
 | Branch | `dev` |
 | Branch status before decision-resolution commit | `dev...origin/dev [ahead 4]` |
-| Worktree safety | Safe for docs-only coordination; dirty files are active execution docs/team outputs only |
+| Worktree safety | Safe for docs-only Team 00 coordination; dirty files are active execution docs/team outputs only. Implementation must use dedicated worktree. |
 | Open decisions | 0 |
-| Ready queue depth | 0 active application-code items |
-| Refinement queue depth | 13 active unique refinement / near-ready items |
+| Ready queue depth | 1 active application-code item: `CF-W1-L3-PORT-01A` |
+| Refinement queue depth | 12 active unique refinement / near-ready items |
 | Integration queue depth | 0 active application-code items |
 | Product Owner action required | No |
 | Daemon should continue | Yes, continue autonomous work |
@@ -60,11 +60,22 @@ Use dedicated worktrees only after Team 00 promotes an implementation item with 
 
 ## Ready Assessment
 
-No implementation item is Ready.
+`CF-W1-L3-PORT-01A` is Ready for Team 07 implementation.
+
+Team 07 must use:
+
+- Branch: `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A`
+- Worktree: `../investment-scanner-worktrees/team07-CF-W1-L3-PORT-01A`
+
+Allowed files:
+
+- `backend/src/modules/portfolio-management/portfolio-management.service.ts`
+- `backend/src/modules/portfolio-management/portfolio-management.types.ts`
+- `backend/src/modules/portfolio-management/portfolio-management.md`
+- `backend/tests/modules/portfolio-management/portfolio-management.service.test.ts`
 
 Near-ready but still requiring Team 00 promotion:
 
-- `CF-W1-L3-PORT-01A`
 - `CF-W1-TP-01B`
 - `CF-W1-NOTIF-02`
 - `CF-W1-L3-ALERT-01`
@@ -78,8 +89,8 @@ Policy-resolved but still requiring packet refresh:
 - `CF-W1-UX-05`
 - `CF-W1-MD-01`
 
-Do not edit source/tests until a child is selected, exact reservations are copied into a team implementation inbox, and the ready queue is updated.
+Do not edit any other source/tests until a child is selected, exact reservations are copied into a team implementation inbox, and the ready queue is updated.
 
 ## Next Coordination Action
 
-Commit the docs-only decision-resolution update after staged-scope verification, then evaluate one child slice for Ready promotion. Preferred first child: `CF-W1-L3-PORT-01A` if its contract, QA plan, file reservations, source evidence, and implementation handoff pass all gates.
+Team 07 should start `CF-W1-L3-PORT-01A` in the dedicated worktree. Team 00 next evaluates `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, or `CF-W1-L3-ALERT-01` for the next Ready promotion while other factory teams continue docs-only packet refresh.

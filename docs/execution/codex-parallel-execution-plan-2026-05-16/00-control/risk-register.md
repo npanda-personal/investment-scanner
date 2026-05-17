@@ -74,7 +74,7 @@
 - Copilot trust UX policy is resolved as Option B; implementation remains blocked until Copilot-only contract/QA/file reservations and source-supported trust evidence are refreshed.
 - Continuous Factory Wave 2 dirty DQ changes were accepted and committed as `CF-W2-DQ-01`.
 - Continuous Factory Wave 2 Signal Generation changes were reframed as bounded `CF-W2-SIG-01A`; `CF-W1-SIG-01B` adds trusted list read-path filtering.
-- No downstream Trade Plan, alert, portfolio, watchlist readiness, or copilot implementation is allowed until module-specific consumer gates, child contracts, QA scenarios, and exact file reservations are recorded.
+- No downstream Trade Plan, alert, watchlist readiness, portfolio-intelligence, or copilot implementation is allowed until module-specific consumer gates, child contracts, QA scenarios, and exact file reservations are recorded. The bounded exception is `CF-W1-L3-PORT-01A`, now promoted for portfolio-management-only readiness DTO implementation.
 - Portfolio/watchlist child-resource ownership hardening is accepted as `CF-W1-L3-AUTH-01`, and alert event ownership is accepted as `CF-W1-L3-AUTH-02`; copilot trust UX, Data Quality readiness consumer policy, notification/copilot alert consumers, and platform nullable-owner migration remain separate.
 - Signal trigger DTO projection is accepted and committed as `CF-W1-SIG-TRIGGER-01`; persisted trigger snapshots, normalized trigger tables, and downstream trigger consumer adoption remain separate.
 
@@ -176,3 +176,11 @@
 - `CF-W1-UX-05` is resolved as Option A: first copy cleanup is Copilot-only after or together with `CF-W1-UX-02`; shared `StatusBadge`, Research Hub, and Market Data UI changes remain future.
 - `CF-W1-MD-01` is resolved as Option A: future-dated candles and invalid adjusted close are rejected; missing adjusted close is fallback/incomplete evidence; zero/suspicious volume is warning evidence; spike rejection remains opt-in. Durable readiness storage, provider/startup behavior, schema, routes, shared utilities, frontend, packages, generated files, and live providers remain out of scope.
 - No application-code item became Ready from these policy resolutions. Ready queue depth remains zero until Team 00 promotes one exact implementation handoff.
+
+## Team 00 Ready Promotion Risk Decisions - 2026-05-18
+
+- `CF-W1-L3-PORT-01A` is promoted to Ready only as a portfolio-management implementation slice.
+- Team 07 must use branch `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A` and worktree `../investment-scanner-worktrees/team07-CF-W1-L3-PORT-01A`; the shared `dev` workspace has unrelated active-doc changes from other teams.
+- Allowed implementation files are limited to `backend/src/modules/portfolio-management/portfolio-management.service.ts`, `backend/src/modules/portfolio-management/portfolio-management.types.ts`, `backend/src/modules/portfolio-management/portfolio-management.md`, and `backend/tests/modules/portfolio-management/portfolio-management.service.test.ts`.
+- Shared/high-risk boundaries remain blocked: Prisma, route registries, shared backend utilities or DTOs, shared UI, package manifests, generated files, Data Quality Engine source/exports, watchlist, alerts, portfolio-intelligence, frontend, providers, startup/backfill, live providers, paid/cloud, broker, and telemetry.
+- If Team 07 discovers a need for any forbidden file or for `LIMITED` to become action-ready, the workstream stops and returns to Team 00 for blocker routing.
