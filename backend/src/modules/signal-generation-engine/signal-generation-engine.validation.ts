@@ -92,7 +92,7 @@ export function parseRunRequest(body: any): SignalRunRequest {
     modelVersion: normalizeVersionText(body?.modelVersion),
     rulesetVersion: normalizeVersionText(body?.rulesetVersion),
     requestedByUserId: normalizeVersionText(body?.requestedByUserId),
-    useDataQualityFilter: body?.useDataQualityFilter === true,
+    useDataQualityFilter: body?.useDataQualityFilter !== false,
     minSignalReadinessScore: Number.isFinite(Number(body?.minSignalReadinessScore)) ? Math.min(100, Math.max(0, Number(body.minSignalReadinessScore))) : undefined,
     allowedReadinessStatuses: Array.isArray(body?.allowedReadinessStatuses) ? body.allowedReadinessStatuses : undefined,
     includeLimited: body?.includeLimited === true,

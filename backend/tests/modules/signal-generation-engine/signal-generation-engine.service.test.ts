@@ -318,8 +318,8 @@ describe('SignalGenerationEngineService', () => {
     };
     const dataQualityService = {
       filterEligibleInstruments: jest.fn().mockResolvedValue({
-        eligibleInstrumentIds: ['ready', 'missing'],
-        excludedInstrumentIds: ['blocked'],
+        eligibleInstrumentIds: ['ready'],
+        excludedInstrumentIds: ['blocked', 'missing'],
         missingQualityEvaluationCount: 1,
         warnings: ['missing: missing data quality evaluation'],
         evaluationsByInstrumentId: {
@@ -354,18 +354,21 @@ describe('SignalGenerationEngineService', () => {
 
     const result = await service.run({ limit: 3, useDataQualityFilter: true });
 
-    expect(result.generated).toBe(2);
+    expect(result.generated).toBe(1);
     expect(result.dataQuality).toMatchObject({
       beforeFilter: 3,
-      afterFilter: 2,
-      excludedByDataQuality: 1,
+      afterFilter: 1,
+      excludedByDataQuality: 2,
       missingQualityEvaluationCount: 1,
-      eligibleInstrumentCount: 2,
-      attemptedGenerationCount: 2,
+      eligibleInstrumentCount: 1,
+      attemptedGenerationCount: 1,
     });
-    expect(result).toMatchObject({ eligibleInstrumentCount: 2, attemptedGenerationCount: 2, skippedCount: 1 });
+    expect(result).toMatchObject({ eligibleInstrumentCount: 1, attemptedGenerationCount: 1, skippedCount: 2 });
     expect(result.warnings[0]).toContain('missing data quality');
     expect(dataQualityService.filterEligibleInstruments).toHaveBeenCalledTimes(1);
+    expect(dataQualityService.filterEligibleInstruments).toHaveBeenCalledWith(['ready', 'blocked', 'missing'], expect.objectContaining({
+      missingQualityBehavior: 'SKIP',
+    }));
     const generationOptions = generateForInstrument.mock.calls[0][1] as any;
     expect(generationOptions.dataQualityEvaluationsByInstrumentId.ready).toMatchObject({
       filterApplied: true,
@@ -380,9 +383,43 @@ describe('SignalGenerationEngineService', () => {
     });
     expect(generationOptions.dataQualityEvaluationsByInstrumentId.missing).toMatchObject({
       filterApplied: true,
-      eligible: true,
-      excludedReason: 'Missing data quality evaluation; configured behavior allowed processing.',
+      eligible: false,
+      excludedReason: 'Missing data quality evaluation.',
     });
+  });
+
+  it('fails closed when the data quality filter is unavailable for a trusted run', async () => {
+    const repository = { createSignalResult: jest.fn(), ...runAuditRepository() };
+    const marketDataService = {
+      listInstruments: jest.fn().mockResolvedValue({ instruments: [{ id: 'one' }, { id: 'two' }], pagination: { total: 2 } }),
+    };
+    const dataQualityService = {
+      filterEligibleInstruments: jest.fn().mockRejectedValue(new Error('dq unavailable')),
+    };
+    const service = new SignalGenerationEngineService(repository as any, marketDataService as any, {} as any, dataQualityService as any);
+    const generateForInstrument = jest.spyOn(service, 'generateForInstrument');
+
+    const result = await service.run({ batchSize: 2, region: 'IN', assetType: 'STOCK' });
+
+    expect(dataQualityService.filterEligibleInstruments).toHaveBeenCalledWith(['one', 'two'], expect.objectContaining({
+      missingQualityBehavior: 'SKIP',
+    }));
+    expect(generateForInstrument).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      generatedCount: 0,
+      skippedCount: 2,
+      failedCount: 0,
+      dataQuality: {
+        filterApplied: true,
+        beforeFilter: 2,
+        afterFilter: 0,
+        excludedByDataQuality: 2,
+        missingQualityEvaluationCount: 2,
+        eligibleInstrumentCount: 0,
+        attemptedGenerationCount: 0,
+      },
+    });
+    expect(result.warnings[0]).toContain('trusted signal generation failed closed');
   });
 
   it('runs one bounded batch and returns progress metadata', async () => {
@@ -416,7 +453,7 @@ describe('SignalGenerationEngineService', () => {
       data_status: 'PARTIAL',
     } as any));
 
-    const result = await service.run({ batchSize: 2, offset: 2, region: 'IN', assetType: 'STOCK' });
+    const result = await service.run({ batchSize: 2, offset: 2, region: 'IN', assetType: 'STOCK', useDataQualityFilter: false });
 
     expect(marketDataService.listInstruments).toHaveBeenCalledWith(expect.objectContaining({
       page: 2,
@@ -485,6 +522,7 @@ describe('SignalGenerationEngineService', () => {
       includeStrategyMatches: true,
       strategyCode: 'TREND_MOMENTUM',
       maxConcurrency: 2,
+      useDataQualityFilter: false,
     });
 
     expect(result.processedCount).toBe(2);
@@ -507,7 +545,7 @@ describe('SignalGenerationEngineService', () => {
     const service = new SignalGenerationEngineService(runAuditRepository() as any, marketDataService as any, {} as any);
     jest.spyOn(service, 'generateForInstrument').mockResolvedValue(null);
 
-    const result = await service.run({ batchSize: 2, offset: 4, region: 'IN', assetType: 'STOCK' });
+    const result = await service.run({ batchSize: 2, offset: 4, region: 'IN', assetType: 'STOCK', useDataQualityFilter: false });
 
     expect(result.processedCount).toBe(1);
     expect(result.nextOffset).toBeNull();
@@ -549,7 +587,7 @@ describe('SignalGenerationEngineService', () => {
       } as any;
     });
 
-    const result = await service.run({ batchSize: 2, offset: 0, region: 'IN', assetType: 'STOCK' });
+    const result = await service.run({ batchSize: 2, offset: 0, region: 'IN', assetType: 'STOCK', useDataQualityFilter: false });
 
     expect(result.generatedCount).toBe(1);
     expect(result.failedCount).toBe(1);
@@ -595,7 +633,7 @@ describe('SignalGenerationEngineService', () => {
       } as any;
     });
 
-    const result = await service.run({ batchSize: 4, maxConcurrency: 2, providerThrottleMs: 0, region: 'IN', assetType: 'STOCK' });
+    const result = await service.run({ batchSize: 4, maxConcurrency: 2, providerThrottleMs: 0, region: 'IN', assetType: 'STOCK', useDataQualityFilter: false });
 
     expect(result.maxConcurrency).toBe(2);
     expect(result.providerThrottleMs).toBe(0);
@@ -635,7 +673,7 @@ describe('SignalGenerationEngineService', () => {
       writeStatus: instrumentId === 'created' ? 'CREATED' : instrumentId === 'updated' ? 'UPDATED' : 'NO_OP',
     } as any));
 
-    const result = await service.run({ batchSize: 3, offset: 0, region: 'IN', assetType: 'STOCK' });
+    const result = await service.run({ batchSize: 3, offset: 0, region: 'IN', assetType: 'STOCK', useDataQualityFilter: false });
 
     expect(result.generatedCount).toBe(1);
     expect(result.updatedCount).toBe(1);

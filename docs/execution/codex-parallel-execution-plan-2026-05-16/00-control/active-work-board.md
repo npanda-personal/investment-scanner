@@ -86,9 +86,10 @@ No historical active work items have been migrated as active.
 
 | ID | Work Item | Owner | State | Scope | Notes |
 |---|---|---|---|---|---|
-| CF-W2-RECON | Dirty DQ/SGE change reconciliation | Orchestrator | Blocked | `13-implementation-evidence/CF-W2-dirty-change-reconciliation-report.md` | Source/test changes occurred before readiness was fully proven. No staging, commit, revert, or downstream implementation allowed until Product Owner decision. |
-| CF-W2-DQ-01 | Data Quality fail-closed defaults | Data Quality Engine Team + QA + Architect | Conditionally Accepted | `backend/src/modules/data-quality-engine/**`, DQ tests | Readiness, focused tests, QA, code review, Architect signoff, and PO conditional acceptance completed. Local commit pending git staging availability. |
-| CF-W2-SIG-01 | Signal Generation DQ fail-closed behavior | Signal Generation Engine Team + QA + Architect | Blocked | `backend/src/modules/signal-generation-engine/**`, SGE tests | Dirty change partially resolves run-path fail-closed behavior, but explicit opt-out, read paths, trust classification, and trigger contract remain unresolved. |
+| CF-W2-RECON | Dirty DQ/SGE change reconciliation | Orchestrator | Committed | `13-implementation-evidence/CF-W2-dirty-change-reconciliation-report.md` | Reconciliation/governance controls committed in `2fe3c10`. |
+| CF-W2-DQ-01 | Data Quality fail-closed defaults | Data Quality Engine Team + QA + Architect | Committed | `backend/src/modules/data-quality-engine/**`, DQ tests | Readiness, focused tests, QA, code review, Architect signoff, PO conditional acceptance, and local commit `88a331b` completed. |
+| CF-W2-SIG-01 | Signal Generation DQ fail-closed behavior | Signal Generation Engine Team + QA + Architect | Split / Reframed | `backend/src/modules/signal-generation-engine/**`, SGE tests | Full requirement remains incomplete. Dirty work reframed as bounded `CF-W2-SIG-01A` run-path DQ fail-closed slice. |
+| CF-W2-SIG-01A | Signal Generation run-path DQ fail-closed behavior | Signal Generation Engine Team + QA + Architect | Conditionally Accepted | `signal-generation-engine` source/tests | Focused test passed. QA, review, Architect, and delegated PO acceptance completed. Commit pending scoped staging. |
 
 ## Current Sprint 1B Readiness
 
@@ -98,9 +99,9 @@ Blocking gates:
 - Angel One remains excluded from implementation and live validation.
 - Provider-heavy startup behavior remains excluded by default.
 - Downstream modules remain blocked until separate readiness enforcement tests, QA, review, Architect signoff, and Product Owner acceptance exist.
-- `signal-generation-engine` remains blocked for full trusted/fail-closed behavior. Wave 2 dirty changes partially address run-path defaults, but reconciliation is unresolved.
+- `signal-generation-engine` run-path defaults are covered by bounded `CF-W2-SIG-01A`; full trusted/read-path enforcement remains blocked.
 - Full Market Data durable readiness evidence still requires future Architect/Product Owner decisions before source or schema changes.
-- Continuous Factory Wave 2 reconciliation must be resolved before any downstream implementation, staging, or commit.
+- Continuous Factory Wave 2 reconciliation is split and controlled. Downstream implementation remains blocked until full Signal Generation read-path/trust gaps and target-semantics work are resolved.
 
 ## Historical References
 

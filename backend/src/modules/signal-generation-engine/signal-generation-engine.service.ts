@@ -121,9 +121,10 @@ export class SignalGenerationEngineService {
     const resolved = await this.resolveRunUniverse(request, batchSize, offset);
     const resolvedInstrumentIds = resolved.instrumentIds;
     let instrumentIds = resolvedInstrumentIds;
+    const useDataQualityFilter = request.useDataQualityFilter !== false;
     let filteredDataQualityResult: Awaited<ReturnType<DataQualityEngineService['filterEligibleInstruments']>> | null = null;
     let dataQuality: SignalRunResponse['dataQuality'] = {
-      filterApplied: Boolean(request.useDataQualityFilter),
+      filterApplied: useDataQualityFilter,
       beforeFilter: resolvedInstrumentIds.length,
       afterFilter: resolvedInstrumentIds.length,
       excludedByDataQuality: 0,
@@ -132,16 +133,22 @@ export class SignalGenerationEngineService {
       attemptedGenerationCount: resolvedInstrumentIds.length,
     };
 
-    if (request.useDataQualityFilter) {
+    if (useDataQualityFilter) {
       const filtered = await this.dataQualityService.filterEligibleInstruments(resolvedInstrumentIds, {
         minSignalReadinessScore: request.minSignalReadinessScore ?? 70,
         allowedReadinessStatuses: request.allowedReadinessStatuses,
         includeLimited: request.includeLimited,
         skipUnusable: request.skipUnusable ?? true,
-        missingQualityBehavior: request.missingQualityBehavior ?? 'WARN_AND_PROCESS',
+        missingQualityBehavior: request.missingQualityBehavior ?? 'SKIP',
       }).catch((error: any) => {
-        warnings.push(`Data quality filter unavailable: ${error?.message || 'unknown error'}`);
-        return null;
+        warnings.push(`Data quality filter unavailable; trusted signal generation failed closed: ${error?.message || 'unknown error'}`);
+        return {
+          eligibleInstrumentIds: [],
+          excludedInstrumentIds: resolvedInstrumentIds,
+          missingQualityEvaluationCount: resolvedInstrumentIds.length,
+          warnings: [],
+          evaluationsByInstrumentId: {},
+        };
       });
       if (filtered) {
         filteredDataQualityResult = filtered;
@@ -173,12 +180,13 @@ export class SignalGenerationEngineService {
       totalCount: resolved.totalCount,
       warnings,
     });
-    const dataQualityEvaluationsByInstrumentId = request.useDataQualityFilter && filteredDataQualityResult
+    const dataQualityEvaluationsByInstrumentId = useDataQualityFilter && filteredDataQualityResult
       ? this.getDataQualityEligibilityMap(resolvedInstrumentIds, filteredDataQualityResult)
       : {};
     const researchContextMode: NonNullable<SignalRunRequest['researchContextMode']> = request.instrumentId || request.symbol ? 'FULL' : 'LIGHTWEIGHT';
     const generationRequest = {
       ...request,
+      useDataQualityFilter,
       researchContextMode,
       modelVersion,
       rulesetVersion,

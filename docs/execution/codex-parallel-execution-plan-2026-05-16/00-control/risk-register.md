@@ -29,11 +29,11 @@
 | UI scope creep risk | Medium | Medium | UX + Orchestrator | UI controls added before UX/QA criteria | keep UI minimal unless explicitly approved | mark frontend files read-only by default |
 | Test-only scope drift risk | Medium | Medium | Orchestrator + QA | implementation touches source while approved as test-only | reserve exactly one test file | stop and reject scope expansion |
 | Market Data durable evidence gap | High | High | Market Data Foundation + Architect | readiness evidence exists only transiently or without source/run/provenance fields | add contract-first storage/readiness characterization tests before source changes | propose backend-only storage/readiness test slice |
-| Downstream DQ optional-filter risk | High | High | Lane 2 module owners + Architect | signal/backtest/calibration paths run with DQ filtering disabled or warning-only | require fail-closed consumer contracts and focused tests | start with signal-generation-engine DQ enforcement tests |
+| Downstream DQ optional-filter risk | High | Medium | Lane 2 module owners + Architect | signal/backtest/calibration paths run with DQ filtering disabled or warning-only | require fail-closed consumer contracts and focused tests | continue with signal read-path and downstream consumer gates |
 | User-facing untrusted data leak risk | High | High | Lane 3 module owners + QA | portfolio/watchlist/alert/copilot outputs omit readiness evidence | require Lane 3 readiness consumer contract | start with alerts-monitoring readiness tests |
 | Market Data natural-key gap | High | Medium | Market Data Foundation + Architect | storage is characterized as symbol/date-centric only | require ADR before schema or storage-key changes | propose durable readiness evidence decision |
 | Storage characterization overclaim risk | Medium | Medium | Orchestrator + QA | tests treated as full contract compliance | preserve limitations in QA/PO evidence | keep downstream blocklist active |
-| Signal-generation strict-filter overclaim risk | High | Medium | Signal Generation + Architect + QA | Wave 3 strict-filter tests are treated as default fail-closed enforcement | preserve limitation that strict opt-in path only is proven | propose signal-generation fail-closed policy decision |
+| Signal-generation strict-filter overclaim risk | Medium | Medium | Signal Generation + Architect + QA | Wave 3 strict-filter tests or CF-W2-SIG-01A are treated as full read-path enforcement | preserve limitation that run path only is proven | prepare read-path trust-classification requirement |
 | Strategy Decision target-price violation | High | High | Strategy Decision + Product Owner + Architect | `targetPrice` or target-price wording appears in trusted outputs | replace with rule-based exit/invalidation semantics after PO decision | refine CF-W1-STRAT-01 |
 | Alert ownership leakage risk | High | High | Alerts + Auth + Architect | alert events/list/read/dismiss are global or rule owner is not preserved | define ownership contract before alert implementation | refine CF-W1-L3-AUTH-02 |
 | Copilot trust overclaim risk | High | Medium | UX + Copilot + QA | summaries show complete/reliable without DQ readiness evidence | add trust UX contract and blocked states | refine CF-W1-UX-02 |
@@ -45,7 +45,7 @@
 
 - Market Data durable readiness evidence is incomplete for full contract compliance.
 - Current Market Data natural-key behavior is symbol/date-centric and narrower than the active contract target.
-- `signal-generation-engine` strict DQ-filtered runs are characterized, but default trusted/fail-closed behavior remains unapproved and unimplemented.
+- `signal-generation-engine` run-path default/fail-closed behavior is accepted in bounded `CF-W2-SIG-01A`, but read-path filtering and persisted trust classification remain unresolved.
 - Lane 2 strategy/signal/risk modules still need fail-closed downstream DQ enforcement tests beyond the Wave 3 strict signal-generation path.
 - Lane 3 portfolio/watchlist/alerts/copilot modules still need readiness consumer contracts and tests.
 - Angel One remains excluded from implementation and live validation.
@@ -54,9 +54,9 @@
 - Strategy Decision target-price semantics conflict with root no-arbitrary-target policy and require Product Owner decision.
 - Alert ownership and Lane 3 readiness consumer contracts remain unresolved.
 - Copilot/research trust UX remains unresolved.
-- Continuous Factory Wave 2 dirty DQ/SGE changes are pending Product Owner decision.
-- No downstream implementation is allowed until Wave 2 reconciliation is resolved.
-- No Signal Generation commit is allowed until unresolved gaps are addressed or explicitly accepted as known limitations.
+- Continuous Factory Wave 2 dirty DQ changes were accepted and committed as `CF-W2-DQ-01`.
+- Continuous Factory Wave 2 Signal Generation changes were reframed as bounded `CF-W2-SIG-01A`; full `CF-W1-SIG-01` remains incomplete.
+- No downstream implementation is allowed until Signal Generation read-path/trust gaps and strategy target-semantics risks are resolved.
 
 ## Sprint 1B Preparation Risk Decisions
 
@@ -77,6 +77,6 @@
 - Wave 2 entered reconciliation mode because source/test files were modified before readiness was fully proven.
 - Current dirty files are limited to Data Quality Engine and Signal Generation Engine source/tests.
 - Data Quality fail-closed default changes completed readiness, QA, code review, Architect signoff, and Product Owner conditional acceptance as a separate evidence track.
-- Signal Generation changes remain blocked until Product Owner and Architect decide whether unresolved run opt-out, read-path, trusted/untrusted classification, and trigger-contract gaps are acceptable known limitations.
-- No staging, commit, push, revert, or downstream implementation is allowed until reconciliation is resolved.
-- No Signal Generation file may be staged with the Data Quality commit.
+- Signal Generation run-path changes are accepted only as `CF-W2-SIG-01A`; explicit opt-out, read-path, trusted/untrusted classification, latest auto-generation, and trigger-contract gaps remain tracked.
+- No push is allowed.
+- No downstream implementation is allowed from `CF-W2-SIG-01A` alone.
