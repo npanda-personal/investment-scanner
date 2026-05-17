@@ -8,7 +8,8 @@ No historical active work items have been migrated as active.
 
 - Root `AGENTS.md` and current Product Owner direction are authoritative.
 - `docs/codex-agent-team-plan/` is historical evidence only.
-- No implementation work is active unless the Product Owner explicitly approves an implementation work packet.
+- Standing delegation policy in `98-orchestrator/standing-delegation-policy.md` governs routine autonomous factory gates.
+- No implementation work is active unless it is inside an approved boundary or the standing delegation policy permits it.
 - Sprint 1B Waves are approved only when the Product Owner explicitly defines the bounded file scope.
 - GitHub push is disabled by default.
 
@@ -106,3 +107,12 @@ Blocking gates:
 ## Historical References
 
 Old work items in `docs/codex-agent-team-plan/` may be used only as evidence or revalidation candidates. They are not active work.
+
+## Autonomous Orchestrator Setup
+
+| ID | Work Item | Owner | State | Scope | Notes |
+|---|---|---|---|---|---|
+| ORCH-SETUP-01 | Standing delegation policy | Orchestrator | Committed after setup | `98-orchestrator/standing-delegation-policy.md` | Codex handles routine gates internally when delegation conditions pass. |
+| ORCH-SETUP-02 | Autonomous wave operating rules | Orchestrator | Committed after setup | `98-orchestrator/autonomous-wave-operating-rules.md` | Defines evidence sync, factories, one-writer rule, one commit per accepted requirement, and partial-slice reframing. |
+| ORCH-SETUP-03 | Decision inbox/outbox | Orchestrator | Committed after setup | `99-decision-inbox/`, `99-decision-outbox/` | Human Product Owner reviews only true consent blockers placed in decision inbox. |
+| ORCH-SETUP-04 | Cadence | Orchestrator | Committed after setup | `98-orchestrator/cadence.md` | Defines continuous factory, daily automation, implementation, review, and decision-review cadence. |

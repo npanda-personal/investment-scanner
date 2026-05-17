@@ -40,6 +40,8 @@
 | Subscription self-plan risk | Medium | Medium | Subscription Billing + Product Owner | ordinary user can self-select higher/admin plan in local mode | clarify local/manual billing policy | refine CF-W1-SUB-01 |
 | Implementation factory false-ready risk | High | Medium | Orchestrator | item enters Ready without PO/Architect/QA gates | enforce ready queue criteria and no-pull evidence | keep ready queue strict |
 | Premature source edit reconciliation risk | High | High | Orchestrator + Product Owner + Architect + QA | source/test files are dirty before readiness evidence, QA, review, signoff, and PO packet are complete | use Pre-Implementation Readiness Lock and reconciliation mode | split dirty DQ/SGE changes before any commit |
+| Over-escalation bottleneck risk | Medium | High | Orchestrator | routine QA/review/PO packet/commit asks for human mediation | use standing delegation policy | route only true consent blockers to `99-decision-inbox/` |
+| Under-escalation consent risk | High | Medium | Orchestrator | Prisma, route, shared, package, provider, UI, target semantics, or threshold ambiguity proceeds without decision | enforce escalation rules | create Decision Packet before work continues |
 
 ## Current Blockers
 
@@ -80,3 +82,11 @@
 - Signal Generation run-path changes are accepted only as `CF-W2-SIG-01A`; explicit opt-out, read-path, trusted/untrusted classification, latest auto-generation, and trigger-contract gaps remain tracked.
 - No push is allowed.
 - No downstream implementation is allowed from `CF-W2-SIG-01A` alone.
+
+## Autonomous Orchestrator Setup Risk Decisions
+
+- Routine gates are delegated to Codex only when all standing delegation conditions pass.
+- True consent blockers must create a Decision Packet under `99-decision-inbox/`.
+- Human Product Owner review is concentrated on `99-decision-inbox/open-decisions.md`.
+- Push remains disabled.
+- Active execution docs are the only docs modified by this setup.
