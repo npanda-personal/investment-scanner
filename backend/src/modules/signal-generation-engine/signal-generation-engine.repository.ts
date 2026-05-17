@@ -286,6 +286,7 @@ export class SignalGenerationEngineRepository {
 
     return this.sortSignals(
       results.map((item) => this.toDto(item))
+        .filter((result) => this.isTrustedReadSignal(result))
         .filter((result) => !query.direction || result.direction === query.direction)
         .filter((result) => !query.confidence || result.confidence === query.confidence)
         .filter((result) => query.minScore === undefined || result.score >= query.minScore)
@@ -355,6 +356,14 @@ export class SignalGenerationEngineRepository {
     return [...result.triggered_signals, ...result.negative_signals].some((signal) =>
       signal.code.toLowerCase().includes(needle) || signal.category.toLowerCase() === needle
     );
+  }
+
+  private isTrustedReadSignal(result: SignalResultDto): boolean {
+    const dataQuality = result.dataQualityEligibility;
+    return result.auditStatus === 'CURRENT'
+      && dataQuality?.filterApplied === true
+      && dataQuality.eligible === true
+      && dataQuality.signalReadinessStatus === 'READY';
   }
 
   private normalizeUtcDay(value: Date): Date {

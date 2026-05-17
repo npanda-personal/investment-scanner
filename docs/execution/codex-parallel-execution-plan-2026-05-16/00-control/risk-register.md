@@ -33,7 +33,8 @@
 | User-facing untrusted data leak risk | High | High | Lane 3 module owners + QA | portfolio/watchlist/alert/copilot outputs omit readiness evidence | require Lane 3 readiness consumer contract | start with alerts-monitoring readiness tests |
 | Market Data natural-key gap | High | Medium | Market Data Foundation + Architect | storage is characterized as symbol/date-centric only | require ADR before schema or storage-key changes | propose durable readiness evidence decision |
 | Storage characterization overclaim risk | Medium | Medium | Orchestrator + QA | tests treated as full contract compliance | preserve limitations in QA/PO evidence | keep downstream blocklist active |
-| Signal-generation strict-filter overclaim risk | Medium | Medium | Signal Generation + Architect + QA | Wave 3 strict-filter tests or CF-W2-SIG-01A are treated as full read-path enforcement | preserve limitation that run path only is proven | prepare read-path trust-classification requirement |
+| Signal-generation strict-filter overclaim risk | Medium | Low | Signal Generation + Architect + QA | Wave 3 strict-filter tests or CF-W2-SIG-01A are treated as full read-path enforcement | preserve limitation that run path and trusted list read paths are separate | prepare latest-instrument gate requirement |
+| Signal latest auto-generation trust gap | High | Medium | Signal Generation + Architect + QA | `latestForInstrument()` can generate or return a signal outside the trusted list gate | contract and test latest path separately | prepare `CF-W1-SIG-LATEST-01` |
 | Strategy Decision target-price violation | High | High | Strategy Decision + Product Owner + Architect | `targetPrice` or target-price wording appears in trusted outputs | replace with rule-based exit/invalidation semantics after PO decision | refine CF-W1-STRAT-01 |
 | Alert ownership leakage risk | High | High | Alerts + Auth + Architect | alert events/list/read/dismiss are global or rule owner is not preserved | define ownership contract before alert implementation | refine CF-W1-L3-AUTH-02 |
 | Copilot trust overclaim risk | High | Medium | UX + Copilot + QA | summaries show complete/reliable without DQ readiness evidence | add trust UX contract and blocked states | refine CF-W1-UX-02 |
@@ -47,7 +48,8 @@
 
 - Market Data durable readiness evidence is incomplete for full contract compliance.
 - Current Market Data natural-key behavior is symbol/date-centric and narrower than the active contract target.
-- `signal-generation-engine` run-path default/fail-closed behavior is accepted in bounded `CF-W2-SIG-01A`, but read-path filtering and persisted trust classification remain unresolved.
+- `signal-generation-engine` run-path default/fail-closed behavior is accepted in bounded `CF-W2-SIG-01A`, and trusted list read-path filtering is accepted in `CF-W1-SIG-01B`.
+- `latestForInstrument()` remains unresolved and must not be treated as trusted until separately gated.
 - Lane 2 strategy/signal/risk modules still need fail-closed downstream DQ enforcement tests beyond the Wave 3 strict signal-generation path.
 - Lane 3 portfolio/watchlist/alerts/copilot modules still need readiness consumer contracts and tests.
 - Angel One remains excluded from implementation and live validation.
@@ -57,8 +59,8 @@
 - Alert ownership and Lane 3 readiness consumer contracts remain unresolved.
 - Copilot/research trust UX remains unresolved.
 - Continuous Factory Wave 2 dirty DQ changes were accepted and committed as `CF-W2-DQ-01`.
-- Continuous Factory Wave 2 Signal Generation changes were reframed as bounded `CF-W2-SIG-01A`; full `CF-W1-SIG-01` remains incomplete.
-- No downstream implementation is allowed until Signal Generation read-path/trust gaps and strategy target-semantics risks are resolved.
+- Continuous Factory Wave 2 Signal Generation changes were reframed as bounded `CF-W2-SIG-01A`; `CF-W1-SIG-01B` adds trusted list read-path filtering.
+- No downstream implementation is allowed until Signal Generation latest-path and strategy target-semantics risks are resolved.
 
 ## Sprint 1B Preparation Risk Decisions
 

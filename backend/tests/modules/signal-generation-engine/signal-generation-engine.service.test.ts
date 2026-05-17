@@ -26,6 +26,17 @@ const freshPrice = (index: number, adjusted_close: number, volume = 100) => {
   };
 };
 
+const trustedReadEvidence = {
+  auditStatus: 'CURRENT' as const,
+  dataQualityEligibility: {
+    filterApplied: true,
+    eligible: true,
+    coverageStatus: 'GOOD',
+    signalReadinessStatus: 'READY',
+    liquidityStatus: 'LIQUID',
+  },
+};
+
 const runAuditRepository = () => ({
   createRunAudit: jest.fn(async (input: any) => ({
     id: 'run-1',
@@ -242,6 +253,7 @@ describe('SignalGenerationEngineService', () => {
           generated_at: '2026-04-28T00:00:00.000Z',
           source: 'signal-generation-engine',
           data_status: 'COMPLETE',
+          ...trustedReadEvidence,
         }],
         total: 1,
         limit: 100,
@@ -267,6 +279,181 @@ describe('SignalGenerationEngineService', () => {
       currency: 'USD',
       priceTimestamp: '2026-04-28T00:00:00.000Z',
     });
+  });
+
+  it('filters untrusted persisted rows from top signal responses', async () => {
+    const repository = {
+      latestSignals: jest.fn().mockResolvedValue({
+        signals: [
+          {
+            id: 'trusted-signal',
+            instrument_id: 'trusted',
+            symbol: 'TRUST',
+            company_name: 'Trusted Co',
+            sector: 'Technology',
+            country: 'IN',
+            currentPrice: null,
+            previousClose: null,
+            dailyChange: null,
+            dailyChangePercent: null,
+            currency: null,
+            priceTimestamp: null,
+            score: 80,
+            direction: 'BULLISH',
+            confidence: 'HIGH',
+            triggered_signals: [],
+            negative_signals: [],
+            explanation: 'Bullish because DQ is trusted.',
+            generated_at: '2026-04-28T00:00:00.000Z',
+            source: 'signal-generation-engine',
+            data_status: 'COMPLETE',
+            ...trustedReadEvidence,
+          },
+          {
+            id: 'legacy-signal',
+            instrument_id: 'legacy',
+            symbol: 'LEGACY',
+            company_name: 'Legacy Co',
+            sector: 'Technology',
+            country: 'IN',
+            currentPrice: null,
+            previousClose: null,
+            dailyChange: null,
+            dailyChangePercent: null,
+            currency: null,
+            priceTimestamp: null,
+            score: 90,
+            direction: 'BULLISH',
+            confidence: 'HIGH',
+            triggered_signals: [],
+            negative_signals: [],
+            explanation: 'Bullish because legacy row has no DQ snapshot.',
+            generated_at: '2026-04-28T00:00:00.000Z',
+            source: 'signal-generation-engine',
+            data_status: 'COMPLETE',
+            auditStatus: 'LEGACY_MISSING',
+            dataQualityEligibility: null,
+          },
+          {
+            id: 'limited-signal',
+            instrument_id: 'limited',
+            symbol: 'LIMIT',
+            company_name: 'Limited Co',
+            sector: 'Technology',
+            country: 'IN',
+            currentPrice: null,
+            previousClose: null,
+            dailyChange: null,
+            dailyChangePercent: null,
+            currency: null,
+            priceTimestamp: null,
+            score: 70,
+            direction: 'NEUTRAL',
+            confidence: 'MEDIUM',
+            triggered_signals: [],
+            negative_signals: [],
+            explanation: 'Neutral because DQ is limited.',
+            generated_at: '2026-04-28T00:00:00.000Z',
+            source: 'signal-generation-engine',
+            data_status: 'PARTIAL',
+            auditStatus: 'CURRENT',
+            dataQualityEligibility: {
+              filterApplied: true,
+              eligible: false,
+              coverageStatus: 'PARTIAL',
+              signalReadinessStatus: 'LIMITED',
+              liquidityStatus: 'LIQUID',
+            },
+          },
+        ],
+        total: 3,
+      }),
+    };
+    const marketDataService = {
+      getInstrumentsByIds: jest.fn().mockResolvedValue([{ id: 'trusted', currency: 'INR' }]),
+      getLatestPricesBySymbols: jest.fn().mockResolvedValue([{ symbol: 'TRUST', adjusted_close: 105, date: '2026-04-28T00:00:00.000Z' }]),
+      listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: [{ adjusted_close: 105 }, { adjusted_close: 100 }] }),
+    };
+    const service = new SignalGenerationEngineService(repository as any, marketDataService as any, {} as any);
+
+    const result = await service.topSignals({ limit: 5 });
+
+    expect(result.signals.map((signal) => signal.instrument_id)).toEqual(['trusted']);
+    expect(result.total).toBe(1);
+    expect(result.totalCount).toBe(1);
+    expect(result.hasMore).toBe(false);
+  });
+
+  it('filters untrusted persisted rows from screener responses', async () => {
+    const repository = {
+      latestSignals: jest.fn().mockResolvedValue({
+        signals: [
+          {
+            instrument_id: 'trusted',
+            symbol: 'TRUST',
+            company_name: 'Trusted Co',
+            sector: 'Technology',
+            country: 'IN',
+            currentPrice: null,
+            previousClose: null,
+            dailyChange: null,
+            dailyChangePercent: null,
+            currency: null,
+            priceTimestamp: null,
+            score: 80,
+            direction: 'BULLISH',
+            confidence: 'HIGH',
+            triggered_signals: [],
+            negative_signals: [],
+            explanation: 'Trusted.',
+            generated_at: '2026-04-28T00:00:00.000Z',
+            source: 'signal-generation-engine',
+            data_status: 'COMPLETE',
+            ...trustedReadEvidence,
+          },
+          {
+            instrument_id: 'blocked',
+            symbol: 'BLOCK',
+            company_name: 'Blocked Co',
+            sector: 'Technology',
+            country: 'IN',
+            currentPrice: null,
+            previousClose: null,
+            dailyChange: null,
+            dailyChangePercent: null,
+            currency: null,
+            priceTimestamp: null,
+            score: 80,
+            direction: 'BULLISH',
+            confidence: 'HIGH',
+            triggered_signals: [],
+            negative_signals: [],
+            explanation: 'Blocked.',
+            generated_at: '2026-04-28T00:00:00.000Z',
+            source: 'signal-generation-engine',
+            data_status: 'COMPLETE',
+            auditStatus: 'CURRENT',
+            dataQualityEligibility: {
+              filterApplied: true,
+              eligible: false,
+              signalReadinessStatus: 'NOT_READY',
+            },
+          },
+        ],
+        total: 2,
+      }),
+    };
+    const marketDataService = {
+      getInstrumentsByIds: jest.fn().mockResolvedValue([{ id: 'trusted', currency: 'INR' }]),
+      getLatestPricesBySymbols: jest.fn().mockResolvedValue([]),
+      listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: [] }),
+    };
+    const service = new SignalGenerationEngineService(repository as any, marketDataService as any, {} as any);
+
+    const result = await service.screener({ limit: 5 });
+
+    expect(result.signals.map((signal) => signal.instrument_id)).toEqual(['trusted']);
+    expect(result.items?.map((signal) => signal.instrument_id)).toEqual(['trusted']);
   });
 
   it('returns null price context when market data is unavailable', async () => {
@@ -731,6 +918,7 @@ describe('SignalGenerationEngineService', () => {
           generated_at: '2026-04-28T00:00:00.000Z',
           source: 'signal-generation-engine',
           data_status: 'COMPLETE',
+          ...trustedReadEvidence,
         }],
         total: 1,
       }),
@@ -822,6 +1010,7 @@ describe('SignalGenerationEngineService', () => {
             generated_at: '2026-04-28T00:00:00.000Z',
             source: 'signal-generation-engine',
             data_status: 'COMPLETE',
+            ...trustedReadEvidence,
           },
           {
             instrument_id: 'blocked',
@@ -843,7 +1032,8 @@ describe('SignalGenerationEngineService', () => {
             explanation: 'Bullish.',
             generated_at: '2026-04-28T00:00:00.000Z',
             source: 'signal-generation-engine',
-            data_status: 'MISSING',
+            data_status: 'COMPLETE',
+            ...trustedReadEvidence,
           },
         ],
         total: 2,

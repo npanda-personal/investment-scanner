@@ -4,7 +4,6 @@ Date: 2026-05-17
 
 | ID | Blocker | Decision owner |
 | --- | --- | --- |
-| CF-W1-SIG-01B | Signal Generation read-path trust filtering and persisted trusted/untrusted classification | Product Owner + Architect |
 | CF-W1-STRAT-01 | Replacement for target-price semantics and exit/invalidation language | Product Owner + Architect |
 | CF-W1-UX-02 | Copilot naming, trust surface, and blocked-state behavior | Product Owner + UX + Architect |
 | CF-W1-L3-DQ-01 | Lane 3 display-vs-action readiness policy | Product Owner + Architect |

@@ -90,7 +90,15 @@ No historical active work items have been migrated as active.
 | CF-W2-RECON | Dirty DQ/SGE change reconciliation | Orchestrator | Committed | `13-implementation-evidence/CF-W2-dirty-change-reconciliation-report.md` | Reconciliation/governance controls committed in `2fe3c10`. |
 | CF-W2-DQ-01 | Data Quality fail-closed defaults | Data Quality Engine Team + QA + Architect | Committed | `backend/src/modules/data-quality-engine/**`, DQ tests | Readiness, focused tests, QA, code review, Architect signoff, PO conditional acceptance, and local commit `88a331b` completed. |
 | CF-W2-SIG-01 | Signal Generation DQ fail-closed behavior | Signal Generation Engine Team + QA + Architect | Split / Reframed | `backend/src/modules/signal-generation-engine/**`, SGE tests | Full requirement remains incomplete. Dirty work reframed as bounded `CF-W2-SIG-01A` run-path DQ fail-closed slice. |
-| CF-W2-SIG-01A | Signal Generation run-path DQ fail-closed behavior | Signal Generation Engine Team + QA + Architect | Conditionally Accepted | `signal-generation-engine` source/tests | Focused test passed. QA, review, Architect, and delegated PO acceptance completed. Commit pending scoped staging. |
+| CF-W2-SIG-01A | Signal Generation run-path DQ fail-closed behavior | Signal Generation Engine Team + QA + Architect | Committed | `signal-generation-engine` source/tests | Focused test passed. QA, review, Architect, delegated PO acceptance, and local commit `71765dc` completed. |
+
+## Autonomous Factory Wave 2026-05-17 SIG Read Path
+
+| ID | Work Item | Owner | State | Scope | Notes |
+|---|---|---|---|---|---|
+| CF-W1-SIG-01B | Signal Generation read-path DQ trust filtering | Signal Generation Engine Team + QA + Architect | Conditionally Accepted | `signal-generation-engine` source/tests | Focused tests passed. QA, review, Architect, and delegated PO acceptance completed. Commit pending scoped staging. |
+| CF-W1-SIG-LATEST-01 | Latest signal DQ gate | Architecture + QA Factory | Needs Architecture Contract | Active docs, future `signal-generation-engine` files | Remains separate from SIG-01B because it touches the auto-generation read path. |
+| CF-W1-STRAT-01 | No-target / exit-invalidation semantics | Product + Architecture Factory | Blocked | `strategy-decision-engine`, `trade-plan-risk-engine` future files | True product/architecture semantics decision required before implementation. |
 
 ## Current Sprint 1B Readiness
 
@@ -100,9 +108,9 @@ Blocking gates:
 - Angel One remains excluded from implementation and live validation.
 - Provider-heavy startup behavior remains excluded by default.
 - Downstream modules remain blocked until separate readiness enforcement tests, QA, review, Architect signoff, and Product Owner acceptance exist.
-- `signal-generation-engine` run-path defaults are covered by bounded `CF-W2-SIG-01A`; full trusted/read-path enforcement remains blocked.
+- `signal-generation-engine` run-path defaults are covered by `CF-W2-SIG-01A`; trusted list read paths are covered by `CF-W1-SIG-01B`; `latestForInstrument()` remains blocked.
 - Full Market Data durable readiness evidence still requires future Architect/Product Owner decisions before source or schema changes.
-- Continuous Factory Wave 2 reconciliation is split and controlled. Downstream implementation remains blocked until full Signal Generation read-path/trust gaps and target-semantics work are resolved.
+- Downstream implementation remains blocked until `latestForInstrument()` gating and target-semantics work are resolved.
 
 ## Historical References
 

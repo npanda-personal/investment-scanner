@@ -58,14 +58,16 @@ export class SignalGenerationEngineService {
       this.directionCountsFor(query),
     ]);
     const enriched = await this.enrichSignals(signals, query);
+    const trusted = this.trustedReadSignals(enriched);
+    const totalCount = this.trustedReadTotal(total, enriched.length, trusted.length);
     return {
-      signals: enriched,
-      items: enriched,
-      total,
-      totalCount: total,
+      signals: trusted,
+      items: trusted,
+      total: totalCount,
+      totalCount,
       limit: query.limit,
       offset: query.offset || 0,
-      hasMore: (query.offset || 0) + signals.length < total,
+      hasMore: (query.offset || 0) + trusted.length < totalCount,
       filtersApplied: this.filtersApplied(query),
       scope: this.scopeFor(query),
       directionCounts,
@@ -78,14 +80,16 @@ export class SignalGenerationEngineService {
       this.directionCountsFor(query),
     ]);
     const enriched = await this.enrichSignals(signals, query);
+    const trusted = this.trustedReadSignals(enriched);
+    const totalCount = this.trustedReadTotal(total, enriched.length, trusted.length);
     return {
-      signals: enriched,
-      items: enriched,
-      total,
-      totalCount: total,
+      signals: trusted,
+      items: trusted,
+      total: totalCount,
+      totalCount,
       limit: query.limit,
       offset: query.offset || 0,
-      hasMore: (query.offset || 0) + signals.length < total,
+      hasMore: (query.offset || 0) + trusted.length < totalCount,
       filtersApplied: this.filtersApplied(query),
       scope: this.scopeFor(query),
       directionCounts,
@@ -1159,6 +1163,22 @@ export class SignalGenerationEngineService {
       return { BULLISH: 0, NEUTRAL: 0, BEARISH: 0 };
     }
     return (this.repository as any).directionCounts(query);
+  }
+
+  private trustedReadSignals(signals: SignalResultDto[]): SignalResultDto[] {
+    return signals.filter((signal) => this.isTrustedReadSignal(signal));
+  }
+
+  private trustedReadTotal(total: number, loadedCount: number, trustedCount: number) {
+    return trustedCount === loadedCount ? total : trustedCount;
+  }
+
+  private isTrustedReadSignal(signal: SignalResultDto): boolean {
+    const dataQuality = signal.dataQualityEligibility;
+    return signal.auditStatus === 'CURRENT'
+      && dataQuality?.filterApplied === true
+      && dataQuality.eligible === true
+      && dataQuality.signalReadinessStatus === 'READY';
   }
 
   private clampInt(value: unknown, fallback: number, min: number, max: number) {

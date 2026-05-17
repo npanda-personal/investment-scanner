@@ -25,6 +25,26 @@ const signal: SignalResultDto = {
   data_status: 'COMPLETE',
 };
 
+const trustedReadRecord = {
+  rulesetVersion: 'signal-engine-v1',
+  scoringInputSummary: {
+    priceBarsUsed: 260,
+    latestCloseDate: '2026-04-28T00:00:00.000Z',
+    hasSma50: true,
+    hasSma200: true,
+    hasVolume: true,
+    fundamentalsAvailable: true,
+    strategyContextLoaded: false,
+  },
+  dataQualityEligibilitySnapshot: {
+    filterApplied: true,
+    eligible: true,
+    coverageStatus: 'GOOD',
+    signalReadinessStatus: 'READY',
+    liquidityStatus: 'LIQUID',
+  },
+};
+
 describe('SignalGenerationEngineRepository', () => {
   it('upserts same-day signal results by instrument, model version, and normalized generated date', async () => {
     const upsert = jest.fn().mockResolvedValue({
@@ -276,6 +296,7 @@ describe('SignalGenerationEngineRepository', () => {
       modelVersion: 'signal-engine-v1',
       source: 'signal-generation-engine',
       dataStatus: 'COMPLETE',
+      ...trustedReadRecord,
     }, {
       id: 'signal-2',
       instrumentId: 'stock-2',
@@ -293,6 +314,7 @@ describe('SignalGenerationEngineRepository', () => {
       modelVersion: 'signal-engine-v1',
       source: 'signal-generation-engine',
       dataStatus: 'COMPLETE',
+      ...trustedReadRecord,
     }]);
     const repository = new SignalGenerationEngineRepository({ signalResult: { findMany } } as any);
 
@@ -323,6 +345,85 @@ describe('SignalGenerationEngineRepository', () => {
     expect(result.total).toBe(1);
   });
 
+  it('excludes legacy and untrusted persisted rows from latest trusted read lists', async () => {
+    const findMany = jest.fn().mockResolvedValue([{
+      id: 'signal-trusted',
+      instrumentId: 'trusted',
+      symbol: 'TRUST',
+      companyName: 'Trusted',
+      sector: 'Technology',
+      country: 'IN',
+      score: 75,
+      direction: 'BULLISH',
+      confidence: 'HIGH',
+      triggeredSignals: [],
+      negativeSignals: [],
+      explanation: signal.explanation,
+      generatedAt: new Date(signal.generated_at),
+      modelVersion: 'signal-engine-v1',
+      source: 'signal-generation-engine',
+      dataStatus: 'COMPLETE',
+      ...trustedReadRecord,
+    }, {
+      id: 'signal-legacy',
+      instrumentId: 'legacy',
+      symbol: 'LEGACY',
+      companyName: 'Legacy',
+      sector: 'Technology',
+      country: 'IN',
+      score: 80,
+      direction: 'BULLISH',
+      confidence: 'HIGH',
+      triggeredSignals: [],
+      negativeSignals: [],
+      explanation: signal.explanation,
+      generatedAt: new Date(signal.generated_at),
+      modelVersion: 'signal-engine-v1',
+      source: 'signal-generation-engine',
+      dataStatus: 'COMPLETE',
+    }, {
+      id: 'signal-limited',
+      instrumentId: 'limited',
+      symbol: 'LIMIT',
+      companyName: 'Limited',
+      sector: 'Technology',
+      country: 'IN',
+      score: 70,
+      direction: 'NEUTRAL',
+      confidence: 'MEDIUM',
+      triggeredSignals: [],
+      negativeSignals: [],
+      explanation: signal.explanation,
+      generatedAt: new Date(signal.generated_at),
+      modelVersion: 'signal-engine-v1',
+      source: 'signal-generation-engine',
+      dataStatus: 'PARTIAL',
+      rulesetVersion: 'signal-engine-v1',
+      scoringInputSummary: trustedReadRecord.scoringInputSummary,
+      dataQualityEligibilitySnapshot: {
+        filterApplied: true,
+        eligible: false,
+        coverageStatus: 'PARTIAL',
+        signalReadinessStatus: 'LIMITED',
+        liquidityStatus: 'LIQUID',
+      },
+    }]);
+    const repository = new SignalGenerationEngineRepository({ signalResult: { findMany } } as any);
+
+    const result = await repository.latestSignals({ limit: 25 });
+
+    expect(result.signals.map((item) => item.symbol)).toEqual(['TRUST']);
+    expect(result.total).toBe(1);
+    expect(result.signals[0]).toMatchObject({
+      auditStatus: 'CURRENT',
+      dataQualityEligibility: expect.objectContaining({
+        filterApplied: true,
+        eligible: true,
+        signalReadinessStatus: 'READY',
+      }),
+    });
+  });
+
   it('treats STOCK scope as current stock rows plus legacy null and EQUITY asset types', async () => {
     const findMany = jest.fn().mockResolvedValue([]);
     const repository = new SignalGenerationEngineRepository({ signalResult: { findMany } } as any);
@@ -347,9 +448,22 @@ describe('SignalGenerationEngineRepository', () => {
 
   it('counts latest directions for the current scope without applying the selected direction', async () => {
     const findMany = jest.fn().mockResolvedValue([
-      { ...signal, id: 's1', instrumentId: 'stock-1', direction: 'BULLISH', generatedAt: new Date(signal.generated_at), triggeredSignals: [], negativeSignals: [], dataStatus: 'COMPLETE' },
-      { ...signal, id: 's2', instrumentId: 'stock-2', direction: 'NEUTRAL', generatedAt: new Date(signal.generated_at), triggeredSignals: [], negativeSignals: [], dataStatus: 'COMPLETE' },
-      { ...signal, id: 's3', instrumentId: 'stock-3', direction: 'BEARISH', generatedAt: new Date(signal.generated_at), triggeredSignals: [], negativeSignals: [], dataStatus: 'COMPLETE' },
+      { ...signal, id: 's1', instrumentId: 'stock-1', direction: 'BULLISH', generatedAt: new Date(signal.generated_at), triggeredSignals: [], negativeSignals: [], dataStatus: 'COMPLETE', ...trustedReadRecord },
+      { ...signal, id: 's2', instrumentId: 'stock-2', direction: 'NEUTRAL', generatedAt: new Date(signal.generated_at), triggeredSignals: [], negativeSignals: [], dataStatus: 'COMPLETE', ...trustedReadRecord },
+      { ...signal, id: 's3', instrumentId: 'stock-3', direction: 'BEARISH', generatedAt: new Date(signal.generated_at), triggeredSignals: [], negativeSignals: [], dataStatus: 'COMPLETE', ...trustedReadRecord },
+      {
+        ...signal,
+        id: 's4',
+        instrumentId: 'stock-4',
+        direction: 'BULLISH',
+        generatedAt: new Date(signal.generated_at),
+        triggeredSignals: [],
+        negativeSignals: [],
+        dataStatus: 'COMPLETE',
+        rulesetVersion: 'signal-engine-v1',
+        scoringInputSummary: trustedReadRecord.scoringInputSummary,
+        dataQualityEligibilitySnapshot: { filterApplied: true, eligible: false, signalReadinessStatus: 'NOT_READY' },
+      },
     ]);
     const repository = new SignalGenerationEngineRepository({ signalResult: { findMany } } as any);
 
@@ -363,8 +477,8 @@ describe('SignalGenerationEngineRepository', () => {
 
   it('uses a safe sort allowlist and falls back for invalid sort fields', async () => {
     const rows = [
-      { ...signal, id: 's1', instrumentId: 'stock-1', symbol: 'ZZZ', score: 10, generatedAt: new Date(signal.generated_at), triggeredSignals: [], negativeSignals: [], dataStatus: 'COMPLETE' },
-      { ...signal, id: 's2', instrumentId: 'stock-2', symbol: 'AAA', score: 90, generatedAt: new Date(signal.generated_at), triggeredSignals: [], negativeSignals: [], dataStatus: 'COMPLETE' },
+      { ...signal, id: 's1', instrumentId: 'stock-1', symbol: 'ZZZ', score: 10, generatedAt: new Date(signal.generated_at), triggeredSignals: [], negativeSignals: [], dataStatus: 'COMPLETE', ...trustedReadRecord },
+      { ...signal, id: 's2', instrumentId: 'stock-2', symbol: 'AAA', score: 90, generatedAt: new Date(signal.generated_at), triggeredSignals: [], negativeSignals: [], dataStatus: 'COMPLETE', ...trustedReadRecord },
     ];
     const repository = new SignalGenerationEngineRepository({ signalResult: { findMany: jest.fn().mockResolvedValue(rows) } } as any);
 
@@ -380,8 +494,8 @@ describe('SignalGenerationEngineRepository', () => {
 
   it('applies latest-row semantics to latestSignalUniverse and counts', async () => {
     const findMany = jest.fn().mockResolvedValue([
-      { ...signal, id: 'latest-1', instrumentId: 'stock-1', symbol: 'AAPL', direction: 'NEUTRAL', score: 55, generatedAt: new Date('2026-04-30T00:00:00.000Z'), triggeredSignals: [], negativeSignals: [], dataStatus: 'COMPLETE' },
-      { ...signal, id: 'latest-2', instrumentId: 'stock-2', symbol: 'MSFT', direction: 'BULLISH', score: 80, generatedAt: new Date('2026-04-30T00:00:00.000Z'), triggeredSignals: [], negativeSignals: [], dataStatus: 'COMPLETE' },
+      { ...signal, id: 'latest-1', instrumentId: 'stock-1', symbol: 'AAPL', direction: 'NEUTRAL', score: 55, generatedAt: new Date('2026-04-30T00:00:00.000Z'), triggeredSignals: [], negativeSignals: [], dataStatus: 'COMPLETE', ...trustedReadRecord },
+      { ...signal, id: 'latest-2', instrumentId: 'stock-2', symbol: 'MSFT', direction: 'BULLISH', score: 80, generatedAt: new Date('2026-04-30T00:00:00.000Z'), triggeredSignals: [], negativeSignals: [], dataStatus: 'COMPLETE', ...trustedReadRecord },
     ]);
     const repository = new SignalGenerationEngineRepository({ signalResult: { findMany } } as any);
 
