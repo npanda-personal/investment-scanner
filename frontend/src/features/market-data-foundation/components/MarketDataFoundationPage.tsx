@@ -28,6 +28,7 @@ import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import {
   backfillCatalogMetadata,
   cancelCatalogSyncRun,
+  fetchActiveMarketDataPriceBackfillRun,
   fetchCatalogSyncRunStatus,
   fetchCatalogSources,
   fetchInstruments,
@@ -37,7 +38,9 @@ import {
   syncMarketData,
   type MarketDataCatalogSyncRunResponse,
   type MarketDataCatalogSyncRunStatus,
+  type MarketDataPriceBackfillRunResponse,
   type MarketDataSchedulerRegionStatus,
+  type MarketDataSchedulerStatus,
   type CatalogSourceInfo,
   type V1Instrument,
 } from '../api/marketDataFoundationService';
@@ -267,6 +270,8 @@ const MarketDataFoundationPage: React.FC = () => {
   const [catalogSyncCanceling, setCatalogSyncCanceling] = useState(false);
   const [catalogSyncRun, setCatalogSyncRun] = useState<MarketDataCatalogSyncRunResponse | null>(null);
   const [catalogSyncError, setCatalogSyncError] = useState<string | null>(null);
+  const [activePriceBackfillRun, setActivePriceBackfillRun] = useState<MarketDataPriceBackfillRunResponse | null>(null);
+  const [schedulerStatus, setSchedulerStatus] = useState<MarketDataSchedulerStatus | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -322,6 +327,23 @@ const MarketDataFoundationPage: React.FC = () => {
       .catch(() => setCatalogSources([]));
   }, []);
 
+  const refreshBackgroundServices = useCallback(async () => {
+    const [priceBackfill, scheduler] = await Promise.all([
+      fetchActiveMarketDataPriceBackfillRun({ region: scope.region, assetType: scope.assetType }).catch(() => undefined),
+      fetchMarketDataSchedulerStatus().catch(() => undefined),
+    ]);
+    if (priceBackfill !== undefined) setActivePriceBackfillRun(priceBackfill);
+    if (scheduler !== undefined) setSchedulerStatus(scheduler);
+  }, [scope.region, scope.assetType]);
+
+  useEffect(() => {
+    void refreshBackgroundServices();
+    const interval = window.setInterval(() => {
+      void refreshBackgroundServices();
+    }, 5000);
+    return () => window.clearInterval(interval);
+  }, [refreshBackgroundServices]);
+
   useEffect(() => {
     const source = catalogSources.find((item) => item.catalogSource === importSource);
     if (!source) return;
@@ -338,6 +360,10 @@ const MarketDataFoundationPage: React.FC = () => {
   }, [scope.region, scope.assetType]);
 
   const handleSync = async (instrument: V1Instrument) => {
+    if (providerBackgroundActive) {
+      setError('A background market-data load is already running. Wait for it to finish before starting another sync.');
+      return;
+    }
     setSyncingId(instrument.id);
     setError(null);
     setSuccess(null);
@@ -376,6 +402,10 @@ const MarketDataFoundationPage: React.FC = () => {
   });
 
   const handleCatalogSync = async (runToContinue?: MarketDataCatalogSyncRunResponse | null) => {
+    if (providerBackgroundActive && !catalogSyncActive) {
+      setError('A background market-data load is already running. Wait for it to finish before starting catalog sync.');
+      return;
+    }
     const request = buildCatalogSyncRequest(runToContinue);
     setCatalogSyncStarting(true);
     setCatalogSyncError(null);
@@ -471,6 +501,10 @@ const MarketDataFoundationPage: React.FC = () => {
   }, [catalogSyncRun, catalogSyncStarting, refreshCatalogAfterTerminalSync]);
 
   const handleCatalogImport = async () => {
+    if (providerBackgroundActive) {
+      setError('A background market-data load is already running. Wait for it to finish before importing catalog data.');
+      return;
+    }
     setImportingCatalog(true);
     setError(null);
     setSuccess(null);
@@ -542,6 +576,10 @@ const MarketDataFoundationPage: React.FC = () => {
   };
 
   const handleCatalogBackfill = async () => {
+    if (providerBackgroundActive) {
+      setError('A background market-data load is already running. Wait for it to finish before backfilling metadata.');
+      return;
+    }
     setBackfillingCatalog(true);
     setError(null);
     setSuccess(null);
@@ -664,7 +702,7 @@ const MarketDataFoundationPage: React.FC = () => {
               <IconButton
                 size="small"
                 color="primary"
-                disabled={syncingId === instrument.id}
+                disabled={providerBackgroundActive || syncingId === instrument.id}
                 onClick={() => void handleSync(instrument)}
               >
                 {syncingId === instrument.id ? <CircularProgress size={18} /> : <SyncIcon fontSize="small" />}
@@ -760,6 +798,9 @@ const MarketDataFoundationPage: React.FC = () => {
     ? `No instruments match ${activeFilters.join(', ')} in ${scopeLabel}.`
     : `No instruments found for ${scopeLabel}.`;
   const catalogSyncActive = catalogSyncStarting || isCatalogSyncActive(catalogSyncRun?.status);
+  const priceBackfillActive = isCatalogSyncActive(activePriceBackfillRun?.status);
+  const schedulerActive = schedulerStatus?.activeRun === true;
+  const providerBackgroundActive = catalogSyncActive || priceBackfillActive || schedulerActive;
   const catalogSyncTotal = catalogSyncRun?.totalCount ?? 0;
   const catalogSyncProcessed = catalogSyncRun?.processedCount ?? 0;
   const catalogSyncPercent = catalogSyncRun?.percentComplete ?? (catalogSyncTotal > 0 ? (catalogSyncProcessed / catalogSyncTotal) * 100 : 0);
@@ -784,9 +825,9 @@ const MarketDataFoundationPage: React.FC = () => {
             variant="outlined"
             startIcon={catalogSyncActive ? <CircularProgress size={18} /> : <SyncIcon />}
             onClick={() => void handleCatalogSync()}
-            disabled={catalogSyncActive}
+            disabled={providerBackgroundActive}
           >
-            {catalogSyncActive ? 'Syncing Catalog...' : 'Sync Catalog'}
+            {catalogSyncActive ? 'Syncing Catalog...' : providerBackgroundActive ? 'Data Load Running' : 'Sync Catalog'}
           </Button>
           <Button variant="outlined" startIcon={<SyncIcon />} onClick={() => navigate('/market-data-foundation/ingestion')}>
             Ingestion
@@ -859,7 +900,7 @@ const MarketDataFoundationPage: React.FC = () => {
                     variant="contained"
                     aria-label="Continue catalog sync"
                     onClick={() => void handleCatalogSync(catalogSyncRun)}
-                    disabled={catalogSyncStarting}
+                    disabled={catalogSyncStarting || providerBackgroundActive}
                   >
                     Continue Sync
                   </Button>
@@ -894,6 +935,35 @@ const MarketDataFoundationPage: React.FC = () => {
                   </Typography>
                 ))}
               </Box>
+            )}
+          </Stack>
+        </Alert>
+      )}
+      {(priceBackfillActive || schedulerActive) && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          <Stack spacing={1}>
+            <Typography variant="body2">
+              Background market-data load is running. Sync and dataload buttons are disabled to avoid duplicate provider requests.
+            </Typography>
+            {priceBackfillActive && activePriceBackfillRun && (
+              <>
+                <Typography variant="caption">
+                  Price backfill {activePriceBackfillRun.status}: processed {formatCount(activePriceBackfillRun.processedCount)} / {formatCount(activePriceBackfillRun.totalCount)}, remaining {formatCount(activePriceBackfillRun.remainingCandidates)}, batch {formatCount(activePriceBackfillRun.currentBatchNumber)}.
+                </Typography>
+                <LinearProgress
+                  aria-label="Background price backfill progress"
+                  variant={(activePriceBackfillRun.totalCount ?? 0) > 0 ? 'determinate' : 'indeterminate'}
+                  value={(activePriceBackfillRun.totalCount ?? 0) > 0 ? Math.min(100, Math.max(0, activePriceBackfillRun.percentComplete ?? 0)) : undefined}
+                />
+              </>
+            )}
+            {schedulerActive && (
+              <>
+                <Typography variant="caption">
+                  Latest-day candle scheduler is active. Last run {schedulerStatus?.lastRunAt || 'starting'}.
+                </Typography>
+                <LinearProgress aria-label="Latest-day candle scheduler progress" />
+              </>
             )}
           </Stack>
         </Alert>
@@ -949,7 +1019,7 @@ const MarketDataFoundationPage: React.FC = () => {
                 variant="outlined"
                 startIcon={importingCatalog ? <CircularProgress size={18} /> : <SyncIcon />}
                 onClick={handleCatalogImport}
-                disabled={importingCatalog || backfillingCatalog || !importAvailable}
+                disabled={providerBackgroundActive || importingCatalog || backfillingCatalog || !importAvailable}
                 sx={{ flex: { xs: '1 1 auto', sm: '0 1 auto' }, whiteSpace: 'nowrap' }}
               >
                 {importingCatalog ? 'Importing...' : 'Import Catalog'}
@@ -958,7 +1028,7 @@ const MarketDataFoundationPage: React.FC = () => {
                 variant="outlined"
                 startIcon={backfillingCatalog ? <CircularProgress size={18} /> : <SyncIcon />}
                 onClick={handleCatalogBackfill}
-                disabled={backfillingCatalog || importingCatalog}
+                disabled={providerBackgroundActive || backfillingCatalog || importingCatalog}
                 sx={{ flex: { xs: '1 1 auto', sm: '0 1 auto' }, whiteSpace: 'nowrap' }}
               >
                 {backfillingCatalog ? 'Backfilling...' : 'Backfill Metadata'}
@@ -1196,7 +1266,7 @@ const MarketDataFoundationPage: React.FC = () => {
             <Divider />
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
               <Button variant="outlined" onClick={() => navigate(`/stocks/${selectedInstrument.id}`)}>Open Workspace</Button>
-              <Button variant="contained" onClick={() => void handleSync(selectedInstrument)} disabled={syncingId === selectedInstrument.id}>
+              <Button variant="contained" onClick={() => void handleSync(selectedInstrument)} disabled={providerBackgroundActive || syncingId === selectedInstrument.id}>
                 {syncingId === selectedInstrument.id ? 'Syncing...' : 'Sync Prices'}
               </Button>
             </Stack>

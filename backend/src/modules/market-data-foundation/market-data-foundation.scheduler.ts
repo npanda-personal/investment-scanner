@@ -16,6 +16,7 @@ export interface MarketDataSchedulerConfig {
   postCloseSyncWindowMinutes: number;
   finalizationGraceMinutes: number;
   skipWeekends: boolean;
+  runOnStartup?: boolean;
 }
 
 export class MarketDataFoundationScheduler {
@@ -29,7 +30,7 @@ export class MarketDataFoundationScheduler {
     private readonly config = readMarketDataSchedulerConfig()
   ) {}
 
-  start() {
+  start(options: { runStartup?: boolean } = {}) {
     if (!this.config.enabled || this.timer) return;
     const intervalMs = Math.max(1, this.config.intervalMinutes) * 60_000;
     this.timer = setInterval(() => {
@@ -38,6 +39,14 @@ export class MarketDataFoundationScheduler {
       });
     }, intervalMs);
     console.log('[MarketDataScheduler] started', this.publicConfig());
+    const runStartup = options.runStartup ?? this.config.runOnStartup;
+    if (runStartup) {
+      setTimeout(() => {
+        this.runOnce().catch((error) => {
+          console.error('[MarketDataScheduler] startup run failed', error);
+        });
+      }, 0);
+    }
   }
 
   stop() {
@@ -58,22 +67,50 @@ export class MarketDataFoundationScheduler {
     try {
       const results = [];
       for (const region of this.config.regions) {
+        const activePriceBackfill = this.service.activePriceBackfillRun({
+          region,
+          assetType: this.config.assetType,
+        });
+        if (activePriceBackfill) {
+          this.nextSuggestedRunAt = new Date(now.getTime() + Math.max(1, this.config.intervalMinutes) * 60_000).toISOString();
+          console.log('[MarketDataScheduler] skipping scheduled latest-candle sync while price backfill is active', {
+            region,
+            assetType: this.config.assetType,
+            priceBackfillRunId: activePriceBackfill.runId,
+          });
+          results.push({
+            region,
+            skipped: true,
+            reasonCode: 'PRICE_BACKFILL_RUNNING',
+            priceBackfillRunId: activePriceBackfill.runId,
+          });
+          continue;
+        }
+
         const latest = await this.service.latestStoredCandleInfo(region, this.config.assetType, now);
         const decision = shouldRunMarketDataSync(region, now, {
           latestTradingDate: latest.latestTradingDate,
           finalConfirmed: latest.finalConfirmed,
         }, this.sessionOptions());
+        const latestCompletedTradingDate = latestCompletedTradingDateForRegion(region, now);
+        const missingLatestCompleted = Boolean(
+          latestCompletedTradingDate
+            && (!latest.latestTradingDate || latest.latestTradingDate < latestCompletedTradingDate)
+        );
         this.nextSuggestedRunAt = decision.nextSuggestedRunAt ?? this.nextSuggestedRunAt;
 
         console.log('[MarketDataScheduler] region decision', {
           region,
           assetType: this.config.assetType,
-          shouldRun: decision.shouldRun,
+          shouldRun: decision.shouldRun || missingLatestCompleted,
           reasonCode: decision.reasonCode,
           tradingDate: decision.todayTradingDate,
+          missingLatestCompleted,
+          latestCompletedTradingDate,
+          latestStoredTradingDate: latest.latestTradingDate,
         });
 
-        if (!decision.shouldRun) {
+        if (!decision.shouldRun && !missingLatestCompleted) {
           results.push({ region, skipped: true, decision });
           continue;
         }
@@ -81,7 +118,6 @@ export class MarketDataFoundationScheduler {
         const summary = await this.service.syncScheduledRegion(region, {
           assetType: this.config.assetType,
           batchSize: this.config.batchSize,
-          lookbackTradingDays: 3,
           now,
           ...this.sessionOptions(),
         });
@@ -155,6 +191,10 @@ export class MarketDataFoundationScheduler {
     };
   }
 
+  configuredForStartupRun(): boolean {
+    return this.config.enabled && this.config.runOnStartup !== false;
+  }
+
   private sessionOptions() {
     return {
       syncDuringMarketHours: this.config.syncDuringMarketHours,
@@ -172,6 +212,7 @@ export class MarketDataFoundationScheduler {
       assetType: this.config.assetType,
       batchSize: this.config.batchSize,
       syncDuringMarketHours: this.config.syncDuringMarketHours,
+      runOnStartup: this.config.runOnStartup,
     };
   }
 
@@ -199,7 +240,7 @@ export function readMarketDataSchedulerConfig(env = process.env): MarketDataSche
     .map((region) => String(region));
 
   return {
-    enabled: parseBoolean(env.MARKET_DATA_SCHEDULER_ENABLED, false),
+    enabled: parseBoolean(env.MARKET_DATA_SCHEDULER_ENABLED, parseBoolean(env.ANGEL_ONE_ENABLE_MARKET_DATA, false)),
     intervalMinutes: parseNumber(env.MARKET_DATA_SCHEDULER_INTERVAL_MINUTES, 15),
     regions: rawRegions.length > 0 ? rawRegions : ['IN'],
     assetType: (env.MARKET_DATA_SCHEDULER_ASSET_TYPE || 'STOCK').trim().toUpperCase(),
@@ -208,14 +249,56 @@ export function readMarketDataSchedulerConfig(env = process.env): MarketDataSche
     postCloseSyncWindowMinutes: parseNumber(env.MARKET_DATA_SCHEDULER_POST_CLOSE_WINDOW_MINUTES, 120),
     finalizationGraceMinutes: parseNumber(env.MARKET_DATA_SCHEDULER_FINALIZATION_GRACE_MINUTES, 15),
     skipWeekends: parseBoolean(env.MARKET_DATA_SCHEDULER_SKIP_WEEKENDS, true),
+    runOnStartup: parseBoolean(env.MARKET_DATA_SCHEDULER_RUN_ON_STARTUP, true),
   };
 }
 
 const singletonScheduler = new MarketDataFoundationScheduler();
 
-export function startMarketDataFoundationScheduler() {
-  singletonScheduler.start();
+export function startMarketDataFoundationScheduler(options: { runStartup?: boolean } = {}) {
+  singletonScheduler.start(options);
   return singletonScheduler;
+}
+
+export async function startMarketDataStartupLoads(env = process.env) {
+  const scheduler = startMarketDataFoundationScheduler({ runStartup: false });
+  if (env.NODE_ENV !== 'test' && scheduler.configuredForStartupRun()) {
+    await scheduler.runOnce().catch((error) => {
+      console.error('[MarketDataScheduler] startup run failed', error);
+      return [];
+    });
+  }
+  return startMarketDataStartupPriceBackfill(env);
+}
+
+export async function startMarketDataStartupPriceBackfill(env = process.env) {
+  if (env.NODE_ENV === 'test') return null;
+  const angelEnabled = parseBoolean(env.ANGEL_ONE_ENABLE_MARKET_DATA, false);
+  const startupEnabled = parseBoolean(env.MARKET_DATA_STARTUP_PRICE_BACKFILL_ENABLED, angelEnabled);
+  if (!startupEnabled || !angelEnabled) return null;
+
+  const service = new MarketDataFoundationService();
+  const result = await service.startPriceBackfillRun({
+    region: env.MARKET_DATA_STARTUP_PRICE_BACKFILL_REGION || 'IN',
+    assetType: env.MARKET_DATA_STARTUP_PRICE_BACKFILL_ASSET_TYPE || 'STOCK',
+    batchSize: parseNumber(env.MARKET_DATA_STARTUP_PRICE_BACKFILL_BATCH_SIZE, 20),
+    workerConcurrency: parseNumber(env.MARKET_DATA_STARTUP_PRICE_BACKFILL_WORKER_CONCURRENCY, 2),
+    maxBatches: parseNumber(env.MARKET_DATA_STARTUP_PRICE_BACKFILL_MAX_BATCHES, 100),
+    force: false,
+    fullReload: false,
+  });
+  console.log('[MarketDataStartupBackfill] price backfill background run', {
+    runId: result.runId,
+    status: result.status,
+    region: result.region,
+    assetType: result.assetType,
+    batchSize: result.batchSize,
+    workerConcurrency: result.workerConcurrency,
+    providerThrottleMs: result.providerThrottleMs,
+    totalCount: result.totalCount,
+    alreadyRunning: result.alreadyRunning === true,
+  });
+  return result;
 }
 
 export function getMarketDataFoundationScheduler() {

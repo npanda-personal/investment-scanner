@@ -16,6 +16,8 @@ import type {
   MarketDataRepairRunRecord,
   MarketDataRepairRunResponse,
   MarketDataRepairSummary,
+  MarketDataPriceBackfillRunRequest,
+  MarketDataPriceBackfillRunResponse,
   MarketDataManualMetadataTemplate,
   MarketDataStockMissingDataDiagnostics,
   MarketDataUniverseHealth,
@@ -62,6 +64,8 @@ export type {
   MarketDataRepairRunResponse,
   MarketDataRepairRunStatus,
   MarketDataRepairSummary,
+  MarketDataPriceBackfillRunRequest,
+  MarketDataPriceBackfillRunResponse,
   MarketDataManualMetadataTemplate,
   MarketDataStockMissingDataDiagnostics,
   MarketDataUniverseHealth,
@@ -387,6 +391,42 @@ export async function backfillMarketDataPrices(data: MarketDataRepairRequest): P
   const response = await axios.post<MarketDataRepairSummary>(
     `${API_BASE}/v1/market-data/prices/backfill`,
     normalBackfillRequest
+  );
+  return response.data;
+}
+
+export async function startMarketDataPriceBackfillRun(data: MarketDataPriceBackfillRunRequest): Promise<MarketDataPriceBackfillRunResponse> {
+  const payload = scopedRepairPayload(data) as MarketDataPriceBackfillRunRequest;
+  delete payload.fullReload;
+  const response = await axios.post<MarketDataPriceBackfillRunResponse>(
+    `${API_BASE}/v1/market-data/prices/backfill-runs`,
+    payload
+  );
+  return response.data;
+}
+
+export async function fetchMarketDataPriceBackfillRun(runId: string): Promise<MarketDataPriceBackfillRunResponse> {
+  const response = await axios.get<MarketDataPriceBackfillRunResponse>(
+    `${API_BASE}/v1/market-data/prices/backfill-runs/${encodeURIComponent(runId)}`
+  );
+  return response.data;
+}
+
+export async function fetchActiveMarketDataPriceBackfillRun(options: MarketScopedApiOptions = {}): Promise<MarketDataPriceBackfillRunResponse | null> {
+  const params = {
+    region: normalizeMarketForApi(options.region),
+    assetType: normalizeAssetTypeForMarketDataApi(options.assetType),
+  };
+  const response = await axios.get<MarketDataPriceBackfillRunResponse | null>(
+    `${API_BASE}/v1/market-data/prices/backfill-active-run`,
+    { params }
+  );
+  return response.data;
+}
+
+export async function cancelMarketDataPriceBackfillRun(runId: string): Promise<MarketDataPriceBackfillRunResponse> {
+  const response = await axios.post<MarketDataPriceBackfillRunResponse>(
+    `${API_BASE}/v1/market-data/prices/backfill-runs/${encodeURIComponent(runId)}/cancel`
   );
   return response.data;
 }

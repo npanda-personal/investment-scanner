@@ -26,6 +26,10 @@ const controller = {
   importManualMetadata: jest.fn(),
   enrichMetadata: jest.fn(),
   backfillPrices: jest.fn(),
+  startPriceBackfillRun: jest.fn(),
+  activePriceBackfillRun: jest.fn(),
+  getPriceBackfillRun: jest.fn(),
+  cancelPriceBackfillRun: jest.fn(),
   schedulerStatus: jest.fn(),
   listCatalogSources: jest.fn(),
   listInstruments: jest.fn(),
@@ -89,6 +93,11 @@ describe('market data routers', () => {
         'POST /market-data/metadata/manual-import',
         'POST /market-data/metadata/enrich',
         'POST /market-data/prices/backfill',
+        'POST /market-data/prices/backfill-runs',
+        'GET /market-data/prices/backfill-active-run',
+        'GET /market-data/prices/backfill-runs/active',
+        'GET /market-data/prices/backfill-runs/:runId',
+        'POST /market-data/prices/backfill-runs/:runId/cancel',
         'GET /market-data/scheduler/status',
         'GET /market-data/catalog/sources',
         'GET /instruments',
@@ -171,5 +180,96 @@ describe('market data controller', () => {
       actions: ['PROVIDER_BUSINESS_METADATA_REPAIR'],
     }));
     expect(res.json).toHaveBeenCalledWith({ status: 'COMPLETED' });
+  });
+
+  it('passes price backfill worker concurrency from request to service', async () => {
+    const service = {
+      backfillPrices: jest.fn().mockResolvedValue({ processedCount: 3 }),
+    };
+    const controller = new MarketDataFoundationController(service as any);
+    const req = {
+      query: {
+        region: 'IN',
+        assetType: 'STOCK',
+        workerConcurrency: '3',
+      },
+      body: {
+        batchSize: 25,
+        fullReload: false,
+      },
+      originalUrl: '/api/v1/market-data/prices/backfill',
+    } as any;
+    const res = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+    } as any;
+
+    await controller.backfillPrices(req, res);
+
+    expect(service.backfillPrices).toHaveBeenCalledWith(expect.objectContaining({
+      region: 'IN',
+      assetType: 'STOCK',
+      batchSize: 25,
+      workerConcurrency: 3,
+      fullReload: false,
+    }));
+    expect(res.json).toHaveBeenCalledWith({ processedCount: 3 });
+  });
+
+  it('starts price backfill as a background run with bounded parameters', async () => {
+    const service = {
+      startPriceBackfillRun: jest.fn().mockResolvedValue({ runId: 'price-backfill-1', status: 'RUNNING' }),
+    };
+    const controller = new MarketDataFoundationController(service as any);
+    const req = {
+      query: {
+        region: 'IN',
+        assetType: 'STOCK',
+      },
+      body: {
+        batchSize: 20,
+        workerConcurrency: 2,
+        maxBatches: 100,
+        force: false,
+      },
+      originalUrl: '/api/v1/market-data/prices/backfill-runs',
+    } as any;
+    const res = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+    } as any;
+
+    await controller.startPriceBackfillRun(req, res);
+
+    expect(service.startPriceBackfillRun).toHaveBeenCalledWith(expect.objectContaining({
+      region: 'IN',
+      assetType: 'STOCK',
+      batchSize: 20,
+      workerConcurrency: 2,
+      maxBatches: 100,
+      force: false,
+    }));
+    expect(res.status).toHaveBeenCalledWith(202);
+    expect(res.json).toHaveBeenCalledWith({ runId: 'price-backfill-1', status: 'RUNNING' });
+  });
+
+  it('returns and cancels background price backfill runs', async () => {
+    const service = {
+      getPriceBackfillRun: jest.fn().mockReturnValue({ runId: 'price-backfill-1', status: 'RUNNING' }),
+      cancelPriceBackfillRun: jest.fn().mockReturnValue({ runId: 'price-backfill-1', status: 'PARTIAL' }),
+    };
+    const controller = new MarketDataFoundationController(service as any);
+    const res = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+    } as any;
+
+    await controller.getPriceBackfillRun({ params: { runId: 'price-backfill-1' } } as any, res);
+    await controller.cancelPriceBackfillRun({ params: { runId: 'price-backfill-1' } } as any, res);
+
+    expect(service.getPriceBackfillRun).toHaveBeenCalledWith('price-backfill-1');
+    expect(service.cancelPriceBackfillRun).toHaveBeenCalledWith('price-backfill-1');
+    expect(res.json).toHaveBeenNthCalledWith(1, { runId: 'price-backfill-1', status: 'RUNNING' });
+    expect(res.json).toHaveBeenNthCalledWith(2, { runId: 'price-backfill-1', status: 'PARTIAL' });
   });
 });

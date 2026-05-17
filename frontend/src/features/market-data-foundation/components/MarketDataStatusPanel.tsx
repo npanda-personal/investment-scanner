@@ -6,6 +6,9 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import SyncIcon from '@mui/icons-material/Sync';
 import {
   backfillMarketDataPrices,
+  cancelMarketDataPriceBackfillRun,
+  fetchActiveMarketDataPriceBackfillRun,
+  fetchMarketDataPriceBackfillRun,
   fetchLatestMarketDataRepairRun,
   fetchMarketDataHealth,
   fetchMarketDataRepairPlan,
@@ -19,6 +22,7 @@ import {
   repairMarketDataCatalogIdentity,
   repairMarketDataProviderBusinessMetadata,
   runMarketDataUniverseRepair,
+  startMarketDataPriceBackfillRun,
   fetchTrustedUniverseRepairWorkbench,
   validateMarketDataProviders,
   type MarketDataHealth,
@@ -27,10 +31,12 @@ import {
   type MarketDataRepairRunRecord,
   type MarketDataRepairRunResponse,
   type MarketDataRepairSummary,
+  type MarketDataPriceBackfillRunResponse,
   type MarketDataStockMissingDataDiagnostics,
   type MarketDataUniverseHealth,
   type TrustedReviewUniverseHealth,
   type MarketDataSchedulerRegionStatus,
+  type MarketDataSchedulerStatus,
   type ReviewReadinessSummary,
   type MarketDataRepairLane,
   type TrustedUniverseRepairWorkbench,
@@ -118,6 +124,8 @@ const trustColor = (trustStatus?: MarketDataUniverseHealth['trustStatus']): 'suc
 const repairRunIsGreen = (run?: Pick<MarketDataRepairRunResponse, 'status' | 'anotherRunNeeded' | 'afterTrustStatus' | 'universeSignoff'> | MarketDataRepairRunRecord | null) =>
   Boolean(run && run.status === 'COMPLETED' && !run.anotherRunNeeded && run.afterTrustStatus === 'OK' && run.universeSignoff?.status === 'PASS');
 
+const isBackgroundRunActive = (status?: string | null) => status === 'PENDING' || status === 'RUNNING';
+
 const repairRunColor = (run?: Pick<MarketDataRepairRunResponse, 'status' | 'anotherRunNeeded' | 'afterTrustStatus' | 'universeSignoff'> | MarketDataRepairRunRecord | null): 'success' | 'warning' | 'error' | 'default' => {
   if (!run) return 'default';
   if (run.status === 'FAILED') return 'error';
@@ -161,6 +169,8 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
   const [repairSummary, setRepairSummary] = useState<MarketDataRepairSummary | null>(null);
   const [repairRunResult, setRepairRunResult] = useState<MarketDataRepairRunResponse | null>(null);
   const [latestRepairRun, setLatestRepairRun] = useState<MarketDataRepairRunRecord | null>(null);
+  const [priceBackfillRun, setPriceBackfillRun] = useState<MarketDataPriceBackfillRunResponse | null>(null);
+  const [priceBackfillCanceling, setPriceBackfillCanceling] = useState(false);
   const [repairRunning, setRepairRunning] = useState<RepairAction | null>(null);
   const [repairRunRunning, setRepairRunRunning] = useState<'DRY_RUN' | 'RUN' | 'DRAIN' | null>(null);
   const [lastRepairAction, setLastRepairAction] = useState<RepairAction | null>(null);
@@ -169,6 +179,7 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
   const [manualMetadataCsv, setManualMetadataCsv] = useState('');
   const [manualTemplateMessage, setManualTemplateMessage] = useState<string | null>(null);
   const [repairError, setRepairError] = useState<string | null>(null);
+  const [schedulerStatus, setSchedulerStatus] = useState<MarketDataSchedulerStatus | null>(null);
   const [candleStatus, setCandleStatus] = useState<MarketDataSchedulerRegionStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -188,9 +199,10 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
       fetchTrustedUniverseRepairWorkbench({ region, assetType }).catch(() => null),
       fetchLatestMarketDataRepairRun({ region, assetType }).catch(() => null),
       fetchMarketDataStockMissingDataDiagnostics({ region, assetType }).catch(() => null),
-      fetchMarketDataSchedulerStatus().catch(() => null),
+      fetchMarketDataSchedulerStatus().catch(() => undefined),
+      fetchActiveMarketDataPriceBackfillRun({ region, assetType }).catch(() => undefined),
     ])
-      .then(([result, universeResult, reviewReadinessResult, trustedReviewResult, repairPlanResult, repairWorkbenchResult, latestRepairRunResult, missingDataDiagnosticsResult, schedulerStatus]) => {
+      .then(([result, universeResult, reviewReadinessResult, trustedReviewResult, repairPlanResult, repairWorkbenchResult, latestRepairRunResult, missingDataDiagnosticsResult, schedulerStatusResult, activePriceBackfillResult]) => {
         if (!mounted) return;
         setStatus(result);
         setUniverseHealth(universeResult);
@@ -201,7 +213,11 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
         setLatestRepairRun(latestRepairRunResult);
         setMissingDataDiagnostics(missingDataDiagnosticsResult);
         const normalizedRegion = normalizeMarketForApi(region);
-        setCandleStatus(schedulerStatus?.regionStatuses.find((item) => item.region === normalizedRegion) ?? null);
+        if (schedulerStatusResult !== undefined) {
+          setSchedulerStatus(schedulerStatusResult);
+          setCandleStatus(schedulerStatusResult?.regionStatuses.find((item) => item.region === normalizedRegion) ?? null);
+        }
+        if (activePriceBackfillResult !== undefined) setPriceBackfillRun(activePriceBackfillResult);
       })
       .catch((err: any) => {
         if (mounted) setError(err.response?.data?.error || err.message || 'Unable to load market data status');
@@ -214,6 +230,30 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
       mounted = false;
     };
   }, [region, assetType, refreshNonce]);
+
+  useEffect(() => {
+    if (!priceBackfillRun?.runId || !isBackgroundRunActive(priceBackfillRun.status)) return undefined;
+    let canceled = false;
+    const interval = window.setInterval(() => {
+      fetchMarketDataPriceBackfillRun(priceBackfillRun.runId)
+        .then((result) => {
+          if (canceled) return;
+          setPriceBackfillRun(result);
+          if (!isBackgroundRunActive(result.status)) {
+            setRepairSummary(result.latestBatch ?? null);
+            setLastRepairAction('BACKFILL_PRICES');
+            setRefreshNonce((value) => value + 1);
+          }
+        })
+        .catch((err: any) => {
+          if (!canceled) setRepairError(err.response?.data?.error || err.message || 'Unable to refresh price backfill progress.');
+        });
+    }, 3000);
+    return () => {
+      canceled = true;
+      window.clearInterval(interval);
+    };
+  }, [priceBackfillRun?.runId, priceBackfillRun?.status]);
 
   const manualMetadataErrors = (() => {
     const text = manualMetadataCsv.trim();
@@ -283,7 +323,7 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
       batchSize: boundedRequest?.batchSize || REPAIR_BATCH_SIZE,
       offset: boundedRequest?.offset ?? (action === 'CATALOG_IDENTITY_REPAIR' ? catalogIdentityOffset : action === 'MANUAL_METADATA_IMPORT' ? manualMetadataOffset : 0),
       providerValidationQueue: boundedRequest?.queueMode === 'RETRY_FAILED' || action === 'RETRY_FAILED_PROVIDERS' ? 'RETRY_FAILED' as const : 'UNKNOWN_FIRST' as const,
-      force: action === 'VALIDATE_PROVIDERS' || action === 'RETRY_FAILED_PROVIDERS' || action === 'PROVIDER_BUSINESS_METADATA_REPAIR' ? false : true,
+      force: action === 'CATALOG_IDENTITY_REPAIR' || action === 'MANUAL_METADATA_IMPORT',
       workerConcurrency: action === 'PROVIDER_BUSINESS_METADATA_REPAIR' ? 4 : undefined,
     };
     const catalogIdentityRequest = {
@@ -298,6 +338,21 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
     };
 
     try {
+      if (action === 'BACKFILL_PRICES') {
+        const run = await startMarketDataPriceBackfillRun({
+          ...request,
+          batchSize: 20,
+          maxBatches: 100,
+          workerConcurrency: 2,
+          force: false,
+        });
+        setPriceBackfillRun(run);
+        setLastRepairAction(action);
+        setRepairSummary(run.latestBatch ?? null);
+        setRefreshNonce((value) => value + 1);
+        return;
+      }
+
       const result = action === 'VALIDATE_PROVIDERS' || action === 'RETRY_FAILED_PROVIDERS'
         ? await validateMarketDataProviders(request)
         : action === 'CATALOG_IDENTITY_REPAIR'
@@ -370,6 +425,19 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
     }
   };
 
+  const cancelPriceBackfill = async () => {
+    if (!priceBackfillRun?.runId) return;
+    setPriceBackfillCanceling(true);
+    try {
+      const result = await cancelMarketDataPriceBackfillRun(priceBackfillRun.runId);
+      setPriceBackfillRun(result);
+    } catch (err: any) {
+      setRepairError(err.response?.data?.error || err.message || 'Unable to cancel price backfill run.');
+    } finally {
+      setPriceBackfillCanceling(false);
+    }
+  };
+
   const exportManualTemplate = async () => {
     setRepairError(null);
     try {
@@ -437,19 +505,24 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
         : repairRunColor(latestRepairRun)
     : 'default';
 
-  const validateUnknownDisabled = Boolean(repairRunning) || providerUnknownRemaining === 0;
-  const retryFailedDisabled = Boolean(repairRunning) || providerUnknownRemaining > 0 || providerRetryEligible === 0;
-  const catalogIdentityDisabled = Boolean(repairRunning) || ((repairPlan?.supportedCatalogIdentityRepairNeeded ?? repairPlan?.catalogIdentityRepairNeeded ?? 0) === 0);
-  const businessMetadataDisabled = Boolean(repairRunning) || (((repairPlan?.businessMetadataAutoRepairable ?? repairPlan?.businessMetadataRepairNeeded ?? repairPlan?.metadataEnrichmentNeeded) || 0) + (repairPlan?.businessMetadataRetryEligible || 0)) === 0;
-  const manualMetadataDisabled = Boolean(repairRunning) || !manualMetadataCsv.trim() || manualMetadataErrors.length > 0;
-  const backfillPricesDisabled = Boolean(repairRunning) || ((repairPlan?.supportedPriceBackfillNeeded ?? repairPlan?.priceBackfillNeeded ?? 0) === 0);
+  const priceBackfillActive = isBackgroundRunActive(priceBackfillRun?.status);
+  const repairActionBlocked = Boolean(repairRunning) || priceBackfillActive;
+  const priceBackfillTotal = priceBackfillRun?.totalCount ?? 0;
+  const priceBackfillProcessed = priceBackfillRun?.processedCount ?? 0;
+  const priceBackfillPercent = priceBackfillRun?.percentComplete ?? (priceBackfillTotal > 0 ? (priceBackfillProcessed / priceBackfillTotal) * 100 : 0);
+  const validateUnknownDisabled = repairActionBlocked || providerUnknownRemaining === 0;
+  const retryFailedDisabled = repairActionBlocked || providerUnknownRemaining > 0 || providerRetryEligible === 0;
+  const catalogIdentityDisabled = repairActionBlocked || ((repairPlan?.supportedCatalogIdentityRepairNeeded ?? repairPlan?.catalogIdentityRepairNeeded ?? 0) === 0);
+  const businessMetadataDisabled = repairActionBlocked || (((repairPlan?.businessMetadataAutoRepairable ?? repairPlan?.businessMetadataRepairNeeded ?? repairPlan?.metadataEnrichmentNeeded) || 0) + (repairPlan?.businessMetadataRetryEligible || 0)) === 0;
+  const manualMetadataDisabled = repairActionBlocked || !manualMetadataCsv.trim() || manualMetadataErrors.length > 0;
+  const backfillPricesDisabled = Boolean(repairRunning) || priceBackfillActive || ((repairPlan?.supportedPriceBackfillNeeded ?? repairPlan?.priceBackfillNeeded ?? 0) === 0);
   const workflowDisabledReasons = [
-    validateUnknownDisabled ? `Validate unknown providers disabled: ${repairRunning ? 'another repair action is running.' : 'no UNKNOWN providers remain in queue.'}` : null,
-    retryFailedDisabled ? `Retry failed providers disabled: ${repairRunning ? 'another repair action is running.' : providerUnknownRemaining > 0 ? `UNKNOWN queue still has ${formatCount(providerUnknownRemaining)} rows.` : 'no retry-eligible providers remain.'}` : null,
-    catalogIdentityDisabled ? `Repair catalog identity disabled: ${repairRunning ? 'another repair action is running.' : 'no supported catalog identity gaps remain.'}` : null,
-    businessMetadataDisabled ? `Enrich provider business metadata disabled: ${repairRunning ? 'another repair action is running.' : 'no auto-repairable metadata rows remain.'}` : null,
-    manualMetadataDisabled ? `Import manual metadata disabled: ${repairRunning ? 'another repair action is running.' : !manualMetadataCsv.trim() ? 'manual CSV is empty.' : manualMetadataErrors[0] || 'manual CSV validation failed.'}` : null,
-    backfillPricesDisabled ? `Backfill prices disabled: ${repairRunning ? 'another repair action is running.' : 'no supported price-backfill queue remains.'}` : null,
+    validateUnknownDisabled ? `Validate unknown providers disabled: ${repairActionBlocked ? 'another repair action is running.' : 'no UNKNOWN providers remain in queue.'}` : null,
+    retryFailedDisabled ? `Retry failed providers disabled: ${repairActionBlocked ? 'another repair action is running.' : providerUnknownRemaining > 0 ? `UNKNOWN queue still has ${formatCount(providerUnknownRemaining)} rows.` : 'no retry-eligible providers remain.'}` : null,
+    catalogIdentityDisabled ? `Repair catalog identity disabled: ${repairActionBlocked ? 'another repair action is running.' : 'no supported catalog identity gaps remain.'}` : null,
+    businessMetadataDisabled ? `Enrich provider business metadata disabled: ${repairActionBlocked ? 'another repair action is running.' : 'no auto-repairable metadata rows remain.'}` : null,
+    manualMetadataDisabled ? `Import manual metadata disabled: ${repairActionBlocked ? 'another repair action is running.' : !manualMetadataCsv.trim() ? 'manual CSV is empty.' : manualMetadataErrors[0] || 'manual CSV validation failed.'}` : null,
+    backfillPricesDisabled ? `Backfill prices disabled: ${repairRunning ? 'another repair action is running.' : priceBackfillActive ? 'background price backfill is already running.' : 'no supported price-backfill queue remains.'}` : null,
   ].filter(Boolean) as string[];
   const coverageStatus = (summary: MarketDataRepairSummary) => {
     if (summary.requiredHistoryCoverageStatus) return summary.requiredHistoryCoverageStatus;
@@ -536,6 +609,17 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
       },
     ]
     : [];
+  const businessMetadataBlockerDiagnostics = repairPlan?.businessMetadataBlockerDiagnostics;
+  const hasBusinessMetadataBlockerDiagnostics = Boolean(
+    businessMetadataBlockerDiagnostics
+      && businessMetadataBlockerDiagnostics.unresolvedTotal > 0
+  );
+  const businessMetadataMissingFieldSetSplit = hasBusinessMetadataBlockerDiagnostics
+    ? Object.entries(businessMetadataBlockerDiagnostics?.byMissingFieldSet ?? {})
+      .filter(([, count]) => count > 0)
+      .map(([fieldSet, count]) => `${fieldSet}: ${formatCount(count)}`)
+      .join(', ')
+    : '';
 
   if (loading) {
     return (
@@ -1074,6 +1158,22 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
               <Typography variant="h6">{formatCount(repairPlan?.manualBusinessMetadataRequired ?? repairPlan?.manualMetadataRequired)}</Typography>
             </Box>
           </Box>
+          {hasBusinessMetadataBlockerDiagnostics && businessMetadataBlockerDiagnostics && (
+            <Box sx={{ p: 1.5, border: '1px solid', borderColor: 'warning.main', borderRadius: 1 }}>
+              <Typography variant="caption" color="text.secondary">
+                Business metadata blockers (required: {businessMetadataBlockerDiagnostics.requiredFields.join(', ')})
+              </Typography>
+              <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} useFlexGap flexWrap="wrap">
+                <Typography variant="caption">Unresolved: {formatCount(businessMetadataBlockerDiagnostics.unresolvedTotal)}</Typography>
+                <Typography variant="caption">Missing sector: {formatCount(businessMetadataBlockerDiagnostics.missingSector)}</Typography>
+                <Typography variant="caption">Missing industry: {formatCount(businessMetadataBlockerDiagnostics.missingIndustry)}</Typography>
+                <Typography variant="caption">Missing marketCap: {formatCount(businessMetadataBlockerDiagnostics.missingMarketCap)}</Typography>
+              </Stack>
+              <Typography variant="caption" color="text.secondary">
+                By missing-field set: {businessMetadataMissingFieldSetSplit || 'none'}
+              </Typography>
+            </Box>
+          )}
 
           {(repairPlan?.sampleCoverageResults || []).slice(0, 3).map((sample) => (
             <Typography key={`${sample.symbol}-${sample.requiredHistoryStartDate}-${sample.coverageStatus || 'coverage'}`} variant="caption" color="text.secondary">
@@ -1175,6 +1275,55 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
           ))}
 
           {repairRunning && <LinearProgress aria-label="Market data repair progress" />}
+          {priceBackfillRun && (
+            <Alert severity={priceBackfillRun.status === 'FAILED' ? 'error' : priceBackfillActive || priceBackfillRun.hasMore ? 'info' : 'success'}>
+              <Stack spacing={1}>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between">
+                  <Box>
+                    <Typography variant="body2">
+                      Price backfill {priceBackfillRun.status}: processed {formatCount(priceBackfillProcessed)} / {formatCount(priceBackfillTotal)}; remaining {formatCount(priceBackfillRun.remainingCandidates)}.
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Batch {formatCount(priceBackfillRun.currentBatchNumber)} of {formatCount(priceBackfillRun.batchesPlanned || priceBackfillRun.maxBatches)}; concurrency {formatCount(priceBackfillRun.workerConcurrency)}; provider throttle {formatCount(priceBackfillRun.providerThrottleMs)}ms.
+                    </Typography>
+                  </Box>
+                  {priceBackfillActive && (
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="inherit"
+                      onClick={() => void cancelPriceBackfill()}
+                      disabled={priceBackfillCanceling}
+                    >
+                      {priceBackfillCanceling ? 'Canceling...' : 'Cancel'}
+                    </Button>
+                  )}
+                </Stack>
+                <LinearProgress
+                  aria-label="Price backfill background progress"
+                  variant={priceBackfillTotal > 0 ? 'determinate' : 'indeterminate'}
+                  value={priceBackfillTotal > 0 ? Math.min(100, Math.max(0, priceBackfillPercent)) : undefined}
+                />
+                <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                  <Chip size="small" label={`Updated ${formatCount(priceBackfillRun.updated)}`} />
+                  <Chip size="small" label={`Failed ${formatCount(priceBackfillRun.failed)}`} />
+                  <Chip size="small" label={`Rows inserted ${formatCount(priceBackfillRun.priceRowsInserted)}`} />
+                  <Chip size="small" label={`Rows updated ${formatCount(priceBackfillRun.priceRowsUpdated)}`} />
+                  <Chip size="small" label={`No-op rows ${formatCount(priceBackfillRun.priceRowsNoOp)}`} />
+                  <Chip size="small" label={`Warnings ${formatCount(priceBackfillRun.warningCount)}`} />
+                </Stack>
+                {priceBackfillRun.message && <Typography variant="caption">{priceBackfillRun.message}</Typography>}
+                {priceBackfillRun.warnings?.slice(-2).map((warning) => (
+                  <Typography key={warning} variant="caption" color="warning.main">Warning: {warning}</Typography>
+                ))}
+                {priceBackfillRun.recentErrors?.slice(-2).map((item) => (
+                  <Typography key={`${item.symbol || 'run'}-${item.timestamp || item.message}`} variant="caption" color="error">
+                    Error{item.symbol ? ` ${item.symbol}` : ''}: {item.message}
+                  </Typography>
+                ))}
+              </Stack>
+            </Alert>
+          )}
           {repairError && <Alert severity="error">{repairError}</Alert>}
           {repairSummary && (
             <Alert severity={repairSummarySeverity}>
@@ -1357,7 +1506,7 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
         <Typography variant="overline" color="text.secondary">Daily Candle</Typography>
         <Typography variant="body1">{formatCandleStatus(candleStatus)}</Typography>
         <Typography variant="caption" color="text.secondary">
-          Stored: {candleStatus?.latestStoredTradingDate || 'none'}
+          Stored: {candleStatus?.latestStoredTradingDate || 'none'}; loader {schedulerStatus?.activeRun ? 'running' : 'idle'}
         </Typography>
       </Paper>
       <Paper variant="outlined" sx={{ p: 2 }}>

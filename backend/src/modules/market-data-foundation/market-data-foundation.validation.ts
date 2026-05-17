@@ -64,7 +64,7 @@ export const validateHistoricalPrice = (price: HistoricalPrice): string[] => {
 
 export const partitionHistoricalPrices = (
   prices: HistoricalPrice[],
-  spikeThreshold = Number(process.env.MARKET_DATA_SPIKE_THRESHOLD ?? '0.5')
+  spikeThreshold = defaultSpikeRejectionThreshold()
 ): ValidationResult<HistoricalPrice> => {
   const result: ValidationResult<HistoricalPrice> = { valid: [], invalid: [] };
   let duplicateProviderRowsSkipped = 0;
@@ -118,6 +118,7 @@ export const partitionHistoricalPrices = (
   for (const price of sorted) {
     const previousClose = previousValidCloseBySymbol.get(price.symbol);
     if (
+      spikeThreshold > 0 &&
       previousClose !== undefined &&
       previousClose > 0 &&
       Math.abs(price.close - previousClose) / previousClose > spikeThreshold
@@ -135,6 +136,14 @@ export const partitionHistoricalPrices = (
   result.invalid = allInvalid;
   (result as any).duplicateProviderRowsSkipped = duplicateProviderRowsSkipped;
   return result;
+};
+
+const defaultSpikeRejectionThreshold = (): number => {
+  if (!/^(1|true|yes|on)$/i.test(String(process.env.MARKET_DATA_REJECT_PRICE_SPIKES || ''))) {
+    return 0;
+  }
+  const parsed = Number(process.env.MARKET_DATA_SPIKE_THRESHOLD ?? '0.5');
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0.5;
 };
 
 export const validateRequiredString = (value: unknown, fieldName: string): string | null => {

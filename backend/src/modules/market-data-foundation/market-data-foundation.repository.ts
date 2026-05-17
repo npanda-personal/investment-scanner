@@ -749,18 +749,24 @@ export class MarketDataFoundationRepository {
     });
   }
 
-  async listBlockedPriceBackfillStockIds(options: Pick<PaginationOptions, 'region' | 'assetType'> & { now?: Date }) {
+  async listBlockedPriceBackfillStockIds(options: Pick<PaginationOptions, 'region' | 'assetType'> & {
+    now?: Date;
+    includeRetryable?: boolean;
+  }) {
     const now = options.now ?? new Date();
+    const blockedStates: Prisma.MarketDataRepairStateWhereInput[] = [{ status: 'MANUAL_REQUIRED' } as any];
+    if (!options.includeRetryable) {
+      blockedStates.push(
+        { status: 'RETRY_COOLDOWN' } as any,
+        { status: 'FAILED_RETRYABLE', nextRetryAt: { gt: now } } as any
+      );
+    }
     const rows = await (this.prisma as any).marketDataRepairState.findMany({
       where: {
         region: options.region,
         assetType: options.assetType,
         repairType: 'PRICE_BACKFILL',
-        OR: [
-          { status: 'MANUAL_REQUIRED' },
-          { status: 'RETRY_COOLDOWN' },
-          { status: 'FAILED_RETRYABLE', nextRetryAt: { gt: now } },
-        ],
+        OR: blockedStates,
         stock: {
           is: {
             AND: [
@@ -1179,18 +1185,19 @@ export class MarketDataFoundationRepository {
       WITH input_symbols(symbol) AS (
         SELECT unnest(ARRAY[${Prisma.join(symbols)}]::text[])
       ),
-      oldest AS (
+      history AS (
         SELECT
           input_symbols.symbol,
-          first_price.timestamp AS "firstTimestamp"
+          history_stats."priceHistoryBars",
+          history_stats."firstTimestamp"
         FROM input_symbols
         LEFT JOIN LATERAL (
-          SELECT price_ticks.timestamp
+          SELECT
+            COUNT(*)::int AS "priceHistoryBars",
+            MIN(price_ticks.timestamp) AS "firstTimestamp"
           FROM price_ticks
           WHERE price_ticks.symbol = input_symbols.symbol
-          ORDER BY price_ticks.timestamp ASC
-          LIMIT 1
-        ) first_price ON TRUE
+        ) history_stats ON TRUE
       ),
       recent_ranked AS (
         SELECT
@@ -1246,8 +1253,8 @@ export class MarketDataFoundationRepository {
       )
       SELECT
         input_symbols.symbol,
-        COALESCE(quality."rollingWindowBars", 0)::int AS "priceHistoryBars",
-        oldest."firstTimestamp",
+        COALESCE(history."priceHistoryBars", 0)::int AS "priceHistoryBars",
+        history."firstTimestamp",
         latest."latestTimestamp",
         latest."latestVolume",
         latest."latestAdjustedClose",
@@ -1257,7 +1264,7 @@ export class MarketDataFoundationRepository {
         COALESCE(quality."adjustedCloseRows", 0)::int AS "adjustedCloseRows",
         COALESCE(quality."maxPriceGapDays", 0)::float AS "maxPriceGapDays"
       FROM input_symbols
-      LEFT JOIN oldest ON oldest.symbol = input_symbols.symbol
+      LEFT JOIN history ON history.symbol = input_symbols.symbol
       LEFT JOIN latest ON latest.symbol = input_symbols.symbol
       LEFT JOIN quality ON quality.symbol = input_symbols.symbol
       ORDER BY input_symbols.symbol ASC
@@ -1345,31 +1352,13 @@ export class MarketDataFoundationRepository {
     console.log(`  Storing ${prices.length} price ticks for ${prices[0].symbol}...`);
 
     await this.prisma.$transaction(async (tx: any) => {
-      const batchSize = 100;
-      for (let i = 0; i < rowsToWrite.length; i += batchSize) {
-        const batch = rowsToWrite.slice(i, i + batchSize);
-        const upsertOperations = batch.map((price) => {
-          const source = price.source || 'yahoo';
-          return tx.priceTick.upsert({
-            where: {
-              symbol_timestamp: {
-                symbol: price.symbol,
-                timestamp: price.date,
-              },
-            },
-            update: {
-              open: new Prisma.Decimal(price.open),
-              high: new Prisma.Decimal(price.high),
-              low: new Prisma.Decimal(price.low),
-              close: new Prisma.Decimal(price.close),
-              adjustedClose: price.adjustedClose !== undefined && price.adjustedClose !== null ? new Prisma.Decimal(price.adjustedClose) : null,
-              volume: price.volume !== undefined && price.volume !== null ? BigInt(price.volume) : null,
-              source,
-              region: regionInfo.region,
-              exchange: regionInfo.exchange,
-              dataStatus: 'COMPLETE',
-            },
-            create: {
+      const batchSize = 1000;
+      for (let i = 0; i < rowsToInsert.length; i += batchSize) {
+        const batch = rowsToInsert.slice(i, i + batchSize);
+        await tx.priceTick.createMany({
+          data: batch.map((price) => {
+            const source = price.source || 'yahoo';
+            return {
               symbol: price.symbol,
               region: regionInfo.region,
               exchange: regionInfo.exchange,
@@ -1382,14 +1371,40 @@ export class MarketDataFoundationRepository {
               volume: price.volume !== undefined && price.volume !== null ? BigInt(price.volume) : null,
               source,
               dataStatus: 'COMPLETE',
+            };
+          }),
+          skipDuplicates: true,
+        });
+      }
+
+      for (let i = 0; i < rowsToUpdate.length; i += batchSize) {
+        const batch = rowsToUpdate.slice(i, i + batchSize);
+        await Promise.all(batch.map((price) => {
+          const source = price.source || 'yahoo';
+          return tx.priceTick.update({
+            where: {
+              symbol_timestamp: {
+                symbol: price.symbol,
+                timestamp: price.date,
+              },
+            },
+            data: {
+              open: new Prisma.Decimal(price.open),
+              high: new Prisma.Decimal(price.high),
+              low: new Prisma.Decimal(price.low),
+              close: new Prisma.Decimal(price.close),
+              adjustedClose: price.adjustedClose !== undefined && price.adjustedClose !== null ? new Prisma.Decimal(price.adjustedClose) : null,
+              volume: price.volume !== undefined && price.volume !== null ? BigInt(price.volume) : null,
+              source,
+              region: regionInfo.region,
+              exchange: regionInfo.exchange,
+              dataStatus: 'COMPLETE',
             },
           });
-        });
-
-        await Promise.all(upsertOperations);
+        }));
 
         if (batch.length === batchSize) {
-          console.log(`    Processed ${i + batchSize} of ${rowsToWrite.length} changed records...`);
+          console.log(`    Processed ${Math.min(i + batchSize, rowsToWrite.length)} of ${rowsToWrite.length} changed records...`);
         }
       }
 
@@ -2065,15 +2080,14 @@ export class MarketDataFoundationRepository {
             OR stocks."assetType" IS NULL
           )
           AND NOT (
-            stocks.symbol ILIKE ${'%FUT%'}
-            OR stocks.name ILIKE ${'%future%'}
+            UPPER(COALESCE(stocks."assetType", '')) IN (${Prisma.join(['FUTURE', 'FUTURES'])})
+            OR UPPER(COALESCE(stocks."instrumentSegment", '')) = ${'FUTURES'}
           )
         )`);
       } else if (normalizedAssetType === 'FUTURE' || normalizedAssetType === 'FUTURES') {
         filters.push(Prisma.sql`(
           UPPER(stocks."assetType") IN (${Prisma.join(['FUTURE', 'FUTURES'])})
-          OR stocks.symbol ILIKE ${'%FUT%'}
-          OR stocks.name ILIKE ${'%future%'}
+          OR UPPER(COALESCE(stocks."instrumentSegment", '')) = ${'FUTURES'}
         )`);
       } else if (normalizedAssetType === 'FOREX' || normalizedAssetType === 'FX' || normalizedAssetType === 'CURRENCY') {
         filters.push(Prisma.sql`UPPER(stocks."assetType") IN (${Prisma.join(['FOREX', 'FX', 'CURRENCY'])})`);
@@ -2153,8 +2167,7 @@ export class MarketDataFoundationRepository {
     return {
       OR: [
         { assetType: { in: ['FUTURE', 'FUTURES'], mode: 'insensitive' } },
-        { symbol: { contains: 'FUT', mode: 'insensitive' } },
-        { name: { contains: 'future', mode: 'insensitive' } },
+        { instrumentSegment: { equals: 'FUTURES', mode: 'insensitive' } },
       ],
     };
   }
@@ -2162,8 +2175,8 @@ export class MarketDataFoundationRepository {
   private notFuturesSymbolWhere(): Prisma.StockWhereInput {
     return {
       NOT: [
-        { symbol: { contains: 'FUT', mode: 'insensitive' } },
-        { name: { contains: 'future', mode: 'insensitive' } },
+        { assetType: { in: ['FUTURE', 'FUTURES'], mode: 'insensitive' } },
+        { instrumentSegment: { equals: 'FUTURES', mode: 'insensitive' } },
       ],
     };
   }

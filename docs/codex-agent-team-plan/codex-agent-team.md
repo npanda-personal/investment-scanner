@@ -15,6 +15,7 @@ Codex agents coordinate through the lead/orchestrator and written artifacts, not
 - Role agents publish short structured updates back to the orchestrator.
 - Agents do not assume another agent's unstated work. If they need another lane's output, they use the latest written contract or ask the orchestrator for a decision.
 - Agents may inspect shared files in parallel, but only the assigned owner edits them.
+- No Codex agent may be spawned in standby/idle mode; every spawn instruction must include a concrete task, expected output, and write scope.
 
 This is the realistic communication path for Codex work: task brief -> independent agent work -> structured handoff -> orchestrator integration -> QA verification -> post-QA Lead validation -> post-QA Architect signoff after Lead validation -> Product Owner acceptance -> GitHub check-in.
 
@@ -136,6 +137,7 @@ Use the central runtime lane when:
 Central runtime lane rules:
 
 - The Orchestrator checks memory and stale repo-local Node processes before starting runtime work.
+- All runtime stdout, stderr, process, test, and server logs must be written under `logs/` or a task-specific subfolder under `logs/`. Root-level `*.log` files are forbidden and must be moved or regenerated under `logs/` before check-in.
 - Run the smallest useful runtime check first, preferably one Playwright spec or one API proof at a time.
 - Do not start broad multi-spec UI runs while several workers are also active unless memory and process state are clearly safe.
 - After each runtime check, record pass/fail evidence against the specific QA item and clean up repo-local processes that are no longer needed.
@@ -156,6 +158,7 @@ The Flow Monitor:
 - recommends exact next assignments, closures, reassignments, and board updates,
 - checks whether the Orchestrator has drifted into single-threaded execution while safe parallel work exists,
 - triggers an Orchestrator correction by reporting the deviation, the impacted roles, and the recovery plan.
+- Deputy actions include directing the Orchestrator to close, reassign, or restart work for idle agents before adding new work.
 
 Deputy enforcement triggers:
 
@@ -274,7 +277,7 @@ Every agent must follow the project guidelines before making decisions, writing 
 
 Mandatory baseline for all agents:
 
-- `docs/AGENTS.md` for project rules, module boundaries, hardening sequence, testing expectations, and output expectations.
+- `AGENTS.md` for project rules, module boundaries, hardening sequence, testing expectations, and output expectations.
 - `docs/instructions.md` for hard constraints, especially personal/local-first and free/open-source-only rules.
 - `docs/codex-agent-team-plan/team-operating-model.md` for team authority, agile flow, WIP limits, and signoff order.
 - `docs/codex-agent-team-plan/codex-agent-team.md` for Codex-agent communication, work packets, handoffs, single-writer reservations, and pull rules.
@@ -284,17 +287,17 @@ Mandatory baseline for all agents:
 Role-specific guideline loading:
 
 - Product Owner Agent reads `docs/roadmap.md`, relevant module docs, and Product Owner direction before creating or revising requirements.
-- Solution Architect Agent reads `docs/architecture.md`, `docs/AGENTS.md`, relevant module docs, and affected public contracts before architecture decisions.
-- Orchestrator reads `docs/codex-agent-team-plan/codex-agent-team.md`, `docs/AGENTS.md`, `docs/codex-agent-team-plan/active-work-board.md`, affected route/shared files, and all agent handoffs before assigning write reservations or integrating.
-- Lane Developer Agent reads `docs/AGENTS.md`, `docs/architecture.md`, relevant module `{module}.md`, relevant backend/frontend source, and applicable tests before implementation.
-- QA Agent reads `docs/AGENTS.md`, `docs/module-verification-register.md`, `docs/ux-ui-best-practices.md` for UI-facing work, relevant module docs, and the work packet before defining verification.
+- Solution Architect Agent reads `docs/architecture.md`, `AGENTS.md`, relevant module docs, and affected public contracts before architecture decisions.
+- Orchestrator reads `docs/codex-agent-team-plan/codex-agent-team.md`, `AGENTS.md`, `docs/codex-agent-team-plan/active-work-board.md`, affected route/shared files, and all agent handoffs before assigning write reservations or integrating.
+- Lane Developer Agent reads `AGENTS.md`, `docs/architecture.md`, relevant module `{module}.md`, relevant backend/frontend source, and applicable tests before implementation.
+- QA Agent reads `AGENTS.md`, `docs/module-verification-register.md`, `docs/ux-ui-best-practices.md` for UI-facing work, relevant module docs, and the work packet before defining verification.
 
 Task-specific guideline loading:
 
 - UI-facing work must follow `docs/ux-ui-best-practices.md`.
-- Data-bearing module work must follow `docs/module-verification-register.md` and the live-data validation requirements in `docs/AGENTS.md`.
-- New module work must follow `docs/AGENTS.md`, `docs/architecture.md`, and the new-module flow in this document.
-- Module hardening, polish, audit, verify, or continuation work must follow the mandatory hardening sequence in `docs/AGENTS.md`.
+- Data-bearing module work must follow `docs/module-verification-register.md` and the live-data validation requirements in `AGENTS.md`.
+- New module work must follow `AGENTS.md`, `docs/architecture.md`, and the new-module flow in this document.
+- Module hardening, polish, audit, verify, or continuation work must follow the mandatory hardening sequence in `AGENTS.md`.
 - Material product, architecture, schema, module-boundary, dependency, or cross-module decisions must use `docs/codex-agent-team-plan/decision-record-template.md`.
 - Release candidates must use `docs/codex-agent-team-plan/release-checklist.md`.
 - Deferred debt must be recorded in `docs/codex-agent-team-plan/technical-debt-register.md`.
@@ -442,7 +445,7 @@ Minimum non-idle expectations:
 Use this startup sequence when beginning a fresh multi-agent Codex batch.
 
 1. **Orchestrator loads baseline context**
-   Read `docs/AGENTS.md`, `docs/instructions.md`, `docs/codex-agent-team-plan/team-operating-model.md`, `docs/codex-agent-team-plan/codex-agent-team.md`, `docs/codex-agent-team-plan/sdlc-operating-model.md`, and `docs/codex-agent-team-plan/active-work-board.md`; inspect current branch, remote, dirty files, and existing work state.
+   Read `AGENTS.md`, `docs/instructions.md`, `docs/codex-agent-team-plan/team-operating-model.md`, `docs/codex-agent-team-plan/codex-agent-team.md`, `docs/codex-agent-team-plan/sdlc-operating-model.md`, and `docs/codex-agent-team-plan/active-work-board.md`; inspect current branch, remote, dirty files, and existing work state.
 2. **Product Owner creates the first Top 5**
    Produce five small product briefs with priority rank, workflow, value, domain assumptions, in/out-of-scope notes, and acceptance criteria.
 3. **Orchestrator records and intakes the Top 5**
@@ -518,6 +521,7 @@ The Orchestrator is responsible for keeping the Codex-agent team moving. The use
 Required Orchestrator behavior:
 
 - After assigning or spawning an agent, verify in the same orchestration cycle that the agent has a clear task, owned write scope, and expected output.
+- Never spawn an agent without an immediate concrete task (no standby or awaiting-instruction mode).
 - Before assigning an artifact path to an agent, create or verify the parent directory.
 - If an agent is idle, waiting, or silent after a reasonable work interval, send a status prompt requiring one of three outcomes: handoff, continue unblocked work, or blocker report.
 - If the agent still waits after one prompt, interrupt once with a direct action request; if it still does not produce, close/reassign and update the board.
@@ -537,13 +541,14 @@ Deviation examples:
 
 - Orchestrator does feature, QA, PO, Architect, or discovery work locally while qualified agents are free and safe parallel work exists.
 - A completed QA/developer/PO/Architect handoff does not update the active board in the same orchestration cycle.
-- Agents remain in an awaiting-instruction state after assignment or after finishing work.
+- Completed or idle agents must be closed or reassigned by the Orchestrator or deputy in the same cycle; no agent remains in an awaiting-instruction state.
 - Runtime evidence blocks the whole team instead of moving into the central runtime lane while other roles work ahead.
 - The Flow Monitor is not active during multi-agent execution without a recorded reason.
 
 Required correction:
 
 - Stop assigning new work until the board reflects reality.
+- Close/reassign completed and idle agents before adding new assignments for that role.
 - Either delegate the work to the correct role or record why delegation is not possible.
 - Add/update a plan artifact when the deviation reveals a reusable process gap.
 - If the Orchestrator must temporarily single-thread a task, record the reason, expected duration, and safe parallel work that remains blocked or available.
@@ -719,6 +724,7 @@ If an agent discovers that it must edit an unreserved file, it must stop before 
 - If a lane is waiting on a contract, it should continue with local inspection, test planning, fixture review, or module documentation gaps instead of idling.
 - If shared files are needed, the lane agent should provide a patch recommendation but not edit the shared file unless assigned.
 - If Product Owner requirements change mid-task, all agents should stop relying on stale assumptions and update their handoff against the latest requirement.
+- Independent non-conflicting items should be delegated and executed in parallel whenever their write scopes are disjoint.
 
 ## Work Packet Template
 

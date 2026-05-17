@@ -3,7 +3,7 @@
 ## Context Loaded
 
 - Product brief source: `docs/codex-agent-team-plan/po-test-report-2026-05-13.md`.
-- Global architecture/process sources: `docs/architecture.md`, `docs/AGENTS.md`, `docs/instructions.md`, `docs/codex-agent-team-plan/codex-agent-team.md`, `docs/codex-agent-team-plan/team-operating-model.md`, `docs/codex-agent-team-plan/sdlc-operating-model.md`, and `docs/codex-agent-team-plan/active-work-board.md`.
+- Global architecture/process sources: `docs/architecture.md`, `AGENTS.md`, `docs/instructions.md`, `docs/codex-agent-team-plan/codex-agent-team.md`, `docs/codex-agent-team-plan/team-operating-model.md`, `docs/codex-agent-team-plan/sdlc-operating-model.md`, and `docs/codex-agent-team-plan/active-work-board.md`.
 - Module docs inspected: Market Data Foundation, Data Quality Engine, Signal Quality Lab, Signal Calibration Engine, Strategy Framework, Backtesting Strategy Lab, Strategy Decision Engine, Today Trade Review, Research Hub, and Trade Plan Risk Engine.
 - Code touchpoints inspected for contract impact: `backend/prisma/schema.prisma`, `backend/src/api/routes.ts`, `frontend/src/app/routes.tsx`, and `frontend/src/app/NavigationLayout.tsx`.
 

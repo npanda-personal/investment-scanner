@@ -2,7 +2,7 @@
 
 ## Sources Loaded
 
-- `docs/AGENTS.md`
+- `AGENTS.md`
 - `docs/instructions.md`
 - `docs/codex-agent-team-plan/codex-agent-team.md`
 - `docs/codex-agent-team-plan/team-operating-model.md`

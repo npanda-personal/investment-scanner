@@ -136,6 +136,48 @@ Acceptance criteria:
 - Trade Plans still classify missing/latest/history gaps as insufficient data.
 - Signal Quality distinguishes missing price history, insufficient future rows, and not-yet-mature outcomes.
 
+### 7.1 Immediate Business Metadata Remediation Plan For `IN / STOCK`
+
+Current blocker split after the latest live evidence:
+
+- `supportedBusinessMetadataRepairNeeded = 577`
+- `businessMetadataAutoRepairable = 0`
+- `businessMetadataManualRequired = 813`
+
+This indicates the remaining business-metadata path is mostly manual-fallback:
+
+- the supported queue has no durable free-provider repair candidates after repeated bounded provider repairs;
+- the residual 813 rows are unresolved because at least one required field (`sector`, `industry`, or positive numeric `marketCap`) is still missing.
+
+Remediation sequence (no paid providers):
+
+1. **Finish the provider-business pass cleanly.**
+   - Keep `PROVIDER_BUSINESS_METADATA_REPAIR` as the no-cost first lane.
+   - Run bounded batches until `supportedBusinessMetadataRepairNeeded` is `0` or only manual-required rows remain.
+   - Any non-progress loop on this lane must be treated as `PARTIAL` with explicit blocker evidence, not green status.
+
+2. **Use free/free-operator sources for manual enrichment.**
+   - Use official exchange catalog files as the identity+context anchor (NSE/BSE lists for symbol, ISIN, listing metadata where available).
+   - Use Angel One scrip master only for deterministic identity matching (`providerSymbol`, exchange/series handling, token availability), not as a business-metadata authority.
+   - For each unresolved row, fill `sector`, `industry`, and `marketCap` only when all three are present and market-cap is a valid positive number.
+
+3. **Manual import as gate-safe fallback.**
+   - Export unresolved rows from manual metadata template.
+   - Drive bounded manual CSV imports with stable templates and provider symbols/exact exchanges.
+   - Keep unresolved rows explicit in `manualBusinessMetadataRequired` until field completion is confirmed.
+
+4. **Post-remediation proof requirements.**
+   - Re-measure `repair-plan` and readiness after the manual pass:
+     - `supportedBusinessMetadataRepairNeeded` should fall to `0`;
+     - `businessMetadataManualRequired` should fall materially or be explained as still requiring operator curation;
+     - `contextReady` should only improve from row-level metadata fill, and trust gates must still respect remaining blockers.
+
+Remaining blockers for this lane:
+
+- No currently documented free source is integrated as an authoritative sector/industry/market-cap provider beyond Yahoo business payloads.
+- Exchange catalog feeds are inconsistent in business metadata coverage and should not be assumed complete for all rows.
+- Manual curation remains required for rows where exchange/identity enrichment cannot produce all three required fields.
+
 ## 4. PO Rejections
 
 The Product Owner rejects the following as unacceptable behavior:

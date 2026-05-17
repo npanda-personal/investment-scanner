@@ -69,7 +69,7 @@ Rejected items enter `Revision Mode` on the same work item and return to the rej
 
 All team members and Codex agents must use the project docs as their operating guidelines:
 
-- `docs/AGENTS.md` for project rules, module boundaries, hardening, testing, and output expectations.
+- `AGENTS.md` for project rules, module boundaries, hardening, testing, and output expectations.
 - `docs/instructions.md` for non-negotiable hard constraints.
 - `docs/architecture.md` for system design, module ownership, contracts, and architecture principles.
 - `docs/roadmap.md` for product direction and priority context.
@@ -223,7 +223,7 @@ The Orchestrator must protect the user's laptop during continuous team execution
 5. **Senior Fullstack Lead review**
    Review code shape, shared changes, contract compatibility, imports, module exports, and integration risk.
 6. **QA verification**
-   Run the relevant backend tests, frontend build, Playwright module smoke tests, and manual live-data checks when required by `docs/AGENTS.md`.
+   Run the relevant backend tests, frontend build, Playwright module smoke tests, and manual live-data checks when required by `AGENTS.md`.
 7. **Post-QA Senior Fullstack Lead validation**
    Confirm the implemented work satisfies the Architect's asks, shared-file expectations, public contract usage, integration quality, and code-shape expectations before Architect signoff after Lead validation.
 8. **Post-QA Solution Architect signoff after Lead validation**
@@ -358,8 +358,8 @@ A module work item is done when:
 - backend and frontend behavior match the documented contract,
 - module docs are updated for changed routes, response shapes, calculations, batching, or workflows,
 - relevant backend tests, frontend build, and UI smoke tests have passed or blockers are recorded,
-- data-bearing UI/API changes have completed the live-data validation pass required by `docs/AGENTS.md`,
-- changed API calls and frontend button workflows meet the performance/progress standard in `docs/AGENTS.md`; long-running bulk operations must use bounded batches, workers, or status polling with visible progress,
+- data-bearing UI/API changes have completed the live-data validation pass required by `AGENTS.md`,
+- changed API calls and frontend button workflows meet the performance/progress standard in `AGENTS.md`; long-running bulk operations must use bounded batches, workers, or status polling with visible progress,
 - the final behavior reflects the latest Product Owner requirements, not stale roadmap assumptions,
 - the implementation uses no paid libraries, tools, services, providers, or hosted verification,
 - Senior Fullstack Lead and QA signoff are recorded,

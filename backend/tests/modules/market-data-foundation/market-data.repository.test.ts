@@ -48,7 +48,8 @@ describe('MarketDataFoundationRepository', () => {
               }),
               expect.objectContaining({
                 NOT: expect.not.arrayContaining([
-                  expect.objectContaining({ assetType: expect.anything() }),
+                  expect.objectContaining({ symbol: expect.anything() }),
+                  expect.objectContaining({ name: expect.anything() }),
                 ]),
               }),
             ]),
@@ -71,8 +72,9 @@ describe('MarketDataFoundationRepository', () => {
     ]));
   });
 
-  it('stores historical prices with upsert summary and duplicate prevention', async () => {
-    const upsert = jest.fn().mockResolvedValue({});
+  it('stores historical prices with bulk insert/update summary and duplicate prevention', async () => {
+    const createMany = jest.fn().mockResolvedValue({ count: 1 });
+    const update = jest.fn().mockResolvedValue({});
     const latestPriceUpsert = jest.fn().mockResolvedValue({});
     const prisma = {
       priceTick: {
@@ -84,7 +86,7 @@ describe('MarketDataFoundationRepository', () => {
         upsert: latestPriceUpsert,
       },
       $transaction: jest.fn(async (callback: any): Promise<any> => callback({
-        priceTick: { upsert },
+        priceTick: { createMany, update },
         latestPrice: { upsert: latestPriceUpsert },
       })),
     } as any;
@@ -112,16 +114,14 @@ describe('MarketDataFoundationRepository', () => {
       },
     ], () => ({ region: 'US', exchange: 'NASDAQ' }));
 
-    expect(upsert).toHaveBeenCalledTimes(2);
-    expect(upsert.mock.calls.map((call) => call[0].create.source)).toEqual(
-      expect.arrayContaining(['yahoo', 'nse_cm_udiff_bhavcopy'])
-    );
-    expect(upsert.mock.calls.map((call) => call[0].where.symbol_timestamp.timestamp)).toEqual(
-      expect.arrayContaining([
-        new Date('2025-01-01T00:00:00.000Z'),
-        new Date('2025-01-02T00:00:00.000Z'),
-      ])
-    );
+    expect(createMany).toHaveBeenCalledTimes(1);
+    expect(createMany.mock.calls[0][0].skipDuplicates).toBe(true);
+    expect(createMany.mock.calls[0][0].data).toHaveLength(1);
+    expect(createMany.mock.calls[0][0].data[0].source).toBe('nse_cm_udiff_bhavcopy');
+    expect(createMany.mock.calls[0][0].data[0].timestamp).toEqual(new Date('2025-01-02T00:00:00.000Z'));
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(update.mock.calls[0][0].where.symbol_timestamp.timestamp).toEqual(new Date('2025-01-01T00:00:00.000Z'));
+    expect(update.mock.calls[0][0].data.source).toBe('yahoo');
     expect(summary).toMatchObject({
       rowsReceived: 2,
       rowsInserted: 1,
@@ -131,7 +131,8 @@ describe('MarketDataFoundationRepository', () => {
   });
 
   it('updates source provenance when a fallback source confirms an existing candle', async () => {
-    const upsert = jest.fn().mockResolvedValue({});
+    const createMany = jest.fn().mockResolvedValue({ count: 0 });
+    const update = jest.fn().mockResolvedValue({});
     const latestPriceUpsert = jest.fn().mockResolvedValue({});
     const prisma = {
       priceTick: {
@@ -152,7 +153,7 @@ describe('MarketDataFoundationRepository', () => {
         upsert: latestPriceUpsert,
       },
       $transaction: jest.fn(async (callback: any): Promise<any> => callback({
-        priceTick: { upsert },
+        priceTick: { createMany, update },
         latestPrice: { upsert: latestPriceUpsert },
       })),
     } as any;
@@ -171,8 +172,9 @@ describe('MarketDataFoundationRepository', () => {
       },
     ], () => ({ region: 'US', exchange: 'NASDAQ' }));
 
-    expect(upsert).toHaveBeenCalledTimes(1);
-    expect(upsert.mock.calls[0][0].update.source).toBe('nse_cm_udiff_bhavcopy');
+    expect(createMany).not.toHaveBeenCalled();
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(update.mock.calls[0][0].data.source).toBe('nse_cm_udiff_bhavcopy');
     expect(summary).toMatchObject({
       rowsReceived: 1,
       rowsInserted: 0,
@@ -231,6 +233,23 @@ describe('MarketDataFoundationRepository', () => {
     }));
   });
 
+  it('does not exclude cash equities just because the symbol or name contains future-like text', async () => {
+    const prisma = {
+      stock: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await repository.listStocksForUniverseHealth({ region: 'IN', assetType: 'STOCK' });
+
+    const where = JSON.stringify(prisma.stock.findMany.mock.calls[0][0].where);
+    expect(where).not.toContain('"contains":"FUT"');
+    expect(where).not.toContain('"contains":"future"');
+    expect(where).toContain('"assetType":{"in":["FUTURE","FUTURES"]');
+    expect(where).toContain('"instrumentSegment":{"equals":"FUTURES"');
+  });
+
   it('uses a set-based timestamp query for scoped latest data timestamp', async () => {
     const latestDate = new Date('2026-05-12T00:00:00.000Z');
     const prisma = {
@@ -255,7 +274,9 @@ describe('MarketDataFoundationRepository', () => {
     expect(query.text).toContain('INNER JOIN stocks ON stocks.symbol = price_ticks.symbol');
     expect(query.text).toContain('UPPER(stocks."assetType") IN');
     expect(query.text).toContain('stocks."assetType" IS NULL');
-    expect(query.text).toContain('stocks.symbol ILIKE');
+    expect(query.text).toContain('stocks."instrumentSegment"');
+    expect(query.text).not.toContain('stocks.symbol ILIKE');
+    expect(query.text).not.toContain('stocks.name ILIKE');
   });
 
   it('derives latest stored trading date from the set-based timestamp query', async () => {
@@ -310,7 +331,7 @@ describe('MarketDataFoundationRepository', () => {
     const latestTimestamp = new Date('2026-05-08T00:00:00.000Z');
     const readinessRows = [{
       symbol: 'READY.NS',
-      priceHistoryBars: 252,
+      priceHistoryBars: 3800,
       firstTimestamp,
       latestTimestamp,
       latestVolume: BigInt(1000),
@@ -333,7 +354,7 @@ describe('MarketDataFoundationRepository', () => {
     const result = await repository.priceReadinessStatsForSymbols(['READY.NS', 'CATALOG.NS']);
 
     expect(result.get('READY.NS')).toMatchObject({
-      priceHistoryBars: 252,
+      priceHistoryBars: 3800,
       latestPriceDate: '2026-05-08',
       latestVolume: BigInt(1000),
       rollingWindowBars: 252,
@@ -350,7 +371,8 @@ describe('MarketDataFoundationRepository', () => {
     expect(prisma.priceTick.findMany).not.toHaveBeenCalled();
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
     const qualityQuery = prisma.$queryRaw.mock.calls[0][0];
-    expect(qualityQuery.text).toContain('ORDER BY price_ticks.timestamp ASC');
+    expect(qualityQuery.text).toContain('COUNT(*)::int AS "priceHistoryBars"');
+    expect(qualityQuery.text).toContain('MIN(price_ticks.timestamp) AS "firstTimestamp"');
     expect(qualityQuery.text).toContain('ROW_NUMBER() OVER (ORDER BY sampled.timestamp DESC)');
     expect(qualityQuery.text).toContain('LAG(sampled.timestamp) OVER (ORDER BY sampled.timestamp DESC)');
     expect(qualityQuery.text).toContain('CROSS JOIN LATERAL');
@@ -405,7 +427,12 @@ describe('MarketDataFoundationRepository', () => {
                   { assetType: null },
                 ]),
               }),
-              expect.objectContaining({ NOT: expect.any(Array) }),
+              expect.objectContaining({
+                NOT: expect.arrayContaining([
+                  expect.objectContaining({ assetType: expect.objectContaining({ in: ['FUTURE', 'FUTURES'] }) }),
+                  expect.objectContaining({ instrumentSegment: expect.objectContaining({ equals: 'FUTURES' }) }),
+                ]),
+              }),
             ]),
           }),
         ]),
@@ -413,7 +440,7 @@ describe('MarketDataFoundationRepository', () => {
     }));
   });
 
-  it('maps FUTURES segment filtering to explicit future rows and future-like symbols', async () => {
+  it('maps FUTURES segment filtering to explicit futures rows only', async () => {
     const prisma = {
       stock: {
         findMany: jest.fn().mockResolvedValue([]),
@@ -435,13 +462,15 @@ describe('MarketDataFoundationRepository', () => {
           expect.objectContaining({
             OR: expect.arrayContaining([
               expect.objectContaining({ assetType: expect.objectContaining({ in: ['FUTURE', 'FUTURES'] }) }),
-              { symbol: { contains: 'FUT', mode: 'insensitive' } },
-              { name: { contains: 'future', mode: 'insensitive' } },
+              { instrumentSegment: { equals: 'FUTURES', mode: 'insensitive' } },
             ]),
           }),
         ]),
       }),
     }));
+    const futuresFilter = JSON.stringify(prisma.stock.findMany.mock.calls[0][0].where);
+    expect(futuresFilter).not.toContain('"contains":"FUT"');
+    expect(futuresFilter).not.toContain('"contains":"future"');
   });
 
   it('matches INR currency using stored currency or deterministic Indian fallbacks', async () => {
@@ -934,6 +963,37 @@ describe('MarketDataFoundationRepository', () => {
     expect(whereJson).not.toContain('lte');
   });
 
+  it('lists only manual-required price-backfill blockers when retryable rows are explicitly included', async () => {
+    const prisma = {
+      marketDataRepairState: {
+        findMany: jest.fn().mockResolvedValue([
+          { stockId: 'stock-manual' },
+        ]),
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+    const now = new Date('2026-05-12T00:00:00.000Z');
+
+    const ids = await repository.listBlockedPriceBackfillStockIds({
+      region: 'IN',
+      assetType: 'STOCK',
+      now,
+      includeRetryable: true,
+    });
+
+    expect(ids).toEqual(['stock-manual']);
+    expect(prisma.marketDataRepairState.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        repairType: 'PRICE_BACKFILL',
+        OR: [{ status: 'MANUAL_REQUIRED' }],
+      }),
+      select: { stockId: true },
+    }));
+    const whereJson = JSON.stringify(prisma.marketDataRepairState.findMany.mock.calls[0][0].where);
+    expect(whereJson).not.toContain('RETRY_COOLDOWN');
+    expect(whereJson).not.toContain('FAILED_RETRYABLE');
+  });
+
   it('repairs catalog identity only for the provided stock id', async () => {
     const update = jest.fn().mockImplementation(({ data }) => Promise.resolve(data));
     const prisma = {
@@ -1120,7 +1180,8 @@ describe('MarketDataFoundationRepository', () => {
   });
 
   it('does not rewrite identical daily candles', async () => {
-    const upsert = jest.fn().mockResolvedValue({});
+    const createMany = jest.fn().mockResolvedValue({ count: 0 });
+    const update = jest.fn().mockResolvedValue({});
     const latestPriceUpsert = jest.fn().mockResolvedValue({});
     const prisma = {
       priceTick: {
@@ -1140,7 +1201,7 @@ describe('MarketDataFoundationRepository', () => {
         upsert: latestPriceUpsert,
       },
       $transaction: jest.fn(async (callback: any): Promise<any> => callback({
-        priceTick: { upsert },
+        priceTick: { createMany, update },
         latestPrice: { upsert: latestPriceUpsert },
       })),
     } as any;
@@ -1158,7 +1219,8 @@ describe('MarketDataFoundationRepository', () => {
       },
     ], () => ({ region: 'US', exchange: 'NASDAQ' }));
 
-    expect(upsert).not.toHaveBeenCalled();
+    expect(createMany).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
     expect(latestPriceUpsert).toHaveBeenCalledTimes(1);
     expect(summary).toMatchObject({
       rowsReceived: 1,
@@ -1169,7 +1231,8 @@ describe('MarketDataFoundationRepository', () => {
   });
 
   it('updates changed daily candle values', async () => {
-    const upsert = jest.fn().mockResolvedValue({});
+    const createMany = jest.fn().mockResolvedValue({ count: 0 });
+    const update = jest.fn().mockResolvedValue({});
     const latestPriceUpsert = jest.fn().mockResolvedValue({});
     const prisma = {
       priceTick: {
@@ -1189,7 +1252,7 @@ describe('MarketDataFoundationRepository', () => {
         upsert: latestPriceUpsert,
       },
       $transaction: jest.fn(async (callback: any): Promise<any> => callback({
-        priceTick: { upsert },
+        priceTick: { createMany, update },
         latestPrice: { upsert: latestPriceUpsert },
       })),
     } as any;
@@ -1207,8 +1270,9 @@ describe('MarketDataFoundationRepository', () => {
       },
     ], () => ({ region: 'US', exchange: 'NASDAQ' }));
 
-    expect(upsert).toHaveBeenCalledTimes(1);
-    expect(upsert.mock.calls[0][0].update.close.toString()).toBe('105');
+    expect(createMany).not.toHaveBeenCalled();
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(update.mock.calls[0][0].data.close.toString()).toBe('105');
     expect(summary).toMatchObject({
       rowsReceived: 1,
       rowsInserted: 0,

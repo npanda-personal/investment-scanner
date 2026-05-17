@@ -73,6 +73,11 @@ export const createMarketDataV1Router = (
   router.post('/market-data/metadata/manual-import', controller.importManualMetadata);
   router.post('/market-data/metadata/enrich', controller.enrichMetadata);
   router.post('/market-data/prices/backfill', controller.backfillPrices);
+  router.post('/market-data/prices/backfill-runs', controller.startPriceBackfillRun);
+  router.get('/market-data/prices/backfill-active-run', controller.activePriceBackfillRun);
+  router.get('/market-data/prices/backfill-runs/active', controller.activePriceBackfillRun);
+  router.get('/market-data/prices/backfill-runs/:runId', controller.getPriceBackfillRun);
+  router.post('/market-data/prices/backfill-runs/:runId/cancel', controller.cancelPriceBackfillRun);
   router.get('/market-data/catalog/sources', controller.listCatalogSources);
   router.post('/market-data/catalog/import', controller.importCatalog);
   router.post('/market-data/catalog/backfill-metadata', controller.backfillCatalogMetadata);

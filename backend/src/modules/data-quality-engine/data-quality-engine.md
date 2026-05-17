@@ -151,7 +151,7 @@ The backend remains bounded at a maximum `batchSize` of 100. The frontend overla
 - Liquidity thresholds are simple daily-volume heuristics and can be tuned by market later.
 - `POOR` and `ILLIQUID` view presets currently target the strictest diagnostic states. Broader multi-status presets can be added if the API gains multi-value filters.
 - Backend evaluation currently processes each bounded batch with per-instrument error isolation; frontend request parallelism is the coordinated acceleration strategy for full-scope runs.
-- The implementation follows `docs/AGENTS.md`, `docs/architecture.md`, and `docs/ux-ui-best-practices.md`: module boundaries stay flat, Market Data Foundation is consumed through public exports, batch work remains bounded, and the UI uses shared table/filter/page patterns where practical.
+- The implementation follows `AGENTS.md`, `docs/architecture.md`, and `docs/ux-ui-best-practices.md`: module boundaries stay flat, Market Data Foundation is consumed through public exports, batch work remains bounded, and the UI uses shared table/filter/page patterns where practical.
 
 ## Verification
 

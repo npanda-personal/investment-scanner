@@ -4,6 +4,7 @@ import net from 'net';
 import path from 'path';
 import { MarketDataFoundationRepository } from './market-data-foundation.repository';
 import { YahooFinanceIngestionService } from './market-data-foundation.provider';
+import { AngelOneMarketDataProvider } from './market-data-foundation.angel-one-provider';
 import { enqueueIngestionJob } from './market-data-foundation.queue';
 import { getCatalogDownloadConfig, getCatalogSourceConfig, getCatalogSourceConfigs } from './market-data-foundation.catalog-sources';
 import type {
@@ -66,6 +67,8 @@ import type {
   CatalogSyncRunRequest,
   CatalogSyncRunStatus,
   CatalogSyncRunStatusResponse,
+  PriceBackfillRunRequest,
+  PriceBackfillRunStatusResponse,
   SearchResult,
   StockSyncTask,
   SyncSummary,
@@ -125,6 +128,14 @@ type CatalogSyncRunRecord = CatalogSyncRunStatusResponse & {
   tradingDate: string;
   providerEndDate?: Date;
   processedTaskIds: Set<string>;
+};
+
+type PriceBackfillRunRecord = PriceBackfillRunStatusResponse & {
+  activeKey: string;
+  cancelRequested: boolean;
+  force: boolean;
+  fullReload: boolean;
+  processedStockIds: Set<string>;
 };
 
 const KNOWN_NSE_FNO_STOCK_UNDERLYINGS = new Set([
@@ -356,6 +367,12 @@ type CatalogIdentityRowsSnapshot = {
   sourceIdentity: MarketDataRepairSourceIdentity;
 };
 
+type CatalogIdentityWorkItem = {
+  stock: any;
+  row: CreateStockRequest;
+  filledFields: string[];
+};
+
 type RepairRunSourceSnapshot = {
   fingerprint?: string;
   identity?: MarketDataRepairSourceIdentity;
@@ -415,8 +432,11 @@ type IndianExchangeFallbackResult = {
 
 export class MarketDataFoundationService {
   private static lastIngestionAt = 0;
+  private static ingestionThrottleChain: Promise<void> = Promise.resolve();
   private static catalogSyncRuns = new Map<string, CatalogSyncRunRecord>();
   private static activeCatalogSyncRuns = new Map<string, string>();
+  private static priceBackfillRuns = new Map<string, PriceBackfillRunRecord>();
+  private static activePriceBackfillRuns = new Map<string, string>();
   private readonly manualSyncCooldownMinutes = this.readPositiveNumber(
     process.env.MARKET_DATA_MANUAL_SYNC_COOLDOWN_MINUTES,
     15
@@ -429,7 +449,8 @@ export class MarketDataFoundationService {
 
   constructor(
     private readonly repository = new MarketDataFoundationRepository(),
-    private readonly marketDataProvider = new YahooFinanceIngestionService()
+    private readonly marketDataProvider = new YahooFinanceIngestionService(),
+    private readonly angelOneMarketDataProvider = new AngelOneMarketDataProvider()
   ) {}
 
   list(options: PaginationOptions) {
@@ -663,10 +684,13 @@ export class MarketDataFoundationService {
       else counts.activeInstruments += 1;
       const providerStatus = normalizeProviderStatus(stock.providerSupportStatus);
       if (!isInactiveOrDelisted) {
-        const priceBackfillFallbackRequired = providerStatus === 'SUPPORTED' && priceBackfillBlockedStockIds.has(stock.id);
+        const priceBackfillBlockReason = providerStatus === 'SUPPORTED'
+          ? this.priceBackfillBlockReason(activeSnapshot?.repairStatesByStockId, stock.id, priceBackfillBlockedStockIds.has(stock.id))
+          : null;
         let priceBackfillFallbackCounted = false;
         const recordSupportedPriceBackfillNeed = () => {
-          if (priceBackfillFallbackRequired) {
+          if (priceBackfillBlockReason === 'retry') return;
+          if (priceBackfillBlockReason === 'manual') {
             if (!priceBackfillFallbackCounted) {
               counts.historyCoverageFallbackRequired = (counts.historyCoverageFallbackRequired || 0) + 1;
               priceBackfillFallbackCounted = true;
@@ -1288,9 +1312,13 @@ export class MarketDataFoundationService {
         unsupportedExcluded += 1;
       }
       const priceBackfillFallbackRequired = isProviderSupported && priceBackfillBlockedStockIds.has(stock.id);
+      const priceBackfillBlockReason = isProviderSupported
+        ? this.priceBackfillBlockReason(activeSnapshot?.repairStatesByStockId, stock.id, priceBackfillFallbackRequired)
+        : null;
       let priceBackfillFallbackCounted = false;
       const recordPriceBackfillNeed = () => {
-        if (priceBackfillFallbackRequired) {
+        if (priceBackfillBlockReason === 'retry') return;
+        if (priceBackfillBlockReason === 'manual') {
           if (!priceBackfillFallbackCounted) {
             historyCoverageFallbackRequired += 1;
             priceBackfillFallbackCounted = true;
@@ -1425,6 +1453,9 @@ export class MarketDataFoundationService {
       { action: 'BACKFILL_PRICES' as const, label: 'Backfill prices', count: supportedPriceBackfillNeeded },
       { action: 'MANUAL_METADATA_IMPORT' as const, label: 'Import manual metadata', count: manualBusinessMetadataRequired },
     ].filter((item) => item.count > 0);
+    const businessMetadataBlockerDiagnostics = scope.region === 'IN' && scope.assetType === 'STOCK'
+      ? this.businessMetadataBlockerDiagnostics(stocks)
+      : undefined;
 
     const planWithoutSignoff = {
       scope,
@@ -1462,6 +1493,7 @@ export class MarketDataFoundationService {
       missingSector,
       missingIndustry,
       missingMarketCap,
+      businessMetadataBlockerDiagnostics,
       manualSectorIndustryRequired,
       topActions,
       warnings,
@@ -1928,13 +1960,11 @@ export class MarketDataFoundationService {
       }
 
       try {
-        const validation = await this.marketDataProvider.validateProviderSymbol(providerSymbol, {
-          region: scope.region,
-          assetType: scope.assetType,
-          validationWindowStartDate: validationWindow.startDate,
-          validationWindowEndDate: validationWindow.endDate,
-          timeoutMs: 8000,
-        });
+        const validation = await this.validateProviderSymbolForScope(providerSymbol, scope, validationWindow);
+        const sourceName = validation.sourceName || 'YAHOO_CHART';
+        const providerName = validation.provider || (sourceName === 'ANGEL_ONE_HISTORICAL' ? 'angel_one' : 'yahoo');
+        const fallbackSourceAttempted = validation.fallbackSourceAttempted
+          ?? (sourceName === 'ANGEL_ONE_HISTORICAL' ? null : this.shouldUseAngelProviderValidation(providerSymbol, scope) ? 'YAHOO_CHART' : null);
         summary.providerValidated = (summary.providerValidated || 0) + 1;
         summary.providerCalls = (summary.providerCalls || 0) + 1;
         if (validation.providerCallMs !== undefined) {
@@ -1956,15 +1986,15 @@ export class MarketDataFoundationService {
           manualRequiredReason: classification === 'MANUAL_SYMBOL_REPAIR_REQUIRED' ? validation.message : undefined,
           nextRetryAt,
           evidence: {
-            provider: validation.provider || 'yahoo',
+            provider: providerName,
             providerSymbol,
             candlesFound: validation.candlesFound ?? 0,
             providerCallMs: validation.providerCallMs,
             validationWindowStartDate: validation.validationWindowStartDate || validationWindow.startDateIso,
             validationWindowEndDate: validation.validationWindowEndDate || validationWindow.endDateIso,
-            fallbackSourceAttempted: validation.fallbackSourceAttempted ?? null,
+            fallbackSourceAttempted,
             freeFallbackRequired: validation.freeFallbackRequired || classification === 'FREE_FALLBACK_REQUIRED',
-            sourceName: validation.sourceName || 'YAHOO_CHART',
+            sourceName,
             ...historyDiagnostics,
           },
         });
@@ -1978,7 +2008,7 @@ export class MarketDataFoundationService {
           nextRetryAt,
           message: validation.message ?? null,
           historyDiagnostics,
-          sourceName: validation.sourceName || 'YAHOO_CHART',
+          sourceName,
         });
         if (status === 'VALIDATION_FAILED') {
           summary.failed += 1;
@@ -2033,6 +2063,51 @@ export class MarketDataFoundationService {
     return summary;
   }
 
+  private async validateProviderSymbolForScope(
+    providerSymbol: string,
+    scope: { region: string; assetType: string },
+    validationWindow: ReturnType<MarketDataFoundationService['providerValidationWindow']>
+  ): Promise<ProviderValidationResult> {
+    if (!this.shouldUseAngelProviderValidation(providerSymbol, scope)) {
+      return this.marketDataProvider.validateProviderSymbol(providerSymbol, {
+        region: scope.region,
+        assetType: scope.assetType,
+        validationWindowStartDate: validationWindow.startDate,
+        validationWindowEndDate: validationWindow.endDate,
+        timeoutMs: 8000,
+      });
+    }
+
+    const angelValidation = await this.angelOneMarketDataProvider.validateProviderSymbol(providerSymbol, {
+      region: scope.region,
+      assetType: scope.assetType,
+      validationWindowStartDate: validationWindow.startDate,
+      validationWindowEndDate: validationWindow.endDate,
+    });
+    const classification = angelValidation.classification || this.compatibleProviderValidationClassification(angelValidation);
+    if (this.isRetryableProviderValidation(classification) && !this.angelOneMarketDataProvider.shouldFailClosed()) {
+      const yahooValidation = await this.marketDataProvider.validateProviderSymbol(providerSymbol, {
+        region: scope.region,
+        assetType: scope.assetType,
+        validationWindowStartDate: validationWindow.startDate,
+        validationWindowEndDate: validationWindow.endDate,
+        timeoutMs: 8000,
+      });
+      return {
+        ...yahooValidation,
+        fallbackSourceAttempted: 'YAHOO_CHART',
+      };
+    }
+    return angelValidation;
+  }
+
+  private shouldUseAngelProviderValidation(providerSymbol: string, scope: { region: string; assetType: string }): boolean {
+    return this.angelOneMarketDataProvider.canHandleHistorical(providerSymbol, {
+      region: scope.region,
+      assetType: scope.assetType,
+    });
+  }
+
   async repairCatalogIdentity(request: MarketDataRepairRequest = {}): Promise<MarketDataRepairSummary> {
     const scope = this.repairScope(request);
     const catalogSource = this.normalizeCatalogSource(request.catalogSource || this.defaultCatalogIdentitySource(scope));
@@ -2045,17 +2120,21 @@ export class MarketDataFoundationService {
 
   private async repairCatalogIdentityFromRows(
     request: MarketDataRepairRequest,
-    catalog: CatalogIdentityRowsSnapshot
+    catalog: CatalogIdentityRowsSnapshot,
+    options: { actionableOnly?: boolean } = {}
   ): Promise<MarketDataRepairSummary> {
     const started = Date.now();
     const scope = this.repairScope(request);
     const batch = this.stableSourceRepairBatch(request);
     const sourceRows = catalog.rows;
-    const page = sourceRows.slice(batch.offset, batch.offset + batch.batchSize);
     const scopedStocks = (await this.repository.listStocksForUniverseHealth(scope))
       .filter((stock) => stock.isActive !== false && stock.isDelisted !== true);
     const stocksByKey = this.stocksByIdentityKey(scopedStocks);
-    const summary = this.emptyRepairSummary(scope, batch, sourceRows.length, false);
+    const workItems: Array<Partial<CatalogIdentityWorkItem> & { row: CreateStockRequest }> = options.actionableOnly
+      ? this.actionableCatalogIdentityWorkItems(sourceRows, stocksByKey)
+      : sourceRows.map((row) => ({ row }));
+    const page = workItems.slice(batch.offset, batch.offset + batch.batchSize);
+    const summary = this.emptyRepairSummary(scope, batch, workItems.length, false);
     summary.catalogSource = catalog.catalogSource;
     summary.catalogRowsRead = sourceRows.length;
     summary.downloaded = catalog.downloaded;
@@ -2065,9 +2144,10 @@ export class MarketDataFoundationService {
     summary.fieldProvenance = [];
     summary.warnings.push(...catalog.warnings);
 
-    for (const row of page) {
+    for (const item of page) {
       summary.processedCount += 1;
-      const stock = this.findStockForCatalogIdentityRow(row, stocksByKey);
+      const row = item.row;
+      const stock = item.stock || this.findStockForCatalogIdentityRow(row, stocksByKey);
       if (!stock) {
         summary.skipped += 1;
         summary.noOp = (summary.noOp || 0) + 1;
@@ -2076,7 +2156,7 @@ export class MarketDataFoundationService {
       }
       summary.matchedExistingRows = (summary.matchedExistingRows || 0) + 1;
 
-      const filledFields = this.repairedCatalogIdentityFields(stock, row);
+      const filledFields = item.filledFields || this.repairedCatalogIdentityFields(stock, row);
       if (filledFields.length === 0) {
         summary.skipped += 1;
         summary.noOp = (summary.noOp || 0) + 1;
@@ -2104,6 +2184,9 @@ export class MarketDataFoundationService {
       }
     }
 
+    if (summary.updated > 0) {
+      this.invalidateUniverseComputationSnapshot(scope);
+    }
     this.finishRepairSummary(summary, started);
     return summary;
   }
@@ -2225,6 +2308,9 @@ export class MarketDataFoundationService {
       summary.remainingManualRequired = (summary.skippedRecentAttempt || 0) + (summary.manualRequired || 0);
     }
 
+    if (summary.processedCount > 0) {
+      this.invalidateUniverseComputationSnapshot(scope);
+    }
     this.finishRepairSummary(summary, started);
     return summary;
   }
@@ -2444,6 +2530,9 @@ export class MarketDataFoundationService {
       });
     }
 
+    if (summary.updated > 0) {
+      this.invalidateUniverseComputationSnapshot(scope);
+    }
     this.finishRepairSummary(summary, started);
     return summary;
   }
@@ -2452,9 +2541,15 @@ export class MarketDataFoundationService {
     const started = Date.now();
     const scope = this.repairScope(request);
     const batch = this.mutatingRepairBatch(request);
-    const candidates = await this.priceBackfillCandidates(scope);
+    const workerConcurrency = this.priceBackfillConcurrency(request);
+    const providerThrottleMs = this.priceBackfillProviderThrottleMs();
+    const excludeStockIds = new Set((request.excludeStockIds || []).filter(Boolean));
+    const includeRetryableBlocked = request.force === true || request.fullReload === true;
+    const candidates = await this.priceBackfillCandidates(scope, excludeStockIds, { includeRetryableBlocked });
     const page = candidates.slice(0, batch.batchSize);
     const summary = this.emptyRepairSummary(scope, batch, candidates.length, true);
+    summary.workerConcurrency = workerConcurrency;
+    summary.providerThrottleMs = providerThrottleMs;
     summary.priceRowsReceived = 0;
     summary.priceRowsInserted = 0;
     summary.priceRowsUpdated = 0;
@@ -2464,6 +2559,7 @@ export class MarketDataFoundationService {
     summary.incrementalCaughtUp = 0;
     summary.historyCoverageFallbackRequired = 0;
     summary.sampleCoverageResults = [];
+    summary.processedStockIds = [];
     const latestCompletedDate = latestCompletedTradingDateForRegion(scope.region);
     summary.latestCompletedEodDate = latestCompletedDate;
 
@@ -2478,14 +2574,16 @@ export class MarketDataFoundationService {
     const safeEndDate = this.endOfTradingDateUtc(latestCompletedDate);
     summary.targetEndDate = safeEndDate.toISOString();
 
-    for (const candidate of page) {
+    await this.eachWithConcurrency(page, workerConcurrency, async (candidate) => {
       const { stock, mode, startDate } = this.priceBackfillFetchPlan(candidate, latestCompletedDate, request);
       summary.processedCount += 1;
+      if (stock.id) summary.processedStockIds!.push(stock.id);
       if (mode === 'DEEP') summary.deepReloaded = (summary.deepReloaded || 0) + 1;
       else summary.incrementalCaughtUp = (summary.incrementalCaughtUp || 0) + 1;
       try {
+        await this.throttleIngestion(providerThrottleMs);
         const result = await this.ingestSymbol(stock.symbol, startDate, safeEndDate, Boolean(request.fullReload), {
-          force: request.force !== false,
+          force: request.force === true || request.fullReload === true,
           region: scope.region,
           assetType: scope.assetType,
           skipFreshnessGate: true,
@@ -2516,22 +2614,150 @@ export class MarketDataFoundationService {
           this.addPriceBackfillCoverageSample(summary, candidate, null);
         }
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'price backfill failed';
+        if (this.isYahooRateLimitError(errorMessage)) {
+          summary.failed += 1;
+          summary.providerRetryableFailures = (summary.providerRetryableFailures || 0) + 1;
+          await this.recordPriceBackfillRepairAttempt(stock, scope, 'YAHOO_RATE_LIMITED', {}, errorMessage, null, 'FAILED_RETRYABLE');
+          summary.warnings.push(`${stock.symbol}: Yahoo rate limit hit; retry is cooling down before another provider call.`);
+          this.addPriceBackfillCoverageSample(summary, candidate, 'YAHOO_RATE_LIMITED');
+          return;
+        }
+        if (this.isAngelOneTokenNotFoundError(errorMessage)) {
+          summary.manualRequired = (summary.manualRequired || 0) + 1;
+          summary.historyCoverageFallbackRequired = (summary.historyCoverageFallbackRequired || 0) + 1;
+          const manualRequiredReason = 'Angel One scrip master token was not found; catalog symbol lifecycle or broker-symbol mapping must be reviewed before retrying automatic backfill.';
+          await this.recordPriceBackfillRepairAttempt(stock, scope, 'ANGEL_ONE_TOKEN_NOT_FOUND', {}, errorMessage, manualRequiredReason, 'MANUAL_REQUIRED');
+          summary.warnings.push(`${stock.symbol}: ${manualRequiredReason}`);
+          this.addPriceBackfillCoverageSample(summary, candidate, 'ANGEL_ONE_TOKEN_NOT_FOUND');
+          return;
+        }
         summary.failed += 1;
         summary.historyCoverageFallbackRequired = (summary.historyCoverageFallbackRequired || 0) + 1;
-        const errorMessage = error instanceof Error ? error.message : 'price backfill failed';
         await this.recordPriceBackfillRepairAttempt(stock, scope, 'YAHOO_PROVIDER_ERROR', {}, errorMessage, null, 'FAILED_RETRYABLE');
         summary.warnings.push(`${stock.symbol}: ${errorMessage}`);
         this.addPriceBackfillCoverageSample(summary, candidate, 'YAHOO_PROVIDER_ERROR');
       }
-    }
+    });
 
-    const remainingCandidates = await this.priceBackfillCandidates(scope);
+    const attemptedStockIds = new Set([...excludeStockIds, ...(summary.processedStockIds || [])]);
+    const remainingCandidates = await this.priceBackfillCandidates(scope, attemptedStockIds, { includeRetryableBlocked });
     summary.remainingCandidates = remainingCandidates.length;
     summary.hasMore = remainingCandidates.length > 0;
     summary.nextOffset = summary.hasMore ? 0 : null;
     this.assignPriceBackfillDepthDiagnostics(summary, remainingCandidates);
+    if (summary.processedCount > 0) {
+      this.invalidateUniverseComputationSnapshot(scope);
+    }
     this.finishRepairSummary(summary, started);
     return summary;
+  }
+
+  async startPriceBackfillRun(request: PriceBackfillRunRequest = {}): Promise<PriceBackfillRunStatusResponse> {
+    const scope = this.repairScope(request);
+    const activeKey = this.priceBackfillActiveKey(scope.region, scope.assetType);
+    const activeRunId = MarketDataFoundationService.activePriceBackfillRuns.get(activeKey);
+    if (activeRunId) {
+      const activeRun = MarketDataFoundationService.priceBackfillRuns.get(activeRunId);
+      if (activeRun && !activeRun.completedAt) {
+        return this.toPriceBackfillRunResponse(activeRun, {
+          alreadyRunning: true,
+          message: `A price backfill run is already running for ${scope.region}/${scope.assetType}.`,
+        });
+      }
+      MarketDataFoundationService.activePriceBackfillRuns.delete(activeKey);
+    }
+
+    const now = new Date();
+    const clamped = this.normalizePriceBackfillRunRequest(request);
+    const repairPlan = await this.repairPlan(scope);
+    const totalCount = repairPlan.supportedPriceBackfillNeeded ?? repairPlan.priceBackfillNeeded ?? 0;
+    const runId = this.createPriceBackfillRunId(now);
+    const run: PriceBackfillRunRecord = {
+      success: true,
+      runId,
+      status: 'RUNNING',
+      message: 'Price backfill started in the background.',
+      region: scope.region,
+      assetType: scope.assetType,
+      scopeType: 'PRICE_BACKFILL',
+      batchSize: clamped.batchSize,
+      workerConcurrency: clamped.workerConcurrency,
+      providerThrottleMs: clamped.providerThrottleMs,
+      maxBatches: clamped.maxBatches,
+      totalCount,
+      processedCount: 0,
+      currentBatchNumber: 0,
+      batchesPlanned: Math.min(clamped.maxBatches, Math.ceil(totalCount / clamped.batchSize)),
+      batchesExecuted: 0,
+      updated: 0,
+      skipped: 0,
+      failed: 0,
+      noOp: 0,
+      priceRowsReceived: 0,
+      priceRowsInserted: 0,
+      priceRowsUpdated: 0,
+      priceRowsNoOp: 0,
+      zeroRowProviderReturns: 0,
+      warningCount: 0,
+      warnings: [],
+      recentErrors: [],
+      latestBatch: null,
+      remainingCandidates: totalCount,
+      hasMore: totalCount > 0,
+      percentComplete: totalCount > 0 ? 0 : 100,
+      startedAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+      completedAt: null,
+      statusUrl: `/api/v1/market-data/prices/backfill-runs/${runId}`,
+      activeKey,
+      cancelRequested: false,
+      force: request.force === true || request.fullReload === true,
+      fullReload: request.fullReload === true,
+      processedStockIds: new Set<string>(),
+    };
+
+    for (const warning of clamped.warnings) this.addPriceBackfillRunWarning(run, warning);
+    MarketDataFoundationService.priceBackfillRuns.set(runId, run);
+    MarketDataFoundationService.activePriceBackfillRuns.set(activeKey, runId);
+    this.prunePriceBackfillRuns();
+
+    setTimeout(() => {
+      void this.processPriceBackfillRun(runId);
+    }, 0);
+
+    return this.toPriceBackfillRunResponse(run);
+  }
+
+  getPriceBackfillRun(runId: string): PriceBackfillRunStatusResponse | null {
+    const run = MarketDataFoundationService.priceBackfillRuns.get(runId);
+    return run ? this.toPriceBackfillRunResponse(run) : null;
+  }
+
+  activePriceBackfillRun(request: Pick<MarketDataRepairRequest, 'region' | 'assetType'> = {}): PriceBackfillRunStatusResponse | null {
+    const scope = this.repairScope(request);
+    const activeKey = this.priceBackfillActiveKey(scope.region, scope.assetType);
+    const activeRunId = MarketDataFoundationService.activePriceBackfillRuns.get(activeKey);
+    if (!activeRunId) return null;
+    const run = MarketDataFoundationService.priceBackfillRuns.get(activeRunId);
+    if (!run || run.completedAt) {
+      MarketDataFoundationService.activePriceBackfillRuns.delete(activeKey);
+      return null;
+    }
+    return this.toPriceBackfillRunResponse(run);
+  }
+
+  cancelPriceBackfillRun(runId: string): PriceBackfillRunStatusResponse | null {
+    const run = MarketDataFoundationService.priceBackfillRuns.get(runId);
+    if (!run) return null;
+    if (this.isCatalogSyncTerminal(run.status)) {
+      return this.toPriceBackfillRunResponse(run);
+    }
+    run.cancelRequested = true;
+    run.status = 'PARTIAL';
+    run.message = 'Cancellation requested. The current price-backfill batch will finish before the run stops.';
+    this.touchPriceBackfillRun(run);
+    return this.toPriceBackfillRunResponse(run);
   }
 
   get(id: string) {
@@ -3261,7 +3487,15 @@ export class MarketDataFoundationService {
     };
   }
 
-  fetchHistorical(symbol: string, startDate?: Date, endDate?: Date) {
+  async fetchHistorical(symbol: string, startDate?: Date, endDate?: Date, options: { region?: string; assetType?: string; exchange?: string | null } = {}) {
+    if (this.angelOneMarketDataProvider.canHandleHistorical(symbol, options)) {
+      try {
+        return await this.angelOneMarketDataProvider.fetchHistorical(symbol, startDate, endDate, options);
+      } catch (error) {
+        if (this.angelOneMarketDataProvider.shouldFailClosed()) throw error;
+        console.warn(`${symbol}: Angel One historical fetch failed; falling back to Yahoo because ANGEL_ONE_FAIL_CLOSED=false.`);
+      }
+    }
     return this.marketDataProvider.fetchHistorical(symbol, startDate, endDate);
   }
 
@@ -3352,10 +3586,6 @@ export class MarketDataFoundationService {
 
     const providerEndDate = gate.providerEndDate ?? now;
     const batchSize = Math.max(1, Math.min(options.batchSize ?? 25, 250));
-    const lookbackTradingDays = Math.max(1, Math.min(options.lookbackTradingDays ?? 3, 10));
-    const startDate = new Date(now);
-    startDate.setUTCDate(startDate.getUTCDate() - Math.max(lookbackTradingDays * 2 + 1, 7));
-    startDate.setUTCHours(0, 0, 0, 0);
 
     const tasks = await this.repository.listActiveStockSyncTasks({ region, assetType }, batchSize);
     const summary: ScheduledRegionSyncSummary = {
@@ -3378,7 +3608,7 @@ export class MarketDataFoundationService {
     for (const task of tasks) {
       try {
         await this.throttleIngestion(250);
-        const result = await this.ingestSymbol(task.symbol, startDate, providerEndDate, false, {
+        const result = await this.ingestSymbol(task.symbol, undefined, providerEndDate, false, {
           region,
           assetType,
           skipFreshnessGate: true,
@@ -3497,7 +3727,11 @@ export class MarketDataFoundationService {
 
     console.log(`  Fetching data from ${effectiveStartDate.toISOString().split('T')[0]} to ${effectiveEndDate.toISOString().split('T')[0]}`);
 
-    let prices = await this.fetchHistorical(providerSymbol, effectiveStartDate, effectiveEndDate);
+    let prices = await this.fetchHistorical(providerSymbol, effectiveStartDate, effectiveEndDate, {
+      region,
+      assetType,
+      exchange: stock?.exchange,
+    });
     const exchangeFallback = await this.fetchIndianExchangeEodFallbackIfNeeded({
       stock,
       symbol,
@@ -4353,6 +4587,241 @@ export class MarketDataFoundationService {
     };
   }
 
+  private async processPriceBackfillRun(runId: string): Promise<void> {
+    const run = MarketDataFoundationService.priceBackfillRuns.get(runId);
+    if (!run) return;
+
+    try {
+      if (run.totalCount <= 0) {
+        run.status = 'COMPLETED';
+        run.message = 'Price backfill queue is already empty.';
+        run.hasMore = false;
+        run.percentComplete = 100;
+        this.completePriceBackfillRun(run);
+        return;
+      }
+
+      while (run.batchesExecuted < run.maxBatches) {
+        if (run.cancelRequested) {
+          run.status = 'CANCELED';
+          run.message = 'Price backfill canceled after the current batch.';
+          this.completePriceBackfillRun(run);
+          return;
+        }
+
+        run.currentBatchNumber = run.batchesExecuted + 1;
+        run.message = `Processing price backfill batch ${run.currentBatchNumber} of ${run.batchesPlanned || run.maxBatches}.`;
+        this.touchPriceBackfillRun(run);
+
+        const processedBeforeBatch = run.processedCount;
+        const summary = await this.backfillPrices({
+          region: run.region,
+          assetType: run.assetType,
+          batchSize: run.batchSize,
+          offset: 0,
+          workerConcurrency: run.workerConcurrency,
+          force: run.force,
+          fullReload: run.fullReload,
+          excludeStockIds: Array.from(run.processedStockIds),
+        });
+        run.batchesExecuted += 1;
+        this.applyPriceBackfillBatchSummary(run, summary);
+        this.touchPriceBackfillRun(run);
+
+        if (run.cancelRequested) {
+          run.status = 'CANCELED';
+          run.message = 'Price backfill canceled after the current batch.';
+          this.completePriceBackfillRun(run);
+          return;
+        }
+
+        if (!summary.hasMore) {
+          run.hasMore = false;
+          run.percentComplete = 100;
+          run.status = run.failed > 0 ? 'PARTIAL' : 'COMPLETED';
+          run.message = run.failed > 0
+            ? 'Price backfill completed with errors.'
+            : 'Price backfill completed.';
+          this.completePriceBackfillRun(run);
+          return;
+        }
+
+        if (run.processedCount === processedBeforeBatch) {
+          run.status = 'PARTIAL';
+          run.hasMore = true;
+          run.message = 'Price backfill stopped because the last batch made no progress.';
+          this.addPriceBackfillRunWarning(run, 'Last price-backfill batch made no progress while eligible rows remain.');
+          this.completePriceBackfillRun(run);
+          return;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      run.status = 'PARTIAL';
+      run.hasMore = run.remainingCandidates > 0;
+      run.message = run.hasMore
+        ? 'Price backfill reached the maximum background batch limit. More eligible rows remain.'
+        : 'Price backfill completed within the maximum background batch limit.';
+      if (run.hasMore) {
+        this.addPriceBackfillRunWarning(run, 'Max batches reached before the price-backfill queue drained.');
+      }
+      this.completePriceBackfillRun(run);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown price backfill failure';
+      this.addPriceBackfillRunError(run, undefined, message);
+      run.status = run.batchesExecuted === 0 && run.processedCount === 0 ? 'FAILED' : 'PARTIAL';
+      run.message = `Price backfill failed: ${message}`;
+      this.completePriceBackfillRun(run);
+    }
+  }
+
+  private applyPriceBackfillBatchSummary(run: PriceBackfillRunRecord, summary: MarketDataRepairSummary): void {
+    run.latestBatch = summary;
+    run.processedCount += summary.processedCount || 0;
+    run.updated += summary.updated || 0;
+    run.skipped += summary.skipped || 0;
+    run.failed += summary.failed || 0;
+    run.noOp += summary.noOp || 0;
+    run.priceRowsReceived += summary.priceRowsReceived || 0;
+    run.priceRowsInserted += summary.priceRowsInserted || 0;
+    run.priceRowsUpdated += summary.priceRowsUpdated || 0;
+    run.priceRowsNoOp += summary.priceRowsNoOp || 0;
+    run.zeroRowProviderReturns += summary.zeroRowProviderReturns || 0;
+    for (const stockId of summary.processedStockIds || []) {
+      run.processedStockIds.add(stockId);
+    }
+    run.remainingCandidates = summary.remainingCandidates ?? Math.max(0, run.totalCount - run.processedCount);
+    run.hasMore = summary.hasMore === true;
+    run.percentComplete = this.priceBackfillPercent(run);
+
+    for (const warning of summary.warnings || []) {
+      this.addPriceBackfillRunWarning(run, warning);
+    }
+    if ((summary.failed || 0) > 0) {
+      this.addPriceBackfillRunError(run, undefined, `${summary.failed} symbols failed in batch ${run.currentBatchNumber}.`);
+    }
+  }
+
+  private normalizePriceBackfillRunRequest(request: PriceBackfillRunRequest) {
+    const warnings: string[] = [];
+    const batchSize = this.clampCatalogSyncNumber(request.batchSize ?? request.limit, 20, 1, 100, 'batchSize', warnings);
+    const workerConcurrency = this.clampCatalogSyncNumber(
+      request.workerConcurrency,
+      this.priceBackfillConcurrency(request),
+      1,
+      4,
+      'workerConcurrency',
+      warnings
+    );
+    const maxBatches = this.clampCatalogSyncNumber(
+      request.maxBatches ?? request.maxBatchesPerAction,
+      100,
+      1,
+      500,
+      'maxBatches',
+      warnings
+    );
+    return {
+      batchSize,
+      workerConcurrency,
+      maxBatches,
+      providerThrottleMs: this.priceBackfillProviderThrottleMs(),
+      warnings,
+    };
+  }
+
+  private priceBackfillActiveKey(region: string, assetType: string): string {
+    return `${region}:${assetType}:PRICE_BACKFILL`;
+  }
+
+  private createPriceBackfillRunId(now: Date): string {
+    const stamp = now.toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
+    const suffix = Math.random().toString(36).slice(2, 8);
+    return `price-backfill-${stamp}-${suffix}`;
+  }
+
+  private priceBackfillPercent(run: PriceBackfillRunRecord): number {
+    if (run.totalCount <= 0) return 100;
+    const completedByRemaining = Math.max(0, run.totalCount - run.remainingCandidates);
+    const completed = Math.max(run.processedCount, completedByRemaining);
+    return Math.min(100, Number(((completed / run.totalCount) * 100).toFixed(1)));
+  }
+
+  private touchPriceBackfillRun(run: PriceBackfillRunRecord): void {
+    run.updatedAt = new Date().toISOString();
+  }
+
+  private completePriceBackfillRun(run: PriceBackfillRunRecord): void {
+    const now = new Date().toISOString();
+    run.percentComplete = this.priceBackfillPercent(run);
+    run.updatedAt = now;
+    run.completedAt = now;
+    MarketDataFoundationService.activePriceBackfillRuns.delete(run.activeKey);
+    this.prunePriceBackfillRuns();
+  }
+
+  private addPriceBackfillRunWarning(run: PriceBackfillRunRecord, warning: string): void {
+    run.warningCount += 1;
+    run.warnings.push(warning);
+    if (run.warnings.length > 20) {
+      run.warnings.splice(0, run.warnings.length - 20);
+    }
+  }
+
+  private addPriceBackfillRunError(run: PriceBackfillRunRecord, symbol: string | undefined, message: string): void {
+    run.recentErrors.push({ symbol, message, timestamp: new Date().toISOString() });
+    if (run.recentErrors.length > 20) {
+      run.recentErrors.splice(0, run.recentErrors.length - 20);
+    }
+  }
+
+  private toPriceBackfillRunResponse(
+    run: PriceBackfillRunRecord,
+    overrides: Partial<PriceBackfillRunStatusResponse> = {}
+  ): PriceBackfillRunStatusResponse {
+    return {
+      success: true,
+      runId: run.runId,
+      status: run.status,
+      message: run.message,
+      region: run.region,
+      assetType: run.assetType,
+      scopeType: 'PRICE_BACKFILL',
+      batchSize: run.batchSize,
+      workerConcurrency: run.workerConcurrency,
+      providerThrottleMs: run.providerThrottleMs,
+      maxBatches: run.maxBatches,
+      totalCount: run.totalCount,
+      processedCount: run.processedCount,
+      currentBatchNumber: run.currentBatchNumber,
+      batchesPlanned: run.batchesPlanned,
+      batchesExecuted: run.batchesExecuted,
+      updated: run.updated,
+      skipped: run.skipped,
+      failed: run.failed,
+      noOp: run.noOp,
+      priceRowsReceived: run.priceRowsReceived,
+      priceRowsInserted: run.priceRowsInserted,
+      priceRowsUpdated: run.priceRowsUpdated,
+      priceRowsNoOp: run.priceRowsNoOp,
+      zeroRowProviderReturns: run.zeroRowProviderReturns,
+      warningCount: run.warningCount,
+      warnings: [...run.warnings],
+      recentErrors: [...run.recentErrors],
+      latestBatch: run.latestBatch,
+      remainingCandidates: run.remainingCandidates,
+      hasMore: run.hasMore,
+      percentComplete: run.percentComplete,
+      startedAt: run.startedAt,
+      updatedAt: run.updatedAt,
+      completedAt: run.completedAt,
+      statusUrl: run.statusUrl,
+      cancelRequested: run.cancelRequested,
+      ...overrides,
+    };
+  }
+
   private async persistCatalogSyncRunState(
     run: CatalogSyncRunRecord,
     status: 'PENDING' | 'SYNCED' | 'FINAL_CONFIRMED' | 'FAILED',
@@ -4397,6 +4866,19 @@ export class MarketDataFoundationService {
     for (const run of terminalRuns) {
       if (!keepIds.has(run.runId) && Date.parse(run.completedAt || run.updatedAt) < cutoff) {
         MarketDataFoundationService.catalogSyncRuns.delete(run.runId);
+      }
+    }
+  }
+
+  private prunePriceBackfillRuns(): void {
+    const terminalRuns = Array.from(MarketDataFoundationService.priceBackfillRuns.values())
+      .filter((run) => run.completedAt)
+      .sort((a, b) => Date.parse(b.completedAt || b.updatedAt) - Date.parse(a.completedAt || a.updatedAt));
+    const keepIds = new Set(terminalRuns.slice(0, 10).map((run) => run.runId));
+    const cutoff = Date.now() - 30 * 60_000;
+    for (const run of terminalRuns) {
+      if (!keepIds.has(run.runId) && Date.parse(run.completedAt || run.updatedAt) < cutoff) {
+        MarketDataFoundationService.priceBackfillRuns.delete(run.runId);
       }
     }
   }
@@ -5823,7 +6305,7 @@ export class MarketDataFoundationService {
     const requiredHistoryComplete = Boolean(
       storedHistoryStartDate
       && storedHistoryEndDate
-      && storedHistoryStartDate <= requiredHistoryStartDate
+      && this.storedHistoryStartCoversRequiredWindow(storedHistoryStartDate, requiredHistoryStartDate)
       && (!validationWindow.latestCompletedEodDate || storedHistoryEndDate >= validationWindow.latestCompletedEodDate)
       && storedHistoryBars >= requiredHistoryMinimumBars
     );
@@ -5849,6 +6331,15 @@ export class MarketDataFoundationService {
     const calendarDays = Math.floor((end.getTime() - start.getTime()) / 86_400_000) + 1;
     const expectedTradingDays = Math.floor((calendarDays / 365.25) * 252);
     return Math.max(1, Math.floor(expectedTradingDays * 0.9));
+  }
+
+  private storedHistoryStartCoversRequiredWindow(storedHistoryStartDate: string, requiredHistoryStartDate: string): boolean {
+    if (storedHistoryStartDate <= requiredHistoryStartDate) return true;
+    const stored = new Date(`${storedHistoryStartDate}T00:00:00.000Z`);
+    const required = new Date(`${requiredHistoryStartDate}T00:00:00.000Z`);
+    if (Number.isNaN(stored.getTime()) || Number.isNaN(required.getTime())) return false;
+    const deltaDays = Math.floor((stored.getTime() - required.getTime()) / 86_400_000);
+    return deltaDays <= 7;
   }
 
   private providerStatusForValidation(
@@ -6539,7 +7030,7 @@ export class MarketDataFoundationService {
       return this.repairCatalogIdentityFromRows({
         ...base,
         force: request.force,
-      }, sourceSnapshot.catalogSnapshot);
+      }, sourceSnapshot.catalogSnapshot, { actionableOnly: true });
     }
     if (action === 'PROVIDER_BUSINESS_METADATA_REPAIR') {
       return this.repairProviderBusinessMetadata({
@@ -6557,7 +7048,7 @@ export class MarketDataFoundationService {
     }
     return this.backfillPrices({
       ...base,
-      force: request.force !== false,
+      force: request.force === true || request.fullReload === true,
       fullReload: request.fullReload,
     });
   }
@@ -6833,6 +7324,23 @@ export class MarketDataFoundationService {
     return Math.max(1, Math.min(Number(request.workerConcurrency) || this.readPositiveNumber(process.env.MARKET_DATA_PROVIDER_METADATA_REPAIR_CONCURRENCY, 4), 6));
   }
 
+  private priceBackfillConcurrency(request: Pick<MarketDataRepairRequest, 'workerConcurrency'>) {
+    return Math.max(1, Math.min(Number(request.workerConcurrency) || this.readPositiveNumber(process.env.MARKET_DATA_PRICE_BACKFILL_CONCURRENCY, 2), 4));
+  }
+
+  private priceBackfillProviderThrottleMs() {
+    const fallback = process.env.NODE_ENV === 'test' ? 0 : 1250;
+    return Math.max(0, Math.min(this.readPositiveNumber(process.env.MARKET_DATA_PRICE_BACKFILL_PROVIDER_THROTTLE_MS, fallback), 10_000));
+  }
+
+  private isYahooRateLimitError(message: string): boolean {
+    return /too many requests|rate.?limit|\\b429\\b/i.test(message);
+  }
+
+  private isAngelOneTokenNotFoundError(message: string): boolean {
+    return /angel one .*scrip master .*token .*not found|angel one scrip master did not contain/i.test(message);
+  }
+
   private catalogBackfillConcurrency(request: Pick<CatalogBackfillRequest, 'workerConcurrency' | 'validateProvider'>) {
     const fallback = request.validateProvider
       ? this.readPositiveNumber(process.env.MARKET_DATA_CATALOG_BACKFILL_PROVIDER_CONCURRENCY, 4)
@@ -6953,6 +7461,21 @@ export class MarketDataFoundationService {
     return byKey;
   }
 
+  private actionableCatalogIdentityWorkItems(
+    rows: CreateStockRequest[],
+    stocksByKey: Map<string, any[]>
+  ): CatalogIdentityWorkItem[] {
+    const workItems: CatalogIdentityWorkItem[] = [];
+    for (const row of rows) {
+      for (const stock of this.findStocksForCatalogIdentityRow(row, stocksByKey)) {
+        const filledFields = this.repairedCatalogIdentityFields(stock, row);
+        if (filledFields.length === 0) continue;
+        workItems.push({ stock, row, filledFields });
+      }
+    }
+    return workItems;
+  }
+
   private findStockForCatalogIdentityRow(row: CreateStockRequest, stocksByKey: Map<string, any[]>) {
     for (const key of this.identityKeysForCatalogRow(row)) {
       const stocks = this.uniqueStocks(stocksByKey.get(key) || []);
@@ -6960,6 +7483,32 @@ export class MarketDataFoundationService {
       if (stocks.length > 1) return null;
     }
     return null;
+  }
+
+  private findStocksForCatalogIdentityRow(row: CreateStockRequest, stocksByKey: Map<string, any[]>): any[] {
+    for (const key of this.identityKeysForCatalogRow(row)) {
+      const stocks = this.uniqueStocks(stocksByKey.get(key) || []);
+      if (stocks.length === 0) continue;
+      if (stocks.length === 1) return stocks;
+      const safeMatches = this.safeDuplicateCatalogIdentityMatches(row, stocks);
+      if (safeMatches.length > 0) return safeMatches;
+      return [];
+    }
+    return [];
+  }
+
+  private safeDuplicateCatalogIdentityMatches(row: CreateStockRequest, stocks: any[]): any[] {
+    const rowExchange = this.identityText(row.exchange);
+    const rowProviderSymbol = this.identityText(row.providerSymbol);
+    const rowSourceSymbol = this.identityText(row.sourceSymbol || row.symbol || row.displaySymbol);
+    return stocks.filter((stock) => {
+      const stockExchange = this.identityText(stock.exchange);
+      if (rowExchange && stockExchange && rowExchange !== stockExchange) return false;
+      const stockProviderSymbol = this.identityText(stock.providerSymbol);
+      if (rowProviderSymbol && stockProviderSymbol === rowProviderSymbol) return true;
+      const stockSourceSymbol = this.identityText(stock.sourceSymbol || stock.symbol || stock.displaySymbol);
+      return Boolean(rowSourceSymbol && stockSourceSymbol && this.baseSymbolFromProviderSymbol(stockSourceSymbol) === this.baseSymbolFromProviderSymbol(rowSourceSymbol));
+    });
   }
 
   private identityKeysForCatalogRow(row: Partial<CreateStockRequest>): string[] {
@@ -7085,6 +7634,38 @@ export class MarketDataFoundationService {
     if (!this.hasValidMetadataValue(stock.industry)) missing.push('industry');
     if (!this.hasValidMarketCap(stock.marketCap)) missing.push('marketCap');
     return missing;
+  }
+
+  private businessMetadataBlockerDiagnostics(stocks: any[]): NonNullable<MarketDataRepairPlan['businessMetadataBlockerDiagnostics']> {
+    const byMissingFieldSet = new Map<string, number>();
+    let unresolvedTotal = 0;
+    let missingSector = 0;
+    let missingIndustry = 0;
+    let missingMarketCap = 0;
+
+    for (const stock of stocks) {
+      if (stock.isActive === false || stock.isDelisted === true) continue;
+      if (normalizeProviderStatus(stock.providerSupportStatus) !== 'SUPPORTED') continue;
+      const missing = this.missingBusinessMetadataFields(stock);
+      if (missing.length === 0) continue;
+      unresolvedTotal += 1;
+      if (missing.includes('sector')) missingSector += 1;
+      if (missing.includes('industry')) missingIndustry += 1;
+      if (missing.includes('marketCap')) missingMarketCap += 1;
+      const key = missing.join('+');
+      byMissingFieldSet.set(key, (byMissingFieldSet.get(key) || 0) + 1);
+    }
+
+    return {
+      requiredFields: ['sector', 'industry', 'marketCap'],
+      unresolvedTotal,
+      missingSector,
+      missingIndustry,
+      missingMarketCap,
+      byMissingFieldSet: Object.fromEntries(
+        [...byMissingFieldSet.entries()].sort(([a], [b]) => a.localeCompare(b))
+      ),
+    };
   }
 
   private providerBusinessMetadataHasUsefulFields(providerData: any): boolean {
@@ -7302,14 +7883,19 @@ export class MarketDataFoundationService {
     return overrides;
   }
 
-  private async priceBackfillCandidates(scope: { region: string; assetType: string }): Promise<PriceBackfillCandidate[]> {
+  private async priceBackfillCandidates(
+    scope: { region: string; assetType: string },
+    excludeStockIds: Set<string> = new Set(),
+    options: { includeRetryableBlocked?: boolean } = {}
+  ): Promise<PriceBackfillCandidate[]> {
     const stocks = await this.repository.listStocksForUniverseHealth(scope);
     const { readinessBySymbol, statsBySymbol } = await this.universeReadinessAndStatsForStocks(stocks, scope);
     const validationWindow = this.providerValidationWindow(scope);
-    const blockedStockIds = await this.blockedPriceBackfillStockIds(scope);
+    const blockedStockIds = await this.blockedPriceBackfillStockIds(scope, options.includeRetryableBlocked === true);
     return stocks
       .flatMap((stock): PriceBackfillCandidate[] => {
         if (stock.isActive === false || stock.isDelisted === true) return [];
+        if (stock.id && excludeStockIds.has(stock.id)) return [];
         if (normalizeProviderStatus(stock.providerSupportStatus) !== 'SUPPORTED') return [];
         if (blockedStockIds.has(stock.id)) return [];
         const readiness = readinessBySymbol.get(stock.symbol);
@@ -7367,6 +7953,23 @@ export class MarketDataFoundationService {
     repairType: string
   ) {
     return repairStatesByStockId?.get(stockId)?.find((state) => state.repairType === repairType) || null;
+  }
+
+  private priceBackfillBlockReason(
+    repairStatesByStockId: Map<string, any[]> | undefined,
+    stockId: string,
+    blockedWithoutState: boolean
+  ): 'manual' | 'retry' | null {
+    const state = this.repairStateForStock(repairStatesByStockId, stockId, 'PRICE_BACKFILL');
+    if (!state) return blockedWithoutState ? 'manual' : null;
+    if (state.status === 'MANUAL_REQUIRED') return 'manual';
+    if (state.status === 'RETRY_COOLDOWN') return 'retry';
+    if (state.status === 'FAILED_RETRYABLE') {
+      if (!state.nextRetryAt) return 'retry';
+      const nextRetryAt = state.nextRetryAt instanceof Date ? state.nextRetryAt : new Date(state.nextRetryAt);
+      return Number.isNaN(nextRetryAt.getTime()) || nextRetryAt > new Date() ? 'retry' : null;
+    }
+    return null;
   }
 
   private retryStateBucket(state: any, now = new Date()): 'manual' | 'blocked' | 'eligible' | 'cooldown' | null {
@@ -7444,10 +8047,16 @@ export class MarketDataFoundationService {
     };
   }
 
-  private async blockedPriceBackfillStockIds(scope: { region: string; assetType: string }): Promise<Set<string>> {
+  private async blockedPriceBackfillStockIds(
+    scope: { region: string; assetType: string },
+    includeRetryableBlocked = false
+  ): Promise<Set<string>> {
     const repositoryAny = this.repository as any;
     if (typeof repositoryAny.listBlockedPriceBackfillStockIds !== 'function') return new Set();
-    const ids = await repositoryAny.listBlockedPriceBackfillStockIds(scope);
+    const ids = await repositoryAny.listBlockedPriceBackfillStockIds({
+      ...scope,
+      includeRetryable: includeRetryableBlocked,
+    });
     return new Set(ids);
   }
 
@@ -7559,7 +8168,7 @@ export class MarketDataFoundationService {
   private hasValidMetadataValue(value: unknown): value is string {
     if (typeof value !== 'string') return false;
     const normalized = value.trim().toUpperCase();
-    return Boolean(normalized) && !['UNKNOWN', 'N/A', 'NA', 'NONE', 'NULL'].includes(normalized);
+    return Boolean(normalized) && !['UNKNOWN', 'N/A', 'NA', 'NONE', 'NULL', '-', '--'].includes(normalized);
   }
 
   private hasValidMarketCap(value: unknown): boolean {
@@ -7699,10 +8308,8 @@ export class MarketDataFoundationService {
     return 'UNKNOWN';
   }
 
-  private normalizeInstrumentAssetType(value?: string | null, symbol?: string | null, name?: string | null): string {
+  private normalizeInstrumentAssetType(value?: string | null, symbol?: string | null, _name?: string | null): string {
     const normalizedSymbol = symbol?.trim().toUpperCase() || '';
-    const normalizedName = name?.trim().toUpperCase() || '';
-    if (normalizedSymbol.includes('FUT') || normalizedName.includes('FUTURE')) return 'FUTURE';
     if (normalizedSymbol.startsWith('^')) return 'INDEX';
     return this.normalizeAssetType(value);
   }
@@ -7920,6 +8527,7 @@ export class MarketDataFoundationService {
     const sourceSymbol = this.readCsv(row, ['SYMBOL', 'SM_SYMBOL', 'TRADING SYMBOL', 'TRADINGSYMBOL']);
     const name = this.readCsv(row, [
       'NAME OF COMPANY',
+      'NAME_OF_COMPANY',
       'NAME',
       'COMPANY NAME',
       'SECURITY NAME',
@@ -7930,8 +8538,8 @@ export class MarketDataFoundationService {
       'ETF NAME',
       'SCHEME NAME',
     ]);
-    const isin = this.readCsv(row, ['ISIN', 'ISIN NUMBER', 'ISINNUMBER']);
-    const listingDate = this.readCsv(row, ['DATE OF LISTING', 'DATEOFLISTING']);
+    const isin = this.readCsv(row, ['ISIN', 'ISIN NUMBER', 'ISIN_NUMBER', 'ISINNUMBER']);
+    const listingDate = this.readCsv(row, ['DATE OF LISTING', 'DATE_OF_LISTING', 'DATEOFLISTING']);
     const series = this.readCsv(row, ['SERIES', 'SM_SERIES', 'INSTRUMENT TYPE', 'INSTRUMENT']).toUpperCase();
     if (!sourceSymbol || !name) return null;
     const sourceSymbolUpper = this.baseSymbolFromProviderSymbol(sourceSymbol);
@@ -8204,9 +8812,33 @@ export class MarketDataFoundationService {
   }
 
   private parseCatalogDate(value: string): Date | null {
-    if (!value) return null;
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
+    const trimmed = value?.trim();
+    if (!trimmed) return null;
+    const isoDate = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+    if (isoDate) {
+      const [, year, month, day] = isoDate;
+      return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+    }
+    const dmyDate = /^(\d{1,2})[-/ ]([A-Za-z]{3,})[-/ ](\d{2,4})$/.exec(trimmed);
+    if (dmyDate) {
+      const [, day, monthText, yearText] = dmyDate;
+      const monthIndex = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'].indexOf(monthText.slice(0, 3).toUpperCase());
+      if (monthIndex >= 0) {
+        const shortYear = Number(yearText);
+        const year = yearText.length === 2 ? (shortYear >= 70 ? 1900 + shortYear : 2000 + shortYear) : shortYear;
+        return new Date(Date.UTC(year, monthIndex, Number(day)));
+      }
+    }
+    const numericDmyDate = /^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/.exec(trimmed);
+    if (numericDmyDate) {
+      const [, dayText, monthText, yearText] = numericDmyDate;
+      const shortYear = Number(yearText);
+      const year = yearText.length === 2 ? (shortYear >= 70 ? 1900 + shortYear : 2000 + shortYear) : shortYear;
+      return new Date(Date.UTC(year, Number(monthText) - 1, Number(dayText)));
+    }
+    const parsed = new Date(trimmed);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return new Date(Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()));
   }
 
   private splitCsvLine(line: string): string[] {
@@ -8251,6 +8883,7 @@ export class MarketDataFoundationService {
       'LEGACY_NIFTY500',
       'LEGACY_DATABASE',
       'NSE_EQUITY_SECURITIES',
+      'NSE_SME_EQUITY_SECURITIES',
       'NSE_EQUITY_DERIVATIVES_UNDERLYINGS',
       'NSE_INDEX_SECURITIES',
       'BSE_INDEX_SECURITIES',
@@ -8284,12 +8917,18 @@ export class MarketDataFoundationService {
   }
 
   private async throttleIngestion(minDelayMs = 1000) {
-    const now = Date.now();
-    const elapsed = now - MarketDataFoundationService.lastIngestionAt;
-    if (elapsed < minDelayMs) {
-      await new Promise(resolve => setTimeout(resolve, minDelayMs - elapsed));
-    }
-    MarketDataFoundationService.lastIngestionAt = Date.now();
+    const throttle = async () => {
+      const delayMs = Math.max(0, minDelayMs);
+      const now = Date.now();
+      const elapsed = now - MarketDataFoundationService.lastIngestionAt;
+      if (elapsed < delayMs) {
+        await new Promise(resolve => setTimeout(resolve, delayMs - elapsed));
+      }
+      MarketDataFoundationService.lastIngestionAt = Date.now();
+    };
+    const next = MarketDataFoundationService.ingestionThrottleChain.then(throttle, throttle);
+    MarketDataFoundationService.ingestionThrottleChain = next.catch(() => undefined);
+    await next;
   }
 
   private async evaluateSyncFreshnessGate(input: {

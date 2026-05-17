@@ -13,6 +13,7 @@ export { MarketDataFoundationController } from './market-data-foundation.control
 export { MarketDataFoundationService, StockService } from './market-data-foundation.service';
 export { MarketDataFoundationRepository } from './market-data-foundation.repository';
 export { YahooFinanceIngestionService } from './market-data-foundation.provider';
+export { AngelOneMarketDataProvider, readAngelOneProviderConfig } from './market-data-foundation.angel-one-provider';
 export {
   enqueueIngestionJob,
   ingestionQueue,
@@ -26,6 +27,8 @@ export {
   getMarketDataFoundationScheduler,
   readMarketDataSchedulerConfig,
   startMarketDataFoundationScheduler,
+  startMarketDataStartupLoads,
+  startMarketDataStartupPriceBackfill,
 } from './market-data-foundation.scheduler';
 export {
   getMarketSessionConfig,
@@ -60,6 +63,8 @@ export type {
   MarketDataRepairRunResponse,
   MarketDataRepairRunStatus,
   MarketDataRepairSummary,
+  PriceBackfillRunRequest,
+  PriceBackfillRunStatusResponse,
   MarketDataUniverseHealth,
   MarketDataSchedulerDecision,
   MarketDataSchedulerRegionStatus,

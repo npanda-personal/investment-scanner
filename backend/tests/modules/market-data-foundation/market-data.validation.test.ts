@@ -123,6 +123,38 @@ describe('market data validation', () => {
     );
   });
 
+  it('keeps large price moves by default so corporate actions do not erase history', () => {
+    const result = partitionHistoricalPrices([
+      {
+        symbol: 'FCSSOFT.NS',
+        date: new Date('2025-01-01'),
+        open: 100,
+        high: 110,
+        low: 95,
+        close: 100,
+      },
+      {
+        symbol: 'FCSSOFT.NS',
+        date: new Date('2025-01-02'),
+        open: 210,
+        high: 230,
+        low: 200,
+        close: 220,
+      },
+      {
+        symbol: 'FCSSOFT.NS',
+        date: new Date('2025-01-03'),
+        open: 50,
+        high: 55,
+        low: 45,
+        close: 48,
+      },
+    ]);
+
+    expect(result.valid).toHaveLength(3);
+    expect(result.invalid).toHaveLength(0);
+  });
+
   it('validates required string inputs', () => {
     expect(validateRequiredString('AAPL', 'symbol')).toBeNull();
     expect(validateRequiredString('', 'symbol')).toBe('symbol is required');

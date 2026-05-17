@@ -445,6 +445,14 @@ export interface MarketDataRepairPlan {
   missingSector: number;
   missingIndustry: number;
   missingMarketCap: number;
+  businessMetadataBlockerDiagnostics?: {
+    requiredFields: Array<'sector' | 'industry' | 'marketCap'>;
+    unresolvedTotal: number;
+    missingSector: number;
+    missingIndustry: number;
+    missingMarketCap: number;
+    byMissingFieldSet: Record<string, number>;
+  };
   manualSectorIndustryRequired: number;
   topActions: Array<{
     action:
@@ -634,6 +642,7 @@ export interface MarketDataRepairSummary {
   retryCooldownSkipped?: number;
   manualRequiredSkipped?: number;
   providerCalls?: number;
+  providerThrottleMs?: number;
   providerTimeouts?: number;
   providerRetryableFailures?: number;
   freeFallbackRequired?: number;
@@ -1203,6 +1212,51 @@ export interface MarketDataCatalogSyncRunNotFoundResponse {
   success: false;
   code: 'RUN_NOT_FOUND' | string;
   message: string;
+}
+
+export interface MarketDataPriceBackfillRunRequest extends MarketDataRepairRequest {
+  maxBatches?: number;
+}
+
+export interface MarketDataPriceBackfillRunResponse {
+  success: boolean;
+  runId: string;
+  status: MarketDataCatalogSyncRunStatus;
+  message?: string;
+  region: string;
+  assetType: string;
+  scopeType?: 'PRICE_BACKFILL' | string;
+  batchSize?: number;
+  workerConcurrency?: number;
+  providerThrottleMs?: number;
+  maxBatches?: number;
+  totalCount?: number;
+  processedCount?: number;
+  currentBatchNumber?: number;
+  batchesPlanned?: number;
+  batchesExecuted?: number;
+  updated?: number;
+  skipped?: number;
+  failed?: number;
+  noOp?: number;
+  priceRowsReceived?: number;
+  priceRowsInserted?: number;
+  priceRowsUpdated?: number;
+  priceRowsNoOp?: number;
+  zeroRowProviderReturns?: number;
+  warningCount?: number;
+  warnings?: string[];
+  recentErrors?: MarketDataCatalogSyncRunRecentError[];
+  latestBatch?: MarketDataRepairSummary | null;
+  remainingCandidates?: number;
+  hasMore?: boolean;
+  percentComplete?: number;
+  startedAt?: string;
+  updatedAt?: string;
+  completedAt?: string | null;
+  statusUrl?: string;
+  alreadyRunning?: boolean;
+  cancelRequested?: boolean;
 }
 
 export interface MarketDataSchedulerRegionStatus {

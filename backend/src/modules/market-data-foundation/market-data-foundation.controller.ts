@@ -602,12 +602,63 @@ export class MarketDataFoundationController {
         assetType,
         batchSize: this.numberParam(req, 'batchSize') ?? this.numberParam(req, 'limit'),
         offset: this.numberParam(req, 'offset'),
+        workerConcurrency: this.numberParam(req, 'workerConcurrency'),
         force: this.parseOptionalBoolean(req.query.force ?? req.body?.force),
         fullReload: this.parseOptionalBoolean(req.query.fullReload ?? req.body?.fullReload),
       }));
     } catch (error) {
       console.error('Price backfill repair error:', error);
       return res.status(500).json({ error: 'Price backfill repair failed' });
+    }
+  };
+
+  startPriceBackfillRun = async (req: Request, res: Response) => {
+    try {
+      const { region, assetType } = this.getMarketFilter(req);
+      return res.status(202).json(await this.service.startPriceBackfillRun({
+        region,
+        assetType,
+        batchSize: this.numberParam(req, 'batchSize') ?? this.numberParam(req, 'limit'),
+        workerConcurrency: this.numberParam(req, 'workerConcurrency'),
+        maxBatches: this.numberParam(req, 'maxBatches'),
+        force: this.parseOptionalBoolean(req.query.force ?? req.body?.force),
+        fullReload: this.parseOptionalBoolean(req.query.fullReload ?? req.body?.fullReload),
+      }));
+    } catch (error: any) {
+      console.error('Price backfill run start error:', error);
+      return res.status(500).json({ error: error.message || 'Price backfill run start failed' });
+    }
+  };
+
+  getPriceBackfillRun = async (req: Request, res: Response) => {
+    try {
+      const run = this.service.getPriceBackfillRun(this.getParam(req.params.runId));
+      if (!run) return res.status(404).json({ error: 'Price backfill run not found' });
+      return res.json(run);
+    } catch (error: any) {
+      console.error('Price backfill run status error:', error);
+      return res.status(500).json({ error: error.message || 'Price backfill run status failed' });
+    }
+  };
+
+  activePriceBackfillRun = async (req: Request, res: Response) => {
+    try {
+      const { region, assetType } = this.getMarketFilter(req);
+      return res.json(this.service.activePriceBackfillRun({ region, assetType }));
+    } catch (error: any) {
+      console.error('Active price backfill run status error:', error);
+      return res.status(500).json({ error: error.message || 'Active price backfill run status failed' });
+    }
+  };
+
+  cancelPriceBackfillRun = async (req: Request, res: Response) => {
+    try {
+      const run = this.service.cancelPriceBackfillRun(this.getParam(req.params.runId));
+      if (!run) return res.status(404).json({ error: 'Price backfill run not found' });
+      return res.json(run);
+    } catch (error: any) {
+      console.error('Price backfill run cancel error:', error);
+      return res.status(500).json({ error: error.message || 'Price backfill run cancel failed' });
     }
   };
 

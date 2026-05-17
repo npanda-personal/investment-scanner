@@ -1,5 +1,8 @@
 # Logs
-logs
+# Canonical runtime dump location is logs/; keep generated logs ignored,
+# while retaining logs/.gitkeep so the directory exists in fresh checkouts.
+logs/*
+!logs/.gitkeep
 *.log
 npm-debug.log*
 yarn-debug.log*

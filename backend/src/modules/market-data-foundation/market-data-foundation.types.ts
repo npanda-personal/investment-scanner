@@ -61,6 +61,7 @@ export type CatalogSource =
   | 'LEGACY_NIFTY500'
   | 'LEGACY_DATABASE'
   | 'NSE_EQUITY_SECURITIES'
+  | 'NSE_SME_EQUITY_SECURITIES'
   | 'NSE_EQUITY_DERIVATIVES_UNDERLYINGS'
   | 'NSE_INDEX_SECURITIES'
   | 'BSE_INDEX_SECURITIES'
@@ -853,6 +854,7 @@ export interface MarketDataRepairRequest {
   batchSize?: number;
   limit?: number;
   offset?: number;
+  excludeStockIds?: string[];
   includeRetryFailed?: boolean;
   providerValidationQueue?: ProviderValidationQueue;
   force?: boolean;
@@ -996,6 +998,14 @@ export interface MarketDataRepairPlan {
   missingSector: number;
   missingIndustry: number;
   missingMarketCap: number;
+  businessMetadataBlockerDiagnostics?: {
+    requiredFields: Array<'sector' | 'industry' | 'marketCap'>;
+    unresolvedTotal: number;
+    missingSector: number;
+    missingIndustry: number;
+    missingMarketCap: number;
+    byMissingFieldSet: Record<string, number>;
+  };
   manualSectorIndustryRequired: number;
   topActions: Array<{
     action:
@@ -1078,6 +1088,7 @@ export interface MarketDataRepairSummary {
   retryCooldownSkipped?: number;
   manualRequiredSkipped?: number;
   providerCalls?: number;
+  providerThrottleMs?: number;
   providerTimeouts?: number;
   providerRetryableFailures?: number;
   freeFallbackRequired?: number;
@@ -1155,6 +1166,7 @@ export interface MarketDataRepairSummary {
   latestCompletedEodDate?: string | null;
   targetEndDate?: string | null;
   remainingCandidates?: number;
+  processedStockIds?: string[];
   fieldProvenance?: Array<{
     instrumentId: string;
     symbol: string;
@@ -1555,6 +1567,58 @@ export interface CatalogSyncRunStatusResponse {
   warningCount: number;
   warnings: string[];
   recentErrors: CatalogSyncRunError[];
+  hasMore: boolean;
+  percentComplete: number;
+  startedAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+  statusUrl: string;
+  alreadyRunning?: boolean;
+  cancelRequested?: boolean;
+}
+
+export interface PriceBackfillRunError {
+  symbol?: string;
+  message: string;
+  timestamp: string;
+}
+
+export interface PriceBackfillRunRequest extends MarketDataRepairRequest {
+  maxBatches?: number;
+  maxBatchesPerAction?: number;
+}
+
+export interface PriceBackfillRunStatusResponse {
+  success: boolean;
+  runId: string;
+  status: CatalogSyncRunStatus;
+  message: string;
+  region: string;
+  assetType: string;
+  scopeType: 'PRICE_BACKFILL';
+  batchSize: number;
+  workerConcurrency: number;
+  providerThrottleMs: number;
+  maxBatches: number;
+  totalCount: number;
+  processedCount: number;
+  currentBatchNumber: number;
+  batchesPlanned: number;
+  batchesExecuted: number;
+  updated: number;
+  skipped: number;
+  failed: number;
+  noOp: number;
+  priceRowsReceived: number;
+  priceRowsInserted: number;
+  priceRowsUpdated: number;
+  priceRowsNoOp: number;
+  zeroRowProviderReturns: number;
+  warningCount: number;
+  warnings: string[];
+  recentErrors: PriceBackfillRunError[];
+  latestBatch: MarketDataRepairSummary | null;
+  remainingCandidates: number;
   hasMore: boolean;
   percentComplete: number;
   startedAt: string;

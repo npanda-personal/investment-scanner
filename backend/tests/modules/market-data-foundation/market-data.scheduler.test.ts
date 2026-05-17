@@ -2,10 +2,11 @@
 import { MarketDataFoundationScheduler } from '../../../src/modules/market-data-foundation';
 
 describe('MarketDataFoundationScheduler', () => {
-  it('skips regions when session decision says sync is not useful', async () => {
+  it('skips regions when session decision says sync is not useful and latest completed candle is already stored', async () => {
     const service = {
+      activePriceBackfillRun: jest.fn().mockReturnValue(null),
       latestStoredCandleInfo: jest.fn().mockResolvedValue({
-        latestTradingDate: null,
+        latestTradingDate: '2026-05-04',
         finalConfirmed: false,
         syncState: null,
         tradingDate: '2026-05-05',
@@ -30,8 +31,45 @@ describe('MarketDataFoundationScheduler', () => {
     expect(service.syncScheduledRegion).not.toHaveBeenCalled();
   });
 
+  it('runs catch-up sync when latest completed candle is missing even if session decision would skip', async () => {
+    const service = {
+      activePriceBackfillRun: jest.fn().mockReturnValue(null),
+      latestStoredCandleInfo: jest.fn().mockResolvedValue({
+        latestTradingDate: '2026-05-01',
+        finalConfirmed: false,
+        syncState: null,
+        tradingDate: '2026-05-05',
+      }),
+      syncScheduledRegion: jest.fn().mockResolvedValue({
+        region: 'IN',
+        assetType: 'STOCK',
+        tradingDate: '2026-05-05',
+        rowsInserted: 1,
+        rowsUpdated: 0,
+        rowsNoOp: 0,
+      }),
+    };
+    const scheduler = new MarketDataFoundationScheduler(service as any, {
+      enabled: true,
+      intervalMinutes: 15,
+      regions: ['IN'],
+      assetType: 'STOCK',
+      batchSize: 25,
+      syncDuringMarketHours: false,
+      postCloseSyncWindowMinutes: 120,
+      finalizationGraceMinutes: 15,
+      skipWeekends: true,
+    });
+
+    const result = await scheduler.runOnce(new Date('2026-05-05T03:00:00.000Z'));
+
+    expect(result[0]).toMatchObject({ region: 'IN', skipped: false });
+    expect(service.syncScheduledRegion).toHaveBeenCalledTimes(1);
+  });
+
   it('uses incremental scheduled sync settings when session is useful', async () => {
     const service = {
+      activePriceBackfillRun: jest.fn().mockReturnValue(null),
       latestStoredCandleInfo: jest.fn().mockResolvedValue({
         latestTradingDate: null,
         finalConfirmed: false,
@@ -64,7 +102,6 @@ describe('MarketDataFoundationScheduler', () => {
     expect(service.syncScheduledRegion).toHaveBeenCalledWith('IN', expect.objectContaining({
       assetType: 'STOCK',
       batchSize: 25,
-      lookbackTradingDays: 3,
     }));
   });
 
@@ -74,6 +111,7 @@ describe('MarketDataFoundationScheduler', () => {
       release = () => resolve();
     });
     const service = {
+      activePriceBackfillRun: jest.fn().mockReturnValue(null),
       latestStoredCandleInfo: jest.fn().mockResolvedValue({
         latestTradingDate: null,
         finalConfirmed: false,
@@ -101,6 +139,35 @@ describe('MarketDataFoundationScheduler', () => {
 
     expect(second).toEqual([]);
     expect(service.syncScheduledRegion).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips latest-candle sync while a price backfill background run is active', async () => {
+    const service = {
+      activePriceBackfillRun: jest.fn().mockReturnValue({ runId: 'price-backfill-1', status: 'RUNNING' }),
+      latestStoredCandleInfo: jest.fn(),
+      syncScheduledRegion: jest.fn(),
+    };
+    const scheduler = new MarketDataFoundationScheduler(service as any, {
+      enabled: true,
+      intervalMinutes: 15,
+      regions: ['IN'],
+      assetType: 'STOCK',
+      batchSize: 25,
+      syncDuringMarketHours: false,
+      postCloseSyncWindowMinutes: 120,
+      finalizationGraceMinutes: 15,
+      skipWeekends: true,
+    });
+
+    const result = await scheduler.runOnce(new Date('2026-05-05T10:30:00.000Z'));
+
+    expect(result[0]).toMatchObject({
+      skipped: true,
+      reasonCode: 'PRICE_BACKFILL_RUNNING',
+      priceBackfillRunId: 'price-backfill-1',
+    });
+    expect(service.latestStoredCandleInfo).not.toHaveBeenCalled();
+    expect(service.syncScheduledRegion).not.toHaveBeenCalled();
   });
 
   it('status shows whether the latest completed candle is stored', async () => {

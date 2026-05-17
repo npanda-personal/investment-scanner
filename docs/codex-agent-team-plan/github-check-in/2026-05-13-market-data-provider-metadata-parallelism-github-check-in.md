@@ -17,7 +17,7 @@
 - `frontend/src/features/market-data-foundation/components/MarketDataStatusPanel.tsx`
 - `frontend/src/features/market-data-foundation/types.ts`
 - `frontend/tests/ui/market-data-foundation.spec.ts`
-- `docs/AGENTS.md`
+- `AGENTS.md`
 - `docs/codex-agent-team-plan/active-work-board.md`
 - `docs/codex-agent-team-plan/codex-agent-team.md`
 - `docs/codex-agent-team-plan/team-operating-model.md`

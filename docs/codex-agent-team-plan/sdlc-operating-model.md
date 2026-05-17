@@ -11,7 +11,9 @@ The process stays personal/local-first. Do not add paid services, paid tooling, 
 - Work in small vertical slices that deliver user-visible or module-verifiable value.
 - Keep the Top 5 priority pipeline moving; do not wait for a full roadmap before starting useful work.
 - Keep a minimum refined product backlog of five candidate requirements, bugs, enhancements, or app-review findings so the Product Owner lane does not stop after one requirement batch.
+- No Codex agent is started in standby/idle mode; each spawned agent receives a concrete task in the spawn instruction.
 - Keep one active implementation task per developer agent.
+- Independent non-conflicting items should be delegated/executed in parallel, with disjoint write scopes.
 - Use the single-writer rule for files/modules.
 - Preserve module boundaries and public contracts.
 - Treat tests, live-data checks, and docs as delivery artifacts, not optional cleanup.
@@ -139,6 +141,7 @@ Every work item must leave evidence, even when blocked.
 - Implementation evidence: changed files, behavior summary, tests/docs updated, and handoff.
 - Handoff quality evidence: work item, state, mode, owner, lane/module, exact files changed or inspected, checks run/skipped, assumptions, risks, blockers, shared-file requests, next gate, and evidence notes.
 - QA evidence: commands/checks run, result, logs/screenshots when useful, and skipped-test reasons.
+- Log evidence: any command, server, test, browser, or runtime log file must be written under `logs/` or a task-specific subfolder under `logs/`; do not create root-level `*.log` artifacts.
 - Data evidence: live-data validation for data-bearing UI/API changes.
 - GitHub check-in evidence: active branch, pushed remote, commit SHA, committed files, scoped-staging confirmation, unsafe/unaccepted-file exclusion confirmation, rollback notes, and CI status/link when available.
 - Documentation check-in evidence: confirmation that every task-owned doc/evidence file for the accepted requirement was committed and pushed with the task, or an explicit reason a doc was excluded because it belongs to unrelated future work, rejected work, or unaccepted scope.
@@ -214,6 +217,7 @@ Every module should expose enough diagnostic behavior for a local user to unders
 - UI should show meaningful empty/error states, not generic success-looking blanks.
 - Data-quality or readiness blockers should be visible and specific.
 - Logs should identify module, operation, input scope, and failure reason where practical.
+- File-based logs belong under `logs/`; root-level `*.log` files fail operational hygiene and must be corrected before release.
 - Health endpoints or health panels should exist for modules that own ingestion, repair, batching, or readiness.
 
 ## Release And Rollback
