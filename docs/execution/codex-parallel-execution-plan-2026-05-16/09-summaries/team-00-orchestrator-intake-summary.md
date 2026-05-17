@@ -94,6 +94,8 @@ Launch separate Codex chats or Codex automations for Teams 03, 02, 04, and 01 fi
 
 ## Product Owner Action
 
-Product Owner action required: yes for the three open Decision Inbox items only.
+Superseded by decision resolution checkpoint: `09-summaries/team-00-decision-resolution-checkpoint-2026-05-17.md`.
+
+Current Product Owner action required: no. The three Decision Inbox items that were open during intake are now resolved.
 
 Routine approvals are not needed for docs-only audits, requirement refinement, architecture prep, QA prep, queue maintenance, or Team 00 coordination under standing delegation.

@@ -4,9 +4,11 @@ Date: 2026-05-17
 
 ## Status
 
-Architecture-ready for later Decision Packet / ADR drafting only.
+ADR direction accepted for later formal ADR drafting.
 
-Source, Prisma, migration, route, provider, scheduler, and startup implementation remain blocked.
+Product Owner approved Option B as ADR direction only on 2026-05-17. Resolution: `07-decisions/DECISION-20260517-market-data-durable-readiness-storage-adr-resolution.md`.
+
+Source, Prisma, migration, route, provider, scheduler, startup, repository, service, generated type, Data Quality handoff, and executable test implementation remain blocked until separate implementation slices are approved.
 
 ## Contract Intent
 
@@ -72,16 +74,9 @@ Do not change:
 
 Do not run live providers, Angel One, repair runs, backfills, services, or tests in this docs-only preparation task.
 
-## Decision Packet Note
+## Decision Resolution Note
 
-A Decision Packet / ADR is needed later before choosing between:
-
-- expanding `PriceTick`,
-- adding a companion OHLC evidence table,
-- adding a durable readiness evidence table,
-- keeping current storage and limiting claims to derived/read-path evidence.
-
-The Decision Packet must cover migration path, rollback, Prisma impact, query/test strategy, downstream contract impact, and Product Owner approval. It was not created in this pass because implementation is not active now.
+The parent Decision Packet was resolved on 2026-05-17 as Option B ADR direction: companion durable readiness/evidence storage. The formal ADR must still cover migration path, rollback, Prisma impact, query/test strategy, downstream contract impact, and implementation slice boundaries. Source/schema/test implementation is not active now.
 
 ## Acceptance Criteria For Future Approval
 

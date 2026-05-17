@@ -1,3 +1,13 @@
+# Resolution Status
+
+Status: Resolved by Product Owner on 2026-05-17.
+
+Approved option: Option B, backend-only compatibility direction.
+
+Resolution record: `07-decisions/DECISION-20260517-trade-plan-no-target-dq-hard-block-resolution.md`
+
+This item is no longer open in `open-decisions.md`. The parent Decision Inbox blocker is resolved, but app-code child slices still require a refreshed backend-only work packet, QA scenarios, exact file reservations, and implementation handoff.
+
 # Decision Needed
 
 Decide the Trade Plan no-target compatibility and Data Quality hard-block policy before source changes to `trade-plan-risk-engine`.

@@ -4,9 +4,9 @@ Date: 2026-05-17
 
 ## Status
 
-Requirement refined. Not Ready for Implementation.
+Product policy resolved. Not Ready for Implementation.
 
-This is a parent policy requirement for Lane 3 consumers. It must become an accepted architecture/QA-backed contract before portfolio, watchlist, alerts, portfolio intelligence, or related UX implementation starts.
+This is a parent policy requirement for Lane 3 consumers. Product Owner approved Option B on 2026-05-17, but child implementation still requires refreshed architecture/QA-backed contracts, exact file reservations, and one-module-at-a-time work packets before portfolio, watchlist, alerts, portfolio intelligence, or related UX implementation starts.
 
 ## Product Value
 
@@ -28,14 +28,18 @@ Observed gaps:
 - Alerts create price, signal, portfolio, and watchlist events without checking instrument-level readiness or preserving DQ evidence.
 - Action-like alert behavior is higher risk than display-only portfolio/watchlist context and needs a Product Owner plus Architect policy decision.
 
-## Required Policy Decision
+## Resolved Policy Decision
 
-The Product Owner and Architect must decide the Lane 3 display-vs-action policy:
+Resolution: `07-decisions/DECISION-20260517-lane3-readiness-consumer-policy-resolution.md`
 
-- whether display-only portfolio/watchlist surfaces may show limited or stale data when clearly labeled,
-- whether action-like alert creation must require `READY` data and current latest-completed-session evidence,
-- whether portfolio intelligence can produce reliability/review labels when readiness is limited or missing,
-- what exact blocked state and reason fields must be exposed to users and downstream modules.
+Approved policy:
+
+- `READY` supports trusted display and action-like workflows.
+- `LIMITED` may appear only in passive portfolio, watchlist, or research contexts.
+- `LIMITED` must show visible warnings, reasons, and no reliability/action labels.
+- Alerts, action-like workflows, reliability labels, and trusted summaries require `READY`.
+- Missing, stale hard blockers, unsupported, `NOT_READY`, and `UNUSABLE` remain blocked.
+- Child slices must not overclaim reliability and must implement one module at a time with focused tests.
 
 ## Candidate Acceptance Criteria
 
@@ -94,4 +98,4 @@ Frontend files require separate UX approval and explicit reservation.
 
 ## Next Gate
 
-Architecture contract and QA plan. Do not move to Ready for Implementation until the policy decision, exact file reservations, QA plan, and work packet are accepted.
+Post-decision architecture and QA refresh. Do not move to Ready for Implementation until child contracts, exact file reservations, QA scenarios, and implementation work packets are accepted.

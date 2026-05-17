@@ -10,9 +10,9 @@ There are fewer than ten active candidates after removing completed bounded slic
 
 | Rank | ID | Next gate | Notes |
 | --- | --- | --- | --- |
-| 1 | CF-W1-L3-DQ-01 | Product/Architect policy decision + architecture contract + QA plan | Parent Lane 3 display-vs-action readiness policy. High unblock value for alerts, portfolio/watchlist, portfolio intelligence, research, and copilot trust surfaces. |
-| 2 | CF-W1-TP-01A | Architecture contract + QA plan + Product decision | Trade Plan no-target compatibility and DQ hard-block requirement is refined, but not code-ready. |
-| 3 | CF-W1-MD-02 | ADR / architecture contract + ADR QA checklist | Durable Market Data readiness evidence ADR. Schema/source implementation remains blocked until storage model and natural key are accepted. |
+| 1 | CF-W1-L3-DQ-01 | Child architecture contract + QA scenario refresh | Option B policy is accepted. High unblock value, but no app-code slice is ready until child module files are reserved. |
+| 2 | CF-W1-TP-01A | Backend-only child contract + QA scenario refresh | Option B policy is accepted. Trade Plan source work still needs exact backend reservations and implementation handoff. |
+| 3 | CF-W1-MD-02 | Formal ADR + ADR QA checklist | Option B ADR direction is accepted. Schema/source implementation remains blocked until separate approval-gated slices are prepared. |
 | 4 | CF-W1-MD-01 | Validation policy + QA plan | Market Data validation hardening QA plan exists; policy is still unresolved, and source/test execution remains blocked. |
 | 5 | CF-W1-UX-02 | Product/UX decision + architecture contract + QA plan | Copilot/research trust UX requirement and QA plan exist, but naming, trust fields, blocked states, and shared-file scope are unresolved. |
 | 6 | CF-W1-L3-ALERT-01 | Wait for `CF-W1-L3-DQ-01`; then architecture + QA handoff | Alert ownership backend slice is committed; readiness suppression remains blocked by Lane 3 readiness policy. |
@@ -25,9 +25,9 @@ These are the current Team 02 priorities. None is app-code ready.
 
 | ID | What is proven | What is missing | Current disposition |
 | --- | --- | --- | --- |
-| CF-W1-L3-DQ-01 | Requirement, draft contract, draft QA plan, and Decision Packet exist. Docs-only prep can continue. | Accepted display-vs-action policy, accepted consumer DTO fields, exact child-slice file reservations, accepted QA scenario matrix. | Keep in Product/Architect/QA refinement; implementation blocked by Decision Inbox. |
-| CF-W1-TP-01A | Requirement, draft contract, draft QA plan, and Decision Packet exist. It is independent of completed alert ownership and trigger DTO slices. | Accepted no-target replacement semantics, accepted DQ hard-block states including `LIMITED`, API/UI compatibility boundary, exact backend-only or split UI file reservations. | Keep in Product/Architect/QA refinement; implementation blocked by Decision Inbox. |
-| CF-W1-MD-02 | Requirement, draft contract, ADR QA plan, and Decision Packet exist. Docs-only ADR prep can proceed. | Accepted storage model, natural key, Prisma impact decision, migration/rollback/query/test strategy, and later source/schema work packet. | Keep in ADR/Decision prep; source/schema work blocked by Decision Inbox. |
+| CF-W1-L3-DQ-01 | Requirement, draft contract, draft QA plan, and Option B policy acceptance exist. | Accepted child DTO fields, exact child-slice file reservations, accepted QA scenario matrix. | Keep in post-decision architecture/QA refinement. |
+| CF-W1-TP-01A | Requirement, draft contract, draft QA plan, and Option B policy acceptance exist. | Exact backend-only source/test file reservations, API/UI exclusion proof, accepted QA scenario matrix. | Keep in post-decision architecture/QA refinement. |
+| CF-W1-MD-02 | Requirement, draft contract, ADR QA plan, and Option B ADR direction acceptance exist. | Formal ADR, migration/rollback/query/test strategy, and later source/schema work packet. | Keep in ADR prep; source/schema work blocked by shared-file gates. |
 
 ## Next Non-Blocked Candidates For Architecture / QA Prep
 
@@ -35,9 +35,9 @@ These items are not app-code ready.
 
 | Rank | ID | Prep gate | Guardrail |
 | --- | --- | --- | --- |
-| 1 | CF-W1-L3-DQ-01 | Product policy options, architecture contract, and QA scenarios | No portfolio/watchlist/alerts/source changes until display-vs-action policy and file reservations are accepted. |
-| 2 | CF-W1-TP-01A | Architecture contract and QA plan | Product/Architect target replacement and DQ hard-block semantics still required before source work. |
-| 3 | CF-W1-MD-02 | ADR packet and ADR QA checklist | No Prisma, schema, source, provider, startup, or test changes until ADR approval. |
+| 1 | CF-W1-L3-DQ-01 | Child architecture contract and QA scenarios | No portfolio/watchlist/alerts/source changes until child file reservations are accepted. |
+| 2 | CF-W1-TP-01A | Backend-only child architecture contract and QA plan | No source work until exact backend-only reservation and API/UI exclusions are accepted. |
+| 3 | CF-W1-MD-02 | Formal ADR and ADR QA checklist | No Prisma, schema, source, provider, startup, or test changes until separate implementation approval. |
 | 4 | CF-W1-MD-01 | Validation policy and QA plan | No Market Data source/test changes until policy is accepted. |
 | 5 | CF-W1-UX-02 | Copilot trust UX contract and QA scenarios | No UI/backend/source/shared-file changes until Product/UX/Architect naming, trust-field, blocked-state, and file-reservation decisions are accepted. |
 
@@ -56,4 +56,4 @@ These items are not app-code ready.
 
 ## Product Agent Recommendation
 
-Do not pull application-code work until a current item has an accepted requirement, accepted contract or architecture review, exact file reservation, QA plan, and no unresolved Product Owner, Architect, QA, shared-file, schema, provider, UI, or upstream blocker. Team 00 remains the only owner for Ready queue updates.
+Do not pull application-code work until a current item has an accepted requirement, accepted child contract or architecture review, exact file reservation, QA plan, and no unresolved Product Owner, Architect, QA, shared-file, schema, provider, UI, or upstream blocker. The resolved decisions are policy inputs only; they do not satisfy Ready criteria by themselves. Team 00 remains the only owner for Ready queue updates.

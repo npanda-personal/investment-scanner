@@ -8,11 +8,11 @@ Trade Plan no-target compatibility and Data Quality hard-block contract.
 
 ## State
 
-Docs-only contract draft prepared. Application implementation is blocked.
+Product policy accepted. Application implementation is blocked until the backend-only child packet is prepared.
 
 ## Owner / Lane / Module
 
-- Owner: Team 03 Architecture Factory until Product Owner and Architect decision.
+- Owner: Team 03 Architecture Factory for post-decision backend-only child packet preparation.
 - Lane: Lane 2.
 - Module: trade-plan-risk-engine.
 
@@ -42,13 +42,14 @@ Only active execution documentation under:
 
 ## Decisions Needed
 
-Product Owner and Architect must decide:
+Product Owner approved Option B:
 
-- whether the existing `target` object remains as a compatibility field,
-- whether trusted Trade Plan outputs should emit `target = null`,
-- whether frontend labels change from target/reward to exit/invalidation/risk review,
-- how `LIMITED` Data Quality affects paper-readiness status,
-- how existing stored Trade Plan rows should be treated on read paths.
+- existing target-shaped fields remain compatibility-only for now,
+- target-shaped fields must not be trusted paper-readiness,
+- no arbitrary predefined target-price semantics,
+- trusted output language uses rule-based exit, invalidation, risk-review, evidence, and reason-summary wording,
+- missing or blocked DQ hard-blocks trusted Trade Plan readiness,
+- `LIMITED` is blocked or limited-review-only until later narrowed by Product Owner.
 
 ## Future Reservation Model After Decision
 
@@ -105,4 +106,4 @@ Exact current write scope for this Team 03 pass:
 
 Future implementation is not reserved. If Product Owner and Architect accept a backend-only child slice, reserve exact Trade Plan files only and keep frontend/Today Review files excluded unless explicitly approved.
 
-Current blocker: no accepted decision for target compatibility, `LIMITED` DQ behavior, API/UI migration boundary, or existing stored Trade Plan row interpretation.
+Current blocker: exact backend-only file reservations, child QA scenarios, and proof that broader API/UI/stored-row migration is not required.

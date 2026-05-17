@@ -4,9 +4,11 @@ Date: 2026-05-17
 
 ## Status
 
-Contract draft prepared. Implementation remains blocked.
+Product policy accepted. Implementation remains blocked.
 
-Product Owner and Architect acceptance are required before Trade Plan source, API semantics, persisted JSON shape, Today Review behavior, or frontend displays change.
+Product Owner approved Option B on 2026-05-17. Resolution: `07-decisions/DECISION-20260517-trade-plan-no-target-dq-hard-block-resolution.md`.
+
+Implementation still requires a backend-only child work packet, refreshed QA scenarios, exact file reservations, and proof that frontend, Today Review, Prisma/schema, route, shared, package, generated, provider, startup/backfill, broad UI, and live-provider changes are excluded.
 
 ## Contract Intent
 
@@ -47,7 +49,7 @@ The following states should block paper-readiness and trusted plan publication i
 - required use-case tier is `BLOCKED`,
 - `eligibleForSignals = false` when the plan depends on signal/strategy evidence.
 
-`LIMITED` behavior is not approved yet. It needs a Product Owner and Architect decision to choose between blocked, limited-review-only, or warning-only behavior.
+`LIMITED` is blocked or limited-review-only until a later Product Owner-approved policy narrows it.
 
 ## Forbidden Until Decision
 
@@ -63,17 +65,14 @@ Do not change:
 
 Do not silently change the meaning of existing stored Trade Plan rows.
 
-## Decision Packet Note
+## Decision Resolution Note
 
-A Decision Packet is needed later before implementation if the project will:
+The parent Decision Packet was resolved on 2026-05-17 as Option B. A future Decision Packet is needed only if implementation will:
 
-- remove `target` from trusted outputs,
-- keep `target` as a compatibility field with restricted semantics,
-- replace target displays with exit/invalidation/risk-review displays,
-- decide how `LIMITED` Data Quality affects paper readiness,
-- migrate Today Review and frontend copy.
-
-The Decision Packet was not created in this pass because implementation is not being opened now.
+- remove, rename, or migrate target-shaped API/stored fields,
+- change `LIMITED` from blocked or limited-review-only into a broader trusted state,
+- migrate Today Review or frontend copy,
+- require Prisma/schema, route, shared, package, generated, provider, startup/backfill, broad UI, or live-provider changes.
 
 ## Acceptance Criteria For Future Approval
 

@@ -4,9 +4,9 @@ Date: 2026-05-17
 
 ## Status
 
-Requirement refined. Not Ready for Implementation.
+ADR direction resolved. Not Ready for Implementation.
 
-This requirement may move toward Architecture Decision Packet / ADR preparation and ADR QA checklist review only. Application source, tests, Prisma schema, migrations, routes, providers, services, startup/backfill, schedulers, and package changes remain blocked until Product Owner and Architect approve the storage model and natural-key decision.
+Product Owner approved Option B as ADR direction only on 2026-05-17: companion durable readiness/evidence storage. Application source, tests, Prisma schema, migrations, routes, providers, services, startup/backfill, schedulers, and package changes remain blocked until separate implementation slices are approved.
 
 ## Product Value
 
@@ -42,18 +42,20 @@ Observed gaps:
 - `04-qa/CF-W1-MD-02-qa-plan.md` must be accepted or updated by QA for ADR review.
 - Any later source work requires a separate approved work packet and ready-queue entry.
 
-## Required Product / Architecture Decision
+## Resolved ADR Direction
 
-The ADR must compare and decide between at least these options:
+Resolution: `07-decisions/DECISION-20260517-market-data-durable-readiness-storage-adr-resolution.md`
 
-- expand existing `PriceTick` / latest-price storage with durable provenance fields,
-- create a companion OHLC evidence table,
-- create a durable readiness evidence table,
-- keep current storage and explicitly limit product claims to derived/read-path evidence.
+Approved direction:
 
-The decision must cover:
+- Use companion durable readiness/evidence storage.
+- Target natural key should include canonical symbol or instrument, region, asset type, timeframe, timestamp or trading date, source, and source symbol where needed.
+- Market Data owns durable evidence persistence.
+- Data Quality Engine remains the evaluator.
+- Until implementation is approved, product claims remain limited to derived/read-path evidence.
 
-- natural key,
+The ADR still must cover:
+
 - append-only versus idempotent/upserted versus derived/cached semantics,
 - Prisma schema and migration impact,
 - historical backfill or no-backfill plan,
@@ -130,4 +132,4 @@ Any implementation could affect Prisma schema, OHLC storage semantics, generated
 
 ## Next Gate
 
-Architecture Decision Packet / ADR prep and ADR QA checklist acceptance. This requirement cannot move to app-code readiness until the ADR is approved and a new implementation work packet reserves exact source, schema, migration, and test files.
+Formal ADR preparation and ADR QA checklist acceptance. This requirement cannot move to app-code readiness until separate implementation work packets reserve exact source, schema, migration, generated, repository/service, Data Quality handoff, and test files as applicable.

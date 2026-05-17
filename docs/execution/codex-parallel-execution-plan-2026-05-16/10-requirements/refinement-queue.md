@@ -8,22 +8,21 @@ Status: Refreshed by Team 02 Requirement Factory for the current daemon cycle af
 
 | ID | Question |
 | --- | --- |
-| CF-W1-L3-DQ-01 | Should portfolio/watchlist surfaces display limited data while action-like alerts and reliability claims remain blocked? |
-| CF-W1-TP-01A | What replaces Trade Plan target-price geometry in user-facing output, which API/UI compatibility boundaries apply, and which DQ states hard-block paper-review readiness? |
-| CF-W1-MD-02 | Which durable OHLC/readiness evidence storage model, natural key, migration/rollback path, and query/test strategy should be accepted before Prisma or source changes? |
 | CF-W1-UX-02 | Should the product keep the `AI Investment Copilot` label, and should blocked summaries hide generated text or show diagnostic untrusted context? |
 | CF-W1-UX-05 | Which advisory-feeling labels and status colors should be replaced first, especially shared status labels? |
 | CF-W1-MD-01 | What are the accepted policies for future-dated candles, adjusted-close gaps, and suspicious price spikes? |
 
+## Needs Post-Decision Architecture / QA Refresh
+
+| ID | Resolved policy | Next refinement need |
+| --- | --- | --- |
+| CF-W1-L3-DQ-01 | Option B: passive `LIMITED` display with action-like blocking. | Child module contracts, DTO fields, QA scenarios, and exact file reservations. |
+| CF-W1-TP-01A | Option B: backend-only compatibility direction. | Backend-only child packet, exact source/test file reservation, and QA scenarios. |
+| CF-W1-MD-02 | Option B as ADR direction only: companion durable readiness/evidence storage. | Formal ADR, ADR QA checklist, and separate future implementation slice planning. |
+
 ## Blocked By Decision Inbox
 
-The following items are blocked from implementation by open Decision Inbox entries. Docs-only refinement, option framing, architecture prep, and QA planning may continue.
-
-| ID | Decision Inbox blocker | Implementation impact |
-| --- | --- | --- |
-| CF-W1-L3-DQ-01 | `DECISION-20260517-lane3-readiness-consumer-policy` | No portfolio/watchlist/alerts/portfolio-intelligence/copilot readiness consumer implementation until display-vs-action policy is accepted. |
-| CF-W1-TP-01A | `DECISION-20260517-trade-plan-no-target-dq-hard-block` | No Trade Plan source/API/UI compatibility work until no-target replacement semantics and DQ hard-block behavior are accepted. |
-| CF-W1-MD-02 | `DECISION-20260517-market-data-durable-readiness-storage-adr` | No Prisma, schema, source, provider, startup, or executable storage validation work until durable evidence storage direction is accepted. |
+No items are currently blocked by an open Decision Inbox entry.
 
 If a new true consent blocker appears during Team 02 docs-only work, record it in the Team 02 outbox and ask Team 00 to route the decision.
 
@@ -31,9 +30,9 @@ If a new true consent blocker appears during Team 02 docs-only work, record it i
 
 | ID | Contract status |
 | --- | --- |
-| CF-W1-L3-DQ-01 | Draft exists; needs Product/Architect acceptance for Lane 3 readiness policy for portfolio, watchlist, alerts, and portfolio intelligence |
-| CF-W1-TP-01A | Draft exists; needs Product/Architect acceptance for Trade Plan no-target compatibility, DQ hard-block, and API/UI migration boundary |
-| CF-W1-MD-02 | Draft exists; needs ADR/decision packet for durable Market Data readiness evidence, natural key, and storage model |
+| CF-W1-L3-DQ-01 | Product policy accepted; needs child architecture contracts and exact file reservations |
+| CF-W1-TP-01A | Product policy accepted; needs backend-only child architecture contract and exact file reservations |
+| CF-W1-MD-02 | ADR direction accepted; needs formal ADR and separate future implementation split |
 | CF-W1-L3-ALERT-01 | Alert readiness suppression contract after `CF-W1-L3-DQ-01` |
 | CF-W1-UX-02 | Copilot trust fields, blocked states, local deterministic proof, and UI scope |
 
@@ -41,9 +40,9 @@ If a new true consent blocker appears during Team 02 docs-only work, record it i
 
 | ID | QA focus/status |
 | --- | --- |
-| CF-W1-L3-DQ-01 | Draft exists; final Lane 3 display-only versus action-like readiness scenarios depend on accepted policy |
-| CF-W1-TP-01A | Draft exists; final Trade Plan no-target, DQ hard-block, and API/frontend compatibility scenarios depend on accepted semantics |
-| CF-W1-MD-02 | ADR QA checklist draft exists; no executable validation until storage/natural-key ADR is accepted |
+| CF-W1-L3-DQ-01 | Policy accepted; QA needs child module scenario matrix before executable validation |
+| CF-W1-TP-01A | Policy accepted; QA needs backend-only child scenario matrix before executable validation |
+| CF-W1-MD-02 | ADR direction accepted; no executable validation until future source/schema implementation is approved |
 | CF-W1-L3-ALERT-01 | Alert event suppression and DQ evidence tests |
 | CF-W1-UX-02 | Copilot trusted, blocked, stale, scoped, deterministic-local, and safe empty states |
 | CF-W1-MD-01 | Market Data validation tests for future dates, adjusted close, and spike policy |
@@ -54,9 +53,9 @@ These items are not implementation-ready.
 
 | Rank | ID | Prep needed |
 | --- | --- | --- |
-| 1 | CF-W1-L3-DQ-01 | Lane 3 display-vs-action readiness policy contract and QA scenarios. |
-| 2 | CF-W1-TP-01A | Architecture contract and QA scenarios for no-target compatibility and DQ hard-block states. |
-| 3 | CF-W1-MD-02 | ADR packet and ADR QA checklist for durable readiness evidence and natural key. |
+| 1 | CF-W1-L3-DQ-01 | Child module readiness contracts and QA scenarios under approved Option B. |
+| 2 | CF-W1-TP-01A | Backend-only child contract and QA scenarios under approved Option B. |
+| 3 | CF-W1-MD-02 | Formal ADR and future slice plan under approved Option B ADR direction. |
 | 4 | CF-W1-MD-01 | Validation-policy clarification and QA plan for future-dated, adjusted-close, and suspicious-spike behavior. |
 | 5 | CF-W1-UX-02 | Copilot trust UX contract refinement, Product/UX naming decision, blocked-state behavior, and QA validation scenarios. |
 
@@ -66,19 +65,13 @@ These items are not implementation-ready.
 
 | ID | Useful next output | Owner to route |
 | --- | --- | --- |
-| CF-W1-L3-DQ-01 | Product/Architect policy options for display-only, limited-review, alert/action blocking, DTO fields, and child-slice split. | Team 03 with Team 00 decision routing if consent is needed |
-| CF-W1-TP-01A | Product/Architect options for target compatibility, replacement output fields, DQ hard blockers, `LIMITED` behavior, and backend-vs-frontend split. | Team 03 with Team 00 decision routing if consent is needed |
-| CF-W1-MD-02 | ADR option matrix for `PriceTick` expansion, companion OHLC evidence table, durable readiness evidence table, or explicitly limited derived-evidence claims. | Team 03 with Team 04 ADR QA checklist |
+| CF-W1-L3-DQ-01 | Child-slice split, DTO fields, file reservations, and QA scenarios under approved Option B. | Team 03 with Team 04 QA refresh |
+| CF-W1-TP-01A | Backend-only child packet, compatibility limitation language, exact file reservations, and QA scenarios under approved Option B. | Team 03 with Team 04 QA refresh |
+| CF-W1-MD-02 | Formal ADR for companion durable readiness/evidence storage and future slice plan. | Team 03 with Team 04 ADR QA checklist |
 
-## Recommended Decision Packets For Team 00 Routing
+## Decision Packet Routing
 
-Team 02 found product-policy ambiguity but did not create or edit Decision Inbox files under this write scope.
-
-| ID | Recommended packet | Why |
-| --- | --- | --- |
-| CF-W1-L3-DQ-01 | Lane 3 display-vs-action readiness policy | Required before portfolio/watchlist/alerts/portfolio-intelligence can distinguish display-only data from action-like or reliability-bearing output. |
-| CF-W1-TP-01A | Trade Plan no-target replacement and DQ hard-block policy | Required before source work can remove target-price geometry without breaking API/UI compatibility or creating fail-open paper-review readiness. |
-| CF-W1-MD-02 | Durable readiness evidence storage and natural-key ADR | Required before any Prisma, schema, source, provider, startup, backfill, or executable validation scope can be proposed. |
+No new Decision Packet is required from the three resolved items. Create a new Decision Packet only if post-decision child preparation reveals a broader API/UI/stored-row migration, Prisma/schema/migration need, shared-file conflict, provider/startup requirement, or unresolved product-language/UX policy.
 
 ## Completed Or Split Out Of Active Refinement
 

@@ -29,11 +29,11 @@ Setup authorization note: standing branch/worktree/commit/push authorization cha
 | Work item | QA status | What changed after setup authorization | Required next gate |
 | --- | --- | --- | --- |
 | `CF-W1-MD-01` | QA-blocked for executable validation | No status change; docs-only QA plan remains usable for future policy review. | Product/Architect validation policy and implementation work packet. |
-| `CF-W1-L3-ALERT-01` | QA-blocked by upstream policy | No status change; alert readiness suppression remains dependent on `CF-W1-L3-DQ-01`. | Architecture contract/work packet after Lane 3 readiness policy. |
+| `CF-W1-L3-ALERT-01` | QA-blocked by missing child contract | Parent Lane 3 Option B policy is accepted; alert readiness suppression still needs child contract and implementation handoff. | Architecture contract/work packet for alert readiness suppression. |
 | `CF-W1-UX-02` | QA-blocked by Product/UX/Architecture decisions | No status change; UI smoke remains excluded until approved UI scope and spec exist. | Product/UX/Architect trust contract and implementation packet. |
-| `CF-W1-L3-DQ-01` | Can proceed only to architecture/work-packet refresh | Setup authorization permits Team 03 docs-only prep, not app-code or QA execution. | Accepted Lane 3 readiness policy contract and exact implementation reservation. |
-| `CF-W1-TP-01A` | Can proceed only to architecture/work-packet refresh | Setup authorization permits Team 03 docs-only prep, not app-code or QA execution. | Accepted no-target/DQ hard-block contract and exact implementation reservation. |
-| `CF-W1-MD-02` | Can proceed only to ADR/work-packet refresh | Setup authorization permits ADR/decision-packet prep, not schema/source/test execution. | Accepted storage/natural-key ADR before any Prisma/source/test work. |
+| `CF-W1-L3-DQ-01` | Can proceed only to child architecture/QA refresh | Product Owner accepted Option B, but this does not approve app-code or QA execution. | Child module contracts, exact reservations, and scenario matrix. |
+| `CF-W1-TP-01A` | Can proceed only to backend-only architecture/QA refresh | Product Owner accepted Option B, but this does not approve app-code or QA execution. | Backend-only child packet, exact reservations, and scenario matrix. |
+| `CF-W1-MD-02` | Can proceed only to formal ADR and ADR QA checklist | Product Owner accepted Option B as ADR direction only, not schema/source/test execution. | Formal ADR before any separate Prisma/source/test slice. |
 
 ## Remaining Next QA Plans
 
@@ -50,11 +50,11 @@ Commands below are guidance only. They were not run during this documentation-on
 | `CF-W1-L3-AUTH-01` | `cd backend` then `npm.cmd test -- portfolio-management.service.test.ts portfolio-management.ownership.test.ts watchlist-management.service.test.ts watchlist-management.ownership.test.ts --runInBand` | Completed and committed in `74ba6dd`; keep as regression focus for future Lane 3 ownership edits. |
 | `CF-W1-L3-AUTH-02` | `cd backend` then `npm.cmd test -- alerts-monitoring.service.test.ts alerts-monitoring.ownership.test.ts alerts-monitoring.routes.test.ts --runInBand` | Completed and committed in `503bcd9`; keep as regression focus for future Alerts Monitoring ownership edits. |
 | `CF-W1-SIG-TRIGGER-01` | `cd backend` then `npm.cmd test -- signal-generation-engine.service.test.ts signal-generation-engine.trigger-contract.test.ts signal-generation-engine.validation.test.ts signal-generation-dq-enforcement.invariants.test.ts --runInBand` | Completed and committed in `6ab3999`; keep as regression focus for future Signal Generation DTO changes. |
-| `CF-W1-L3-DQ-01` | `cd backend` then `npm.cmd test -- data-quality-engine.service.test.ts data-quality-engine.invariants.test.ts --runInBand` | Blocked until Lane 3 readiness policy contract and implementation handoff. |
+| `CF-W1-L3-DQ-01` | `cd backend` then `npm.cmd test -- data-quality-engine.service.test.ts data-quality-engine.invariants.test.ts --runInBand` | Blocked until child implementation handoff. |
 | `CF-W1-L3-DQ-01` | `cd backend` then `npm.cmd test -- portfolio-management.service.test.ts watchlist-management.service.test.ts portfolio-intelligence.service.test.ts --runInBand` | Blocked until corresponding Lane 3 consumer implementation. |
 | `CF-W1-L3-DQ-01` | `cd backend` then `npm.cmd test -- alerts-monitoring.service.test.ts alerts-monitoring.routes.test.ts alerts-monitoring.validation.test.ts --runInBand` | Blocked until alert readiness contract and implementation. |
-| `CF-W1-TP-01A` | `cd backend` then `npm.cmd test -- trade-plan-risk-engine.service.test.ts trade-plan-risk-engine.paper-readiness.test.ts --runInBand` | Blocked until Trade Plan contract and implementation handoff. |
-| `CF-W1-MD-02` | `cd backend` then `npm.cmd test -- market-data-readiness-evidence.invariants.test.ts market-data-storage-readiness.invariants.test.ts market-data.universe.test.ts market-data.validation.test.ts market-data.repository.test.ts --runInBand` | Blocked until ADR approval and scoped implementation. |
+| `CF-W1-TP-01A` | `cd backend` then `npm.cmd test -- trade-plan-risk-engine.service.test.ts trade-plan-risk-engine.paper-readiness.test.ts --runInBand` | Blocked until backend-only child implementation handoff. |
+| `CF-W1-MD-02` | `cd backend` then `npm.cmd test -- market-data-readiness-evidence.invariants.test.ts market-data-storage-readiness.invariants.test.ts market-data.universe.test.ts market-data.validation.test.ts market-data.repository.test.ts --runInBand` | Blocked until separate approved scoped implementation. |
 | `CF-W1-MD-01` | `cd backend` then `npm.cmd test -- market-data.validation.test.ts --runInBand` | Plan prepared; blocked from execution until validation policy and implementation handoff exist. |
 | `CF-W1-MD-01` | `cd backend` then `npm.cmd test -- market-data.validation.test.ts market-data-readiness-evidence.invariants.test.ts market-data.repository.test.ts --runInBand` | Approval-gated only if duplicate/readiness evidence or repository behavior is touched. |
 | `CF-W1-L3-ALERT-01` | `cd backend` then `npm.cmd test -- alerts-monitoring.service.test.ts alerts-monitoring.validation.test.ts --runInBand` | Plan prepared; blocked until `CF-W1-L3-DQ-01`, alert readiness contract, and implementation handoff. |
@@ -72,9 +72,9 @@ Provider-adjacent, startup-adjacent, frontend build, backend build, UI smoke, li
 
 ## Current QA Blockers
 
-- `CF-W1-L3-DQ-01`: blocked by Product Owner and Architect decision on Lane 3 display-vs-action readiness policy.
-- `CF-W1-TP-01A`: blocked by Trade Plan target/no-target and DQ hard-block contract acceptance; full target geometry migration remains separate.
-- `CF-W1-MD-02`: blocked from executable validation by ADR/Product/Architect approval for durable readiness evidence and Prisma/OHLC storage model.
+- `CF-W1-L3-DQ-01`: blocked from executable validation until child contracts, exact file reservations, and implementation handoff exist.
+- `CF-W1-TP-01A`: blocked from executable validation until backend-only child packet, exact file reservations, and implementation handoff exist; full target geometry migration remains separate.
+- `CF-W1-MD-02`: blocked from executable validation because Option B is ADR direction only; source/schema/test work needs separate approval.
 - `CF-W1-MD-01`: executable validation remains blocked until future-date, adjusted-close, suspicious-volume, and spike policy are accepted and implementation scope exists.
 - `CF-W1-L3-ALERT-01`: blocked by Lane 3 readiness policy, alert readiness contract, and implementation handoff.
 - `CF-W1-UX-02`: blocked by Copilot naming/trust-field/blocked-state decisions, shared-file reservation if needed, and implementation handoff.

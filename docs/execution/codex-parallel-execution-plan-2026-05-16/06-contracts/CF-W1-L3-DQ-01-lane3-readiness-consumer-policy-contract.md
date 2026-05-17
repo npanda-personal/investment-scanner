@@ -4,9 +4,11 @@ Date: 2026-05-17
 
 ## Status
 
-Contract draft prepared. Implementation remains blocked.
+Parent policy accepted. Child implementation remains blocked.
 
-Product Owner and Architect acceptance are required because the unresolved policy is whether Lane 3 passive displays may show limited data while action-like workflows remain blocked.
+Product Owner approved Option B on 2026-05-17. Resolution: `07-decisions/DECISION-20260517-lane3-readiness-consumer-policy-resolution.md`.
+
+Implementation still requires child contracts, QA scenarios, exact file reservations, and one-module-at-a-time work packets.
 
 ## Contract Intent
 
@@ -22,7 +24,7 @@ This contract covers the policy surface for:
 
 ## Proposed Conservative Policy
 
-This policy is proposed for Product Owner and Architect acceptance. It is not approved for source implementation yet.
+This parent policy is accepted as Product Owner direction. It is not approved for source implementation yet.
 
 | Consumer behavior | `READY` | `LIMITED` | `NOT_READY`, `BLOCKED`, missing DQ, stale hard blocker |
 | --- | --- | --- | --- |
@@ -74,9 +76,9 @@ Use child work items with one module owner per implementation pass:
 - Do not change Data Quality Engine public contract without Architect approval.
 - Do not edit Prisma, route registries, shared UI, package files, generated types, providers, scheduler/startup behavior, or live-provider flows in this parent policy slice.
 
-## Decision Packet Note
+## Decision Resolution Note
 
-A Decision Packet is needed later if Product Owner acceptance is required for `LIMITED` passive display versus blocked action behavior. It was not created in this pass because this task is documentation-only contract preparation and no implementation gate is being opened now.
+The parent policy Decision Packet was resolved on 2026-05-17 as Option B. Future Decision Packets are needed only if a child slice tries to broaden `LIMITED` behavior, add action-like exceptions, touch shared/high-risk files, or expand into UI/source scope outside the approved child packet.
 
 ## Team 03 Relaunch Architecture Notes - 2026-05-17
 

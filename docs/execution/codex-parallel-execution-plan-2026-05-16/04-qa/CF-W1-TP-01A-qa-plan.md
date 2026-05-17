@@ -4,9 +4,9 @@ Date: 2026-05-17
 
 Owner: Team 04 QA Factory
 
-Status: QA planning only. Implementation remains blocked until the Trade Plan no-target compatibility and DQ hard-block contract is accepted.
+Status: Product policy accepted; QA planning only. Implementation remains blocked until the backend-only child contract, exact file reservations, and implementation handoff are accepted.
 
-Current status refresh: recent setup authorization permits docs-only architecture/work-packet preparation, but it does not make `CF-W1-TP-01A` app-code ready and does not approve QA execution.
+Current status refresh: Product Owner approved Option B on 2026-05-17. This does not make `CF-W1-TP-01A` app-code ready and does not approve QA execution.
 
 ## Scope
 
@@ -62,7 +62,7 @@ Frontend build and Playwright/UI smoke are excluded by default and require separ
 ## Stop Conditions
 
 Stop QA and return to Orchestrator/Architect if validation requires:
-- unresolved target geometry migration decisions,
+- broader target geometry migration outside approved backend-only compatibility scope,
 - frontend display changes,
 - Prisma schema changes,
 - route registry changes,

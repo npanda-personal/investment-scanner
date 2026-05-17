@@ -8,11 +8,11 @@ Prepared by Team 03 Architecture Factory and refreshed after `CF-W1-L3-AUTH-02` 
 
 | Priority | Candidate | Architecture status | Implementation status | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | `CF-W1-L3-DQ-01` | Docs-only policy preparation can continue | Not architecture-ready for app code | Needs Product Owner + Architect decision on display-only versus action-like readiness behavior. |
-| 2 | `CF-W1-TP-01A` | Docs-only contract refinement can continue | Not architecture-ready for app code | Needs Product Owner + Architect decision on no-target Trade Plan semantics, API/UI compatibility, and DQ hard-block behavior. |
-| 3 | `CF-W1-L3-ALERT-01` | Docs-only prep can proceed after aligning to `CF-W1-L3-DQ-01` | Not architecture-ready for app code | Alert event ownership is committed; readiness suppression still depends on Lane 3 readiness policy. |
+| 1 | `CF-W1-L3-DQ-01` | Post-decision child contract prep can continue | Not architecture-ready for app code | Option B policy accepted; needs child DTO/file reservations and QA scenarios. |
+| 2 | `CF-W1-TP-01A` | Post-decision backend-only child contract prep can continue | Not architecture-ready for app code | Option B policy accepted; needs exact backend-only reservations and QA scenarios. |
+| 3 | `CF-W1-L3-ALERT-01` | Docs-only prep can proceed under accepted `CF-W1-L3-DQ-01` policy | Not architecture-ready for app code | Alert event ownership is committed; readiness suppression needs child contract and exact files. |
 | 4 | `CF-W1-UX-02` | Docs-only UX/architecture prep can continue | Not architecture-ready for app code | Needs Product Owner + UX + Architect decision on naming, trust surface, blocked states, and shared-file scope. |
-| 5 | `CF-W1-MD-02` | ADR/decision-packet prep can continue | Source/schema implementation blocked | Durable readiness evidence likely touches Prisma/storage/natural-key policy. |
+| 5 | `CF-W1-MD-02` | Formal ADR prep can continue | Source/schema implementation blocked | Option B ADR direction accepted; implementation remains split and approval-gated. |
 | 6 | `CF-W1-MD-01` | Docs-only validation policy prep can continue | Not architecture-ready for app code | Needs policy for future-dated candles, adjusted-close gaps, and suspicious price spikes. |
 | 7 | `CF-W1-UX-05` | Docs-only copy/shared-status inventory can continue | Not architecture-ready for app code | Needs Product Owner/UX copy and status-color decision plus shared UI reservation if code follows. |
 
@@ -26,21 +26,23 @@ Prepared by Team 03 Architecture Factory and refreshed after `CF-W1-L3-AUTH-02` 
 
 ## Blocked By Open Decisions
 
-The following architecture candidates are blocked from application-code implementation by open Decision Inbox items. Docs-only option framing, contract refinement, and QA alignment may continue.
+No current architecture candidate is blocked by an open Decision Inbox item.
 
-| Candidate | Open decision | Blocked scope |
+Resolved decision inputs:
+
+| Candidate | Resolution | Remaining architecture blocker |
 | --- | --- | --- |
-| `CF-W1-L3-DQ-01` | `DECISION-20260517-lane3-readiness-consumer-policy` | Lane 3 readiness consumer implementation and downstream alert/portfolio/copilot reliability claims. |
-| `CF-W1-TP-01A` | `DECISION-20260517-trade-plan-no-target-dq-hard-block` | Trade Plan source/API/UI compatibility work and paper-review readiness behavior. |
-| `CF-W1-MD-02` | `DECISION-20260517-market-data-durable-readiness-storage-adr` | Prisma/schema/source/provider/startup/executable storage validation work. |
+| `CF-W1-L3-DQ-01` | Option B accepted. | Child DTO fields, module split, exact file reservations, and QA scenario matrix. |
+| `CF-W1-TP-01A` | Option B accepted. | Backend-only reservation, API/UI/stored-row exclusion proof, and QA scenario matrix. |
+| `CF-W1-MD-02` | Option B accepted as ADR direction only. | Formal ADR and separate approval-gated source/schema split. |
 
 ## Docs-Only Architecture Prep Can Continue
 
-- `CF-W1-L3-DQ-01`: prepare Lane 3 display-vs-action readiness policy options.
-- `CF-W1-TP-01A`: prepare no-target/DQ hard-block architecture questions and split boundaries.
+- `CF-W1-L3-DQ-01`: prepare child module contracts under approved Option B.
+- `CF-W1-TP-01A`: prepare backend-only child contract under approved Option B.
 - `CF-W1-L3-ALERT-01`: prepare only as a dependent alert readiness contract, not as implementation-ready work.
 - `CF-W1-UX-02`: prepare UX trust architecture questions and shared-file stop conditions.
-- `CF-W1-MD-02`: prepare ADR/decision packet only; no schema/source readiness.
+- `CF-W1-MD-02`: prepare formal ADR only; no schema/source readiness.
 - `CF-W1-MD-01`: prepare validation policy and QA alignment.
 - `CF-W1-UX-05`: prepare copy/status inventory and shared UI reservation needs.
 
@@ -48,7 +50,7 @@ The following architecture candidates are blocked from application-code implemen
 
 No implementation item is architecture-ready now. Keep `12-ready-queue/ready-for-implementation.md` at zero app-code items until a candidate has an accepted requirement, accepted architecture contract, accepted QA plan, exact file reservations, and no open Product Owner, Architect, shared-file, schema, route, package, provider, or upstream blocker.
 
-Next Team 03 recommendation: prepare a docs-only `CF-W1-L3-DQ-01` Lane 3 readiness policy decision packet first, because it unblocks multiple downstream Lane 3 candidates without requiring Prisma, route, package, or application-source changes.
+Next Team 03 recommendation: prepare docs-only child contracts and file reservations for `CF-W1-L3-DQ-01` first, because the parent policy is now accepted and it unblocks multiple downstream Lane 3 candidates without requiring Prisma, route, package, or shared-file changes.
 
 ## Team 03 Relaunch Result - 2026-05-17
 
@@ -62,8 +64,8 @@ Current readiness result:
 
 | Candidate | Docs-only prep status | App-code readiness | Reason |
 | --- | --- | --- | --- |
-| `CF-W1-L3-DQ-01` | Architecture review, contract, and work packet can continue | Blocked | Product Owner and Architect have not accepted the Lane 3 display-vs-action readiness policy or child file reservations. |
-| `CF-W1-TP-01A` | Architecture review, contract, and work packet can continue | Blocked | Product Owner and Architect have not accepted Trade Plan no-target compatibility semantics, `LIMITED` DQ behavior, API/UI boundary, or exact source reservations. |
-| `CF-W1-MD-02` | ADR/decision recommendation prep can continue | Blocked from source/schema | Durable evidence may require Prisma/OHLC storage, natural-key, migration, rollback, and downstream contract decisions. |
+| `CF-W1-L3-DQ-01` | Parent policy accepted; child contract prep can continue | Blocked | Child DTO fields, QA scenarios, and exact file reservations are not accepted. |
+| `CF-W1-TP-01A` | Parent policy accepted; backend-only child prep can continue | Blocked | Exact backend-only file reservations and QA scenarios are not accepted. |
+| `CF-W1-MD-02` | ADR direction accepted; formal ADR prep can continue | Blocked from source/schema | Source/schema implementation remains separately approval-gated. |
 
-No candidate should be moved to `Ready for Implementation` from this Team 03 pass. The next Team 00 action is to route Product Owner/Architect policy consent only when a true decision is desired; otherwise keep Teams 02/03/04 in docs-only refinement.
+No candidate should be moved to `Ready for Implementation` from this Team 03 pass. The next Team 00 action is to launch Team 03 for post-decision child contracts and then Team 04 for QA scenario refresh.

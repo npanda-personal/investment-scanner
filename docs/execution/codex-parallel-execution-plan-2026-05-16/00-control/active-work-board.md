@@ -73,24 +73,24 @@ Operating rules:
 | Field | Current Value |
 | --- | --- |
 | Current daemon cycle id | `DAEMON-20260517` |
-| Current rolling iteration count | 15 |
-| Active teams | Team 00 master orchestration intake |
-| Queued teams | Team 03 architecture decision prep; Team 02 requirement refinement; Team 04 QA plan refinement; Team 01 audit refresh; Teams 05-09 docs-only lane audits/refinement if no ready implementation appears |
+| Current rolling iteration count | 16 |
+| Active teams | Team 00 decision resolution checkpoint |
+| Queued teams | Team 03 child contract/file reservation refresh; Team 04 QA scenario refresh; Team 02 requirement queue refresh; Team 01 audit refresh; Teams 05-09 docs-only lane audits/refinement if no ready implementation appears |
 | Idle teams | Team 05, Team 06, Team 07, Team 08, Team 09, Team 10 until matching docs-only or implementation work is launched |
-| Blocked teams | No team fully blocked; affected workstreams `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02` are blocked from implementation by open Decision Inbox items |
+| Blocked teams | No team fully blocked; no open Decision Inbox blockers; some workstreams remain blocked from implementation by missing child contracts, QA scenarios, exact file reservations, shared-file gates, or future Product/UX policy scope |
 | Teams relaunched this cycle | None yet in this dedicated Team 00 intake chat |
 | Teams shut down due to no work | None permanently; Teams without ready implementation move to audit/refinement |
 | Teams re-added due to new work | Team 07 completed `CF-W1-L3-AUTH-02`; Team 06 completed `CF-W1-SIG-TRIGGER-01` |
 | Ready queue depth | 0 active application-code items |
 | Refinement queue depth | 7 active unique refinement items: `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, `CF-W1-MD-02`, `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-MD-01`, `CF-W1-L3-ALERT-01` |
 | Integration queue depth | 0 active application-code items after bounded commits |
-| Decision inbox count | 3 open decisions |
+| Decision inbox count | 0 open decisions |
 | Ready-work pressure | none |
-| Blocked-work pressure | high |
-| Next team to launch | Team 03 Architecture Factory for docs-only decision/contract prep |
-| Next item to assign | `CF-W1-L3-DQ-01` Lane 3 readiness policy decision/contract prep; no application-code item is ready |
-| Last commit at Team 00 intake start | `4ad0a39 docs: checkpoint daemon decision routing` |
-| Daemon should continue | Yes for unrelated workstreams; affected decision-gated workstreams wait |
+| Blocked-work pressure | medium |
+| Next team to launch | Team 03 Architecture Factory for post-decision child contract and file-reservation refresh |
+| Next item to assign | `CF-W1-L3-DQ-01` child slice preparation; no application-code item is ready |
+| Last commit at Team 00 resume start | `d5927d6 docs: initialize team 00 orchestrator intake` |
+| Daemon should continue | Yes; no Product Owner action required |
 
 ## Sprint 0 Items
 
@@ -208,3 +208,4 @@ Old work items in `docs/codex-agent-team-plan/` may be used only as evidence or 
 | DAEMON-20260517-13 | Standing worktree/commit/push authorization | Team 00 | Committed and pushed | `98-orchestrator/`, `15-automation-prompts/`, `99-decision-inbox/`, `00-control/`, `09-summaries/` | Product Owner authorized worktrees, scoped local commits, and push to `dev` under strict gates. Commit `1e882cd` pushed to `origin/dev`. |
 | DAEMON-20260517-14 | Team 02/03/04 docs-only refinement and decision routing | Teams 02, 03, 04, 00 | Checkpointing | Requirements, architecture, QA, Decision Inbox, queues | Team 02 refined requirements, Team 03 completed architecture prep, Team 04 refreshed QA plans. Three true consent blockers opened; no app-code Ready item exists. |
 | DAEMON-20260517-15 | Dedicated Team 00 master orchestration intake | Team 00 | Checkpointing | Active execution docs only | Branch `dev`; initial worktree clean; ready queue depth 0; refinement queue depth 7; integration queue depth 0; open decisions 3; next launch Team 03 docs-only architecture decision prep. |
+| DAEMON-20260517-16 | Product Owner decision resolution routing | Team 00 | Checkpointing | Active execution docs only | Resolved the three open Decision Inbox items: Lane 3 Option B, Trade Plan Option B, and Market Data durable readiness storage Option B as ADR direction only. Open decisions now 0; no app-code item is Ready. |

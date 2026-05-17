@@ -8,13 +8,13 @@ Durable Market Data readiness evidence and natural-key decision preparation.
 
 ## State
 
-Architecture-ready for later Decision Packet / ADR drafting only.
+ADR direction accepted for formal ADR drafting.
 
-Application source, Prisma, migrations, providers, services, tests, and route changes are blocked.
+Application source, Prisma, migrations, providers, services, tests, generated types, Data Quality handoff, and route changes are blocked until separate implementation slices are approved.
 
 ## Owner / Lane / Module
 
-- Owner: Team 03 Architecture Factory for decision preparation.
+- Owner: Team 03 Architecture Factory for formal ADR preparation.
 - Lane: Lane 1.
 - Module: market-data-foundation.
 
@@ -98,4 +98,4 @@ Exact current write scope for this Team 03 pass:
 
 Future source/schema implementation is not reserved. A later source packet must follow an accepted ADR and explicitly reserve Prisma/schema/migration/source/test files if needed.
 
-Current blocker: Product Owner and Architect must accept storage model, natural key, Prisma impact, migration/backfill or no-backfill strategy, rollback, query/test strategy, and durable-vs-derived downstream claims.
+Current blocker: formal ADR, ADR QA checklist, and separate future implementation slice approvals are not yet recorded. Product claims remain limited to derived/read-path evidence until implementation is approved.

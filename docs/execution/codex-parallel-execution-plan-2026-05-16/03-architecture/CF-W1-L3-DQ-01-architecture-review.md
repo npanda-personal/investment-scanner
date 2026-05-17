@@ -6,9 +6,9 @@ Owner: Team 03 Architecture Factory
 
 ## Status
 
-Docs-only architecture review prepared. Not Ready for Implementation.
+Product policy accepted. Not Ready for Implementation.
 
-This item remains blocked by Product Owner and Architect policy consent for Lane 3 display-only versus action-like readiness behavior.
+Product Owner approved Option B on 2026-05-17. This item now needs post-decision child contracts, QA scenarios, exact DTO/file reservations, and one-module-at-a-time work packets before app-code implementation.
 
 ## Evidence Inspected
 
@@ -69,11 +69,10 @@ Future child packets should reserve one module at a time:
 
 ## Blockers
 
-- Product Owner and Architect have not accepted display-vs-action readiness policy.
 - Exact DTO fields and child implementation reservations are not accepted.
-- `LIMITED` readiness semantics remain ambiguous for action-like workflows.
+- Child QA scenarios have not been refreshed against approved Option B.
+- No module-local child packet has been promoted to Ready.
 
 ## Readiness Result
 
-Architecture-ready for docs-only policy decision prep. Blocked for app-code implementation.
-
+Architecture-ready for post-decision child contract prep. Blocked for app-code implementation.

@@ -4,7 +4,7 @@ Date: 2026-05-17
 
 | ID | Shared/high-risk file or boundary | Why blocked |
 | --- | --- | --- |
-| CF-W1-MD-02 | Prisma schema / OHLC storage model | Durable evidence may need schema/natural-key changes. |
+| CF-W1-MD-02 | Prisma schema / OHLC storage model | Option B ADR direction is approved, but durable evidence implementation may need schema/natural-key changes and remains blocked until a separate implementation slice is approved. |
 | CF-W1-STRAT-02 | Prisma `StrategyDefinition` uniqueness | Version-keyed definitions likely require schema/storage decision. |
 | CF-W1-TP-01 | Trade Plan target geometry / frontend display model | Full migration may require Trade Plan source, API semantics, and UI contract decisions. |
 | CF-W1-UX-05 | `frontend/src/shared/**` | Shared `StatusBadge` language/color mapping requires shared UI reservation. |

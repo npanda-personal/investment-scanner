@@ -4,9 +4,9 @@ Date: 2026-05-17
 
 Owner: Team 04 QA Factory
 
-Status: QA planning only. Product Owner and Architect decision is required for Lane 3 display-vs-action readiness policy before implementation validation.
+Status: Product policy accepted; QA planning only. Child implementation validation remains blocked until module-specific contracts, exact file reservations, and implementation handoffs exist.
 
-Current status refresh: recent setup authorization permits Team 03/Team 00 to continue docs-only architecture and work-packet preparation, but it does not make `CF-W1-L3-DQ-01` app-code ready and does not approve QA execution.
+Current status refresh: Product Owner approved Option B on 2026-05-17. This does not make `CF-W1-L3-DQ-01` app-code ready and does not approve QA execution.
 
 ## Scope
 
@@ -61,8 +61,8 @@ UI smoke is excluded by default. It requires explicit UI scope approval, running
 ## Stop Conditions
 
 Stop QA and return to Product Owner/Architect if:
-- display-vs-action readiness policy remains unresolved,
-- `LIMITED` readiness semantics are ambiguous,
+- child readiness contract or exact file reservation is missing,
+- `LIMITED` readiness is treated as action-ready or reliability-bearing without a new Product Owner decision,
 - alert event behavior becomes a user-ownership/schema decision,
 - implementation requires Prisma, route registry, shared utilities, shared UI, package, provider, startup/backfill, or UI scope,
 - tests require live providers or services,

@@ -4,9 +4,9 @@ Date: 2026-05-17
 
 ## Status
 
-Requirement refined. Not Ready for Implementation.
+Product policy resolved. Not Ready for Implementation.
 
-This is a documentation-only contract-prep requirement. It does not authorize Trade Plan source, API, frontend, schema, or test changes.
+Product Owner approved Option B on 2026-05-17. This does not authorize Trade Plan source, API, frontend, schema, or test changes until Team 03/04/00 refresh the backend-only child work packet, QA scenarios, and exact file reservations.
 
 ## Product Value
 
@@ -37,15 +37,19 @@ Observed gaps:
 
 Legacy `CF-W1-TP-01` should be treated as split and not pulled as an active implementation item.
 
-## Required Decisions
+## Resolved Decision
 
-Product Owner and Architect must decide:
+Resolution: `07-decisions/DECISION-20260517-trade-plan-no-target-dq-hard-block-resolution.md`
 
-- what replaces current user-facing target-price semantics in Trade Plan outputs,
-- whether any compatibility `target` object may remain temporarily, and how it must be labeled,
-- which DQ states hard-block paper-review readiness,
-- how `LIMITED` readiness differs between display-only research context and paper-review eligibility,
-- whether frontend Today Review and Trade Plan surfaces are in scope for the first implementation slice.
+Approved policy:
+
+- Existing target-shaped fields remain compatibility-only for now.
+- Target-shaped fields must not be treated as trusted paper-readiness.
+- No arbitrary predefined target-price semantics may be generated.
+- Trusted output language must shift to rule-based exit, invalidation, risk-review, evidence, and reason-summary wording.
+- Missing or blocked DQ states hard-block trusted Trade Plan readiness.
+- `LIMITED` is blocked or limited-review-only until a later Product Owner-approved policy narrows it.
+- Frontend, Today Review, Prisma/schema, route registry, shared utility, shared UI, package, generated type, provider, startup/backfill, broad UI, and live-provider changes are excluded.
 
 ## Candidate Acceptance Criteria
 
@@ -97,4 +101,4 @@ Likely implementation files after accepted contract, QA plan, and work packet:
 
 ## Next Gate
 
-Architecture contract and QA plan. Do not move to Ready for Implementation until Product Owner policy, Architect contract, QA scenarios, exact file reservations, and work packet are accepted.
+Post-decision backend-only architecture and QA refresh. Do not move to Ready for Implementation until the child work packet reserves exact backend source/test files and confirms no broader API/UI/stored-row migration is needed.

@@ -6,7 +6,9 @@ Owner: Team 03 Architecture Factory
 
 ## Status
 
-ADR/decision-prep review prepared. Source, schema, migration, provider, route, service, startup, and test implementation are blocked.
+ADR direction accepted. Source, schema, migration, provider, route, service, startup, and test implementation are blocked.
+
+Product Owner approved Option B as ADR direction only on 2026-05-17. This review now routes to formal ADR prep and later split implementation packets.
 
 ## Evidence Inspected
 
@@ -70,12 +72,11 @@ Future source reservation is forbidden until ADR approval. If later approved, ex
 
 ## Blockers
 
-- Storage model and natural key are not accepted.
-- Prisma/migration impact is unknown.
+- Formal ADR is not yet recorded.
+- Prisma/migration impact is not approved for implementation.
 - Migration/backfill/no-backfill and rollback approach are not accepted.
 - DQE handoff and downstream durable-vs-derived claims need ADR treatment.
 
 ## Readiness Result
 
-Architecture-ready for docs-only ADR/decision recommendation prep. Blocked for all source/schema/test implementation.
-
+Architecture-ready for formal ADR prep. Blocked for all source/schema/test implementation.

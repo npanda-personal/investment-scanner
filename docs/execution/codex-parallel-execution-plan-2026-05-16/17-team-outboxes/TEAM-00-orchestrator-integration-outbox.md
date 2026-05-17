@@ -220,3 +220,51 @@ Stage only active execution docs, verify `git diff --cached --name-status`, comm
 ```text
 docs: initialize team 00 orchestrator intake
 ```
+
+---
+
+# Decision Resolution Checkpoint
+
+Date: 2026-05-17
+
+State: Decision Inbox resolved; daemon checkpointing
+
+## Work Item
+
+Resolve the three current Decision Inbox items from Product Owner instruction and refresh active execution queues.
+
+## Decisions Resolved
+
+| Decision | Result |
+| --- | --- |
+| `DECISION-20260517-lane3-readiness-consumer-policy` | Option B approved. |
+| `DECISION-20260517-trade-plan-no-target-dq-hard-block` | Option B approved. |
+| `DECISION-20260517-market-data-durable-readiness-storage-adr` | Option B approved as ADR direction only. |
+
+## Queue Result
+
+- Open decisions: 0.
+- Product Owner action required: no.
+- Ready queue depth: 0.
+- Integration queue depth: 0.
+- Daemon should continue autonomous work.
+
+## Implementation Decision
+
+No application-code child item became Ready for Implementation.
+
+Reason:
+
+- `CF-W1-L3-DQ-01` needs child contracts, DTO fields, QA scenarios, and exact file reservations.
+- `CF-W1-TP-01A` needs backend-only child packet, QA scenarios, and exact file reservations.
+- `CF-W1-MD-02` is ADR direction only; no source/schema/test work is approved.
+
+## Next Assignment
+
+Team 03 should launch from:
+
+`16-team-inboxes/TEAM-03-post-decision-child-contracts.md`
+
+Prompt:
+
+`15-automation-prompts/AUTO-03-architecture-factory.md`

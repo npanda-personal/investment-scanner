@@ -8,11 +8,11 @@ Lane 3 readiness consumer policy contract.
 
 ## State
 
-Docs-only contract draft prepared. Application implementation is blocked.
+Product policy accepted. Application implementation is blocked until child work packets are prepared.
 
 ## Owner / Lane / Modules
 
-- Owner: Team 03 Architecture Factory until policy is accepted.
+- Owner: Team 03 Architecture Factory for post-decision child contract preparation.
 - Lane: Lane 3.
 - Future consuming modules: portfolio-management, watchlist-management, alerts-monitoring, portfolio-intelligence, research/copilot surfaces as separately approved child slices.
 
@@ -38,13 +38,12 @@ Only active execution documentation under:
 
 ## Policy Decisions Needed
 
-Product Owner and Architect must decide:
+Product Owner approved Option B:
 
-- whether portfolio/watchlist passive displays may show `LIMITED` data,
-- whether alerts are always blocked unless DQ is `READY`,
-- which Data Quality use-case tier maps to each Lane 3 consumer,
-- how missing DQ is represented in user-facing DTOs,
-- whether frontend surfaces are required in the first implementation slice.
+- `READY` supports trusted display and action-like workflows.
+- `LIMITED` may appear only in passive portfolio/watchlist/research contexts with visible warnings and no reliability/action labels.
+- Alerts, action-like workflows, reliability labels, and trusted summaries require `READY`.
+- Missing, stale hard blockers, unsupported, `NOT_READY`, and `UNUSABLE` remain blocked.
 
 ## Future Reservation Model
 
@@ -57,9 +56,9 @@ Candidate child reservations:
 - Portfolio intelligence reliability gate: portfolio-intelligence module source/tests only.
 - Copilot/research trust surface: copilot/research modules and UX-approved frontend files only.
 
-## Decision Packet Note
+## Decision Resolution Note
 
-A Decision Packet should be created later if the Product Owner is ready to choose the display-vs-action readiness policy. It was not created in this pass.
+The display-vs-action Decision Packet was resolved on 2026-05-17 as Option B. Future Decision Packets are needed only if a child slice broadens the approved policy or needs forbidden/shared/high-risk scope.
 
 ## Acceptance Criteria For This Packet
 
@@ -82,4 +81,4 @@ Exact current write scope for this Team 03 pass:
 
 Future implementation is not reserved. When policy is accepted, Team 00 should create child work packets with one writer per module and exact file lists.
 
-Current blocker: Product Owner and Architect must accept the Lane 3 display-vs-action readiness policy, including `LIMITED` behavior, alert/action block behavior, DTO fields, and child slice boundaries.
+Current blocker: child DTO fields, QA scenarios, exact file reservations, and module-specific implementation handoffs are not yet accepted.

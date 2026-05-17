@@ -1,3 +1,13 @@
+# Resolution Status
+
+Status: Resolved by Product Owner on 2026-05-17.
+
+Approved option: Option B, passive `LIMITED` display with action-like blocking.
+
+Resolution record: `07-decisions/DECISION-20260517-lane3-readiness-consumer-policy-resolution.md`
+
+This item is no longer open in `open-decisions.md`. The parent Decision Inbox blocker is resolved, but app-code child slices still require exact contracts, QA scenarios, file reservations, and implementation handoffs.
+
 # Decision Needed
 
 Decide the Lane 3 readiness consumer policy for passive display, reliability labels, alerts, and action-like workflows.

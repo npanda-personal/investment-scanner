@@ -4,9 +4,9 @@ Date: 2026-05-17
 
 Owner: Team 04 QA Factory
 
-Status: QA planning only. `CF-W1-MD-02` is an ADR/contract-prep item until Product Owner and Architect approve storage and Prisma/OHLC decisions.
+Status: ADR direction accepted; QA planning only. `CF-W1-MD-02` remains an ADR/contract-prep item until separate implementation slices approve source/schema/test work.
 
-Current status refresh: recent setup authorization permits ADR/work-packet preparation, but it does not approve schema/source/test execution, Prisma commands, provider checks, or Market Data readiness validation.
+Current status refresh: Product Owner approved Option B as ADR direction only on 2026-05-17. This does not approve schema/source/test execution, Prisma commands, provider checks, or Market Data readiness validation.
 
 ## Scope
 
@@ -66,7 +66,7 @@ Frontend build, Playwright/UI smoke, live local provider validation, live servic
 ## Stop Conditions
 
 Stop QA and return to Orchestrator/Architect if:
-- ADR proposes schema/storage changes without Product Owner and Architect approval,
+- implementation proposes schema/storage changes without separate Product Owner and Architect approval,
 - natural key or provenance model is ambiguous,
 - DQ handoff ownership is unclear,
 - tests require live providers or services,

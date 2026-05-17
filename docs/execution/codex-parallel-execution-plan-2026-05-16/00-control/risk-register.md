@@ -65,16 +65,16 @@
 - `signal-generation-engine` run-path default/fail-closed behavior is accepted in bounded `CF-W2-SIG-01A`, and trusted list read-path filtering is committed in `CF-W1-SIG-01B` as `a5bc49a`.
 - `latestForInstrument()` is gated by committed `CF-W1-SIG-LATEST-01` as `e0a6788`.
 - Lane 2 strategy/signal/risk modules still need fail-closed downstream DQ enforcement tests beyond the accepted Signal Generation and Strategy Decision slices.
-- Lane 3 portfolio/watchlist child ownership is accepted in bounded `CF-W1-L3-AUTH-01`; alerts, copilot, and Data Quality readiness consumer policy remain separate.
+- Lane 3 portfolio/watchlist child ownership is accepted in bounded `CF-W1-L3-AUTH-01`; Lane 3 readiness consumer policy is resolved as Option B but child contracts and file reservations remain separate.
 - Angel One remains excluded from implementation and live validation.
 - Startup scheduler/backfill behavior requires Architect approval before it can be changed or accepted as Sprint 1B scope.
-- Downstream modules remain blocked from treating Market Data / DQ as trusted input.
-- Strategy Decision target-price semantics are resolved for the bounded Option B-Strict compatibility slice; Trade Plan target geometry remains a separate blocked migration.
-- Alert event ownership first backend slice is resolved and committed as `CF-W1-L3-AUTH-02`; notification/copilot digest consumers and Lane 3 readiness consumer policy remain separate.
+- Downstream modules remain blocked from treating Market Data / DQ as trusted input until module-specific consumer gates are implemented and tested.
+- Strategy Decision target-price semantics are resolved for the bounded Option B-Strict compatibility slice; Trade Plan no-target/DQ hard-block policy is resolved as Option B but backend implementation is not yet ready.
+- Alert event ownership first backend slice is resolved and committed as `CF-W1-L3-AUTH-02`; notification/copilot digest consumers and Lane 3 readiness consumer implementation remain separate.
 - Copilot/research trust UX remains unresolved.
 - Continuous Factory Wave 2 dirty DQ changes were accepted and committed as `CF-W2-DQ-01`.
 - Continuous Factory Wave 2 Signal Generation changes were reframed as bounded `CF-W2-SIG-01A`; `CF-W1-SIG-01B` adds trusted list read-path filtering.
-- No downstream Trade Plan, alert, portfolio, watchlist readiness, or copilot implementation is allowed until module-specific consumer gates and Trade Plan target migration are resolved.
+- No downstream Trade Plan, alert, portfolio, watchlist readiness, or copilot implementation is allowed until module-specific consumer gates, child contracts, QA scenarios, and exact file reservations are recorded.
 - Portfolio/watchlist child-resource ownership hardening is accepted as `CF-W1-L3-AUTH-01`, and alert event ownership is accepted as `CF-W1-L3-AUTH-02`; copilot trust UX, Data Quality readiness consumer policy, notification/copilot alert consumers, and platform nullable-owner migration remain separate.
 - Signal trigger DTO projection is accepted and committed as `CF-W1-SIG-TRIGGER-01`; persisted trigger snapshots, normalized trigger tables, and downstream trigger consumer adoption remain separate.
 
@@ -138,7 +138,15 @@
 ## Team 00 Intake Risk Decisions
 
 - As of the dedicated Team 00 intake on 2026-05-17, the initial worktree was clean and safe for a docs-only orchestration update.
-- The ready queue remains at zero active application-code items; forcing implementation would bypass open Decision Inbox gates.
+- The ready queue remains at zero active application-code items; forcing implementation would bypass child contract, QA, and file-reservation gates.
 - The active refinement and architecture queue docs had stale wording that understated the three open Decision Inbox blockers; Team 00 corrected those active-doc references in this intake.
 - Push to `dev` is authorized by active docs only under strict standing gates, but this intake remains local-only because the user explicitly prohibited push.
 - Worktrees are authorized for isolated Teams 03-10 work, but no immediate worktree is needed until an application-code item reaches Ready with exact file reservations.
+
+## Decision Resolution Risk Decisions
+
+- As of daemon iteration 16, the Decision Inbox has zero open decisions and Product Owner action is not required.
+- Lane 3 readiness policy is resolved as Option B: `READY` supports trusted/action-like workflows; `LIMITED` is passive display only with visible warnings; alerts, reliability labels, action-like workflows, and trusted summaries require `READY`.
+- Trade Plan no-target/DQ hard-block policy is resolved as Option B: target-shaped fields remain compatibility-only and cannot support trusted paper-readiness; missing or blocked DQ hard-blocks trusted readiness; `LIMITED` remains blocked or limited-review-only until narrowed later.
+- Market Data durable readiness storage is resolved as Option B ADR direction only: companion durable readiness/evidence storage is the direction; no Prisma/schema/migration/source/test implementation is approved by this decision.
+- No application-code item became Ready from these resolutions because child contracts, QA scenario updates, exact file reservations, and implementation handoffs still need Team 03/04/00 routing.

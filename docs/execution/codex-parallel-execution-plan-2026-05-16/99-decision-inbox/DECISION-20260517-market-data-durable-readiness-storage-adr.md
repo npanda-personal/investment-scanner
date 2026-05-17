@@ -1,3 +1,13 @@
+# Resolution Status
+
+Status: Resolved by Product Owner on 2026-05-17.
+
+Approved option: Option B as ADR direction only, companion durable readiness/evidence storage.
+
+Resolution record: `07-decisions/DECISION-20260517-market-data-durable-readiness-storage-adr-resolution.md`
+
+This item is no longer open in `open-decisions.md`. No Prisma/schema/migration/source/test implementation is approved by this decision; future implementation must be split and separately approved.
+
 # Decision Needed
 
 Decide the approved ADR direction for durable Market Data readiness evidence storage before Prisma, Market Data source, or readiness evidence tests are changed.

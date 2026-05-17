@@ -6,9 +6,9 @@ Owner: Team 03 Architecture Factory
 
 ## Status
 
-Docs-only architecture review prepared. Not Ready for Implementation.
+Product policy accepted. Not Ready for Implementation.
 
-This item remains blocked by Product Owner and Architect consent on Trade Plan no-target compatibility, Data Quality hard-block states, and API/UI migration boundaries.
+Product Owner approved Option B on 2026-05-17. This item now needs a backend-only child contract, QA scenario refresh, exact source/test file reservations, and proof that broader API/UI/stored-row migration is not required.
 
 ## Evidence Inspected
 
@@ -73,12 +73,10 @@ Frontend and Today Review files must be separate child slices unless the decisio
 
 ## Blockers
 
-- No accepted replacement semantics for user-facing target fields.
-- No accepted `LIMITED` DQ behavior for paper-readiness.
-- API/UI compatibility boundary is not accepted.
-- Existing stored Trade Plan row interpretation is not accepted.
+- Exact backend-only source/test file reservations are not accepted.
+- Child QA scenarios have not been refreshed against approved Option B.
+- API/UI/stored-row migration must remain excluded or trigger a new Decision Packet.
 
 ## Readiness Result
 
-Architecture-ready for docs-only contract/decision prep. Blocked for app-code implementation.
-
+Architecture-ready for post-decision backend-only child contract prep. Blocked for app-code implementation.

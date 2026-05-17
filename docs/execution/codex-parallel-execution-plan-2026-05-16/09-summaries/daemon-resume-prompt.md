@@ -16,7 +16,7 @@ docs/codex-agent-team-plan/** is historical evidence only.
 Use the active execution folder:
 docs/execution/codex-parallel-execution-plan-2026-05-16/
 
-Resume Continuous Daemon Scheduler Mode from cycle DAEMON-20260517, rolling iteration 15.
+Resume Continuous Daemon Scheduler Mode from cycle DAEMON-20260517, rolling iteration 16.
 
 Team 00 is the master runtime orchestrator. The human Product Owner is not the mediator for routine gates.
 
@@ -45,10 +45,9 @@ Read:
 - 18-integration-queue/
 
 Current open decisions:
-- `DECISION-20260517-lane3-readiness-consumer-policy`
-- `DECISION-20260517-trade-plan-no-target-dq-hard-block`
-- `DECISION-20260517-market-data-durable-readiness-storage-adr`
-- Product Owner action is required for those affected workstreams. All unrelated autonomous work continues.
+- No open decisions.
+- Product Owner action not required.
+- Daemon should continue autonomous work.
 
 Current ready queue:
 - No active application-code item is Ready for Implementation.
@@ -61,14 +60,20 @@ Latest Team 00 intake:
 - Ready queue depth: 0 active application-code items
 - Refinement queue depth: 7 active unique items
 - Integration queue depth: 0 active application-code items
-- Open decisions: 3
+- Open decisions: 0
 - Next team to launch: Team 03 Architecture Factory with `15-automation-prompts/AUTO-03-architecture-factory.md`
+
+Latest decision resolution:
+- `DECISION-20260517-lane3-readiness-consumer-policy`: Option B approved.
+- `DECISION-20260517-trade-plan-no-target-dq-hard-block`: Option B approved.
+- `DECISION-20260517-market-data-durable-readiness-storage-adr`: Option B approved as ADR direction only.
+- Resolution docs are under `07-decisions/`.
 
 Current planning queues:
 - Team 02 refreshed requirement priorities and kept app-code Ready at zero.
 - Team 03 completed architecture prep for `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02`.
 - Team 04 refreshed QA plans for `CF-W1-MD-01`, `CF-W1-L3-ALERT-01`, `CF-W1-UX-02`, and status for Team 03 items.
-- Team 00 opened three Decision Packets for true consent blockers.
+- Team 00 resolved the three Decision Inbox items after Product Owner approval and set open decisions to zero.
 
 Current committed daemon outputs include:
 - 1e882cd docs: authorize continuous codex factory execution
@@ -83,10 +88,10 @@ Current committed daemon outputs include:
 
 Resume daemon operation:
 1. Keep Team 00 running as scheduler/integration owner.
-2. Launch Team 03 Architecture Factory first for docs-only decision/contract prep on `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02`.
-3. Relaunch Team 02 Requirement Factory and Team 04 QA Factory for docs-only refinement after Team 03 or in parallel if write scopes are isolated.
+2. Launch Team 03 Architecture Factory first for post-decision child contract/file reservation refresh on `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and formal ADR prep for `CF-W1-MD-02`.
+3. Relaunch Team 02 Requirement Factory and Team 04 QA Factory for post-decision refinement after Team 03 or in parallel if write scopes are isolated.
 4. Continue audits, requirement refinement, architecture prep, QA planning, implementation only when Ready criteria pass, review, and release work.
-5. Keep `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02` out of implementation until their Decision Inbox items are resolved.
+5. Keep `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02` out of implementation until child contracts, QA scenarios, exact file reservations, and implementation work packets are accepted.
 6. Launch Teams 05-09 only when matching ready work exists; otherwise assign module-domain audit/refinement/prep.
 7. Relaunch Team 10 when integration queue items appear.
 8. Update `99-decision-inbox/open-decisions.md` whenever a true consent blocker is created or resolved.
