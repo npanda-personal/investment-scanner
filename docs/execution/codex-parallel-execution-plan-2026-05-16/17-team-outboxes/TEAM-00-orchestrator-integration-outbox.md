@@ -1166,3 +1166,33 @@ Admin, settings, auth/subscription, notifications, and user-alert convenience wo
 ## Next Action
 
 Route `CF-W1-BT-02` to Team 03 for architecture/contract refresh.
+
+---
+
+# Runtime Dispatch Update
+
+Date: 2026-05-18
+
+## Completed Team 00 Action
+
+Team 00 corrected the priority stack to direct investor/trader value and committed the docs-only checkpoint:
+
+- Commit: `7f57459 docs: reprioritize market intelligence roadmap`
+
+## Spawned Agents
+
+| Team | Agent | Assignment | Status |
+| --- | --- | --- | --- |
+| Team 03 - Architecture Factory | `019e3ba9-a6af-7650-88cd-2e7533d4b9e4` | `CF-W1-BT-02` architecture/contract refresh | active |
+| Team 02 - PO + Requirement Factory | `019e3ba9-ee7f-7143-aeb4-3952fe30d96d` | market-intelligence-focused requirement discovery | active |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-BT-02` QA refresh after Team 03 completes.
+- Team 05: market-data / DQ work after Team 00 selects the next item.
+- Team 06: signal / strategy / Trade Plan work after Team 00 selects the next item.
+- Team 10: next review/release gate after QA accepts an implementation handoff.
+
+## Product Owner Action
+
+Not required. Open decisions remain zero.

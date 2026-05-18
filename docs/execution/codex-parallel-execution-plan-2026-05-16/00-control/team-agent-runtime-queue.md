@@ -649,3 +649,27 @@ Date: 2026-05-18
 - Team 02 is ready for market-intelligence-focused requirements discovery.
 - Team 05 is ready for market-data / DQ work after Team 00 selection.
 - Team 06 is ready for signal / strategy / Trade Plan work after Team 00 selection.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 03 - Architecture Factory | `019e3ba9-a6af-7650-88cd-2e7533d4b9e4` | `gpt-5.4`, high | architecture/contract refresh | `CF-W1-BT-02` | active |
+| 2 | Team 02 - PO + Requirement Factory | `019e3ba9-ee7f-7143-aeb4-3952fe30d96d` | `gpt-5.4-mini`, medium | persistent market-intelligence discovery | next high-value requirement after `CF-W1-BT-02` | active |
+| 3 | Open slot | none | pending | QA prep | `CF-W1-BT-02` after Team 03 output | waiting |
+| 4 | Open slot | none | pending | market-data / DQ | next Team 05 item after Team 00 selection | ready |
+| 5 | Open slot | none | pending | signal / strategy / Trade Plan | next Team 06 item after Team 00 selection | ready |
+| 6 | Open slot | none | pending | review/signoff | next accepted implementation gate | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04 is ready to refresh `CF-W1-BT-02` QA once Team 03 completes the architecture/contract refresh.
+- Team 05 is ready for market-data / DQ work after Team 00 selects the next item.
+- Team 06 is ready for signal / strategy / Trade Plan work after Team 00 selects the next item.
+- Team 10 is idle until the next QA-accepted implementation handoff.
