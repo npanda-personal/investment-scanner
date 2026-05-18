@@ -4,7 +4,7 @@ Date: 2026-05-17
 
 Owner: Team 08 UX / Research / Copilot
 
-Status: Policy resolved; first child is Copilot-only. Not Ready for Implementation.
+Status: Policy resolved; first child is Copilot-only. Not Ready for Implementation. This is sequenced behind `CF-W1-UX-02` and should not be treated as an independent Ready-promotion candidate.
 
 ## Product Value
 
@@ -18,6 +18,7 @@ Inputs:
 - `11-module-audits/audit-ux-research-copilot.md`
 - `06-contracts/CF-W1-UX-02-copilot-trust-ux-contract.md`
 - `07-decisions/DECISION-20260517-ux-product-language-status-policy-resolution.md`
+- Current Team 00 routing keeps this behind `CF-W1-UX-02` and the other current front-runners.
 
 Observed risks:
 

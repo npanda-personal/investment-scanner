@@ -4,7 +4,7 @@ Date: 2026-05-17
 
 ## Status
 
-Requirement refined. Not Ready for Implementation.
+Requirement refined. Not Ready for Implementation. Current Team 00 routing keeps this behind the Lane 3, platform, and Market Data front-runners; it remains a Copilot-only follow-up.
 
 This is UX/product requirement refinement only. It does not authorize backend, frontend, route, shared UI, provider, package, or Playwright changes.
 
@@ -20,6 +20,7 @@ Latest inputs:
 - `11-module-audits/audit-ux-research-copilot.md`
 - `00-control/risk-register.md`
 - `07-decisions/DECISION-20260517-copilot-trust-ux-policy-resolution.md`
+- Current Team 00 routing keeps this behind `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-L3-ALERT-01`, `CF-W1-L3-AUTH-03`, `CF-W1-MD-01`, `CF-W1-AUTH-01`, and `CF-W1-SUB-01`.
 
 Observed gaps:
 

@@ -1,189 +1,263 @@
 # TEAM-10 Outbox
 
-Date: 2026-05-17
+Date: 2026-05-18
 
 Team: TEAM-10 - Review / Release
 
-State: Review complete for current docs-only factory output; application-code release remains closed.
+State: `CF-W1-L3-PORT-01A` review complete; revision required before release acceptance.
+
+## 2026-05-18 `CF-W1-L3-PORT-01A` Review / Release Gate
+
+Team 10 reviewed the Team 07 developer handoff in branch `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A` at worktree `../investment-scanner-worktrees/team07-CF-W1-L3-PORT-01A`.
+
+### Heartbeat
+
+| Field | Value |
+| --- | --- |
+| Team | `TEAM-10` - Review / Release |
+| Current state | Rejected / Rework |
+| Current assignment | Review Team 07 `CF-W1-L3-PORT-01A` developer handoff |
+| Input source | Ready queue, Team 07 worktree diff, Team 07 developer handoff, requirement, contract, QA plan |
+| Output target | `17-team-outboxes/TEAM-10-outbox.md`, `18-integration-queue/CF-W1-L3-PORT-01A-team10-review-release.md` |
+| Current branch/worktree | Team 10 shared worktree `dev`; reviewed Team 07 worktree `../investment-scanner-worktrees/team07-CF-W1-L3-PORT-01A` |
+| Active requirement id | `CF-W1-L3-PORT-01A` |
+| Files inspected | Portfolio service/types/tests/doc, DQE service/tests/invariants, Ready queue, requirement, contract, QA plan, Team 07 handoff |
+| Files reserved | Team 10 docs only: this outbox and Team 10 review-release integration record |
+| Files changed by Team 10 | This outbox and `18-integration-queue/CF-W1-L3-PORT-01A-team10-review-release.md` |
+| Tests/checks run | `diff --name-only`, `diff --check`, focused portfolio service Jest test |
+| Commit SHA | None |
+| Blockers | Release-blocking code-review finding; no human Decision Packet needed |
+| Can continue without human approval | Yes, after Team 07 revision is available |
+| Next relaunch condition | Team 07 updates the same implementation worktree and Team 04 QA reruns focused validation |
+
+### Review Decision
+
+Rejected for release acceptance pending a bounded Team 07 revision.
+
+The implementation stays inside the approved portfolio-management source/test/doc files and uses the Data Quality public service/type exports, but the readiness mapping has one release-blocking contract mismatch:
+
+- `backend/src/modules/portfolio-management/portfolio-management.service.ts:213` to `:216` sets `hardBlocked` when `evaluation.readinessBlockers.length > 0`.
+- Current Data Quality output can include non-portfolio blockers while daily-review and signal tiers are still usable. `backend/src/modules/data-quality-engine/data-quality-engine.service.ts:501` sets the automation tier to `BLOCKED`, and `:513` includes `automation` when tier reasons are folded into readiness blockers.
+- Data Quality tests already define this as valid: `backend/tests/modules/data-quality-engine/data-quality-engine.service.test.ts:72` to `:78` and `backend/tests/modules/data-quality-engine/data-quality-engine.invariants.test.ts:99` to `:103` show `dailyReview` and `signal` can be `READY` while automation is `BLOCKED`.
+- Result: a generated/evaluated READY instrument can become portfolio `displayStatus = BLOCKED`, violating the `CF-W1-L3-PORT-01A` contract that portfolio passive display trusts `dailyReview = READY`, and action readiness follows `signal = READY` plus `eligibleForSignals`.
+
+Required revision:
+
+- Do not treat every `readinessBlockers` entry as a portfolio display hard block.
+- Base portfolio display blocking on `coverageStatus = UNUSABLE`, `signalReadinessStatus = NOT_READY`, `dailyReview` tier `BLOCKED`, and known display-relevant hard blockers such as stale/unsupported/scope mismatch.
+- Keep `LIMITED` passive-display-only and action-blocked.
+- Add a focused portfolio test where DQE-like READY daily-review/signal tiers include `AUTOMATION_BLOCKED: PHASE0_AUTOMATION_NOT_AUTHORIZED`; portfolio readiness should not be display-blocked by that automation-only blocker.
+
+### Scope Evidence
+
+Changed app files in Team 07 worktree:
+
+- `backend/src/modules/portfolio-management/portfolio-management.service.ts`
+- `backend/src/modules/portfolio-management/portfolio-management.types.ts`
+- `backend/src/modules/portfolio-management/portfolio-management.md`
+- `backend/tests/modules/portfolio-management/portfolio-management.service.test.ts`
+
+Additional docs in Team 07 worktree:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-07-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-L3-PORT-01A-developer-handoff.md` (untracked handoff)
+
+Forbidden source files were not touched by the implementation diff reviewed by Team 10.
+
+### Validation
+
+Memory check:
+
+- `.NET ComputerInfo`: 77.04% used, 3.62 GB free, 15.77 GB total.
+
+Commands run:
+
+- `git -C ..\investment-scanner-worktrees\team07-CF-W1-L3-PORT-01A diff --name-only`
+- `git -C ..\investment-scanner-worktrees\team07-CF-W1-L3-PORT-01A diff --check`
+- `npm.cmd test -- portfolio-management.service.test.ts --runInBand`
+
+Focused test result:
+
+- Pass: 1 suite, 7 tests.
+
+Concurrent QA note:
+
+- Team 04 also recorded focused QA pass evidence for this implementation, then marked it superseded for release acceptance by this Team 10 code-review rejection.
+
+Skipped:
+
+- Backend build was not rerun by Team 10 because the focused test passed but code review rejected the release candidate.
+- UI smoke was not applicable; this is a backend-only DTO slice with no frontend reservation.
+- Broad route/ownership regression was not run because routes and ownership controllers were untouched.
+
+### Gate Outcome
+
+No commit created.
+
+No Product Owner Decision Packet opened. This is a routine code-review rejection and can be fixed within the existing Team 07 allowed files.
+
+Next gate: Team 07 revision in the same worktree, then Team 04 QA verification and Team 10 re-review before Architect signoff, delegated PO packet, scoped commit, or release acceptance.
 
 ## Assignment
 
-Continue Team 10 review/release operations after Team 01-09 produced additional docs-only planning, contracts, QA plans, audits, and decision packets.
+Recheck current release/readiness state after Team 00 resolved the Decision Inbox items and Teams 02-09 refreshed docs-only planning evidence.
 
 ## Evidence Sync
 
 | Check | Result |
 | --- | --- |
 | Branch | `dev` |
-| Recent commits | `d2a6eae docs: resolve daemon decision inbox items`, `d5927d6 docs: initialize team 00 orchestrator intake`, `4ad0a39 docs: checkpoint daemon decision routing`, `1e882cd docs: authorize continuous codex factory execution`, `1a0c91b docs: checkpoint daemon requirement and qa prep` |
-| Ahead/behind | `dev` is ahead of `origin/dev` by 2 local docs-only commits |
+| Ahead/behind | `dev` is ahead of `origin/dev` by 5 local docs-only commits |
+| Recent commits | `a20f5e8 docs: resolve current decision inbox items`, `c739f78 docs: route team 01 audit findings to parallel teams`, `bb73b72 docs: coordinate team 00 factory assignments`, `d2a6eae docs: resolve daemon decision inbox items`, `d5927d6 docs: initialize team 00 orchestrator intake` |
 | Dirty app/source files | None found by scoped `git status` filter |
-| Dirty active docs | Many Team 01-10 active execution docs are modified or untracked |
-| Integration queue | No current application-code item pending |
-| Ready queue | No active application-code item Ready for Implementation |
+| Dirty active docs | Docs-only Team 01-09 refresh files remain modified/untracked |
+| Decision Inbox | No open decisions |
+| Ready queue | One active application-code item: `CF-W1-L3-PORT-01A` for Team 07 |
+| Integration queue | Team 07 developer handoff reviewed; Team 10 rejection record added |
 
 ## Branch / Worktree
 
 - Branch/worktree: shared repository worktree on `dev`.
 - Dedicated Team 10 worktree: not created.
-- Scoped commit readiness: not ready because there is no exact staged scope and many unrelated docs-only team outputs are dirty.
-- Push readiness: not ready because worktree is dirty and no exact accepted commit scope exists.
+- Commit readiness: not ready from Team 10, because no exact staged scope exists and the dirty docs belong to multiple teams/output groups.
+- Push readiness: not ready, because the worktree is dirty and no exact accepted commit scope exists.
 
 ## Subagents
 
-None used in this continuation pass.
-
-Earlier Team 10 read-only reviewer was closed and produced no file edits.
+None used in this recheck.
 
 ## Ready Work Pulled
 
-None.
+`CF-W1-L3-PORT-01A` was pulled for Review / Release gate only.
 
-The live ready queue states no active application-code item is Ready for Implementation. Prepared child artifacts are still planning evidence until Team 00 promotes a bounded slice.
+Team 10 did not implement source changes. The reviewed source patch remains in Team 07's dedicated worktree.
 
 ## Review Decision
 
 Accepted as docs-only planning/release-control evidence, not implementation release evidence:
 
-- Team 01 audits, including child/post-decision source readiness audits.
-- Team 02 requirement and queue refinement.
-- Team 03 architecture reviews, contracts, work packets, and Market Data ADR prep.
-- Team 04 QA plans and post-decision scenario matrix.
-- Team 05 Market Data / Data Quality read-only audit and outboxes.
-- Team 06 Trade Plan readiness checks and outboxes.
-- Team 07 Lane 3 readiness/ownership planning and `CF-W1-L3-AUTH-03` prep.
-- Team 08 Copilot trust UX planning and decision routing.
-- Team 09 platform/auth/subscription/notification planning and decision routing.
+- Decision resolutions for `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, and `CF-W1-MD-01`.
+- Team 03/04/06/07/09 readiness and QA refresh outputs.
+- Team 00 Ready promotion for `CF-W1-L3-PORT-01A`, followed by Team 07 developer handoff.
 
 Rejected for application-code release or Ready promotion in this Team 10 pass:
 
-- `CF-W1-L3-PORT-01`
+- `CF-W1-L3-PORT-01A`
 - `CF-W1-L3-ALERT-01`
 - `CF-W1-L3-AUTH-03`
+- `CF-W1-L3-INTEL-01`
 - `CF-W1-TP-01B`
-- `CF-W1-MD-02`
-- `CF-W1-MD-01`
+- `CF-W1-NOTIF-02`
 - `CF-W1-AUTH-01`
 - `CF-W1-SUB-01`
-- `CF-W1-NOTIF-02`
 - `CF-W1-UX-02`
+- `CF-W1-UX-05`
+- `CF-W1-MD-01`
+- `CF-W1-MD-02`
 
-Reason: no source/test patch, implementation handoff, QA execution evidence, code-review evidence, Architect signoff, Product Owner packet, scoped staging, or Ready queue promotion exists for a new application-code release.
+Reason: `CF-W1-L3-PORT-01A` has a source/test patch and developer validation, but Team 10 found the release-blocking readiness mapping issue recorded above. The other listed items still lack a current Ready implementation handoff and release evidence.
 
 ## Evidence Reviewed
 
-Runtime and control docs:
-
-- `AGENTS.md`
-- `98-orchestrator/runtime-bootstrap.md`
-- `98-orchestrator/standing-delegation-policy.md`
-- `98-orchestrator/escalation-rules.md`
-- `98-orchestrator/worktree-branch-policy.md`
-- `98-orchestrator/team-heartbeat-protocol.md`
-- `00-control/active-work-board.md`
-
-Queues and inboxes:
-
-- `16-team-inboxes/README.md`
-- `16-team-inboxes/TEAM-03-post-decision-child-contracts.md`
-- `16-team-inboxes/TEAM-07-CF-W1-L3-AUTH-01.md`
-- `12-ready-queue/ready-for-implementation.md`
-- `12-ready-queue/blocked-by-decision.md`
-- `12-ready-queue/blocked-by-shared-file.md`
-- `12-ready-queue/blocked-by-upstream-dependency.md`
-- `18-integration-queue/README.md`
-- `18-integration-queue/MOR-20260517-runtime-cycle.md`
-- `18-integration-queue/CF-W1-L3-AUTH-01-release-record.md`
 - `99-decision-inbox/open-decisions.md`
-
-Recent team outboxes:
-
-- `17-team-outboxes/TEAM-02-requirement-factory.md`
-- `17-team-outboxes/TEAM-03-architecture-factory.md`
+- `12-ready-queue/ready-for-implementation.md`
+- `18-integration-queue/`
+- `00-control/active-work-board.md`
+- `17-team-outboxes/TEAM-00-orchestrator-integration-outbox.md`
 - `17-team-outboxes/TEAM-04-qa-factory.md`
-- `17-team-outboxes/TEAM-05-outbox.md`
+- `17-team-outboxes/TEAM-06-outbox.md`
 - `17-team-outboxes/TEAM-07-outbox.md`
-- `17-team-outboxes/TEAM-08-outbox.md`
 - `17-team-outboxes/TEAM-09-outbox.md`
-
-Decision packet reviewed:
-
-- `99-decision-inbox/DECISION-20260517-copilot-trust-ux-policy.md`
 
 Commands:
 
-- `git status --short`
-- `git branch --show-current`
+- `git status --short --branch`
 - `git log --oneline -5`
 - `git status --short | rg "^( M|M |A |\\?\\?) (backend|frontend|shared|package|config|scripts|docker|README|AGENTS|\\.github|\\.gitignore|logs|node_modules)"`
-- `git diff --stat`
-- `git diff --check`
 
-## Current Open Decisions
+## Current Decision State
 
-The Decision Inbox now has 4 true consent blockers:
+No open Product Owner decisions.
 
-| Decision | Blocks | Team 10 validation |
-| --- | --- | --- |
-| `DECISION-20260517-platform-auth-default-user-fallback-policy` | `CF-W1-AUTH-01` | Valid blocker; protected controller fallback policy is product/security semantics. |
-| `DECISION-20260517-local-manual-subscription-plan-change-policy` | `CF-W1-SUB-01` | Valid blocker; local subscription self-service/admin policy affects access behavior. |
-| `DECISION-20260517-copilot-trust-ux-policy` | `CF-W1-UX-02`, `CF-W1-QA-UI-01` | Valid blocker; naming, blocked-summary visibility, trust fields, and shared UI/navigation scope need Product/UX/Architect decision. |
-| `DECISION-20260517-market-data-validation-hardening-policy` | `CF-W1-MD-01` | Valid blocker; future-date, adjusted-close, suspicious-volume, and spike validation semantics need Product/Architect/QA decision before source or test work. |
+Recently resolved items still require module-local packet refresh, exact file reservations, QA refresh, and Team 00 Ready promotion before source/test work:
 
-These block only their affected workstreams. Unrelated docs-only prep and future non-conflicting Ready promotions can continue.
+- `CF-W1-AUTH-01`
+- `CF-W1-SUB-01`
+- `CF-W1-UX-02`
+- `CF-W1-UX-05`
+- `CF-W1-MD-01`
 
 ## Release Readiness Notes
 
-- `CF-W1-TP-01B`: strongest next implementation candidate after Team 00 Ready promotion because architecture, QA plan, work packet, and Team 06 readiness evidence exist. It still needs exact scoped handoff and isolated implementation ownership.
-- `CF-W1-L3-PORT-01`: viable next Lane 3 candidate after Team 00 chooses portfolio-only or watchlist-only child slice and records exact file reservations.
-- `CF-W1-L3-ALERT-01`: planning is advanced, but event suppression may have broader behavior impact; promote only after Team 00 confirms QA acceptance and exact scope.
-- `CF-W1-L3-AUTH-03`: useful Lane 3 ownership follow-up, still planning-only.
-- `CF-W1-NOTIF-02`: candidate for Team 09 after file reservations and Ready promotion; not blocked by auth/subscription policy decisions unless implementation broadens.
-- `CF-W1-MD-02`: remains ADR-only. No Prisma/schema/source/test implementation is approved.
+- `CF-W1-TP-01B`: still a strong near-ready candidate, but Team 06 says it needs Team 00 Ready promotion and a new Team 06 implementation inbox.
+- `CF-W1-L3-PORT-01A`: Ready-promoted and implemented by Team 07, but Team 10 rejected the release candidate pending a bounded readiness-mapping revision.
+- `CF-W1-NOTIF-02`: prepared, but Team 09 says it still needs Team 00/Team 09 Ready promotion.
+- `CF-W1-L3-ALERT-01`: prepared, but still needs Ready promotion and careful behavior review because alert suppression can change event creation.
+- `CF-W1-L3-INTEL-01`: remains downstream of accepted `CF-W1-L3-PORT-01A`.
+- `CF-W1-MD-02`: remains ADR/source-schema-gated; no implementation approval.
 
 ## Stale / Contradictory Control State
 
-- `00-control/active-work-board.md` still reports Decision Inbox count `0` and Team 10 idle, but current `99-decision-inbox/open-decisions.md` reports 4 open decisions and Team 10 has just completed a review pass.
-- Integration queue files still describe earlier historical integration state. They do not contain a current app-code submission.
-- Team 00 should update the active board before any scoped commit/push.
+- `00-control/active-work-board.md` reflects decision inbox count `0` and the Team 00 `CF-W1-L3-PORT-01A` Ready promotion.
+- `17-team-outboxes/TEAM-00-orchestrator-integration-outbox.md` contains older appended sections with historical open-decision counts; use the latest appended Team 00 section plus `open-decisions.md` and `ready-for-implementation.md` as current state.
+- The stale completed-work inbox `16-team-inboxes/TEAM-07-CF-W1-L3-AUTH-01.md` must not be treated as current Ready evidence.
 
 ## Validation
 
 Builds run: none.
 
-Tests run: none.
+Tests run: `npm.cmd test -- portfolio-management.service.test.ts --runInBand` in the Team 07 backend worktree. Result: pass, 1 suite, 7 tests.
 
 UI checks run: none.
 
 Live local data checks run: none.
 
-Skipped reason: Team 10 reviewed docs-only evidence. No implementation patch was submitted, so runtime tests would not validate a release candidate.
-
-`git diff --check` completed without whitespace errors. Git reported normal Markdown CRLF conversion warnings.
+Skipped reason: backend build, UI smoke, and route/ownership regression were not run because code review rejected the release candidate before broader release validation.
 
 ## Commit / Integration Decision
 
 No commit created.
 
-No integration queue item created.
+Integration queue item created:
+
+- `18-integration-queue/CF-W1-L3-PORT-01A-team10-review-release.md`
 
 Reason:
 
-- No app-code release candidate exists.
+- The application-code release candidate exists but is rejected pending revision.
+- No accepted staged scope exists for one accepted requirement.
 - The worktree contains many unrelated docs-only outputs from several teams.
-- No exact staged scope exists for one accepted requirement or one isolated docs-only factory update.
 
 ## Blockers
 
-- Four active Decision Inbox items block `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-UX-02`, `CF-W1-QA-UI-01`, and `CF-W1-MD-01`.
-- Dirty shared worktree prevents safe broad commit or push.
-- No app-code Ready queue item exists.
-- Active board is stale versus current Decision Inbox and Team 10 state.
+- `CF-W1-L3-PORT-01A` release acceptance is blocked by the Team 10 review finding above.
+- Dirty shared docs worktree prevents safe broad commit or push.
+- Multiple near-ready candidates still require Team 00 Ready promotion and exact implementation inbox/handoff.
 
 ## Next Recommended Assignment
 
-1. Team 00 should update `00-control/active-work-board.md` to reflect 4 open decisions, no app-code Ready item, and current Team 10 review completion.
-2. Team 00 should scope docs-only commits by team/output group instead of one mixed release commit.
-3. Route the 3 open Decision Inbox items to Product Owner / Architect / QA.
-4. Consider `CF-W1-TP-01B` for the next bounded Ready promotion after exact file reservations and implementation ownership are recorded.
-5. Consider `CF-W1-L3-PORT-01A` as the first Lane 3 readiness implementation slice because it can be portfolio-only and backend-local.
+1. Team 07 should revise `CF-W1-L3-PORT-01A` inside the existing file reservation.
+2. Team 04 should rerun focused portfolio QA after the revision.
+3. Team 10 should re-review before Architect signoff, delegated PO packet, scoped commit, or release acceptance.
+4. Keep `CF-W1-L3-INTEL-01` behind accepted `CF-W1-L3-PORT-01A`.
+
+---
+
+# 2026-05-18 - CF-W1-TP-01B Review / Release Precheck
+
+Review result: **REJECT**
+
+Evidence file:
+
+- `18-integration-queue/CF-W1-TP-01B-team10-review-release.md`
+
+Summary:
+
+- Scope confirmed against `dev`: only the six approved Trade Plan files plus Team 06 reporting docs changed.
+- Focused Trade Plan tests passed: `npm.cmd test -- trade-plan-risk-engine.service.test.ts trade-plan-risk-engine.paper-readiness.test.ts --runInBand` returned 2 suites / 46 tests passed.
+- Product-language scan returned no forbidden target/advice wording matches in the reviewed scope.
+- Release is blocked because Trade Plan now treats any Data Quality blocker containing `blocked` as a hard paper-readiness blocker. DQE always emits `AUTOMATION_BLOCKED: PHASE0_AUTOMATION_NOT_AUTHORIZED` through readiness blockers, so otherwise trusted paper-review candidates can be blocked solely by the intentionally policy-blocked automation tier.
+
+Next gate:
+
+- Return to Team 06 rework, then Team 04 focused QA rerun, then Team 10 re-review.

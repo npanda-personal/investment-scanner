@@ -4,7 +4,7 @@ Date: 2026-05-17
 
 Owner: Team 09 Platform / Auth / Subscription / Notifications
 
-Status: refinement only; not Ready for Implementation
+Status: refinement only; not Ready for Implementation. Current Team 00 routing keeps this as the next Team 09 candidate behind `CF-W1-TP-01B` and ahead of the alert/auth follow-ups.
 
 ## User Problem
 
@@ -70,6 +70,6 @@ Forbidden:
 
 The focused platform QA plan, architecture review, contract, and work packet are prepared.
 
-Team 03's 2026-05-18 near-ready file-reservation matrix confirms this slice is narrowly provider-scoped and has no shared/high-risk request if implementation changes only the local log provider payload, focused tests, and module docs.
+Team 03's 2026-05-18 near-ready file-reservation matrix confirms this slice is narrowly provider-scoped and has no shared/high-risk request if implementation changes only the local log provider payload, focused tests, and module docs. Current Team 00 routing keeps this ahead of `CF-W1-L3-ALERT-01` and `CF-W1-L3-AUTH-03`.
 
 This item still needs Ready promotion and exact file reservation before source work.

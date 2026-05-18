@@ -4,7 +4,7 @@ Date: 2026-05-17
 
 Owner: Team 08 UX / Research / Copilot
 
-Status: Draft contract. Not Ready for Implementation.
+Status: Post-decision contract refreshed. Not Ready for Implementation.
 
 This contract prepares the future Copilot trust UX slice. It does not authorize application source, test, shared UI, route, package, provider, Prisma, startup, or Playwright changes.
 
@@ -14,6 +14,7 @@ This contract prepares the future Copilot trust UX slice. It does not authorize 
 - `04-qa/CF-W1-UX-02-qa-plan.md`
 - `11-module-audits/audit-ux-research-copilot.md`
 - `17-team-outboxes/TEAM-08-ux-research-copilot-2026-05-17.md`
+- `07-decisions/DECISION-20260517-copilot-trust-ux-policy-resolution.md`
 
 ## Current Evidence
 
@@ -120,7 +121,7 @@ Avoid:
 - `high-scoring names`
 - `buy`, `sell`, `must`, `guaranteed`, `profit target`, `price target`
 
-Final labels are blocked on `DECISION-20260517-copilot-trust-ux-policy`.
+Final labels are resolved by Option B: use `Local Research Copilot` or `Research Copilot`, hide generated narrative in blocked states, and keep the first slice Copilot-only.
 
 ## Scope Contract
 
@@ -161,13 +162,13 @@ Forbidden without separate reservation:
 
 ## Architecture Gate
 
-Implementation is blocked until Product Owner / UX / Architect resolve:
+The Product Owner decision is resolved, but implementation remains blocked until Team 08/03/04 and Team 00 confirm:
 
-- Copilot naming.
-- Blocked-summary visibility.
-- Required trust fields and fallback behavior for unknown DQ evidence.
-- Whether Stock Research Workbench is included or split.
-- Whether shared UI/navigation changes are in scope.
+- source-supported trust fields and fallback behavior for unknown or missing DQ evidence;
+- exact Copilot-only backend, frontend, and test file reservations;
+- no shared UI/navigation/route registry scope;
+- no Stock Research Workbench scope in the first slice;
+- focused backend and UI QA handoff.
 
 ## Recommendation
 
@@ -178,3 +179,7 @@ Approve a narrow Copilot-only first slice:
 - Hide generated narrative for blocked summaries.
 - Split Stock Research Workbench trust surfaces to `CF-W1-UX-01`.
 - Avoid shared UI/navigation changes in this slice.
+
+## Post-Decision Refresh - 2026-05-18
+
+Option B is accepted. The proposed file reservations remain valid for Team 00 Ready evaluation, but source work is still blocked until Team 08 confirms current-source trust-field mapping and Team 04 accepts focused QA evidence. `CF-W1-UX-05A` may be folded into the same Copilot-only implementation handoff to avoid duplicate edits to the same files.

@@ -111,4 +111,4 @@ Minimum focused backend scenarios:
 
 Architecture child contract is prepared for `CF-W1-TP-01B`.
 
-Do not move this item to `Ready for Implementation` until Team 04 refreshes/accepts the backend-only child QA scenarios and Team 00 promotes the exact file reservation.
+Do not move this item to `Ready for Implementation` until Team 00 promotes the exact file reservation and implementation handoff. Team 04's child QA plan already exists in `04-qa/CF-W1-TP-01B-qa-plan.md`.

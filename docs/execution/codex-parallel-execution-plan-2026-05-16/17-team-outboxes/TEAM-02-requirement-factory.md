@@ -1,18 +1,18 @@
 # TEAM-02 Requirement Factory Outbox
 
-Date: 2026-05-17
+Date: 2026-05-18
 
-Mode: continued Team 02 docs-only requirement/queue refresh. No application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, providers, services, or frontend files changed.
+Mode: persistent Team 02 PO + requirements value-discovery lane. No application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, providers, services, or frontend files changed.
 
 ## Team Heartbeat
 
 - Team id/name: TEAM-02 Requirement Factory
-- Current state: completed
-- Current assignment: resync requirements, top candidates, refinement queue, and blocked/ready queues after Team 07 and Team 08 planning artifacts
+- Current state: active
+- Current assignment: resync requirements, top candidates, refinement queue, and blocked/ready queues; discover new high-value requirement candidates from module audits; keep priorities ordered by user value
 - Input source: root `AGENTS.md`, runtime bootstrap, standing delegation, escalation rules, worktree/branch policy, heartbeat protocol, Team 02 charter, Team 02 automation prompt, team inboxes, ready/blocked queues, Decision Inbox, Team 07/08 outboxes and prepared artifacts
 - Output target: `10-requirements/`, `12-ready-queue/`, this outbox
 - Branch/worktree: `dev`; shared workspace, no separate Team 02 worktree created
-- Active requirement ids: `CF-W1-L3-AUTH-03`, `CF-W1-L3-INTEL-01`, `CF-W1-L3-PORT-01`, `CF-W1-L3-ALERT-01`, `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-MD-01`
+- Active requirement ids: `CF-W1-L3-AUTH-03`, `CF-W1-L3-INTEL-01`, `CF-W1-L3-INTEL-02`, `CF-W1-L3-PORT-01`, `CF-W1-L3-PORT-01B`, `CF-W1-L3-ALERT-01`, `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-MD-01`, `CF-W1-AUTH-02`, `CF-W1-DQ-02`, `CF-W1-TP-02`, `CF-W1-SQLAB-01`
 - Ready work pulled: none
 - Can continue without human approval: yes for docs-only requirement refinement; no for app-code implementation or decision-blocked work
 
@@ -94,8 +94,8 @@ No item was moved to Ready.
 | CF-W1-NOTIF-02 | Requirement, architecture, contract, work packet, and platform QA plan prepared; blocked until Team 00/Team 09 Ready promotion. |
 | CF-W1-MD-02 | ADR direction accepted; blocked until formal ADR and later source/schema split approval. |
 | CF-W1-L3-INTEL-01 | Requirement, architecture review, contract, work packet, and QA plan prepared; blocked until `CF-W1-L3-PORT-01A` is accepted and Team 00 promotes. |
-| CF-W1-MD-01 | Requirement and QA plan prepared; Option A policy now resolved; post-decision packet refresh still needed. |
-| CF-W1-UX-02 | Contract/work packet/QA prep exists; Option B policy now resolved; Copilot-only packet refresh still needed. |
+| CF-W1-MD-01 | Requirement, Team 03 validation-only packet, and Team 04 QA refresh now prepared; Team 05 readiness acceptance and Team 00 promotion still needed. |
+| CF-W1-UX-02 | Team 03 Copilot-only packet and Team 04 QA refresh now prepared; Team 08 source-supported trust-field mapping and Team 00 promotion still needed. |
 | CF-W1-UX-05 | Requirement, contract, work packet, and QA plan prepared; Option A policy now resolved; Copilot-only sequencing still needed. |
 | CF-W1-AUTH-01 | Previously decision-blocked; superseded by 2026-05-18 Option A resolution and packet-refresh state. |
 | CF-W1-SUB-01 | Previously decision-blocked; superseded by 2026-05-18 Option A resolution and packet-refresh state. |
@@ -125,7 +125,7 @@ No item was moved to Ready.
 
 - Shared worktree is dirty with concurrent docs from multiple teams. Team 02 did not stage or commit.
 - No app-code Ready item exists until Team 00 promotes a specific child with exact handoff/reservations.
-- `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-MD-01`, `CF-W1-AUTH-01`, and `CF-W1-SUB-01` moved out of Decision Inbox blocker state after Product Owner resolution; all still need post-decision packet refresh before source/test work.
+- `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-MD-01`, `CF-W1-AUTH-01`, and `CF-W1-SUB-01` moved out of Decision Inbox blocker state after Product Owner resolution; Team 03/04 refresh evidence now exists, but source/test work still needs remaining owner checks and Team 00 Ready promotion.
 - `CF-W1-UX-05` remains valid but dropped out of the current top ten due to lower maturity than `CF-W1-L3-AUTH-03`.
 
 ## Next Recommended Assignment
@@ -245,7 +245,7 @@ Mode: Team 02 monitor loop consumed the 2026-05-18 Product Owner decision resolu
 
 Ready work pulled: none.
 
-No policy-resolved item became implementation-ready. Each still needs architecture/QA refresh, exact file reservations, and Team 00 Ready promotion.
+No policy-resolved item became implementation-ready. Team 03/04 refresh evidence now exists for the five post-decision items, but each still needs remaining owner checks, exact implementation handoff, and Team 00 Ready promotion.
 
 ### Next Recommended Assignment
 
@@ -262,3 +262,178 @@ Latest poll:
 - Team 02 inbox assignment was briefly stale in an earlier poll, but Team 00 has since refreshed it to the no-open-decisions / post-decision-refinement state.
 - Team 03 and Team 04 planning updates are consistent with Team 02 queues: no item is app-code Ready, and policy-resolved items still need packet/QA/file-reservation refresh.
 - No additional Team 02 requirement file was needed in this poll.
+
+## 2026-05-18 Continuation - Refinement Queue Refresh
+
+Mode: Team 02 continued refinement queue updates after Team 03/04 post-decision readiness refresh evidence. No application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, providers, services, or frontend files changed.
+
+### Evidence Sync
+
+- Branch/worktree: `dev`; shared workspace, no separate Team 02 worktree created.
+- Latest observed commit: `4642470 docs: promote portfolio readiness dto slice`.
+- Ready queue: `CF-W1-L3-PORT-01A` remains the only promoted Ready item and belongs to Team 07.
+- Decision Inbox: no open decisions.
+- Shared workspace state: dirty docs workspace with concurrent Team 03/04/06/07/09/10 artifacts; Team 02 did not stage, revert, or overwrite unrelated files.
+
+### Evidence Consumed
+
+- `03-architecture/team03-post-decision-readiness-refresh-2026-05-18.md`
+- `06-contracts/CF-W1-AUTH-01-platform-auth-fail-closed-contract.md`
+- `06-contracts/CF-W1-SUB-01-manual-subscription-plan-policy-contract.md`
+- `06-contracts/CF-W1-MD-01-market-data-validation-hardening-contract.md`
+- `06-contracts/CF-W1-UX-02-copilot-trust-ux-contract.md`
+- `06-contracts/CF-W1-UX-05-product-language-status-contract.md`
+- `08-work-packets/CF-W1-AUTH-01-work-packet.md`
+- `08-work-packets/CF-W1-SUB-01-work-packet.md`
+- `08-work-packets/CF-W1-MD-01-work-packet.md`
+- `08-work-packets/CF-W1-UX-02-work-packet.md`
+- `08-work-packets/CF-W1-UX-05-work-packet.md`
+- `04-qa/next-validation-plans.md`
+
+### Queue Delta
+
+- Replaced old refresh-needed wording for `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-MD-01`, `CF-W1-UX-02`, and `CF-W1-UX-05` with current "contract/work packet and QA refresh prepared" state.
+- Kept all five policy-resolved items out of Ready; each still needs Team 00 promotion and an exact implementation handoff.
+- Marked `CF-W1-AUTH-01` and `CF-W1-SUB-01` as sequencing/combined-handoff candidates because subscription controller/test/doc files overlap.
+- Marked `CF-W1-MD-01` as needing Team 05 readiness acceptance before Team 00 Ready promotion.
+- Marked `CF-W1-UX-02` as needing Team 08 source-supported trust-field mapping before Ready promotion.
+- Marked `CF-W1-UX-05` as a sequenced/fold-in Copilot-only child of `CF-W1-UX-02`; shared `StatusBadge`, Research Hub, and Market Data UI work remain future.
+- Restored `CF-W1-UX-05` to the active top/refinement ten as a sequenced candidate, not an independent parallel app-code pull.
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/blocked-by-upstream-dependency.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/blocked-by-shared-file.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+### Implementation Readiness
+
+Ready work pulled: none by Team 02.
+
+| ID | Result |
+| --- | --- |
+| CF-W1-AUTH-01 | Contract/work packet and QA refresh prepared; blocked until Team 00 Ready promotion, Team 09 handoff, and AUTH/SUB sequencing. |
+| CF-W1-SUB-01 | Contract/work packet and QA refresh prepared; blocked until Team 00 Ready promotion, Team 09 handoff, and AUTH/SUB sequencing. |
+| CF-W1-MD-01 | Validation-only contract/work packet and QA refresh prepared; blocked until Team 05 readiness acceptance and Team 00 Ready promotion. |
+| CF-W1-UX-02 | Copilot-only contract/work packet and QA refresh prepared; blocked until Team 08 source-supported trust-field mapping and Team 00 Ready promotion. |
+| CF-W1-UX-05 | Copilot-only copy cleanup packet and QA refresh prepared; blocked until folded into or sequenced after `CF-W1-UX-02`. |
+
+### Validation
+
+- Stale wording scan for prior refresh-needed phrases: passed with no active stale matches.
+- `git diff --check`: passed; Git reported normal Markdown CRLF conversion warnings.
+- Tests/builds/UI/live checks: none; docs-only requirement/queue update.
+
+### Next Recommended Assignment
+
+Team 00 should keep `CF-W1-L3-PORT-01A` as the only active Ready implementation handoff, then evaluate `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-L3-ALERT-01`, `CF-W1-L3-AUTH-03`, and the refreshed post-decision candidates one at a time. For `CF-W1-AUTH-01` and `CF-W1-SUB-01`, decide whether to issue a combined Team 09 handoff or explicitly sequence the overlapping files.
+
+## 2026-05-18 Continuation - Persistent Discovery Cycle
+
+Mode: Team 02 value-discovery pass after module-audit review. No application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, providers, services, or frontend files changed.
+
+### Evidence Consumed
+
+- `11-module-audits/audit-platform-auth-subscription-notifications.md`
+- `11-module-audits/audit-market-data-data-quality.md`
+- `11-module-audits/audit-backtesting-trade-risk.md`
+- `11-module-audits/audit-ux-research-copilot.md`
+- `11-module-audits/audit-strategy-signal-rules.md`
+- `11-module-audits/audit-portfolio-watchlist-alerts.md`
+- `11-module-audits/audit-qa-test-infrastructure.md`
+
+### Queue Delta
+
+- Created new requirement drafts for `CF-W1-AUTH-02`, `CF-W1-DQ-02`, `CF-W1-TP-02`, and `CF-W1-L3-INTEL-02`.
+- Added new watchlist child requirement `CF-W1-L3-PORT-01B` for user-facing watchlist readiness evidence.
+- Added new portfolio-intelligence review traceability requirement `CF-W1-L3-INTEL-02` for explainable review output.
+- Added a new ranked discovery stack to `requirements-backlog.md` and `refinement-queue.md`.
+- Kept the current Ready-promotion front-runners unchanged: `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-L3-ALERT-01`, and `CF-W1-L3-AUTH-03`.
+- Kept `CF-W1-AUTH-01` and `CF-W1-SUB-01` explicitly sequenced because the subscription files overlap.
+
+### New Requirement Candidates
+
+| Rank | ID | Value | Current next gate |
+| --- | --- | --- | --- |
+| 1 | CF-W1-L3-INTEL-02 | Portfolio Intelligence review traceability | Product refinement and bounded architecture contract. |
+| 2 | CF-W1-AUTH-02 | Alert inbox user isolation | Product refinement and bounded architecture contract. |
+| 3 | CF-W1-DQ-02 | Data Quality currentness evidence | Architecture contract and QA plan. |
+| 4 | CF-W1-TP-02 | Trade Plan exit/invalidation semantics | Product refinement and architecture contract. |
+
+### Items Ready For Architecture
+
+- `CF-W1-L3-INTEL-02`
+- `CF-W1-AUTH-02`
+- `CF-W1-DQ-02`
+- `CF-W1-TP-02`
+
+### Top Unassigned Item
+
+Team 00 should delegate `CF-W1-L3-INTEL-02` next for portfolio-intelligence review workflow value discovery. `CF-W1-L3-PORT-01B` has already been fed to Team 03 for architecture prep. After that, continue with `CF-W1-TP-01B` for the next Ready-promotion decision and route the remaining discovery items to architecture/product refinement in rank order.
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-PORT-01B-watchlist-readiness-dto-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-INTEL-02-portfolio-intelligence-review-traceability-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-AUTH-02-alert-inbox-user-isolation-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-DQ-02-dq-currentness-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-TP-02-trade-plan-exit-invalidation-semantics-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+## 2026-05-18 Continuation - Signal Quality Lab Discovery Cycle
+
+Mode: Team 02 value-discovery pass after read-only signal-quality audit. No application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, providers, services, or frontend files changed.
+
+### Evidence Consumed
+
+- `11-module-audits/audit-strategy-signal-rules.md`
+- `11-module-audits/TEAM-06-lane2-dq-fail-closed-audit-2026-05-17.md`
+- `11-module-audits/audit-qa-test-infrastructure.md`
+
+### Queue Delta
+
+- Created new requirement draft `CF-W1-SQLAB-01` for Signal Quality Lab outcome confidence and explicit trusted-versus-untrusted review output.
+- Re-ranked the current discovery stack so the newest highest-user-value under-covered area is Signal Quality Lab, ahead of the existing Portfolio Intelligence review-traceability item.
+- Kept `CF-W1-L3-INTEL-02`, `CF-W1-AUTH-02`, `CF-W1-DQ-02`, and `CF-W1-TP-02` in descending discovery order after the new Signal Quality item.
+- Kept the Ready-promotion front-runners unchanged: `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-L3-ALERT-01`, and `CF-W1-L3-AUTH-03`.
+
+### New Requirement Candidates
+
+| Rank | ID | Value | Current next gate |
+| --- | --- | --- | --- |
+| 1 | CF-W1-SQLAB-01 | Signal Quality outcome confidence | Product refinement and bounded architecture contract. |
+| 2 | CF-W1-L3-INTEL-02 | Portfolio Intelligence review traceability | Product refinement and architecture contract. |
+| 3 | CF-W1-AUTH-02 | Alert inbox user isolation | Product refinement and bounded architecture contract. |
+| 4 | CF-W1-DQ-02 | Data Quality currentness evidence | Architecture contract and QA plan. |
+| 5 | CF-W1-TP-02 | Trade Plan exit/invalidation semantics | Product refinement and architecture contract. |
+
+### Items Ready For Architecture
+
+- `CF-W1-SQLAB-01`
+- `CF-W1-L3-INTEL-02`
+- `CF-W1-AUTH-02`
+- `CF-W1-DQ-02`
+- `CF-W1-TP-02`
+
+### Top Unassigned Item
+
+Team 00 should delegate `CF-W1-SQLAB-01` next for Signal Quality Lab outcome-confidence discovery. `CF-W1-L3-INTEL-02` remains the next downstream discovery item, and `CF-W1-L3-PORT-01B` remains fed to Team 03 for architecture prep.
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SQLAB-01-signal-quality-outcome-confidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+### Implementation Readiness
+
+Ready work pulled: none by Team 02.
+
+No item moved to Ready. The new Signal Quality requirement is architecture-prep only and remains blocked until Team 00/03 reservation and contract work exists.

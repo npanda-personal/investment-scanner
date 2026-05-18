@@ -4,15 +4,121 @@ Date: 2026-05-18
 
 ## Current Ready Queue
 
-No available application-code item is currently Ready for a team to pull.
+No available application-code item is currently waiting unassigned in Ready.
 
 `CF-W1-L3-PORT-01A` was pulled by Team 07, implemented in its dedicated worktree, and moved through first-pass QA / Code Review. Team 10 rejected release acceptance and routed bounded rework back to Team 07. It remains uncommitted and unaccepted.
+
+`CF-W1-TP-01B` already has an implementation handoff in the Team 06 worktree and is routed to Team 10 review.
+
+`CF-W1-NOTIF-02` is promoted and pulled by Team 09 for bounded implementation in a dedicated worktree.
+
+`CF-W1-L3-ALERT-01` is promoted and pulled by Team 07 for bounded implementation in a dedicated worktree. It must not run in parallel with `CF-W1-L3-AUTH-03` because both reserve alerts-monitoring files.
 
 ## Pulled / In Review
 
 | ID | Owner | Branch | Worktree | Scope | Status |
 | --- | --- | --- | --- | --- | --- |
 | `CF-W1-L3-PORT-01A` | Team 07 - Portfolio / Watchlist / Alerts | `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A` | `../investment-scanner-worktrees/team07-CF-W1-L3-PORT-01A` | Backend-only portfolio-management readiness DTOs | Rejected / Rework after Team 10 review; Team 07 revision pending |
+| `CF-W1-TP-01B` | Team 06 - Strategy / Signal / Risk | `codex/team06-strategy-signal/CF-W1-TP-01B` | `../investment-scanner-worktrees/team06-CF-W1-TP-01B` | Backend-only Trade Plan DQ hard-block and target compatibility | Implemented in worktree; Team 10 review pending |
+| `CF-W1-NOTIF-02` | Team 09 - Platform / Auth / Subscription / Notifications | `codex/team09-platform/CF-W1-NOTIF-02` | `../investment-scanner-worktrees/team09-CF-W1-NOTIF-02` | Backend-only local notification log redaction | Ready and pulled by Team 09 for implementation |
+| `CF-W1-L3-ALERT-01` | Team 07 - Portfolio / Watchlist / Alerts | `codex/team07-portfolio-alerts/CF-W1-L3-ALERT-01` | `../investment-scanner-worktrees/team07-CF-W1-L3-ALERT-01` | Backend-only alert readiness suppression | Ready and pulled by Team 07 for implementation |
+
+## Active Ready Handoff - `CF-W1-L3-ALERT-01`
+
+Date promoted: 2026-05-18
+
+Team 00 evaluated `CF-W1-L3-ALERT-01` against Ready gates and promoted it as an independent Team 07 backend-only implementation slice.
+
+Gate evidence:
+
+- Requirement: `10-requirements/CF-W1-L3-ALERT-01-alert-readiness-suppression-requirement.md`
+- Architecture review: `03-architecture/CF-W1-L3-ALERT-01-architecture-review.md`
+- Contract: `06-contracts/CF-W1-L3-ALERT-01-alert-readiness-suppression-contract.md`
+- Work packet: `08-work-packets/CF-W1-L3-ALERT-01-work-packet.md`
+- QA plan: `04-qa/CF-W1-L3-ALERT-01-qa-plan.md`
+- Team 03 reservation matrix: `03-architecture/team03-near-ready-file-reservation-matrix-2026-05-18.md`
+- Open decisions: none.
+- Shared/high-risk blocker: none if implementation stays inside reserved alerts-monitoring files and does not run in parallel with `CF-W1-L3-AUTH-03`.
+
+Allowed files:
+
+- `backend/src/modules/alerts-monitoring/alerts-monitoring.service.ts`
+- `backend/src/modules/alerts-monitoring/alerts-monitoring.types.ts`
+- `backend/src/modules/alerts-monitoring/alerts-monitoring.md`
+- `backend/tests/modules/alerts-monitoring/alerts-monitoring.service.test.ts`
+
+Optional only if ownership-sensitive behavior is touched:
+
+- `backend/tests/modules/alerts-monitoring/alerts-monitoring.ownership.test.ts`
+
+Forbidden files:
+
+- Prisma schema or migrations
+- backend or frontend route registries
+- shared backend utilities or shared DTOs
+- shared frontend components
+- package manifests
+- generated files
+- Data Quality Engine source or public exports
+- Portfolio Management source/tests
+- Watchlist Management source/tests
+- Portfolio Intelligence source/tests
+- notification or copilot digest consumers
+- frontend files
+- providers, startup/backfill, Angel One, broker, live-provider, paid/cloud, or telemetry flows
+
+Focused validation command:
+
+```powershell
+cd backend
+npm.cmd test -- alerts-monitoring.service.test.ts alerts-monitoring.validation.test.ts --runInBand
+```
+
+## Active Ready Handoff - `CF-W1-NOTIF-02`
+
+Date promoted: 2026-05-18
+
+Team 00 evaluated `CF-W1-NOTIF-02` against Ready gates and promoted it as an independent Team 09 backend-only implementation slice.
+
+Gate evidence:
+
+- Requirement: `10-requirements/CF-W1-NOTIF-02-notification-log-redaction-requirement.md`
+- Architecture review: `03-architecture/CF-W1-NOTIF-02-architecture-review.md`
+- Contract: `06-contracts/CF-W1-NOTIF-02-notification-log-redaction-contract.md`
+- Work packet: `08-work-packets/CF-W1-NOTIF-02-work-packet.md`
+- QA plan: `04-qa/CF-W1-NOTIF-02-qa-plan.md`
+- Team 09 readiness evidence: `17-team-outboxes/TEAM-09-outbox.md`
+- Open decisions: none.
+- Shared/high-risk blocker: none if implementation stays inside the reserved provider/test/doc files.
+
+Allowed files:
+
+- `backend/src/modules/notifications-delivery/notifications-delivery.provider.ts`
+- `backend/tests/modules/notifications-delivery/notifications-delivery.service.test.ts`
+- `backend/src/modules/notifications-delivery/notifications-delivery.md`
+
+Forbidden files:
+
+- notification controller, service, repository, router, validation, or unrelated tests
+- auth-identity source/tests
+- subscription-billing source/tests
+- Prisma schema or migrations
+- backend or frontend route registries
+- shared backend utilities or shared DTOs
+- shared frontend components
+- package manifests
+- generated files
+- frontend files
+- backend/src/server.ts
+- backend/.env.example
+- external provider, SMTP implementation, provider startup, live provider, paid/cloud, broker, or telemetry flows
+
+Focused validation command:
+
+```powershell
+cd backend
+npm.cmd test -- notifications-delivery.service.test.ts --runInBand
+```
 
 ## Active Ready Handoff - `CF-W1-L3-PORT-01A`
 

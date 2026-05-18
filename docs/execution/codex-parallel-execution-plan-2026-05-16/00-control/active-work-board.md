@@ -74,8 +74,8 @@ Operating rules:
 | --- | --- |
 | Current daemon cycle id | `DAEMON-20260517` |
 | Current rolling iteration count | 22 |
-| Active teams | Team 00 spawned-subagent runtime pool; Teams 07/02/03/06/05/09 planned as first active subagents |
-| Queued teams | Team 04 QA rerun for `CF-W1-L3-PORT-01A`; Team 10 re-review for `CF-W1-L3-PORT-01A`; Team 03 Architect Signoff; Team 08 Copilot trust/copy source mapping |
+| Active teams | Team 00 spawned-subagent runtime pool; Team 02 persistent PO/Requirements lane; Team 07 rework; Team 03 architecture prep; Team 08 Copilot mapping |
+| Queued teams | Team 04 QA rerun for `CF-W1-L3-PORT-01A`; Team 10 re-review for `CF-W1-L3-PORT-01A`; Team 03 Architect Signoff; Team 06 `CF-W1-TP-01B` implementation if promoted; Team 09 `CF-W1-NOTIF-02` implementation if promoted |
 | Idle teams | None fully idle; implementation lanes without Ready work stay docs-only |
 | Blocked teams | No team fully blocked; no open Decision Inbox items; source/test work remains blocked by missing Team 00 Ready promotion for all children except `CF-W1-L3-PORT-01A` |
 | Teams relaunched this cycle | Team 01 audit consumed; Teams 02, 03, 04, 06, 07, and 09 reassigned through current inbox files |
@@ -218,3 +218,4 @@ Old work items in `docs/codex-agent-team-plan/` may be used only as evidence or 
 | DAEMON-20260518-21 | `CF-W1-L3-PORT-01A` developer handoff routed | Team 00 + Teams 04/10 | QA Verification / Code Review | Team 07 worktree and `18-integration-queue/CF-W1-L3-PORT-01A-review-routing.md` | Team 07 reports focused portfolio test and backend build passed. Team 00 verified changed files are within reserved scope and routed QA to Team 04 and review to Team 10. No commit yet. |
 | DAEMON-20260518-22 | `CF-W1-L3-PORT-01A` review rejection routed | Team 00 + Teams 07/04/10 | Rejected / Rework | Team 07 worktree and `18-integration-queue/CF-W1-L3-PORT-01A-review-routing.md` | Team 04 first-pass QA passed, but Team 10 rejected release acceptance because automation-only Data Quality blockers can be treated as portfolio display hard blockers. Team 07 rework is assigned in the existing file reservation; Team 04/10 rerun after revision. |
 | DAEMON-20260518-23 | Spawned-subagent runtime model | Team 00 | Runtime Pool Updated | `00-control/team-agent-runtime-queue.md`, runtime policy docs | Product Owner directed Team 00 to stop relying on human-mediated separate team chats. Team 00 now maintains up to six active spawned subagents and queues dependent teams until slots open. |
+| DAEMON-20260518-24 | Persistent PO/Requirements lane | Team 00 + Team 02 | Runtime Pool Updated | `00-control/team-agent-runtime-queue.md`, requirements queues | Team 02 is now the persistent PO + Requirements value-discovery lane. It continuously audits modules, proposes user-value requirements/refactors/UX improvements, and reorders priorities. Team 00 pulls the top unassigned item for delegation. |

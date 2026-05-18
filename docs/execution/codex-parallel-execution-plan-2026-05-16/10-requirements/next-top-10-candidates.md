@@ -1,12 +1,14 @@
 # Next Top 10 Candidates
 
-Date: 2026-05-17
+Date: 2026-05-18
 
-Prepared by Team 02 Requirement Factory in daemon scheduler mode after prior bounded decision items were resolved, after the 2026-05-17 Product Owner resolutions for Lane 3 readiness, Trade Plan no-target/DQ hard-block behavior, and Market Data durable readiness ADR direction, and after Team 03/04 post-decision child prep. Refreshed by Team 00 on 2026-05-18 after Product Owner resolved the five current Decision Inbox items and after Team 00 promoted `CF-W1-L3-PORT-01A`.
+Prepared by Team 02 Requirement Factory in daemon scheduler mode after prior bounded decision items were resolved, after the 2026-05-17 Product Owner resolutions for Lane 3 readiness, Trade Plan no-target/DQ hard-block behavior, and Market Data durable readiness ADR direction, and after Team 03/04 post-decision child prep. Refreshed by Team 02 on 2026-05-18 after Team 00 promoted `CF-W1-L3-PORT-01A`, routed the PORT-01A rework back through Team 07, and Team 03/04 prepared post-decision contracts, work packets, and QA refreshes. The current Ready-promotion front-runners are `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01`.
 
 ## Current Top Candidates
 
-There are nine active refinement candidates after removing completed bounded slices and the promoted `CF-W1-L3-PORT-01A` implementation handoff from the pull path.
+There are ten active refinement candidates after removing completed bounded slices and the promoted `CF-W1-L3-PORT-01A` implementation handoff from the pull path.
+
+The top three Ready-promotion candidates are `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01`.
 
 | Rank | ID | Next gate | Notes |
 | --- | --- | --- | --- |
@@ -15,10 +17,11 @@ There are nine active refinement candidates after removing completed bounded sli
 | 3 | CF-W1-L3-ALERT-01 | Team 00 Ready evaluation | Alert readiness suppression contract, Team 03 reservation matrix, backend reservations, and QA plan are prepared, but no app-code slice is Ready until Team 00 gates pass. |
 | 4 | CF-W1-L3-AUTH-03 | Team 00 Ready evaluation | Alert rule target ownership requirement, architecture review, contract, work packet, and QA plan are prepared, but no app-code slice is Ready until Team 00 gates pass. |
 | 5 | CF-W1-MD-02 | Formal ADR + ADR QA checklist | Option B ADR direction is accepted. Schema/source implementation remains blocked until separate approval-gated slices are prepared. |
-| 6 | CF-W1-MD-01 | Team 05/03/04 packet refresh | Option A validation policy is resolved; source/test execution still needs validation-only file reservations and Team 00 Ready promotion. |
-| 7 | CF-W1-UX-02 | Team 08/03/04 packet refresh | Option B Copilot trust UX policy is resolved; implementation still needs Copilot-only trust-field contract/QA/file reservations. |
-| 8 | CF-W1-AUTH-01 | Team 09/03/04 packet refresh | Option A auth fallback policy is resolved; implementation still needs module-local controller/test reservations. |
-| 9 | CF-W1-SUB-01 | Team 09/03/04 packet refresh | Option A subscription policy is resolved; implementation still needs backend-only reservations and frontend limitation handling. |
+| 6 | CF-W1-AUTH-01 | Team 00/Team 09 Ready evaluation | Option A auth fallback policy is resolved; Team 03 contract/work packet and Team 04 QA refresh are prepared, but implementation still needs Ready promotion and exact handoff. Sequence or combine with `CF-W1-SUB-01`. |
+| 7 | CF-W1-SUB-01 | Team 00/Team 09 Ready evaluation | Option A subscription policy is resolved; Team 03 contract/work packet and Team 04 QA refresh are prepared, but implementation still needs Ready promotion and exact handoff. Prefer sequencing with `CF-W1-AUTH-01`. |
+| 8 | CF-W1-MD-01 | Team 05 readiness acceptance + Team 00 Ready evaluation | Option A validation policy is resolved; Team 03 validation-only contract/work packet and Team 04 QA refresh are prepared, but source/test execution still needs readiness acceptance and promotion. |
+| 9 | CF-W1-UX-02 | Team 08 source mapping + Team 00 Ready evaluation | Option B Copilot trust UX policy is resolved; Team 03 contract/work packet and Team 04 QA refresh are prepared, but implementation still needs source-supported trust-field mapping and promotion. |
+| 10 | CF-W1-UX-05 | Sequence with `CF-W1-UX-02` | Option A Copilot-only copy policy is resolved; Team 03 contract/work packet and Team 04 QA refresh are prepared, but the first child should fold into or follow the `CF-W1-UX-02` Copilot handoff. |
 
 ## Focused Priority Readiness Result
 
@@ -32,10 +35,15 @@ These are the current Team 02 priorities. None is app-code ready.
 | CF-W1-L3-ALERT-01 | Parent policy accepted; child architecture contract, Team 03 reservation matrix, backend reservations, and QA plan exist. | Team 00 Ready promotion and implementation handoff. | Keep out of Ready until Team 00 gates pass. |
 | CF-W1-L3-AUTH-03 | Requirement, architecture review, contract, work packet, and QA plan exist. | Team 00 Ready promotion and implementation handoff. | Keep out of Ready until Team 00 gates pass. |
 | CF-W1-MD-02 | Requirement, draft contract, ADR QA plan, and Option B ADR direction acceptance exist. | Formal ADR, migration/rollback/query/test strategy, and later source/schema work packet. | Keep in ADR prep; source/schema work blocked by shared-file gates. |
+| CF-W1-AUTH-01 | Option A policy, Team 03 contract/work packet, and Team 04 QA refresh exist. | Team 00 Ready promotion, Team 09 handoff, and sequencing/combining decision with `CF-W1-SUB-01`. | Keep out of Ready until promotion gates pass. |
+| CF-W1-SUB-01 | Option A policy, Team 03 contract/work packet, Team 04 QA refresh, and known frontend limitation scope exist. | Team 00 Ready promotion, Team 09 handoff, and sequencing/combining decision with `CF-W1-AUTH-01`. | Keep out of Ready until promotion gates pass. |
+| CF-W1-MD-01 | Option A policy, Team 03 validation-only contract/work packet, and Team 04 QA refresh exist. | Team 05 readiness acceptance and Team 00 Ready promotion. | Keep out of Ready until promotion gates pass. |
+| CF-W1-UX-02 | Option B policy, Team 03 Copilot-only contract/work packet, and Team 04 QA refresh exist. | Team 08 source-supported trust-field mapping, exact implementation handoff, startup/resource plan, and Team 00 Ready promotion. | Keep out of Ready until promotion gates pass. |
+| CF-W1-UX-05 | Option A policy, Team 03 Copilot-only contract/work packet, and Team 04 QA refresh exist. | Sequencing with or folding into `CF-W1-UX-02`; no shared UI handoff. | Keep out of Ready until the Copilot handoff is selected. |
 
 ## Next Docs-Only Prep / Ready-Evaluation Candidates
 
-These items are not app-code ready. Some are ready-evaluation candidates; policy-resolved items remain docs-only until contract/QA/reservation refresh completes.
+These items are not app-code ready. Some are ready-evaluation candidates; policy-resolved items remain docs-only until Team 00 promotes an exact implementation handoff.
 
 | Rank | ID | Prep gate | Guardrail |
 | --- | --- | --- | --- |
@@ -44,10 +52,11 @@ These items are not app-code ready. Some are ready-evaluation candidates; policy
 | 3 | CF-W1-L3-ALERT-01 | Team 00 Ready evaluation | No alerts source changes until Team 00 gates pass. |
 | 4 | CF-W1-L3-AUTH-03 | Team 00 Ready evaluation | No alerts source changes until Team 00 gates pass. |
 | 5 | CF-W1-MD-02 | Formal ADR and ADR QA checklist | No Prisma, schema, source, provider, startup, or test changes until separate implementation approval. |
-| 6 | CF-W1-MD-01 | Market Data validation-only packet refresh | No Market Data source/test changes until exact validation file reservations and Team 00 promotion exist. |
-| 7 | CF-W1-UX-02 | Copilot-only trust UX packet refresh | No Copilot source/UI/test changes until exact trust-field contract, QA plan, and file reservations exist. |
-| 8 | CF-W1-AUTH-01 | Team 09 fail-closed controller packet refresh | No platform source/test changes until exact controller/test reservations and focused QA plan exist. |
-| 9 | CF-W1-SUB-01 | Team 09 admin/manual subscription packet refresh | No subscription source/test changes until exact backend reservations and known UI limitation handling exist. |
+| 6 | CF-W1-AUTH-01 | Ready evaluation for prepared Team 09 fail-closed controller packet | No platform source/test changes until Team 00 promotion and exact handoff exist; sequence or combine with `CF-W1-SUB-01`. |
+| 7 | CF-W1-SUB-01 | Ready evaluation for prepared Team 09 admin/manual subscription packet | No subscription source/test changes until Team 00 promotion and exact backend handoff exist; sequence or combine with `CF-W1-AUTH-01`. |
+| 8 | CF-W1-MD-01 | Team 05 readiness acceptance and Ready evaluation for prepared Market Data validation-only packet | No Market Data source/test changes until Team 05 acceptance and Team 00 promotion exist. |
+| 9 | CF-W1-UX-02 | Team 08 source-supported trust-field mapping and Ready evaluation for prepared Copilot-only trust UX packet | No Copilot source/UI/test changes until mapping, exact handoff, QA execution plan, and Team 00 promotion exist. |
+| 10 | CF-W1-UX-05 | Fold into or sequence after `CF-W1-UX-02` Copilot handoff | No shared UI, navigation, Research Hub, or Market Data UI changes in the first child. |
 
 ## Completed Or Removed From Active Top 10
 
@@ -66,4 +75,4 @@ These items are not app-code ready. Some are ready-evaluation candidates; policy
 
 Do not pull application-code work except the Team 00-promoted `CF-W1-L3-PORT-01A` handoff until another current item has an accepted requirement, accepted child contract or architecture review, exact file reservation, QA plan, and no unresolved Product Owner, Architect, QA, shared-file, schema, provider, UI, or upstream blocker. The resolved decisions are policy inputs only; they do not satisfy Ready criteria by themselves. Team 00 remains the only owner for Ready queue updates.
 
-`CF-W1-L3-PORT-01` remains the parent portfolio/watchlist requirement and `CF-W1-L3-PORT-01B` remains the later watchlist child. `CF-W1-UX-05` remains active outside the current top ten; its approved first slice is Copilot-only and should re-enter after `CF-W1-UX-02` packet refresh or be merged into that approved Copilot path. Shared `StatusBadge` work remains future.
+`CF-W1-L3-PORT-01` remains the parent portfolio/watchlist requirement and `CF-W1-L3-PORT-01B` remains the later watchlist child. `CF-W1-UX-05` is now tracked in the active ten as a sequenced Copilot-only child; shared `StatusBadge` work remains future.

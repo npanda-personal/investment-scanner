@@ -70,22 +70,17 @@ Update focused notification service tests to prove:
 
 ## Suggested Command
 
-```text
-npm.cmd test -- notifications-delivery --runInBand
+```powershell
+cd backend
+npm.cmd test -- notifications-delivery.service.test.ts --runInBand
 ```
-
-Run from `backend/` if that is the existing test working directory.
 
 ## Current Blockers
 
 - Team 09 has not yet pulled an implementation-ready item from `12-ready-queue/ready-for-implementation.md`.
+- Team 00 / Team 09 must issue the exact provider-only implementation handoff.
 - Active execution docs have unrelated dirty changes from other teams; exact staging/commit must avoid them.
 
 ## Ready Promotion Recommendation
 
-Team 00 or Team 09 lead can promote this as a small backend-only Team 09 implementation slice once:
-
-- the current dirty docs are classified;
-- QA accepts this work packet;
-- exact file reservation above is recorded;
-- no open auth/subscription decisions are treated as blocking this unrelated notification privacy slice.
+Team 00 or Team 09 lead can promote this as a small backend-only Team 09 implementation slice once the exact file reservation above is copied into the implementation handoff. Auth/subscription policy packets remain separate and should not block this provider-only slice.

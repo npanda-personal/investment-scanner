@@ -14,7 +14,7 @@ Related completed slice: `CF-W1-L3-AUTH-02`
 
 Architecture child packet prepared. Not Ready for Implementation.
 
-Team 04 must refresh/accept the alert child QA plan, and Team 00 must promote the exact file reservation before source work starts.
+Team 04's alert child QA plan already exists. Team 00 must still promote the exact file reservation and implementation handoff before source work starts.
 
 ## Owner / Lane / Module
 
@@ -67,7 +67,7 @@ The future implementation must:
 
 ## QA Handoff Needed
 
-Team 04 should refresh `04-qa/CF-W1-L3-ALERT-01-qa-plan.md` against the accepted child contract before this packet can be pulled.
+Use `04-qa/CF-W1-L3-ALERT-01-qa-plan.md` after Team 00 promotes this packet.
 
 Minimum scenarios:
 
@@ -110,4 +110,6 @@ Stop and return to Team 00 / Architect if implementation requires:
 
 ## Next Gate
 
-Team 04 QA child-plan refresh, then Team 00 may promote the `alerts-monitoring` backend slice to `Ready for Implementation` if no shared/high-risk blockers remain.
+Do not promote in parallel with `CF-W1-L3-AUTH-03`. Both slices share `alerts-monitoring.service.ts`, `alerts-monitoring.types.ts`, `alerts-monitoring.md`, and focused tests.
+
+Team 00 may promote the `alerts-monitoring` backend slice to `Ready for Implementation` if the exact reservation and implementation handoff are copied without scope expansion.

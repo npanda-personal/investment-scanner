@@ -6,7 +6,7 @@ Date: 2026-05-17
 
 Requirement created. Not Ready for Implementation.
 
-Team 03 prepared the backend-only child contract and backend file reservations under parent policy `CF-W1-TP-01A`. Team 04 prepared the child QA plan. This item still needs Team 00 Ready promotion before Trade Plan source or test work starts.
+Team 03 prepared the backend-only child contract and backend file reservations under parent policy `CF-W1-TP-01A`. Team 04 prepared the child QA plan. This item is the current front-runner for the next Team 00 Ready promotion after the PORT-01A rework routing, but it still needs Team 00 Ready promotion before Trade Plan source or test work starts.
 
 ## Product Value
 
@@ -21,6 +21,7 @@ Trade Plan paper-review readiness must fail closed when Data Quality evidence is
 - QA plan: `04-qa/CF-W1-TP-01B-qa-plan.md`.
 - Team 03 2026-05-18 near-ready file-reservation matrix confirms this backend-only child is bounded, with exact Trade Plan file reservations and optional geometry-file use only with Architect note.
 - Team 06 2026-05-18 readiness inspection: child packet is aligned enough to become a bounded backend-only implementation handoff, but is not Ready until Team 00 promotes it and copies exact reservations into a Team 06 implementation inbox.
+- Current Team 00 routing keeps this ahead of `CF-W1-NOTIF-02`, `CF-W1-L3-ALERT-01`, and `CF-W1-L3-AUTH-03`.
 - Ready queue still has no active app-code item.
 
 ## Acceptance Criteria

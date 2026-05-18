@@ -4,7 +4,7 @@ Date: 2026-05-17
 
 Owner: TEAM-05 - Market Data / Data Quality
 
-Status: Policy resolved. Not Ready for Implementation.
+Status: Policy resolved. Not Ready for Implementation. Current Team 00 routing keeps this behind the Lane 3 and platform front-runners; Team 05 acceptance still gates it.
 
 ## Product Value
 
@@ -43,6 +43,7 @@ How validation findings become durable readiness evidence remains separate under
 - `04-qa/CF-W1-MD-01-qa-plan.md`
 - `11-module-audits/TEAM-05-market-data-data-quality-domain-audit-2026-05-17.md`
 - `07-decisions/DECISION-20260517-market-data-validation-hardening-policy-resolution.md`
+- Current Team 00 routing keeps this behind `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-L3-ALERT-01`, and `CF-W1-L3-AUTH-03`.
 
 ## Approved Decision
 

@@ -4,7 +4,7 @@ Date: 2026-05-17
 
 Owner: Team 08 UX / Research / Copilot
 
-Status: Blocked work-packet proposal. Not Ready for Implementation.
+Status: Post-decision work-packet proposal refreshed. Not Ready for Implementation.
 
 ## Work Item
 
@@ -16,10 +16,11 @@ No Team 08 application-code item is Ready.
 
 Current blockers:
 
-- Product/UX policy decision is open for Copilot naming and blocked-summary behavior.
-- Architecture contract is draft-only.
-- UI scope is not approved.
+- Team 08 must confirm source-supported trust-field mapping and fallback behavior.
+- Team 04 must accept focused Copilot-only QA handoff.
+- Team 00 must promote exact backend/frontend/test reservations.
 - Shared UI/navigation changes are not reserved.
+- Stock Research Workbench is excluded from the first slice.
 - Worktree contains unrelated dirty docs from other teams.
 
 ## Proposed Implementation After Approval
@@ -87,8 +88,6 @@ Minimum later validation:
 
 ## Stop Conditions
 
-- Copilot naming remains unresolved.
-- Blocked-summary visibility remains unresolved.
 - Required trust fields cannot be derived without shared DQ/storage changes.
 - Implementation requires shared UI, route, navigation, Prisma, package, provider, startup, or generated-file changes.
 - UI smoke would only prove a page heading rather than trust/blocked states.
@@ -96,4 +95,8 @@ Minimum later validation:
 
 ## Next Gate
 
-Resolve `DECISION-20260517-copilot-trust-ux-policy`, then route this packet through architecture/QA acceptance and Ready promotion.
+Team 08/03/04 refresh the Copilot-only handoff after Option B, then Team 00 evaluates Ready promotion.
+
+## Post-Decision Refresh - 2026-05-18
+
+Option B is resolved: use `Local Research Copilot` or `Research Copilot`, hide generated narrative in blocked states, keep Stock Research Workbench out of scope, and avoid shared UI/navigation edits. `CF-W1-UX-05A` can be included in this same Copilot-only handoff if Team 00 records one writer and one file reservation set.

@@ -4,7 +4,7 @@ Date: 2026-05-17
 
 ## Status
 
-Requirement created. Not Ready for Implementation.
+Requirement created. Not Ready for Implementation. Current Team 00 routing keeps this behind `CF-W1-TP-01B` and `CF-W1-NOTIF-02`, but still ahead of the post-decision AUTH/SUB and UX follow-ups.
 
 Team 03 prepared the alert child architecture contract and backend file reservations. Team 04 refreshed the child QA plan. This item still needs Team 00 Ready promotion before any alerts source or test work starts.
 
@@ -21,6 +21,7 @@ Alerts are action-like. Alerts Monitoring must not create trusted alert events f
 - Work packet draft: `08-work-packets/CF-W1-L3-ALERT-01-work-packet.md`.
 - QA plan: `04-qa/CF-W1-L3-ALERT-01-qa-plan.md`.
 - Team 03 2026-05-18 near-ready file-reservation matrix confirms this child has exact backend reservations, no shared/high-risk request if it consumes Data Quality public service/types only, and should remain behind `CF-W1-L3-PORT-01A` unless Team 00 chooses otherwise.
+- Current Team 00 routing places this as the third Ready-promotion candidate after `CF-W1-TP-01B` and `CF-W1-NOTIF-02`.
 - Ready queue still has no active app-code item.
 
 ## Acceptance Criteria

@@ -8,46 +8,114 @@ Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automat
 
 ## Assignment
 
-Auth and subscription policies are resolved, but source work remains blocked until module-local packets, exact file reservations, QA refresh, and Team 00 handoffs exist. Continue notification redaction readiness prep and queue hygiene.
+Pull `CF-W1-NOTIF-02` for bounded implementation.
 
-Current priority after Team 01 audit consumption:
+State: Ready for Implementation after Team 00 promotion.
 
-1. Refresh `CF-W1-AUTH-01` after Option A: protected Team 09 controllers fail closed when `req.user.id` is missing; no auth middleware, routes, Prisma, shared utility, package, generated, or frontend changes.
-2. Refresh `CF-W1-SUB-01` after Option A: ordinary users may not self-change plan or self-select `ADMIN`; admin/manual path remains local if already present and safe; no frontend implementation.
-3. Inspect whether `CF-W1-NOTIF-02` can become module-local implementation-ready.
-4. Confirm whether the future write scope can stay inside notification delivery provider/service tests/module docs only.
-5. Report any need for auth/subscription policy changes, route changes, Prisma changes, shared utilities, frontend/UI, package changes, external providers, or paid/cloud behavior.
+You are not alone in the codebase. Other teams have active docs-only edits in the shared `dev` workspace and Team 07/Team 06 have separate implementation worktrees. Do not revert or overwrite edits made by others, and do not implement in the shared worktree.
 
-Do not implement until Team 03 and Team 04 readiness and exact file reservations exist and Team 00 promotes the item.
-
-## Scope
-
-Allowed writes:
-
-- Team 09-owned active execution docs under `10-requirements/`, `03-architecture/`, `04-qa/`, `06-contracts/`, `08-work-packets/`, and `13-implementation-evidence/`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-09*.md`
-
-Forbidden:
-
-- auth, subscription, notification source/tests
-- auth middleware
-- route registries
-- Prisma schema or migrations
-- package manifests
-- shared utilities/UI
-- frontend/UI
-- providers, paid/cloud, external notification providers
+`CF-W1-AUTH-01` and `CF-W1-SUB-01` remain out of this handoff. They should be combined or sequenced later under a single Team 09 writer because they share subscription controller/test/doc files.
 
 ## Branch / Worktree
 
-Use shared `dev` for docs-only platform prep. If `CF-W1-NOTIF-02` is promoted, use `codex/team09-platform/CF-W1-NOTIF-02` and `../investment-scanner-worktrees/team09-CF-W1-NOTIF-02`.
+Create and use this dedicated implementation branch/worktree:
 
-## Blockers
+- Branch: `codex/team09-platform/CF-W1-NOTIF-02`
+- Worktree: `../investment-scanner-worktrees/team09-CF-W1-NOTIF-02`
+- Base: current local `dev` after Team 00 Ready-promotion docs.
 
-`CF-W1-AUTH-01` and `CF-W1-SUB-01` no longer require Product Owner decisions. They still need Team 09/03/04 packet refresh and Team 00 Ready promotion. `CF-W1-NOTIF-02` needs Team 00 Ready promotion.
+Record branch, worktree path, starting commit, and final status in `17-team-outboxes/TEAM-09-outbox.md`.
 
-No open auth/subscription decision blocks docs-only work. Auth fallback, subscription, and notification source work remain forbidden until Team 00 promotes exact implementation handoffs.
+## Evidence To Use
+
+- Requirement: `10-requirements/CF-W1-NOTIF-02-notification-log-redaction-requirement.md`
+- Architecture review: `03-architecture/CF-W1-NOTIF-02-architecture-review.md`
+- Contract: `06-contracts/CF-W1-NOTIF-02-notification-log-redaction-contract.md`
+- Work packet: `08-work-packets/CF-W1-NOTIF-02-work-packet.md`
+- QA plan: `04-qa/CF-W1-NOTIF-02-qa-plan.md`
+- Team 09 readiness evidence: `17-team-outboxes/TEAM-09-outbox.md`
+- Ready queue handoff: `12-ready-queue/ready-for-implementation.md`
+
+## Allowed Files
+
+You may edit only:
+
+- `backend/src/modules/notifications-delivery/notifications-delivery.provider.ts`
+- `backend/tests/modules/notifications-delivery/notifications-delivery.service.test.ts`
+- `backend/src/modules/notifications-delivery/notifications-delivery.md`
+
+You may also update Team 09 reporting docs in the dedicated worktree:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-09-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-NOTIF-02-developer-handoff.md`
+
+## Forbidden Files
+
+Do not edit:
+
+- notification controller, service, repository, router, validation, or unrelated tests
+- auth-identity source/tests
+- subscription-billing source/tests
+- Prisma schema or migrations
+- backend or frontend route registries
+- shared backend utilities or shared DTOs
+- shared frontend components
+- package manifests
+- generated files
+- frontend files
+- backend/src/server.ts
+- backend/.env.example
+- external provider, SMTP implementation, provider startup, live provider, paid/cloud, broker, or telemetry flows
+
+Do not install packages, run providers, start services, run SMTP/network flows, migrate Prisma, commit, or push.
+
+## Implementation Requirements
+
+- Preserve `EMAIL_LOG` as the active delivery channel.
+- Preserve local/free/no-network provider behavior.
+- Preserve `smtpAvailable: false`.
+- Preserve the existing `NotificationProviderResult` shape.
+- Remove raw recipient email from `console.info`.
+- Remove raw subject text from `console.info`.
+- Remove raw message body and body preview from `console.info`.
+- Avoid logging notification payload contents.
+- Use minimized non-sensitive metadata only, such as provider/channel/message id, body length, subject length, and a redacted recipient marker.
+- Preserve persisted notification event behavior.
+- Update module docs to describe minimized/redacted local console logs.
+
+## Focused Validation
+
+Run after implementation:
+
+```powershell
+cd backend
+npm.cmd test -- notifications-delivery.service.test.ts --runInBand
+```
+
+If the command cannot run, record the exact blocker, skipped command, risk, and next owner in the outbox.
+
+## Stop Conditions
+
+Stop and return to Team 00 if implementation requires:
+
+- new packages, hashing dependencies, SMTP implementation, network calls, or external provider work
+- persisted event shape changes
+- controller/service/router/repository/validation changes
+- auth/subscription source changes
+- frontend/UI work
+- Prisma/schema/migration, route registry, shared utility/UI, package, generated-file, server, env-example, provider/startup/live-data behavior
+- paid/cloud, broker, telemetry, or credential use
 
 ## Expected Outbox
 
-Update `17-team-outboxes/TEAM-09-outbox.md`.
+Update `17-team-outboxes/TEAM-09-outbox.md` with:
+
+- exact branch/worktree used
+- starting commit
+- exact files changed and inspected
+- behavior changed
+- tests run and results
+- tests skipped and reasons
+- forbidden files confirmed untouched
+- assumptions, risks, blockers
+- next gate: Team 04 QA, Team 10 review, Architect Signoff, delegated PO acceptance, or Team 00 blocker routing

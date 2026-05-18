@@ -12,11 +12,11 @@ No active implementation item is currently blocked by an open Product Owner deci
 
 | ID | Resolution | Remaining gate |
 | --- | --- | --- |
-| CF-W1-AUTH-01 | `07-decisions/DECISION-20260517-platform-auth-default-user-fallback-policy-resolution.md` | Team 09/03/04 module-local architecture and QA refresh, exact controller/test reservations, then Team 00 Ready promotion. |
-| CF-W1-SUB-01 | `07-decisions/DECISION-20260517-local-manual-subscription-plan-change-policy-resolution.md` | Team 09/03/04 backend-only packet refresh, focused tests, frontend limitation note, then Team 00 Ready promotion. |
-| CF-W1-UX-02 | `07-decisions/DECISION-20260517-copilot-trust-ux-policy-resolution.md` | Team 08/03/04 Copilot-only contract and QA refresh, trust-field source mapping, exact reservations, then Team 00 Ready promotion. |
-| CF-W1-UX-05 | `07-decisions/DECISION-20260517-ux-product-language-status-policy-resolution.md` | Copilot-only `CF-W1-UX-05A` child packet sequenced after or with `CF-W1-UX-02`; no shared UI scope. |
-| CF-W1-MD-01 | `07-decisions/DECISION-20260517-market-data-validation-hardening-policy-resolution.md` | Team 05/03/04 validation-only architecture and QA refresh, exact source/test reservations, then Team 00 Ready promotion. |
+| CF-W1-AUTH-01 | `07-decisions/DECISION-20260517-platform-auth-default-user-fallback-policy-resolution.md` | Team 03/04 contract, work packet, and QA refresh prepared; needs Team 00 Ready promotion, Team 09 handoff, and sequencing/combining with `CF-W1-SUB-01`. |
+| CF-W1-SUB-01 | `07-decisions/DECISION-20260517-local-manual-subscription-plan-change-policy-resolution.md` | Team 03/04 contract, work packet, and QA refresh prepared; needs Team 00 Ready promotion, Team 09 handoff, and sequencing/combining with `CF-W1-AUTH-01`. |
+| CF-W1-UX-02 | `07-decisions/DECISION-20260517-copilot-trust-ux-policy-resolution.md` | Team 03/04 contract, work packet, and QA refresh prepared; needs Team 08 source-supported trust-field mapping and Team 00 Ready promotion. |
+| CF-W1-UX-05 | `07-decisions/DECISION-20260517-ux-product-language-status-policy-resolution.md` | Team 03/04 Copilot-only child packet and QA refresh prepared; needs sequencing after or folding into `CF-W1-UX-02`; no shared UI scope. |
+| CF-W1-MD-01 | `07-decisions/DECISION-20260517-market-data-validation-hardening-policy-resolution.md` | Team 03/04 validation-only contract, work packet, and QA refresh prepared; needs Team 05 readiness acceptance and Team 00 Ready promotion. |
 
 ## Still Blocked By Product / UX Policy Not Currently In Decision Inbox
 

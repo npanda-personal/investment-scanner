@@ -1,10 +1,10 @@
 # CF-W1-UX-02 QA Plan
 
-Date: 2026-05-17
+Date: 2026-05-18
 
 Owner: Team 04 QA Factory
 
-Status: QA planning only. Copilot trust UX validation remains blocked until Option B is reflected in a refreshed Copilot-only contract, exact file reservations, and implementation scope.
+Status: Option B QA refresh prepared. Copilot trust UX validation remains blocked until the Copilot-only contract, exact file reservations, and implementation handoff are accepted.
 
 Current status refresh: Product Owner approved Option B on 2026-05-18. `CF-W1-UX-02` remains docs-only until Team 08/03/04 refresh the Copilot-only trust packet and Team 00 issues an implementation handoff.
 
@@ -26,7 +26,9 @@ This plan does not approve backend source edits, frontend source edits, test edi
 
 ## Approved Product / UX Policy
 
-Product Owner approved:
+Decision reference: `07-decisions/DECISION-20260517-copilot-trust-ux-policy-resolution.md`.
+
+Product Owner approved Option B:
 
 - visible copy changes to `Local Research Copilot` or `Research Copilot`;
 - blocked summaries hide generated narrative and show blocked/trust explanation;
@@ -53,6 +55,7 @@ Before implementation validation, the refreshed contract must still define:
 - Source modules, data gaps, blocker reasons, latest trusted data date, and scope context are visible where available.
 - Backend tests prove trusted, blocked, stale, scoped, missing-source, and safe-language scenarios.
 - UI smoke tests, if approved later, prove trusted and blocked states rather than only page load or heading checks.
+- Blocked summaries hide generated narrative and show blocked/trust explanation instead.
 - No provider, Angel One, startup/backfill, Prisma mutation, paid/cloud, broker, telemetry, or external AI path is required.
 
 ## Scenario Matrix

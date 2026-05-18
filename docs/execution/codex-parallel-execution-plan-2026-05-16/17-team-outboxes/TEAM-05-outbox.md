@@ -1,126 +1,167 @@
 # TEAM-05 Outbox
 
-Date: 2026-05-17
+Date: 2026-05-18
 
 Team: TEAM-05 - Market Data / Data Quality
 
-State: Needs Product Refinement / Decision Opened
+State: Docs-only readiness inspection completed
 
 ## Branch / Worktree
 
 - Branch: `dev`
 - Worktree: shared repository worktree
-- Git state: dirty with many active execution docs already modified or untracked by other workstreams. Team 05 only added Team 05-owned audit/outbox/requirement/decision files and updated the Decision Inbox index for the new Team 05 decision.
+- Team 00 assignment check: no alternate exact Team 05 docs target was assigned; `17-team-outboxes/TEAM-05-outbox.md` remains the required write target.
 
 ## Assignment
 
-Primary domain:
+Evaluate whether `CF-W1-MD-01` can be promoted to a validation-only implementation slice without durable storage, providers, schema, route, startup/backfill, package, generated, frontend, or shared utility scope.
 
-- market-data-foundation
-- data-quality-engine
-- OHLC evidence
-- readiness gates
-- data trust
-- provider-safe workflows
+## Files Inspected
 
-## Subagents Used
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/team-agent-runtime-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/ready-for-implementation.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/16-team-inboxes/TEAM-05-current-assignment.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MD-01-market-data-validation-hardening-policy-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-MD-01-market-data-validation-hardening-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-MD-01-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-MD-01-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/07-decisions/DECISION-20260517-market-data-validation-hardening-policy-resolution.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/TEAM-05-market-data-data-quality-domain-audit-2026-05-17.md`
+- `backend/src/modules/market-data-foundation/market-data-foundation.validation.ts`
+- `backend/src/modules/market-data-foundation/index.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.types.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.repository.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.provider.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.exchange-eod-adapter.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.angel-one-provider.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.md`
+- `backend/tests/modules/market-data-foundation/market-data.validation.test.ts`
+- `backend/tests/modules/market-data-foundation/market-data-readiness-evidence.invariants.test.ts`
+- `backend/tests/modules/market-data-foundation/market-data-storage-readiness.invariants.test.ts`
 
-- Product / Requirement explorer
-- Architecture explorer
-- QA explorer
+## Ready-Promotion Recommendation
 
-All subagents were read-only. No subagent edited files, ran tests, staged, committed, or pushed.
+Recommendation: **Do not promote `CF-W1-MD-01` to Ready as currently written.**
 
-## Ready Work Pulled
+Reason: the prepared packet is close, but it still conflates two different scopes:
 
-None.
+1. reject-only validation hardening that can stay inside `market-data-foundation.validation.ts` and its focused test; and
+2. fallback/warning evidence for missing `adjustedClose` and suspicious volume, which the current validation API does not model cleanly without touching additional contracts or consumers.
 
-The current ready queue says no active application-code item is Ready for Implementation.
+## Why The Current Packet Is Not Yet Ready
 
-## Audits Completed
+### Blocker 1 - Warning/fallback evidence is not representable in the reserved validation surface alone
 
-- `11-module-audits/TEAM-05-market-data-data-quality-domain-audit-2026-05-17.md`
+Current validation primitives:
 
-## Requirements Refined
+- `validateHistoricalPrice(price)` returns only `string[]` errors.
+- `partitionHistoricalPrices(prices, spikeThreshold?)` returns only `valid` and `invalid`, plus ad hoc duplicate metadata.
 
-Added:
+Current storage consumer behavior:
 
-- `10-requirements/CF-W1-MD-01-market-data-validation-hardening-policy-requirement.md`
+- `market-data-foundation.repository.ts` builds `warnings` only from `validation.invalid`.
+- Valid rows with missing `adjustedClose` or zero volume currently produce no validation-side warning/fallback evidence.
 
-Findings for Team 00 / Team 02:
+Impact:
 
-- `CF-W1-MD-02` is ADR prep only. It needs a formal ADR for companion durable readiness/evidence storage.
-- `CF-W1-MD-01` now has a first-class validation policy requirement, but source/test implementation remains blocked by the opened Product Owner / Architect / QA decision.
-- `CF-W2-DQ-01` is completed and must not be repulled.
+- The accepted policy says missing `adjustedClose` must be represented as fallback/incomplete evidence.
+- The accepted policy says zero or suspicious volume should be warning/readiness evidence.
+- That is not fully achievable inside the currently reserved files unless Team 00/03 explicitly accepts an ad hoc non-typed warning channel on the validation result, or widens scope to include at least the repository/type contract and matching tests.
 
-## Contracts Prepared
+### Blocker 2 - Future-date boundary input is underspecified for an isolated validation-only slice
 
-None by Team 05 in this pass.
+Accepted policy:
 
-Team 05 recommends formal `CF-W1-MD-02` ADR drafting and ADR QA checklist as the next safe contract path.
+- reject future-dated candles relative to the accepted evaluation date or latest completed market session date.
 
-## QA Plans Prepared
+Current code shape:
 
-None by Team 05 in this pass.
+- `partitionHistoricalPrices` is called from repository, Yahoo provider, exchange EOD adapter, and Angel One provider.
+- The validator has no boundary/evaluation-date input today.
 
-QA finding:
+Impact:
 
-- `CF-W1-MD-01` and `CF-W1-MD-02` are not executable-QA ready.
-- Existing QA docs should remain planning-only until policy/ADR gates pass.
+- A backward-compatible optional parameter could keep this inside validation-only scope.
+- The current contract/work packet does not state that constraint explicitly.
+- Without that clarification, implementation pressure can spill into provider/adapter/repository call-site edits.
 
-## Implementation Completed
+### Blocker 3 - "Suspicious volume" is not yet deterministic enough for a bounded Ready handoff
 
-None.
+Observed codebase behavior:
 
-Decision packet opened:
+- negative volume is invalid;
+- zero volume is accepted by validation and later treated as readiness blockage through volume coverage;
+- no explicit suspicious-volume threshold or stable reason string exists in the validation layer.
 
-- `99-decision-inbox/DECISION-20260517-market-data-validation-hardening-policy.md`
+Impact:
 
-Decision index updated:
+- The decision resolved directionally, but the exact suspicious-volume rule for this first slice is still too loose for a bounded Ready packet.
+- Team 00 should either narrow the child slice to zero-volume behavior only, or define the first-pass suspicious-volume rule/reason string explicitly before promotion.
 
-- `99-decision-inbox/open-decisions.md`
+## What Is Safe To Promote After Narrowing
 
-No application source, Prisma schema, migrations, route registries, shared utilities/UI, package files, frontend files, provider files, startup/backfill paths, or tests were changed.
+If Team 00/03 split `CF-W1-MD-01` into a stricter child limited to **reject-only validation hardening plus documentation**, Team 05 recommends that child can become Ready with these exact files:
+
+- `backend/src/modules/market-data-foundation/market-data-foundation.validation.ts`
+- `backend/tests/modules/market-data-foundation/market-data.validation.test.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.md`
+
+Allowed behavior for that narrowed child:
+
+- reject future-dated candles using a backward-compatible validation boundary input with a safe default;
+- reject present-but-invalid `adjustedClose` values;
+- preserve duplicate handling and opt-in spike rejection;
+- document that warning/fallback evidence for missing `adjustedClose` and suspicious volume remains a follow-on contract unless an explicit validation warning channel is accepted.
+
+## Candidate Tests If A Narrowed Child Is Promoted
+
+Required focused test file:
+
+- `backend/tests/modules/market-data-foundation/market-data.validation.test.ts`
+
+Useful secondary regression checks only if Team 00 widens the packet deliberately:
+
+- `backend/tests/modules/market-data-foundation/market-data-readiness-evidence.invariants.test.ts`
+- `backend/tests/modules/market-data-foundation/market-data-storage-readiness.invariants.test.ts`
+
+Those secondary tests should not be pulled into the first Ready handoff unless the packet explicitly includes readiness/storage evidence behavior.
+
+## Focused Validation Commands
+
+For the narrowed validation-only child:
+
+```powershell
+cd backend
+npm.cmd test -- market-data.validation.test.ts --runInBand
+```
+
+Only if Team 00 deliberately widens the packet to cover readiness/storage evidence assertions:
+
+```powershell
+cd backend
+npm.cmd test -- market-data.validation.test.ts market-data-readiness-evidence.invariants.test.ts market-data-storage-readiness.invariants.test.ts --runInBand
+```
 
 ## Tests Run
 
 None.
 
-Skipped because no Team 05 implementation item is Ready and active QA docs block executable validation for `CF-W1-MD-01` and `CF-W1-MD-02`.
+This was a docs-only readiness inspection. No application implementation or executable QA was authorized.
 
-## Commits Created
+## Changes Made
 
-None.
+- Updated `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-05-outbox.md` only.
 
-No files were staged, committed, or pushed.
+## Blockers For Team 00
 
-## Outbox / Evidence Paths
+1. Split or narrow `CF-W1-MD-01` so the first Ready slice is reject-only validation hardening.
+2. Decide whether missing `adjustedClose` / zero-or-suspicious-volume evidence must:
+   - stay out of the first slice, or
+   - widen the slice to include a formal validation warning channel and its consuming tests.
+3. Clarify the first-pass future-date boundary contract as backward-compatible optional validation input, so provider/repository/startup scope does not get pulled in.
+4. Clarify whether "suspicious volume" has an actual deterministic first-pass threshold or is deferred.
 
-- `17-team-outboxes/TEAM-05-outbox.md`
-- `17-team-outboxes/TEAM-05-market-data-data-quality-daemon-2026-05-17-iteration-17.md`
-- `11-module-audits/TEAM-05-market-data-data-quality-domain-audit-2026-05-17.md`
-- `10-requirements/CF-W1-MD-01-market-data-validation-hardening-policy-requirement.md`
-- `99-decision-inbox/DECISION-20260517-market-data-validation-hardening-policy.md`
+## Next Gate
 
-## Decisions Opened
-
-- `DECISION-20260517-market-data-validation-hardening-policy`
-
-## Blockers
-
-- No Team 05 app-code Ready queue item.
-- `CF-W1-MD-02` requires formal ADR acceptance before source/schema/test implementation.
-- Prisma schema, migration, generated type, natural-key, and durable evidence storage work require separate approval.
-- `CF-W1-MD-01` requires resolution of `DECISION-20260517-market-data-validation-hardening-policy` before source/test implementation.
-- Angel One, live providers, startup/backfill, repair/backfill, route registry, shared utility, package, generated fixture, frontend/UI, and broker/paid/cloud work remain excluded.
-- Dirty shared worktree prevents any clean release/ready claim until Team 00 reconciles unrelated docs changes.
-
-## Next Recommended Assignment
-
-1. Product Owner + Architect + QA: resolve `DECISION-20260517-market-data-validation-hardening-policy`.
-2. Team 03 / Team 04: continue formal `CF-W1-MD-02` ADR plus ADR QA checklist.
-3. Team 05: remain in audit/refinement mode until a Market Data / Data Quality item is promoted to Ready with exact file reservations.
-
-Can continue without human approval: yes, for docs-only audit/refinement in non-conflicting Team 05-owned files.
-
-Can continue with implementation: no, because no Team 05 app-code item is Ready.
+Return to Team 00 / Team 03 / Team 04 for packet narrowing or contract clarification before any Ready promotion.

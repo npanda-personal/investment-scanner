@@ -69,7 +69,7 @@ The implementation should not touch controller, service, repository, router, val
 
 ## Readiness Result
 
-`CF-W1-NOTIF-02` is close to implementation-ready as a small backend-only privacy slice, but source work should wait until the focused work packet is accepted and the current dirty active-doc state is classified by Team 00 or the team lead.
+`CF-W1-NOTIF-02` is close to implementation-ready as a small backend-only privacy slice. The remaining blocker is Team 00 / Team 09 Ready promotion with the exact file reservation and implementation handoff. The focused QA plan already exists.
 
 ## Stop Conditions
 

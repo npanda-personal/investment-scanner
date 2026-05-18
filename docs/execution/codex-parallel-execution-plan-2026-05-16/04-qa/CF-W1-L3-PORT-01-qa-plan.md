@@ -1,10 +1,10 @@
 # CF-W1-L3-PORT-01 QA Plan
 
-Date: 2026-05-17
+Date: 2026-05-18
 
 Owner: Team 04 QA Factory
 
-Status: Child QA plan prepared. Team 00 selected `CF-W1-L3-PORT-01A` portfolio on 2026-05-18 and recorded exact file reservations in the ready queue and Team 07 inbox. The portfolio focused command becomes executable after Team 07 implementation exists.
+Status: `CF-W1-L3-PORT-01A` initial focused QA command passed, but Team 10 rejected release acceptance for a readiness-mapping issue. Team 04 must rerun focused QA after Team 07 revision.
 
 ## Scope
 
@@ -12,8 +12,8 @@ Backend-only QA plan for passive display readiness DTOs under accepted `CF-W1-L3
 
 Covered child slices:
 
-- `CF-W1-L3-PORT-01A`: portfolio-management holding and summary readiness DTOs.
-- `CF-W1-L3-PORT-01B`: watchlist-management item and detail readiness DTOs.
+- `CF-W1-L3-PORT-01A`: portfolio-management holding and summary readiness DTOs. This is the active Ready implementation slice for Team 07.
+- `CF-W1-L3-PORT-01B`: watchlist-management item and detail readiness DTOs. This remains future and blocked behind the accepted portfolio-only slice unless Team 00 records a combined backend-only exception.
 
 This plan does not approve source edits, test edits, Prisma/schema changes, route changes, shared DTOs/utilities, shared UI, frontend work, providers, startup/backfill, Angel One, broker, paid/cloud services, UI smoke, broad suites, staging, commits, or pushes.
 
@@ -54,7 +54,7 @@ This plan does not approve source edits, test edits, Prisma/schema changes, rout
 
 ## Focused Command Guidance
 
-Run only after the corresponding child implementation exists.
+Run only after the corresponding child implementation exists and Team 07 provides an implementation outbox with developer validation.
 
 Portfolio-only slice:
 
@@ -95,7 +95,7 @@ npm.cmd test -- portfolio-management.ownership.test.ts watchlist-management.owne
 
 ## Evidence Required Later
 
-- Exact child slice selected: portfolio-only, watchlist-only, or Team 00-approved combined backend pass.
+- Exact child slice selected: `CF-W1-L3-PORT-01A` portfolio-only for the current Ready handoff, or a later Team 00-approved watchlist/combined pass.
 - Exact changed-file list from implementation handoff.
 - Scenario results for `READY`, `LIMITED`, missing, `NOT_READY`, blocked tier, stale, unsupported, and scope mismatch.
 - Focused command output for implemented slice.

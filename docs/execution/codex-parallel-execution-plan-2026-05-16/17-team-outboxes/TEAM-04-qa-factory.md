@@ -2,23 +2,50 @@
 
 Date: 2026-05-18
 
-Mode: docs-only QA planning.
+Mode: focused QA rerun plus docs-only QA planning.
+
+## 2026-05-18 `CF-W1-L3-PORT-01A` QA Rerun After Team 07 Rework
+
+- Team: `TEAM-04` - QA Factory
+- Requirement: `CF-W1-L3-PORT-01A`
+- Source worktree: `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-L3-PORT-01A`
+- Decision: `PASS`
+- Commands run:
+  - `Get-Counter '\Memory\% Committed Bytes In Use'` -> `67.20%`
+  - `npm.cmd test -- portfolio-management.service.test.ts --runInBand` -> pass (`1` suite, `11` tests)
+  - `npm.cmd run build` -> pass
+- Scope confirmation:
+  - Reviewed Team 07 worktree status shows only approved portfolio-management source/test/doc files changed on the application side.
+  - No forbidden source scope changes found in Prisma/migrations, route registries, shared utilities/DTOs, shared UI, package manifests, generated files, Data Quality Engine source/exports, watchlist, alerts, portfolio-intelligence, frontend, providers, startup/backfill, broker/live-provider, paid/cloud, or telemetry paths.
+- Key scenario result:
+  - Verified the Team 10-required automation-only DQE blocker case is present and meaningful. The portfolio test fixture carries `AUTOMATION_BLOCKED: PHASE0_AUTOMATION_NOT_AUTHORIZED` while daily-review and signal tiers stay `READY`, and assertions prove portfolio display/action readiness remain `READY`.
+- Skipped checks:
+  - Ownership/routes regression tests skipped because those files were not changed.
+  - UI smoke tests skipped because this is backend-only scope.
+  - Broad backend suites skipped because the assignment required focused verification only.
+- Risks / notes:
+  - Team 07 outbox in the implementation worktree still contains older narrative sections from earlier passes; Team 04 used the updated developer handoff plus current file diff as the authoritative rework record.
+- Output files updated:
+  - `04-qa/CF-W1-L3-PORT-01A-qa-evidence.md`
+  - `18-integration-queue/CF-W1-L3-PORT-01A-qa-verification.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Next gate: `TEAM-10` re-review can proceed.
 
 ## Current Heartbeat
 
 - Team: `TEAM-04` - QA Factory
-- State: Idle / Watching queues / Needs Ready promotion for child implementation packets
-- Current assignment: current inbox priorities are fully covered by prepared QA plans; no executable QA is authorized until Team 00 promotes a bounded implementation handoff
-- Latest heartbeat: 2026-05-18 bounded queue check confirmed no active application-code Ready item; current portfolio priority is narrowed to `CF-W1-L3-PORT-01A`, which is covered by the prepared parent `CF-W1-L3-PORT-01` QA plan
+- State: QA Rerun Complete / Awaiting `TEAM-10` Re-review
+- Current assignment: reran focused QA for Team 07's `CF-W1-L3-PORT-01A` rework and recorded a pass for the scoped portfolio-management slice
+- Latest heartbeat: 2026-05-18 Team 04 verified the Team 10 automation-blocked DQE case, reran the focused portfolio-management test and backend build in the Team 07 worktree, and updated QA evidence for Team 10 re-review
 - Input source: runtime bootstrap, standing delegation, ready/blocked queues, Decision Inbox, Team 03 child contracts/work packets
-- Output target: `04-qa/` and this outbox
+- Output target: `04-qa/`, `18-integration-queue/`, and this outbox
 - Branch/worktree: `dev` in `C:\work\repo\investment-scanner`
-- Active requirement ids: `CF-W1-NOTIF-02`, `CF-W1-L3-ALERT-01`, `CF-W1-L3-PORT-01A`, `CF-W1-TP-01B`
-- Files reserved by Team 04 for this pass: no active QA-plan write reservation remains; this heartbeat updates only the Team 04 outbox
-- Tests/checks run: targeted docs-only `git diff --check`, `git status --short -- <Team 04 paths>`, and `rg` line-reference checks; no executable tests
+- Active requirement ids: `CF-W1-NOTIF-02`, `CF-W1-L3-ALERT-01`, `CF-W1-L3-PORT-01A`, `CF-W1-TP-01B`, `CF-W1-MD-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-AUTH-01`, `CF-W1-SUB-01`
+- Files reserved by Team 04 for this pass: `04-qa/CF-W1-L3-PORT-01-qa-plan.md`, `04-qa/CF-W1-L3-PORT-01A-qa-evidence.md`, `04-qa/CF-W1-MD-01-qa-plan.md`, `04-qa/CF-W1-UX-02-qa-plan.md`, `04-qa/CF-W1-UX-05-product-language-status-qa-plan.md`, `04-qa/CF-W1-QA-AUTH-01-platform-auth-subscription-notification-qa-plan.md`, `04-qa/next-validation-plans.md`, this outbox
+- Tests/checks run: `Get-Counter '\Memory\% Committed Bytes In Use'` (`67.20%`), `npm.cmd test -- portfolio-management.service.test.ts --runInBand` in Team 07 worktree passed 11 tests, `npm.cmd run build` passed, plus targeted `git status`, `git diff`, and `rg` line-reference checks; no broad suites
 - Commit SHA: none
 - Decision Packets created: none
-- Can continue without human approval: yes, for docs-only QA prep; no, for executable QA or implementation
+- Can continue without human approval: yes, for docs-only QA updates and routing; no, for implementation, commit, or push
 
 ## Completed Work
 
@@ -30,16 +57,27 @@ Prepared and refreshed QA plans for:
 - `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02`: post-decision child scenario matrix and ADR QA checklist recorded after Team 03 architecture refresh.
 - `CF-W1-L3-ALERT-01`: refreshed child QA plan against the alert readiness suppression contract.
 - `CF-W1-L3-PORT-01`: prepared portfolio/watchlist readiness DTO child QA plan; this covers the current `CF-W1-L3-PORT-01A` portfolio-only priority.
+- `CF-W1-L3-PORT-01A`: reran focused QA after Team 07 rework, confirmed the Team 10 automation-blocked DQE case, and updated `04-qa/CF-W1-L3-PORT-01A-qa-evidence.md` plus `18-integration-queue/CF-W1-L3-PORT-01A-qa-verification.md`. Team 10 re-review is now the next gate.
 - `CF-W1-TP-01B`: prepared backend-only Trade Plan compatibility and DQ hard-block child QA plan.
 - `CF-W1-NOTIF-02`: prepared focused notification local log redaction QA plan.
+- `CF-W1-MD-01`: refreshed Option A validation-hardening QA plan after Product Owner resolution.
+- `CF-W1-UX-02`: refreshed Option B Copilot-only trust QA plan after Product Owner resolution.
+- `CF-W1-UX-05`: refreshed Option A Copilot-only copy/status QA plan after Product Owner resolution.
+- `CF-W1-AUTH-01` and `CF-W1-SUB-01`: refreshed Option A platform auth/subscription assertions in the combined Team 09 QA plan.
 
-Updated `04-qa/next-validation-plans.md` so these three items are no longer listed as missing QA-plan gaps and added status refresh notes for `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, and `CF-W1-MD-02` after setup authorization.
+Updated `04-qa/next-validation-plans.md` so the resolved-policy items show QA refresh prepared while executable QA remains blocked behind exact reservations and Team 00 Ready promotion.
 
 Latest Team 04 addition: `04-qa/post-decision-child-scenario-matrix-2026-05-17.md` records child QA scenarios for Lane 3 readiness consumers, Trade Plan backend-only no-target/DQ behavior, and the Market Data durable readiness ADR checklist. This is planning evidence only and does not move any item to Ready for Implementation.
 
 Latest child-plan addition: `04-qa/CF-W1-L3-PORT-01-qa-plan.md` and `04-qa/CF-W1-TP-01B-qa-plan.md` are new planning artifacts; `04-qa/CF-W1-L3-ALERT-01-qa-plan.md` is refreshed. None of these approves implementation or executable QA.
 
 Latest notification-plan addition: `04-qa/CF-W1-NOTIF-02-qa-plan.md` records focused provider redaction scenarios for the prepared notification contract/work packet. It does not approve source/test execution.
+
+Latest policy-resolution refresh: Product Owner resolved the five remaining Decision Inbox items on 2026-05-18. Team 04 reflected those outcomes in QA planning for `CF-W1-MD-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-AUTH-01`, and `CF-W1-SUB-01`. This does not approve implementation or executable QA.
+
+Latest Ready promotion note: Team 00 promoted `CF-W1-L3-PORT-01A` to Ready for Team 07 implementation in `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A`; Team 07 implementation output is present, Team 04 initial focused QA passed, and Team 10 requires a Team 07 revision before release acceptance.
+
+Latest QA evidence: Team 04 found Team 07's developer handoff in `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-L3-PORT-01A`, passed the focused backend test command, and recorded QA evidence in `04-qa/CF-W1-L3-PORT-01A-qa-evidence.md`. Team 10's review supersedes release acceptance until Team 07 revises and Team 04 reruns QA.
 
 Setup authorization interpretation: standing branch/worktree/commit/push authorization does not approve QA execution, app-code readiness, tests, builds, services, providers, Prisma commands, UI smoke, Angel One, startup/backfill, live services, or Ready queue movement.
 
@@ -56,9 +94,13 @@ No application source, tests, Prisma, route registries, shared utilities/UI, pac
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-MD-02-qa-plan.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/post-decision-child-scenario-matrix-2026-05-17.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-L3-PORT-01-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-L3-PORT-01A-qa-evidence.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-TP-01B-qa-plan.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-NOTIF-02-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-UX-05-product-language-status-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-QA-AUTH-01-platform-auth-subscription-notification-qa-plan.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-L3-PORT-01A-qa-verification.md`
 
 ## Files Inspected
 
@@ -79,6 +121,12 @@ Content inspected:
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-UX-02-copilot-trust-ux-requirement.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/ready-for-implementation.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/99-decision-inbox/open-decisions.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/07-decisions/DECISION-20260517-platform-auth-default-user-fallback-policy-resolution.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/07-decisions/DECISION-20260517-local-manual-subscription-plan-change-policy-resolution.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/07-decisions/DECISION-20260517-copilot-trust-ux-policy-resolution.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/07-decisions/DECISION-20260517-ux-product-language-status-policy-resolution.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/07-decisions/DECISION-20260517-market-data-validation-hardening-policy-resolution.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-L3-DQ-01-lane3-readiness-consumer-policy-contract.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-TP-01A-trade-plan-no-target-dq-hard-block-contract.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-MD-02-durable-readiness-evidence-contract.md`
@@ -170,24 +218,28 @@ Excluded by default:
 
 ## Blockers
 
-- `CF-W1-MD-01`: future-date, adjusted-close, suspicious-volume, and spike policies are not accepted.
+- `CF-W1-MD-01`: Option A QA refresh is prepared; executable validation is blocked until validation-only file reservations and Team 00 implementation handoff.
 - `CF-W1-L3-ALERT-01`: blocked by `CF-W1-L3-DQ-01`, alert readiness contract, and implementation handoff.
-- `CF-W1-UX-02`: blocked by Copilot naming, trust-field, blocked-summary, scope, shared-file, and implementation decisions.
+- `CF-W1-UX-02`: Option B QA refresh is prepared; executable validation is blocked until Copilot-only trust-field contract refresh, exact file reservations, and Team 00 implementation handoff.
 - `CF-W1-UX-02` UI smoke is also blocked because `frontend/tests/ui/ai-investment-copilot.spec.ts` and `frontend/tests/ui/stock-research-workbench.spec.ts` do not currently exist.
 - `CF-W1-L3-DQ-01`: child scenario matrix is now recorded; QA execution is blocked until module-specific child contracts, exact file reservations, and implementation handoffs.
 - `CF-W1-TP-01A`: backend-only scenario matrix is now recorded; QA execution is blocked until accepted backend-only child packet, exact source/test reservations, and implementation handoff.
 - `CF-W1-MD-02`: ADR QA checklist is now recorded; schema/source/test execution remains blocked until a formal storage/natural-key ADR and separate implementation slice approval.
 - `CF-W1-L3-ALERT-01`: child QA plan is refreshed; executable QA is blocked until Team 00 Ready promotion and implementation handoff.
-- `CF-W1-L3-PORT-01A`: portfolio-only coverage is prepared in the parent `CF-W1-L3-PORT-01` child QA plan; executable QA is blocked until Team 00 promotes exact portfolio-management reservations.
+- `CF-W1-L3-PORT-01A`: initial focused QA passed, but release acceptance is blocked by Team 10's code-review finding; next gates are Team 07 revision, Team 04 QA rerun, and Team 10 re-review.
 - `CF-W1-TP-01B`: child QA plan is prepared; executable QA is blocked until Team 00 Ready promotion and backend-only implementation handoff.
 - `CF-W1-NOTIF-02`: focused QA plan is prepared; executable QA is blocked until Team 00/Team 09 Ready promotion and implementation handoff.
-- Team 09 auth/subscription decisions are resolved, but `CF-W1-AUTH-01` and `CF-W1-SUB-01` still need Option A QA refresh and exact implementation handoffs before executable QA.
+- `CF-W1-UX-05`: Option A QA refresh is prepared; executable validation is blocked until Copilot-only child sequencing with `CF-W1-UX-02`, exact copy/test reservations, and Team 00 implementation handoff.
+- `CF-W1-AUTH-01`: Option A QA refresh is prepared; executable validation is blocked until exact controller/test reservations and Team 00 implementation handoff.
+- `CF-W1-SUB-01`: Option A QA refresh is prepared; executable validation is blocked until exact backend reservations, frontend limitation handling, and Team 00 implementation handoff.
 - Scoped commit/push is not attempted because the shared worktree contains many unrelated active docs changes from other teams.
 
 ## Next Recommendations
 
-1. Product Owner and Architect should accept or revise the `CF-W1-MD-01` validation policy before any Market Data source/test work.
-2. Architect should prepare the `CF-W1-L3-ALERT-01` alert readiness suppression contract only after `CF-W1-L3-DQ-01` child contracts and file reservations are accepted.
-3. Product Owner, UX, and Architect should decide `CF-W1-UX-02` naming, trust fields, and blocked-state behavior before backend or UI implementation.
-4. Team 00 may consider Ready promotion for one child slice at a time only after reconciling dirty docs state and copying exact reservations: `CF-W1-L3-ALERT-01`, `CF-W1-L3-PORT-01A` or `CF-W1-L3-PORT-01B`, `CF-W1-TP-01B`, or `CF-W1-NOTIF-02`.
-5. Keep `CF-W1-MD-02` source/schema/test work blocked until a formal ADR is accepted.
+1. Team 07 should revise `CF-W1-L3-PORT-01A` inside the current reservation to address Team 10's readiness-mapping finding.
+2. Team 04 should rerun `npm.cmd test -- portfolio-management.service.test.ts --runInBand` after that revision and update QA evidence.
+3. Team 10 should re-review after Team 04 rerun.
+4. Team 00 may consider Ready promotion for the next bounded slice after reconciling dirty docs state and copying exact reservations: `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, or `CF-W1-L3-ALERT-01`.
+5. Team 03 and module teams should refresh source-changing packets for `CF-W1-MD-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-AUTH-01`, and `CF-W1-SUB-01` using the resolved policies and Team 04 QA criteria.
+6. Keep `CF-W1-L3-INTEL-01` queued behind accepted `CF-W1-L3-PORT-01A`.
+7. Keep `CF-W1-MD-02` source/schema/test work blocked until a formal ADR is accepted.

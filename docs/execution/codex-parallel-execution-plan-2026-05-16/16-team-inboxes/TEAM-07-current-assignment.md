@@ -8,48 +8,48 @@ Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automat
 
 ## Assignment
 
-Revise `CF-W1-L3-PORT-01A` after Team 10 Code Review / Release Readiness rejection.
+Pull `CF-W1-L3-ALERT-01` for bounded implementation.
 
-State: Rejected / Rework. This remains inside the original Team 07 implementation reservation and does not require Product Owner action.
+State: Ready for Implementation after Team 00 promotion.
 
 You are not alone in the codebase. Other teams have active docs-only edits in the shared `dev` workspace. Do not revert or overwrite edits made by others, and do not implement in the shared worktree.
 
 ## Branch / Worktree
 
-Continue using this dedicated implementation branch/worktree:
+Create and use this dedicated implementation branch/worktree:
 
-- Branch: `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A`
-- Worktree: `../investment-scanner-worktrees/team07-CF-W1-L3-PORT-01A`
-- Base: latest local `dev` after the Team 00 Ready-promotion docs commit.
+- Branch: `codex/team07-portfolio-alerts/CF-W1-L3-ALERT-01`
+- Worktree: `../investment-scanner-worktrees/team07-CF-W1-L3-ALERT-01`
+- Base: current local `dev` after the Team 00 Ready-promotion docs update.
 
 Record the branch, worktree path, starting commit, and final status in `17-team-outboxes/TEAM-07-outbox.md`.
 
 ## Work Item
 
-`CF-W1-L3-PORT-01A` - portfolio-management readiness DTOs.
-
-Implement only the portfolio-management child slice from the parent Lane 3 readiness DTO contract.
+`CF-W1-L3-ALERT-01` - alert readiness suppression for action-like alert event creation.
 
 ## Evidence To Use
 
-- Requirement: `10-requirements/CF-W1-L3-PORT-01A-portfolio-readiness-dto-requirement.md`
-- Architecture review: `03-architecture/CF-W1-L3-PORT-01-architecture-review.md`
-- Contract: `06-contracts/CF-W1-L3-PORT-01-portfolio-watchlist-readiness-dto-contract.md`
-- Work packet: `08-work-packets/CF-W1-L3-PORT-01-work-packet.md`
-- QA plan: `04-qa/CF-W1-L3-PORT-01-qa-plan.md`
+- Requirement: `10-requirements/CF-W1-L3-ALERT-01-alert-readiness-suppression-requirement.md`
+- Architecture review: `03-architecture/CF-W1-L3-ALERT-01-architecture-review.md`
+- Contract: `06-contracts/CF-W1-L3-ALERT-01-alert-readiness-suppression-contract.md`
+- Work packet: `08-work-packets/CF-W1-L3-ALERT-01-work-packet.md`
+- QA plan: `04-qa/CF-W1-L3-ALERT-01-qa-plan.md`
 - Team 03 reservation matrix: `03-architecture/team03-near-ready-file-reservation-matrix-2026-05-18.md`
 - Ready queue handoff: `12-ready-queue/ready-for-implementation.md`
-- Team 04 first-pass QA evidence: `18-integration-queue/CF-W1-L3-PORT-01A-qa-verification.md`
-- Team 10 release-blocking review: `18-integration-queue/CF-W1-L3-PORT-01A-team10-review-release.md`
 
 ## Allowed Files
 
 You may edit only:
 
-- `backend/src/modules/portfolio-management/portfolio-management.service.ts`
-- `backend/src/modules/portfolio-management/portfolio-management.types.ts`
-- `backend/src/modules/portfolio-management/portfolio-management.md`
-- `backend/tests/modules/portfolio-management/portfolio-management.service.test.ts`
+- `backend/src/modules/alerts-monitoring/alerts-monitoring.service.ts`
+- `backend/src/modules/alerts-monitoring/alerts-monitoring.types.ts`
+- `backend/src/modules/alerts-monitoring/alerts-monitoring.md`
+- `backend/tests/modules/alerts-monitoring/alerts-monitoring.service.test.ts`
+
+Optional only if ownership-sensitive behavior is touched:
+
+- `backend/tests/modules/alerts-monitoring/alerts-monitoring.ownership.test.ts`
 
 ## Forbidden Files
 
@@ -62,38 +62,26 @@ Do not edit:
 - package manifests
 - generated files
 - Data Quality Engine source or public exports
+- Portfolio Management source/tests
 - watchlist-management source/tests
-- alerts-monitoring source/tests
 - portfolio-intelligence source/tests
 - frontend files
+- notifications-delivery or copilot digest consumers
 - providers, startup/backfill, Angel One, broker, live-provider, paid/cloud, or telemetry flows
 
 Do not run providers, startup/backfill flows, live provider calls, Prisma migrations, package installs, broad services, or UI smoke tests for this slice.
 
-## Required Rework
-
-Team 10 rejected the first handoff because the portfolio mapper treated any `DataQualityEvaluationDto.readinessBlockers` entry as a portfolio display hard block. Data Quality can include non-portfolio blockers, especially the phase-0 automation blocker, while daily-review and signal tiers remain usable.
-
-Revise within the allowed files only:
-
-- Do not use the full `readinessBlockers` array as the portfolio display hard-block predicate.
-- Keep display blocking tied to portfolio-relevant hard blockers: `coverageStatus = UNUSABLE`, `signalReadinessStatus = NOT_READY`, daily-review tier `BLOCKED`, and known stale/unsupported/scope-mismatch blockers.
-- Keep action readiness tied to signal tier `READY` and `eligibleForSignals = true`.
-- Add a portfolio service test with DQE-like `READY` daily-review/signal tiers plus `AUTOMATION_BLOCKED: PHASE0_AUTOMATION_NOT_AUTHORIZED`, proving portfolio display/action readiness is not blocked solely by automation.
-
 ## Implementation Requirements
 
-- Add module-local portfolio readiness DTO fields to holding valuation output.
-- Add a portfolio-level readiness summary to portfolio summary output.
-- Preserve existing route paths and existing portfolio response fields, including `dataStatus`, price, valuation, and signal fields.
-- Consume Data Quality through public service/type outputs only.
-- Do not import `DataQualityEngineRepository`.
-- Do not duplicate Data Quality scoring, stale thresholds, liquidity scoring, or coverage scoring.
-- Use `DataQualityEvaluationDto.useCaseTiers` where available; do not request Data Quality export changes for `DataQualityUseCaseTiers`.
-- Treat `READY` as trusted display/action eligibility only as defined by the accepted contract.
-- Treat `LIMITED` as passive display only with visible reasons and blocked action eligibility.
-- Treat missing, `NOT_READY`, `UNUSABLE`, stale hard blocker, unsupported, scope mismatch, or blocked tier evidence as blocked/untrusted.
-- Ensure `dataStatus = COMPLETE` does not imply Data Quality trust.
+- Consume `DataQualityEngineService` through the public Data Quality module export.
+- Suppress stock, portfolio, and watchlist alert events unless the instrument has `READY` alert readiness.
+- Prefer `automation` use-case tier `READY` when available.
+- Fallback only when `automation` tier is absent: use `signal` tier `READY`, or `signalReadinessStatus = READY && eligibleForSignals = true` when tiers are absent.
+- Treat `LIMITED`, missing DQ, `NOT_READY`, blocked tier, stale hard blocker, unsupported, scope mismatch, provider gap, and `UNUSABLE` as suppressed.
+- Add readiness suppression evidence to `AlertEvaluationResult`.
+- Add Data Quality evidence to created event metadata.
+- Preserve duplicate suppression.
+- Preserve parent-rule event ownership behavior from `CF-W1-L3-AUTH-02`.
 - Keep wording research-support oriented; do not introduce advice, buy/sell, guarantee, target-price, or trade-instruction wording.
 
 ## Focused Validation
@@ -102,8 +90,7 @@ Run after implementation:
 
 ```powershell
 cd backend
-npm.cmd test -- portfolio-management.service.test.ts --runInBand
-npm.cmd run build
+npm.cmd test -- alerts-monitoring.service.test.ts alerts-monitoring.validation.test.ts --runInBand
 ```
 
 If the focused command cannot run, record the exact blocker, skipped command, risk, and next owner in the outbox.
@@ -114,9 +101,9 @@ Stop and return to Team 00 if implementation requires:
 
 - Data Quality Engine source or public export changes
 - shared DTO/helper files
-- watchlist, alerts, portfolio-intelligence, notifications, copilot, frontend, route, Prisma, provider, startup/backfill, package, generated-file, or live-data changes
-- treating `LIMITED` as action-ready
-- breaking existing portfolio response compatibility
+- portfolio-management, watchlist-management, portfolio-intelligence, notifications, copilot, frontend, route, Prisma, provider, startup/backfill, package, generated-file, or live-data changes
+- creating alert events from `LIMITED` or missing/non-ready DQ
+- changing alert ownership model or direct `AlertEvent.userId`
 - using live provider calls, paid services, broker credentials, cloud services, external telemetry, or provider-heavy startup behavior
 - editing a file outside the allowed list
 
@@ -133,4 +120,4 @@ Update `17-team-outboxes/TEAM-07-outbox.md` with:
 - tests skipped and reasons
 - forbidden files confirmed untouched
 - assumptions, risks, blockers
-- next gate: Team 04 QA rerun, Team 10 re-review, Architect Signoff, delegated PO acceptance, or Team 00 blocker routing
+- next gate: Developer Validation, Team 04 QA, Team 10 review, Architect Signoff, delegated PO acceptance, or Team 00 blocker routing

@@ -4,7 +4,7 @@ Date: 2026-05-17
 
 Owner: Team 08 UX / Research / Copilot
 
-Status: Blocked proposal. Not Ready for Implementation.
+Status: Post-decision proposal refreshed. Not Ready for Implementation.
 
 ## Work Item
 
@@ -41,7 +41,6 @@ Allowed files after Ready promotion:
 
 ## Stop Conditions
 
-- Product/UX priority decision is unresolved.
 - Selected slice needs shared UI reservation.
 - Copy changes would alter business semantics.
 - UI tests would prove only page load.
@@ -49,4 +48,8 @@ Allowed files after Ready promotion:
 
 ## Next Gate
 
-Resolve `DECISION-20260517-ux-product-language-status-policy`, then promote one child slice with exact file reservations.
+Sequence `CF-W1-UX-05A` after or with `CF-W1-UX-02`, then promote one Copilot-only child slice with exact file reservations.
+
+## Post-Decision Refresh - 2026-05-18
+
+Option A is resolved. This packet remains Copilot-only, and shared `StatusBadge`, Research Hub, and Market Data UI work remain future. Do not run `CF-W1-UX-05A` as a parallel writer against Copilot files while `CF-W1-UX-02` is active.

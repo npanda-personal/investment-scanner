@@ -8,7 +8,7 @@ Alert rule target ownership validation for portfolio and watchlist rule referenc
 
 ## State
 
-Draft work packet prepared. Not Ready for Implementation.
+Focused work packet prepared. Not Ready for Implementation.
 
 ## Owner / Lane / Module
 
@@ -78,4 +78,6 @@ Stop and return to Team 00 / Architect if implementation requires:
 
 ## Next Gate
 
-Architecture/QA acceptance and Team 00 Ready promotion.
+Do not promote in parallel with `CF-W1-L3-ALERT-01`. Both slices share the same `alerts-monitoring` service/types/doc/test files.
+
+Team 00 Ready promotion with exact reservations.

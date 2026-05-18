@@ -688,3 +688,69 @@ Human Product Owner action is required only when those delegated roles cannot pr
 ## Runtime Queue Doc
 
 `00-control/team-agent-runtime-queue.md`
+
+---
+
+# Persistent PO / Requirements Runtime Update
+
+Date: 2026-05-18
+
+State: Team 02 retasked as persistent PO + Requirements value-discovery lane.
+
+## Product Owner Direction
+
+The Product Owner directed Team 00 to keep requirements continuously supplied by a persistent PO-style agent. If the requirement queue thins out, Team 02 should audit more modules and propose new user-value requirements, refactors, UX improvements, and trust/reliability improvements.
+
+## Team 02 Standing Assignment
+
+- Keep auditing modules and workflows for investor/trader value.
+- Create or refine requirement candidates.
+- Reorder priorities from highest user value to lowest after each cycle.
+- Identify the top unassigned item Team 00 should delegate next.
+- Stay read-only for application source/tests.
+
+## Current Consumed Readiness Outputs
+
+- Team 06: `CF-W1-TP-01B` recommended promotable with exact file reservations.
+- Team 09: `CF-W1-NOTIF-02` recommended Ready; `AUTH-01` and `SUB-01` should be combined or sequenced.
+- Team 05: `CF-W1-MD-01` not Ready as written; narrow to reject-only validation child before promotion.
+
+## Current Ready Teams
+
+- Team 07 remains active on `CF-W1-L3-PORT-01A` rework.
+- Team 02 remains active as persistent PO + Requirements.
+- Team 03 remains active for architecture readiness.
+- Team 08 is active for Copilot trust/copy source mapping.
+
+## Next Team 00 Decision
+
+Evaluate `CF-W1-TP-01B` and `CF-W1-NOTIF-02` for Ready promotion. Use Team 02 priority ordering, Team 03 architecture evidence, and Team 06/09 readiness outputs.
+
+---
+
+# Parallel Independent Workstream Routing
+
+Date: 2026-05-18
+
+State: Independent readyable items are now routed in parallel instead of waiting behind unrelated gates.
+
+## Routing Decisions
+
+- `CF-W1-L3-PORT-01A`: Team 04 QA rerun passed; separate Team 10 re-review agent launched with a dedicated evidence file to avoid Team 10 outbox write conflicts.
+- `CF-W1-TP-01B`: existing Team 06 implementation branch/worktree found with handoff and validation evidence; routed to Team 10 review in parallel.
+- `CF-W1-NOTIF-02`: promoted to Ready and assigned to Team 09 implementation in a dedicated worktree.
+- New Team 02 discovery items `CF-W1-AUTH-02`, `CF-W1-DQ-02`, and `CF-W1-TP-02`: routed to Team 03 architecture prep.
+
+## Active Agents
+
+- Team 02 persistent PO/Requirements: `019e3a50-ed56-71f0-bfb6-621445556b85`
+- Team 10 `PORT-01A` re-review: `019e3a5c-c67a-7ef1-a8aa-8a5a0e96c926`
+- Team 10 `TP-01B` review: `019e3a5c-45bc-7f52-b09c-659216041aae`
+- Team 09 `NOTIF-02` implementation: `019e3a5d-70e7-74d0-ae55-04e80a57d43e`
+- Team 03 new architecture prep: `019e3a5d-c2d9-7b90-b65d-11b31d4b3999`
+
+## Queue Result
+
+- Active spawned agents: 5 of 6.
+- Open slot: 1.
+- Product Owner action required: no.

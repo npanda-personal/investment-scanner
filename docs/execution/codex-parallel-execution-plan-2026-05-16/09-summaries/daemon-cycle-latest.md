@@ -6,7 +6,7 @@ Date: 2026-05-18
 
 - Cycle id: `DAEMON-20260517`
 - Rolling iteration count: 22
-- Current mode: Team 00 switched to spawned-subagent rolling runtime and queued Team 07 rework first
+- Current mode: Team 00 running spawned-subagent pool with persistent PO/Requirements lane
 - Daemon continuing: yes
 - Git status at checkpoint start: dirty with active execution docs/team outputs only
 - Resume prompt path: `09-summaries/daemon-resume-prompt.md`
@@ -19,15 +19,15 @@ Date: 2026-05-18
 | --- | --- | --- | --- |
 | Team 00 | coordinating | spawned-subagent runtime pool | Maintain up to six active agents, consume completed outputs, and rotate queued Team 04/10 gates. |
 | Team 01 | completed audit | Current-assignment readiness drift audit consumed | Re-audit after Ready promotion or new drift. |
-| Team 02 | assigned | Refresh requirements and top candidates after resolved decisions | Continue from `16-team-inboxes/TEAM-02-current-assignment.md`. |
-| Team 03 | assigned | Architecture/file-reservation readiness and post-decision packet refresh | Continue from `16-team-inboxes/TEAM-03-current-assignment.md`. |
+| Team 02 | active persistent PO/Requirements | Continuous module audit, requirement discovery, and priority reordering | Keep active; retask/relaunch instead of closing. |
+| Team 03 | active | Architect Signoff for `CF-W1-L3-PORT-01A`; architecture prep for `CF-W1-L3-PORT-01B`, `CF-W1-AUTH-02`, `CF-W1-DQ-02`, and `CF-W1-TP-02` | Continue spawned agents. |
 | Team 04 | waiting for rerun | Rerun `CF-W1-L3-PORT-01A` QA after Team 07 rework | Continue from `16-team-inboxes/TEAM-04-current-assignment.md` after Team 07 updates the handoff. |
-| Team 05 | assigned docs-only | Refresh `CF-W1-MD-01` validation-only packet; support `CF-W1-MD-02` ADR | Continue from `16-team-inboxes/TEAM-05-current-assignment.md`. |
-| Team 06 | assigned docs-only | `CF-W1-TP-01B` remains ready-candidate; no implementation until Team 00 promotion | Continue from `16-team-inboxes/TEAM-06-current-assignment.md`. |
+| Team 05 | completed docs-only | `CF-W1-MD-01` not Ready as written; recommends reject-only split | Closed; relaunch after Team 00/03 narrows packet. |
+| Team 06 | active rework | `CF-W1-TP-01B` automation-only DQ blocker rework after Team 10 rejection | Continue spawned agent `019e3a61-6c87-7e70-b4cd-59cb3883909d`. |
 | Team 07 | rework assigned | Revise `CF-W1-L3-PORT-01A` after Team 10 rejection | Continue in `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A` worktree. |
-| Team 08 | assigned docs-only | Refresh `CF-W1-UX-02` and `CF-W1-UX-05` as Copilot-only packets | Continue from `16-team-inboxes/TEAM-08-current-assignment.md`. |
-| Team 09 | assigned docs-only | Refresh `CF-W1-AUTH-01`, `CF-W1-SUB-01`; `CF-W1-NOTIF-02` remains ready-candidate | Continue from `16-team-inboxes/TEAM-09-current-assignment.md`. |
-| Team 10 | waiting for re-review | Re-review `CF-W1-L3-PORT-01A` after Team 07 rework and Team 04 QA rerun | Continue from `16-team-inboxes/TEAM-10-current-assignment.md` after QA rerun. |
+| Team 08 | active docs-only | `CF-W1-UX-02` / `CF-W1-UX-05` source-supported trust/copy mapping | Continue from spawned agent `019e3a54-eb66-7a11-bbc5-ac33aca91fc1`. |
+| Team 09 | active implementation | `CF-W1-NOTIF-02` notification log redaction in dedicated worktree | Continue spawned agent `019e3a5d-70e7-74d0-ae55-04e80a57d43e`. |
+| Team 10 | queued review | `CF-W1-L3-PORT-01A` re-review passed; `CF-W1-TP-01B` rejected and routed to rework | Relaunch after Team 06 rework and Team 04 QA rerun. |
 
 ## Queue Pressure
 
@@ -38,8 +38,9 @@ Date: 2026-05-18
 - Decision inbox count: 0 open decisions
 - Refinement queue depth: 12 active unique refinement / near-ready items
 - Active spawned subagent limit: 6
-- Active spawned subagents planned: Teams 07, 02, 03, 06, 05, 09
-- Queued spawned subagents: Team 04, Team 10, Team 03 Architect Signoff, Team 08
+- Active spawned subagents: Team 02 persistent PO/Requirements, Team 03 Architect Signoff, Team 03 architecture prep, Team 06 `TP-01B` rework, Team 09 `NOTIF-02` implementation
+- Open spawned subagent slots: 1
+- Queued spawned subagents: Team 04 `NOTIF-02` QA, Team 10 `NOTIF-02` review, Team 04 `TP-01B` QA if needed, Team 00 PO packet/commit
 
 ## Decision Resolution
 
@@ -81,12 +82,12 @@ Daemon should continue autonomous work.
 
 ## Next Assignments
 
-1. Spawn Team 07 to revise `CF-W1-L3-PORT-01A` in the existing dedicated worktree.
-2. Spawn Teams 02, 03, 06, 05, and 09 for non-conflicting readiness/refinement work.
-3. Queue Team 04 for QA rerun immediately after Team 07 completes.
-4. Queue Team 10 for release re-review immediately after Team 04 returns evidence.
-5. Continue post-decision packet refresh for `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, and `CF-W1-MD-01`.
-6. Evaluate the next near-ready child only when review bandwidth is safe:
+1. Complete `CF-W1-L3-PORT-01A` Architect Signoff, then delegated PO acceptance / staged-scope verification.
+2. Complete Team 06 `CF-W1-TP-01B` rework, then route Team 04 QA rerun and Team 10 re-review.
+3. Complete Team 09 `CF-W1-NOTIF-02` implementation, then route Team 04 QA and Team 10 review.
+4. Keep Team 02 active as persistent PO/Requirements value-discovery lane.
+5. Continue Team 03 architecture prep for `CF-W1-L3-PORT-01B`, `CF-W1-AUTH-02`, `CF-W1-DQ-02`, and `CF-W1-TP-02`.
+6. Evaluate the next near-ready child only when file ownership is safe:
    - `CF-W1-TP-01B`
    - `CF-W1-NOTIF-02`
    - `CF-W1-L3-ALERT-01`

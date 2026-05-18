@@ -4,7 +4,7 @@ Date: 2026-05-17
 
 ## Status
 
-Policy resolved. Not Ready for Implementation.
+Policy resolved. Not Ready for Implementation. Sequence this with `CF-W1-AUTH-01` rather than parallelizing the overlapping subscription files unless Team 00 records an exact combined reservation.
 
 Resolution: `07-decisions/DECISION-20260517-local-manual-subscription-plan-change-policy-resolution.md`.
 
@@ -18,6 +18,7 @@ Local validation should not accidentally encode ordinary user self-upgrade to `A
 - Product Owner approved Option A: ordinary users may not self-change plans or self-select `ADMIN`; subscription plan changes are admin/manual only for now.
 - Billing provider status says external billing is disabled and plan changes are manual/admin-ready.
 - Frontend UI scope remains not approved. If existing UI becomes mismatched, record the limitation or create a separate UX work item.
+- Current Team 00 routing keeps this behind `CF-W1-AUTH-01` as the sequenced AUTH/SUB follow-up.
 
 ## Acceptance Criteria
 
@@ -34,4 +35,4 @@ Local validation should not accidentally encode ordinary user self-upgrade to `A
 
 ## Next Gate
 
-Team 09, Team 03, and Team 04 refresh a backend-only module-local packet with exact file reservations, focused tests, and frontend limitation notes, then Team 00 evaluates Ready promotion.
+Team 09, Team 03, and Team 04 refresh a backend-only module-local packet with exact file reservations, focused tests, and frontend limitation notes, then Team 00 evaluates Ready promotion on the sequenced AUTH/SUB path.

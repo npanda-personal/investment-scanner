@@ -23,22 +23,27 @@ Status: Architecture readiness inspection complete. No item is promoted to Ready
 - `10-requirements/CF-W1-TP-01B-trade-plan-backend-dq-hard-block-requirement.md`
 - `10-requirements/CF-W1-NOTIF-02-notification-log-redaction-requirement.md`
 - `10-requirements/CF-W1-L3-ALERT-01-alert-readiness-suppression-requirement.md`
+- `10-requirements/CF-W1-L3-AUTH-03-alert-rule-target-ownership-requirement.md`
 - `03-architecture/CF-W1-L3-PORT-01-architecture-review.md`
 - `03-architecture/CF-W1-TP-01B-architecture-review.md`
 - `03-architecture/CF-W1-NOTIF-02-architecture-review.md`
 - `03-architecture/CF-W1-L3-ALERT-01-architecture-review.md`
+- `03-architecture/CF-W1-L3-AUTH-03-architecture-review.md`
 - `06-contracts/CF-W1-L3-PORT-01-portfolio-watchlist-readiness-dto-contract.md`
 - `06-contracts/CF-W1-TP-01B-backend-compatibility-dq-hard-block-contract.md`
 - `06-contracts/CF-W1-NOTIF-02-notification-log-redaction-contract.md`
 - `06-contracts/CF-W1-L3-ALERT-01-alert-readiness-suppression-contract.md`
+- `06-contracts/CF-W1-L3-AUTH-03-alert-rule-target-ownership-contract.md`
 - `04-qa/CF-W1-L3-PORT-01-qa-plan.md`
 - `04-qa/CF-W1-TP-01B-qa-plan.md`
 - `04-qa/CF-W1-NOTIF-02-qa-plan.md`
 - `04-qa/CF-W1-L3-ALERT-01-qa-plan.md`
+- `04-qa/CF-W1-L3-AUTH-03-qa-plan.md`
 - `08-work-packets/CF-W1-L3-PORT-01-work-packet.md`
 - `08-work-packets/CF-W1-TP-01B-work-packet.md`
 - `08-work-packets/CF-W1-NOTIF-02-work-packet.md`
 - `08-work-packets/CF-W1-L3-ALERT-01-work-packet.md`
+- `08-work-packets/CF-W1-L3-AUTH-03-work-packet.md`
 - Team 06, Team 07, and Team 09 readiness/outbox evidence for their candidate slices.
 
 ## Readiness Matrix
@@ -46,9 +51,11 @@ Status: Architecture readiness inspection complete. No item is promoted to Ready
 | Candidate | Team 03 architecture result | Exact allowed files after Team 00 promotion | Shared/high-risk request | Decision blocker | Current blocker | Team 03 recommendation |
 | --- | --- | --- | --- | --- | --- | --- |
 | `CF-W1-L3-PORT-01A` | Portfolio-only child is bounded and implementation-eligible. Team 00 promoted it on 2026-05-18. Keep separate from watchlist. | `backend/src/modules/portfolio-management/portfolio-management.service.ts`; `backend/src/modules/portfolio-management/portfolio-management.types.ts`; `backend/src/modules/portfolio-management/portfolio-management.md`; `backend/tests/modules/portfolio-management/portfolio-management.service.test.ts` | None if implementation imports only Data Quality public service/types and does not touch DQE exports or shared DTOs. | None found. Open Decision Inbox items do not block this slice. | No upstream Ready blocker remains. Team 07 must use the dedicated worktree because shared `dev` has unrelated active-doc changes. | Ready handoff written to Team 07. Do not combine with watchlist without Team 00 exception. |
+| `CF-W1-L3-PORT-01B` | Watchlist-only child is now architecture-bounded and has exact module-local reservations. | `backend/src/modules/watchlist-management/watchlist-management.service.ts`; `backend/src/modules/watchlist-management/watchlist-management.types.ts`; `backend/src/modules/watchlist-management/watchlist-management.md`; `backend/tests/modules/watchlist-management/watchlist-management.service.test.ts` | None if implementation consumes only DQE public outputs and does not touch portfolio, alerts, or DQE exports. | None found. | Upstream sequencing blocker: `CF-W1-L3-PORT-01A` must be accepted first so watchlist readiness reuses an accepted DTO shape. | Keep blocked behind accepted `CF-W1-L3-PORT-01A`, then promote as an independent watchlist-only child. |
 | `CF-W1-TP-01B` | Backend-only Trade Plan compatibility/DQ hard-block child is bounded and aligned with Team 06 readiness inspection. | `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.service.ts`; `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.types.ts`; `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.md`; `backend/tests/modules/trade-plan-risk-engine/trade-plan-risk-engine.service.test.ts`; `backend/tests/trade-plan-risk-engine.paper-readiness.test.ts`; optional only with Architect note: `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.geometry.ts` | None if repository, Prisma, route, frontend, Today Review, shared utility/UI, package, generated, provider, startup/backfill, live-provider, paid/cloud, and telemetry files remain excluded. | None found. Product Owner Option B is already resolved for backend-only compatibility. | Team 00 Ready promotion and implementation handoff. | Promote as a backend-only Lane 2 candidate after Team 00 copies exact reservations and optional geometry rule. |
-| `CF-W1-NOTIF-02` | Local notification log redaction is narrowly provider-scoped and aligned with Team 09 readiness check. | `backend/src/modules/notifications-delivery/notifications-delivery.provider.ts`; `backend/tests/modules/notifications-delivery/notifications-delivery.service.test.ts`; `backend/src/modules/notifications-delivery/notifications-delivery.md` | None if implementation changes only local log provider payload and focused tests/docs. | None for this slice. Auth fallback and subscription decisions are resolved but remain separate backend policy packets. | Team 00/Team 09 Ready promotion and implementation handoff. | Promote as a small Team 09 backend-only slice when Team 00 is ready; keep auth/subscription policy work separate. |
-| `CF-W1-L3-ALERT-01` | Alert readiness suppression child has exact backend reservations and QA plan. Implementation is bounded but should follow `PORT-01A` unless Team 00 chooses otherwise. | `backend/src/modules/alerts-monitoring/alerts-monitoring.service.ts`; `backend/src/modules/alerts-monitoring/alerts-monitoring.types.ts`; `backend/src/modules/alerts-monitoring/alerts-monitoring.md`; `backend/tests/modules/alerts-monitoring/alerts-monitoring.service.test.ts`; optional only if ownership-sensitive paths are touched: `backend/tests/modules/alerts-monitoring/alerts-monitoring.ownership.test.ts` | None if implementation uses Data Quality public service/types and leaves DQE exports, routes, Prisma, notifications, copilot digest, frontend, shared files, providers, and package files untouched. | None found. `LIMITED` behavior is resolved conservatively as suppress/block for alert event creation. | Team 00 Ready promotion and implementation handoff. | Eligible for Ready review, but prefer after `PORT-01A` if Team 00 wants Lane 3 DTO evidence first. |
+| `CF-W1-NOTIF-02` | Local notification log redaction is narrowly provider-scoped and aligned with Team 09 readiness check. | `backend/src/modules/notifications-delivery/notifications-delivery.provider.ts`; `backend/tests/modules/notifications-delivery/notifications-delivery.service.test.ts`; `backend/src/modules/notifications-delivery/notifications-delivery.md` | None if implementation changes only local log provider payload and focused tests/docs. | None for this slice. Auth fallback and subscription decisions are resolved but remain separate backend policy packets. | Team 00/Team 09 Ready promotion and implementation handoff only. Team 04 QA plan is already prepared. | Promote as a small Team 09 backend-only slice when Team 00 is ready; keep auth/subscription controller policy work separate. |
+| `CF-W1-L3-AUTH-03` | Alert rule target ownership slice is bounded and aligned with the prepared Team 07 QA plan. | `backend/src/modules/alerts-monitoring/alerts-monitoring.service.ts`; `backend/src/modules/alerts-monitoring/alerts-monitoring.repository.ts`; `backend/src/modules/alerts-monitoring/alerts-monitoring.types.ts`; `backend/src/modules/alerts-monitoring/alerts-monitoring.md`; `backend/tests/modules/alerts-monitoring/alerts-monitoring.service.test.ts`; `backend/tests/modules/alerts-monitoring/alerts-monitoring.ownership.test.ts` | None if implementation stays inside `alerts-monitoring` and consumes portfolio/watchlist ownership through public services only. | None found. Parent ownership and alert-readiness decisions are already resolved. | Team 00 Ready promotion and implementation handoff only. Do not run in parallel with `CF-W1-L3-ALERT-01` because the reserved files overlap. | Prefer as the first remaining `alerts-monitoring` source slice if Team 00 wants to close user-owned target hardening before DQ event suppression. |
+| `CF-W1-L3-ALERT-01` | Alert readiness suppression child has exact backend reservations and Team 04 QA plan. Implementation is bounded but shares `alerts-monitoring` files with `CF-W1-L3-AUTH-03`. | `backend/src/modules/alerts-monitoring/alerts-monitoring.service.ts`; `backend/src/modules/alerts-monitoring/alerts-monitoring.types.ts`; `backend/src/modules/alerts-monitoring/alerts-monitoring.md`; `backend/tests/modules/alerts-monitoring/alerts-monitoring.service.test.ts`; optional only if ownership-sensitive paths are touched: `backend/tests/modules/alerts-monitoring/alerts-monitoring.ownership.test.ts` | None if implementation uses Data Quality public service/types and leaves DQE exports, routes, Prisma, notifications, copilot digest, frontend, shared files, providers, and package files untouched. | None found. `LIMITED` behavior is resolved conservatively as suppress/block for alert event creation. | Team 00 Ready promotion and implementation handoff only. Do not promote in parallel with `CF-W1-L3-AUTH-03`. | Eligible for Ready review after `PORT-01A`, but sequence behind `CF-W1-L3-AUTH-03` if Team 00 wants the narrower alert ownership hardening first. |
 
 ## Candidate-Specific Stop Conditions
 
@@ -88,9 +95,21 @@ Stop and return to Team 00 / Architect if the implementation needs:
 - creating events from missing, `LIMITED`, `NOT_READY`, `BLOCKED`, stale, unsupported, scope-mismatched, provider-gap, or unusable DQ evidence;
 - direct financial advice or arbitrary target-price language.
 
+### `CF-W1-L3-AUTH-03`
+
+Stop and return to Team 00 / Architect if the implementation needs:
+
+- portfolio-management or watchlist-management source/test changes;
+- auth middleware, route registry, Prisma/schema, shared utility/UI, package, generated, frontend, notification, or copilot changes;
+- Data Quality readiness suppression in the same slice;
+- cross-module repository imports instead of public service reads;
+- broadening legacy `userId = null` compatibility or new default-user policy behavior.
+
 ## Downstream Sequencing
 
 `CF-W1-L3-INTEL-01` remains downstream of accepted `CF-W1-L3-PORT-01A`. Portfolio Intelligence should consume portfolio readiness DTOs after they exist rather than duplicating Data Quality readiness logic.
+
+`CF-W1-L3-AUTH-03` and `CF-W1-L3-ALERT-01` are both `alerts-monitoring` slices. They share `alerts-monitoring.service.ts`, `alerts-monitoring.types.ts`, `alerts-monitoring.md`, and at least one focused test file. Team 00 should promote at most one of them at a time.
 
 ## Ready Promotion Guidance
 

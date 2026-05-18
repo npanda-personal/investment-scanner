@@ -4,7 +4,7 @@ Date: 2026-05-17
 
 Owner: Team 08 UX / Research / Copilot
 
-Status: Draft contract. Not Ready for Implementation.
+Status: Post-decision contract refreshed. Not Ready for Implementation.
 
 ## Contract Goal
 
@@ -93,8 +93,14 @@ Research Hub, separate approval:
 - `frontend/src/features/research-hub/components/ResearchOverviewPage.tsx`
 - `frontend/tests/ui/research-hub.spec.ts`
 
+## Post-Decision Scope
+
+Product Owner approved Option A in `07-decisions/DECISION-20260517-ux-product-language-status-policy-resolution.md`.
+
+The first child is Copilot-only copy cleanup after or together with `CF-W1-UX-02`. Shared `StatusBadge`, Research Hub, Market Data UI, route/navigation, package, provider, Prisma, and generated-file changes are not approved.
+
 ## Blockers
 
-- Product/UX priority decision is required.
-- Shared UI reservation is required for `StatusBadge`.
-- Route/navigation changes are excluded unless separately approved.
+- `CF-W1-UX-05A` must be sequenced with `CF-W1-UX-02` because both need Copilot files.
+- Shared UI reservation is required for any future `StatusBadge` work.
+- Team 00 must promote an exact Copilot-only handoff before implementation.

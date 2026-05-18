@@ -13,11 +13,11 @@ Date: 2026-05-18
 | CF-W1-QA-UI-01 | Copilot/research Playwright trust states | UX trust contract and approved UI scope |
 | CF-W1-UX-01 | Stock Research Workbench trust surfaces | Lane 3 readiness policy and UX trust contract |
 | CF-W1-NOTIF-02 | Notification log preview redaction validation | Notification privacy requirement, architecture review, contract, work packet, platform QA plan, and Team 03 reservation matrix are prepared; still needs Team 00/Team 09 Ready promotion |
-| CF-W1-AUTH-01 | Platform authenticated controller fallback hardening | Option A policy is resolved; needs Team 09/Team 03/Team 04 module-local implementation packet, exact controller/test reservations, and Team 00 Ready promotion |
-| CF-W1-SUB-01 | Local/manual subscription plan-change hardening | Option A policy is resolved; needs Team 09/Team 03/Team 04 backend-only implementation packet, exact source/test reservations, and Team 00 Ready promotion |
-| CF-W1-UX-02 | Copilot trust UX implementation | Option B policy is resolved; needs Copilot-only trust-field contract refresh, source-supported fallback rules, focused QA plan, exact backend/frontend/test reservations, and Team 00 Ready promotion |
-| CF-W1-UX-05 | Copilot-only product-language cleanup | Option A policy is resolved; needs sequencing with `CF-W1-UX-02`, child packet refresh, exact file reservations, and no shared `StatusBadge` scope |
-| CF-W1-MD-01 | Market Data validation hardening | Option A policy is resolved; needs validation-only architecture/work-packet refresh, focused QA plan update, exact validation source/test reservations, and no durable-storage/provider/schema scope |
+| CF-W1-AUTH-01 | Platform authenticated controller fallback hardening | Option A policy is resolved; Team 03 contract/work packet and Team 04 QA refresh are prepared; needs Team 00 Ready promotion and Team 09 handoff; sequence or combine with `CF-W1-SUB-01` due overlapping subscription files |
+| CF-W1-SUB-01 | Local/manual subscription plan-change hardening | Option A policy is resolved; Team 03 contract/work packet and Team 04 QA refresh are prepared; needs Team 00 Ready promotion and Team 09 handoff; sequence or combine with `CF-W1-AUTH-01` due overlapping subscription files |
+| CF-W1-UX-02 | Copilot trust UX implementation | Option B policy is resolved; Team 03 Copilot-only contract/work packet and Team 04 QA refresh are prepared; still needs Team 08 source-supported trust-field mapping, exact handoff, and Team 00 Ready promotion |
+| CF-W1-UX-05 | Copilot-only product-language cleanup | Option A policy is resolved; Team 03 contract/work packet and Team 04 QA refresh are prepared; needs sequencing with or folding into `CF-W1-UX-02`, exact handoff, and no shared `StatusBadge` scope |
+| CF-W1-MD-01 | Market Data validation hardening | Option A policy is resolved; Team 03 validation-only contract/work packet and Team 04 QA refresh are prepared; needs Team 05 readiness acceptance, Team 00 Ready promotion, and no durable-storage/provider/schema scope |
 
 ## Team 00 Routing Note - 2026-05-18
 
@@ -34,9 +34,9 @@ Next parallel readiness inspections:
 
 The five former Decision Inbox items are resolved. They are no longer Product Owner blockers, but each still has upstream readiness work before source/test edits:
 
-- `CF-W1-AUTH-01` and `CF-W1-SUB-01`: Team 09 backend policy packets.
-- `CF-W1-UX-02` and `CF-W1-UX-05`: Team 08 Copilot-only trust/copy packet refresh.
-- `CF-W1-MD-01`: Team 05 Market Data validation-only packet refresh.
+- `CF-W1-AUTH-01` and `CF-W1-SUB-01`: Team 03/04 packet and QA refreshes are prepared; Team 09 handoff and Team 00 Ready promotion remain.
+- `CF-W1-UX-02` and `CF-W1-UX-05`: Team 03/04 packet and QA refreshes are prepared; Team 08 source mapping/sequencing and Team 00 Ready promotion remain.
+- `CF-W1-MD-01`: Team 03/04 packet and QA refreshes are prepared; Team 05 readiness acceptance and Team 00 Ready promotion remain.
 
 ## Team 00 Ready Promotion Note - 2026-05-18
 

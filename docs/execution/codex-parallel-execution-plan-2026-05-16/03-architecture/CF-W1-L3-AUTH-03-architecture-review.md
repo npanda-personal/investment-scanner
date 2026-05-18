@@ -6,7 +6,7 @@ Owner: Team 07 Portfolio / Watchlist / Alerts
 
 ## Status
 
-Architecture draft prepared. Not Ready for Implementation.
+Architecture review prepared. Not Ready for Implementation.
 
 ## Work Item
 
@@ -75,4 +75,4 @@ Allowed after Ready promotion:
 
 ## Readiness Result
 
-Not Ready for Implementation. This draft needs QA plan acceptance and Team 00 Ready promotion before Team 07 may touch source or tests.
+Not Ready for Implementation. The focused QA plan already exists in `04-qa/CF-W1-L3-AUTH-03-qa-plan.md`. The remaining blocker is Team 00 Ready promotion with the exact file reservation and implementation handoff.

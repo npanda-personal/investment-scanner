@@ -1,6 +1,6 @@
 # TEAM-08 Outbox - UX / Research / Copilot
 
-Date: 2026-05-17
+Date: 2026-05-18
 
 ## Heartbeat
 
@@ -116,6 +116,96 @@ Reason: docs-only preparation; no implementation was Ready. Playwright, builds, 
 Team 00 should route `DECISION-20260517-copilot-trust-ux-policy`.
 
 If Option B is accepted, Team 03/04 should accept or revise the contract and QA plan, then promote the Copilot-only work packet to Ready with exact file reservations.
+
+---
+
+## Continuation - CF-W1-UX-02 / CF-W1-UX-05 Source Mapping
+
+Date: 2026-05-18
+
+State: Not Ready for Implementation.
+
+### Ready-Promotion Recommendation
+
+Do not promote `CF-W1-UX-02` or `CF-W1-UX-05A` yet.
+
+Reason: the underlying services expose trust-adjacent evidence, but the current Copilot DTO and page contract do not surface the required trust fields without backend contract changes. Shared UI and navigation edits are not needed for the first Copilot-only slice, but the Copilot response shape itself still needs a contract refresh before implementation can be safe.
+
+### Source-Supported Trust Mapping
+
+Available in current source, but not yet surfaced by the Copilot response:
+
+- `backend/src/modules/stock-research-workbench/stock-research-workbench.service.ts` exposes `trust.source`, `trust.last_updated_timestamp`, `trust.data_status`, plus chart and overview timestamps.
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.service.ts` already carries `data_status`, `sourceDataDate`, `sourcePriceDate`, `generated_at`, `scope`, `dataQualityEligibility`, `runAudit`, `latestGeneratedAt`, and readiness-related evaluation output.
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.service.ts` exposes `dataStatus`, `updatedAt`, `source`, `range`, `insiderOwnership.ownershipDataStatus`, and scoped run responses.
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.service.ts` exposes `dataStatus`, `updatedAt`, and region-scoped summaries.
+
+Current Copilot service can already read those modules, but it only returns the flat summary payload in `backend/src/modules/ai-investment-copilot/ai-investment-copilot.types.ts`.
+
+### Missing Trust Fields / Blockers
+
+Missing from the current Copilot contract:
+
+- explicit trust state
+- DQ readiness evidence
+- use-case tier
+- blocker reasons and warning reasons
+- latest trusted data date
+- summary visibility state
+- local-only / deterministic / no-external / no-paid-provider proof
+- scope evidence in the Copilot response
+
+Additional blocker:
+
+- `marketBrief()` currently ignores the requested scope query, so the trust mapping cannot claim complete scope fidelity without a backend contract update.
+
+### UX Copy Risks
+
+Current source still uses advisory-feeling or recommendation-adjacent copy:
+
+- page title `AI Investment Copilot`
+- action label `Generate Report`
+- section label `Bullish Factors`
+- service copy `high-scoring names to research`
+- service copy `appears strong`
+- the page status chip maps `COMPLETE` to success and `MISSING` to error, which can read like recommendation quality instead of evidence readiness
+
+The current disclaimer is useful, but it does not fully prove local/deterministic/no-external behavior in the UI.
+
+### File Reservation Outcome
+
+No Ready-promotion file reservation set is warranted yet.
+
+If Team 00 promotes a revised Copilot-only handoff later, the existing contract files remain the likely docs reference point:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-UX-02-copilot-trust-ux-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-UX-05-product-language-status-contract.md`
+
+### Focused Validation / UI Smoke Commands If Promoted
+
+Backend:
+
+```powershell
+cd backend
+npm.cmd test -- ai-investment-copilot.service.test.ts ai-investment-copilot.validation.test.ts ai-investment-copilot.routes.test.ts --runInBand
+```
+
+UI smoke after accepted UI scope, local startup plan, and memory/resource gate:
+
+```powershell
+cd frontend
+npm.cmd run test:ui -- ai-investment-copilot.spec.ts --workers=1
+```
+
+Optional text-scan after implementation is reserved:
+
+```powershell
+rg -n "buy now|sell now|must buy|must sell|guaranteed|profit target|price target|recommendation quality|target achieved" backend/src/modules/ai-investment-copilot frontend/src/features/ai-investment-copilot backend/tests/modules/ai-investment-copilot frontend/tests/ui
+```
+
+### Bottom Line
+
+`CF-W1-UX-02` and `CF-W1-UX-05A` remain docs-only. The right next step is a Copilot-only contract refresh that adds the trust object and scope fallback rules before any code promotion.
 
 ---
 

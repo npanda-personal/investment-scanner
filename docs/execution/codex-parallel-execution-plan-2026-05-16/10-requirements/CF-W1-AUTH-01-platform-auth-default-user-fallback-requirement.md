@@ -1,10 +1,10 @@
 # CF-W1-AUTH-01 - Platform Auth Default-User Fallback Requirement
 
-Date: 2026-05-17
+Date: 2026-05-18
 
 ## Status
 
-Policy resolved. Not Ready for Implementation.
+Policy resolved. Team 03/04 post-decision contract/work-packet/QA refresh prepared. Not Ready for Implementation. Sequence this with `CF-W1-SUB-01` rather than parallelizing the overlapping subscription files unless Team 00 records an exact combined reservation.
 
 Resolution: `07-decisions/DECISION-20260517-platform-auth-default-user-fallback-policy-resolution.md`.
 
@@ -17,7 +17,8 @@ Authenticated platform routes should not silently fall back to `default-user` if
 - Decision packet identified controller-level `req.user?.id || 'default-user'` fallback in protected Team 09 routes.
 - Product Owner approved Option A: protected Team 09 controllers must fail closed when `req.user.id` is missing.
 - Affected modules: `subscription-billing` and `notifications-delivery`.
-- Source work still needs module-local architecture/QA refresh, exact controller/test reservations, and Team 00 Ready promotion.
+- Team 03 prepared the module-local contract/work packet and Team 04 prepared the Option A QA refresh.
+- Source work still needs Team 00 Ready promotion, Team 09 implementation handoff, and sequencing with `CF-W1-SUB-01` because subscription files overlap.
 
 ## Acceptance Criteria
 
@@ -34,4 +35,4 @@ Authenticated platform routes should not silently fall back to `default-user` if
 
 ## Next Gate
 
-Team 09, Team 03, and Team 04 refresh a module-local backend packet with exact controller/test reservations, then Team 00 evaluates Ready promotion.
+Team 00 evaluates Ready promotion for the prepared module-local backend packet, then hands off to Team 09 on a sequenced AUTH/SUB path. Only combine with `CF-W1-SUB-01` if Team 00 records exact shared-file reservations.

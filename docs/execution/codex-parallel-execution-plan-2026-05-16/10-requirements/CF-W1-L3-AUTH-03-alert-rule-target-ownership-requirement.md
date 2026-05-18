@@ -4,7 +4,7 @@ Date: 2026-05-17
 
 ## Status
 
-Requirement draft prepared by Team 07. Not Ready for Implementation.
+Requirement draft prepared by Team 07. Not Ready for Implementation. Current Team 00 routing keeps this behind `CF-W1-L3-ALERT-01` and ahead of the post-decision platform auth/subscription and Copilot items.
 
 This is a follow-up to the completed `CF-W1-L3-AUTH-02` alert event ownership slice. That slice scoped alert event inbox operations through parent `AlertRule.userId`, but current source evidence still shows alert rule create/update can persist portfolio or watchlist references without proving the referenced resource belongs to the current user. Service-level evaluation also supports an unscoped `evaluate()` path that can fall back to default-user portfolio/watchlist lookups.
 
@@ -19,6 +19,7 @@ Portfolio and watchlist alert rules must not point at another user's portfolio o
 - `backend/src/modules/alerts-monitoring/alerts-monitoring.repository.ts` persists `portfolioId` and `watchlistId` directly from input.
 - `backend/src/modules/alerts-monitoring/alerts-monitoring.service.ts` evaluates portfolio and watchlist rules with the caller-supplied `userId`; when `evaluate()` is called without `userId`, portfolio/watchlist services can fall back to `default-user`.
 - `CF-W1-L3-AUTH-02` protected event list/read/dismiss paths but intentionally left broader alert ownership follow-up work split out.
+- Current Team 00 routing keeps this as the next Lane 3 follow-up after `CF-W1-L3-ALERT-01`.
 
 ## Acceptance Criteria
 

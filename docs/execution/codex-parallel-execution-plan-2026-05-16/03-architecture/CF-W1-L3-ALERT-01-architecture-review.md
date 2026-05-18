@@ -127,4 +127,4 @@ Minimum focused backend scenarios:
 
 Architecture child contract is prepared for `CF-W1-L3-ALERT-01`.
 
-Do not move this item to `Ready for Implementation` until Team 04 refreshes/accepts the alert child QA plan and Team 00 promotes the exact file reservation.
+Do not move this item to `Ready for Implementation` until Team 00 promotes the exact file reservation and implementation handoff. Team 04's child QA plan already exists in `04-qa/CF-W1-L3-ALERT-01-qa-plan.md`.

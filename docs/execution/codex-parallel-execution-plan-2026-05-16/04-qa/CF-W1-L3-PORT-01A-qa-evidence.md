@@ -12,64 +12,95 @@ Owner: Team 04 QA Factory
 
 - Branch: `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A`
 - Worktree: `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-L3-PORT-01A`
-- Developer handoff: `18-integration-queue/CF-W1-L3-PORT-01A-developer-handoff.md`
+- Developer handoff under test: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-L3-PORT-01A-developer-handoff.md`
 
 ## Files Reviewed
 
 - `backend/src/modules/portfolio-management/portfolio-management.service.ts`
 - `backend/src/modules/portfolio-management/portfolio-management.types.ts`
+- `backend/src/modules/portfolio-management/portfolio-management.md`
 - `backend/tests/modules/portfolio-management/portfolio-management.service.test.ts`
-- `06-contracts/CF-W1-L3-PORT-01-portfolio-watchlist-readiness-dto-contract.md`
-- `10-requirements/CF-W1-L3-PORT-01A-portfolio-readiness-dto-requirement.md`
-- `04-qa/CF-W1-L3-PORT-01-qa-plan.md`
+- `backend/src/modules/data-quality-engine/data-quality-engine.service.ts`
+- `backend/tests/modules/data-quality-engine/data-quality-engine.service.test.ts`
+- `backend/tests/modules/data-quality-engine/data-quality-engine.invariants.test.ts`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-L3-PORT-01-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-L3-PORT-01A-review-routing.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-L3-PORT-01A-team10-review-release.md`
+
+## Scope Confirmation
+
+Team 04 reviewed Team 07 worktree status and diff scope.
+
+Changed application/test files remain inside the approved reservation:
+
+- `backend/src/modules/portfolio-management/portfolio-management.service.ts`
+- `backend/src/modules/portfolio-management/portfolio-management.types.ts`
+- `backend/src/modules/portfolio-management/portfolio-management.md`
+- `backend/tests/modules/portfolio-management/portfolio-management.service.test.ts`
+
+Observed additional Team 07 worktree docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-07-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-L3-PORT-01A-developer-handoff.md`
+
+Forbidden source scope remained untouched in the reviewed worktree status: Prisma/migrations, route registries, shared backend utilities/DTOs, shared UI, package manifests, generated files, Data Quality Engine source/exports, watchlist-management, alerts-monitoring, portfolio-intelligence, frontend, providers, startup/backfill, broker/live-provider, paid/cloud, and telemetry paths.
 
 ## Memory Gate
 
-The first CIM memory query was blocked by OS permissions. A .NET memory check succeeded:
+Memory was checked before focused backend execution:
 
-- Total physical memory: `16936132608`
-- Available physical memory: `3845718016`
-- Approximate utilization: `77.3%`
+- `Get-Counter '\Memory\% Committed Bytes In Use'`
+- Result: `67.20%`
 
-Focused validation was allowed because utilization was below the 90% start threshold.
+Focused backend validation was safe to run because utilization was below the AGENTS threshold.
 
-## Focused QA Command
+## Commands Run
 
 Run from `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-L3-PORT-01A\backend`:
 
 ```powershell
 npm.cmd test -- portfolio-management.service.test.ts --runInBand
+npm.cmd run build
 ```
 
-Result:
+Results:
 
-- Test suites: `1 passed`
-- Tests: `7 passed`
-- Snapshots: `0`
-- Duration: `3.91 s`
+- `npm.cmd test -- portfolio-management.service.test.ts --runInBand`: passed, `1` suite, `11` tests.
+- `npm.cmd run build`: passed (`tsc`).
+
+No package installation, provider run, commit, or push was performed.
 
 ## Scenario Coverage
 
 | Scenario | QA result |
 | --- | --- |
-| Data Quality public boundary | Passed. Implementation imports `DataQualityEngineService` and `DataQualityEvaluationDto` from the public module export and does not import `DataQualityEngineRepository`. |
-| Backward-compatible portfolio output | Passed. Existing valuation, price, signal, `dataStatus`, and route-level behavior are preserved by additive DTO fields. |
-| `READY` DQ evidence | Passed. Tests assert holding readiness and portfolio summary readiness are `READY` with action eligibility. |
-| `LIMITED` DQ evidence | Passed. Tests assert passive display remains `LIMITED` while action eligibility is `BLOCKED`. |
-| Missing DQ evidence | Passed. Tests assert missing evaluation blocks readiness even when `dataStatus = COMPLETE`. |
-| `NOT_READY`, `UNUSABLE`, stale/hard-block evidence | Passed. Tests assert blocked readiness, blocked action eligibility, and blocker propagation. |
-| Forbidden scope | Passed by review. Changed files stay inside the Ready handoff's portfolio-management source/docs/test reservation plus Team 07 docs; no Prisma, route, shared utility/UI, package, generated, provider, startup/backfill, frontend, watchlist, alerts, portfolio-intelligence, Angel One, broker, live-provider, paid/cloud, or telemetry paths are changed. |
+| Data Quality public boundary | Passed. `portfolio-management.service.ts` imports `DataQualityEngineService` and `DataQualityEvaluationDto` from `../data-quality-engine` public exports and does not import `DataQualityEngineRepository`. |
+| Backward-compatible portfolio output | Passed. Tests and reviewed service code keep valuation, price, signal, `dataStatus`, and existing summary fields while adding `readiness` and `readinessSummary`. |
+| `READY` DQ evidence | Passed. Default fixture keeps `dailyReview = READY`, `signal = READY`, `eligibleForSignals = true`; tests assert holding `displayStatus = READY`, `actionStatus = READY`, and summary `status = READY`. |
+| Team 10 required automation-only blocker case | Passed and meaningful. The new default fixture models DQE-like output with `readinessBlockers = ['AUTOMATION_BLOCKED: PHASE0_AUTOMATION_NOT_AUTHORIZED']`, `dailyReview = READY`, `signal = READY`, and `automation = BLOCKED`; the test asserts display/action stay `READY` while the blocker remains visible. This directly proves the Team 10 rejection case is fixed rather than masked. |
+| Explicit signal-tier requirement for action workflows | Passed. A focused test removes signal-tier evidence while keeping daily review ready and confirms `displayStatus = READY` but `actionStatus = BLOCKED`, matching the required action gate. |
+| `LIMITED` DQ evidence | Passed. Tests assert passive display remains available with `displayStatus = LIMITED`, `actionStatus = BLOCKED`, preserved reasons, warnings, and limited summary counts. |
+| Missing DQ evidence | Passed. Tests assert missing evaluation returns blocked readiness with `signalReadinessStatus = MISSING` even when `dataStatus = COMPLETE`, so trust is not inferred from price presence. |
+| `NOT_READY`, `UNUSABLE`, stale, unsupported, or scope mismatch | Passed. Service hard-blocking now keys off `coverageStatus = UNUSABLE`, `signalReadinessStatus = NOT_READY`, daily-review `BLOCKED`, and stale/unsupported/scope-mismatch blockers only. Tests cover stale, unsupported, scope mismatch, and blocked tier outcomes. |
+| Mixed holdings summary counts | Passed. Tests assert `readyCount = 1`, `limitedCount = 1`, `blockedCount = 2`, `missingEvaluationCount = 1`, and action workflow gating is false when any holding remains blocked. |
+| Product-language safety | Passed by review. No new direct advice, target-price, guarantee, or trade-instruction wording was introduced in the changed portfolio service/types/doc files. |
 
 ## Skipped Checks
 
 - Ownership/routes regression tests were not run because ownership, controllers, and routes were not changed.
 - UI smoke tests were not run because this is a backend-only DTO slice with no frontend scope.
-- Backend build was not rerun by Team 04; Team 07 developer handoff reports `npm.cmd run build` passed.
+- Broad backend suites were not run because the assignment required the focused portfolio-management test plus backend build only.
+- Live local data/provider validation was not run because this slice uses mocked tests and does not require provider execution.
+
+## Risks / Notes
+
+- Team 07 outbox content in the implementation worktree still contains older narrative sections from earlier passes; the updated developer handoff and current file diff were used as the authoritative rework record for this QA rerun.
+- This QA rerun validates the scoped portfolio-management slice only. It does not replace Team 10 code review, Architect Signoff, or delegated Product Owner acceptance.
 
 ## QA Result
 
-Focused validation passed for the scoped `CF-W1-L3-PORT-01A` handoff, but this QA result is superseded for release acceptance by Team 10's later code-review rejection.
+Pass for QA rerun.
 
-Team 10 found that the portfolio mapper can treat automation-only Data Quality blockers as portfolio display blockers. Team 07 must revise inside the existing file reservation, and Team 04 must rerun focused QA after that revision.
+Team 07's rework satisfies the focused `CF-W1-L3-PORT-01A` QA plan, including the Team 10-required automation-only Data Quality blocker case. Focused backend automation is green, build is green, forbidden application scope stayed untouched, and no blocked command paths were used.
 
-Next gates: Team 07 revision, Team 04 QA rerun, Team 10 re-review, Architect Signoff, delegated Product Owner acceptance, then scoped commit if all standing criteria pass.
+Team 10 re-review can proceed.

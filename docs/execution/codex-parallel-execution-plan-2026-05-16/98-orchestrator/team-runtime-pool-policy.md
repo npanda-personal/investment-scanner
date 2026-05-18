@@ -18,6 +18,8 @@ Runtime slots are reusable execution capacity. A completed team report frees a s
 - Team 00 may spawn Codex subagents to run team roles directly. Keep at most six active spawned subagents; queue additional teams in `00-control/team-agent-runtime-queue.md`.
 - When a spawned subagent finishes, Team 00 consumes the output, closes the agent, updates queues, and spawns the next queued team if safe.
 - Requirement-specific decisions are delegated to Team 02, structure/process decisions to Team 00, and architecture/design decisions to Team 03. Ask the human Product Owner only if those delegated roles cannot proceed or a non-delegable safety/cost/git/credential/live-provider blocker exists.
+- Team 02 is a persistent PO + Requirements value-discovery lane. Do not leave it closed while safe requirement discovery remains; retask or relaunch it to audit modules, propose user-value improvements, and reorder priorities.
+- Independent items must run in parallel by default. Only serialize workstreams when there is a real dependency, shared-file conflict, resource limit, unsafe git state, or unresolved blocker.
 
 ## Default Rolling Launch Priority
 

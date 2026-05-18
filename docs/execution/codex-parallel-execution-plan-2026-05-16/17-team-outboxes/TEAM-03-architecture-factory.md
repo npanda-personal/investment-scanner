@@ -137,6 +137,90 @@ No new Decision Packet was opened.
 
 No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
 
+## Team 03 Discovery + Watchlist Child Refresh - 2026-05-18
+
+Assignment: prepare docs-only architecture/contracts/work-packet readiness for new Team 02 discovery items `CF-W1-AUTH-02`, `CF-W1-DQ-02`, `CF-W1-TP-02`, and add the newly prioritized `CF-W1-L3-PORT-01B` watchlist child without promoting Ready.
+
+Prepared:
+
+- `03-architecture/CF-W1-AUTH-02-architecture-review.md`
+- `06-contracts/CF-W1-AUTH-02-alert-inbox-user-isolation-contract.md`
+- `08-work-packets/CF-W1-AUTH-02-work-packet.md`
+- `03-architecture/CF-W1-DQ-02-architecture-review.md`
+- `06-contracts/CF-W1-DQ-02-dq-currentness-evidence-contract.md`
+- `08-work-packets/CF-W1-DQ-02-work-packet.md`
+- `03-architecture/CF-W1-TP-02-architecture-review.md`
+- `06-contracts/CF-W1-TP-02-exit-invalidation-semantics-contract.md`
+- `08-work-packets/CF-W1-TP-02-work-packet.md`
+- `03-architecture/CF-W1-L3-PORT-01B-architecture-review.md`
+- `06-contracts/CF-W1-L3-PORT-01B-watchlist-readiness-dto-contract.md`
+- `08-work-packets/CF-W1-L3-PORT-01B-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `03-architecture/team03-near-ready-file-reservation-matrix-2026-05-18.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+- `17-team-outboxes/TEAM-03-outbox.md`
+
+Readiness result:
+
+| Candidate | Team 03 result |
+| --- | --- |
+| `CF-W1-DQ-02` | Exact Lane 1 Market Data session helper + DQE reservations are defined. Best new upstream QA-prep candidate. |
+| `CF-W1-AUTH-02` | Prepared as a digest-consumer user-isolation packet. Does not reopen accepted alert-event ownership. Conflicts with active `CF-W1-NOTIF-02` and Copilot UX packets. |
+| `CF-W1-TP-02` | Prepared as a future Trade Plan semantics packet with exact module-local reservations. Must stay sequenced behind `CF-W1-TP-01B`. |
+| `CF-W1-L3-PORT-01B` | Exact watchlist-only reservations are defined. Depends on accepted `CF-W1-L3-PORT-01A` DTO semantics, then can run independently. |
+
+No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
+
+## Team 03 Readiness Reconciliation - 2026-05-18
+
+Assignment: continue near-ready architecture/file-reservation readiness with emphasis on `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-L3-ALERT-01`, `CF-W1-L3-AUTH-03`, Team 09 `AUTH-01` / `SUB-01` sequencing, and `CF-W1-MD-01` validation-only scope.
+
+Result:
+
+- Added `CF-W1-L3-AUTH-03` to the Team 03 near-ready matrix with exact reserved files and a no-parallel rule against `CF-W1-L3-ALERT-01`.
+- Reconciled stale blocker wording in `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01` architecture/work-packet docs so Team 00 sees that focused QA plans already exist.
+- Reframed `CF-W1-AUTH-01` and `CF-W1-SUB-01` controller test reservations as exact new-file additions and documented the preferred combined Team 09 controller-policy handoff.
+- Reaffirmed that `CF-W1-MD-01` stays validation-only and that any repository/provider/durable-readiness/storage work remains out of scope under `CF-W1-MD-02`.
+
+Current Team 03 recommendation to Team 00:
+
+1. Promote `CF-W1-NOTIF-02` next if the goal is the narrowest safe backend-only slice.
+2. Promote `CF-W1-TP-01B` next if Lane 2 risk/trade-plan hardening is preferred.
+3. Keep `CF-W1-L3-AUTH-03` and `CF-W1-L3-ALERT-01` mutually exclusive in any single implementation pass because they share `alerts-monitoring` files.
+4. Do not split `CF-W1-AUTH-01` and `CF-W1-SUB-01` across separate writers unless Team 00 sequences the shared subscription controller/doc/test files explicitly.
+
+Scoped docs validation completed: stale-decision wording scan across refreshed UX docs returned no matches, trailing-whitespace scan across Team 03 edited docs returned no matches, and `git diff --check` passed for tracked Team 03 docs with normal Markdown CRLF warnings.
+
 Scoped Markdown validation completed: `git diff --check` passed for the Team 03 tracked docs with normal CRLF warnings, and a trailing-whitespace scan over edited Team 03 docs returned no matches.
 
 Next action: Team 00 should evaluate one bounded candidate for Ready promotion, with `CF-W1-L3-PORT-01A` as the strongest first Lane 3 candidate and `CF-W1-L3-INTEL-01` held downstream until `PORT-01A` is accepted.
+
+## Team 03 Post-Decision Refresh - 2026-05-18
+
+Rechecked queues after `a20f5e8 docs: resolve current decision inbox items`. The Decision Inbox is empty, but no app-code item is Ready.
+
+Prepared post-decision architecture/work-packet artifacts:
+
+- `03-architecture/team03-post-decision-readiness-refresh-2026-05-18.md`
+- `06-contracts/CF-W1-AUTH-01-platform-auth-fail-closed-contract.md`
+- `08-work-packets/CF-W1-AUTH-01-work-packet.md`
+- `06-contracts/CF-W1-SUB-01-manual-subscription-plan-policy-contract.md`
+- `08-work-packets/CF-W1-SUB-01-work-packet.md`
+- `06-contracts/CF-W1-MD-01-market-data-validation-hardening-contract.md`
+- `08-work-packets/CF-W1-MD-01-work-packet.md`
+
+Refreshed:
+
+- `06-contracts/CF-W1-UX-02-copilot-trust-ux-contract.md`
+- `08-work-packets/CF-W1-UX-02-work-packet.md`
+- `06-contracts/CF-W1-UX-05-product-language-status-contract.md`
+- `08-work-packets/CF-W1-UX-05-work-packet.md`
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-outbox.md`
+
+Readiness result: `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, and `CF-W1-MD-01` are no longer Product Owner decision-blocked, but none is Ready for Implementation. `CF-W1-AUTH-01` and `CF-W1-SUB-01` share subscription controller files; `CF-W1-UX-02` and `CF-W1-UX-05A` share Copilot files. Team 00 must combine or sequence those handoffs with one writer per file.
+
+No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.

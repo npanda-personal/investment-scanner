@@ -1,10 +1,10 @@
 # CF-W1-MD-01 QA Plan
 
-Date: 2026-05-17
+Date: 2026-05-18
 
 Owner: Team 04 QA Factory
 
-Status: QA planning only. Market Data validation hardening remains blocked from executable validation until Option A is reflected in a refreshed validation-only implementation handoff.
+Status: Option A QA refresh prepared. Market Data validation hardening remains blocked from executable validation until Team 05/03/04 confirm validation-only file reservations and Team 00 promotes an implementation handoff.
 
 Current status refresh: Product Owner approved Option A on 2026-05-18. `CF-W1-MD-01` remains docs-only and QA-blocked for execution until Team 05/03/04 refresh exact validation-only file reservations and Team 00 promotes a handoff.
 
@@ -25,7 +25,9 @@ This plan does not approve application source edits, test edits, Prisma changes,
 
 ## Approved Policy
 
-Product Owner approved:
+Decision reference: `07-decisions/DECISION-20260517-market-data-validation-hardening-policy-resolution.md`.
+
+Product Owner approved Option A:
 
 - reject future-dated candles relative to accepted evaluation date or latest completed market session date;
 - reject `adjustedClose` when present but non-finite, zero, negative, or outside accepted policy bounds;
@@ -67,7 +69,7 @@ Durable readiness evidence remains separate under `CF-W1-MD-02`.
 
 Commands below are guidance only. They were not run during this docs-only QA planning task.
 
-Future focused validation after policy acceptance and implementation handoff:
+Future focused validation after Team 00 Ready promotion and implementation handoff:
 
 ```powershell
 cd backend

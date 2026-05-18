@@ -12,7 +12,7 @@ Parent: `CF-W1-TP-01A`
 
 Architecture child packet prepared. Not Ready for Implementation.
 
-Team 04 must refresh/accept the backend-only child QA plan, and Team 00 must promote the exact file reservation before source work starts.
+Team 04's backend-only child QA plan already exists. Team 00 must still promote the exact file reservation and implementation handoff before source work starts.
 
 ## Owner / Lane / Module
 
@@ -61,7 +61,7 @@ The future implementation must:
 
 ## QA Handoff Needed
 
-Team 04 should refresh `04-qa/CF-W1-TP-01A-qa-plan.md` against the accepted child contract before this packet can be pulled.
+Use the prepared Team 04 child plan in `04-qa/CF-W1-TP-01B-qa-plan.md` after Team 00 promotes this packet.
 
 Minimum scenarios:
 
@@ -103,4 +103,4 @@ Stop and return to Team 00 / Architect if implementation requires:
 
 ## Next Gate
 
-Team 04 QA child-plan refresh, then Team 00 may promote the backend-only Trade Plan slice to `Ready for Implementation` if no shared/high-risk blockers remain.
+Team 00 may promote the backend-only Trade Plan slice to `Ready for Implementation` if the exact reservation and implementation handoff are copied without scope expansion.

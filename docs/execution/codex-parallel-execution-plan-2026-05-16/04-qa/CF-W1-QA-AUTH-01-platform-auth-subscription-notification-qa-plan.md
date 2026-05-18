@@ -1,23 +1,28 @@
 # CF-W1-QA-AUTH-01 - Platform Auth / Subscription / Notification QA Plan
 
-Date: 2026-05-17
+Date: 2026-05-18
 
 Owner: Team 09 Platform / Auth / Subscription / Notifications with QA Factory review
 
-Status: QA planning only; not executable until Option A file reservations and implementation handoffs are accepted
+Status: Option A QA refresh prepared for `CF-W1-AUTH-01` and `CF-W1-SUB-01`; `CF-W1-NOTIF-02` remains covered by its focused redaction plan. Not executable until exact Team 09 backend reservations and Team 00 implementation handoffs are accepted.
 
 ## Scope
 
 Validate the next Team 09 platform slices:
 
-- `CF-W1-AUTH-01`: authenticated controller fallback policy
-- `CF-W1-SUB-01`: local/manual subscription plan-change policy
+- `CF-W1-AUTH-01`: protected Team 09 controller fail-closed behavior when `req.user.id` is missing
+- `CF-W1-SUB-01`: local/manual admin-only subscription plan-change policy
 - `CF-W1-NOTIF-02`: notification local log redaction
+
+Decision references:
+
+- `07-decisions/DECISION-20260517-platform-auth-default-user-fallback-policy-resolution.md`
+- `07-decisions/DECISION-20260517-local-manual-subscription-plan-change-policy-resolution.md`
 
 ## Preconditions
 
-- `CF-W1-AUTH-01` policy is resolved as Option A; tests still require exact controller/test reservations and Team 00 implementation handoff.
-- `CF-W1-SUB-01` policy is resolved as Option A; tests still require exact backend reservations and Team 00 implementation handoff.
+- `CF-W1-AUTH-01` policy is resolved as Option A; tests still require exact subscription/notification controller and test reservations and Team 00 implementation handoff.
+- `CF-W1-SUB-01` policy is resolved as Option A; tests still require exact backend reservations, known frontend limitation notes if existing UI is mismatched, and Team 00 implementation handoff.
 - `CF-W1-NOTIF-02` does not require the auth/subscription decisions, but does require exact notification provider/test/doc file reservations before source work.
 - No Prisma, route registry, package, shared UI, or external provider work is included.
 
@@ -28,6 +33,7 @@ Validate the next Team 09 platform slices:
 - Protected subscription controller actions use authenticated `req.user.id`.
 - Protected notification controller actions use authenticated `req.user.id`.
 - Missing `req.user` in a protected controller path fails closed after the accepted policy.
+- Protected controllers do not use `default-user` fallback when `requireAuth` should have supplied user context.
 - Existing `requireAuth` missing-token and invalid-token tests remain valid.
 - Service-level defaults, if retained, are documented as explicit internal/test compatibility only.
 
@@ -37,6 +43,7 @@ Validate the next Team 09 platform slices:
 - Ordinary users cannot self-select `ADMIN`.
 - Admin/manual plan path remains guarded by `ADMIN_API_KEY` if already present and safe.
 - Plan limits still read the authenticated user's current subscription.
+- If a frontend subscription action still implies user self-change, QA records it as a limitation or routes it to a separate UX work item rather than expanding this backend slice.
 
 ### Notification Redaction
 
@@ -58,16 +65,27 @@ Validate the next Team 09 platform slices:
 
 ## Suggested Focused Commands
 
-Run only after implementation files are reserved:
+Run only after implementation files are reserved.
+
+Auth fallback focused validation:
 
 ```text
-npm.cmd test -- auth-identity subscription-billing notifications-delivery --runInBand
+cd backend
+npm.cmd test -- subscription-billing.routes.test.ts notifications-delivery.routes.test.ts --runInBand
 ```
 
-If route-level tests are updated:
+Subscription policy focused validation:
 
 ```text
-npm.cmd test -- subscription-billing.routes notifications-delivery.routes --runInBand
+cd backend
+npm.cmd test -- subscription-billing.service.test.ts subscription-billing.routes.test.ts --runInBand
+```
+
+Notification redaction focused validation:
+
+```text
+cd backend
+npm.cmd test -- notifications-delivery.service.test.ts --runInBand
 ```
 
 ## Skipped Checks
@@ -75,7 +93,7 @@ npm.cmd test -- subscription-billing.routes notifications-delivery.routes --runI
 - No Playwright unless frontend subscription or notification UI is explicitly approved.
 - No live SMTP, network, or provider checks.
 - No Prisma migration checks unless a future approved slice changes schema.
-- No full backend build until implementation scope is accepted; focused tests first.
+- No full backend build until implementation scope is accepted; focused tests first and build only after Team 00 validation approval/resource gate.
 
 ## QA Rejection Criteria
 
@@ -87,6 +105,8 @@ npm.cmd test -- subscription-billing.routes notifications-delivery.routes --runI
 
 ## Current Blockers
 
-- `CF-W1-AUTH-01` needs Option A QA refresh, exact controller/test reservations, and Team 00 Ready promotion.
-- `CF-W1-SUB-01` needs Option A QA refresh, exact backend reservations, frontend limitation handling, and Team 00 Ready promotion.
+- `CF-W1-AUTH-01` needs exact controller/test reservations and Team 00 Ready promotion.
+- `CF-W1-SUB-01` needs exact backend reservations, frontend limitation handling, and Team 00 Ready promotion.
 - `CF-W1-NOTIF-02` needs Ready promotion and exact notification provider/test/doc file reservation before source work.
+
+Refresh result: Option A policy assertions are now recorded for `CF-W1-AUTH-01` and `CF-W1-SUB-01`; executable QA remains blocked until exact implementation handoffs exist.
