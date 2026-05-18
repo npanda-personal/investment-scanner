@@ -1583,6 +1583,40 @@ Spawned Team 02 Requirement Factory:
 
 Date: 2026-05-18
 
+## Market Data Sync Fix Complete
+
+Team 00 completed the user-prioritized Market Data catalog sync fix on `dev`.
+
+- Commit: `593ebc3 fix: sync stale catalog candles per instrument`
+- QA: Team 04 ACCEPT.
+- Review: Team 10 ACCEPT.
+- Architecture: Team 03 ACCEPT.
+- Push: not performed.
+- Product Owner action required: no.
+
+The fix makes catalog sync use per-instrument stale-candle eligibility so a region-level current latest candle cannot skip instruments whose own latest stored daily candle is older than the latest completed trading date. The Market Data catalog table now displays `Data Through` based on stored candle evidence rather than catalog-row metadata update time.
+
+## Active Agents
+
+| Team | Agent | Work item |
+| --- | --- | --- |
+| Team 03 | `019e3d09-7477-7392-be87-fec6dfc01663` | reconcile architecture routing for `CF-W1-STRAT-02B`, `CF-W1-BT-01A`, and `CF-W1-SQLAB-02` |
+| Team 02 | `019e3d09-c4a9-7483-b758-83be4c5926ee` | rolling requirements discovery for investor/trader value |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03: active on top-stack architecture reconciliation.
+- Team 02: active on persistent requirements discovery.
+- Team 04: ready for QA planning or verification after Team 03 output.
+- Team 10: ready for the next QA-accepted review handoff.
+- Team 00: monitor outputs and route the next bounded Ready item.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
 ## Gate Results
 
 `CF-W1-STRAT-02B`

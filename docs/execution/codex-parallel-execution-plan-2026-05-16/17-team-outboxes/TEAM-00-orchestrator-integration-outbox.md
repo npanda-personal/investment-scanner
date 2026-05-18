@@ -2936,4 +2936,56 @@ State: rolling spawned-agent coordination continued.
 - Team 00: delegated PO acceptance and scoped commit for `CF-W1-SMI-01` if Architect Re-Signoff accepts.
 - Team 00: sequencing / Ready evaluation for `CF-W1-SQLAB-02A` when current gate pressure clears.
 
+---
+
+# Runtime Checkpoint - Market Data Sync Fix And Factory Resume
+
+Date: 2026-05-18
+
+## User-Reported Defect Fixed
+
+Team 00 fixed the Market Data catalog sync issue where `Sync Catalog` could report the latest completed candle as current for the region while individual instruments still had stale data-through dates.
+
+Local commit:
+
+- `593ebc3 fix: sync stale catalog candles per instrument`
+
+Behavior now:
+
+- catalog sync counts/selects stale active supported instruments by each instrument's latest stored daily candle;
+- region-level recent-sync / no-new-data gates no longer skip the whole catalog when stale instruments remain;
+- Market Data table shows per-instrument `Data Through` instead of misleading catalog-row update time;
+- catalog-row update time remains visible as secondary tooltip/detail evidence.
+
+Gate result:
+
+- Team 04 QA: ACCEPT.
+- Team 10 Review: ACCEPT.
+- Team 03 Architect Signoff: ACCEPT.
+- Delegated PO acceptance: accepted under current user direction to fix this first.
+- Push: not performed.
+
+Validation:
+
+- Focused stale-catalog service test passed.
+- Focused stale-task repository tests passed.
+- Backend build passed.
+- Frontend build passed.
+- Full touched Market Data service suite still has unrelated pre-existing failures; they are not from this fix and need a separate cleanup packet before broad Market Data release-clean claims.
+
+## Factory Resume
+
+Team 00 closed completed QA/review/signoff agents and relaunched rolling lanes:
+
+- Team 03 `019e3d09-7477-7392-be87-fec6dfc01663`: architecture reconciliation for `CF-W1-STRAT-02B`, `CF-W1-BT-01A`, and `CF-W1-SQLAB-02`.
+- Team 02 `019e3d09-c4a9-7483-b758-83be4c5926ee`: persistent requirements discovery for direct investor/trader value.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03: active on top-stack architecture reconciliation.
+- Team 02: active on rolling requirements discovery.
+- Team 04: ready after Team 03 identifies the next QA plan or verification target.
+- Team 10: ready for the next QA-accepted review handoff.
+- Team 00: continue monitoring, consume agent outputs, and promote only bounded Ready items.
+
 Product Owner action required: no.

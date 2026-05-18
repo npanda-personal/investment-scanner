@@ -2812,3 +2812,52 @@ No spawned agents are active at this checkpoint.
 - Team 00: `CF-W1-BT-01A` sequencing / Ready evaluation.
 - Team 02: persistent requirements discovery.
 - Team 03: next architecture prep after the sequencing decision.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Market Data Catalog Stale-Candle Fix
+
+Team 00 handled the user-reported Market Data sync defect before continuing factory work.
+
+Local `dev` commit:
+
+- `593ebc3 fix: sync stale catalog candles per instrument`
+
+Gate results:
+
+- Team 04 QA: ACCEPT.
+- Team 10 Review: ACCEPT.
+- Team 03 Architect Signoff: ACCEPT.
+- Product Owner action required: no.
+- Push: not performed.
+
+Validation recorded:
+
+- `npm.cmd test -- market-data.service.test.ts -t "continues catalog sync for stale instruments" --runInBand` passed.
+- `npm.cmd test -- market-data.repository.test.ts -t "stale sync tasks" --runInBand` passed.
+- `npm.cmd run build` passed in `backend`.
+- `npm.cmd run build` passed in `frontend`.
+- Broader touched Market Data suite still has unrelated pre-existing failures in `market-data.service.test.ts`; the new stale-catalog tests passed.
+
+## Current Active Agents
+
+| Slot | Team | Agent | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Team 03 - Architecture Factory | `019e3d09-7477-7392-be87-fec6dfc01663` | architecture reconciliation | `CF-W1-STRAT-02B` / `CF-W1-BT-01A` / `CF-W1-SQLAB-02` top-stack routing | active |
+| 2 | Team 02 - Requirement Factory | `019e3d09-c4a9-7483-b758-83be4c5926ee` | rolling requirements discovery | next direct investor/trader-value requirements | active |
+| 3 | Open slot | none | queued | Team 04 QA planning or verification after Team 03 output | ready |
+| 4 | Open slot | none | queued | Team 10 review after next QA-accepted handoff | waiting |
+| 5 | Open slot | none | queued | Team 03 signoff after next review acceptance | waiting |
+| 6 | Open slot | none | queued | next implementation worktree after Team 00 Ready promotion | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03: top-stack architecture reconciliation is active now.
+- Team 02: persistent investor-value requirements discovery is active now.
+- Team 04: ready for QA planning/verification once Team 03 identifies the next bounded child or Ready candidate.
+- Team 10: ready for the next QA-accepted implementation review.
+- Team 00: monitor active outputs and route the next independent item without Product Owner approval unless a true consent blocker appears.
