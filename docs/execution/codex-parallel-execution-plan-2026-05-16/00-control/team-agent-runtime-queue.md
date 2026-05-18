@@ -1392,6 +1392,37 @@ Team 04 rejected because context-gap cases are not downgraded to `LIMITED`; suff
 
 Date: 2026-05-18
 
+## Completed Since Previous Snapshot
+
+- Team 02 `019e3c0f-0b02-7182-a4eb-2c66a3b0da70`: completed investor/trader-value requirements refresh and was closed.
+
+## Newly Spawned
+
+- Team 06 `019e3c15-5e77-79b1-b0c1-b52317bc1933`: bounded `CF-W1-CAL-01` QA-reject rework for `context-gap -> LIMITED`.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 03 - Architect Signoff | `019e3c10-711f-7ca2-9311-3a28736dd2d4` | `gpt-5.4`, high | architect signoff | `CF-W1-BT-02` after Team 10 ACCEPT | active |
+| 2 | Team 06 - Strategy / Signal / Risk | `019e3c15-5e77-79b1-b0c1-b52317bc1933` | `gpt-5.3-codex`, high | QA reject rework | `CF-W1-CAL-01` context-gap downgrade | active |
+| 3 | Open slot | none | pending | QA rerun | `CF-W1-CAL-01` after Team 06 rework | waiting |
+| 4 | Open slot | none | pending | PO packet / commit | `CF-W1-BT-02` after Architect Signoff acceptance | waiting |
+| 5 | Open slot | none | pending | architecture prep | `CF-W1-SQLAB-02` after Team 00 evaluates Team 02 output | ready |
+| 6 | Open slot | none | pending | architecture prep | `CF-W1-STRAT-02` or `CF-W1-MD-02` after Team 00 evaluation | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03 is ready for `CF-W1-SQLAB-02` architecture prep after Team 00 confirms sequencing behind `CF-W1-SQLAB-02A`.
+- Team 04 is ready for `CF-W1-CAL-01` QA rerun after Team 06 rework completes.
+- Team 00 is ready for `CF-W1-BT-02` delegated PO acceptance and scoped commit if Architect Signoff accepts.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
 ## Runtime Recovery
 
 - Prior Team 03 architect agent `019e3c02-4baa-77a3-a567-d5cf34e804db` was no longer visible to the runtime and left no `CF-W1-BT-02` architect signoff files in the BT worktree.

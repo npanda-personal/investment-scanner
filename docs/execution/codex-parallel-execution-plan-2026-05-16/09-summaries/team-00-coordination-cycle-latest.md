@@ -1615,6 +1615,37 @@ Routing:
 
 Date: 2026-05-18
 
+## Team 06 Rework Spawned / Team 02 Completed
+
+Spawned Team 06 for bounded `CF-W1-CAL-01` QA-reject rework:
+
+- Agent: `019e3c15-5e77-79b1-b0c1-b52317bc1933`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-CAL-01`
+- Fix scope: context-gap evidence must downgrade readiness to `LIMITED`, with focused regression coverage.
+
+Closed Team 02 after docs-only requirement discovery:
+
+- Agent: `019e3c0f-0b02-7182-a4eb-2c66a3b0da70`
+- Output: refreshed investor/trader-value ranking and added/refined requirements for trigger auditability and Trade Plan exit/invalidation semantics.
+- Top candidates for Team 00 evaluation: `CF-W1-SQLAB-02`, `CF-W1-STRAT-02`, `CF-W1-MD-02`.
+
+## Active Agents
+
+- Team 03 `019e3c10-711f-7ca2-9311-3a28736dd2d4`: `CF-W1-BT-02` Architect Signoff.
+- Team 06 `019e3c15-5e77-79b1-b0c1-b52317bc1933`: `CF-W1-CAL-01` QA-reject rework.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03: `CF-W1-SQLAB-02` architecture prep after Team 00 confirms sequencing behind `CF-W1-SQLAB-02A`.
+- Team 04: `CF-W1-CAL-01` QA rerun after Team 06 rework.
+- Team 00: `CF-W1-BT-02` delegated PO acceptance and scoped commit if Architect Signoff accepts.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
 ## BT-02 Architect Signoff Relaunched
 
 The saved Team 03 architect agent `019e3c02-4baa-77a3-a567-d5cf34e804db` was not recoverable from the runtime and no architect-signoff evidence existed in the BT worktree. Team 00 relaunched the same bounded gate.

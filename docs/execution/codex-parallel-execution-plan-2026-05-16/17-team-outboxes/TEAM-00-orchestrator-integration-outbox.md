@@ -1726,6 +1726,29 @@ Teams ready to pick up new tasks:
 
 ---
 
+# CAL-01 Rework Spawned And Requirements Cycle Closed
+
+Date: 2026-05-18
+
+Team 00 spawned bounded Team 06 rework for `CF-W1-CAL-01`:
+
+- Agent: `019e3c15-5e77-79b1-b0c1-b52317bc1933`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-CAL-01`
+- Scope: fix context-gap readiness downgrade and add regression coverage.
+
+Team 02 completed the investor/trader-value requirements refresh and was closed:
+
+- Agent: `019e3c0f-0b02-7182-a4eb-2c66a3b0da70`
+- Next Team 00 evaluation candidates: `CF-W1-SQLAB-02`, `CF-W1-STRAT-02`, `CF-W1-MD-02`.
+
+Teams ready to pick up new tasks:
+
+- Team 03: `CF-W1-SQLAB-02` architecture prep after Team 00 sequencing check.
+- Team 04: `CF-W1-CAL-01` QA rerun after Team 06 rework.
+- Team 00: `CF-W1-BT-02` delegated PO acceptance and scoped commit if Architect Signoff accepts.
+
+---
+
 # BT-02 Architect Signoff Relaunched
 
 Date: 2026-05-18
