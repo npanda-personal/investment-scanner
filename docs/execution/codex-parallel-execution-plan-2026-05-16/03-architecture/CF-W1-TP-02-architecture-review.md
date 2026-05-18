@@ -6,19 +6,21 @@ Owner: Team 03 Architecture Factory
 
 ## Status
 
-Future Trade Plan semantics architecture packet prepared. Not Ready for Implementation.
+Future Trade Plan semantics packet refreshed. Not Ready for Implementation.
 
-This requirement is explicitly sequenced after `CF-W1-TP-01B`. It must not be treated as a replacement for the active backend-only compatibility/DQ hard-block slice.
+`CF-W1-TP-01B` is no longer a pending acceptance prerequisite. It is accepted and locally committed on the Team 06 branch as `8ff22fd`. That clears the stale prerequisite wording in older `TP-02` docs, but it does not make `TP-02` Ready. The next valid gate is Team 04 QA planning for the bounded semantics packet.
 
 ## Evidence Inspected
 
 - `AGENTS.md`
-- `00-control/risk-register.md`
 - `10-requirements/CF-W1-TP-02-trade-plan-exit-invalidation-semantics-requirement.md`
+- `10-requirements/next-top-10-candidates.md`
+- `00-control/active-work-board.md`
+- `00-control/team-agent-runtime-queue.md`
+- `09-summaries/team-00-pause-resume-checkpoint.md`
 - `03-architecture/CF-W1-TP-01B-architecture-review.md`
 - `06-contracts/CF-W1-TP-01B-backend-compatibility-dq-hard-block-contract.md`
-- `06-contracts/CF-W1-STRAT-01-no-target-exit-invalidation-contract.md`
-- `03-architecture/CF-W1-STRAT-01-architect-signoff.md`
+- `18-integration-queue/CF-W1-TP-01B-team10-review-release.md`
 - `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.service.ts`
 - `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.types.ts`
 - `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.validation.ts`
@@ -30,18 +32,18 @@ This requirement is explicitly sequenced after `CF-W1-TP-01B`. It must not be tr
 ## Current Source Findings
 
 - Trade Plan still exposes `target: Target | null` as a first-class DTO field.
-- `targetRewardRisk` is accepted as a raw number with no explicit bounded validation.
+- `targetRewardRisk` is still accepted as a raw number with no explicit bounded validation.
 - Invalidation output is still primarily `string[]` with no stable rule ids or rule version fields.
 - Geometry and service behavior still rely on reward-risk target semantics for some rationale and proof wording.
-- `CF-W1-TP-01B` already reserves the same module-owned files for the first backend-only compatibility pass.
+- The accepted `CF-W1-TP-01B` branch evidence proves the compatibility/DQ hard-block child can remain isolated to the same module-owned file set and does not require schema, repository, frontend, or route changes.
 
 ## Architecture Decision
 
-Prepare `CF-W1-TP-02` as the later semantics migration for `trade-plan-risk-engine` only.
+Keep `CF-W1-TP-02` as the later semantics migration for `trade-plan-risk-engine` only.
 
 The first future semantics packet should:
 
-- preserve `CF-W1-TP-01B` compatibility boundaries;
+- preserve accepted `CF-W1-TP-01B` DQ hard-block behavior;
 - add additive structured exit and invalidation condition fields owned by Trade Plan;
 - keep legacy `target` and `invalidationRules: string[]` fields for compatibility only in the first pass;
 - validate `targetRewardRisk` as a finite value in the inclusive range `0.5` to `5.0`;
@@ -75,7 +77,7 @@ interface TradePlanInvalidationConditionDto {
 
 The exact names may vary, but the semantics must stay additive and module-owned.
 
-## Exact Future File Reservations
+## Exact Allowed Files
 
 - `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.service.ts`
 - `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.types.ts`
@@ -85,7 +87,7 @@ The exact names may vary, but the semantics must stay additive and module-owned.
 - `backend/tests/modules/trade-plan-risk-engine/trade-plan-risk-engine.service.test.ts`
 - `backend/tests/trade-plan-risk-engine.paper-readiness.test.ts`
 
-## Forbidden Files
+## Exact Forbidden Files
 
 - `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.repository.ts`
 - `backend/tests/modules/trade-plan-risk-engine/trade-plan-risk-engine.repository.test.ts`
@@ -93,32 +95,43 @@ The exact names may vary, but the semantics must stay additive and module-owned.
 - `backend/prisma/migrations/**`
 - backend and frontend route registries
 - Today Review backend/frontend files
-- backtesting or strategy-decision source/tests
+- frontend Trade Plan files
+- Strategy Decision or backtesting source/tests
 - shared backend utilities
 - shared frontend components
 - package manifests
 - generated files
-- frontend trade-plan files
 - providers, startup/backfill, paid/cloud, broker, or telemetry flows
 
-## Dependency And Conflict Notes
+## One-Writer Constraint
 
-- `CF-W1-TP-02` is blocked behind acceptance of `CF-W1-TP-01B` because both packets reserve the same Trade Plan service/types/docs/tests.
+- Team 00 must reserve the full Trade Plan service/types/validation/geometry/doc/test set to one writer in any future implementation pass.
+- `CF-W1-TP-02` must not run in parallel with any other `trade-plan-risk-engine` source packet.
+
+## Dependencies
+
+- The stale prerequisite is cleared: `CF-W1-TP-01B` is accepted branch-locally as `8ff22fd`.
+- `CF-W1-TP-02` still depends on Team 04 QA planning before any Team 00 Ready evaluation.
 - The packet can reuse `CF-W1-STRAT-01` vocabulary decisions, but it must not reopen Strategy Decision files.
 - Any persisted-listing or repository durability change is future work and needs a separate child packet.
 
-## Required QA Scenarios
+## QA Handoff Needs
 
-Focused backend QA should prove:
+Team 04 can now plan focused backend QA for:
 
-- structured exit conditions exist without advice-like wording;
-- structured invalidation conditions exist with stable ids and rule versions where Trade Plan owns the rule;
-- `targetRewardRisk` rejects non-finite or out-of-range inputs;
-- legacy `target` compatibility fields remain present but are not trusted as advice or readiness proof;
-- existing DQ hard-block behavior from `CF-W1-TP-01B` is preserved.
+- structured exit conditions without advice-like wording;
+- structured invalidation conditions with stable ids and rule versions where Trade Plan owns the rule;
+- validation rejection for non-finite or out-of-range `targetRewardRisk`;
+- preserved `CF-W1-TP-01B` DQ blocker behavior;
+- legacy `target` compatibility fields remaining present but not trusted as advice or readiness proof.
 
-## Readiness Result
+## Parallel With Active Team 06 Work
 
-Architecture packet prepared. Not Ready for Implementation.
+- This docs-only refresh can run in parallel with active Team 06 `CF-W1-SIG-TRIGGER-02A` work because the write scope is limited to docs and the active Team 06 work is in `signal-generation-engine`.
+- A future `TP-02` source implementation would not overlap file-wise with `signal-generation-engine`, but Team 00 should not assign a second Team 06 implementation pass until the active Team 06 handoff closes.
 
-The file reservations are exact, but Team 00 should keep this packet behind `CF-W1-TP-01B` and route QA prep only after the active compatibility slice is accepted.
+## Ready Recommendation
+
+- Architecture packet: prepared and current after `TP-01B` acceptance.
+- Next gate: Team 04 QA planning can start now.
+- Not Ready for Implementation: Team 00 still needs QA evidence, exact sequencing, and an explicit Team 06 handoff before any promotion.

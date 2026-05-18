@@ -4,6 +4,42 @@ Date: 2026-05-17
 
 Prepared by Team 03 Architecture Factory and refreshed after `CF-W1-L3-AUTH-02` commit `503bcd9`, `CF-W1-SIG-TRIGGER-01` commit `6ab3999`, and checkpoint protocol fix commit `f75808f`.
 
+## Rolling Triage - 2026-05-18
+
+Input update consumed:
+
+- Team 02 requirement refresh committed on `dev` as `1db4b4e docs: refresh parallel requirement candidates`.
+- Updated top parallel candidates from Team 00 / Team 02:
+  1. `CF-W1-SQLAB-02`
+  2. `CF-W1-STRAT-02`
+  3. `CF-W1-TP-02`
+  4. `CF-W1-MD-02`
+  5. `CF-W1-UX-01`
+- Team 02 also explicitly kept `CF-W1-SIG-TRIGGER-02` behind active `CF-W1-SIG-TRIGGER-02A` because both live in `signal-generation-engine`.
+
+Signoff-priority check:
+
+- No newer Team 03 Architect Signoff-ready item was visible in the latest active checkpoints read during this pass.
+- Continue rolling architecture readiness until Team 00 explicitly routes a signoff handoff.
+
+Current triage result:
+
+| Candidate | Current architecture state | First-child / dependency state | Team 03 routing result |
+| --- | --- | --- | --- |
+| `CF-W1-SQLAB-02` | Sufficient current packeting already exists | `CF-W1-SQLAB-02A` architecture + Team 04 QA plan already exist; durable `02B` remains storage-blocked; shared backend writer set must stay sequenced behind accepted `CF-W1-SQLAB-01` branch work | No Team 03 refresh needed this cycle. Flag for Team 00 sequencing only, not Ready movement. |
+| `CF-W1-STRAT-02` | Refreshed this cycle | `CF-W1-STRAT-02A` is already accepted as branch commit `359d0a3`; parent now blocked on approval-gated durable `02B` | Do not send to Team 04 for another `02A` loop. Team 00 should open a separate `02B` packet only if schema/generated approval is intentional. |
+| `CF-W1-TP-02` | Refreshed this cycle | Prior stale prerequisite cleared because `CF-W1-TP-01B` is already accepted as branch commit `8ff22fd` | Route to Team 04 QA planning now. Not Ready. |
+| `CF-W1-MD-02` | ADR-only packet remains sufficient and current | Durable readiness storage still needs separate approval-gated schema/source packet | No Team 03 refresh needed this cycle. Keep out of Team 00 Ready evaluation. |
+| `CF-W1-UX-01` | Parent remains lower-priority and not yet source-evidence-complete | Backend trust-evidence parent still needs verified scope/latest-trusted-date/blocker provenance alignment | No Team 03 refresh this cycle. Keep behind the upstream Lane 2 packets above. |
+
+Routing flags for Team 00:
+
+- `Team 04 QA planning now`: `CF-W1-TP-02`
+- `Team 00 sequencing only, not Ready`: `CF-W1-SQLAB-02A`
+- `Team 00 durable-child decision only, not QA/Ready`: `CF-W1-STRAT-02`
+- `Keep blocked / ADR-only`: `CF-W1-MD-02`
+- `Keep lower-priority parent`: `CF-W1-UX-01`
+
 ## Team 03 SIG-TRIGGER-02 Persisted Trigger Auditability Prep - 2026-05-18
 
 Prepared:

@@ -8,9 +8,9 @@ Strategy Framework rule versioning and Data Quality gate policy.
 
 ## State
 
-Split required. Not Ready for durable implementation.
+Blocked pending a separate approval-gated durable child.
 
-This packet prepares the no-schema first child only: explicit source-declared rule revisions plus explicit DQ gate policy exposure inside Strategy Framework. Durable version-keyed persistence remains out of scope and blocked.
+`CF-W1-STRAT-02A` already delivered the no-schema trust-surfacing child and was accepted on the Team 06 branch as `359d0a3`. This parent packet now exists only to keep the remaining durable history gap explicit. It does not authorize another no-schema pass.
 
 ## Owner / Lane / Modules
 
@@ -22,93 +22,81 @@ This packet prepares the no-schema first child only: explicit source-declared ru
 
 ## Allowed Files After Ready Promotion
 
-- `backend/src/modules/strategy-framework/strategy-framework.registry.ts`
-- `backend/src/modules/strategy-framework/strategy-framework.types.ts`
-- `backend/src/modules/strategy-framework/strategy-framework.service.ts`
-- `backend/src/modules/strategy-framework/strategy-framework.md`
-- `backend/tests/modules/strategy-framework/strategy-framework.service.test.ts`
-- `frontend/src/features/strategy-framework/types.ts`
-- `frontend/src/features/strategy-framework/components/StrategyFrameworkPage.tsx`
-- `frontend/tests/ui/strategy-framework.spec.ts`
+None from this parent packet.
 
-## Current Forbidden Files
+Team 00 must open a separate `CF-W1-STRAT-02B` packet before any application writer is authorized.
 
-- application source or tests before Team 00 promotion
+Candidate approval-gated future `02B` files to evaluate later:
+
 - `backend/prisma/schema.prisma`
 - `backend/prisma/migrations/**`
 - generated Prisma client or generated types
 - `backend/src/modules/strategy-framework/strategy-framework.repository.ts`
+- `backend/src/modules/strategy-framework/strategy-framework.types.ts`
+- `backend/src/modules/strategy-framework/strategy-framework.service.ts`
+- `backend/src/modules/strategy-framework/strategy-framework.md`
+- `backend/tests/modules/strategy-framework/strategy-framework.repository.test.ts`
+- `backend/tests/modules/strategy-framework/strategy-framework.service.test.ts`
+
+## Current Forbidden Files
+
+- all application source or tests under this parent until Team 00 opens `CF-W1-STRAT-02B`
+- `backend/src/modules/strategy-framework/strategy-framework.registry.ts`
 - `backend/src/modules/strategy-framework/strategy-framework.evaluator.ts`
 - `backend/src/modules/strategy-framework/strategy-framework.controller.ts`
 - `backend/src/modules/strategy-framework/strategy-framework.router.ts`
 - `backend/src/modules/strategy-framework/strategy-framework.validation.ts`
 - `backend/tests/modules/strategy-framework/strategy-framework.evaluator.test.ts`
-- `backend/tests/modules/strategy-framework/strategy-framework.repository.test.ts`
-- `backend/src/modules/data-quality-engine/**`
-- `frontend/src/features/strategy-framework/api/strategyFrameworkApi.ts`
-- `frontend/src/features/strategy-framework/routes.tsx`
+- all `frontend/src/features/strategy-framework/**`
+- all `backend/src/modules/data-quality-engine/**`
 - backend and frontend route registries
 - shared backend utilities
 - shared frontend components
 - package manifests
-- paid/cloud, provider/startup, broker, or telemetry flows
+- paid/cloud, provider/startup, broker, telemetry, or live-data flows
 
 ## Required Behavior
 
-Future implementation must:
+Future `CF-W1-STRAT-02B` implementation must:
 
-- add additive `ruleRevision` metadata to registry-backed rule declarations;
-- add additive declarative DQ gate policy metadata to strategy definitions;
-- add additive trust/versioning metadata to list/detail/proof payloads without changing existing proof-performance status meaning;
-- show that stronger review requires DQE `signal` tier `READY`;
-- show that trusted standalone backtest promotion requires DQE `backtest` tier `READY`;
-- keep limited or missing DQ evidence review-visible only;
+- preserve version-keyed durable strategy definition history instead of overwriting by `code`;
+- expose durable-history state additively on top of accepted `02A` trust metadata;
 - preserve current evaluator math, proof grading, standalone backtest gating, routes, and page tabs.
 
 ## Explicitly Deferred
 
-- durable version-keyed `StrategyDefinition` persistence;
-- Prisma/schema, migration, generated, or repository identity changes;
-- evaluator math, scoring, or backtest-config changes;
-- Data Quality Engine source changes;
-- controller/router/validation/API-client changes;
-- shared UI/navigation or route expansion.
+- reopening `CF-W1-STRAT-02A`
+- evaluator math, scoring, or backtest-config changes
+- Data Quality Engine source changes
+- controller/router/validation/API-client changes
+- shared UI/navigation or route expansion unless Team 00 later opens a separate compatibility follow-up
 
 ## Dependency Notes
 
-- This first child is source-supported because Strategy Framework list/detail/proof are registry-backed.
+- `CF-W1-STRAT-02A` is already complete and should stay closed.
 - Full durable/stable rule revisioning remains blocked until Team 00 / Architect authorize a schema/generated/repository child.
-- Team 00 should not promote another Strategy Framework source packet in parallel with this slice. The registry/types/service/doc/test and page/type/UI spec form one writer set.
+- One-writer constraint for future `02B`:
+  - reserve schema/migrations/generated/repository/service/types/doc/tests to one writer;
+  - do not run in parallel with any other `strategy-framework` source packet.
+- Parallel with active Team 06 `CF-W1-SIG-TRIGGER-02A`:
+  - this docs-only parent refresh is safe in parallel;
+  - future source implementation has no file overlap with `signal-generation-engine`, but Team 00 should not assign another Team 06 implementation pass until the active Team 06 work closes.
 
 ## QA Handoff Needed
 
-Team 04 should prepare no-schema child QA only.
+No new Team 04 executable QA handoff is needed now.
 
-Required QA focus:
+If Team 00 later opens `CF-W1-STRAT-02B`, required QA focus becomes:
 
-- backend service coverage for versioned rule metadata, legacy undeclared rule fallback, and DQ gate policy payload exposure;
-- UI smoke coverage for catalog/detail/proof trust metadata, research-support wording, and unchanged standalone backtest action rules;
-- additive compatibility checks so existing Strategy Framework consumers do not break.
-
-Suggested focused commands after implementation exists:
-
-```powershell
-cd backend
-npm.cmd test -- strategy-framework.service.test.ts --runInBand
-```
-
-```powershell
-cd frontend
-npm.cmd run test:ui -- strategy-framework.spec.ts --workers=1
-npm.cmd run build
-```
+- repository/schema behavior for version-keyed persisted definition history;
+- additive compatibility of Strategy Framework list/detail/proof payloads while durable history is added;
+- regression protection for accepted `02A` trust metadata semantics.
 
 ## Stop Conditions
 
 Stop and return to Team 00 / Architect if implementation requires:
 
-- Prisma/schema or generated file changes;
-- repository identity changes or version-keyed persistence;
+- any attempt to reopen accepted `02A` files as the main durable solution;
 - evaluator math or score semantics changes;
 - Data Quality Engine source changes;
 - controller/router/validation or route-registry changes;
@@ -116,9 +104,9 @@ Stop and return to Team 00 / Architect if implementation requires:
 
 ## Next Gate
 
-Team 04 QA planning can start for the no-schema child now.
+Team 00 should keep the parent requirement out of Ready.
 
-Team 00 should keep the parent requirement out of Ready and choose one of two paths:
+Next gate:
 
-1. promote the no-schema trust-surfacing child only; or
-2. open a separate approval-gated durable persistence child for schema/repository work.
+1. leave `CF-W1-STRAT-02` blocked as a parent requirement; or
+2. open a separate approval-gated `CF-W1-STRAT-02B` packet for schema/repository/generated durable history work.

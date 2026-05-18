@@ -6,9 +6,9 @@ Owner: Team 03 Architecture Factory
 
 ## Status
 
-Future Trade Plan semantics contract prepared. Not Ready for Implementation.
+Future Trade Plan semantics contract refreshed. Not Ready for Implementation.
 
-Sequencing prerequisite: accepted `CF-W1-TP-01B`.
+Sequencing prerequisite status: `CF-W1-TP-01B` is accepted and locally committed as `8ff22fd`. `TP-02` is no longer blocked by pending acceptance, but it still needs Team 04 QA planning and Team 00 sequencing.
 
 ## Contract Intent
 
@@ -23,7 +23,7 @@ Trusted Trade Plan output must:
 - use modeled exit-condition language, not price-target advice;
 - use modeled invalidation-condition language with explicit reason evidence;
 - expose stable rule ids and rule versions where Trade Plan owns the logic;
-- preserve DQ blocker semantics from `CF-W1-TP-01B`.
+- preserve DQ blocker semantics from accepted `CF-W1-TP-01B`.
 
 Trusted Trade Plan output must not:
 
@@ -68,28 +68,43 @@ Where Trade Plan owns the model logic, stable ids should be module-owned rather 
 
 The exact ids are module-local implementation detail, but they must be stable inside the packet and surfaced in tests.
 
-## Boundaries
+## Exact Allowed Files
 
-In scope for the first packet:
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.service.ts`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.types.ts`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.validation.ts`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.geometry.ts`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.md`
+- `backend/tests/modules/trade-plan-risk-engine/trade-plan-risk-engine.service.test.ts`
+- `backend/tests/trade-plan-risk-engine.paper-readiness.test.ts`
 
-- Trade Plan service/types/validation/geometry/docs/tests
+## Exact Forbidden Files
 
-Out of scope:
-
-- repository behavior changes
-- Prisma/schema/migrations
-- Today Review
-- frontend/API migration
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.repository.ts`
+- `backend/tests/modules/trade-plan-risk-engine/trade-plan-risk-engine.repository.test.ts`
+- `backend/prisma/schema.prisma`
+- `backend/prisma/migrations/**`
+- backend and frontend route registries
+- Today Review backend/frontend files
+- frontend/API migration files
 - backtesting strategy trade records
 - Strategy Decision files
 - shared utilities/UI
+- package manifests
+- generated files
+
+## One-Writer Constraint
+
+- Reserve the Trade Plan service/types/validation/geometry/doc/test set to one writer.
+- Do not run `CF-W1-TP-02` in parallel with any other `trade-plan-risk-engine` source packet.
+- This docs-only contract refresh can run in parallel with active Team 06 `CF-W1-SIG-TRIGGER-02A`.
 
 ## Test Contract
 
-Focused backend tests must prove:
+Team 04 can now plan focused backend tests that prove:
 
 - structured exit and invalidation conditions are present;
 - rule ids and rule versions are populated where the module owns them;
 - out-of-range `targetRewardRisk` is rejected;
 - trusted output avoids forbidden target/advice wording;
-- `CF-W1-TP-01B` DQ blocker semantics remain intact.
+- accepted `CF-W1-TP-01B` DQ blocker semantics remain intact.

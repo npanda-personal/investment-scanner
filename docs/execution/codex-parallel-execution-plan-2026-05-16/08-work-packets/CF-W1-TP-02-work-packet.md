@@ -8,9 +8,9 @@ Trade Plan exit and invalidation semantics without target-like advice.
 
 ## State
 
-Future semantics packet prepared. Not Ready for Implementation.
+Future semantics packet refreshed. Not Ready for Implementation.
 
-This packet is sequenced behind `CF-W1-TP-01B`. It must not be promoted while the compatibility/DQ hard-block slice is still active or unresolved.
+This packet is no longer blocked by pending `CF-W1-TP-01B` acceptance. `CF-W1-TP-01B` is accepted and locally committed as `8ff22fd`. The next gate is Team 04 QA planning, not another architecture prerequisite loop.
 
 ## Owner / Lane / Module
 
@@ -50,16 +50,21 @@ This packet is sequenced behind `CF-W1-TP-01B`. It must not be promoted while th
 
 Future implementation must:
 
-- preserve `CF-W1-TP-01B` DQ hard-block behavior;
+- preserve accepted `CF-W1-TP-01B` DQ hard-block behavior;
 - add structured exit conditions and structured invalidation conditions;
 - keep legacy `target` and `invalidationRules` fields as compatibility-only in the first pass;
 - reject `targetRewardRisk` values outside `0.5` to `5.0`;
 - replace advice-like target semantics in trusted output with modeled exit/invalidation semantics;
 - preserve existing route paths and avoid repository/schema migration.
 
+## One-Writer Constraint
+
+- Reserve the Trade Plan service/types/validation/geometry/doc/test set to one writer.
+- Do not run `CF-W1-TP-02` in parallel with any other `trade-plan-risk-engine` source packet.
+
 ## QA Handoff Needed
 
-Team 04 should prepare focused backend QA for:
+Team 04 can now prepare focused backend QA for:
 
 - structured exit-condition output;
 - structured invalidation-condition output;
@@ -86,6 +91,13 @@ Stop and return to Team 00 / Architect if implementation requires:
 - shared utility/UI changes;
 - expanding the packet beyond module-owned Trade Plan semantics.
 
+## Parallel With Active Team 06 Work
+
+- This docs-only refresh is safe in parallel with active Team 06 `CF-W1-SIG-TRIGGER-02A`.
+- A future `TP-02` source pass has no file overlap with `signal-generation-engine`, but Team 00 should not assign another Team 06 implementation pass until the active Team 06 handoff closes.
+
 ## Next Gate
 
-Keep behind `CF-W1-TP-01B` until that packet is accepted. After that, route to Team 04 QA prep and Team 00 sequencing.
+Route `CF-W1-TP-02` to Team 04 QA planning now.
+
+After QA planning exists, Team 00 can decide whether to keep it queued behind higher-priority Lane 2 work or evaluate it for a later Ready promotion.
