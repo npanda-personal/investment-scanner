@@ -190,6 +190,50 @@ Date: 2026-05-18
 
 ## Assignment
 
+Refresh architecture readiness for `CF-W1-HCTX-01` - Historical Context explainability.
+
+This assignment follows the Team 02 market-intelligence priority refresh: `CF-W1-HCTX-01` is the next top unassigned item after `CF-W1-BT-02`.
+
+This is docs-only architecture prep. Do not implement application code. Refresh the existing HCTX artifacts to ensure the first child is backend-first, additive, no-schema, no-route, and safe for downstream consumers such as calibration.
+
+## Source Input
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-HCTX-01-historical-context-explainability-requirement.md`
+- Existing architecture/contract/work packet:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-HCTX-01-architecture-review.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-HCTX-01-historical-context-explainability-contract.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-HCTX-01-work-packet.md`
+- Relevant source to inspect read-only:
+  - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.md`
+  - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.service.ts`
+  - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.types.ts`
+  - `backend/tests/modules/historical-context-snapshots/**`
+  - `frontend/src/features/historical-context-snapshots/**` only if needed for future UI reservation notes
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-HCTX-01-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-HCTX-01-historical-context-explainability-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-HCTX-01-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+## Required Output
+
+- Recommend the smallest backend-first first child if feasible.
+- Define exact allowed/forbidden future implementation files.
+- Explicitly block schema, route registry, shared utility/UI, Market Context source, Smart Money source, Signal Calibration source, providers, package/generated files, and frontend implementation unless separately approved.
+- Provide QA planning handoff notes for Team 04.
+- Return a clear Ready recommendation: `Ready candidate`, `split required`, or `blocked`.
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
 Prepare architecture readiness for `CF-W1-L3-INTEL-03` - Portfolio Intelligence concentration review.
 
 This is docs-only architecture prep. Do not implement application code. The first slice should stay bounded to deterministic concentration review over existing Portfolio Intelligence allocation/review data. If implementation needs optimizer/rebalance behavior, Prisma/schema, route registry, shared UI, portfolio-management source changes, or broad frontend navigation changes, document that blocker or split a future approval-gated child instead of marking it Ready.

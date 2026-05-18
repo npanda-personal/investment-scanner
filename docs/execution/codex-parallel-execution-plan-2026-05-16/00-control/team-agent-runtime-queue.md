@@ -702,3 +702,85 @@ Date: 2026-05-18
 - Team 03 is ready to prepare `CF-W1-HCTX-01` after the `BT-02` QA handoff is launched.
 - Team 06 is ready for signal / strategy / Trade Plan work after Team 00 selects the next item.
 - Team 10 is idle until the next QA-accepted implementation handoff.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 05 - Market Data / Data Quality | `019e3bae-63f2-75f2-b48b-b9bae671eefa` | `gpt-5.4`, medium | readiness scout | next Market Data / DQ item after accepted `DQ-02A` and `MD-01` | active |
+| 2 | Team 04 - QA Factory | `019e3bb0-d8ec-78d0-a908-da63263be3d2` | `gpt-5.4`, high | QA planning | `CF-W1-BT-02` | active |
+| 3 | Open slot | none | pending | architecture prep | `CF-W1-HCTX-01` after `BT-02` QA output or if write scope is clear | ready |
+| 4 | Open slot | none | pending | signal / strategy / Trade Plan | next Team 06 item after Team 00 selection | ready |
+| 5 | Open slot | none | pending | review/signoff | next accepted implementation gate | waiting |
+| 6 | Open slot | none | pending | requirements discovery | next market-intelligence cycle after Team 00 selection | ready |
+
+## Recent Commit
+
+- `bd2098c docs: prepare backtesting review QA handoff`
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03 is ready for `CF-W1-HCTX-01` architecture/contract prep once Team 00 launches it.
+- Team 06 is ready for signal / strategy / Trade Plan work after Team 00 selects the next item.
+- Team 10 is idle until the next QA-accepted implementation handoff.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Completed Since Previous Snapshot
+
+- Team 05 `019e3bae-63f2-75f2-b48b-b9bae671eefa`: completed Lane 1 scout. Result: `CF-W1-DQ-02` is the next Market Data/DQ prep item, architecture/QA-prep-only; no Lane 1 Ready pull.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | `019e3bb0-d8ec-78d0-a908-da63263be3d2` | `gpt-5.4`, high | QA planning | `CF-W1-BT-02` | active |
+| 2 | Team 03 - Architecture Factory | `019e3bb2-2657-7e92-8a79-ad7b7521bcbd` | `gpt-5.4`, high | architecture/contract refresh | `CF-W1-HCTX-01` | active |
+| 3 | Open slot | none | pending | QA planning | `CF-W1-HCTX-01` after Team 03 output | waiting |
+| 4 | Open slot | none | pending | architecture prep | `CF-W1-MCTX-01` after HCTX handoff or if write scope is clear | ready |
+| 5 | Open slot | none | pending | signal / strategy / Trade Plan | next Team 06 item after Team 00 selection | ready |
+| 6 | Open slot | none | pending | review/signoff | next accepted implementation gate | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 05 is idle after the Lane 1 scout; next Lane 1 work should be `CF-W1-DQ-02` prep only, not implementation.
+- Team 06 is ready for signal / strategy / Trade Plan work after Team 00 selects the next item.
+- Team 10 is idle until the next QA-accepted implementation handoff.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Ready Promotion
+
+`CF-W1-BT-02` is promoted and assigned to Team 06.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 03 - Architecture Factory | `019e3bb2-2657-7e92-8a79-ad7b7521bcbd` | `gpt-5.4`, high | architecture/contract refresh | `CF-W1-HCTX-01` | active |
+| 2 | Team 06 - Strategy / Signal / Risk | pending spawn | `gpt-5.3-codex`, high | implementation | `CF-W1-BT-02` | ready |
+| 3 | Open slot | none | pending | QA verification | `CF-W1-BT-02` after Team 06 handoff | waiting |
+| 4 | Open slot | none | pending | review/release | `CF-W1-BT-02` after Team 04 accepts | waiting |
+| 5 | Open slot | none | pending | architect signoff | `CF-W1-BT-02` after Team 10 accepts | waiting |
+| 6 | Open slot | none | pending | architecture prep | `CF-W1-MCTX-01` after HCTX handoff or clear scope | ready |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06 is ready to implement `CF-W1-BT-02`.
+- Team 04 is ready for `CF-W1-BT-02` QA after Team 06 handoff.
+- Team 10 is ready for review after QA accepts.
+- Team 03 is active on `CF-W1-HCTX-01`; next architecture item is `CF-W1-MCTX-01`.

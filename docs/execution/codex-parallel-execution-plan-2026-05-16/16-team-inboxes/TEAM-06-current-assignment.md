@@ -272,3 +272,137 @@ npm.cmd run build
 ## Next Gate
 
 Return developer handoff to Team 00 for Team 04 QA, Team 10 review, Architect Signoff, delegated PO acceptance, and scoped local commit.
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Implement `CF-W1-BT-02` in a dedicated Team 06 worktree after Team 00 Ready promotion.
+
+This is the current Team 06 assignment. It supersedes older SQLAB/STRAT tails above.
+
+You are not alone in the codebase. Do not revert or overwrite edits made by others. Do not implement in the shared `dev` worktree.
+
+## Branch / Worktree
+
+- Branch: `codex/team06-strategy-signal/CF-W1-BT-02`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-BT-02`
+
+## Work Item
+
+`CF-W1-BT-02` - Backtesting canonical review disposition and saved-list/detail reason-summary normalization.
+
+## Evidence To Use
+
+- Requirement: `10-requirements/CF-W1-BT-02-backtesting-outcome-review-traceability-requirement.md`
+- Architecture review: `03-architecture/CF-W1-BT-02-architecture-review.md`
+- Contract: `06-contracts/CF-W1-BT-02-backtesting-outcome-review-traceability-contract.md`
+- Work packet: `08-work-packets/CF-W1-BT-02-work-packet.md`
+- QA plan: `04-qa/CF-W1-BT-02-qa-plan.md`
+- Ready queue handoff: `12-ready-queue/ready-for-implementation.md`
+
+## Allowed Files
+
+You may edit only:
+
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.types.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+- `backend/tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.test.ts`
+- `frontend/src/features/backtesting-strategy-lab/types.ts`
+- `frontend/src/features/backtesting-strategy-lab/components/BacktestingStrategyLabPage.tsx`
+- `frontend/tests/ui/backtesting-strategy-lab.spec.ts`
+
+Allowed reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-BT-02-developer-handoff.md`
+
+## Forbidden Files
+
+Do not edit:
+
+- Prisma schema or migrations
+- generated files
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.repository.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.controller.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.router.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.validation.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.module.ts`
+- `backend/src/modules/backtesting-strategy-lab/index.ts`
+- backend or frontend route registries
+- `backend/src/modules/strategy-framework/**`
+- `backend/src/modules/trade-plan-risk-engine/**`
+- `frontend/src/features/backtesting-strategy-lab/api/**`
+- `frontend/src/features/backtesting-strategy-lab/hooks/**`
+- `frontend/src/features/backtesting-strategy-lab/routes.tsx`
+- shared backend utilities
+- shared frontend components
+- package manifests
+- providers, startup/backfill, live-provider, paid/cloud, telemetry, broker, or historical docs
+
+## Implementation Requirements
+
+- Add additive run-level review-disposition fields equivalent to:
+  - `TRUSTED_REVIEW`
+  - `PARTIAL_REVIEW`
+  - `DIAGNOSTIC_ONLY`
+  - `LEGACY_REPAIRED`
+  - `WITHHELD`
+- Add one concise reason summary and a specific reason list derived from current module evidence.
+- Derive review disposition only from existing availability, calculation-audit, coverage, benchmark, exit-diagnostic, and trade-count evidence.
+- Ensure saved-run list and selected-run detail show the same disposition label and reason summary for the same run.
+- Preserve existing benchmark, availability, data-coverage, exit-diagnostic, realism-warning, and calculation-audit evidence.
+- Preserve registered and custom-run execution behavior, routes, query params, and current payload fields.
+- Keep research-support language and avoid direct advice, target-price, guarantee, broker, or automation wording.
+
+## Focused Validation
+
+Run after implementation:
+
+```powershell
+cd backend
+npm.cmd test -- backtesting-strategy-lab.service.test.ts --runInBand
+npm.cmd run build
+```
+
+If frontend files are changed:
+
+```powershell
+cd frontend
+npm.cmd run test:ui -- backtesting-strategy-lab.spec.ts --workers=1
+npm.cmd run build
+```
+
+Before builds or UI smoke, check memory/resource safety if practical.
+
+## Stop Conditions
+
+Stop and return to Team 00 if implementation requires:
+
+- any forbidden file;
+- schema/generated/route/shared changes;
+- `strategy-framework` or `trade-plan-risk-engine` source edits;
+- frontend API/hook/route changes;
+- simulation math, benchmark math, route-contract, shared UI, or cross-module source changes;
+- trade-level structured rule-ID expansion;
+- provider/startup/live-provider/paid/cloud/telemetry/broker scope.
+
+## Expected Outbox
+
+Update `17-team-outboxes/TEAM-06-outbox.md` with:
+
+- exact branch/worktree used
+- starting commit
+- exact files changed
+- exact files inspected
+- behavior changed
+- tests run and results
+- tests skipped and reasons
+- forbidden files confirmed untouched
+- assumptions, risks, blockers
+- next gate: Team 04 QA, Team 10 review, Architect Signoff, delegated PO acceptance, or Team 00 blocker routing

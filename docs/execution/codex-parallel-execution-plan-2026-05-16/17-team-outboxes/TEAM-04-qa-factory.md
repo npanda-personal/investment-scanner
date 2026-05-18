@@ -171,10 +171,12 @@ Mode: focused QA rerun plus docs-only QA planning.
 - Contracts changed:
   - none
 - Result:
-  - Prepared a bounded no-schema QA plan for additive backtesting review outcome and trade traceability evidence in `04-qa/CF-W1-BT-02-qa-plan.md`.
-  - Recorded required coverage for trusted, partial, diagnostic-only, legacy-repaired, and withheld review outcomes; registered and custom backtest trade traceability; additive review trace fields; feature-local UI smoke expectations; and research-support wording checks.
+  - Refreshed the bounded no-schema QA plan for additive run-level backtesting review-disposition evidence in `04-qa/CF-W1-BT-02-qa-plan.md`.
+  - Recorded required backend service coverage for `TRUSTED_REVIEW`, `PARTIAL_REVIEW`, `DIAGNOSTIC_ONLY`, `LEGACY_REPAIRED`, and `WITHHELD`, including explicit diagnostic-only reasons for insufficient history, no trades, benchmark unavailable, weak end-of-test exit dominance, and low sample size.
+  - Recorded explicit withheld coverage for `LEGACY_INVALID` aggregate proof plus saved-run-list and selected-detail normalization so the same run shows the same disposition label and reason summary in both surfaces.
+  - Recorded regression expectations that current benchmark, availability, data-coverage, exit-diagnostic, realism-warning, and calculation-audit evidence remains visible and that feature-local UI smoke stays research-support only.
   - Preserved the Team 03 boundary that the packet must stay inside `backtesting-strategy-lab` service/types/doc/test plus feature-local types/page/UI spec files only.
-  - Added explicit stop conditions for repository/controller/router/validation/schema/shared-route/shared-UI drift and for any Strategy Framework or Trade Plan Risk source widening.
+  - Added explicit reject conditions for forbidden-file touches and for any simulation-math, benchmark-math, route-contract, shared-UI, or cross-module source widening, including any Strategy Framework or Trade Plan Risk source edits.
   - Updated `04-qa/next-validation-plans.md` so `CF-W1-BT-02` is visible in the QA queue as QA-ready for Team 00 Ready evaluation, while executable QA remains blocked pending Ready promotion and implementation handoff.
 - Tests run: none
 - Tests skipped:
@@ -186,16 +188,16 @@ Mode: focused QA rerun plus docs-only QA planning.
   - current backtesting routes, API client usage, and saved-run read path stay unchanged in the first child
 - Risks:
   - implementers could blur review trust framing with simulation behavior or benchmark math unless the additive-only contract is followed exactly
-  - implementers could overstate weak end-of-test exits or legacy-repaired evidence as trusted review output unless outcome mapping remains explicit
+  - implementers could let list and detail drift into two different trust stories unless both surfaces bind to the same derived summary fields
 - Blockers:
   - executable QA remains blocked until Team 00 promotes the bounded no-schema `backtesting-strategy-lab` implementation handoff
-  - repository/controller/router/validation/schema/shared-route widening, `strategy-framework` source edits, and `trade-plan-risk-engine` source edits remain explicit reject conditions for the first child
+  - forbidden-file touches and any simulation-math, benchmark-math, route-contract, shared-UI, `strategy-framework` source, `trade-plan-risk-engine` source, or other cross-module source edits remain explicit reject conditions for the first child
 - Shared-file requests:
   - none from Team 04; single-writer reservation remains a Team 00 implementation concern
 - QA-ready for Team 00 Ready evaluation:
   - `CF-W1-BT-02`: yes, as one bounded no-schema `backtesting-strategy-lab` review-traceability child slice only
 - Next gate:
-  - Team 00 Ready evaluation for `CF-W1-BT-02` only, while keeping schema, route, shared-file, Strategy Framework source, and Trade Plan Risk source widening out of scope
+  - Team 00 Ready evaluation for `CF-W1-BT-02` only, while keeping schema, route, shared UI, simulation math, benchmark math, Strategy Framework source, Trade Plan Risk source, and any broader cross-module widening out of scope
 - Evidence notes:
   - Team 04 used the active execution folder and current backtesting module/test/UI surfaces only; no application source, tests, package manifests, generated files, architecture docs, contracts, requirements, ready queues, Prisma, routes, shared files, or historical docs were modified
 

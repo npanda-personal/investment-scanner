@@ -73,24 +73,24 @@ Operating rules:
 | Field | Current Value |
 | --- | --- |
 | Current daemon cycle id | `DAEMON-20260517` |
-| Current rolling iteration count | 39 |
-| Active teams | Team 00 orchestration; no spawned subagents active at this checkpoint |
-| Queued teams | Team 03 `CF-W1-BT-02` architecture/contract refresh; Team 04 `CF-W1-BT-02` QA refresh after Team 03; Team 02 market-intelligence-focused discovery |
-| Idle teams | Implementation lanes are idle unless Team 00 selects a Ready item; Teams 05/06 are the next preferred implementation lanes for market-data/DQ and signal/strategy/Trade Plan work |
+| Current rolling iteration count | 40 |
+| Active teams | Team 03 `CF-W1-HCTX-01` architecture refresh; Team 06 `CF-W1-BT-02` implementation queued for launch |
+| Queued teams | Team 04 QA for `CF-W1-BT-02` after Team 06 handoff; Team 10 review after QA; Team 03 Architect Signoff after review |
+| Idle teams | Team 05 is idle after Lane 1 scout; Team 06 becomes active once the `CF-W1-BT-02` worktree/agent launches |
 | Blocked teams | No team fully blocked; no open Decision Inbox items; platform/notification/alert convenience work is intentionally low priority unless it blocks correctness, privacy, or user-data safety |
-| Teams relaunched this cycle | Team 00 completed AUTH/SUB branch-gate closure and corrected future priority routing toward market-intelligence value |
+| Teams relaunched this cycle | Team 03/04/02 completed `CF-W1-BT-02` prep; Team 05 completed Lane 1 scout; Team 06 is assigned `CF-W1-BT-02` |
 | Teams shut down due to no work | None permanently; Teams without ready implementation move to audit/refinement |
 | Teams re-added due to new work | Team 07 completed `CF-W1-L3-AUTH-02`; Team 06 completed `CF-W1-SIG-TRIGGER-01` |
-| Ready queue depth | 0 available-to-pull application-code items; accepted branch commits remain parked for later clean integration |
+| Ready queue depth | 0 unassigned; `CF-W1-BT-02` is promoted and assigned to Team 06 |
 | Refinement queue depth | Active market-intelligence queue: `CF-W1-BT-02`, `CF-W1-HCTX-01`, `CF-W1-MCTX-01`, `CF-W1-CAL-01`, `CF-W1-SQLAB-02`, `CF-W1-STRAT-02`, `CF-W1-DQ-02`, `CF-W1-TP-01B`, `CF-W1-MD-02`, `CF-W1-UX-01` |
 | Integration queue depth | Branch-local accepted commits are parked; shared `dev` integration is deferred until clean exact scope |
 | Decision inbox count | 0 open decisions |
 | Spawned subagent active limit | 6 |
 | Spawned subagent queue doc | `00-control/team-agent-runtime-queue.md` |
-| Ready-work pressure | none unassigned; next safe work is docs-only architecture/QA prep |
+| Ready-work pressure | `CF-W1-BT-02` assigned to Team 06; next gates are implementation, Team 04 QA, Team 10 review, Architect Signoff, delegated PO acceptance |
 | Blocked-work pressure | low-to-medium; blockers are readiness/packet gates, clean integration scope, and intentionally demoted low-value platform/notification/alert convenience items |
-| Next team to launch | Team 03 architecture/contract refresh for `CF-W1-BT-02` |
-| Next item to assign | `CF-W1-BT-02`, then `CF-W1-HCTX-01`, `CF-W1-MCTX-01`, and `CF-W1-CAL-01` |
+| Next team to launch | Team 06 implementation for `CF-W1-BT-02` |
+| Next item to assign | After BT-02 launch, continue docs prep with `CF-W1-HCTX-01`, then `CF-W1-MCTX-01`, and `CF-W1-CAL-01` |
 | Last commit at Team 00 resume start | `8450df1 docs: refresh requirements priority queue` |
 | Daemon should continue | Yes; Product Owner action is not required |
 

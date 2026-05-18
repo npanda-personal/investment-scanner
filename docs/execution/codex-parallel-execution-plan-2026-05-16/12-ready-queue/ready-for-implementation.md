@@ -6,8 +6,11 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+`CF-W1-BT-02` is promoted and assigned to Team 06 for a bounded `backtesting-strategy-lab` implementation in a dedicated worktree.
+
 2026-05-18 Team 00 promotion update:
 
+- `CF-W1-BT-02` is promoted after Team 03 refreshed the narrowed architecture/contract/work packet and Team 04 accepted the narrowed QA plan. Implementation is limited to canonical run-level review disposition plus shared saved-list/detail reason summary.
 - `CF-W1-STRAT-02A` was promoted, implemented, accepted through QA/review/Architect/delegated PO gates, and locally committed on its Team 06 branch as `359d0a3`.
 - `CF-W1-DQ-02A` was promoted, implemented, accepted through QA/review/Architect/delegated PO gates, and locally committed on its Team 05 branch as `c2d6753`.
 - `CF-W1-UX-01A` was promoted, implemented, accepted through QA/review/Architect/delegated PO gates, and locally committed on its Team 08 branch as `246d5a3`.
@@ -37,6 +40,7 @@ No available application-code item is currently waiting unassigned in Ready.
 | `CF-W1-STRAT-02A` | Team 06 - Strategy / Signal / Risk | `codex/team06-strategy-signal/CF-W1-STRAT-02A` | `../investment-scanner-worktrees/team06-CF-W1-STRAT-02A` | No-schema Strategy Framework rule metadata and DQ gate trust exposure | Accepted and locally committed as `359d0a3`; awaiting later clean `dev` integration |
 | `CF-W1-UX-01A` | Team 08 - UX / Research / Copilot | `codex/team08-ux-research/CF-W1-UX-01A` | `../investment-scanner-worktrees/team08-CF-W1-UX-01A` | Frontend-only Stock Research Workbench trust framing from current page evidence | Accepted and locally committed as `246d5a3`; awaiting later clean `dev` integration |
 | `CF-W1-DQ-02A` | Team 05 - Market Data / Data Quality | `codex/team05-market-data/CF-W1-DQ-02A` | `../investment-scanner-worktrees/team05-CF-W1-DQ-02A` | Backend-only DQE currentness evidence and fail-closed propagation | Accepted and locally committed as `c2d6753`; awaiting later clean `dev` integration |
+| `CF-W1-BT-02` | Team 06 - Strategy / Signal / Risk | `codex/team06-strategy-signal/CF-W1-BT-02` | `../investment-scanner-worktrees/team06-CF-W1-BT-02` | Backtesting canonical review disposition and saved-list/detail reason-summary normalization | Promoted and assigned to Team 06 |
 | `CF-W1-L3-PORT-01A` | Team 07 - Portfolio / Watchlist / Alerts | `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A` | `../investment-scanner-worktrees/team07-CF-W1-L3-PORT-01A` | Backend-only portfolio-management readiness DTOs | Rejected / Rework after Team 10 review; Team 07 revision pending |
 | `CF-W1-TP-01B` | Team 06 - Strategy / Signal / Risk | `codex/team06-strategy-signal/CF-W1-TP-01B` | `../investment-scanner-worktrees/team06-CF-W1-TP-01B` | Backend-only Trade Plan DQ hard-block and target compatibility | Implemented in worktree; Team 10 review pending |
 | `CF-W1-NOTIF-02` | Team 09 - Platform / Auth / Subscription / Notifications | `codex/team09-platform/CF-W1-NOTIF-02` | `../investment-scanner-worktrees/team09-CF-W1-NOTIF-02` | Backend-only local notification log redaction | Ready and pulled by Team 09 for implementation |
@@ -45,6 +49,93 @@ No available application-code item is currently waiting unassigned in Ready.
 | `CF-W1-L3-TREV-01` | Team 07 - Portfolio / Watchlist / Alerts | `codex/team07-portfolio-alerts/CF-W1-L3-TREV-01` | `../investment-scanner-worktrees/team07-CF-W1-L3-TREV-01` | Today Review run/list publication evidence and readiness-coherence normalization | Ready and assigned to Team 07 |
 | `CF-W1-SQLAB-01` | Team 06 - Strategy / Signal / Risk | `codex/team06-strategy-signal/CF-W1-SQLAB-01` | `../investment-scanner-worktrees/team06-CF-W1-SQLAB-01` | Backend-only Signal Quality Lab outcome-confidence metadata | Ready and assigned to Team 06 |
 | `CF-W1-AUTH-SUB-01` | Team 09 - Platform / Auth / Subscription / Notifications | `codex/team09-platform/CF-W1-AUTH-SUB-01` | `../investment-scanner-worktrees/team09-CF-W1-AUTH-SUB-01` | Combined backend-only auth fail-closed and admin/manual subscription controller-policy slice | Accepted and locally committed as `354499d`; awaiting later clean `dev` integration |
+
+## Active Ready Handoff - `CF-W1-BT-02`
+
+Date promoted: 2026-05-18
+
+Team 00 evaluated `CF-W1-BT-02` against Ready gates and promoted it as an independent Team 06 implementation slice.
+
+Gate evidence:
+
+- Requirement: `10-requirements/CF-W1-BT-02-backtesting-outcome-review-traceability-requirement.md`
+- Architecture review: `03-architecture/CF-W1-BT-02-architecture-review.md`
+- Contract: `06-contracts/CF-W1-BT-02-backtesting-outcome-review-traceability-contract.md`
+- Work packet: `08-work-packets/CF-W1-BT-02-work-packet.md`
+- QA plan: `04-qa/CF-W1-BT-02-qa-plan.md`
+- Team 03 architecture outbox: `17-team-outboxes/TEAM-03-architecture-factory.md`
+- Team 04 QA outbox: `17-team-outboxes/TEAM-04-qa-factory.md`
+- Open decisions: none.
+- Shared/high-risk blocker: none if implementation stays inside the reserved backend module and feature-local frontend files.
+
+Branch/worktree:
+
+- Branch: `codex/team06-strategy-signal/CF-W1-BT-02`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-BT-02`
+
+Allowed files:
+
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.types.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+- `backend/tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.test.ts`
+- `frontend/src/features/backtesting-strategy-lab/types.ts`
+- `frontend/src/features/backtesting-strategy-lab/components/BacktestingStrategyLabPage.tsx`
+- `frontend/tests/ui/backtesting-strategy-lab.spec.ts`
+
+Allowed branch-local evidence docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-BT-02-developer-handoff.md`
+
+Forbidden files:
+
+- Prisma schema or migrations
+- generated files
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.repository.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.controller.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.router.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.validation.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.module.ts`
+- `backend/src/modules/backtesting-strategy-lab/index.ts`
+- backend or frontend route registries
+- `backend/src/modules/strategy-framework/**`
+- `backend/src/modules/trade-plan-risk-engine/**`
+- `frontend/src/features/backtesting-strategy-lab/api/**`
+- `frontend/src/features/backtesting-strategy-lab/hooks/**`
+- `frontend/src/features/backtesting-strategy-lab/routes.tsx`
+- shared backend utilities
+- shared frontend components
+- package manifests
+- providers, startup/backfill, live-provider, paid/cloud, telemetry, broker, or historical docs
+
+Required behavior:
+
+- add additive run-level review-disposition fields equivalent to `TRUSTED_REVIEW`, `PARTIAL_REVIEW`, `DIAGNOSTIC_ONLY`, `LEGACY_REPAIRED`, and `WITHHELD`;
+- add one concise reason summary and specific reason list derived from current module evidence;
+- derive review disposition only from existing availability, calculation-audit, coverage, benchmark, exit-diagnostic, and trade-count evidence;
+- make the saved-run list and selected-run detail show the same disposition label and reason summary for the same run;
+- preserve existing benchmark, availability, data-coverage, exit-diagnostic, realism-warning, and calculation-audit evidence;
+- preserve registered and custom-run execution behavior, routes, query params, and current payload fields;
+- keep research-support language and avoid direct advice, target-price, guarantee, broker, or automation wording.
+
+Focused validation guidance:
+
+```powershell
+cd backend
+npm.cmd test -- backtesting-strategy-lab.service.test.ts --runInBand
+npm.cmd run build
+```
+
+If frontend files are changed:
+
+```powershell
+cd frontend
+npm.cmd run test:ui -- backtesting-strategy-lab.spec.ts --workers=1
+npm.cmd run build
+```
+
+Stop and return to Team 00 if implementation requires any forbidden file, schema/generated/route/shared changes, `strategy-framework` or `trade-plan-risk-engine` source edits, frontend API/hook/route changes, simulation math changes, benchmark math changes, route-contract changes, shared UI, cross-module source changes, or trade-level structured rule-ID expansion.
 
 ## Active Ready Handoff - `CF-W1-AUTH-SUB-01`
 

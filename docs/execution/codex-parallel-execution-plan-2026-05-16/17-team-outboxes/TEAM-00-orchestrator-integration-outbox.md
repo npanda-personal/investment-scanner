@@ -1230,3 +1230,71 @@ Team 04 should prepare `CF-W1-BT-02` QA planning now. Team 00 must still evaluat
 - Team 03: `CF-W1-HCTX-01` architecture/contract prep after Team 04 is launched.
 - Team 05: market-data / DQ recommendation output pending.
 - Team 06: signal / strategy / Trade Plan work after Team 00 selection.
+
+---
+
+# Lane 1 Scout And HCTX Dispatch
+
+Date: 2026-05-18
+
+## Consumed Team 05 Output
+
+Team 05 `019e3bae-63f2-75f2-b48b-b9bae671eefa` completed the Market Data / Data Quality scout.
+
+Recommendation:
+
+- Next Lane 1 item: `CF-W1-DQ-02`.
+- Current state: architecture/QA-prep-only.
+- No new Lane 1 Ready pull.
+- Broader `CF-W1-DQ-02` remains split because persisted `DataQualityEvaluation` rows do not durably store session-aware currentness fields.
+- `CF-W1-MD-02` remains ADR/storage-approval-gated before schema/source work.
+
+## New Dispatch
+
+Team 03 `019e3bb2-2657-7e92-8a79-ad7b7521bcbd` is active on `CF-W1-HCTX-01` architecture/contract refresh.
+
+Team 04 `019e3bb0-d8ec-78d0-a908-da63263be3d2` remains active on `CF-W1-BT-02` QA planning.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06: signal / strategy / Trade Plan work after Team 00 selection.
+- Team 10: next review/release gate after QA accepts an implementation handoff.
+- Team 05: idle; next Lane 1 work should stay architecture/QA prep until Team 00 promotes a bounded item.
+
+---
+
+# BT-02 Ready Promotion
+
+Date: 2026-05-18
+
+## Gate Result
+
+`CF-W1-BT-02` is promoted to Ready and assigned to Team 06.
+
+Evidence:
+
+- Requirement: `10-requirements/CF-W1-BT-02-backtesting-outcome-review-traceability-requirement.md`
+- Architecture review: `03-architecture/CF-W1-BT-02-architecture-review.md`
+- Contract: `06-contracts/CF-W1-BT-02-backtesting-outcome-review-traceability-contract.md`
+- Work packet: `08-work-packets/CF-W1-BT-02-work-packet.md`
+- QA plan: `04-qa/CF-W1-BT-02-qa-plan.md`
+- Open decisions: none
+- Shared-file conflict: none inside the reserved first child
+
+Branch/worktree:
+
+- Branch: `codex/team06-strategy-signal/CF-W1-BT-02`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-BT-02`
+
+## Scope
+
+Allowed implementation scope is limited to the reserved `backtesting-strategy-lab` service/types/doc/test plus feature-local types/page/UI smoke files.
+
+Forbidden scope includes schema/generated files, repository/controller/router/validation/module/export changes, route registries, shared utilities/UI, frontend API/hooks/routes, Strategy Framework source, Trade Plan source, simulation math, benchmark math, route-contract changes, cross-module source changes, provider/startup/live/paid/cloud/telemetry/broker flows, and trade-level structured rule-ID expansion.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06: implement `CF-W1-BT-02`.
+- Team 04: QA after Team 06 handoff.
+- Team 10: review after Team 04 accepts.
+- Team 03: continue `CF-W1-HCTX-01`.

@@ -496,3 +496,73 @@ Date: 2026-05-18
 ## Next Coordination Action
 
 Commit the consumed Team 02/03 docs and Team 04 handoff if staged scope is clean, then spawn Team 04 for `CF-W1-BT-02` QA planning.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
+## Dispatch Update
+
+- Team 04 QA Factory is active on `CF-W1-BT-02` QA planning as `019e3bb0-d8ec-78d0-a908-da63263be3d2`.
+- Team 05 Lane 1 scout completed as `019e3bae-63f2-75f2-b48b-b9bae671eefa`; recommendation is `CF-W1-DQ-02` architecture/QA-prep-only, no new Lane 1 Ready pull.
+- Team 03 Architecture Factory is active on `CF-W1-HCTX-01` as `019e3bb2-2657-7e92-8a79-ad7b7521bcbd`.
+
+## Current Git State
+
+- Branch: `dev`.
+- Latest docs commit before this spawn update: `bd2098c docs: prepare backtesting review QA handoff`.
+- Shared `dev` remains not push-safe because `backend/tests/modules/alerts-monitoring/alerts-monitoring.ownership.test.ts` is dirty outside the current docs checkpoint.
+- No push performed.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06 is ready for signal / strategy / Trade Plan work after Team 00 selects the next item.
+- Team 10 is idle until the next QA-accepted implementation handoff.
+- Team 05 is idle; next Lane 1 task should be `CF-W1-DQ-02` architecture/QA prep only.
+
+## Next Coordination Action
+
+Consume Team 04 `CF-W1-BT-02` QA output and Team 03 `CF-W1-HCTX-01` architecture output as they finish. If `BT-02` QA accepts the plan, Team 00 should evaluate `CF-W1-BT-02` for Ready promotion before assigning implementation.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
+## Ready Promotion
+
+`CF-W1-BT-02` is promoted for Team 06 implementation.
+
+Gate result:
+
+- Requirement exists and is narrowed to canonical run-level review disposition plus list/detail reason summary.
+- Team 03 architecture review, contract, and work packet are refreshed and return `Ready candidate`.
+- Team 04 QA plan is refreshed and QA-plan ready.
+- Open decisions: 0.
+- Shared/high-risk blockers: none if implementation stays in the reserved `backtesting-strategy-lab` backend and feature-local frontend files.
+
+## Branch / Worktree
+
+- Branch: `codex/team06-strategy-signal/CF-W1-BT-02`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-BT-02`
+
+## Current Git State
+
+- Branch: `dev`.
+- Latest docs commit before this promotion update: `bd2098c docs: prepare backtesting review QA handoff`.
+- Shared `dev` remains not push-safe because `backend/tests/modules/alerts-monitoring/alerts-monitoring.ownership.test.ts` is dirty outside the current docs checkpoint.
+- No push performed.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06 is ready to implement `CF-W1-BT-02`.
+- Team 04 is ready for `CF-W1-BT-02` QA after Team 06 handoff.
+- Team 10 is ready for review after QA accepts.
+- Team 03 is active on `CF-W1-HCTX-01`; next architecture item is `CF-W1-MCTX-01`.
+
+## Next Coordination Action
+
+Commit the active-doc Ready promotion if staged scope is clean, create the Team 06 worktree, and spawn Team 06 implementation.
