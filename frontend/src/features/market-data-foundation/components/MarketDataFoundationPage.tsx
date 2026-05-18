@@ -50,6 +50,8 @@ import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { normalizeAssetTypeForMarketDataApi, normalizeMarketForApi } from '../api/marketScopeApi';
 
 const formatTimestamp = (timestamp: string) => new Date(timestamp).toLocaleString();
+const formatDateOnly = (date?: string | null) => date ? new Date(`${date.slice(0, 10)}T00:00:00`).toLocaleDateString() : 'No candle';
+const dataThroughDate = (instrument: V1Instrument) => instrument.stored_data_through_date || instrument.latest_price_date || null;
 const formatMarketCap = (value: number | null) => value === null ? 'N/A' : new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(value);
 const formatAssetType = (value: string) => value === 'EQUITY' ? 'STOCK' : value;
 const formatBytes = (value?: number) => value === undefined ? 'n/a' : `${(value / 1024).toFixed(1)} KB`;
@@ -685,7 +687,18 @@ const MarketDataFoundationPage: React.FC = () => {
         );
       },
     },
-    { id: 'lastSuccessfulDataLoadTimestamp', label: 'Last Updated', sortable: true, render: (instrument) => formatTimestamp(instrument.last_updated_timestamp) },
+    {
+      id: 'lastSuccessfulDataLoadTimestamp',
+      label: 'Data Through',
+      sortable: true,
+      render: (instrument) => (
+        <Tooltip title={`Catalog row last changed ${formatTimestamp(instrument.last_updated_timestamp)}`} arrow>
+          <Typography component="span" sx={subtleCellText}>
+            {formatDateOnly(dataThroughDate(instrument))}
+          </Typography>
+        </Tooltip>
+      ),
+    },
     {
       id: 'actions',
       label: 'Actions',
@@ -1256,11 +1269,12 @@ const MarketDataFoundationPage: React.FC = () => {
                 <Typography variant="body2"><strong>Universe state:</strong> {selectedInstrument.universe_state || 'Not classified'}</Typography>
                 <Typography variant="body2"><strong>Price history bars:</strong> {selectedInstrument.price_history_bars ?? 0}</Typography>
                 <Typography variant="body2"><strong>Latest price date:</strong> {selectedInstrument.latest_price_date || 'Missing'}</Typography>
+                <Typography variant="body2"><strong>Data through:</strong> {formatDateOnly(dataThroughDate(selectedInstrument))}</Typography>
                 <Typography variant="body2"><strong>Expected trading date:</strong> {selectedInstrument.expected_latest_trading_date || 'Unknown'}</Typography>
                 <Typography variant="body2"><strong>Recent volume:</strong> {selectedInstrument.has_recent_volume ? 'Present' : 'Missing'}</Typography>
                 <Typography variant="body2"><strong>Readiness blockers:</strong> {selectedInstrument.readiness_blockers?.length ? selectedInstrument.readiness_blockers.join(', ') : 'None'}</Typography>
                 <Typography variant="body2"><strong>Data status:</strong> {selectedInstrument.data_status}</Typography>
-                <Typography variant="body2"><strong>Last updated:</strong> {formatTimestamp(selectedInstrument.last_updated_timestamp)}</Typography>
+                <Typography variant="body2"><strong>Catalog row updated:</strong> {formatTimestamp(selectedInstrument.last_updated_timestamp)}</Typography>
               </Stack>
             </Box>
             <Divider />

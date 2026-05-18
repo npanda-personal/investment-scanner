@@ -240,6 +240,46 @@ export class MarketDataFoundationRepository {
     });
   }
 
+  async listStaleActiveStockSyncTasks(
+    options: Pick<PaginationOptions, 'region' | 'assetType' | 'instrumentSegment'> = {},
+    targetTradingDate: string,
+    take?: number,
+    excludeIds: string[] = []
+  ): Promise<Array<{ id: string; symbol: string; providerSymbol: string | null; lastSuccessfulDataLoadTimestamp: Date | null }>> {
+    const target = new Date(`${targetTradingDate}T00:00:00.000Z`);
+    const excludeFilter = excludeIds.length > 0
+      ? Prisma.sql`AND stocks.id NOT IN (${Prisma.join(excludeIds)})`
+      : Prisma.sql``;
+    const limitFilter = typeof take === 'number'
+      ? Prisma.sql`LIMIT ${Math.max(1, take)}`
+      : Prisma.sql``;
+
+    return this.prisma.$queryRaw<Array<{ id: string; symbol: string; providerSymbol: string | null; lastSuccessfulDataLoadTimestamp: Date | null }>>(Prisma.sql`
+      WITH latest_by_stock AS (
+        SELECT
+          stocks.id,
+          stocks.symbol,
+          stocks."providerSymbol",
+          stocks."lastSuccessfulDataLoadTimestamp",
+          MAX(price_ticks.timestamp) AS "latestStoredTimestamp"
+        FROM stocks
+        LEFT JOIN price_ticks ON price_ticks.symbol = stocks.symbol
+        WHERE ${this.activeStockSyncTaskSqlWhere(options)}
+        ${excludeFilter}
+        GROUP BY stocks.id, stocks.symbol, stocks."providerSymbol", stocks."lastSuccessfulDataLoadTimestamp"
+      )
+      SELECT
+        id,
+        symbol,
+        "providerSymbol",
+        "lastSuccessfulDataLoadTimestamp"
+      FROM latest_by_stock
+      WHERE "latestStoredTimestamp" IS NULL OR "latestStoredTimestamp" < ${target}
+      ORDER BY "latestStoredTimestamp" ASC NULLS FIRST, "lastSuccessfulDataLoadTimestamp" ASC NULLS FIRST, symbol ASC
+      ${limitFilter}
+    `);
+  }
+
   countActiveStockSyncTasks(options: Pick<PaginationOptions, 'region' | 'assetType' | 'instrumentSegment'> = {}) {
     return this.prisma.stock.count({
       where: {
@@ -251,6 +291,28 @@ export class MarketDataFoundationRepository {
         ],
       },
     });
+  }
+
+  async countStaleActiveStockSyncTasks(
+    options: Pick<PaginationOptions, 'region' | 'assetType' | 'instrumentSegment'> = {},
+    targetTradingDate: string
+  ): Promise<number> {
+    const target = new Date(`${targetTradingDate}T00:00:00.000Z`);
+    const rows = await this.prisma.$queryRaw<Array<{ count: number | bigint }>>(Prisma.sql`
+      WITH latest_by_stock AS (
+        SELECT
+          stocks.id,
+          MAX(price_ticks.timestamp) AS "latestStoredTimestamp"
+        FROM stocks
+        LEFT JOIN price_ticks ON price_ticks.symbol = stocks.symbol
+        WHERE ${this.activeStockSyncTaskSqlWhere(options)}
+        GROUP BY stocks.id
+      )
+      SELECT COUNT(*)::int AS count
+      FROM latest_by_stock
+      WHERE "latestStoredTimestamp" IS NULL OR "latestStoredTimestamp" < ${target}
+    `);
+    return Number(rows[0]?.count || 0);
   }
 
   async upsertCatalogInstrument(data: CreateStockRequest): Promise<{ stock: any; action: 'inserted' | 'updated' | 'noOp' }> {
@@ -2097,6 +2159,40 @@ export class MarketDataFoundationRepository {
     }
 
     return filters.length > 0 ? Prisma.join(filters, ' AND ') : Prisma.sql`TRUE`;
+  }
+
+  private activeStockSyncTaskSqlWhere(options: Pick<PaginationOptions, 'region' | 'assetType' | 'instrumentSegment'> = {}): Prisma.Sql {
+    const filters: Prisma.Sql[] = [
+      this.scopedStockSqlWhere(options),
+      Prisma.sql`stocks."isActive" = TRUE`,
+      Prisma.sql`(
+        stocks."providerSupportStatus" IS NULL
+        OR UPPER(stocks."providerSupportStatus") IN (${Prisma.join(['SUPPORTED', 'UNKNOWN'])})
+      )`,
+    ];
+    const normalizedSegment = options.instrumentSegment?.trim().toUpperCase();
+    if (normalizedSegment) {
+      if (normalizedSegment === 'CASH') {
+        filters.push(Prisma.sql`(
+          (
+            UPPER(stocks."assetType") IN (${Prisma.join(['STOCK', 'EQUITY'])})
+            OR stocks."assetType" IS NULL
+          )
+          AND NOT (
+            UPPER(COALESCE(stocks."assetType", '')) IN (${Prisma.join(['FUTURE', 'FUTURES'])})
+            OR UPPER(COALESCE(stocks."instrumentSegment", '')) = ${'FUTURES'}
+          )
+        )`);
+      } else if (normalizedSegment === 'FUTURES') {
+        filters.push(Prisma.sql`(
+          UPPER(stocks."assetType") IN (${Prisma.join(['FUTURE', 'FUTURES'])})
+          OR UPPER(COALESCE(stocks."instrumentSegment", '')) = ${'FUTURES'}
+        )`);
+      } else {
+        filters.push(Prisma.sql`UPPER(COALESCE(stocks."instrumentSegment", stocks."assetType", '')) = ${normalizedSegment}`);
+      }
+    }
+    return Prisma.join(filters, ' AND ');
   }
 
   private stockWhere(options: Pick<PaginationOptions, 'region' | 'assetType' | 'instrumentSegment'>): Prisma.StockWhereInput {

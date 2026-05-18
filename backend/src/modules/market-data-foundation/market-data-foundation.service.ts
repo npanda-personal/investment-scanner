@@ -126,6 +126,7 @@ type CatalogSyncRunRecord = CatalogSyncRunStatusResponse & {
   force: boolean;
   fullReload: boolean;
   tradingDate: string;
+  targetTradingDate: string;
   providerEndDate?: Date;
   processedTaskIds: Set<string>;
 };
@@ -3552,6 +3553,7 @@ export class MarketDataFoundationService {
     const assetType = options.assetType || 'STOCK';
     const now = options.now || new Date();
     const tradingDate = tradingDateForRegion(region, now) || now.toISOString().slice(0, 10);
+    const targetTradingDate = latestCompletedTradingDateForRegion(region, now) || tradingDate;
     const gate = await this.evaluateSyncFreshnessGate({
       region,
       assetType,
@@ -3567,27 +3569,36 @@ export class MarketDataFoundationService {
       skipWeekends: options.skipWeekends,
     });
     if (gate.shouldSkip) {
-      console.log(`Catalog sync skipped: ${gate.reason}. No provider fetch required. Next eligible sync at ${gate.nextEligibleSyncAt ?? 'unknown'}`);
-      const skippedCount = await this.repository.instrumentCount({ region, assetType });
-      const summary = this.buildSkippedRegionSummary(region, assetType, tradingDate, skippedCount, gate.reason, gate.message, now, gate.nextEligibleSyncAt);
-      await this.repository.upsertSyncState({
-        region,
-        assetType,
-        scopeType: 'CATALOG',
-        scopeKey: region,
-        tradingDate,
-        timeframe: '1D',
-        status: gate.reason === 'FINAL_CANDLE_CONFIRMED' ? 'FINAL_CONFIRMED' : 'SYNCED',
-        summary,
-        lastCheckedAt: now,
-      });
-      return summary;
+      const staleCount = await this.countStaleCatalogSyncTasks({ region, assetType }, targetTradingDate);
+      if (staleCount > 0) {
+        console.log(`Catalog sync continuing: ${staleCount} instruments still need latest completed candle ${targetTradingDate}.`);
+      } else {
+        console.log(`Catalog sync skipped: ${gate.reason}. No provider fetch required. Next eligible sync at ${gate.nextEligibleSyncAt ?? 'unknown'}`);
+        const skippedCount = await this.repository.instrumentCount({ region, assetType });
+        const summary = this.buildSkippedRegionSummary(region, assetType, tradingDate, skippedCount, gate.reason, gate.message, now, gate.nextEligibleSyncAt);
+        await this.repository.upsertSyncState({
+          region,
+          assetType,
+          scopeType: 'CATALOG',
+          scopeKey: region,
+          tradingDate,
+          timeframe: '1D',
+          status: gate.reason === 'FINAL_CANDLE_CONFIRMED' ? 'FINAL_CONFIRMED' : 'SYNCED',
+          summary,
+          lastCheckedAt: now,
+        });
+        return summary;
+      }
     }
 
-    const providerEndDate = gate.providerEndDate ?? now;
+    const providerEndDate = gate.shouldSkip
+      ? this.endOfTradingDateUtc(targetTradingDate)
+      : gate.providerEndDate ?? now;
     const batchSize = Math.max(1, Math.min(options.batchSize ?? 25, 250));
 
-    const tasks = await this.repository.listActiveStockSyncTasks({ region, assetType }, batchSize);
+    const tasks = gate.shouldSkip
+      ? await this.listStaleCatalogSyncTasks({ region, assetType }, targetTradingDate, batchSize)
+      : await this.repository.listActiveStockSyncTasks({ region, assetType }, batchSize);
     const summary: ScheduledRegionSyncSummary = {
       region,
       assetType,
@@ -4172,7 +4183,13 @@ export class MarketDataFoundationService {
 
     const now = new Date();
     const clamped = this.normalizeCatalogSyncRunRequest(request);
-    const totalCount = await this.countActiveStockSyncTasks({ region, assetType });
+    const tradingDate = tradingDateForRegion(region, now) || now.toISOString().slice(0, 10);
+    const targetTradingDate = latestCompletedTradingDateForRegion(region, now) || tradingDate;
+    const force = request.force === true || request.fullReload === true;
+    const totalCount = await this.countCatalogSyncTasks({ region, assetType }, {
+      force,
+      targetTradingDate,
+    });
     const runId = this.createCatalogSyncRunId(now);
     const warnings = [...clamped.warnings];
     const run: CatalogSyncRunRecord = {
@@ -4212,9 +4229,10 @@ export class MarketDataFoundationService {
       statusUrl: `/api/market-data-foundation/stocks/sync-runs/${runId}`,
       activeKey,
       cancelRequested: false,
-      force: request.force === true || request.fullReload === true,
+      force,
       fullReload: request.fullReload === true,
-      tradingDate: tradingDateForRegion(region, now) || now.toISOString().slice(0, 10),
+      tradingDate,
+      targetTradingDate,
       processedTaskIds: new Set<string>(),
     };
 
@@ -4265,18 +4283,24 @@ export class MarketDataFoundationService {
           cooldownMinutes: this.manualSyncCooldownMinutes,
         });
         if (gate.shouldSkip) {
-          run.processedCount = run.totalCount;
-          run.skippedCount = run.totalCount;
-          run.hasMore = false;
-          run.percentComplete = 100;
-          run.status = 'COMPLETED';
-          run.message = gate.message;
-          this.addCatalogSyncWarning(run, gate.message);
-          await this.persistCatalogSyncRunState(run, gate.reason === 'FINAL_CANDLE_CONFIRMED' ? 'FINAL_CONFIRMED' : 'SYNCED', now);
-          this.completeCatalogSyncRun(run);
-          return;
+          const staleCatchUpAllowed = await this.enableCatalogStaleCatchUpIfNeeded(run, now);
+          if (staleCatchUpAllowed) {
+            run.providerEndDate = this.endOfTradingDateUtc(run.targetTradingDate);
+          } else {
+            run.processedCount = run.totalCount;
+            run.skippedCount = run.totalCount;
+            run.hasMore = false;
+            run.percentComplete = 100;
+            run.status = 'COMPLETED';
+            run.message = gate.message;
+            this.addCatalogSyncWarning(run, gate.message);
+            await this.persistCatalogSyncRunState(run, gate.reason === 'FINAL_CANDLE_CONFIRMED' ? 'FINAL_CONFIRMED' : 'SYNCED', now);
+            this.completeCatalogSyncRun(run);
+            return;
+          }
+        } else {
+          run.providerEndDate = gate.providerEndDate;
         }
-        run.providerEndDate = gate.providerEndDate;
       }
 
       while (run.batchesExecuted < run.maxBatches) {
@@ -4289,11 +4313,7 @@ export class MarketDataFoundationService {
           return;
         }
 
-        const tasks = await this.repository.listActiveStockSyncTasks(
-          { region: run.region, assetType: run.assetType },
-          run.batchSize,
-          Array.from(run.processedTaskIds)
-        );
+        const tasks = await this.listCatalogSyncTasks(run);
         if (tasks.length === 0) {
           run.hasMore = false;
           run.percentComplete = 100;
@@ -4476,6 +4496,64 @@ export class MarketDataFoundationService {
       return repository.instrumentCount(options);
     }
     return 0;
+  }
+
+  private async countCatalogSyncTasks(
+    options: Pick<PaginationOptions, 'region' | 'assetType'>,
+    config: { force: boolean; targetTradingDate: string }
+  ): Promise<number> {
+    const repository = this.repository as any;
+    if (!config.force && typeof repository.countStaleActiveStockSyncTasks === 'function') {
+      return repository.countStaleActiveStockSyncTasks(options, config.targetTradingDate);
+    }
+    return this.countActiveStockSyncTasks(options);
+  }
+
+  private async countStaleCatalogSyncTasks(
+    options: Pick<PaginationOptions, 'region' | 'assetType'>,
+    targetTradingDate: string
+  ): Promise<number> {
+    const repository = this.repository as any;
+    if (typeof repository.countStaleActiveStockSyncTasks !== 'function') return 0;
+    return repository.countStaleActiveStockSyncTasks(options, targetTradingDate);
+  }
+
+  private async listCatalogSyncTasks(run: CatalogSyncRunRecord): Promise<StockSyncTask[]> {
+    const repository = this.repository as any;
+    const options = { region: run.region, assetType: run.assetType };
+    const excludeIds = Array.from(run.processedTaskIds);
+    if (!run.force && !run.fullReload && typeof repository.listStaleActiveStockSyncTasks === 'function') {
+      return repository.listStaleActiveStockSyncTasks(options, run.targetTradingDate, run.batchSize, excludeIds);
+    }
+    return this.repository.listActiveStockSyncTasks(options, run.batchSize, excludeIds);
+  }
+
+  private async listStaleCatalogSyncTasks(
+    options: Pick<PaginationOptions, 'region' | 'assetType'>,
+    targetTradingDate: string,
+    batchSize: number,
+    excludeIds: string[] = []
+  ): Promise<StockSyncTask[]> {
+    const repository = this.repository as any;
+    if (typeof repository.listStaleActiveStockSyncTasks === 'function') {
+      return repository.listStaleActiveStockSyncTasks(options, targetTradingDate, batchSize, excludeIds);
+    }
+    return this.repository.listActiveStockSyncTasks(options, batchSize, excludeIds);
+  }
+
+  private async enableCatalogStaleCatchUpIfNeeded(run: CatalogSyncRunRecord, now: Date): Promise<boolean> {
+    if (run.force || run.fullReload) return false;
+    const staleCount = await this.countStaleCatalogSyncTasks({ region: run.region, assetType: run.assetType }, run.targetTradingDate);
+    if (staleCount <= 0) return false;
+
+    run.totalCount = staleCount;
+    run.hasMore = true;
+    run.percentComplete = this.catalogSyncPercent(run);
+    run.batchesPlanned = Math.min(run.maxBatches, Math.ceil(staleCount / run.batchSize));
+    run.message = `Catalog freshness is current at region level, but ${staleCount} instruments still need latest completed candle ${run.targetTradingDate}.`;
+    this.addCatalogSyncWarning(run, run.message);
+    run.updatedAt = now.toISOString();
+    return true;
   }
 
   private applyCatalogSyncBatchResults(

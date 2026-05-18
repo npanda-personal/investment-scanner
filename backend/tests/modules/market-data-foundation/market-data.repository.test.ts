@@ -297,6 +297,46 @@ describe('MarketDataFoundationRepository', () => {
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
   });
 
+  it('selects active stale sync tasks by per-symbol latest stored candle', async () => {
+    const prisma = {
+      $queryRaw: jest.fn().mockResolvedValue([
+        { id: 'stock-1', symbol: 'STALE.NS', providerSymbol: 'STALE.NS', lastSuccessfulDataLoadTimestamp: new Date('2026-05-17T00:00:00.000Z') },
+      ]),
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    const result = await repository.listStaleActiveStockSyncTasks(
+      { region: 'IN', assetType: 'STOCK' },
+      '2026-05-18',
+      25,
+      ['done-stock']
+    );
+
+    expect(result).toHaveLength(1);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    const query = prisma.$queryRaw.mock.calls[0][0];
+    expect(query.text).toContain('MAX(price_ticks.timestamp)');
+    expect(query.text).toContain('stocks."isActive" = TRUE');
+    expect(query.text).toContain('stocks."providerSupportStatus"');
+    expect(query.text).toContain('"latestStoredTimestamp" IS NULL OR "latestStoredTimestamp" <');
+    expect(query.text).toContain('stocks.id NOT IN');
+    expect(query.text).toContain('LIMIT');
+  });
+
+  it('counts active stale sync tasks by per-symbol latest stored candle', async () => {
+    const prisma = {
+      $queryRaw: jest.fn().mockResolvedValue([{ count: 42 }]),
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await expect(repository.countStaleActiveStockSyncTasks({ region: 'IN', assetType: 'STOCK' }, '2026-05-18')).resolves.toBe(42);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    const query = prisma.$queryRaw.mock.calls[0][0];
+    expect(query.text).toContain('COUNT(*)::int AS count');
+    expect(query.text).toContain('MAX(price_ticks.timestamp)');
+    expect(query.text).toContain('"latestStoredTimestamp" IS NULL OR "latestStoredTimestamp" <');
+  });
+
   it('groups repair states by stock id for trusted baseline classification', async () => {
     const prisma = {
       marketDataRepairState: {

@@ -513,7 +513,8 @@ Implemented validations:
 - Price timestamps normalized to UTC midnight for idempotent storage.
 - Regional mapping logic ensures `IN` filters for NSE/BSE and `India`.
 - Local search and catalog sync task selection respect the same region/asset scope filters used by list endpoints.
-- Scheduled batch selection prioritizes instruments with `null` or oldest `lastSuccessfulDataLoadTimestamp` before symbol order, so bounded scheduled runs do not repeatedly process only the first symbols alphabetically.
+- Scheduled and manual catalog sync select instruments whose own latest stored daily candle is missing or older than the latest completed trading date before using region-level no-new-data skips. This prevents a single current symbol from making stale instruments look current.
+- Forced/full-reload catalog sync still processes the active supported catalog queue and prioritizes instruments with `null` or oldest `lastSuccessfulDataLoadTimestamp` before symbol order, so bounded runs do not repeatedly process only the first symbols alphabetically.
 
 ## Idempotent Persistence Rules
 

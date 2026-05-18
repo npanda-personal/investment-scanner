@@ -1874,6 +1874,82 @@ describe('MarketDataFoundationService syncV1', () => {
     }
   });
 
+  it('continues catalog sync for stale instruments when the region-level latest candle is current', async () => {
+    resetCatalogSyncRuns();
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-18T12:00:00.000Z'));
+    const timeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation((() => 0) as any);
+    const tasks = [
+      { id: 'stock-1', symbol: 'STALE.NS', providerSymbol: 'STALE.NS', lastSuccessfulDataLoadTimestamp: new Date('2026-05-17T00:00:00.000Z') },
+    ];
+    const repository = {
+      countStaleActiveStockSyncTasks: jest.fn().mockResolvedValue(tasks.length),
+      listStaleActiveStockSyncTasks: jest.fn().mockResolvedValue(tasks),
+      listActiveStockSyncTasks: jest.fn(),
+      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue('2026-05-18'),
+      getSyncState: jest.fn().mockResolvedValue({
+        status: 'SYNCED',
+        lastCheckedAt: new Date('2026-05-18T12:00:00.000Z').toISOString(),
+      }),
+      upsertSyncState: jest.fn().mockResolvedValue({}),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+    jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
+      rowsReceived: 1,
+      rowsInserted: 1,
+      rowsUpdated: 0,
+      rowsSkipped: 0,
+      rowsNoOp: 0,
+      warningCount: 0,
+      warnings: [],
+    });
+
+    try {
+      const start = await service.startCatalogSyncRun({
+        region: 'IN',
+        assetType: 'STOCK',
+        batchSize: 1,
+        maxBatches: 1,
+      });
+
+      await (service as any).processCatalogSyncRun(start.runId);
+      const status = service.getCatalogSyncRun(start.runId);
+
+      expect(repository.countStaleActiveStockSyncTasks).toHaveBeenCalledWith(
+        { region: 'IN', assetType: 'STOCK' },
+        '2026-05-18'
+      );
+      expect(repository.listStaleActiveStockSyncTasks).toHaveBeenCalledWith(
+        { region: 'IN', assetType: 'STOCK' },
+        '2026-05-18',
+        1,
+        []
+      );
+      expect(repository.listActiveStockSyncTasks).not.toHaveBeenCalled();
+      expect(service.ingestSymbol).toHaveBeenCalledWith(
+        'STALE.NS',
+        undefined,
+        new Date('2026-05-18T23:59:59.999Z'),
+        false,
+        expect.objectContaining({
+          region: 'IN',
+          assetType: 'STOCK',
+          skipFreshnessGate: true,
+        })
+      );
+      expect(status).toMatchObject({
+        status: 'COMPLETED',
+        totalCount: 1,
+        processedCount: 1,
+        succeededCount: 1,
+        rowsInserted: 1,
+      });
+    } finally {
+      timeoutSpy.mockRestore();
+      jest.useRealTimers();
+      resetCatalogSyncRuns();
+    }
+  });
+
   it('marks active catalog sync runs for cancellation without aborting the current batch', async () => {
     resetCatalogSyncRuns();
     const timeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation((() => 0) as any);
