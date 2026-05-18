@@ -1,5 +1,38 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - STRAT-03 Review Accepted, BT-01A Rework, SIG-02 QA Routing
+
+Date: 2026-05-18
+
+Team 00 consumed:
+
+- Team 03 `CF-W1-SIG-02` architecture output and closed the completed Team 03 agent.
+- Team 10 `CF-W1-STRAT-03` review ACCEPT and closed the completed Team 10 agent.
+- Team 02 rolling requirements output and closed the completed Team 02 agent.
+
+Routing:
+
+- `CF-W1-SIG-02`: routed to Team 04 for docs-only QA planning.
+- `CF-W1-SIG-02`: remains a Ready candidate only; implementation sequencing must account for accepted parked `CF-W1-SIG-TRIGGER-02A` commit `788c237`.
+- `CF-W1-BT-01A`: routed back to Team 06 for corrected test/doc-only characterization rework in `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-BT-01A`.
+- `CF-W1-STRAT-03`: routed to Team 03 Architect Signoff in `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-STRAT-03`.
+- `CF-W1-SQLAB-02B`: recorded as a durable learning-memory requirement but not implementation-safe without explicit schema/repository/generated approval.
+
+Current active agents:
+
+- None at this checkpoint before the next spawn wave.
+
+Teams ready to pick up new tasks:
+
+- Team 06: `CF-W1-BT-01A` corrected characterization rework.
+- Team 04: `CF-W1-SIG-02` QA planning.
+- Team 03: `CF-W1-STRAT-03` Architect Signoff.
+- Team 02: persistent requirements discovery.
+
+Product Owner action required: no.
+
+---
+
 Date: 2026-05-17
 
 Owner: Team 00 - Master Orchestrator / Integration

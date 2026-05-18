@@ -4,6 +4,103 @@ Date: 2026-05-19
 
 Mode: docs-only requirement discovery after rechecking root `AGENTS.md`, the live runtime queue, ready/blocked queues, next-top-10 candidates, backlog/refinement queues, current module audits, and current backtesting source docs. No application code, tests, Prisma, route registries, package manifests, generated files, Team 00 control docs, Ready queue files, architecture docs, or QA docs changed.
 
+## 2026-05-19 Durable Signal Learning Memory Discovery
+
+## Work Item
+
+Continue Team 02 requirement discovery on a different under-served direct investor/trader-value workflow, then add the missing requirement artifact for durable post-event learning memory and refresh Team 02 ranking docs so they no longer point at already-routed `CF-W1-SIG-02`.
+
+## Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SQLAB-02B-signal-outcome-journal-durable-learning-memory-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+## Files Inspected
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/team-agent-runtime-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/ready-for-implementation.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SQLAB-02-signal-outcome-journal-post-event-learning-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-SQLAB-02-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-SQLAB-02-signal-outcome-journal-post-event-learning-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-SQLAB-02-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-SQLAB-02A-qa-plan.md`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.md`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md`
+- `docs/codex-agent-team-plan/po-current-state-review-2026-05-13-cycle2.md`
+
+## Audited Workflow
+
+Signal Quality Lab durable post-event learning memory: turning measured signal outcomes into a module-owned local research-memory workflow instead of leaving learning as a transient preview only.
+
+## Evidence Summary
+
+- `signal-quality-lab.md` still says outcomes are on-demand only and that no outcome persistence table exists in the MVP.
+- Team 03 already split `CF-W1-SQLAB-02` into `CF-W1-SQLAB-02A` derived preview and future durable child `CF-W1-SQLAB-02B`, but Team 02 had not yet created the durable child requirement artifact.
+- The existing contract and work packet both say `CF-W1-SQLAB-02A` must not claim persistence and that durable storage remains blocked until a separate approved packet exists.
+- `signal-calibration-engine.md` still depends on historical outcome evidence, so durable local learning memory remains meaningful even after the no-schema preview child exists.
+- The Product Owner current-state review still calls out missing disciplined research workflow memory, which keeps this gap investor-relevant and distinct from active `SIG-02`, `RH-01`, and `TREV-02` work.
+
+## Requirement Added
+
+Added `CF-W1-SQLAB-02B-signal-outcome-journal-durable-learning-memory-requirement.md`.
+
+Bounded scope:
+
+- explicit durable child for `signal-quality-lab` post-event learning memory;
+- one module-owned local learning record per measured signal-result and selected horizon scope;
+- durable status, lesson classification, concise summary, and derivation provenance;
+- explicit idempotent update behavior;
+- no preview-child widening, no cross-module storage reuse, and no implicit schema approval.
+
+## Queue Delta
+
+- `CF-W1-SQLAB-02` is now treated as lineage only; the remaining storage gap is explicit child `CF-W1-SQLAB-02B`.
+- `CF-W1-SIG-02` is removed from the fresh Team 02 discovery opening because it is already in active Team 03 architecture prep.
+- `CF-W1-SQLAB-02B` becomes the next fresh Team 02 docs-only requirement gap, but it is consent-gated rather than parallel-safe for implementation.
+- `CF-W1-RH-01`, `CF-W1-L3-TREV-02`, and `CF-W1-SQLAB-02A` remain stronger Team 00 near-term routing items than the new storage child because they already have downstream prep or sequencing paths.
+
+## Team 00 Parallel-Safe Candidates
+
+1. `CF-W1-RH-01`
+   - keep as Team 00 Ready evaluation;
+   - no duplicate Team 03/04 prep.
+2. `CF-W1-L3-TREV-02`
+   - keep as Team 00 Ready evaluation when Today Review writer sequencing is safe.
+3. `CF-W1-SQLAB-02A`
+   - keep as sequencing-only after accepted `CF-W1-SQLAB-01`;
+   - do not reopen requirement discovery.
+4. `CF-W1-SIG-02`
+   - keep with active Team 03 architecture prep;
+   - hand to Team 04 only after Team 03 completes the packet.
+
+## Blockers / Guardrails
+
+- `CF-W1-SQLAB-02B` is not implementation-safe until Team 00 intentionally opens Prisma/schema, repository, and generated-artifact consent.
+- Do not reopen `CF-W1-SQLAB-02A`; the new gap is durable memory, not another no-schema preview refinement.
+- Do not reopen `CF-W1-SQLAB-02` as a generic parent; route either `02A` sequencing or `02B` storage consent explicitly.
+- Stop if the durable child widens into generic notes, thesis workflows, cross-module storage reuse, shared UI, or route-registry work without a new packet.
+
+## Routing Recommendation
+
+- Team 03 routing recommended: yes, but only as an approval-gated storage architecture packet for `CF-W1-SQLAB-02B` after Team 00 opens the consent gate.
+- Team 04 routing recommended: yes, immediately after Team 03 defines the exact storage child packet and only under the same consent gate.
+- Team 03/04 rerouting not recommended for `CF-W1-RH-01`, `CF-W1-L3-TREV-02`, `CF-W1-SQLAB-02A`, or `CF-W1-SIG-02`; those already have prep, sequencing, or active architecture ownership.
+
+## Validation
+
+- Tests run: none
+- Builds run: none
+- UI checks run: none
+- Live local data checks run: none
+- Skipped reason: Team 02 stayed inside docs-only requirement and ranking scope
+
 ## 2026-05-19 Signal Trigger Evidence Discovery
 
 ## Work Item
