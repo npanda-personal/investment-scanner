@@ -1145,3 +1145,35 @@ Push/merge status: not pushed and not merged to `dev`.
 ## Next Coordination Action
 
 Monitor Team 06 and Team 02. Route `CF-W1-BT-02` to QA rerun when Team 06 completes.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
+## CAL-01 Architecture Dispatch
+
+Team 02 completed the calibration-first requirement cycle and Team 00 committed it as `3d3ec76 docs: prioritize calibration reliability drift`.
+
+Team 03 Architecture Factory is now active:
+
+- Agent: `019e3bea-4818-7fa0-aea0-f0f8b4d13bfb`
+- Work item: `CF-W1-CAL-01`
+- Scope: docs-only architecture review, contract, work packet, and QA handoff notes.
+
+## Active Agents
+
+- Team 06 `019e3bdf-8c03-7d22-a081-90ff86b279af`: `CF-W1-BT-02` bounded QA-rejection rework.
+- Team 03 `019e3bea-4818-7fa0-aea0-f0f8b4d13bfb`: `CF-W1-CAL-01` architecture prep.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-BT-02` QA rerun after Team 06 handoff.
+- Team 04: `CF-W1-CAL-01` QA planning after Team 03 output.
+- Team 10: `CF-W1-BT-02` review after QA accepts.
+- Team 02: ready for the next persistent requirement discovery cycle when Team 00 opens it.
+
+## Next Coordination Action
+
+Record this dispatch, then continue monitoring Team 06 and Team 03.

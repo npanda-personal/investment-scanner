@@ -1625,3 +1625,22 @@ Teams ready to pick up new tasks:
 - Team 10: `CF-W1-BT-02` review after QA acceptance.
 - Team 03: `CF-W1-BT-02` Architect Signoff after Team 10 acceptance.
 - Team 03: next architecture prep after Team 02 identifies the next top unassigned investor-value item.
+
+---
+
+# CAL-01 Architecture Dispatch
+
+Date: 2026-05-18
+
+Team 02 completed the calibration-first requirement cycle. Team 00 committed it as `3d3ec76 docs: prioritize calibration reliability drift`.
+
+Spawned:
+
+- Team 03 `019e3bea-4818-7fa0-aea0-f0f8b4d13bfb`: docs-only `CF-W1-CAL-01` architecture prep.
+
+Teams ready to pick up new tasks:
+
+- Team 04: `CF-W1-BT-02` QA rerun after Team 06 handoff.
+- Team 04: `CF-W1-CAL-01` QA planning after Team 03 output.
+- Team 10: `CF-W1-BT-02` review after QA acceptance.
+- Team 02: next persistent market-intelligence discovery cycle when Team 00 relaunches it.

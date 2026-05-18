@@ -1004,3 +1004,31 @@ Date: 2026-05-18
 - Team 10 is ready for `CF-W1-BT-02` review after QA accepts.
 - Team 03 is ready for `CF-W1-BT-02` Architect Signoff after Team 10 accepts.
 - Team 03 has an open architecture-prep slot after Team 02 identifies the next top unassigned investor-value item.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Completed Since Previous Snapshot
+
+- Team 02 `019e3be0-06d7-78d3-853b-707d92419a35`: completed calibration-first requirements cycle and was closed. Team 00 committed `3d3ec76 docs: prioritize calibration reliability drift`.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 06 - Strategy / Signal / Risk | `019e3bdf-8c03-7d22-a081-90ff86b279af` | `gpt-5.3-codex`, high | bounded QA rework | `CF-W1-BT-02` trusted disposition and UI evidence | active |
+| 2 | Team 03 - Architecture Factory | `019e3bea-4818-7fa0-aea0-f0f8b4d13bfb` | `gpt-5.4`, high | docs-only architecture prep | `CF-W1-CAL-01` | active |
+| 3 | Open slot | none | pending | QA rerun | `CF-W1-BT-02` after Team 06 rework | waiting |
+| 4 | Open slot | none | pending | QA planning | `CF-W1-CAL-01` after Team 03 output | waiting |
+| 5 | Open slot | none | pending | review/release | `CF-W1-BT-02` after QA accepts | waiting |
+| 6 | Open slot | none | pending | requirements discovery | next persistent Team 02 cycle | ready |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04 is ready for `CF-W1-BT-02` QA rerun after Team 06 rework.
+- Team 04 is ready for `CF-W1-CAL-01` QA planning after Team 03 output.
+- Team 10 is ready for `CF-W1-BT-02` review after QA accepts.
+- Team 02 is ready to relaunch another persistent discovery cycle when Team 00 opens the next slot.
