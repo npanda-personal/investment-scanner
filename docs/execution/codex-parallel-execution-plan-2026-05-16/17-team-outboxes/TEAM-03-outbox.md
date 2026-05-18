@@ -835,3 +835,76 @@ Validation was read-only source/doc inspection plus scoped markdown authoring on
 - Team 04: prepare a focused `CF-W1-UX-01` UI QA plan for limited and blocked trust states.
 - Team 08 or Team 00-assigned Lane 3 frontend owner: review the narrowed first-child contract and confirm the exact page/types/UI-test reservation set.
 - Team 00: decide whether to promote the conservative frontend-only child now or hold for a later backend trust-evidence child.
+
+## Continuation - CF-W1-STRAT-02A Architect Re-Signoff
+
+Date: 2026-05-18
+
+State: Signoff review complete.
+
+### Assignment
+
+Architect re-signoff for `CF-W1-STRAT-02A` after Team 06 rework, Team 04 QA rerun `ACCEPT`, and Team 10 re-review `ACCEPT`.
+
+### Work Pulled
+
+No app-code work pulled.
+
+### Files Read
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-STRAT-02A-architect-signoff.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-STRAT-02A-developer-handoff.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-STRAT-02A-qa-rerun-verification.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-STRAT-02A-code-rereview.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-STRAT-02-strategy-framework-rule-versioning-dq-gate-policy-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-STRAT-02-strategy-framework-rule-versioning-dq-gate-policy-contract.md`
+- Team 06 worktree Strategy Framework source/test diffs
+
+### Evidence Prepared
+
+Created:
+
+- `18-integration-queue/CF-W1-STRAT-02A-architect-resignoff.md`
+
+Updated:
+
+- `17-team-outboxes/TEAM-03-outbox.md`
+
+### Verdict
+
+`SIGNOFF ACCEPT`
+
+### Architecture Result
+
+- Prior rejection is resolved: no helper-level default `ruleRevision` fabrication remains.
+- Explicit registry-backed source declarations are present.
+- A real undeclared registry case now surfaces `LEGACY_UNDECLARED` limited trust metadata.
+- No forbidden schema/persistence/router/controller/evaluator/DQE/shared/package/generated drift was observed.
+- Trust metadata remains additive and separate from proof/evaluator/backtest semantics.
+
+### Validation
+
+Team 03 performed source/diff inspection only for this pass.
+
+Relied on existing gate evidence:
+
+- Team 04 QA rerun: `ACCEPT`
+- Team 10 code re-review: `ACCEPT`
+
+No new builds, tests, UI smoke runs, commits, or pushes were performed by Team 03.
+
+### Residual Risk
+
+Durable version-keyed persisted rule revision history remains future child `CF-W1-STRAT-02B`.
+
+### Next Gate
+
+Delegated Product Owner acceptance may proceed, followed by Team 00 scoped check-in flow.
+
+### Teams Ready For New Tasks
+
+- Team 03 is free for the next architecture assignment.
+- Team 04 is free to pick up the next QA packet.
+- Team 06 is free to pick up the next implementation packet.
+- Team 10 is free to pick up the next review/release packet.

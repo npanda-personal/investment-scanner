@@ -1003,3 +1003,45 @@ Date: 2026-05-18
 - Team 07: `CF-W1-L3-INTEL-03` after sequencing decision.
 - Team 03: `CF-W1-BT-02` packet refresh.
 - Team 02: persistent PO/Requirements discovery relaunch.
+
+---
+
+# Runtime Checkpoint - STRAT Commit And UX QA
+
+Date: 2026-05-18
+
+## Current Git State
+
+- Main branch: `dev`.
+- `CF-W1-STRAT-02A` branch: `codex/team06-strategy-signal/CF-W1-STRAT-02A`.
+- `CF-W1-STRAT-02A` worktree: `../investment-scanner-worktrees/team06-CF-W1-STRAT-02A`.
+- STRAT branch commit: `359d0a3 feat: add strategy trust metadata`.
+- Main `dev` remains not push-safe because of the unrelated dirty app-test file `backend/tests/modules/alerts-monitoring/alerts-monitoring.ownership.test.ts`.
+
+## Gate Results
+
+`CF-W1-STRAT-02A`
+
+- Team 04 QA rerun accepted.
+- Team 10 code re-review accepted.
+- Team 03 Architect Re-Signoff accepted.
+- Team 00 delegated PO acceptance completed.
+- Scoped local branch commit completed.
+- No push or `dev` merge performed.
+
+`CF-W1-UX-01A`
+
+- Team 08 implementation handoff submitted.
+- Frontend build and focused Workbench UI smoke passed in the Team 08 worktree.
+- Team 04 QA verification is active.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 10 is ready for `CF-W1-UX-01A` review after Team 04 accepts QA.
+- Team 03 is ready for `CF-W1-UX-01A` Architect Signoff after Team 10 accepts.
+- Team 02 is ready to relaunch persistent PO/Requirements discovery.
+- Team 03 / Team 04 can pick up the next docs-only prep item when a slot is open.
+
+## Next Action
+
+Consume the Team 04 QA result for `CF-W1-UX-01A`; if accepted, spawn Team 10 review in the Team 08 worktree.

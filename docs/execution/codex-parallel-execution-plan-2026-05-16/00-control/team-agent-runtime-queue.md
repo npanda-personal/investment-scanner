@@ -530,3 +530,32 @@ Date: 2026-05-18
 - Team 04 is ready for `CF-W1-STRAT-02A` QA rerun after Team 06 rework.
 - Team 10 is ready for `CF-W1-STRAT-02A` re-review after QA rerun.
 - Team 03 is ready for `CF-W1-STRAT-02A` signoff after Team 10 accepts.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Completed Since Previous Snapshot
+
+- `CF-W1-STRAT-02A`: Team 06 rework, Team 04 QA rerun, Team 10 re-review, Team 03 Architect Re-Signoff, delegated PO acceptance, and scoped local branch commit completed as `359d0a3 feat: add strategy trust metadata`.
+- `CF-W1-UX-01A`: Team 08 implementation completed; frontend build and focused Workbench UI smoke passed; Team 04 QA verification is active.
+
+## Current Pool
+
+| Slot | Team | Agent | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | `019e3b6b-4165-7971-a252-d3d41fa95030` | QA verification | `CF-W1-UX-01A` Workbench trust framing | active |
+| 2 | Open slot | none | review | `CF-W1-UX-01A` after Team 04 QA ACCEPT | waiting |
+| 3 | Open slot | none | signoff | `CF-W1-UX-01A` after Team 10 ACCEPT | waiting |
+| 4 | Open slot | none | PO packet / commit | `CF-W1-UX-01A` after Architect Signoff | waiting |
+| 5 | Open slot | none | PO + requirements discovery | next high-value requirement cycle | ready |
+| 6 | Open slot | none | architecture / QA prep | next top requirement after Team 02 prioritization | ready |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 10 is ready for `CF-W1-UX-01A` review after Team 04 accepts QA.
+- Team 03 is ready for `CF-W1-UX-01A` Architect Signoff after Team 10 accepts.
+- Team 02 is ready to relaunch persistent PO/Requirements discovery.
+- Team 03 / Team 04 can prep the next highest-value docs-only packet in parallel if it does not share files with active UX review evidence.
