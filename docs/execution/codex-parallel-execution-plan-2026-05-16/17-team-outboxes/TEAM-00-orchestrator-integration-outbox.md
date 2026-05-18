@@ -2786,3 +2786,25 @@ Teams ready to pick up new tasks:
 - Team 04: `CF-W1-MCTX-01` QA after Team 05 handoff.
 - Team 04: `CF-W1-MD-03` QA after Team 05 handoff.
 - Team 00: `CF-W1-SMI-01` delegated PO acceptance and scoped commit if Architect Signoff accepts.
+
+---
+
+# SMI-01 Architect Reject Routed
+
+Date: 2026-05-18
+
+Team 03 rejected `CF-W1-SMI-01` Architect Signoff for a bounded Smart Money contract issue:
+
+- `UNKNOWN` freshness must not emit `SNAPSHOT_CURRENT` or `SNAPSHOT_STALE` reason codes.
+
+Team 00 routing:
+
+- closed Team 03 signoff agent `019e3cba-bc19-7570-9221-cdc8f5c17bad`;
+- return SMI to Team 06 for bounded service/test rework;
+- keep unrelated active workstreams moving.
+
+Teams ready to pick up new tasks:
+
+- Team 06: `CF-W1-SMI-01` bounded rework now.
+- Team 04: `CF-W1-SMI-01` QA rerun after Team 06 handoff.
+- Team 10: `CF-W1-SMI-01` rereview after QA accepts.

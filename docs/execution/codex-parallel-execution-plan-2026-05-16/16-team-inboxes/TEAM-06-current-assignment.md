@@ -234,6 +234,87 @@ Update `17-team-outboxes/TEAM-06-CF-W1-SMI-01-outbox.md` and `18-integration-que
 
 ---
 
+# Current Dispatcher Assignment
+
+Date: 2026-05-18
+
+## Assignment
+
+Rework `CF-W1-SMI-01` after Team 03 Architect Signoff `REJECT`.
+
+This assignment supersedes older Team 06 tails. Work only in the dedicated Smart Money worktree. You are not alone in the codebase; do not revert or overwrite edits made by Team 04, Team 10, or Team 03 evidence writers.
+
+## Branch / Worktree
+
+- Branch: `codex/team06-strategy-signal/CF-W1-SMI-01`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-SMI-01`
+
+## Blocking Finding To Fix
+
+Team 03 found a public contract contradiction:
+
+- `smart-money-intelligence.service.ts` can emit `freshnessStatus = UNKNOWN` when persisted timing cannot be parsed reliably.
+- The same response can still carry a `SNAPSHOT_CURRENT` reason code because persisted evidence currently emits `SNAPSHOT_CURRENT` for every non-`STALE` case.
+
+## Allowed Files
+
+You may edit only:
+
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.service.ts`
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.types.ts`
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.md`
+- `backend/tests/modules/smart-money-intelligence/smart-money-intelligence.service.test.ts`
+
+Allowed reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-CF-W1-SMI-01-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-SMI-01-developer-handoff.md`
+
+## Forbidden Files
+
+Do not edit Prisma/schema, migrations, generated files, route registries, Smart Money controller/router/repository/module/index/validation/provider files, downstream module source, frontend source/tests, shared backend utilities, shared frontend components, package manifests, providers, startup/backfill, live-provider, paid/cloud, telemetry, broker, credentials, or existing Team 03/04/10 evidence files except by reference.
+
+## Required Fix
+
+- Emit `SNAPSHOT_CURRENT` only when `freshnessStatus === 'CURRENT'`.
+- Emit `SNAPSHOT_STALE` only when `freshnessStatus === 'STALE'`.
+- For `freshnessStatus === 'UNKNOWN'`, do not emit `SNAPSHOT_CURRENT` or `SNAPSHOT_STALE`.
+- Add one focused service test with invalid persisted timing input asserting:
+  - `freshnessStatus = UNKNOWN`
+  - no `SNAPSHOT_CURRENT`
+  - no `SNAPSHOT_STALE`
+  - `evidenceStatus = LIMITED`
+- Preserve the prior ownership-trust fix and tests for `PARTIAL` / `ERROR`.
+
+## Focused Validation
+
+Run after rework:
+
+```powershell
+cd backend
+npm.cmd test -- smart-money-intelligence.service.test.ts --runInBand
+npm.cmd run build
+```
+
+Before build/test work, check memory/resource safety if practical.
+
+## Stop Conditions
+
+Stop and return to Team 00 if the fix requires any forbidden file, schema/generated/route/shared changes, provider/live-data or durable storage implementation, frontend/downstream consumer adoption, paid/cloud, telemetry, broker, or credential scope.
+
+## Expected Outbox
+
+Update `17-team-outboxes/TEAM-06-CF-W1-SMI-01-outbox.md` and `18-integration-queue/CF-W1-SMI-01-developer-handoff.md` with:
+
+- exact rework summary;
+- changed files;
+- tests run and results;
+- forbidden files confirmed untouched;
+- residual risks;
+- next gate: Team 04 QA rerun.
+
+---
+
 # Current Active Assignment Override
 
 Date: 2026-05-18

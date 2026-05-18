@@ -1751,6 +1751,23 @@ Teams ready to pick up new tasks:
 - Team 04: `CF-W1-MD-03` QA after Team 05 handoff.
 - Team 00: `CF-W1-SMI-01` delegated PO acceptance and scoped commit if Architect Signoff accepts.
 
+## SMI-01 Architect Signoff Rejected
+
+Team 03 rejected `CF-W1-SMI-01` Architect Signoff because `freshnessStatus = UNKNOWN` can still carry a `SNAPSHOT_CURRENT` reason code.
+
+Team 00 routing:
+
+- return only SMI to Team 06 bounded rework;
+- continue active MCTX implementation, MD-03 implementation, and STRAT-02B architecture;
+- no Product Owner action is required.
+
+Teams ready to pick up new tasks:
+
+- Team 06: `CF-W1-SMI-01` bounded rework now.
+- Team 04: `CF-W1-SMI-01` QA rerun after Team 06 handoff.
+- Team 10: `CF-W1-SMI-01` rereview after QA accepts.
+- Team 03: `CF-W1-SMI-01` Architect Signoff after Team 10 accepts.
+
 ---
 
 # Latest Coordination State
