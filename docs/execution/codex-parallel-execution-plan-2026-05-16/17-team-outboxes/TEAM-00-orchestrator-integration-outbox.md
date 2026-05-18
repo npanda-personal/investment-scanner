@@ -616,3 +616,35 @@ Pending:
 ## Product Owner Action
 
 No human Product Owner action is required unless QA, review, or Architect Signoff finds a true consent blocker.
+
+---
+
+# `CF-W1-L3-PORT-01A` Review Rework Routing
+
+Date: 2026-05-18
+
+State: Team 10 rejection consumed; Team 07 rework assigned
+
+## Evidence Consumed
+
+- Team 07 developer handoff in worktree: `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-L3-PORT-01A\docs\execution\codex-parallel-execution-plan-2026-05-16\18-integration-queue\CF-W1-L3-PORT-01A-developer-handoff.md`
+- Team 04 first-pass QA evidence: `18-integration-queue/CF-W1-L3-PORT-01A-qa-verification.md`
+- Team 10 review rejection: `18-integration-queue/CF-W1-L3-PORT-01A-team10-review-release.md`
+
+## Routing Result
+
+- Team 07 is assigned bounded rework in the existing branch/worktree.
+- Team 04 is assigned QA rerun after Team 07 updates the handoff.
+- Team 10 is assigned release re-review after QA rerun.
+
+## Blocking Finding
+
+Team 10 found that the first implementation can treat automation-only Data Quality blockers as portfolio display hard blockers. Team 07 must revise the mapper and add a focused test proving DQE-like `READY` daily-review/signal tiers plus `AUTOMATION_BLOCKED: PHASE0_AUTOMATION_NOT_AUTHORIZED` do not block otherwise portfolio-eligible display/action readiness.
+
+## Queue Result
+
+- Ready queue depth: 0 available-to-pull application-code items.
+- Integration queue depth: 1 active rejected/rework handoff: `CF-W1-L3-PORT-01A`.
+- Open decisions: 0.
+- Product Owner action required: no.
+- Commit/push authorization: blocked until Team 07 rework, Team 04 QA rerun, Team 10 re-review, Architect Signoff, delegated PO acceptance, and exact staged-scope verification pass.

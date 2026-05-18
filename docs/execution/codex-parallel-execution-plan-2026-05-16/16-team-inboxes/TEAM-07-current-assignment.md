@@ -8,15 +8,15 @@ Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automat
 
 ## Assignment
 
-Pull `CF-W1-L3-PORT-01A` for bounded implementation.
+Revise `CF-W1-L3-PORT-01A` after Team 10 Code Review / Release Readiness rejection.
 
-State: Ready for Implementation after Team 00 promotion.
+State: Rejected / Rework. This remains inside the original Team 07 implementation reservation and does not require Product Owner action.
 
 You are not alone in the codebase. Other teams have active docs-only edits in the shared `dev` workspace. Do not revert or overwrite edits made by others, and do not implement in the shared worktree.
 
 ## Branch / Worktree
 
-Create and use this dedicated implementation branch/worktree:
+Continue using this dedicated implementation branch/worktree:
 
 - Branch: `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A`
 - Worktree: `../investment-scanner-worktrees/team07-CF-W1-L3-PORT-01A`
@@ -39,6 +39,8 @@ Implement only the portfolio-management child slice from the parent Lane 3 readi
 - QA plan: `04-qa/CF-W1-L3-PORT-01-qa-plan.md`
 - Team 03 reservation matrix: `03-architecture/team03-near-ready-file-reservation-matrix-2026-05-18.md`
 - Ready queue handoff: `12-ready-queue/ready-for-implementation.md`
+- Team 04 first-pass QA evidence: `18-integration-queue/CF-W1-L3-PORT-01A-qa-verification.md`
+- Team 10 release-blocking review: `18-integration-queue/CF-W1-L3-PORT-01A-team10-review-release.md`
 
 ## Allowed Files
 
@@ -68,6 +70,17 @@ Do not edit:
 
 Do not run providers, startup/backfill flows, live provider calls, Prisma migrations, package installs, broad services, or UI smoke tests for this slice.
 
+## Required Rework
+
+Team 10 rejected the first handoff because the portfolio mapper treated any `DataQualityEvaluationDto.readinessBlockers` entry as a portfolio display hard block. Data Quality can include non-portfolio blockers, especially the phase-0 automation blocker, while daily-review and signal tiers remain usable.
+
+Revise within the allowed files only:
+
+- Do not use the full `readinessBlockers` array as the portfolio display hard-block predicate.
+- Keep display blocking tied to portfolio-relevant hard blockers: `coverageStatus = UNUSABLE`, `signalReadinessStatus = NOT_READY`, daily-review tier `BLOCKED`, and known stale/unsupported/scope-mismatch blockers.
+- Keep action readiness tied to signal tier `READY` and `eligibleForSignals = true`.
+- Add a portfolio service test with DQE-like `READY` daily-review/signal tiers plus `AUTOMATION_BLOCKED: PHASE0_AUTOMATION_NOT_AUTHORIZED`, proving portfolio display/action readiness is not blocked solely by automation.
+
 ## Implementation Requirements
 
 - Add module-local portfolio readiness DTO fields to holding valuation output.
@@ -90,6 +103,7 @@ Run after implementation:
 ```powershell
 cd backend
 npm.cmd test -- portfolio-management.service.test.ts --runInBand
+npm.cmd run build
 ```
 
 If the focused command cannot run, record the exact blocker, skipped command, risk, and next owner in the outbox.
@@ -119,4 +133,4 @@ Update `17-team-outboxes/TEAM-07-outbox.md` with:
 - tests skipped and reasons
 - forbidden files confirmed untouched
 - assumptions, risks, blockers
-- next gate: Developer Validation, QA Verification, Code Review, Architect Signoff, or Team 00 blocker routing
+- next gate: Team 04 QA rerun, Team 10 re-review, Architect Signoff, delegated PO acceptance, or Team 00 blocker routing

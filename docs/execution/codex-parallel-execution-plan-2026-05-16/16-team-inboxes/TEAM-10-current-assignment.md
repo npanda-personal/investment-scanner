@@ -8,9 +8,9 @@ Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automat
 
 ## Assignment
 
-Perform Code Review / Release Readiness precheck for `CF-W1-L3-PORT-01A`.
+Stand by for Code Review / Release Readiness re-review of `CF-W1-L3-PORT-01A` after Team 07 rework and Team 04 QA rerun.
 
-Team 07 submitted a developer handoff from its dedicated worktree. Review is read-only unless Team 00 later asks for a release evidence doc update. Do not stage, commit, push, or edit application source/tests.
+Team 10 rejected the first handoff because the readiness mapper can treat automation-only Data Quality blockers as portfolio display hard blockers. Review is read-only unless Team 00 later asks for a release evidence doc update. Do not stage, commit, push, or edit application source/tests.
 
 ## Source Handoff
 
@@ -19,7 +19,8 @@ Team 07 submitted a developer handoff from its dedicated worktree. Review is rea
 - Worktree: `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-L3-PORT-01A`
 - Handoff path in worktree: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-L3-PORT-01A-developer-handoff.md`
 - Team 00 routing note: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-L3-PORT-01A-review-routing.md`
-- QA gate: Team 04 is assigned QA verification in parallel; final acceptance waits for QA result.
+- First-pass rejection evidence: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-L3-PORT-01A-team10-review-release.md`
+- QA gate: Team 04 must rerun QA after Team 07 rework; final acceptance waits for the rerun result.
 
 ## Review Scope
 
@@ -37,6 +38,7 @@ Verify:
 - `READY`, `LIMITED`, missing, blocked, stale, unsupported, and scope-mismatch mappings follow the accepted contract;
 - `LIMITED` cannot become action-ready;
 - `dataStatus = COMPLETE` does not imply Data Quality trust;
+- automation-only Data Quality blockers do not block portfolio display/action readiness when daily-review and signal tiers remain `READY`;
 - Data Quality Engine is consumed through public service/type outputs only;
 - no DQE scoring, stale threshold, liquidity scoring, or coverage scoring is duplicated;
 - no forbidden product language or financial-advice wording was introduced;
@@ -74,8 +76,9 @@ No Product Owner decision is open.
 
 Commit/release remains blocked until:
 
+- Team 07 completes the bounded rework;
 - Team 04 QA passes;
-- Team 10 code review passes;
+- Team 10 re-review passes;
 - Architect signoff is recorded;
 - delegated Product Owner acceptance packet is recorded;
 - Team 00 verifies exact staged scope in the Team 07 worktree.

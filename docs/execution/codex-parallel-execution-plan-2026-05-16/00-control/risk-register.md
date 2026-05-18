@@ -184,3 +184,10 @@
 - Allowed implementation files are limited to `backend/src/modules/portfolio-management/portfolio-management.service.ts`, `backend/src/modules/portfolio-management/portfolio-management.types.ts`, `backend/src/modules/portfolio-management/portfolio-management.md`, and `backend/tests/modules/portfolio-management/portfolio-management.service.test.ts`.
 - Shared/high-risk boundaries remain blocked: Prisma, route registries, shared backend utilities or DTOs, shared UI, package manifests, generated files, Data Quality Engine source/exports, watchlist, alerts, portfolio-intelligence, frontend, providers, startup/backfill, live providers, paid/cloud, broker, and telemetry.
 - If Team 07 discovers a need for any forbidden file or for `LIMITED` to become action-ready, the workstream stops and returns to Team 00 for blocker routing.
+
+## Team 00 Review Rework Risk Decisions - 2026-05-18
+
+- Team 04 first-pass QA passed for `CF-W1-L3-PORT-01A`, but Team 10 rejected release acceptance because the portfolio mapper can treat automation-only Data Quality blockers as portfolio display hard blockers.
+- This is a routine code-review rejection, not a Product Owner consent blocker, while the fix stays inside the existing Team 07 file reservation.
+- Team 07 must revise the mapper and add a focused automation-blocked Data Quality case before Team 04 reruns QA and Team 10 re-reviews.
+- No commit, push, Architect Signoff, or delegated Product Owner acceptance is authorized until the rework passes QA and review.

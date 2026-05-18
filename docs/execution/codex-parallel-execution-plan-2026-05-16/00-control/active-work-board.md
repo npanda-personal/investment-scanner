@@ -73,22 +73,22 @@ Operating rules:
 | Field | Current Value |
 | --- | --- |
 | Current daemon cycle id | `DAEMON-20260517` |
-| Current rolling iteration count | 19 |
-| Active teams | Team 07 submitted `CF-W1-L3-PORT-01A` developer handoff; Team 04 is assigned QA Verification; Team 10 is assigned Code Review / Release Readiness precheck; Teams 02/03/04/05/08/09 continue post-decision packet refresh where non-conflicting |
-| Queued teams | Team 04 QA for `CF-W1-L3-PORT-01A`; Team 10 review for `CF-W1-L3-PORT-01A`; Team 02 requirement refinement; Team 03 architecture/file-reservation refresh; Team 05 `CF-W1-MD-01` validation-only prep; Team 08 `CF-W1-UX-02` / `CF-W1-UX-05` Copilot-only prep; Team 09 `CF-W1-AUTH-01` / `CF-W1-SUB-01` policy packet refresh |
+| Current rolling iteration count | 22 |
+| Active teams | Team 07 rework for `CF-W1-L3-PORT-01A`; Team 04 waiting for QA rerun; Team 10 waiting for release re-review; Teams 02/03/04/05/08/09 continue post-decision packet refresh where non-conflicting |
+| Queued teams | Team 07 rework for `CF-W1-L3-PORT-01A`; Team 04 QA rerun for `CF-W1-L3-PORT-01A`; Team 10 re-review for `CF-W1-L3-PORT-01A`; Team 02 requirement refinement; Team 03 architecture/file-reservation refresh; Team 05 `CF-W1-MD-01` validation-only prep; Team 08 `CF-W1-UX-02` / `CF-W1-UX-05` Copilot-only prep; Team 09 `CF-W1-AUTH-01` / `CF-W1-SUB-01` policy packet refresh |
 | Idle teams | None fully idle; implementation lanes without Ready work stay docs-only |
 | Blocked teams | No team fully blocked; no open Decision Inbox items; source/test work remains blocked by missing Team 00 Ready promotion for all children except `CF-W1-L3-PORT-01A` |
 | Teams relaunched this cycle | Team 01 audit consumed; Teams 02, 03, 04, 06, 07, and 09 reassigned through current inbox files |
 | Teams shut down due to no work | None permanently; Teams without ready implementation move to audit/refinement |
 | Teams re-added due to new work | Team 07 completed `CF-W1-L3-AUTH-02`; Team 06 completed `CF-W1-SIG-TRIGGER-01` |
-| Ready queue depth | 0 available-to-pull application-code items; `CF-W1-L3-PORT-01A` has moved from implementation to QA/Review |
+| Ready queue depth | 0 available-to-pull application-code items; `CF-W1-L3-PORT-01A` has moved from implementation to Rejected / Rework |
 | Refinement queue depth | 12 active unique refinement / near-ready items: `CF-W1-L3-ALERT-01`, `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-MD-02`, `CF-W1-MD-01`, `CF-W1-UX-02`, `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-UX-05`, `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, `CF-W1-L3-INTEL-01` |
-| Integration queue depth | 1 active application-code handoff awaiting QA/review: `CF-W1-L3-PORT-01A` |
+| Integration queue depth | 1 active application-code handoff in rejected/rework state: `CF-W1-L3-PORT-01A` |
 | Decision inbox count | 0 open decisions |
-| Ready-work pressure | review pressure: Team 04 and Team 10 must process `CF-W1-L3-PORT-01A` |
+| Ready-work pressure | rework pressure: Team 07 must revise `CF-W1-L3-PORT-01A`; Team 04/10 rerun after revision |
 | Blocked-work pressure | medium; blockers are readiness/packet gates, not Product Owner decisions |
-| Next team to launch | Team 04 QA and Team 10 review for `CF-W1-L3-PORT-01A` |
-| Next item to assign | After QA/review pass, route Architect Signoff for `CF-W1-L3-PORT-01A`; Team 00 can then evaluate `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, or `CF-W1-L3-ALERT-01` |
+| Next team to launch | Team 07 rework for `CF-W1-L3-PORT-01A` |
+| Next item to assign | After Team 07 rework, route Team 04 QA rerun and Team 10 re-review for `CF-W1-L3-PORT-01A`; Team 00 can then evaluate `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, or `CF-W1-L3-ALERT-01` when review bandwidth is safe |
 | Last commit at Team 00 resume start | `c739f78 docs: route team 01 audit findings to parallel teams` |
 | Daemon should continue | Yes; Product Owner action is not required |
 
@@ -214,3 +214,4 @@ Old work items in `docs/codex-agent-team-plan/` may be used only as evidence or 
 | DAEMON-20260518-19 | Resolve five current Decision Inbox items | Team 00 | Checkpointing | `07-decisions/`, `99-decision-inbox/`, active queues, team inboxes, summaries | Product Owner resolved auth fallback Option A, subscription plan-change Option A, Copilot trust UX Option B, UX product-language Option A, and Market Data validation Option A. Open decisions now 0. No app-code item became Ready; post-decision packet refresh continues. |
 | DAEMON-20260518-20 | `CF-W1-L3-PORT-01A` Ready promotion | Team 00 | Ready for Implementation | `12-ready-queue/`, `16-team-inboxes/TEAM-07-current-assignment.md`, active control docs | Team 00 verified requirement, architecture, contract, QA plan, Team 03 reservations, Team 07 readiness evidence, blocked queues, and git state. Team 07 owns the bounded portfolio-management implementation in `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A`; Ready queue depth is now 1. |
 | DAEMON-20260518-21 | `CF-W1-L3-PORT-01A` developer handoff routed | Team 00 + Teams 04/10 | QA Verification / Code Review | Team 07 worktree and `18-integration-queue/CF-W1-L3-PORT-01A-review-routing.md` | Team 07 reports focused portfolio test and backend build passed. Team 00 verified changed files are within reserved scope and routed QA to Team 04 and review to Team 10. No commit yet. |
+| DAEMON-20260518-22 | `CF-W1-L3-PORT-01A` review rejection routed | Team 00 + Teams 07/04/10 | Rejected / Rework | Team 07 worktree and `18-integration-queue/CF-W1-L3-PORT-01A-review-routing.md` | Team 04 first-pass QA passed, but Team 10 rejected release acceptance because automation-only Data Quality blockers can be treated as portfolio display hard blockers. Team 07 rework is assigned in the existing file reservation; Team 04/10 rerun after revision. |

@@ -6,19 +6,19 @@ Date: 2026-05-18
 
 No available application-code item is currently Ready for a team to pull.
 
-`CF-W1-L3-PORT-01A` was pulled by Team 07, implemented in its dedicated worktree, and moved to QA Verification / Code Review routing. It remains uncommitted and unaccepted.
+`CF-W1-L3-PORT-01A` was pulled by Team 07, implemented in its dedicated worktree, and moved through first-pass QA / Code Review. Team 10 rejected release acceptance and routed bounded rework back to Team 07. It remains uncommitted and unaccepted.
 
 ## Pulled / In Review
 
 | ID | Owner | Branch | Worktree | Scope | Status |
 | --- | --- | --- | --- | --- | --- |
-| `CF-W1-L3-PORT-01A` | Team 07 - Portfolio / Watchlist / Alerts | `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A` | `../investment-scanner-worktrees/team07-CF-W1-L3-PORT-01A` | Backend-only portfolio-management readiness DTOs | Developer handoff submitted; QA/Code Review pending |
+| `CF-W1-L3-PORT-01A` | Team 07 - Portfolio / Watchlist / Alerts | `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A` | `../investment-scanner-worktrees/team07-CF-W1-L3-PORT-01A` | Backend-only portfolio-management readiness DTOs | Rejected / Rework after Team 10 review; Team 07 revision pending |
 
 ## Active Ready Handoff - `CF-W1-L3-PORT-01A`
 
 Date promoted: 2026-05-18
 
-Current status: Pulled by Team 07; developer handoff routed to Team 04 and Team 10 on 2026-05-18.
+Current status: Pulled by Team 07; first developer handoff routed to Team 04 and Team 10 on 2026-05-18; Team 10 rejected for bounded rework on 2026-05-18.
 
 Team 00 evaluated `CF-W1-L3-PORT-01A` against the Ready gates and promoted it as the first Lane 3 readiness implementation slice.
 
@@ -196,6 +196,14 @@ No app-code item became Ready during decision resolution itself. `CF-W1-L3-PORT-
 - Team 04 owns QA Verification.
 - Team 10 owns Code Review / Release Readiness precheck.
 - No commit is authorized until QA, review, Architect Signoff, delegated PO acceptance, and Team 00 staged-scope verification pass.
+
+2026-05-18 review result:
+
+- Team 04 first-pass focused QA passed.
+- Team 10 rejected release acceptance because automation-only Data Quality blockers can be treated as portfolio display hard blockers.
+- Team 07 must revise within the existing file reservation and add the focused automation-blocked DQE case.
+- Team 04 must rerun QA, then Team 10 must re-review.
+- No Product Owner action is required unless the rework needs forbidden scope.
 
 2026-05-18 routing result:
 

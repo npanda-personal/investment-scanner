@@ -8,9 +8,9 @@ Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automat
 
 ## Assignment
 
-Run QA Verification for `CF-W1-L3-PORT-01A`.
+Stand by for QA rerun on `CF-W1-L3-PORT-01A` after Team 07 completes the Team 10 rework.
 
-Team 07 submitted developer handoff from its dedicated worktree. QA may inspect and run focused validation in that worktree, but must not edit application source or tests.
+The first focused QA command passed, but Team 10 later rejected release acceptance because the readiness mapper can treat automation-only Data Quality blockers as portfolio display hard blockers. QA must rerun after Team 07 revises the implementation. QA may inspect and run focused validation in that worktree, but must not edit application source or tests.
 
 ## Source Handoff
 
@@ -20,6 +20,8 @@ Team 07 submitted developer handoff from its dedicated worktree. QA may inspect 
 - Handoff path in worktree: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-L3-PORT-01A-developer-handoff.md`
 - QA plan: `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-L3-PORT-01-qa-plan.md`
 - Team 00 routing note: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-L3-PORT-01A-review-routing.md`
+- First-pass QA evidence: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-L3-PORT-01A-qa-verification.md`
+- Team 10 rejection: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-L3-PORT-01A-team10-review-release.md`
 
 ## Files To Verify
 
@@ -54,6 +56,7 @@ Verify the QA plan scenarios for portfolio-only readiness DTOs:
 - missing DQ is blocked/untrusted and does not inherit trust from non-null price or signal.
 - NOT_READY, UNUSABLE, stale, unsupported, scope mismatch, or blocked-tier evidence is blocked/untrusted.
 - mixed holdings produce accurate summary counts.
+- automation-only Data Quality blocker evidence does not block otherwise portfolio-eligible display/action readiness when daily-review and signal tiers are `READY`.
 - existing portfolio fields, `dataStatus`, valuation, price, and signal compatibility are preserved.
 - Data Quality is consumed through public service/type outputs only.
 - no direct advice, target-price, buy/sell, guarantee, or trade-instruction wording is introduced.

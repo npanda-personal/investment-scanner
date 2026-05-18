@@ -6,7 +6,7 @@ Owner: Team 00 - Master Orchestrator / Integration
 
 ## State
 
-Developer handoff submitted. Needs QA Verification and Code Review.
+Rejected / Rework after Team 10 Code Review / Release Readiness.
 
 Do not commit, push, or merge this work yet.
 
@@ -39,9 +39,36 @@ Developer-reported validation:
 - `npm.cmd run build`: passed.
 - First focused test attempt failed because `jest` was unavailable without `node_modules`; Team 07 reports using a local junction to existing backend `node_modules`, with no package install and no network access.
 
+## Review Result
+
+Team 04 recorded a first-pass focused QA command pass:
+
+- `18-integration-queue/CF-W1-L3-PORT-01A-qa-verification.md`
+
+Team 10 later rejected release acceptance:
+
+- `18-integration-queue/CF-W1-L3-PORT-01A-team10-review-release.md`
+
+Release-blocking issue:
+
+- The first implementation treats any `DataQualityEvaluationDto.readinessBlockers` entry as a portfolio display hard block.
+- Data Quality can include non-portfolio blockers, especially phase-0 automation blockers, while daily-review and signal tiers remain usable.
+- Team 07 must revise the portfolio mapper and add a focused test proving automation-only blockers do not block otherwise portfolio-eligible display/action readiness.
+
+## Team 07 Rework Assignment
+
+Team 07 is assigned bounded rework through:
+
+- `16-team-inboxes/TEAM-07-current-assignment.md`
+
+Expected output:
+
+- updated Team 07 developer handoff in the dedicated worktree
+- updated `17-team-outboxes/TEAM-07-outbox.md`
+
 ## Team 04 Assignment
 
-Team 04 is assigned QA Verification through:
+Team 04 is assigned QA rerun after Team 07 rework through:
 
 - `16-team-inboxes/TEAM-04-current-assignment.md`
 
@@ -49,11 +76,11 @@ Expected output:
 
 - `17-team-outboxes/TEAM-04-qa-factory.md`
 
-QA must verify the portfolio-only readiness DTO scenarios from `04-qa/CF-W1-L3-PORT-01-qa-plan.md` and confirm no forbidden files or commands were used.
+QA must verify the portfolio-only readiness DTO scenarios from `04-qa/CF-W1-L3-PORT-01-qa-plan.md`, including the Team 10 automation-blocked DQE case, and confirm no forbidden files or commands were used.
 
 ## Team 10 Assignment
 
-Team 10 is assigned Code Review / Release Readiness precheck through:
+Team 10 is assigned Code Review / Release Readiness re-review after Team 04 QA rerun through:
 
 - `16-team-inboxes/TEAM-10-current-assignment.md`
 
@@ -65,7 +92,7 @@ Team 10 must review only the approved file scope and record pass/reject findings
 
 ## Next Gates
 
-After Team 04 and Team 10 pass:
+After Team 07 rework, Team 04 rerun, and Team 10 re-review pass:
 
 1. Route Architect Signoff.
 2. Prepare delegated Product Owner acceptance packet.
@@ -75,10 +102,11 @@ After Team 04 and Team 10 pass:
 
 ## Current Blockers
 
-- QA Verification pending.
-- Code Review pending.
+- Team 07 rework pending.
+- Team 04 QA rerun pending.
+- Team 10 re-review pending.
 - Architect Signoff pending.
 - Delegated Product Owner acceptance pending.
 - Local commit pending.
 
-No human Product Owner action is required at this gate unless QA/review/architecture finds a true consent blocker.
+No human Product Owner action is required at this gate unless Team 07 discovers a need for forbidden scope or QA/review/architecture finds a true consent blocker.
