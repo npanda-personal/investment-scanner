@@ -198,3 +198,35 @@ Team 07 should be spawned for:
 - Team 10: ready for review after QA evidence exists.
 - Team 03: ready for Architect Signoff after Team 10 acceptance.
 - Team 02: active and should continue persistent requirement discovery.
+
+---
+
+# Latest Active Snapshot
+
+Date: 2026-05-18
+
+## Active Subagent Pool
+
+No spawned subagent is active at the moment this snapshot is written. Team 06 has completed `CF-W1-SQLAB-01` and has been closed.
+
+## Completed Since Previous Snapshot
+
+- Team 06 `019e3ace-0d5c-7503-a928-ba12a0e5be6a`: completed `CF-W1-SQLAB-01` implementation in the Team 06 worktree. Developer validation passed: `signal-quality-lab.service.test.ts` (`30/30`) and backend build.
+- Team 03 `019e3aca-7848-7892-97ff-f3c6e35e64aa`: completed `CF-W1-SQLAB-02` architecture split. Durable storage remains blocked; no-schema child is ready for QA planning only.
+
+## Queued Subagents
+
+| Queue | Team | Launch Trigger | Recommended Model / Reasoning | Assignment |
+| --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Verification | immediately | `gpt-5.4`, high | Verify `CF-W1-SQLAB-01` in `../investment-scanner-worktrees/team06-CF-W1-SQLAB-01`. |
+| 2 | Team 03 - Architecture Factory | immediately | `gpt-5.4`, high | Prepare architecture review, contract, and work packet for `CF-W1-STRAT-02`. |
+| 3 | Team 02 - PO + Requirement Factory | immediately | `gpt-5.4-mini`, medium | Continue persistent module audits, requirement discovery, and priority reordering. |
+| 4 | Team 10 - Review / Release | Team 04 accepts `CF-W1-SQLAB-01` | `gpt-5.5`, high | Review `CF-W1-SQLAB-01` implementation and release evidence. |
+| 5 | Team 03 - Architect Signoff | Team 10 accepts `CF-W1-SQLAB-01` | `gpt-5.4`, high | Architect Signoff for `CF-W1-SQLAB-01`. |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-SQLAB-01` QA verification.
+- Team 03: `CF-W1-STRAT-02` architecture prep.
+- Team 02: persistent PO/Requirements discovery.
+- Team 10: idle until the next QA-accepted handoff.

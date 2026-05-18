@@ -54,3 +54,35 @@ Decision reconciliation:
 ## Expected Outbox
 
 Update `17-team-outboxes/TEAM-02-requirement-factory.md` with queue deltas and Ready-depth evidence.
+
+---
+
+# Latest Standing Assignment
+
+Date: 2026-05-18
+
+## Assignment
+
+Continue as the persistent PO + Requirements value-discovery lane.
+
+Do not wait for Team 00 to feed one requirement at a time. Audit the next highest user-value investor/trader workflow, propose bounded requirements, and reorder the top candidate stack from highest user value to lowest after each cycle.
+
+## Current Inputs
+
+- `CF-W1-STRAT-02` has been drafted and routed to Team 03 architecture prep.
+- `CF-W1-SQLAB-01` is active implementation in Team 06.
+- `CF-W1-SQLAB-02` architecture split is complete; no-schema child needs QA planning, durable storage child is blocked.
+- Accepted branch commits remain parked for later clean integration; do not treat parked commits as merged into `dev`.
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/**`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/**`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+## Required Output
+
+- Add or refine at least one high-user-value requirement candidate.
+- Keep `next-top-10-candidates.md`, `top-10-ready-candidates.md`, `refinement-queue.md`, and `requirements-backlog.md` consistent.
+- Do not move any application-code item to Ready.
+- Identify the next top unassigned item for Team 00 after the cycle.

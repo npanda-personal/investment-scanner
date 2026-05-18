@@ -12,7 +12,7 @@ The top three Ready-promotion candidates are `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, a
 
 | Rank | ID | Next gate | Notes |
 | --- | --- | --- | --- |
-| 1 | CF-W1-L3-TREV-01 | Team 00/Team 03 reservation and QA plan | Today Review already persists readiness, review-universe, and scan-funnel evidence, but the trust gap needs a bounded coherence contract. |
+| 1 | CF-W1-STRAT-02 | Team 00/Team 03 reservation and QA plan | Strategy Framework already owns the source-of-truth strategy catalog, but rule provenance and DQ-gate policy still need a bounded trust contract. |
 | 2 | CF-W1-SQLAB-02 | Team 00/Team 03 reservation and QA plan | Signal-quality outcome calculations already exist, but the learning loop still lacks a durable journal. |
 | 3 | CF-W1-BT-02 | Team 00/Team 03 reservation and QA plan | Backtesting already has availability, benchmark, exit, and repair evidence, but the review trust gap needs a bounded contract. |
 | 4 | CF-W1-L3-ALERT-03 | Team 00/Team 03 reservation and QA plan | Alert follow-through needs a bounded contract so trigger review outcomes and notes are traceable. |
@@ -30,7 +30,7 @@ These are the current Team 02 priorities. None is app-code ready.
 
 | ID | What is proven | What is missing | Current disposition |
 | --- | --- | --- | --- |
-| CF-W1-L3-TREV-01 | Today Review readiness, review-universe, and scan-funnel evidence exist in the module snapshot; today-review UI already surfaces mismatch warnings and trust status. | Bounded publication-evidence contract, exact file reservation, and Team 00 Ready promotion. | Keep out of Ready until Team 00/03 prep exists. |
+| CF-W1-STRAT-02 | Strategy Framework already exposes catalog and proof surfaces, but rule provenance and DQ-gate policy remain to be bounded. | Bounded trust contract, exact file reservation, and Team 00/03 prep. | Keep out of Ready until Team 00/03 prep exists. |
 | CF-W1-SQLAB-02 | Signal-quality outcome calculations exist, but the learning loop still lacks a durable journal. | Bounded journal contract, exact file reservation, and Team 00/03 prep. | Keep out of Ready until Team 00/03 prep exists. |
 | CF-W1-L3-ALERT-03 | Alert inbox read/dismiss flow exists, but no durable follow-through outcome or review-note state is persisted. | Bounded follow-through contract, exact file reservation, and Team 00/03 prep. | Keep out of Ready until Team 00/03 prep exists. |
 | CF-W1-L3-INTEL-03 | Portfolio intelligence already exposes concentration and red flags, but no durable exposure-review state is persisted. | Bounded concentration-review contract, exact file reservation, and Team 00/03 prep. | Keep out of Ready until Team 00/03 prep exists. |
@@ -53,7 +53,7 @@ These items are not app-code ready. Some are ready-evaluation candidates; policy
 
 | Rank | ID | Prep gate | Guardrail |
 | --- | --- | --- | --- |
-| 1 | CF-W1-L3-TREV-01 | Team 00/Team 03 reservation and QA plan | No Today Review source changes until Team 00/Team 03 prep exists. |
+| 1 | CF-W1-STRAT-02 | Team 00/Team 03 reservation and QA plan | No Strategy Framework source changes until Team 00/Team 03 prep exists. |
 | 2 | CF-W1-SQLAB-02 | Team 00/Team 03 reservation and QA plan | No signal-outcome journal source changes until Team 00/Team 03 prep exists. |
 | 3 | CF-W1-BT-02 | Team 00/Team 03 reservation and QA plan | No backtesting source changes until Team 00/Team 03 prep exists. |
 | 4 | CF-W1-L3-ALERT-03 | Team 00/Team 03 reservation and QA plan | No alert follow-through source changes until Team 00/Team 03 prep exists. |

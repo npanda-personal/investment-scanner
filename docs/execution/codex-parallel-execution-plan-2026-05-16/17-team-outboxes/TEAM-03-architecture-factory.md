@@ -2,6 +2,65 @@
 
 Date: 2026-05-17
 
+## Team 03 SQLAB-02 Signal Outcome Journal Prep - 2026-05-18
+
+Assignment: prepare architecture readiness for `CF-W1-SQLAB-02` signal outcome journal and post-event learning in the main worktree without touching application code, tests, package manifests, generated files, root `AGENTS.md`, `docs/AGENTS.md`, or historical `docs/codex-agent-team-plan/**`.
+
+Prepared:
+
+- `03-architecture/CF-W1-SQLAB-02-architecture-review.md`
+- `06-contracts/CF-W1-SQLAB-02-signal-outcome-journal-post-event-learning-contract.md`
+- `08-work-packets/CF-W1-SQLAB-02-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Files inspected:
+
+- `AGENTS.md`
+- `10-requirements/CF-W1-SQLAB-02-signal-outcome-journal-post-event-learning-requirement.md`
+- `10-requirements/requirements-backlog.md`
+- `10-requirements/refinement-queue.md`
+- `12-ready-queue/ready-for-implementation.md`
+- `03-architecture/module-ownership-map.md`
+- `00-control/active-work-board.md`
+- `99-decision-inbox/open-decisions.md`
+- `03-architecture/CF-W1-SQLAB-01-architecture-review.md`
+- `06-contracts/CF-W1-SQLAB-01-signal-quality-outcome-confidence-contract.md`
+- `03-architecture/CF-W1-CAL-01-architecture-review.md`
+- `backend/prisma/schema.prisma`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.md`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.service.ts`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.types.ts`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.repository.ts`
+- `backend/tests/modules/signal-quality-lab/signal-quality-lab.service.test.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.md`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md`
+- `backend/src/modules/today-trade-review/today-trade-review.md`
+- `frontend/src/features/signal-quality-lab/types.ts`
+- `frontend/src/features/signal-quality-lab/api/signalQualityLabService.ts`
+- `frontend/src/features/signal-quality-lab/components/SignalQualityLabPage.tsx`
+- `frontend/tests/ui/signal-quality-lab.spec.ts`
+
+Readiness result:
+
+- `CF-W1-SQLAB-02` cannot meet its full durable-learning requirement inside the current no-schema boundary.
+- A bounded no-schema first slice is source-supported: additive derived journal-preview metadata can stay inside `signal-quality-lab` backend service/types/doc/test plus `signal-quality-lab` frontend types/page/UI smoke test.
+- Durable post-event learning storage remains blocked because `signal-quality-lab` has no owned persisted row or JSON surface to extend. Reusing `SignalResult` or `SignalCalibrationResult` would cross module ownership and is intentionally forbidden.
+- Team 04 QA planning can start now for the no-schema first slice only.
+- Team 00 must combine or sequence `CF-W1-SQLAB-02` with `CF-W1-SQLAB-01`; they share the same `signal-quality-lab` backend writer set.
+- No new Decision Packet was opened from this pass because the architecture blocker is precise: future durable storage approval, not a policy ambiguity.
+
+Current Team 03 recommendation to Team 00:
+
+1. Let Team 04 start QA planning for the no-schema `CF-W1-SQLAB-02` first slice now.
+2. Keep the no-schema preview child separate from the future durable storage child so review does not blur a derived preview into a persisted journal promise.
+3. Do not promote `CF-W1-SQLAB-02` in parallel with `CF-W1-SQLAB-01`; either sequence them or intentionally merge them into one `signal-quality-lab` writer pass.
+
+No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
+
 ## Team 03 Watchlist Review Actionability Prep - 2026-05-18
 
 Assignment: prepare architecture readiness for `CF-W1-L3-WATCH-01` watchlist review actionability in the main worktree without touching application code, tests, package manifests, generated files, root `AGENTS.md`, `docs/AGENTS.md`, or historical `docs/codex-agent-team-plan/**`.

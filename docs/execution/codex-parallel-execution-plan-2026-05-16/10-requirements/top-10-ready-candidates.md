@@ -10,7 +10,7 @@ There are ten active top/refinement candidates after removing completed bounded 
 
 | Rank | ID | Candidate | Severity | Current readiness | Reason |
 | --- | --- | --- | --- | --- | --- |
-| 1 | CF-W1-L3-TREV-01 | Today Review publication evidence | P1 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Daily shortlist trust depends on matching readiness mode, trusted-universe evidence, and publish/withhold explanations. |
+| 1 | CF-W1-STRAT-02 | Strategy Framework rule versioning and DQ gate policy | P0 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Strategy source-of-truth trust depends on durable rule provenance and explicit DQ-gate policy before rule behavior changes. |
 | 2 | CF-W1-SQLAB-02 | Signal outcome journal and post-event learning | P1 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Signal-quality outcome calculations already exist, but the learning loop still lacks a durable journal. |
 | 3 | CF-W1-BT-02 | Backtesting outcome review traceability | P1 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Backtesting results need a trust frame for partial, diagnostic, and legacy-repaired outcomes. |
 | 4 | CF-W1-L3-ALERT-03 | Alert follow-through traceability | P1 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Alert inbox review needs durable outcome state so trigger follow-up is traceable beyond read/dismiss. |
@@ -27,7 +27,7 @@ These are not app-code ready. No item is blocked by an open Decision Inbox item,
 
 | Rank | ID | Prep gate |
 | --- | --- | --- |
-| 1 | CF-W1-L3-TREV-01 | Team 00/03 reservation and QA plan for prepared Today Review publication-evidence packet. |
+| 1 | CF-W1-STRAT-02 | Team 00/03 reservation and QA plan for prepared Strategy Framework rule-versioning and DQ-gate packet. |
 | 2 | CF-W1-SQLAB-02 | Team 00/03 reservation and QA plan for prepared signal outcome journal packet. |
 | 3 | CF-W1-BT-02 | Team 00/03 reservation and QA plan for prepared backtesting outcome-review packet. |
 | 4 | CF-W1-L3-ALERT-03 | Team 00/03 reservation and QA plan for prepared alert follow-through packet. |

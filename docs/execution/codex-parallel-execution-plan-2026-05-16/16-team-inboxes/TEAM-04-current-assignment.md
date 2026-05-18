@@ -101,3 +101,73 @@ Continue docs-only QA prep only after this review:
 - `CF-W1-UX-05`
 - `CF-W1-AUTH-01`
 - `CF-W1-SUB-01`
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Run QA Verification for `CF-W1-SQLAB-01` in the dedicated Team 06 worktree. This supersedes the stale `CF-W1-L3-PORT-01A` standby text above for the next Team 04 spawned agent.
+
+## Source Handoff
+
+- Requirement: `CF-W1-SQLAB-01`
+- Branch: `codex/team06-strategy-signal/CF-W1-SQLAB-01`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-SQLAB-01`
+- Developer handoff: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-SQLAB-01-developer-handoff.md`
+- QA plan: `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-SQLAB-01-qa-plan.md`
+
+## Files To Verify
+
+Allowed implementation files:
+
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.service.ts`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.types.ts`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.md`
+- `backend/tests/modules/signal-quality-lab/signal-quality-lab.service.test.ts`
+
+Allowed evidence docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-SQLAB-01-developer-handoff.md`
+
+Forbidden scope to confirm untouched:
+
+- Prisma schema or migrations
+- `signal-quality-lab` repository, controller, router, or validation source
+- Data Quality Engine source or exports
+- Signal Generation, Signal Calibration, Strategy Decision, Trade Plan source/tests
+- backend/frontend route registries
+- shared backend utilities, shared DTOs, shared UI
+- package manifests, generated files, frontend source/tests
+- providers, startup/backfill, live-provider, paid/cloud, broker, telemetry, or automation flows
+
+## Required QA Checks
+
+- Confirm additive `outcomeConfidence` exists on SQLAB summary payloads without removing or renaming existing fields.
+- Verify `TRUSTED`, `LIMITED`, `DIAGNOSTIC`, and `UNTRUSTED` state coverage.
+- Verify missing optional DQ evidence does not become trusted.
+- Verify no selected-horizon evidence maps to untrusted.
+- Verify DQ lookup failure maps to untrusted and surfaces a reason.
+- Confirm current DQ filter/query behavior is unchanged.
+- Confirm wording remains research-support only with no target-price, direct advice, broker, or automation framing.
+
+## Focused Commands
+
+Run in the Team 06 worktree if environment is available:
+
+```powershell
+cd C:\work\repo\investment-scanner-worktrees\team06-CF-W1-SQLAB-01\backend
+npm.cmd test -- signal-quality-lab.service.test.ts --runInBand
+npm.cmd run build
+```
+
+## Output
+
+Write QA result to the Team 06 worktree:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-SQLAB-01-qa-verification.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`

@@ -286,3 +286,70 @@ Recently closed:
 - Team 04 is ready for `CF-W1-L3-WATCH-01` QA planning.
 - Team 06 can take the next Lane 2 implementation only after Team 00 promotes a specific Ready item, likely `CF-W1-SQLAB-01` if gates pass.
 - Team 10 is idle until the next QA-accepted implementation handoff.
+
+---
+
+# Latest Runtime Checkpoint
+
+Date: 2026-05-18
+
+## Current Git State
+
+Main workspace:
+
+- Branch: `dev`
+- Head: `97a4c3c docs: promote signal quality outcome confidence`
+- Divergence: `dev` is ahead of `origin/dev` by 17 local commits.
+- Push status: not push-safe.
+- Reason: shared `dev` has active execution docs awaiting checkpoint commit and an unrelated dirty app-test file at `backend/tests/modules/alerts-monitoring/alerts-monitoring.ownership.test.ts`.
+- Rule: do not stage or push the dirty app-test file unless Team 00 starts a deliberate alert integration pass.
+
+Active implementation worktree:
+
+- `CF-W1-SQLAB-01`: branch `codex/team06-strategy-signal/CF-W1-SQLAB-01`; worktree `../investment-scanner-worktrees/team06-CF-W1-SQLAB-01`.
+- Team 06 implementation is complete and awaiting Team 04 QA verification.
+
+## Active Agents
+
+No active agent has been spawned after the Team 06 handoff at this checkpoint.
+
+Recently closed:
+
+- Team 06 `019e3ace-0d5c-7503-a928-ba12a0e5be6a`: completed `CF-W1-SQLAB-01` implementation. Focused service test passed (`30/30`) and backend build passed.
+- Team 03 `019e3aca-7848-7892-97ff-f3c6e35e64aa`: prepared `CF-W1-SQLAB-02` architecture review, contract, and work packet. The durable parent is blocked; a no-schema derived journal-preview child can move to Team 04 QA planning but must not implement in parallel with `CF-W1-SQLAB-01`.
+
+## Current Workstream State
+
+`CF-W1-SQLAB-01`
+
+- State: developer handoff received from Team 06.
+- Changed files stayed within the reserved Signal Quality Lab service/types/doc/test scope plus handoff docs.
+- Next gate: Team 04 QA verification in the Team 06 worktree.
+
+`CF-W1-SQLAB-02`
+
+- State: architecture split complete.
+- No-schema first slice: eligible for Team 04 QA planning only.
+- Durable storage slice: blocked pending explicit storage packet because `signal-quality-lab` has no owned persisted journal row.
+- Implementation sequencing: blocked behind `CF-W1-SQLAB-01` because both reserve the same backend Signal Quality Lab files.
+
+`CF-W1-STRAT-02`
+
+- State: Team 02 requirement draft prepared.
+- Next gate: Team 03 architecture contract and exact file-reservation prep.
+
+## Queued Gates
+
+1. Spawn Team 04 QA Verification for `CF-W1-SQLAB-01`.
+2. Spawn Team 03 architecture prep for `CF-W1-STRAT-02`.
+3. Relaunch Team 02 persistent PO/Requirements discovery.
+4. Commit active execution docs only from shared `dev`; exclude `backend/tests/modules/alerts-monitoring/alerts-monitoring.ownership.test.ts`.
+5. After Team 04 QA accepts `CF-W1-SQLAB-01`, route Team 10 review, Architect Signoff, delegated PO acceptance, and scoped branch commit.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04 is ready for `CF-W1-SQLAB-01` QA verification.
+- Team 03 is ready for `CF-W1-STRAT-02` architecture prep.
+- Team 02 is ready to relaunch as persistent PO/Requirements discovery.
+- Team 04 can later plan `CF-W1-SQLAB-02A`, but do not run it in parallel with Team 04 SQLAB-01 QA unless output files are isolated.
+- Team 10 is idle until the next QA-accepted handoff.

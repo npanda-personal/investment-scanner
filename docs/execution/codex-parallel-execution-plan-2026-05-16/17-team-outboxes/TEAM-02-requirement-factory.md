@@ -12,7 +12,7 @@ Mode: persistent Team 02 PO + requirements value-discovery lane. No application 
 - Input source: root `AGENTS.md`, runtime bootstrap, standing delegation, escalation rules, worktree/branch policy, heartbeat protocol, Team 02 charter, Team 02 automation prompt, team inboxes, ready/blocked queues, Decision Inbox, Team 07/08 outboxes and prepared artifacts
 - Output target: `10-requirements/`, `12-ready-queue/`, this outbox
 - Branch/worktree: `dev`; shared workspace, no separate Team 02 worktree created
-- Active requirement ids: `CF-W1-L3-AUTH-03`, `CF-W1-L3-INTEL-01`, `CF-W1-L3-INTEL-02`, `CF-W1-L3-INTEL-03`, `CF-W1-L3-PORT-01`, `CF-W1-L3-PORT-01B`, `CF-W1-L3-ALERT-01`, `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-MD-01`, `CF-W1-AUTH-02`, `CF-W1-DQ-02`, `CF-W1-TP-02`, `CF-W1-SQLAB-01`, `CF-W1-HCTX-01`, `CF-W1-MCTX-01`, `CF-W1-L3-TREV-01`, `CF-W1-BT-02`, `CF-W1-L3-ALERT-03`, `CF-W1-L3-WATCH-01`, `CF-W1-CAL-01`
+- Active requirement ids: `CF-W1-L3-AUTH-03`, `CF-W1-L3-INTEL-01`, `CF-W1-L3-INTEL-02`, `CF-W1-L3-INTEL-03`, `CF-W1-L3-PORT-01`, `CF-W1-L3-PORT-01B`, `CF-W1-L3-ALERT-01`, `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-MD-01`, `CF-W1-AUTH-02`, `CF-W1-DQ-02`, `CF-W1-TP-02`, `CF-W1-STRAT-02`, `CF-W1-SQLAB-01`, `CF-W1-HCTX-01`, `CF-W1-MCTX-01`, `CF-W1-L3-TREV-01`, `CF-W1-BT-02`, `CF-W1-L3-ALERT-03`, `CF-W1-L3-WATCH-01`, `CF-W1-CAL-01`
 - Ready work pulled: none
 - Can continue without human approval: yes for docs-only requirement refinement; no for app-code implementation or decision-blocked work
 
@@ -483,6 +483,47 @@ Team 00 should delegate `CF-W1-CAL-01` next for signal-calibration reliability d
 ### Files Changed
 
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-HCTX-01-historical-context-explainability-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+## 2026-05-18 Continuation - Strategy Framework Rule Provenance Refresh
+
+Mode: Team 02 value-discovery pass after strategy/rule audit review. No application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, providers, services, or frontend files changed.
+
+### Evidence Consumed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-strategy-signal-rules.md`
+- `backend/src/modules/strategy-framework/strategy-framework.md`
+- `backend/src/modules/strategy-framework/strategy-framework.registry.ts`
+- `backend/src/modules/strategy-framework/strategy-framework.service.ts`
+- `backend/src/modules/strategy-framework/strategy-framework.evaluator.ts`
+- `backend/src/modules/strategy-framework/strategy-framework.types.ts`
+- `frontend/src/features/strategy-framework/components/StrategyFrameworkPage.tsx`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/blocked-by-shared-file.md`
+
+### Queue Delta
+
+- Created new requirement draft `CF-W1-STRAT-02` for Strategy Framework rule versioning and DQ gate policy.
+- Elevated the Lane 2 strategy/rule provenance gap above the Lane 3 publication and exposure-review items in the current discovery ordering.
+- Preserved `CF-W1-SQLAB-02` and `CF-W1-BT-02` immediately behind the new strategy-trust item as the next measured-outcome and backtesting trust candidates.
+- Left Ready-promotion front-runners unchanged; `CF-W1-STRAT-02` is refinement-only and blocked from implementation by schema/storage decision risk.
+
+### Implementation Readiness
+
+Ready work pulled: none by Team 02.
+
+No item moved to Ready. `CF-W1-STRAT-02` is architecture-prep only and remains blocked until Team 00/03 reservation and contract work exists.
+
+### Next Recommended Assignment
+
+Team 00 should route `CF-W1-STRAT-02` to Team 03 for product refinement and architecture-contract prep. After that, keep `CF-W1-SQLAB-02` and `CF-W1-BT-02` as the next Lane 2 discovery candidates ahead of the Lane 3 trust-surface items.
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-STRAT-02-strategy-framework-rule-versioning-dq-gate-policy-requirement.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`

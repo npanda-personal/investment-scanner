@@ -56,3 +56,41 @@ Decision reconciliation:
 ## Expected Outbox
 
 Update `17-team-outboxes/TEAM-03-outbox.md` and `17-team-outboxes/TEAM-03-architecture-factory.md`.
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Prepare architecture readiness for `CF-W1-STRAT-02` - Strategy Framework rule versioning and Data Quality gate policy.
+
+This is docs-only architecture prep. Do not implement application code and do not reserve schema/package/generated/shared files as approved implementation scope. If the bounded slice truly needs Prisma/schema or generated type changes, document that as a blocker or split a future approval-gated child packet instead of treating it as Ready.
+
+## Source Input
+
+- Requirement draft: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-STRAT-02-strategy-framework-rule-versioning-dq-gate-policy-requirement.md`
+- Relevant module docs/source to inspect read-only:
+  - `backend/src/modules/strategy-framework/strategy-framework.md`
+  - `backend/src/modules/strategy-framework/strategy-framework.registry.ts`
+  - `backend/src/modules/strategy-framework/strategy-framework.types.ts`
+  - `backend/src/modules/strategy-framework/strategy-framework.service.ts`
+  - `frontend/src/features/strategy-framework/components/StrategyFrameworkPage.tsx`
+  - `frontend/src/features/strategy-framework/types.ts`
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-STRAT-02-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-STRAT-02-strategy-framework-rule-versioning-dq-gate-policy-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-STRAT-02-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+## Required Output
+
+- Exact file-reservation recommendation for the smallest no-schema/no-shared first child if feasible.
+- Explicit blocker if stable rule revisioning cannot be represented without Prisma/schema/generated/shared-contract changes.
+- QA planning handoff notes for Team 04.
+- A clear Ready recommendation: `Ready candidate`, `split required`, or `blocked`.
