@@ -236,6 +236,51 @@ Date: 2026-05-18
 
 ## Assignment
 
+Prepare architecture readiness for `CF-W1-MD-03` - Market Data signoff threshold contract enforcement.
+
+This is docs-only architecture prep. Do not implement application code. Do not edit tests. Do not run providers, services, Prisma commands, builds, UI smoke, or live data.
+
+## Why This Item
+
+Team 02 added `CF-W1-MD-03` as the next top unassigned upstream market-data requirement. Team 03 completed `CF-W1-RH-02A` architecture, and `RH-02A` is now queued for Team 04 QA planning behind active Team 04 work. `CF-W1-MD-03` is independent of active Research Hub and Smart Money writers.
+
+## Source Input
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MD-03-market-data-signoff-threshold-contract-requirement.md`
+- Readiness contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/market-data-dq-readiness-contract.md`
+- Relevant audits:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-market-data-data-quality.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/TEAM-05-market-data-data-quality-domain-audit-2026-05-17.md`
+- Relevant source/docs to inspect read-only:
+  - `backend/src/modules/market-data-foundation/market-data-foundation.md`
+  - `backend/src/modules/market-data-foundation/**` read-only as needed
+  - `backend/tests/modules/market-data-foundation/**` read-only as needed
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-MD-03-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-MD-03-market-data-signoff-threshold-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-MD-03-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+## Required Output
+
+- Determine the smallest bounded first child for enforcing/explaining existing `95%` price-ready and `90%` metadata-ready signoff thresholds.
+- Recommend exact allowed and forbidden future implementation files.
+- Keep the packet separate from `CF-W1-MD-02A` durable evidence/schema proposal work.
+- Explicitly block Prisma/schema, durable storage, provider/startup redesign, route changes, shared utilities/UI, package manifests, generated files, frontend/UI implementation, DQE implementation, paid/cloud, broker, telemetry, and broad universe-state rewrite unless separately approved.
+- Provide QA planning handoff notes for Team 04.
+- Return one of: `Ready candidate`, `split required`, or `blocked`.
+
+---
+
+# Current Active Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
 Prepare architecture readiness for `CF-W1-MD-02A` - additive companion durable evidence schema packet.
 
 This is docs-only architecture prep. It must produce a proposal/contract packet only. Do not implement application code and do not edit Prisma/schema, migrations, generated files, repositories, services, providers, startup/backfill, route registries, shared utilities/UI, package manifests, or tests.

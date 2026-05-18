@@ -367,6 +367,49 @@ Return `ACCEPT` or `REJECT`, with commands run, scenario evidence, changed-file 
 
 ---
 
+# Current Main-Workspace QA Assignment
+
+Date: 2026-05-18
+
+## Assignment
+
+Prepare docs-only QA planning for `CF-W1-L3-TREV-02` - Today Review candidate snapshot provenance.
+
+This is main-workspace QA planning only. Do not implement application code. Do not run tests, builds, services, providers, Prisma commands, UI smoke, or live data.
+
+This assignment is independent from the parallel `CF-W1-SMI-01` worktree QA verification because the SMI agent writes only worktree evidence files.
+
+## Source Input
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-TREV-02-today-review-candidate-snapshot-provenance-requirement.md`
+- Architecture review: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-L3-TREV-02-architecture-review.md`
+- Contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-L3-TREV-02-today-review-candidate-snapshot-provenance-contract.md`
+- Work packet: `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-L3-TREV-02-work-packet.md`
+- Team 03 outbox: `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-L3-TREV-02-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/next-validation-plans.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+## Required QA Plan Coverage
+
+- Candidate-level provenance labels and evidence dates for stored snapshot detail.
+- Compatibility-only labels for partial or legacy snapshot shapes.
+- Explicit unavailable/unknown provenance fallback when stored evidence cannot prove source timing.
+- Repository compatibility normalization without schema, migration, generated, or route changes.
+- Candidate detail rendering only; no broad Today Review page redesign.
+- Preserve read-only research-support wording and avoid target-like, direct-advice, broker, or automation wording.
+- Reject implementation if it touches Prisma/schema, route registries, shared utilities/UI, package manifests, provider/live-data, startup/backfill, upstream module source, Trade Plan geometry, Strategy Decision rewrite, paid/cloud, broker, telemetry, or broad UI scope.
+- Explicit sequencing note: do not implement in parallel with `CF-W1-L3-TREV-01` because both reserve Today Review writer files.
+
+## Output
+
+State whether `CF-W1-L3-TREV-02` is QA-plan ready for Team 00 Ready evaluation and list any blocker.
+
+---
+
 # Current Dispatcher Assignment
 
 Date: 2026-05-18

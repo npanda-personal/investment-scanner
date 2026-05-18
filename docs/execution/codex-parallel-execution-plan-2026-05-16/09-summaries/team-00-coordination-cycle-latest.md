@@ -1583,6 +1583,50 @@ Spawned Team 02 Requirement Factory:
 
 Date: 2026-05-18
 
+## Gate Results
+
+`CF-W1-SMI-01`
+
+- Team 04 QA accepted in the Team 06 Smart Money worktree.
+- Focused service test passed: `smart-money-intelligence.service.test.ts`, `14/14`.
+- Backend build passed.
+- Team 00 closed the completed QA agent and spawned Team 10 review / release in the same worktree.
+
+`CF-W1-L3-TREV-02`
+
+- Team 04 completed docs-only QA planning.
+- The item is QA-plan ready for Team 00 Ready evaluation.
+- It must not run in parallel with `CF-W1-L3-TREV-01` because the Today Review writer files overlap.
+
+`CF-W1-MD-03`
+
+- Team 00 spawned Team 03 architecture readiness after `CF-W1-RH-02A` architecture completed.
+
+## Active Agents
+
+- Team 02 `019e3c9e-9c1f-77f3-9cd4-f8ee983b7c99`: rolling market-intelligence requirements discovery.
+- Team 10 `019e3ca3-e034-7681-b8b9-34568833f37e`: `CF-W1-SMI-01` review / release.
+- Team 03 `019e3ca4-265b-7341-bc72-ff9b919f34e0`: `CF-W1-MD-03` architecture readiness.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04 is ready for `CF-W1-MD-02A` QA review after the current docs checkpoint is committed.
+- Team 03 is ready for `CF-W1-SMI-01` Architect Signoff if Team 10 accepts.
+- Team 04 is ready for `CF-W1-RH-02A` QA planning after `MD-02A` unless Team 00 reprioritizes Research Hub.
+- Team 00 is ready to evaluate `CF-W1-L3-TREV-02` for Ready promotion when the Today Review writer set is free.
+
+## Next Coordination Action
+
+1. Commit the completed Team 04 `TREV-02` QA-plan docs and Team 00 dispatch notes without staging unrelated app-test state.
+2. Spawn Team 04 for `CF-W1-MD-02A` QA review if the Team 04 main-workspace files are clean.
+3. Consume Team 10 `SMI-01`, Team 03 `MD-03`, and Team 02 outputs as they complete.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
 ## Rolling PO / Architect Relaunch
 
 Team 00 corrected the worker-pool mismatch: both rolling lanes are now active.
@@ -1691,6 +1735,43 @@ Teams ready to pick up new tasks:
 - Team 04: `CF-W1-SMI-01` QA verification now.
 - Team 10: `CF-W1-SMI-01` review after QA acceptance.
 - Team 04: `CF-W1-L3-TREV-02` QA planning after `CF-W1-RH-01`.
+
+## Dispatch Result
+
+Closed completed agents:
+
+- Team 04 `019e3c91-35dc-7b63-8a4d-732ca25eb873`: `CF-W1-RH-01` QA planning.
+- Team 02 `019e3c91-cd7c-7083-bee9-1f6f35688d72`: `CF-W1-MD-03` requirement discovery.
+
+Spawned:
+
+- Team 04 `019e3c9d-feb2-7470-9388-c4bdb560ab22`: `CF-W1-SMI-01` QA verification in the Team 06 worktree.
+- Team 04 `019e3c9e-4d3e-7db0-8303-2faf8d2de923`: `CF-W1-L3-TREV-02` QA planning.
+- Team 02 `019e3c9e-9c1f-77f3-9cd4-f8ee983b7c99`: rolling requirements discovery.
+
+Teams ready to pick up new tasks:
+
+- Team 10: `CF-W1-SMI-01` review after QA acceptance.
+- Team 03: `CF-W1-MD-03` architecture prep after `RH-02A`.
+- Team 04: `CF-W1-MD-02A` QA review after `TREV-02`.
+- Team 00: `CF-W1-RH-01` Ready evaluation when an implementation slot is safe.
+
+## RH-02A Architecture Consumed
+
+Team 03 `019e3c98-a960-7712-9d11-c08fa649bffd` completed `CF-W1-RH-02A` as a `Ready candidate` and was closed.
+
+Routing:
+
+- Queue `CF-W1-RH-02A` for Team 04 QA planning.
+- Keep `CF-W1-RH-01` and `CF-W1-RH-02A` out of parallel implementation because both reserve the same Research Hub backend files.
+- Relaunch Team 03 on `CF-W1-MD-03` architecture prep.
+
+Teams ready to pick up new tasks:
+
+- Team 03: `CF-W1-MD-03` architecture prep now.
+- Team 10: `CF-W1-SMI-01` review after QA acceptance.
+- Team 04: `CF-W1-MD-02A` QA review after `TREV-02`.
+- Team 04: `CF-W1-RH-02A` QA planning after `MD-02A` unless reprioritized.
 
 ---
 

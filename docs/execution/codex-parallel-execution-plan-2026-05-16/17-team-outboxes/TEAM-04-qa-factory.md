@@ -4,6 +4,79 @@ Date: 2026-05-18
 
 Mode: focused QA rerun plus docs-only QA planning.
 
+## 2026-05-18 `CF-W1-L3-TREV-02` Today Review Candidate Snapshot Provenance QA Planning
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only QA packet preparation
+- Work item: `CF-W1-L3-TREV-02`
+- State/mode: QA planning only; no executable validation
+- Owner: Team 04 QA Factory
+- Lane/module: Lane 3 / `today-trade-review`
+- Files changed:
+  - `04-qa/CF-W1-L3-TREV-02-qa-plan.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - `AGENTS.md`
+  - `16-team-inboxes/TEAM-04-current-assignment.md`
+  - `10-requirements/CF-W1-L3-TREV-02-today-review-candidate-snapshot-provenance-requirement.md`
+  - `03-architecture/CF-W1-L3-TREV-02-architecture-review.md`
+  - `06-contracts/CF-W1-L3-TREV-02-today-review-candidate-snapshot-provenance-contract.md`
+  - `08-work-packets/CF-W1-L3-TREV-02-work-packet.md`
+  - `17-team-outboxes/TEAM-03-architecture-factory.md`
+  - `04-qa/CF-W1-L3-TREV-01-qa-plan.md`
+  - `04-qa/CF-W1-RH-01-qa-plan.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+  - `backend/src/modules/today-trade-review/today-trade-review.types.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.repository.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.service.ts`
+  - `frontend/src/features/today-trade-review/components/TodayReviewCandidateDetailPage.tsx`
+  - `backend/tests/modules/today-trade-review/today-trade-review.service.test.ts`
+  - `frontend/tests/ui/today-trade-review.spec.ts`
+- Behavior changed:
+  - none; docs-only QA planning
+- Docs changed:
+  - prepared `04-qa/CF-W1-L3-TREV-02-qa-plan.md`
+  - refreshed `04-qa/next-validation-plans.md`
+  - recorded this handoff in `17-team-outboxes/TEAM-04-qa-factory.md`
+- Contracts changed:
+  - none
+- Result:
+  - Prepared a bounded Today Review candidate-detail provenance QA plan in `04-qa/CF-W1-L3-TREV-02-qa-plan.md`.
+  - Recorded required coverage for candidate-level provenance labels and evidence dates across stored snapshot detail, including Data Quality, Market Context, Strategy proof, Trade Plan, raw signal, calibration, smart-money, and Today Review Lite compatibility surfaces where applicable.
+  - Recorded explicit compatibility-only handling for partial or legacy snapshot shapes and explicit unavailable or unknown timing fallback when stored evidence cannot prove source timing.
+  - Added repository compatibility normalization assertions for older persisted candidate rows, with exact rejection if implementation needs schema, migration, generated-file, route, provider, startup, or backfill work.
+  - Limited the UI surface to `TodayReviewCandidateDetailPage.tsx` only and rejected broad Today Review page redesign, frontend API/hook rewiring, or shared UI work.
+  - Added research-support wording constraints for changed provenance/detail copy and exact reject conditions for Prisma/schema, route registries, shared files, upstream module source, Trade Plan geometry, Strategy Decision rewrite, paid/cloud, broker, telemetry, provider/live-data, startup/backfill, package/generated, or broad UI scope.
+  - Recorded the sequencing guard that `CF-W1-L3-TREV-02` must not implement in parallel with `CF-W1-L3-TREV-01` because the Today Review writer set overlaps.
+  - Updated `04-qa/next-validation-plans.md` so `CF-W1-L3-TREV-02` is visible in the Team 04 queue as QA-plan ready for Team 00 Ready evaluation as one bounded Today Review candidate-detail child only.
+- Tests run: none
+- Tests skipped:
+  - all executable validation was skipped because this was a docs-only QA planning pass with no Team 00 Ready promotion or implementation handoff
+- Skipped-test reason:
+  - planning-only assignment; no builds/tests/services/providers/UI smoke/live data were authorized or required
+- Assumptions:
+  - Team 00 will keep the child bounded to the reserved Today Review backend/frontend detail files only
+  - repository compatibility normalization, if added, stays read-only and additive on current persisted rows
+  - existing legacy Trade Plan copy on the candidate detail page remains outside this packet unless Team 00 explicitly routes a separate semantics child
+- Risks:
+  - implementers could surface candidate provenance rows but still imply direct upstream timing where only candidate publication time is known
+  - implementers could widen the packet into `TodayReviewPage.tsx`, frontend API/hooks, or upstream module source unless Team 00 keeps the writer set exact
+  - compatibility reconstruction for older rows could fabricate evidence timing unless fallback labels remain explicit
+- Blockers:
+  - executable QA remains blocked until Team 00 promotes the bounded Today Review candidate-detail implementation handoff
+  - `CF-W1-L3-TREV-02` must remain mutually exclusive with `CF-W1-L3-TREV-01` in implementation because both reserve the same Today Review writer files
+  - any widening into Prisma/schema, routes, shared files, upstream modules, Trade Plan geometry, Strategy Decision rewrite, provider/live-data, startup/backfill, package/generated, or broad Today Review UI remains an explicit reject condition
+- Shared-file requests:
+  - none from Team 04; single-writer reservation remains a Team 00 implementation concern
+- QA-ready for Team 00 Ready evaluation:
+  - `CF-W1-L3-TREV-02`: yes, as one bounded `today-trade-review` candidate-detail provenance child only
+- Next gate:
+  - Team 00 Ready evaluation for `CF-W1-L3-TREV-02`, with exact Today Review writer reservations and explicit no-parallel sequencing against `CF-W1-L3-TREV-01`
+- Evidence notes:
+  - Team 04 used the active execution folder plus current Today Review module/test/detail UI surfaces only; no application source, tests, package manifests, generated files, Prisma, routes, shared files, builds, services, providers, or live data were modified or run
+
 ## 2026-05-18 `CF-W1-RH-01` Research Hub Actionability Evidence Wiring QA Planning
 
 - Team: `TEAM-04` - QA Factory

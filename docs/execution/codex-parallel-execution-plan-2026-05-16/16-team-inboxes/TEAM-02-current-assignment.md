@@ -203,6 +203,42 @@ Date: 2026-05-18
 
 ## Assignment
 
+Relaunch the rolling PO + Requirements discovery lane after the `CF-W1-MD-03` cycle. Do not monitor passively.
+
+Audit a different under-served direct investor/trader-value workflow and add/refine at least one bounded requirement if current source/docs support it.
+
+## Current Active / Queued Items To Exclude
+
+- `CF-W1-RH-02A`: active Team 03 architecture prep.
+- `CF-W1-MD-03`: queued for Team 03 architecture after `RH-02A`; do not rework unless Team 00 routes a rejection.
+- `CF-W1-RH-01`: QA plan ready; Team 00 Ready evaluation pending.
+- `CF-W1-L3-TREV-02`: active Team 04 QA planning.
+- `CF-W1-MD-02A`: proposal packet ready; queued for Team 04 QA review.
+- `CF-W1-SMI-01`: active Team 04 worktree QA verification.
+- `CF-W1-TP-02`: active follow-up gate; do not rework unless Team 00 routes a rejection back to requirements.
+- Accepted branch commits parked for later clean integration stay out of active discovery ranking.
+
+## Priority Rule
+
+Rank direct investor/trader value first: market data, DQ evidence, signal/trigger provenance, strategy trust, calibration, backtesting, Trade Plan research support, historical/market context, smart-money evidence, Research Hub evidence, Today Review provenance, reviewability, and explainability.
+
+Keep admin, settings, auth/subscription, notifications, and alert convenience work lowest unless they block correctness, privacy, user-data safety, or an accepted branch gate.
+
+## Required Output
+
+- Requirement(s) created or refined.
+- Queue deltas in `next-top-10-candidates.md`, `top-10-ready-candidates.md`, `requirements-backlog.md`, and `refinement-queue.md`.
+- The next top unassigned market-intelligence item after excluding active/queued/accepted/parked/blocked work.
+- No Ready movement and no application-code edits.
+
+---
+
+# Current Active Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
 Relaunch the rolling PO + Requirements discovery lane after the `CF-W1-MD-02A` cycle. Do not monitor passively.
 
 Audit a different under-served direct investor/trader-value workflow and add/refine at least one bounded requirement if current source/docs support it.

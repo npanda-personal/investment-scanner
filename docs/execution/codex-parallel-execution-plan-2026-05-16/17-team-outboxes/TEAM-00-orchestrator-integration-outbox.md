@@ -2454,6 +2454,49 @@ Launch Team 04 QA Verification in the SMI worktree. This does not conflict with 
 - Team 10: `CF-W1-SMI-01` review after QA acceptance.
 - Team 04: `CF-W1-L3-TREV-02` QA planning after `CF-W1-RH-01`.
 
+## Dispatch Result
+
+Closed:
+
+- Team 04 `019e3c91-35dc-7b63-8a4d-732ca25eb873`
+- Team 02 `019e3c91-cd7c-7083-bee9-1f6f35688d72`
+
+Spawned:
+
+- Team 04 `019e3c9d-feb2-7470-9388-c4bdb560ab22`: `CF-W1-SMI-01` QA verification.
+- Team 04 `019e3c9e-4d3e-7db0-8303-2faf8d2de923`: `CF-W1-L3-TREV-02` QA planning.
+- Team 02 `019e3c9e-9c1f-77f3-9cd4-f8ee983b7c99`: rolling requirements discovery.
+
+Teams ready to pick up new tasks:
+
+- Team 10: `CF-W1-SMI-01` review after QA acceptance.
+- Team 03: `CF-W1-MD-03` architecture prep after `RH-02A`.
+- Team 04: `CF-W1-MD-02A` QA review after `TREV-02`.
+- Team 00: `CF-W1-RH-01` Ready evaluation when an implementation slot is safe.
+
+---
+
+# Team 00 Consumes RH-02A Architecture
+
+Date: 2026-05-18
+
+## Result
+
+Team 03 completed `CF-W1-RH-02A` architecture as a `Ready candidate`.
+
+Decision:
+
+- Queue Team 04 QA planning for `CF-W1-RH-02A`.
+- Do not implement `CF-W1-RH-01` and `CF-W1-RH-02A` in parallel; they share Research Hub backend files.
+- Relaunch Team 03 on `CF-W1-MD-03` architecture prep.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03: `CF-W1-MD-03` architecture prep now.
+- Team 10: `CF-W1-SMI-01` review after QA acceptance.
+- Team 04: `CF-W1-MD-02A` QA review after `TREV-02`.
+- Team 04: `CF-W1-RH-02A` QA planning after `MD-02A` unless Team 00 reprioritizes Research Hub.
+
 ---
 
 # BT-02 Review Accepted
@@ -2536,3 +2579,33 @@ Teams ready to pick up new tasks:
 - Team 10: `CF-W1-BT-02` review after QA acceptance.
 - Team 03: `CF-W1-BT-02` Architect Signoff after Team 10 acceptance.
 - Team 04: `CF-W1-CAL-01` QA planning after Team 03 output.
+
+---
+
+# SMI-01 QA Accepted And Review Dispatched
+
+Date: 2026-05-18
+
+Team 04 accepted `CF-W1-SMI-01` QA in the Team 06 Smart Money worktree.
+
+Team 00 routing:
+
+- Closed Team 04 QA agent `019e3c9d-feb2-7470-9388-c4bdb560ab22`.
+- Spawned Team 10 Review / Release agent `019e3ca3-e034-7681-b8b9-34568833f37e`.
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-SMI-01`.
+- If Team 10 accepts, route to Team 03 Architect Signoff.
+- If Team 10 rejects, stop only the SMI workstream and route bounded Team 06 rework.
+
+Team 04 also completed `CF-W1-L3-TREV-02` QA planning and Team 00 closed agent `019e3c9e-4d3e-7db0-8303-2faf8d2de923`.
+
+Team 00 spawned Team 03 architecture readiness for `CF-W1-MD-03`:
+
+- Agent: `019e3ca4-265b-7341-bc72-ff9b919f34e0`.
+- Scope: docs-only Market Data signoff-threshold architecture packet.
+
+Teams ready to pick up new tasks:
+
+- Team 04: `CF-W1-MD-02A` QA review after current docs checkpoint.
+- Team 03: `CF-W1-SMI-01` Architect Signoff after Team 10 acceptance.
+- Team 04: `CF-W1-RH-02A` QA planning after `MD-02A`.
+- Team 00: `CF-W1-L3-TREV-02` Ready evaluation when Today Review writer sequencing is safe.

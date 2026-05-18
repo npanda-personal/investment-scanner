@@ -196,6 +196,71 @@ Date: 2026-05-18
 
 ## Assignment
 
+Review `CF-W1-SMI-01` after Team 04 QA `ACCEPT`.
+
+This assignment supersedes older Team 10 tails above. The workstream is backend-only Smart Money Intelligence in a dedicated Team 06 worktree. Do not review unrelated Calibration, Trade Plan, Today Review, Research Hub, or Market Data work in this pass.
+
+## Branch / Worktree
+
+- Branch: `codex/team06-strategy-signal/CF-W1-SMI-01`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-SMI-01`
+
+## Evidence To Review
+
+From the worktree:
+
+- Developer handoff: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-SMI-01-developer-handoff.md`
+- QA evidence: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-SMI-01-qa-verification.md`
+- Team 06 outbox: `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-CF-W1-SMI-01-outbox.md`
+- Team 04 outbox: `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-CF-W1-SMI-01-qa-outbox.md`
+
+## Review Scope
+
+Review only the approved Team 06 changed files:
+
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.service.ts`
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.types.ts`
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.md`
+- `backend/tests/modules/smart-money-intelligence/smart-money-intelligence.service.test.ts`
+
+Verify:
+
+- additive evidence metadata does not remove or silently redefine existing Smart Money outputs;
+- persisted snapshot evidence maps to trusted persisted evidence only when current source proves it;
+- on-demand derived evidence remains limited / downstream-unsafe;
+- stale, missing, unavailable, and placeholder evidence is represented as limited or unavailable instead of trusted;
+- existing ordering and distribution behavior is preserved;
+- product language remains research-support and avoids direct advice, target-price, guarantee, broker/action instructions, or automation claims;
+- Prisma, routes, frontend, shared utilities/UI, packages, generated files, providers, startup/backfill, paid/cloud, live-provider, broker, and telemetry were not touched.
+
+## Commands / Evidence
+
+Team 10 may inspect diffs from the worktree. Do not run broad suites unless needed. If reviewing command evidence, use Team 04's accepted QA evidence unless you need to rerun:
+
+- `npm.cmd test -- smart-money-intelligence.service.test.ts --runInBand`: passed, `14/14`.
+- `npm.cmd run build`: passed.
+
+## Allowed Writes
+
+Only in the Team 06 SMI worktree:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-SMI-01-team10-review-release.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-10-CF-W1-SMI-01-review-outbox.md`
+
+Do not edit application source/tests. Do not commit.
+
+## Output
+
+Return pass/reject decision, findings with file/line references, changed-file scope confirmation, whether QA evidence is sufficient, release risk, rollback note, and whether Architect Signoff can proceed.
+
+---
+
+# Current Dispatcher Assignment
+
+Date: 2026-05-18
+
+## Assignment
+
 Review `CF-W1-TP-02` after Team 04 QA `ACCEPT`.
 
 This assignment supersedes older Team 10 tails above. The workstream is backend-only Trade Plan Risk Engine in a dedicated Team 06 worktree. Do not review unrelated Calibration, alerts, Today Review, or platform work in this pass.

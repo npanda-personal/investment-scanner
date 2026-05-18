@@ -2341,3 +2341,111 @@ Team 00 is routing `CF-W1-SMI-01` to a separate Team 04 QA Verification agent in
 - Team 10: `CF-W1-SMI-01` review after QA acceptance.
 - Team 04: `CF-W1-L3-TREV-02` QA planning after `CF-W1-RH-01`.
 - Team 04: `CF-W1-MD-02A` QA review after `TREV-02`.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Completed Since Previous Snapshot
+
+- Team 04 `019e3c91-35dc-7b63-8a4d-732ca25eb873`: completed `CF-W1-RH-01` QA planning and was closed.
+- Team 02 `019e3c91-cd7c-7083-bee9-1f6f35688d72`: completed `CF-W1-MD-03` requirement discovery and was closed.
+
+## Checkpoint Commits
+
+- `3109153 docs: route smart money evidence to qa`
+- `1d34d8a docs: prepare research hub qa and market data threshold requirement`
+
+## Newly Spawned
+
+- Team 04 `019e3c9d-feb2-7470-9388-c4bdb560ab22`: `CF-W1-SMI-01` QA verification in the Team 06 worktree.
+- Team 04 `019e3c9e-4d3e-7db0-8303-2faf8d2de923`: `CF-W1-L3-TREV-02` main-workspace QA planning.
+- Team 02 `019e3c9e-9c1f-77f3-9cd4-f8ee983b7c99`: rolling requirements discovery after `MD-03`.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 03 - Architecture Factory | `019e3c98-a960-7712-9d11-c08fa649bffd` | `gpt-5.4`, high | architecture prep | `CF-W1-RH-02A` | active |
+| 2 | Team 04 - QA Factory | `019e3c9d-feb2-7470-9388-c4bdb560ab22` | `gpt-5.4`, high | QA verification | `CF-W1-SMI-01` in Team 06 worktree | active |
+| 3 | Team 04 - QA Factory | `019e3c9e-4d3e-7db0-8303-2faf8d2de923` | `gpt-5.4`, high | QA planning | `CF-W1-L3-TREV-02` | active |
+| 4 | Team 02 - Requirement Factory | `019e3c9e-9c1f-77f3-9cd4-f8ee983b7c99` | `gpt-5.4`, medium | rolling requirements discovery | next under-served market-intelligence workflow | active |
+| 5 | Open slot | none | pending | QA review | `CF-W1-MD-02A` after TREV-02 QA planning | queued |
+| 6 | Open slot | none | pending | architecture prep | `CF-W1-MD-03` after RH-02A architecture | queued |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 10: `CF-W1-SMI-01` review after QA acceptance.
+- Team 03: `CF-W1-MD-03` architecture prep after `RH-02A` completes.
+- Team 04: `CF-W1-MD-02A` QA review after `TREV-02` QA planning.
+- Team 00: `CF-W1-RH-01` Ready evaluation when the current queue has a safe implementation slot.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Completed Since Previous Snapshot
+
+- Team 03 `019e3c98-a960-7712-9d11-c08fa649bffd`: completed `CF-W1-RH-02A` architecture readiness as a `Ready candidate`; closed.
+
+## Routing Result
+
+- `CF-W1-RH-02A` is queued for Team 04 QA planning after active `CF-W1-L3-TREV-02` QA planning and `CF-W1-MD-02A` QA review unless a higher-priority implementation gate appears.
+- `CF-W1-RH-01` and `CF-W1-RH-02A` must not be implemented in parallel because they reserve the same Research Hub backend files.
+- Team 03 is being relaunched on `CF-W1-MD-03` architecture prep.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | `019e3c9d-feb2-7470-9388-c4bdb560ab22` | `gpt-5.4`, high | QA verification | `CF-W1-SMI-01` in Team 06 worktree | active |
+| 2 | Team 04 - QA Factory | `019e3c9e-4d3e-7db0-8303-2faf8d2de923` | `gpt-5.4`, high | QA planning | `CF-W1-L3-TREV-02` | active |
+| 3 | Team 02 - Requirement Factory | `019e3c9e-9c1f-77f3-9cd4-f8ee983b7c99` | `gpt-5.4`, medium | rolling requirements discovery | next under-served market-intelligence workflow | active |
+| 4 | Team 03 - Architecture Factory | pending spawn | `gpt-5.4`, high | architecture prep | `CF-W1-MD-03` | ready |
+| 5 | Open slot | none | pending | QA planning/review | `CF-W1-MD-02A`, then `CF-W1-RH-02A` | queued |
+| 6 | Open slot | none | pending | review/signoff | `CF-W1-SMI-01` after QA ACCEPT | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03: `CF-W1-MD-03` architecture prep now.
+- Team 10: `CF-W1-SMI-01` review after QA acceptance.
+- Team 04: `CF-W1-MD-02A` QA review after `TREV-02` QA planning.
+- Team 04: `CF-W1-RH-02A` QA planning after `MD-02A` QA review or if Team 00 reprioritizes Research Hub.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Completed Since Previous Snapshot
+
+- Team 04 `019e3c9d-feb2-7470-9388-c4bdb560ab22`: accepted `CF-W1-SMI-01` QA verification in the Team 06 worktree; closed.
+- Team 04 `019e3c9e-4d3e-7db0-8303-2faf8d2de923`: completed `CF-W1-L3-TREV-02` QA planning; closed.
+
+## Newly Spawned
+
+- Team 10 `019e3ca3-e034-7681-b8b9-34568833f37e`: `CF-W1-SMI-01` review / release in the Team 06 SMI worktree.
+- Team 03 `019e3ca4-265b-7341-bc72-ff9b919f34e0`: `CF-W1-MD-03` architecture readiness in the main workspace.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 02 - Requirement Factory | `019e3c9e-9c1f-77f3-9cd4-f8ee983b7c99` | `gpt-5.4`, medium | rolling requirements discovery | next under-served market-intelligence workflow | active |
+| 2 | Team 10 - Review / Release | `019e3ca3-e034-7681-b8b9-34568833f37e` | `gpt-5.5`, high | review / release | `CF-W1-SMI-01` | active |
+| 3 | Team 03 - Architecture Factory | `019e3ca4-265b-7341-bc72-ff9b919f34e0` | `gpt-5.4`, high | architecture prep | `CF-W1-MD-03` | active |
+| 4 | Open slot | none | pending | QA review | `CF-W1-MD-02A` after current docs checkpoint | ready |
+| 5 | Open slot | none | pending | QA planning | `CF-W1-RH-02A` after `MD-02A` unless reprioritized | queued |
+| 6 | Open slot | none | pending | signoff | `CF-W1-SMI-01` after Team 10 ACCEPT | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-MD-02A` QA review after this docs checkpoint clears the Team 04 main-workspace outbox.
+- Team 03: Architect Signoff for `CF-W1-SMI-01` if Team 10 accepts.
+- Team 04: `CF-W1-RH-02A` QA planning after `MD-02A` or if Team 00 reprioritizes Research Hub.
+- Team 00: Ready evaluation for `CF-W1-L3-TREV-02` when the Today Review implementation lane is safe and not sharing files with `CF-W1-L3-TREV-01`.
