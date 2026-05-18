@@ -2,6 +2,78 @@
 
 Date: 2026-05-17
 
+## Team 03 DQ-02 Currentness Evidence Readiness Refresh - 2026-05-18
+
+Assignment: prepare docs-only architecture readiness for `CF-W1-DQ-02` in the shared `dev` workspace without touching application code, tests, Prisma/schema, route registries, shared utilities, shared UI, package manifests, generated files, providers, services, builds, or UI smoke.
+
+Priority clarification:
+
+- `16-team-inboxes/TEAM-03-current-assignment.md` contains newer historical override tails for other items.
+- The current Product Owner instruction for this pass explicitly re-targeted Team 03 to `CF-W1-DQ-02`.
+- This refresh follows that latest explicit instruction.
+
+Updated:
+
+- `03-architecture/CF-W1-DQ-02-architecture-review.md`
+- `06-contracts/CF-W1-DQ-02-dq-currentness-evidence-contract.md`
+- `08-work-packets/CF-W1-DQ-02-work-packet.md`
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Files inspected:
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/16-team-inboxes/TEAM-03-current-assignment.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-DQ-02-dq-currentness-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-market-data-data-quality.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-DQ-02A-qa-plan.md`
+- `backend/src/modules/data-quality-engine/data-quality-engine.md`
+- `backend/src/modules/data-quality-engine/data-quality-engine.service.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.repository.ts`
+- `backend/src/modules/market-data-foundation/index.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.market-session.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.types.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`
+- `backend/tests/modules/data-quality-engine/data-quality-engine.invariants.test.ts`
+
+Readiness result:
+
+- `CF-W1-DQ-02` remains `split required`.
+- The smallest feasible first child is `CF-W1-DQ-02A`, bounded to `data-quality-engine` service/types/doc/tests only.
+- Exact future implementation writer set:
+  - `backend/src/modules/data-quality-engine/data-quality-engine.service.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.md`
+  - `backend/tests/modules/data-quality-engine/data-quality-engine.service.test.ts`
+  - `backend/tests/modules/data-quality-engine/data-quality-engine.invariants.test.ts`
+- Exact forbidden future files for this child:
+  - all `backend/src/modules/market-data-foundation/**`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.repository.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.controller.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.router.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.validation.ts`
+  - `backend/src/modules/data-quality-engine/index.ts`
+  - `backend/prisma/schema.prisma`
+  - `backend/prisma/migrations/**`
+  - backend/frontend route registries
+  - shared backend utilities
+  - shared UI
+  - package manifests
+  - generated files
+  - all frontend source/tests
+- Explicit blocker preserved: the full parent cannot be promoted as one packet because persisted `DataQualityEvaluation` rows do not store structured session-aware currentness evidence. Any consistent list/summary/diagnostics exposure would widen into DQE read-side/public-contract work and may require a later schema path if durable fields are required.
+- Team 04 QA planning is already prepared in `04-qa/CF-W1-DQ-02A-qa-plan.md`; executable validation should stay limited to the reserved DQE files and reject repository/schema/Market Data/source widening.
+
+Current Team 03 recommendation to Team 00:
+
+1. Keep the parent `CF-W1-DQ-02` out of Ready promotion as a single packet.
+2. Treat `CF-W1-DQ-02A` as the only bounded first child for any future Ready evaluation.
+3. Preserve the exact one-writer reservation on the five DQE files above.
+4. Reject any attempt to fold Market Data helper edits, DQE repository/read-side edits, route changes, schema changes, generated files, or shared utility/UI work into this child.
+
+No tests, builds, Prisma commands, services, providers, UI smoke runs, commits, or pushes were run.
+
 ## Team 03 MCTX-01 Market Context Regime Evidence Prep - 2026-05-18
 
 Assignment: prepare docs-only architecture readiness for `CF-W1-MCTX-01` in the shared worktree without touching application source/tests, Prisma/schema, route registries, shared utilities, shared UI, package manifests, generated files, providers, builds, test runs, services, or UI smoke execution.

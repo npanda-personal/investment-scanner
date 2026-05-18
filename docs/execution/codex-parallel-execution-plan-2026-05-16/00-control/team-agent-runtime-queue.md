@@ -944,3 +944,35 @@ Date: 2026-05-18
 ## Next Coordination Action
 
 Consume whichever active agent completes first, then route only that workstream's next gate. Keep unrelated work moving in parallel.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Completed Since Previous Snapshot
+
+- Team 03 `019e3bdf-e323-72c3-bdc6-a2f792d1aa83`: completed docs-only `CF-W1-DQ-02` architecture readiness and was closed. Result: parent remains `split required`; no implementation promotion from this output.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 06 - Strategy / Signal / Risk | `019e3bdf-8c03-7d22-a081-90ff86b279af` | `gpt-5.3-codex`, high | bounded QA rework | `CF-W1-BT-02` trusted disposition and UI evidence | active |
+| 2 | Team 03 - Architect Signoff | `019e3bdf-b187-7f13-9e92-7de4b45b3bd6` | `gpt-5.4`, high | architect signoff | `CF-W1-HCTX-01` in Team 05 worktree | active |
+| 3 | Team 02 - PO + Requirement Factory | `019e3be0-06d7-78d3-853b-707d92419a35` | `gpt-5.4-mini`, medium | persistent discovery | next high-value market-intelligence requirement | active |
+| 4 | Open slot | none | pending | QA rerun | `CF-W1-BT-02` after Team 06 rework | waiting |
+| 5 | Open slot | none | pending | PO packet / commit | `CF-W1-HCTX-01` after Architect Signoff acceptance | waiting |
+| 6 | Open slot | none | pending | next architecture prep | next highest unassigned investor-value item after Team 02 output | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04 is ready for `CF-W1-BT-02` QA rerun after Team 06 rework.
+- Team 00 is ready for delegated PO acceptance and scoped local branch commit if `CF-W1-HCTX-01` Architect Signoff accepts.
+- Team 03 has an open architecture slot after the DQ packet commit; next target should be chosen after Team 02 finishes the current discovery cycle.
+- Team 10 is ready for `CF-W1-BT-02` review after QA accepts.
+
+## Next Coordination Action
+
+Commit the completed `CF-W1-DQ-02` architecture packet with exact staged scope, then continue monitoring Team 06, Team 03 Signoff, and Team 02.

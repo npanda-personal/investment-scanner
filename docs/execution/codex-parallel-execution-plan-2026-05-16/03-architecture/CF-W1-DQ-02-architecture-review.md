@@ -6,7 +6,7 @@ Owner: Team 03 Architecture Factory
 
 ## Status
 
-Split required. A bounded module-local first child is feasible. The full parent is not Ready for Implementation.
+Split required. A bounded module-local first child (`CF-W1-DQ-02A`) is feasible. The full parent is not Ready for Implementation.
 
 `CF-W1-DQ-02` cannot honestly be treated as one clean backend packet in the current codebase. The smallest safe first slice stays inside Data Quality Engine service/types/doc/tests and consumes existing Market Data public session exports without editing Market Data source. Broader persisted or API-wide currentness exposure is a separate follow-on because current `DataQualityEvaluation` rows do not store the needed session-aware fields.
 
@@ -38,7 +38,7 @@ Split required. A bounded module-local first child is feasible. The full parent 
 - `market-data-foundation.market-session.ts` already exports `latestCompletedTradingDateForRegion()` and `shouldRunMarketDataSync()` through `market-data-foundation/index.ts`; the first child does not need new Market Data helpers.
 - Market Data instrument payloads already project session-related evidence such as `latest_completed_eod_date`, `stored_data_through_date`, `readiness_blockers`, and `trusted_baseline_blocker_codes`.
 - `DataQualityEvaluation` persistence currently stores scores plus `dataGaps`, `warnings`, `readinessReasons`, and `readinessBlockers`, but it does not store `latestObservedTradingDate`, `latestCompletedTradingDate`, currentness status, or reason code.
-- `data-quality-engine.repository.ts` reconstructs DTOs from persisted rows and summary counts using string matching like `latest price is stale`; it cannot emit session-aware currentness evidence without a wider DQE read-side change.
+- `data-quality-engine.repository.ts` reconstructs DTOs and summary counts from persisted string arrays, including stale detection via `latest price is stale`; that preserves fail-closed filtering once new blocker/gap strings are persisted, but it cannot emit a structured session-aware currentness object without a wider DQE read-side change.
 
 ## Architecture Decision
 
@@ -56,7 +56,7 @@ Recommended first child scope:
 - consume existing Market Data public session helpers from `backend/src/modules/market-data-foundation/index.ts`;
 - classify currentness inside `data-quality-engine.service.ts`;
 - add additive currentness evidence fields to the in-memory DQ evaluation DTO;
-- convert non-current outcomes into stable blocker/reason-code strings so strict callers keep failing closed without duplicating session logic;
+- convert non-current outcomes into stable blocker/reason-code strings so persisted DQ rows and strict callers keep failing closed without duplicating session logic;
 - keep the slice backward-compatible by not requiring schema, route, repository, Market Data source, or frontend work.
 
 The first child should support semantics equivalent to:
@@ -126,7 +126,7 @@ That is a broader DQE public-contract/read-side change than the first child and 
 
 ## QA Planning Handoff For Team 04
 
-Team 04 should plan QA for the first child only:
+Existing QA planning already exists in `04-qa/CF-W1-DQ-02A-qa-plan.md`. Team 04 should keep executable validation bounded to the first child only:
 
 - current after latest completed session;
 - current during open/grace window without false stale classification;
@@ -137,7 +137,7 @@ Team 04 should plan QA for the first child only:
 - `readinessBlockers`, `dataGaps`, and use-case tiers stay fail-closed for stale/missing/blocked outcomes;
 - default `filterEligibleInstruments()` behavior still excludes non-current instruments through the existing strict path.
 
-Team 04 should not claim repository/list/summary/diagnostics persistence coverage for this first child.
+Team 04 should explicitly reject any implementation that widens into repository/list/summary/diagnostics persistence coverage, Market Data source edits, schema work, route work, or shared-file changes for this first child.
 
 ## Readiness Result
 

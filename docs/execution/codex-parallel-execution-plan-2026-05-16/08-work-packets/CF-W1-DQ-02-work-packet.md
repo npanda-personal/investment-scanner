@@ -4,7 +4,7 @@ Date: 2026-05-18
 
 ## Work Item
 
-`CF-W1-DQ-02` first child only: Data Quality service-local currentness classifier and fail-closed propagation.
+`CF-W1-DQ-02A` first child only: Data Quality service-local currentness classifier and fail-closed propagation.
 
 ## State
 
@@ -51,7 +51,7 @@ Future implementation must:
 - import and use existing Market Data public session exports only;
 - replace the hard-coded seven-day stale heuristic for evaluated instruments with session-aware currentness classification;
 - add additive currentness evidence fields and stable reason codes to the in-memory DQ evaluation result;
-- propagate stale, missing, and blocked currentness into `dataGaps`, `readinessBlockers`, and use-case tiers so strict callers fail closed;
+- propagate stale, missing, and blocked currentness into persisted `dataGaps` and `readinessBlockers`, plus in-memory use-case tiers/currentness fields, so strict callers fail closed;
 - preserve existing route and persistence behavior by not promising repository/list/summary/diagnostics-wide currentness storage in this child.
 
 ## Explicit Parent Blocker
@@ -62,7 +62,7 @@ The full requirement still needs a later approval-gated packet if Team 00 wants 
 
 ## QA Planning Handoff For Team 04
 
-Team 04 should plan and later verify the first child with focused backend coverage for:
+Team 04 already has the bounded planning artifact `04-qa/CF-W1-DQ-02A-qa-plan.md`. Executable verification for the first child should stay focused on:
 
 - latest observed date equals latest completed session => current;
 - market open/finalization grace without false stale classification;
@@ -101,4 +101,4 @@ Stop and return to Team 00 / Architect if implementation requires:
 
 ## Next Gate
 
-Team 04 QA planning for the bounded first child, then Team 00 sequencing.
+Team 04 focused QA execution for the bounded first child after Team 00 promotion, then Team 00 sequencing.

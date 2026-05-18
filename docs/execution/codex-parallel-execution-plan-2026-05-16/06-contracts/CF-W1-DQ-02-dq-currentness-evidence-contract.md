@@ -6,7 +6,7 @@ Owner: Team 03 Architecture Factory
 
 ## Status
 
-Split-required contract. First child only is defined here. Not Ready for Implementation.
+Split-required contract. First child `CF-W1-DQ-02A` only is defined here. Not Ready for Implementation.
 
 ## Contract Intent
 
@@ -89,6 +89,7 @@ For the first child, non-current outcomes must propagate through existing DQE st
 - `signal` and `dailyReview` use-case tiers must not remain `READY` when currentness is non-current.
 - `eligibleForSignals` and `eligibleForBacktesting` must keep fail-closed behavior through existing stale/blocker semantics.
 - `filterEligibleInstruments()` must continue excluding affected instruments without any caller-side session logic.
+- Persisted DQ rows may continue storing only blocker/gap strings in this child; a structured currentness object is required only on service-evaluated payloads that can return it without repository widening.
 
 ## Explicit Non-Goals For The First Child
 
@@ -115,3 +116,5 @@ Focused backend tests for the first child must prove:
 - session-evidence-unavailable classification;
 - provider-gap blocked classification;
 - fail-closed tier/blocker propagation for stale, missing, and blocked outcomes.
+
+Reference QA planning artifact: `04-qa/CF-W1-DQ-02A-qa-plan.md`.

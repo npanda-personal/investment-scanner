@@ -99,9 +99,9 @@ Updated:
 Result:
 
 - `CF-W1-DQ-02` is not a single Ready candidate after source re-audit.
-- A bounded first child is feasible entirely inside `data-quality-engine` service/types/doc/tests while consuming existing Market Data public session exports read-only.
+- A bounded first child (`CF-W1-DQ-02A`) is feasible entirely inside `data-quality-engine` service/types/doc/tests while consuming existing Market Data public session exports read-only.
 - The full parent remains split-required because persisted `DataQualityEvaluation` rows do not store session-aware currentness evidence, so consistent list/summary/diagnostics exposure would widen into DQE read-side/public-contract work and possibly a later schema path if durable fields are required.
-- Team 04 QA planning can start now for the bounded first child only.
+- Team 04 QA planning is already prepared in `04-qa/CF-W1-DQ-02A-qa-plan.md` for the bounded first child only.
 - Team 00 must not promote Market Data helper edits, DQE repository/read-side edits, or schema work under this child.
 
 ## Team 03 SQLAB-02 Post-Event Learning Prep - 2026-05-18
