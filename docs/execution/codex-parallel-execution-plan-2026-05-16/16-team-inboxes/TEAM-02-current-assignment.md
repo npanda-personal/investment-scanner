@@ -230,6 +230,45 @@ Keep admin, settings, auth/subscription, notifications, and alert convenience wo
 
 ---
 
+# Current Dispatcher Assignment
+
+Date: 2026-05-18
+
+## Assignment
+
+Continue the rolling PO + Requirements discovery lane on a distinct investor/trader-value workflow.
+
+Do not monitor passively or self-switch to signoff work. Team 00 will explicitly assign gate-support work if needed. This cycle is requirements discovery and ranking only.
+
+## Current Active / Routed Items To Exclude
+
+- `CF-W1-TP-02`: Team 10 review active after Team 04 QA ACCEPT.
+- `CF-W1-SMI-01`: Team 04 QA planning active.
+- `CF-W1-RH-01`: Team 03 architecture readiness active.
+- `CF-W1-L3-TREV-02`: refined by Team 02 and next queued architecture candidate after `RH-01`.
+- `CF-W1-SIG-TRIGGER-02A`: accepted and locally committed on Team 06 branch.
+- `CF-W1-SQLAB-01`, `CF-W1-BT-02`, `CF-W1-CAL-01`, `CF-W1-HCTX-01`, `CF-W1-MD-01`, `CF-W1-DQ-02A`, `CF-W1-STRAT-02A`, `CF-W1-UX-01A`, and `CF-W1-AUTH-SUB-01`: accepted branch commits parked for later clean integration.
+
+## Product Priority
+
+Prioritize direct investor/trader value:
+
+- market data and Data Quality evidence;
+- signals, trigger provenance, strategy trust, calibration, backtesting, Trade Plan research support;
+- historical context, market context, signal-quality learning, smart-money evidence freshness, Research Hub evidence wiring, Today Review provenance, reviewability, and explainability.
+
+Keep admin, settings, auth/subscription, notifications, and alert convenience work lowest unless they block correctness, privacy, user-data safety, or an accepted branch gate.
+
+## Required Output
+
+- Audit one under-served market-intelligence workflow not already active or queued.
+- Add or refine at least one bounded requirement if evidence supports it.
+- Keep `next-top-10-candidates.md`, `top-10-ready-candidates.md`, `requirements-backlog.md`, and `refinement-queue.md` aligned.
+- Identify the next top unassigned requirement for Team 00 after excluding active/queued/accepted/parked/blocked items.
+- Do not move application-code work to Ready.
+
+---
+
 # Latest Standing Assignment
 
 Date: 2026-05-18

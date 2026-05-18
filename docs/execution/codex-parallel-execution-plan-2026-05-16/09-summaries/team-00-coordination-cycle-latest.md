@@ -1583,6 +1583,33 @@ Spawned Team 02 Requirement Factory:
 
 Date: 2026-05-18
 
+## Dispatch Update
+
+Team 00 consumed two completed gates:
+
+- Team 04 accepted `CF-W1-TP-02` QA Verification.
+- Team 02 refined `CF-W1-L3-TREV-02`; Team 00 committed it as `b7f2dd4 docs: refine today review provenance requirement`.
+
+## Active Agents
+
+- Team 10 `019e3c6a-8df5-7f33-b295-01e1f15a7f98`: `CF-W1-TP-02` review after QA ACCEPT.
+- Team 04 `019e3c6a-cfd8-7831-9114-807ced06ef88`: `CF-W1-SMI-01` QA planning.
+- Team 03 `019e3c6b-1903-72f1-9286-4def1285544c`: `CF-W1-RH-01` architecture readiness.
+- Team 02 `019e3c6b-ae6c-7333-b6aa-3096105ce0e3`: rolling requirements discovery.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03: `CF-W1-TP-02` Architect Signoff if Team 10 ACCEPTS.
+- Team 00: delegated PO acceptance and scoped branch commit after Architect Signoff ACCEPT.
+- Team 04: `CF-W1-RH-01` QA planning after architecture output.
+- Team 03: `CF-W1-L3-TREV-02` architecture readiness after `CF-W1-RH-01`.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
 ## Runtime Update
 
 `CF-W1-TP-02` is now dispatched.
@@ -1678,6 +1705,33 @@ Team 00 spawned Team 04 QA Verification:
 - Team 10: `CF-W1-TP-02` review after Team 04 ACCEPT.
 - Team 03: `CF-W1-RH-01` architecture readiness after `CF-W1-SMI-01` completes.
 - Team 00: delegated PO acceptance and scoped branch commit after Architect Signoff ACCEPT.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
+## SMI-01 Architecture Consumed
+
+Team 03 completed `CF-W1-SMI-01` architecture readiness.
+
+- Closed Team 03 agent: `019e3c5b-2ba4-77f2-93ab-81b3a54f7f06`.
+- Docs commit: `d9db2e7 docs: prepare smart money evidence architecture`.
+- Result: `Ready candidate` after Team 04 QA planning and Team 00 Ready evaluation.
+
+## Next Routing
+
+- Team 04 receives `CF-W1-SMI-01` QA planning.
+- Team 03 receives `CF-W1-RH-01` architecture readiness.
+
+## Active / Ready Teams
+
+- Team 04 `019e3c63-643d-7240-a15b-e2f406f292c5`: active `CF-W1-TP-02` QA Verification.
+- Team 02 `019e3c60-d0ac-7ac0-a8b2-adb623baf30e`: active rolling requirement discovery.
+- Team 04: ready to spawn for `CF-W1-SMI-01` QA planning.
+- Team 03: ready to spawn for `CF-W1-RH-01` architecture readiness.
+- Team 10: ready for `CF-W1-TP-02` review after QA ACCEPT.
 
 ---
 

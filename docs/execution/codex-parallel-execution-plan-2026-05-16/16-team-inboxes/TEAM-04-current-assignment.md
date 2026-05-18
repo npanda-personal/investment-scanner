@@ -306,6 +306,48 @@ Return `ACCEPT` or `REJECT`, with evidence path, commands run, results, files in
 
 ---
 
+# Current Dispatcher Assignment
+
+Date: 2026-05-18
+
+## Assignment
+
+Prepare docs-only QA planning for `CF-W1-SMI-01` - Smart Money evidence freshness and partial-trust framing.
+
+This assignment is independent from active `CF-W1-TP-02` QA, which is running in the Team 06 TP-02 worktree. Write this SMI QA plan only in the main `dev` docs workspace.
+
+Do not implement application code. Do not run tests. Do not modify Smart Money source, tests, route registries, Prisma/schema, shared utilities/UI, frontend files, providers, packages, or generated files.
+
+## Source Input
+
+- Architecture review: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-SMI-01-architecture-review.md`
+- Contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-SMI-01-smart-money-evidence-freshness-partial-trust-contract.md`
+- Work packet: `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-SMI-01-work-packet.md`
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SMI-01-smart-money-evidence-freshness-partial-trust-requirement.md`
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-SMI-01-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/next-validation-plans.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+## Required QA Plan Coverage
+
+- persisted daily snapshot evidence is framed as `PERSISTED_SNAPSHOT`;
+- on-demand detail fallback is framed as `ON_DEMAND_DERIVED` and not downstream-safe;
+- missing persisted snapshot remains a downstream-safe data gap on persisted-only reads;
+- ownership placeholder evidence is `LIMITED` / partial trust, not complete confirmation;
+- stale persisted snapshots are stale/limited rather than silently trusted;
+- insufficient-history fallback maps to unavailable evidence;
+- `top()` and `distribution()` preserve ranking/order while adding evidence metadata;
+- no frontend trust surfacing, repository, schema, route, shared utility/UI, provider, package, or generated-file work is required.
+
+## Output
+
+State whether `CF-W1-SMI-01` is QA-plan ready for Team 00 Ready evaluation and list any blocker.
+
+---
+
 # Current Active Assignment Override
 
 Date: 2026-05-18

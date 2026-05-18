@@ -1359,6 +1359,36 @@ Date: 2026-05-18
 
 Date: 2026-05-18
 
+## Current Checkpoint
+
+- Team 04 accepted `CF-W1-TP-02` QA Verification and Team 00 routed it to Team 10 review.
+- Team 02 refined `CF-W1-L3-TREV-02`; Team 00 committed that requirement checkpoint as `b7f2dd4 docs: refine today review provenance requirement`.
+- Team 03 completed `CF-W1-SMI-01` architecture; Team 00 committed it as `d9db2e7 docs: prepare smart money evidence architecture`.
+
+## Active Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 10 - Review / Release | `019e3c6a-8df5-7f33-b295-01e1f15a7f98` | `gpt-5.5`, high | review/release | `CF-W1-TP-02` after QA ACCEPT | active |
+| 2 | Team 04 - QA Factory | `019e3c6a-cfd8-7831-9114-807ced06ef88` | `gpt-5.4`, high | QA planning | `CF-W1-SMI-01` | active |
+| 3 | Team 03 - Architecture Factory | `019e3c6b-1903-72f1-9286-4def1285544c` | `gpt-5.4`, high | architecture prep | `CF-W1-RH-01` | active |
+| 4 | Team 02 - Requirement Factory | `019e3c6b-ae6c-7333-b6aa-3096105ce0e3` | `gpt-5.4`, medium | requirements discovery | next distinct market-intelligence value cycle | active |
+| 5 | Open slot | none | pending | Architect Signoff | `CF-W1-TP-02` after Team 10 ACCEPT | waiting |
+| 6 | Open slot | none | pending | architecture prep | `CF-W1-L3-TREV-02` after `CF-W1-RH-01` | queued |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03 is ready for `CF-W1-TP-02` Architect Signoff if Team 10 accepts.
+- Team 00 is ready for delegated PO acceptance and scoped branch commit after Architect Signoff ACCEPT.
+- Team 04 is ready for `CF-W1-RH-01` QA planning after Team 03 completes architecture.
+- Team 03 is queued for `CF-W1-L3-TREV-02` architecture after `CF-W1-RH-01`.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
 ## Completed Since Previous Snapshot
 
 - Team 00 committed the `CF-W1-TP-02` Ready promotion checkpoint on `dev` as `8e82e13 docs: promote trade plan semantics slice`.
@@ -1457,6 +1487,40 @@ Date: 2026-05-18
 - Team 03 is ready for `CF-W1-RH-01` architecture readiness after active `CF-W1-SMI-01` completes.
 - Team 00 is ready for delegated PO acceptance and scoped branch commit after Architect Signoff ACCEPT.
 - Team 02 is active and should be relaunched again after this discovery cycle completes.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Completed Since Previous Snapshot
+
+- Team 03 `019e3c5b-2ba4-77f2-93ab-81b3a54f7f06`: completed `CF-W1-SMI-01` architecture readiness and was closed.
+- Team 00 committed the SMI architecture packet on `dev` as `d9db2e7 docs: prepare smart money evidence architecture`.
+
+## Queue Decision
+
+- `CF-W1-SMI-01` moves to Team 04 QA planning.
+- `CF-W1-RH-01` moves to Team 03 architecture readiness.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | `019e3c63-643d-7240-a15b-e2f406f292c5` | `gpt-5.4`, high | QA verification | `CF-W1-TP-02` after Team 06 handoff | active |
+| 2 | Team 02 - Requirement Factory | `019e3c60-d0ac-7ac0-a8b2-adb623baf30e` | `gpt-5.4`, medium | requirements discovery | next distinct market-intelligence value cycle | active |
+| 3 | Team 04 - QA Factory | pending spawn | `gpt-5.4`, high | QA planning | `CF-W1-SMI-01` | ready |
+| 4 | Team 03 - Architecture Factory | pending spawn | `gpt-5.4`, high | architecture prep | `CF-W1-RH-01` | ready |
+| 5 | Open slot | none | pending | review/release | `CF-W1-TP-02` after Team 04 ACCEPT | waiting |
+| 6 | Open slot | none | pending | next implementation | next promoted Ready item | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04 is ready for `CF-W1-SMI-01` QA planning.
+- Team 03 is ready for `CF-W1-RH-01` architecture readiness.
+- Team 10 is ready for `CF-W1-TP-02` review after Team 04 accepts.
+- Team 00 is ready for delegated PO acceptance and scoped branch commit after Architect Signoff ACCEPT.
 
 ---
 

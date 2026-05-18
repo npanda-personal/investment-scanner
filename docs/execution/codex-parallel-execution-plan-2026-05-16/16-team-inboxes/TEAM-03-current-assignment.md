@@ -229,6 +229,51 @@ Team 00 is assigning this because higher-ranked candidates are either already ac
 
 ---
 
+# Current Dispatcher Assignment
+
+Date: 2026-05-18
+
+## Assignment
+
+Prepare architecture readiness for `CF-W1-RH-01` - Research Hub actionability evidence wiring.
+
+This is docs-only architecture prep. Do not implement application code. Do not edit tests. Do not run providers, services, Prisma commands, builds, or UI smoke.
+
+Team 00 is assigning this because Team 02 refined `CF-W1-RH-01` as the next top unassigned market-intelligence requirement, and `CF-W1-SMI-01` architecture has already been completed and routed to Team 04 QA planning.
+
+## Source Input
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-RH-01-research-hub-actionability-evidence-wiring-requirement.md`
+- Current queue references:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- Relevant source/docs to inspect read-only:
+  - `backend/src/modules/research-hub/research-hub.md`
+  - `backend/src/modules/research-hub/research-hub.service.ts`
+  - `backend/src/modules/research-hub/research-hub.types.ts`
+  - `backend/tests/modules/research-hub/**`
+  - `frontend/src/features/research-hub/**` read-only as needed
+  - accepted/active public-output docs for Today Review, Trade Plan, Signal Quality Lab, and Signal Calibration only as needed for dependency boundaries
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-RH-01-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-RH-01-research-hub-actionability-evidence-wiring-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-RH-01-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+## Required Output
+
+- Determine the smallest bounded first child, preferably additive to Research Hub backend actionability fields.
+- Recommend exact allowed and forbidden future implementation files.
+- Explicitly block private upstream internals, fabricated trust scoring, schema, route registry, shared utility/UI, provider/live-data, startup/backfill, package/generated files, broad frontend redesign, and upstream module source edits unless separately approved.
+- Identify dependency sequencing with `CF-W1-L3-TREV-01`, `CF-W1-TP-02`, `CF-W1-SQLAB-01`, and `CF-W1-CAL-01` without treating their branch commits as merged into `dev`.
+- Provide QA planning handoff notes for Team 04.
+- Return one of: `Ready candidate`, `split required`, or `blocked`.
+
+---
+
 # Current Active Assignment Override
 
 Date: 2026-05-18
