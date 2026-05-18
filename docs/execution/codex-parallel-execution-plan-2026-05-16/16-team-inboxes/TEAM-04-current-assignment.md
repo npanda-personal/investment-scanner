@@ -247,6 +247,65 @@ State whether `CF-W1-BT-02` is QA-plan ready for Team 00 Ready evaluation and li
 
 ---
 
+# Current Dispatcher Assignment
+
+Date: 2026-05-18
+
+## Assignment
+
+Perform Team 04 QA Verification for `CF-W1-TP-02` after Team 06 developer handoff.
+
+This is an implementation verification gate in the dedicated Team 06 worktree. Do not modify application source. Do not widen scope beyond the approved backend-only Trade Plan slice.
+
+## Worktree / Branch
+
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-TP-02`
+- Branch: `codex/team06-strategy-signal/CF-W1-TP-02`
+- Base: accepted `CF-W1-TP-01B` commit `8ff22fd`
+
+## Source Input
+
+Read from the main `dev` workspace if a planning file is absent from the worktree:
+
+- QA plan: `C:\work\repo\investment-scanner\docs\execution\codex-parallel-execution-plan-2026-05-16\04-qa\CF-W1-TP-02-qa-plan.md`
+- Ready promotion: `C:\work\repo\investment-scanner\docs\execution\codex-parallel-execution-plan-2026-05-16\09-summaries\team-00-CF-W1-TP-02-ready-promotion.md`
+
+Read from the implementation worktree:
+
+- Developer handoff: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-TP-02-developer-handoff.md`
+- Team 06 outbox: `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-outbox.md`
+- Changed Trade Plan source/tests/docs listed in the developer handoff.
+
+## Allowed Writes In The Worktree
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-TP-02-qa-verification.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+## Required QA Coverage
+
+- Confirm `CF-W1-TP-02` preserves accepted `CF-W1-TP-01B` Data Quality hard-block behavior.
+- Verify additive `exitConditions[]` and `invalidationConditions[]` semantics and stable module-owned IDs/rule versions.
+- Verify legacy `target` and `invalidationRules` remain compatibility outputs only.
+- Verify trusted readiness does not depend on target-shaped fields.
+- Verify invalid `targetRewardRisk` values are rejected when non-finite or outside inclusive `0.5` to `5.0`.
+- Verify research-support wording avoids arbitrary target-price, direct advice, guarantee, broker, or action-command language.
+- Confirm no forbidden files were modified.
+
+## Required Validation
+
+Check memory before heavy commands. If memory is safe, run from the worktree backend:
+
+```powershell
+npm.cmd test -- trade-plan-risk-engine.service.test.ts trade-plan-risk-engine.paper-readiness.test.ts --runInBand
+npm.cmd run build
+```
+
+## Output
+
+Return `ACCEPT` or `REJECT`, with evidence path, commands run, results, files inspected, forbidden-scope check, risks, and next gate recommendation.
+
+---
+
 # Current Active Assignment Override
 
 Date: 2026-05-18
