@@ -142,6 +142,81 @@ Update `17-team-outboxes/TEAM-06-outbox.md` with:
 
 ---
 
+# Current Active Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Implement `CF-W1-SMI-01` - Smart Money evidence freshness and partial-trust framing.
+
+This assignment supersedes older Team 06 tails for the next spawned implementation agent. Do not touch unrelated Strategy / Signal / Risk modules. You are not alone in the codebase; do not revert edits made by others and stay within the reserved writer set.
+
+## Branch / Worktree
+
+- Branch: `codex/team06-strategy-signal/CF-W1-SMI-01`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-SMI-01`
+
+## Source Input
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SMI-01-smart-money-evidence-freshness-partial-trust-requirement.md`
+- Architecture review: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-SMI-01-architecture-review.md`
+- Contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-SMI-01-smart-money-evidence-freshness-partial-trust-contract.md`
+- Work packet: `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-SMI-01-work-packet.md`
+- QA plan: `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-SMI-01-qa-plan.md`
+- Ready promotion: `docs/execution/codex-parallel-execution-plan-2026-05-16/09-summaries/team-00-CF-W1-SMI-01-ready-promotion.md`
+
+## Allowed Files
+
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.service.ts`
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.types.ts`
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.md`
+- `backend/tests/modules/smart-money-intelligence/smart-money-intelligence.service.test.ts`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-CF-W1-SMI-01-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-SMI-01-developer-handoff.md`
+
+## Forbidden Files / Scope
+
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.repository.ts`
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.controller.ts`
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.router.ts`
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.validation.ts`
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.module.ts`
+- `backend/src/modules/smart-money-intelligence/index.ts`
+- Prisma schema or migrations
+- generated files
+- backend or frontend route registries
+- Market Data source, Data Quality source, Historical Context source, Market Context source, Signal Calibration/Generation source, Research Hub source
+- shared backend utilities, shared DTOs, shared frontend components
+- frontend source or tests
+- package manifests
+- provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or automation flows
+
+## Required Behavior
+
+- Add additive Smart Money evidence metadata to stock/list summary payloads without removing or renaming existing fields.
+- Distinguish persisted daily snapshot evidence (`PERSISTED_SNAPSHOT`) from on-demand derived detail fallback (`ON_DEMAND_DERIVED`).
+- Expose requested range, data-through/snapshot framing, stale/missing evidence, insufficient-history fallback, and ownership-placeholder partial trust.
+- Keep persisted-only read paths downstream-safe and do not trigger auto-generation.
+- Preserve ranking/order, scoring behavior, routes, query params, current response shapes, and research-support wording.
+
+## Focused Validation
+
+Run in the worktree backend:
+
+```powershell
+npm.cmd test -- smart-money-intelligence.service.test.ts --runInBand
+npm.cmd run build
+```
+
+Check memory/resource safety before heavy commands if practical.
+
+## Stop Conditions
+
+Stop and return to Team 00 if implementation requires any forbidden file, schema/generated/route/shared change, Market Data or DQE source change, durable readiness storage, frontend trust surfacing, provider/live-data, startup/backfill, package work, paid/cloud, broker, telemetry, or advice-like/target-like wording.
+
+---
+
 # Current Dispatcher Assignment
 
 Date: 2026-05-18

@@ -2189,3 +2189,44 @@ The prior one-worker state happened because Team 03 had completed the `CF-W1-RH-
 - Team 04 is ready for `CF-W1-RH-01` QA planning now.
 - Team 06 is ready for `CF-W1-SMI-01` implementation after Team 00 creates/validates the worktree and launches the agent.
 - Team 04 is ready for `CF-W1-TP-02` QA rerun after Team 06 rework if that handoff is still the active gate.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Completed Since Previous Snapshot
+
+- Team 03 `019e3c7c-951e-7d01-9b36-b7c4b7dfc695`: completed `CF-W1-L3-TREV-02` architecture readiness as a `Ready candidate`; closed.
+- Team 02 `019e3c7c-5c92-7652-9ab1-5c830e212d01`: completed upstream Market Data requirement refresh; added `CF-W1-MD-02A`; closed.
+
+## Dispatch Plan
+
+Team 00 is dispatching independent work without file conflicts:
+
+- Team 03 rolling architecture prep: `CF-W1-MD-02A` proposal-only architecture packet.
+- Team 04 docs-only QA planning: `CF-W1-RH-01`.
+- Team 06 implementation: `CF-W1-SMI-01` in a dedicated worktree.
+- Team 02 rolling requirements discovery: next under-served market-intelligence workflow after excluding active/queued items.
+
+`CF-W1-L3-TREV-02` QA planning is queued behind `CF-W1-RH-01` because both would otherwise write the same main-workspace Team 04 QA files.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 03 - Architecture Factory | pending spawn | `gpt-5.4`, high | architecture prep | `CF-W1-MD-02A` proposal-only packet | ready |
+| 2 | Team 04 - QA Factory | pending spawn | `gpt-5.4`, high | QA planning | `CF-W1-RH-01` | ready |
+| 3 | Team 06 - Strategy / Signal / Risk | pending worktree + spawn | `gpt-5.3-codex`, high | implementation | `CF-W1-SMI-01` | ready |
+| 4 | Team 02 - Requirement Factory | pending spawn | `gpt-5.4`, medium | rolling requirements discovery | next under-served market-intelligence workflow | ready |
+| 5 | Open slot | none | pending | QA planning | `CF-W1-L3-TREV-02` after Team 04 main-workspace writer frees | queued |
+| 6 | Open slot | none | pending | review/signoff | next QA-accepted implementation handoff | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03: `CF-W1-MD-02A` architecture prep now.
+- Team 04: `CF-W1-RH-01` QA planning now.
+- Team 06: `CF-W1-SMI-01` implementation after worktree setup.
+- Team 02: next rolling requirements discovery now.
+- Team 04: `CF-W1-L3-TREV-02` QA planning after `RH-01` QA plan completes.

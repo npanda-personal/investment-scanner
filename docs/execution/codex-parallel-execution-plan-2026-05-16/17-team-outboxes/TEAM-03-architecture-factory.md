@@ -2,6 +2,110 @@
 
 Date: 2026-05-17
 
+## Team 03 TREV-02 Candidate Snapshot Provenance Prep - 2026-05-18
+
+Assignment: prepare docs-only architecture readiness for `CF-W1-L3-TREV-02` in the shared `dev` workspace without touching application code, application tests outside the future Today Review writer set, Prisma/schema, route registries, shared utilities, shared UI, package manifests, generated files, providers, services, builds, UI smoke, or live data.
+
+Prepared:
+
+- `03-architecture/CF-W1-L3-TREV-02-architecture-review.md`
+- `06-contracts/CF-W1-L3-TREV-02-today-review-candidate-snapshot-provenance-contract.md`
+- `08-work-packets/CF-W1-L3-TREV-02-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Files inspected:
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/16-team-inboxes/TEAM-03-current-assignment.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-TREV-02-today-review-candidate-snapshot-provenance-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-TREV-01-today-review-publication-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-L3-TREV-01-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-L3-TREV-01-today-review-publication-evidence-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-L3-TREV-01-work-packet.md`
+- `backend/src/modules/today-trade-review/today-trade-review.md`
+- `backend/src/modules/today-trade-review/today-trade-review.types.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.service.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.repository.ts`
+- `backend/tests/modules/today-trade-review/today-trade-review.service.test.ts`
+- `frontend/src/features/today-trade-review/types.ts`
+- `frontend/src/features/today-trade-review/api/todayTradeReviewApi.ts`
+- `frontend/src/features/today-trade-review/hooks/useTodayReview.ts`
+- `frontend/src/features/today-trade-review/components/TodayReviewCandidateDetailPage.tsx`
+- `frontend/src/features/today-trade-review/components/TodayReviewPage.tsx`
+- `frontend/tests/ui/today-trade-review.spec.ts`
+
+Files changed:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-L3-TREV-02-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-L3-TREV-02-today-review-candidate-snapshot-provenance-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-L3-TREV-02-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Readiness result:
+
+- `CF-W1-L3-TREV-02` is a `Ready candidate`.
+- The smallest bounded first child is the full requirement packet: additive Today Review candidate-provenance normalization plus candidate-detail provenance rendering only.
+- Exact future writer set:
+  - `backend/src/modules/today-trade-review/today-trade-review.types.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.repository.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.service.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.md`
+  - `backend/tests/modules/today-trade-review/today-trade-review.service.test.ts`
+  - exact new focused compatibility-read test: `backend/tests/modules/today-trade-review/today-trade-review.repository.test.ts`
+  - `frontend/src/features/today-trade-review/types.ts`
+  - `frontend/src/features/today-trade-review/components/TodayReviewCandidateDetailPage.tsx`
+  - `frontend/tests/ui/today-trade-review.spec.ts`
+- Exact forbidden files and scopes for the first child:
+  - `backend/prisma/schema.prisma`
+  - `backend/prisma/migrations/**`
+  - `backend/src/api/routes.ts`
+  - `frontend/src/app/routes.tsx`
+  - `backend/src/modules/today-trade-review/index.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.controller.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.router.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.validation.ts`
+  - `backend/tests/modules/today-trade-review/today-trade-review.controller.test.ts`
+  - `frontend/src/features/today-trade-review/components/TodayReviewPage.tsx`
+  - `frontend/src/features/today-trade-review/api/todayTradeReviewApi.ts`
+  - `frontend/src/features/today-trade-review/hooks/useTodayReview.ts`
+  - `frontend/src/features/today-trade-review/routes.tsx`
+  - `frontend/src/features/today-trade-review/index.ts`
+  - all `backend/src/modules/market-data-foundation/**`
+  - all `backend/src/modules/data-quality-engine/**`
+  - all `backend/src/modules/market-context-intelligence/**`
+  - all `backend/src/modules/strategy-decision-engine/**`
+  - all `backend/src/modules/trade-plan-risk-engine/**`
+  - all `backend/src/modules/signal-generation-engine/**`
+  - all `backend/src/modules/signal-calibration-engine/**`
+  - all `backend/src/modules/smart-money-intelligence/**`
+  - shared backend utilities
+  - shared frontend components
+  - package manifests
+  - generated files
+  - provider/live-data integration
+  - startup/backfill workflows
+  - paid/cloud, broker, or telemetry scope
+  - broad Today Review UI work
+- Dependency result:
+  - `CF-W1-L3-TREV-01` remains the run-level parent trust packet;
+  - Team 03 must not treat any branch-only `TREV-01` implementation as merged into `dev`;
+  - `TREV-02` is not schema-blocked by `TREV-01`, but the two packets share the Today Review writer set and must not run in parallel;
+  - `CF-W1-TP-02` remains a separate wording/semantics stream and stays out of this child.
+- Team 04 QA planning should cover full provenance, mixed timing sources, partial legacy support, unavailable snapshots, repository compatibility normalization, and research-support wording regression.
+
+Current Team 03 recommendation to Team 00:
+
+1. Route `CF-W1-L3-TREV-02` to Team 04 QA planning now.
+2. Keep `CF-W1-L3-TREV-01` and `CF-W1-L3-TREV-02` mutually exclusive in implementation because the shared Today Review writer set overlaps.
+3. Do not widen the child into run/list publication evidence, target-language cleanup, route changes, schema work, shared UI, upstream source edits, provider/live-data, startup/backfill, paid/cloud, broker, or telemetry scope.
+
+No tests, builds, Prisma commands, services, providers, UI smoke runs, live-data checks, commits, or pushes were run.
+
 ## Team 03 RH-01 Research Hub Actionability Prep - 2026-05-18
 
 Assignment: prepare docs-only architecture readiness for `CF-W1-RH-01` in the shared `dev` workspace without touching application code, tests outside the Research Hub future writer set, Prisma/schema, route registries, shared utilities, shared UI, package manifests, generated files, providers, services, builds, or UI smoke.

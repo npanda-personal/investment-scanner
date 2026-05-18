@@ -4,6 +4,29 @@ Date: 2026-05-17
 
 Prepared by Team 03 Architecture Factory and refreshed after `CF-W1-L3-AUTH-02` commit `503bcd9`, `CF-W1-SIG-TRIGGER-01` commit `6ab3999`, and checkpoint protocol fix commit `f75808f`.
 
+## Team 03 TREV-02 Candidate Snapshot Provenance Prep - 2026-05-18
+
+Prepared:
+
+- `03-architecture/CF-W1-L3-TREV-02-architecture-review.md`
+- `06-contracts/CF-W1-L3-TREV-02-today-review-candidate-snapshot-provenance-contract.md`
+- `08-work-packets/CF-W1-L3-TREV-02-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Result:
+
+- `CF-W1-L3-TREV-02` is a `Ready candidate`.
+- The smallest bounded first child is the full requirement packet: additive Today Review candidate-provenance normalization plus candidate-detail provenance rendering only.
+- Exact future writer set is limited to Today Review service/repository/types/doc/tests plus frontend types, candidate detail page, and the existing Today Review UI spec.
+- No Prisma/schema, route registry, shared utility/UI, generated-file, package, provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or broad UI scope is allowed.
+- `CF-W1-L3-TREV-01` remains the run-level parent. Its docs inform sequencing, but branch-only `TREV-01` implementation artifacts must not be treated as merged into `dev`.
+- Team 04 QA planning can start now.
+- Team 00 must not allow `CF-W1-L3-TREV-01` and `CF-W1-L3-TREV-02` to run in parallel because the shared Today Review writer set overlaps.
+
 ## Team 03 RH-01 Research Hub Actionability Prep - 2026-05-18
 
 Prepared:

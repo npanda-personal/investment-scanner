@@ -247,6 +247,48 @@ State whether `CF-W1-BT-02` is QA-plan ready for Team 00 Ready evaluation and li
 
 ---
 
+# Current Active Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Prepare docs-only QA planning for `CF-W1-RH-01` - Research Hub actionability evidence wiring.
+
+This is main-workspace QA planning only. Do not implement application code. Do not run tests, builds, services, providers, Prisma commands, UI smoke, or live data.
+
+Team 03 completed the architecture packet in commit `76a2c32`. The next gate is a focused QA plan so Team 00 can evaluate Ready promotion for one bounded Research Hub backend writer pass.
+
+## Source Input
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-RH-01-research-hub-actionability-evidence-wiring-requirement.md`
+- Architecture review: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-RH-01-architecture-review.md`
+- Contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-RH-01-research-hub-actionability-evidence-wiring-contract.md`
+- Work packet: `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-RH-01-work-packet.md`
+- Team 03 outbox: `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-RH-01-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/next-validation-plans.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+## Required QA Plan Coverage
+
+- Today Review public latest-run mapping for `READY`, `LIMITED`, `BLOCKED`, and `INSUFFICIENT_DATA`.
+- Trade Plan public paper-readiness mapping for `READY`, `LIMITED`, `BLOCKED`, and `INSUFFICIENT_DATA`.
+- Signal Quality summary replaces placeholder insufficiency when public summary exists, but does not overstate trust on current `dev`.
+- Calibration persisted-read mapping replaces placeholder insufficiency when public rows exist, but does not overstate trust on current `dev`.
+- Missing upstream public evidence fails closed.
+- `canReviewActionableSetups` stays conservative and research-support only.
+- No frontend Research Hub changes, upstream source edits, route changes, schema/generated changes, shared utility/UI, provider/live-data, startup/backfill, package, paid/cloud, broker, or telemetry scope.
+
+## Output
+
+State whether `CF-W1-RH-01` is QA-plan ready for Team 00 Ready evaluation and list any blocker.
+
+---
+
 # Current Dispatcher Assignment
 
 Date: 2026-05-18

@@ -2,7 +2,7 @@
 
 Date: 2026-05-18
 
-Mode: docs-only backlog refresh after a Research Hub delta-traceability workflow audit. No application code, tests, Prisma, route registries, package manifests, generated files, Team 00 control docs, or Ready queue files changed.
+Mode: docs-only backlog refresh after an upstream Market Data durable-evidence child-packet audit. No application code, tests, Prisma, route registries, package manifests, generated files, Team 00 control docs, or Ready queue files changed.
 
 ## Work Item
 
@@ -10,9 +10,8 @@ Audit one under-served market-intelligence workflow, convert the evidence into a
 
 ## Files Changed
 
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-RH-02-research-hub-what-changed-traceability-requirement.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-RH-02A-research-hub-what-changed-fail-closed-basis-requirement.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-TREV-02-today-review-candidate-snapshot-provenance-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MD-02A-additive-companion-evidence-schema-packet-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MD-02-durable-market-data-readiness-evidence-requirement.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
@@ -23,54 +22,57 @@ Audit one under-served market-intelligence workflow, convert the evidence into a
 
 - `AGENTS.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/16-team-inboxes/TEAM-02-current-assignment.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-RH-01-research-hub-actionability-evidence-wiring-requirement.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-RH-02-research-hub-what-changed-traceability-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MD-02-durable-market-data-readiness-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-MD-02-durable-readiness-evidence-adr.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-MD-02-durable-readiness-evidence-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-MD-02-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-MD-02-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/TEAM-05-market-data-data-quality-domain-audit-2026-05-17.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/07-decisions/DECISION-20260517-market-data-durable-readiness-storage-adr-resolution.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/blocked-by-shared-file.md`
+- `backend/src/modules/market-data-foundation/market-data-foundation.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-ux-research-copilot.md`
-- `backend/src/modules/research-hub/research-hub.service.ts`
-- `backend/src/modules/research-hub/research-hub.types.ts`
-- `backend/src/modules/research-hub/research-hub.md`
-- `frontend/src/features/research-hub/components/ResearchOverviewPage.tsx`
 
 ## Audited Workflow
 
-Research Hub what-changed delta traceability and fail-closed review-history semantics.
+Market Data durable readiness evidence and the next bounded child after the accepted ADR draft.
 
 ## Evidence Summary
 
-- `research-hub.service.ts` explicitly marks `whatChanged` as simulated for MVP and populates `newTradeCandidates` from the current `tradeCandidates` list instead of from a prior comparison basis.
-- `ResearchOverviewPage.tsx` renders `NEW REVIEW CANDIDATES` and the fallback copy `No new review candidates since the last evaluation`, which overclaims temporal evidence when no basis exists.
-- `research-hub.types.ts` already contains a bounded `ResearchWhatChanged` container, so the gap is comparison-basis semantics rather than missing layout or route plumbing.
-- `research-hub.md` still treats `What Changed` as a core mandate, which raises user-trust risk if the module keeps simulated delta language.
+- `CF-W1-MD-02` already has an accepted ADR direction and an actual ADR draft at `03-architecture/CF-W1-MD-02-durable-readiness-evidence-adr.md`, but the requirement queue was still treating the item mostly as a broad parent.
+- The ADR draft and work packet already name `CF-W1-MD-02A` as the first future child: an additive Prisma/schema proposal for companion durable evidence storage.
+- `market-data-foundation.md` still documents current persistence as `PriceTick` on `symbol + timestamp` and `LatestPrice` on `symbol`, which is narrower than the target durable-evidence natural key and keeps trust claims upstream-limited.
+- Team 05's audit confirms that durable provenance remains incomplete for provider symbol, source fingerprint/run id, validation window, duplicate or invalid rows, missing-candle cause, and stale-currentness basis.
 
 ## Requirement Refined This Cycle
 
-`CF-W1-RH-02A` was added as the next bounded requirement. The child should expose comparison-basis status, compared-against timing when auditable, and explicit unavailable-basis fallback semantics without widening into storage/schema work.
+`CF-W1-MD-02A` was added as the next bounded requirement. The child is docs-only and should define the additive schema-proposal packet boundary, minimum durable evidence fields, and blocked follow-on packets without widening into Prisma edits, repository/service work, or DQE implementation.
 
 ## Queue Delta
 
-- `CF-W1-TP-02` is now in active Team 10 review after Team 04 QA ACCEPT and is excluded from the next unassigned pull.
-- `CF-W1-SMI-01` is now in active Team 04 QA-planning flow and is excluded from the next unassigned pull.
-- `CF-W1-RH-01` is now in active Team 03 architecture readiness and is excluded from the next unassigned pull.
-- `CF-W1-L3-TREV-02` is already queued as the next architecture candidate after `CF-W1-RH-01` and is excluded from this cycle.
-- `CF-W1-RH-02A` is now recorded as the next top unassigned requirement for Team 00.
-- `CF-W1-RH-02` remains as the parent only; future true-delta history work should split later if the bounded child exposes a storage gap.
+- `CF-W1-TP-02` remains in active Team 10 review after Team 04 QA ACCEPT and stays excluded from the next unassigned pull.
+- `CF-W1-SMI-01` remains in active Team 04 QA-planning flow and stays excluded from the next unassigned pull.
+- `CF-W1-RH-01` remains in active Team 03 architecture readiness and stays excluded from the next unassigned pull.
+- `CF-W1-L3-TREV-02` remains queued as the next architecture candidate after `CF-W1-RH-01` and stays excluded from this cycle.
+- `CF-W1-MD-02A` is now recorded as the next top unassigned requirement for Team 00 because it is upstream, bounded, and already supported by the accepted ADR draft.
+- `CF-W1-MD-02` remains visible as the governing parent only; `CF-W1-MD-02B/C/D` stay blocked behind the new child and explicit schema approval.
+- `CF-W1-RH-02A` remains a valid next pull, but it moves behind `CF-W1-MD-02A` in the filtered stack.
 
 ## Blockers
 
-- `CF-W1-RH-02A`: stop and split if Team 03 cannot identify a safe existing comparison basis and the child would need new durable overview storage.
-- `CF-W1-RH-02A`: keep it separate from `CF-W1-RH-01` actionability evidence wiring; this child removes false-delta claims rather than widening Research Hub trust dimensions.
-- `CF-W1-RH-02`: keep it as parent only unless the bounded child proves a separate true-delta history/storage requirement is necessary.
+- `CF-W1-MD-02A`: stop if Team 03 turns the child into actual Prisma/schema work instead of a proposal-only packet.
+- `CF-W1-MD-02A`: stop if the child widens into repository/service, DQE handoff, downstream adoption, startup/backfill, provider, or UI scope.
+- `CF-W1-MD-02`: keep it as parent only unless the new child is accepted and explicitly sequenced into later `B/C/D` packets.
 
 ## Recommended Next Team 00 Action
 
-Use `CF-W1-RH-02A` as the next top unassigned requirement handoff.
+Use `CF-W1-MD-02A` as the next top unassigned requirement handoff.
 
-1. Route `CF-W1-RH-02A` to Team 03 for architecture/contract prep and Team 04 for QA-plan prep.
-2. Keep `CF-W1-SQLAB-02` and `CF-W1-STRAT-02` next in the filtered pull stack while they remain parent/sequenced items.
+1. Route `CF-W1-MD-02A` to Team 03 for architecture/contract prep and Team 04 for ADR QA review.
+2. Keep `CF-W1-RH-02A` and `CF-W1-SQLAB-02` next in the filtered pull stack while they remain bounded docs-only follow-ons.
 3. Keep `CF-W1-RH-01` and `CF-W1-L3-TREV-02` out of this cycle's unassigned routing because they are already active or queued.
 
 ## Validation

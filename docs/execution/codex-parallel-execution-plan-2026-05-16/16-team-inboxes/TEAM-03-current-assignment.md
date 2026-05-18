@@ -230,6 +230,52 @@ This item was already queued after `CF-W1-RH-01`. Team 03 completed `CF-W1-RH-01
 
 ---
 
+# Current Active Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Prepare architecture readiness for `CF-W1-MD-02A` - additive companion durable evidence schema packet.
+
+This is docs-only architecture prep. It must produce a proposal/contract packet only. Do not implement application code and do not edit Prisma/schema, migrations, generated files, repositories, services, providers, startup/backfill, route registries, shared utilities/UI, package manifests, or tests.
+
+## Why This Item
+
+Team 02 refined `CF-W1-MD-02` into a parent-only ADR and added `CF-W1-MD-02A` as the next top unassigned upstream market-data evidence requirement. The accepted ADR direction exists, but future schema/source work remains a true consent blocker. This Team 03 pass should make that boundary exact without crossing it.
+
+## Source Input
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MD-02A-additive-companion-evidence-schema-packet-requirement.md`
+- Parent requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MD-02-durable-market-data-readiness-evidence-requirement.md`
+- ADR: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-MD-02-durable-readiness-evidence-adr.md`
+- Parent contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-MD-02-durable-readiness-evidence-contract.md`
+- Parent QA plan: `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-MD-02-qa-plan.md`
+- Parent work packet: `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-MD-02-work-packet.md`
+- Relevant source/docs to inspect read-only:
+  - `backend/src/modules/market-data-foundation/market-data-foundation.md`
+  - `backend/src/modules/market-data-foundation/**` read-only as needed
+  - `backend/src/modules/data-quality-engine/**` read-only as needed for handoff boundary only
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-MD-02A-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-MD-02A-additive-companion-evidence-schema-packet-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-MD-02A-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+## Required Output
+
+- A proposal-only architecture packet with exact future schema/migration/generation blockers.
+- Explicit minimum natural key and durable evidence fields, aligned to the accepted ADR direction.
+- Exact split between `MD-02A` proposal work and later `MD-02B/C/D` implementation packets.
+- Explicit rejection if source, Prisma/schema, migrations, generated files, repository/service, provider/live-data, startup/backfill, DQE handoff implementation, downstream adoption, UI, shared utility/UI, package, paid/cloud, broker, or telemetry work is required in this pass.
+- QA planning handoff notes for Team 04.
+- Return one of: `proposal packet ready`, `split required`, or `blocked`.
+
+---
+
 # Current Dispatcher Assignment
 
 Date: 2026-05-18

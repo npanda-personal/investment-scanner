@@ -4,9 +4,9 @@ Date: 2026-05-17
 
 ## Status
 
-ADR direction resolved. Not Ready for Implementation.
+ADR direction resolved and formal ADR draft prepared. Parent only. Not Ready for Implementation.
 
-Product Owner approved Option B as ADR direction only on 2026-05-17: companion durable readiness/evidence storage. Application source, tests, Prisma schema, migrations, routes, providers, services, startup/backfill, schedulers, and package changes remain blocked until separate implementation slices are approved.
+Product Owner approved Option B as ADR direction only on 2026-05-17: companion durable readiness/evidence storage. The formal ADR draft now exists at `03-architecture/CF-W1-MD-02-durable-readiness-evidence-adr.md`. Application source, tests, Prisma schema, migrations, routes, providers, services, startup/backfill, schedulers, and package changes remain blocked until separate implementation slices are approved.
 
 ## Product Value
 
@@ -35,11 +35,12 @@ Observed gaps:
 ## Exact Dependencies
 
 - Product Owner and Architect must choose the storage/evidence strategy before source or schema work starts.
-- The future ADR must align with root `AGENTS.md` Market Data and OHLC policy, Data Quality ownership, global market scope, batch orchestration, and local-first zero-incremental-cost constraints.
+- The ADR draft and future child packets must align with root `AGENTS.md` Market Data and OHLC policy, Data Quality ownership, global market scope, batch orchestration, and local-first zero-incremental-cost constraints.
 - Data Quality Engine must remain the owner of readiness evaluation; Market Data Foundation must not duplicate downstream DQ scoring logic.
 - The future ADR must define how downstream modules distinguish durable evidence from derived/read-path evidence.
 - `06-contracts/CF-W1-MD-02-durable-readiness-evidence-contract.md` must be accepted or updated by Architecture.
 - `04-qa/CF-W1-MD-02-qa-plan.md` must be accepted or updated by QA for ADR review.
+- The next bounded child is `CF-W1-MD-02A`, the additive companion evidence schema packet requirement.
 - Any later source work requires a separate approved work packet and ready-queue entry.
 
 ## Resolved ADR Direction
@@ -66,9 +67,22 @@ The ADR still must cover:
 - local/free constraints,
 - provider, Angel One, startup, scheduler, and repair/backfill exclusions.
 
+## Parent Split
+
+Parent `CF-W1-MD-02` now remains the governing ADR parent only.
+
+Immediate child sequence:
+
+- `CF-W1-MD-02A` additive companion evidence schema packet requirement
+- `CF-W1-MD-02B` Market Data repository/service write-read packet
+- `CF-W1-MD-02C` Data Quality Engine handoff packet
+- `CF-W1-MD-02D` downstream adoption packet
+
+Do not route the later packets before `CF-W1-MD-02A` is narrowed and accepted as the next architecture/QA-prep handoff.
+
 ## Candidate Acceptance Criteria
 
-For the ADR / decision phase:
+For the parent ADR / split-planning phase:
 
 - The ADR defines whether OHLC/price records are append-only, idempotent/upserted, derived, cached, provider-specific, normalized canonical records, or some documented combination.
 - The ADR defines a natural key that includes instrument identity or canonical symbol, region, asset type, timeframe, timestamp or trading date, and source.
@@ -80,6 +94,7 @@ For the ADR / decision phase:
 - The ADR preserves local-first, zero-incremental-cost constraints and introduces no paid/cloud/provider lock-in.
 - Downstream consumers know which evidence is durable and which remains derived or not available.
 - No source, test, Prisma, provider, service, route, package, generated, startup/backfill, repair, or UI work is performed in this phase.
+- The parent explicitly keeps `CF-W1-MD-02A` as the next bounded child and does not treat the parent itself as an app-code handoff.
 
 ## Likely Owner Team
 
@@ -150,4 +165,4 @@ This work is entirely in execution docs and future Market Data / Data Quality ar
 
 ## Next Gate
 
-Formal ADR preparation and ADR QA checklist acceptance. This requirement cannot move to app-code readiness until separate implementation work packets reserve exact source, schema, migration, generated, repository/service, Data Quality handoff, and test files as applicable.
+Route `CF-W1-MD-02A` as the next bounded child for Team 03 architecture prep and Team 04 ADR QA review. The parent cannot move to app-code readiness until later implementation work packets reserve exact source, schema, migration, generated, repository/service, Data Quality handoff, and test files as applicable.

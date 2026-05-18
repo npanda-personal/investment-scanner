@@ -2355,6 +2355,36 @@ The factory should not have stayed at one active worker. Team 03 completed `CF-W
 
 ---
 
+# Team 00 Dispatch After Rolling Outputs
+
+Date: 2026-05-18
+
+## Consumed Outputs
+
+- Team 03 completed `CF-W1-L3-TREV-02` architecture readiness. Result: `Ready candidate`, pending Team 04 QA planning.
+- Team 02 completed Market Data durable-evidence requirement refresh. Result: new top unassigned requirement `CF-W1-MD-02A`.
+
+## Routing Decision
+
+Team 00 will run parallel, non-conflicting work:
+
+- Team 03 on `CF-W1-MD-02A` architecture prep.
+- Team 04 on `CF-W1-RH-01` QA planning.
+- Team 06 on `CF-W1-SMI-01` implementation in a dedicated worktree.
+- Team 02 on another rolling requirements-discovery cycle.
+
+`CF-W1-L3-TREV-02` QA planning is queued behind `CF-W1-RH-01` to avoid two main-workspace Team 04 agents editing the same QA queue/outbox files.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03: `CF-W1-MD-02A` architecture prep now.
+- Team 04: `CF-W1-RH-01` QA planning now.
+- Team 06: `CF-W1-SMI-01` implementation after worktree setup.
+- Team 02: next rolling requirements discovery now.
+- Team 04: `CF-W1-L3-TREV-02` QA planning after `RH-01`.
+
+---
+
 # BT-02 Review Accepted
 
 Date: 2026-05-18

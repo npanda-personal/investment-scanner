@@ -2,7 +2,7 @@
 
 Date: 2026-05-18
 
-Status: Refreshed by Team 02 after Team 06 `CF-W1-SIG-TRIGGER-02A` launch and the Product Owner investor-value priority correction. This queue is refinement-only; Team 00 owns Ready queue movement.
+Status: Refreshed by Team 02 after the 2026-05-18 market-data durable-evidence child-packet audit and the Product Owner investor-value priority correction. This queue is refinement-only; Team 00 owns Ready queue movement.
 
 Current dispatch correction on 2026-05-18 after the Research Hub delta-traceability audit:
 
@@ -11,7 +11,7 @@ Current dispatch correction on 2026-05-18 after the Research Hub delta-traceabil
 - `CF-W1-RH-01` is in active Team 03 architecture readiness and should stay out of the next unassigned pull.
 - `CF-W1-L3-TREV-02` is already queued as the next architecture candidate after `CF-W1-RH-01` and should stay out of the next unassigned pull.
 - `CF-W1-SQLAB-02`, `CF-W1-STRAT-02`, and `CF-W1-MD-02` remain high-value parent items but are still sequenced or blocked for new bounded routing.
-- After excluding active, queued, accepted, parked, and blocked items, the next top unassigned requirement is `CF-W1-RH-02A`.
+- After excluding active, queued, accepted, parked, and blocked items, the next top unassigned requirement is `CF-W1-MD-02A`.
 
 ## Team 02 Current Priority Override
 
@@ -26,15 +26,16 @@ Current ordering is based on two filters:
 
 | Rank | ID | Why it is ahead now | Team 00 routing note |
 | --- | --- | --- | --- |
-| 1 | `CF-W1-RH-02A` | Research Hub can remove false temporal claims now by failing delta semantics closed and exposing comparison-basis status. | Route to Team 03 and Team 04 now. |
-| 2 | `CF-W1-SQLAB-02` | Highest-value parent item still visible after the Research Hub follow-on, but the post-preview path is sequenced. | Keep visible; do not present as the immediate pull. |
-| 3 | `CF-W1-STRAT-02` | High-value parent item, but durable revision history remains blocked. | Keep visible; do not present as the next unassigned pull. |
-| 4 | `CF-W1-MD-02` | High-value ADR item, but still schema/storage-blocked for implementation-facing prep. | Keep visible as ADR-only. |
-| 5 | `CF-W1-RH-02` | Parent requirement remains useful for later true-delta history work if the bounded child exposes a storage gap. | Keep as parent only; do not route before `CF-W1-RH-02A`. |
-| 6 | `CF-W1-RH-01` | Already in active architecture readiness; keep visible for sequencing clarity, not for immediate routing. | Do not reroute this cycle unless Team 00 changes the queue. |
+| 1 | `CF-W1-MD-02A` | The durable-evidence ADR draft already exists, so the next bounded upstream packet is the additive schema proposal that all later market-data trust work depends on. | Route to Team 03 and Team 04 now. |
+| 2 | `CF-W1-RH-02A` | Research Hub can remove false temporal claims now by failing delta semantics closed and exposing comparison-basis status. | Keep immediately behind `CF-W1-MD-02A`. |
+| 3 | `CF-W1-SQLAB-02` | Highest-value parent item still visible after the market-data and Research Hub follow-ons, but the post-preview path is sequenced. | Keep visible; do not present as the immediate pull. |
+| 4 | `CF-W1-STRAT-02` | High-value parent item, but durable revision history remains blocked. | Keep visible; do not present as the next unassigned pull. |
+| 5 | `CF-W1-MD-02` | Parent requirement remains useful for the durable-evidence program, but the child split should lead now. | Keep as parent only; do not route before `CF-W1-MD-02A`. |
+| 6 | `CF-W1-RH-02` | Parent requirement remains useful for later true-delta history work if the bounded child exposes a storage gap. | Keep as parent only; do not route before `CF-W1-RH-02A`. |
 
 ### Candidates Team 00 Can Route In Parallel Right Now
 
+- `CF-W1-MD-02A`
 - `CF-W1-RH-02A`
 - `CF-W1-SQLAB-02` remains visible but is not the immediate pull.
 - `CF-W1-STRAT-02` remains visible as the next upstream trust parent.
@@ -94,9 +95,9 @@ These are docs-only discovery priorities. They do not override Team 00's current
 
 | Rank | ID | Why now | Next refinement need |
 | --- | --- | --- | --- |
-| 1 | CF-W1-RH-02A | Research Hub `whatChanged` should stop simulating deltas unless a safe prior comparison basis exists. | Team 03 decision on no-schema comparison basis and Team 04 fail-closed QA prep. |
-| 2 | CF-W1-SQLAB-02 | Signal outcome learning remains the next higher-value parent item after the current Research Hub follow-on, but it stays sequenced behind `CF-W1-SQLAB-02A`. | Team 03 post-preview follow-up once `CF-W1-SQLAB-02A` closes. |
-| 3 | CF-W1-STRAT-02 | Strategy provenance and DQ-gated trust remain the next upstream trust parent after the Research Hub delta fix. | Team 03/04 contract and QA follow-up. |
+| 1 | CF-W1-MD-02A | Durable market-data evidence is the strongest remaining upstream trust gap, and the additive schema-proposal child can advance it without touching app code. | Team 03 additive schema-packet prep and Team 04 ADR QA review. |
+| 2 | CF-W1-RH-02A | Research Hub `whatChanged` should stop simulating deltas unless a safe prior comparison basis exists. | Team 03 decision on no-schema comparison basis and Team 04 fail-closed QA prep. |
+| 3 | CF-W1-SQLAB-02 | Signal outcome learning remains the next higher-value parent item after the current market-data child and Research Hub follow-on, but it stays sequenced behind `CF-W1-SQLAB-02A`. | Team 03 post-preview follow-up once `CF-W1-SQLAB-02A` closes. |
 
 ## Decision Inbox State
 
@@ -150,7 +151,8 @@ The former Decision Inbox items moved to refinement / Ready-evaluation prep:
 | CF-W1-SQLAB-01 | Audit-derived requirement draft; future Signal Quality Lab child remains outside Ready until a Team 00/03 reservation and contract are prepared. |
 | CF-W1-TP-01B | Backend-only child contract, Team 03 reservation matrix, backend reservations, Team 06 inspection, and QA plan prepared; needs Team 00 Ready evaluation. |
 | CF-W1-NOTIF-02 | Requirement, architecture, contract, work packet, Team 03 reservation matrix, and platform QA plan prepared; needs Team 00/Team 09 Ready evaluation. |
-| CF-W1-MD-02 | ADR direction accepted; formal ADR and separate future source/schema split remain. |
+| CF-W1-MD-02A | New bounded child requirement drafted; needs Team 00 routing to Team 03/04 for additive schema-packet prep and ADR QA review. |
+| CF-W1-MD-02 | ADR direction accepted; formal ADR draft exists and separate future source/schema split remains. |
 | CF-W1-AUTH-01 | Policy accepted; Team 03 contract/work packet prepared around module-local Team 09 controller/test scope; needs Team 00 Ready evaluation. |
 | CF-W1-SUB-01 | Policy accepted; Team 03 backend-only contract/work packet prepared with UI limitation note; needs Team 00 Ready evaluation. |
 | CF-W1-UX-02 | Policy accepted; Team 03 Copilot-only contract/work packet refreshed; needs Team 08 source-supported trust-field mapping and Team 00 Ready evaluation. |
@@ -220,6 +222,7 @@ These candidates are not the immediate next unassigned pull because they are eit
 | CF-W1-L3-WATCH-01 | Watchlist review-actionability contract and QA plan. | Team 00 / Team 03 |
 | CF-W1-L3-INTEL-02 | Portfolio intelligence review traceability contract and QA plan. | Team 00 / Team 03 |
 | CF-W1-L3-ALERT-03 | Alert follow-through contract and QA plan. | Team 00 / Team 03 |
+| CF-W1-MD-02A | Additive companion evidence schema packet contract and ADR QA review. | Team 00 / Team 03 / Team 04 |
 | CF-W1-RH-01 | Research Hub actionability evidence-wiring contract and QA plan. | Team 00 / Team 03 / Team 04 |
 | CF-W1-L3-TREV-02 | Today Review candidate snapshot provenance contract and QA plan. | Team 00 / Team 03 / Team 04 |
 | CF-W1-RH-02A | Research Hub `whatChanged` fail-closed comparison-basis contract and QA plan. | Team 00 / Team 03 / Team 04 |
