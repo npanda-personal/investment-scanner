@@ -1660,6 +1660,40 @@ Date: 2026-05-18
 
 Date: 2026-05-18
 
+## Newly Spawned
+
+- Team 06 `019e3c36-5758-7052-839d-479fdbe261e7`: `CF-W1-SIG-TRIGGER-02A` implementation.
+
+## Worktree Setup
+
+- Branch: `codex/team06-strategy-signal/CF-W1-SIG-TRIGGER-02A`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-SIG-TRIGGER-02A`
+- Base commit: `a2d4edb docs: promote trigger audit child`
+- Backend dependency junction: created from worktree `backend/node_modules` to main workspace `backend/node_modules`.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 06 - Strategy / Signal / Risk | `019e3c36-5758-7052-839d-479fdbe261e7` | `gpt-5.3-codex`, high | implementation | `CF-W1-SIG-TRIGGER-02A` | active |
+| 2 | Open slot | none | pending | QA verification | `CF-W1-SIG-TRIGGER-02A` after Team 06 handoff | waiting |
+| 3 | Open slot | none | pending | requirements discovery | next persistent Team 02 cycle after Team 06 handoff stabilizes | ready |
+| 4 | Open slot | none | pending | review/release | next QA-accepted handoff | waiting |
+| 5 | Open slot | none | pending | architect signoff | next Team 10 accepted handoff | waiting |
+| 6 | Open slot | none | pending | next implementation | next promoted Ready item | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04 is ready for `CF-W1-SIG-TRIGGER-02A` QA after Team 06 handoff.
+- Team 02 is ready for the next persistent discovery cycle after Team 06 handoff stabilizes.
+- Team 10 is ready for the next QA-accepted review handoff.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
 ## Runtime Recovery
 
 - Prior Team 03 architect agent `019e3c02-4baa-77a3-a567-d5cf34e804db` was no longer visible to the runtime and left no `CF-W1-BT-02` architect signoff files in the BT worktree.
