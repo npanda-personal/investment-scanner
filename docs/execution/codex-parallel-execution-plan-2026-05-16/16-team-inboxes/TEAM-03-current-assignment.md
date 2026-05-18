@@ -188,6 +188,57 @@ This is docs-only architecture prep. Do not implement application code. Treat th
 
 Date: 2026-05-18
 
+## Product Owner Priority Correction
+
+This final override supersedes older assignment tails above.
+
+Prioritize direct investor/trader value before platform or Lane 3 convenience work:
+
+- market data and Data Quality evidence;
+- signals, strategy trust, calibration, backtesting, Trade Plan research support, historical context, market context, and research evidence;
+- admin, settings, auth/subscription, notifications, and user-alert convenience work only when they block correctness, privacy, or user-data safety.
+
+## Assignment
+
+Prepare architecture readiness for `CF-W1-MCTX-01` - Market Context regime evidence and partial-context framing.
+
+This is docs-only architecture prep. Do not implement application code. Do not edit tests. Do not run providers, services, Prisma commands, builds, or UI smoke.
+
+## Source Input
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MCTX-01-market-context-regime-evidence-requirement.md`
+- Active priority queue:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- Relevant audit/context:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-market-data-data-quality.md`
+  - `backend/src/modules/market-context-intelligence/market-context-intelligence.md`
+  - `backend/src/modules/market-context-intelligence/market-context-intelligence.service.ts`
+  - `backend/src/modules/market-context-intelligence/market-context-intelligence.types.ts`
+  - `backend/tests/modules/market-context-intelligence/**` read-only as needed
+  - `frontend/src/features/market-context-intelligence/**` read-only as needed
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-MCTX-01-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-MCTX-01-market-context-regime-evidence-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-MCTX-01-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+## Required Output
+
+- Exact file-reservation recommendation for the smallest module-local first child if feasible.
+- Explicit blocker if regime-evidence clarity requires Prisma/schema, route registry, generated files, shared helpers, provider/live data, package changes, Market Data source changes, DQE source changes, frontend route/shared UI changes, or broad UX work.
+- QA planning handoff notes for Team 04.
+- Ready recommendation: `Ready candidate`, `split required`, or `blocked`.
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
 ## Assignment
 
 Refresh architecture readiness for `CF-W1-HCTX-01` - Historical Context explainability.
