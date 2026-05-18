@@ -2753,3 +2753,32 @@ Date: 2026-05-18
 - Team 02: persistent requirements discovery after the requirements docs are committed.
 - Team 10: `CF-W1-MCTX-01` review after QA rerun accepts.
 - Team 00: `CF-W1-MD-03` delegated PO acceptance and scoped commit if Architect Signoff accepts.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Completed Since Previous Snapshot
+
+- Team 03 `019e3cd2-1a4a-7191-aa51-1de6082982d7`: accepted `CF-W1-MD-03` Architect Signoff; closed.
+- Team 00 completed delegated PO acceptance and committed `CF-W1-MD-03` locally on its feature branch as `58c5404`.
+- Team 10 `019e3cd3-db06-7101-a403-e0a3560b9a20`: accepted `CF-W1-MCTX-01` review; closed.
+
+## Current Pool
+
+| Slot | Team | Agent | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Team 03 - Architecture Factory | `019e3cd5-dd24-7d42-b7fb-7bc8afec9177` | architecture prep | `CF-W1-BT-01A` | active |
+| 2 | Team 03 - Architect Signoff | `019e3cd9-734c-72b2-bd3c-fd50abedfb96` | signoff | `CF-W1-MCTX-01` | active |
+| 3 | Open slot | none | queued | Team 00 `CF-W1-MCTX-01` delegated PO commit after signoff ACCEPT | waiting |
+| 4 | Open slot | none | queued | Team 04 `CF-W1-BT-01A` QA planning after architecture output | waiting |
+| 5 | Open slot | none | queued | Team 02 persistent requirements discovery | waiting |
+| 6 | Open slot | none | queued | next review/signoff gate | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 00: `CF-W1-MCTX-01` delegated PO acceptance and scoped branch commit if Architect Signoff accepts.
+- Team 04: `CF-W1-BT-01A` QA planning after Team 03 returns architecture output.
+- Team 02: persistent requirements discovery after current gate pressure clears.
