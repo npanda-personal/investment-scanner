@@ -976,3 +976,31 @@ Date: 2026-05-18
 ## Next Coordination Action
 
 Commit the completed `CF-W1-DQ-02` architecture packet with exact staged scope, then continue monitoring Team 06, Team 03 Signoff, and Team 02.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Completed Since Previous Snapshot
+
+- `CF-W1-HCTX-01`: Team 03 Architect Signoff accepted; Team 00 completed delegated PO acceptance and scoped local branch commit `23b6c92 feat: add historical context lookup explainability`.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 06 - Strategy / Signal / Risk | `019e3bdf-8c03-7d22-a081-90ff86b279af` | `gpt-5.3-codex`, high | bounded QA rework | `CF-W1-BT-02` trusted disposition and UI evidence | active |
+| 2 | Team 02 - PO + Requirement Factory | `019e3be0-06d7-78d3-853b-707d92419a35` | `gpt-5.4-mini`, medium | persistent discovery | next high-value market-intelligence requirement | active |
+| 3 | Open slot | none | pending | QA rerun | `CF-W1-BT-02` after Team 06 rework | waiting |
+| 4 | Open slot | none | pending | review/release | `CF-W1-BT-02` after QA accepts | waiting |
+| 5 | Open slot | none | pending | architect signoff | `CF-W1-BT-02` after Team 10 accepts | waiting |
+| 6 | Open slot | none | pending | next architecture prep | next highest unassigned investor-value item after Team 02 output | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04 is ready for `CF-W1-BT-02` QA rerun after Team 06 rework.
+- Team 10 is ready for `CF-W1-BT-02` review after QA accepts.
+- Team 03 is ready for `CF-W1-BT-02` Architect Signoff after Team 10 accepts.
+- Team 03 has an open architecture-prep slot after Team 02 identifies the next top unassigned investor-value item.
