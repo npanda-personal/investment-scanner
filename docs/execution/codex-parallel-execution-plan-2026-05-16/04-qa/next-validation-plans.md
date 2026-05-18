@@ -1,6 +1,6 @@
 # Next Validation Plans
 
-Date: 2026-05-19
+Date: 2026-05-18
 
 Prepared by Team 04 QA Factory and refreshed after docs-only QA plans for `CF-W1-MD-01`, `CF-W1-MD-03`, `CF-W1-L3-ALERT-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-HCTX-01`, `CF-W1-CAL-01`, `CF-W1-SQLAB-01`, `CF-W1-L3-ALERT-03`, `CF-W1-L3-WATCH-01`, `CF-W1-SQLAB-02A`, `CF-W1-STRAT-02A`, `CF-W1-STRAT-03`, `CF-W1-BT-02`, `CF-W1-BT-03`, `CF-W1-DQ-02A`, `CF-W1-L3-INTEL-03`, `CF-W1-MCTX-01`, `CF-W1-SMI-01`, `CF-W1-SIG-TRIGGER-02A`, `CF-W1-SIG-02`, `CF-W1-RH-01`, and `CF-W1-L3-TREV-02`.
 

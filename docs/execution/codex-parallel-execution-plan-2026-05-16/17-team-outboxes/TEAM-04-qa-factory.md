@@ -1,6 +1,6 @@
 # TEAM-04 QA Factory Outbox
 
-Date: 2026-05-19
+Date: 2026-05-18
 
 Mode: focused QA rerun plus docs-only QA planning.
 

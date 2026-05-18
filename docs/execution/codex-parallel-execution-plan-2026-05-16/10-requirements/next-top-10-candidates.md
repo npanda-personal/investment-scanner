@@ -1,6 +1,6 @@
 # Next Top 10 Candidates
 
-Date: 2026-05-19
+Date: 2026-05-18
 
 Prepared by Team 02 Requirement Factory for the next direct-value requirement/ranking refresh after rechecking the live runtime queue, Ready queue, blocked queues, recent Team 00 / Team 03 / Team 04 outboxes, current module audits, and current backtesting source docs.
 

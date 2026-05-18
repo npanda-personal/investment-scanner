@@ -1,6 +1,6 @@
 # CF-W1-BT-03 Backtesting Proof-Basis / Overfit Guardrail Contract
 
-Date: 2026-05-19
+Date: 2026-05-18
 
 Owner: Team 03 Architecture Factory
 

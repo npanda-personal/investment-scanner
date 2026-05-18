@@ -1,6 +1,6 @@
 # Requirements Backlog
 
-Date: 2026-05-19
+Date: 2026-05-18
 
 Status: Refreshed by Team 02 after an explicit Signal Outcome Journal durable-memory discovery cycle. Product Owner action is not required; all policy-resolved items remain refinement/architecture/QA-prep items only until Team 00 promotes exact implementation handoffs. Product Owner corrected the priority model on 2026-05-18: direct investor/trader value should lead, especially market data, Data Quality, signals, strategies, backtests, calibration, historical context, market context, trade-plan research support, and research evidence. Admin, settings, auth/subscription, notifications, and alert convenience work should be lowest priority unless needed for correctness, privacy, or user-data safety. After excluding active, queued, accepted, parked, blocked, and already-routed items, the next fresh Team 02 discovery item is `CF-W1-SQLAB-02B`; the next direct trader-review candidate after the current evidence-stack items is `CF-W1-L3-WATCH-01`, with `CF-W1-L3-INTEL-03` and `CF-W1-UX-01` behind it. `CF-W1-RH-01` and `CF-W1-L3-TREV-02` remain Team 00 Ready-evaluation candidates rather than new requirement gaps.
 
