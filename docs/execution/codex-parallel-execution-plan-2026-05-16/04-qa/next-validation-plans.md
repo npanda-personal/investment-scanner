@@ -2,9 +2,11 @@
 
 Date: 2026-05-18
 
-Prepared by Team 04 QA Factory and refreshed after docs-only QA plans for `CF-W1-MD-01`, `CF-W1-L3-ALERT-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-AUTH-01`, and `CF-W1-SUB-01`.
+Prepared by Team 04 QA Factory and refreshed after docs-only QA plans for `CF-W1-MD-01`, `CF-W1-L3-ALERT-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-HCTX-01`, `CF-W1-CAL-01`, `CF-W1-SQLAB-01`, and `CF-W1-L3-ALERT-03`.
 
 Refresh note: docs-only QA refresh. No tests, builds, services, providers, UI checks, or application source/test edits were run or modified during this refresh.
+
+Latest refresh note: Team 04 added the docs-only QA plan for `CF-W1-L3-ALERT-03` on 2026-05-18. This records follow-through traceability acceptance scenarios and focused command guidance only. It does not approve executable QA or Ready promotion while `CF-W1-L3-ALERT-01` and `CF-W1-L3-AUTH-03` still overlap the same `alerts-monitoring` writer set.
 
 Setup authorization note: standing branch/worktree/commit/push authorization changes execution mechanics only. It does not approve app-code work, tests, builds, Prisma commands, providers, Angel One, startup/backfill, UI smoke, live services, or Ready queue movement for any candidate below.
 
@@ -29,6 +31,10 @@ Policy-resolution refresh note: Product Owner resolved the remaining five Decisi
 6. `CF-W1-UX-02`: Copilot trust UX QA plan recorded in `04-qa/CF-W1-UX-02-qa-plan.md`.
 7. `CF-W1-UX-05`: Copilot-only product-language/status QA plan recorded in `04-qa/CF-W1-UX-05-product-language-status-qa-plan.md`.
 8. `CF-W1-AUTH-01` and `CF-W1-SUB-01`: platform auth/subscription Option A QA assertions recorded in `04-qa/CF-W1-QA-AUTH-01-platform-auth-subscription-notification-qa-plan.md`.
+9. `CF-W1-HCTX-01`: Historical Context explainability QA plan recorded in `04-qa/CF-W1-HCTX-01-qa-plan.md`.
+10. `CF-W1-CAL-01`: Signal Calibration reliability drift QA plan recorded in `04-qa/CF-W1-CAL-01-qa-plan.md`.
+11. `CF-W1-SQLAB-01`: Signal Quality Lab outcome-confidence QA plan recorded in `04-qa/CF-W1-SQLAB-01-qa-plan.md`.
+12. `CF-W1-L3-ALERT-03`: alert follow-through traceability QA plan recorded in `04-qa/CF-W1-L3-ALERT-03-qa-plan.md`.
 
 ## Post-Decision Scenario Matrix Prepared
 
@@ -44,6 +50,7 @@ Matrix file: `04-qa/post-decision-child-scenario-matrix-2026-05-17.md`.
 - `CF-W1-L3-PORT-01A`: initial focused QA command passed and is recorded in `04-qa/CF-W1-L3-PORT-01A-qa-evidence.md`; Team 10 later rejected release acceptance, so Team 04 must rerun QA after Team 07 revision.
 - `CF-W1-TP-01B`: backend-only Trade Plan compatibility and DQ hard-block QA plan recorded in `04-qa/CF-W1-TP-01B-qa-plan.md`.
 - `CF-W1-NOTIF-02`: notification local log redaction QA plan recorded in `04-qa/CF-W1-NOTIF-02-qa-plan.md`.
+- `CF-W1-L3-ALERT-03`: alert follow-through traceability QA plan recorded in `04-qa/CF-W1-L3-ALERT-03-qa-plan.md`.
 
 These child plans are not executable validation approval. Source/test execution still requires Team 00 Ready promotion, exact file reservations, and implementation handoff.
 
@@ -53,6 +60,7 @@ These child plans are not executable validation approval. Source/test execution 
 | --- | --- | --- | --- |
 | `CF-W1-MD-01` | Reject-only validator-child QA plan prepared; QA-ready for Team 00 Ready evaluation | Team 03/05/04 are now aligned on the narrowed validation-only child and the deferred warning/evidence follow-on scope. | Team 00 Ready evaluation for one validation-only implementation handoff. |
 | `CF-W1-L3-ALERT-01` | Child QA plan refreshed; executable validation still blocked | Team 03 prepared child contract/work packet; Team 04 refreshed alert child scenarios. | Team 00 Ready promotion, exact file reservations, and implementation handoff. |
+| `CF-W1-L3-ALERT-03` | Child QA plan prepared; not QA-ready for Team 00 Ready evaluation yet | Team 03 prepared the backend-only follow-through packet and Team 04 aligned scenarios, but this slice still conflicts with active `CF-W1-L3-ALERT-01` and parked `CF-W1-L3-AUTH-03` on the same `alerts-monitoring` file set. | Team 00 sequencing decision after `CF-W1-L3-ALERT-01` clears and away from `CF-W1-L3-AUTH-03`; then exact file reservations and implementation handoff. |
 | `CF-W1-UX-02` | Combined Copilot-only QA plan prepared; QA-ready for Team 00 Ready evaluation | Team 04 consolidated `CF-W1-UX-02` and `CF-W1-UX-05A` into one Copilot-only QA packet with preserved blocked/limited/trusted, scope, latest-date, digest-regression, and safe-language scenarios. | Team 00 Ready evaluation for one combined `CF-W1-UX-02 + CF-W1-UX-05A` implementation handoff. |
 | `CF-W1-L3-DQ-01` | Child QA scenario matrix prepared; executable validation still blocked | Product Owner accepted Option B; Team 03 refreshed architecture notes; Team 04 recorded child scenarios. This does not approve app-code or QA execution. | Child module contracts, exact reservations, and implementation handoffs. |
 | `CF-W1-TP-01A` | Backend-only QA scenario matrix prepared; executable validation still blocked | Product Owner accepted Option B; Team 03 refreshed architecture notes; Team 04 recorded backend-only scenarios. This does not approve app-code or QA execution. | Accepted backend-only child packet, exact reservations, and implementation handoff. |
@@ -63,6 +71,9 @@ These child plans are not executable validation approval. Source/test execution 
 | `CF-W1-UX-05` | Companion QA note prepared; no separate executable slice | `CF-W1-UX-05A` now rides entirely inside the combined Copilot-only `CF-W1-UX-02` packet; shared `StatusBadge`, Research Hub, and Market Data UI remain future. | Team 00 Ready evaluation for the combined `CF-W1-UX-02 + CF-W1-UX-05A` packet only. |
 | `CF-W1-AUTH-01` | Option A QA refresh prepared; executable validation still blocked | Platform plan now requires protected Team 09 controllers to fail closed when `req.user.id` is missing and forbids `default-user` controller fallback. | Team 09 module-local controller/test reservations and Team 00 Ready promotion. |
 | `CF-W1-SUB-01` | Option A QA refresh prepared; executable validation still blocked | Platform plan now requires admin/manual-only subscription plan changes and records frontend mismatch handling as a limitation/future UX path. | Team 09 backend-only reservations and Team 00 Ready promotion. |
+| `CF-W1-HCTX-01` | Backend-only QA plan prepared; QA-ready for Team 00 Ready evaluation | Team 03 prepared a bounded Historical Context explainability packet; Team 04 aligned exact provenance, lag, metadata-gap, and additive-compatibility scenarios to the reserved `historical-context-snapshots` files. | Team 00 Ready evaluation for one backend-only `historical-context-snapshots` explainability handoff. |
+| `CF-W1-CAL-01` | Backend-only QA plan prepared; QA-ready for Team 00 Ready evaluation | Team 03 revalidated the bounded calibration trust-state packet; Team 04 aligned trusted/limited/diagnostic-only/unavailable scenarios and fail-closed DQ assertions to the reserved `signal-calibration-engine` files. | Team 00 Ready evaluation for one backend-only `signal-calibration-engine` trust-state handoff. |
+| `CF-W1-SQLAB-01` | Backend-only QA plan prepared; QA-ready for Team 00 Ready evaluation | Team 03 revalidated the bounded Signal Quality Lab confidence packet; Team 04 aligned trusted/limited/diagnostic/untrusted scenarios and additive compatibility assertions to the reserved `signal-quality-lab` files. | Team 00 Ready evaluation for one backend-only `signal-quality-lab` outcome-confidence handoff. |
 
 ## Remaining Next QA Plans
 
@@ -87,6 +98,9 @@ Commands below are guidance only. They were not run during this documentation-on
 | `CF-W1-MD-01` | `cd backend` then `npm.cmd test -- market-data.validation.test.ts --runInBand` | Reject-only validator-child QA plan prepared; blocked from execution until the validation-only implementation handoff exists. |
 | `CF-W1-L3-ALERT-01` | `cd backend` then `npm.cmd test -- alerts-monitoring.service.test.ts alerts-monitoring.validation.test.ts --runInBand` | Plan prepared; blocked until `CF-W1-L3-DQ-01`, alert readiness contract, and implementation handoff. |
 | `CF-W1-L3-ALERT-01` | `cd backend` then `npm.cmd test -- alerts-monitoring.service.test.ts alerts-monitoring.ownership.test.ts alerts-monitoring.routes.test.ts --runInBand` | Approval-gated regression if alert event listing, mutation, or parent rule ownership is touched. |
+| `CF-W1-L3-ALERT-03` | `cd backend` then `npm.cmd test -- alerts-monitoring.service.test.ts alerts-monitoring.validation.test.ts --runInBand` | Plan prepared; blocked until Team 00 sequences the packet after `CF-W1-L3-ALERT-01` and away from `CF-W1-L3-AUTH-03`, then issues an implementation handoff. |
+| `CF-W1-L3-ALERT-03` | `cd backend` then `npm.cmd test -- alerts-monitoring.service.test.ts alerts-monitoring.ownership.test.ts alerts-monitoring.routes.test.ts --runInBand` | Approval-gated regression if follow-through endpoint, ownership-sensitive event mutation, or module router surfaces are touched. |
+| `CF-W1-L3-ALERT-03` | `cd backend` then `npm.cmd test -- alerts-monitoring.service.test.ts alerts-monitoring.controller.test.ts alerts-monitoring.repository.test.ts --runInBand` | Guidance only if the implementation adds dedicated follow-through controller/repository coverage. |
 | `CF-W1-UX-02 + CF-W1-UX-05A` | `cd backend` then `npm.cmd test -- ai-investment-copilot.service.test.ts ai-investment-copilot.routes.test.ts --runInBand` | Combined Copilot-only QA plan prepared; blocked until the combined implementation handoff exists. |
 | `CF-W1-UX-02 + CF-W1-UX-05A` | `cd backend` then `npm.cmd test -- ai-investment-copilot.validation.test.ts --runInBand` | Guidance only if controller/validation scope changes are included in the combined packet. |
 | `CF-W1-UX-02 + CF-W1-UX-05A` | `cd backend` then `npm.cmd test -- ai-investment-copilot.service.test.ts notifications-delivery.service.test.ts --runInBand` | Guidance only if additive Copilot DTO changes touch digest assembly. |
@@ -94,6 +108,9 @@ Commands below are guidance only. They were not run during this documentation-on
 | `CF-W1-UX-02 + CF-W1-UX-05A` | `rg -n "buy now\|sell now\|must buy\|must sell\|guaranteed\|profit target\|price target\|recommendation quality\|target achieved" backend/src/modules/ai-investment-copilot frontend/src/features/ai-investment-copilot backend/tests/modules/ai-investment-copilot frontend/tests/ui` | Guidance only after the combined Copilot-only files are reserved. |
 | `CF-W1-AUTH-01` | `cd backend` then `npm.cmd test -- subscription-billing.routes.test.ts notifications-delivery.routes.test.ts --runInBand` | Option A QA refresh prepared; blocked until Team 09 controller/test reservations and implementation handoff. |
 | `CF-W1-SUB-01` | `cd backend` then `npm.cmd test -- subscription-billing.service.test.ts subscription-billing.routes.test.ts --runInBand` | Option A QA refresh prepared; blocked until Team 09 backend-only reservations and implementation handoff. |
+| `CF-W1-HCTX-01` | `cd backend` then `npm.cmd test -- historical-context-snapshots.service.test.ts historical-context-snapshots.routes.test.ts --runInBand` | Backend-only QA plan prepared; blocked until Team 00 Ready promotion and implementation handoff. |
+| `CF-W1-CAL-01` | `cd backend` then `npm.cmd test -- signal-calibration-engine.service.test.ts signal-calibration-engine.routes.test.ts --runInBand` | Backend-only QA plan prepared; blocked until Team 00 Ready promotion and implementation handoff. |
+| `CF-W1-SQLAB-01` | `cd backend` then `npm.cmd test -- signal-quality-lab.service.test.ts signal-quality-lab.routes.test.ts --runInBand` | Backend-only QA plan prepared; blocked until Team 00 Ready promotion and implementation handoff. |
 
 ## Safe Command Discipline
 
@@ -110,9 +127,13 @@ Provider-adjacent, startup-adjacent, frontend build, backend build, UI smoke, li
 - `CF-W1-MD-02`: blocked from executable validation because Option B is ADR direction only; formal ADR and source/schema/test work need separate approval.
 - `CF-W1-MD-01`: executable validation remains blocked until Team 00 promotes the narrowed validation-only implementation handoff.
 - `CF-W1-L3-ALERT-01`: child QA plan is refreshed; blocked until Team 00 Ready promotion, exact reservations, and implementation handoff.
+- `CF-W1-L3-ALERT-03`: child QA plan is prepared, but the packet is not QA-ready for Team 00 Ready evaluation until Team 00 sequences it behind `CF-W1-L3-ALERT-01` and away from `CF-W1-L3-AUTH-03`.
 - `CF-W1-L3-PORT-01A`: initial focused QA passed, but release acceptance is blocked by Team 10 review; Team 04 must rerun QA after Team 07 revision.
 - `CF-W1-TP-01B`: child QA plan is prepared; blocked until Team 00 Ready promotion and exact backend-only implementation handoff.
 - `CF-W1-NOTIF-02`: focused QA plan is prepared; blocked until Team 00/Team 09 Ready promotion and exact notification provider/test/doc reservation.
 - `CF-W1-UX-02 + CF-W1-UX-05A`: executable validation remains blocked until Team 00 promotes one combined Copilot-only implementation handoff.
 - `CF-W1-AUTH-01`: executable validation remains blocked until exact controller/test reservations and implementation handoff.
 - `CF-W1-SUB-01`: executable validation remains blocked until exact backend reservations and implementation handoff.
+- `CF-W1-HCTX-01`: executable validation remains blocked until Team 00 promotes the backend-only `historical-context-snapshots` handoff; frontend rendering remains explicitly out of scope for the first slice.
+- `CF-W1-CAL-01`: executable validation remains blocked until Team 00 promotes the backend-only `signal-calibration-engine` handoff; SQLAB and DQE source remain public-dependency only and must not widen the packet.
+- `CF-W1-SQLAB-01`: executable validation remains blocked until Team 00 promotes the backend-only `signal-quality-lab` handoff; DQE source/export changes remain out of scope for the first slice.

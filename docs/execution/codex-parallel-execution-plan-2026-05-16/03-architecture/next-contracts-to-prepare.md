@@ -4,6 +4,39 @@ Date: 2026-05-17
 
 Prepared by Team 03 Architecture Factory and refreshed after `CF-W1-L3-AUTH-02` commit `503bcd9`, `CF-W1-SIG-TRIGGER-01` commit `6ab3999`, and checkpoint protocol fix commit `f75808f`.
 
+## Team 03 Watchlist Review Actionability Prep - 2026-05-18
+
+Prepared:
+
+- `03-architecture/CF-W1-L3-WATCH-01-architecture-review.md`
+- `06-contracts/CF-W1-L3-WATCH-01-watchlist-review-actionability-contract.md`
+- `08-work-packets/CF-W1-L3-WATCH-01-work-packet.md`
+
+Result:
+
+- `CF-W1-L3-WATCH-01` is source-supported as a bounded watchlist-owned vertical slice.
+- The first slice can stay inside `watchlist-management` backend/frontend/docs/tests and derive review priority from existing signal, daily-move, note, and tag fields without Prisma/schema, route-registry, shared utility/UI, package, generated, provider/startup, live-provider, paid/cloud, telemetry, or broker scope.
+- Team 04 QA planning can start from the packet now.
+- Team 00 must keep this packet separate from `CF-W1-L3-PORT-01B`; both reserve the same watchlist backend writer set, but they are different contracts and should not be combined by default.
+- `CF-W1-L3-TREV-01` has no file overlap and is not a conflict.
+
+## Team 03 Alert Follow-Through Prep - 2026-05-18
+
+Prepared:
+
+- `03-architecture/CF-W1-L3-ALERT-03-architecture-review.md`
+- `06-contracts/CF-W1-L3-ALERT-03-alert-follow-through-traceability-contract.md`
+- `08-work-packets/CF-W1-L3-ALERT-03-work-packet.md`
+
+Result:
+
+- `CF-W1-L3-ALERT-03` is source-supported as a bounded backend-only `alerts-monitoring` packet.
+- The first slice can stay module-local by persisting `metadata.followThrough` on `AlertEvent` and projecting additive event DTO fields.
+- No Prisma/schema, route-registry, shared utility/UI, package, generated, provider/startup, live-provider, paid/cloud, telemetry, or broker scope is required for the first packet.
+- Team 04 QA planning can start from the packet now.
+- Team 00 must not promote this packet in parallel with `CF-W1-L3-ALERT-01` or `CF-W1-L3-AUTH-03` because the same `alerts-monitoring` service/types/doc/test surfaces are required.
+- `CF-W1-L3-TREV-01` has no file overlap and is not a conflict.
+
 ## Current Architecture Queue
 
 | Priority | Candidate | Architecture status | Implementation status | Notes |

@@ -4,6 +4,119 @@ Date: 2026-05-18
 
 Mode: focused QA rerun plus docs-only QA planning.
 
+## 2026-05-18 `CF-W1-L3-ALERT-03` Alert Follow-Through Traceability QA Planning
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only QA packet preparation
+- Work item: `CF-W1-L3-ALERT-03`
+- Files changed:
+  - `04-qa/CF-W1-L3-ALERT-03-qa-plan.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - `AGENTS.md`
+  - `10-requirements/CF-W1-L3-ALERT-03-alert-follow-through-traceability-requirement.md`
+  - `03-architecture/CF-W1-L3-ALERT-03-architecture-review.md`
+  - `06-contracts/CF-W1-L3-ALERT-03-alert-follow-through-traceability-contract.md`
+  - `08-work-packets/CF-W1-L3-ALERT-03-work-packet.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+  - `backend/package.json`
+  - `frontend/package.json`
+  - `backend/src/modules/alerts-monitoring/alerts-monitoring.md`
+  - `backend/tests/modules/alerts-monitoring/alerts-monitoring.service.test.ts`
+  - `backend/tests/modules/alerts-monitoring/alerts-monitoring.ownership.test.ts`
+  - `backend/tests/modules/alerts-monitoring/alerts-monitoring.routes.test.ts`
+  - `backend/tests/modules/alerts-monitoring/alerts-monitoring.validation.test.ts`
+- Result:
+  - Prepared a bounded backend-only QA plan for alert follow-through traceability in `04-qa/CF-W1-L3-ALERT-03-qa-plan.md`.
+  - Recorded acceptance scenarios for first-write, repeated-write, read-only, dismiss-only, mark-all-read, cross-user, deferred-with/without-due-date, and additive DTO compatibility behavior.
+  - Preserved the architecture rule that follow-through is separate from inbox-state semantics and must not be inferred from `readAt` or `dismissedAt`.
+  - Preserved the Team 03 blocker that this packet must not be promoted or implemented in parallel with active `CF-W1-L3-ALERT-01` or parked `CF-W1-L3-AUTH-03`.
+  - Updated `04-qa/next-validation-plans.md` so `CF-W1-L3-ALERT-03` is visible in the QA queue with explicit not-ready sequencing status.
+- Tests run: none
+- Tests skipped:
+  - all executable validation was skipped because this was a docs-only QA planning pass with no Team 00 sequencing, Ready promotion, or implementation handoff
+- QA-ready for Team 00 Ready evaluation:
+  - `CF-W1-L3-ALERT-03`: no; Team 04 does not consider it QA-ready until Team 00 sequences it after `CF-W1-L3-ALERT-01` and away from `CF-W1-L3-AUTH-03`
+- Remaining blockers:
+  - `CF-W1-L3-ALERT-01` is still the active alert-module writer set on the same `alerts-monitoring` core files and focused tests
+  - `CF-W1-L3-AUTH-03` remains a parked alert-module packet against the same service/types/doc/test surfaces
+  - executable QA remains blocked until Team 00 issues exact file reservations and a bounded implementation handoff after those conflicts clear
+- Next gate:
+  - Team 00 sequencing decision for `CF-W1-L3-ALERT-03` after the conflicting alert-module packets are cleared or explicitly deprioritized
+- Evidence notes:
+  - Team 04 used the active execution folder and current alerts-monitoring docs/test/script surface only; no application source, tests, package manifests, generated files, or historical docs folders were modified
+
+## 2026-05-18 `CF-W1-HCTX-01`, `CF-W1-CAL-01`, And `CF-W1-SQLAB-01` QA Planning
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only QA packet preparation
+- Work items:
+  - `CF-W1-HCTX-01`
+  - `CF-W1-CAL-01`
+  - `CF-W1-SQLAB-01`
+- Files changed:
+  - `04-qa/CF-W1-HCTX-01-qa-plan.md`
+  - `04-qa/CF-W1-CAL-01-qa-plan.md`
+  - `04-qa/CF-W1-SQLAB-01-qa-plan.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - `AGENTS.md`
+  - `10-requirements/CF-W1-HCTX-01-historical-context-explainability-requirement.md`
+  - `03-architecture/CF-W1-HCTX-01-architecture-review.md`
+  - `06-contracts/CF-W1-HCTX-01-historical-context-explainability-contract.md`
+  - `08-work-packets/CF-W1-HCTX-01-work-packet.md`
+  - `10-requirements/CF-W1-CAL-01-signal-calibration-reliability-drift-requirement.md`
+  - `03-architecture/CF-W1-CAL-01-architecture-review.md`
+  - `06-contracts/CF-W1-CAL-01-signal-calibration-reliability-drift-contract.md`
+  - `08-work-packets/CF-W1-CAL-01-work-packet.md`
+  - `10-requirements/CF-W1-SQLAB-01-signal-quality-outcome-confidence-requirement.md`
+  - `03-architecture/CF-W1-SQLAB-01-architecture-review.md`
+  - `06-contracts/CF-W1-SQLAB-01-signal-quality-outcome-confidence-contract.md`
+  - `08-work-packets/CF-W1-SQLAB-01-work-packet.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+  - `04-qa/TEAM-06-lane2-dq-fail-closed-qa-plan-2026-05-17.md`
+  - `17-team-outboxes/TEAM-03-outbox.md`
+  - `backend/package.json`
+  - `frontend/package.json`
+  - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.md`
+  - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md`
+  - `backend/src/modules/signal-quality-lab/signal-quality-lab.md`
+  - `backend/tests/modules/historical-context-snapshots/historical-context-snapshots.service.test.ts`
+  - `backend/tests/modules/historical-context-snapshots/historical-context-snapshots.routes.test.ts`
+  - `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.service.test.ts`
+  - `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.routes.test.ts`
+  - `backend/tests/modules/signal-quality-lab/signal-quality-lab.service.test.ts`
+  - `backend/tests/modules/signal-quality-lab/signal-quality-lab.routes.test.ts`
+- Result:
+  - Prepared a bounded backend-only QA plan for `CF-W1-HCTX-01` covering exact-date, nearest-prior, missing-within-lookback, metadata-gap, not-requested, and additive-compatibility scenarios.
+  - Prepared a bounded backend-only QA plan for `CF-W1-CAL-01` covering trusted, limited, diagnostic-only, unavailable-no-evidence, unavailable-blocking-DQ, and compatibility-without-score-rewrite scenarios.
+  - Prepared a bounded backend-only QA plan for `CF-W1-SQLAB-01` covering trusted, limited, diagnostic, untrusted-no-evidence, untrusted-DQ-lookup-failure, and additive summary/group compatibility scenarios.
+  - Updated `04-qa/next-validation-plans.md` so all three candidates are now recorded as QA-ready for Team 00 Ready evaluation without moving any item to Ready.
+  - Preserved the architecture boundary that all three packets remain service/types/doc/service-test scoped, with optional route-test assertions only if the future implementation chooses them.
+  - Preserved explicit stop conditions against Prisma, route, validation, controller, frontend, provider, package, generated, and cross-module source widening.
+- Tests run: none
+- Tests skipped:
+  - all executable validation was skipped because this was a docs-only QA planning pass with no Team 00 Ready promotion or implementation handoff
+- QA-ready for Team 00 Ready evaluation:
+  - `CF-W1-HCTX-01`: yes, as one backend-only `historical-context-snapshots` explainability slice
+  - `CF-W1-CAL-01`: yes, as one backend-only `signal-calibration-engine` trust-state slice
+  - `CF-W1-SQLAB-01`: yes, as one backend-only `signal-quality-lab` outcome-confidence slice
+- Remaining blockers:
+  - Team 00 has not yet promoted any of the three packets to Ready or issued an implementation handoff
+  - executable QA remains blocked until exact file reservations are activated by implementation
+  - `CF-W1-CAL-01` should align vocabulary with `CF-W1-SQLAB-01` if SQLAB lands first, but SQLAB is not a blocking prerequisite
+  - `CF-W1-HCTX-01` frontend rendering remains a separate future consumer packet and is not approved in the first slice
+- Next gate:
+  - Team 00 Ready evaluation for `CF-W1-HCTX-01`
+  - Team 00 Ready evaluation for `CF-W1-SQLAB-01`
+  - Team 00 sequencing decision on whether to promote `CF-W1-CAL-01` after or alongside SQLAB vocabulary alignment
+- Evidence notes:
+  - Team 04 used the active execution folder and current module/test surface only; no application source, tests, package manifests, generated files, or historical docs folders were modified
+
 ## 2026-05-18 `CF-W1-L3-TREV-01` Today Review Publication Evidence QA Planning
 
 - Team: `TEAM-04` - QA Factory

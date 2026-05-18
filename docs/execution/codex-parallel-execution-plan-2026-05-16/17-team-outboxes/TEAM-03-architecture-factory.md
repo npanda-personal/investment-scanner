@@ -2,6 +2,67 @@
 
 Date: 2026-05-17
 
+## Team 03 Watchlist Review Actionability Prep - 2026-05-18
+
+Assignment: prepare architecture readiness for `CF-W1-L3-WATCH-01` watchlist review actionability in the main worktree without touching application code, tests, package manifests, generated files, root `AGENTS.md`, `docs/AGENTS.md`, or historical `docs/codex-agent-team-plan/**`.
+
+Prepared:
+
+- `03-architecture/CF-W1-L3-WATCH-01-architecture-review.md`
+- `06-contracts/CF-W1-L3-WATCH-01-watchlist-review-actionability-contract.md`
+- `08-work-packets/CF-W1-L3-WATCH-01-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Files inspected:
+
+- `AGENTS.md`
+- `10-requirements/CF-W1-L3-WATCH-01-watchlist-review-actionability-requirement.md`
+- `10-requirements/requirements-backlog.md`
+- `10-requirements/refinement-queue.md`
+- `12-ready-queue/ready-for-implementation.md`
+- `03-architecture/module-ownership-map.md`
+- `00-control/active-work-board.md`
+- `99-decision-inbox/open-decisions.md`
+- `11-module-audits/audit-portfolio-watchlist-alerts.md`
+- `03-architecture/CF-W1-L3-PORT-01B-architecture-review.md`
+- `06-contracts/CF-W1-L3-PORT-01-portfolio-watchlist-readiness-dto-contract.md`
+- `08-work-packets/CF-W1-L3-PORT-01B-work-packet.md`
+- `backend/src/modules/watchlist-management/watchlist-management.md`
+- `backend/src/modules/watchlist-management/watchlist-management.service.ts`
+- `backend/src/modules/watchlist-management/watchlist-management.types.ts`
+- `backend/src/modules/watchlist-management/watchlist-management.validation.ts`
+- `backend/src/modules/watchlist-management/watchlist-management.repository.ts`
+- `backend/tests/modules/watchlist-management/watchlist-management.service.test.ts`
+- `backend/tests/modules/watchlist-management/watchlist-management.validation.test.ts`
+- `frontend/src/features/watchlist-management/types.ts`
+- `frontend/src/features/watchlist-management/api/watchlistManagementService.ts`
+- `frontend/src/features/watchlist-management/hooks/useWatchlistManagement.ts`
+- `frontend/src/features/watchlist-management/components/WatchlistManagementPage.tsx`
+- `frontend/src/features/watchlist-management/routes.tsx`
+- `frontend/tests/ui/today-trade-review.spec.ts`
+
+Readiness result:
+
+- `CF-W1-L3-WATCH-01` can stay module-local and bounded as a watchlist-owned vertical slice.
+- The first slice should add additive review-priority DTO fields plus additive `reviewPriorityDesc` sorting using existing watchlist enrichment fields only.
+- The packet is intentionally separate from `CF-W1-L3-PORT-01B`; readiness DTOs and review actionability are different contracts.
+- No Prisma/schema, route-registry, shared utility/UI, package, generated, provider/startup, live-provider, paid/cloud, telemetry, or broker scope is required.
+- Team 04 QA planning can start now.
+- The packet is not Ready for Implementation because Team 00 must sequence it against the parked `CF-W1-L3-PORT-01B` watchlist backend reservation set.
+- No Today Review file overlap exists.
+
+Current Team 03 recommendation to Team 00:
+
+1. Let Team 04 start QA planning for `CF-W1-L3-WATCH-01` now.
+2. Do not promote `CF-W1-L3-WATCH-01` in parallel with `CF-W1-L3-PORT-01B`; both need `watchlist-management.service.ts`, `watchlist-management.types.ts`, `watchlist-management.md`, and focused watchlist backend tests.
+3. Keep `CF-W1-L3-WATCH-01` separate from readiness DTO work so one Team 10 review can approve actionability behavior without mixing in Data Quality readiness semantics.
+
+No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
+
 ## Assignment
 
 Relaunch architecture prep after Product Owner resolved the three Decision Inbox items.
@@ -399,5 +460,67 @@ Refreshed:
 - `17-team-outboxes/TEAM-03-outbox.md`
 
 Readiness result: `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, and `CF-W1-MD-01` are no longer Product Owner decision-blocked, but none is Ready for Implementation. `CF-W1-AUTH-01` and `CF-W1-SUB-01` share subscription controller files; `CF-W1-UX-02` and `CF-W1-UX-05A` share Copilot files. Team 00 must combine or sequence those handoffs with one writer per file.
+
+No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
+
+## Team 03 Alert Follow-Through Traceability Prep - 2026-05-18
+
+Assignment: prepare architecture readiness for `CF-W1-L3-ALERT-03` alert follow-through traceability in the main worktree without touching application code, tests, package manifests, generated files, root `AGENTS.md`, or historical docs.
+
+Prepared:
+
+- `03-architecture/CF-W1-L3-ALERT-03-architecture-review.md`
+- `06-contracts/CF-W1-L3-ALERT-03-alert-follow-through-traceability-contract.md`
+- `08-work-packets/CF-W1-L3-ALERT-03-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Files inspected:
+
+- `AGENTS.md`
+- `10-requirements/CF-W1-L3-ALERT-03-alert-follow-through-traceability-requirement.md`
+- `10-requirements/requirements-backlog.md`
+- `10-requirements/refinement-queue.md`
+- `12-ready-queue/ready-for-implementation.md`
+- `03-architecture/module-ownership-map.md`
+- `00-control/active-work-board.md`
+- `99-decision-inbox/open-decisions.md`
+- `11-module-audits/audit-portfolio-watchlist-alerts.md`
+- `06-contracts/CF-W1-L3-ALERT-01-alert-readiness-suppression-contract.md`
+- `06-contracts/CF-W1-L3-AUTH-03-alert-rule-target-ownership-contract.md`
+- `07-decisions/DECISION-20260517-alert-event-ownership-model-resolution.md`
+- `backend/prisma/schema.prisma`
+- `backend/src/modules/alerts-monitoring/alerts-monitoring.md`
+- `backend/src/modules/alerts-monitoring/alerts-monitoring.types.ts`
+- `backend/src/modules/alerts-monitoring/alerts-monitoring.service.ts`
+- `backend/src/modules/alerts-monitoring/alerts-monitoring.repository.ts`
+- `backend/src/modules/alerts-monitoring/alerts-monitoring.controller.ts`
+- `backend/src/modules/notifications-delivery/notifications-delivery.md`
+- `backend/src/modules/notifications-delivery/notifications-delivery.service.ts`
+- `backend/src/modules/ai-investment-copilot/ai-investment-copilot.md`
+- `backend/src/modules/ai-investment-copilot/ai-investment-copilot.service.ts`
+- `backend/src/modules/portfolio-intelligence/portfolio-intelligence.md`
+- `backend/tests/modules/alerts-monitoring/alerts-monitoring.service.test.ts`
+- `backend/tests/modules/alerts-monitoring/alerts-monitoring.ownership.test.ts`
+- `frontend/src/features/alerts-monitoring/types.ts`
+- `frontend/src/features/alerts-monitoring/api/alertsMonitoringService.ts`
+- `frontend/src/features/alerts-monitoring/components/AlertsMonitoringPage.tsx`
+
+Readiness result:
+
+- `CF-W1-L3-ALERT-03` can stay module-local and bounded as a backend-only `alerts-monitoring` slice.
+- Existing `AlertEvent.metadata` JSON is sufficient for durable follow-through persistence; no Prisma/schema change is required.
+- The recommended first slice adds a dedicated module-local follow-through update action, keeps `readAt` and `dismissedAt` as inbox-only state, and projects additive `followThrough` DTO fields.
+- The packet is not Ready for Implementation because Team 04 QA planning is still missing and Team 00 must sequence the shared `alerts-monitoring` file set behind active `CF-W1-L3-ALERT-01` and parked `CF-W1-L3-AUTH-03`.
+- No Today Review file overlap exists.
+
+Current Team 03 recommendation to Team 00:
+
+1. Let Team 04 start QA planning for `CF-W1-L3-ALERT-03` now.
+2. Do not promote `CF-W1-L3-ALERT-03` while `CF-W1-L3-ALERT-01` is still the active alert-module writer.
+3. Sequence `CF-W1-L3-AUTH-03` and `CF-W1-L3-ALERT-03` explicitly; do not allow parallel writers on `alerts-monitoring.service.ts`, `alerts-monitoring.types.ts`, `alerts-monitoring.md`, or focused tests.
 
 No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
