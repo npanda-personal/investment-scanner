@@ -1225,3 +1225,26 @@ Date: 2026-05-18
 - Team 03 is ready for `CF-W1-BT-02` Architect Signoff after Team 10 accepts.
 - Team 04 is ready for `CF-W1-CAL-01` QA after Team 06 handoff.
 - Team 02 is ready for another persistent market-intelligence discovery cycle when relaunched.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 06 - Strategy / Signal / Risk | `019e3bf9-059e-75a0-8419-fa14b45dadbe` | `gpt-5.3-codex`, high | implementation | `CF-W1-CAL-01` | active |
+| 2 | Team 10 - Review / Release | `019e3bfd-d89f-7d70-bc39-141f5c1554e9` | `gpt-5.5`, high | review/release | `CF-W1-BT-02` after QA ACCEPT | active |
+| 3 | Open slot | none | pending | architect signoff | `CF-W1-BT-02` after Team 10 accepts | waiting |
+| 4 | Open slot | none | pending | QA verification | `CF-W1-CAL-01` after Team 06 handoff | waiting |
+| 5 | Open slot | none | pending | requirements discovery | next persistent Team 02 cycle | ready |
+| 6 | Open slot | none | pending | next architecture prep | next high-value item after Team 02 cycle | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03 is ready for `CF-W1-BT-02` Architect Signoff after Team 10 accepts.
+- Team 04 is ready for `CF-W1-CAL-01` QA after Team 06 handoff.
+- Team 02 is ready for another persistent market-intelligence discovery cycle when relaunched.
