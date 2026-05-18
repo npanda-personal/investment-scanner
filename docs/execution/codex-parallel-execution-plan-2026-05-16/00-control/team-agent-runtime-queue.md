@@ -475,3 +475,34 @@ Date: 2026-05-18
 - Team 05 is ready to implement `CF-W1-DQ-02A`.
 - Team 03 is ready to refresh `CF-W1-BT-02` packets.
 - Team 02 should relaunch after implementation agents are started.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Completed Since Previous Snapshot
+
+- Team 05 implemented `CF-W1-DQ-02A`; Team 04 QA accepted, Team 10 review accepted, Team 03 Architect Signoff accepted, and Team 00 delegated PO acceptance committed the feature branch as `c2d6753 feat: add dq currentness evidence`.
+- Team 06 implemented `CF-W1-STRAT-02A`; developer validation passed backend test/build and frontend UI/build. Team 04 QA is active on the Strategy Framework worktree.
+- Team 02 completed one docs-only PO/requirements discovery cycle, adding `CF-W1-UX-01` and refining `CF-W1-HCTX-01` and `CF-W1-MCTX-01`.
+
+## Current Active Subagent Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | `019e3b19-04d1-7bd3-b4c5-b75abd9732a4` | `gpt-5.3-codex`, high | QA verification | `CF-W1-STRAT-02A` | active |
+| 2 | Open slot | none | pending | review/release | `CF-W1-STRAT-02A` after QA ACCEPT | waiting |
+| 3 | Open slot | none | pending | Architect Signoff | `CF-W1-STRAT-02A` after Team 10 ACCEPT | waiting |
+| 4 | Open slot | none | pending | PO packet / commit | `CF-W1-STRAT-02A` after Architect Signoff | waiting |
+| 5 | Open slot | none | pending | PO + requirements discovery | next high-value requirement cycle | ready |
+| 6 | Open slot | none | pending | architecture / QA prep | `CF-W1-UX-01`, `CF-W1-HCTX-01`, or `CF-W1-MCTX-01` | ready |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 10 is ready to review `CF-W1-STRAT-02A` after Team 04 accepts QA.
+- Team 03 is ready for `CF-W1-STRAT-02A` Architect Signoff after Team 10 accepts.
+- Team 02 is ready to relaunch persistent PO/Requirements discovery after the main docs checkpoint commit.
+- Team 03 / Team 08 are ready for `CF-W1-UX-01` contract/source-mapping prep after Team 00 assigns it.
+- Team 03 / Team 04 are ready to prep `CF-W1-HCTX-01` and `CF-W1-MCTX-01` after the current STRAT QA/review lane advances.

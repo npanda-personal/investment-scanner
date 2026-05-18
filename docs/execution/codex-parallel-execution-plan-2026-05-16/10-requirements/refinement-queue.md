@@ -8,7 +8,7 @@ Team 00 promoted `CF-W1-L3-PORT-01A` to Ready on 2026-05-18. It is no longer a r
 
 The current Ready-promotion front-runners after the PORT-01A rework routing are `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01`.
 
-Filtered for the actively routed/recent items excluded from this cycle, the next unassigned route is `CF-W1-L3-INTEL-03`.
+This non-active discovery cycle is focused on `CF-W1-UX-01`, `CF-W1-HCTX-01`, and `CF-W1-MCTX-01`, with `CF-W1-CAL-01` held as the next follow-on once the first three are packeted.
 
 ## New Audit-Derived Requirements
 
@@ -28,6 +28,17 @@ These are the newest high-value discovery items from read-only module audits. No
 | 10 | CF-W1-L3-WATCH-01 | Product refinement and bounded architecture contract for explainable watchlist review priority and reason summaries. |
 | 11 | CF-W1-L3-INTEL-03 | Product refinement and bounded architecture contract for explainable concentration and exposure review over existing portfolio detail surfaces. |
 | 12 | CF-W1-L3-INTEL-02 | Product refinement and architecture contract for explainable portfolio intelligence review output. |
+
+## Current Cycle Non-Active Value Order
+
+These are docs-only discovery priorities. They do not override Team 00's current Ready-promotion queue.
+
+| Rank | ID | Why now | Next refinement need |
+| --- | --- | --- | --- |
+| 1 | CF-W1-UX-01 | Research Workbench is already user-facing and still lacks readiness blockers, scope proof, latest trusted date, and downstream widget eligibility. | Team 03/08 contract prep and QA planning. |
+| 2 | CF-W1-HCTX-01 | Historical lookup provenance is still too thin for post-event learning and calibration trust. | Architecture contract and QA plan. |
+| 3 | CF-W1-MCTX-01 | Market regime labels still compress too much evidence into one chip/score. | Architecture contract and QA plan. |
+| 4 | CF-W1-CAL-01 | Calibration trust drift is still important, but it should follow clearer upstream context evidence. | Architecture contract and QA plan after HCTX/MCTX prep. |
 
 ## Decision Inbox State
 
@@ -77,6 +88,7 @@ The former Decision Inbox items moved to refinement / Ready-evaluation prep:
 | CF-W1-CAL-01 | Audit-derived requirement draft | Product refinement drafted | QA plan needed | Future signal-calibration-engine backend child only after Team 00/03 reservation | DQ-as-penalty behavior and missing hard gates remain explicit | Keep future-child prep; not Ready |
 | CF-W1-HCTX-01 | Audit-derived requirement draft | Product refinement drafted | QA plan needed | Future historical-context-snapshots backend child only after Team 00/03 reservation | Selected-snapshot provenance and gap explanation remain explicit | Keep future-child prep; not Ready |
 | CF-W1-MCTX-01 | Audit-derived requirement draft | Product refinement drafted | QA plan needed | Future market-context-intelligence backend child only after Team 00/03 reservation | Regime evidence and partial-context explanation remain explicit | Keep future-child prep; not Ready |
+| CF-W1-UX-01 | Audit-derived requirement draft | Product refinement drafted | QA plan needed | Future stock-research-workbench backend/frontend child only after Team 00/03/08 reservation | Workbench trust, scope proof, blocker reasons, and downstream eligibility remain explicit | Keep future-child prep; not Ready |
 | CF-W1-SQLAB-01 | Audit-derived requirement draft; future Signal Quality Lab child remains outside Ready until a Team 00/03 reservation and contract are prepared. |
 | CF-W1-TP-01B | Backend-only child contract, Team 03 reservation matrix, backend reservations, Team 06 inspection, and QA plan prepared; needs Team 00 Ready evaluation. |
 | CF-W1-NOTIF-02 | Requirement, architecture, contract, work packet, Team 03 reservation matrix, and platform QA plan prepared; needs Team 00/Team 09 Ready evaluation. |
@@ -104,6 +116,7 @@ The former Decision Inbox items moved to refinement / Ready-evaluation prep:
 | CF-W1-CAL-01 | QA plan needed; executable validation blocked until Team 00/03 reservation and implementation handoff. |
 | CF-W1-HCTX-01 | QA plan needed; executable validation blocked until Team 00/03 reservation and implementation handoff. |
 | CF-W1-MCTX-01 | QA plan needed; executable validation blocked until Team 00/03 reservation and implementation handoff. |
+| CF-W1-UX-01 | QA plan needed; executable validation blocked until Team 00/03/08 reservation, exact implementation handoff, and approved UI scope exist. |
 | CF-W1-SQLAB-01 | QA plan needed; executable validation blocked until Team 00/03 reservation and implementation handoff. |
 | CF-W1-TP-01B | Child QA plan prepared; executable validation blocked until Team 00 Ready promotion and implementation handoff. |
 | CF-W1-MD-02 | ADR direction accepted; no executable validation until future source/schema implementation is approved. |
@@ -146,6 +159,7 @@ These items are not implementation-ready.
 | CF-W1-CAL-01 | Signal Calibration trust-state contract and QA plan. | Team 00 / Team 03 |
 | CF-W1-HCTX-01 | Historical Context explainability contract and QA plan. | Team 00 / Team 03 |
 | CF-W1-MCTX-01 | Market Context regime-evidence contract and QA plan. | Team 00 / Team 03 |
+| CF-W1-UX-01 | Stock Research Workbench trust-surface contract and QA plan. | Team 00 / Team 03 / Team 08 |
 | CF-W1-SQLAB-01 | Signal Quality outcome-confidence contract and QA plan. | Team 00 / Team 03 |
 | CF-W1-L3-ALERT-03 | Alert follow-through contract and QA plan. | Team 00 / Team 03 |
 | CF-W1-L3-WATCH-01 | Watchlist review-actionability contract and QA plan. | Team 00 / Team 03 |

@@ -2,11 +2,22 @@
 
 Date: 2026-05-18
 
-Status: Refreshed by Team 02 after Team 03/04 post-decision readiness refresh evidence and after Team 00 promoted `CF-W1-L3-PORT-01A`. This is a top-candidate list, not proof of implementation readiness. The current Ready-promotion front-runners after the PORT-01A rework routing are `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01`. Filtered for the actively routed/recent items excluded from this cycle, the next unassigned route for Team 00 is `CF-W1-L3-INTEL-03`. See `12-ready-queue/ready-for-implementation.md` for actual implementation-ready items.
+Status: Refreshed by Team 02 after Team 03/04 post-decision readiness refresh evidence and after Team 00 promoted `CF-W1-L3-PORT-01A`. This is a top-candidate list, not proof of implementation readiness. The current Ready-promotion front-runners after the PORT-01A rework routing are `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01`. This non-active discovery cycle is focused on `CF-W1-UX-01`, `CF-W1-HCTX-01`, and `CF-W1-MCTX-01`, with `CF-W1-CAL-01` next after those three are packeted. See `12-ready-queue/ready-for-implementation.md` for actual implementation-ready items.
+
+## Current Cycle Non-Active Value Focus
+
+These are docs-only backlog priorities. They are not Ready-evaluation results.
+
+| Rank | ID | Why now | Next gate |
+| --- | --- | --- | --- |
+| 1 | CF-W1-UX-01 | Research Workbench already exposes signal and strategy context but still lacks bounded trust and eligibility framing. | Team 00/03/08 contract and QA prep. |
+| 2 | CF-W1-HCTX-01 | Historical lookup provenance is the clearest post-event learning gap. | Team 00/03 contract and QA prep. |
+| 3 | CF-W1-MCTX-01 | Regime labels still need fuller evidence and partial-context framing. | Team 00/03 contract and QA prep. |
+| 4 | CF-W1-CAL-01 | Calibration trust drift should follow clearer upstream context evidence. | Team 00/03 contract and QA prep. |
 
 ## Current Top Candidates
 
-There are eleven active top/refinement candidates after removing completed bounded slices and the promoted `CF-W1-L3-PORT-01A` implementation handoff from active pull.
+There are eleven active top/refinement candidates in the current pull order after removing completed bounded slices and the promoted `CF-W1-L3-PORT-01A` implementation handoff from active pull. `CF-W1-UX-01` is tracked separately as the current docs-only non-active trust-surface priority.
 
 | Rank | ID | Candidate | Severity | Current readiness | Reason |
 | --- | --- | --- | --- | --- | --- |
@@ -28,18 +39,19 @@ These are not app-code ready. No item is blocked by an open Decision Inbox item,
 
 | Rank | ID | Prep gate |
 | --- | --- | --- |
-| 1 | CF-W1-DQ-02 | Team 00/03 reservation and QA plan for prepared market-session-aware currentness packet. |
-| 2 | CF-W1-STRAT-02 | Team 00/03 reservation and QA plan for prepared Strategy Framework rule-versioning and DQ-gate packet. |
-| 3 | CF-W1-SQLAB-02 | Team 00/03 reservation and QA plan for prepared signal outcome journal packet. |
-| 4 | CF-W1-BT-02 | Team 00/03 reservation and QA plan for prepared backtesting review-disposition packet. |
-| 5 | CF-W1-L3-ALERT-03 | Team 00/03 reservation and QA plan for prepared alert follow-through packet. |
-| 6 | CF-W1-L3-INTEL-03 | Team 00/03 reservation and QA plan for prepared portfolio concentration-review packet over existing portfolio detail surfaces. |
-| 7 | CF-W1-L3-WATCH-01 | Team 00/03 reservation and QA plan for prepared watchlist review-actionability packet. |
-| 8 | CF-W1-CAL-01 | Team 00/03 reservation and QA plan for prepared Signal Calibration reliability packet. |
-| 9 | CF-W1-HCTX-01 | Team 00/03 reservation and QA plan for prepared Historical Context explainability packet. |
-| 10 | CF-W1-MCTX-01 | Team 00/03 reservation and QA plan for prepared Market Context regime-evidence packet. |
-| 11 | CF-W1-TP-01B | Team 00 Ready evaluation. |
-| 12 | CF-W1-NOTIF-02 | Team 00/Team 09 Ready evaluation and exact implementation handoff. |
+| 1 | CF-W1-UX-01 | Team 00/03/08 reservation and QA plan for a bounded Stock Research Workbench trust-surface child. |
+| 2 | CF-W1-DQ-02 | Team 00/03 reservation and QA plan for prepared market-session-aware currentness packet. |
+| 3 | CF-W1-STRAT-02 | Team 00/03 reservation and QA plan for prepared Strategy Framework rule-versioning and DQ-gate packet. |
+| 4 | CF-W1-SQLAB-02 | Team 00/03 reservation and QA plan for prepared signal outcome journal packet. |
+| 5 | CF-W1-BT-02 | Team 00/03 reservation and QA plan for prepared backtesting review-disposition packet. |
+| 6 | CF-W1-L3-ALERT-03 | Team 00/03 reservation and QA plan for prepared alert follow-through packet. |
+| 7 | CF-W1-L3-INTEL-03 | Team 00/03 reservation and QA plan for prepared portfolio concentration-review packet over existing portfolio detail surfaces. |
+| 8 | CF-W1-L3-WATCH-01 | Team 00/03 reservation and QA plan for prepared watchlist review-actionability packet. |
+| 9 | CF-W1-CAL-01 | Team 00/03 reservation and QA plan for prepared Signal Calibration reliability packet. |
+| 10 | CF-W1-HCTX-01 | Team 00/03 reservation and QA plan for prepared Historical Context explainability packet. |
+| 11 | CF-W1-MCTX-01 | Team 00/03 reservation and QA plan for prepared Market Context regime-evidence packet. |
+| 12 | CF-W1-TP-01B | Team 00 Ready evaluation. |
+| 13 | CF-W1-NOTIF-02 | Team 00/Team 09 Ready evaluation and exact implementation handoff. |
 
 ## Implementation-Ready Result
 
@@ -47,7 +59,7 @@ These are not app-code ready. No item is blocked by an open Decision Inbox item,
 
 The nearest remaining child candidates are `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-L3-ALERT-01`, and `CF-W1-L3-AUTH-03`; each still needs Team 00 Ready promotion and exact implementation handoff. Team 00 still owns any future Ready queue update. Team 03's 2026-05-18 near-ready file-reservation matrix is supporting evidence only, not a Ready promotion for the remaining items.
 
-After excluding `CF-W1-SQLAB-01`, `CF-W1-SQLAB-02A`, `CF-W1-STRAT-02A`, `CF-W1-BT-02`, `CF-W1-DQ-02`, and `CF-W1-L3-WATCH-01`, the next Team 00 route target is `CF-W1-L3-INTEL-03`.
+For this docs-only non-active discovery cycle, the next Team 00 refinement route should be `CF-W1-UX-01`. The near-ready implementation queue remains unchanged.
 
 The resolved decisions and prepared child contracts/QA plans are planning inputs only. They do not satisfy Ready criteria by themselves.
 

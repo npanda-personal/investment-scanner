@@ -12,17 +12,24 @@ Historical context snapshots are the evidence layer behind regime review, calibr
 
 ## Evidence
 
-- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.md` documents nearest-date lookup, `dataStatus`, and `gaps[]`, but the review surface still relies on raw fields rather than an explicit provenance story.
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.types.ts` shows `SnapshotLookupResult` currently exposes only `market`, `sector`, `country`, `smartMoney`, `dataQuality`, `dataStatus`, and `gaps`.
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.service.ts` performs nearest-snapshot lookup but does not return additive provenance such as requested date, selected snapshot date, lag days, lookback used, or per-slice evidence source.
 - The same module depends on `market-context-intelligence` and `smart-money-intelligence`, so missing or stale upstream context can be hidden unless surfaced clearly.
 - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md` depends on historical context snapshots for regime and adjustment evidence, making lookup provenance directly relevant to downstream trust.
-- The frontend snapshot page currently shows chips and gaps, but does not yet force a clear explanation of selected-date lag, persisted-vs-missing evidence, or what a partial lookup means for downstream research.
+- `frontend/src/features/historical-context-snapshots/components/HistoricalContextSnapshotsPage.tsx` shows chips, basic snapshot strings, and `gaps[]`, but not a clear explanation of selected-date lag, persisted-vs-missing evidence, or what a partial lookup means for downstream research.
+
+## Dependencies
+
+- Market Context and Smart Money persisted snapshot reads must remain bounded and explainable.
+- Any new lookup provenance must stay additive and must not break current downstream consumers such as Signal Calibration.
+- Future currentness policy work from Data Quality should be referenced, not duplicated, when historical evidence is stale or absent.
 
 ## Acceptance Criteria
 
-- Historical context lookup output explains which nearest snapshot was selected and why.
-- The response or review surface exposes lookup lag, scope, and explicit gap reasons for missing market, sector, country, smart-money, or data-quality context.
+- Historical context lookup output explains which nearest snapshot was selected for each requested slice and why.
+- The response or review surface exposes requested date, selected snapshot date, lag days, lookback window, scope, and explicit gap reasons for missing market, sector, country, smart-money, or data-quality context.
 - Partial lookups are visibly diagnostic, not silently complete.
-- Downstream consumers can tell when context is persisted evidence versus a missing or metadata-gap fallback.
+- Downstream consumers can tell when context is persisted evidence versus a missing, metadata-gap, or out-of-lookback fallback.
 - Focused tests cover complete, partial, missing, and metadata-gap lookup cases.
 
 ## Non-Goals

@@ -2,11 +2,22 @@
 
 Date: 2026-05-18
 
-Prepared by Team 02 Requirement Factory in daemon scheduler mode after prior bounded decision items were resolved, after the 2026-05-17 Product Owner resolutions for Lane 3 readiness, Trade Plan no-target/DQ hard-block behavior, and Market Data durable readiness ADR direction, and after Team 03/04 post-decision child prep. Refreshed by Team 02 on 2026-05-18 after Team 00 promoted `CF-W1-L3-PORT-01A`, routed the PORT-01A rework back through Team 07, and Team 03/04 prepared post-decision contracts, work packets, and QA refreshes. The current Ready-promotion front-runners are `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01`. Filtered for the actively routed/recent items excluded from this cycle, the next unassigned upstream route for Team 00 is `CF-W1-L3-INTEL-03`.
+Prepared by Team 02 Requirement Factory in daemon scheduler mode after prior bounded decision items were resolved, after the 2026-05-17 Product Owner resolutions for Lane 3 readiness, Trade Plan no-target/DQ hard-block behavior, and Market Data durable readiness ADR direction, and after Team 03/04 post-decision child prep. Refreshed by Team 02 on 2026-05-18 after Team 00 promoted `CF-W1-L3-PORT-01A`, routed the PORT-01A rework back through Team 07, and Team 03/04 prepared post-decision contracts, work packets, and QA refreshes. The current Ready-promotion front-runners are `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01`. This non-active discovery cycle is focused on `CF-W1-UX-01`, `CF-W1-HCTX-01`, and `CF-W1-MCTX-01`, with `CF-W1-CAL-01` next after those three are packeted.
+
+## Current Cycle Non-Active Value Focus
+
+These are docs-only refinement priorities for direct user trust, monitoring, and post-event learning. They do not change Team 00's current near-ready implementation queue.
+
+| Rank | ID | Next gate | Notes |
+| --- | --- | --- | --- |
+| 1 | CF-W1-UX-01 | Team 00/03/08 reservation and QA plan | Workbench trust is the most direct user-facing gap because the page already combines price context with signal and strategy widgets. |
+| 2 | CF-W1-HCTX-01 | Team 00/Team 03 reservation and QA plan | Historical lookup provenance is the clearest post-event learning gap in the current code. |
+| 3 | CF-W1-MCTX-01 | Team 00/Team 03 reservation and QA plan | Regime evidence still compresses partial context into one label and score. |
+| 4 | CF-W1-CAL-01 | Team 00/Team 03 reservation and QA plan | Calibration trust-state drift should follow clearer historical and market-context evidence. |
 
 ## Current Top Candidates
 
-There are twelve active refinement candidates after removing completed bounded slices and the promoted `CF-W1-L3-PORT-01A` implementation handoff from the pull path.
+There are twelve active refinement candidates in the current pull order after removing completed bounded slices and the promoted `CF-W1-L3-PORT-01A` implementation handoff from the pull path. `CF-W1-UX-01` is being tracked as the current docs-only non-active trust-surface priority outside the near-ready pull order.
 
 The top three Ready-promotion candidates are `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01`.
 
@@ -55,18 +66,19 @@ These items are not app-code ready. Some are ready-evaluation candidates; policy
 
 | Rank | ID | Prep gate | Guardrail |
 | --- | --- | --- | --- |
-| 1 | CF-W1-BT-02 | Team 00/Team 03 reservation and QA plan | No backtesting source changes until Team 00/Team 03 prep exists. |
-| 2 | CF-W1-STRAT-02 | Team 00/Team 03 reservation and QA plan | No Strategy Framework source changes until Team 00/Team 03 prep exists. |
-| 3 | CF-W1-L3-ALERT-03 | Team 00/Team 03 reservation and QA plan | No alert follow-through source changes until Team 00/Team 03 prep exists. |
-| 4 | CF-W1-CAL-01 | Team 00/Team 03 reservation and QA plan | No Signal Calibration source changes until Team 00/Team 03 prep exists. |
-| 5 | CF-W1-HCTX-01 | Team 00/Team 03 reservation and QA plan | No Historical Context source changes until Team 00/Team 03 prep exists. |
-| 6 | CF-W1-MCTX-01 | Team 00/Team 03 reservation and QA plan | No Market Context source changes until Team 00/Team 03 prep exists. |
-| 7 | CF-W1-SQLAB-02 | Parent signal-outcome journal; durable-storage child blocked. | No signal-outcome journal source changes until the durable-storage split is separately approved. |
-| 8 | CF-W1-TP-01B | Team 00 Ready evaluation | No Trade Plan source changes until Team 00 gates pass. |
-| 9 | CF-W1-NOTIF-02 | Team 00/Team 09 Ready evaluation | No notification source changes until promotion gates pass. |
-| 10 | CF-W1-L3-ALERT-01 | Team 00 Ready evaluation | No alerts source changes until Team 00 gates pass. |
-| 11 | CF-W1-L3-AUTH-03 | Team 00 Ready evaluation | No alerts source changes until Team 00 gates pass. |
-| 12 | CF-W1-MD-02 | Formal ADR and ADR QA checklist | No Prisma, schema, source, provider, startup, or test changes until separate implementation approval. |
+| 1 | CF-W1-UX-01 | Team 00/03/08 reservation and QA plan | No stock-research shared UI, route, or signal/strategy source changes until bounded feature-local prep exists. |
+| 2 | CF-W1-BT-02 | Team 00/Team 03 reservation and QA plan | No backtesting source changes until Team 00/Team 03 prep exists. |
+| 3 | CF-W1-STRAT-02 | Team 00/Team 03 reservation and QA plan | No Strategy Framework source changes until Team 00/Team 03 prep exists. |
+| 4 | CF-W1-L3-ALERT-03 | Team 00/Team 03 reservation and QA plan | No alert follow-through source changes until Team 00/Team 03 prep exists. |
+| 5 | CF-W1-CAL-01 | Team 00/Team 03 reservation and QA plan | No Signal Calibration source changes until Team 00/Team 03 prep exists. |
+| 6 | CF-W1-HCTX-01 | Team 00/Team 03 reservation and QA plan | No Historical Context source changes until Team 00/Team 03 prep exists. |
+| 7 | CF-W1-MCTX-01 | Team 00/Team 03 reservation and QA plan | No Market Context source changes until Team 00/Team 03 prep exists. |
+| 8 | CF-W1-SQLAB-02 | Parent signal-outcome journal; durable-storage child blocked. | No signal-outcome journal source changes until the durable-storage split is separately approved. |
+| 9 | CF-W1-TP-01B | Team 00 Ready evaluation | No Trade Plan source changes until Team 00 gates pass. |
+| 10 | CF-W1-NOTIF-02 | Team 00/Team 09 Ready evaluation | No notification source changes until promotion gates pass. |
+| 11 | CF-W1-L3-ALERT-01 | Team 00 Ready evaluation | No alerts source changes until Team 00 gates pass. |
+| 12 | CF-W1-L3-AUTH-03 | Team 00 Ready evaluation | No alerts source changes until Team 00 gates pass. |
+| 13 | CF-W1-MD-02 | Formal ADR and ADR QA checklist | No Prisma, schema, source, provider, startup, or test changes until separate implementation approval. |
 
 ## Completed Or Removed From Active Top 10
 
@@ -85,6 +97,6 @@ These items are not app-code ready. Some are ready-evaluation candidates; policy
 
 Do not pull application-code work except the Team 00-promoted `CF-W1-L3-PORT-01A` handoff until another current item has an accepted requirement, accepted child contract or architecture review, exact file reservation, QA plan, and no unresolved Product Owner, Architect, QA, shared-file, schema, provider, UI, or upstream blocker. The resolved decisions are policy inputs only; they do not satisfy Ready criteria by themselves. Team 00 remains the only owner for Ready queue updates.
 
-`CF-W1-SQLAB-02A` is the active no-schema Signal Quality Lab child in Team 04 QA planning. The filtered next unassigned route for Team 00 is `CF-W1-L3-INTEL-03`.
+`CF-W1-SQLAB-02A` is the active no-schema Signal Quality Lab child in Team 04 QA planning. For this docs-only non-active discovery cycle, the next refinement route should be `CF-W1-UX-01`; Team 00's current near-ready implementation queue remains unchanged.
 
 `CF-W1-L3-PORT-01` remains the parent portfolio/watchlist requirement and `CF-W1-L3-PORT-01B` remains the later watchlist child. `CF-W1-UX-05` is now tracked in the active ten as a sequenced Copilot-only child; shared `StatusBadge` work remains future.
