@@ -2,7 +2,7 @@
 
 Date: 2026-05-18
 
-Prepared by Team 04 QA Factory and refreshed after docs-only QA plans for `CF-W1-MD-01`, `CF-W1-L3-ALERT-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-HCTX-01`, `CF-W1-CAL-01`, `CF-W1-SQLAB-01`, `CF-W1-L3-ALERT-03`, `CF-W1-L3-WATCH-01`, `CF-W1-SQLAB-02A`, `CF-W1-STRAT-02A`, `CF-W1-BT-02`, `CF-W1-DQ-02A`, and `CF-W1-L3-INTEL-03`.
+Prepared by Team 04 QA Factory and refreshed after docs-only QA plans for `CF-W1-MD-01`, `CF-W1-L3-ALERT-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-HCTX-01`, `CF-W1-CAL-01`, `CF-W1-SQLAB-01`, `CF-W1-L3-ALERT-03`, `CF-W1-L3-WATCH-01`, `CF-W1-SQLAB-02A`, `CF-W1-STRAT-02A`, `CF-W1-BT-02`, `CF-W1-DQ-02A`, `CF-W1-L3-INTEL-03`, and `CF-W1-MCTX-01`.
 
 Refresh note: docs-only QA refresh. No tests, builds, services, providers, UI checks, or application source/test edits were run or modified during this refresh.
 
@@ -11,6 +11,8 @@ Latest refresh note: Team 04 refreshed the docs-only QA plan for `CF-W1-BT-02` o
 Latest DQ refresh note: Team 04 added the docs-only QA plan for `CF-W1-DQ-02A` on 2026-05-18. This records current completed-session, current finalization-pending, stale lag, missing latest price, session-evidence unavailable, provider-gap blocked, and fail-closed blocker/tier propagation assertions for a bounded backend-only `data-quality-engine` child. It does not approve executable QA, Market Data source edits, DQE repository/read-side widening, schema work, route work, frontend work, or provider/startup/live validation.
 
 Latest INTEL refresh note: Team 04 added the docs-only QA plan for `CF-W1-L3-INTEL-03` on 2026-05-18. This records deterministic concentration ranking, stable tie-breaks, portfolio-level versus holding-level concentration drivers, bounded reason summaries, research-support wording, feature-local concentration-review UI smoke expectations, and explicit reject conditions for optimizer/rebalance, `portfolio-management` source, schema, route, shared UI, or direct-advice expansion. It does not approve executable QA, route work, shared-file widening, or concurrent writer promotion with `CF-W1-L3-INTEL-01` or `CF-W1-L3-INTEL-02`.
+
+Latest MCTX refresh note: Team 04 added the docs-only QA plan for `CF-W1-MCTX-01` on 2026-05-18. This records persisted-versus-fresh provenance, exact live denominator preservation on fresh summaries, derived-denominator `PARTIAL` framing for persisted summaries, trustworthy/partial/low-evidence/missing-evidence coverage, Market Context page plus Market Regime widget evidence framing, and explicit reject conditions for schema/routes/repository/controller/router/validation/index, upstream source, shared-file, provider/live-data, or broad-UX widening. It does not approve executable QA, schema work, route work, or shared-file widening.
 
 Setup authorization note: standing branch/worktree/commit/push authorization changes execution mechanics only. It does not approve app-code work, tests, builds, Prisma commands, providers, Angel One, startup/backfill, UI smoke, live services, or Ready queue movement for any candidate below.
 
@@ -45,6 +47,7 @@ Policy-resolution refresh note: Product Owner resolved the remaining five Decisi
 16. `CF-W1-BT-02`: backtesting outcome review traceability QA plan recorded in `04-qa/CF-W1-BT-02-qa-plan.md`.
 17. `CF-W1-DQ-02A`: bounded Data Quality Engine currentness-evidence first-child QA plan recorded in `04-qa/CF-W1-DQ-02A-qa-plan.md`.
 18. `CF-W1-L3-INTEL-03`: Portfolio Intelligence concentration-review QA plan recorded in `04-qa/CF-W1-L3-INTEL-03-qa-plan.md`.
+19. `CF-W1-MCTX-01`: Market Context regime-evidence and partial-context framing QA plan recorded in `04-qa/CF-W1-MCTX-01-qa-plan.md`.
 
 ## Post-Decision Scenario Matrix Prepared
 
@@ -64,6 +67,7 @@ Matrix file: `04-qa/post-decision-child-scenario-matrix-2026-05-17.md`.
 - `CF-W1-SQLAB-02A`: no-schema derived journal-preview QA plan recorded in `04-qa/CF-W1-SQLAB-02A-qa-plan.md`.
 - `CF-W1-STRAT-02A`: no-schema Strategy Framework rule metadata and DQ gate exposure QA plan recorded in `04-qa/CF-W1-STRAT-02A-qa-plan.md`.
 - `CF-W1-DQ-02A`: bounded Data Quality Engine currentness-evidence first-child QA plan recorded in `04-qa/CF-W1-DQ-02A-qa-plan.md`.
+- `CF-W1-MCTX-01`: Market Context regime-evidence and partial-context framing QA plan recorded in `04-qa/CF-W1-MCTX-01-qa-plan.md`.
 
 These child plans are not executable validation approval. Source/test execution still requires Team 00 Ready promotion, exact file reservations, and implementation handoff.
 
@@ -93,6 +97,7 @@ These child plans are not executable validation approval. Source/test execution 
 | `CF-W1-BT-02` | Child QA plan prepared; QA-ready for Team 00 Ready evaluation | Team 03 prepared a bounded no-schema `backtesting-strategy-lab` review-traceability packet; Team 04 aligned trusted/partial/diagnostic-only/legacy-repaired/withheld outcome scenarios, explicit diagnostic-only reason coverage, list/detail label-and-summary normalization, supporting-evidence regression checks, and feature-local review-evidence UI smoke to the reserved backend service/types/doc/test plus feature-local types/page/UI spec files. | Team 00 Ready evaluation for the bounded `CF-W1-BT-02` child only, while keeping schema, route, shared UI, simulation math, benchmark math, Strategy Framework source, and Trade Plan Risk source widening out of scope. |
 | `CF-W1-DQ-02A` | Child QA plan prepared; QA-ready for Team 00 Ready evaluation | Team 03 split `CF-W1-DQ-02` into a bounded service-local currentness child and a blocked broader parent; Team 04 aligned current completed-session, current finalization-pending, stale lag, missing latest price, session-evidence unavailable, provider-gap blocked, and fail-closed blocker/tier propagation scenarios to the reserved `data-quality-engine` service/types/doc/test files only. | Team 00 Ready evaluation for the bounded backend-only `CF-W1-DQ-02A` child only, while keeping Market Data source edits, DQE repository/read-side widening, schema work, routes, frontend, and durable parent exposure out of scope. |
 | `CF-W1-L3-INTEL-03` | Child QA plan prepared; QA-ready for Team 00 Ready evaluation only with explicit one-writer sequencing | Team 03 prepared a bounded `portfolio-intelligence` concentration-review packet; Team 04 aligned deterministic holding/sector/country ranking, stable tie-breaks, portfolio-level versus holding-level explanation, bounded reason-summary wording, feature-local concentration-review UI smoke expectations, and explicit stop conditions against optimizer/rebalance, `portfolio-management` source, schema, route, or shared-file widening. | Team 00 sequencing decision against `CF-W1-L3-INTEL-01` and `CF-W1-L3-INTEL-02`, then Ready evaluation for the bounded `CF-W1-L3-INTEL-03` child only. |
+| `CF-W1-MCTX-01` | Child QA plan prepared; QA-ready for Team 00 Ready evaluation | Team 03 prepared a bounded `market-context-intelligence` regime-evidence packet; Team 04 aligned persisted-versus-fresh provenance, fresh live denominator preservation, derived-denominator `PARTIAL` framing for persisted summaries, trustworthy/partial/low-evidence/missing-evidence coverage, and feature-local page/widget evidence framing to the reserved `market-context-intelligence` service/types/doc/test plus feature-local types/page/widget/UI spec files only. | Team 00 Ready evaluation for the bounded `CF-W1-MCTX-01` child only, while keeping schema, routes, repository/controller/router/validation/index, upstream module source, shared UI/utilities, provider/live-data, and broad UX widening out of scope. |
 
 ## Remaining Next QA Plans
 
@@ -152,6 +157,10 @@ Commands below are guidance only. They were not run during this documentation-on
 | `CF-W1-L3-INTEL-03` | `cd frontend` then `npm.cmd run test:ui -- portfolio-intelligence.spec.ts --workers=1` | Approval-gated only after the bounded UI implementation adds a feature-local `portfolio-intelligence` spec, Team 00 validation approval, one-worker Playwright scheduling, and a local startup/resource plan. |
 | `CF-W1-L3-INTEL-03` | `cd backend` then `npm.cmd run build` | Approval-gated only after accepted implementation, Team 00 validation approval, and memory/resource check. |
 | `CF-W1-L3-INTEL-03` | `cd frontend` then `npm.cmd run build` | Approval-gated only if the reserved implementation changes `frontend/src/features/portfolio-intelligence/types.ts` or `components/PortfolioIntelligencePanel.tsx`, after Team 00 validation approval and memory/resource check. |
+| `CF-W1-MCTX-01` | `cd backend` then `npm.cmd test -- market-context-intelligence.service.test.ts --runInBand` | Child QA plan prepared; blocked until Team 00 promotes the bounded `market-context-intelligence` implementation handoff. |
+| `CF-W1-MCTX-01` | `cd frontend` then `npm.cmd run test:ui -- market-context-intelligence.spec.ts --workers=1` | Approval-gated only after the bounded UI implementation updates the feature-local Market Context spec, Team 00 validation approval, one-worker Playwright scheduling, and a local startup/resource plan. |
+| `CF-W1-MCTX-01` | `cd backend` then `npm.cmd run build` | Approval-gated only after accepted implementation, Team 00 validation approval, and memory/resource check. |
+| `CF-W1-MCTX-01` | `cd frontend` then `npm.cmd run build` | Approval-gated only if the reserved implementation changes `frontend/src/features/market-context-intelligence/types.ts`, `components/MarketContextPage.tsx`, or `components/MarketRegimeWidget.tsx`, after Team 00 validation approval and memory/resource check. |
 
 ## Safe Command Discipline
 
@@ -184,3 +193,4 @@ Provider-adjacent, startup-adjacent, frontend build, backend build, UI smoke, li
 - `CF-W1-BT-02`: child QA plan is prepared and QA-ready for Team 00 Ready evaluation, but executable validation remains blocked until Team 00 promotes the bounded no-schema `backtesting-strategy-lab` handoff; forbidden-file touches and any simulation-math, benchmark-math, route-contract, shared-UI, Strategy Framework source, Trade Plan Risk source, or other cross-module source changes remain explicit reject conditions.
 - `CF-W1-DQ-02A`: child QA plan is prepared and QA-ready for Team 00 Ready evaluation, but executable validation remains blocked until Team 00 promotes the bounded backend-only `data-quality-engine` handoff; any Market Data Foundation source edit, DQE repository/controller/router/validation/index edit, schema/generated/route/shared/package/frontend change, or provider/startup/live-flow widening remains an explicit reject condition.
 - `CF-W1-L3-INTEL-03`: child QA plan is prepared and QA-ready for Team 00 Ready evaluation only with explicit one-writer sequencing against `CF-W1-L3-INTEL-01` and `CF-W1-L3-INTEL-02`; executable validation remains blocked until Team 00 promotes the bounded `portfolio-intelligence` handoff, reserves the exact shared backend writer set, and either adds a feature-local `frontend/tests/ui/portfolio-intelligence.spec.ts` or records the UI-smoke blocker explicitly.
+- `CF-W1-MCTX-01`: child QA plan is prepared and QA-ready for Team 00 Ready evaluation, but executable validation remains blocked until Team 00 promotes the bounded `market-context-intelligence` handoff; any schema, route, repository/controller/router/validation/index, upstream module source, shared utility/UI, package/generated, provider/live-data, or broad-UX widening remains an explicit reject condition.

@@ -972,3 +972,37 @@ Already active:
 ## Next Coordination Action
 
 Consume whichever active agent completes first, then route the next gate. Do not ask Product Owner unless a true consent blocker appears.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
+## BT-02 QA Rejection Routed
+
+Team 04 reran `CF-W1-BT-02` QA after dependency-junction unblock and rejected the slice on executable behavior:
+
+- backend trusted-review scenario returned `DIAGNOSTIC_ONLY` instead of `TRUSTED_REVIEW`;
+- frontend legacy-invalid smoke did not render the required `Review Disposition` evidence.
+
+This is routine bounded rework inside the existing Team 06 reservation. No Product Owner decision is required.
+
+## Current Pool
+
+- Team 06 bounded rework for `CF-W1-BT-02`: ready to spawn.
+- Team 10 review: active on `CF-W1-HCTX-01`.
+- Team 04 QA planning: active on `CF-W1-MCTX-01`.
+- Team 02 requirements discovery: active on market-intelligence requirements.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06 is ready for `CF-W1-BT-02` rework now.
+- Team 04 is ready for `CF-W1-BT-02` QA rerun after Team 06 rework.
+- Team 10 waits for `CF-W1-BT-02` until QA passes.
+- Team 03 is ready for `CF-W1-CAL-01` architecture prep when a slot opens.
+- Team 10 remains active on `CF-W1-HCTX-01` review.
+
+## Next Coordination Action
+
+Spawn Team 06 for bounded `CF-W1-BT-02` rework.

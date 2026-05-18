@@ -851,11 +851,11 @@ Date: 2026-05-18
 
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Team 04 - QA Factory | `019e3bcf-03ae-7583-8feb-6869b40b6b54` | `gpt-5.4`, high | QA rerun after dependency junction | `CF-W1-BT-02` in Team 06 worktree | active |
+| 1 | Team 06 - Strategy / Signal / Risk | pending spawn | `gpt-5.3-codex`, high | bounded QA rework | `CF-W1-BT-02` trusted disposition and UI evidence | ready |
 | 2 | Team 10 - Review / Release | `019e3bd1-b1ab-7dc0-ba1e-5bfcfe7eaf02` | `gpt-5.5`, high | review/release | `CF-W1-HCTX-01` in Team 05 worktree | active |
 | 3 | Team 04 - QA Factory | `019e3bd1-f31d-7e92-a6e3-f88780ca2b59` | `gpt-5.4`, high | QA planning | `CF-W1-MCTX-01` | active |
 | 4 | Team 02 - PO + Requirement Factory | `019e3bd2-303d-78a3-9948-894bf4d6494f` | `gpt-5.4-mini`, medium | persistent market-intelligence discovery | next high-value requirement cycle | active |
-| 5 | Open slot | none | pending | review/release | `CF-W1-BT-02` after QA accepts | waiting |
+| 5 | Open slot | none | pending | QA rerun | `CF-W1-BT-02` after Team 06 rework | waiting |
 | 6 | Open slot | none | pending | architecture prep | `CF-W1-CAL-01`, then `CF-W1-DQ-02` follow-up | ready |
 
 ## Completed Since Previous Snapshot
@@ -866,7 +866,8 @@ Date: 2026-05-18
 ## Teams Ready To Pick Up New Tasks
 
 - Team 10 is active on `CF-W1-HCTX-01` review.
-- Team 10 is ready for `CF-W1-BT-02` review after BT QA rerun accepts.
+- Team 06 is ready for bounded `CF-W1-BT-02` QA rework.
+- Team 10 waits for `CF-W1-BT-02` until Team 06 rework and Team 04 QA rerun pass.
 - Team 03 is ready for `CF-W1-CAL-01` architecture prep when a slot opens.
 - Team 04 is active on `CF-W1-MCTX-01` QA planning.
 - Team 02 is active on market-intelligence requirements discovery.

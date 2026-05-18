@@ -139,6 +139,97 @@ Update `17-team-outboxes/TEAM-06-outbox.md` with:
 - forbidden files confirmed untouched
 - assumptions, risks, blockers
 - next gate: Team 04 QA, Team 10 review, Architect Signoff, delegated PO acceptance, or Team 00 blocker routing
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Perform bounded rework for `CF-W1-BT-02` after Team 04 QA rejection.
+
+This is a routine QA rejection inside the existing Team 06 reservation. Do not widen scope. Do not edit forbidden files. Do not commit.
+
+## Branch / Worktree
+
+- Branch: `codex/team06-strategy-signal/CF-W1-BT-02`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-BT-02`
+
+Dependency junctions already exist:
+
+- `backend\node_modules` -> main repo backend `node_modules`
+- `frontend\node_modules` -> main repo frontend `node_modules`
+
+## QA Findings To Fix
+
+Team 04 QA evidence:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-BT-02-qa-verification.md`
+
+Findings:
+
+1. Backend focused test fails on trusted-review coverage. The `trusted` fixture expects `TRUSTED_REVIEW`, but current derivation returns `DIAGNOSTIC_ONLY` because `LOW_TRADE_SAMPLE` is added before trusted/partial evaluation.
+2. Frontend UI smoke fails in the legacy-invalid saved-run scenario because `Review Disposition` is not visible, despite mocked `WITHHELD` review fields.
+
+## Allowed Files
+
+You may edit only:
+
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.types.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+- `backend/tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.test.ts`
+- `frontend/src/features/backtesting-strategy-lab/types.ts`
+- `frontend/src/features/backtesting-strategy-lab/components/BacktestingStrategyLabPage.tsx`
+- `frontend/tests/ui/backtesting-strategy-lab.spec.ts`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-BT-02-developer-handoff.md`
+
+## Forbidden Files
+
+Do not edit:
+
+- Prisma schema or migrations
+- generated files
+- backtesting repository/controller/router/validation/module/index
+- backend or frontend route registries
+- `backend/src/modules/strategy-framework/**`
+- `backend/src/modules/trade-plan-risk-engine/**`
+- frontend backtesting API/hooks/routes
+- shared backend utilities or shared frontend components
+- package manifests
+- providers, startup/backfill, live-provider, paid/cloud, telemetry, broker, or historical docs
+
+## Required Validation
+
+Run:
+
+```powershell
+cd C:\work\repo\investment-scanner-worktrees\team06-CF-W1-BT-02\backend
+npm.cmd test -- backtesting-strategy-lab.service.test.ts --runInBand
+npm.cmd run build
+```
+
+Run because frontend files are in scope:
+
+```powershell
+cd C:\work\repo\investment-scanner-worktrees\team06-CF-W1-BT-02\frontend
+npm.cmd run test:ui -- backtesting-strategy-lab.spec.ts --workers=1
+npm.cmd run build
+```
+
+If Playwright hits sandbox process restrictions, record the blocker and command; do not edit package manifests.
+
+## Expected Output
+
+Update:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-BT-02-developer-handoff.md`
+
+Return changed files, tests run, scope confirmation, remaining risks, and whether Team 04 QA rerun can proceed.
 ---
 
 # Latest Assignment Override

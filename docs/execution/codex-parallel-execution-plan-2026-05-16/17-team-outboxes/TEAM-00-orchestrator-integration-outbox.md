@@ -1516,3 +1516,23 @@ Teams ready to pick up new tasks:
 - Team 10: `CF-W1-BT-02` review after QA accepts.
 - Team 03: `CF-W1-CAL-01` architecture prep when a slot opens.
 - Team 04: next implementation QA after one active QA agent completes.
+
+---
+
+# BT-02 QA Rejection Routed
+
+Date: 2026-05-18
+
+Team 04 rejected `CF-W1-BT-02` after runnable QA. The dependency blocker is gone; remaining failures are bounded product behavior inside Team 06's existing file reservation.
+
+Rework assigned:
+
+- backend trusted-review scenario must return `TRUSTED_REVIEW`, not `DIAGNOSTIC_ONLY`;
+- frontend legacy-invalid smoke must render `Review Disposition` evidence for the mocked `WITHHELD` run.
+
+Teams ready to pick up new tasks:
+
+- Team 06: `CF-W1-BT-02` bounded rework now.
+- Team 04: QA rerun after Team 06 rework.
+- Team 10: `CF-W1-BT-02` review only after QA accepts.
+- Team 10: still active on `CF-W1-HCTX-01` review.

@@ -4,6 +4,74 @@ Date: 2026-05-18
 
 Mode: focused QA rerun plus docs-only QA planning.
 
+## 2026-05-18 `CF-W1-MCTX-01` Market Context Regime Evidence QA Planning
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only QA packet preparation
+- Work item: `CF-W1-MCTX-01`
+- State/mode: QA planning only; no executable validation
+- Owner: Team 04 QA Factory
+- Lane/module: Lane 1 / `market-context-intelligence`
+- Files changed:
+  - `04-qa/CF-W1-MCTX-01-qa-plan.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - `AGENTS.md`
+  - `16-team-inboxes/TEAM-04-current-assignment.md`
+  - `10-requirements/CF-W1-MCTX-01-market-context-regime-evidence-requirement.md`
+  - `03-architecture/CF-W1-MCTX-01-architecture-review.md`
+  - `06-contracts/CF-W1-MCTX-01-market-context-regime-evidence-contract.md`
+  - `08-work-packets/CF-W1-MCTX-01-work-packet.md`
+  - `17-team-outboxes/TEAM-03-architecture-factory.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+  - `backend/src/modules/market-context-intelligence/market-context-intelligence.service.ts`
+  - `backend/src/modules/market-context-intelligence/market-context-intelligence.types.ts`
+  - `frontend/src/features/market-context-intelligence/types.ts`
+  - `frontend/src/features/market-context-intelligence/components/MarketContextPage.tsx`
+  - `frontend/src/features/market-context-intelligence/components/MarketRegimeWidget.tsx`
+  - `frontend/tests/ui/market-context-intelligence.spec.ts`
+- Behavior changed:
+  - none; docs-only QA planning
+- Docs changed:
+  - prepared `04-qa/CF-W1-MCTX-01-qa-plan.md`
+  - refreshed `04-qa/next-validation-plans.md`
+  - recorded this handoff in `17-team-outboxes/TEAM-04-qa-factory.md`
+- Contracts changed:
+  - none
+- Result:
+  - Prepared a bounded QA plan for additive Market Context provenance and regime-evidence framing in `04-qa/CF-W1-MCTX-01-qa-plan.md`.
+  - Recorded required coverage for persisted-versus-fresh provenance, exact live denominator preservation on fresh auto-generated summaries, derived-denominator `PARTIAL` framing for persisted summaries, and explicit trustworthy/partial/low-evidence/missing-evidence state coverage.
+  - Recorded that both `MarketContextPage.tsx` and `MarketRegimeWidget.tsx` must render provenance/evidence framing and must not tell different trust stories for the same summary payload.
+  - Preserved the Team 03 boundary that the first child must stay inside `market-context-intelligence` service/types/doc/test plus feature-local types/page/widget/UI spec files only.
+  - Added exact reject conditions for schema/routes/repository/controller/router/validation/index changes, Market Data/DQE/Historical Context/Signal Calibration/Signal Generation source edits, shared utilities/UI, package/generated files, provider/live-data work, or broad UX/navigation widening.
+  - Updated `04-qa/next-validation-plans.md` so `CF-W1-MCTX-01` is visible in the QA queue as QA-ready for Team 00 Ready evaluation as one bounded `market-context-intelligence` child.
+- Tests run: none
+- Tests skipped:
+  - all executable validation was skipped because this was a docs-only QA planning pass with no Team 00 Ready promotion or implementation handoff
+- Skipped-test reason:
+  - planning-only assignment; no builds/tests/services were authorized or required
+- Assumptions:
+  - Team 00 will keep the child bounded to the reserved `market-context-intelligence` backend and feature-local frontend files only
+  - exact persisted SMA denominator durability remains deferred and is not smuggled into this child
+  - the current Market Context page and Market Regime widget remain the only user-facing surfaces for the first slice
+- Risks:
+  - implementers could preserve current denominator ambiguity by returning the freshly persisted read path instead of the fresh in-memory evidence-rich summary
+  - persisted sector-derived denominator counts could be mislabeled as trustworthy if the derived-versus-live distinction is not enforced exactly
+  - the page and widget could drift into different evidence copy unless both surfaces bind to the same additive evidence fields
+- Blockers:
+  - executable QA remains blocked until Team 00 promotes the bounded `market-context-intelligence` implementation handoff
+  - any schema, route, repository/controller/router/validation/index, upstream module source, shared utility/UI, package/generated, provider/live-data, or broad-UX widening remains an explicit reject condition for the first child
+- Shared-file requests:
+  - none from Team 04; single-writer reservation remains a Team 00 implementation concern
+- QA-ready for Team 00 Ready evaluation:
+  - `CF-W1-MCTX-01`: yes, as one bounded `market-context-intelligence` regime-evidence child only
+- Next gate:
+  - Team 00 Ready evaluation for `CF-W1-MCTX-01` only, while keeping schema, route, repository/controller/router/validation/index, shared-file, upstream-source, provider/live-data, and broad-UX widening out of scope
+- Evidence notes:
+  - Team 04 used the active execution folder and current Market Context module/test/UI surfaces only; no application source, tests, package manifests, generated files, architecture docs, contracts, requirements, ready queues, Prisma, routes, shared files, or historical docs were modified
+
 ## 2026-05-18 `CF-W1-L3-INTEL-03` Portfolio Intelligence Concentration Review QA Planning
 
 - Team: `TEAM-04` - QA Factory
@@ -629,6 +697,7 @@ Prepared and refreshed QA plans for:
 - `CF-W1-UX-02`: consolidated into the combined Copilot-only `CF-W1-UX-02 + CF-W1-UX-05A` QA plan.
 - `CF-W1-UX-05`: folded into the combined Copilot-only `CF-W1-UX-02 + CF-W1-UX-05A` QA plan rather than a separate executable slice.
 - `CF-W1-AUTH-01` and `CF-W1-SUB-01`: refreshed Option A platform auth/subscription assertions in the combined Team 09 QA plan.
+- `CF-W1-MCTX-01`: prepared a bounded Market Context regime-evidence QA plan covering persisted-versus-fresh provenance, live-versus-derived denominator framing, evidence-state coverage, and feature-local page/widget trust framing.
 
 Updated `04-qa/next-validation-plans.md` so the resolved-policy items show QA refresh prepared while executable QA remains blocked behind exact reservations and Team 00 Ready promotion.
 
@@ -801,6 +870,7 @@ Excluded by default:
 - `CF-W1-UX-05`: companion QA note is prepared; it must execute only inside the combined `CF-W1-UX-02 + CF-W1-UX-05A` handoff and remains blocked until that packet is promoted.
 - `CF-W1-AUTH-01`: Option A QA refresh is prepared; executable validation is blocked until exact controller/test reservations and Team 00 implementation handoff.
 - `CF-W1-SUB-01`: Option A QA refresh is prepared; executable validation is blocked until exact backend reservations, frontend limitation handling, and Team 00 implementation handoff.
+- `CF-W1-MCTX-01`: child QA plan is prepared and QA-ready for Team 00 Ready evaluation, but executable validation remains blocked until Team 00 promotes the bounded `market-context-intelligence` handoff; any schema, route, repository/controller/router/validation/index, upstream module source, shared utility/UI, package/generated, provider/live-data, or broad-UX widening remains an explicit reject condition.
 - Scoped commit/push is not attempted because the shared worktree contains many unrelated active docs changes from other teams.
 
 ## Next Recommendations
@@ -810,5 +880,6 @@ Excluded by default:
 3. Team 10 should re-review after Team 04 rerun.
 4. Team 00 may consider Ready promotion for the next bounded slice after reconciling dirty docs state and copying exact reservations: `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-L3-ALERT-01`, or `CF-W1-L3-WATCH-01` if it is kept strictly separate from `CF-W1-L3-PORT-01B`.
 5. Team 00 can evaluate the narrowed `CF-W1-MD-01` validator child and the combined `CF-W1-UX-02 + CF-W1-UX-05A` Copilot child for Ready promotion; executable QA stays blocked until the corresponding implementation handoffs exist.
+6. Team 00 can evaluate `CF-W1-MCTX-01` for Ready promotion as one bounded `market-context-intelligence` child if it keeps the packet additive and inside the reserved service/types/doc/test plus feature-local types/page/widget/UI spec files only.
 6. Keep `CF-W1-L3-INTEL-01` queued behind accepted `CF-W1-L3-PORT-01A`.
 7. Keep `CF-W1-MD-02` source/schema/test work blocked until a formal ADR is accepted.
