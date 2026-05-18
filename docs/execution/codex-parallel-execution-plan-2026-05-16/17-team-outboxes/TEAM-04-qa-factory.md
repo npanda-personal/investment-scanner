@@ -4,6 +4,73 @@ Date: 2026-05-19
 
 Mode: focused QA rerun plus docs-only QA planning.
 
+## 2026-05-19 `CF-W1-SIG-02` Canonical Trigger Evidence Compatibility QA Planning
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only QA packet preparation
+- Work item: `CF-W1-SIG-02`
+- State/mode: QA planning only; no executable validation
+- Owner: Team 04 QA Factory
+- Lane/module: Lane 2 / `signal-generation-engine`
+- Files changed:
+  - `04-qa/CF-W1-SIG-02-qa-plan.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-CF-W1-SIG-02-qa.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - `AGENTS.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/16-team-inboxes/TEAM-04-CF-W1-SIG-02-qa-assignment.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SIG-02-canonical-trigger-evidence-compatibility-requirement.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-SIG-02-architecture-review.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-SIG-02-canonical-trigger-evidence-compatibility-contract.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-SIG-02-work-packet.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-SIG-TRIGGER-02A-qa-plan.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/ready-for-implementation.md`
+  - `backend/src/modules/signal-generation-engine/signal-generation-engine.service.ts`
+  - `backend/src/modules/signal-generation-engine/signal-generation-engine.repository.ts`
+  - `backend/src/modules/signal-generation-engine/signal-generation-engine.trigger-contract.test.ts`
+  - `backend/src/modules/signal-generation-engine/signal-generation-engine.service.test.ts`
+  - `backend/tests/modules/signal-generation-engine/signal-generation-dq-enforcement.invariants.test.ts`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/next-validation-plans.md`
+- Behavior changed:
+  - none; docs-only QA planning
+- Docs changed:
+  - prepared `04-qa/CF-W1-SIG-02-qa-plan.md`
+  - refreshed `04-qa/next-validation-plans.md`
+  - recorded this handoff in `17-team-outboxes/TEAM-04-CF-W1-SIG-02-qa.md`
+  - recorded the planning summary in this master outbox
+- Contracts changed:
+  - none
+- Result:
+  - Prepared a bounded canonical trigger-evidence QA plan for `SignalResultDto.triggerContract`.
+  - Recorded canonical packet readiness only when provenance and timestamp evidence are explicit.
+  - Preserved legacy incompleteness for legacy rows and compatibility-only labeling for request-local enrichment.
+  - Required explicit request-local labeling for `latestForInstrument()` generation, persisted row timestamps when available, and run audit evidence only when repository-backed evidence exists.
+  - Preserved unavailable trigger-price, timeframe, rule-id, and richer lifecycle fields.
+  - Preserved strict DQ fail-closed regression coverage.
+  - Recorded the Team 00 sequencing rule against parked `CF-W1-SIG-TRIGGER-02A` commit `788c237`.
+- Tests run: none
+- Tests skipped:
+  - all executable validation was skipped because this was a docs-only QA planning pass with explicit instructions not to run tests, builds, services, providers, Prisma commands, UI smoke, or live data
+- Skipped-test reason:
+  - planning-only assignment; no executable validation was authorized or required
+- Assumptions:
+  - Team 00 will keep the child stacked or reconciled against parked `CF-W1-SIG-TRIGGER-02A` commit `788c237`
+  - current `dev` Signal Generation source and the accepted trigger-audit packet remain the authoritative baseline for this child
+- Risks:
+  - implementers could overclaim durable trigger provenance from request-local or compatibility-only enrichment unless packet-origin and field-provenance labels remain explicit
+  - scope could drift into schema, routes, frontend, shared files, downstream adoption, or other `signal-generation-engine` widening unless Team 00 keeps the writer set exact
+- Blockers:
+  - executable QA remains blocked until Team 00 sequences the child against parked `CF-W1-SIG-TRIGGER-02A` commit `788c237` and promotes the bounded backend-only `signal-generation-engine` handoff
+- Shared-file requests:
+  - none from Team 04; single-writer reservation remains a Team 00 implementation concern
+- QA-ready for Team 00 Ready evaluation:
+  - `CF-W1-SIG-02`: yes, as one bounded backend-only `signal-generation-engine` canonical trigger-evidence child only, with mandatory sequencing against parked `CF-W1-SIG-TRIGGER-02A`
+- Next gate:
+  - Team 00 Ready evaluation for `CF-W1-SIG-02`, with exact reservation of the Signal Generation service/types/repository/doc/test writer set and an explicit sequencing decision on parked `CF-W1-SIG-TRIGGER-02A` commit `788c237`
+- Evidence notes:
+  - Team 04 used the active execution folder, source packet docs, the ready queue reference, and current Signal Generation source/test surfaces only; no application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, builds, services, providers, or live data were modified or run
+
 ## 2026-05-19 `CF-W1-BT-03` Backtesting Proof-Basis / Overfit Guardrail QA Planning
 
 - Team: `TEAM-04` - QA Factory
