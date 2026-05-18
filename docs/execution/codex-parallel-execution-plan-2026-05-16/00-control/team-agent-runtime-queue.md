@@ -829,14 +829,14 @@ Current routing follows the Product Owner correction: prioritize direct investor
 | 1 | Team 04 - QA Factory | `019e3bc4-d5b6-7031-aa78-7e921f6659d2` | `gpt-5.4`, high | QA verification | `CF-W1-BT-02` in Team 06 worktree | active |
 | 2 | Team 05 - Market Data / Data Quality | `019e3bc1-3287-7841-957d-68a4ceea116c` | `gpt-5.3-codex`, high | implementation | `CF-W1-HCTX-01` | active |
 | 3 | Open slot | none | pending | QA verification | `CF-W1-HCTX-01` after Team 05 handoff | waiting |
-| 4 | Open slot | none | pending | review/release | next QA-accepted handoff | waiting |
+| 4 | Team 03 - Architecture Factory | `019e3bc6-dfda-72f1-8db1-2b7730d337c1` | `gpt-5.4`, high | architecture prep | `CF-W1-MCTX-01` | active |
 | 5 | Open slot | none | pending | architect signoff | next Team 10 accepted handoff | waiting |
-| 6 | Open slot | none | pending | architecture prep | `CF-W1-MCTX-01`, then `CF-W1-CAL-01`, then `CF-W1-DQ-02` follow-up | ready |
+| 6 | Open slot | none | pending | architecture prep | `CF-W1-CAL-01`, then `CF-W1-DQ-02` follow-up | ready |
 
 ## Teams Ready To Pick Up New Tasks
 
 - Team 04 is active on `CF-W1-BT-02` QA.
 - Team 05 is active implementing `CF-W1-HCTX-01`.
 - Team 10 is ready for review after QA accepts a handoff.
-- Team 03 is ready for `CF-W1-MCTX-01` architecture prep after the HCTX implementation lane is launched.
+- Team 03 is active on `CF-W1-MCTX-01` architecture prep.
 - Team 02 should relaunch persistent market-intelligence requirements discovery when an active slot is available.

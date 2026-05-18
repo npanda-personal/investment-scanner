@@ -1411,5 +1411,5 @@ Team 04 QA is active:
 Teams ready to pick up new tasks:
 
 - Team 10: `CF-W1-BT-02` review after Team 04 accepts.
-- Team 03: `CF-W1-MCTX-01` architecture prep now.
+- Team 03: active on `CF-W1-MCTX-01` architecture prep as `019e3bc6-dfda-72f1-8db1-2b7730d337c1`.
 - Team 04: `CF-W1-HCTX-01` QA after Team 05 hands off and the current QA agent completes.
