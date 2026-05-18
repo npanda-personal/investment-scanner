@@ -389,6 +389,47 @@ Date: 2026-05-18
 
 ## Assignment
 
+Prepare docs-only QA planning for `CF-W1-MCTX-01` - Market Context regime evidence and partial-context framing.
+
+This is docs-only QA planning in the shared `dev` workspace. Do not edit application source/tests. Do not run tests, builds, services, providers, Prisma commands, UI smoke, or live data. This work is independent from the active `BT-02` and `HCTX-01` QA verification agents, which write evidence in separate worktrees.
+
+## Source Input
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MCTX-01-market-context-regime-evidence-requirement.md`
+- Architecture review: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-MCTX-01-architecture-review.md`
+- Contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-MCTX-01-market-context-regime-evidence-contract.md`
+- Work packet: `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-MCTX-01-work-packet.md`
+- Team 03 outbox: `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-MCTX-01-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/next-validation-plans.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+## Required QA Plan Coverage
+
+- persisted versus fresh summary provenance;
+- exact live denominators for fresh auto-generated summaries;
+- persisted summaries with derived denominators render `PARTIAL`, not `TRUSTWORTHY`;
+- trustworthy, low-evidence, missing-evidence, and explicitly missing macro states;
+- additive backend fields preserve existing Market Context response compatibility;
+- Market Context page and Market Regime widget both show provenance/evidence framing;
+- research-support wording only, no direct advice, no target-price, no guarantee, no broker or automation wording;
+- explicit rejection if implementation touches Prisma/schema, routes, repository/controller/router/validation/index, Market Data/DQE source, Historical Context source, Signal Calibration/Generation source, shared utilities/UI, package manifests, generated files, provider/live data, or broad UX/navigation scope.
+
+## Output
+
+State whether `CF-W1-MCTX-01` is QA-plan ready for Team 00 Ready evaluation and list any blocker.
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
 Stand by for QA Verification on the next active implementation handoff.
 
 Do not run QA before a developer handoff exists. Do not start a new docs-only QA plan ahead of direct investor/trader value work unless Team 00 assigns it.

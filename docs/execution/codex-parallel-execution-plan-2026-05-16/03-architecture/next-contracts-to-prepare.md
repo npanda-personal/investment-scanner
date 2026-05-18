@@ -4,6 +4,24 @@ Date: 2026-05-17
 
 Prepared by Team 03 Architecture Factory and refreshed after `CF-W1-L3-AUTH-02` commit `503bcd9`, `CF-W1-SIG-TRIGGER-01` commit `6ab3999`, and checkpoint protocol fix commit `f75808f`.
 
+## Team 03 MCTX-01 Market Context Regime Evidence Prep - 2026-05-18
+
+Prepared:
+
+- `03-architecture/CF-W1-MCTX-01-architecture-review.md`
+- `06-contracts/CF-W1-MCTX-01-market-context-regime-evidence-contract.md`
+- `08-work-packets/CF-W1-MCTX-01-work-packet.md`
+
+Result:
+
+- `CF-W1-MCTX-01` is source-supported as one bounded `market-context-intelligence` vertical slice.
+- The first child stays module-local and user-visible: additive backend evidence framing plus module-owned page/widget rendering and UI smoke coverage.
+- Exact future write scope is limited to `market-context-intelligence` service/types/doc/service-test and feature types/page/widget/UI spec only.
+- No Prisma/schema, route-registry, shared helper, shared UI, provider/live-data, Market Data source, DQE source, package, or generated-file approval is required for the first child.
+- Exact persisted SMA denominator durability remains explicitly deferred. If Product Owner later requires stored exact denominator provenance on persisted reads, that is a separate approval-gated repository plus schema path and is not part of this child.
+- Team 04 QA planning can start now.
+- Team 00 should treat this as the next top market-context `Ready candidate`.
+
 ## Team 03 HCTX-01 Historical Context Explainability Refresh - 2026-05-18
 
 Updated:
@@ -141,6 +159,7 @@ Result:
 | --- | --- | --- | --- | --- |
 | 1 | `CF-W1-HCTX-01` | Historical Context lookup-provenance packet refreshed | Ready candidate pending QA handoff | Exact `historical-context-snapshots` service/types/doc/service-test reservations are defined. First child is additive backend lookup explainability only. No schema, route, shared UI, package, generated, provider, or frontend blocker exists. |
 | 2 | `CF-W1-BT-02` | Backtesting-only disposition-normalization packet prepared | In Team 04 QA handoff | Exact `backtesting-strategy-lab` service/types/doc/test and page/types/UI spec reservations are defined. First child is run-level disposition plus summary only. No schema, route, shared UI, package, or generated blocker exists. |
+| 3 | `CF-W1-MCTX-01` | Market Context regime-evidence packet prepared | Ready candidate pending QA handoff | Exact `market-context-intelligence` service/types/doc/service-test and feature types/page/widget/UI spec reservations are defined. First child adds provenance, denominator framing, and missing-component evidence without schema, route, shared, provider/live, Market Data, or DQE edits. Exact persisted denominator durability remains explicitly deferred. |
 | 3 | `CF-W1-L3-PORT-01B` | Watchlist-only child architecture packet prepared | Not Ready for Implementation | High user-value watchlist child now has exact watchlist reservations, but it remains blocked until `CF-W1-L3-PORT-01A` is accepted so the readiness DTO shape is stable in accepted source. |
 | 4 | `CF-W1-DQ-02` | Split-required bounded first child prepared | Not Ready for Implementation | Only a DQE service/types/doc/test child is source-supported. Full persisted/public currentness exposure remains blocked from one-pass promotion because current DQ rows do not store session-aware evidence. |
 | 4 | `CF-W1-AUTH-02` | Consumer-isolation packet prepared with Team 09 and Team 08 child reservations | Not Ready for Implementation | Alert event ownership is already accepted in `CF-W1-L3-AUTH-02`; remaining work is digest user propagation. Conflicts with `CF-W1-NOTIF-02`, `CF-W1-UX-02`, and `CF-W1-UX-05`. |
@@ -204,9 +223,9 @@ Resolved decision inputs:
 
 ## Recommendation
 
-`CF-W1-HCTX-01` is the clearest new Ready candidate from this pass. `CF-W1-BT-02` is already in Team 04 QA handoff, so the next Team 03 routing recommendation is to move `CF-W1-HCTX-01` to Team 04 QA prep now. Keep every other item out of `12-ready-queue/ready-for-implementation.md` until a candidate has an accepted requirement, accepted architecture contract, accepted QA plan, exact file reservations, and no open Product Owner, Architect, shared-file, schema, route, package, provider, or upstream blocker.
+`CF-W1-MCTX-01` is the clearest new Ready candidate from this pass. `CF-W1-BT-02` is already in Team 04 QA handoff, and `CF-W1-HCTX-01` is already refreshed and active, so the next Team 03 routing recommendation is to move `CF-W1-MCTX-01` to Team 04 QA prep now. Keep every other item out of `12-ready-queue/ready-for-implementation.md` until a candidate has an accepted requirement, accepted architecture contract, accepted QA plan, exact file reservations, and no open Product Owner, Architect, shared-file, schema, route, package, provider, or upstream blocker.
 
-Next Team 03 recommendation: route `CF-W1-HCTX-01` to Team 04 QA prep now because the narrowed Historical Context packet is fully bounded and does not carry schema, route, shared-UI, provider, or frontend risk. Keep `CF-W1-DQ-02` as the strongest upstream follow-on QA-prep candidate. Keep `CF-W1-L3-PORT-01B` blocked behind accepted `CF-W1-L3-PORT-01A`. After `CF-W1-MD-02` ADR acceptance, prepare `CF-W1-MD-02A` as a schema/migration proposal packet only if Team 00 and Architect explicitly authorize that approval-gated path.
+Next Team 03 recommendation: route `CF-W1-MCTX-01` to Team 04 QA prep now because the narrowed Market Context packet is fully bounded and does not carry schema, route, shared-UI, provider, Market Data source, or DQE source risk. Keep `CF-W1-DQ-02` as the strongest upstream follow-on QA-prep candidate. Keep `CF-W1-L3-PORT-01B` blocked behind accepted `CF-W1-L3-PORT-01A`. After `CF-W1-MD-02` ADR acceptance, prepare `CF-W1-MD-02A` as a schema/migration proposal packet only if Team 00 and Architect explicitly authorize that approval-gated path.
 
 ## Team 03 Discovery Refresh - 2026-05-18
 

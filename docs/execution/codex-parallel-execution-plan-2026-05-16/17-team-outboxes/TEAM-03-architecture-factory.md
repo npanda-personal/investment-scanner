@@ -2,6 +2,72 @@
 
 Date: 2026-05-17
 
+## Team 03 MCTX-01 Market Context Regime Evidence Prep - 2026-05-18
+
+Assignment: prepare docs-only architecture readiness for `CF-W1-MCTX-01` in the shared worktree without touching application source/tests, Prisma/schema, route registries, shared utilities, shared UI, package manifests, generated files, providers, builds, test runs, services, or UI smoke execution.
+
+Prepared:
+
+- `03-architecture/CF-W1-MCTX-01-architecture-review.md`
+- `06-contracts/CF-W1-MCTX-01-market-context-regime-evidence-contract.md`
+- `08-work-packets/CF-W1-MCTX-01-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Files inspected:
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/16-team-inboxes/TEAM-03-current-assignment.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MCTX-01-market-context-regime-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-market-data-data-quality.md`
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.md`
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.service.ts`
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.types.ts`
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.repository.ts`
+- `backend/tests/modules/market-context-intelligence/market-context-intelligence.service.test.ts`
+- `backend/tests/modules/market-context-intelligence/market-context-intelligence.routes.test.ts`
+- `backend/tests/modules/market-context-intelligence/market-context-intelligence.repository.test.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.md`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md`
+- `frontend/src/features/market-context-intelligence/types.ts`
+- `frontend/src/features/market-context-intelligence/api/marketContextIntelligenceService.ts`
+- `frontend/src/features/market-context-intelligence/hooks/useMarketContext.ts`
+- `frontend/src/features/market-context-intelligence/components/MarketContextPage.tsx`
+- `frontend/src/features/market-context-intelligence/components/MarketRegimeWidget.tsx`
+- `frontend/tests/ui/market-context-intelligence.spec.ts`
+
+Readiness result:
+
+- `CF-W1-MCTX-01` is a `Ready candidate`.
+- The smallest feasible first child is one module-local vertical slice spanning `market-context-intelligence` backend service/types/doc/service-test and module-owned frontend types/page/widget/UI smoke coverage.
+- Exact future write scope is limited to:
+  - `backend/src/modules/market-context-intelligence/market-context-intelligence.service.ts`
+  - `backend/src/modules/market-context-intelligence/market-context-intelligence.types.ts`
+  - `backend/src/modules/market-context-intelligence/market-context-intelligence.md`
+  - `backend/tests/modules/market-context-intelligence/market-context-intelligence.service.test.ts`
+  - `frontend/src/features/market-context-intelligence/types.ts`
+  - `frontend/src/features/market-context-intelligence/components/MarketContextPage.tsx`
+  - `frontend/src/features/market-context-intelligence/components/MarketRegimeWidget.tsx`
+  - `frontend/tests/ui/market-context-intelligence.spec.ts`
+- Prisma/schema, route-registry, repository/controller/router/validation, shared helper/UI, provider/live-data, Market Data source, DQE source, Historical Context source, Calibration source, package manifests, generated files, and broad UX/navigation work remain forbidden.
+- No blocker was found for the bounded first child.
+- Explicit deferred blocker: exact persisted SMA denominator durability or repository-backed stored provenance is a separate approval-gated repository plus schema path and must not be folded into this child.
+- Team 04 QA planning can start now.
+
+Current Team 03 recommendation to Team 00:
+
+1. Route `CF-W1-MCTX-01` to Team 04 QA planning now.
+2. Treat it as one bounded module-local `Ready candidate`, not as a schema, route, shared, provider/live, Market Data, or DQE packet.
+3. Do not allow parallel writers on the reserved `market-context-intelligence` service/types/doc/test and feature page/widget/types/UI spec file set.
+4. Keep any future exact persisted denominator storage or durable provenance work as a separate approval-gated child.
+
+No tests, builds, Prisma commands, services, providers, UI smoke runs, commits, or pushes were run.
+
 ## Team 03 HCTX-01 Historical Context Explainability Refresh - 2026-05-18
 
 Assignment: refresh architecture readiness for `CF-W1-HCTX-01` as the next top unassigned market-intelligence item after `CF-W1-BT-02`, without touching application code, tests, Prisma/schema, route registries, shared utilities, shared UI, package manifests, generated files, historical docs, or Team 04 files.
