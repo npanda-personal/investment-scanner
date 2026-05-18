@@ -459,6 +459,92 @@ Current Team 03 recommendation to Team 00:
 
 No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
 
+## Team 03 SMI-01 Smart Money Evidence Freshness Prep - 2026-05-18
+
+Assignment: prepare docs-only architecture readiness for `CF-W1-SMI-01` in the shared `dev` workspace without touching application code, tests, Prisma/schema, route registries, shared utilities, shared UI, Market Data source, Data Quality source, providers, services, builds, UI smoke, package manifests, generated files, or frontend implementation.
+
+Prepared:
+
+- `03-architecture/CF-W1-SMI-01-architecture-review.md`
+- `06-contracts/CF-W1-SMI-01-smart-money-evidence-freshness-partial-trust-contract.md`
+- `08-work-packets/CF-W1-SMI-01-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Files inspected:
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/16-team-inboxes/TEAM-03-current-assignment.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SMI-01-smart-money-evidence-freshness-partial-trust-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-L3-INTEL-03-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-MCTX-01-market-context-regime-evidence-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-L3-INTEL-03-work-packet.md`
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.md`
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.service.ts`
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.types.ts`
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.repository.ts`
+- `backend/tests/modules/smart-money-intelligence/smart-money-intelligence.service.test.ts`
+- `backend/tests/modules/smart-money-intelligence/smart-money-intelligence.routes.test.ts`
+- `backend/tests/modules/smart-money-intelligence/smart-money-intelligence.validation.test.ts`
+- `frontend/src/features/smart-money-intelligence/types.ts`
+- `frontend/src/features/smart-money-intelligence/components/SmartMoneyIntelligencePage.tsx`
+
+Readiness result:
+
+- `CF-W1-SMI-01` is a `Ready candidate`.
+- The smallest feasible first child is backend-only and stays module-local inside `smart-money-intelligence`.
+- Exact future writer set:
+  - `backend/src/modules/smart-money-intelligence/smart-money-intelligence.service.ts`
+  - `backend/src/modules/smart-money-intelligence/smart-money-intelligence.types.ts`
+  - `backend/src/modules/smart-money-intelligence/smart-money-intelligence.md`
+  - `backend/tests/modules/smart-money-intelligence/smart-money-intelligence.service.test.ts`
+- Exact forbidden files and scopes for the first child:
+  - `backend/src/modules/smart-money-intelligence/smart-money-intelligence.repository.ts`
+  - `backend/src/modules/smart-money-intelligence/smart-money-intelligence.controller.ts`
+  - `backend/src/modules/smart-money-intelligence/smart-money-intelligence.router.ts`
+  - `backend/src/modules/smart-money-intelligence/smart-money-intelligence.validation.ts`
+  - `backend/src/modules/smart-money-intelligence/smart-money-intelligence.provider.ts`
+  - `backend/src/modules/smart-money-intelligence/smart-money-intelligence.module.ts`
+  - `backend/src/modules/smart-money-intelligence/index.ts`
+  - `backend/tests/modules/smart-money-intelligence/smart-money-intelligence.routes.test.ts`
+  - `backend/tests/modules/smart-money-intelligence/smart-money-intelligence.validation.test.ts`
+  - all `backend/src/modules/market-data-foundation/**`
+  - all `backend/src/modules/data-quality-engine/**`
+  - `backend/src/api/routes.ts`
+  - all `frontend/src/features/smart-money-intelligence/**`
+  - all `frontend/tests/ui/**`
+  - `frontend/src/app/routes.tsx`
+  - shared backend utilities
+  - shared frontend components
+  - `backend/prisma/schema.prisma`
+  - `backend/prisma/migrations/**`
+  - package manifests
+  - generated files
+  - provider/live-data integration
+  - startup/backfill workflows
+  - paid/cloud, broker, or telemetry scope
+- Current source supports persisted-vs-derived provenance, ownership-gap trust framing, and bounded downstream-safe semantics without repository or schema changes.
+- Exact persisted candle-level coverage durability and Smart Money UI surfacing remain explicit follow-on scope and are not part of this first child.
+
+Blockers:
+
+- no blocker inside the bounded first child itself;
+- Team 04 QA planning is still required before Team 00 Ready evaluation;
+- Team 00 must preserve one-writer sequencing if any other future `smart-money-intelligence` packet opens before this one lands.
+
+Current Team 03 recommendation to Team 00:
+
+1. Route `CF-W1-SMI-01` to Team 04 QA planning now as a backend-only Smart Money packet.
+2. Treat it as one bounded Team 06 writer pass if promoted.
+3. Reject any attempt to fold repository, schema, route, shared utility/UI, Market Data source, Data Quality source, provider/live-data, startup/backfill, package, generated, or frontend implementation scope into this child.
+
+No tests, builds, Prisma commands, services, providers, UI smoke runs, live data checks, commits, or pushes were run.
+
 ## Team 03 INTEL-03 Portfolio Concentration Review Prep - 2026-05-18
 
 Assignment: prepare architecture readiness for `CF-W1-L3-INTEL-03` portfolio-intelligence concentration review in the main worktree without touching application code, tests, Prisma/schema, route registries, package manifests, generated files, shared utilities, shared UI, historical docs, or the decision inbox.

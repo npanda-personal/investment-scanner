@@ -444,3 +444,26 @@ New doc:
 - `03-architecture/CF-W1-L3-INTEL-01-architect-signoff.md`
 
 Readiness result: not ready for application code. The item has requirement, architecture review, contract, QA plan, and work packet drafts, but implementation must wait for `CF-W1-L3-PORT-01A` portfolio readiness DTO acceptance because current Portfolio Intelligence source has no `PortfolioSummaryDto.readinessSummary` or `HoldingValuationDto.readiness` fields to consume.
+
+## Team 03 SMI-01 Smart Money Evidence Freshness Prep - 2026-05-18
+
+Prepared:
+
+- `03-architecture/CF-W1-SMI-01-architecture-review.md`
+- `06-contracts/CF-W1-SMI-01-smart-money-evidence-freshness-partial-trust-contract.md`
+- `08-work-packets/CF-W1-SMI-01-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Result:
+
+- `CF-W1-SMI-01` is a `Ready candidate`.
+- The smallest feasible first child is backend-only and stays module-local inside `smart-money-intelligence`.
+- Exact future writer set is limited to Smart Money service/types/doc/service-test only.
+- No schema, route, shared utility/UI, Market Data source, Data Quality source, provider/live-data, startup/backfill, package, generated-file, or frontend implementation change is required.
+- Persisted candle-level coverage durability and Smart Money UI rendering remain explicit follow-on scope and are not part of this child.
+- Team 04 QA planning can start now.
+- Team 00 should sequence this packet as a bounded Team 06 writer pass only after deciding where it fits relative to the already-active higher-priority market-intelligence items.
