@@ -265,6 +265,70 @@ Mode: focused QA rerun plus docs-only QA planning.
 - Evidence notes:
   - Team 04 used the active execution folder and current Market Context module/test/UI surfaces only; no application source, tests, package manifests, generated files, architecture docs, contracts, requirements, ready queues, Prisma, routes, shared files, or historical docs were modified
 
+## 2026-05-18 `CF-W1-SMI-01` Smart Money Evidence Freshness And Partial-Trust QA Planning
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only QA packet preparation
+- Work item: `CF-W1-SMI-01`
+- State/mode: QA planning only; no executable validation
+- Owner: Team 04 QA Factory
+- Lane/module: Lane 2 / `smart-money-intelligence`
+- Files changed:
+  - `04-qa/CF-W1-SMI-01-qa-plan.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - `AGENTS.md`
+  - `16-team-inboxes/TEAM-04-current-assignment.md`
+  - `03-architecture/CF-W1-SMI-01-architecture-review.md`
+  - `06-contracts/CF-W1-SMI-01-smart-money-evidence-freshness-partial-trust-contract.md`
+  - `08-work-packets/CF-W1-SMI-01-work-packet.md`
+  - `10-requirements/CF-W1-SMI-01-smart-money-evidence-freshness-partial-trust-requirement.md`
+  - `04-qa/CF-W1-HCTX-01-qa-plan.md`
+  - `04-qa/CF-W1-MCTX-01-qa-plan.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Behavior changed:
+  - none; docs-only QA planning
+- Docs changed:
+  - prepared `04-qa/CF-W1-SMI-01-qa-plan.md`
+  - refreshed `04-qa/next-validation-plans.md`
+  - recorded this handoff in `17-team-outboxes/TEAM-04-qa-factory.md`
+- Contracts changed:
+  - none
+- Result:
+  - Prepared a bounded backend-only QA plan for additive Smart Money evidence freshness and partial-trust framing in `04-qa/CF-W1-SMI-01-qa-plan.md`.
+  - Recorded required coverage for persisted snapshot provenance, on-demand derived detail fallback framing, downstream-safe persisted-only data-gap behavior, ownership-placeholder partial trust, stale persisted snapshots, insufficient-history unavailable evidence, and additive range/data-through coverage semantics.
+  - Recorded explicit regression expectations that `top()` and `distribution()` preserve current ranking/order while adding evidence metadata to each returned row.
+  - Preserved the Team 03 split boundary that the child must stay inside `smart-money-intelligence` service/types/doc/test only, with no frontend trust surfacing, repository, schema, route, shared utility/UI, provider/live-data, package, generated-file, or downstream-consumer widening.
+  - Updated `04-qa/next-validation-plans.md` so `CF-W1-SMI-01` is visible in the QA queue as QA-ready for Team 00 Ready evaluation as one bounded backend-only `smart-money-intelligence` child.
+- Tests run: none
+- Tests skipped:
+  - all executable validation was skipped because this was a docs-only QA planning pass with no Team 00 Ready promotion or implementation handoff
+- Skipped-test reason:
+  - planning-only assignment; no builds/tests/services/providers were authorized or required
+- Assumptions:
+  - Team 00 will keep the child bounded to the reserved `smart-money-intelligence` service/types/doc/test files only
+  - persisted-only reads remain the downstream-safe contract and detail fallback remains module-owned only
+  - frontend trust-surface rendering remains a later follow-on packet and is not required for this first child
+- Risks:
+  - implementers could expose provenance labels but still let missing persisted snapshots auto-derive Smart Money context on persisted-only reads
+  - ownership placeholders could remain hidden inside coarse confidence/status text instead of being surfaced as partial trust
+  - `top()` or `distribution()` ordering could regress if additive evidence enrichment re-sorts rows
+- Blockers:
+  - executable QA remains blocked until Team 00 promotes the bounded backend-only `smart-money-intelligence` implementation handoff
+  - any frontend trust surfacing, repository, schema, route, shared utility/UI, provider/live-data, package, generated-file, or downstream-consumer widening remains an explicit reject condition for the first child
+- Shared-file requests:
+  - none from Team 04; single-writer reservation remains a Team 00 implementation concern
+- QA-ready for Team 00 Ready evaluation:
+  - `CF-W1-SMI-01`: yes, as one bounded backend-only `smart-money-intelligence` evidence-framing child only
+- Recommendation:
+  - Team 00 can evaluate `CF-W1-SMI-01` for Ready promotion as one bounded backend-only `smart-money-intelligence` child if it keeps the packet additive and inside the reserved service/types/doc/test files only
+- Next gate:
+  - Team 00 Ready evaluation for `CF-W1-SMI-01` only, while keeping frontend trust surfacing, repository, schema, route, shared utility/UI, provider/live-data, package, generated-file, and downstream-consumer widening out of scope
+- Evidence notes:
+  - Team 04 used the active execution folder and the requested SMI planning artifacts only; no application source, tests, package manifests, generated files, Prisma, routes, shared files, frontend files, providers, or historical docs were modified
+
 ## 2026-05-18 `CF-W1-L3-INTEL-03` Portfolio Intelligence Concentration Review QA Planning
 
 - Team: `TEAM-04` - QA Factory
