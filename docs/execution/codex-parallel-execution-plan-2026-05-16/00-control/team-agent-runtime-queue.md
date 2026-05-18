@@ -840,3 +840,33 @@ Current routing follows the Product Owner correction: prioritize direct investor
 - Team 10 is ready for review after QA accepts a handoff.
 - Team 04 is ready for `CF-W1-MCTX-01` QA planning.
 - Team 02 should relaunch persistent market-intelligence requirements discovery when an active slot is available.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | `019e3bcf-03ae-7583-8feb-6869b40b6b54` | `gpt-5.4`, high | QA rerun after dependency junction | `CF-W1-BT-02` in Team 06 worktree | active |
+| 2 | Team 10 - Review / Release | `019e3bd1-b1ab-7dc0-ba1e-5bfcfe7eaf02` | `gpt-5.5`, high | review/release | `CF-W1-HCTX-01` in Team 05 worktree | active |
+| 3 | Team 04 - QA Factory | `019e3bd1-f31d-7e92-a6e3-f88780ca2b59` | `gpt-5.4`, high | QA planning | `CF-W1-MCTX-01` | active |
+| 4 | Team 02 - PO + Requirement Factory | `019e3bd2-303d-78a3-9948-894bf4d6494f` | `gpt-5.4-mini`, medium | persistent market-intelligence discovery | next high-value requirement cycle | active |
+| 5 | Open slot | none | pending | review/release | `CF-W1-BT-02` after QA accepts | waiting |
+| 6 | Open slot | none | pending | architecture prep | `CF-W1-CAL-01`, then `CF-W1-DQ-02` follow-up | ready |
+
+## Completed Since Previous Snapshot
+
+- Team 04 `019e3bcc-350d-79e1-9b11-9bd69e859a28`: `CF-W1-HCTX-01` QA PASS; focused service test and backend build passed after backend `node_modules` junction.
+- Team 03 `019e3bc6-dfda-72f1-8db1-2b7730d337c1`: `CF-W1-MCTX-01` architecture/contract/work-packet completed as `Ready candidate`.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 10 is active on `CF-W1-HCTX-01` review.
+- Team 10 is ready for `CF-W1-BT-02` review after BT QA rerun accepts.
+- Team 03 is ready for `CF-W1-CAL-01` architecture prep when a slot opens.
+- Team 04 is active on `CF-W1-MCTX-01` QA planning.
+- Team 02 is active on market-intelligence requirements discovery.
