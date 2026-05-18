@@ -1392,6 +1392,45 @@ Date: 2026-05-18
 
 Date: 2026-05-18
 
+## Completed Since Previous Snapshot
+
+- Team 02 `019e3c5a-d381-7e23-9231-6e7915b465f5`: completed rolling requirement discovery and was closed.
+- Team 02 refined `CF-W1-RH-01` and identified it as the next top unassigned requirement.
+- Team 00 committed the Team 02 requirement refresh on `dev` as `3a7b072 docs: refine research hub evidence requirements`.
+
+## Queue Decision
+
+- `CF-W1-RH-01` is queued for Team 03 architecture readiness after active `CF-W1-SMI-01` architecture prep completes.
+- Team 02 was relaunched on a distinct market-intelligence discovery cycle so the PO lane remains active.
+
+## Newly Spawned
+
+- Team 02 `019e3c60-d0ac-7ac0-a8b2-adb623baf30e`: rolling market-intelligence requirement discovery.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 06 - Strategy / Signal / Risk | `019e3c58-1357-7401-a41d-f3f22e08b159` | `gpt-5.3-codex`, high | implementation | `CF-W1-TP-02` Trade Plan exit/invalidation semantics | active |
+| 2 | Team 03 - Architecture Factory | `019e3c5b-2ba4-77f2-93ab-81b3a54f7f06` | `gpt-5.4`, high | architecture prep | `CF-W1-SMI-01` | active |
+| 3 | Team 02 - Requirement Factory | `019e3c60-d0ac-7ac0-a8b2-adb623baf30e` | `gpt-5.4`, medium | requirements discovery | next distinct market-intelligence value cycle | active |
+| 4 | Open slot | none | pending | QA verification | `CF-W1-TP-02` after Team 06 handoff | waiting |
+| 5 | Open slot | none | pending | architecture prep | `CF-W1-RH-01` after Team 03 completes `CF-W1-SMI-01` | queued |
+| 6 | Open slot | none | pending | review/release | next QA-accepted handoff | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04 is ready for `CF-W1-TP-02` QA after Team 06 handoff.
+- Team 03 is ready for `CF-W1-RH-01` architecture readiness after active `CF-W1-SMI-01` completes.
+- Team 10 is ready for `CF-W1-TP-02` review after Team 04 accepts.
+- Team 02 is active and should be relaunched again after this discovery cycle completes.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
 ## Gate And Prep Dispatch
 
 Team 10 accepted `CF-W1-SIG-TRIGGER-02A`; Team 00 routed the next gate to Team 03 Architect Signoff.

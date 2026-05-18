@@ -192,6 +192,44 @@ Keep admin, settings, auth/subscription, notifications, and alert convenience wo
 
 ---
 
+# Current Dispatcher Assignment
+
+Date: 2026-05-18
+
+## Assignment
+
+Continue the rolling PO + Requirements discovery lane on a distinct market-intelligence workflow.
+
+Team 02 just refined `CF-W1-RH-01`; Team 00 is queuing that for architecture after active `CF-W1-SMI-01` architecture prep. Do not keep reworking `CF-W1-RH-01` this cycle unless you find a direct inconsistency from the current queue docs.
+
+## Current Active / Routed Items To Exclude
+
+- `CF-W1-TP-02`: active Team 06 implementation.
+- `CF-W1-SMI-01`: active Team 03 architecture readiness.
+- `CF-W1-RH-01`: next architecture-prep candidate queued after `CF-W1-SMI-01`.
+- `CF-W1-SIG-TRIGGER-02A`: accepted and locally committed on Team 06 branch.
+- `CF-W1-SQLAB-01`, `CF-W1-BT-02`, `CF-W1-CAL-01`, `CF-W1-HCTX-01`, `CF-W1-MD-01`, `CF-W1-DQ-02A`, `CF-W1-STRAT-02A`, `CF-W1-UX-01A`, and `CF-W1-AUTH-SUB-01`: accepted branch commits parked for later clean integration.
+
+## Product Priority
+
+Prioritize direct investor/trader value:
+
+- market data and Data Quality evidence;
+- signal reviewability, trigger provenance, strategy trust, calibration, backtesting, Trade Plan research support;
+- historical context, market context, signal-quality learning, smart-money evidence freshness, Research Hub evidence wiring, reviewability, and explainability.
+
+Keep admin, settings, auth/subscription, notifications, and alert convenience work lowest unless they block correctness, privacy, user-data safety, or an accepted branch gate.
+
+## Required Output
+
+- Audit one under-served market-intelligence workflow not already active or queued.
+- Add or refine at least one bounded requirement if evidence supports it.
+- Keep `next-top-10-candidates.md`, `top-10-ready-candidates.md`, `requirements-backlog.md`, and `refinement-queue.md` aligned.
+- Identify the next top unassigned requirement for Team 00 after excluding active/queued/accepted/parked/blocked items.
+- Do not move application-code work to Ready.
+
+---
+
 # Latest Standing Assignment
 
 Date: 2026-05-18
