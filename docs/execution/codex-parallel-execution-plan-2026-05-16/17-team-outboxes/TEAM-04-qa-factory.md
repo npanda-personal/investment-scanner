@@ -4,6 +4,77 @@ Date: 2026-05-18
 
 Mode: focused QA rerun plus docs-only QA planning.
 
+## 2026-05-19 `CF-W1-STRAT-03` Strategy Decision Review Provenance QA Planning
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only QA packet preparation
+- Work item: `CF-W1-STRAT-03`
+- State/mode: QA planning only; no executable validation
+- Owner: Team 04 QA Factory
+- Lane/module: Lane 2 / `strategy-decision-engine`
+- Files changed:
+  - `04-qa/CF-W1-STRAT-03-qa-plan.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - `AGENTS.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/16-team-inboxes/TEAM-04-current-assignment.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-STRAT-03-strategy-decision-review-provenance-requirement.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-STRAT-03-architecture-review.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-STRAT-03-strategy-decision-review-provenance-contract.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-STRAT-03-work-packet.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-STRAT-02A-qa-plan.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-BT-02-qa-plan.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/next-validation-plans.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+  - `backend/src/modules/strategy-decision-engine/strategy-decision-engine.md`
+  - `backend/src/modules/strategy-decision-engine/strategy-decision-engine.service.ts`
+  - `backend/src/modules/strategy-decision-engine/strategy-decision-engine.types.ts`
+  - `backend/tests/modules/strategy-decision-engine/strategy-decision-engine.service.test.ts`
+- Behavior changed:
+  - none; docs-only QA planning
+- Docs changed:
+  - prepared `04-qa/CF-W1-STRAT-03-qa-plan.md`
+  - refreshed `04-qa/next-validation-plans.md`
+  - recorded this handoff in `17-team-outboxes/TEAM-04-qa-factory.md`
+- Contracts changed:
+  - none
+- Result:
+  - Prepared a bounded backend-only QA plan for Strategy Decision provenance and top-level `reasonSummary` exposure in `04-qa/CF-W1-STRAT-03-qa-plan.md`.
+  - Recorded required additive mapping for persisted framework-backed rows to `FRAMEWORK_BACKED` and explicit legacy rows to `LEGACY_FALLBACK` only when they are actually returned.
+  - Recorded strict `legacyIncludedByRequest=true` gating only when `includeLegacy=true` is explicitly requested and the returned row is non-framework-backed.
+  - Recorded default proof-safe legacy exclusion for current candidate and funnel-style reads so the packet cannot weaken existing non-framework-backed filtering.
+  - Recorded request-local `READ_PATH_CREATED` coverage only on the response that creates a row through `latestForInstrument()` and on any `watchlist()` or `portfolio()` item that delegates to that same miss path.
+  - Recorded an explicit reject condition against fabricated durable read-path-created provenance on later history or list reads because current persistence does not store that origin.
+  - Recorded exact `reasonSummary` precedence: blocker, warning, data gap, reason, existing `riskPlan.reasonSummary`, then a neutral research-support fallback.
+  - Recorded exact reject conditions for decision math, query or route behavior, persistence keys, Prisma/schema, repository, frontend, shared UI/DTOs, package manifests, provider/live-data, startup/backfill, and cross-module source widening.
+  - Updated `04-qa/next-validation-plans.md` so `CF-W1-STRAT-03` is visible in the Team 04 queue as QA-plan ready for Team 00 Ready evaluation as one bounded backend-only `strategy-decision-engine` child only.
+- Tests run: none
+- Tests skipped:
+  - all executable validation was skipped because this was a docs-only QA planning pass with explicit instructions not to run tests, builds, services, providers, Prisma commands, UI smoke, or live data
+- Skipped-test reason:
+  - planning-only assignment; no executable validation was authorized or required
+- Assumptions:
+  - Team 00 will keep the child bounded to the reserved `strategy-decision-engine` service/types/doc/test files only
+  - current proof-safe legacy exclusion remains owned by existing query behavior and must not be rewritten in this child
+  - durable read-path-created provenance remains out of scope until a separate schema/repository child is explicitly approved
+- Risks:
+  - implementers could overstate persisted certainty by replaying `READ_PATH_CREATED` on later history/list responses without stored evidence
+  - implementers could loosen current default legacy exclusion while adding provenance fields
+  - implementers could widen the packet into repository, query/route, frontend, or downstream adoption work unless Team 00 keeps the writer set exact
+- Blockers:
+  - executable QA remains blocked until Team 00 promotes the bounded backend-only `strategy-decision-engine` implementation handoff
+  - any widening into decision math, query/route behavior, persistence/schema/repository work, frontend/shared work, package changes, provider/live-data, startup/backfill, or cross-module source remains an explicit reject condition
+- Shared-file requests:
+  - none from Team 04; single-writer reservation remains a Team 00 implementation concern
+- QA-ready for Team 00 Ready evaluation:
+  - `CF-W1-STRAT-03`: yes, as one bounded backend-only `strategy-decision-engine` provenance child only
+- Next gate:
+  - Team 00 Ready evaluation for `CF-W1-STRAT-03`, with exact reservation of the Strategy Decision service/types/doc/test writer set and explicit preservation of proof-safe legacy exclusion plus request-local-only `READ_PATH_CREATED` semantics
+- Evidence notes:
+  - Team 04 used the active execution folder, source packet docs, comparable QA-plan patterns, and current Strategy Decision module source/test surfaces only; no application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, builds, services, providers, or live data were modified or run
+
 ## 2026-05-18 `CF-W1-MD-03` Market Data Signoff Threshold QA Planning
 
 - Team: `TEAM-04` - QA Factory

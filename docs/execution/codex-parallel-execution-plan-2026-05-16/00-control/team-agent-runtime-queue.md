@@ -2982,6 +2982,59 @@ Team 03 completed `CF-W1-STRAT-03` architecture as a Ready candidate after QA pl
 - Team 10: `CF-W1-BT-01A` review only after QA accepts.
 - Team 00: `CF-W1-STRAT-03` Ready evaluation after Team 04 QA plan.
 
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## STRAT-03 Ready Promotion
+
+Team 04 completed the `CF-W1-STRAT-03` QA plan with no blocker. Team 00 promoted `CF-W1-STRAT-03` as a bounded backend-only Strategy Decision implementation slice.
+
+Branch/worktree:
+
+- Branch: `codex/team06-strategy-signal/CF-W1-STRAT-03`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-STRAT-03`
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06: `CF-W1-STRAT-03` implementation after worktree setup.
+- Team 06: `CF-W1-BT-01A` bounded QA-reject rework continues independently.
+- Team 04: `CF-W1-BT-01A` QA rerun after Team 06 rework.
+- Team 04: `CF-W1-STRAT-03` QA after Team 06 handoff.
+- Team 10: review after each QA-accepted handoff.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## BT-01A Rework Complete And BT-03 Discovered
+
+Team 06 completed `CF-W1-BT-01A` QA-reject rework. Team 04 QA rerun can proceed.
+
+Team 02 completed the next requirement discovery cycle and added `CF-W1-BT-03` as the next fresh backtesting value requirement for architecture prep.
+
+## Queued Work
+
+| Queue | Team | Assignment | Status |
+| --- | --- | --- | --- |
+| 1 | Team 04 | `CF-W1-BT-01A` QA rerun in Team 06 worktree | ready |
+| 2 | Team 06 | `CF-W1-STRAT-03` implementation after worktree setup | ready |
+| 3 | Team 03 | `CF-W1-BT-03` architecture prep | ready |
+| 4 | Team 04 | `CF-W1-STRAT-03` QA after Team 06 handoff | waiting |
+| 5 | Team 10 | `CF-W1-BT-01A` or `CF-W1-STRAT-03` review after QA acceptance | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-BT-01A` QA rerun now.
+- Team 06: `CF-W1-STRAT-03` implementation after worktree setup.
+- Team 03: `CF-W1-BT-03` architecture prep now.
+- Team 04: `CF-W1-STRAT-03` QA after implementation handoff.
+- Team 10: review after each QA-accepted handoff.
+
 ## Current Active Agents
 
 | Slot | Team | Agent | Mode | Work Item | Status |

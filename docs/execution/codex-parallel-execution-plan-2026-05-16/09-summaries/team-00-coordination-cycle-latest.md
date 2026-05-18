@@ -1612,6 +1612,54 @@ Spawned agents:
 - Team 06 `019e3d1d-e5df-7c91-b45b-8184cae31643`: `CF-W1-BT-01A` bounded QA-reject rework.
 - Team 04 `019e3d1d-e61a-7622-a5f5-ca7a6cc13a57`: `CF-W1-STRAT-03` QA planning.
 
+---
+
+# Runtime Checkpoint - STRAT-03 Ready Promotion
+
+Date: 2026-05-18
+
+Team 04 completed `CF-W1-STRAT-03` QA planning with no blocker. Team 00 promoted `CF-W1-STRAT-03` as a bounded backend-only Strategy Decision implementation slice.
+
+Branch/worktree:
+
+- Branch: `codex/team06-strategy-signal/CF-W1-STRAT-03`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-STRAT-03`
+
+Teams ready to pick up new tasks:
+
+- Team 06: `CF-W1-STRAT-03` implementation after worktree setup.
+- Team 06: `CF-W1-BT-01A` bounded QA-reject rework continues independently.
+- Team 04: `CF-W1-BT-01A` QA rerun after Team 06 rework.
+- Team 04: `CF-W1-STRAT-03` QA after Team 06 handoff.
+- Team 10: review after each QA-accepted handoff.
+
+---
+
+# Runtime Checkpoint - Next Wave Ready
+
+Date: 2026-05-18
+
+Completed outputs consumed:
+
+- Team 06 completed `CF-W1-BT-01A` QA-reject rework; focused test passed with 28 tests and backend build passed.
+- Team 02 added `CF-W1-BT-03` as a new backtesting proof-basis / overfit guardrail requirement.
+
+Next wave:
+
+- Team 04: `CF-W1-BT-01A` QA rerun.
+- Team 06: `CF-W1-STRAT-03` implementation after worktree setup.
+- Team 03: `CF-W1-BT-03` architecture prep.
+
+Teams ready to pick up new tasks:
+
+- Team 04: `CF-W1-BT-01A` QA rerun now.
+- Team 06: `CF-W1-STRAT-03` implementation after worktree setup.
+- Team 03: `CF-W1-BT-03` architecture prep now.
+- Team 04: `CF-W1-STRAT-03` QA after implementation handoff.
+- Team 10: review after each QA-accepted handoff.
+
+Product Owner action required: no.
+
 Active agents:
 
 - Team 02 `019e3d1a-cf1e-79a2-8c24-096b7d773616`: next distinct direct-value requirement discovery.

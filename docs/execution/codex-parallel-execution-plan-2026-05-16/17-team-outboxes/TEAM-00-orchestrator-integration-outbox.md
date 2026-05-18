@@ -277,6 +277,56 @@ Product Owner action required: no.
 
 ---
 
+# Team 00 Runtime Dispatch - STRAT-03 Ready Promotion
+
+Date: 2026-05-18
+
+## Consumed Output
+
+- Team 04 completed `CF-W1-STRAT-03` QA planning with no blocker.
+
+## Routing
+
+- `CF-W1-STRAT-03` promoted to Ready as one bounded backend-only `strategy-decision-engine` child.
+- Team 06 assignment file created at `16-team-inboxes/TEAM-06-CF-W1-STRAT-03-assignment.md`.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06: `CF-W1-STRAT-03` implementation after worktree setup.
+- Team 06: `CF-W1-BT-01A` bounded QA-reject rework continues independently.
+- Team 04: `CF-W1-BT-01A` QA rerun after Team 06 rework.
+- Team 04: `CF-W1-STRAT-03` QA after Team 06 handoff.
+- Team 10: review after each QA-accepted handoff.
+
+---
+
+# Team 00 Runtime Dispatch - Next Wave Ready
+
+Date: 2026-05-18
+
+## Consumed Outputs
+
+- Team 06 completed `CF-W1-BT-01A` QA-reject rework in reserved scope.
+- Team 02 added `CF-W1-BT-03` as the next fresh backtesting proof-basis / overfit guardrail requirement.
+
+## Routing
+
+- `CF-W1-BT-01A`: route to Team 04 QA rerun.
+- `CF-W1-STRAT-03`: route to Team 06 implementation after worktree setup.
+- `CF-W1-BT-03`: route to Team 03 architecture prep.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-BT-01A` QA rerun now.
+- Team 06: `CF-W1-STRAT-03` implementation after worktree setup.
+- Team 03: `CF-W1-BT-03` architecture prep now.
+- Team 04: `CF-W1-STRAT-03` QA after implementation handoff.
+- Team 10: review after each QA-accepted handoff.
+
+Product Owner action required: no.
+
+---
+
 # Team 00 Runtime Dispatch - Team 02 Relaunch
 
 Date: 2026-05-18

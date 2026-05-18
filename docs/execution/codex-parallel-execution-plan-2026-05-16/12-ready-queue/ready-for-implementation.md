@@ -6,6 +6,8 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+`CF-W1-STRAT-03` is promoted and assigned to Team 06 for a bounded backend-only Strategy Decision provenance implementation in a dedicated worktree. It can run in parallel with `CF-W1-BT-01A` rework because the file reservations are disjoint.
+
 `CF-W1-SMI-01` is promoted and assigned to Team 06 for bounded backend-only Smart Money evidence freshness and partial-trust framing in a dedicated worktree. It can run in parallel with `CF-W1-TP-02` rework because the file reservations are disjoint.
 
 `CF-W1-TP-02` is promoted and assigned to Team 06 for bounded backend-only Trade Plan exit/invalidation semantics implementation. It must be based on accepted branch `codex/team06-strategy-signal/CF-W1-TP-01B` because upstream commit `8ff22fd` is not yet in `dev`.
@@ -1273,3 +1275,76 @@ npm.cmd run build
 ```
 
 Stop and return to Team 00 if characterization requires source changes, schema/generated/route/shared/package/frontend changes, simulation semantics changes, or changes outside the allowed file reservation.
+
+---
+
+## Active Ready Handoff - `CF-W1-STRAT-03`
+
+Date promoted: 2026-05-18
+
+Team 00 evaluated `CF-W1-STRAT-03` after Team 03 architecture prep and Team 04 QA planning. The slice is promoted only as one bounded backend-only `strategy-decision-engine` child.
+
+Gate evidence:
+
+- Requirement: `10-requirements/CF-W1-STRAT-03-strategy-decision-review-provenance-requirement.md`
+- Architecture review: `03-architecture/CF-W1-STRAT-03-architecture-review.md`
+- Contract: `06-contracts/CF-W1-STRAT-03-strategy-decision-review-provenance-contract.md`
+- Work packet: `08-work-packets/CF-W1-STRAT-03-work-packet.md`
+- QA plan: `04-qa/CF-W1-STRAT-03-qa-plan.md`
+- Open decisions: none.
+- Shared/high-risk blocker: none if implementation stays inside reserved Strategy Decision service/types/doc/service-test files.
+
+Branch/worktree:
+
+- Branch: `codex/team06-strategy-signal/CF-W1-STRAT-03`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-STRAT-03`
+
+Allowed files:
+
+- `backend/src/modules/strategy-decision-engine/strategy-decision-engine.service.ts`
+- `backend/src/modules/strategy-decision-engine/strategy-decision-engine.types.ts`
+- `backend/src/modules/strategy-decision-engine/strategy-decision-engine.md`
+- `backend/tests/modules/strategy-decision-engine/strategy-decision-engine.service.test.ts`
+
+Allowed branch-local evidence docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-CF-W1-STRAT-03-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-STRAT-03-developer-handoff.md`
+
+Forbidden files:
+
+- `backend/src/modules/strategy-decision-engine/strategy-decision-engine.repository.ts`
+- `backend/src/modules/strategy-decision-engine/strategy-decision-engine.controller.ts`
+- `backend/src/modules/strategy-decision-engine/strategy-decision-engine.router.ts`
+- `backend/src/modules/strategy-decision-engine/strategy-decision-engine.validation.ts`
+- `backend/src/modules/strategy-decision-engine/strategy-decision-engine.module.ts`
+- `backend/src/modules/strategy-decision-engine/index.ts`
+- `backend/tests/modules/strategy-decision-engine/strategy-decision-engine.repository.test.ts`
+- Prisma schema or migrations
+- generated files
+- backend or frontend route registries
+- frontend `strategy-decision-engine` files
+- shared backend utilities or shared DTOs
+- shared frontend components
+- package manifests
+- upstream/downstream source in Strategy Framework, Signal Generation, Calibration, DQE, Smart Money, Market Context, Research Hub, or Trade Plan
+- provider, live-data, startup/backfill, paid/cloud, broker, telemetry, or credentials
+
+Required behavior:
+
+- add additive provenance metadata for `FRAMEWORK_BACKED`, `LEGACY_FALLBACK`, and request-local `READ_PATH_CREATED`;
+- keep `READ_PATH_CREATED` honest as request-local provenance on the response that creates a row, not durable replayable stored origin;
+- set `legacyIncludedByRequest=true` only when the caller explicitly used `includeLegacy=true` and the returned row is non-framework-backed;
+- preserve proof-safe default legacy exclusion;
+- add top-level `reasonSummary` using the approved precedence: first blocker, first warning, first data gap, first reason, existing `riskPlan.reasonSummary`, then neutral research-support fallback;
+- preserve current decision math, query behavior, route behavior, persistence keys, candidate-date defaults, and existing DTO fields.
+
+Required validation after implementation:
+
+```powershell
+cd backend
+npm.cmd test -- strategy-decision-engine.service.test.ts --runInBand
+npm.cmd run build
+```
+
+Stop and return to Team 00 if implementation requires repository/controller/router/validation/module/index edits, schema/generated/route/shared/package/frontend/provider/startup/live changes, durable stored read-path provenance, decision math changes, query/route changes, persistence-key changes, or downstream consumer adoption.

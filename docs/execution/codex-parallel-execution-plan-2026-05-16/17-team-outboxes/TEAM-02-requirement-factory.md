@@ -1,6 +1,108 @@
 # TEAM-02 Requirement Factory Outbox
 
-Date: 2026-05-18
+Date: 2026-05-19
+
+Mode: docs-only requirement discovery after rechecking root `AGENTS.md`, the live runtime queue, ready/blocked queues, next-top-10 candidates, backlog/refinement queues, current module audits, and current backtesting source docs. No application code, tests, Prisma, route registries, package manifests, generated files, Team 00 control docs, Ready queue files, architecture docs, or QA docs changed.
+
+## 2026-05-19 Backtesting Proof-Basis Discovery
+
+## Work Item
+
+Pick a new under-served direct investor/trader-value workflow that is not already active, routed, sequencing-only, or consent-blocked, then add one bounded requirement and refresh Team 02 ranking docs to match the live queue state.
+
+## Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-BT-03-backtesting-proof-basis-overfit-guardrail-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+## Files Inspected
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/team-agent-runtime-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/ready-for-implementation.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/blocked-by-upstream-dependency.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/blocked-by-decision.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-backtesting-trade-risk.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-strategy-signal-rules.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-market-data-data-quality.md`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.types.ts`
+- `frontend/src/features/backtesting-strategy-lab/components/BacktestingStrategyLabPage.tsx`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-BT-02-backtesting-outcome-review-traceability-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-BT-01A-backtesting-dq-fail-closed-characterization-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/risk-register.md`
+
+## Audited Workflow
+
+Backtesting proof-basis and overfit guardrails: making it explicit when a historical run is single-window-only, sample-limited, and missing broader validation evidence even if the raw run metrics look strong.
+
+## Evidence Summary
+
+- `audit-backtesting-trade-risk.md` already records that overfit controls are diagnostic only and that the module has no walk-forward, holdout, parameter-sensitivity, or minimum-proof gate.
+- `backtesting-strategy-lab.md` explicitly says the module does not own walk-forward optimization, Monte Carlo, or advanced quant research.
+- Current service/UI evidence already exposes trade-count warnings, benchmark gaps, drawdown warnings, weak-exit warnings, availability, data coverage, and realism warnings, but not one explicit proof-basis summary.
+- `CF-W1-BT-02` already covers canonical review disposition and `CF-W1-BT-01A` already covers DQ characterization, so the remaining gap is distinct rather than duplicate.
+- The live queue makes `CF-W1-STRAT-03`, `CF-W1-BT-01A`, `CF-W1-RH-01`, `CF-W1-L3-TREV-02`, and `CF-W1-SQLAB-02A` routed, active, or sequencing-controlled rather than fresh Team 02 discovery openings.
+
+## Requirement Added
+
+Added `CF-W1-BT-03-backtesting-proof-basis-overfit-guardrail-requirement.md`.
+
+Bounded scope:
+
+- explicit single-window-only proof framing;
+- explicit absence of holdout, walk-forward, and parameter-sensitivity evidence;
+- explicit weak-sample proof warnings;
+- additive list/detail proof summary later;
+- no advanced validation engine, schema, route, shared UI, or simulation rewrite in the first child.
+
+## Queue Delta
+
+- `CF-W1-BT-03` is now the top fresh Team 02 discovery item.
+- `CF-W1-STRAT-03` is demoted from "next Team 02 discovery item" because it is already routed to Team 03 architecture in the live runtime queue.
+- `CF-W1-BT-01A` is demoted from "next Team 02 discovery item" because it is already in QA.
+- `CF-W1-RH-01` and `CF-W1-L3-TREV-02` remain strong Team 00 parallel-safe candidates, but as Ready-evaluation/routing work rather than new requirement discovery.
+- `CF-W1-SQLAB-02A` remains sequencing-only after `CF-W1-SQLAB-01`.
+
+## Team 00 Parallel-Safe Candidates
+
+1. `CF-W1-BT-03`
+   - route to Team 03 for architecture/contract/work-packet prep;
+   - then Team 04 for QA planning.
+2. `CF-W1-RH-01`
+   - keep as Team 00 Ready evaluation; no duplicate Team 03/04 prep.
+3. `CF-W1-L3-TREV-02`
+   - keep as Team 00 Ready evaluation when Today Review writer sequencing is safe.
+4. `CF-W1-SQLAB-02A`
+   - keep as sequencing-only after `CF-W1-SQLAB-01`.
+
+## Blockers / Guardrails
+
+- Do not reopen `CF-W1-BT-02`; the new gap is proof-basis framing, not list/detail review disposition.
+- Do not reopen `CF-W1-BT-01A`; that slice is already in gate flow and covers DQ characterization, not proof-basis semantics.
+- Stop if `BT-03` widens into walk-forward engines, holdout engines, parameter-sweep tooling, schema changes, shared UI changes, or simulation-math rewrites.
+- `CF-W1-STRAT-02B1` remains explicit consent-blocked and should not be substituted in as the next fresh Team 02 discovery item.
+
+## Routing Recommendation
+
+- Team 03 routing recommended: yes, for new `CF-W1-BT-03` prep.
+- Team 04 routing recommended: yes, immediately after Team 03 packet completion.
+- Team 03/04 rerouting not recommended for `CF-W1-RH-01`, `CF-W1-L3-TREV-02`, or `CF-W1-SQLAB-02A`; those already have prep and now need Team 00 sequencing or Ready evaluation instead.
+
+## Validation
+
+- Tests run: none
+- Builds run: none
+- UI checks run: none
+- Live local data checks run: none
+- Skipped reason: Team 02 stayed inside docs-only requirement/ranking scope
 
 Mode: docs-only ranking refresh after rechecking the live runtime queue, Ready queue, blocked queues, and recent Team 00 / Team 03 / Team 04 / Team 06 outboxes. No application code, tests, Prisma, route registries, package manifests, generated files, Team 00 control docs, Ready queue files, or architecture / QA docs changed.
 
