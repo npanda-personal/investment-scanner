@@ -4,6 +4,71 @@ Date: 2026-05-18
 
 Mode: focused QA rerun plus docs-only QA planning.
 
+## 2026-05-18 `CF-W1-TP-02` Trade Plan Exit/Invalidation Semantics QA Planning
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only QA packet preparation
+- Work item: `CF-W1-TP-02`
+- State/mode: QA planning only; no executable validation
+- Owner: Team 04 QA Factory
+- Lane/module: Lane 2 / `trade-plan-risk-engine`
+- Files changed:
+  - `04-qa/CF-W1-TP-02-qa-plan.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - `AGENTS.md`
+  - `10-requirements/CF-W1-TP-02-trade-plan-exit-invalidation-semantics-requirement.md`
+  - `03-architecture/CF-W1-TP-02-architecture-review.md`
+  - `06-contracts/CF-W1-TP-02-exit-invalidation-semantics-contract.md`
+  - `08-work-packets/CF-W1-TP-02-work-packet.md`
+  - `17-team-outboxes/TEAM-03-architecture-factory.md`
+  - `04-qa/CF-W1-TP-01B-qa-plan.md`
+  - `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.service.ts`
+  - `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.types.ts`
+  - `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.validation.ts`
+  - `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.geometry.ts`
+  - `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.md`
+  - `backend/tests/modules/trade-plan-risk-engine/trade-plan-risk-engine.service.test.ts`
+  - `backend/tests/trade-plan-risk-engine.paper-readiness.test.ts`
+- Behavior changed:
+  - none; docs-only QA planning
+- Docs changed:
+  - prepared `04-qa/CF-W1-TP-02-qa-plan.md`
+  - recorded this handoff in `17-team-outboxes/TEAM-04-qa-factory.md`
+- Contracts changed:
+  - none
+- Result:
+  - Prepared the bounded backend-only QA plan for additive Trade Plan `exitConditions` and `invalidationConditions`.
+  - Recorded exact acceptance scenarios for additive structured exit/invalidation semantics, compatibility-only treatment of legacy `target` and `invalidationRules`, and request-boundary rejection for non-finite or out-of-range `targetRewardRisk` outside `0.5` to `5.0` inclusive.
+  - Preserved `CF-W1-TP-01B` DQ hard-block regression requirements so missing DQ proof, `UNUSABLE`, `NOT_READY`, `LIMITED`, `ILLIQUID`, and signal-ineligible states cannot quietly become ready because semantics fields were added.
+  - Added product-language checks that reject `price target`, `profit target`, `buy now`, `sell now`, `must buy`, `must sell`, and `guaranteed` wording in trusted output/docs/tests.
+  - Added exact reject conditions for repository, Prisma/schema/migrations, routes, shared files, frontend, Today Review, Strategy Decision, backtesting, package/generated, provider/live-data, paid/cloud, telemetry, and broker scope drift.
+  - Recorded that this docs-only QA packet is parallel-safe with active `CF-W1-SIG-TRIGGER-02A` review/signoff because the write scopes do not overlap.
+- Tests run: none
+- Tests skipped:
+  - all executable validation was skipped because this was a docs-only QA planning pass with no Team 00 Ready promotion or implementation handoff
+- Skipped-test reason:
+  - planning-only assignment; no builds/tests/services/providers were authorized or required
+- Assumptions:
+  - Team 00 will keep the first `TP-02` child bounded to the reserved Trade Plan service/types/validation/geometry/doc/test files only
+  - the first child remains additive and backend-only, with legacy `target` and `invalidationRules` preserved only for compatibility
+  - Team 00 will treat this handoff as QA planning complete but not as Ready promotion
+- Risks:
+  - implementers could add structured `exitConditions` and `invalidationConditions` but leave paper-readiness logic hard-dependent on legacy `target`
+  - validation could remain permissive for `targetRewardRisk` and preserve out-of-range semantics drift
+  - scope could drift into repository/schema/routes/frontend/Today Review/backtesting unless Team 00 keeps the writer set exact
+- Blockers:
+  - the packet is still Not Ready for Implementation until Team 00 performs sequencing and readiness evaluation
+  - executable QA remains blocked until Team 00 promotes a bounded implementation handoff
+- Shared-file requests:
+  - none from Team 04; single-writer reservation remains a Team 00 implementation concern
+- QA-ready for Team 00 sequencing/readiness evaluation:
+  - `CF-W1-TP-02`: yes, as one bounded backend-only `trade-plan-risk-engine` semantics child only
+- Next gate:
+  - Team 00 sequencing and readiness evaluation for `CF-W1-TP-02`; do not move directly to Ready from Team 04
+- Evidence notes:
+  - Team 04 used the active execution folder plus current Trade Plan module/test/doc surfaces only; no application source, tests, Prisma, routes, shared files, builds, services, or providers were modified or run
+
 ## 2026-05-18 `CF-W1-SIG-TRIGGER-02A` Signal Generation Trigger Audit QA Planning
 
 - Team: `TEAM-04` - QA Factory
