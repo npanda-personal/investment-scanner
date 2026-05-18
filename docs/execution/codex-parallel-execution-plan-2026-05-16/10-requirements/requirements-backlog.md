@@ -2,7 +2,7 @@
 
 Date: 2026-05-18
 
-Status: Refreshed by Team 02 after the 2026-05-18 Research Hub audit. Product Owner action is not required; all policy-resolved items remain refinement/architecture/QA-prep items only until Team 00 promotes exact implementation handoffs. Product Owner corrected the priority model on 2026-05-18: direct investor/trader value should lead, especially market data, Data Quality, signals, strategies, backtests, calibration, historical context, market context, trade-plan research support, and research evidence. Admin, settings, auth/subscription, notifications, and alert convenience work should be lowest priority unless needed for correctness, privacy, or user-data safety. After excluding active, accepted, parked, and blocked items, the next top unassigned investor/trader-value item is `CF-W1-RH-01`.
+Status: Refreshed by Team 02 after the 2026-05-18 Today Review candidate-provenance audit. Product Owner action is not required; all policy-resolved items remain refinement/architecture/QA-prep items only until Team 00 promotes exact implementation handoffs. Product Owner corrected the priority model on 2026-05-18: direct investor/trader value should lead, especially market data, Data Quality, signals, strategies, backtests, calibration, historical context, market context, trade-plan research support, and research evidence. Admin, settings, auth/subscription, notifications, and alert convenience work should be lowest priority unless needed for correctness, privacy, or user-data safety. After excluding active, queued, accepted, parked, and blocked items, the next top unassigned investor/trader-value item is `CF-W1-L3-TREV-02`.
 
 ## New Audit-Derived Candidates
 
@@ -40,13 +40,13 @@ These are the investor/trader value priorities for this docs-only refinement cyc
 | 9 | CF-W1-L3-INTEL-02 | Review traceability remains useful once higher-value trust layers are settled. | Architecture contract and QA plan for review-output explainability. |
 | 10 | CF-W1-L3-ALERT-03 | Post-trigger follow-through only matters after the evidence stack is stronger. | Architecture contract and QA plan for outcome traceability. |
 
-## Current Next Unassigned Non-Blocked Pull
+## Current Next Unassigned Pull Stack
 
 | Rank | ID | Why now | Next gate |
 | --- | --- | --- | --- |
-| 1 | CF-W1-RH-01 | Research Hub already renders an actionability surface but still hard-codes Today Review, Trade Plan, Signal Quality, and Calibration as unwired placeholders. | Team 03 architecture contract and Team 04 QA plan for bounded actionability evidence wiring. |
-| 2 | CF-W1-L3-TREV-02 | Today Review candidate detail can expose auditable provenance without reopening broad signal or trade-plan logic. | Team 03 contract split and Team 04 QA prep after `CF-W1-RH-01` dispatch. |
-| 3 | CF-W1-RH-02 | Research Hub `whatChanged` currently simulates deltas and needs a comparison-basis rule before it can claim temporal evidence. | Team 03 decision on no-schema comparison basis vs later storage split. |
+| 1 | CF-W1-L3-TREV-02 | Today Review candidate detail can expose auditable provenance without reopening broad signal or trade-plan logic, and the stored snapshots already exist. | Team 03 contract split and Team 04 QA prep. |
+| 2 | CF-W1-RH-02 | Research Hub `whatChanged` currently simulates deltas and needs a comparison-basis rule before it can claim temporal evidence. | Team 03 decision on no-schema comparison basis vs later storage split. |
+| 3 | CF-W1-SQLAB-02 | Signal outcome learning remains the next higher-value parent requirement after the reviewability follow-ons, but it stays sequenced behind `CF-W1-SQLAB-02A`. | Team 03 post-preview follow-up once `CF-W1-SQLAB-02A` closes. |
 
 ## Intake Rules
 
@@ -159,4 +159,4 @@ These are documentation-prep candidates only. None is app-code Ready for Impleme
 
 `CF-W1-UX-05` remains a valid Product/UX copy-policy candidate, but it is outside this cycle's top investor/trader review priorities because its approved first child should be sequenced with `CF-W1-UX-02`; shared `StatusBadge` work remains future.
 
-`CF-W1-TP-02` is active Team 06 implementation and `CF-W1-SMI-01` is active Team 03 architecture prep. After the 2026-05-18 Research Hub audit and after excluding active, accepted, parked, and blocked items, the filtered next unassigned docs-only item for Team 00 routing is `CF-W1-RH-01`, followed by `CF-W1-L3-TREV-02` and `CF-W1-RH-02`. Admin/settings/auth/subscription/notification and alert convenience work should not preempt those lanes.
+`CF-W1-TP-02` is active Team 06 implementation, `CF-W1-SMI-01` is active Team 03 architecture prep, and `CF-W1-RH-01` is already queued behind `CF-W1-SMI-01`. After the 2026-05-18 Today Review candidate-provenance audit and after excluding active, queued, accepted, parked, and blocked items, the filtered next unassigned docs-only item for Team 00 routing is `CF-W1-L3-TREV-02`, followed by `CF-W1-RH-02`. Admin/settings/auth/subscription/notification and alert convenience work should not preempt those lanes.

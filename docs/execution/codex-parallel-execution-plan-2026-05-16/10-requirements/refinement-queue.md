@@ -4,12 +4,13 @@ Date: 2026-05-18
 
 Status: Refreshed by Team 02 after Team 06 `CF-W1-SIG-TRIGGER-02A` launch and the Product Owner investor-value priority correction. This queue is refinement-only; Team 00 owns Ready queue movement.
 
-Current dispatch correction on 2026-05-18 after the Research Hub audit:
+Current dispatch correction on 2026-05-18 after the Today Review candidate-provenance audit:
 
 - `CF-W1-TP-02` is active Team 06 implementation and should stay out of the next unassigned pull.
 - `CF-W1-SMI-01` is active Team 03 architecture prep and should stay out of the next unassigned pull.
+- `CF-W1-RH-01` is queued behind `CF-W1-SMI-01` architecture prep and should stay out of the next unassigned pull.
 - `CF-W1-SQLAB-02`, `CF-W1-STRAT-02`, and `CF-W1-MD-02` remain high-value parent items but are still sequenced or blocked for new bounded routing.
-- After excluding active, accepted, parked, and blocked items, the next top unassigned non-blocked requirement is `CF-W1-RH-01`.
+- After excluding active, queued, accepted, parked, and blocked items, the next top unassigned requirement is `CF-W1-L3-TREV-02`.
 
 ## Team 02 Current Priority Override
 
@@ -24,18 +25,18 @@ Current ordering is based on two filters:
 
 | Rank | ID | Why it is ahead now | Team 00 routing note |
 | --- | --- | --- | --- |
-| 1 | `CF-W1-RH-01` | Research Hub already exposes the actionability panel but still hard-codes major trust dimensions as unwired placeholders. | Route to Team 03 and Team 04 now. |
-| 2 | `CF-W1-L3-TREV-02` | Today Review detail can expose candidate-level provenance and evidence timing without reopening active implementation slices. | Route after `CF-W1-RH-01` enters prep. |
-| 3 | `CF-W1-RH-02` | Research Hub should stop implying auditable deltas until a comparison basis exists. | Route behind `CF-W1-RH-01`; split if storage is required. |
-| 4 | `CF-W1-SQLAB-02` | High-value parent item, but still sequenced behind earlier accepted/blocked child work. | Keep visible; do not present as the next unassigned pull. |
-| 5 | `CF-W1-STRAT-02` | High-value parent item, but durable revision history remains blocked. | Keep visible; do not present as the next unassigned pull. |
-| 6 | `CF-W1-MD-02` | High-value ADR item, but still schema/storage-blocked for implementation-facing prep. | Keep visible as ADR-only. |
+| 1 | `CF-W1-L3-TREV-02` | Today Review detail can expose candidate-level provenance and evidence timing without reopening active implementation slices, and it is not already queued. | Route to Team 03 and Team 04 now. |
+| 2 | `CF-W1-RH-02` | Research Hub should stop implying auditable deltas until a comparison basis exists. | Route after `CF-W1-L3-TREV-02`; split if storage is required. |
+| 3 | `CF-W1-SQLAB-02` | Highest-value parent item still visible after the reviewability follow-ons, but the post-preview path is sequenced. | Keep visible; do not present as the immediate pull. |
+| 4 | `CF-W1-STRAT-02` | High-value parent item, but durable revision history remains blocked. | Keep visible; do not present as the next unassigned pull. |
+| 5 | `CF-W1-MD-02` | High-value ADR item, but still schema/storage-blocked for implementation-facing prep. | Keep visible as ADR-only. |
+| 6 | `CF-W1-RH-01` | Already queued after active `CF-W1-SMI-01`; keep visible for sequencing clarity, not for immediate routing. | Do not reroute this cycle unless Team 00 changes the queue. |
 
 ### Candidates Team 00 Can Route In Parallel Right Now
 
-- `CF-W1-RH-01`
 - `CF-W1-L3-TREV-02`
 - `CF-W1-RH-02`
+- `CF-W1-SQLAB-02` remains visible but is not the immediate pull.
 
 ### Additional Discovery Candidates Added This Cycle
 
@@ -88,13 +89,13 @@ These are docs-only discovery priorities. They do not override Team 00's current
 | 9 | CF-W1-L3-INTEL-02 | Review traceability remains useful once higher-value trust layers are settled. | Architecture contract and QA plan for review-output explainability. |
 | 10 | CF-W1-L3-ALERT-03 | Post-trigger follow-through only matters after the evidence stack is stronger. | Architecture contract and QA plan for outcome traceability. |
 
-## Next Unassigned Non-Blocked Pull
+## Next Unassigned Pull Stack
 
 | Rank | ID | Why now | Next refinement need |
 | --- | --- | --- | --- |
-| 1 | CF-W1-RH-01 | Research Hub already exposes the actionability surface but still hard-codes major trust dimensions as unwired placeholders. | Team 03/04 packet prep for bounded actionability evidence wiring. |
-| 2 | CF-W1-L3-TREV-02 | Today Review candidate detail can become auditable through provenance labels and evidence timing without broad upstream rewrites. | Team 03/04 packet prep after `CF-W1-RH-01`. |
-| 3 | CF-W1-RH-02 | Research Hub `whatChanged` should stop simulating deltas unless a safe prior comparison basis exists. | Team 03 decision on no-schema comparison vs later storage split. |
+| 1 | CF-W1-L3-TREV-02 | Today Review candidate detail can become auditable through provenance labels and evidence timing without broad upstream rewrites. | Team 03/04 packet prep now. |
+| 2 | CF-W1-RH-02 | Research Hub `whatChanged` should stop simulating deltas unless a safe prior comparison basis exists. | Team 03 decision on no-schema comparison vs later storage split. |
+| 3 | CF-W1-SQLAB-02 | Signal outcome learning remains the next higher-value parent item after the current reviewability follow-ons, but it stays sequenced behind `CF-W1-SQLAB-02A`. | Team 03 post-preview follow-up once `CF-W1-SQLAB-02A` closes. |
 
 ## Decision Inbox State
 
@@ -194,16 +195,15 @@ These items are not implementation-ready.
 | 9 | CF-W1-L3-INTEL-02 | Team 00/03 reservation and QA plan for portfolio intelligence review traceability. |
 | 10 | CF-W1-L3-ALERT-03 | Team 00/03 reservation and QA plan for prepared alert follow-through packet once active alert writers clear. |
 
-## Next-Wave Discovery Queue
+## Queued And Follow-On Discovery Queue
 
-These candidates are intentionally outside the current top 10 routing stack but are now specific enough to feed a future Team 03 architecture cycle.
+These candidates are not the immediate next unassigned pull because they are either already queued, already active, or explicitly sequenced behind the current top stack.
 
 | Rank | ID | Prep needed |
 | --- | --- | --- |
-| 11 | CF-W1-RH-01 | Team 03/04 contract and QA prep for bounded Research Hub actionability evidence wiring. |
-| 12 | CF-W1-SMI-01 | Team 03/04 contract and QA prep for Smart Money freshness and partial-trust semantics. |
-| 13 | CF-W1-L3-TREV-02 | Team 03/04 contract and QA prep for Today Review candidate snapshot provenance. |
-| 14 | CF-W1-RH-02 | Team 03/04 decision on no-schema delta basis vs later storage split for Research Hub `whatChanged`. |
+| 11 | CF-W1-RH-01 | Team 03/04 contract and QA prep for bounded Research Hub actionability evidence wiring once the queued slot behind `CF-W1-SMI-01` opens. |
+| 12 | CF-W1-SMI-01 | Team 03/04 contract and QA prep for Smart Money freshness and partial-trust semantics while the active architecture cycle runs. |
+| 13 | CF-W1-RH-02 | Team 03/04 decision on no-schema delta basis vs later storage split for Research Hub `whatChanged` after `CF-W1-L3-TREV-02`. |
 
 ## Current Priority Refinement Output
 

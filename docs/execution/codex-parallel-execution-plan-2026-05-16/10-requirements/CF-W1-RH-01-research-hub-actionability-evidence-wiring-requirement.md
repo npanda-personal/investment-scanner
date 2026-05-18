@@ -80,4 +80,4 @@ This is a `10-requirements/**` discovery item now, with later work centered in `
 
 ## Next Gate
 
-Product refinement is sufficient for Team 03 and Team 04 to prepare a bounded Research Hub actionability contract and QA plan. After the 2026-05-18 routing changes that put `CF-W1-TP-02` into active Team 06 implementation and `CF-W1-SMI-01` into active Team 03 architecture prep, this is the next top unassigned non-blocked requirement Team 00 should pull for docs-only prep.
+Product refinement is sufficient for Team 03 and Team 04 to prepare a bounded Research Hub actionability contract and QA plan. Team 00 has already queued this requirement behind active `CF-W1-SMI-01` architecture prep, so it should stay in that queued slot unless the dispatcher explicitly changes the sequence.

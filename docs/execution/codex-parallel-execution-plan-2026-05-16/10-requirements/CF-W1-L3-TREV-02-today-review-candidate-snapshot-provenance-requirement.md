@@ -8,13 +8,14 @@ Audit-derived requirement draft. Not Ready for Implementation.
 
 ## Product Value
 
-Today Review candidate detail should explain which persisted evidence actually justified publication of a candidate and how old that evidence was at publication time. Traders reviewing a shortlist candidate need more than a reason summary and raw snapshot blobs; they need auditable source-module provenance, evidence dates, and clear unavailable/compatibility-only labels when parts of the snapshot are missing or legacy-shaped.
+Today Review candidate detail should explain which persisted evidence actually justified publication of a candidate and how old that evidence was at publication time. Traders reviewing a shortlist candidate need more than a reason summary and raw snapshot blobs; they need auditable source-module provenance, publication-time timestamps, and clear unavailable or compatibility-only labels when parts of the snapshot are missing or legacy-shaped.
 
 ## Evidence
 
 - `backend/src/modules/today-trade-review/today-trade-review.types.ts` stores `dataQualitySnapshot`, `marketContextSnapshot`, `strategyProofSnapshot`, `tradePlanSnapshot`, and `sourceSignalSnapshot` largely as `Record<string, unknown> | null`.
 - The same types file already has a structured `TodayReviewCandidateExplainability` model with `promotionReasons`, `watchReasons`, `blockers`, and optional `evidenceDate` on each reason, which shows the module is already moving toward explicit provenance.
-- `frontend/src/features/today-trade-review/components/TodayReviewCandidateDetailPage.tsx` still renders broad "Available / Unavailable" support fields and target/reward compatibility wording instead of a source-dated provenance chain.
+- `backend/src/modules/today-trade-review/today-trade-review.types.ts` already stores `createdAt`, `updatedAt`, and `TodayReviewSourceSnapshot.generatedAt`, so the first child can expose publication-time evidence timing without recomputing upstream modules.
+- `frontend/src/features/today-trade-review/components/TodayReviewCandidateDetailPage.tsx` still renders broad "Available / Unavailable" support fields such as `Readiness evidence`, `Strategy proof evidence`, and `Trade-plan proof-chain` instead of a source-dated provenance chain.
 - `backend/src/modules/today-trade-review/today-trade-review.md` says candidates snapshot publication-time state so the page does not recompute the full upstream graph on normal load, which makes stored provenance a direct trust requirement rather than a nice-to-have.
 
 ## Bounded Requirement
@@ -23,14 +24,16 @@ Define a bounded Today Review detail follow-on so candidate snapshots expose aud
 
 The first child should focus on:
 
-- stable provenance labels for each stored upstream snapshot;
-- evidence date or publication-time timestamp fields where the module already owns them;
+- stable provenance labels for each stored upstream snapshot and explainability reason source;
+- evidence date, candidate publication timestamp, or stored snapshot timestamp fields where the module already owns them;
 - compatibility-only labels when snapshot substructures are legacy, partial, or unavailable;
-- read-only research-support framing for plan, proof, and signal support.
+- read-only research-support framing for plan, proof, and signal support;
+- no target-language cleanup in this child because that stays in the Trade Plan semantics stream.
 
 ## Acceptance Criteria
 
 - Candidate detail can identify which source modules contributed publication evidence and when that evidence was dated or stored.
+- Candidate detail shows whether displayed timing came from underlying evidence, candidate publication time, or a compatibility fallback.
 - Stored snapshots that are partial, legacy-shaped, or unavailable are labeled explicitly instead of appearing silently complete.
 - Reason summaries, blockers, and watch reasons stay consistent with the stored provenance chain.
 - The detail view remains read-only and does not recompute or mutate upstream evidence on load.
@@ -73,4 +76,4 @@ This discovery item is requirement-only now and does not overlap Team 06's activ
 
 ## Next Gate
 
-Product refinement is sufficient for Team 03 and Team 04 to prepare a bounded Today Review candidate-provenance contract once `CF-W1-L3-TREV-01` is no longer the immediate Today Review focus. Team 00 should keep it as a next-wave reviewability candidate behind the current top stack.
+Product refinement is sufficient for Team 03 and Team 04 to prepare a bounded Today Review candidate-provenance contract once `CF-W1-RH-01` is queued behind active `CF-W1-SMI-01` architecture prep. After excluding active, queued, accepted, parked, and blocked items, this is the next top unassigned market-intelligence requirement Team 00 should pull for docs-only prep.
