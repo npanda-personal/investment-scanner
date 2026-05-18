@@ -1666,6 +1666,25 @@ Teams ready to pick up new tasks:
 - Team 03: `CF-W1-BT-02` Architect Signoff after Team 10 acceptance.
 - Team 04: `CF-W1-CAL-01` QA planning after Team 03 output.
 
+---
+
+# CAL-01 QA Planning Dispatch
+
+Date: 2026-05-18
+
+Team 03 completed `CF-W1-CAL-01` architecture as a Ready candidate after QA planning. Team 00 committed it as `15f643f docs: prepare calibration reliability architecture`.
+
+Spawned:
+
+- Team 04 `019e3bf0-ea7e-7ee0-bf0d-37e9ca02c408`: docs-only `CF-W1-CAL-01` QA planning.
+
+Teams ready to pick up new tasks:
+
+- Team 10: `CF-W1-BT-02` review after QA acceptance.
+- Team 03: `CF-W1-BT-02` Architect Signoff after Team 10 acceptance.
+- Team 00: `CF-W1-CAL-01` Ready evaluation after QA plan acceptance.
+- Team 02: next persistent market-intelligence discovery cycle when relaunched.
+
 ## Dispatch Result
 
 Spawned Team 04 QA Factory:

@@ -1238,3 +1238,31 @@ Spawned Team 04 QA Factory:
 - Team 03: `CF-W1-BT-02` Architect Signoff after Team 10 accepts.
 - Team 04: `CF-W1-CAL-01` QA planning after Team 03 output.
 - Team 02: next persistent requirement discovery cycle when a slot opens.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
+## CAL-01 QA Planning Dispatch
+
+Team 03 completed `CF-W1-CAL-01` architecture as a Ready candidate after QA planning. Team 00 committed the architecture packet as `15f643f`.
+
+Spawned Team 04 QA Factory:
+
+- Agent: `019e3bf0-ea7e-7ee0-bf0d-37e9ca02c408`
+- Work item: `CF-W1-CAL-01`
+- Scope: docs-only QA planning.
+
+## Active Agents
+
+- Team 04 `019e3bef-6ec0-7d73-aa02-ccfaa1cdab49`: `CF-W1-BT-02` QA rerun.
+- Team 04 `019e3bf0-ea7e-7ee0-bf0d-37e9ca02c408`: `CF-W1-CAL-01` QA planning.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 10: `CF-W1-BT-02` review after QA accepts.
+- Team 03: `CF-W1-BT-02` Architect Signoff after Team 10 accepts.
+- Team 00: `CF-W1-CAL-01` Ready evaluation after Team 04 QA plan accepts.
+- Team 02: next persistent requirement discovery cycle when a slot opens.
