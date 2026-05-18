@@ -6,6 +6,11 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+2026-05-18 Team 00 promotion update:
+
+- `CF-W1-STRAT-02A` is promoted to Ready and assigned to Team 06 in a dedicated worktree for bounded no-schema Strategy Framework rule metadata and DQ gate exposure.
+- `CF-W1-DQ-02A` is promoted to Ready and assigned to Team 05 in a dedicated worktree for bounded backend-only Data Quality Engine currentness evidence.
+
 `CF-W1-SQLAB-01` was promoted by Team 00 on 2026-05-18 and assigned to Team 06 in a dedicated worktree for bounded backend-only Signal Quality Lab implementation.
 
 `CF-W1-SQLAB-02A` is active in Team 04 QA planning for the no-schema Signal Quality Lab preview child. It is not a Ready item yet.
@@ -26,6 +31,8 @@ No available application-code item is currently waiting unassigned in Ready.
 
 | ID | Owner | Branch | Worktree | Scope | Status |
 | --- | --- | --- | --- | --- | --- |
+| `CF-W1-STRAT-02A` | Team 06 - Strategy / Signal / Risk | `codex/team06-strategy-signal/CF-W1-STRAT-02A` | `../investment-scanner-worktrees/team06-CF-W1-STRAT-02A` | No-schema Strategy Framework rule metadata and DQ gate trust exposure | Ready and assigned to Team 06 |
+| `CF-W1-DQ-02A` | Team 05 - Market Data / Data Quality | `codex/team05-market-data/CF-W1-DQ-02A` | `../investment-scanner-worktrees/team05-CF-W1-DQ-02A` | Backend-only DQE currentness evidence and fail-closed propagation | Ready and assigned to Team 05 |
 | `CF-W1-L3-PORT-01A` | Team 07 - Portfolio / Watchlist / Alerts | `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A` | `../investment-scanner-worktrees/team07-CF-W1-L3-PORT-01A` | Backend-only portfolio-management readiness DTOs | Rejected / Rework after Team 10 review; Team 07 revision pending |
 | `CF-W1-TP-01B` | Team 06 - Strategy / Signal / Risk | `codex/team06-strategy-signal/CF-W1-TP-01B` | `../investment-scanner-worktrees/team06-CF-W1-TP-01B` | Backend-only Trade Plan DQ hard-block and target compatibility | Implemented in worktree; Team 10 review pending |
 | `CF-W1-NOTIF-02` | Team 09 - Platform / Auth / Subscription / Notifications | `codex/team09-platform/CF-W1-NOTIF-02` | `../investment-scanner-worktrees/team09-CF-W1-NOTIF-02` | Backend-only local notification log redaction | Ready and pulled by Team 09 for implementation |

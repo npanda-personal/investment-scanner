@@ -200,3 +200,75 @@ npm.cmd run build
 ## Next Gate
 
 After rework, return to Team 04 QA rerun, then Team 10 re-review.
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Implement `CF-W1-STRAT-02A` in a dedicated Team 06 worktree after Team 00 Ready promotion.
+
+## Branch / Worktree
+
+- Branch: `codex/team06-strategy-signal/CF-W1-STRAT-02A`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-STRAT-02A`
+
+## Allowed Files
+
+- `backend/src/modules/strategy-framework/strategy-framework.registry.ts`
+- `backend/src/modules/strategy-framework/strategy-framework.types.ts`
+- `backend/src/modules/strategy-framework/strategy-framework.service.ts`
+- `backend/src/modules/strategy-framework/strategy-framework.md`
+- `backend/tests/modules/strategy-framework/strategy-framework.service.test.ts`
+- `frontend/src/features/strategy-framework/types.ts`
+- `frontend/src/features/strategy-framework/components/StrategyFrameworkPage.tsx`
+- `frontend/tests/ui/strategy-framework.spec.ts`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-STRAT-02A-developer-handoff.md`
+
+## Forbidden Files
+
+- Prisma schema or migrations
+- generated files
+- `backend/src/modules/strategy-framework/strategy-framework.repository.ts`
+- `backend/src/modules/strategy-framework/strategy-framework.evaluator.ts`
+- `backend/src/modules/strategy-framework/strategy-framework.controller.ts`
+- `backend/src/modules/strategy-framework/strategy-framework.router.ts`
+- `backend/src/modules/strategy-framework/strategy-framework.validation.ts`
+- Strategy Framework evaluator or repository tests
+- Data Quality Engine source or exports
+- frontend API, route files, route registries
+- shared backend utilities, shared UI, package manifests
+- provider/startup, live-provider, paid/cloud, broker, telemetry, or market-data ownership changes
+
+## Required Behavior
+
+- Add additive source-declared `ruleRevision` metadata to registered strategy rule declarations.
+- Add additive declarative DQ gate policy metadata to strategy definitions.
+- Add additive trust/versioning fields to list/detail/proof payloads and Strategy Framework UI.
+- Keep trust/versioning metadata separate from existing `StrategyProofStatus`.
+- Preserve evaluator math, proof grading, standalone backtest action rules, routes, query params, and API paths.
+- Do not present source-declared revisions as durable persisted history.
+
+## Focused Validation
+
+```powershell
+cd backend
+npm.cmd test -- strategy-framework.service.test.ts --runInBand
+npm.cmd run build
+```
+
+If frontend files are changed:
+
+```powershell
+cd frontend
+npm.cmd run test:ui -- strategy-framework.spec.ts --workers=1
+npm.cmd run build
+```
+
+## Next Gate
+
+Return developer handoff to Team 00 for Team 04 QA, Team 10 review, Architect Signoff, delegated PO acceptance, and scoped local commit.

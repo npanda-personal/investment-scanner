@@ -193,3 +193,14 @@ Date: 2026-05-18
 - Team 07 can implement `CF-W1-L3-INTEL-03` only after sequencing is resolved.
 - Team 03 can refresh `CF-W1-BT-02`.
 - Team 02 should relaunch persistent discovery after this checkpoint.
+
+## Ready Promotion Update
+
+`CF-W1-STRAT-02A` and `CF-W1-DQ-02A` are promoted to Ready and assigned to separate worktrees.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06: implement `CF-W1-STRAT-02A`.
+- Team 05: implement `CF-W1-DQ-02A`.
+- Team 03: refresh `CF-W1-BT-02` after Team 02 narrowing.
+- Team 02: relaunch persistent discovery after implementation agents are started.

@@ -78,3 +78,70 @@ cd backend
 npm.cmd test -- market-data.validation.test.ts --runInBand
 npm.cmd run build
 ```
+# TEAM-05 Current Assignment
+
+Date: 2026-05-18
+
+Team: TEAM-05 - Market Data / Data Quality
+
+Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automation-prompts/AUTO-05-market-data-data-quality.md`
+
+## Assignment
+
+Implement `CF-W1-DQ-02A` in a dedicated Team 05 worktree after Team 00 Ready promotion.
+
+## Branch / Worktree
+
+- Branch: `codex/team05-market-data/CF-W1-DQ-02A`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team05-CF-W1-DQ-02A`
+
+## Allowed Files
+
+- `backend/src/modules/data-quality-engine/data-quality-engine.service.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.md`
+- `backend/tests/modules/data-quality-engine/data-quality-engine.service.test.ts`
+- `backend/tests/modules/data-quality-engine/data-quality-engine.invariants.test.ts`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-05-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-DQ-02A-developer-handoff.md`
+
+## Forbidden Files
+
+- all `backend/src/modules/market-data-foundation/**` source files
+- `backend/src/modules/data-quality-engine/data-quality-engine.repository.ts`
+- DQE controller, router, validation, or index files
+- Prisma schema or migrations
+- route registries
+- shared backend utilities or shared UI
+- package manifests
+- generated files
+- frontend files
+- provider, startup, backfill, live-provider, paid/cloud, broker, telemetry, or broad repair/sync flows
+
+## Required Behavior
+
+- Add additive market-session-aware currentness evidence inside Data Quality Engine only.
+- Consume existing Market Data public session helpers; do not edit Market Data source.
+- Preserve existing DQ score/status/gap/blocker fields.
+- Fail closed for stale, missing, blocked, provider-gap, or session-unavailable currentness outcomes.
+- Preserve `filterEligibleInstruments()` strict exclusion behavior for non-current instruments.
+- Keep repository/list/summary/diagnostics persistence exposure out of scope.
+
+## Focused Validation
+
+```powershell
+cd backend
+npm.cmd test -- data-quality-engine.service.test.ts data-quality-engine.invariants.test.ts --runInBand
+npm.cmd run build
+```
+
+Optional read-only reassurance if useful and resource-safe:
+
+```powershell
+cd backend
+npm.cmd test -- market-data.market-session.test.ts --runInBand
+```
+
+## Next Gate
+
+Return developer handoff to Team 00 for Team 04 QA, Team 10 review, Architect Signoff, delegated PO acceptance, and scoped local commit.

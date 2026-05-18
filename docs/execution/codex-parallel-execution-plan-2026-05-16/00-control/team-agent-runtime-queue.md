@@ -457,3 +457,21 @@ No spawned subagents are active at this checkpoint.
 - Team 03 should refresh `CF-W1-BT-02` after Team 02 narrowed the requirement.
 - Team 02 should be relaunched after this docs checkpoint.
 - Team 10 is idle until the next QA-accepted implementation handoff.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Ready Promotions
+
+- `CF-W1-STRAT-02A` promoted to Ready for Team 06 implementation in `codex/team06-strategy-signal/CF-W1-STRAT-02A`.
+- `CF-W1-DQ-02A` promoted to Ready for Team 05 implementation in `codex/team05-market-data/CF-W1-DQ-02A`.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06 is ready to implement `CF-W1-STRAT-02A`.
+- Team 05 is ready to implement `CF-W1-DQ-02A`.
+- Team 03 is ready to refresh `CF-W1-BT-02` packets.
+- Team 02 should relaunch after implementation agents are started.
