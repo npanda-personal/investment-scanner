@@ -1668,6 +1668,29 @@ Teams ready to pick up new tasks:
 
 ---
 
+# Gate Dispatch Checkpoint
+
+Date: 2026-05-18
+
+## Completed Outputs Consumed
+
+- Team 10 accepted `CF-W1-SIG-TRIGGER-02A`.
+- Team 04 completed `CF-W1-TP-02` QA planning.
+- Team 00 committed the `CF-W1-TP-02` QA plan as `ca57844 docs: prepare trade plan semantics qa`.
+
+## New Assignment
+
+- Team 03 `019e3c4b-7989-7741-8187-8cebacb335da`: Architect Signoff for `CF-W1-SIG-TRIGGER-02A`.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 00: delegated PO acceptance and scoped branch commit for `CF-W1-SIG-TRIGGER-02A` if Architect Signoff accepts.
+- Team 00: `CF-W1-TP-02` sequencing / Ready evaluation after the active signoff gate.
+- Team 03: next architecture work only after current signoff completes.
+- Team 02: next requirement discovery only after Team 00 assigns it.
+
+---
+
 # Dispatcher Runtime Checkpoint
 
 Date: 2026-05-18

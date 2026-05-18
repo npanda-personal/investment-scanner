@@ -1359,6 +1359,39 @@ Date: 2026-05-18
 
 Date: 2026-05-18
 
+## Gate And Prep Dispatch
+
+Team 10 accepted `CF-W1-SIG-TRIGGER-02A`; Team 00 routed the next gate to Team 03 Architect Signoff.
+
+Team 04 completed `CF-W1-TP-02` QA planning and Team 00 committed it:
+
+- Commit: `ca57844 docs: prepare trade plan semantics qa`
+- Status: `CF-W1-TP-02` is QA-planned, but still requires Team 00 sequencing / Ready evaluation before implementation.
+
+## Current Active Agents
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 03 - Architect Signoff | `019e3c4b-7989-7741-8187-8cebacb335da` | `gpt-5.4`, high | architect signoff | `CF-W1-SIG-TRIGGER-02A` after Team 10 ACCEPT | active |
+| 2 | Open slot | none | pending | delegated PO / commit | `CF-W1-SIG-TRIGGER-02A` after Architect Signoff ACCEPT | waiting |
+| 3 | Open slot | none | pending | Ready evaluation | `CF-W1-TP-02` sequencing / readiness check | ready |
+| 4 | Open slot | none | pending | rolling architecture readiness | next Team 03 task assigned by Team 00 | waiting |
+| 5 | Open slot | none | pending | rolling requirement discovery | next Team 02 task assigned by Team 00 | waiting |
+| 6 | Open slot | none | pending | next implementation | next promoted Ready item with isolated files | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 00: delegated PO acceptance and scoped branch commit for `CF-W1-SIG-TRIGGER-02A` if Team 03 accepts.
+- Team 00: evaluate `CF-W1-TP-02` for sequencing / Ready after current signoff gate is handled.
+- Team 03: next rolling architecture task only after the current signoff completes.
+- Team 02: next requirement discovery cycle only after Team 00 assigns it.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
 ## Team 00 Dispatcher Rule
 
 Team 00 is the explicit dispatcher for Team 02 and Team 03. Team 02 and Team 03 should not self-monitor for whether to switch between signoff support, acceptance support, discovery, or design work. Team 00 assigns the task type and records it here.
