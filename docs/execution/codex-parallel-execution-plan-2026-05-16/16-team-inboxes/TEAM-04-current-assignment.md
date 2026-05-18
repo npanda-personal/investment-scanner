@@ -253,6 +253,90 @@ Date: 2026-05-18
 
 ## Assignment
 
+Run QA Verification for `CF-W1-HCTX-01` in the dedicated Team 05 worktree.
+
+This is independent from the active `CF-W1-BT-02` QA gate because it uses a separate worktree and a separate backend module. Do not edit application source/tests. Do not install packages or alter manifests.
+
+## Source Handoff
+
+- Requirement: `CF-W1-HCTX-01`
+- Branch: `codex/team05-market-data/CF-W1-HCTX-01`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team05-CF-W1-HCTX-01`
+- Developer handoff: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-HCTX-01-developer-handoff.md`
+- Team 05 outbox: `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-05-outbox.md`
+- QA plan: `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-HCTX-01-qa-plan.md`
+
+## Files To Verify
+
+Allowed implementation files:
+
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.service.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.types.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.md`
+- `backend/tests/modules/historical-context-snapshots/historical-context-snapshots.service.test.ts`
+
+Allowed evidence docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-05-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-HCTX-01-developer-handoff.md`
+
+Forbidden scope to confirm untouched:
+
+- Prisma schema or migrations
+- generated files
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.repository.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.controller.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.router.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.validation.ts`
+- `backend/src/modules/historical-context-snapshots/index.ts`
+- backend or frontend route registries
+- `backend/src/modules/market-context-intelligence/**`
+- `backend/src/modules/smart-money-intelligence/**`
+- `backend/src/modules/market-data-foundation/**`
+- `backend/src/modules/signal-calibration-engine/**`
+- shared backend utilities, shared DTOs, shared frontend components
+- frontend source or tests
+- package manifests
+- providers, startup/backfill, live-provider, Angel One, broker, paid/cloud, telemetry, or automation flows
+
+## Required QA Checks
+
+- Confirm additive `lookupExplainability` exists without removing or renaming current lookup fields.
+- Verify exact-date, nearest-prior, metadata-gap, missing-within-lookback, and not-requested evidence.
+- Verify top-level requested date, lookback, region, asset type, selected nearest snapshot date, max lag, partial flag, and summary are derived from current lookup evidence.
+- Confirm no second repository search was added.
+- Confirm current `market`, `sector`, `country`, `smartMoney`, `dataQuality`, `dataStatus`, and `gaps[]` behavior remains backward-compatible.
+- Confirm research-support wording only, with no advice, direct trading instruction, target-price, guarantee, broker, or automation framing.
+
+## Focused Commands
+
+Run in the Team 05 worktree if environment is available:
+
+```powershell
+cd C:\work\repo\investment-scanner-worktrees\team05-CF-W1-HCTX-01\backend
+npm.cmd test -- historical-context-snapshots.service.test.ts --runInBand
+npm.cmd run build
+```
+
+If dependency binaries are missing, record the exact blocker and whether QA can accept static source/test inspection only. Do not install packages.
+
+## Output
+
+Write QA evidence in the Team 05 worktree:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-HCTX-01-qa-verification.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+Return pass/reject decision, commands run, scenario evidence, changed-file scope confirmation, skipped checks and reasons, residual risks, and whether Team 10 review can proceed.
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
 Stand by for QA Verification on the next active implementation handoff.
 
 Do not run QA before a developer handoff exists. Do not start a new docs-only QA plan ahead of direct investor/trader value work unless Team 00 assigns it.
