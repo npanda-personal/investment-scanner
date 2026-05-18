@@ -4,7 +4,7 @@ Date: 2026-05-18
 
 ## Status
 
-Audit-derived requirement draft. Not Ready for Implementation.
+Parent split candidate. First bounded child is `CF-W1-RH-02A`. Parent is not Ready for Implementation.
 
 ## Product Value
 
@@ -17,24 +17,18 @@ Research Hub's "What Changed" panel should help a trader understand what actuall
 - `frontend/src/features/research-hub/components/ResearchOverviewPage.tsx` renders a `NEW REVIEW CANDIDATES` panel and a fallback line saying "since the last evaluation," which can overclaim temporal evidence.
 - `backend/src/modules/research-hub/research-hub.types.ts` already has a bounded `ResearchWhatChanged` object, so the gap is about evidence quality and comparison basis, not a missing UI container.
 
-## Bounded Requirement
+## Parent Split Direction
 
-Define a bounded follow-on so Research Hub either shows auditable change evidence or explicitly says the comparison basis is unavailable.
+Split the first follow-on into a bounded fail-closed child before any broader true-delta history work.
 
-The first child should focus on:
-
-- identifying a safe previous comparison basis from existing persisted rows or stable upstream snapshots;
-- exposing compared-against timestamp/date and comparison status;
-- distinguishing true new candidates, downgraded candidates, and unknown/unavailable delta states;
-- suppressing fake delta claims when no prior basis exists.
+- `CF-W1-RH-02A`: fail-closed comparison-basis child that exposes compared-against status/date when possible and suppresses fake delta claims when no prior basis exists.
+- Future `CF-W1-RH-02B` only if needed later: true-delta history beyond the fail-closed child, potentially including durable overview snapshot/storage design.
 
 ## Acceptance Criteria
 
-- `whatChanged` is backed by a defined prior comparison basis or explicitly marked unavailable.
-- "New review candidate" and "downgraded candidate" labels are not shown unless they are derived from auditable prior state.
-- The response exposes the compared-against date/time or an explicit no-basis message.
-- Market-gate changes are derived from prior persisted state or shown as unavailable, not inferred from the current response alone.
-- Focused tests later cover first-run/no-prior-state, no-change, new-candidate, downgrade, and unavailable-basis scenarios.
+- Parent/child split is explicit and keeps fail-closed basis handling separate from any later storage/history path.
+- `CF-W1-RH-02A` can proceed without inventing durable overview storage.
+- Any future true-delta child must stop for a storage split instead of expanding silently.
 
 ## Non-Goals
 
@@ -73,4 +67,4 @@ This is a requirement-only discovery item now and does not overlap Team 06's act
 
 ## Next Gate
 
-Product refinement is sufficient for Team 03 to decide whether a no-schema comparison child is source-supported or whether the item must split into an ADR/storage follow-on. Team 00 should keep it behind `CF-W1-RH-01` because the broader actionability contract is the higher-value Research Hub trust gap.
+Team 00 should treat `CF-W1-RH-02A` as the next bounded Research Hub candidate. Keep the parent behind the child and stop for a separate storage/history split if Team 03 cannot prove a safe comparison-basis path from existing persisted data.

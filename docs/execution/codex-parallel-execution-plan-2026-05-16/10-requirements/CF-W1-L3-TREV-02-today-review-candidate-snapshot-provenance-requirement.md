@@ -76,4 +76,4 @@ This discovery item is requirement-only now and does not overlap Team 06's activ
 
 ## Next Gate
 
-Product refinement is sufficient for Team 03 and Team 04 to prepare a bounded Today Review candidate-provenance contract once `CF-W1-RH-01` is queued behind active `CF-W1-SMI-01` architecture prep. After excluding active, queued, accepted, parked, and blocked items, this is the next top unassigned market-intelligence requirement Team 00 should pull for docs-only prep.
+Product refinement is sufficient for Team 03 and Team 04 to prepare a bounded Today Review candidate-provenance contract. As of 2026-05-18 this item is already queued as the next architecture candidate after active `CF-W1-RH-01`, so it should stay out of the current unassigned pull while Team 00 works through the live queue.
