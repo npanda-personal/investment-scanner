@@ -253,6 +253,54 @@ Date: 2026-05-18
 
 ## Assignment
 
+Prepare docs-only QA planning for `CF-W1-SIG-TRIGGER-02A` - Signal Generation trigger audit surfacing and provenance labeling.
+
+This final override supersedes older Team 04 assignment tails above. Do not implement application code. Do not run tests. Prepare the focused QA plan only for the bounded first child, not the full durable parent.
+
+## Source Input
+
+- Architecture review: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-SIG-TRIGGER-02-architecture-review.md`
+- Contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-SIG-TRIGGER-02-persisted-trigger-auditability-contract.md`
+- Work packet: `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-SIG-TRIGGER-02-work-packet.md`
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SIG-TRIGGER-02-persisted-trigger-auditability-requirement.md`
+- Related completed context: `docs/execution/codex-parallel-execution-plan-2026-05-16/09-summaries/CF-W1-SIG-TRIGGER-01-po-acceptance-packet.md`
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-SIG-TRIGGER-02A-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/next-validation-plans.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+## Required QA Plan Coverage
+
+- persisted `created_at` and `updated_at` exposure for current `SignalResult` rows;
+- additive run audit metadata when `generationRunId` resolves to a generation run;
+- explicit `trigger_timestamp` semantics distinguishing source-price-date from source-data-date;
+- persisted-versus-compatibility-only provenance labeling for transient `strategyMatches[]` fields;
+- continued unavailability for `trigger_price`, rule ids, timeframe, and any unproven lifecycle state;
+- legacy row handling and incomplete-field signaling;
+- no regression to strict DQ trusted read/run/latest behavior;
+- rejection if implementation touches Prisma/schema/migrations, generated files, routes/controllers/routers/validation, frontend, shared utilities/UI, package manifests, downstream modules, providers/live data, paid/cloud, broker, or telemetry.
+
+## Suggested Focused Command For Future Implementation QA
+
+```powershell
+cd backend
+npm.cmd test -- signal-generation-engine.repository.test.ts signal-generation-engine.service.test.ts signal-generation-engine.trigger-contract.test.ts signal-generation-dq-enforcement.invariants.test.ts --runInBand
+```
+
+## Output
+
+State whether `CF-W1-SIG-TRIGGER-02A` is QA-plan ready for Team 00 Ready evaluation and list any blocker.
+
+---
+
+# Current Active Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
 Run QA Verification for `CF-W1-CAL-01` after Team 06 developer handoff.
 
 This final override supersedes all older Team 04 tails above. Team 06 reports implementation and developer validation passed in the dedicated CAL worktree. Verify executable behavior before Team 10 review.

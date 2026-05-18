@@ -1596,6 +1596,37 @@ Date: 2026-05-18
 
 Date: 2026-05-18
 
+## Completed Since Previous Snapshot
+
+- Team 03 `019e3c20-e9f8-7da2-83f1-ebe84851a830`: completed `CF-W1-SIG-TRIGGER-02` architecture packet as `split required`; bounded child `CF-W1-SIG-TRIGGER-02A` is ready for QA planning.
+
+## Newly Spawned
+
+- Team 04 `019e3c2a-f0de-7573-92e8-0cef341ab83a`: docs-only QA planning for `CF-W1-SIG-TRIGGER-02A`.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | `019e3c2a-f0de-7573-92e8-0cef341ab83a` | `gpt-5.4`, high | QA planning | `CF-W1-SIG-TRIGGER-02A` | active |
+| 2 | Open slot | none | pending | Ready evaluation | `CF-W1-SIG-TRIGGER-02A` after QA plan | waiting |
+| 3 | Open slot | none | pending | requirements discovery | next persistent Team 02 cycle after QA output | waiting |
+| 4 | Open slot | none | pending | next implementation | next promoted Ready item | waiting |
+| 5 | Open slot | none | pending | review/release | next QA-accepted handoff | waiting |
+| 6 | Open slot | none | pending | architect signoff | next Team 10 accepted handoff | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 00 is ready to evaluate `CF-W1-SIG-TRIGGER-02A` for Ready after Team 04 QA plan.
+- Team 02 is ready for the next persistent discovery cycle after this QA planning output is consumed.
+- Team 06 is ready for the next Strategy / Signal / Risk implementation only after Team 00 promotes a new Ready item.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
 ## Runtime Recovery
 
 - Prior Team 03 architect agent `019e3c02-4baa-77a3-a567-d5cf34e804db` was no longer visible to the runtime and left no `CF-W1-BT-02` architect signoff files in the BT worktree.
