@@ -1583,6 +1583,36 @@ Spawned Team 02 Requirement Factory:
 
 Date: 2026-05-18
 
+## Rolling PO / Architect Relaunch
+
+Team 00 corrected the worker-pool mismatch: both rolling lanes are now active.
+
+Reason for the prior one-worker view:
+
+- Team 03 had completed `CF-W1-RH-01` architecture, but its next assignment had not been relaunched after checkpointing.
+- Team 02 had completed its previous requirement cycle, but its persistent discovery lane had not been relaunched.
+
+Checkpoint completed:
+
+- `CF-W1-RH-01` architecture packet committed on `dev` as `76a2c32 docs: prepare research hub actionability architecture`.
+
+Spawned:
+
+- Team 02 `019e3c7c-5c92-7652-9ab1-5c830e212d01`: rolling PO + Requirements discovery on the next under-served direct investor/trader-value workflow.
+- Team 03 `019e3c7c-951e-7d01-9b36-b7c4b7dfc695`: rolling architecture prep for `CF-W1-L3-TREV-02`.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-RH-01` QA planning now.
+- Team 06: `CF-W1-SMI-01` implementation once Team 00 validates/creates its worktree.
+- Team 04: `CF-W1-TP-02` QA rerun if the Team 06 rework handoff remains active.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
 ## Dispatch Update
 
 Team 00 consumed two completed gates:

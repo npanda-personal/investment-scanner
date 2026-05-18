@@ -2147,3 +2147,45 @@ Date: 2026-05-18
 - Team 00 is ready for `CF-W1-BT-02` delegated PO acceptance and scoped commit if Architect Signoff accepts.
 - Team 10 is ready for `CF-W1-CAL-01` review after QA accepts.
 - Team 02 is ready for another persistent market-intelligence discovery cycle when relaunched.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Runtime Correction
+
+Team 00 corrected the visible worker-pool mismatch. The rolling model requires both PO/Requirements and Architecture to stay active when no higher-priority signoff or acceptance gate is consuming them.
+
+The prior one-worker state happened because Team 03 had completed the `CF-W1-RH-01` architecture packet and Team 02 had completed its previous requirement cycle, but the next rolling assignments had not yet been relaunched after the checkpoint was recorded.
+
+## Completed / Checkpointed
+
+- Team 03 completed `CF-W1-RH-01` architecture readiness.
+- Team 00 committed that completed architecture packet on `dev` as `76a2c32 docs: prepare research hub actionability architecture`.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 02 - PO + Requirement Factory | `019e3c7c-5c92-7652-9ab1-5c830e212d01` | `gpt-5.4`, medium | rolling requirements discovery | next under-served direct investor/trader-value workflow | active |
+| 2 | Team 03 - Architecture Factory | `019e3c7c-951e-7d01-9b36-b7c4b7dfc695` | `gpt-5.4`, high | rolling architecture prep | `CF-W1-L3-TREV-02` Today Review candidate snapshot provenance | active |
+| 3 | Open slot | none | pending | QA planning | `CF-W1-RH-01` after Team 00 dispatches Team 04 | ready |
+| 4 | Open slot | none | pending | QA verification / review | next implementation handoff or QA-accepted item | waiting |
+| 5 | Open slot | none | pending | next implementation | next Team 00 Ready promotion | waiting |
+| 6 | Open slot | none | pending | next signoff | next Team 10 ACCEPT | waiting |
+
+## Queued Agents
+
+| Queue | Team | Launch Trigger | Recommended Model / Reasoning | Assignment |
+| --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | immediately, after Team 00 writes assignment | `gpt-5.4`, high | docs-only QA planning for `CF-W1-RH-01` from commit `76a2c32`. |
+| 2 | Team 04 - QA Factory | Team 03 completes `CF-W1-L3-TREV-02` architecture as Ready/split child | `gpt-5.4`, high | QA planning for the bounded Today Review provenance child. |
+| 3 | Team 03 - Architecture Factory | Team 03 completes `CF-W1-L3-TREV-02` and no signoff is pending | `gpt-5.4`, high | next architecture prep, likely `CF-W1-RH-02A` unless Team 02 output changes the top unassigned item. |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04 is ready for `CF-W1-RH-01` QA planning now.
+- Team 06 is ready for `CF-W1-SMI-01` implementation after Team 00 creates/validates the worktree and launches the agent.
+- Team 04 is ready for `CF-W1-TP-02` QA rerun after Team 06 rework if that handoff is still the active gate.

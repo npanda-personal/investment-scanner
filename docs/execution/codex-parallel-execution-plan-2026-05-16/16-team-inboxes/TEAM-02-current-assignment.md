@@ -156,6 +156,47 @@ Do not move any application-code item to Ready. Team 00 owns Ready movement.
 
 ---
 
+# Current Active Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Relaunch the rolling PO + Requirements discovery lane now. This is not a passive monitoring task and not a signoff task. Team 00 will explicitly route acceptance or signoff work when needed.
+
+Audit one under-served direct investor/trader-value workflow and add or refine at least one bounded requirement if current source/docs support it.
+
+## Current Active / Queued Items To Exclude
+
+- `CF-W1-TP-02`: in implementation/review follow-up flow; do not rework the requirement unless Team 00 routes a rejection back to requirements.
+- `CF-W1-SMI-01`: Ready-promoted implementation candidate; do not re-rank as unassigned.
+- `CF-W1-RH-01`: architecture packet completed in commit `76a2c32`; next gate is Team 04 QA planning, not more requirement discovery.
+- `CF-W1-L3-TREV-02`: Team 00 is routing this to Team 03 rolling architecture prep.
+- `CF-W1-RH-02A`: already refined as the next Research Hub what-changed child; keep visible for future architecture, but do not rework unless you find a concrete inconsistency.
+- Accepted branch commits parked for later clean integration stay out of active discovery ranking.
+
+## Priority Rule
+
+Rank direct investor/trader value first:
+
+- market data and Data Quality evidence;
+- signal and trigger provenance;
+- strategy trust and calibration;
+- backtesting review loops;
+- Trade Plan research support;
+- historical context, market context, smart-money evidence, Research Hub evidence, Today Review provenance, reviewability, and explainability.
+
+Keep admin, settings, auth/subscription, notifications, and alert convenience work lowest unless they block correctness, privacy, user-data safety, or an accepted branch gate.
+
+## Required Output
+
+- Requirement(s) created or refined.
+- Queue deltas in `next-top-10-candidates.md`, `top-10-ready-candidates.md`, `requirements-backlog.md`, and `refinement-queue.md`.
+- The next top unassigned market-intelligence item after excluding active/queued/accepted/parked/blocked work.
+- No Ready movement and no application-code edits.
+
+---
+
 # Current Dispatcher Assignment
 
 Date: 2026-05-18
@@ -217,6 +258,46 @@ Prioritize direct investor/trader value:
 - market data and Data Quality evidence;
 - signal reviewability, trigger provenance, strategy trust, calibration, backtesting, Trade Plan research support;
 - historical context, market context, signal-quality learning, smart-money evidence freshness, Research Hub evidence wiring, reviewability, and explainability.
+
+Keep admin, settings, auth/subscription, notifications, and alert convenience work lowest unless they block correctness, privacy, user-data safety, or an accepted branch gate.
+
+## Required Output
+
+- Audit one under-served market-intelligence workflow not already active or queued.
+- Add or refine at least one bounded requirement if evidence supports it.
+- Keep `next-top-10-candidates.md`, `top-10-ready-candidates.md`, `requirements-backlog.md`, and `refinement-queue.md` aligned.
+- Identify the next top unassigned requirement for Team 00 after excluding active/queued/accepted/parked/blocked items.
+- Do not move application-code work to Ready.
+
+---
+
+# Current Dispatcher Assignment
+
+Date: 2026-05-18
+
+## Assignment
+
+Continue the rolling PO + Requirements discovery lane on a distinct investor/trader-value workflow.
+
+Do not monitor passively or self-switch to signoff work. Team 00 will explicitly assign gate-support work if needed. This cycle is requirements discovery and ranking only.
+
+## Current Active / Routed Items To Exclude
+
+- `CF-W1-TP-02`: Team 06 rework active after Team 10 review reject.
+- `CF-W1-SMI-01`: Ready promoted for Team 06 implementation.
+- `CF-W1-RH-01`: Team 03 architecture readiness active.
+- `CF-W1-L3-TREV-02`: queued architecture candidate after `RH-01`.
+- `CF-W1-RH-02A`: freshly split requirement; queue behind `RH-01` and `TREV-02` architecture unless Team 00 reprioritizes.
+- `CF-W1-SIG-TRIGGER-02A`: accepted and locally committed on Team 06 branch.
+- `CF-W1-SQLAB-01`, `CF-W1-BT-02`, `CF-W1-CAL-01`, `CF-W1-HCTX-01`, `CF-W1-MD-01`, `CF-W1-DQ-02A`, `CF-W1-STRAT-02A`, `CF-W1-UX-01A`, and `CF-W1-AUTH-SUB-01`: accepted branch commits parked for later clean integration.
+
+## Product Priority
+
+Prioritize direct investor/trader value:
+
+- market data and Data Quality evidence;
+- signals, trigger provenance, strategy trust, calibration, backtesting, Trade Plan research support;
+- historical context, market context, signal-quality learning, smart-money evidence freshness, Research Hub evidence wiring, Today Review provenance, reviewability, and explainability.
 
 Keep admin, settings, auth/subscription, notifications, and alert convenience work lowest unless they block correctness, privacy, user-data safety, or an accepted branch gate.
 

@@ -184,6 +184,52 @@ This is docs-only architecture prep. Do not implement application code. Treat th
 
 ---
 
+# Current Active Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Relaunch the rolling Architecture Factory lane now. This is docs-only architecture prep, not implementation.
+
+Prepare architecture readiness for `CF-W1-L3-TREV-02` - Today Review candidate snapshot provenance.
+
+This item was already queued after `CF-W1-RH-01`. Team 03 completed `CF-W1-RH-01` architecture in commit `76a2c32`, so the architecture lane should continue instead of idling.
+
+## Source Input
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-TREV-02-today-review-candidate-snapshot-provenance-requirement.md`
+- Related Today Review docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-TREV-01-today-review-publication-evidence-requirement.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-L3-TREV-01-architecture-review.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-L3-TREV-01-today-review-publication-evidence-contract.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-L3-TREV-01-work-packet.md`
+- Relevant source/docs to inspect read-only:
+  - `backend/src/modules/today-trade-review/today-trade-review.md`
+  - `backend/src/modules/today-trade-review/today-trade-review.service.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.types.ts`
+  - `backend/tests/modules/today-trade-review/**`
+  - `frontend/src/features/today-trade-review/**` read-only only if needed for future UI reservation notes
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-L3-TREV-02-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-L3-TREV-02-today-review-candidate-snapshot-provenance-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-L3-TREV-02-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+## Required Output
+
+- Determine the smallest bounded first child for Today Review candidate-level provenance.
+- Recommend exact allowed and forbidden future implementation files.
+- Explicitly block Prisma/schema, route registry, shared utilities/UI, generated files, package manifests, provider/live-data, startup/backfill, paid/cloud, broker, telemetry, and broad UI work unless separately approved.
+- Identify dependencies on `CF-W1-L3-TREV-01` without treating branch-only artifacts as merged into `dev`.
+- Provide QA planning handoff notes for Team 04.
+- Return one of: `Ready candidate`, `split required`, or `blocked`.
+
+---
+
 # Current Dispatcher Assignment
 
 Date: 2026-05-18

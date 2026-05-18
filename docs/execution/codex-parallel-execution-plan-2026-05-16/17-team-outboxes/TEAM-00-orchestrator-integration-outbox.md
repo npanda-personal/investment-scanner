@@ -2328,6 +2328,33 @@ Teams ready to pick up new tasks:
 
 ---
 
+# Team 00 Runtime Correction - Rolling Lanes Relaunched
+
+Date: 2026-05-18
+
+## Why Only One Worker Was Visible
+
+The factory should not have stayed at one active worker. Team 03 completed `CF-W1-RH-01` architecture and Team 02 completed its previous requirements cycle, but Team 00 had not relaunched their next rolling assignments after recording the checkpoint.
+
+## Correction Completed
+
+- Committed completed Team 03 `CF-W1-RH-01` architecture packet on `dev`: `76a2c32 docs: prepare research hub actionability architecture`.
+- Relaunched Team 02 rolling PO + Requirements discovery: `019e3c7c-5c92-7652-9ab1-5c830e212d01`.
+- Relaunched Team 03 rolling Architecture Factory on `CF-W1-L3-TREV-02`: `019e3c7c-951e-7d01-9b36-b7c4b7dfc695`.
+
+## Current Active Agents
+
+- Team 02: active, requirements discovery and priority refresh.
+- Team 03: active, Today Review candidate snapshot provenance architecture prep.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-RH-01` QA planning.
+- Team 06: `CF-W1-SMI-01` implementation after Team 00 worktree setup.
+- Team 04: `CF-W1-TP-02` QA rerun if the Team 06 rework handoff remains active.
+
+---
+
 # BT-02 Review Accepted
 
 Date: 2026-05-18
