@@ -20,7 +20,10 @@ Routing:
 
 Current active agents:
 
-- None at this checkpoint before the next spawn wave.
+- Team 06 `019e3d43-2e5a-74d3-b9b8-96e161d16f0b`: `CF-W1-BT-01A` corrected characterization rework.
+- Team 04 `019e3d43-2e8f-7453-b29f-de58abbf224e`: `CF-W1-SIG-02` QA planning.
+- Team 03 `019e3d43-2ecb-7000-82f2-d16d1e35bb4f`: `CF-W1-STRAT-03` Architect Signoff.
+- Team 02 `019e3d43-2f37-72b0-9d4e-9c53da4cf62f`: rolling direct investor/trader-value requirements discovery.
 
 Teams ready to pick up new tasks:
 

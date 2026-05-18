@@ -43,14 +43,17 @@ Team 02 completed a rolling direct-value requirements cycle and added `CF-W1-SQL
 
 ## Active Agents
 
-No active spawned agents at this checkpoint; the next wave is ready to launch.
+- Team 06 `019e3d43-2e5a-74d3-b9b8-96e161d16f0b`: `CF-W1-BT-01A` corrected characterization rework.
+- Team 04 `019e3d43-2e8f-7453-b29f-de58abbf224e`: `CF-W1-SIG-02` QA planning.
+- Team 03 `019e3d43-2ecb-7000-82f2-d16d1e35bb4f`: `CF-W1-STRAT-03` Architect Signoff.
+- Team 02 `019e3d43-2f37-72b0-9d4e-9c53da4cf62f`: rolling direct-value requirements discovery.
 
 ## Teams Ready To Pick Up New Tasks
 
-- Team 06: `CF-W1-BT-01A` corrected characterization rework in the existing dedicated worktree.
-- Team 04: `CF-W1-SIG-02` QA planning.
-- Team 03: `CF-W1-STRAT-03` Architect Signoff.
-- Team 02: next persistent requirements discovery cycle after current docs checkpoint.
+- Team 06: active on `CF-W1-BT-01A` corrected characterization rework.
+- Team 04: active on `CF-W1-SIG-02` QA planning.
+- Team 03: active on `CF-W1-STRAT-03` Architect Signoff.
+- Team 02: active on rolling requirements discovery.
 - Team 00: Ready evaluation for `CF-W1-RH-01` or `CF-W1-L3-TREV-02` when current gate pressure clears.
 
 ## Product Owner Action
