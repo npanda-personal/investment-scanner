@@ -1440,3 +1440,31 @@ Developer validation attempted backend test/build, but local worktree tool binar
 - Team 10: `CF-W1-HCTX-01` review after QA accepts.
 - Team 04: continues active `CF-W1-BT-02` QA in the separate Team 06 worktree.
 - Team 03: continues active `CF-W1-MCTX-01` architecture prep.
+
+## Dispatch Result
+
+Second Team 04 QA is active:
+
+- Agent: `019e3bcc-350d-79e1-9b11-9bd69e859a28`
+- Worktree: `../investment-scanner-worktrees/team05-CF-W1-HCTX-01`
+
+Teams ready to pick up new tasks:
+
+- Team 10: review after either active QA gate accepts.
+- Team 02: market-intelligence requirements discovery if assigned a non-conflicting docs-only slice.
+- Team 03: next architecture target after MCTX is `CF-W1-CAL-01`.
+
+---
+
+# BT-02 QA Environment Unblock
+
+Date: 2026-05-18
+
+Team 04 rejected `CF-W1-BT-02` only because runnable validation could not find local tool binaries. Team 00 created dependency junctions to existing main-repo `node_modules` for the Team 06 backend/frontend worktree. No package install, manifest edit, or application-code edit was performed.
+
+Teams ready to pick up new tasks:
+
+- Team 04: `CF-W1-BT-02` QA rerun now.
+- Team 10: `CF-W1-BT-02` review after QA accepts.
+- Team 04: `CF-W1-HCTX-01` QA remains active in the separate Team 05 worktree.
+- Team 03: `CF-W1-MCTX-01` architecture prep remains active.

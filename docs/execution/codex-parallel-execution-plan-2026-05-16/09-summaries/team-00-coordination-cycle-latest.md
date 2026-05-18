@@ -814,3 +814,68 @@ Validation status:
 ## Next Coordination Action
 
 Spawn a second Team 04 QA agent for `CF-W1-HCTX-01`, because it runs in a separate worktree and does not share the `BT-02` changed files.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
+## QA Dispatch
+
+Second Team 04 QA Verification is active for `CF-W1-HCTX-01`:
+
+- Agent: `019e3bcc-350d-79e1-9b11-9bd69e859a28`
+- Worktree: `../investment-scanner-worktrees/team05-CF-W1-HCTX-01`
+- Gate: rerun focused backend validation or record exact worktree toolchain blocker
+
+## Current Pool
+
+- Team 04 QA Verification: active on `CF-W1-BT-02`.
+- Team 04 QA Verification: active on `CF-W1-HCTX-01`.
+- Team 03 architecture prep: active on `CF-W1-MCTX-01`.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 10 is ready for `CF-W1-BT-02` review after BT QA accepts.
+- Team 10 is ready for `CF-W1-HCTX-01` review after HCTX QA accepts.
+- Team 03 next architecture target after MCTX is `CF-W1-CAL-01`.
+- Team 02 is ready for persistent market-intelligence requirements discovery when a slot is opened.
+
+## Next Coordination Action
+
+Spawn Team 02 persistent market-intelligence discovery if a clean docs-only assignment can avoid Team 03's active MCTX write set.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
+## BT-02 QA Environment Unblock
+
+Team 04 rejected `CF-W1-BT-02` at QA because runnable validation could not execute: `jest`, `tsc`, and `playwright` were unavailable in the Team 06 worktree.
+
+Team 00 resolved this as a local validation-environment blocker without package install or manifest edits by creating junctions:
+
+- Team 06 backend `node_modules` -> main backend `node_modules`
+- Team 06 frontend `node_modules` -> main frontend `node_modules`
+- Team 05 backend `node_modules` -> main backend `node_modules`
+
+## Current Pool
+
+- Team 04 QA rerun for `CF-W1-BT-02`: ready to spawn.
+- Team 04 QA Verification: active on `CF-W1-HCTX-01`.
+- Team 03 architecture prep: active on `CF-W1-MCTX-01`.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04 is ready for `CF-W1-BT-02` QA rerun now.
+- Team 10 is ready for `CF-W1-BT-02` review after rerun accepts.
+- Team 10 is ready for `CF-W1-HCTX-01` review after HCTX QA accepts.
+- Team 03 next architecture target after MCTX is `CF-W1-CAL-01`.
+- Team 02 is ready for persistent market-intelligence requirements discovery when a non-conflicting docs-only slot is opened.
+
+## Next Coordination Action
+
+Spawn Team 04 QA rerun for `CF-W1-BT-02`.

@@ -337,6 +337,58 @@ Date: 2026-05-18
 
 ## Assignment
 
+Rerun QA Verification for `CF-W1-BT-02` in the Team 06 worktree after Team 00 removed the local toolchain blocker by adding dependency junctions.
+
+Do not edit application source/tests. Do not install packages or alter manifests.
+
+## Environment Unblock
+
+Team 00 created these local junctions:
+
+- `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-BT-02\backend\node_modules` -> `C:\work\repo\investment-scanner\backend\node_modules`
+- `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-BT-02\frontend\node_modules` -> `C:\work\repo\investment-scanner\frontend\node_modules`
+
+## Source Handoff
+
+- Requirement: `CF-W1-BT-02`
+- Branch: `codex/team06-strategy-signal/CF-W1-BT-02`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-BT-02`
+- Developer handoff: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-BT-02-developer-handoff.md`
+- Prior QA rejection: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-BT-02-qa-verification.md`
+
+## Required Commands
+
+```powershell
+cd C:\work\repo\investment-scanner-worktrees\team06-CF-W1-BT-02\backend
+npm.cmd test -- backtesting-strategy-lab.service.test.ts --runInBand
+npm.cmd run build
+```
+
+```powershell
+cd C:\work\repo\investment-scanner-worktrees\team06-CF-W1-BT-02\frontend
+npm.cmd run test:ui -- backtesting-strategy-lab.spec.ts --workers=1
+npm.cmd run build
+```
+
+## Required QA Checks
+
+Retain the previous static scope and scenario checks, then update the QA decision based on executable validation.
+
+Write updated QA evidence in the Team 06 worktree:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-BT-02-qa-verification.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+Return pass/reject decision and whether Team 10 review can proceed.
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
 Stand by for QA Verification on the next active implementation handoff.
 
 Do not run QA before a developer handoff exists. Do not start a new docs-only QA plan ahead of direct investor/trader value work unless Team 00 assigns it.
