@@ -289,6 +289,84 @@ State whether `CF-W1-RH-01` is QA-plan ready for Team 00 Ready evaluation and li
 
 ---
 
+# Parallel Worktree QA Assignment
+
+Date: 2026-05-18
+
+## Assignment
+
+Run QA Verification for `CF-W1-SMI-01` in the dedicated Team 06 worktree.
+
+This is parallel-safe with the active `CF-W1-RH-01` main-workspace QA-planning agent because this assignment writes QA evidence only inside the SMI worktree. Do not edit main-workspace Team 04 QA files for this verification.
+
+## Branch / Worktree
+
+- Branch: `codex/team06-strategy-signal/CF-W1-SMI-01`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-SMI-01`
+
+## Evidence To Review
+
+- Developer handoff: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-SMI-01-developer-handoff.md`
+- Team 06 outbox: `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-CF-W1-SMI-01-outbox.md`
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SMI-01-smart-money-evidence-freshness-partial-trust-requirement.md`
+- Architecture review: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-SMI-01-architecture-review.md`
+- Contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-SMI-01-smart-money-evidence-freshness-partial-trust-contract.md`
+- Work packet: `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-SMI-01-work-packet.md`
+- QA plan: `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-SMI-01-qa-plan.md`
+
+## Files To Verify
+
+Allowed implementation files:
+
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.service.ts`
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.types.ts`
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.md`
+- `backend/tests/modules/smart-money-intelligence/smart-money-intelligence.service.test.ts`
+
+Allowed worktree QA evidence writes:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-SMI-01-qa-verification.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-CF-W1-SMI-01-qa-outbox.md`
+
+## Forbidden Scope To Confirm Untouched
+
+- Smart Money repository/controller/router/validation/module/index files
+- Prisma schema or migrations
+- generated files
+- backend/frontend route registries
+- Market Data source, Data Quality source, Historical Context source, Market Context source, Signal Calibration/Generation source, Research Hub source
+- shared backend utilities, shared DTOs, shared frontend components
+- frontend source/tests
+- package manifests
+- providers, startup/backfill, live-provider, Angel One, broker, paid/cloud, telemetry, or automation flows
+
+## Required QA Checks
+
+- Additive `evidence` metadata exists without removing or renaming current Smart Money fields.
+- Persisted reads are framed as `PERSISTED_SNAPSHOT` and downstream-safe only when evidence is usable.
+- On-demand fallback is framed as `ON_DEMAND_DERIVED` and non-downstream-safe.
+- Stale persisted snapshot maps to stale/limited rather than silently trusted.
+- Missing persisted snapshot remains a downstream-safe data gap on persisted-only reads and does not auto-generate.
+- Ownership placeholder evidence is partial trust, not complete confirmation.
+- Insufficient-history fallback maps to unavailable evidence.
+- `top()` and `distribution()` preserve ranking/order while adding evidence metadata.
+- Research-support wording only; no direct advice, target-price, guarantee, broker, automation, or trade-command language.
+
+## Required Commands
+
+Run in the worktree backend:
+
+```powershell
+npm.cmd test -- smart-money-intelligence.service.test.ts --runInBand
+npm.cmd run build
+```
+
+## Output
+
+Return `ACCEPT` or `REJECT`, with commands run, scenario evidence, changed-file scope confirmation, skipped checks and reasons, residual risks, and whether Team 10 Review can proceed.
+
+---
+
 # Current Dispatcher Assignment
 
 Date: 2026-05-18

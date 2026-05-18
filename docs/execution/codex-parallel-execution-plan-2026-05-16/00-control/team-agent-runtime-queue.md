@@ -2292,13 +2292,52 @@ Date: 2026-05-18
 | 1 | Team 04 - QA Factory | `019e3c91-35dc-7b63-8a4d-732ca25eb873` | `gpt-5.4`, high | QA planning | `CF-W1-RH-01` | active |
 | 2 | Team 06 - Strategy / Signal / Risk | `019e3c91-9007-7ea1-889c-6a93708de12c` | `gpt-5.3-codex`, high | implementation | `CF-W1-SMI-01` | active |
 | 3 | Team 02 - Requirement Factory | `019e3c91-cd7c-7083-bee9-1f6f35688d72` | `gpt-5.4`, medium | rolling requirements discovery | next under-served market-intelligence workflow | active |
-| 4 | Team 03 - Architecture Factory | pending spawn | `gpt-5.4`, high | architecture prep | `CF-W1-RH-02A` | ready |
+| 4 | Team 03 - Architecture Factory | `019e3c98-a960-7712-9d11-c08fa649bffd` | `gpt-5.4`, high | architecture prep | `CF-W1-RH-02A` | active |
 | 5 | Open slot | none | pending | QA planning | `CF-W1-L3-TREV-02`, then `CF-W1-MD-02A` | queued |
 | 6 | Open slot | none | pending | review/signoff | next QA-accepted implementation handoff | waiting |
 
 ## Teams Ready To Pick Up New Tasks
 
-- Team 03: `CF-W1-RH-02A` architecture prep now.
+- Team 03: next architecture prep after `CF-W1-RH-02A` completes and Team 02's active requirement output is consumed.
 - Team 04: `CF-W1-L3-TREV-02` QA planning after `CF-W1-RH-01`.
 - Team 04: `CF-W1-MD-02A` ADR/schema-proposal QA review after `TREV-02` unless a higher-priority gate appears.
 - Team 10: `CF-W1-SMI-01` review after Team 06 implementation and Team 04 QA acceptance.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Completed Since Previous Snapshot
+
+- Team 06 `019e3c91-9007-7ea1-889c-6a93708de12c`: completed `CF-W1-SMI-01` implementation in the Team 06 worktree and was closed.
+
+## SMI-01 QA Routing
+
+Team 06 validation passed:
+
+- `npm.cmd test -- smart-money-intelligence.service.test.ts --runInBand`
+- `npm.cmd run build`
+
+Memory check before launching QA: `85.1%`.
+
+Team 00 is routing `CF-W1-SMI-01` to a separate Team 04 QA Verification agent in the SMI worktree. This is parallel-safe with active `CF-W1-RH-01` QA planning because it writes only worktree QA evidence, not the main Team 04 QA planning queue files.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | `019e3c91-35dc-7b63-8a4d-732ca25eb873` | `gpt-5.4`, high | QA planning | `CF-W1-RH-01` | active |
+| 2 | Team 02 - Requirement Factory | `019e3c91-cd7c-7083-bee9-1f6f35688d72` | `gpt-5.4`, medium | rolling requirements discovery | next under-served market-intelligence workflow | active |
+| 3 | Team 03 - Architecture Factory | `019e3c98-a960-7712-9d11-c08fa649bffd` | `gpt-5.4`, high | architecture prep | `CF-W1-RH-02A` | active |
+| 4 | Team 04 - QA Factory | pending spawn | `gpt-5.4`, high | QA verification | `CF-W1-SMI-01` in Team 06 worktree | ready |
+| 5 | Open slot | none | pending | QA planning | `CF-W1-L3-TREV-02`, then `CF-W1-MD-02A` | queued |
+| 6 | Open slot | none | pending | review/signoff | `CF-W1-SMI-01` after QA ACCEPT | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-SMI-01` QA verification now in the Team 06 worktree.
+- Team 10: `CF-W1-SMI-01` review after QA acceptance.
+- Team 04: `CF-W1-L3-TREV-02` QA planning after `CF-W1-RH-01`.
+- Team 04: `CF-W1-MD-02A` QA review after `TREV-02`.

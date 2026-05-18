@@ -1662,14 +1662,35 @@ Routing:
 
 - Keep `CF-W1-MD-02A` out of Ready for Implementation.
 - Queue Team 04 ADR/schema-proposal QA review behind current main-workspace Team 04 work.
-- Relaunch Team 03 on `CF-W1-RH-02A` architecture prep.
+- Relaunched Team 03 on `CF-W1-RH-02A` architecture prep as agent `019e3c98-a960-7712-9d11-c08fa649bffd`.
 
 Teams ready to pick up new tasks:
 
-- Team 03: `CF-W1-RH-02A` architecture prep now.
+- Team 03: next architecture prep after `CF-W1-RH-02A` completes and Team 02's active requirement output is consumed.
 - Team 04: `CF-W1-L3-TREV-02` QA planning after `CF-W1-RH-01`.
 - Team 04: `CF-W1-MD-02A` QA review after `TREV-02` unless a higher-priority gate appears.
 - Team 10: `CF-W1-SMI-01` review after Team 06 and Team 04 gates.
+
+## SMI-01 Developer Handoff Consumed
+
+Team 06 `019e3c91-9007-7ea1-889c-6a93708de12c` completed `CF-W1-SMI-01` implementation and was closed.
+
+Validation reported by Team 06:
+
+- `npm.cmd test -- smart-money-intelligence.service.test.ts --runInBand` passed.
+- `npm.cmd run build` passed.
+
+Team 00 routing:
+
+- Launch Team 04 QA Verification in `../investment-scanner-worktrees/team06-CF-W1-SMI-01`.
+- If QA accepts, route to Team 10 Review / Release.
+- If QA rejects, return only the SMI workstream to bounded Team 06 rework unless a true consent blocker appears.
+
+Teams ready to pick up new tasks:
+
+- Team 04: `CF-W1-SMI-01` QA verification now.
+- Team 10: `CF-W1-SMI-01` review after QA acceptance.
+- Team 04: `CF-W1-L3-TREV-02` QA planning after `CF-W1-RH-01`.
 
 ---
 

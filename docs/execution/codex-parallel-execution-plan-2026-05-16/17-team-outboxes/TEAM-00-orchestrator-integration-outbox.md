@@ -2419,14 +2419,40 @@ Decision:
 
 - Keep `CF-W1-MD-02A` out of Ready for Implementation.
 - Queue Team 04 ADR/schema-proposal QA review behind active Team 04 main-workspace QA-plan work.
-- Relaunch Team 03 on `CF-W1-RH-02A` because it is the next independent architecture-prep item and does not share writer files with active agents.
+- Relaunched Team 03 on `CF-W1-RH-02A` because it is the next independent architecture-prep item and does not share writer files with active agents.
+- Team 03 agent: `019e3c98-a960-7712-9d11-c08fa649bffd`.
 
 ## Teams Ready To Pick Up New Tasks
 
-- Team 03: `CF-W1-RH-02A` architecture prep now.
+- Team 03: next architecture prep after `CF-W1-RH-02A` completes and Team 02's active requirement output is consumed.
 - Team 04: `CF-W1-L3-TREV-02` QA planning after `CF-W1-RH-01`.
 - Team 04: `CF-W1-MD-02A` QA review after `TREV-02`.
 - Team 10: `CF-W1-SMI-01` review after implementation and QA acceptance.
+
+---
+
+# Team 00 Consumes SMI-01 Developer Handoff
+
+Date: 2026-05-18
+
+## Result
+
+Team 06 completed `CF-W1-SMI-01` implementation in the Team 06 worktree.
+
+Developer validation passed:
+
+- `smart-money-intelligence.service.test.ts` focused test.
+- Backend build.
+
+## Routing Decision
+
+Launch Team 04 QA Verification in the SMI worktree. This does not conflict with the active Team 04 `CF-W1-RH-01` QA-planning agent because the SMI QA agent writes only worktree evidence files.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-SMI-01` QA verification now.
+- Team 10: `CF-W1-SMI-01` review after QA acceptance.
+- Team 04: `CF-W1-L3-TREV-02` QA planning after `CF-W1-RH-01`.
 
 ---
 
