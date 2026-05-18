@@ -2861,3 +2861,41 @@ Validation recorded:
 - Team 04: ready for QA planning/verification once Team 03 identifies the next bounded child or Ready candidate.
 - Team 10: ready for the next QA-accepted implementation review.
 - Team 00: monitor active outputs and route the next independent item without Product Owner approval unless a true consent blocker appears.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## BT-01A Ready Promotion
+
+Team 03 architecture reconciliation completed and Team 00 promoted `CF-W1-BT-01A` as a characterization-only Ready item.
+
+Important sequencing:
+
+- `CF-W1-BT-01A` must stack on accepted parked `CF-W1-BT-02`.
+- Base branch: `codex/team06-strategy-signal/CF-W1-BT-02`
+- Base commit: `bb49ce2`
+- New branch: `codex/team06-strategy-signal/CF-W1-BT-01A`
+- New worktree: `../investment-scanner-worktrees/team06-CF-W1-BT-01A`
+
+`CF-W1-STRAT-02B` remains proposal-only and schema/generated/repository blocked. `CF-W1-SQLAB-02A` is actionable later only after sequencing against accepted `CF-W1-SQLAB-01`.
+
+## Current Active Agents
+
+| Slot | Team | Agent | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Team 02 - Requirement Factory | `019e3d09-c4a9-7483-b758-83be4c5926ee` | rolling requirements discovery | next direct investor/trader-value requirements | active |
+| 2 | Team 06 - Strategy / Signal / Risk | `019e3d0f-9c05-7f51-a421-85c6b75dd120` | characterization implementation | `CF-W1-BT-01A` stacked on `BT-02` | active |
+| 3 | Team 04 - QA Factory | none | QA verification | `CF-W1-BT-01A` after Team 06 handoff | waiting |
+| 4 | Team 10 - Review / Release | none | review | `CF-W1-BT-01A` after QA acceptance | waiting |
+| 5 | Team 03 - Architect Signoff | none | signoff | `CF-W1-BT-01A` after review acceptance | waiting |
+| 6 | Open slot | none | queued | next implementation or prep item | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06: `CF-W1-BT-01A` implementation now in the stacked worktree.
+- Team 04: `CF-W1-BT-01A` QA after Team 06 handoff.
+- Team 02: active on persistent requirements discovery.
+- Team 00: keep `CF-W1-STRAT-02B1` blocked from implementation because it needs schema/generated consent.

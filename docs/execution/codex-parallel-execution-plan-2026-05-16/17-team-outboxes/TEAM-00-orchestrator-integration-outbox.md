@@ -2989,3 +2989,39 @@ Team 00 closed completed QA/review/signoff agents and relaunched rolling lanes:
 - Team 00: continue monitoring, consume agent outputs, and promote only bounded Ready items.
 
 Product Owner action required: no.
+
+---
+
+# Runtime Checkpoint - BT-01A Ready Promotion
+
+Date: 2026-05-18
+
+Team 00 consumed Team 03 architecture reconciliation.
+
+Routing decisions:
+
+- `CF-W1-STRAT-02B` is complete as proposal-only and remains blocked for schema/generated/repository implementation consent.
+- `CF-W1-BT-01A` is promoted as a characterization-only Ready item.
+- `CF-W1-SQLAB-02A` remains a later Team 00 sequencing decision after accepted `CF-W1-SQLAB-01`.
+
+`CF-W1-BT-01A` branch/worktree:
+
+- Base branch: `codex/team06-strategy-signal/CF-W1-BT-02`
+- Base commit: `bb49ce2 feat: add backtesting review disposition`
+- New branch: `codex/team06-strategy-signal/CF-W1-BT-01A`
+- New worktree: `../investment-scanner-worktrees/team06-CF-W1-BT-01A`
+
+Allowed implementation files:
+
+- `backend/tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.test.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+
+Teams ready to pick up new tasks:
+
+- Team 06: `CF-W1-BT-01A` stacked characterization implementation now.
+- Team 04: QA after Team 06 handoff.
+- Team 10: review after QA acceptance.
+- Team 03: signoff after Team 10 acceptance.
+- Team 02: active on persistent requirements discovery.
+
+Product Owner action required: no for `BT-01A`. `STRAT-02B1` remains a true schema/generated consent gate before implementation.

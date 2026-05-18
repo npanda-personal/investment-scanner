@@ -1617,6 +1617,39 @@ The fix makes catalog sync use per-instrument stale-candle eligibility so a regi
 
 Date: 2026-05-18
 
+## BT-01A Stacked Ready Promotion
+
+Team 03 returned top-stack routing:
+
+- `CF-W1-STRAT-02B`: proposal-only complete; blocked for schema/generated/repository consent before any implementation.
+- `CF-W1-BT-01A`: promotable as characterization-only if stacked on accepted parked `CF-W1-BT-02`.
+- `CF-W1-SQLAB-02A`: actionable later, sequenced behind accepted `CF-W1-SQLAB-01`.
+
+Team 00 promoted `CF-W1-BT-01A` and created the stacked worktree:
+
+- Branch: `codex/team06-strategy-signal/CF-W1-BT-01A`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-BT-01A`
+- Base: `codex/team06-strategy-signal/CF-W1-BT-02` at `bb49ce2`
+
+Allowed files:
+
+- `backend/tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.test.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06: `CF-W1-BT-01A` implementation in stacked worktree.
+- Team 04: `CF-W1-BT-01A` QA after Team 06 handoff.
+- Team 10: `CF-W1-BT-01A` review after QA acceptance.
+- Team 03: `CF-W1-BT-01A` signoff after Team 10 acceptance.
+- Team 02: active on persistent requirements discovery.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
 ## Gate Results
 
 `CF-W1-STRAT-02B`

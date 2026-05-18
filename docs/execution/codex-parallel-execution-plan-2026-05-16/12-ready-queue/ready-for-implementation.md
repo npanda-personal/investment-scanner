@@ -1207,3 +1207,69 @@ cd backend
 npm.cmd test -- market-data.service.test.ts market-data.universe.test.ts --runInBand
 npm.cmd run build
 ```
+
+---
+
+## Active Ready Handoff - `CF-W1-BT-01A`
+
+Date promoted: 2026-05-18
+
+Team 00 evaluated `CF-W1-BT-01A` after Team 03 architecture reconciliation. The slice is promoted only as a characterization-only stacked implementation on accepted parked `CF-W1-BT-02`.
+
+Sequencing decision:
+
+- Base branch: `codex/team06-strategy-signal/CF-W1-BT-02`
+- Base commit: `bb49ce2 feat: add backtesting review disposition`
+- New branch: `codex/team06-strategy-signal/CF-W1-BT-01A`
+- New worktree: `../investment-scanner-worktrees/team06-CF-W1-BT-01A`
+- Rationale: `CF-W1-BT-01A` and accepted parked `CF-W1-BT-02` reserve overlapping backtesting test/doc files, so `BT-01A` must stack on the accepted `BT-02` baseline rather than run from `dev`.
+
+Gate evidence:
+
+- Requirement: `10-requirements/CF-W1-BT-01A-backtesting-dq-fail-closed-characterization-requirement.md`
+- Architecture review: `03-architecture/CF-W1-BT-01A-architecture-review.md`
+- Contract: `06-contracts/CF-W1-BT-01A-backtesting-dq-fail-closed-characterization-contract.md`
+- Work packet: `08-work-packets/CF-W1-BT-01A-work-packet.md`
+- QA plan: `04-qa/CF-W1-BT-01A-qa-plan.md`
+- Open decisions: none.
+- Shared/high-risk blocker: none if implementation stays characterization-only and inside reserved files.
+
+Allowed files:
+
+- `backend/tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.test.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+
+Allowed branch-local evidence docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-BT-01A-developer-handoff.md`
+
+Forbidden files:
+
+- backtesting source files, including `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.ts`
+- Prisma schema or migrations
+- generated files
+- backend or frontend route registries
+- frontend source or UI tests
+- shared backend utilities
+- shared frontend UI
+- package manifests
+- provider, live-data, startup/backfill, paid/cloud, broker, telemetry, or credentials
+- any unrelated accepted branch work
+
+Required behavior:
+
+- add focused characterization tests for current Backtesting Strategy Lab DQ fail-closed behavior;
+- document the observed DQ behavior and limitations in the module docs;
+- do not rewrite simulation math, scoring, routes, DTO contracts, persistence, or frontend behavior;
+- preserve accepted `CF-W1-BT-02` review-disposition behavior in the stacked branch.
+
+Focused validation:
+
+```powershell
+cd backend
+npm.cmd test -- backtesting-strategy-lab.service.test.ts --runInBand
+npm.cmd run build
+```
+
+Stop and return to Team 00 if characterization requires source changes, schema/generated/route/shared/package/frontend changes, simulation semantics changes, or changes outside the allowed file reservation.

@@ -142,6 +142,71 @@ Update `17-team-outboxes/TEAM-06-outbox.md` with:
 
 ---
 
+# Current Assignment - `CF-W1-BT-01A`
+
+Date assigned: 2026-05-18
+
+Team: Team 06 - Strategy / Signal / Risk
+
+Work item: `CF-W1-BT-01A` Backtesting DQ fail-closed characterization
+
+Branch/worktree:
+
+- Branch: `codex/team06-strategy-signal/CF-W1-BT-01A`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-BT-01A`
+- Base: accepted parked `CF-W1-BT-02` branch commit `bb49ce2`
+
+This is a stacked branch. You are not alone in the codebase. Do not revert accepted `CF-W1-BT-02` edits and do not pull this work back to `dev`. Preserve the accepted `BT-02` review-disposition behavior while adding the `BT-01A` characterization.
+
+## Allowed Files
+
+- `backend/tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.test.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+
+Allowed reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-BT-01A-developer-handoff.md`
+
+## Forbidden Files
+
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.types.ts`
+- all other backtesting source files
+- Prisma schema or migrations
+- generated files
+- backend or frontend route registries
+- frontend source or UI tests
+- shared backend utilities
+- shared frontend UI
+- package manifests
+- provider, live-data, startup/backfill, paid/cloud, broker, telemetry, or credentials
+- unrelated accepted branch work
+
+## Required Work
+
+- Add focused characterization coverage for current Backtesting Strategy Lab DQ fail-closed behavior.
+- Document current observed behavior and limitations in `backtesting-strategy-lab.md`.
+- Do not rewrite simulation math, scoring, DTO contracts, persistence, route behavior, frontend behavior, or DQ ownership.
+
+## Required Validation
+
+```powershell
+cd backend
+npm.cmd test -- backtesting-strategy-lab.service.test.ts --runInBand
+npm.cmd run build
+```
+
+If any command cannot run, record the exact blocker, skipped command, risk, and next owner.
+
+## Handoff
+
+Update `17-team-outboxes/TEAM-06-outbox.md` and create/update `18-integration-queue/CF-W1-BT-01A-developer-handoff.md` with branch/worktree, base commit, changed files, inspected files, behavior characterized, tests run/results, skipped checks, forbidden files confirmed untouched, risks, blockers, and next gate: Team 04 QA.
+
+Stop and return to Team 00 if the characterization requires source changes, schema/generated/route/shared/package/frontend changes, simulation semantics changes, or changes outside the allowed file reservation.
+
+---
+
 # Current Dispatcher Assignment
 
 Date: 2026-05-18
