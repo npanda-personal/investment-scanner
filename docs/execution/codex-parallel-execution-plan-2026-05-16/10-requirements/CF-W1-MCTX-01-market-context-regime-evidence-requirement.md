@@ -54,4 +54,11 @@ The first child slice should focus on:
 
 ## Next Gate
 
-Architecture contract and QA plan for a bounded Market Context regime-evidence slice, with later implementation reserved to the market-context-intelligence module only.
+Architecture contract and QA plan are already prepared for a bounded Market Context regime-evidence slice. The next Team 00 action is Ready evaluation and exact implementation handoff sequencing for the reserved `market-context-intelligence` files only.
+
+## Ready-Evaluation Notes
+
+- `03-architecture/CF-W1-MCTX-01-architecture-review.md` already narrows the child to one module-local vertical slice with exact backend and feature-local file reservations.
+- `04-qa/CF-W1-MCTX-01-qa-plan.md` already confirms focused QA coverage for trustworthy, partial, low-evidence, and missing-evidence regime states.
+- This child is more dispatchable than prep-only parent items because it does not require Prisma, routes, shared UI, Market Data source changes, DQE source changes, or provider work.
+- Team 02 should keep `CF-W1-MCTX-01` ahead of prep-only follow-ons when ranking the next unassigned Team 00 handoff, unless Team 00 explicitly changes the live routing order.

@@ -2449,3 +2449,98 @@ Date: 2026-05-18
 - Team 03: Architect Signoff for `CF-W1-SMI-01` if Team 10 accepts.
 - Team 04: `CF-W1-RH-02A` QA planning after `MD-02A` or if Team 00 reprioritizes Research Hub.
 - Team 00: Ready evaluation for `CF-W1-L3-TREV-02` when the Today Review implementation lane is safe and not sharing files with `CF-W1-L3-TREV-01`.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Dispatch Update
+
+Team 00 is preparing Team 04 for `CF-W1-MD-02A` ADR/schema-proposal QA review. This is docs-only and independent of active Team 10 SMI review and Team 03 MD-03 architecture.
+
+## Current Pool After Dispatch
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 02 - Requirement Factory | `019e3c9e-9c1f-77f3-9cd4-f8ee983b7c99` | `gpt-5.4`, medium | rolling requirements discovery | next under-served market-intelligence workflow | active |
+| 2 | Team 10 - Review / Release | `019e3ca3-e034-7681-b8b9-34568833f37e` | `gpt-5.5`, high | review / release | `CF-W1-SMI-01` | active |
+| 3 | Team 03 - Architecture Factory | `019e3ca4-265b-7341-bc72-ff9b919f34e0` | `gpt-5.4`, high | architecture prep | `CF-W1-MD-03` | active |
+| 4 | Team 04 - QA Factory | pending spawn | `gpt-5.4`, high | docs-only QA review | `CF-W1-MD-02A` | ready |
+| 5 | Open slot | none | pending | QA planning | `CF-W1-RH-02A` after `MD-02A` unless reprioritized | queued |
+| 6 | Open slot | none | pending | signoff | `CF-W1-SMI-01` after Team 10 ACCEPT | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-MD-02A` QA review now.
+- Team 03: Architect Signoff for `CF-W1-SMI-01` if Team 10 accepts.
+- Team 04: `CF-W1-RH-02A` QA planning after `MD-02A`.
+- Team 00: Ready evaluation for `CF-W1-L3-TREV-02` when Today Review writer sequencing is safe.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## SMI-01 Review Rejected
+
+Team 10 rejected `CF-W1-SMI-01` for one bounded source issue:
+
+- degraded `ownershipDataStatus` values `PARTIAL` and `ERROR` can map to complete ownership trust and permit `USABLE` evidence.
+
+Routing:
+
+- Stop only the SMI workstream.
+- Return to Team 06 for bounded rework in the same SMI worktree.
+- Team 04 QA rerun follows Team 06 handoff.
+- Team 03 Architect Signoff is blocked for SMI until Team 10 accepts after QA rerun.
+
+## Current Pool After Rework Routing
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 02 - Requirement Factory | `019e3c9e-9c1f-77f3-9cd4-f8ee983b7c99` | `gpt-5.4`, medium | rolling requirements discovery | next under-served market-intelligence workflow | active |
+| 2 | Team 03 - Architecture Factory | `019e3ca4-265b-7341-bc72-ff9b919f34e0` | `gpt-5.4`, high | architecture prep | `CF-W1-MD-03` | active |
+| 3 | Team 06 - Strategy / Signal / Risk | pending spawn | `gpt-5.3-codex`, high | bounded rework | `CF-W1-SMI-01` | ready |
+| 4 | Team 04 - QA Factory | pending spawn | `gpt-5.4`, high | docs-only QA review | `CF-W1-MD-02A` | ready |
+| 5 | Open slot | none | pending | QA rerun | `CF-W1-SMI-01` after Team 06 rework | waiting |
+| 6 | Open slot | none | pending | signoff | `CF-W1-SMI-01` after QA and Team 10 ACCEPT | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06: `CF-W1-SMI-01` bounded review-reject rework now.
+- Team 04: `CF-W1-MD-02A` proposal QA review now.
+- Team 04: `CF-W1-SMI-01` QA rerun after Team 06 handoff.
+- Team 03: `CF-W1-SMI-01` Architect Signoff only after Team 10 re-accepts.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Completed Since Previous Snapshot
+
+- Team 02 `019e3c9e-9c1f-77f3-9cd4-f8ee983b7c99`: completed requirement discovery; `CF-W1-MCTX-01` is now the next top unassigned investor-value item for Team 00 Ready evaluation.
+- Team 03 `019e3ca4-265b-7341-bc72-ff9b919f34e0`: completed `CF-W1-MD-03` architecture as a `Ready candidate` after Team 04 QA planning.
+
+## Active Agents
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 06 - Strategy / Signal / Risk | `019e3ca9-3939-7513-96d8-4db91c2ab7d6` | `gpt-5.3-codex`, high | bounded rework | `CF-W1-SMI-01` | active |
+| 2 | Team 04 - QA Factory | `019e3ca9-3969-70c2-8146-b3dbc2fd3718` | `gpt-5.4`, high | docs-only QA review | `CF-W1-MD-02A` | active |
+| 3 | Open slot | none | pending | QA planning | `CF-W1-MD-03` | ready after Team 04 `MD-02A` completes |
+| 4 | Open slot | none | pending | Ready evaluation | `CF-W1-MCTX-01` | ready for Team 00 evaluation |
+| 5 | Open slot | none | pending | QA rerun | `CF-W1-SMI-01` after Team 06 handoff | waiting |
+| 6 | Open slot | none | pending | requirements discovery | next Team 02 cycle | ready |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 02: relaunch persistent requirements discovery after this docs checkpoint.
+- Team 00: evaluate `CF-W1-MCTX-01` for Ready promotion.
+- Team 04: `CF-W1-MD-03` QA planning after `MD-02A` QA review completes.
+- Team 04: `CF-W1-SMI-01` QA rerun after Team 06 rework.
+- Team 03: `CF-W1-SMI-01` Architect Signoff only after QA and Team 10 re-accept.

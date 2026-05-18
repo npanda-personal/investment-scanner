@@ -142,6 +142,98 @@ Update `17-team-outboxes/TEAM-06-outbox.md` with:
 
 ---
 
+# Current Dispatcher Assignment
+
+Date: 2026-05-18
+
+## Assignment
+
+Rework `CF-W1-SMI-01` after Team 10 `REJECT`.
+
+This assignment supersedes older Team 06 tails above. Work only in the dedicated Smart Money worktree. You are not alone in the codebase; do not revert or overwrite edits made by Team 04 or Team 10 evidence writers.
+
+## Branch / Worktree
+
+- Branch: `codex/team06-strategy-signal/CF-W1-SMI-01`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-SMI-01`
+
+## Blocking Finding To Fix
+
+Team 10 found that `smart-money-intelligence.service.ts` maps only `ownershipDataStatus === 'MISSING'` to `PARTIAL_OWNERSHIP_GAP`; `PARTIAL` and `ERROR` ownership statuses currently map to `COMPLETE`. That can allow `evidenceStatus = USABLE` for degraded ownership evidence, which violates the `CF-W1-SMI-01` trust contract.
+
+## Allowed Files
+
+You may edit only:
+
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.service.ts`
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.types.ts`
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.md`
+- `backend/tests/modules/smart-money-intelligence/smart-money-intelligence.service.test.ts`
+
+Allowed reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-CF-W1-SMI-01-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-SMI-01-developer-handoff.md`
+
+## Forbidden Files
+
+Do not edit:
+
+- Prisma schema or migrations
+- generated files
+- backend or frontend route registries
+- Smart Money controller/router/repository/module/index/validation/provider files
+- downstream module source
+- frontend source or UI tests
+- shared backend utilities
+- shared frontend components
+- package manifests
+- providers, startup/backfill, live-provider, paid/cloud, telemetry, broker, or credentials
+- Team 04 or Team 10 review evidence files except by referencing them in your handoff
+
+## Required Fix
+
+- Treat ownership trust as `COMPLETE` only when `ownershipDataStatus === 'COMPLETE'`.
+- Treat `MISSING`, `PARTIAL`, and `ERROR` as degraded ownership evidence.
+- Ensure persisted/current rows with degraded ownership remain `LIMITED`, not `USABLE`.
+- Add focused tests for persisted/current `PARTIAL` and `ERROR` ownership statuses.
+- Preserve existing ordering, distribution, current evidence fields, and research-support wording.
+
+## Focused Validation
+
+Run after rework:
+
+```powershell
+cd backend
+npm.cmd test -- smart-money-intelligence.service.test.ts --runInBand
+npm.cmd run build
+```
+
+Before build/test work, check memory/resource safety if practical.
+
+## Stop Conditions
+
+Stop and return to Team 00 if the fix requires:
+
+- any forbidden file;
+- schema/generated/route/shared changes;
+- provider/live-data or durable storage implementation;
+- frontend or downstream consumer adoption;
+- paid/cloud, telemetry, broker, or credential scope.
+
+## Expected Outbox
+
+Update `17-team-outboxes/TEAM-06-CF-W1-SMI-01-outbox.md` and `18-integration-queue/CF-W1-SMI-01-developer-handoff.md` with:
+
+- exact rework summary;
+- changed files;
+- tests run and results;
+- forbidden files confirmed untouched;
+- residual risks;
+- next gate: Team 04 QA rerun.
+
+---
+
 # Current Active Assignment Override
 
 Date: 2026-05-18

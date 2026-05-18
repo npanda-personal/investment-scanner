@@ -2,6 +2,186 @@
 
 Date: 2026-05-17
 
+## Team 03 MD-03 Market Data Signoff Threshold Prep - 2026-05-18
+
+Assignment: prepare docs-only architecture readiness for `CF-W1-MD-03` in the shared `dev` workspace without touching application code, tests, Prisma/schema, migrations, generated files, routes, shared utilities, shared UI, package manifests, providers, services, builds, UI smoke, or live data.
+
+Prepared:
+
+- `03-architecture/CF-W1-MD-03-architecture-review.md`
+- `06-contracts/CF-W1-MD-03-market-data-signoff-threshold-contract.md`
+- `08-work-packets/CF-W1-MD-03-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Files inspected:
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MD-03-market-data-signoff-threshold-contract-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/market-data-dq-readiness-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-market-data-data-quality.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/TEAM-05-market-data-data-quality-domain-audit-2026-05-17.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/next-validation-plans.md`
+- `backend/src/modules/market-data-foundation/market-data-foundation.md`
+- `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.types.ts`
+- `backend/tests/modules/market-data-foundation/market-data.service.test.ts`
+- `backend/tests/modules/market-data-foundation/market-data.universe.test.ts`
+
+Files changed:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-MD-03-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-MD-03-market-data-signoff-threshold-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-MD-03-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Readiness result:
+
+- `CF-W1-MD-03` is a `Ready candidate`.
+- The smallest bounded first child is one backend-only signoff-threshold slice; no pre-implementation split is needed.
+- Exact future writer set:
+  - `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`
+  - `backend/src/modules/market-data-foundation/market-data-foundation.md`
+  - `backend/tests/modules/market-data-foundation/market-data.service.test.ts`
+  - `backend/tests/modules/market-data-foundation/market-data.universe.test.ts`
+- The child is limited to enforcing and explaining the existing `95%` price-ready and `90%` metadata-ready thresholds inside `universeSignoff`.
+- Existing review-ready minimum-count/share gates remain preserved.
+- Current response shape, coverage fields, and route surface remain preserved.
+
+Exact blocked scope:
+
+- Prisma/schema and migrations
+- generated files
+- Market Data repository/provider/validation/types/controller/router/scheduler/worker/queue changes
+- Data Quality Engine source/tests
+- route registries
+- shared backend utilities
+- shared UI
+- package manifests
+- frontend source or UI tests
+- provider/startup/backfill redesign
+- paid/cloud, broker, telemetry, or live-provider scope
+- `CF-W1-MD-02A` or future `CF-W1-MD-02B` durable evidence/schema work
+
+QA planning handoff for Team 04:
+
+- plan threshold pass, price-fail, metadata-fail, and dual-fail scenarios;
+- verify `downstreamAllowed=false` whenever either threshold misses;
+- verify separate blocker reasoning for price-threshold versus metadata-threshold failure;
+- verify preserved review-ready minimum-count/share failure behavior;
+- verify `universeHealth()` and `repairPlan()` stay consistent on signoff outcomes for matching threshold state;
+- reject any widening into schema, DQE, repository/provider/startup, route, shared-file, or frontend scope.
+
+Current Team 03 recommendation to Team 00:
+
+1. Route `CF-W1-MD-03` to Team 04 QA planning now.
+2. Keep `CF-W1-MD-03` separate from `CF-W1-MD-02A`; `MD-02A` remains proposal-only.
+3. Do not run `CF-W1-MD-03` in parallel with any later Market Data packet that reserves `market-data-foundation.service.ts`, `market-data-foundation.md`, `market-data.service.test.ts`, or `market-data.universe.test.ts`.
+
+No tests, builds, Prisma commands, services, providers, UI smoke runs, live-data checks, commits, or pushes were run.
+
+## Team 03 RH-02A What-Changed Fail-Closed Basis Prep - 2026-05-18
+
+Assignment: prepare docs-only architecture readiness for `CF-W1-RH-02A` in the shared `dev` workspace without touching application code, tests outside the future Research Hub writer set, Prisma/schema, migrations, generated files, route registries, shared utilities, shared UI, package manifests, providers, services, builds, UI smoke, or live data.
+
+Prepared:
+
+- `03-architecture/CF-W1-RH-02A-architecture-review.md`
+- `06-contracts/CF-W1-RH-02A-research-hub-what-changed-fail-closed-basis-contract.md`
+- `08-work-packets/CF-W1-RH-02A-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Files inspected:
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/16-team-inboxes/TEAM-03-current-assignment.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-RH-02A-research-hub-what-changed-fail-closed-basis-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-RH-02-research-hub-what-changed-traceability-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-RH-01-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-RH-01-research-hub-actionability-evidence-wiring-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-RH-01-work-packet.md`
+- `backend/src/modules/research-hub/research-hub.md`
+- `backend/src/modules/research-hub/research-hub.service.ts`
+- `backend/src/modules/research-hub/research-hub.types.ts`
+- `backend/tests/modules/research-hub/research-hub.service.test.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.types.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.service.ts`
+- `frontend/src/features/research-hub/api/researchHubApi.ts`
+- `frontend/src/features/research-hub/components/ResearchOverviewPage.tsx`
+- `frontend/tests/ui/research-hub.spec.ts`
+
+Files changed:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-RH-02A-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-RH-02A-research-hub-what-changed-fail-closed-basis-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-RH-02A-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Readiness result:
+
+- `CF-W1-RH-02A` is a `Ready candidate`.
+- A bounded no-schema first child can make `whatChanged` fail closed when no comparison basis exists.
+- Current `dev` does not expose a safe module-owned or same-semantics public prior Research Hub basis.
+- Existing Today Review persisted runs are explicitly rejected as a surrogate basis because Today Review is a downstream published review set, not the same contract as Research Hub overview priorities.
+- The safe first child therefore adds explicit comparison-basis status, returns unavailable-basis semantics on current `dev`, clears fake delta claims, and replaces the hard-coded frontend temporal fallback copy.
+
+Exact future writer set:
+
+- `backend/src/modules/research-hub/research-hub.service.ts`
+- `backend/src/modules/research-hub/research-hub.types.ts`
+- `backend/src/modules/research-hub/research-hub.md`
+- `backend/tests/modules/research-hub/research-hub.service.test.ts`
+- `frontend/src/features/research-hub/api/researchHubApi.ts`
+- `frontend/src/features/research-hub/components/ResearchOverviewPage.tsx`
+- `frontend/tests/ui/research-hub.spec.ts`
+
+Exact blocked scope:
+
+- scheduler/journal storage
+- durable Research Hub overview snapshots
+- Prisma/schema and migrations
+- generated files
+- route changes
+- shared backend utilities
+- shared UI
+- package manifests
+- upstream module source/tests
+- provider/live-data
+- startup/backfill
+- paid/cloud
+- broker
+- telemetry
+- broad UI redesign
+
+Sequencing result for Team 00:
+
+- `CF-W1-RH-01` and `CF-W1-RH-02A` share the same Research Hub backend writer set and must not run in parallel.
+- Sequence `RH-02A` behind accepted/merged `RH-01`, or intentionally re-pack both into one combined one-writer Research Hub pass.
+
+QA planning handoff for Team 04:
+
+- plan backend assertions for explicit unavailable-basis status and cleared delta arrays;
+- assert that service logic does not infer prior basis from current `tradeCandidates` or from Today Review persisted runs;
+- plan module-owned UI smoke updates so Research Hub no longer says `since the last evaluation` when basis is unavailable;
+- keep all route, schema, shared UI, upstream source, provider/live-data, startup/backfill, and storage work out of scope.
+
+Current Team 03 recommendation to Team 00:
+
+1. Route `CF-W1-RH-02A` to Team 04 QA planning now.
+2. Keep `CF-W1-RH-02A` out of any parallel pass with `CF-W1-RH-01`.
+3. Promote `CF-W1-RH-02A` only as the fail-closed unavailable-basis child; do not widen it into durable history/storage work.
+
+No tests, builds, Prisma commands, services, providers, UI smoke runs, live-data checks, commits, or pushes were run.
+
 ## Team 03 MD-02A Additive Companion Evidence Schema Packet Prep - 2026-05-18
 
 Assignment: prepare docs-only architecture readiness for `CF-W1-MD-02A` in the shared `dev` workspace without touching application code, Prisma/schema, migrations, generated files, repositories, services, providers, startup/backfill, route registries, shared utilities/UI, package manifests, or tests.

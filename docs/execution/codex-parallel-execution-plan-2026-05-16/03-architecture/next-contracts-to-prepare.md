@@ -4,6 +4,34 @@ Date: 2026-05-17
 
 Prepared by Team 03 Architecture Factory and refreshed after `CF-W1-L3-AUTH-02` commit `503bcd9`, `CF-W1-SIG-TRIGGER-01` commit `6ab3999`, and checkpoint protocol fix commit `f75808f`.
 
+## Team 03 MD-03 Market Data Signoff Threshold Prep - 2026-05-18
+
+Prepared:
+
+- `03-architecture/CF-W1-MD-03-architecture-review.md`
+- `06-contracts/CF-W1-MD-03-market-data-signoff-threshold-contract.md`
+- `08-work-packets/CF-W1-MD-03-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Result:
+
+- `CF-W1-MD-03` is a `Ready candidate`.
+- The smallest bounded first child is the full backend-only signoff-threshold slice; no split is required before Team 04 QA planning.
+- Exact future writer set is limited to:
+  - `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`
+  - `backend/src/modules/market-data-foundation/market-data-foundation.md`
+  - `backend/tests/modules/market-data-foundation/market-data.service.test.ts`
+  - `backend/tests/modules/market-data-foundation/market-data.universe.test.ts`
+- The child enforces and explains the existing `95%` price-ready and `90%` metadata-ready thresholds inside `universeSignoff` only. It must preserve current coverage fields, review-ready minimum-count/share gates, and current route/DTO shape.
+- No Prisma/schema, repository/provider/startup/backfill redesign, Data Quality Engine source, route/controller, shared utility, package, frontend, or UI scope is allowed.
+- `CF-W1-MD-03` stays separate from `CF-W1-MD-02A`; `MD-02A` remains proposal-only and authorizes no application writer.
+- Team 04 QA planning can start now for threshold pass/fail, dual-fail, explanation parity, and `universeHealth()` versus `repairPlan()` consistency.
+- Team 00 must not run `CF-W1-MD-03` in parallel with any later Market Data child that reserves `market-data-foundation.service.ts`, `market-data-foundation.md`, `market-data.service.test.ts`, or `market-data.universe.test.ts`.
+
 ## Team 03 MD-02A Additive Companion Evidence Schema Packet - 2026-05-18
 
 Prepared:
@@ -31,6 +59,36 @@ Result:
   - `MD-02D` downstream DQE-consumer adoption.
 - Team 04 QA planning should review the packet as ADR/schema-proposal completeness only.
 - Team 00 must keep `CF-W1-MD-02A` out of Ready-for-implementation routing and decide separately whether to open `CF-W1-MD-02B` with explicit schema/migration/generated approval.
+
+## Team 03 RH-02A What-Changed Fail-Closed Basis Prep - 2026-05-18
+
+Prepared:
+
+- `03-architecture/CF-W1-RH-02A-architecture-review.md`
+- `06-contracts/CF-W1-RH-02A-research-hub-what-changed-fail-closed-basis-contract.md`
+- `08-work-packets/CF-W1-RH-02A-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Result:
+
+- `CF-W1-RH-02A` is a `Ready candidate`.
+- The bounded first child is a no-schema Research Hub fail-closed comparison-basis slice, but it is not backend-only because the current module page hard-codes misleading temporal fallback text.
+- Current `dev` does not expose a safe module-owned or same-semantics public prior Research Hub basis. Existing Today Review persisted runs are explicitly rejected as a surrogate basis because their downstream publication semantics do not match Research Hub `tradeCandidates`.
+- Exact future writer set is limited to Research Hub service/types/doc/test plus module-owned frontend API type, page rendering, and UI smoke:
+  - `backend/src/modules/research-hub/research-hub.service.ts`
+  - `backend/src/modules/research-hub/research-hub.types.ts`
+  - `backend/src/modules/research-hub/research-hub.md`
+  - `backend/tests/modules/research-hub/research-hub.service.test.ts`
+  - `frontend/src/features/research-hub/api/researchHubApi.ts`
+  - `frontend/src/features/research-hub/components/ResearchOverviewPage.tsx`
+  - `frontend/tests/ui/research-hub.spec.ts`
+- Scheduler/journal storage, durable overview snapshots, Prisma/schema, migrations, generated files, route registries, shared utilities/UI, package manifests, upstream module source/tests, provider/live-data, startup/backfill, paid/cloud, broker, telemetry, and broad UI redesign remain explicitly blocked.
+- `CF-W1-RH-01` and `CF-W1-RH-02A` share the same Research Hub backend writer set and must not run in parallel. Team 00 should sequence `RH-02A` behind accepted/merged `RH-01` work or intentionally re-pack both into one writer pass.
+- Team 04 QA planning can start now for unavailable-basis fail-closed behavior and the module-owned UI wording regression only.
 
 ## Team 03 TREV-02 Candidate Snapshot Provenance Prep - 2026-05-18
 

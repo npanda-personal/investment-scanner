@@ -2,15 +2,15 @@
 
 Date: 2026-05-18
 
-Mode: docs-only backlog refresh after a Market Data signoff-threshold audit. No application code, tests, Prisma, route registries, package manifests, generated files, Team 00 control docs, or Ready queue files changed.
+Mode: docs-only backlog refresh after a Market Context dispatchability audit. No application code, tests, Prisma, route registries, package manifests, generated files, Team 00 control docs, or Ready queue files changed.
 
 ## Work Item
 
-Audit one under-served market-intelligence workflow, convert the evidence into a bounded requirement update, and realign queue docs to the actual 2026-05-18 active, queued, and routed state.
+Audit one under-served market-intelligence workflow, refine the requirement where needed, and realign queue docs to the actual 2026-05-18 active, queued, routed, and Ready-evaluation state.
 
 ## Files Changed
 
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MD-03-market-data-signoff-threshold-contract-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MCTX-01-market-context-regime-evidence-requirement.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
@@ -21,11 +21,16 @@ Audit one under-served market-intelligence workflow, convert the evidence into a
 
 - `AGENTS.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/16-team-inboxes/TEAM-02-current-assignment.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-market-data-data-quality.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/TEAM-05-market-data-data-quality-domain-audit-2026-05-17.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/market-data-dq-readiness-contract.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/next-validation-plans.md`
-- `backend/src/modules/market-data-foundation/market-data-foundation.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MCTX-01-market-context-regime-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-MCTX-01-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-MCTX-01-market-context-regime-evidence-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-MCTX-01-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-MCTX-01-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/ready-for-implementation.md`
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.md`
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.service.ts`
+- `frontend/src/features/market-context-intelligence/components/MarketContextPage.tsx`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
@@ -33,42 +38,44 @@ Audit one under-served market-intelligence workflow, convert the evidence into a
 
 ## Audited Workflow
 
-Market Data signoff threshold enforcement for review-universe trust.
+Market Context regime-evidence dispatchability for a live investor review surface.
 
 ## Evidence Summary
 
-- `audit-market-data-data-quality.md` and `TEAM-05-market-data-data-quality-domain-audit-2026-05-17.md` both identify the same gap: universe signoff does not fully encode the active `95%` price-ready / `90%` metadata-ready contract as hard gates.
-- `market-data-foundation.md` already exposes `coverage.priceCoveragePercentage`, `coverage.metadataCoveragePercentage`, and `universeSignoff`, so the missing behavior is a bounded signoff-trust problem rather than a new product surface.
-- `06-contracts/market-data-dq-readiness-contract.md` already records the threshold values, so this is contract enforcement work, not a new Product Owner decision.
-- `04-qa/next-validation-plans.md` already names `CF-W1-MD-03` as the future threshold-test packet, which means current docs supported turning it into an explicit requirement.
+- `CF-W1-MCTX-01` already had a bounded source-backed requirement for regime evidence, but Team 02 queue docs were still ranking it behind prep-only parent items.
+- Team 03 already prepared `CF-W1-MCTX-01` architecture, contract, and work-packet docs with exact module-local file reservations and no schema/route/shared-file widening.
+- Team 04 already prepared a focused QA plan that covers trustworthy, partial, low-evidence, and missing-evidence regime states plus module-local UI smoke.
+- `ready-for-implementation.md` still shows no unassigned application-code item in Ready, so the correct Team 02 action was to surface `CF-W1-MCTX-01` as the next Team 00 evaluation candidate without moving it to Ready.
 
-## Requirement Added This Cycle
+## Requirement Refined This Cycle
 
-`CF-W1-MD-03` was added as a bounded high-user-value requirement for Market Data signoff threshold enforcement. The slice stays inside signoff logic, explanation output, and focused tests. It must not widen into schema/storage ADR work, provider redesign, route changes, or frontend scope.
+`CF-W1-MCTX-01` was refined to make its dispatchability explicit: requirement, architecture, contract, work packet, and QA plan are already complete for one bounded `market-context-intelligence` slice. The slice stays inside module-local backend evidence framing plus the existing feature-local page/widget surfaces. It must not widen into schema/storage, routes, shared UI, Market Data source, or DQE source work.
 
 ## Queue Delta
 
-- `CF-W1-MD-02A` is active Team 03 architecture prep and is now removed from the unassigned pull stack.
+- `CF-W1-RH-02A` is active Team 03 architecture prep and is removed from the immediate unassigned pull stack.
+- `CF-W1-MD-03` is now treated as queued behind `CF-W1-RH-02A`, not as the immediate next unassigned pull.
 - `CF-W1-TP-02` remains in active implementation/review follow-up and stays excluded from the next unassigned pull.
-- `CF-W1-SMI-01` remains in active Team 06 implementation and stays excluded from the next unassigned pull.
-- `CF-W1-RH-01` remains routed to Team 04 QA planning and stays excluded from the next unassigned pull.
-- `CF-W1-L3-TREV-02` remains queued for Team 04 QA planning and stays excluded from this cycle.
-- `CF-W1-MD-03` is now recorded as the next top unassigned requirement for Team 00 because it is upstream, bounded, and already supported by audit and contract evidence.
-- `CF-W1-RH-02A` remains a valid next pull, but it now sits behind `CF-W1-MD-03` in the filtered stack.
+- `CF-W1-SMI-01` remains in active Team 04 worktree QA verification and stays excluded from the next unassigned pull.
+- `CF-W1-RH-01` now has a QA plan ready and stays excluded from the next unassigned pull pending Team 00 Ready evaluation.
+- `CF-W1-L3-TREV-02` remains in active Team 04 QA planning and stays excluded from this cycle.
+- `CF-W1-MD-02A` remains queued for Team 04 QA review and stays excluded from this cycle.
+- `CF-W1-MCTX-01` is now recorded as the next top unassigned requirement for Team 00 because it is direct investor-value work and is already fully packeted for one bounded slice.
+- `CF-W1-SQLAB-02` and `CF-W1-STRAT-02` now sit immediately behind `CF-W1-MCTX-01` in the filtered stack.
 
 ## Blockers
 
-- `CF-W1-MD-03`: stop if Team 03 widens the packet into Prisma/schema/storage ADR work, provider/startup redesign, shared-file changes, or frontend/UI scope.
-- `CF-W1-MD-03`: stop if the slice tries to redefine the whole universe-state model instead of enforcing and explaining the existing `95%` / `90%` contract thresholds.
-- `CF-W1-MD-02A` remains active and should not be reopened by Team 02 unless Team 00 routes a rejection back to requirements.
+- `CF-W1-MCTX-01`: stop if Team 00 or a downstream writer widens the packet into Prisma/schema/storage work, repository/controller/router/validation edits, route/shared-file changes, Market Data source changes, DQE source changes, or broad UX work.
+- `CF-W1-MCTX-01`: stop if the slice rewrites regime math instead of adding bounded provenance, denominator framing, and missing-component evidence.
+- `CF-W1-RH-02A` and `CF-W1-MD-03` remain active/queued and should not be reopened by Team 02 unless Team 00 routes a rejection back to requirements.
 
 ## Recommended Next Team 00 Action
 
-Use `CF-W1-MD-03` as the next top unassigned requirement handoff.
+Use `CF-W1-MCTX-01` as the next top unassigned requirement handoff.
 
-1. Route `CF-W1-MD-03` to Team 03 for architecture/contract prep and Team 04 for focused QA-plan prep.
-2. Keep `CF-W1-RH-02A` and `CF-W1-SQLAB-02` next in the filtered pull stack while they remain bounded docs-only follow-ons.
-3. Keep `CF-W1-MD-02A`, `CF-W1-RH-01`, and `CF-W1-L3-TREV-02` out of this cycle's unassigned routing because they are already active or queued.
+1. Evaluate `CF-W1-MCTX-01` for exact Ready handoff sequencing without moving it to Ready from Team 02.
+2. Keep `CF-W1-SQLAB-02` and `CF-W1-STRAT-02` next in the filtered pull stack while they remain bounded docs-only follow-ons.
+3. Keep `CF-W1-RH-02A`, `CF-W1-MD-03`, `CF-W1-MD-02A`, `CF-W1-RH-01`, and `CF-W1-L3-TREV-02` out of this cycle's immediate unassigned routing because they are already active, queued, or pending another gate.
 
 ## Validation
 

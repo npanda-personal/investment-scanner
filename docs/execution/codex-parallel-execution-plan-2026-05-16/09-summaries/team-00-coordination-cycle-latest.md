@@ -1621,6 +1621,58 @@ Date: 2026-05-18
 2. Spawn Team 04 for `CF-W1-MD-02A` QA review if the Team 04 main-workspace files are clean.
 3. Consume Team 10 `SMI-01`, Team 03 `MD-03`, and Team 02 outputs as they complete.
 
+## Dispatch Update
+
+Team 04 receives `CF-W1-MD-02A` ADR/schema-proposal QA review as the next docs-only main-workspace QA task.
+
+Teams ready to pick up new tasks:
+
+- Team 04: `CF-W1-MD-02A` QA review now.
+- Team 03: `CF-W1-SMI-01` Architect Signoff if Team 10 accepts.
+- Team 04: `CF-W1-RH-02A` QA planning after `MD-02A`.
+- Team 00: `CF-W1-L3-TREV-02` Ready evaluation when Today Review writer sequencing is safe.
+
+## SMI-01 Review Routing
+
+Team 10 rejected `CF-W1-SMI-01` for a bounded trust-mapping issue. Team 00 is routing it back to Team 06 in the same worktree.
+
+Blocking finding:
+
+- `PARTIAL` and `ERROR` ownership statuses must be degraded ownership evidence, not complete trust.
+
+Teams ready to pick up new tasks:
+
+- Team 06: `CF-W1-SMI-01` bounded rework now.
+- Team 04: `CF-W1-MD-02A` proposal QA review now.
+- Team 04: `CF-W1-SMI-01` QA rerun after Team 06 handoff.
+- Team 03: `CF-W1-SMI-01` Architect Signoff only after Team 10 re-accepts.
+
+## Requirement And Architecture Outputs
+
+Team 02 completed the latest requirement cycle:
+
+- `CF-W1-MCTX-01` is now the top unassigned direct investor-value item.
+- No Ready movement was made by Team 02.
+
+Team 03 completed `CF-W1-MD-03` architecture:
+
+- Result: `Ready candidate` after Team 04 QA planning.
+- Exact future allowed implementation files are limited to Market Data Foundation service/doc and focused tests.
+- The packet remains separate from `CF-W1-MD-02A` durable evidence/schema work.
+
+Teams ready to pick up new tasks:
+
+- Team 02: relaunch persistent requirements discovery after this docs checkpoint.
+- Team 00: evaluate `CF-W1-MCTX-01` for Ready promotion.
+- Team 04: `CF-W1-MD-03` QA planning after active `MD-02A` QA review completes.
+- Team 04: `CF-W1-SMI-01` QA rerun after Team 06 handoff.
+
+## Next Coordination Action
+
+1. Commit completed docs-only outputs, excluding unrelated app-test state and active Team 04 QA output files.
+2. Relaunch Team 02 persistent requirements discovery.
+3. Evaluate `CF-W1-MCTX-01` for Ready promotion while Team 06 and Team 04 continue independent work.
+
 ---
 
 # Latest Coordination State

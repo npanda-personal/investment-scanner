@@ -15,8 +15,8 @@ Product Owner correction after this refresh:
 Apply this extra filter before Team 00 chooses the next pull:
 
 - exclude active implementation, active architecture/QA prep, accepted branch commits parked for later integration, and items already blocked behind schema/durable-storage/shared-file gates;
-- as of 2026-05-18, `CF-W1-MD-02A` is in active Team 03 architecture prep, `CF-W1-TP-02` is in active implementation/review follow-up, `CF-W1-SMI-01` is in active Team 06 implementation, `CF-W1-RH-01` is routed to Team 04 QA planning, and `CF-W1-L3-TREV-02` is already queued for Team 04 QA planning, so none of them belongs in the next unassigned pull;
-- after those exclusions, the next top unassigned requirement is `CF-W1-MD-03`.
+- as of 2026-05-18, `CF-W1-RH-02A` is in active Team 03 architecture prep, `CF-W1-MD-03` is queued for Team 03 architecture after `CF-W1-RH-02A`, `CF-W1-TP-02` is in active implementation/review follow-up, `CF-W1-SMI-01` is in active Team 04 worktree QA verification, `CF-W1-RH-01` has a QA plan ready and is pending Team 00 Ready evaluation, `CF-W1-L3-TREV-02` is in active Team 04 QA planning, and `CF-W1-MD-02A` is queued for Team 04 QA review, so none of them belongs in the next unassigned pull;
+- after those exclusions, the next top unassigned requirement is `CF-W1-MCTX-01`.
 
 ## Cycle Frame
 
@@ -50,7 +50,6 @@ These items are already promoted, pulled, accepted, or in active QA / review flo
 - `CF-W1-L3-ALERT-01`
 - `CF-W1-L3-PORT-01A`
 - `CF-W1-L3-TREV-01`
-- `CF-W1-MCTX-01`
 - `CF-W1-MD-01`
 - `CF-W1-NOTIF-02`
 - `CF-W1-SQLAB-01`
@@ -65,8 +64,8 @@ These items are already promoted, pulled, accepted, or in active QA / review flo
 
 | Rank | ID | User value | Acceptance criteria focus | Non-goals | Likely owner team | Expected architecture / QA gate | Likely file ownership risk | Dependencies | Parallel with `CF-W1-SIG-TRIGGER-02A`? |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | `CF-W1-MD-03` | Closes a direct upstream trust gap by making Market Data signoff fail closed when contract price-coverage or metadata-coverage thresholds are missed. | Explicit `95%` price-ready and `90%` metadata-coverage signoff gates, stable blocker reasons, downstreamAllowed blocking, and focused threshold characterization tests. | No schema/storage ADR work, no provider/startup redesign, no route/shared-UI work, and no universe redesign beyond the threshold gates. | Team 03 prep, Team 04 QA prep, later Team 05 implementation. | Bounded Market Data signoff contract and QA packet can proceed now from existing audit and contract evidence. | Medium: module-local Market Data service/docs/tests only. | Existing universe health/signoff outputs and threshold language already exist in docs/contracts; child must stay bounded to signoff logic and tests. | `Yes` for docs-only prep. No active file overlap in the current exclusions. |
-| 2 | `CF-W1-RH-02A` | Fails Research Hub delta claims closed so the overview stops implying review-history evidence it cannot prove. | Comparison-basis status, compared-against timestamp when auditable, and unavailable-basis fallback instead of fake delta labels. | No new scheduler/journal system, no broad Research Hub redesign, no upstream module rewrite, no storage/schema work. | Team 03 prep, Team 04 QA prep, later Team 08 implementation. | Bounded child can proceed now and remains local unless architecture proves a storage split is required. | Medium. Child stays local unless architecture proves a later storage split is required. | Keeps semantic alignment with `CF-W1-RH-01`, but can proceed as a bounded child without waiting for the broader actionability packet to finish. | `Yes`. Docs-only and isolated from current implementation writers. |
+| 1 | `CF-W1-MCTX-01` | Makes a core market-intelligence review surface explainable by showing whether the regime label is backed by persisted or fresh evidence, how strong the denominators are, and what is missing. | Additive provenance, denominator framing, trustworthy vs partial vs low-evidence vs missing-evidence states, stable reason codes, and focused module-local tests/UI smoke. | No regime-math rewrite, no schema/storage work, no route/shared-UI work, no Market Data or DQE source changes. | Team 00 Ready evaluation, then later Lane 1 implementation. | Requirement, architecture packet, contract, work packet, and QA plan are already prepared; only Team 00 Ready evaluation and implementation sequencing remain. | Medium: one module-local backend/frontend writer set only. | Exact file reservations already exist; any exact persisted denominator durability remains explicitly deferred. | `Yes`. Current exclusions show no active writer on `market-context-intelligence`. |
+| 2 | `CF-W1-MD-03` | Closes a direct upstream trust gap by making Market Data signoff fail closed when contract price-coverage or metadata-coverage thresholds are missed. | Explicit `95%` price-ready and `90%` metadata-coverage signoff gates, stable blocker reasons, downstreamAllowed blocking, and focused threshold characterization tests. | No schema/storage ADR work, no provider/startup redesign, no route/shared-UI work, and no universe redesign beyond the threshold gates. | Team 03 prep, Team 04 QA prep, later Team 05 implementation. | Bounded Market Data signoff contract and QA packet can proceed now from existing audit and contract evidence. | Medium: module-local Market Data service/docs/tests only. | Existing universe health/signoff outputs and threshold language already exist in docs/contracts; child must stay bounded to signoff logic and tests. | `Yes` for docs-only prep. No active file overlap in the current exclusions. |
 | 3 | `CF-W1-SQLAB-02` | Creates durable post-event learning so outcome review is not ephemeral. | Durable journal semantics, explicit evaluated vs unevaluable states, additive outcome-learning record, focused create/update/missing-data tests. | No signal scoring rewrite, no backtest rewrite, no alerting or execution behavior. | Team 03 prep, Team 04 QA prep, later Team 06 implementation. | Bounded child split after `CF-W1-SQLAB-02A`; docs-only contract and QA plan can proceed now. | Medium: module-local backend/frontend/test files, but storage path may escalate later. | `CF-W1-SQLAB-02A` learning-preview child must stay separate; no schema jump in the first prep pass. | `Yes` for docs-only prep. Different module from active Signal Generation work. |
 | 4 | `CF-W1-STRAT-02` | Makes strategy provenance and DQ gate policy explicit before more signals, backtests, and trade plans rely on strategy trust. | Stable strategy version plus durable rule revision marker, explicit DQ gate policy, blocked vs limited trust exposure, focused proof-state tests. | No strategy math rewrite, no signal math rewrite, no backtest realism rewrite. | Team 03 prep, Team 04 QA prep, later Team 06 implementation. | Bounded Strategy Framework contract and QA packet; stop if schema uniqueness is required. | Medium: strategy-framework backend/frontend/test files; possible later shared contract pressure. | Must preserve existing strategy behavior; may need later schema decision if rule revision persistence is not additive. | `Yes` for docs-only prep. No active Team 06 write overlap with `signal-generation-engine`. |
 | 5 | `CF-W1-MD-02` | Keeps the upstream durable-evidence parent visible while the first bounded child is already in active architecture prep. | Parent ADR direction, durable-vs-derived evidence boundary, and blocked packet sequence stay explicit. | No source or schema work; no bypassing the `MD-02A/B/C/D` split. | Team 03 architecture ownership, Team 04 ADR QA visibility. | Parent-only holding item after the new child split. | Low in docs, high if misrouted into implementation. | `CF-W1-MD-02A` remains active and later follow-ons must stay sequenced. | `Yes` for docs-only planning. |
@@ -80,9 +79,9 @@ These items are already promoted, pulled, accepted, or in active QA / review flo
 
 These are the clearest next docs-only candidates Team 00 can route now after excluding active, queued, accepted, parked, and blocked items:
 
-1. `CF-W1-MD-03`
-2. `CF-W1-RH-02A`
-3. `CF-W1-SQLAB-02`
+1. `CF-W1-MCTX-01`
+2. `CF-W1-SQLAB-02`
+3. `CF-W1-STRAT-02`
 
 ## Additional Next-Wave Discovery Candidates
 
@@ -97,9 +96,9 @@ Ranking is unchanged. These were added because current source shows underdevelop
 
 ## Next Unassigned Pull Stack
 
-1. `CF-W1-MD-03`
-2. `CF-W1-RH-02A`
-3. `CF-W1-SQLAB-02`
+1. `CF-W1-MCTX-01`
+2. `CF-W1-SQLAB-02`
+3. `CF-W1-STRAT-02`
 
 ## Why This Ranking Changed
 
@@ -108,9 +107,9 @@ Ranking is unchanged. These were added because current source shows underdevelop
 - `CF-W1-SMI-01` no longer belongs in the next unassigned pull because it is already in active Team 04 QA-planning flow.
 - `CF-W1-RH-01` no longer belongs in the next unassigned pull because it is already in active Team 03 architecture readiness.
 - `CF-W1-L3-TREV-02` no longer belongs in the next unassigned pull because it is already queued as the next architecture candidate after `CF-W1-RH-01`.
-- `CF-W1-MD-02A` moved out of the unassigned stack because Team 03 now owns the active architecture-prep cycle for that child.
-- `CF-W1-MD-03` was added because current audits and Market Data docs show a bounded upstream trust gap: signoff still does not hard-enforce the active `95%` price-ready / `90%` metadata-ready contract.
-- `CF-W1-RH-02A` remains high value, but it now follows the new upstream Market Data signoff-threshold packet.
+- `CF-W1-MCTX-01` moved to the top filtered slot because it is already requirement-complete, architecture-prepared, contract-prepared, work-packet-prepared, and QA-plan-ready while staying inside one module-local writer set.
+- `CF-W1-RH-02A` and `CF-W1-MD-03` dropped out of the immediate unassigned pull because the latest Team 02 assignment exclusions place `RH-02A` in active Team 03 architecture prep and `MD-03` queued behind it.
+- `CF-W1-MD-03` remains high value, but it is no longer the next unassigned pull under the current exclusion list.
 - `CF-W1-UX-01` stays in the upper half because it is a direct research surface, but it still trails upstream trust-evidence packets.
 - Lane 3 convenience items remain behind signal/strategy/market-data/trade-plan evidence work unless correctness, privacy, or user-data safety demands earlier action.
 
@@ -122,10 +121,10 @@ Ranking is unchanged. These were added because current source shows underdevelop
 
 ## Next 3 Candidates Team 00 Should Evaluate
 
-1. `CF-W1-MD-03`
-2. `CF-W1-RH-02A`
-3. `CF-W1-SQLAB-02`
+1. `CF-W1-MCTX-01`
+2. `CF-W1-SQLAB-02`
+3. `CF-W1-STRAT-02`
 
 ## Team 02 Recommendation
 
-Keep Team 00's live Ready / review routing unchanged for already-active branches. For the next new docs-only pull after excluding active, queued, accepted, parked, and blocked items, route `CF-W1-MD-03` first. Keep `CF-W1-RH-02A` and `CF-W1-SQLAB-02` immediately behind it, with `CF-W1-MD-02` remaining visible as the governing parent only and `CF-W1-MD-02A` staying in its active architecture lane. Do not let admin/settings/auth/subscription/notifications or alert-convenience work preempt this stack unless a correctness, privacy, or user-data-safety blocker appears.
+Keep Team 00's live Ready / review routing unchanged for already-active branches. For the next new docs-only pull after excluding active, queued, accepted, parked, and blocked items, evaluate `CF-W1-MCTX-01` first for exact Ready handoff sequencing. Keep `CF-W1-SQLAB-02` and `CF-W1-STRAT-02` immediately behind it, with `CF-W1-MD-03` still visible but queued behind active `CF-W1-RH-02A` and `CF-W1-MD-02A` lanes. Do not let admin/settings/auth/subscription/notifications or alert-convenience work preempt this stack unless a correctness, privacy, or user-data-safety blocker appears.

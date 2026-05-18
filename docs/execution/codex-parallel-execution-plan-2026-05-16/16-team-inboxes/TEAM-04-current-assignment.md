@@ -247,6 +247,50 @@ State whether `CF-W1-BT-02` is QA-plan ready for Team 00 Ready evaluation and li
 
 ---
 
+# Current Dispatcher Assignment
+
+Date: 2026-05-18
+
+## Assignment
+
+Review `CF-W1-MD-02A` as a docs-only ADR/schema-proposal QA gate.
+
+This final override supersedes older Team 04 tails above. Do not treat `MD-02A` as an implementation QA plan. It is a proposal-only completeness review for the future additive companion durable readiness evidence storage packet.
+
+## Source Input
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MD-02A-additive-companion-evidence-schema-packet-requirement.md`
+- Architecture review: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-MD-02A-architecture-review.md`
+- Contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-MD-02A-additive-companion-evidence-schema-packet-contract.md`
+- Work packet: `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-MD-02A-work-packet.md`
+- Parent ADR: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-MD-02-durable-readiness-evidence-adr.md`
+- Parent QA plan: `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-MD-02-qa-plan.md`
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-MD-02A-qa-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/next-validation-plans.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+## Required QA Review Coverage
+
+- additive-only posture;
+- complete natural-key basis for future companion evidence;
+- minimum durable evidence field coverage;
+- explicit durable-versus-derived claim boundary;
+- exact split between `MD-02A`, `MD-02B`, `MD-02C`, and `MD-02D`;
+- clear rejection of implementation work in this pass.
+
+## Forbidden Scope
+
+Do not edit or approve edits to Prisma/schema, migrations, generated artifacts, Market Data source/tests, DQE source/tests, route registries, shared utilities/UI, package manifests, provider/live-data, startup/backfill, frontend/UI, paid/cloud, broker, telemetry, or downstream consumer implementation.
+
+## Output
+
+Return whether `CF-W1-MD-02A` is accepted as a proposal QA packet, rejected for missing proposal content, or blocked by a true consent item. No tests, builds, services, Prisma commands, UI smoke, providers, or live data are authorized.
+
+---
+
 # Current Active Assignment Override
 
 Date: 2026-05-18

@@ -2609,3 +2609,73 @@ Teams ready to pick up new tasks:
 - Team 03: `CF-W1-SMI-01` Architect Signoff after Team 10 acceptance.
 - Team 04: `CF-W1-RH-02A` QA planning after `MD-02A`.
 - Team 00: `CF-W1-L3-TREV-02` Ready evaluation when Today Review writer sequencing is safe.
+
+---
+
+# MD-02A QA Review Dispatch
+
+Date: 2026-05-18
+
+Team 00 assigned Team 04 to review `CF-W1-MD-02A` as a docs-only ADR/schema-proposal QA gate.
+
+Scope:
+
+- proposal completeness only;
+- no application-code QA;
+- no Prisma/schema/migration/generated/source/test/provider/startup/frontend/shared-file/package work.
+
+Teams ready to pick up new tasks:
+
+- Team 04: `CF-W1-MD-02A` QA review now.
+- Team 03: `CF-W1-SMI-01` Architect Signoff after Team 10 acceptance.
+- Team 04: `CF-W1-RH-02A` QA planning after `MD-02A`.
+
+---
+
+# SMI-01 Team 10 Reject Routed
+
+Date: 2026-05-18
+
+Team 10 rejected `CF-W1-SMI-01` because degraded Smart Money ownership statuses can still be over-framed as complete trust.
+
+Team 00 routing:
+
+- Stop only `CF-W1-SMI-01`.
+- Send back to Team 06 for bounded rework in `../investment-scanner-worktrees/team06-CF-W1-SMI-01`.
+- Keep Team 02 requirements discovery, Team 03 `MD-03` architecture, and Team 04 `MD-02A` proposal QA moving.
+- Do not route Architect Signoff until Team 06 rework, Team 04 QA rerun, and Team 10 re-review accept.
+
+Teams ready to pick up new tasks:
+
+- Team 06: `CF-W1-SMI-01` bounded rework now.
+- Team 04: `CF-W1-MD-02A` proposal QA review now.
+- Team 04: `CF-W1-SMI-01` QA rerun after Team 06 handoff.
+
+---
+
+# Team 02 And MD-03 Outputs Consumed
+
+Date: 2026-05-18
+
+Team 02 completed the latest docs-only requirement cycle.
+
+Result:
+
+- `CF-W1-MCTX-01` is the next top unassigned direct investor-value item.
+- No item was moved to Ready by Team 02.
+- Team 00 will evaluate `CF-W1-MCTX-01` for Ready promotion.
+
+Team 03 completed `CF-W1-MD-03` architecture readiness.
+
+Result:
+
+- `CF-W1-MD-03` is a `Ready candidate` only after Team 04 QA planning.
+- It is backend-only and limited to Market Data Foundation service/doc/focused tests if later promoted.
+- It must remain separate from `CF-W1-MD-02A` durable evidence/schema proposal work.
+
+Teams ready to pick up new tasks:
+
+- Team 02: persistent requirements discovery relaunch after docs checkpoint.
+- Team 00: `CF-W1-MCTX-01` Ready evaluation.
+- Team 04: `CF-W1-MD-03` QA planning after active `MD-02A` QA review.
+- Team 04: `CF-W1-SMI-01` QA rerun after Team 06 rework.
