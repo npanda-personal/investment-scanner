@@ -6,9 +6,9 @@ Owner: Team 03 Architecture Factory
 
 ## Status
 
-Split packet prepared. Not Ready for durable implementation.
+Child readiness refined. `CF-W1-SQLAB-02A` is a Ready candidate only after `CF-W1-SQLAB-01` branch-local acceptance on the shared backend `signal-quality-lab` files. `CF-W1-SQLAB-02B` remains proposal-blocked for durable implementation.
 
-`CF-W1-SQLAB-02` cannot satisfy the full durable-journal requirement inside the current no-schema boundary. A bounded no-schema first slice is source-supported as an additive derived journal preview inside `signal-quality-lab`, but durable post-event learning storage remains blocked pending an approved storage surface.
+`CF-W1-SQLAB-02` cannot satisfy the full durable-journal requirement inside the current no-schema boundary. A bounded no-schema first slice is source-supported as an additive derived journal preview inside `signal-quality-lab`, and it can be routed as the next sequenced child after `CF-W1-SQLAB-01`. Durable post-event learning storage remains blocked pending explicit schema/repository/generated consent because there is still no module-owned persistence surface for the journal.
 
 ## Evidence Inspected
 
@@ -42,6 +42,7 @@ Split packet prepared. Not Ready for durable implementation.
 - `signal-quality-lab` calculates outcomes on demand. Its repository `recalculate()` path explicitly returns `persistedOutcomes: false`, and the module doc says no `SignalOutcome` table exists in this MVP.
 - Backend and frontend `SignalOutcomeSet` types expose measured forward-return data only. There is no journal-entry DTO, lesson-note field, or persistence status field today.
 - The existing instrument-history workflow already joins signal history and outcome rows by `signalResultId` and selected horizon on the `Signal Quality Lab` page, so a bounded derived journal preview can be rendered without route-registry changes.
+- The frontend already loads instrument history and outcomes through the existing `fetchSignalHistory(...)` and `fetchSignalOutcomes(...)` calls, so additive preview fields do not require new endpoints, new query params, or frontend API-client behavior changes.
 - Prisma currently provides no `signal-quality-lab` owned persistence model. `SignalResult` stores raw signal fields plus `scoringInputSummary` and `dataQualityEligibilitySnapshot`, but no post-event learning or journal field exists there.
 - Reusing `SignalResult` for journal persistence would cross module ownership into `signal-generation-engine` and would mix raw signal generation with post-event learning state.
 - `TodayReviewRun.sourceSnapshot` shows the repo can persist additive JSON when a module already owns a persisted row, but `signal-quality-lab` has no equivalent owned row to extend in the first slice.
@@ -104,9 +105,19 @@ Recommended first-pass mapping:
 
 This keeps the first slice bounded, research-support oriented, and honest about durability.
 
+## Ready-Candidate Decision
+
+`CF-W1-SQLAB-02A` is a Ready candidate, not a promoted Ready item, with these exact sequencing conditions:
+
+- `CF-W1-SQLAB-01` must reach branch-local acceptance first because both packets reserve `signal-quality-lab.service.ts`, `signal-quality-lab.types.ts`, `signal-quality-lab.md`, and `signal-quality-lab.service.test.ts`.
+- Team 00 must route `CF-W1-SQLAB-02A` on top of the accepted `CF-W1-SQLAB-01` branch/worktree or assign the same writer to both packets in strict sequence. It must not run as a parallel writer against those shared backend files.
+- Team 04 already prepared the child QA plan for this exact no-schema slice. No additional architecture split is needed before Ready review.
+
+`CF-W1-SQLAB-02B` is still proposal-blocked because durable post-event learning has no owned persistence row in `signal-quality-lab` and would need explicit consent for Prisma/schema, repository mapping, generated artifacts, and storage ownership.
+
 ## Exact Future File Reservations
 
-For the no-schema first slice only:
+For the `CF-W1-SQLAB-02A` no-schema child only:
 
 - `backend/src/modules/signal-quality-lab/signal-quality-lab.service.ts`
 - `backend/src/modules/signal-quality-lab/signal-quality-lab.types.ts`
@@ -124,9 +135,12 @@ For the no-schema first slice only:
 - `backend/src/modules/signal-quality-lab/signal-quality-lab.controller.ts`
 - `backend/src/modules/signal-quality-lab/signal-quality-lab.router.ts`
 - `backend/src/modules/signal-quality-lab/signal-quality-lab.validation.ts`
+- `backend/tests/modules/signal-quality-lab/signal-quality-lab.routes.test.ts`
+- `backend/tests/modules/signal-quality-lab/signal-quality-lab.validation.test.ts`
 - `backend/src/modules/signal-generation-engine/**`
 - `backend/src/modules/signal-calibration-engine/**`
 - `backend/src/modules/today-trade-review/**`
+- `frontend/src/features/signal-quality-lab/api/signalQualityLabService.ts`
 - backend and frontend route registries
 - shared backend utilities
 - shared frontend components
@@ -136,9 +150,9 @@ For the no-schema first slice only:
 
 ## Dependency And Conflict Notes
 
-- This first slice does not need Prisma, route, shared DTO, package, generated, or provider approval.
+- This first slice does not need Prisma, route, shared DTO, frontend API-client, package, generated, or provider approval.
 - Durable journal persistence remains blocked because no owned storage surface exists inside `signal-quality-lab`.
-- The packet shares `signal-quality-lab.service.ts`, `signal-quality-lab.types.ts`, `signal-quality-lab.md`, and the service test with `CF-W1-SQLAB-01`. Team 00 must combine or sequence those packets; they must not run as parallel writers.
+- The packet shares `signal-quality-lab.service.ts`, `signal-quality-lab.types.ts`, `signal-quality-lab.md`, and the service test with `CF-W1-SQLAB-01`. Team 00 must combine or sequence those packets; they must not run as parallel writers. Branch-local acceptance of `CF-W1-SQLAB-01` is the gate for this child to become implementation-eligible.
 - `CF-W1-CAL-01` is a semantic downstream consumer only. It is not a file-set blocker for the no-schema preview slice.
 
 ## Required QA Scenarios
@@ -155,7 +169,7 @@ Team 04 should plan for:
 
 ## Readiness Result
 
-- No-schema first slice: bounded and source-supported. Team 04 QA planning can start.
-- Full durable journal requirement: blocked for future storage approval.
+- `CF-W1-SQLAB-02A`: Ready candidate after `CF-W1-SQLAB-01` branch-local acceptance and Team 00 sequencing on the shared backend files.
+- `CF-W1-SQLAB-02B`: proposal-blocked for future storage approval.
 
-This packet is intentionally not Ready for Implementation until Team 00 decides whether to promote the no-schema child or route a separate storage decision packet.
+Do not promote the full parent requirement. Team 00 should either promote `CF-W1-SQLAB-02A` as the next sequenced no-schema child or keep working a separate storage approval packet for `CF-W1-SQLAB-02B`.

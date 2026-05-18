@@ -8,7 +8,7 @@ Signal outcome journal and post-event learning.
 
 ## State
 
-Split architecture packet prepared. Not Ready for durable implementation.
+Child routing refined. `CF-W1-SQLAB-02A` is a Ready candidate only after `CF-W1-SQLAB-01` branch-local acceptance on the shared backend `signal-quality-lab` files. `CF-W1-SQLAB-02B` remains proposal-blocked for durable implementation.
 
 This packet only prepares the no-schema first slice: a derived journal preview inside `signal-quality-lab`. Durable journal persistence remains out of scope and blocked.
 
@@ -39,6 +39,8 @@ This packet only prepares the no-schema first slice: a derived journal preview i
 - `backend/src/modules/signal-quality-lab/signal-quality-lab.controller.ts`
 - `backend/src/modules/signal-quality-lab/signal-quality-lab.router.ts`
 - `backend/src/modules/signal-quality-lab/signal-quality-lab.validation.ts`
+- `backend/tests/modules/signal-quality-lab/signal-quality-lab.routes.test.ts`
+- `backend/tests/modules/signal-quality-lab/signal-quality-lab.validation.test.ts`
 - `backend/src/modules/signal-generation-engine/**`
 - `backend/src/modules/signal-calibration-engine/**`
 - `backend/src/modules/today-trade-review/**`
@@ -71,8 +73,9 @@ Future implementation must:
 
 ## Dependency Notes
 
-- Durable persistence is blocked until Team 00 / Architect approve a storage packet.
+- Durable persistence is blocked until Team 00 / Architect approve a storage packet for `CF-W1-SQLAB-02B`.
 - This packet shares backend writer files with `CF-W1-SQLAB-01`. Team 00 must combine or sequence the two packets and keep one writer per file.
+- `CF-W1-SQLAB-02A` becomes implementation-eligible only after `CF-W1-SQLAB-01` reaches branch-local acceptance in its dedicated worktree or equivalent accepted branch state. Do not wait for merge to `dev`, but do require one accepted upstream backend baseline before this child starts.
 - `CF-W1-CAL-01` is only a semantic downstream consumer and is not a file-reservation blocker.
 
 ## QA Handoff Needed
@@ -105,11 +108,13 @@ Stop and return to Team 00 / Architect if implementation requires:
 - editable note persistence or any save/update flow;
 - shared utility, shared UI, package, generated, provider, or route-registry work.
 
+Also stop if Team 00 attempts to run `CF-W1-SQLAB-02A` in parallel with `CF-W1-SQLAB-01` on the overlapping backend files.
+
 ## Next Gate
 
-Team 04 QA planning can start for the no-schema first slice.
+Team 04 QA planning is already prepared for the no-schema first slice.
 
-Team 00 must then decide one of two paths:
+Team 00 must now decide one of two paths:
 
-1. promote the no-schema preview child as the first bounded implementation slice; or
-2. open a separate storage approval packet for the durable parent requirement.
+1. promote `CF-W1-SQLAB-02A` as the next sequenced bounded implementation child after `CF-W1-SQLAB-01` branch-local acceptance; or
+2. keep `CF-W1-SQLAB-02B` as a separate storage approval packet for the durable parent requirement.

@@ -2686,3 +2686,38 @@ Routing:
 - Team 10: `CF-W1-SMI-01` rereview after QA rerun accepts.
 - Team 03: `CF-W1-SMI-01` Architect Signoff after Team 10 accepts.
 - Team 04: `CF-W1-MCTX-01` and `CF-W1-MD-03` QA after Team 05 handoffs.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Completed Since Previous Snapshot
+
+- Team 03 `019e3cba-bbe2-7022-be2a-558560b6d05c`: completed `CF-W1-STRAT-02B` proposal packet; closed.
+- Team 04 `019e3cc5-756a-73c0-8536-7315af4fde95`: accepted `CF-W1-STRAT-02B` proposal QA review; closed.
+- Team 04 `019e3cc3-758b-75e0-8226-45a019a9d60c`: rejected `CF-W1-MCTX-01` QA for persisted-sector evidence overlap; closed.
+- Team 04 `019e3cc5-7526-7b33-9682-e6ec873a150c`: accepted `CF-W1-MD-03` QA; closed.
+- Team 10 `019e3cc6-9d3a-77c1-aeb3-1c9de01465d0`: accepted `CF-W1-SMI-01` second rereview; closed.
+- Team 03 `019e3cc6-672b-7d80-9ee1-0363477eb6e8`: refreshed `CF-W1-SQLAB-02`; `02A` is a Ready candidate after `SQLAB-01`, `02B` remains proposal-blocked; closed.
+- Team 04 `019e3cc8-bc23-7682-abb2-70a1d04a5a60`: prepared `CF-W1-RH-02A` QA plan; closed.
+
+## Current Pool
+
+| Slot | Team | Agent | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Team 02 - Requirement Factory | `019e3cc6-66fc-7813-abbc-e5c987bc0f61` | rolling requirements | priority refresh and new direct-value requirements | active |
+| 2 | Team 05 - Market Data / Data Quality | `019e3cca-b86b-7581-a013-53de9c4f6df0` | bounded rework | `CF-W1-MCTX-01` persisted-sector evidence fix | active |
+| 3 | Team 10 - Review / Release | `019e3ccb-0ae8-7433-b6ec-9e720acb3ff4` | review / release | `CF-W1-MD-03` | active |
+| 4 | Team 03 - Architect Signoff | `019e3ccb-3888-71a1-870b-6b7417db3af3` | signoff | `CF-W1-SMI-01` | active |
+| 5 | Open slot | none | queued | `CF-W1-MCTX-01` QA rerun after Team 05 handoff | waiting |
+| 6 | Open slot | none | queued | `CF-W1-MD-03` Architect Signoff after Team 10 ACCEPT | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-MCTX-01` QA rerun after Team 05 rework handoff.
+- Team 03: `CF-W1-MD-03` Architect Signoff if Team 10 accepts.
+- Team 00: delegated PO acceptance and scoped branch commit for `CF-W1-SMI-01` if Architect Re-Signoff accepts.
+- Team 00: `CF-W1-SQLAB-02A` Ready sequencing after current gate pressure clears.
+- Team 03: a new rolling architecture task can be spawned in an isolated outbox if capacity remains below six.

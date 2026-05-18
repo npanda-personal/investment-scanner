@@ -6,7 +6,7 @@ Owner: Team 03 Architecture Factory
 
 ## Status
 
-Split contract prepared. Not Ready for durable implementation.
+Child contract refined. `CF-W1-SQLAB-02A` is a Ready candidate only after `CF-W1-SQLAB-01` branch-local acceptance on the shared backend files. `CF-W1-SQLAB-02B` remains proposal-blocked for durable implementation.
 
 This contract intentionally covers the no-schema first slice only. It does not authorize durable journal persistence.
 
@@ -25,10 +25,12 @@ Allowed direction:
 - derive additive journal-preview metadata from existing `SignalOutcomeSet` measurement output;
 - render that metadata inside the existing instrument-history workflow;
 - mark the preview explicitly as not persisted.
+- keep the current `fetchSignalHistory(...)` and `fetchSignalOutcomes(...)` endpoint usage unchanged so the child stays off the frontend API-client file.
 
 Forbidden:
 
 - Prisma/schema, migrations, repository, controller, router, validation, or new route behavior;
+- route/validation test widening for unchanged controller/query behavior;
 - any write path for note entry, note editing, or journal persistence;
 - reuse of `SignalResult`, `SignalCalibrationResult`, `TodayReviewRun`, or any other foreign module persistence surface for journal storage;
 - signal scoring, calibration math, strategy-rule, or Data Quality source/export changes;
@@ -83,6 +85,7 @@ The exact type name may differ, but the semantics must stay stable.
 - Existing `outcomes`, `evaluationDiagnostics`, `horizonAvailability`, `recommendedAction`, and current instrument-history fields stay backward-compatible.
 - The new journal preview is additive and must not remove or rename current fields.
 - The preview must not claim persistence. `persistenceStatus` or equivalent copy must remain explicit.
+- Existing route paths, query parameters, and frontend API-client behavior stay unchanged. This child must fit through the current instrument-history fetch contract.
 
 ## Required UI Contract
 
@@ -108,6 +111,14 @@ The full parent requirement still needs a future approved storage packet because
 - `signal-quality-lab` owns no persisted row today;
 - there is no existing journal table or module-owned JSON surface to extend;
 - using another module's persisted row would violate module ownership and make future migration riskier.
+
+That future packet is `CF-W1-SQLAB-02B` and remains proposal-blocked until Team 00 / Architect approve Prisma/schema, repository, and generated-artifact consent.
+
+## Sequencing Rule
+
+- `CF-W1-SQLAB-02A` cannot run in parallel with `CF-W1-SQLAB-01` because both reserve `signal-quality-lab.service.ts`, `signal-quality-lab.types.ts`, `signal-quality-lab.md`, and `signal-quality-lab.service.test.ts`.
+- Team 00 may route this child immediately after `CF-W1-SQLAB-01` branch-local acceptance by stacking it on the same branch/worktree or assigning the same writer in sequence.
+- Until that sequencing note exists, this contract is a Ready candidate only. It is not self-promoting.
 
 ## Test Contract
 

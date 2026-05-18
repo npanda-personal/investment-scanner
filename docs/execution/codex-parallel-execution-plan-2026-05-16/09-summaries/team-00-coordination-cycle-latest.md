@@ -1585,6 +1585,70 @@ Date: 2026-05-18
 
 ## Gate Results
 
+`CF-W1-STRAT-02B`
+
+- Team 03 completed the durable revision-history proposal packet.
+- Team 04 accepted the proposal QA review.
+- Result: proposal-only; not Ready for implementation.
+- Future `CF-W1-STRAT-02B1` remains gated on explicit schema/migration/generated/repository consent.
+
+`CF-W1-MD-03`
+
+- Team 05 completed implementation in `../investment-scanner-worktrees/team05-CF-W1-MD-03`.
+- Team 04 QA accepted with inherited baseline test failures classified as unrelated.
+- Next gate: Team 10 review / release.
+
+`CF-W1-MCTX-01`
+
+- Team 04 QA rejected one bounded persisted-sector evidence issue.
+- Team 05 rework is active in `../investment-scanner-worktrees/team05-CF-W1-MCTX-01`.
+- Product Owner action is not required.
+
+`CF-W1-SMI-01`
+
+- Team 04 second QA rerun accepted.
+- Team 10 second rereview accepted.
+- Team 03 Architect Re-Signoff is active.
+
+`CF-W1-SQLAB-02`
+
+- Team 03 refreshed the packet.
+- Result: `CF-W1-SQLAB-02A` is a Ready candidate only after accepted `CF-W1-SQLAB-01`; durable `CF-W1-SQLAB-02B` remains schema/storage-blocked.
+
+`CF-W1-RH-02A`
+
+- Team 04 prepared the QA plan.
+- Implementation must be sequenced against `CF-W1-RH-01` because both reserve Research Hub backend files.
+
+## Active Agents
+
+- Team 02 `019e3cc6-66fc-7813-abbc-e5c987bc0f61`: rolling requirements / value discovery.
+- Team 05 `019e3cca-b86b-7581-a013-53de9c4f6df0`: `CF-W1-MCTX-01` bounded QA-reject rework.
+- Team 10 `019e3ccb-0ae8-7433-b6ec-9e720acb3ff4`: `CF-W1-MD-03` review / release.
+- Team 03 `019e3ccb-3888-71a1-870b-6b7417db3af3`: `CF-W1-SMI-01` Architect Re-Signoff.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-MCTX-01` QA rerun after Team 05 rework handoff.
+- Team 03: `CF-W1-MD-03` Architect Signoff if Team 10 accepts.
+- Team 00: delegated PO acceptance and scoped branch commit for `CF-W1-SMI-01` if Architect Re-Signoff accepts.
+- Team 00: evaluate `CF-W1-SQLAB-02A` sequencing after `SQLAB-01` branch acceptance and current gate pressure clears.
+- Team 03: next rolling architecture task can run in a new isolated outbox if subagent capacity is available.
+
+## Product Owner Action
+
+Product Owner action required: no.
+
+Open decisions: 0.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
+## Gate Results
+
 `CF-W1-SMI-01`
 
 - Team 04 QA accepted in the Team 06 Smart Money worktree.

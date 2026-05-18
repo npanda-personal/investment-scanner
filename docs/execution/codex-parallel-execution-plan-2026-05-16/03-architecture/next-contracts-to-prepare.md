@@ -4,6 +4,44 @@ Date: 2026-05-17
 
 Prepared by Team 03 Architecture Factory and refreshed after `CF-W1-L3-AUTH-02` commit `503bcd9`, `CF-W1-SIG-TRIGGER-01` commit `6ab3999`, and checkpoint protocol fix commit `f75808f`.
 
+## Team 03 STRAT-02B Durable Revision History Prep - 2026-05-18
+
+Prepared:
+
+- `03-architecture/CF-W1-STRAT-02B-architecture-review.md`
+- `06-contracts/CF-W1-STRAT-02B-durable-revision-history-contract.md`
+- `08-work-packets/CF-W1-STRAT-02B-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Result:
+
+- `CF-W1-STRAT-02B` is `proposal packet ready`.
+- No no-schema/no-generated first child exists once accepted `CF-W1-STRAT-02A` stays closed.
+- Current `StrategyDefinition` persistence is still `code`-unique, repository seed/upsert still overwrites by `code`, and current Strategy Framework service reads still come from the registry rather than persisted definition history.
+- Durable history therefore must split before implementation:
+  - `CF-W1-STRAT-02B1` approval-gated schema/migration/generated/repository durable-identity foundation;
+  - `CF-W1-STRAT-02B2` additive service compatibility durable-history exposure after `02B1`.
+- Exact future consent gate is explicit: Team 00 and Architect must approve `backend/prisma/schema.prisma`, `backend/prisma/migrations/**`, generated Prisma artifacts, and `strategy-framework.repository.ts` together before `02B1` opens.
+- Proposed future `02B1` writer set only:
+  - `backend/prisma/schema.prisma`
+  - `backend/prisma/migrations/**`
+  - generated Prisma client or generated types
+  - `backend/src/modules/strategy-framework/strategy-framework.repository.ts`
+  - `backend/src/modules/strategy-framework/strategy-framework.types.ts`
+  - `backend/src/modules/strategy-framework/strategy-framework.md`
+  - `backend/tests/modules/strategy-framework/strategy-framework.repository.test.ts`
+- Proposed future `02B2` writer set only:
+  - `backend/src/modules/strategy-framework/strategy-framework.service.ts`
+  - `backend/src/modules/strategy-framework/strategy-framework.types.ts`
+  - `backend/src/modules/strategy-framework/strategy-framework.md`
+  - `backend/tests/modules/strategy-framework/strategy-framework.service.test.ts`
+- Team 04 should review this as proposal/split completeness only. It is not an executable QA handoff.
+- Team 00 must keep `CF-W1-STRAT-02B` out of Ready-for-implementation routing and must not reopen `CF-W1-STRAT-02A` under this packet.
+
 ## Team 03 MD-03 Market Data Signoff Threshold Prep - 2026-05-18
 
 Prepared:

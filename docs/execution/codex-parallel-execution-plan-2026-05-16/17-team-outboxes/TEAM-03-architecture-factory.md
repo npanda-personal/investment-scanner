@@ -2,6 +2,113 @@
 
 Date: 2026-05-17
 
+## Team 03 STRAT-02B Durable Revision History Prep - 2026-05-18
+
+Assignment: prepare docs-only architecture readiness for `CF-W1-STRAT-02B` in the shared `dev` workspace without touching application code, tests, Prisma/schema, migrations, generated files, routes, shared utilities, shared UI, package manifests, providers, services, builds, UI smoke, or live data.
+
+Prepared:
+
+- `03-architecture/CF-W1-STRAT-02B-architecture-review.md`
+- `06-contracts/CF-W1-STRAT-02B-durable-revision-history-contract.md`
+- `08-work-packets/CF-W1-STRAT-02B-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Files inspected:
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-STRAT-02B-strategy-definition-durable-revision-history-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-STRAT-02-strategy-framework-rule-versioning-dq-gate-policy-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-STRAT-02-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-STRAT-02-strategy-framework-rule-versioning-dq-gate-policy-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-STRAT-02-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/09-summaries/CF-W1-STRAT-02A-po-acceptance-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-STRAT-02A-qa-plan.md`
+- `backend/src/modules/strategy-framework/strategy-framework.md`
+- `backend/src/modules/strategy-framework/strategy-framework.registry.ts`
+- `backend/src/modules/strategy-framework/strategy-framework.repository.ts`
+- `backend/src/modules/strategy-framework/strategy-framework.service.ts`
+- `backend/src/modules/strategy-framework/strategy-framework.types.ts`
+- `backend/tests/modules/strategy-framework/strategy-framework.repository.test.ts`
+- `backend/tests/modules/strategy-framework/strategy-framework.service.test.ts`
+- `backend/prisma/schema.prisma`
+
+Files changed:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-STRAT-02B-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-STRAT-02B-durable-revision-history-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-STRAT-02B-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Readiness result:
+
+- `CF-W1-STRAT-02B` is `proposal packet ready`.
+- No no-schema/no-generated first child remains once accepted `CF-W1-STRAT-02A` is kept closed.
+- Current source confirms the durable gap is real:
+  - Prisma `StrategyDefinition` is still `code`-unique;
+  - repository seed/upsert still overwrites by `code`;
+  - service list/detail/proof reads still come from registry/current summaries rather than persisted definition history.
+- Durable history therefore requires an explicit implementation split:
+  - `CF-W1-STRAT-02B1` for schema/migration/generated/repository durable identity;
+  - `CF-W1-STRAT-02B2` for additive service compatibility durable-history exposure after `02B1`.
+
+Exact future consent gate:
+
+- Team 00 and Architect must explicitly approve:
+  - `backend/prisma/schema.prisma`
+  - `backend/prisma/migrations/**`
+  - generated Prisma client or generated types
+  - `backend/src/modules/strategy-framework/strategy-framework.repository.ts`
+- no other `strategy-framework` source writer may be active when `02B1` opens.
+
+Proposed future file reservations only, not approved:
+
+- `CF-W1-STRAT-02B1`
+  - `backend/prisma/schema.prisma`
+  - `backend/prisma/migrations/**`
+  - generated Prisma client or generated types
+  - `backend/src/modules/strategy-framework/strategy-framework.repository.ts`
+  - `backend/src/modules/strategy-framework/strategy-framework.types.ts`
+  - `backend/src/modules/strategy-framework/strategy-framework.md`
+  - `backend/tests/modules/strategy-framework/strategy-framework.repository.test.ts`
+- `CF-W1-STRAT-02B2`
+  - `backend/src/modules/strategy-framework/strategy-framework.service.ts`
+  - `backend/src/modules/strategy-framework/strategy-framework.types.ts`
+  - `backend/src/modules/strategy-framework/strategy-framework.md`
+  - `backend/tests/modules/strategy-framework/strategy-framework.service.test.ts`
+
+Exact blocked scope:
+
+- reopening accepted `CF-W1-STRAT-02A`
+- evaluator math or proof-status semantics changes
+- controller/router/validation or route changes
+- frontend/shared UI changes
+- Data Quality Engine source changes or local DQ score duplication
+- package manifests
+- provider/startup/backfill/live-data work
+- paid/cloud, broker, or telemetry scope
+
+QA planning handoff for Team 04:
+
+- review this packet as proposal/split completeness only;
+- confirm no safe no-schema/no-generated child remains;
+- confirm legacy rows are not presented as fabricated older-version history;
+- confirm `02B1` owns all schema/generated/repository risk and `02B2` stays additive/backward-compatible;
+- reject any widening into evaluator/proof/router/UI/DQ duplication scope.
+
+Current Team 03 recommendation to Team 00:
+
+1. Route `CF-W1-STRAT-02B` to Team 04 for proposal review now.
+2. Keep `CF-W1-STRAT-02B` out of Ready-for-implementation routing.
+3. Open `CF-W1-STRAT-02B1` only through an explicit schema/migration/generated/repository consent gate.
+4. Do not reopen `CF-W1-STRAT-02A` under this durable-history packet.
+
+No tests, builds, Prisma commands, services, providers, UI smoke runs, live-data checks, commits, or pushes were run.
+
 ## Team 03 MD-03 Market Data Signoff Threshold Prep - 2026-05-18
 
 Assignment: prepare docs-only architecture readiness for `CF-W1-MD-03` in the shared `dev` workspace without touching application code, tests, Prisma/schema, migrations, generated files, routes, shared utilities, shared UI, package manifests, providers, services, builds, UI smoke, or live data.
