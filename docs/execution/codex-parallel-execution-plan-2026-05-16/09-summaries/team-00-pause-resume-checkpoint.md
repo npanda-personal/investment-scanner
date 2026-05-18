@@ -199,3 +199,90 @@ Recently closed:
 - Team 10 is ready to review after QA passes.
 - Team 03 is ready for Architect Signoff after Team 10 accepts.
 - Team 02 remains active and should not be closed.
+
+---
+
+# Latest Runtime Checkpoint
+
+Date: 2026-05-18
+
+## Current Git State
+
+Main workspace:
+
+- Branch: `dev`
+- Head: `01d77f3 docs: add next factory planning packets`
+- Divergence: `dev` is ahead of `origin/dev` by 15 local commits.
+- Push status: not push-safe.
+- Reason: shared `dev` still has an uncommitted app-test edit in `backend/tests/modules/alerts-monitoring/alerts-monitoring.ownership.test.ts`.
+- Active execution docs status: clean before this checkpoint update.
+
+Clean accepted branch commits:
+
+- `CF-W1-L3-PORT-01A`: `f1432e6 feat: add portfolio readiness dto evidence`.
+- `CF-W1-TP-01B`: `8ff22fd fix: harden trade plan readiness gates`.
+- `CF-W1-NOTIF-02`: `c77ece7 fix: redact notification log payloads`.
+- `CF-W1-L3-ALERT-01`: `2fb0cb6 fix: gate alerts on data quality readiness`.
+- `CF-W1-MD-01`: `913b56b fix: harden market data validation`.
+- `CF-W1-L3-TREV-01`: `e0673c3 feat: add today review publication evidence`.
+
+## Active Agents
+
+No spawned agents are active at this checkpoint.
+
+Recently closed:
+
+- Team 07 `019e3aa3-8dfa-7780-89f0-dff04a14c1a4`: implemented `CF-W1-L3-TREV-01`.
+- Team 04 `019e3ab5-fd56-7ac2-a113-d783251f0694`: accepted `CF-W1-L3-TREV-01` QA.
+- Team 10 `019e3abc-9a6b-7cf2-87d2-1c37c6bd1f8e`: accepted `CF-W1-L3-TREV-01` review/release gate.
+- Team 03 `019e3ac3-a47f-7700-9383-063d4faac445`: accepted `CF-W1-L3-TREV-01` Architect Signoff.
+- Team 02 `019e3ab0-923c-7563-944e-a62edf4e3d7d`: added `CF-W1-SQLAB-02` requirement.
+
+## Current Workstream State
+
+`CF-W1-L3-TREV-01`
+
+- State: accepted and locally committed on Team 07 branch.
+- Commit: `e0673c3`.
+- Validation accepted:
+  - backend focused Jest: pass, 24 tests.
+  - backend build: pass.
+  - frontend Playwright Today Review smoke: pass, 8 tests.
+  - frontend build: pass.
+  - Team 10 review: accepted.
+  - Architect Signoff: accepted.
+- Temporary Vite server used for QA has been stopped.
+- Next: integrate into `dev` only after a separate clean exact-scope integration pass.
+
+`CF-W1-L3-ALERT-03`
+
+- State: requirement, architecture contract/work packet, and QA plan prepared.
+- Not Ready because it conflicts with active/parked `alerts-monitoring` writers: accepted `CF-W1-L3-ALERT-01` branch and parked `CF-W1-L3-AUTH-03`.
+
+`CF-W1-L3-WATCH-01`
+
+- State: requirement and architecture contract/work packet prepared.
+- Needs Team 04 QA plan.
+- Not Ready because Team 00 must sequence it against the parked `CF-W1-L3-PORT-01B` watchlist writer set.
+
+`CF-W1-SQLAB-02`
+
+- State: requirement prepared.
+- Needs Team 03 architecture and Team 04 QA prep.
+
+## Queued Gates
+
+1. Commit this checkpoint as active execution docs only.
+2. Relaunch persistent Team 02 requirement discovery.
+3. Route `CF-W1-SQLAB-02` to Team 03 architecture prep.
+4. Route `CF-W1-L3-WATCH-01` to Team 04 QA planning.
+5. Evaluate `CF-W1-SQLAB-01` or `CF-W1-HCTX-01` for next Ready promotion because their current packets are prepared and do not conflict with active Lane 3 work.
+6. Do not push or merge accepted branch commits into `dev` until the dirty alerts ownership test is classified and exact integration scope is clean.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 02 is ready to relaunch as persistent PO/Requirements discovery.
+- Team 03 is ready for `CF-W1-SQLAB-02` architecture prep.
+- Team 04 is ready for `CF-W1-L3-WATCH-01` QA planning.
+- Team 06 can take the next Lane 2 implementation only after Team 00 promotes a specific Ready item, likely `CF-W1-SQLAB-01` if gates pass.
+- Team 10 is idle until the next QA-accepted implementation handoff.
