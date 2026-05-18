@@ -199,3 +199,9 @@
 - Shared `dev` remains not push-safe while `backend/tests/modules/alerts-monitoring/alerts-monitoring.ownership.test.ts` is dirty outside a current accepted integration action.
 - `CF-W1-L3-TREV-01` is accepted and locally committed on its Team 07 branch as `e0673c3`; it must not be pushed or merged into `dev` until Team 00 performs a clean integration pass with exact scope.
 - `CF-W1-SQLAB-01` is promoted only as a backend-only Signal Quality Lab additive outcome-confidence slice. Data Quality Engine source/export changes, signal/calibration/strategy/trade-plan source changes, repository/controller/router/validation changes, frontend/UI work, route/schema/package/generated/provider/startup/live/paid/cloud/telemetry/broker scope, and changing default DQ filter behavior remain blocked.
+
+## Product Owner Priority Correction Risk Decisions - 2026-05-18
+
+- Future routing must prioritize direct investor/trader value: market data, Data Quality, signals, strategy trust, backtests, calibration, historical context, market context, Trade Plan research support, and research evidence.
+- Admin, settings, auth/subscription, notifications, and alert convenience work are lowest priority unless they block correctness, privacy, user-data safety, or an already accepted branch gate.
+- The next safe docs-only handoff is `CF-W1-BT-02` architecture/contract refresh, followed by historical context, market context, calibration, signal-quality learning, Strategy Framework provenance, DQ currentness, Trade Plan readiness, and Market Data durable-readiness ADR prep.

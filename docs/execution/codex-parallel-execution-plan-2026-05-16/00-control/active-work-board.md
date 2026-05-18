@@ -73,25 +73,25 @@ Operating rules:
 | Field | Current Value |
 | --- | --- |
 | Current daemon cycle id | `DAEMON-20260517` |
-| Current rolling iteration count | 22 |
-| Active teams | Team 00 spawned-subagent runtime pool; Team 02 persistent PO/Requirements lane; Team 07 rework; Team 03 architecture prep; Team 08 Copilot mapping |
-| Queued teams | Team 04 QA rerun for `CF-W1-L3-PORT-01A`; Team 10 re-review for `CF-W1-L3-PORT-01A`; Team 03 Architect Signoff; Team 06 `CF-W1-TP-01B` implementation if promoted; Team 09 `CF-W1-NOTIF-02` implementation if promoted |
-| Idle teams | None fully idle; implementation lanes without Ready work stay docs-only |
-| Blocked teams | No team fully blocked; no open Decision Inbox items; source/test work remains blocked by missing Team 00 Ready promotion for all children except `CF-W1-L3-PORT-01A` |
-| Teams relaunched this cycle | Team 01 audit consumed; Teams 02, 03, 04, 06, 07, and 09 reassigned through current inbox files |
+| Current rolling iteration count | 39 |
+| Active teams | Team 00 orchestration; no spawned subagents active at this checkpoint |
+| Queued teams | Team 03 `CF-W1-BT-02` architecture/contract refresh; Team 04 `CF-W1-BT-02` QA refresh after Team 03; Team 02 market-intelligence-focused discovery |
+| Idle teams | Implementation lanes are idle unless Team 00 selects a Ready item; Teams 05/06 are the next preferred implementation lanes for market-data/DQ and signal/strategy/Trade Plan work |
+| Blocked teams | No team fully blocked; no open Decision Inbox items; platform/notification/alert convenience work is intentionally low priority unless it blocks correctness, privacy, or user-data safety |
+| Teams relaunched this cycle | Team 00 completed AUTH/SUB branch-gate closure and corrected future priority routing toward market-intelligence value |
 | Teams shut down due to no work | None permanently; Teams without ready implementation move to audit/refinement |
 | Teams re-added due to new work | Team 07 completed `CF-W1-L3-AUTH-02`; Team 06 completed `CF-W1-SIG-TRIGGER-01` |
-| Ready queue depth | 0 available-to-pull application-code items; `CF-W1-L3-PORT-01A` has moved from implementation to Rejected / Rework |
-| Refinement queue depth | 12 active unique refinement / near-ready items: `CF-W1-L3-ALERT-01`, `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-MD-02`, `CF-W1-MD-01`, `CF-W1-UX-02`, `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-UX-05`, `CF-W1-L3-DQ-01`, `CF-W1-TP-01A`, `CF-W1-L3-INTEL-01` |
-| Integration queue depth | 1 active application-code handoff in rejected/rework state: `CF-W1-L3-PORT-01A` |
+| Ready queue depth | 0 available-to-pull application-code items; accepted branch commits remain parked for later clean integration |
+| Refinement queue depth | Active market-intelligence queue: `CF-W1-BT-02`, `CF-W1-HCTX-01`, `CF-W1-MCTX-01`, `CF-W1-CAL-01`, `CF-W1-SQLAB-02`, `CF-W1-STRAT-02`, `CF-W1-DQ-02`, `CF-W1-TP-01B`, `CF-W1-MD-02`, `CF-W1-UX-01` |
+| Integration queue depth | Branch-local accepted commits are parked; shared `dev` integration is deferred until clean exact scope |
 | Decision inbox count | 0 open decisions |
 | Spawned subagent active limit | 6 |
 | Spawned subagent queue doc | `00-control/team-agent-runtime-queue.md` |
-| Ready-work pressure | rework pressure: Team 07 must revise `CF-W1-L3-PORT-01A`; Team 04/10 rerun after revision |
-| Blocked-work pressure | medium; blockers are readiness/packet gates, not Product Owner decisions |
-| Next team to launch | Team 07 rework for `CF-W1-L3-PORT-01A` |
-| Next item to assign | After Team 07 rework, route Team 04 QA rerun and Team 10 re-review for `CF-W1-L3-PORT-01A`; Team 00 can then evaluate `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, or `CF-W1-L3-ALERT-01` when review bandwidth is safe |
-| Last commit at Team 00 resume start | `c739f78 docs: route team 01 audit findings to parallel teams` |
+| Ready-work pressure | none unassigned; next safe work is docs-only architecture/QA prep |
+| Blocked-work pressure | low-to-medium; blockers are readiness/packet gates, clean integration scope, and intentionally demoted low-value platform/notification/alert convenience items |
+| Next team to launch | Team 03 architecture/contract refresh for `CF-W1-BT-02` |
+| Next item to assign | `CF-W1-BT-02`, then `CF-W1-HCTX-01`, `CF-W1-MCTX-01`, and `CF-W1-CAL-01` |
+| Last commit at Team 00 resume start | `8450df1 docs: refresh requirements priority queue` |
 | Daemon should continue | Yes; Product Owner action is not required |
 
 ## Sprint 0 Items
@@ -231,3 +231,5 @@ Old work items in `docs/codex-agent-team-plan/` may be used only as evidence or 
 | DAEMON-20260518-34 | `CF-W1-UX-01A` accepted branch commit | Teams 08, 04, 10, 03, 00 | Committed on implementation branch | Team 08 Stock Research Workbench worktree | Team 04 QA accepted, Team 10 review accepted, Team 03 Architect Signoff accepted, Team 00 delegated PO acceptance completed, and scoped branch commit `246d5a3` was created. Full backend trust-evidence parent remains blocked. No push or `dev` integration yet. |
 | DAEMON-20260518-35 | Team 02 priority refresh | Team 02 + Team 00 | Requirements Updated | `10-requirements/`, `17-team-outboxes/TEAM-02-requirement-factory.md` | Team 02 refreshed the top-10 user-value queue, kept already promoted/pulled/accepted items out of discovery, and recommended `CF-W1-AUTH-01` as the next Team 00 promotion candidate with `CF-W1-L3-AUTH-03` as fallback after alert-lane ownership clears. |
 | DAEMON-20260518-36 | `CF-W1-AUTH-SUB-01` combined Ready promotion | Team 00 + Team 09 | Ready for Implementation | `12-ready-queue/`, `16-team-inboxes/TEAM-09-current-assignment.md` | Team 00 promoted a combined backend-only Team 09 controller-policy slice covering `CF-W1-AUTH-01` and `CF-W1-SUB-01`, resolving the overlapping subscription controller/test/doc reservation with one writer. |
+| DAEMON-20260518-37 | `CF-W1-AUTH-SUB-01` accepted branch commit | Teams 09, 04, 10, 03, 00 | Committed on implementation branch | Team 09 AUTH/SUB worktree | Team 09 implemented, Team 04 QA passed, Team 10 review accepted, Team 03 Architect Signoff accepted, Team 00 delegated PO acceptance completed, and scoped branch commit `354499d` was created. No push or `dev` integration yet. |
+| DAEMON-20260518-38 | Product Owner priority correction | Product Owner + Team 00 | Priority Model Updated | `10-requirements/`, Team 00 coordination docs | Future routing should prioritize direct investor/trader value: market data, DQ, signals, strategy trust, backtests, calibration, historical context, market context, Trade Plan, and research evidence. Admin/settings/auth/subscription/notifications and alert convenience work are lowest priority unless blocking correctness, privacy, or user-data safety. |

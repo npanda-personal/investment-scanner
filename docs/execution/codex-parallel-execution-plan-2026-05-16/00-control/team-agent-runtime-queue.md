@@ -619,3 +619,33 @@ Date: 2026-05-18
 - Team 10 is ready after Team 04 accepts.
 - Team 03 is ready after Team 10 accepts.
 - Team 02 is ready for another PO/requirements cycle when a slot is available.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Completed Since Previous Snapshot
+
+- `CF-W1-AUTH-SUB-01`: Team 09 implementation, Team 04 QA, Team 10 review, Team 03 Architect Signoff, delegated PO acceptance, and scoped local branch commit completed as `354499d fix: fail closed auth subscription controllers`.
+- Product Owner corrected future priority away from admin/settings/auth/subscription/notifications and alert convenience work toward market data, DQ, signals, strategy, backtests, calibration, context, Trade Plan, and research evidence.
+
+## Current Pool
+
+| Slot | Team | Agent | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Open slot | none | architecture / contract refresh | `CF-W1-BT-02` | ready |
+| 2 | Open slot | none | QA prep | `CF-W1-BT-02` after Team 03 refresh | waiting |
+| 3 | Open slot | none | requirements discovery | market-data/signals/backtests/context/calibration | ready |
+| 4 | Open slot | none | market-data / DQ prep | next Team 05 item | ready after Team 00 selection |
+| 5 | Open slot | none | signal / strategy / Trade Plan prep | next Team 06 item | ready after Team 00 selection |
+| 6 | Open slot | none | reserved | review/signoff for next implementation | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03 is ready for `CF-W1-BT-02` architecture/contract refresh.
+- Team 04 is ready for `CF-W1-BT-02` QA refresh after Team 03.
+- Team 02 is ready for market-intelligence-focused requirements discovery.
+- Team 05 is ready for market-data / DQ work after Team 00 selection.
+- Team 06 is ready for signal / strategy / Trade Plan work after Team 00 selection.

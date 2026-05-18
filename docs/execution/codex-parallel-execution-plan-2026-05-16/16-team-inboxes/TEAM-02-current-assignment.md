@@ -120,6 +120,84 @@ Pick a different under-served workflow or module from the backlog/audits, then a
 
 Date: 2026-05-18
 
+## Product Owner Priority Correction
+
+This final standing assignment supersedes older tails above.
+
+Continue as the persistent PO + Requirements value-discovery lane, but rank direct investor/trader value first.
+
+Highest priority discovery/refinement themes:
+
+- market data and Data Quality evidence;
+- signals, strategy trust, calibration, backtesting, Trade Plan research support;
+- historical context, market context, signal-quality learning, and research evidence.
+
+Lowest priority unless they block correctness, privacy, or user-data safety:
+
+- admin and settings;
+- auth/subscription;
+- notifications;
+- alert inbox or user-alert convenience work.
+
+## Assignment
+
+Keep `next-top-10-candidates.md`, `top-10-ready-candidates.md`, `requirements-backlog.md`, and queue notes aligned to the corrected priority model.
+
+Treat `CF-W1-BT-02` as the next Team 00 architecture/QA-prep handoff. After that, prioritize `CF-W1-HCTX-01`, `CF-W1-MCTX-01`, `CF-W1-CAL-01`, `CF-W1-SQLAB-02`, `CF-W1-STRAT-02`, `CF-W1-DQ-02`, `CF-W1-TP-01B`, and `CF-W1-MD-02` before any platform/notification/alert convenience item.
+
+Do not move any application-code item to Ready. Team 00 owns Ready movement.
+
+## Required Output
+
+- Add or refine at least one high-user-value market-intelligence requirement if the queue thins.
+- Keep already accepted or parked branch work out of the active discovery ranking.
+- Identify the next top unassigned market-intelligence item after each cycle.
+- Report any true consent blocker to Team 00, but do not ask the human Product Owner for routine prioritization.
+
+---
+
+# Latest Standing Assignment
+
+Date: 2026-05-18
+
+## Product Owner Priority Correction
+
+Continue as the persistent PO + Requirements value-discovery lane, but reorder the backlog by direct investor/trader value first.
+
+Highest priority discovery/refinement themes:
+
+- market data and Data Quality evidence;
+- signals, strategy trust, calibration, backtesting, Trade Plan research support;
+- historical context, market context, signal-quality learning, and research evidence.
+
+Lowest priority unless they block correctness, privacy, or user-data safety:
+
+- admin and settings;
+- auth/subscription;
+- notifications;
+- alert inbox or user-alert convenience work.
+
+## Assignment
+
+Keep `next-top-10-candidates.md`, `top-10-ready-candidates.md`, `requirements-backlog.md`, and queue notes aligned to the corrected priority model.
+
+Treat `CF-W1-BT-02` as the next Team 00 architecture/QA-prep handoff. After that, prioritize `CF-W1-HCTX-01`, `CF-W1-MCTX-01`, `CF-W1-CAL-01`, `CF-W1-SQLAB-02`, `CF-W1-STRAT-02`, `CF-W1-DQ-02`, `CF-W1-TP-01B`, and `CF-W1-MD-02` before any platform/notification/alert convenience item.
+
+Do not move any application-code item to Ready. Team 00 owns Ready movement.
+
+## Required Output
+
+- Add or refine at least one high-user-value market-intelligence requirement if the queue thins.
+- Keep already accepted or parked branch work out of the active discovery ranking.
+- Identify the next top unassigned market-intelligence item after each cycle.
+- Report any true consent blocker to Team 00, but do not ask the human Product Owner for routine prioritization.
+
+---
+
+# Latest Standing Assignment
+
+Date: 2026-05-18
+
 ## Assignment
 
 Continue persistent PO + Requirements discovery on a distinct unassigned workflow.
@@ -170,3 +248,43 @@ Pick a different under-served workflow or module from the backlog/audits, then a
 - Queue deltas in backlog/refinement/top-candidate docs.
 - Next top unassigned item excluding actively routed items above.
 - No Ready movement.
+
+---
+
+# Latest Standing Assignment
+
+Date: 2026-05-18
+
+## Product Owner Priority Correction
+
+This final standing assignment supersedes older tails above.
+
+Continue as the persistent PO + Requirements value-discovery lane, but rank direct investor/trader value first.
+
+Highest priority discovery/refinement themes:
+
+- market data and Data Quality evidence;
+- signals, strategy trust, calibration, backtesting, Trade Plan research support;
+- historical context, market context, signal-quality learning, and research evidence.
+
+Lowest priority unless they block correctness, privacy, or user-data safety:
+
+- admin and settings;
+- auth/subscription;
+- notifications;
+- alert inbox or user-alert convenience work.
+
+## Assignment
+
+Keep `next-top-10-candidates.md`, `top-10-ready-candidates.md`, `requirements-backlog.md`, and queue notes aligned to the corrected priority model.
+
+Treat `CF-W1-BT-02` as the next Team 00 architecture/QA-prep handoff. After that, prioritize `CF-W1-HCTX-01`, `CF-W1-MCTX-01`, `CF-W1-CAL-01`, `CF-W1-SQLAB-02`, `CF-W1-STRAT-02`, `CF-W1-DQ-02`, `CF-W1-TP-01B`, and `CF-W1-MD-02` before any platform/notification/alert convenience item.
+
+Do not move any application-code item to Ready. Team 00 owns Ready movement.
+
+## Required Output
+
+- Add or refine at least one high-user-value market-intelligence requirement if the queue thins.
+- Keep already accepted or parked branch work out of the active discovery ranking.
+- Identify the next top unassigned market-intelligence item after each cycle.
+- Report any true consent blocker to Team 00, but do not ask the human Product Owner for routine prioritization.

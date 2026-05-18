@@ -1122,3 +1122,47 @@ The combination is intentional because standalone packets overlap on `subscripti
 ## Product Owner Action
 
 Not required. Both source policies are already resolved by Product Owner Option A decisions, and this handoff stays inside the approved module-local Team 09 boundaries.
+
+---
+
+# Runtime Checkpoint - AUTH/SUB Parked And Priority Corrected
+
+Date: 2026-05-18
+
+## Completed Gate
+
+`CF-W1-AUTH-SUB-01` completed all gates and was locally committed on the Team 09 branch:
+
+- Branch: `codex/team09-platform/CF-W1-AUTH-SUB-01`
+- Worktree: `../investment-scanner-worktrees/team09-CF-W1-AUTH-SUB-01`
+- Commit: `354499d fix: fail closed auth subscription controllers`
+- Push/merge: not performed
+
+## Product Owner Priority Correction
+
+Future routing should prioritize direct investor/trader value:
+
+- market data
+- Data Quality
+- signals
+- strategy trust
+- backtests
+- calibration
+- historical context
+- market context
+- Trade Plan research support
+- research evidence
+
+Admin, settings, auth/subscription, notifications, and user-alert convenience work should be lowest priority unless it blocks correctness, privacy, or user-data safety.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03: `CF-W1-BT-02` architecture/contract refresh.
+- Team 04: `CF-W1-BT-02` QA refresh after Team 03.
+- Team 05: market-data / DQ prep or implementation when Team 00 selects the next item.
+- Team 06: signal / strategy / Trade Plan prep or implementation when Team 00 selects the next item.
+- Team 02: continue market-intelligence-focused requirements discovery.
+
+## Next Action
+
+Route `CF-W1-BT-02` to Team 03 for architecture/contract refresh.

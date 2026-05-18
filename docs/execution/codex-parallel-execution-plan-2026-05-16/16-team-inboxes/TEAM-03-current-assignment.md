@@ -138,6 +138,56 @@ This is docs-only architecture prep. Do not implement application code. If the b
 
 Date: 2026-05-18
 
+## Product Owner Priority Correction
+
+Future architecture routing must prioritize direct investor/trader value before platform or Lane 3 convenience work:
+
+- market data and Data Quality evidence;
+- signals, strategy trust, calibration, backtesting, Trade Plan research support, historical context, market context, and research evidence;
+- admin, settings, auth/subscription, notifications, and user-alert convenience work only when they block correctness, privacy, or user-data safety.
+
+## Assignment
+
+Refresh architecture readiness for `CF-W1-BT-02` - Backtesting outcome review traceability.
+
+This is docs-only architecture prep. Do not implement application code. Treat this as the next active Team 03 handoff, superseding the older `CF-W1-DQ-02` tail assignment until `CF-W1-BT-02` refresh is complete.
+
+## Source Input
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-BT-02-backtesting-outcome-review-traceability-requirement.md`
+- Existing architecture/contract/work-packet artifacts if present:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-BT-02-architecture-review.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-BT-02-backtesting-outcome-review-traceability-contract.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-BT-02-work-packet.md`
+- Relevant audit/source to inspect read-only:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-backtesting-trade-risk.md`
+  - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+  - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.ts`
+  - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.types.ts`
+  - `frontend/src/features/backtesting-strategy-lab/components/BacktestingStrategyLabPage.tsx`
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-BT-02-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-BT-02-backtesting-outcome-review-traceability-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-BT-02-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+## Required Output
+
+- Narrow the packet to the smallest no-schema/no-shared first child if feasible.
+- Recommend exact implementation file reservations and forbidden files.
+- Explicitly block any Prisma/schema/generated/shared-route/shared-UI/source-contract change.
+- Provide QA planning handoff notes for Team 04.
+- Return a clear Ready recommendation: `Ready candidate`, `split required`, or `blocked`.
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
 ## Assignment
 
 Prepare architecture readiness for `CF-W1-L3-INTEL-03` - Portfolio Intelligence concentration review.
@@ -205,3 +255,55 @@ This is docs-only architecture prep. Do not implement application code. If the b
 - Explicit blocker if market-session-aware currentness requires shared Market Data source/helpers, schema, route, generated, or broad DQE public-contract changes.
 - QA planning handoff notes for Team 04.
 - Ready recommendation: `Ready candidate`, `split required`, or `blocked`.
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Product Owner Priority Correction
+
+This final override supersedes the older DQ and Lane 3 assignment tails above.
+
+Prioritize direct investor/trader value before platform or Lane 3 convenience work:
+
+- market data and Data Quality evidence;
+- signals, strategy trust, calibration, backtesting, Trade Plan research support, historical context, market context, and research evidence;
+- admin, settings, auth/subscription, notifications, and user-alert convenience work only when they block correctness, privacy, or user-data safety.
+
+## Assignment
+
+Refresh architecture readiness for `CF-W1-BT-02` - Backtesting outcome review traceability.
+
+This is docs-only architecture prep. Do not implement application code.
+
+## Source Input
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-BT-02-backtesting-outcome-review-traceability-requirement.md`
+- Existing architecture/contract/work-packet artifacts if present:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-BT-02-architecture-review.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-BT-02-backtesting-outcome-review-traceability-contract.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-BT-02-work-packet.md`
+- Relevant audit/source to inspect read-only:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-backtesting-trade-risk.md`
+  - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+  - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.ts`
+  - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.types.ts`
+  - `frontend/src/features/backtesting-strategy-lab/components/BacktestingStrategyLabPage.tsx`
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-BT-02-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-BT-02-backtesting-outcome-review-traceability-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-BT-02-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+## Required Output
+
+- Narrow the packet to the smallest no-schema/no-shared first child if feasible.
+- Recommend exact implementation file reservations and forbidden files.
+- Explicitly block any Prisma/schema/generated/shared-route/shared-UI/source-contract change.
+- Provide QA planning handoff notes for Team 04.
+- Return a clear Ready recommendation: `Ready candidate`, `split required`, or `blocked`.

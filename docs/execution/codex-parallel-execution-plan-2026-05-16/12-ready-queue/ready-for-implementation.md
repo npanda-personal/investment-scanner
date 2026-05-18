@@ -28,7 +28,7 @@ No available application-code item is currently waiting unassigned in Ready.
 
 `CF-W1-MD-01` was promoted and pulled by Team 05 for a narrowed backend-only reject-only Market Data validator child. QA, Team 10 review, Architect Signoff, delegated PO acceptance, and scoped local commit are complete on the Team 05 branch.
 
-`CF-W1-AUTH-SUB-01` is promoted and assigned to Team 09 in a dedicated worktree for one combined backend-only controller-policy handoff covering `CF-W1-AUTH-01` and `CF-W1-SUB-01`. This avoids the shared `subscription-billing.controller.ts` collision by using a single writer.
+`CF-W1-AUTH-SUB-01` was promoted, implemented, accepted through QA/review/Architect/delegated PO gates, and locally committed on its Team 09 branch as `354499d`.
 
 ## Pulled / In Review
 
@@ -44,7 +44,7 @@ No available application-code item is currently waiting unassigned in Ready.
 | `CF-W1-MD-01` | Team 05 - Market Data / Data Quality | `codex/team05-market-data/CF-W1-MD-01` | `../investment-scanner-worktrees/team05-CF-W1-MD-01` | Backend-only reject-only historical-price validator hardening | Accepted and locally committed as `913b56b`; awaiting later clean `dev` integration |
 | `CF-W1-L3-TREV-01` | Team 07 - Portfolio / Watchlist / Alerts | `codex/team07-portfolio-alerts/CF-W1-L3-TREV-01` | `../investment-scanner-worktrees/team07-CF-W1-L3-TREV-01` | Today Review run/list publication evidence and readiness-coherence normalization | Ready and assigned to Team 07 |
 | `CF-W1-SQLAB-01` | Team 06 - Strategy / Signal / Risk | `codex/team06-strategy-signal/CF-W1-SQLAB-01` | `../investment-scanner-worktrees/team06-CF-W1-SQLAB-01` | Backend-only Signal Quality Lab outcome-confidence metadata | Ready and assigned to Team 06 |
-| `CF-W1-AUTH-SUB-01` | Team 09 - Platform / Auth / Subscription / Notifications | `codex/team09-platform/CF-W1-AUTH-SUB-01` | `../investment-scanner-worktrees/team09-CF-W1-AUTH-SUB-01` | Combined backend-only auth fail-closed and admin/manual subscription controller-policy slice | Ready and assigned to Team 09 |
+| `CF-W1-AUTH-SUB-01` | Team 09 - Platform / Auth / Subscription / Notifications | `codex/team09-platform/CF-W1-AUTH-SUB-01` | `../investment-scanner-worktrees/team09-CF-W1-AUTH-SUB-01` | Combined backend-only auth fail-closed and admin/manual subscription controller-policy slice | Accepted and locally committed as `354499d`; awaiting later clean `dev` integration |
 
 ## Active Ready Handoff - `CF-W1-AUTH-SUB-01`
 
@@ -641,31 +641,29 @@ Forcing implementation now would either preserve unsafe behavior with misleading
 
 ## Next Safe Work
 
-Docs-only contract and QA preparation:
+Docs-only contract and QA preparation should now follow the Product Owner corrected investor/trader-value order:
 
-- `CF-W1-L3-PORT-01A`
-- `CF-W1-L3-ALERT-01`
-- `CF-W1-L3-AUTH-03`
-- `CF-W1-L3-INTEL-01`
-- `CF-W1-TP-01B`
-- `CF-W1-UX-02`
-- `CF-W1-MD-02`
-- `CF-W1-MD-01`
-- `CF-W1-NOTIF-02`
+1. `CF-W1-BT-02`
+2. `CF-W1-HCTX-01`
+3. `CF-W1-MCTX-01`
+4. `CF-W1-CAL-01`
+5. `CF-W1-SQLAB-02`
+6. `CF-W1-STRAT-02`
+7. `CF-W1-DQ-02`
+8. `CF-W1-TP-01B`
+9. `CF-W1-MD-02`
+10. `CF-W1-UX-01`
 
-Next Team 00/owner work should evaluate the remaining prepared child artifacts for Ready promotion:
+Platform, notification, auth/subscription, settings, and alert convenience items should not preempt this stack unless they block correctness, privacy, user-data safety, or an already accepted branch gate.
 
-- `CF-W1-TP-01B`: promote the backend-only Trade Plan compatibility and DQ hard-block child if the prepared contract and QA plan pass Ready gates.
-- `CF-W1-NOTIF-02`: promote the notification log redaction slice if the prepared requirement, contract, work packet, and platform QA plan pass Ready gates.
-- `CF-W1-L3-ALERT-01`: promote the alert readiness suppression child if the prepared contract and QA plan pass Ready gates.
-- `CF-W1-L3-AUTH-03`: promote the alert rule target ownership child if the prepared requirement, contract, work packet, and QA plan pass Ready gates.
-- `CF-W1-L3-INTEL-01`: keep queued behind `CF-W1-L3-PORT-01A`; promote only after portfolio readiness DTOs are implemented and accepted.
-- `CF-W1-MD-02`: formal ADR and later approval-gated source/schema split packets.
-- `CF-W1-AUTH-01`: evaluate prepared Team 09 backend fail-closed controller packet for Ready, sequenced or combined with `CF-W1-SUB-01`.
-- `CF-W1-SUB-01`: evaluate prepared Team 09 backend manual/admin-only subscription packet for Ready, sequenced or combined with `CF-W1-AUTH-01`.
-- `CF-W1-UX-02`: complete Team 08 source-supported trust-field mapping, then evaluate prepared Copilot-only trust UX packet for Ready.
-- `CF-W1-UX-05`: fold Copilot-only copy cleanup into or behind `CF-W1-UX-02`; keep shared status work future.
-- `CF-W1-MD-01`: complete Team 05 readiness acceptance, then evaluate prepared Market Data validation-only packet for Ready.
+Next Team 00/owner work:
+
+- `CF-W1-BT-02`: route Team 03 architecture/contract refresh, then Team 04 QA refresh.
+- `CF-W1-HCTX-01`: prepare historical lookup provenance packet after `BT-02`.
+- `CF-W1-MCTX-01`: prepare market context regime-evidence packet after `HCTX-01`.
+- `CF-W1-CAL-01`: prepare calibration trust-drift packet after context evidence prep.
+- `CF-W1-TP-01B`: reconcile branch/review state before any further Ready work.
+- `CF-W1-MD-02`: continue ADR and split-packet prep only; no schema/source promotion.
 
 No app-code item became Ready during decision resolution itself. `CF-W1-L3-PORT-01A` was later promoted by Team 00 after requirement, architecture, QA, reservation, and Team 07 readiness gates passed.
 
