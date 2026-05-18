@@ -86,3 +86,87 @@ Do not wait for Team 00 to feed one requirement at a time. Audit the next highes
 - Keep `next-top-10-candidates.md`, `top-10-ready-candidates.md`, `refinement-queue.md`, and `requirements-backlog.md` consistent.
 - Do not move any application-code item to Ready.
 - Identify the next top unassigned item for Team 00 after the cycle.
+
+---
+
+# Latest Standing Assignment
+
+Date: 2026-05-18
+
+## Assignment
+
+Continue persistent PO + Requirements discovery on a distinct unassigned workflow.
+
+Already actively routed or recently completed:
+
+- `CF-W1-SQLAB-01`: active rework / QA rerun path.
+- `CF-W1-SQLAB-02A`: requirement split and QA planning complete; implementation sequencing blocked behind SQLAB-01.
+- `CF-W1-STRAT-02A`: architecture complete; QA planning active.
+- `CF-W1-BT-02`: routed to Team 03 architecture prep.
+- `CF-W1-L3-WATCH-01`: refined in the prior Team 02 cycle.
+
+Pick a different under-served workflow or module from the backlog/audits, then add/refine one bounded user-value requirement if evidence supports it.
+
+## Required Output
+
+- Requirement(s) created or refined.
+- Queue deltas in backlog/refinement/top-candidate docs.
+- Next top unassigned item excluding actively routed items above.
+- No Ready movement.
+
+---
+
+# Latest Standing Assignment
+
+Date: 2026-05-18
+
+## Assignment
+
+Continue persistent PO + Requirements discovery on a distinct unassigned workflow.
+
+Already actively routed or recently completed:
+
+- `CF-W1-SQLAB-01`: accepted and locally committed on Team 06 branch.
+- `CF-W1-SQLAB-02A`: requirement split and QA planning complete; implementation sequencing blocked behind SQLAB-01 integration.
+- `CF-W1-STRAT-02A`: architecture and QA planning complete; Team 00 Ready evaluation pending.
+- `CF-W1-BT-02`: architecture and QA planning complete but Team 02 narrowed the requirement after those packets; packet refresh needed before Ready.
+- `CF-W1-DQ-02`: architecture complete as split-required; DQ-02A QA planning active.
+- `CF-W1-L3-INTEL-03`: routed to Team 03 architecture prep.
+- `CF-W1-L3-WATCH-01`: recently refined.
+
+Pick a different under-served workflow or module from the backlog/audits, then add/refine one bounded user-value requirement if evidence supports it.
+
+## Required Output
+
+- Requirement(s) created or refined.
+- Queue deltas in backlog/refinement/top-candidate docs.
+- Next top unassigned item excluding actively routed items above.
+- No Ready movement.
+
+---
+
+# Latest Standing Assignment
+
+Date: 2026-05-18
+
+## Assignment
+
+Continue persistent PO + Requirements discovery on a distinct unassigned workflow.
+
+Already actively routed or recently completed:
+
+- `CF-W1-SQLAB-01`: Architect Signoff active after QA/review acceptance.
+- `CF-W1-SQLAB-02A`: requirement split and QA planning complete; implementation sequencing blocked behind SQLAB-01.
+- `CF-W1-STRAT-02A`: architecture and QA planning complete; Team 00 Ready evaluation pending.
+- `CF-W1-BT-02`: architecture complete and QA planning active.
+- `CF-W1-DQ-02`: routed to Team 03 architecture prep.
+- `CF-W1-L3-WATCH-01`: recently refined.
+
+Pick a different under-served workflow or module from the backlog/audits, then add/refine one bounded user-value requirement if evidence supports it.
+
+## Required Output
+
+- Requirement(s) created or refined.
+- Queue deltas in backlog/refinement/top-candidate docs.
+- Next top unassigned item excluding actively routed items above.
+- No Ready movement.

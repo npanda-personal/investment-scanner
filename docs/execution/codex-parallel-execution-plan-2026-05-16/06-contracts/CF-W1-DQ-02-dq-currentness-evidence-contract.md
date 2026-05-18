@@ -6,86 +6,112 @@ Owner: Team 03 Architecture Factory
 
 ## Status
 
-Backend-only currentness-evidence contract prepared. Not Ready for Implementation.
+Split-required contract. First child only is defined here. Not Ready for Implementation.
 
 ## Contract Intent
 
-Data Quality Engine must expose explainable market-session-aware currentness evidence instead of relying only on a blunt calendar-age rule.
+The bounded first child gives Data Quality Engine a market-session-aware currentness classifier and fail-closed blocker propagation without widening into Market Data source edits, DQE repository/read-side work, schema changes, or route changes.
 
-Market Data Foundation remains the source of session timing and latest completed trading-date evidence. Data Quality Engine remains the owner of readiness evaluation and downstream fail-closed gating.
+Market Data Foundation remains the source of session timing. Data Quality Engine remains the owner of readiness gating.
 
-## Required Source Boundary
+## First-Child Boundary
 
-Implementation must use Market Data Foundation public exports only.
+Allowed implementation boundary:
 
-Allowed direction:
+- `backend/src/modules/data-quality-engine/data-quality-engine.service.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.md`
+- focused DQE service/invariant tests
+- consumption of existing Market Data public exports already available from `backend/src/modules/market-data-foundation/index.ts`
 
-- Market Data Foundation public session helper or public helper type
-- Data Quality Engine service/types/docs/tests
+Forbidden in the first child:
 
-Forbidden:
+- editing any `backend/src/modules/market-data-foundation/**` source file;
+- editing `data-quality-engine.repository.ts`, controller/router/validation, or route registries;
+- Prisma/schema/migration work;
+- frontend work;
+- generated/package/shared-utility/shared-UI changes.
 
-- importing Market Data repository/provider internals into DQE;
-- duplicating session-calendar logic inside DQE;
-- changing Prisma/schema, routes, providers, startup/backfill, or durable-storage behavior.
+If the implementation cannot stay inside that boundary, the child fails the contract and must return to Team 00 for re-splitting.
 
-## Required Currentness Fields
+## Required Currentness Semantics
 
-Add additive DQ evaluation evidence with fields equivalent to:
+The first child must add additive DQ evaluation evidence with semantics equivalent to:
 
 ```ts
 type DataQualityCurrentnessStatus = 'CURRENT' | 'STALE' | 'MISSING' | 'BLOCKED';
 
-interface DataQualityCurrentnessEvidenceDto {
-  status: DataQualityCurrentnessStatus;
-  reasonCode:
-    | 'CURRENT_COMPLETED_SESSION'
-    | 'CURRENT_FINALIZATION_PENDING'
-    | 'STALE_COMPLETED_SESSION_MISSED'
-    | 'MISSING_LATEST_PRICE'
-    | 'SESSION_EVIDENCE_UNAVAILABLE'
-    | 'PROVIDER_GAP_BLOCKED';
-  latestObservedTradingDate: string | null;
-  latestCompletedTradingDate: string | null;
-  daysBehind: number | null;
-  reason: string;
-}
+type DataQualityCurrentnessReasonCode =
+  | 'CURRENT_COMPLETED_SESSION'
+  | 'CURRENT_FINALIZATION_PENDING'
+  | 'STALE_COMPLETED_SESSION_MISSED'
+  | 'MISSING_LATEST_PRICE'
+  | 'SESSION_EVIDENCE_UNAVAILABLE'
+  | 'PROVIDER_GAP_BLOCKED';
 ```
 
-The exact type name may differ, but the semantics must stay stable.
+Expected payload shape may be any additive DTO field set that preserves:
+
+- status
+- reasonCode
+- latestObservedTradingDate
+- latestCompletedTradingDate
+- daysBehind
+- plain-language reason
+
+The exact type name may differ. The field semantics must not.
+
+## Required Input Sources
+
+The first child may use only existing inputs already available on DQE evaluation paths:
+
+- latest observed price date from the latest price record;
+- instrument region/asset scope;
+- existing Market Data public session helpers;
+- existing Market Data instrument evidence such as `latest_completed_eod_date`, `stored_data_through_date`, `readiness_blockers`, and `trusted_baseline_blocker_codes` when present.
+
+The first child must not create a second market-session calendar implementation inside DQE.
 
 ## Required Mapping Rules
 
-- If latest stored price matches the latest completed trading session, currentness is `CURRENT`.
-- If the market is still open or in grace and the latest stored price matches the most recent completed session, currentness remains `CURRENT` with `CURRENT_FINALIZATION_PENDING`.
-- If latest stored price is missing, currentness is `MISSING`.
-- If the latest stored trading date lags the latest completed session, currentness is `STALE`.
-- If session evidence cannot be derived for the scoped region, currentness is `BLOCKED`.
-- If Market Data public evidence already indicates provider-gap or missing-final-candle blocker, currentness is `BLOCKED` and must not claim freshness.
+- Match between latest observed date and latest completed session => `CURRENT_COMPLETED_SESSION`.
+- Market open or finalization grace while latest observed date still matches the latest completed session => `CURRENT_FINALIZATION_PENDING`.
+- Missing latest price => `MISSING_LATEST_PRICE`.
+- Latest observed date behind latest completed session => `STALE_COMPLETED_SESSION_MISSED`.
+- No session evidence available for the region/scope => `SESSION_EVIDENCE_UNAVAILABLE`.
+- Existing Market Data blocker evidence that implies the final candle is missing or provider-gapped => `PROVIDER_GAP_BLOCKED`.
 
-## Downstream Fail-Closed Rule
+## Fail-Closed Propagation Rules
 
-Non-current results must propagate into standard DQ outputs so strict callers can fail closed without adding custom stale/session logic:
+For the first child, non-current outcomes must propagate through existing DQE strict-consumer paths:
 
-- `STALE`, `MISSING`, or `BLOCKED` currentness must contribute to `readinessBlockers`;
-- signal and daily-review use-case tiers must not report `READY` when currentness is `STALE`, `MISSING`, or `BLOCKED`;
-- callers using existing strict DQ filters or use-case tiers must be able to exclude non-current instruments without copying session logic.
+- `STALE`, `MISSING`, and `BLOCKED` outcomes must add stable blocker/gap strings.
+- `signal` and `dailyReview` use-case tiers must not remain `READY` when currentness is non-current.
+- `eligibleForSignals` and `eligibleForBacktesting` must keep fail-closed behavior through existing stale/blocker semantics.
+- `filterEligibleInstruments()` must continue excluding affected instruments without any caller-side session logic.
 
-## Forbidden Behavior
+## Explicit Non-Goals For The First Child
 
-- Do not silently treat unsupported or session-unavailable regions as current.
-- Do not keep the old seven-day rule as the only source of stale reasoning.
-- Do not claim durable or provider-auditable evidence from this packet alone.
-- Do not modify DQ routes or create frontend-only stale semantics.
+- No persisted currentness object across existing stored `DataQualityEvaluation` rows.
+- No additive summary/list/diagnostics repository projection requirement.
+- No route/API contract promise beyond what existing service paths can return safely.
+- No durable storage claim.
+- No Market Data helper/source changes.
 
-## Test Contract
+## Parent Blocker Preserved
 
-Focused backend tests must prove:
+The full parent requirement remains blocked from single-packet Ready promotion because existing persisted DQ rows do not store session-aware currentness fields.
 
-- current completed-session evidence;
-- current pre-finalization evidence;
-- stale lagging evidence;
-- missing latest-price evidence;
-- session-unavailable evidence;
-- provider-gap blocked evidence;
-- strict downstream DQ tiers remain non-ready for stale/missing/blocked cases.
+Any later packet that promises consistent list/summary/diagnostics exposure must explicitly reserve the DQE read side and, if durable persistence is required, request separate schema approval.
+
+## Test Contract For Team 04
+
+Focused backend tests for the first child must prove:
+
+- current completed-session classification;
+- current finalization-pending classification;
+- stale lagging classification;
+- missing latest-price classification;
+- session-evidence-unavailable classification;
+- provider-gap blocked classification;
+- fail-closed tier/blocker propagation for stale, missing, and blocked outcomes.

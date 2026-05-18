@@ -171,3 +171,152 @@ Write QA result to the Team 06 worktree:
 
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-SQLAB-01-qa-verification.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Prepare docs-only QA planning for `CF-W1-STRAT-02A`, the no-schema Strategy Framework rule metadata and DQ gate exposure child split out by Team 03.
+
+Do not QA or implement durable rule-revision history. The durable parent remains blocked because it needs Prisma/schema/repository/generated approval.
+
+## Source Input
+
+- Architecture review: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-STRAT-02-architecture-review.md`
+- Contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-STRAT-02-strategy-framework-rule-versioning-dq-gate-policy-contract.md`
+- Work packet: `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-STRAT-02-work-packet.md`
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-STRAT-02-strategy-framework-rule-versioning-dq-gate-policy-requirement.md`
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-STRAT-02A-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/next-validation-plans.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+## Required QA Plan Coverage
+
+- versioned and legacy undeclared rule metadata
+- DQ gate policy exposure in service/catalog/detail/proof surfaces
+- unchanged strategy math, backtest action rules, evaluator behavior, and route contracts
+- additive frontend proof/detail trust fields, without shared UI or route changes
+- payload regression guard for current strategy catalog/detail consumers
+- explicit blocker that durable revision history remains out of scope
+
+## Output
+
+State whether `CF-W1-STRAT-02A` is QA-plan ready for Team 00 Ready evaluation and list any blocker.
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Prepare docs-only QA planning for `CF-W1-BT-02` - Backtesting outcome review traceability.
+
+## Source Input
+
+- Architecture review: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-BT-02-architecture-review.md`
+- Contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-BT-02-backtesting-outcome-review-traceability-contract.md`
+- Work packet: `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-BT-02-work-packet.md`
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-BT-02-backtesting-outcome-review-traceability-requirement.md`
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-BT-02-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/next-validation-plans.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+## Required QA Plan Coverage
+
+- trusted, partial, diagnostic-only, legacy-repaired, and withheld review outcomes
+- registered and custom backtest trade traceability
+- no-schema/no-route/no-shared-file scope enforcement
+- additive review trace fields without changing simulation math, strategy framework source, or trade-plan risk source
+- feature-local UI smoke expectations for visible review evidence and research-support language
+
+## Output
+
+State whether `CF-W1-BT-02` is QA-plan ready for Team 00 Ready evaluation and list any blocker.
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Prepare docs-only QA planning for `CF-W1-DQ-02A`, the bounded Data Quality Engine currentness-evidence first child.
+
+Do not QA or implement the full DQ-02 parent. The parent remains split-required because persisted evaluations do not store session-aware currentness evidence and broader read-side/public-contract or schema work may be needed later.
+
+## Source Input
+
+- Architecture review: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-DQ-02-architecture-review.md`
+- Contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-DQ-02-dq-currentness-evidence-contract.md`
+- Work packet: `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-DQ-02-work-packet.md`
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-DQ-02-dq-currentness-evidence-requirement.md`
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-DQ-02A-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/next-validation-plans.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+## Required QA Plan Coverage
+
+- current after latest completed session
+- current during open/grace window
+- stale lag
+- missing latest price
+- session-evidence unavailable
+- provider-gap blocked
+- fail-closed blocker/tier propagation
+- exact rejection if implementation edits Market Data Foundation, DQE repository/controller/router/validation/index, schema, generated files, routes, shared utilities/UI, package manifests, frontend, or provider/startup/live flows
+
+## Output
+
+State whether `CF-W1-DQ-02A` is QA-plan ready for Team 00 Ready evaluation and list any blocker.
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Prepare docs-only QA planning for `CF-W1-L3-INTEL-03` - Portfolio Intelligence concentration review.
+
+## Source Input
+
+- Architecture review: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-L3-INTEL-03-architecture-review.md`
+- Contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-L3-INTEL-03-portfolio-intelligence-concentration-review-contract.md`
+- Work packet: `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-L3-INTEL-03-work-packet.md`
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-INTEL-03-portfolio-intelligence-concentration-review-requirement.md`
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-L3-INTEL-03-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/next-validation-plans.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+## Required QA Plan Coverage
+
+- deterministic concentration ranking and stable tie-breaks
+- portfolio-level versus holding-level concentration drivers
+- bounded reason summaries and research-support wording
+- no optimizer, rebalance, direct advice, schema, route, shared UI, or portfolio-management source expansion
+- feature-local UI smoke expectations for visible concentration review evidence
+- one-writer sequencing against `CF-W1-L3-INTEL-01` and `CF-W1-L3-INTEL-02`
+
+## Output
+
+State whether `CF-W1-L3-INTEL-03` is QA-plan ready for Team 00 Ready evaluation and list sequencing blockers.

@@ -4,6 +4,309 @@ Date: 2026-05-18
 
 Mode: focused QA rerun plus docs-only QA planning.
 
+## 2026-05-18 `CF-W1-L3-INTEL-03` Portfolio Intelligence Concentration Review QA Planning
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only QA packet preparation
+- Work item: `CF-W1-L3-INTEL-03`
+- State/mode: QA planning only; no executable validation
+- Owner: Team 04 QA Factory
+- Lane/module: Lane 3 / `portfolio-intelligence`
+- Files changed:
+  - `04-qa/CF-W1-L3-INTEL-03-qa-plan.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - `AGENTS.md`
+  - `16-team-inboxes/TEAM-04-current-assignment.md`
+  - `03-architecture/CF-W1-L3-INTEL-03-architecture-review.md`
+  - `06-contracts/CF-W1-L3-INTEL-03-portfolio-intelligence-concentration-review-contract.md`
+  - `08-work-packets/CF-W1-L3-INTEL-03-work-packet.md`
+  - `10-requirements/CF-W1-L3-INTEL-03-portfolio-intelligence-concentration-review-requirement.md`
+  - `99-decision-inbox/open-decisions.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+  - `backend/src/modules/portfolio-intelligence/portfolio-intelligence.md`
+  - `backend/tests/modules/portfolio-intelligence/portfolio-intelligence.service.test.ts`
+  - `frontend/src/features/portfolio-intelligence/types.ts`
+  - `frontend/src/features/portfolio-intelligence/components/PortfolioIntelligencePanel.tsx`
+  - `frontend/tests/ui/portfolio-intelligence.spec.ts` check for current spec presence
+- Behavior changed:
+  - none; docs-only QA planning
+- Docs changed:
+  - prepared `04-qa/CF-W1-L3-INTEL-03-qa-plan.md`
+  - refreshed `04-qa/next-validation-plans.md`
+  - recorded this handoff in `17-team-outboxes/TEAM-04-qa-factory.md`
+- Contracts changed:
+  - none
+- Result:
+  - Prepared a bounded `portfolio-intelligence` QA plan for additive concentration-review ranking and explanation evidence in `04-qa/CF-W1-L3-INTEL-03-qa-plan.md`.
+  - Recorded required coverage for deterministic holding/sector/country concentration ranking, stable tie-breaks, portfolio-level versus holding-level concentration drivers, bounded reason summaries, and research-support wording.
+  - Preserved the Team 03 boundary that the first child must stay inside `portfolio-intelligence` service/types/doc/test plus feature-local `types.ts`, `PortfolioIntelligencePanel.tsx`, and an optional focused UI smoke only.
+  - Added exact reject conditions for optimizer/rebalance or advice-shaped expansion, `portfolio-management` source edits, schema/routes/shared-UI/shared-utility changes, and any widening beyond the reserved packet.
+  - Recorded that `frontend/tests/ui/portfolio-intelligence.spec.ts` is currently absent, so the implementation must either add a focused feature-local UI smoke or hand off an explicit UI-test blocker.
+  - Updated `04-qa/next-validation-plans.md` so `CF-W1-L3-INTEL-03` is visible in the QA queue as QA-ready for Team 00 Ready evaluation only with explicit one-writer sequencing against `CF-W1-L3-INTEL-01` and `CF-W1-L3-INTEL-02`.
+- Tests run: none
+- Tests skipped:
+  - all executable validation was skipped because this was a docs-only QA planning pass with no Team 00 Ready promotion or implementation handoff
+- Skipped-test reason:
+  - planning-only assignment; no builds/tests/services were authorized or required
+- Assumptions:
+  - Team 00 will keep the child bounded to the reserved `portfolio-intelligence` backend and feature-local frontend files only
+  - current module thresholds in `portfolio-intelligence.validation.ts` remain the threshold source and are reused rather than changed
+  - the existing detail surface remains the only UI host for the concentration-review section
+- Risks:
+  - implementers could blur holding-review urgency with concentration-review ordering and accidentally replace current `reviewRanking` instead of adding a new layer
+  - unstable ties could slip through if sorting relies on insertion order rather than an explicit final key sort
+  - the missing focused UI spec could leave user-visible ranking/rendering regressions unverified unless the handoff adds one or records the blocker clearly
+- Blockers:
+  - executable QA remains blocked until Team 00 promotes the bounded `portfolio-intelligence` implementation handoff
+  - this packet shares the same backend writer set as `CF-W1-L3-INTEL-01` and `CF-W1-L3-INTEL-02`, so Team 00 must explicitly sequence or combine them under one writer plan
+  - focused UI smoke remains blocked until a feature-local `frontend/tests/ui/portfolio-intelligence.spec.ts` exists or the implementation handoff records the gap explicitly
+- Shared-file requests:
+  - none from Team 04; single-writer reservation remains a Team 00 implementation concern
+- QA-ready for Team 00 Ready evaluation:
+  - `CF-W1-L3-INTEL-03`: yes, as one bounded `portfolio-intelligence` concentration-review child only, with explicit one-writer sequencing against `CF-W1-L3-INTEL-01` and `CF-W1-L3-INTEL-02`
+- Next gate:
+  - Team 00 sequencing decision against the other `portfolio-intelligence` packets, then Ready evaluation for `CF-W1-L3-INTEL-03` only
+- Evidence notes:
+  - Team 04 used the active execution folder and current `portfolio-intelligence` module/test/UI surfaces only; no application source, tests, package manifests, generated files, architecture docs, contracts, requirements, ready queues, Prisma, routes, shared files, or historical docs were modified
+
+## 2026-05-18 `CF-W1-DQ-02A` Data Quality Engine Currentness-Evidence QA Planning
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only QA packet preparation
+- Work item: `CF-W1-DQ-02A`
+- State/mode: QA planning only; no executable validation
+- Owner: Team 04 QA Factory
+- Lane/module: Lane 1 / `data-quality-engine`
+- Files changed:
+  - `04-qa/CF-W1-DQ-02A-qa-plan.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - `AGENTS.md`
+  - `16-team-inboxes/TEAM-04-current-assignment.md`
+  - `03-architecture/CF-W1-DQ-02-architecture-review.md`
+  - `06-contracts/CF-W1-DQ-02-dq-currentness-evidence-contract.md`
+  - `08-work-packets/CF-W1-DQ-02-work-packet.md`
+  - `10-requirements/CF-W1-DQ-02-dq-currentness-evidence-requirement.md`
+  - `99-decision-inbox/open-decisions.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.md`
+  - `backend/tests/modules/data-quality-engine/data-quality-engine.service.test.ts`
+  - `backend/tests/modules/data-quality-engine/data-quality-engine.invariants.test.ts`
+  - `backend/tests/modules/market-data-foundation/market-data.market-session.test.ts`
+- Behavior changed:
+  - none; docs-only QA planning
+- Docs changed:
+  - prepared `04-qa/CF-W1-DQ-02A-qa-plan.md`
+  - refreshed `04-qa/next-validation-plans.md`
+  - recorded this handoff in `17-team-outboxes/TEAM-04-qa-factory.md`
+- Contracts changed:
+  - none
+- Result:
+  - Prepared a bounded backend-only QA plan for additive DQE currentness evidence and fail-closed propagation in `04-qa/CF-W1-DQ-02A-qa-plan.md`.
+  - Recorded required coverage for current completed-session, current finalization-pending, stale lag, missing latest price, session-evidence unavailable, provider-gap blocked, and fail-closed blocker/tier propagation behavior.
+  - Preserved the Team 03 split boundary that the child must stay inside DQE service/types/doc/test only and must consume existing Market Data public session exports without any Market Data source edit.
+  - Added exact reject conditions for any Market Data Foundation source edit, DQE repository/controller/router/validation/index edit, schema/generated/route/shared/package/frontend change, or provider/startup/live-flow widening.
+  - Updated `04-qa/next-validation-plans.md` so `CF-W1-DQ-02A` is visible in the QA queue as QA-ready for Team 00 Ready evaluation, while the broader parent remains blocked.
+- Tests run: none
+- Tests skipped:
+  - all executable validation was skipped because this was a docs-only QA planning pass with no Team 00 Ready promotion or implementation handoff
+- Skipped-test reason:
+  - planning-only assignment; no builds/tests/services were authorized or required
+- Assumptions:
+  - Team 00 will keep the child bounded to the reserved `data-quality-engine` service/types/doc/test files only
+  - existing Market Data public session helpers remain sufficient for the child and no new Market Data source helper is required
+- Risks:
+  - implementers could preserve the old seven-day heuristic as the effective gate while only layering cosmetic currentness fields on top
+  - implementers could accidentally widen into DQE repository/read-side work or Market Data source edits if they try to cover persisted list/summary/diagnostics exposure in the same packet
+- Blockers:
+  - executable QA remains blocked until Team 00 promotes the bounded backend-only `data-quality-engine` implementation handoff
+  - the broader `CF-W1-DQ-02` parent remains blocked because persisted DQ rows do not durably store session-aware currentness evidence
+- Shared-file requests:
+  - none from Team 04; single-writer reservation remains a Team 00 implementation concern
+- QA-ready for Team 00 Ready evaluation:
+  - `CF-W1-DQ-02A`: yes, as one bounded backend-only `data-quality-engine` child slice only
+- Next gate:
+  - Team 00 Ready evaluation for `CF-W1-DQ-02A` only, while keeping Market Data source edits, DQE repository/read-side widening, schema work, routes, frontend, and durable parent exposure out of scope
+- Evidence notes:
+  - Team 04 used the active execution folder plus current DQE and Market Data session-test surfaces only; no application source, tests, package manifests, generated files, architecture docs, contracts, requirements, ready queues, Prisma, routes, shared files, or historical docs were modified
+
+## 2026-05-18 `CF-W1-BT-02` Backtesting Outcome Review Traceability QA Planning
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only QA packet preparation
+- Work item: `CF-W1-BT-02`
+- State/mode: QA planning only; no executable validation
+- Owner: Team 04 QA Factory
+- Lane/module: Lane 2 / `backtesting-strategy-lab`
+- Files changed:
+  - `04-qa/CF-W1-BT-02-qa-plan.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - `AGENTS.md`
+  - `16-team-inboxes/TEAM-04-current-assignment.md`
+  - `03-architecture/CF-W1-BT-02-architecture-review.md`
+  - `06-contracts/CF-W1-BT-02-backtesting-outcome-review-traceability-contract.md`
+  - `08-work-packets/CF-W1-BT-02-work-packet.md`
+  - `10-requirements/CF-W1-BT-02-backtesting-outcome-review-traceability-requirement.md`
+  - `99-decision-inbox/open-decisions.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+  - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+  - `backend/tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.test.ts`
+  - `frontend/src/features/backtesting-strategy-lab/types.ts`
+  - `frontend/src/features/backtesting-strategy-lab/components/BacktestingStrategyLabPage.tsx`
+  - `frontend/tests/ui/backtesting-strategy-lab.spec.ts`
+- Behavior changed:
+  - none; docs-only QA planning
+- Docs changed:
+  - prepared `04-qa/CF-W1-BT-02-qa-plan.md`
+  - refreshed `04-qa/next-validation-plans.md`
+  - recorded this handoff in `17-team-outboxes/TEAM-04-qa-factory.md`
+- Contracts changed:
+  - none
+- Result:
+  - Prepared a bounded no-schema QA plan for additive backtesting review outcome and trade traceability evidence in `04-qa/CF-W1-BT-02-qa-plan.md`.
+  - Recorded required coverage for trusted, partial, diagnostic-only, legacy-repaired, and withheld review outcomes; registered and custom backtest trade traceability; additive review trace fields; feature-local UI smoke expectations; and research-support wording checks.
+  - Preserved the Team 03 boundary that the packet must stay inside `backtesting-strategy-lab` service/types/doc/test plus feature-local types/page/UI spec files only.
+  - Added explicit stop conditions for repository/controller/router/validation/schema/shared-route/shared-UI drift and for any Strategy Framework or Trade Plan Risk source widening.
+  - Updated `04-qa/next-validation-plans.md` so `CF-W1-BT-02` is visible in the QA queue as QA-ready for Team 00 Ready evaluation, while executable QA remains blocked pending Ready promotion and implementation handoff.
+- Tests run: none
+- Tests skipped:
+  - all executable validation was skipped because this was a docs-only QA planning pass with no Team 00 Ready promotion or implementation handoff
+- Skipped-test reason:
+  - planning-only assignment; no builds/tests/services were authorized or required
+- Assumptions:
+  - Team 00 will keep the child bounded to the reserved `backtesting-strategy-lab` service/types/doc/test and feature-local `types.ts`, `BacktestingStrategyLabPage.tsx`, and `backtesting-strategy-lab.spec.ts` files only
+  - current backtesting routes, API client usage, and saved-run read path stay unchanged in the first child
+- Risks:
+  - implementers could blur review trust framing with simulation behavior or benchmark math unless the additive-only contract is followed exactly
+  - implementers could overstate weak end-of-test exits or legacy-repaired evidence as trusted review output unless outcome mapping remains explicit
+- Blockers:
+  - executable QA remains blocked until Team 00 promotes the bounded no-schema `backtesting-strategy-lab` implementation handoff
+  - repository/controller/router/validation/schema/shared-route widening, `strategy-framework` source edits, and `trade-plan-risk-engine` source edits remain explicit reject conditions for the first child
+- Shared-file requests:
+  - none from Team 04; single-writer reservation remains a Team 00 implementation concern
+- QA-ready for Team 00 Ready evaluation:
+  - `CF-W1-BT-02`: yes, as one bounded no-schema `backtesting-strategy-lab` review-traceability child slice only
+- Next gate:
+  - Team 00 Ready evaluation for `CF-W1-BT-02` only, while keeping schema, route, shared-file, Strategy Framework source, and Trade Plan Risk source widening out of scope
+- Evidence notes:
+  - Team 04 used the active execution folder and current backtesting module/test/UI surfaces only; no application source, tests, package manifests, generated files, architecture docs, contracts, requirements, ready queues, Prisma, routes, shared files, or historical docs were modified
+
+## 2026-05-18 `CF-W1-STRAT-02A` No-Schema Strategy Framework Trust-Metadata QA Planning
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only QA packet preparation
+- Work item: `CF-W1-STRAT-02A`
+- State/mode: QA planning only; no executable validation
+- Owner: Team 04 QA Factory
+- Lane/module: Lane 2 / `strategy-framework`
+- Files changed:
+  - `04-qa/CF-W1-STRAT-02A-qa-plan.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - `AGENTS.md`
+  - `16-team-inboxes/TEAM-04-current-assignment.md`
+  - `03-architecture/CF-W1-STRAT-02-architecture-review.md`
+  - `06-contracts/CF-W1-STRAT-02-strategy-framework-rule-versioning-dq-gate-policy-contract.md`
+  - `08-work-packets/CF-W1-STRAT-02-work-packet.md`
+  - `10-requirements/CF-W1-STRAT-02-strategy-framework-rule-versioning-dq-gate-policy-requirement.md`
+  - `99-decision-inbox/open-decisions.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+  - `backend/src/modules/strategy-framework/strategy-framework.md`
+  - `backend/tests/modules/strategy-framework/strategy-framework.service.test.ts`
+  - `frontend/src/features/strategy-framework/types.ts`
+  - `frontend/src/features/strategy-framework/components/StrategyFrameworkPage.tsx`
+  - `frontend/tests/ui/strategy-framework.spec.ts`
+- Behavior changed:
+  - none; docs-only QA planning
+- Docs changed:
+  - prepared `04-qa/CF-W1-STRAT-02A-qa-plan.md`
+  - refreshed `04-qa/next-validation-plans.md`
+  - recorded this handoff in `17-team-outboxes/TEAM-04-qa-factory.md`
+- Contracts changed:
+  - none
+- Result:
+  - Prepared a bounded no-schema QA plan for additive Strategy Framework rule revision metadata and DQ gate policy exposure in `04-qa/CF-W1-STRAT-02A-qa-plan.md`.
+  - Recorded required coverage for declared and legacy undeclared rule metadata, DQ gate policy exposure across service/catalog/detail/proof surfaces, additive frontend proof/detail trust fields, unchanged strategy math/evaluator/backtest action behavior, and payload regression protection for current catalog/detail consumers.
+  - Preserved the Team 03 split boundary that `CF-W1-STRAT-02A` is trust surfacing only and that durable rule-revision history remains a separate blocked child.
+  - Updated `04-qa/next-validation-plans.md` so `CF-W1-STRAT-02A` is visible in the QA queue as QA-ready for Team 00 Ready evaluation, with the durable blocker stated explicitly.
+- Tests run: none
+- Tests skipped:
+  - all executable validation was skipped because this was a docs-only QA planning pass with no Team 00 Ready promotion or implementation handoff
+- Skipped-test reason:
+  - planning-only assignment; no builds/tests/services were authorized or required
+- Assumptions:
+  - Team 00 will keep the child bounded to the reserved `strategy-framework` registry/types/service/doc/test and feature-local types/page/UI spec files only
+  - current Strategy Framework catalog/detail/proof routes stay unchanged in the first child
+- Risks:
+  - implementers could blur proof-performance state with new trust/versioning state unless the contract and QA plan are followed exactly
+  - durable history could be implied incorrectly if source-declared revisions are presented as persisted revision history
+- Blockers:
+  - durable rule-revision history remains out of scope and blocked pending separate Prisma/schema/repository/generated approval
+  - executable QA remains blocked until Team 00 promotes the bounded no-schema `strategy-framework` implementation handoff
+- Shared-file requests:
+  - none from Team 04; single-writer reservation remains a Team 00 implementation concern
+- QA-ready for Team 00 Ready evaluation:
+  - `CF-W1-STRAT-02A`: yes, as one bounded no-schema Strategy Framework trust-metadata child slice only
+- Next gate:
+  - Team 00 Ready evaluation for `CF-W1-STRAT-02A` only, while keeping durable revision persistence blocked as a separate future child
+- Evidence notes:
+  - Team 04 used the active execution folder and current Strategy Framework module/test/UI surfaces only; no application source, tests, package manifests, generated files, architecture docs, contracts, requirements, ready queues, Prisma, routes, shared files, or historical docs were modified
+
+## 2026-05-18 `CF-W1-SQLAB-02A` No-Schema Derived Journal Preview QA Planning
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only QA packet preparation
+- Work item: `CF-W1-SQLAB-02A`
+- Files changed:
+  - `04-qa/CF-W1-SQLAB-02A-qa-plan.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - `AGENTS.md`
+  - `03-architecture/CF-W1-SQLAB-02-architecture-review.md`
+  - `06-contracts/CF-W1-SQLAB-02-signal-outcome-journal-post-event-learning-contract.md`
+  - `08-work-packets/CF-W1-SQLAB-02-work-packet.md`
+  - `99-decision-inbox/open-decisions.md`
+  - `09-summaries/team-00-coordination-cycle-latest.md`
+  - `00-control/team-agent-runtime-queue.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+  - `backend/package.json`
+  - `frontend/package.json`
+  - `backend/src/modules/signal-quality-lab/signal-quality-lab.md`
+  - `backend/tests/modules/signal-quality-lab/signal-quality-lab.service.test.ts`
+  - `frontend/src/features/signal-quality-lab/components/SignalQualityLabPage.tsx`
+  - `frontend/tests/ui/signal-quality-lab.spec.ts`
+- Result:
+  - Prepared a bounded no-schema QA plan for additive journal-preview behavior in `04-qa/CF-W1-SQLAB-02A-qa-plan.md`.
+  - Recorded acceptance scenarios for favorable, adverse, and flat follow-through mapping, pending future-data handling, missing local price-history handling, explicit derived-not-persisted UI copy, and additive signal-history/outcome compatibility.
+  - Preserved the Team 03 split boundary that `CF-W1-SQLAB-02A` remains preview-only and that the durable-storage parent stays blocked.
+  - Preserved the Team 00 sequencing rule that `CF-W1-SQLAB-02A` must not be promoted or implemented in parallel with `CF-W1-SQLAB-01` because both packets reserve the same `signal-quality-lab` backend service/types/doc/service-test surfaces.
+  - Updated `04-qa/next-validation-plans.md` so `CF-W1-SQLAB-02A` is visible in the QA queue with the required sequencing blocker and blocked durable parent called out explicitly.
+- Tests run: none
+- Tests skipped:
+  - all executable validation was skipped because this was a docs-only QA planning pass with no Team 00 sequencing decision, Ready promotion, or implementation handoff
+- QA-ready for Team 00 Ready evaluation:
+  - `CF-W1-SQLAB-02A`: yes, as one bounded no-schema `signal-quality-lab` child slice, only if Team 00 sequences it after `CF-W1-SQLAB-01` and keeps durable storage out of scope
+- Remaining blockers:
+  - `CF-W1-SQLAB-01` still owns the same backend `signal-quality-lab` service/types/doc/service-test writer set, so the child is not parallel-safe until that packet clears
+  - executable QA remains blocked until Team 00 issues exact file reservations and a bounded implementation handoff for the child
+  - the durable parent `CF-W1-SQLAB-02B` remains blocked pending a separate approved storage packet for `signal-quality-lab`
+- Next gate:
+  - Team 00 sequencing decision after `CF-W1-SQLAB-01` clears the shared backend `signal-quality-lab` files, then Ready evaluation for `CF-W1-SQLAB-02A` only
+- Evidence notes:
+  - Team 04 used the active execution folder and current Signal Quality Lab docs/test/UI surface only; no application source, tests, package manifests, generated files, or historical docs folders were modified
+
 ## 2026-05-18 `CF-W1-L3-ALERT-03` Alert Follow-Through Traceability QA Planning
 
 - Team: `TEAM-04` - QA Factory

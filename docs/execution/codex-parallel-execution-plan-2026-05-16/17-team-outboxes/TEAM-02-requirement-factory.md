@@ -12,7 +12,7 @@ Mode: persistent Team 02 PO + requirements value-discovery lane. No application 
 - Input source: root `AGENTS.md`, runtime bootstrap, standing delegation, escalation rules, worktree/branch policy, heartbeat protocol, Team 02 charter, Team 02 automation prompt, team inboxes, ready/blocked queues, Decision Inbox, Team 07/08 outboxes and prepared artifacts
 - Output target: `10-requirements/`, `12-ready-queue/`, this outbox
 - Branch/worktree: `dev`; shared workspace, no separate Team 02 worktree created
-- Active requirement ids: `CF-W1-L3-AUTH-03`, `CF-W1-L3-INTEL-01`, `CF-W1-L3-INTEL-02`, `CF-W1-L3-INTEL-03`, `CF-W1-L3-PORT-01`, `CF-W1-L3-PORT-01B`, `CF-W1-L3-ALERT-01`, `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-MD-01`, `CF-W1-AUTH-02`, `CF-W1-DQ-02`, `CF-W1-TP-02`, `CF-W1-STRAT-02`, `CF-W1-SQLAB-01`, `CF-W1-HCTX-01`, `CF-W1-MCTX-01`, `CF-W1-L3-TREV-01`, `CF-W1-BT-02`, `CF-W1-L3-ALERT-03`, `CF-W1-L3-WATCH-01`, `CF-W1-CAL-01`
+- Active requirement ids: `CF-W1-L3-AUTH-03`, `CF-W1-L3-INTEL-01`, `CF-W1-L3-INTEL-02`, `CF-W1-L3-INTEL-03`, `CF-W1-L3-PORT-01`, `CF-W1-L3-PORT-01B`, `CF-W1-L3-ALERT-01`, `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-MD-01`, `CF-W1-AUTH-02`, `CF-W1-DQ-02`, `CF-W1-TP-02`, `CF-W1-STRAT-02`, `CF-W1-SQLAB-01`, `CF-W1-HCTX-01`, `CF-W1-MCTX-01`, `CF-W1-BT-02`, `CF-W1-L3-ALERT-03`, `CF-W1-L3-WATCH-01`, `CF-W1-CAL-01`
 - Ready work pulled: none
 - Can continue without human approval: yes for docs-only requirement refinement; no for app-code implementation or decision-blocked work
 
@@ -195,6 +195,64 @@ No item was moved to Ready.
 ### Next Recommended Assignment
 
 Team 00 should evaluate `CF-W1-L3-PORT-01A` for the next bounded Ready promotion before `CF-W1-L3-PORT-01B` or `CF-W1-L3-INTEL-01`.
+
+## 2026-05-18 Continuation - Backtesting Review Disposition Refinement
+
+Mode: Team 02 continued the backtesting review workflow discovery pass and refined the existing requirement around canonical trust labeling. No application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, providers, services, or frontend files changed.
+
+### Evidence Consumed
+
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.types.ts`
+- `backend/tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.test.ts`
+- `frontend/src/features/backtesting-strategy-lab/components/BacktestingStrategyLabPage.tsx`
+
+### Queue Delta
+
+- Refined `CF-W1-BT-02` from a broad outcome-review traceability prompt into a canonical review-disposition contract for backtesting results.
+- Tightened the requirement so the remaining gap is framed as a shared review label and reason summary across list/detail surfaces, not new simulation math.
+- Kept the candidate in the same rank band behind `CF-W1-SQLAB-02A` and ahead of `CF-W1-STRAT-02` because the module already exposes availability, benchmark, exit, and repair evidence.
+- Preserved Team 00 ownership of any Ready promotion; no item moved to Ready.
+
+### Implementation Readiness
+
+Ready work pulled: none by Team 02.
+
+No item moved to Ready. `CF-W1-BT-02` remains refinement-only and still needs Team 00/03 reservation and QA prep before any source/test work.
+
+### Next Recommended Assignment
+
+Team 00 should delegate `CF-W1-DQ-02` next as the next unassigned upstream route. `CF-W1-BT-02` remains the next distinct backtesting review candidate after that.
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-BT-02-backtesting-outcome-review-traceability-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+
+### Validation
+
+- Stale wording scan: completed by inspection; BT-02 text now consistently refers to a canonical review-disposition label and reason summary.
+- Tests run: none.
+- Builds run: none.
+- UI checks run: none.
+- Live local data checks run: none.
+- Skipped reason: Team 02 task was docs-only requirement/queue work.
+
+### Risks / Blockers
+
+- Shared docs workspace remains dirty with concurrent Team 03/04/07/08/09/10 edits. Team 02 did not stage, revert, or overwrite unrelated files.
+- No app-code Ready item exists until Team 00 promotes a specific child with exact handoff/reservations.
+- `CF-W1-BT-02` remains a future child until Team 00/03 reservation and QA prep exist.
+
+### Next Recommended Assignment
+
+1. Team 00: route `CF-W1-DQ-02` as the next upstream discovery item.
+2. Team 00/Team 03: keep `CF-W1-BT-02` queued for later review-disposition contract prep.
+3. Team 00: continue one-at-a-time Ready evaluation for the current near-ready Lane 2 and Lane 3 items only when their exact handoffs exist.
 
 ## 2026-05-18 Continuation - Team 03 Reservation Matrix Consumption
 
@@ -488,6 +546,168 @@ Team 00 should delegate `CF-W1-CAL-01` next for signal-calibration reliability d
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+## 2026-05-18 Continuation - Portfolio Concentration Review Cycle
+
+Mode: Team 02 value-discovery pass after portfolio-risk review audit consumption. No application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, providers, services, or frontend files changed.
+
+### Evidence Consumed
+
+- `backend/src/modules/portfolio-intelligence/portfolio-intelligence.md`
+- `backend/src/modules/portfolio-intelligence/portfolio-intelligence.service.ts`
+- `backend/src/modules/portfolio-intelligence/portfolio-intelligence.types.ts`
+- `backend/src/modules/portfolio-intelligence/portfolio-intelligence.validation.ts`
+- `backend/src/modules/portfolio-management/portfolio-management.md`
+- `backend/src/modules/portfolio-management/portfolio-management.service.ts`
+- `frontend/src/features/portfolio-intelligence/components/PortfolioIntelligencePanel.tsx`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-portfolio-watchlist-alerts.md`
+
+### Queue Delta
+
+- Refined `CF-W1-L3-INTEL-03` so the first child slice is explicitly bounded to portfolio-level and holding-level concentration review with deterministic ranking and reason summaries.
+- Re-centered the filtered unassigned discovery order on `CF-W1-L3-INTEL-03` after excluding the actively routed/recent items in this cycle.
+- Left the current Ready-promotion front-runners unchanged: `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01`.
+- Left all Ready queue movement to Team 00.
+
+### Implementation Readiness
+
+Ready work pulled: none by Team 02.
+
+No item moved to Ready. `CF-W1-L3-INTEL-03` remains architecture-prep only and is blocked until Team 00/03 reservation and contract work exists.
+
+### Next Recommended Assignment
+
+After excluding `CF-W1-SQLAB-01`, `CF-W1-SQLAB-02A`, `CF-W1-STRAT-02A`, `CF-W1-BT-02`, `CF-W1-DQ-02`, and `CF-W1-L3-WATCH-01`, Team 00 should delegate `CF-W1-L3-INTEL-03` next for portfolio concentration-review discovery.
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-INTEL-03-portfolio-intelligence-concentration-review-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+## 2026-05-18 Continuation - Data Quality Currentness Evidence Cycle
+
+Mode: Team 02 docs-only requirement refinement after audit review of market-data currentness gaps. No application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, providers, services, or frontend files changed.
+
+### Evidence Consumed
+
+- `11-module-audits/audit-market-data-data-quality.md`
+- `03-architecture/CF-W1-DQ-02-architecture-review.md`
+- `06-contracts/CF-W1-DQ-02-dq-currentness-evidence-contract.md`
+- `08-work-packets/CF-W1-DQ-02-work-packet.md`
+
+### Queue Delta
+
+- Refined `CF-W1-DQ-02` into the lead upstream currentness requirement for Lane 1.
+- Reordered `requirements-backlog.md`, `refinement-queue.md`, `next-top-10-candidates.md`, and `top-10-ready-candidates.md` so `CF-W1-DQ-02` is the first unassigned route / top candidate.
+- Kept `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01` as the current Ready-promotion front-runners.
+- Removed `CF-W1-L3-TREV-01` from active pull-path tables and recorded it as Ready and assigned in the backlog history section.
+
+### Implementation Readiness
+
+Ready work pulled: none by Team 02.
+
+No item moved to Ready. `CF-W1-DQ-02` is still a docs-only QA-prep candidate and needs Team 00/03 reservation plus Team 04 QA planning before any source work.
+
+### Next Recommended Assignment
+
+Team 00 should route `CF-W1-DQ-02` next as the upstream Lane 1 currentness contract. `CF-W1-BT-02` remains the next downstream review-traceability candidate after that.
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-DQ-02-dq-currentness-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+## 2026-05-18 Continuation - Signal Outcome Journal Derived Preview Cycle
+
+Mode: Team 02 refined the Signal Quality Lab split child and re-ranked the next unassigned route. No application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, providers, services, or frontend files changed.
+
+### Evidence Consumed
+
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.md`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.service.ts`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.types.ts`
+- `frontend/src/features/signal-quality-lab/components/SignalQualityLabPage.tsx`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-SQLAB-02-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/09-summaries/team-00-coordination-cycle-latest.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-00-orchestrator-integration-outbox.md`
+
+### Queue Delta
+
+- Added `CF-W1-SQLAB-02A` as the active no-schema Signal Quality Lab derived-preview child.
+- Reframed `CF-W1-SQLAB-02` as the split parent with durable storage blocked separately.
+- Re-ranked the next unassigned route so `CF-W1-BT-02` now leads the docs-only prep queue after the active routed items.
+- Kept `CF-W1-STRAT-02`, `CF-W1-CAL-01`, `CF-W1-HCTX-01`, and `CF-W1-MCTX-01` in the next discovery band.
+- Left the Ready front-runners unchanged: `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01`.
+
+### Implementation Readiness
+
+Ready work pulled: none by Team 02.
+
+No item moved to Ready. `CF-W1-SQLAB-02A` is active in Team 04 QA planning; `CF-W1-BT-02` is the next unassigned item Team 00 should route.
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SQLAB-02A-signal-outcome-journal-derived-preview-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SQLAB-02-signal-outcome-journal-post-event-learning-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+
+## 2026-05-18 Continuation - Watchlist Review Actionability Refinement Cycle
+
+Mode: Team 02 value-discovery pass after watchlist-management audit review. No application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, providers, services, or frontend files changed.
+
+### Evidence Consumed
+
+- `backend/src/modules/watchlist-management/watchlist-management.md`
+- `backend/src/modules/watchlist-management/watchlist-management.service.ts`
+- `backend/src/modules/watchlist-management/watchlist-management.repository.ts`
+- `backend/src/modules/watchlist-management/watchlist-management.types.ts`
+- `frontend/src/features/watchlist-management/components/WatchlistManagementPage.tsx`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-portfolio-watchlist-alerts.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-L3-WATCH-01-architecture-review.md`
+
+### Queue Delta
+
+- Refined `CF-W1-L3-WATCH-01` into a more explicit review-queue contract with deterministic priority bands, reason summaries, and an additive sort option.
+- Re-ranked watchlist review actionability ahead of portfolio concentration review because the watchlist is the more immediate trader review surface and can be explained entirely from module-local fields.
+- Kept `CF-W1-STRAT-02`, `CF-W1-SQLAB-02`, `CF-W1-BT-02`, and `CF-W1-L3-ALERT-03` ahead of the watchlist slice.
+- Left all Ready-queue movement to Team 00.
+
+### Implementation Readiness
+
+Ready work pulled: none by Team 02.
+
+No item moved to Ready. `CF-W1-L3-WATCH-01` remains architecture-prep only and is still blocked until Team 00/03 reservation and contract work exists.
+
+### Next Recommended Assignment
+
+Team 00 should delegate `CF-W1-STRAT-02` next as the top unassigned item. `CF-W1-L3-WATCH-01` is now the next distinct Lane 3 idea-review candidate after alert follow-through.
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-WATCH-01-watchlist-review-actionability-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+### Validation
+
+- Stale wording scan: not rerun separately; queue and requirement edits stayed within active docs-only scope.
+- Tests run: none.
+- Builds run: none.
+- UI checks run: none.
+- Live local data checks run: none.
+- Skipped reason: Team 02 task was docs-only requirement/queue work.
 
 ## 2026-05-18 Continuation - Strategy Framework Rule Provenance Refresh
 
@@ -813,3 +1033,49 @@ Team 00 should delegate `CF-W1-L3-TREV-01` next for Today Review publication-evi
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+## 2026-05-18 Continuation - Portfolio Concentration Surface Refinement
+
+Mode: Team 02 continued the portfolio-intelligence discovery pass and tightened the existing concentration-review requirement into a read-only bounded surface over existing portfolio detail data. No application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, providers, services, or frontend files changed.
+
+### Evidence Consumed
+
+- `backend/src/modules/portfolio-intelligence/portfolio-intelligence.md`
+- `backend/src/modules/portfolio-intelligence/portfolio-intelligence.types.ts`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-INTEL-03-portfolio-intelligence-concentration-review-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+
+### Queue Delta
+
+- Refined `CF-W1-L3-INTEL-03` so the first child slice is explicitly read-only, deterministic, and bounded to existing portfolio detail surfaces.
+- Tightened the requirement to separate portfolio-level and holding-level concentration explanations while still forbidding optimizer, rebalance, schema, route, or shared-component expansion.
+- Kept the filtered next unassigned Team 00 route as `CF-W1-L3-INTEL-03`.
+- Reworded the backlog and candidate queues so the same bounded scope is visible in every ranking table.
+- Preserved Team 00 ownership of any Ready promotion; no item moved to Ready.
+
+### Implementation Readiness
+
+Ready work pulled: none by Team 02.
+
+No item moved to Ready. `CF-W1-L3-INTEL-03` remains architecture-prep only and is blocked until Team 00/03 reservation and contract work exists.
+
+### Next Recommended Assignment
+
+Team 00 should delegate `CF-W1-L3-INTEL-03` next for portfolio concentration-review discovery. The next child should stay inside existing portfolio detail surfaces and avoid introducing new scoring or optimizer behavior.
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-INTEL-03-portfolio-intelligence-concentration-review-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+### Validation
+
+- Docs-only refinement; no builds, tests, UI checks, or live data checks run.
+- `git diff --check` passed; Git emitted existing CRLF line-ending warnings on unrelated dirty files already present in the workspace.

@@ -139,3 +139,64 @@ Update `17-team-outboxes/TEAM-06-outbox.md` with:
 - forbidden files confirmed untouched
 - assumptions, risks, blockers
 - next gate: Team 04 QA, Team 10 review, Architect Signoff, delegated PO acceptance, or Team 00 blocker routing
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Bounded rework for `CF-W1-SQLAB-01` after Team 10 review rejection.
+
+Team 10 rejected the first implementation because hard Data Quality blockers are counted but then collapse into `LIMITED` outcome confidence. Team 00 resolves the routine policy clarification under delegated authority: hard DQ blockers must map to `UNTRUSTED` with an explicit hard-blocker reason, not `LIMITED` or `DIAGNOSTIC`.
+
+## Source Handoff
+
+- Branch: `codex/team06-strategy-signal/CF-W1-SQLAB-01`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-SQLAB-01`
+- Developer handoff: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-SQLAB-01-developer-handoff.md`
+- QA verification: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-SQLAB-01-qa-verification.md`
+- Team 10 rejection: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-SQLAB-01-team10-review-release.md`
+
+## Allowed Rework Files
+
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.service.ts`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.types.ts`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.md`
+- `backend/tests/modules/signal-quality-lab/signal-quality-lab.service.test.ts`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-SQLAB-01-developer-handoff.md`
+
+## Required Rework
+
+- Map hard DQ blockers such as `NOT_READY`, `UNUSABLE`, and `ILLIQUID` evidence to `UNTRUSTED`.
+- Add or use an explicit reason code for hard DQ blockers.
+- Add focused service-test coverage proving hard blockers do not return `LIMITED`.
+- Preserve the existing `TRUSTED`, `LIMITED`, `DIAGNOSTIC`, no-selected-horizon, and DQ-lookup-failure tests.
+- Preserve default DQ filter/query behavior and additive response compatibility.
+
+## Forbidden Scope
+
+- Prisma schema or migrations
+- `signal-quality-lab` repository, controller, router, or validation source
+- Data Quality Engine source or exports
+- Signal Generation, Signal Calibration, Strategy Decision, Trade Plan source/tests
+- backend/frontend route registries
+- shared backend utilities, shared DTOs, shared UI
+- package manifests, generated files, frontend source/tests
+- providers, startup/backfill, live-provider, paid/cloud, broker, telemetry, or automation flows
+
+## Focused Commands
+
+Run in the Team 06 worktree:
+
+```powershell
+cd C:\work\repo\investment-scanner-worktrees\team06-CF-W1-SQLAB-01\backend
+npm.cmd test -- signal-quality-lab.service.test.ts --runInBand
+npm.cmd run build
+```
+
+## Next Gate
+
+After rework, return to Team 04 QA rerun, then Team 10 re-review.

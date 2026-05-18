@@ -230,3 +230,230 @@ No spawned subagent is active at the moment this snapshot is written. Team 06 ha
 - Team 03: `CF-W1-STRAT-02` architecture prep.
 - Team 02: persistent PO/Requirements discovery.
 - Team 10: idle until the next QA-accepted handoff.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | `019e3ada-65b8-7a63-84dc-f4a30f7c0663` | `gpt-5.4`, high | QA verification | `CF-W1-SQLAB-01` in Team 06 worktree | active |
+| 2 | Team 03 - Architecture Factory | `019e3ada-65ee-7f92-9ac7-a710a799de91` | `gpt-5.4`, high | architecture prep | `CF-W1-STRAT-02` | active |
+| 3 | Team 02 - PO + Requirement Factory | `019e3ada-6641-7f11-b956-14c4956787a8` | `gpt-5.4-mini`, medium | persistent discovery cycle | next high-value investor/trader requirement | active |
+| 4 | Open slot | none | pending | review/release | Team 10 review after SQLAB-01 QA | waiting |
+| 5 | Open slot | none | pending | architect signoff | SQLAB-01 Architect Signoff after Team 10 acceptance | waiting |
+| 6 | Open slot | none | pending | QA planning | `CF-W1-SQLAB-02A` QA plan after Team 04 slot clears | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 10 is ready to pick up `CF-W1-SQLAB-01` review after Team 04 accepts QA.
+- Team 04 can pick up `CF-W1-SQLAB-02A` QA planning after the active SQLAB-01 QA agent completes.
+- Team 03 is currently occupied by `CF-W1-STRAT-02`; next architecture item should wait unless its write scope avoids Team 03 outbox and next-contracts conflicts.
+- Team 02 is active and should be relaunched after it completes.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 10 - Review / Release | `019e3ade-cfeb-7840-9f8a-3e52cebe3a62` | `gpt-5.5`, high | review/release | `CF-W1-SQLAB-01` after QA PASS | active |
+| 2 | Team 04 - QA Factory | `019e3ade-d01d-7310-aded-7cc32e76db6c` | `gpt-5.4`, high | QA planning | `CF-W1-SQLAB-02A` no-schema derived journal preview | active |
+| 3 | Team 03 - Architecture Factory | `019e3ada-65ee-7f92-9ac7-a710a799de91` | `gpt-5.4`, high | architecture prep | `CF-W1-STRAT-02` | active |
+| 4 | Team 02 - PO + Requirement Factory | `019e3ada-6641-7f11-b956-14c4956787a8` | `gpt-5.4-mini`, medium | persistent discovery cycle | next high-value investor/trader requirement | active |
+| 5 | Open slot | none | pending | architect signoff | SQLAB-01 Architect Signoff after Team 10 acceptance | waiting |
+| 6 | Open slot | none | pending | review / QA / implementation | next unblocked gate | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03 Architect Signoff is ready to pick up `CF-W1-SQLAB-01` if Team 10 accepts review.
+- Team 10 is active on `CF-W1-SQLAB-01`; no second Team 10 writer should use the same outbox in that worktree.
+- Team 04 is active on `CF-W1-SQLAB-02A`; no second Team 04 writer should touch `TEAM-04-qa-factory.md` in main until it completes.
+- Team 02 is active and should be relaunched after this discovery cycle.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 10 - Review / Release | `019e3ade-cfeb-7840-9f8a-3e52cebe3a62` | `gpt-5.5`, high | review/release | `CF-W1-SQLAB-01` after QA PASS | active |
+| 2 | Team 04 - QA Factory | `019e3ade-d01d-7310-aded-7cc32e76db6c` | `gpt-5.4`, high | QA planning | `CF-W1-SQLAB-02A` no-schema derived journal preview | active |
+| 3 | Team 02 - PO + Requirement Factory | `019e3ae1-4895-7552-8e22-9a88cf1c02e9` | `gpt-5.4-mini`, medium | persistent discovery cycle | next high-value investor/trader requirement excluding actively routed items | active |
+| 4 | Open slot | none | pending | architect signoff | SQLAB-01 Architect Signoff after Team 10 acceptance | waiting |
+| 5 | Open slot | none | pending | QA planning | `CF-W1-STRAT-02A` after Team 04 slot clears | waiting |
+| 6 | Open slot | none | pending | review / QA / implementation | next unblocked gate | waiting |
+
+## Recently Closed
+
+- Team 03 `019e3ada-65ee-7f92-9ac7-a710a799de91`: completed `CF-W1-STRAT-02` architecture prep. Result: split required; no-schema child feasible, durable revisioning blocked pending schema/repository/generated approval.
+- Team 02 `019e3ada-6641-7f11-b956-14c4956787a8`: refined `CF-W1-L3-WATCH-01` as deterministic watchlist review-queue requirement; next routed item remains `CF-W1-STRAT-02`.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03 Architect Signoff is ready for `CF-W1-SQLAB-01` if Team 10 accepts.
+- Team 04 can pick up `CF-W1-STRAT-02A` QA planning after active SQLAB-02A planning completes.
+- Team 02 is active and should be relaunched after this discovery cycle.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Team 10 SQLAB-01 Review Result
+
+Team 10 rejected `CF-W1-SQLAB-01` because hard Data Quality blockers were counted and then collapsed into `LIMITED` confidence. Team 00 routed a bounded Team 06 rework decision: hard DQ blockers must map to `UNTRUSTED` with an explicit hard-blocker reason.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 06 - Strategy / Signal / Risk | pending spawn | `gpt-5.3-codex`, high | bounded rework | `CF-W1-SQLAB-01` hard DQ blocker confidence mapping | ready to spawn |
+| 2 | Team 04 - QA Factory | `019e3ade-d01d-7310-aded-7cc32e76db6c` | `gpt-5.4`, high | QA planning | `CF-W1-SQLAB-02A` no-schema derived journal preview | active |
+| 3 | Team 02 - PO + Requirement Factory | `019e3ae1-4895-7552-8e22-9a88cf1c02e9` | `gpt-5.4-mini`, medium | persistent discovery cycle | next high-value investor/trader requirement excluding actively routed items | active |
+| 4 | Open slot | none | pending | QA rerun | `CF-W1-SQLAB-01` after Team 06 rework | waiting |
+| 5 | Open slot | none | pending | review/release | `CF-W1-SQLAB-01` after QA rerun | waiting |
+| 6 | Open slot | none | pending | QA planning | `CF-W1-STRAT-02A` after Team 04 slot clears | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06 is ready for bounded `CF-W1-SQLAB-01` rework.
+- Team 04 is active on `CF-W1-SQLAB-02A`; next Team 04 gate is SQLAB-01 QA rerun after rework.
+- Team 02 is active and should be relaunched after completion.
+- Team 10 should wait for QA rerun before re-review.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 06 - Strategy / Signal / Risk | `019e3ae4-b448-71e0-a52d-ee28ce48760a` | `gpt-5.3-codex`, high | bounded rework | `CF-W1-SQLAB-01` hard DQ blocker confidence mapping | active |
+| 2 | Team 04 - QA Factory | `019e3ae7-aa4f-71e2-9e0a-4542845368db` | `gpt-5.4`, high | QA planning | `CF-W1-STRAT-02A` no-schema child | active |
+| 3 | Team 02 - PO + Requirement Factory | `019e3ae1-4895-7552-8e22-9a88cf1c02e9` | `gpt-5.4-mini`, medium | persistent discovery cycle | next high-value investor/trader requirement excluding actively routed items | active |
+| 4 | Open slot | none | pending | QA rerun | `CF-W1-SQLAB-01` after Team 06 rework | waiting |
+| 5 | Open slot | none | pending | review/release | `CF-W1-SQLAB-01` after QA rerun | waiting |
+| 6 | Open slot | none | pending | implementation / planning | next unblocked gate | waiting |
+
+## Recently Closed
+
+- Team 04 `019e3ade-d01d-7310-aded-7cc32e76db6c`: completed `CF-W1-SQLAB-02A` QA planning. Result: QA-plan ready for Team 00 Ready evaluation only after `CF-W1-SQLAB-01` clears shared Signal Quality Lab files; durable `SQLAB-02B` remains blocked.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04 QA rerun is ready after Team 06 finishes `CF-W1-SQLAB-01` rework.
+- Team 10 re-review is ready after QA rerun passes.
+- Team 02 is active and should be relaunched after completion.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | `019e3ae8-bd0e-7740-9d92-403dcbb2821b` | `gpt-5.4`, high | QA rerun | `CF-W1-SQLAB-01` hard DQ blocker rework | active |
+| 2 | Team 04 - QA Factory | `019e3ae7-aa4f-71e2-9e0a-4542845368db` | `gpt-5.4`, high | QA planning | `CF-W1-STRAT-02A` no-schema child | active |
+| 3 | Team 02 - PO + Requirement Factory | `019e3ae1-4895-7552-8e22-9a88cf1c02e9` | `gpt-5.4-mini`, medium | persistent discovery cycle | next high-value investor/trader requirement excluding actively routed items | active |
+| 4 | Open slot | none | pending | review/release | `CF-W1-SQLAB-01` after QA rerun | waiting |
+| 5 | Open slot | none | pending | architect signoff | `CF-W1-SQLAB-01` after Team 10 acceptance | waiting |
+| 6 | Open slot | none | pending | implementation / planning | next unblocked gate | waiting |
+
+## Recently Closed
+
+- Team 06 `019e3ae4-b448-71e0-a52d-ee28ce48760a`: completed `CF-W1-SQLAB-01` bounded rework. Hard DQ blockers now map to `UNTRUSTED_DQ_HARD_BLOCKER`; focused service test passed (`31/31`) and backend build passed.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 10 is ready to pick up `CF-W1-SQLAB-01` re-review after QA rerun passes.
+- Team 03 Architect Signoff is ready after Team 10 accepts.
+- Team 02 is active and should be relaunched after completion.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 10 - Review / Release | `019e3aed-3c52-7ed3-a905-a46dc6dc677e` | `gpt-5.5`, high | re-review/release | `CF-W1-SQLAB-01` after hard-blocker QA rerun PASS | active |
+| 2 | Team 03 - Architecture Factory | `019e3aeb-4fcb-71d3-8c2e-45b07e0f2d23` | `gpt-5.4`, high | architecture prep | `CF-W1-BT-02` | active |
+| 3 | Team 02 - PO + Requirement Factory | `019e3aeb-4ffe-76a1-9e30-814caef74aa3` | `gpt-5.4-mini`, medium | persistent discovery cycle | next distinct unassigned requirement | active |
+| 4 | Open slot | none | pending | architect signoff | `CF-W1-SQLAB-01` after Team 10 acceptance | waiting |
+| 5 | Open slot | none | pending | implementation | `CF-W1-STRAT-02A` after docs commit/worktree creation | waiting |
+| 6 | Open slot | none | pending | QA / review / planning | next unblocked gate | waiting |
+
+## Recently Closed
+
+- Team 04 `019e3ae8-bd0e-7740-9d92-403dcbb2821b`: QA rerun passed for `CF-W1-SQLAB-01`; focused service test passed (`31/31`) and backend build passed.
+- Team 04 `019e3ae7-aa4f-71e2-9e0a-4542845368db`: completed `CF-W1-STRAT-02A` QA planning; Ready evaluation can proceed after docs checkpoint.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03 Architect Signoff is ready if Team 10 accepts `CF-W1-SQLAB-01`.
+- Team 06 can implement `CF-W1-STRAT-02A` after Team 00 commits docs, promotes Ready, and creates a dedicated worktree.
+- Team 04 can plan the next QA packet after active docs writers settle.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 03 - Architect Signoff | `019e3af0-ea83-7c11-8e87-8a69b659c3aa` | `gpt-5.4`, high | architect signoff | `CF-W1-SQLAB-01` | active |
+| 2 | Team 04 - QA Factory | `019e3af2-3da3-71a3-9135-1ee802e7e2c5` | `gpt-5.4`, high | QA planning | `CF-W1-BT-02` | active |
+| 3 | Team 03 - Architecture Factory | `019e3af4-bb05-7853-90bb-ef76004fbe5a` | `gpt-5.4`, high | architecture prep | `CF-W1-DQ-02` | active |
+| 4 | Team 02 - PO + Requirement Factory | `019e3af4-bb3f-7743-bffa-2ed3ec447b9d` | `gpt-5.4-mini`, medium | persistent discovery cycle | next distinct unassigned requirement | active |
+| 5 | Open slot | none | pending | implementation | `CF-W1-STRAT-02A` after docs commit/worktree creation | waiting |
+| 6 | Open slot | none | pending | implementation / planning | next unblocked gate | waiting |
+
+## Recently Closed
+
+- Team 03 `019e3aeb-4fcb-71d3-8c2e-45b07e0f2d23`: completed `CF-W1-BT-02` architecture prep; result is Ready candidate pending Team 04 QA plan.
+- Team 02 `019e3aeb-4ffe-76a1-9e30-814caef74aa3`: refined `CF-W1-DQ-02`; next routed item is DQ-02 architecture.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06 can implement `CF-W1-STRAT-02A` after Team 00 commits docs, promotes Ready, and creates the worktree.
+- Team 10 is idle until the next QA-accepted implementation handoff.
+- Team 02 is active and should be relaunched after completion.
+
+---
+
+# Runtime Checkpoint
+
+Date: 2026-05-18
+
+## Current Pool
+
+No spawned subagents are active at this checkpoint.
+
+## Completed Since Previous Checkpoint
+
+- `CF-W1-SQLAB-01`: accepted through QA rerun, Team 10 re-review, Architect Signoff, delegated PO acceptance, and committed locally on the Team 06 branch as `1a41d95 feat: add signal quality outcome confidence`.
+- `CF-W1-STRAT-02A`: architecture and QA planning complete; no-schema first child is Ready-evaluation capable, durable revision history remains blocked.
+- `CF-W1-BT-02`: architecture and QA planning complete, but Team 02 narrowed the requirement afterward; Team 00 should refresh architecture/QA before Ready promotion.
+- `CF-W1-DQ-02A`: architecture and QA planning complete; DQE-only first child is Ready-evaluation capable, broader DQ-02 parent remains split/blocked.
+- `CF-W1-L3-INTEL-03`: architecture and QA planning complete; Ready-evaluation capable only after Team 00 sequencing against `CF-W1-L3-INTEL-01` and `CF-W1-L3-INTEL-02`.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06 can pick up `CF-W1-STRAT-02A` after Team 00 promotes Ready and creates a worktree.
+- Team 05 can pick up `CF-W1-DQ-02A` after Team 00 promotes Ready and creates a worktree.
+- Team 07 can pick up `CF-W1-L3-INTEL-03` only after Team 00 resolves one-writer sequencing against `INTEL-01` and `INTEL-02`.
+- Team 03 should refresh `CF-W1-BT-02` after Team 02 narrowed the requirement.
+- Team 02 should be relaunched after this docs checkpoint.
+- Team 10 is idle until the next QA-accepted implementation handoff.

@@ -4,6 +4,70 @@ Date: 2026-05-17
 
 Prepared by Team 03 Architecture Factory and refreshed after `CF-W1-L3-AUTH-02` commit `503bcd9`, `CF-W1-SIG-TRIGGER-01` commit `6ab3999`, and checkpoint protocol fix commit `f75808f`.
 
+## Team 03 INTEL-03 Portfolio Concentration Review Prep - 2026-05-18
+
+Prepared:
+
+- `03-architecture/CF-W1-L3-INTEL-03-architecture-review.md`
+- `06-contracts/CF-W1-L3-INTEL-03-portfolio-intelligence-concentration-review-contract.md`
+- `08-work-packets/CF-W1-L3-INTEL-03-work-packet.md`
+
+Result:
+
+- `CF-W1-L3-INTEL-03` is source-supported as one bounded `portfolio-intelligence` vertical slice.
+- Existing portfolio summary, allocation, review-ranking, and red-flag evidence are sufficient for additive concentration-review DTO fields plus an existing-panel UI section.
+- No Prisma/schema, route-registry, shared UI, optimizer/rebalance, or `portfolio-management` source approval is required for the first slice.
+- Team 04 QA planning can start now.
+- Team 00 must not promote this packet in parallel with `CF-W1-L3-INTEL-01` or `CF-W1-L3-INTEL-02` because the same `portfolio-intelligence` backend writer set is reserved.
+
+## Team 03 BT-02 Backtesting Review Traceability Prep - 2026-05-18
+
+Prepared:
+
+- `03-architecture/CF-W1-BT-02-architecture-review.md`
+- `06-contracts/CF-W1-BT-02-backtesting-outcome-review-traceability-contract.md`
+- `08-work-packets/CF-W1-BT-02-work-packet.md`
+
+Result:
+
+- `CF-W1-BT-02` is source-supported as one bounded `backtesting-strategy-lab` no-schema packet.
+- Existing run `metrics` and `trades` JSON payloads are sufficient for additive review-outcome and trade-traceability fields.
+- No Prisma/schema/generated/shared-route approval is required for the packet.
+- Team 04 QA planning can start now.
+- Team 00 must keep the packet isolated to the reserved `backtesting-strategy-lab` service/types/doc/test and page/types/UI spec writer set.
+
+## Team 03 STRAT-02 Strategy Framework Trust Prep - 2026-05-18
+
+Prepared:
+
+- `03-architecture/CF-W1-STRAT-02-architecture-review.md`
+- `06-contracts/CF-W1-STRAT-02-strategy-framework-rule-versioning-dq-gate-policy-contract.md`
+- `08-work-packets/CF-W1-STRAT-02-work-packet.md`
+
+Result:
+
+- `CF-W1-STRAT-02` is split by architecture evidence.
+- A no-schema first child is source-supported as a bounded `strategy-framework` trust-surfacing slice covering registry/types/service/doc/test plus the module-owned frontend types/page/UI smoke test.
+- The full durable rule-revision requirement remains blocked because persisted `StrategyDefinition` rows are still `code`-unique and repository seeding overwrites by `code`.
+- Team 04 QA planning can start now for the no-schema first child only.
+- Team 00 must not promote any other Strategy Framework source packet in parallel with this child because the same registry/types/service/doc/test/page files are reserved by one writer set.
+
+## Team 03 DQ-02 Currentness Evidence Revalidation - 2026-05-18
+
+Updated:
+
+- `03-architecture/CF-W1-DQ-02-architecture-review.md`
+- `06-contracts/CF-W1-DQ-02-dq-currentness-evidence-contract.md`
+- `08-work-packets/CF-W1-DQ-02-work-packet.md`
+
+Result:
+
+- `CF-W1-DQ-02` is not a single Ready candidate after source re-audit.
+- A bounded first child is feasible entirely inside `data-quality-engine` service/types/doc/tests while consuming existing Market Data public session exports read-only.
+- The full parent remains split-required because persisted `DataQualityEvaluation` rows do not store session-aware currentness evidence, so consistent list/summary/diagnostics exposure would widen into DQE read-side/public-contract work and possibly a later schema path if durable fields are required.
+- Team 04 QA planning can start now for the bounded first child only.
+- Team 00 must not promote Market Data helper edits, DQE repository/read-side edits, or schema work under this child.
+
 ## Team 03 SQLAB-02 Post-Event Learning Prep - 2026-05-18
 
 Prepared:
@@ -57,16 +121,16 @@ Result:
 
 | Priority | Candidate | Architecture status | Implementation status | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | `CF-W1-L3-PORT-01B` | Watchlist-only child architecture packet prepared | Not Ready for Implementation | High user-value watchlist child now has exact watchlist reservations, but it remains blocked until `CF-W1-L3-PORT-01A` is accepted so the readiness DTO shape is stable in accepted source. |
-| 2 | `CF-W1-DQ-02` | Backend-only Lane 1 currentness packet prepared | Not Ready for Implementation | Exact Market Data session helper and DQE service/type/doc/test reservations are defined; QA prep should start here before downstream trust consumers. |
-| 3 | `CF-W1-AUTH-02` | Consumer-isolation packet prepared with Team 09 and Team 08 child reservations | Not Ready for Implementation | Alert event ownership is already accepted in `CF-W1-L3-AUTH-02`; remaining work is digest user propagation. Conflicts with `CF-W1-NOTIF-02`, `CF-W1-UX-02`, and `CF-W1-UX-05`. |
-| 4 | `CF-W1-TP-02` | Future Trade Plan semantics packet prepared | Not Ready for Implementation | Exact Trade Plan service/type/validation/geometry/doc/test reservations are defined, but the packet stays sequenced behind `CF-W1-TP-01B`. |
-| 5 | `CF-W1-L3-INTEL-02` | Portfolio Intelligence review-traceability packet prepared | Not Ready for Implementation | Exact `portfolio-intelligence` reservations are defined. Depends on accepted `CF-W1-L3-PORT-01A`; does not depend on `PORT-01B`; conflicts with `CF-W1-L3-INTEL-01` because the file set is identical. |
-| 6 | `CF-W1-SQLAB-01` | Signal Quality Lab outcome-confidence packet prepared | Not Ready for Implementation | Exact `signal-quality-lab` service/type/doc/test reservations are defined. No schema/route/provider/frontend blocker for the first slice; keep aligned with `CF-W1-CAL-01` if Team 00 promotes both. |
-| 7 | `CF-W1-CAL-01` | Signal Calibration reliability-drift packet prepared | Not Ready for Implementation | Exact `signal-calibration-engine` service/type/doc/test reservations are defined. Calibration owns the slice; SQLAB and DQE are non-blocking public-contract dependencies only. |
-| 8 | `CF-W1-TP-01B` | Backend-only child reservation confirmed in 2026-05-18 matrix | Not Ready for Implementation | Trade Plan compatibility/DQ hard-block contract, Team 04 QA plan, Team 06 inspection, and exact backend file reservations exist; needs Team 00 Ready promotion. |
-| 9 | `CF-W1-NOTIF-02` | Local log provider redaction reservation confirmed in 2026-05-18 matrix | Not Ready for Implementation | Notification requirement, architecture review, contract, work packet, QA plan, Team 09 inspection, and exact provider/test/doc reservations exist; needs Team 00/Team 09 Ready promotion. |
-| 10 | `CF-W1-L3-ALERT-01` | Alert readiness suppression reservation confirmed in 2026-05-18 matrix | Not Ready for Implementation | Alert readiness suppression contract, Team 04 QA plan, and exact backend file reservations exist; needs Team 00 Ready promotion. |
+| 1 | `CF-W1-BT-02` | Backtesting-only review-traceability packet prepared | Ready candidate pending QA handoff | Exact `backtesting-strategy-lab` service/types/doc/test and page/types/UI spec reservations are defined. No schema, route, shared UI, package, or generated blocker exists. |
+| 2 | `CF-W1-L3-PORT-01B` | Watchlist-only child architecture packet prepared | Not Ready for Implementation | High user-value watchlist child now has exact watchlist reservations, but it remains blocked until `CF-W1-L3-PORT-01A` is accepted so the readiness DTO shape is stable in accepted source. |
+| 3 | `CF-W1-DQ-02` | Split-required bounded first child prepared | Not Ready for Implementation | Only a DQE service/types/doc/test child is source-supported. Full persisted/public currentness exposure remains blocked from one-pass promotion because current DQ rows do not store session-aware evidence. |
+| 4 | `CF-W1-AUTH-02` | Consumer-isolation packet prepared with Team 09 and Team 08 child reservations | Not Ready for Implementation | Alert event ownership is already accepted in `CF-W1-L3-AUTH-02`; remaining work is digest user propagation. Conflicts with `CF-W1-NOTIF-02`, `CF-W1-UX-02`, and `CF-W1-UX-05`. |
+| 5 | `CF-W1-TP-02` | Future Trade Plan semantics packet prepared | Not Ready for Implementation | Exact Trade Plan service/type/validation/geometry/doc/test reservations are defined, but the packet stays sequenced behind `CF-W1-TP-01B`. |
+| 6 | `CF-W1-L3-INTEL-02` | Portfolio Intelligence review-traceability packet prepared | Not Ready for Implementation | Exact `portfolio-intelligence` reservations are defined. Depends on accepted `CF-W1-L3-PORT-01A`; does not depend on `PORT-01B`; conflicts with `CF-W1-L3-INTEL-01` because the file set is identical. |
+| 7 | `CF-W1-SQLAB-01` | Signal Quality Lab outcome-confidence packet prepared | Not Ready for Implementation | Exact `signal-quality-lab` service/type/doc/test reservations are defined. No schema/route/provider/frontend blocker for the first slice; keep aligned with `CF-W1-CAL-01` if Team 00 promotes both. |
+| 8 | `CF-W1-CAL-01` | Signal Calibration reliability-drift packet prepared | Not Ready for Implementation | Exact `signal-calibration-engine` service/type/doc/test reservations are defined. Calibration owns the slice; SQLAB and DQE are non-blocking public-contract dependencies only. |
+| 9 | `CF-W1-TP-01B` | Backend-only child reservation confirmed in 2026-05-18 matrix | Not Ready for Implementation | Trade Plan compatibility/DQ hard-block contract, Team 04 QA plan, Team 06 inspection, and exact backend file reservations exist; needs Team 00 Ready promotion. |
+| 10 | `CF-W1-NOTIF-02` | Local log provider redaction reservation confirmed in 2026-05-18 matrix | Not Ready for Implementation | Notification requirement, architecture review, contract, work packet, QA plan, Team 09 inspection, and exact provider/test/doc reservations exist; needs Team 00/Team 09 Ready promotion. |
 
 ## Completed Or No Longer Next
 
@@ -95,6 +159,7 @@ Resolved decision inputs:
 
 ## Docs-Only Architecture Prep Can Continue
 
+- `CF-W1-BT-02`: route to Team 04 for QA planning now. The packet is bounded and no-schema; keep it isolated to the reserved `backtesting-strategy-lab` writer set.
 - `CF-W1-L3-PORT-01B`: keep watchlist child blocked behind accepted `CF-W1-L3-PORT-01A`, but exact watchlist reservations are now prepared.
 - `CF-W1-DQ-02`: route currentness-evidence packet to Team 04 QA prep first under the root upstream-dependency rule.
 - `CF-W1-AUTH-02`: keep digest-consumer user isolation split into Team 09 and Team 08 child reservations; do not reopen alert repository ownership.
@@ -120,9 +185,9 @@ Resolved decision inputs:
 
 ## Recommendation
 
-No additional implementation item is architecture-ready now. Keep other items out of `12-ready-queue/ready-for-implementation.md` until a candidate has an accepted requirement, accepted architecture contract, accepted QA plan, exact file reservations, and no open Product Owner, Architect, shared-file, schema, route, package, provider, or upstream blocker.
+`CF-W1-BT-02` is the clearest new Ready candidate from this pass, but it still needs the Team 04 QA handoff before Team 00 promotion. Keep every other item out of `12-ready-queue/ready-for-implementation.md` until a candidate has an accepted requirement, accepted architecture contract, accepted QA plan, exact file reservations, and no open Product Owner, Architect, shared-file, schema, route, package, provider, or upstream blocker.
 
-Next Team 03 recommendation: route `CF-W1-DQ-02` to Team 04 QA prep first because it is the highest-leverage new upstream packet. Keep `CF-W1-L3-PORT-01B` blocked behind accepted `CF-W1-L3-PORT-01A`. After `CF-W1-MD-02` ADR acceptance, prepare `CF-W1-MD-02A` as a schema/migration proposal packet only if Team 00 and Architect explicitly authorize that approval-gated path.
+Next Team 03 recommendation: route `CF-W1-BT-02` to Team 04 QA prep now because the backtesting packet is fully bounded and does not carry schema or route risk. Keep `CF-W1-DQ-02` as the strongest upstream follow-on QA-prep candidate. Keep `CF-W1-L3-PORT-01B` blocked behind accepted `CF-W1-L3-PORT-01A`. After `CF-W1-MD-02` ADR acceptance, prepare `CF-W1-MD-02A` as a schema/migration proposal packet only if Team 00 and Architect explicitly authorize that approval-gated path.
 
 ## Team 03 Discovery Refresh - 2026-05-18
 

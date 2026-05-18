@@ -6,23 +6,27 @@ Owner: Team 03 Architecture Factory
 
 ## Status
 
-Backend-only currentness-evidence architecture packet prepared. Not Ready for Implementation.
+Split required. A bounded module-local first child is feasible. The full parent is not Ready for Implementation.
 
-This packet is intentionally narrower than `CF-W1-MD-02`. It must use existing Market Data session logic and current stored latest-price evidence without opening durable-storage, Prisma, route, or provider scope.
+`CF-W1-DQ-02` cannot honestly be treated as one clean backend packet in the current codebase. The smallest safe first slice stays inside Data Quality Engine service/types/doc/tests and consumes existing Market Data public session exports without editing Market Data source. Broader persisted or API-wide currentness exposure is a separate follow-on because current `DataQualityEvaluation` rows do not store the needed session-aware fields.
 
 ## Evidence Inspected
 
 - `AGENTS.md`
-- `00-control/risk-register.md`
-- `10-requirements/CF-W1-DQ-02-dq-currentness-evidence-requirement.md`
-- `03-architecture/CF-W1-MD-02-architecture-review.md`
-- `06-contracts/CF-W1-MD-02-durable-readiness-evidence-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/16-team-inboxes/TEAM-03-current-assignment.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-DQ-02-dq-currentness-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-market-data-data-quality.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/99-decision-inbox/open-decisions.md`
+- `backend/prisma/schema.prisma`
+- `backend/src/modules/data-quality-engine/index.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.repository.ts`
 - `backend/src/modules/data-quality-engine/data-quality-engine.service.ts`
 - `backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
 - `backend/src/modules/data-quality-engine/data-quality-engine.md`
+- `backend/src/modules/market-data-foundation/index.ts`
 - `backend/src/modules/market-data-foundation/market-data-foundation.market-session.ts`
 - `backend/src/modules/market-data-foundation/market-data-foundation.types.ts`
-- `backend/src/modules/market-data-foundation/index.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`
 - `backend/src/modules/market-data-foundation/market-data-foundation.md`
 - `backend/tests/modules/data-quality-engine/data-quality-engine.service.test.ts`
 - `backend/tests/modules/data-quality-engine/data-quality-engine.invariants.test.ts`
@@ -30,100 +34,115 @@ This packet is intentionally narrower than `CF-W1-MD-02`. It must use existing M
 
 ## Current Source Findings
 
-- Data Quality still uses `STALE_PRICE_DAYS = 7` and treats stale/currentness as a simple calendar-age check.
-- Market Data Foundation already owns session timing and latest completed trading-date logic in `market-data-foundation.market-session.ts`.
-- `latestCompletedTradingDateForRegion(region, now)` already expresses the correct completed-session boundary for `IN`, `US`, and `EU`.
-- Data Quality evaluation DTOs do not currently expose stable currentness evidence fields or reason codes.
-- Existing DQ filter and tier logic can already fail closed when stale/missing evidence is represented in blockers and tier statuses.
+- `data-quality-engine.service.ts` still derives stale/currentness from `STALE_PRICE_DAYS = 7` and `Date.now() - latestDate`.
+- `market-data-foundation.market-session.ts` already exports `latestCompletedTradingDateForRegion()` and `shouldRunMarketDataSync()` through `market-data-foundation/index.ts`; the first child does not need new Market Data helpers.
+- Market Data instrument payloads already project session-related evidence such as `latest_completed_eod_date`, `stored_data_through_date`, `readiness_blockers`, and `trusted_baseline_blocker_codes`.
+- `DataQualityEvaluation` persistence currently stores scores plus `dataGaps`, `warnings`, `readinessReasons`, and `readinessBlockers`, but it does not store `latestObservedTradingDate`, `latestCompletedTradingDate`, currentness status, or reason code.
+- `data-quality-engine.repository.ts` reconstructs DTOs from persisted rows and summary counts using string matching like `latest price is stale`; it cannot emit session-aware currentness evidence without a wider DQE read-side change.
 
 ## Architecture Decision
 
-Prepare `CF-W1-DQ-02` as a backend-only Lane 1 packet that:
+Do not promote the previously drafted all-in-one packet. Replace it with a two-part architecture result:
 
-- reuses Market Data Foundation public session evidence;
-- adds explicit DQ currentness evidence fields and stable reason codes;
-- maps non-current, missing, or blocked session evidence into DQ blockers and use-case tiers so strict callers can fail closed without duplicating logic;
-- avoids durable-storage claims and avoids route/API expansion beyond additive DTO fields.
+1. First child feasible:
+   `CF-W1-DQ-02` first child can add service-local currentness classification and fail-closed propagation inside Data Quality Engine only.
+2. Parent still split:
+   full persisted/public exposure of currentness evidence remains blocked until Team 00 explicitly approves a wider DQE read-side/public-contract packet.
 
-## Currentness Evidence Model
+## Recommended First Child
 
-The first implementation packet should add additive DQ evidence fields equivalent to:
+Recommended first child scope:
+
+- consume existing Market Data public session helpers from `backend/src/modules/market-data-foundation/index.ts`;
+- classify currentness inside `data-quality-engine.service.ts`;
+- add additive currentness evidence fields to the in-memory DQ evaluation DTO;
+- convert non-current outcomes into stable blocker/reason-code strings so strict callers keep failing closed without duplicating session logic;
+- keep the slice backward-compatible by not requiring schema, route, repository, Market Data source, or frontend work.
+
+The first child should support semantics equivalent to:
 
 ```ts
 type DataQualityCurrentnessStatus = 'CURRENT' | 'STALE' | 'MISSING' | 'BLOCKED';
 
-interface DataQualityCurrentnessEvidenceDto {
-  status: DataQualityCurrentnessStatus;
-  reasonCode:
-    | 'CURRENT_COMPLETED_SESSION'
-    | 'CURRENT_FINALIZATION_PENDING'
-    | 'STALE_COMPLETED_SESSION_MISSED'
-    | 'MISSING_LATEST_PRICE'
-    | 'SESSION_EVIDENCE_UNAVAILABLE'
-    | 'PROVIDER_GAP_BLOCKED';
-  latestObservedTradingDate: string | null;
-  latestCompletedTradingDate: string | null;
-  daysBehind: number | null;
-  reason: string;
-}
+type DataQualityCurrentnessReasonCode =
+  | 'CURRENT_COMPLETED_SESSION'
+  | 'CURRENT_FINALIZATION_PENDING'
+  | 'STALE_COMPLETED_SESSION_MISSED'
+  | 'MISSING_LATEST_PRICE'
+  | 'SESSION_EVIDENCE_UNAVAILABLE'
+  | 'PROVIDER_GAP_BLOCKED';
 ```
 
-Meaning:
+Required first-child behavior:
 
-- `CURRENT_COMPLETED_SESSION`: latest stored price matches the latest completed trading session.
-- `CURRENT_FINALIZATION_PENDING`: market session is still open or in grace, and the latest stored price matches the last completed session rather than the in-progress day.
-- `STALE_COMPLETED_SESSION_MISSED`: the stored latest trading date lags the latest completed trading session.
-- `MISSING_LATEST_PRICE`: no latest stored price exists.
-- `SESSION_EVIDENCE_UNAVAILABLE`: Market Data session logic cannot produce a completed-session boundary for the scoped region.
-- `PROVIDER_GAP_BLOCKED`: Market Data public evidence already shows a provider-gap or missing-final-candle blocker.
+- `CURRENT_COMPLETED_SESSION`: latest observed trading date matches the latest completed session.
+- `CURRENT_FINALIZATION_PENDING`: market is open or in grace, and the latest observed date still matches the latest completed session rather than the in-progress day.
+- `STALE_COMPLETED_SESSION_MISSED`: latest observed date lags the latest completed session.
+- `MISSING_LATEST_PRICE`: no latest price exists.
+- `SESSION_EVIDENCE_UNAVAILABLE`: region/session timing cannot be derived from existing Market Data public helpers.
+- `PROVIDER_GAP_BLOCKED`: Market Data evidence already shows a provider-gap or missing-final-candle blocker.
 
 ## Exact Future File Reservations
 
-- `backend/src/modules/market-data-foundation/index.ts`
-- `backend/src/modules/market-data-foundation/market-data-foundation.market-session.ts`
-- `backend/src/modules/market-data-foundation/market-data-foundation.types.ts`
-- `backend/src/modules/market-data-foundation/market-data-foundation.md`
+Allowed first-child writer set:
+
 - `backend/src/modules/data-quality-engine/data-quality-engine.service.ts`
 - `backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
 - `backend/src/modules/data-quality-engine/data-quality-engine.md`
-- `backend/tests/modules/market-data-foundation/market-data.market-session.test.ts`
 - `backend/tests/modules/data-quality-engine/data-quality-engine.service.test.ts`
 - `backend/tests/modules/data-quality-engine/data-quality-engine.invariants.test.ts`
 
-## Forbidden Files
+Forbidden first-child files:
 
+- `backend/src/modules/market-data-foundation/**`
+- `backend/src/modules/data-quality-engine/index.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.repository.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.controller.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.router.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.validation.ts`
 - `backend/prisma/schema.prisma`
 - `backend/prisma/migrations/**`
-- Market Data repository, provider, scheduler, startup, repair, worker, queue, or Angel One files
-- Data Quality repository, controller, router, or validation files
 - backend and frontend route registries
 - shared backend utilities
 - shared frontend components
 - package manifests
 - generated files
-- frontend source/tests
-- provider/live-market validation, paid/cloud, broker, or telemetry flows
+- all frontend source/tests
 
-## Dependency And Conflict Notes
+If implementation discovers that the first child needs any Market Data helper edit, DQE repository edit, route change, generated-file change, or schema change, stop and return to Team 00. That is outside the bounded first-child packet.
 
-- This packet does not depend on `CF-W1-MD-02` schema/storage implementation and must not claim durable evidence.
-- This packet depends on existing Market Data session helpers remaining the single source of currentness timing truth.
-- It conflicts with any active Lane 1 work that reserves `data-quality-engine.service.ts`, `data-quality-engine.types.ts`, or `market-data-foundation.market-session.ts`, including future `CF-W1-MD-01` or `CF-W1-MD-02` implementation packets.
-- Downstream alerts, portfolio, watchlist, trade-plan, and Copilot packets should consume the resulting DQ evidence after this packet exists rather than recreating session logic.
+## Explicit Parent Blocker
 
-## Required QA Scenarios
+The full parent requirement is blocked from Ready promotion as a single packet because session-aware currentness evidence is not durably represented in persisted `DataQualityEvaluation` rows.
 
-Focused backend QA should prove:
+To expose currentness evidence consistently from list/summary/diagnostics paths, a later packet would need some combination of:
 
-- latest stored data that matches the latest completed session is marked current;
-- pre-close or grace-window evidence is not falsely marked stale;
-- missing latest price yields `MISSING_LATEST_PRICE`;
-- lagging latest price yields `STALE_COMPLETED_SESSION_MISSED`;
-- unsupported or session-unavailable scope yields `SESSION_EVIDENCE_UNAVAILABLE`;
-- provider-gap or missing-final-candle blockers can flow into a blocked currentness result without claiming freshness.
+- `backend/src/modules/data-quality-engine/data-quality-engine.repository.ts`
+- possibly `backend/src/modules/data-quality-engine/index.ts`
+- focused repository and route tests
+- and, if durable date/reason fields are required instead of derived read-time reconstruction, a separate Prisma/schema approval path
+
+That is a broader DQE public-contract/read-side change than the first child and must not be folded into the bounded slice silently.
+
+## QA Planning Handoff For Team 04
+
+Team 04 should plan QA for the first child only:
+
+- current after latest completed session;
+- current during open/grace window without false stale classification;
+- stale when latest observed date lags the latest completed session;
+- missing latest price;
+- session-evidence unavailable for unsupported scope;
+- provider-gap blocked via existing Market Data blocker evidence;
+- `readinessBlockers`, `dataGaps`, and use-case tiers stay fail-closed for stale/missing/blocked outcomes;
+- default `filterEligibleInstruments()` behavior still excludes non-current instruments through the existing strict path.
+
+Team 04 should not claim repository/list/summary/diagnostics persistence coverage for this first child.
 
 ## Readiness Result
 
-Architecture packet prepared. Not Ready for Implementation.
+Split required.
 
-The file reservations are exact, but Team 04 QA planning and Team 00 sequencing are still required. Under the root dependency rule, this is the strongest new upstream candidate for QA prep before downstream trust consumers.
+- Module-local first slice feasible: yes.
+- Ready recommendation for the parent as written: no.
+- Current recommendation to Team 00: route the bounded first child to Team 04 QA planning, keep the broader parent blocked until DQE read-side/public-contract scope is intentionally approved.

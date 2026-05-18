@@ -94,3 +94,114 @@ This is docs-only architecture prep. Do not implement application code and do no
 - Explicit blocker if stable rule revisioning cannot be represented without Prisma/schema/generated/shared-contract changes.
 - QA planning handoff notes for Team 04.
 - A clear Ready recommendation: `Ready candidate`, `split required`, or `blocked`.
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Prepare architecture readiness for `CF-W1-BT-02` - Backtesting outcome review traceability.
+
+This is docs-only architecture prep. Do not implement application code. If the bounded slice requires Prisma/schema/generated/shared contract changes, document the blocker or split a future approval-gated child instead of marking it Ready.
+
+## Source Input
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-BT-02-backtesting-outcome-review-traceability-requirement.md`
+- Relevant audit: `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-backtesting-trade-risk.md`
+- Relevant module docs/source to inspect read-only:
+  - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+  - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.ts`
+  - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.types.ts`
+  - `frontend/src/features/backtesting-strategy-lab/components/BacktestingStrategyLabPage.tsx`
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-BT-02-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-BT-02-backtesting-outcome-review-traceability-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-BT-02-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+## Required Output
+
+- Exact file-reservation recommendation for the smallest no-schema/no-shared first child if feasible.
+- Explicit blocker if traceability needs Prisma/schema/generated/shared-route approval.
+- QA planning handoff notes for Team 04.
+- Ready recommendation: `Ready candidate`, `split required`, or `blocked`.
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Prepare architecture readiness for `CF-W1-L3-INTEL-03` - Portfolio Intelligence concentration review.
+
+This is docs-only architecture prep. Do not implement application code. The first slice should stay bounded to deterministic concentration review over existing Portfolio Intelligence allocation/review data. If implementation needs optimizer/rebalance behavior, Prisma/schema, route registry, shared UI, portfolio-management source changes, or broad frontend navigation changes, document that blocker or split a future approval-gated child instead of marking it Ready.
+
+## Source Input
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-INTEL-03-portfolio-intelligence-concentration-review-requirement.md`
+- Relevant audit/context:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-portfolio-watchlist-alerts.md`
+  - `backend/src/modules/portfolio-intelligence/portfolio-intelligence.md`
+  - `backend/src/modules/portfolio-intelligence/portfolio-intelligence.service.ts`
+  - `backend/src/modules/portfolio-intelligence/portfolio-intelligence.types.ts`
+  - `frontend/src/features/portfolio-intelligence/**` read-only as needed
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-L3-INTEL-03-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-L3-INTEL-03-portfolio-intelligence-concentration-review-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-L3-INTEL-03-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+## Required Output
+
+- Exact file-reservation recommendation for the smallest module-local first child if feasible.
+- Explicit blocker if concentration review requires schema, route, shared UI, optimizer/rebalance logic, portfolio-management source, or broad frontend changes.
+- QA planning handoff notes for Team 04.
+- Ready recommendation: `Ready candidate`, `split required`, or `blocked`.
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Prepare architecture readiness for `CF-W1-DQ-02` - Data Quality currentness evidence and market-session-aware fail-closed behavior.
+
+This is docs-only architecture prep. Do not implement application code. If the bounded slice requires shared Market Data helper changes, Prisma/schema/generated changes, route-registry changes, or DQE public contract changes, document that blocker or split a future approval-gated child instead of marking it Ready.
+
+## Source Input
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-DQ-02-dq-currentness-evidence-requirement.md`
+- Existing audit/context:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-market-data-data-quality.md`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.md`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.service.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
+  - `backend/src/modules/market-data-foundation/**` read-only as needed
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-DQ-02-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-DQ-02-dq-currentness-evidence-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-DQ-02-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+## Required Output
+
+- Exact file-reservation recommendation for the smallest module-local first child if feasible.
+- Explicit blocker if market-session-aware currentness requires shared Market Data source/helpers, schema, route, generated, or broad DQE public-contract changes.
+- QA planning handoff notes for Team 04.
+- Ready recommendation: `Ready candidate`, `split required`, or `blocked`.

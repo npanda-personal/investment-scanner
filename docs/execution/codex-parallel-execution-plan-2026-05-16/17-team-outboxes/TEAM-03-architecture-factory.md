@@ -2,6 +2,228 @@
 
 Date: 2026-05-17
 
+## Team 03 INTEL-03 Portfolio Concentration Review Prep - 2026-05-18
+
+Assignment: prepare architecture readiness for `CF-W1-L3-INTEL-03` portfolio-intelligence concentration review in the main worktree without touching application code, tests, Prisma/schema, route registries, package manifests, generated files, shared utilities, shared UI, historical docs, or the decision inbox.
+
+Prepared:
+
+- `03-architecture/CF-W1-L3-INTEL-03-architecture-review.md`
+- `06-contracts/CF-W1-L3-INTEL-03-portfolio-intelligence-concentration-review-contract.md`
+- `08-work-packets/CF-W1-L3-INTEL-03-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Files inspected:
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/16-team-inboxes/TEAM-03-current-assignment.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-INTEL-03-portfolio-intelligence-concentration-review-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-portfolio-watchlist-alerts.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/99-decision-inbox/open-decisions.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-L3-INTEL-01-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-L3-INTEL-02-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-L3-INTEL-01-portfolio-intelligence-reliability-gate-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-L3-INTEL-02-portfolio-intelligence-review-traceability-contract.md`
+- `backend/src/modules/portfolio-intelligence/portfolio-intelligence.md`
+- `backend/src/modules/portfolio-intelligence/portfolio-intelligence.service.ts`
+- `backend/src/modules/portfolio-intelligence/portfolio-intelligence.types.ts`
+- `backend/src/modules/portfolio-intelligence/portfolio-intelligence.validation.ts`
+- `backend/src/modules/portfolio-management/portfolio-management.md`
+- `backend/src/modules/portfolio-management/portfolio-management.types.ts`
+- `backend/tests/modules/portfolio-intelligence/portfolio-intelligence.service.test.ts`
+- `backend/tests/modules/portfolio-intelligence/portfolio-intelligence.routes.test.ts`
+- `frontend/src/features/portfolio-intelligence/types.ts`
+- `frontend/src/features/portfolio-intelligence/api/portfolioIntelligenceService.ts`
+- `frontend/src/features/portfolio-intelligence/hooks/usePortfolioIntelligence.ts`
+- `frontend/src/features/portfolio-intelligence/components/PortfolioIntelligencePanel.tsx`
+
+Readiness result:
+
+- `CF-W1-L3-INTEL-03` is a `Ready candidate` as a bounded `portfolio-intelligence` vertical slice.
+- The first slice can stay inside `portfolio-intelligence` backend service/types/doc/test plus the module-owned frontend types/panel/UI smoke surface.
+- Existing portfolio summary, allocation, review-ranking, and red-flag evidence are sufficient for additive concentration-review DTO fields and existing-panel rendering.
+- No Prisma/schema, route-registry, shared UI, optimizer/rebalance, `portfolio-management` source, or broad frontend navigation blocker was found.
+- Team 04 QA planning can start now.
+- Team 00 must not promote this packet in parallel with `CF-W1-L3-INTEL-01` or `CF-W1-L3-INTEL-02` because the same `portfolio-intelligence` backend writer set is reserved.
+
+Current Team 03 recommendation to Team 00:
+
+1. Route `CF-W1-L3-INTEL-03` to Team 04 QA planning now.
+2. Treat it as a bounded module-local Ready candidate after QA handoff, not as a schema or route item.
+3. Combine or sequence it explicitly with `CF-W1-L3-INTEL-01` and `CF-W1-L3-INTEL-02`; do not allow multiple writers on `portfolio-intelligence.service.ts`, `portfolio-intelligence.types.ts`, `portfolio-intelligence.md`, or the focused service test.
+
+No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
+
+## Team 03 DQ-02 Currentness Evidence Revalidation - 2026-05-18
+
+Assignment: re-audit `CF-W1-DQ-02` architecture readiness for Data Quality currentness evidence and market-session-aware fail-closed behavior without touching application code, tests, Prisma/schema, routes, package manifests, generated files, shared utilities, shared UI, historical docs, or the decision inbox.
+
+Updated:
+
+- `03-architecture/CF-W1-DQ-02-architecture-review.md`
+- `06-contracts/CF-W1-DQ-02-dq-currentness-evidence-contract.md`
+- `08-work-packets/CF-W1-DQ-02-work-packet.md`
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Files inspected:
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/16-team-inboxes/TEAM-03-current-assignment.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-DQ-02-dq-currentness-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-market-data-data-quality.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/99-decision-inbox/open-decisions.md`
+- `backend/prisma/schema.prisma`
+- `backend/src/modules/data-quality-engine/index.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.repository.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.service.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.md`
+- `backend/src/modules/market-data-foundation/index.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.market-session.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.types.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.md`
+- `backend/tests/modules/data-quality-engine/data-quality-engine.service.test.ts`
+- `backend/tests/modules/data-quality-engine/data-quality-engine.invariants.test.ts`
+- `backend/tests/modules/market-data-foundation/market-data.market-session.test.ts`
+
+Readiness result:
+
+- `CF-W1-DQ-02` is split required after source re-audit.
+- A bounded module-local first child is feasible with exact writer scope limited to:
+  - `backend/src/modules/data-quality-engine/data-quality-engine.service.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.md`
+  - `backend/tests/modules/data-quality-engine/data-quality-engine.service.test.ts`
+  - `backend/tests/modules/data-quality-engine/data-quality-engine.invariants.test.ts`
+- The first child must consume existing Market Data public session exports read-only. No `market-data-foundation` source file is approved in the first child.
+- The parent requirement is not Ready as one packet because persisted `DataQualityEvaluation` rows do not store session-aware currentness evidence. Consistent list/summary/diagnostics exposure would widen into DQE repository/read-side and public-contract scope, and a later schema path may be needed if durable fields are required.
+- Team 04 QA planning can start now for the bounded first child only.
+
+Current Team 03 recommendation to Team 00:
+
+1. Treat `CF-W1-DQ-02` as `split required`, not `Ready candidate`.
+2. Route Team 04 to the bounded DQE-only first child now.
+3. Keep Market Data helper edits, DQE repository/read-side edits, route work, generated-file work, and schema work explicitly blocked out of the first child.
+
+No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
+
+## Team 03 BT-02 Backtesting Review Traceability Prep - 2026-05-18
+
+Assignment: prepare architecture readiness for `CF-W1-BT-02` backtesting outcome review traceability in the main worktree without touching application code, tests, package manifests, generated files, Prisma/schema, route registries, shared utilities, shared UI, or historical docs.
+
+Prepared:
+
+- `03-architecture/CF-W1-BT-02-architecture-review.md`
+- `06-contracts/CF-W1-BT-02-backtesting-outcome-review-traceability-contract.md`
+- `08-work-packets/CF-W1-BT-02-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Files inspected:
+
+- `AGENTS.md`
+- `16-team-inboxes/TEAM-03-current-assignment.md`
+- `10-requirements/CF-W1-BT-02-backtesting-outcome-review-traceability-requirement.md`
+- `11-module-audits/audit-backtesting-trade-risk.md`
+- `99-decision-inbox/open-decisions.md`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.types.ts`
+- `backend/src/modules/strategy-framework/strategy-framework.types.ts`
+- `backend/src/modules/strategy-framework/strategy-framework.registry.ts`
+- `backend/src/modules/strategy-framework/strategy-framework.evaluator.ts`
+- `backend/tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.test.ts`
+- `frontend/src/features/backtesting-strategy-lab/api/backtestingStrategyLabService.ts`
+- `frontend/src/features/backtesting-strategy-lab/hooks/useBacktestingStrategyLab.ts`
+- `frontend/src/features/backtesting-strategy-lab/types.ts`
+- `frontend/src/features/backtesting-strategy-lab/components/BacktestingStrategyLabPage.tsx`
+- `frontend/tests/ui/backtesting-strategy-lab.spec.ts`
+
+Readiness result:
+
+- `CF-W1-BT-02` is source-supported as one bounded `backtesting-strategy-lab` packet.
+- Existing run `metrics` and `trades` JSON payloads are sufficient for additive review-outcome and trade-traceability fields.
+- No Prisma/schema/generated/shared-route approval is required.
+- Exact future write scope is limited to `backtesting-strategy-lab.service.ts`, `backtesting-strategy-lab.types.ts`, `backtesting-strategy-lab.md`, the focused backend service test, the feature `types.ts`, `BacktestingStrategyLabPage.tsx`, and `frontend/tests/ui/backtesting-strategy-lab.spec.ts`.
+- Repository/controller/router/validation files, Strategy Framework source, Trade Plan source, API/hook/route files, shared UI/utilities, package manifests, and generated/schema files remain forbidden.
+- Team 04 QA planning can start now.
+
+Current Team 03 recommendation to Team 00:
+
+1. Route `CF-W1-BT-02` to Team 04 QA planning immediately.
+2. Treat the packet as one no-schema Ready candidate after QA handoff acceptance.
+3. Do not promote another `backtesting-strategy-lab` source packet in parallel with this one; the reserved service/types/doc/test and page/types/UI spec are one writer set.
+
+No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
+
+## Team 03 STRAT-02 Strategy Framework Trust Prep - 2026-05-18
+
+Assignment: prepare architecture readiness for `CF-W1-STRAT-02` Strategy Framework rule versioning and Data Quality gate policy in the main worktree without touching application code, tests, package manifests, generated files, Prisma/schema, route registries, shared utilities, shared UI, or historical docs.
+
+Prepared:
+
+- `03-architecture/CF-W1-STRAT-02-architecture-review.md`
+- `06-contracts/CF-W1-STRAT-02-strategy-framework-rule-versioning-dq-gate-policy-contract.md`
+- `08-work-packets/CF-W1-STRAT-02-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Files inspected:
+
+- `AGENTS.md`
+- `16-team-inboxes/TEAM-03-current-assignment.md`
+- `10-requirements/CF-W1-STRAT-02-strategy-framework-rule-versioning-dq-gate-policy-requirement.md`
+- `99-decision-inbox/open-decisions.md`
+- `11-module-audits/audit-strategy-signal-rules.md`
+- `12-ready-queue/blocked-by-shared-file.md`
+- `backend/prisma/schema.prisma`
+- `backend/src/modules/strategy-framework/strategy-framework.md`
+- `backend/src/modules/strategy-framework/strategy-framework.registry.ts`
+- `backend/src/modules/strategy-framework/strategy-framework.types.ts`
+- `backend/src/modules/strategy-framework/strategy-framework.service.ts`
+- `backend/src/modules/strategy-framework/strategy-framework.repository.ts`
+- `backend/src/modules/strategy-framework/strategy-framework.evaluator.ts`
+- `backend/src/modules/strategy-framework/strategy-framework.controller.ts`
+- `backend/src/modules/strategy-framework/strategy-framework.router.ts`
+- `backend/src/modules/strategy-framework/index.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.service.ts`
+- `backend/tests/modules/strategy-framework/strategy-framework.service.test.ts`
+- `backend/tests/modules/strategy-framework/strategy-framework.evaluator.test.ts`
+- `backend/tests/modules/strategy-framework/strategy-framework.repository.test.ts`
+- `frontend/src/features/strategy-framework/types.ts`
+- `frontend/src/features/strategy-framework/api/strategyFrameworkApi.ts`
+- `frontend/src/features/strategy-framework/components/StrategyFrameworkPage.tsx`
+- `frontend/tests/ui/strategy-framework.spec.ts`
+
+Readiness result:
+
+- `CF-W1-STRAT-02` is not Ready as a single durable implementation packet.
+- A bounded no-schema first child is feasible: add source-declared rule revisions and explicit DQ gate policy metadata inside Strategy Framework registry/types/service/doc/test plus the module-owned frontend types/page/UI smoke test.
+- Durable stable rule revisioning remains blocked because Prisma `StrategyDefinition` is `code`-unique and repository seeding/upsert currently overwrites by `code`.
+- Team 04 QA planning can start now for the no-schema child only.
+- No controller/router/repository/evaluator/DQE/source/shared/package/generated/schema scope is authorized in the first child.
+
+Current Team 03 recommendation to Team 00:
+
+1. Route Team 04 to the no-schema child only.
+2. Keep the parent requirement out of Ready until it is explicitly split into trust surfacing versus durable persistence.
+3. Do not promote another Strategy Framework source packet in parallel with this child; the registry/types/service/doc/test/page files are one writer set.
+
+No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
+
 ## Team 03 SQLAB-02 Signal Outcome Journal Prep - 2026-05-18
 
 Assignment: prepare architecture readiness for `CF-W1-SQLAB-02` signal outcome journal and post-event learning in the main worktree without touching application code, tests, package manifests, generated files, root `AGENTS.md`, `docs/AGENTS.md`, or historical `docs/codex-agent-team-plan/**`.

@@ -4,7 +4,7 @@ Date: 2026-05-18
 
 ## Status
 
-Audit-derived future child requirement. Not Ready for Implementation.
+Audit-derived parent requirement. First child `CF-W1-SQLAB-02A` is the active no-schema preview slice and is in Team 04 QA planning. Not Ready for Implementation.
 
 ## Product Value
 
@@ -17,6 +17,8 @@ Signal Quality Lab can calculate forward outcomes, but the product still has no 
 - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md` depends on historical signal outcomes and context snapshots, which makes a durable outcome journal valuable for validation and future learning.
 - `backend/src/modules/today-trade-review/today-trade-review.md` persists daily shortlist snapshots, but it does not provide a reusable post-event learning journal for signal outcomes.
 - `frontend/src/features/signal-quality-lab/components/SignalQualityLabPage.tsx` already presents instrument history and forward outcomes, so a bounded journal surface can build on an existing review workflow rather than inventing a new research area.
+- `03-architecture/CF-W1-SQLAB-02-architecture-review.md` splits the work into no-schema `CF-W1-SQLAB-02A` preview planning and a later storage slice.
+- Team 00 coordination notes say `CF-W1-SQLAB-02A` is active in Team 04 QA planning and must stay sequenced after `CF-W1-SQLAB-01`.
 
 ## Bounded Requirement
 
@@ -62,4 +64,4 @@ This requirement sits behind `CF-W1-L3-TREV-01` and ahead of `CF-W1-BT-02` becau
 
 ## Next Gate
 
-Product refinement and an architecture contract for a bounded signal-outcome journal / post-event learning slice, then QA planning and Team 00 Ready evaluation after exact file reservations exist.
+Product refinement and an architecture contract for the later durable-storage child, after the active no-schema preview child finishes QA planning and the exact file reservations remain valid.

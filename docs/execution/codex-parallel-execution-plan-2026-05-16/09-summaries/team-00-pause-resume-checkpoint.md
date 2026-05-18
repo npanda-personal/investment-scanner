@@ -353,3 +353,244 @@ Recently closed:
 - Team 02 is ready to relaunch as persistent PO/Requirements discovery.
 - Team 04 can later plan `CF-W1-SQLAB-02A`, but do not run it in parallel with Team 04 SQLAB-01 QA unless output files are isolated.
 - Team 10 is idle until the next QA-accepted handoff.
+
+---
+
+# Active Spawned Pool Checkpoint
+
+Date: 2026-05-18
+
+| Team | Agent | State | Resume Action |
+| --- | --- | --- | --- |
+| Team 04 - QA Factory | `019e3ada-65b8-7a63-84dc-f4a30f7c0663` | active QA verification | Wait for `CF-W1-SQLAB-01` QA result. If accepted, spawn Team 10 review; if rejected, return only SQLAB-01 to Team 06. |
+| Team 03 - Architecture Factory | `019e3ada-65ee-7f92-9ac7-a710a799de91` | active architecture prep | Consume `CF-W1-STRAT-02` architecture result and route Team 04 QA planning if feasible. |
+| Team 02 - PO + Requirement Factory | `019e3ada-6641-7f11-b956-14c4956787a8` | active discovery cycle | Consume new/refined requirement output, close, then relaunch Team 02 to keep the lane alive. |
+
+## Current Ready Teams
+
+- Team 10 is ready for `CF-W1-SQLAB-01` review after Team 04 accepts QA.
+- Team 04 is ready for `CF-W1-SQLAB-02A` QA planning after the active SQLAB-01 QA slot clears.
+- Team 03 can take the next architecture packet after `CF-W1-STRAT-02` completes.
+- Team 02 should be relaunched after each bounded discovery cycle.
+
+---
+
+# Active Spawned Pool Checkpoint
+
+Date: 2026-05-18
+
+| Team | Agent | State | Resume Action |
+| --- | --- | --- | --- |
+| Team 10 - Review / Release | `019e3ade-cfeb-7840-9f8a-3e52cebe3a62` | active review | Wait for `CF-W1-SQLAB-01` review. If accepted, spawn Team 03 Architect Signoff; if rejected, route only SQLAB-01 to Team 06. |
+| Team 04 - QA Factory | `019e3ade-d01d-7310-aded-7cc32e76db6c` | active QA planning | Consume `CF-W1-SQLAB-02A` QA plan. Do not promote implementation until SQLAB-01 clears shared files. |
+| Team 03 - Architecture Factory | `019e3ada-65ee-7f92-9ac7-a710a799de91` | active architecture prep | Consume `CF-W1-STRAT-02` architecture result and route next QA or blocker. |
+| Team 02 - PO + Requirement Factory | `019e3ada-6641-7f11-b956-14c4956787a8` | active discovery cycle | Consume new/refined requirement output, close, then relaunch Team 02 to keep the lane alive. |
+
+## Current Ready Teams
+
+- Team 03 Architect Signoff is ready for `CF-W1-SQLAB-01` after Team 10 accepts.
+- Team 10 is active on `CF-W1-SQLAB-01`.
+- Team 04 is active on `CF-W1-SQLAB-02A` QA planning.
+- Team 02 is active and should be relaunched after completion.
+
+---
+
+# Active Spawned Pool Checkpoint
+
+Date: 2026-05-18
+
+| Team | Agent | State | Resume Action |
+| --- | --- | --- | --- |
+| Team 10 - Review / Release | `019e3ade-cfeb-7840-9f8a-3e52cebe3a62` | active review | Wait for `CF-W1-SQLAB-01` review. If accepted, spawn Team 03 Architect Signoff; if rejected, route only SQLAB-01 to Team 06. |
+| Team 04 - QA Factory | `019e3ade-d01d-7310-aded-7cc32e76db6c` | active QA planning | Consume `CF-W1-SQLAB-02A` QA plan. Then route `CF-W1-STRAT-02A` QA planning if no conflict remains. |
+| Team 02 - PO + Requirement Factory | `019e3ae1-4895-7552-8e22-9a88cf1c02e9` | active discovery cycle | Consume new/refined requirement output, close, then relaunch Team 02 to keep the lane alive. |
+
+Recently closed:
+
+- Team 03 `019e3ada-65ee-7f92-9ac7-a710a799de91`: completed `CF-W1-STRAT-02` architecture prep. Result is split-required; no-schema child can go to QA, durable revision history is blocked pending schema/repository/generated approval.
+- Team 02 `019e3ada-6641-7f11-b956-14c4956787a8`: refined `CF-W1-L3-WATCH-01` and kept Ready movement untouched.
+
+## Current Ready Teams
+
+- Team 03 Architect Signoff is ready for `CF-W1-SQLAB-01` after Team 10 accepts.
+- Team 04 is active on `CF-W1-SQLAB-02A`; next Team 04 planning item is `CF-W1-STRAT-02A`.
+- Team 02 is active and should be relaunched after completion.
+
+---
+
+# Active Spawned Pool Checkpoint
+
+Date: 2026-05-18
+
+## Team 10 SQLAB-01 Review Result
+
+`CF-W1-SQLAB-01` is rejected for bounded rework. The issue is not a Product Owner blocker: hard Data Quality blockers must not collapse into `LIMITED` outcome confidence. Team 00 assigned the delegated policy clarification that hard blockers map to `UNTRUSTED` with an explicit hard-blocker reason.
+
+| Team | Agent | State | Resume Action |
+| --- | --- | --- | --- |
+| Team 04 - QA Factory | `019e3ade-d01d-7310-aded-7cc32e76db6c` | active QA planning | Consume `CF-W1-SQLAB-02A` QA plan. |
+| Team 02 - PO + Requirement Factory | `019e3ae1-4895-7552-8e22-9a88cf1c02e9` | active discovery cycle | Consume new/refined requirement output, close, then relaunch Team 02. |
+| Team 06 - Strategy / Signal / Risk | pending spawn | queued rework | Rework `CF-W1-SQLAB-01` hard DQ blocker mapping in the Team 06 worktree. |
+
+Recently closed:
+
+- Team 10 `019e3ade-cfeb-7840-9f8a-3e52cebe3a62`: rejected `CF-W1-SQLAB-01`; Architect Signoff must not proceed until rework, QA rerun, and re-review pass.
+
+## Current Ready Teams
+
+- Team 06 is ready for `CF-W1-SQLAB-01` bounded rework.
+- Team 04 is active on `CF-W1-SQLAB-02A` QA planning.
+- Team 02 is active and should be relaunched after completion.
+
+---
+
+# Active Spawned Pool Checkpoint
+
+Date: 2026-05-18
+
+| Team | Agent | State | Resume Action |
+| --- | --- | --- | --- |
+| Team 06 - Strategy / Signal / Risk | `019e3ae4-b448-71e0-a52d-ee28ce48760a` | active bounded rework | Wait for `CF-W1-SQLAB-01` hard-DQ-blocker rework; then route Team 04 QA rerun in the Team 06 worktree. |
+| Team 04 - QA Factory | `019e3ae7-aa4f-71e2-9e0a-4542845368db` | active QA planning | Consume `CF-W1-STRAT-02A` QA plan. |
+| Team 02 - PO + Requirement Factory | `019e3ae1-4895-7552-8e22-9a88cf1c02e9` | active discovery cycle | Consume new/refined requirement output, close, then relaunch Team 02. |
+
+Recently closed:
+
+- Team 04 `019e3ade-d01d-7310-aded-7cc32e76db6c`: completed `CF-W1-SQLAB-02A` QA planning. `SQLAB-02A` is not parallel-safe with active `SQLAB-01`; durable `SQLAB-02B` remains blocked.
+
+## Current Ready Teams
+
+- Team 04 QA rerun is ready after Team 06 finishes `CF-W1-SQLAB-01` rework.
+- Team 10 is ready after QA rerun passes.
+- Team 02 is active and should be relaunched after completion.
+
+---
+
+# Active Spawned Pool Checkpoint
+
+Date: 2026-05-18
+
+| Team | Agent | State | Resume Action |
+| --- | --- | --- | --- |
+| Team 04 - QA Factory | `019e3ae8-bd0e-7740-9d92-403dcbb2821b` | active QA rerun | Wait for `CF-W1-SQLAB-01` QA rerun. If accepted, spawn Team 10 re-review; if rejected, return only SQLAB-01 to Team 06. |
+| Team 04 - QA Factory | `019e3ae7-aa4f-71e2-9e0a-4542845368db` | active QA planning | Consume `CF-W1-STRAT-02A` QA plan. |
+| Team 02 - PO + Requirement Factory | `019e3ae1-4895-7552-8e22-9a88cf1c02e9` | active discovery cycle | Consume new/refined requirement output, close, then relaunch Team 02. |
+
+Recently closed:
+
+- Team 06 `019e3ae4-b448-71e0-a52d-ee28ce48760a`: completed `CF-W1-SQLAB-01` bounded rework. Focused service test passed (`31/31`) and backend build passed.
+
+## Current Ready Teams
+
+- Team 10 is ready after SQLAB-01 QA rerun passes.
+- Team 03 Architect Signoff is ready after Team 10 accepts SQLAB-01.
+- Team 02 is active and should be relaunched after completion.
+
+---
+
+# Active Spawned Pool Checkpoint
+
+Date: 2026-05-18
+
+| Team | Agent | State | Resume Action |
+| --- | --- | --- | --- |
+| Team 10 - Review / Release | `019e3aed-3c52-7ed3-a905-a46dc6dc677e` | active re-review | Wait for `CF-W1-SQLAB-01` re-review. If accepted, spawn Team 03 Architect Signoff; if rejected, return only SQLAB-01 to Team 06. |
+| Team 03 - Architecture Factory | `019e3aeb-4fcb-71d3-8c2e-45b07e0f2d23` | active architecture prep | Consume `CF-W1-BT-02` architecture result and route QA planning if feasible. |
+| Team 02 - PO + Requirement Factory | `019e3aeb-4ffe-76a1-9e30-814caef74aa3` | active discovery cycle | Consume new/refined requirement output, close, then relaunch Team 02. |
+
+Recently closed:
+
+- Team 04 `019e3ae8-bd0e-7740-9d92-403dcbb2821b`: accepted `CF-W1-SQLAB-01` QA rerun.
+- Team 04 `019e3ae7-aa4f-71e2-9e0a-4542845368db`: completed `CF-W1-STRAT-02A` QA planning.
+
+## Current Ready Teams
+
+- Team 03 Architect Signoff is ready after Team 10 accepts SQLAB-01.
+- Team 06 can implement `CF-W1-STRAT-02A` after Team 00 commits docs, promotes Ready, and creates a worktree.
+- Team 02 is active and should be relaunched after completion.
+
+---
+
+# Active Spawned Pool Checkpoint
+
+Date: 2026-05-18
+
+| Team | Agent | State | Resume Action |
+| --- | --- | --- | --- |
+| Team 03 - Architect Signoff | `019e3af0-ea83-7c11-8e87-8a69b659c3aa` | active signoff | Wait for `CF-W1-SQLAB-01` Architect Signoff. If accepted, create delegated PO packet and scoped branch commit; if rejected, return only SQLAB-01 to the correct owner. |
+| Team 04 - QA Factory | `019e3af2-3da3-71a3-9135-1ee802e7e2c5` | active QA planning | Consume `CF-W1-BT-02` QA plan. |
+| Team 03 - Architecture Factory | `019e3af4-bb05-7853-90bb-ef76004fbe5a` | active architecture prep | Consume `CF-W1-DQ-02` architecture result and route Team 04 QA planning if feasible. |
+| Team 02 - PO + Requirement Factory | `019e3af4-bb3f-7743-bffa-2ed3ec447b9d` | active discovery cycle | Consume new/refined requirement output, close, then relaunch Team 02. |
+
+Recently closed:
+
+- Team 03 `019e3aeb-4fcb-71d3-8c2e-45b07e0f2d23`: completed `CF-W1-BT-02` architecture prep.
+- Team 02 `019e3aeb-4ffe-76a1-9e30-814caef74aa3`: refined `CF-W1-DQ-02` into the lead upstream Lane 1 currentness requirement.
+
+## Current Ready Teams
+
+- Team 06 can implement `CF-W1-STRAT-02A` after Team 00 commits docs, promotes Ready, and creates the worktree.
+- Team 10 is idle until the next QA-accepted handoff.
+- Team 02 is active and should be relaunched after completion.
+
+---
+
+# Pause Resume Checkpoint
+
+Date: 2026-05-18
+
+## Current Git State
+
+Main workspace:
+
+- Branch: `dev`
+- Push status: not push-safe.
+- Reason: `dev` has an unrelated dirty app-test file at `backend/tests/modules/alerts-monitoring/alerts-monitoring.ownership.test.ts` and active execution docs are being checkpointed.
+- Rule: do not stage or push the dirty app-test file unless Team 00 starts an explicit alert integration pass.
+
+Accepted branch commits parked for later integration:
+
+- `CF-W1-SQLAB-01`: `1a41d95 feat: add signal quality outcome confidence` on `codex/team06-strategy-signal/CF-W1-SQLAB-01`.
+
+## Active Agents
+
+No spawned subagents are active at this checkpoint.
+
+## Current Workstream State
+
+`CF-W1-SQLAB-01`
+
+- State: accepted and locally committed on the Team 06 branch.
+- Commit: `1a41d95`.
+- Next: integrate into `dev` only during a clean exact-scope integration pass.
+
+`CF-W1-STRAT-02A`
+
+- State: architecture and QA planning complete.
+- Next: Team 00 Ready evaluation and worktree creation if selected.
+- Blocked parent: durable rule revision history remains blocked pending Prisma/schema/repository/generated approval.
+
+`CF-W1-BT-02`
+
+- State: architecture and QA planning exist, but Team 02 narrowed the requirement afterward.
+- Next: Team 03/Team 04 packet refresh before Ready evaluation.
+
+`CF-W1-DQ-02A`
+
+- State: DQE-only first child architecture and QA planning complete.
+- Next: Team 00 Ready evaluation if selected.
+- Blocked parent: broader DQ-02 remains split because persisted DQ rows do not durably store session-aware currentness evidence.
+
+`CF-W1-L3-INTEL-03`
+
+- State: architecture and QA planning complete.
+- Next: Team 00 sequencing against `CF-W1-L3-INTEL-01` and `CF-W1-L3-INTEL-02` before any Ready promotion.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06 is ready for `CF-W1-STRAT-02A` implementation after Team 00 Ready promotion.
+- Team 05 is ready for `CF-W1-DQ-02A` implementation after Team 00 Ready promotion.
+- Team 07 is ready for `CF-W1-L3-INTEL-03` only after sequencing is resolved.
+- Team 03 is ready for `CF-W1-BT-02` packet refresh.
+- Team 02 should be relaunched after this checkpoint.
+- Team 10 is idle until the next QA-accepted handoff.

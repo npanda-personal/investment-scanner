@@ -8,23 +8,25 @@ Team 00 promoted `CF-W1-L3-PORT-01A` to Ready on 2026-05-18. It is no longer a r
 
 The current Ready-promotion front-runners after the PORT-01A rework routing are `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01`.
 
+Filtered for the actively routed/recent items excluded from this cycle, the next unassigned route is `CF-W1-L3-INTEL-03`.
+
 ## New Audit-Derived Requirements
 
 These are the newest high-value discovery items from read-only module audits. None is Ready for Implementation.
 
 | Rank | ID | Next gate |
 | --- | --- | --- |
-| 1 | CF-W1-STRAT-02 | Product refinement and architecture contract for durable rule provenance and explicit DQ-gated strategy trust. |
-| 2 | CF-W1-SQLAB-02 | Product refinement and architecture contract for durable learning memory from measured signal outcomes. |
-| 3 | CF-W1-BT-02 | Product refinement and architecture contract for trusted, partial, diagnostic, and legacy-repaired review outcomes. |
-| 4 | CF-W1-CAL-01 | Product refinement and architecture contract for trusted versus diagnostic calibration outputs. |
-| 5 | CF-W1-HCTX-01 | Product refinement and architecture contract for selected-snapshot provenance and gap explanation. |
-| 6 | CF-W1-MCTX-01 | Product refinement and bounded architecture contract for regime evidence and partial-context explanation. |
-| 7 | CF-W1-SQLAB-01 | Product refinement and architecture contract for trusted versus untrusted signal-quality outputs. |
-| 8 | CF-W1-L3-TREV-01 | Product refinement and architecture contract for trusted publication, withheld-candidate explanation, and readiness coherence. |
+| 1 | CF-W1-DQ-02 | Product refinement and architecture contract for market-session-aware currentness and downstream fail-closed DQ gating. |
+| 2 | CF-W1-SQLAB-02A | Product refinement and Team 04 QA planning for the no-schema Signal Quality Lab derived preview child. |
+| 3 | CF-W1-BT-02 | Product refinement and architecture contract for a canonical review label plus list/detail reason summary. |
+| 4 | CF-W1-STRAT-02 | Product refinement and architecture contract for durable rule provenance and explicit DQ-gated strategy trust. |
+| 5 | CF-W1-CAL-01 | Product refinement and architecture contract for trusted versus diagnostic calibration outputs. |
+| 6 | CF-W1-HCTX-01 | Product refinement and architecture contract for selected-snapshot provenance and gap explanation. |
+| 7 | CF-W1-MCTX-01 | Product refinement and bounded architecture contract for regime evidence and partial-context explanation. |
+| 8 | CF-W1-SQLAB-01 | Product refinement and architecture contract for trusted versus untrusted signal-quality outputs. |
 | 9 | CF-W1-L3-ALERT-03 | Product refinement and bounded architecture contract for post-trigger review outcomes and review-note persistence. |
-| 10 | CF-W1-L3-INTEL-03 | Product refinement and bounded architecture contract for explainable concentration and exposure review. |
-| 11 | CF-W1-L3-WATCH-01 | Product refinement and bounded architecture contract for explainable watchlist review priority and reason summaries. |
+| 10 | CF-W1-L3-WATCH-01 | Product refinement and bounded architecture contract for explainable watchlist review priority and reason summaries. |
+| 11 | CF-W1-L3-INTEL-03 | Product refinement and bounded architecture contract for explainable concentration and exposure review over existing portfolio detail surfaces. |
 | 12 | CF-W1-L3-INTEL-02 | Product refinement and architecture contract for explainable portfolio intelligence review output. |
 
 ## Decision Inbox State
@@ -67,10 +69,11 @@ The former Decision Inbox items moved to refinement / Ready-evaluation prep:
 | CF-W1-L3-AUTH-03 | Requirement, architecture review, contract, work packet, and QA plan prepared; needs Team 00 Ready evaluation. |
 | CF-W1-L3-ALERT-01 | Child contract, Team 03 reservation matrix, backend reservations, and QA plan prepared; needs Team 00 Ready evaluation. |
 | CF-W1-L3-INTEL-01 | Requirement, architecture review, contract, work packet, and QA plan prepared; waits for accepted `CF-W1-L3-PORT-01A` portfolio readiness DTOs. |
+| CF-W1-SQLAB-02A | Audit-derived child requirement draft | Product refinement drafted | QA planning active | No-schema derived preview child only after Team 04 planning | derived journal preview and SignalOutcomeSet reuse remain explicit | Keep active QA-planning prep; not Ready |
 | CF-W1-STRAT-02 | Audit-derived requirement draft | Product refinement drafted | QA plan needed | Future Strategy Framework backend/frontend child only after Team 00/03 reservation | durable rule provenance and DQ-gated trust remain explicit | Keep future-child prep; not Ready |
-| CF-W1-L3-TREV-01 | Audit-derived requirement draft | Product refinement drafted | QA plan needed | Future Today Review backend/frontend child only after Team 00/03 reservation | publication coherence and readiness mismatch remain explicit | Keep future-child prep; not Ready |
-| CF-W1-SQLAB-02 | Audit-derived requirement draft | Product refinement drafted | QA plan needed | Future signal-quality-lab backend child only after Team 00/03 reservation | Durable signal-outcome learning memory remains explicit | Keep future-child prep; not Ready |
-| CF-W1-BT-02 | Audit-derived requirement draft | Product refinement drafted | QA plan needed | Future backtesting-strategy-lab backend/frontend child only after Team 00/03 reservation | review outcome trust, diagnostic framing, and repair/benchmark warnings remain explicit | Keep future-child prep; not Ready |
+| CF-W1-DQ-02 | Audit-derived requirement draft | Product refinement drafted | QA plan needed | Future Market Data / Data Quality backend-only child only after Team 00/03 reservation | currentness evidence and fail-closed gating remain explicit | Keep upstream QA-prep; not Ready |
+| CF-W1-SQLAB-02 | Audit-derived requirement draft | Product refinement drafted | QA plan needed | Future signal-quality-lab durable-storage child only after separate storage packet | durable signal-outcome learning memory remains explicit | Keep future-child prep; not Ready |
+| CF-W1-BT-02 | Audit-derived requirement draft | Product refinement refreshed | QA plan needed | Future backtesting-strategy-lab backend/frontend child only after Team 00/03 reservation | review outcome trust, diagnostic framing, and repair/benchmark warnings remain explicit, but need one canonical label | Keep future-child prep; not Ready |
 | CF-W1-CAL-01 | Audit-derived requirement draft | Product refinement drafted | QA plan needed | Future signal-calibration-engine backend child only after Team 00/03 reservation | DQ-as-penalty behavior and missing hard gates remain explicit | Keep future-child prep; not Ready |
 | CF-W1-HCTX-01 | Audit-derived requirement draft | Product refinement drafted | QA plan needed | Future historical-context-snapshots backend child only after Team 00/03 reservation | Selected-snapshot provenance and gap explanation remain explicit | Keep future-child prep; not Ready |
 | CF-W1-MCTX-01 | Audit-derived requirement draft | Product refinement drafted | QA plan needed | Future market-context-intelligence backend child only after Team 00/03 reservation | Regime evidence and partial-context explanation remain explicit | Keep future-child prep; not Ready |
@@ -88,8 +91,9 @@ The former Decision Inbox items moved to refinement / Ready-evaluation prep:
 
 | ID | QA focus/status |
 | --- | --- |
-| CF-W1-L3-TREV-01 | QA plan needed; executable validation blocked until Team 00/03 reservation and implementation handoff. |
-| CF-W1-SQLAB-02 | QA plan needed; executable validation blocked until Team 00/03 reservation and implementation handoff. |
+| CF-W1-DQ-02 | QA planning required; executable validation blocked until Team 00/03 reservation and exact implementation handoff. |
+| CF-W1-SQLAB-02A | QA planning active; executable validation blocked until the no-schema derived preview child is finalized. |
+| CF-W1-SQLAB-02 | QA plan needed; durable-storage child blocked until separate storage approval. |
 | CF-W1-BT-02 | QA plan needed; executable validation blocked until Team 00/03 reservation and implementation handoff. |
 | CF-W1-L3-PORT-01A | Child QA plan prepared; executable validation begins after Team 07 implementation in the dedicated worktree. |
 | CF-W1-L3-PORT-01B | Child QA plan covers future watchlist slice; executable validation blocked until separate Team 00 handoff. |
@@ -116,33 +120,36 @@ These items are not implementation-ready.
 
 | Rank | ID | Prep needed |
 | --- | --- | --- |
-| 1 | CF-W1-L3-TREV-01 | Team 00/03 reservation and QA plan for prepared Today Review publication-evidence packet. |
-| 2 | CF-W1-SQLAB-02 | Team 00/03 reservation and QA plan for prepared signal outcome journal packet. |
-| 3 | CF-W1-BT-02 | Team 00/03 reservation and QA plan for prepared backtesting outcome-review packet. |
-| 4 | CF-W1-L3-ALERT-03 | Team 00/03 reservation and QA plan for prepared alert follow-through packet. |
-| 5 | CF-W1-L3-INTEL-03 | Team 00/03 reservation and QA plan for prepared portfolio concentration-review packet. |
-| 6 | CF-W1-L3-WATCH-01 | Team 00/03 reservation and QA plan for prepared watchlist review-actionability packet. |
-| 7 | CF-W1-CAL-01 | Team 00/03 reservation and QA plan for prepared Signal Calibration reliability packet. |
-| 8 | CF-W1-HCTX-01 | Team 00/03 reservation and QA plan for prepared Historical Context explainability packet. |
-| 9 | CF-W1-MCTX-01 | Team 00/03 reservation and QA plan for prepared Market Context regime-evidence packet. |
-| 10 | CF-W1-TP-01B | Team 00 Ready evaluation. |
-| 11 | CF-W1-NOTIF-02 | Team 00/Team 09 Ready evaluation and implementation handoff. |
+| 1 | CF-W1-BT-02 | Team 00/03 reservation and QA plan for prepared backtesting review-disposition packet. |
+| 2 | CF-W1-STRAT-02 | Team 00/03 reservation and QA plan for prepared Strategy Framework rule-versioning and DQ-gate packet. |
+| 3 | CF-W1-CAL-01 | Team 00/03 reservation and QA plan for prepared Signal Calibration reliability packet. |
+| 4 | CF-W1-HCTX-01 | Team 00/03 reservation and QA plan for prepared Historical Context explainability packet. |
+| 5 | CF-W1-MCTX-01 | Team 00/03 reservation and QA plan for prepared Market Context regime-evidence packet. |
+| 6 | CF-W1-L3-ALERT-03 | Team 00/03 reservation and QA plan for prepared alert follow-through packet. |
+| 7 | CF-W1-L3-WATCH-01 | Team 00/03 reservation and QA plan for prepared watchlist review-actionability packet. |
+| 8 | CF-W1-SQLAB-02 | Parent signal outcome journal; future durable-storage child remains blocked. |
+| 9 | CF-W1-TP-01B | Team 00 Ready evaluation. |
+| 10 | CF-W1-NOTIF-02 | Team 00/Team 09 Ready evaluation and implementation handoff. |
+| 11 | CF-W1-L3-ALERT-01 | Team 00 Ready evaluation for alert readiness suppression implementation. |
+| 12 | CF-W1-L3-AUTH-03 | Team 00 Ready evaluation for alert rule target ownership implementation. |
+| 13 | CF-W1-MD-02 | Formal ADR and ADR QA checklist. |
 
 ## Current Priority Refinement Output
 
 | ID | Useful next output | Owner to route |
 | --- | --- | --- |
+| CF-W1-SQLAB-02A | No-schema derived journal preview contract and QA plan. | Team 00 / Team 04 |
+| CF-W1-BT-02 | Backtesting review-disposition contract and QA plan. | Team 00 / Team 03 |
 | CF-W1-STRAT-02 | Strategy Framework rule-versioning and DQ-gate contract and QA plan. | Team 00 / Team 03 |
-| CF-W1-L3-TREV-01 | Today Review publication-evidence contract and QA plan. | Team 00 / Team 03 |
-| CF-W1-SQLAB-02 | Signal outcome journal and post-event learning contract and QA plan. | Team 00 / Team 03 |
-| CF-W1-BT-02 | Backtesting outcome-review contract and QA plan. | Team 00 / Team 03 |
+| CF-W1-DQ-02 | Data Quality currentness-evidence contract and QA plan. | Team 00 / Team 03 |
+| CF-W1-SQLAB-02 | Signal outcome journal parent and future durable-storage contract path. | Team 00 / Team 03 |
 | CF-W1-CAL-01 | Signal Calibration trust-state contract and QA plan. | Team 00 / Team 03 |
 | CF-W1-HCTX-01 | Historical Context explainability contract and QA plan. | Team 00 / Team 03 |
 | CF-W1-MCTX-01 | Market Context regime-evidence contract and QA plan. | Team 00 / Team 03 |
 | CF-W1-SQLAB-01 | Signal Quality outcome-confidence contract and QA plan. | Team 00 / Team 03 |
 | CF-W1-L3-ALERT-03 | Alert follow-through contract and QA plan. | Team 00 / Team 03 |
-| CF-W1-L3-INTEL-03 | Portfolio concentration-review contract and QA plan. | Team 00 / Team 03 |
 | CF-W1-L3-WATCH-01 | Watchlist review-actionability contract and QA plan. | Team 00 / Team 03 |
+| CF-W1-L3-INTEL-03 | Portfolio concentration-review contract and QA plan over existing portfolio detail surfaces. | Team 00 / Team 03 |
 | CF-W1-TP-01B | Ready-promotion check for backend-only Trade Plan DQ hard-block implementation. | Team 00 |
 | CF-W1-NOTIF-02 | Ready-promotion check and implementation handoff for notification log redaction. | Team 00 + Team 09 |
 | CF-W1-L3-ALERT-01 | Ready-promotion check for alert readiness suppression implementation. | Team 00 |

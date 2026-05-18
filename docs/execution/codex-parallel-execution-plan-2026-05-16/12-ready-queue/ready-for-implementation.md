@@ -8,6 +8,8 @@ No available application-code item is currently waiting unassigned in Ready.
 
 `CF-W1-SQLAB-01` was promoted by Team 00 on 2026-05-18 and assigned to Team 06 in a dedicated worktree for bounded backend-only Signal Quality Lab implementation.
 
+`CF-W1-SQLAB-02A` is active in Team 04 QA planning for the no-schema Signal Quality Lab preview child. It is not a Ready item yet.
+
 `CF-W1-L3-TREV-01` was promoted by Team 00 on 2026-05-18 and assigned to Team 07 in a dedicated worktree for bounded Today Review implementation.
 
 `CF-W1-L3-PORT-01A` was pulled by Team 07, implemented in its dedicated worktree, and moved through first-pass QA / Code Review. Team 10 rejected release acceptance and routed bounded rework back to Team 07. It remains uncommitted and unaccepted.

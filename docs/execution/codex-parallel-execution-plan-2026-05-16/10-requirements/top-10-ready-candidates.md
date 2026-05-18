@@ -2,24 +2,25 @@
 
 Date: 2026-05-18
 
-Status: Refreshed by Team 02 after Team 03/04 post-decision readiness refresh evidence and after Team 00 promoted `CF-W1-L3-PORT-01A`. This is a top-candidate list, not proof of implementation readiness. The current Ready-promotion front-runners after the PORT-01A rework routing are `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01`. See `12-ready-queue/ready-for-implementation.md` for actual implementation-ready items.
+Status: Refreshed by Team 02 after Team 03/04 post-decision readiness refresh evidence and after Team 00 promoted `CF-W1-L3-PORT-01A`. This is a top-candidate list, not proof of implementation readiness. The current Ready-promotion front-runners after the PORT-01A rework routing are `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01`. Filtered for the actively routed/recent items excluded from this cycle, the next unassigned route for Team 00 is `CF-W1-L3-INTEL-03`. See `12-ready-queue/ready-for-implementation.md` for actual implementation-ready items.
 
 ## Current Top Candidates
 
-There are ten active top/refinement candidates after removing completed bounded slices and the promoted `CF-W1-L3-PORT-01A` implementation handoff from active pull.
+There are eleven active top/refinement candidates after removing completed bounded slices and the promoted `CF-W1-L3-PORT-01A` implementation handoff from active pull.
 
 | Rank | ID | Candidate | Severity | Current readiness | Reason |
 | --- | --- | --- | --- | --- | --- |
-| 1 | CF-W1-STRAT-02 | Strategy Framework rule versioning and DQ gate policy | P0 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Strategy source-of-truth trust depends on durable rule provenance and explicit DQ-gate policy before rule behavior changes. |
-| 2 | CF-W1-SQLAB-02 | Signal outcome journal and post-event learning | P1 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Signal-quality outcome calculations already exist, but the learning loop still lacks a durable journal. |
-| 3 | CF-W1-BT-02 | Backtesting outcome review traceability | P1 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Backtesting results need a trust frame for partial, diagnostic, and legacy-repaired outcomes. |
-| 4 | CF-W1-L3-ALERT-03 | Alert follow-through traceability | P1 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Alert inbox review needs durable outcome state so trigger follow-up is traceable beyond read/dismiss. |
-| 5 | CF-W1-L3-INTEL-03 | Portfolio Intelligence concentration review | P1 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Concentration and exposure review needs a deterministic review-priority layer before traders can action it confidently. |
-| 6 | CF-W1-L3-WATCH-01 | Watchlist review actionability | P1 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Watchlist ideas need a deterministic review-priority and reason-summary layer before traders can action them confidently. |
-| 7 | CF-W1-CAL-01 | Signal Calibration reliability drift | P1 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Calibration already has trust-state machinery, but missing DQ and weak evidence can still look authoritative. |
-| 8 | CF-W1-HCTX-01 | Historical Context explainability | P1 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Historical lookups need selected-snapshot provenance, lag, and gap explanation for downstream trust. |
-| 9 | CF-W1-MCTX-01 | Market Context regime evidence | P1 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Regime labels need evidence, denominators, and partial-context framing before downstream consumers trust them. |
-| 10 | CF-W1-TP-01B | Trade Plan backend-only DQ hard-block child | P0 | Architecture, QA plan, Team 03 file-reservation matrix, and Team 06 readiness inspection prepared; needs Team 00 Ready promotion | Current Team 00 dispatch and Team 06 inspection keep this as the next Team 06 candidate after the PORT-01A routing. |
+| 1 | CF-W1-DQ-02 | Data Quality currentness evidence | P0 | Architecture, QA plan, and exact Market Data/Data Quality source reservations prepared; needs Team 00/03 prep | Upstream currentness is the fail-closed gate downstream trust surfaces should inherit instead of recreating. |
+| 2 | CF-W1-STRAT-02 | Strategy Framework rule versioning and DQ gate policy | P0 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Strategy source-of-truth trust depends on durable rule provenance and explicit DQ-gate policy before rule behavior changes. |
+| 3 | CF-W1-SQLAB-02 | Signal outcome journal and post-event learning | P1 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Signal-quality outcome calculations already exist, but the learning loop still lacks a durable journal. |
+| 4 | CF-W1-BT-02 | Backtesting review disposition traceability | P1 | Requirement draft refined; needs Team 00/03 architecture and QA prep | Backtesting already exposes availability, benchmark, exit, and repair evidence, but the remaining gap is a canonical review label and reason summary. |
+| 5 | CF-W1-L3-ALERT-03 | Alert follow-through traceability | P1 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Alert inbox review needs durable outcome state so trigger follow-up is traceable beyond read/dismiss. |
+| 6 | CF-W1-L3-INTEL-03 | Portfolio Intelligence concentration review | P1 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Concentration and exposure review needs a deterministic review-priority layer over existing portfolio detail surfaces before traders can action it confidently. |
+| 7 | CF-W1-L3-WATCH-01 | Watchlist review actionability | P1 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Watchlist ideas need a deterministic review-priority and reason-summary layer before traders can action them confidently. |
+| 8 | CF-W1-CAL-01 | Signal Calibration reliability drift | P1 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Calibration already has trust-state machinery, but missing DQ and weak evidence can still look authoritative. |
+| 9 | CF-W1-HCTX-01 | Historical Context explainability | P1 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Historical lookups need selected-snapshot provenance, lag, and gap explanation for downstream trust. |
+| 10 | CF-W1-MCTX-01 | Market Context regime evidence | P1 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Regime labels need evidence, denominators, and partial-context framing before downstream consumers trust them. |
+| 11 | CF-W1-TP-01B | Trade Plan backend-only DQ hard-block child | P0 | Architecture, QA plan, Team 03 file-reservation matrix, and Team 06 readiness inspection prepared; needs Team 00 Ready promotion | Current Team 00 dispatch and Team 06 inspection keep this as the next Team 06 candidate after the PORT-01A routing. |
 
 ## Next Docs-Only Prep / Ready-Evaluation Candidates
 
@@ -27,23 +28,26 @@ These are not app-code ready. No item is blocked by an open Decision Inbox item,
 
 | Rank | ID | Prep gate |
 | --- | --- | --- |
-| 1 | CF-W1-STRAT-02 | Team 00/03 reservation and QA plan for prepared Strategy Framework rule-versioning and DQ-gate packet. |
-| 2 | CF-W1-SQLAB-02 | Team 00/03 reservation and QA plan for prepared signal outcome journal packet. |
-| 3 | CF-W1-BT-02 | Team 00/03 reservation and QA plan for prepared backtesting outcome-review packet. |
-| 4 | CF-W1-L3-ALERT-03 | Team 00/03 reservation and QA plan for prepared alert follow-through packet. |
-| 5 | CF-W1-L3-INTEL-03 | Team 00/03 reservation and QA plan for prepared portfolio concentration-review packet. |
-| 6 | CF-W1-L3-WATCH-01 | Team 00/03 reservation and QA plan for prepared watchlist review-actionability packet. |
-| 7 | CF-W1-CAL-01 | Team 00/03 reservation and QA plan for prepared Signal Calibration reliability packet. |
-| 8 | CF-W1-HCTX-01 | Team 00/03 reservation and QA plan for prepared Historical Context explainability packet. |
-| 9 | CF-W1-MCTX-01 | Team 00/03 reservation and QA plan for prepared Market Context regime-evidence packet. |
-| 10 | CF-W1-TP-01B | Team 00 Ready evaluation. |
-| 11 | CF-W1-NOTIF-02 | Team 00/Team 09 Ready evaluation and exact implementation handoff. |
+| 1 | CF-W1-DQ-02 | Team 00/03 reservation and QA plan for prepared market-session-aware currentness packet. |
+| 2 | CF-W1-STRAT-02 | Team 00/03 reservation and QA plan for prepared Strategy Framework rule-versioning and DQ-gate packet. |
+| 3 | CF-W1-SQLAB-02 | Team 00/03 reservation and QA plan for prepared signal outcome journal packet. |
+| 4 | CF-W1-BT-02 | Team 00/03 reservation and QA plan for prepared backtesting review-disposition packet. |
+| 5 | CF-W1-L3-ALERT-03 | Team 00/03 reservation and QA plan for prepared alert follow-through packet. |
+| 6 | CF-W1-L3-INTEL-03 | Team 00/03 reservation and QA plan for prepared portfolio concentration-review packet over existing portfolio detail surfaces. |
+| 7 | CF-W1-L3-WATCH-01 | Team 00/03 reservation and QA plan for prepared watchlist review-actionability packet. |
+| 8 | CF-W1-CAL-01 | Team 00/03 reservation and QA plan for prepared Signal Calibration reliability packet. |
+| 9 | CF-W1-HCTX-01 | Team 00/03 reservation and QA plan for prepared Historical Context explainability packet. |
+| 10 | CF-W1-MCTX-01 | Team 00/03 reservation and QA plan for prepared Market Context regime-evidence packet. |
+| 11 | CF-W1-TP-01B | Team 00 Ready evaluation. |
+| 12 | CF-W1-NOTIF-02 | Team 00/Team 09 Ready evaluation and exact implementation handoff. |
 
 ## Implementation-Ready Result
 
 `CF-W1-L3-PORT-01A` is implementation-ready through the Team 00 handoff in `12-ready-queue/ready-for-implementation.md` and `16-team-inboxes/TEAM-07-current-assignment.md`.
 
 The nearest remaining child candidates are `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-L3-ALERT-01`, and `CF-W1-L3-AUTH-03`; each still needs Team 00 Ready promotion and exact implementation handoff. Team 00 still owns any future Ready queue update. Team 03's 2026-05-18 near-ready file-reservation matrix is supporting evidence only, not a Ready promotion for the remaining items.
+
+After excluding `CF-W1-SQLAB-01`, `CF-W1-SQLAB-02A`, `CF-W1-STRAT-02A`, `CF-W1-BT-02`, `CF-W1-DQ-02`, and `CF-W1-L3-WATCH-01`, the next Team 00 route target is `CF-W1-L3-INTEL-03`.
 
 The resolved decisions and prepared child contracts/QA plans are planning inputs only. They do not satisfy Ready criteria by themselves.
 

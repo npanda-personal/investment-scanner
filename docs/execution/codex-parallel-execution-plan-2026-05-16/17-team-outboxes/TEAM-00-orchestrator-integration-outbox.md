@@ -859,3 +859,66 @@ State: `CF-W1-SQLAB-01` developer handoff consumed; next parallel agents queued
 - Team 03 is ready for `CF-W1-STRAT-02` architecture prep.
 - Team 02 is ready to relaunch persistent PO/Requirements discovery.
 - Team 10 is ready once QA accepts the next implementation handoff.
+
+## Spawned Agents
+
+| Team | Agent | Work item |
+| --- | --- | --- |
+| Team 04 | `019e3ada-65b8-7a63-84dc-f4a30f7c0663` | `CF-W1-SQLAB-01` QA verification |
+| Team 03 | `019e3ada-65ee-7f92-9ac7-a710a799de91` | `CF-W1-STRAT-02` architecture prep |
+| Team 02 | `019e3ada-6641-7f11-b956-14c4956787a8` | persistent requirements discovery |
+
+## Current Spawned Agents
+
+| Team | Agent | Work item |
+| --- | --- | --- |
+| Team 10 | `019e3ade-cfeb-7840-9f8a-3e52cebe3a62` | `CF-W1-SQLAB-01` review/release |
+| Team 04 | `019e3ade-d01d-7310-aded-7cc32e76db6c` | `CF-W1-SQLAB-02A` QA planning |
+| Team 03 | `019e3ada-65ee-7f92-9ac7-a710a799de91` | `CF-W1-STRAT-02` architecture prep |
+| Team 02 | `019e3ada-6641-7f11-b956-14c4956787a8` | persistent requirements discovery |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03 Architect Signoff is ready after Team 10 accepts `CF-W1-SQLAB-01`.
+- Team 10 is active on `CF-W1-SQLAB-01`.
+- Team 04 is active on `CF-W1-SQLAB-02A`.
+- Team 02 is active and should be relaunched after it completes.
+
+## Review Result Update
+
+Team 10 rejected `CF-W1-SQLAB-01` for a bounded issue: hard DQ blockers can collapse into `LIMITED` outcome confidence. Team 00 routed the clarification internally because it is covered by existing DQ trust policy: hard blockers must map to `UNTRUSTED` with an explicit hard-blocker reason.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06 is ready for `CF-W1-SQLAB-01` bounded rework.
+- Team 04 is active on `CF-W1-SQLAB-02A`; it will be needed for SQLAB-01 QA rerun after rework.
+- Team 02 is active and should be relaunched after completion.
+- Team 10 should wait for QA rerun before re-review.
+
+---
+
+# Coordination Checkpoint
+
+Date: 2026-05-18
+
+## Completed Gate
+
+`CF-W1-SQLAB-01` completed all gates and was locally committed on the Team 06 branch:
+
+- Commit: `1a41d95 feat: add signal quality outcome confidence`
+- Branch: `codex/team06-strategy-signal/CF-W1-SQLAB-01`
+- Push/merge: not performed
+
+## Current Queue
+
+- Open decisions: 0.
+- Active spawned agents: 0.
+- `dev` push status: blocked by dirty non-doc app-test file and pending clean integration pass.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06: `CF-W1-STRAT-02A` after Ready promotion.
+- Team 05: `CF-W1-DQ-02A` after Ready promotion.
+- Team 07: `CF-W1-L3-INTEL-03` after sequencing decision.
+- Team 03: `CF-W1-BT-02` packet refresh.
+- Team 02: persistent PO/Requirements discovery relaunch.
