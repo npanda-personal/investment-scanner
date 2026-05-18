@@ -1536,3 +1536,31 @@ Teams ready to pick up new tasks:
 - Team 04: QA rerun after Team 06 rework.
 - Team 10: `CF-W1-BT-02` review only after QA accepts.
 - Team 10: still active on `CF-W1-HCTX-01` review.
+
+---
+
+# Investor-Value Priority Correction Routed
+
+Date: 2026-05-18
+
+Product Owner priority correction has been applied: direct market-intelligence value now outranks admin/settings/auth/subscription/notifications and alert convenience work unless those items block correctness, privacy, user-data safety, or an already accepted branch gate.
+
+Team 02 completed the docs-only priority refresh and Team 00 committed it as `9942e2f docs: reprioritize investor value backlog`.
+
+Next dispatch:
+
+- Team 06: bounded `CF-W1-BT-02` QA-rejection rework.
+- Team 03: `CF-W1-HCTX-01` Architect Signoff after Team 10 ACCEPT.
+- Team 03: docs-only `CF-W1-DQ-02` architecture readiness as the top unassigned investor/trader-value item.
+- Team 02: persistent market-intelligence requirement discovery.
+- Team 04: QA rerun for `CF-W1-BT-02` after Team 06.
+- Team 04: QA planning for `CF-W1-DQ-02` after Team 03.
+
+Teams ready to pick up new tasks:
+
+- Team 06: `CF-W1-BT-02` rework now.
+- Team 03: `CF-W1-HCTX-01` Architect Signoff now.
+- Team 03: `CF-W1-DQ-02` architecture prep now.
+- Team 02: persistent market-intelligence discovery now.
+- Team 04: next QA gate after either handoff.
+- Team 10: ready for `CF-W1-BT-02` review after QA acceptance.

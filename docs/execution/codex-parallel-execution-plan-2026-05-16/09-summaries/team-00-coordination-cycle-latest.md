@@ -1006,3 +1006,45 @@ This is routine bounded rework inside the existing Team 06 reservation. No Produ
 ## Next Coordination Action
 
 Spawn Team 06 for bounded `CF-W1-BT-02` rework.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
+## Priority Correction Applied
+
+Team 00 has re-centered the rolling factory on direct investor/trader value. Future active routing prioritizes market data, Data Quality, signals, strategy trust, backtests, calibration, historical context, market context, Trade Plan research support, and research evidence.
+
+Admin, settings, auth/subscription, notifications, and alert convenience work stay lowest priority unless they block correctness, privacy, user-data safety, or an already accepted branch gate.
+
+## Dispatch Plan
+
+- Spawn Team 06 for bounded `CF-W1-BT-02` QA-rejection rework.
+- Spawn Team 03 for `CF-W1-HCTX-01` Architect Signoff after Team 10 ACCEPT.
+- Spawn Team 03 for docs-only `CF-W1-DQ-02` architecture readiness as the top unassigned investor/trader-value item.
+- Relaunch Team 02 persistent market-intelligence discovery.
+- Route Team 04 to `CF-W1-BT-02` QA rerun after Team 06 handoff.
+- Route Team 04 to `CF-W1-DQ-02` QA planning after Team 03 output.
+
+## Current Git State
+
+- Branch: `dev`.
+- Latest docs commits: `f5d22ca docs: route bt rework and market context qa plan`; `9942e2f docs: reprioritize investor value backlog`.
+- Shared `dev` remains not push-safe because `backend/tests/modules/alerts-monitoring/alerts-monitoring.ownership.test.ts` is dirty outside the current docs checkpoint.
+- No push performed.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06: `CF-W1-BT-02` bounded rework now.
+- Team 03: `CF-W1-HCTX-01` Architect Signoff now.
+- Team 03: `CF-W1-DQ-02` architecture/contract/work-packet refresh now.
+- Team 02: persistent market-intelligence discovery now.
+- Team 04: `CF-W1-BT-02` QA rerun after Team 06 handoff.
+- Team 04: `CF-W1-DQ-02` QA planning after Team 03 output.
+- Team 10: `CF-W1-BT-02` review after QA accepts.
+
+## Next Coordination Action
+
+Commit this dispatch update if staged scope is clean, then launch Team 06, Team 03 signoff, Team 03 architecture prep, and Team 02 in parallel.

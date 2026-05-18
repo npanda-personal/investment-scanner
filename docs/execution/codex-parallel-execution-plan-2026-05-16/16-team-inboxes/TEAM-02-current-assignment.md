@@ -162,6 +162,45 @@ Date: 2026-05-18
 
 ## Product Owner Priority Correction
 
+This latest standing assignment supersedes older tails above.
+
+Continue as the persistent PO + Requirements value-discovery lane, but rank direct investor/trader value first:
+
+- market data and Data Quality evidence;
+- signals, strategy trust, calibration, backtesting, Trade Plan research support;
+- historical context, market context, signal-quality learning, and research evidence.
+
+Keep admin, settings, auth/subscription, notifications, and alert convenience work lowest priority unless they block correctness, privacy, user-data safety, or an already accepted branch gate.
+
+## Current Active / Routed Items To Exclude
+
+- `CF-W1-BT-02`: active bounded Team 06 rework.
+- `CF-W1-HCTX-01`: Team 10 accepted; routed to Architect Signoff.
+- `CF-W1-MCTX-01`: architecture and QA plan prepared; Team 00 Ready evaluation pending.
+- `CF-W1-DQ-02`: routed to Team 03 architecture readiness.
+- Accepted branch commits remain parked for later clean integration and should stay out of active discovery ranking.
+
+## Assignment
+
+Continue market-intelligence requirement discovery on an under-served high-value workflow. Prefer calibration, signal trust, backtesting learning loops, market context, historical context downstream use, market-data/DQ evidence, Trade Plan research support, or research evidence gaps.
+
+Do not move any application-code item to Ready. Team 00 owns Ready movement.
+
+## Required Output
+
+- Add or refine at least one high-user-value market-intelligence requirement if evidence supports it.
+- Keep `next-top-10-candidates.md`, `top-10-ready-candidates.md`, `requirements-backlog.md`, and `refinement-queue.md` aligned with the corrected priority model.
+- Identify the next top unassigned market-intelligence item excluding the active/routed items above.
+- Report true consent blockers to Team 00; do not ask the human Product Owner for routine prioritization.
+
+---
+
+# Latest Standing Assignment
+
+Date: 2026-05-18
+
+## Product Owner Priority Correction
+
 Continue as the persistent PO + Requirements value-discovery lane, but reorder the backlog by direct investor/trader value first.
 
 Highest priority discovery/refinement themes:

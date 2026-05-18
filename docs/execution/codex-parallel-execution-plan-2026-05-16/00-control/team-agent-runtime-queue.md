@@ -871,3 +871,48 @@ Date: 2026-05-18
 - Team 03 is ready for `CF-W1-CAL-01` architecture prep when a slot opens.
 - Team 04 is active on `CF-W1-MCTX-01` QA planning.
 - Team 02 is active on market-intelligence requirements discovery.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Priority Correction Applied
+
+Future routing is now biased toward direct investor/trader value:
+
+- market data and Data Quality evidence;
+- signals, strategy trust, calibration, backtesting, Trade Plan research support, historical context, market context, and research evidence;
+- admin, settings, auth/subscription, notifications, and alert convenience work only when they block correctness, privacy, user-data safety, or an already accepted branch gate.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 06 - Strategy / Signal / Risk | pending spawn | `gpt-5.3-codex`, high | bounded QA rework | `CF-W1-BT-02` trusted disposition and UI evidence | ready |
+| 2 | Team 03 - Architect Signoff | pending spawn | `gpt-5.4`, high | architect signoff | `CF-W1-HCTX-01` in Team 05 worktree | ready |
+| 3 | Team 03 - Architecture Factory | pending spawn | `gpt-5.4`, high | docs-only architecture prep | `CF-W1-DQ-02` | ready |
+| 4 | Team 02 - PO + Requirement Factory | pending spawn | `gpt-5.4-mini`, medium | persistent discovery | next high-value market-intelligence requirement | ready |
+| 5 | Open slot | none | pending | QA rerun / QA planning | `CF-W1-BT-02` after Team 06 rework; `CF-W1-DQ-02` after Team 03 output | waiting |
+| 6 | Open slot | none | pending | review/signoff | next QA-accepted handoff | waiting |
+
+## Completed Since Previous Snapshot
+
+- Team 02 `019e3bd2-303d-78a3-9948-894bf4d6494f`: completed market-intelligence priority refresh and was closed after Team 00 committed `9942e2f docs: reprioritize investor value backlog`.
+- Team 04 `019e3bd1-f31d-7e92-a6e3-f88780ca2b59`: completed docs-only `CF-W1-MCTX-01` QA planning; Team 00 committed the packet in `f5d22ca docs: route bt rework and market context qa plan`.
+- Team 10 `019e3bd1-b1ab-7dc0-ba1e-5bfcfe7eaf02`: accepted `CF-W1-HCTX-01` review; Architect Signoff can proceed.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06 is ready for bounded `CF-W1-BT-02` QA-rejection rework now.
+- Team 03 is ready for `CF-W1-HCTX-01` Architect Signoff now.
+- Team 03 is ready for `CF-W1-DQ-02` architecture/contract/work-packet refresh now.
+- Team 02 is ready for another persistent market-intelligence discovery cycle now.
+- Team 04 is ready for `CF-W1-BT-02` QA rerun after Team 06 rework.
+- Team 04 is ready for `CF-W1-DQ-02` QA planning after Team 03 output.
+- Team 10 is ready for `CF-W1-BT-02` review after QA accepts.
+
+## Next Coordination Action
+
+Spawn Team 06 for `CF-W1-BT-02` rework, Team 03 for `CF-W1-HCTX-01` Architect Signoff, Team 03 for `CF-W1-DQ-02` architecture prep, and Team 02 for persistent market-intelligence discovery. Keep admin/platform/notification/alert convenience work out of the active queue unless it becomes a correctness or accepted-branch gate.

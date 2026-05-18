@@ -148,6 +148,76 @@ Date: 2026-05-18
 
 ## Assignment
 
+Perform bounded QA-rejection rework for `CF-W1-BT-02` in the existing Team 06 worktree.
+
+This latest override supersedes older implementation-only tails above. Team 04 reran executable QA after dependency junctions were created, so this is no longer a toolchain-only blocker. Do not widen scope. Do not commit.
+
+## Branch / Worktree
+
+- Branch: `codex/team06-strategy-signal/CF-W1-BT-02`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-BT-02`
+
+## QA Findings To Fix
+
+Use Team 04 evidence:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-BT-02-qa-verification.md`
+
+Fix only:
+
+1. Backend trusted-review fixture expected `TRUSTED_REVIEW`, but current derivation returns `DIAGNOSTIC_ONLY` because `LOW_TRADE_SAMPLE` is added before trusted/partial evaluation.
+2. Frontend legacy-invalid saved-run scenario does not render `Review Disposition` evidence for the mocked `WITHHELD` review fields.
+
+## Allowed Files
+
+You may edit only:
+
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.types.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+- `backend/tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.test.ts`
+- `frontend/src/features/backtesting-strategy-lab/types.ts`
+- `frontend/src/features/backtesting-strategy-lab/components/BacktestingStrategyLabPage.tsx`
+- `frontend/tests/ui/backtesting-strategy-lab.spec.ts`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-BT-02-developer-handoff.md`
+
+## Forbidden Files
+
+Do not edit Prisma schema or migrations, generated files, backtesting repository/controller/router/validation/module/index files, backend or frontend route registries, `backend/src/modules/strategy-framework/**`, `backend/src/modules/trade-plan-risk-engine/**`, frontend backtesting API/hooks/routes, shared backend utilities, shared frontend components, package manifests, providers, startup/backfill, live-provider, paid/cloud, telemetry, broker, or historical docs.
+
+## Required Validation
+
+Run in the Team 06 worktree:
+
+```powershell
+cd C:\work\repo\investment-scanner-worktrees\team06-CF-W1-BT-02\backend
+npm.cmd test -- backtesting-strategy-lab.service.test.ts --runInBand
+npm.cmd run build
+```
+
+Run because frontend files are in scope:
+
+```powershell
+cd C:\work\repo\investment-scanner-worktrees\team06-CF-W1-BT-02\frontend
+npm.cmd run test:ui -- backtesting-strategy-lab.spec.ts --workers=1
+npm.cmd run build
+```
+
+If Playwright hits sandbox process restrictions, record the exact blocker and command. Do not edit package manifests.
+
+## Next Gate
+
+Return the revised developer handoff to Team 00. Team 00 will route Team 04 QA rerun, then Team 10 review, Team 03 Architect Signoff, delegated PO acceptance, and scoped local commit if accepted.
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
 Perform bounded rework for `CF-W1-BT-02` after Team 04 QA rejection.
 
 This is a routine QA rejection inside the existing Team 06 reservation. Do not widen scope. Do not edit forbidden files. Do not commit.
