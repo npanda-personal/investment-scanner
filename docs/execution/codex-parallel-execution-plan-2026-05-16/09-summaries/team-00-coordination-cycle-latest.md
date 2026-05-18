@@ -1710,6 +1710,68 @@ Wait for Team 10 CAL review result. If it accepts, spawn Team 03 Architect Signo
 
 Date: 2026-05-18
 
+## SIG-TRIGGER-02 Architecture Dispatch
+
+Team 00 evaluated the highest-value unassigned candidates and found:
+
+- `CF-W1-SQLAB-02` remains sequenced behind active no-schema `CF-W1-SQLAB-02A`.
+- `CF-W1-STRAT-02` durable parent remains blocked after accepted `CF-W1-STRAT-02A` because durable rule history needs Prisma/schema/generated approval.
+- `CF-W1-MD-02` remains ADR-only.
+
+Team 00 dispatched the next independent high-value item:
+
+- Team 03 agent: `019e3c20-e9f8-7da2-83f1-ebe84851a830`
+- Work item: `CF-W1-SIG-TRIGGER-02`
+- Mode: docs-only architecture readiness, contract, and work-packet prep.
+
+## Active Agents
+
+- Team 10 `019e3c1d-9dc4-7721-8831-5f9cee0be072`: `CF-W1-CAL-01` Review / Release.
+- Team 03 `019e3c20-e9f8-7da2-83f1-ebe84851a830`: `CF-W1-SIG-TRIGGER-02` architecture readiness.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03: `CF-W1-CAL-01` Architect Signoff if Team 10 accepts.
+- Team 04: `CF-W1-SIG-TRIGGER-02` QA planning if Team 03 returns a bounded child.
+- Team 02: next persistent discovery cycle after current architecture output is consumed.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
+## CAL-01 Architect Signoff Dispatch
+
+Team 10 accepted `CF-W1-CAL-01` review/release:
+
+- Agent closed: `019e3c1d-9dc4-7721-8831-5f9cee0be072`
+- Evidence: `CF-W1-CAL-01-team10-review-release.md`
+- Result: `ACCEPT`, no blocking findings.
+
+Team 00 spawned Architect Signoff:
+
+- Team 03 agent: `019e3c21-c96a-7e10-b5bf-26ec1ed4b417`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-CAL-01`
+- Gate: Architect Signoff before delegated PO acceptance and scoped branch commit.
+
+## Active Agents
+
+- Team 03 `019e3c21-c96a-7e10-b5bf-26ec1ed4b417`: `CF-W1-CAL-01` Architect Signoff.
+- Team 03 `019e3c20-e9f8-7da2-83f1-ebe84851a830`: `CF-W1-SIG-TRIGGER-02` architecture readiness.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 00: `CF-W1-CAL-01` delegated PO acceptance and scoped branch commit if Architect Signoff accepts.
+- Team 04: `CF-W1-SIG-TRIGGER-02` QA planning if Team 03 returns a bounded child.
+- Team 02: next persistent discovery cycle after current architecture output is consumed.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
 ## BT-02 Architect Signoff Relaunched
 
 The saved Team 03 architect agent `019e3c02-4baa-77a3-a567-d5cf34e804db` was not recoverable from the runtime and no architect-signoff evidence existed in the BT worktree. Team 00 relaunched the same bounded gate.

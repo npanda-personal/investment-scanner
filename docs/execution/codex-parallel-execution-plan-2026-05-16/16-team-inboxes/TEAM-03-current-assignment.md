@@ -184,6 +184,60 @@ This is docs-only architecture prep. Do not implement application code. Treat th
 
 ---
 
+# Current Active Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Prepare architecture readiness for `CF-W1-SIG-TRIGGER-02` - persisted trigger auditability follow-on.
+
+This final override supersedes older Team 03 assignment tails above. Do not implement application code. This is docs-only architecture/contract/work-packet prep.
+
+## Why This Item
+
+Team 00 checked the higher-ranked unassigned candidates:
+
+- `CF-W1-SQLAB-02` remains sequenced behind active no-schema `CF-W1-SQLAB-02A`.
+- `CF-W1-STRAT-02` durable parent remains blocked after accepted `CF-W1-STRAT-02A` because durable rule history needs Prisma/schema/generated approval.
+- `CF-W1-MD-02` remains ADR-only and not source-ready.
+
+`CF-W1-SIG-TRIGGER-02` is the next independent high-investor-value candidate that needs architecture split/readiness work.
+
+## Source Input
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SIG-TRIGGER-02-persisted-trigger-auditability-requirement.md`
+- Related completed/active context:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SIG-TRIGGER-01-full-trigger-object-contract-requirement.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/09-summaries/CF-W1-SIG-TRIGGER-01-po-acceptance-packet.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-strategy-signal-rules.md`
+  - `backend/src/modules/signal-generation-engine/signal-generation-engine.md`
+  - `backend/src/modules/signal-generation-engine/signal-generation-engine.service.ts`
+  - `backend/src/modules/signal-generation-engine/signal-generation-engine.types.ts`
+  - `backend/src/modules/signal-generation-engine/signal-generation-engine.repository.ts`
+  - `backend/tests/modules/signal-generation-engine/**`
+  - downstream docs/source read-only only if needed to understand consumer risk
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-SIG-TRIGGER-02-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-SIG-TRIGGER-02-persisted-trigger-auditability-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-SIG-TRIGGER-02-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+## Required Output
+
+- Determine whether there is a bounded no-schema/no-shared first child for better trigger auditability inside `signal-generation-engine`.
+- If schema/shared/downstream adoption is required, mark split/blocker clearly; do not present it as Ready.
+- Recommend exact file reservations for any feasible first child.
+- List forbidden files explicitly, including Prisma/schema/migrations, route registries, shared utilities/UI, packages, generated files, Strategy Decision, Today Review, Trade Plan, Alerts, Portfolio, Watchlists, Copilot, providers, live data, paid/cloud, broker, and telemetry.
+- Preserve no-advice/no-target research-support language.
+- Provide Team 04 QA planning handoff notes.
+- Return one of: `Ready candidate`, `split required`, or `blocked`.
+
+---
+
 # Latest Assignment Override
 
 Date: 2026-05-18

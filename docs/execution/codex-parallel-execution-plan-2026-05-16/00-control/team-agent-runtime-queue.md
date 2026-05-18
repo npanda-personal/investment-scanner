@@ -1493,6 +1493,74 @@ Date: 2026-05-18
 
 Date: 2026-05-18
 
+## Newly Spawned
+
+- Team 03 `019e3c20-e9f8-7da2-83f1-ebe84851a830`: docs-only architecture readiness for `CF-W1-SIG-TRIGGER-02`.
+
+## Sequencing Decision
+
+Team 00 checked the top Team 02 candidates:
+
+- `CF-W1-SQLAB-02`: sequenced behind active no-schema `CF-W1-SQLAB-02A`.
+- `CF-W1-STRAT-02`: durable parent remains blocked after accepted `CF-W1-STRAT-02A` because durable rule history needs Prisma/schema/generated approval.
+- `CF-W1-MD-02`: ADR-only, no source-ready implementation.
+
+Team 00 dispatched the next independent investor/trader-value candidate, `CF-W1-SIG-TRIGGER-02`.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 10 - Review / Release | `019e3c1d-9dc4-7721-8831-5f9cee0be072` | `gpt-5.5`, high | review/release | `CF-W1-CAL-01` after QA ACCEPT | active |
+| 2 | Team 03 - Architecture Factory | `019e3c20-e9f8-7da2-83f1-ebe84851a830` | `gpt-5.4`, high | architecture readiness | `CF-W1-SIG-TRIGGER-02` | active |
+| 3 | Open slot | none | pending | architect signoff | `CF-W1-CAL-01` if Team 10 accepts | waiting |
+| 4 | Open slot | none | pending | QA planning | `CF-W1-SIG-TRIGGER-02` if Team 03 returns a Ready/split child | waiting |
+| 5 | Open slot | none | pending | requirements discovery | next persistent Team 02 cycle after architecture output | waiting |
+| 6 | Open slot | none | pending | next implementation | next promoted Ready item | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03 is ready for `CF-W1-CAL-01` Architect Signoff if Team 10 accepts.
+- Team 04 is ready for `CF-W1-SIG-TRIGGER-02` QA planning if Team 03 returns a bounded child.
+- Team 02 is ready for the next persistent discovery cycle after current architecture output is consumed.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Completed Since Previous Snapshot
+
+- Team 10 `019e3c1d-9dc4-7721-8831-5f9cee0be072`: accepted `CF-W1-CAL-01` review/release and was closed.
+
+## Newly Spawned
+
+- Team 03 `019e3c21-c96a-7e10-b5bf-26ec1ed4b417`: `CF-W1-CAL-01` Architect Signoff after Team 10 ACCEPT.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 03 - Architect Signoff | `019e3c21-c96a-7e10-b5bf-26ec1ed4b417` | `gpt-5.4`, high | architect signoff | `CF-W1-CAL-01` after Team 10 ACCEPT | active |
+| 2 | Team 03 - Architecture Factory | `019e3c20-e9f8-7da2-83f1-ebe84851a830` | `gpt-5.4`, high | architecture readiness | `CF-W1-SIG-TRIGGER-02` | active |
+| 3 | Open slot | none | pending | delegated PO / commit | `CF-W1-CAL-01` if Architect Signoff accepts | waiting |
+| 4 | Open slot | none | pending | QA planning | `CF-W1-SIG-TRIGGER-02` if Team 03 returns a bounded child | waiting |
+| 5 | Open slot | none | pending | requirements discovery | next persistent Team 02 cycle after architecture output | waiting |
+| 6 | Open slot | none | pending | next implementation | next promoted Ready item | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 00 is ready for `CF-W1-CAL-01` delegated PO acceptance and scoped branch commit if Architect Signoff accepts.
+- Team 04 is ready for `CF-W1-SIG-TRIGGER-02` QA planning if Team 03 returns a bounded child.
+- Team 02 is ready for the next persistent discovery cycle after current architecture output is consumed.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
 ## Runtime Recovery
 
 - Prior Team 03 architect agent `019e3c02-4baa-77a3-a567-d5cf34e804db` was no longer visible to the runtime and left no `CF-W1-BT-02` architect signoff files in the BT worktree.

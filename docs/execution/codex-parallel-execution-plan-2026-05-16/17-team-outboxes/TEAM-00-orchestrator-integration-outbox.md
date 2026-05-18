@@ -1790,6 +1790,41 @@ Teams ready to pick up new tasks:
 
 ---
 
+# SIG-TRIGGER-02 Architecture Dispatch
+
+Date: 2026-05-18
+
+Team 00 dispatched Team 03 for `CF-W1-SIG-TRIGGER-02` architecture readiness after confirming higher-ranked parent/durable candidates are currently sequenced or blocked.
+
+- Team 03 agent: `019e3c20-e9f8-7da2-83f1-ebe84851a830`
+- Scope: docs-only architecture review, contract, work packet, and QA handoff notes.
+
+Teams ready to pick up new tasks:
+
+- Team 03: `CF-W1-CAL-01` Architect Signoff if Team 10 accepts.
+- Team 04: `CF-W1-SIG-TRIGGER-02` QA planning if Team 03 returns a bounded child.
+- Team 02: next persistent discovery cycle after current architecture output is consumed.
+
+---
+
+# CAL-01 Architect Signoff Dispatched
+
+Date: 2026-05-18
+
+Team 10 accepted `CF-W1-CAL-01`; Team 00 closed the Team 10 agent and spawned Team 03 Architect Signoff.
+
+- Team 10 closed: `019e3c1d-9dc4-7721-8831-5f9cee0be072`
+- Team 03 spawned: `019e3c21-c96a-7e10-b5bf-26ec1ed4b417`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-CAL-01`
+
+Teams ready to pick up new tasks:
+
+- Team 00: `CF-W1-CAL-01` delegated PO acceptance and scoped branch commit if Architect Signoff accepts.
+- Team 04: `CF-W1-SIG-TRIGGER-02` QA planning if Team 03 returns a bounded child.
+- Team 02: next persistent discovery cycle after current architecture output is consumed.
+
+---
+
 # BT-02 Architect Signoff Relaunched
 
 Date: 2026-05-18
