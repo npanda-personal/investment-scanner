@@ -1610,6 +1610,35 @@ Team 00 consumed two completed gates:
 
 Date: 2026-05-18
 
+## TP-02 Review Reject Routed
+
+Team 10 rejected `CF-W1-TP-02` because additive exit/invalidation arrays were dropped by the returned DTO after `repository.upsert()`.
+
+Team 00 routed bounded Team 06 rework without Product Owner escalation:
+
+- Team 06 agent: `019e3c71-3e92-72a0-9ecc-61602fd4f531`.
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-TP-02`.
+- Approved fix scope: `trade-plan-risk-engine.service.ts`, focused service tests, and evidence docs only.
+- Forbidden scope remains repository, schema, route, frontend, shared utility/UI, package, generated, provider/live-data, startup/backfill, paid/cloud, broker, and telemetry.
+
+## Active Agents
+
+- Team 06 `019e3c71-3e92-72a0-9ecc-61602fd4f531`: `CF-W1-TP-02` bounded rework.
+- Team 03 `019e3c6b-1903-72f1-9286-4def1285544c`: `CF-W1-RH-01` architecture readiness.
+- Team 02 `019e3c6b-ae6c-7333-b6aa-3096105ce0e3`: rolling requirements discovery.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-TP-02` QA rerun after Team 06 rework.
+- Team 00: `CF-W1-SMI-01` Ready evaluation.
+- Team 10: `CF-W1-TP-02` re-review after QA rerun ACCEPT.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
 ## Runtime Update
 
 `CF-W1-TP-02` is now dispatched.

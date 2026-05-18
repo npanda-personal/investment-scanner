@@ -1693,6 +1693,33 @@ Date: 2026-05-18
 
 ---
 
+# Runtime Checkpoint - TP-02 Rework Routed
+
+Date: 2026-05-18
+
+## Review Result
+
+Team 10 rejected `CF-W1-TP-02`.
+
+Blocking issue: additive `exitConditions[]` and `invalidationConditions[]` are created before persistence but lost from the returned DTO after `repository.upsert()`.
+
+## Routing
+
+Team 00 routed bounded Team 06 rework because the fix can remain in service/test/doc scope:
+
+- Team 06 agent: `019e3c71-3e92-72a0-9ecc-61602fd4f531`.
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-TP-02`.
+- Repository/schema changes remain forbidden.
+- Product Owner action required: no.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-TP-02` QA rerun after Team 06 rework.
+- Team 00: `CF-W1-SMI-01` Ready evaluation.
+- Team 10: `CF-W1-TP-02` re-review after QA rerun ACCEPT.
+
+---
+
 # Runtime Checkpoint - CF-W1-TP-02 Dispatched
 
 Date: 2026-05-18

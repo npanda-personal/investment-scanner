@@ -142,6 +142,79 @@ Update `17-team-outboxes/TEAM-06-outbox.md` with:
 
 ---
 
+# Current Dispatcher Assignment
+
+Date: 2026-05-18
+
+## Assignment
+
+Perform bounded `CF-W1-TP-02` rework after Team 10 review `REJECT`.
+
+This is a rework pass in the existing Team 06 Trade Plan worktree. Do not start a new branch. Do not commit.
+
+## Worktree / Branch
+
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-TP-02`
+- Branch: `codex/team06-strategy-signal/CF-W1-TP-02`
+- Base reference: accepted `CF-W1-TP-01B` commit `8ff22fd`
+
+## Blocking Finding To Fix
+
+Team 10 rejected because `exitConditions[]` and `invalidationConditions[]` are built before persistence, but the real returned DTO loses them after `repository.upsert()`.
+
+Fix this without touching the repository file if possible. The approved path is service-side DTO preservation after persistence, similar to how `persistWithReadiness()` already preserves readiness fields from the pre-persist result.
+
+## Allowed Files
+
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.service.ts`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.types.ts` only if type adjustment is strictly needed
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.validation.ts` only if validation follow-up is strictly needed
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.md`
+- `backend/tests/modules/trade-plan-risk-engine/trade-plan-risk-engine.service.test.ts`
+- `backend/tests/trade-plan-risk-engine.paper-readiness.test.ts`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-TP-02-developer-handoff.md`
+
+## Forbidden Files
+
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.repository.ts`
+- `backend/tests/modules/trade-plan-risk-engine/trade-plan-risk-engine.repository.test.ts`
+- Prisma schema or migrations
+- generated files
+- backend or frontend route registries
+- Today Review, Strategy Decision, backtesting, frontend Trade Plan, shared backend utilities, shared UI, package manifests
+- provider/live-data, startup/backfill, paid/cloud, broker integration, or telemetry scope
+
+## Required Rework
+
+- Preserve `exitConditions[]` and `invalidationConditions[]` on the actual DTO returned from `generate()` after `repository.upsert()`.
+- Keep legacy `target` and `invalidationRules` compatibility behavior unchanged.
+- Preserve accepted `TP-01B` DQ hard-block behavior.
+- Add or adjust focused service tests so at least one test fails if repository `upsert()` returns a legacy-shaped DTO without the new arrays.
+- Do not mask a repository/schema need by claiming durable persistence of the arrays. This slice only needs returned DTO semantics to survive the existing persistence boundary without repository/schema widening.
+
+## Validation
+
+Run from the worktree backend after rework:
+
+```powershell
+npm.cmd test -- trade-plan-risk-engine.service.test.ts trade-plan-risk-engine.paper-readiness.test.ts --runInBand
+npm.cmd run build
+```
+
+## Expected Output
+
+Update the developer handoff and Team 06 outbox with:
+
+- exact files changed
+- how the Team 10 rejection was fixed
+- tests/build run and results
+- forbidden files confirmed untouched
+- residual risks
+- whether ready for Team 04 QA rerun
+
+---
+
 # Latest Assignment Override
 
 Date: 2026-05-18

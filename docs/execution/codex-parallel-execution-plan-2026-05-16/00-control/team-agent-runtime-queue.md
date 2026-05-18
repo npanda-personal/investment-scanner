@@ -1389,6 +1389,39 @@ Date: 2026-05-18
 
 Date: 2026-05-18
 
+## TP-02 Review Reject Routed
+
+- Team 10 rejected `CF-W1-TP-02` because the generated DTO loses additive `exitConditions[]` and `invalidationConditions[]` after `repository.upsert()`.
+- Team 00 classified this as bounded service rework, not a Product Owner consent blocker, because the approved fix path stays in `trade-plan-risk-engine.service.ts` and focused service tests without touching the forbidden repository/schema scope.
+
+## Newly Spawned
+
+- Team 06 `019e3c71-3e92-72a0-9ecc-61602fd4f531`: bounded `CF-W1-TP-02` rework after Team 10 reject.
+
+## Active Pool
+
+| Slot | Team | Agent | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Team 06 - Strategy / Signal / Risk | `019e3c71-3e92-72a0-9ecc-61602fd4f531` | implementation rework | `CF-W1-TP-02` returned DTO rehydration | active |
+| 2 | Team 03 - Architecture Factory | `019e3c6b-1903-72f1-9286-4def1285544c` | architecture prep | `CF-W1-RH-01` | active |
+| 3 | Team 02 - Requirement Factory | `019e3c6b-ae6c-7333-b6aa-3096105ce0e3` | requirements discovery | next distinct market-intelligence value cycle | active |
+| 4 | Open slot | none | QA rerun | `CF-W1-TP-02` after Team 06 rework | waiting |
+| 5 | Open slot | none | Ready evaluation | `CF-W1-SMI-01` | ready |
+| 6 | Open slot | none | architecture prep | `CF-W1-L3-TREV-02` after `CF-W1-RH-01` | queued |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04 is ready for `CF-W1-TP-02` QA rerun after Team 06 rework.
+- Team 00 is ready to evaluate `CF-W1-SMI-01` for Ready promotion.
+- Team 10 is ready for `CF-W1-TP-02` re-review after QA rerun ACCEPT.
+- Team 03 is queued for `CF-W1-L3-TREV-02` architecture after `CF-W1-RH-01`.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
 ## Completed Since Previous Snapshot
 
 - Team 00 committed the `CF-W1-TP-02` Ready promotion checkpoint on `dev` as `8e82e13 docs: promote trade plan semantics slice`.
