@@ -8,7 +8,7 @@ Audit-derived requirement draft. Not Ready for Implementation.
 
 ## Product Value
 
-Signal Calibration is a trust surface for research and review, not just a score transform. Traders need to know when calibration is still only diagnostic, when downstream influence is limited, and when missing or weak quality evidence makes the calibrated result unreliable. Without that separation, calibration can drift into looking more authoritative than the evidence supports.
+Signal Calibration is a trust surface for research and review, not just a score transform. Traders need to know when calibration is still only diagnostic, when downstream influence is limited, and when missing or weak quality evidence makes the calibrated result unreliable. Without that separation, calibration can drift into looking more authoritative than the evidence supports and can overstate how much research weight the output deserves.
 
 ## Evidence
 
@@ -16,11 +16,13 @@ Signal Calibration is a trust surface for research and review, not just a score 
 - The same audit found `eligibleForCalibration=false`, `eligibleForSignals=false`, `NOT_READY`, `UNUSABLE`, and `ILLIQUID` are not currently hard blockers inside `calibrationReadiness()`.
 - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md` shows calibration already exposes `calibrationReadiness`, `downstreamInfluence`, `authoritativeScore`, and evidence metadata, so a bounded trust-state refinement is viable.
 - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.md` shows calibration depends on historical regime and context snapshots, so missing or sparse context can silently weaken trust unless surfaced clearly.
+- The current requirement can stay bounded to existing calibration outputs and upstream evidence signals; it should not invent a new score, a new model, or a duplicate DQ/context policy.
 
 ## Dependencies
 
 - Best sequenced after `CF-W1-HCTX-01` and `CF-W1-MCTX-01` contract prep so calibration can consume clearer upstream context provenance instead of inventing its own explanation layer.
 - The first child should tighten trust-state semantics around existing readiness fields rather than widen calibration into new scoring or data-quality ownership.
+- Keep it separate from the actively routed `CF-W1-DQ-02` work; this calibration refinement should use the existing DQ outputs rather than depend on a new DQ contract in this cycle.
 
 ## Bounded Requirement
 
@@ -31,6 +33,7 @@ The first child slice should focus on:
 - preserving the current `calibrationReadiness`, `downstreamInfluence`, and `authoritativeScore` structure while tightening the reason and blocker story;
 - fail-closed trust framing when DQ evidence is missing, insufficient, or explicitly blocking even if a numeric score still exists;
 - explicit distinction between calibrated proof, raw-score fallback, and no-score states;
+- explicit mention of whether the output is strong enough for research comparison, cautionary review, or diagnostic-only inspection;
 - no new calibration model, no route/schema work, and no duplicate DQ scoring logic outside the module.
 
 ## Acceptance Criteria

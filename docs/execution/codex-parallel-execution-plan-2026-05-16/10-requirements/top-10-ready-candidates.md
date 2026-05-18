@@ -4,7 +4,7 @@ Date: 2026-05-18
 
 Status: Refreshed after Product Owner priority correction. This is a docs-only candidate list, not proof of implementation readiness. Team 00 owns all Ready queue movement.
 
-Team 02 discovery note: after the active `CF-W1-BT-02` and `CF-W1-HCTX-01` lanes, `CF-W1-DQ-02` is the top unassigned investor/trader-value item. This does not change Team 00's live Ready routing.
+Team 02 discovery note: after the active `CF-W1-BT-02`, `CF-W1-HCTX-01`, `CF-W1-DQ-02`, and `CF-W1-MCTX-01` lanes, `CF-W1-CAL-01` is the top unassigned investor/trader-value item. This does not change Team 00's live Ready routing.
 
 ## Priority Rule
 
@@ -22,21 +22,23 @@ These are docs-only backlog priorities. They are not Ready-evaluation results.
 
 | Rank | ID | Why now | Next gate |
 | --- | --- | --- | --- |
-| 1 | `CF-W1-DQ-02` | Session-aware currentness is the upstream fail-closed gate for every downstream trust surface. If currentness still looks calendar-fresh instead of session-fresh, every signal, strategy, backtest, and review surface can overstate evidence quality. | Team 03 architecture/contract prep, then Team 04 QA refresh. |
-| 2 | `CF-W1-MCTX-01` | Market regime labels need evidence, denominator clarity, and partial-context framing before downstream trust claims. | Team 03 architecture/contract prep, then Team 04 QA prep. |
-| 3 | `CF-W1-CAL-01` | Calibration trust drift is the next investor-value layer after context evidence is clearer. | Team 03 architecture/contract prep, then Team 04 QA prep. |
-| 4 | `CF-W1-SQLAB-02` | Signal outcome learning connects measured outcomes to future judgment; durable storage remains split, but the post-preview path needs definition. | Team 03 post-preview packet prep after `SQLAB-02A` closes. |
-| 5 | `CF-W1-STRAT-02` | Strategy provenance and DQ-gated trust are upstream to every signal/backtest claim. | Team 03/04 child-packet follow-up after accepted `STRAT-02A`. |
-| 6 | `CF-W1-MD-02` | Durable market-data readiness/evidence remains the foundation for trustworthy signals and backtests. | ADR and split-packet prep only; no schema/source promotion. |
-| 7 | `CF-W1-TP-01B` | Trade Plan no-target/DQ hard-block behavior protects paper-readiness language. | Reconcile branch/review state before any new work. |
-| 8 | `CF-W1-SQLAB-01` | Signal Quality outcome confidence needs a clear trusted-versus-untrusted contract before quality summaries shape judgment. | Team 03 architecture/contract prep, then Team 04 QA prep. |
-| 9 | `CF-W1-UX-01` | Workbench trust remains useful, but it follows market-data/signals/backtest evidence unless backend trust evidence is source-supported. | Backend trust-evidence parent remains blocked until source-supported fields exist. |
-| 10 | `CF-W1-L3-INTEL-03` | Portfolio concentration review is still useful, but it remains below the upstream market-intelligence trust stack unless a safety blocker requires earlier attention. | Team 03 architecture/contract prep, then Team 04 QA prep. |
+| 1 | `CF-W1-CAL-01` | Calibration trust drift is the next direct user-value layer after context evidence is clearer. | Team 03 architecture/contract prep, then Team 04 QA refresh. |
+| 2 | `CF-W1-SQLAB-02` | Signal outcome learning connects measured outcomes to future judgment; durable storage remains split, but the post-preview path needs definition. | Team 03 post-preview packet prep after `SQLAB-02A` closes. |
+| 3 | `CF-W1-STRAT-02` | Strategy provenance and DQ-gated trust are upstream to every signal/backtest claim. | Team 03/04 child-packet follow-up after accepted `STRAT-02A`. |
+| 4 | `CF-W1-MD-02` | Durable market-data readiness/evidence remains the foundation for trustworthy signals and backtests. | ADR and split-packet prep only; no schema/source promotion. |
+| 5 | `CF-W1-SQLAB-01` | Signal Quality outcome confidence needs a clear trusted-versus-untrusted contract before quality summaries shape judgment. | Team 03 architecture/contract prep, then Team 04 QA prep. |
+| 6 | `CF-W1-UX-01` | Workbench trust remains useful, but it follows market-data/signals/backtest evidence unless backend trust evidence is source-supported. | Backend trust-evidence parent remains blocked until source-supported fields exist. |
+| 7 | `CF-W1-L3-INTEL-03` | Portfolio concentration review is still useful, but it remains below the upstream market-intelligence trust stack unless a safety blocker requires earlier attention. | Team 03 architecture/contract prep, then Team 04 QA prep. |
+| 8 | `CF-W1-L3-WATCH-01` | Watchlist review actionability can improve the trader review queue without waiting on convenience work. | Team 03 architecture/contract prep, then Team 04 QA prep. |
+| 9 | `CF-W1-L3-INTEL-02` | Review traceability remains useful once higher-value trust layers are settled. | Team 03 architecture/contract prep, then Team 04 QA prep. |
+| 10 | `CF-W1-L3-ALERT-03` | Post-trigger follow-through only matters after the evidence stack is stronger. | Team 03 architecture/contract prep, then Team 04 QA prep. |
 
 ## Demoted For This Cycle
 
 The following remain valid backlog items, but should not preempt the market-intelligence stack above:
 
+- `CF-W1-DQ-02`
+- `CF-W1-MCTX-01`
 - `CF-W1-L3-WATCH-01`
 - `CF-W1-L3-INTEL-03`
 - `CF-W1-L3-INTEL-02`
@@ -69,9 +71,9 @@ Already promoted, pulled, accepted, or parked branch work should stay out of the
 
 ## Next Team 00 Pull
 
-Next docs-only handoff after the active `BT-02` and `HCTX-01` lanes: `CF-W1-DQ-02` to Team 03 for architecture/contract prep.
+Next docs-only handoff after the active `BT-02` and `HCTX-01` lanes: `CF-W1-CAL-01` to Team 03 for architecture/contract prep.
 
-Next live Ready routing still stays with `CF-W1-MCTX-01` once the active lanes clear.
+Next live Ready routing stays outside this docs-only candidate list; the routed market-context and Data Quality lanes remain excluded until Team 00 changes live routing.
 
 Next dependent handoff: Team 04 QA verification for active implementation handoffs after Team 06 or Team 05 submits developer evidence.
 
