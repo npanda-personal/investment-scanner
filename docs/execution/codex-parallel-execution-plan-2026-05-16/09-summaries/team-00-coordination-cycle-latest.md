@@ -1824,6 +1824,35 @@ Team 00 spawned Team 04 QA planning:
 
 Date: 2026-05-18
 
+## SIG-TRIGGER-02A Ready Promotion
+
+Team 04 completed QA planning and Team 00 promoted `CF-W1-SIG-TRIGGER-02A` to Ready.
+
+Gate summary:
+
+- no open decisions;
+- prior `CF-W1-SIG-TRIGGER-01` commit `6ab3999` is already in current `dev`;
+- requirement, architecture, contract, work packet, QA plan, and exact file reservations exist;
+- no shared/high-risk file is needed for the bounded first child.
+
+Assignment:
+
+- Team: Team 06 - Strategy / Signal / Risk
+- Branch: `codex/team06-strategy-signal/CF-W1-SIG-TRIGGER-02A`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-SIG-TRIGGER-02A`
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06: `CF-W1-SIG-TRIGGER-02A` implementation now.
+- Team 04: `CF-W1-SIG-TRIGGER-02A` QA after Team 06 handoff.
+- Team 02: next persistent discovery cycle after Team 06 launches.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
 ## BT-02 Architect Signoff Relaunched
 
 The saved Team 03 architect agent `019e3c02-4baa-77a3-a567-d5cf34e804db` was not recoverable from the runtime and no architect-signoff evidence existed in the BT worktree. Team 00 relaunched the same bounded gate.

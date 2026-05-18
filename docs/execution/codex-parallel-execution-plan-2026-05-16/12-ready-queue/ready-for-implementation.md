@@ -37,6 +37,8 @@ No available application-code item is currently waiting unassigned in Ready.
 
 `CF-W1-AUTH-SUB-01` was promoted, implemented, accepted through QA/review/Architect/delegated PO gates, and locally committed on its Team 09 branch as `354499d`.
 
+`CF-W1-SIG-TRIGGER-02A` is promoted and assigned to Team 06 for bounded backend-only Signal Generation trigger-audit surfacing in a dedicated worktree.
+
 ## Pulled / In Review
 
 | ID | Owner | Branch | Worktree | Scope | Status |
@@ -55,6 +57,7 @@ No available application-code item is currently waiting unassigned in Ready.
 | `CF-W1-L3-TREV-01` | Team 07 - Portfolio / Watchlist / Alerts | `codex/team07-portfolio-alerts/CF-W1-L3-TREV-01` | `../investment-scanner-worktrees/team07-CF-W1-L3-TREV-01` | Today Review run/list publication evidence and readiness-coherence normalization | Ready and assigned to Team 07 |
 | `CF-W1-SQLAB-01` | Team 06 - Strategy / Signal / Risk | `codex/team06-strategy-signal/CF-W1-SQLAB-01` | `../investment-scanner-worktrees/team06-CF-W1-SQLAB-01` | Backend-only Signal Quality Lab outcome-confidence metadata | Ready and assigned to Team 06 |
 | `CF-W1-AUTH-SUB-01` | Team 09 - Platform / Auth / Subscription / Notifications | `codex/team09-platform/CF-W1-AUTH-SUB-01` | `../investment-scanner-worktrees/team09-CF-W1-AUTH-SUB-01` | Combined backend-only auth fail-closed and admin/manual subscription controller-policy slice | Accepted and locally committed as `354499d`; awaiting later clean `dev` integration |
+| `CF-W1-SIG-TRIGGER-02A` | Team 06 - Strategy / Signal / Risk | `codex/team06-strategy-signal/CF-W1-SIG-TRIGGER-02A` | `../investment-scanner-worktrees/team06-CF-W1-SIG-TRIGGER-02A` | Backend-only Signal Generation trigger-audit surfacing and provenance labeling | Ready and assigned to Team 06 |
 
 ## Active Ready Handoff - `CF-W1-BT-02`
 
@@ -920,6 +923,81 @@ Next Team 00/owner work:
 - `CF-W1-MD-02`: continue ADR and split-packet prep only; no schema/source promotion.
 
 No app-code item became Ready during decision resolution itself. `CF-W1-L3-PORT-01A` was later promoted by Team 00 after requirement, architecture, QA, reservation, and Team 07 readiness gates passed.
+
+---
+
+## Active Ready Handoff - `CF-W1-SIG-TRIGGER-02A`
+
+Date promoted: 2026-05-18
+
+Team 00 evaluated `CF-W1-SIG-TRIGGER-02A` against Ready gates and promoted it as an independent Team 06 backend-only implementation slice.
+
+Gate evidence:
+
+- Requirement: `10-requirements/CF-W1-SIG-TRIGGER-02-persisted-trigger-auditability-requirement.md`
+- Architecture review: `03-architecture/CF-W1-SIG-TRIGGER-02-architecture-review.md`
+- Contract: `06-contracts/CF-W1-SIG-TRIGGER-02-persisted-trigger-auditability-contract.md`
+- Work packet: `08-work-packets/CF-W1-SIG-TRIGGER-02-work-packet.md`
+- QA plan: `04-qa/CF-W1-SIG-TRIGGER-02A-qa-plan.md`
+- Team 03 architecture outbox: `17-team-outboxes/TEAM-03-architecture-factory.md`
+- Team 04 QA outbox: `17-team-outboxes/TEAM-04-qa-factory.md`
+- Open decisions: none.
+- Prior dependency: `CF-W1-SIG-TRIGGER-01` commit `6ab3999` is an ancestor of current `dev`; current source includes `triggerContract` projection.
+- Shared/high-risk blocker: none if implementation stays inside the reserved `signal-generation-engine` files and backend tests.
+
+Branch/worktree:
+
+- Branch: `codex/team06-strategy-signal/CF-W1-SIG-TRIGGER-02A`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-SIG-TRIGGER-02A`
+
+Allowed files:
+
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.types.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.repository.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.service.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.md`
+- `backend/tests/modules/signal-generation-engine/signal-generation-engine.repository.test.ts`
+- `backend/tests/modules/signal-generation-engine/signal-generation-engine.service.test.ts`
+- `backend/tests/modules/signal-generation-engine/signal-generation-engine.trigger-contract.test.ts`
+- `backend/tests/modules/signal-generation-engine/signal-generation-dq-enforcement.invariants.test.ts`
+
+Allowed reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-SIG-TRIGGER-02A-developer-handoff.md`
+
+Forbidden files:
+
+- `backend/prisma/schema.prisma`
+- `backend/prisma/migrations/**`
+- generated files
+- backend/frontend route registries
+- `backend/src/modules/signal-generation-engine/index.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.controller.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.router.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.validation.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.module.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.config.ts`
+- `backend/tests/modules/signal-generation-engine/signal-generation-engine.routes.test.ts`
+- `backend/tests/modules/signal-generation-engine/signal-generation-engine.validation.test.ts`
+- all downstream module source, frontend source, shared utilities/UI, package manifests, provider/live-data, paid/cloud, broker, and telemetry files.
+
+Required behavior:
+
+- surface persisted `created_at` and `updated_at` for current `SignalResult` rows;
+- expose additive run audit metadata when `generationRunId` resolves to a run row;
+- label `trigger_timestamp` semantics as source-price-date, source-data-date, or unavailable;
+- label transient `strategyMatches[]` provenance as compatibility-only;
+- keep `trigger_price`, rule ids, timeframe, and unproven lifecycle state unavailable;
+- preserve legacy incomplete handling and strict DQ trusted read/run/latest behavior.
+
+Required validation after implementation:
+
+```powershell
+cd backend
+npm.cmd test -- signal-generation-engine.repository.test.ts signal-generation-engine.service.test.ts signal-generation-engine.trigger-contract.test.ts signal-generation-dq-enforcement.invariants.test.ts --runInBand
+npm.cmd run build
+```
 
 2026-05-18 acceptance update:
 

@@ -1627,6 +1627,39 @@ Date: 2026-05-18
 
 Date: 2026-05-18
 
+## Completed Since Previous Snapshot
+
+- Team 04 `019e3c2a-f0de-7573-92e8-0cef341ab83a`: completed `CF-W1-SIG-TRIGGER-02A` QA planning and was closed.
+
+## Ready Promotion
+
+- Team 00 promoted `CF-W1-SIG-TRIGGER-02A` to Ready and assigned Team 06.
+- Branch: `codex/team06-strategy-signal/CF-W1-SIG-TRIGGER-02A`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-SIG-TRIGGER-02A`
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 06 - Strategy / Signal / Risk | pending spawn | `gpt-5.3-codex`, high | implementation | `CF-W1-SIG-TRIGGER-02A` | ready |
+| 2 | Open slot | none | pending | QA verification | `CF-W1-SIG-TRIGGER-02A` after Team 06 handoff | waiting |
+| 3 | Open slot | none | pending | requirements discovery | next persistent Team 02 cycle after Team 06 launches | ready |
+| 4 | Open slot | none | pending | review/release | next QA-accepted handoff | waiting |
+| 5 | Open slot | none | pending | architect signoff | next Team 10 accepted handoff | waiting |
+| 6 | Open slot | none | pending | next implementation | next promoted Ready item | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06 is ready for `CF-W1-SIG-TRIGGER-02A` implementation now.
+- Team 04 is ready for `CF-W1-SIG-TRIGGER-02A` QA after Team 06 handoff.
+- Team 02 is ready for the next persistent discovery cycle after Team 06 launches.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
 ## Runtime Recovery
 
 - Prior Team 03 architect agent `019e3c02-4baa-77a3-a567-d5cf34e804db` was no longer visible to the runtime and left no `CF-W1-BT-02` architect signoff files in the BT worktree.

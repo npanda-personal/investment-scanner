@@ -74,23 +74,23 @@ Operating rules:
 | --- | --- |
 | Current daemon cycle id | `DAEMON-20260517` |
 | Current rolling iteration count | 42 |
-| Active teams | Team 03 `CF-W1-SIG-TRIGGER-02` architecture readiness |
-| Queued teams | Team 04 QA planning if `CF-W1-SIG-TRIGGER-02` returns a bounded child; Team 02 recurring discovery after architecture output |
+| Active teams | Team 06 `CF-W1-SIG-TRIGGER-02A` implementation assignment |
+| Queued teams | Team 04 QA after Team 06 handoff; Team 10 review after QA; Team 03 Architect Signoff after review; Team 02 recurring discovery after handoff stabilizes |
 | Idle teams | Team 10 available for next review; Team 06 implementation available after next Ready promotion |
 | Blocked teams | No team fully blocked; no open Decision Inbox items; platform/notification/alert convenience work is intentionally low priority unless it blocks correctness, privacy, or user-data safety |
-| Teams relaunched this cycle | Team 03/04/10/03 completed `CF-W1-CAL-01` gates; Team 03 is active on `CF-W1-SIG-TRIGGER-02` architecture prep |
+| Teams relaunched this cycle | Team 03/04/10/03 completed `CF-W1-CAL-01` gates; Team 03 and Team 04 completed `CF-W1-SIG-TRIGGER-02A` prep; Team 06 is assigned implementation |
 | Teams shut down due to no work | None permanently; Teams without ready implementation move to audit/refinement |
 | Teams re-added due to new work | Team 07 completed `CF-W1-L3-AUTH-02`; Team 06 completed `CF-W1-SIG-TRIGGER-01` |
-| Ready queue depth | 0 unassigned; `CF-W1-BT-02` and `CF-W1-CAL-01` are accepted and committed on branch-local worktrees |
+| Ready queue depth | 0 unassigned; `CF-W1-SIG-TRIGGER-02A` is assigned to Team 06 |
 | Refinement queue depth | Active market-intelligence queue: `CF-W1-SQLAB-02`, `CF-W1-STRAT-02`, `CF-W1-MD-02`, `CF-W1-SIG-TRIGGER-02`, `CF-W1-TP-02`, `CF-W1-UX-01` |
 | Integration queue depth | Branch-local accepted commits are parked, including `CF-W1-BT-02` `bb49ce2` and `CF-W1-CAL-01` `fd3d464`; shared `dev` integration is deferred until clean exact scope |
 | Decision inbox count | 0 open decisions |
 | Spawned subagent active limit | 6 |
 | Spawned subagent queue doc | `00-control/team-agent-runtime-queue.md` |
-| Ready-work pressure | no unassigned Ready item; next pressure is docs-only architecture/QA prep for market-intelligence candidates |
+| Ready-work pressure | `CF-W1-SIG-TRIGGER-02A` assigned to Team 06; next gates are implementation, Team 04 QA, Team 10 review, Architect Signoff, delegated PO acceptance |
 | Blocked-work pressure | low-to-medium; blockers are readiness/packet gates, clean integration scope, and intentionally demoted low-value platform/notification/alert convenience items |
-| Next team to launch | Team 04 QA planning if `CF-W1-SIG-TRIGGER-02` returns a bounded child |
-| Next item to assign | Consume `CF-W1-SIG-TRIGGER-02` architecture output, then relaunch Team 02 discovery or route Team 04 QA planning |
+| Next team to launch | Team 06 implementation for `CF-W1-SIG-TRIGGER-02A` |
+| Next item to assign | Team 04 QA after Team 06 handoff; Team 02 discovery can relaunch once implementation is running |
 | Last commit at Team 00 resume start | `8450df1 docs: refresh requirements priority queue` |
 | Daemon should continue | Yes; Product Owner action is not required |
 
@@ -237,3 +237,4 @@ Old work items in `docs/codex-agent-team-plan/` may be used only as evidence or 
 | DAEMON-20260518-40 | `CF-W1-BT-02` accepted branch commit | Teams 06, 04, 10, 03, 00 | Committed on implementation branch | Team 06 Backtesting worktree | Team 06 implemented backtesting review disposition, QA accepted rerun, Team 10 accepted, Architect Signoff accepted, Team 00 delegated PO acceptance completed, and scoped branch commit `bb49ce2` was created. No push or `dev` integration yet. |
 | DAEMON-20260518-41 | `CF-W1-CAL-01` accepted branch commit | Teams 06, 04, 10, 03, 00 | Committed on implementation branch | Team 06 Signal Calibration worktree | Team 06 implemented calibration readiness trust metadata, QA rejected and rerun accepted after context-gap rework, Team 10 accepted, Architect Signoff accepted, Team 00 delegated PO acceptance completed, and scoped branch commit `fd3d464` was created. No push or `dev` integration yet. |
 | DAEMON-20260518-42 | `CF-W1-SIG-TRIGGER-02` architecture dispatch | Team 00 + Team 03 | Architecture In Progress | `16-team-inboxes/TEAM-03-current-assignment.md`, architecture docs | Team 00 sequenced `SQLAB-02`, `STRAT-02`, and `MD-02` parent/durable work as blocked or sequenced, then dispatched Team 03 for the next independent signal-auditability architecture packet. |
+| DAEMON-20260518-43 | `CF-W1-SIG-TRIGGER-02A` Ready promotion | Team 00 + Team 06 | Ready for Implementation | `12-ready-queue/`, `16-team-inboxes/TEAM-06-current-assignment.md`, promotion summary | Team 00 verified requirement, architecture review, contract, work packet, QA plan, prior trigger dependency, open-decision state, and exact backend-only Signal Generation reservations. Team 06 is assigned a dedicated worktree for trigger-audit surfacing. |

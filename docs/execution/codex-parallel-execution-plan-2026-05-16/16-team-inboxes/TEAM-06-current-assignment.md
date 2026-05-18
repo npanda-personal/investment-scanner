@@ -207,6 +207,112 @@ Update the Team 06 outbox and developer handoff with:
 
 ---
 
+# Current Active Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Implement `CF-W1-SIG-TRIGGER-02A` - bounded Signal Generation trigger-audit surfacing and provenance labeling.
+
+This final override supersedes older Team 06 assignment tails above. Do not implement the full durable `CF-W1-SIG-TRIGGER-02` parent. Stay inside the backend-only first child.
+
+## Branch / Worktree
+
+- Branch: `codex/team06-strategy-signal/CF-W1-SIG-TRIGGER-02A`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-SIG-TRIGGER-02A`
+
+## Evidence To Use
+
+- Requirement: `10-requirements/CF-W1-SIG-TRIGGER-02-persisted-trigger-auditability-requirement.md`
+- Architecture review: `03-architecture/CF-W1-SIG-TRIGGER-02-architecture-review.md`
+- Contract: `06-contracts/CF-W1-SIG-TRIGGER-02-persisted-trigger-auditability-contract.md`
+- Work packet: `08-work-packets/CF-W1-SIG-TRIGGER-02-work-packet.md`
+- QA plan: `04-qa/CF-W1-SIG-TRIGGER-02A-qa-plan.md`
+- Prior accepted trigger projection: `09-summaries/CF-W1-SIG-TRIGGER-01-po-acceptance-packet.md`
+- Ready queue handoff: `12-ready-queue/ready-for-implementation.md`
+
+## Allowed Files
+
+You may edit only:
+
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.types.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.repository.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.service.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.md`
+- `backend/tests/modules/signal-generation-engine/signal-generation-engine.repository.test.ts`
+- `backend/tests/modules/signal-generation-engine/signal-generation-engine.service.test.ts`
+- `backend/tests/modules/signal-generation-engine/signal-generation-engine.trigger-contract.test.ts`
+- `backend/tests/modules/signal-generation-engine/signal-generation-dq-enforcement.invariants.test.ts`
+
+Allowed reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-SIG-TRIGGER-02A-developer-handoff.md`
+
+## Forbidden Files
+
+Do not edit:
+
+- Prisma schema or migrations
+- generated files
+- backend/frontend route registries
+- `backend/src/modules/signal-generation-engine/index.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.controller.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.router.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.validation.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.module.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.config.ts`
+- `backend/tests/modules/signal-generation-engine/signal-generation-engine.routes.test.ts`
+- `backend/tests/modules/signal-generation-engine/signal-generation-engine.validation.test.ts`
+- `backend/src/modules/strategy-framework/**`
+- `backend/src/modules/strategy-decision-engine/**`
+- `backend/src/modules/today-trade-review/**`
+- `backend/src/modules/trade-plan-risk-engine/**`
+- `backend/src/modules/alerts-monitoring/**`
+- `backend/src/modules/portfolio-management/**`
+- `backend/src/modules/portfolio-intelligence/**`
+- `backend/src/modules/watchlist-management/**`
+- `backend/src/modules/ai-investment-copilot/**`
+- `backend/src/modules/market-data-foundation/**`
+- `frontend/src/**`
+- shared backend utilities
+- shared frontend components
+- package manifests
+- providers, live-data, startup/backfill, paid/cloud, broker, or telemetry paths
+
+## Implementation Requirements
+
+- Surface persisted `SignalResult.createdAt` and `SignalResult.updatedAt` in additive trigger audit metadata for current rows.
+- Surface additive generation-run status/timing evidence only when `generationRunId` resolves to a run row.
+- Label `trigger_timestamp` semantics as source-price-date, source-data-date, or unavailable.
+- Label transient `strategyMatches[]` provenance as compatibility-only; do not upgrade it into durable trigger provenance.
+- Keep `trigger_price`, rule ids, timeframe, and unproven lifecycle state unavailable unless module-owned evidence proves the optional `detected` mapping.
+- Preserve legacy incomplete handling, incomplete reasons, and strict DQ trusted read/run/latest behavior.
+- Do not create durable rule provenance, rule-defined trigger price, new trigger tables, shared contracts, routes, frontend adoption, or downstream consumer changes.
+
+## Focused Validation
+
+Run after implementation:
+
+```powershell
+cd C:\work\repo\investment-scanner-worktrees\team06-CF-W1-SIG-TRIGGER-02A\backend
+npm.cmd test -- signal-generation-engine.repository.test.ts signal-generation-engine.service.test.ts signal-generation-engine.trigger-contract.test.ts signal-generation-dq-enforcement.invariants.test.ts --runInBand
+npm.cmd run build
+```
+
+Before build, check memory/resource safety if practical.
+
+## Stop Conditions
+
+Stop and return to Team 00 if implementation requires any forbidden file, schema/generated/route/shared/package/frontend/provider/startup/live change, downstream consumer adoption, durable rule provenance, rule-defined trigger price, or broader lifecycle ownership.
+
+## Expected Outbox
+
+Update `17-team-outboxes/TEAM-06-outbox.md` and `18-integration-queue/CF-W1-SIG-TRIGGER-02A-developer-handoff.md` with exact files changed, behavior changed, tests run/results, skipped checks and reasons, forbidden files confirmed untouched, assumptions, risks, blockers, and next gate: Team 04 QA.
+
+---
+
 # Latest Assignment Override
 
 Date: 2026-05-18

@@ -1861,6 +1861,24 @@ Teams ready to pick up new tasks:
 
 ---
 
+# SIG-TRIGGER-02A Ready Promotion
+
+Date: 2026-05-18
+
+Team 00 promoted `CF-W1-SIG-TRIGGER-02A` to Ready and assigned Team 06.
+
+- Branch: `codex/team06-strategy-signal/CF-W1-SIG-TRIGGER-02A`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-SIG-TRIGGER-02A`
+- Scope: backend-only Signal Generation trigger-audit surfacing and provenance labeling.
+
+Teams ready to pick up new tasks:
+
+- Team 06: `CF-W1-SIG-TRIGGER-02A` implementation now.
+- Team 04: `CF-W1-SIG-TRIGGER-02A` QA after Team 06 handoff.
+- Team 02: next persistent discovery cycle after Team 06 launches.
+
+---
+
 # BT-02 Architect Signoff Relaunched
 
 Date: 2026-05-18
