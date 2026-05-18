@@ -3157,3 +3157,33 @@ Team 02 completed the next requirement discovery cycle and added `CF-W1-BT-03` a
 | 4 | Open slot | none | queued | Team 04 QA rerun after BT-01A rework | waiting |
 | 5 | Open slot | none | queued | Team 10 BT-01A review after QA accepts | waiting |
 | 6 | Open slot | none | queued | Team 00 STRAT-03 Ready evaluation after QA plan | waiting |
+
+---
+
+# Latest Active Snapshot
+
+Date: 2026-05-18
+
+## Current Active Agents
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | `019e3d64-63ec-7233-8b30-597de8b99ca7` | `gpt-5.4`, high | QA verification | `CF-W1-SIG-02` | active |
+| 2 | Team 03 - Architecture Factory | `019e3d64-6421-7922-bb13-6d868bca1456` | `gpt-5.4`, high | architecture prep | `CF-W1-L3-DQ-01` | active |
+| 3 | Team 02 - PO + Requirement Factory | `019e3d64-a317-7e21-bd64-69e1eac8563b` | `gpt-5.4-mini`, high | rolling requirements discovery | next direct investor/trader-value item | active |
+| 4 | Open slot | none | pending | queued review | Team 10 `CF-W1-SIG-02` review after QA ACCEPT | waiting |
+| 5 | Open slot | none | pending | queued QA | Team 04 `CF-W1-SQLAB-02B` proposal QA review | waiting |
+| 6 | Open slot | none | pending | queued gate | next accepted handoff/signoff/implementation gate | waiting |
+
+## Completed Since Previous Snapshot
+
+- Team 03 `019e3d57-ee47-74e3-a2c2-dd9a3f359935`: accepted `CF-W1-BT-01A` Architect Signoff; Team 00 closed the agent after recording that branch commit `83a69c0` is already complete.
+- Team 00 committed active docs checkpoint `74a3198 docs: route sig qa and lane3 readiness prep`.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-SIG-02` QA verification is active.
+- Team 03: `CF-W1-L3-DQ-01` architecture prep is active.
+- Team 02: rolling direct investor/trader-value requirements discovery is active.
+- Team 10: `CF-W1-SIG-02` review after QA ACCEPT.
+- Team 04: `CF-W1-SQLAB-02B` proposal QA review when a QA slot is useful.

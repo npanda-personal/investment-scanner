@@ -1,5 +1,35 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - SIG-02 QA And L3-DQ Architecture Active
+
+Date: 2026-05-18
+
+Team 00 saved the current orchestration state in local docs commit `74a3198 docs: route sig qa and lane3 readiness prep`.
+
+Active spawned agents:
+
+- Team 04 `019e3d64-63ec-7233-8b30-597de8b99ca7`: `CF-W1-SIG-02` QA verification in `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-SIG-02`.
+- Team 03 `019e3d64-6421-7922-bb13-6d868bca1456`: `CF-W1-L3-DQ-01` architecture/contract/work-packet prep on `dev`.
+- Team 02 `019e3d64-a317-7e21-bd64-69e1eac8563b`: rolling Product Owner / requirements discovery biased toward direct investor/trader value.
+
+Routing:
+
+- `CF-W1-SIG-02`: implementation done; Team 04 QA is the active gate. Team 10 review is queued after QA ACCEPT.
+- `CF-W1-L3-DQ-01`: architecture prep is active; Team 00 will evaluate for Ready only after architecture and QA evidence exist.
+- `CF-W1-SQLAB-02B`: proposal-only architecture exists; implementation remains blocked by future schema/generated/repository consent. Team 04 proposal QA is queued.
+
+Teams ready to pick up new tasks:
+
+- Team 04: `CF-W1-SIG-02` QA verification is active.
+- Team 03: `CF-W1-L3-DQ-01` architecture prep is active.
+- Team 02: rolling direct investor/trader-value requirements discovery is active.
+- Team 10: `CF-W1-SIG-02` review after Team 04 accepts.
+- Team 04: `CF-W1-SQLAB-02B` proposal QA review when capacity is useful.
+
+Product Owner action required: no.
+
+---
+
 ## Latest Runtime Checkpoint - STRAT-03 Review Accepted, BT-01A Rework, SIG-02 QA Routing
 
 Date: 2026-05-18

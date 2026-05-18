@@ -73,25 +73,25 @@ Operating rules:
 | Field | Current Value |
 | --- | --- |
 | Current daemon cycle id | `DAEMON-20260517` |
-| Current rolling iteration count | 42 |
-| Active teams | Team 06 `CF-W1-SIG-TRIGGER-02A` implementation assignment |
-| Queued teams | Team 04 QA after Team 06 handoff; Team 10 review after QA; Team 03 Architect Signoff after review; Team 02 recurring discovery after handoff stabilizes |
-| Idle teams | Team 10 available for next review; Team 06 implementation available after next Ready promotion |
+| Current rolling iteration count | 43 |
+| Active teams | Team 04 `CF-W1-SIG-02` QA verification; Team 03 `CF-W1-L3-DQ-01` architecture prep; Team 02 rolling PO/requirements discovery |
+| Queued teams | Team 10 `CF-W1-SIG-02` review after QA ACCEPT; Team 04 `CF-W1-SQLAB-02B` proposal QA review; next implementation/signoff gate from accepted handoffs |
+| Idle teams | Team 05/06/07/08/09 implementation lanes available for the next promoted, isolated Ready item; Team 10 available after SIG-02 QA gate |
 | Blocked teams | No team fully blocked; no open Decision Inbox items; platform/notification/alert convenience work is intentionally low priority unless it blocks correctness, privacy, or user-data safety |
 | Teams relaunched this cycle | Team 03/04/10/03 completed `CF-W1-CAL-01` gates; Team 03 and Team 04 completed `CF-W1-SIG-TRIGGER-02A` prep; Team 06 is assigned implementation |
 | Teams shut down due to no work | None permanently; Teams without ready implementation move to audit/refinement |
 | Teams re-added due to new work | Team 07 completed `CF-W1-L3-AUTH-02`; Team 06 completed `CF-W1-SIG-TRIGGER-01` |
-| Ready queue depth | 0 unassigned; `CF-W1-SIG-TRIGGER-02A` is assigned to Team 06 |
-| Refinement queue depth | Active market-intelligence queue: `CF-W1-SQLAB-02`, `CF-W1-STRAT-02`, `CF-W1-MD-02`, `CF-W1-SIG-TRIGGER-02`, `CF-W1-TP-02`, `CF-W1-UX-01` |
-| Integration queue depth | Branch-local accepted commits are parked, including `CF-W1-BT-02` `bb49ce2` and `CF-W1-CAL-01` `fd3d464`; shared `dev` integration is deferred until clean exact scope |
+| Ready queue depth | 0 unassigned; active Ready/review work is already assigned to isolated worktrees |
+| Refinement queue depth | Active direct investor/trader-value queue; Team 02 is refreshing requirements while Team 03 prepares `CF-W1-L3-DQ-01` architecture |
+| Integration queue depth | Active branch-local handoffs/reviews; accepted branch commits remain parked for clean later integration |
 | Decision inbox count | 0 open decisions |
 | Spawned subagent active limit | 6 |
 | Spawned subagent queue doc | `00-control/team-agent-runtime-queue.md` |
-| Ready-work pressure | `CF-W1-SIG-TRIGGER-02A` assigned to Team 06; next gates are implementation, Team 04 QA, Team 10 review, Architect Signoff, delegated PO acceptance |
-| Blocked-work pressure | low-to-medium; blockers are readiness/packet gates, clean integration scope, and intentionally demoted low-value platform/notification/alert convenience items |
-| Next team to launch | Team 06 implementation for `CF-W1-SIG-TRIGGER-02A` |
-| Next item to assign | Team 04 QA after Team 06 handoff; Team 02 discovery can relaunch once implementation is running |
-| Last commit at Team 00 resume start | `8450df1 docs: refresh requirements priority queue` |
+| Ready-work pressure | `CF-W1-SIG-02` is in QA after implementation; next gate is Team 10 review if QA accepts |
+| Blocked-work pressure | low-to-medium; blockers are readiness/packet gates, explicit SQLAB durable-storage consent, clean integration scope, and intentionally demoted low-value platform/notification/alert convenience items |
+| Next team to launch | Team 10 review for `CF-W1-SIG-02` after Team 04 QA ACCEPT |
+| Next item to assign | Team 04 proposal QA for `CF-W1-SQLAB-02B`, or implementation lane after Team 03/04 make a top item Ready |
+| Last commit at Team 00 resume start | `74a3198 docs: route sig qa and lane3 readiness prep` |
 | Daemon should continue | Yes; Product Owner action is not required |
 
 ## Sprint 0 Items

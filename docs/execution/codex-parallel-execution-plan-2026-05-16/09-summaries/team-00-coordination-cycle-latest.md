@@ -9,8 +9,8 @@ Team: TEAM-00 - Master Orchestrator / Integration
 | Field | Current value |
 | --- | --- |
 | Branch | `dev` |
-| Branch status | `dev...origin/dev [ahead 129]` before the current docs checkpoint |
-| Worktree safety | Safe for scoped docs commits and isolated worktree implementation. Shared `dev` has active Team 02 requirement-discovery docs that must not be staged by Team 00 until Team 02 completes. |
+| Branch status | `dev...origin/dev [ahead 138]` after local docs checkpoint `74a3198` |
+| Worktree safety | Safe for scoped docs commits and isolated worktree implementation. Shared `dev` is clean at this checkpoint; active spawned agents must keep to assigned write scopes. |
 | Open decisions | 0 |
 | Ready queue depth | 0 unassigned implementation items waiting in Ready; active Ready/review work is assigned to dedicated teams/worktrees. |
 | Refinement queue depth | Active; Team 02 is running persistent direct investor/trader-value discovery. |
@@ -56,7 +56,14 @@ Team 02 completed a rolling direct-value requirements cycle and added `CF-W1-SQL
 
 ## Active Agents
 
-No active spawned agents at this checkpoint before the next launch wave.
+| Slot | Team | Agent | Model / Reasoning | Work Item | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | `019e3d64-63ec-7233-8b30-597de8b99ca7` | `gpt-5.4`, high | `CF-W1-SIG-02` QA verification in stacked Team 06 worktree | active |
+| 2 | Team 03 - Architecture Factory | `019e3d64-6421-7922-bb13-6d868bca1456` | `gpt-5.4`, high | `CF-W1-L3-DQ-01` architecture/contract/work-packet prep | active |
+| 3 | Team 02 - Requirement Factory / PO delegate | `019e3d64-a317-7e21-bd64-69e1eac8563b` | `gpt-5.4-mini`, high | rolling direct investor/trader-value requirements discovery | active |
+| 4 | Open slot | none | pending | Team 10 `CF-W1-SIG-02` review after QA accepts | queued |
+| 5 | Open slot | none | pending | Team 04 `CF-W1-SQLAB-02B` proposal QA review | queued |
+| 6 | Open slot | none | pending | next implementation or signoff gate from active handoffs | queued |
 
 ## Teams Ready To Pick Up New Tasks
 
