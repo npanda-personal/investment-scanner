@@ -506,3 +506,27 @@ Date: 2026-05-18
 - Team 02 is ready to relaunch persistent PO/Requirements discovery after the main docs checkpoint commit.
 - Team 03 / Team 08 are ready for `CF-W1-UX-01` contract/source-mapping prep after Team 00 assigns it.
 - Team 03 / Team 04 are ready to prep `CF-W1-HCTX-01` and `CF-W1-MCTX-01` after the current STRAT QA/review lane advances.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Current Pool
+
+| Slot | Team | Agent | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Team 06 - Strategy / Signal / Risk | `019e3b53-24b4-7c43-ba00-e98d4fdffbd4` | bounded rework | `CF-W1-STRAT-02A` ruleRevision fallback removal | active |
+| 2 | Open slot | none | implementation | `CF-W1-UX-01A` Workbench trust framing | ready to spawn |
+| 3 | Open slot | none | QA rerun | `CF-W1-STRAT-02A` after Team 06 rework | waiting |
+| 4 | Open slot | none | review | `CF-W1-STRAT-02A` after QA rerun | waiting |
+| 5 | Open slot | none | signoff | `CF-W1-STRAT-02A` after review | waiting |
+| 6 | Open slot | none | planning | next docs-only prep item | open |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 08 is ready to implement `CF-W1-UX-01A`.
+- Team 04 is ready for `CF-W1-STRAT-02A` QA rerun after Team 06 rework.
+- Team 10 is ready for `CF-W1-STRAT-02A` re-review after QA rerun.
+- Team 03 is ready for `CF-W1-STRAT-02A` signoff after Team 10 accepts.

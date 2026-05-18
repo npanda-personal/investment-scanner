@@ -10,6 +10,7 @@ No available application-code item is currently waiting unassigned in Ready.
 
 - `CF-W1-STRAT-02A` is promoted to Ready and assigned to Team 06 in a dedicated worktree for bounded no-schema Strategy Framework rule metadata and DQ gate exposure.
 - `CF-W1-DQ-02A` is promoted to Ready and assigned to Team 05 in a dedicated worktree for bounded backend-only Data Quality Engine currentness evidence.
+- `CF-W1-UX-01A` is promoted to Ready and assigned to Team 08 in a dedicated worktree for bounded frontend-only Stock Research Workbench trust framing from current source-supported evidence.
 
 `CF-W1-SQLAB-01` was promoted by Team 00 on 2026-05-18 and assigned to Team 06 in a dedicated worktree for bounded backend-only Signal Quality Lab implementation.
 
@@ -32,6 +33,7 @@ No available application-code item is currently waiting unassigned in Ready.
 | ID | Owner | Branch | Worktree | Scope | Status |
 | --- | --- | --- | --- | --- | --- |
 | `CF-W1-STRAT-02A` | Team 06 - Strategy / Signal / Risk | `codex/team06-strategy-signal/CF-W1-STRAT-02A` | `../investment-scanner-worktrees/team06-CF-W1-STRAT-02A` | No-schema Strategy Framework rule metadata and DQ gate trust exposure | Ready and assigned to Team 06 |
+| `CF-W1-UX-01A` | Team 08 - UX / Research / Copilot | `codex/team08-ux-research/CF-W1-UX-01A` | `../investment-scanner-worktrees/team08-CF-W1-UX-01A` | Frontend-only Stock Research Workbench trust framing from current page evidence | Ready and assigned to Team 08 |
 | `CF-W1-DQ-02A` | Team 05 - Market Data / Data Quality | `codex/team05-market-data/CF-W1-DQ-02A` | `../investment-scanner-worktrees/team05-CF-W1-DQ-02A` | Backend-only DQE currentness evidence and fail-closed propagation | Ready and assigned to Team 05 |
 | `CF-W1-L3-PORT-01A` | Team 07 - Portfolio / Watchlist / Alerts | `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A` | `../investment-scanner-worktrees/team07-CF-W1-L3-PORT-01A` | Backend-only portfolio-management readiness DTOs | Rejected / Rework after Team 10 review; Team 07 revision pending |
 | `CF-W1-TP-01B` | Team 06 - Strategy / Signal / Risk | `codex/team06-strategy-signal/CF-W1-TP-01B` | `../investment-scanner-worktrees/team06-CF-W1-TP-01B` | Backend-only Trade Plan DQ hard-block and target compatibility | Implemented in worktree; Team 10 review pending |
@@ -112,6 +114,72 @@ If route-level additive assertions are added:
 cd backend
 npm.cmd test -- signal-quality-lab.service.test.ts signal-quality-lab.routes.test.ts --runInBand
 ```
+
+## Active Ready Handoff - `CF-W1-UX-01A`
+
+Date promoted: 2026-05-18
+
+Team 00 evaluated the narrowed `CF-W1-UX-01A` child against Ready gates and promoted it as an independent Team 08 frontend-only implementation slice.
+
+Gate evidence:
+
+- Requirement: `10-requirements/CF-W1-UX-01-stock-research-workbench-trust-surfaces-requirement.md`
+- Architecture review: `03-architecture/CF-W1-UX-01-architecture-review.md`
+- Contract: `06-contracts/CF-W1-UX-01-stock-research-workbench-trust-surfaces-contract.md`
+- Work packet: `08-work-packets/CF-W1-UX-01-work-packet.md`
+- QA plan: `04-qa/CF-W1-UX-01-qa-plan.md`
+- UX source mapping: `09-summaries/CF-W1-UX-01-ux-source-mapping.md`
+- Team 08 reservation acceptance: `17-team-outboxes/TEAM-08-outbox.md`
+- Open decisions: none.
+- Shared/high-risk blocker: none if implementation stays inside the reserved Stock Research Workbench frontend files and does not edit downstream widget internals.
+
+Branch/worktree:
+
+- Branch: `codex/team08-ux-research/CF-W1-UX-01A`
+- Worktree: `../investment-scanner-worktrees/team08-CF-W1-UX-01A`
+
+Allowed files:
+
+- `frontend/src/features/stock-research-workbench/components/StockResearchWorkbenchPage.tsx`
+- `frontend/src/features/stock-research-workbench/types.ts`
+- `frontend/tests/ui/stock-research-workbench.spec.ts`
+
+Forbidden files:
+
+- `backend/src/modules/stock-research-workbench/**`
+- backend tests
+- `frontend/src/features/stock-research-workbench/api/stockResearchWorkbenchService.ts`
+- `frontend/src/features/signal-generation-engine/**`
+- `frontend/src/features/strategy-decision-engine/**`
+- shared frontend components
+- frontend route registries or navigation metadata
+- backend route registries
+- Prisma schema or migrations
+- package manifests
+- generated files
+- providers, startup/backfill, live-provider, Angel One, broker, paid/cloud, telemetry, or automation flows
+
+Required behavior:
+
+- derive page trust framing only from existing Workbench response fields plus currently requested `region` / `assetType` from market scope;
+- show requested scope only as requested/unverified scope, not as verified scope;
+- map `COMPLETE` to limited research context, not trusted or ready context;
+- map `PARTIAL` and `DELAYED` to limited context with visible warning reasons;
+- map `MISSING` and `ERROR` to blocked context with visible blocker reasons and page-owned downstream widget suppression;
+- keep Signal and Strategy widgets unmodified;
+- do not claim DQ readiness, latest trusted data date, downstream eligibility, reliability, or action readiness;
+- preserve existing loading, error, chart, fundamentals, valuation, peers, and corporate-action empty states;
+- use research-support language only.
+
+Focused validation guidance:
+
+```powershell
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- stock-research-workbench.spec.ts --workers=1
+```
+
+Stop and return to Team 00 if implementation requires backend DTO or endpoint changes, API service changes, SignalWidget or StrategyDecisionWidget edits, shared UI, routes/navigation, package changes, generated files, or new trust fields that current source cannot prove.
 
 ## Active Ready Handoff - `CF-W1-L3-TREV-01`
 

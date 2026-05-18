@@ -475,3 +475,107 @@ Focused regression note:
 ### Next Gate
 
 Team 00 should treat this as Ready-recommended only for a single Copilot-only implementation packet that combines `CF-W1-UX-02` and `CF-W1-UX-05A`, keeps one writer on the file set above, and routes the handoff to Team 04 and Team 10 after implementation.
+
+---
+
+## Continuation - CF-W1-UX-01 Stock Research Workbench Trust Surface Source Mapping
+
+Date: 2026-05-18
+
+Owner: Team 08 - UX / Research / Copilot
+
+Mode: docs-only source mapping. No application source or tests changed.
+
+### UX Readiness Verdict
+
+Ready-recommended for the narrowed frontend-only child after Team 04 provides the focused UI QA plan.
+
+Not ready for the full parent requirement. Current source does not prove verified scope, Data Quality readiness, latest trusted data date, blocker provenance, or downstream widget eligibility.
+
+### Source-Supported Trust Evidence
+
+Current Workbench source can prove only:
+
+- raw market-data evidence fields already present in the response:
+  - `trust.source`
+  - `trust.last_updated_timestamp`
+  - `trust.data_status`
+  - `overview.source`
+  - `overview.last_updated_timestamp`
+  - `overview.data_status`
+  - `chart.source`
+  - `chart.last_updated_timestamp`
+  - `chart.data_status`
+- section-level raw status or presence checks already used by the page:
+  - fundamentals availability and optional status/timestamp
+  - relative strength status when present
+  - peer presence or absence
+  - corporate action presence or absence plus row source/status/timestamp
+- current frontend-requested scope values are available from `useMarketScope()` as requested scope only
+- downstream `SignalWidget` and `StrategyDecisionWidget` are currently rendered from `instrumentId` only, with no trust gate
+
+### Forbidden Overclaims
+
+Forbidden in the first frontend-only child because source cannot prove them:
+
+- `Trusted`
+- `Ready`
+- `Verified scope`
+- `Latest trusted data date`
+- `Data quality passed`
+- `Eligible signal`
+- `Eligible decision`
+- `Reliable`
+- `Safe to trade`
+
+Also forbidden:
+
+- inferring scope verification from `country` or `exchange`
+- inferring readiness from `COMPLETE`
+- inferring downstream eligibility from widget presence
+
+### Team 03 Reservation Review
+
+Confirmed:
+
+- `frontend/src/features/stock-research-workbench/components/StockResearchWorkbenchPage.tsx`
+- `frontend/src/features/stock-research-workbench/types.ts`
+- `frontend/tests/ui/stock-research-workbench.spec.ts`
+
+Reason:
+
+- those files are sufficient for page-local trust framing, blocked suppression, and focused UI coverage;
+- no existing `stock-research-workbench.spec.ts` was found;
+- `frontend/src/features/stock-research-workbench/api/stockResearchWorkbenchService.ts` should remain untouched in the first child so scope stays explicitly unverified at the feature boundary.
+
+### Team 00 Promotion Recommendation
+
+Promote the frontend-only child after Team 04 publishes the focused QA plan.
+
+Do not wait for the backend trust-evidence child to reduce overclaim risk on the page. Do wait for the backend child before asking the Workbench to claim true readiness, trusted dates, verified scope, or downstream eligibility.
+
+### Files Added / Updated By Team 08
+
+Added:
+
+- `09-summaries/CF-W1-UX-01-ux-source-mapping.md`
+
+Updated:
+
+- `17-team-outboxes/TEAM-08-outbox.md`
+
+### Tests Run
+
+None. This was a docs-only source-mapping pass.
+
+### Current Blockers
+
+- Team 04 QA plan not yet present for this child.
+- Shared workspace remains dirty in unrelated file `backend/tests/modules/alerts-monitoring/alerts-monitoring.ownership.test.ts`.
+
+### Teams Ready For New Tasks
+
+- Team 00 can decide Ready promotion for the bounded frontend-only child after QA planning lands.
+- Team 04 is ready to author the focused Stock Research Workbench UI QA plan.
+- Assigned Lane 3 frontend owner can pick up the confirmed reservation set once Team 00 promotes it.
+- Backend trust-evidence teams can stay idle on this item until Team 00 opens the later backend child.

@@ -1,6 +1,6 @@
 # TEAM-08 Current Assignment
 
-Date: 2026-05-17
+Date: 2026-05-18
 
 Team: TEAM-08 - UX / Research / Copilot
 
@@ -8,41 +8,77 @@ Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automat
 
 ## Assignment
 
-`CF-W1-UX-02` and `CF-W1-UX-05` policies are resolved, but implementation remains blocked until Copilot-only contracts, QA plans, exact file reservations, and Team 00 handoffs exist. Continue docs-only UX and trust-state refinement.
+Pull `CF-W1-UX-01A` as the active Team 08 implementation item.
 
-Current priority:
+This is a narrowed frontend-only Stock Research Workbench trust-framing child. The full parent `CF-W1-UX-01` remains blocked for later backend trust evidence. Do not widen this slice.
 
-1. Refresh `CF-W1-UX-02` for Option B: `Local Research Copilot` / `Research Copilot`, hidden blocked narrative, Copilot-only first slice, source-supported trust fields only.
-2. Keep Stock Research Workbench, shared UI, navigation, route, package, provider, Prisma, and generated-file changes out of scope.
-3. Refresh `CF-W1-UX-05A` as Copilot-only copy cleanup after or together with `CF-W1-UX-02`; keep shared `StatusBadge`, Research Hub, and Market Data UI future.
+Branch/worktree:
+
+- Branch: `codex/team08-ux-research/CF-W1-UX-01A`
+- Worktree: `../investment-scanner-worktrees/team08-CF-W1-UX-01A`
+
+Gate evidence:
+
+- Requirement: `10-requirements/CF-W1-UX-01-stock-research-workbench-trust-surfaces-requirement.md`
+- Architecture review: `03-architecture/CF-W1-UX-01-architecture-review.md`
+- Contract: `06-contracts/CF-W1-UX-01-stock-research-workbench-trust-surfaces-contract.md`
+- Work packet: `08-work-packets/CF-W1-UX-01-work-packet.md`
+- QA plan: `04-qa/CF-W1-UX-01-qa-plan.md`
+- Source mapping: `09-summaries/CF-W1-UX-01-ux-source-mapping.md`
 
 ## Scope
 
 Allowed writes:
 
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-UX*.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-QA-UI*.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-UX*.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-UX*.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-08*.md`
+- `frontend/src/features/stock-research-workbench/components/StockResearchWorkbenchPage.tsx`
+- `frontend/src/features/stock-research-workbench/types.ts`
+- `frontend/tests/ui/stock-research-workbench.spec.ts`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-08-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-UX-01A-developer-handoff.md`
 
 Forbidden:
 
-- frontend or backend Copilot source/tests
-- Stock Research source/tests
+- backend source/tests
+- `frontend/src/features/stock-research-workbench/api/stockResearchWorkbenchService.ts`
+- `frontend/src/features/signal-generation-engine/**`
+- `frontend/src/features/strategy-decision-engine/**`
 - shared UI
 - navigation or route files
-- Playwright tests
-- application builds or dev servers
+- package manifests
+- Prisma/schema/migrations
+- generated files
+- providers, startup/backfill, live-provider, broker, paid/cloud, telemetry, or automation flows
+
+Required behavior:
+
+- derive page trust framing only from existing Workbench response fields plus current requested market scope;
+- show scope as requested/unverified only;
+- keep `COMPLETE` as limited research context, not trusted or ready;
+- show warnings for `PARTIAL` / `DELAYED`;
+- show blocked context and suppress downstream widgets for `MISSING` / `ERROR`;
+- do not edit Signal or Strategy widget internals;
+- avoid `Trusted`, `Ready`, `Verified scope`, `Data quality passed`, `Eligible signal`, `Eligible decision`, `Reliable`, `Safe to trade`, buy/sell/advice-like wording, or target/profit language.
+
+Required validation:
+
+```powershell
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- stock-research-workbench.spec.ts --workers=1
+```
+
+Stop and return to Team 00 if backend/API/widget/shared/route/package/generated work is needed.
 
 ## Branch / Worktree
 
-Use shared `dev` for docs-only UX prep. If `CF-W1-UX-02` is later promoted, use `codex/team08-ux-copilot/CF-W1-UX-02` and `../investment-scanner-worktrees/team08-CF-W1-UX-02`.
+Use the dedicated implementation worktree for this item. Do not implement in shared `dev`.
 
 ## Blockers
 
-No UX Decision Inbox item remains open. Implementation and Playwright trust-state validation are still blocked until Team 00 promotes an exact Copilot-only handoff.
+No UX Decision Inbox item remains open. `CF-W1-UX-01A` is Ready only as the narrowed frontend-only child above.
 
 ## Expected Outbox
 
 Update `17-team-outboxes/TEAM-08-outbox.md`.
+
+Also write `18-integration-queue/CF-W1-UX-01A-developer-handoff.md` after implementation and validation.

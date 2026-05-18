@@ -266,6 +266,44 @@ Open decisions: 0.
 
 ---
 
+# Ready Promotion Checkpoint - CF-W1-UX-01A
+
+Date: 2026-05-18
+
+State: narrowed frontend-only child promoted and assigned.
+
+## Work Item
+
+`CF-W1-UX-01A` - Stock Research Workbench trust framing from current source-supported evidence.
+
+## Gate Result
+
+Promoted to Ready for Implementation as a frontend-only Team 08 child.
+
+Verified gates:
+
+- requirement exists;
+- architecture review, contract, and work packet exist;
+- QA plan exists;
+- Team 08 source mapping accepts the reservation set;
+- open decisions count is zero;
+- no shared-file conflict with active `CF-W1-STRAT-02A` rework;
+- full backend trust-evidence parent remains blocked and is not promoted.
+
+## Branch / Worktree
+
+- Branch: `codex/team08-ux-research/CF-W1-UX-01A`
+- Worktree: `../investment-scanner-worktrees/team08-CF-W1-UX-01A`
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 08 is ready to implement `CF-W1-UX-01A`.
+- Team 04 is ready for `CF-W1-STRAT-02A` QA rerun after Team 06 rework.
+- Team 10 is ready for `CF-W1-STRAT-02A` re-review after QA rerun.
+- Team 03 is ready for `CF-W1-STRAT-02A` signoff after Team 10 accepts.
+
+---
+
 # Decision Resolution Checkpoint
 
 Date: 2026-05-17
