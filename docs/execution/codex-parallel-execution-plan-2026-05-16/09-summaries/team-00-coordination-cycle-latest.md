@@ -1583,6 +1583,44 @@ Spawned Team 02 Requirement Factory:
 
 Date: 2026-05-18
 
+## Dispatcher Model
+
+Team 00 now explicitly decides whether Team 02 and Team 03 receive signoff / acceptance support or rolling discovery / design tasks. Team 02 and Team 03 should not self-switch based on passive monitoring.
+
+Current priority order:
+
+1. Gate work for implemented slices.
+2. Ready promotion / implementation dispatch for independent prepared items.
+3. Rolling Team 03 architecture readiness.
+4. Rolling Team 02 requirement discovery.
+
+## Gate Routing
+
+Team 06 completed `CF-W1-SIG-TRIGGER-02A`; Team 00 closed the implementation agent and spawned Team 04 QA verification.
+
+- Closed Team 06: `019e3c36-5758-7052-839d-479fdbe261e7`.
+- Spawned Team 04 QA: `019e3c42-5031-7461-b7ce-9b983a900171`.
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-SIG-TRIGGER-02A`.
+
+## Active Agents
+
+- Team 04 `019e3c42-5031-7461-b7ce-9b983a900171`: `CF-W1-SIG-TRIGGER-02A` QA verification.
+- Team 03 `019e3c3c-0da0-7d81-a077-6a2a65616095`: rolling architecture readiness.
+- Team 02 `019e3c41-8cf8-7df3-a39c-010a1ebe06cf`: rolling requirement discovery.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 10: `CF-W1-SIG-TRIGGER-02A` review after Team 04 accepts QA.
+- Team 03: `CF-W1-SIG-TRIGGER-02A` Architect Signoff after Team 10 accepts.
+- Team 00: delegated PO acceptance and scoped branch commit after Architect Signoff accepts.
+- Team 05: Market Data / DQ work only after Team 00 promotes an isolated Ready item.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
 ## Parallel Work Model
 
 Team 00 confirmed the queue is not inherently one-at-a-time. Work can proceed in parallel when file ownership is isolated. The current source-code bottleneck is Team 06 ownership around Strategy / Signal / Risk modules, so parallel implementation should use other module lanes or wait for Team 06 handoff when the next candidate touches the same files.

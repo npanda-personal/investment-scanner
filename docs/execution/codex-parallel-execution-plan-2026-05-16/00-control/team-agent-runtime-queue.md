@@ -1359,6 +1359,48 @@ Date: 2026-05-18
 
 Date: 2026-05-18
 
+## Team 00 Dispatcher Rule
+
+Team 00 is the explicit dispatcher for Team 02 and Team 03. Team 02 and Team 03 should not self-monitor for whether to switch between signoff support, acceptance support, discovery, or design work. Team 00 assigns the task type and records it here.
+
+Priority order:
+
+1. Existing implementation gates: QA, Team 10 review, Architect Signoff, delegated PO acceptance, and scoped branch commit.
+2. Ready promotion or implementation dispatch for already prepared independent items.
+3. Rolling Team 03 architecture readiness for top-priority items.
+4. Rolling Team 02 requirement discovery and backlog prioritization.
+
+When no signoff or acceptance gate is pending, Team 02 continues requirements and Team 03 continues design / architecture readiness.
+
+## Current Active Agents
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | `019e3c42-5031-7461-b7ce-9b983a900171` | `gpt-5.4`, high | QA verification | `CF-W1-SIG-TRIGGER-02A` after Team 06 handoff | active |
+| 2 | Team 03 - Architecture Factory | `019e3c3c-0da0-7d81-a077-6a2a65616095` | `gpt-5.4`, high | rolling architecture readiness | next independent investor/trader-value candidate | active |
+| 3 | Team 02 - Requirement Factory | `019e3c41-8cf8-7df3-a39c-010a1ebe06cf` | `gpt-5.4`, high | rolling requirement discovery | next market-intelligence requirement cycle | active |
+| 4 | Open slot | none | pending | review/release | `CF-W1-SIG-TRIGGER-02A` after Team 04 ACCEPT | waiting |
+| 5 | Open slot | none | pending | architect signoff | `CF-W1-SIG-TRIGGER-02A` after Team 10 ACCEPT | waiting |
+| 6 | Open slot | none | pending | delegated PO / commit | after Architect Signoff ACCEPT | waiting |
+
+## Completed Since Previous Runtime Checkpoint
+
+- Team 06 `019e3c36-5758-7052-839d-479fdbe261e7` completed `CF-W1-SIG-TRIGGER-02A` implementation and was closed.
+- Team 02 `019e3c39-a5f1-7353-ab62-b55c19f94a3f` completed a requirement refresh and was closed; Team 00 committed it as `1db4b4e docs: refresh parallel requirement candidates`.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 10: ready for `CF-W1-SIG-TRIGGER-02A` review if Team 04 accepts QA.
+- Team 03: active on rolling architecture; should switch to `CF-W1-SIG-TRIGGER-02A` Architect Signoff only after Team 10 accepts.
+- Team 04: active on `CF-W1-SIG-TRIGGER-02A` QA.
+- Team 05: ready for Market Data / DQ implementation only after Team 00 promotes an isolated Ready item.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
 ## Parallelism Clarification
 
 Not all work is dependent. Team 00 should parallelize requirement discovery, architecture prep, QA planning, QA verification, review, and implementation when the write scopes are isolated. Current direct investor/trader-value implementation pressure is concentrated in Team 06 modules, so Team 00 should avoid running two Strategy / Signal / Risk implementations that touch the same module files at the same time.

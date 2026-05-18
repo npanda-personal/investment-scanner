@@ -1668,6 +1668,35 @@ Teams ready to pick up new tasks:
 
 ---
 
+# Dispatcher Runtime Checkpoint
+
+Date: 2026-05-18
+
+## Policy
+
+Team 00 is the active dispatcher. Team 02 and Team 03 do not independently choose whether to monitor for signoff or continue discovery. Team 00 assigns either:
+
+- gate support / signoff / acceptance work; or
+- rolling requirement / design readiness work.
+
+Gate work always outranks new discovery when a matching team slot is available.
+
+## Current Routing
+
+- Team 06 completed `CF-W1-SIG-TRIGGER-02A` and was closed.
+- Team 04 `019e3c42-5031-7461-b7ce-9b983a900171` is active on `CF-W1-SIG-TRIGGER-02A` QA.
+- Team 03 `019e3c3c-0da0-7d81-a077-6a2a65616095` is active on rolling architecture readiness until a signoff gate is assigned.
+- Team 02 `019e3c41-8cf8-7df3-a39c-010a1ebe06cf` is active on rolling requirement discovery until an acceptance-support task is assigned.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 10: ready for `CF-W1-SIG-TRIGGER-02A` review after Team 04 ACCEPT.
+- Team 03: ready for `CF-W1-SIG-TRIGGER-02A` Architect Signoff after Team 10 ACCEPT; currently active on rolling architecture.
+- Team 00: ready for delegated PO acceptance and scoped branch commit after Architect Signoff ACCEPT.
+- Team 05: ready for a Market Data / DQ item only after Team 00 promotes one with isolated file reservations.
+
+---
+
 # Parallel Coordination Checkpoint
 
 Date: 2026-05-18
