@@ -70,7 +70,7 @@ The first pass should stay inside the watchlist workflow and should not depend o
 
 ## Priority Position
 
-This requirement is one of the best unblocked Lane 3 discovery candidates in the current cycle. It now ranks behind `CF-W1-BT-02`, `CF-W1-HCTX-01`, `CF-W1-MCTX-01`, and `CF-W1-CAL-01`, and ahead of `CF-W1-L3-INTEL-03` and blocked `CF-W1-L3-ALERT-03` because it improves a live trader review queue without waiting on active `alerts-monitoring` reservations.
+This requirement is one of the best unblocked Lane 3 discovery candidates in the current cycle. It now ranks behind `CF-W1-SQLAB-02B` and `CF-W1-MD-02`, and ahead of `CF-W1-L3-INTEL-03`, `CF-W1-UX-01`, and blocked `CF-W1-L3-ALERT-03` because it improves a live trader review queue without waiting on active `alerts-monitoring` reservations or broader trust-surface work.
 
 ## Next Gate
 

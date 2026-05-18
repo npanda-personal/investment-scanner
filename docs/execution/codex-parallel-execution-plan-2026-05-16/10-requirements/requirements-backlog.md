@@ -2,7 +2,7 @@
 
 Date: 2026-05-19
 
-Status: Refreshed by Team 02 after an explicit Signal Outcome Journal durable-memory discovery cycle. Product Owner action is not required; all policy-resolved items remain refinement/architecture/QA-prep items only until Team 00 promotes exact implementation handoffs. Product Owner corrected the priority model on 2026-05-18: direct investor/trader value should lead, especially market data, Data Quality, signals, strategies, backtests, calibration, historical context, market context, trade-plan research support, and research evidence. Admin, settings, auth/subscription, notifications, and alert convenience work should be lowest priority unless needed for correctness, privacy, or user-data safety. After excluding active, queued, accepted, parked, blocked, and already-routed items, the next fresh Team 02 discovery item is `CF-W1-SQLAB-02B`, while `CF-W1-RH-01` and `CF-W1-L3-TREV-02` remain Team 00 Ready-evaluation candidates rather than new requirement gaps.
+Status: Refreshed by Team 02 after an explicit Signal Outcome Journal durable-memory discovery cycle. Product Owner action is not required; all policy-resolved items remain refinement/architecture/QA-prep items only until Team 00 promotes exact implementation handoffs. Product Owner corrected the priority model on 2026-05-18: direct investor/trader value should lead, especially market data, Data Quality, signals, strategies, backtests, calibration, historical context, market context, trade-plan research support, and research evidence. Admin, settings, auth/subscription, notifications, and alert convenience work should be lowest priority unless needed for correctness, privacy, or user-data safety. After excluding active, queued, accepted, parked, blocked, and already-routed items, the next fresh Team 02 discovery item is `CF-W1-SQLAB-02B`; the next direct trader-review candidate after the current evidence-stack items is `CF-W1-L3-WATCH-01`, with `CF-W1-L3-INTEL-03` and `CF-W1-UX-01` behind it. `CF-W1-RH-01` and `CF-W1-L3-TREV-02` remain Team 00 Ready-evaluation candidates rather than new requirement gaps.
 
 ## Current Cycle Requirement Added
 
@@ -24,6 +24,7 @@ Status: Refreshed by Team 02 after an explicit Signal Outcome Journal durable-me
 | CF-W1-STRAT-02 | Parent requirement was still being treated as an active pull candidate even though Team 03 already marked it blocked after accepted `CF-W1-STRAT-02A`; Team 02 narrowed the remaining work into explicit child `CF-W1-STRAT-02B`. | Keep parent blocked and route only the new durable-history child. |
 | CF-W1-MD-03 | The Market Data signoff-threshold contract is active/in-review in Team 03/QA follow-up, so it should no longer appear as an unassigned pull candidate. | Keep it visible as queued/active follow-up only. |
 | CF-W1-SQLAB-02 | The parent was still too generic after Team 03 split the work. Team 02 now treats `CF-W1-SQLAB-02A` as the sequencing-only preview child and `CF-W1-SQLAB-02B` as the explicit durable-learning child. | Keep the parent as lineage only and route children intentionally. |
+| CF-W1-L3-WATCH-01 | The watchlist review queue was still trailing broader workbench trust surfaces even though it is a live trader decision surface. Team 02 refreshed the priority so the next unblocked Lane 3 slice is review actionability, not generic trust surfaces. | Keep the first child bounded to review-priority states, deterministic ordering, and reason summaries; do not widen to alerts, notes parsing, or recommendation logic. |
 
 ## New Audit-Derived Candidates
 
@@ -44,8 +45,9 @@ These are the newest high-value discovery items from read-only module audits. Th
 | 11 | CF-W1-MCTX-01 | Market Context regime evidence | Product refinement and bounded architecture contract for regime evidence and partial-context explanation. |
 | 12 | CF-W1-L3-WATCH-01 | Watchlist review actionability | Product refinement and bounded architecture contract for explainable watchlist review priority and reason summaries. |
 | 13 | CF-W1-L3-INTEL-03 | Portfolio Intelligence concentration review | Product refinement and bounded architecture contract for explainable concentration and exposure review over existing portfolio detail surfaces. |
-| 14 | CF-W1-L3-INTEL-02 | Portfolio Intelligence review traceability | Product refinement and architecture contract for explainable review output that does not overclaim trust. |
-| 15 | CF-W1-L3-ALERT-03 | Alert follow-through traceability | Product refinement and bounded architecture contract for post-trigger review outcomes and review-note persistence. |
+| 14 | CF-W1-UX-01 | Stock Research Workbench trust surfaces | Product refinement and bounded architecture contract for workbench trust surfaces and downstream eligibility. |
+| 15 | CF-W1-L3-INTEL-02 | Portfolio Intelligence review traceability | Product refinement and architecture contract for explainable review output that does not overclaim trust. |
+| 16 | CF-W1-L3-ALERT-03 | Alert follow-through traceability | Product refinement and bounded architecture contract for post-trigger review outcomes and review-note persistence. |
 
 ## Current Cycle Non-Active Value Focus
 
@@ -55,9 +57,9 @@ These are the investor/trader value priorities for this docs-only refinement cyc
 | --- | --- | --- | --- |
 | 1 | CF-W1-SQLAB-02B | Signal outcome learning now has a derived preview child, but the durable local research-memory gap is still open. | Approval-gated storage packet after Team 00 opens consent. |
 | 2 | CF-W1-MD-02 | Durable market-data readiness/evidence remains the foundation for trustworthy signals and backtests. | ADR/source/schema split only; no schema/source promotion without separate approval. |
-| 3 | CF-W1-UX-01 | Workbench trust remains useful, but it should follow market-data/signals/backtest evidence unless backend trust evidence is source-supported. | Backend trust-evidence parent remains blocked until source-supported fields exist. |
-| 4 | CF-W1-L3-INTEL-03 | Portfolio concentration review is still useful, but it remains below the upstream market-intelligence trust stack unless a safety blocker requires earlier attention. | Architecture contract and QA plan for bounded review-first language. |
-| 5 | CF-W1-L3-WATCH-01 | Watchlist review actionability can improve the trader review queue without waiting on convenience work. | Architecture contract and QA plan for explainable review priority. |
+| 3 | CF-W1-L3-WATCH-01 | Watchlist review actionability can improve the trader review queue without waiting on convenience work. | Architecture contract and QA plan for explainable review priority. |
+| 4 | CF-W1-L3-INTEL-03 | Portfolio concentration review is still useful, but it follows the live review-queue slice. | Architecture contract and QA plan for bounded review-first language. |
+| 5 | CF-W1-UX-01 | Workbench trust remains useful, but it should follow the more direct review-queue and concentration-review slices unless backend trust evidence is source-supported. | Backend trust-evidence parent remains blocked until source-supported fields exist. |
 | 6 | CF-W1-L3-INTEL-02 | Review traceability remains useful once higher-value trust layers are settled. | Architecture contract and QA plan for review-output explainability. |
 
 ## Current Next Unassigned Pull Stack
@@ -66,7 +68,7 @@ These are the investor/trader value priorities for this docs-only refinement cyc
 | --- | --- | --- | --- |
 | 1 | CF-W1-SQLAB-02B | `SIG-02` is already in architecture prep and `SQLAB-02A` is already the sequencing-only preview child, so the next fresh Team 02 gap is the explicit durable-learning storage child. | Approval-gated Team 03 architecture/contract/work-packet prep and Team 04 QA planning after Team 00 consent. |
 | 2 | CF-W1-MD-02 | Durable market-data evidence remains foundational, but the active child split must still lead first. | ADR and later child follow-ons only. |
-| 3 | CF-W1-UX-01 | Workbench trust remains the next reviewability-heavy requirement once currently routed Lane 2 packets stay in motion. | Later Team 03/04 prep after higher-priority evidence-storage decisions. |
+| 3 | CF-W1-L3-WATCH-01 | The watchlist review queue is the next unblocked direct trader-value slice after the current evidence-storage work. | Later Team 03/04 prep after current evidence-storage decisions. |
 
 ## Intake Rules
 

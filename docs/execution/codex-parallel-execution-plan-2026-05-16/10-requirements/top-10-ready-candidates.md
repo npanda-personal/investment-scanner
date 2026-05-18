@@ -29,9 +29,9 @@ These are docs-only backlog priorities. They are not Ready-evaluation results.
 | 3 | `CF-W1-SQLAB-02` | Signal outcome learning connects measured outcomes to future judgment; durable storage remains split, but the post-preview path needs definition. | Team 03 post-preview packet prep after `SQLAB-02A` closes. |
 | 4 | `CF-W1-STRAT-03` | Strategy Decision provenance is an under-served review surface for candidates, watch/avoid/exit decisions, and read-path-created rows. | Explicit provenance labeling, reason summaries, and opt-in legacy visibility without changing decision math. |
 | 5 | `CF-W1-MD-02` | Durable market-data readiness/evidence remains the governing parent, but `MD-02A` is already active and later follow-ons still need bounded sequencing. | Hold parent only; keep `CF-W1-MD-02A` in its active lane. |
-| 6 | `CF-W1-UX-01` | Workbench trust remains valuable, but it stays behind the upstream market-data/strategy/signal evidence stack until the source-backed trust fields are explicit. | Backend trust-evidence parent remains blocked until source-supported fields exist. |
-| 7 | `CF-W1-L3-INTEL-03` | Portfolio concentration review is still useful, but it remains below the upstream market-intelligence trust stack unless a safety blocker requires earlier attention. | Team 03 architecture/contract prep, then Team 04 QA prep. |
-| 8 | `CF-W1-L3-WATCH-01` | Watchlist review actionability can improve the trader review queue without waiting on convenience work. | Team 03 architecture/contract prep, then Team 04 QA prep. |
+| 6 | `CF-W1-L3-WATCH-01` | Watchlist review actionability can improve the trader review queue without waiting on convenience work. | Team 03 architecture/contract prep, then Team 04 QA prep. |
+| 7 | `CF-W1-L3-INTEL-03` | Portfolio concentration review is still useful, but it now follows the live review-queue slice. | Team 03 architecture/contract prep, then Team 04 QA prep. |
+| 8 | `CF-W1-UX-01` | Workbench trust remains valuable, but it stays behind the more direct review-queue and concentration-review slices until the source-backed trust fields are explicit. | Backend trust-evidence parent remains blocked until source-supported fields exist. |
 | 9 | `CF-W1-L3-INTEL-02` | Review traceability remains useful once higher-value trust layers are settled. | Team 03 architecture/contract prep, then Team 04 QA prep. |
 | 10 | `CF-W1-L3-ALERT-03` | Post-trigger follow-through only matters after the evidence stack is stronger. | Team 03 architecture/contract prep, then Team 04 QA prep. |
 
@@ -73,7 +73,7 @@ Already promoted, pulled, accepted, or parked branch work should stay out of the
 
 ## Next Team 00 Pull
 
-Next docs-only handoff after excluding active, queued, accepted, parked, and blocked items: `CF-W1-STRAT-02B` to Team 00 for Team 03 architecture routing, with `CF-W1-BT-01A` and `CF-W1-SQLAB-02` immediately behind it and `CF-W1-STRAT-03` as the next under-served review-provenance candidate.
+Next docs-only handoff after excluding active, queued, accepted, parked, and blocked items: `CF-W1-STRAT-02B` to Team 00 for Team 03 architecture routing, with `CF-W1-BT-01A` and `CF-W1-SQLAB-02` immediately behind it and `CF-W1-L3-WATCH-01` as the next direct trader-review candidate.
 
 Next live Ready routing stays outside this docs-only candidate list; the routed market-context and Data Quality lanes remain excluded until Team 00 changes live routing.
 

@@ -4,6 +4,36 @@ Date: 2026-05-19
 
 Mode: docs-only requirement discovery after rechecking root `AGENTS.md`, the live runtime queue, ready/blocked queues, next-top-10 candidates, backlog/refinement queues, current module audits, and current backtesting source docs. No application code, tests, Prisma, route registries, package manifests, generated files, Team 00 control docs, Ready queue files, architecture docs, or QA docs changed.
 
+## 2026-05-19 Watchlist Review Queue Priority Refresh
+
+## Work Item
+
+Refresh the direct investor/trader-value queue so the unblocked watchlist review-actionability requirement no longer trails broader workbench trust-surface work.
+
+## Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-WATCH-01-watchlist-review-actionability-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+## Priority Delta
+
+- `CF-W1-L3-WATCH-01` now leads the next direct trader-review slice after `CF-W1-SQLAB-02B` and `CF-W1-MD-02`.
+- `CF-W1-L3-INTEL-03` remains valuable, but it follows the live review queue instead of leading it.
+- `CF-W1-UX-01` is explicitly behind the more direct review-queue and concentration-review slices.
+
+## Blockers
+
+- No product blocker was discovered.
+- `CF-W1-L3-WATCH-01` remains docs-only until Team 00 chooses to route it for Team 03/04 prep.
+
+## Next Team 00 Routing Recommendation
+
+- Route `CF-W1-L3-WATCH-01` next for Team 03 architecture/contract prep, then Team 04 QA planning, after the current `CF-W1-SQLAB-02B` and `CF-W1-MD-02` evidence-stack items.
+
 ## 2026-05-19 Durable Signal Learning Memory Discovery
 
 ## Work Item
