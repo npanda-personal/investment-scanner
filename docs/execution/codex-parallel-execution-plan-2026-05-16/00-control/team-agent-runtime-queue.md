@@ -1061,3 +1061,27 @@ Date: 2026-05-18
 - Team 03 is ready for `CF-W1-BT-02` Architect Signoff after Team 10 accepts.
 - Team 04 is ready for `CF-W1-CAL-01` QA planning after Team 03 output.
 - Team 02 is ready for another persistent market-intelligence discovery cycle when a slot opens.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 03 - Architecture Factory | `019e3bea-4818-7fa0-aea0-f0f8b4d13bfb` | `gpt-5.4`, high | docs-only architecture prep | `CF-W1-CAL-01` | active |
+| 2 | Team 04 - QA Factory | `019e3bef-6ec0-7d73-aa02-ccfaa1cdab49` | `gpt-5.4`, high | QA rerun | `CF-W1-BT-02` after Team 06 rework | active |
+| 3 | Open slot | none | pending | review/release | `CF-W1-BT-02` after QA accepts | waiting |
+| 4 | Open slot | none | pending | architect signoff | `CF-W1-BT-02` after Team 10 accepts | waiting |
+| 5 | Open slot | none | pending | QA planning | `CF-W1-CAL-01` after Team 03 output | waiting |
+| 6 | Open slot | none | pending | requirements discovery | next persistent Team 02 cycle | ready |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 10 is ready for `CF-W1-BT-02` review after QA accepts.
+- Team 03 is ready for `CF-W1-BT-02` Architect Signoff after Team 10 accepts.
+- Team 04 is ready for `CF-W1-CAL-01` QA planning after Team 03 output.
+- Team 02 is ready for another persistent market-intelligence discovery cycle when a slot opens.

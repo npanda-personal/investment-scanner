@@ -4,78 +4,101 @@ Date: 2026-05-18
 
 ## Work Item
 
-Signal Calibration reliability-drift and trust-state refinement.
+Signal Calibration reliability drift and trust-state refinement.
 
 ## State
 
-Architecture packet prepared. Not Ready for Implementation.
+Docs-only architecture refresh completed.
 
-This slice is intentionally backend-only and module-local. It refines calibration trust-state behavior without changing routes, schema, providers, or frontend scope.
+Ready recommendation: `Ready candidate` for Team 04 QA handoff and Team 00 sequencing. Team 03 does not self-promote to implementation.
 
-## Owner / Lane / Modules
+This slice remains backend-only and module-local.
+
+## Owner / Lane / Module
 
 - Architecture owner: Team 03 Architecture Factory
 - Future implementation owner: Team 06 Strategy / Signals / Risk
 - Lane: Lane 2
 - Module: `signal-calibration-engine`
 
-## Allowed Files After Ready Promotion
+## Exact File Reservations
+
+Reserved writer set for the first implementation pass:
 
 - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.service.ts`
 - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.types.ts`
 - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md`
 - `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.service.test.ts`
-- optional only if endpoint-level additive response assertions are added: `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.routes.test.ts`
 
-## Current Forbidden Files
+Optional only if response payload assertions are widened:
 
-- application source or tests before Team 00 promotion
-- `backend/prisma/schema.prisma`
-- `backend/prisma/migrations/**`
+- `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.routes.test.ts`
+
+## Forbidden Files
+
+All other files are forbidden for this child, especially:
+
+- `backend/src/modules/signal-calibration-engine/index.ts`
 - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.repository.ts`
 - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.controller.ts`
 - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.router.ts`
 - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.validation.ts`
-- Signal Quality Lab source or exports
-- Data Quality Engine source or exports
-- Historical Context Snapshots source
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.module.ts`
+- all `backend/src/modules/signal-quality-lab/**`
+- all `backend/src/modules/data-quality-engine/**`
+- all `backend/src/modules/historical-context-snapshots/**`
+- `backend/prisma/schema.prisma`
+- `backend/prisma/migrations/**`
 - backend and frontend route registries
 - shared backend utilities
 - shared frontend components
 - package manifests
 - generated files
-- frontend files
-- providers, live-market validation, paid/cloud, broker, or telemetry flows
+- all frontend source and frontend tests
 
 ## Required Behavior
 
 Future implementation must:
 
-- add stable trusted, limited, diagnostic-only, and unavailable calibration trust states;
-- fail closed for blocking DQ evidence rather than treating it only as a penalty;
-- keep current calibration score math and persisted-row compatibility intact;
-- preserve research-support wording;
-- avoid query, controller, router, repository, schema, provider, or frontend expansion.
+- keep the slice inside the calibration service/types/doc/test boundary;
+- preserve current score math and persisted-row compatibility;
+- keep current readiness/status fields and add trust-state metadata inside `calibrationReadiness`;
+- distinguish `TRUSTED`, `LIMITED`, `DIAGNOSTIC_ONLY`, and `UNAVAILABLE` trust semantics;
+- fail closed for blocking DQ states instead of treating them as penalties only;
+- treat missing DQ evaluation as diagnostic-only rather than normal influence;
+- preserve research-support wording.
 
-## Dependency Notes
+## Blocker / Split Notes
 
-- Primary owner is `signal-calibration-engine`.
-- Non-blocking upstream dependency: current Signal Quality Lab summary diagnostics.
-- Non-blocking upstream dependency: current Data Quality Engine evaluation DTO semantics.
-- `CF-W1-SQLAB-01` and `CF-W1-DQ-02` should be aligned when accepted, but neither is required to begin this bounded module-local slice.
+- Split required: `No`
+- Architectural blocker: `None`
+- Non-blocking semantic alignment:
+  - `CF-W1-SQLAB-01` for shared trust wording
+  - `CF-W1-DQ-02` for future session-aware currentness evidence
+- Shared-file conflict:
+  - no parallel writer on the reserved calibration service/types/doc/test set
 
-## QA Handoff Needed
+## QA Planning Handoff Notes
 
-Team 04 should prepare focused backend QA for:
+Use the prepared QA plan at `04-qa/CF-W1-CAL-01-qa-plan.md`.
 
-- trusted calibration with sufficient evidence and clean DQ;
+Team 04 should validate:
+
+- trusted calibration with strong evidence and clean DQ;
 - limited calibration with low-sample or context-gap evidence;
-- diagnostic-only calibration with missing DQ alignment;
-- unavailable calibration with zero selected-horizon evidence;
-- unavailable calibration with blocking DQ evidence;
-- additive compatibility of current readiness/evidence fields.
+- diagnostic-only calibration when DQ alignment is missing;
+- unavailable calibration when selected-horizon evidence is absent;
+- unavailable calibration when DQ is blocking;
+- compatibility of existing readiness/evidence/score fields.
 
-Suggested focused command after implementation exists:
+Suggested focused command after Team 00 promotion and implementation handoff:
+
+```powershell
+cd backend
+npm.cmd test -- signal-calibration-engine.service.test.ts --runInBand
+```
+
+Optional only if route payload assertions are expanded:
 
 ```powershell
 cd backend
@@ -86,12 +109,12 @@ npm.cmd test -- signal-calibration-engine.service.test.ts signal-calibration-eng
 
 Stop and return to Team 00 / Architect if implementation requires:
 
-- Prisma/schema changes;
-- route/controller/query-contract changes;
-- SQLAB or DQE source/export changes;
-- shared DTO, shared utility, package, generated, provider, or frontend work;
-- calibration model rewrite rather than trust-state refinement.
+- Prisma or schema changes;
+- repository, controller, router, validation, or index edits;
+- SQLAB, DQE, or Historical Context source changes;
+- shared utility, package, generated, provider, or frontend work;
+- score-model rewrite instead of trust-state refinement.
 
 ## Next Gate
 
-Team 04 QA planning, then Team 00 sequencing. This packet is bounded enough for future Ready review, but it is not promoted by Team 03.
+Team 04 QA validation against the prepared plan, then Team 00 Ready evaluation and sequencing.

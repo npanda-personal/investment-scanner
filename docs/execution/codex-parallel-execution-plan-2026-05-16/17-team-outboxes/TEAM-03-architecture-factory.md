@@ -2,6 +2,80 @@
 
 Date: 2026-05-17
 
+## Team 03 CAL-01 Architecture Readiness Refresh - 2026-05-18
+
+Assignment: refresh docs-only architecture readiness for `CF-W1-CAL-01` in the shared dev workspace under the Product Owner correction that direct investor/trader value comes first, without touching application code, tests, Prisma/schema, routes, shared utilities, shared UI, package manifests, generated files, providers, services, builds, UI smoke, or live data.
+
+Updated:
+
+- `03-architecture/CF-W1-CAL-01-architecture-review.md`
+- `06-contracts/CF-W1-CAL-01-signal-calibration-reliability-drift-contract.md`
+- `08-work-packets/CF-W1-CAL-01-work-packet.md`
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Files inspected:
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-CAL-01-signal-calibration-reliability-drift-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-backtesting-trade-risk.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-CAL-01-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-CAL-01-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-CAL-01-signal-calibration-reliability-drift-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-CAL-01-work-packet.md`
+- `backend/src/modules/signal-calibration-engine/index.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.validation.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.types.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.service.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md`
+- `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.service.test.ts`
+- `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.routes.test.ts`
+- `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.validation.test.ts`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.service.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.md`
+
+Readiness result:
+
+- `CF-W1-CAL-01` is a `Ready candidate`.
+- Exact future writer set:
+  - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.service.ts`
+  - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.types.ts`
+  - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md`
+  - `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.service.test.ts`
+  - optional only if payload assertions expand: `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.routes.test.ts`
+- Exact forbidden files for the first child:
+  - `backend/src/modules/signal-calibration-engine/index.ts`
+  - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.repository.ts`
+  - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.controller.ts`
+  - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.router.ts`
+  - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.validation.ts`
+  - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.module.ts`
+  - all `backend/src/modules/signal-quality-lab/**`
+  - all `backend/src/modules/data-quality-engine/**`
+  - all `backend/src/modules/historical-context-snapshots/**`
+  - `backend/prisma/schema.prisma`
+  - `backend/prisma/migrations/**`
+  - backend/frontend route registries
+  - shared backend utilities
+  - shared frontend components
+  - package manifests
+  - generated files
+  - all frontend source/tests
+- No split is required.
+- No architectural blocker remains inside the bounded child.
+- `CF-W1-SQLAB-01` and `CF-W1-DQ-02` are semantic alignment dependencies only; they are not blockers.
+- Team 04 QA already has a compatible plan in `04-qa/CF-W1-CAL-01-qa-plan.md`.
+
+Current Team 03 recommendation to Team 00:
+
+1. Treat `CF-W1-CAL-01` as the current top unassigned direct-value Ready candidate.
+2. Route it through Team 04 QA confirmation now and then evaluate one bounded Team 06 implementation pass with the reserved writer set only.
+3. Reject any attempt to fold SQLAB source work, DQE source work, route/controller changes, schema work, shared utilities, packages, generated files, providers, or frontend scope into this child.
+
+No tests, builds, Prisma commands, services, providers, UI smoke runs, live data checks, commits, or pushes were run.
+
 ## Team 03 DQ-02 Currentness Evidence Readiness Refresh - 2026-05-18
 
 Assignment: prepare docs-only architecture readiness for `CF-W1-DQ-02` in the shared `dev` workspace without touching application code, tests, Prisma/schema, route registries, shared utilities, shared UI, package manifests, generated files, providers, services, builds, or UI smoke.

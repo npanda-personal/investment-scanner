@@ -6,14 +6,19 @@ Owner: Team 03 Architecture Factory
 
 ## Status
 
-Backend-only Signal Calibration reliability-drift packet prepared. Not Ready for Implementation.
+Docs-only architecture refresh completed for `CF-W1-CAL-01`.
 
-This packet is intentionally module-local. It must refine calibration trust-state behavior without opening Prisma, route, frontend, provider, or shared-utility scope.
+Ready recommendation: `Ready candidate` for Team 04 QA handoff and Team 00 sequencing, not self-promoted for implementation.
+
+This slice stays backend-only and module-local. It refines calibration trust semantics without opening Prisma, routes, providers, shared utilities, frontend, or package scope.
 
 ## Evidence Inspected
 
 - `AGENTS.md`
-- `10-requirements/CF-W1-CAL-01-signal-calibration-reliability-drift-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-CAL-01-signal-calibration-reliability-drift-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-CAL-01-qa-plan.md`
+- `backend/src/modules/signal-calibration-engine/index.ts`
 - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.service.ts`
 - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.types.ts`
 - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.validation.ts`
@@ -23,32 +28,34 @@ This packet is intentionally module-local. It must refine calibration trust-stat
 - `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.validation.test.ts`
 - `backend/src/modules/signal-quality-lab/signal-quality-lab.service.ts`
 - `backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.md`
 
 ## Current Source Findings
 
-- `signal-calibration-engine` already owns `calibrationReadiness`, `downstreamInfluence`, `authoritativeScore`, evidence warnings, and passthrough behavior.
-- The module already consumes Signal Quality Lab summary diagnostics and latest Data Quality Engine evaluation inputs through public services.
-- Current readiness semantics are `USABLE`, `LIMITED`, and `UNAVAILABLE`; there is no explicit diagnostic-only or trusted state vocabulary.
-- Current DQ penalty logic treats `NOT_READY`, `UNUSABLE`, `ILLIQUID`, and missing evaluation as penalties or gaps, but not always as hard trust blockers inside `calibrationReadiness(...)`.
-- Historical context gaps are surfaced as data gaps, but the current readiness layer can still read more authoritative than the evidence justifies.
+- `signal-calibration-engine` already owns calibration scoring, evidence decoration, readiness framing, and downstream influence decisions.
+- Current readiness is derived only from raw-score availability and Signal Quality sample evidence. The service builds `calibrationReadiness(...)` from evidence/sample inputs and does not accept DQ blocker flags directly.
+- Persisted DQ evaluation currently affects score penalties and response projection, but not fail-closed readiness. `UNUSABLE`, `NOT_READY`, and `ILLIQUID` are penalized in `persistedDataQualityAdjustment(...)`, while missing DQ only adds a data gap.
+- Current types expose only `USABLE`, `LIMITED`, and `UNAVAILABLE`. There is no explicit trust vocabulary for trusted or diagnostic-only output.
+- Existing service tests prove current penalty behavior and sample-size readiness behavior, but they do not yet prove the new direct-value trust semantics requested by Team 02 and the Product Owner correction.
+- Upstream context-prep concern is no longer a blocker for this packet. `CF-W1-HCTX-01` and `CF-W1-MCTX-01` already have prepared contract paths, so calibration can consume their existing public outputs without inventing new provenance storage.
 
-## Module Boundary Review
+## Module Boundary Decision
 
 `signal-calibration-engine` owns this requirement.
 
 Reasons:
 
-- calibration already owns downstream influence decisions;
-- calibration already decides when raw score stays authoritative;
-- calibration already combines SQLAB evidence, DQ evaluation, and context gaps into a calibration-specific readiness surface.
+- the module already chooses when calibrated vs raw output is authoritative;
+- the module already projects calibration evidence and readiness into DTOs;
+- the trust drift problem is in calibration interpretation, not in SQLAB, DQE, or Historical Context ownership.
 
-Signal Quality Lab and Data Quality Engine remain upstream evidence providers. They should not own calibration reliability-drift policy.
+Signal Quality Lab, Data Quality Engine, and Historical Context Snapshots remain read-only evidence providers for this slice.
 
 ## Architecture Decision
 
-Prepare `CF-W1-CAL-01` as a bounded `signal-calibration-engine` slice that refines calibration trust-state semantics while preserving current score math and additive DTO compatibility.
+Keep the first child entirely inside `signal-calibration-engine` and add trust-state metadata inside the existing `calibrationReadiness` surface instead of creating a new route, schema field, or cross-module contract.
 
-The first implementation should add stable states equivalent to:
+Preferred additive type shape:
 
 ```ts
 type CalibrationTrustState =
@@ -56,74 +63,102 @@ type CalibrationTrustState =
   | 'LIMITED'
   | 'DIAGNOSTIC_ONLY'
   | 'UNAVAILABLE';
-```
 
-With stable reasons equivalent to:
-
-```ts
 type CalibrationTrustReasonCode =
   | 'TRUSTED_EVIDENCE_BACKED'
   | 'LIMITED_LOW_SAMPLE_OR_CONTEXT_GAPS'
   | 'DIAGNOSTIC_MISSING_DQ_ALIGNMENT'
   | 'UNAVAILABLE_NO_SELECTED_HORIZON_EVIDENCE'
   | 'UNAVAILABLE_BLOCKING_DQ_STATUS';
+
+interface CalibrationReadiness {
+  status: 'USABLE' | 'LIMITED' | 'UNAVAILABLE';
+  downstreamInfluence: 'NORMAL' | 'LIMITED' | 'NONE';
+  authoritativeScore: 'CALIBRATED_SCORE' | 'RAW_SCORE' | 'NO_SCORE';
+  trustState: CalibrationTrustState;
+  trustReasonCode: CalibrationTrustReasonCode;
+  trustReason: string;
+  // existing fields preserved
+}
 ```
 
-Recommended first-pass mapping:
+Rationale:
 
-- `TRUSTED`: selected-horizon evidence is sufficient, DQ evaluation exists, no blocking DQ status is present, and calibration applies with normal downstream influence.
-- `LIMITED`: evidence exists but is low-sample or has non-blocking context gaps, and downstream influence stays limited.
-- `DIAGNOSTIC_ONLY`: evidence exists but DQ coverage/alignment is missing, so calibration remains research-only and must not present normal downstream influence.
-- `UNAVAILABLE`: selected-horizon evidence is missing, raw score is unavailable, or blocking DQ evidence means calibration must fail closed.
+- this keeps additive compatibility on the existing response shape;
+- controller and router code can stay unchanged because service DTOs already flow through;
+- backend tests can stay focused on service logic, with route assertions optional only if payload snapshots are expanded.
+
+## Required Trust Mapping
+
+- `TRUSTED`: sufficient selected-horizon evidence, DQ evaluation present, no blocking DQ status, and normal downstream influence.
+- `LIMITED`: evidence exists but is low-sample or has non-blocking context gaps; downstream influence remains limited.
+- `DIAGNOSTIC_ONLY`: historical evidence exists but DQ alignment is missing; output remains research-only and must not present normal downstream influence.
+- `UNAVAILABLE`: selected-horizon evidence is absent, raw score is unavailable, or blocking DQ evidence must fail closed.
 
 ## Exact Future File Reservations
+
+One-writer implementation set:
 
 - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.service.ts`
 - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.types.ts`
 - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md`
 - `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.service.test.ts`
-- optional only if endpoint-level additive response assertions are added: `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.routes.test.ts`
+
+Optional only if additive response assertions are explicitly added:
+
+- `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.routes.test.ts`
 
 ## Forbidden Files
 
-- `backend/prisma/schema.prisma`
-- `backend/prisma/migrations/**`
+Everything outside the reserved writer set is forbidden for the first slice, especially:
+
+- `backend/src/modules/signal-calibration-engine/index.ts`
 - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.repository.ts`
 - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.controller.ts`
 - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.router.ts`
 - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.validation.ts`
-- Signal Quality Lab source or exports
-- Data Quality Engine source or exports
-- Historical Context Snapshots source
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.module.ts`
+- `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.validation.test.ts`
+- all `backend/src/modules/signal-quality-lab/**`
+- all `backend/src/modules/data-quality-engine/**`
+- all `backend/src/modules/historical-context-snapshots/**`
+- `backend/prisma/schema.prisma`
+- `backend/prisma/migrations/**`
 - backend and frontend route registries
 - shared backend utilities
 - shared frontend components
 - package manifests
 - generated files
-- frontend source/tests
-- provider/live-market, paid/cloud, broker, or telemetry flows
+- all frontend source and frontend tests
 
-## Dependency And Conflict Notes
+## Blocker / Split Notes
 
-- `signal-calibration-engine` owns this slice. No shared DTO, schema, route, package, generated, provider, or frontend change is required for the first bounded packet.
-- This packet depends on existing Signal Quality Lab summary diagnostics (`evidenceUsability`, `evaluationDiagnostics`, `horizonAvailability`) remaining available through public service calls.
-- `CF-W1-SQLAB-01` is a semantic dependency, not a blocking source dependency. If accepted first, calibration should align its trust reasons with SQLAB vocabulary. The bounded calibration slice can still proceed against current SQLAB summary fields.
-- `CF-W1-DQ-02` is a non-blocking future improvement. Once accepted, calibration should absorb currentness blockers via the DQ public evaluation, but the first slice can already fail closed on existing `NOT_READY`, `UNUSABLE`, `ILLIQUID`, and `eligibleForCalibration=false` signals.
-- This packet conflicts with any active Lane 2 work reserving `signal-calibration-engine.service.ts`, `signal-calibration-engine.types.ts`, or the same service test file.
+- Split required: `No`.
+- Architectural blocker: `None` inside the bounded slice.
+- Non-blocking semantic dependency: `CF-W1-SQLAB-01` should align trust wording if it lands first, but CAL-01 can proceed against current SQLAB summary fields.
+- Non-blocking semantic dependency: `CF-W1-DQ-02` may later improve session-aware currentness evidence, but CAL-01 can already fail closed on current DQE blocker fields without widening scope.
+- Shared-file conflict note: do not run any other writer on the reserved calibration service/types/doc/test set in the same pass.
 
-## Required QA Scenarios
+## QA Planning Handoff Notes
 
-Focused backend QA should prove:
+Team 04 should keep validation focused on service-local trust-state behavior:
 
-- trusted calibration when evidence is sufficient and DQ-backed;
-- limited calibration when evidence is low-sample or context is partial;
-- diagnostic-only calibration when DQ alignment is missing;
-- unavailable calibration when selected-horizon evidence is absent;
-- unavailable calibration when DQ evidence is blocking;
-- current score math remains unchanged except for trust-state gating and additive metadata.
+- trusted evidence with normal downstream influence;
+- limited evidence with low-sample or context-gap reasons;
+- diagnostic-only behavior when DQ alignment is missing;
+- unavailable behavior for zero selected-horizon evidence;
+- unavailable behavior for blocking DQ states, including `eligibleForCalibration=false`, `eligibleForSignals=false`, `NOT_READY`, `UNUSABLE`, and `ILLIQUID`;
+- additive compatibility of existing readiness, evidence, and score fields.
 
-## Readiness Result
+Route-level checks are optional. They are only needed if the implementation expands explicit payload assertions in the existing route test.
 
-Architecture packet prepared. Not Ready for Implementation.
+## Ready Recommendation
 
-The slice is bounded and module-local, but Team 04 QA planning and Team 00 sequencing are still required.
+`Ready candidate`
+
+Reason:
+
+- requirement is source-supported;
+- write scope is exact and module-local;
+- no schema, route, provider, frontend, or shared-file expansion is required;
+- Team 04 QA planning already exists and only needs to validate the bounded trust-state path.

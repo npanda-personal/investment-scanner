@@ -4,6 +4,30 @@ Date: 2026-05-17
 
 Prepared by Team 03 Architecture Factory and refreshed after `CF-W1-L3-AUTH-02` commit `503bcd9`, `CF-W1-SIG-TRIGGER-01` commit `6ab3999`, and checkpoint protocol fix commit `f75808f`.
 
+## Team 03 CAL-01 Direct-Value Readiness Refresh - 2026-05-18
+
+Prepared:
+
+- `03-architecture/CF-W1-CAL-01-architecture-review.md`
+- `06-contracts/CF-W1-CAL-01-signal-calibration-reliability-drift-contract.md`
+- `08-work-packets/CF-W1-CAL-01-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Result:
+
+- Product Owner correction is now reflected: `CF-W1-CAL-01` is the top current unassigned direct investor/trader value candidate for Team 03 docs-only prep.
+- Re-audit against current source confirms the packet stays module-local inside `signal-calibration-engine`.
+- Exact future writer set remains limited to calibration service/types/doc/service-test, with route test optional only if payload assertions expand.
+- No schema, route, provider, frontend, shared utility, package, generated-file, SQLAB-source, DQE-source, or Historical Context source change is required.
+- `CF-W1-HCTX-01` and `CF-W1-MCTX-01` no longer block this packet at the contract-prep layer.
+- `CF-W1-SQLAB-01` and `CF-W1-DQ-02` remain semantic alignment dependencies only; they are not blockers for the bounded child.
+- Team 04 QA can use the already prepared `04-qa/CF-W1-CAL-01-qa-plan.md`.
+- Team 00 should now treat `CF-W1-CAL-01` as a `Ready candidate` pending QA handoff confirmation and one-writer sequencing.
+
 ## Team 03 MCTX-01 Market Context Regime Evidence Prep - 2026-05-18
 
 Prepared:
@@ -166,7 +190,7 @@ Result:
 | 5 | `CF-W1-TP-02` | Future Trade Plan semantics packet prepared | Not Ready for Implementation | Exact Trade Plan service/type/validation/geometry/doc/test reservations are defined, but the packet stays sequenced behind `CF-W1-TP-01B`. |
 | 6 | `CF-W1-L3-INTEL-02` | Portfolio Intelligence review-traceability packet prepared | Not Ready for Implementation | Exact `portfolio-intelligence` reservations are defined. Depends on accepted `CF-W1-L3-PORT-01A`; does not depend on `PORT-01B`; conflicts with `CF-W1-L3-INTEL-01` because the file set is identical. |
 | 7 | `CF-W1-SQLAB-01` | Signal Quality Lab outcome-confidence packet prepared | Not Ready for Implementation | Exact `signal-quality-lab` service/type/doc/test reservations are defined. No schema/route/provider/frontend blocker for the first slice; keep aligned with `CF-W1-CAL-01` if Team 00 promotes both. |
-| 8 | `CF-W1-CAL-01` | Signal Calibration reliability-drift packet prepared | Not Ready for Implementation | Exact `signal-calibration-engine` service/type/doc/test reservations are defined. Calibration owns the slice; SQLAB and DQE are non-blocking public-contract dependencies only. |
+| 8 | `CF-W1-CAL-01` | Signal Calibration reliability-drift packet refreshed from current source | Ready candidate pending QA handoff | Exact `signal-calibration-engine` service/type/doc/test reservations are defined. Calibration owns the slice; SQLAB and DQE are non-blocking public-contract dependencies only, and no split blocker remains inside the bounded child. |
 | 9 | `CF-W1-TP-01B` | Backend-only child reservation confirmed in 2026-05-18 matrix | Not Ready for Implementation | Trade Plan compatibility/DQ hard-block contract, Team 04 QA plan, Team 06 inspection, and exact backend file reservations exist; needs Team 00 Ready promotion. |
 | 10 | `CF-W1-NOTIF-02` | Local log provider redaction reservation confirmed in 2026-05-18 matrix | Not Ready for Implementation | Notification requirement, architecture review, contract, work packet, QA plan, Team 09 inspection, and exact provider/test/doc reservations exist; needs Team 00/Team 09 Ready promotion. |
 
@@ -223,9 +247,9 @@ Resolved decision inputs:
 
 ## Recommendation
 
-`CF-W1-MCTX-01` is the clearest new Ready candidate from this pass. `CF-W1-BT-02` is already in Team 04 QA handoff, and `CF-W1-HCTX-01` is already refreshed and active, so the next Team 03 routing recommendation is to move `CF-W1-MCTX-01` to Team 04 QA prep now. Keep every other item out of `12-ready-queue/ready-for-implementation.md` until a candidate has an accepted requirement, accepted architecture contract, accepted QA plan, exact file reservations, and no open Product Owner, Architect, shared-file, schema, route, package, provider, or upstream blocker.
+With the Product Owner correction applied, `CF-W1-CAL-01` is now the clearest current unassigned direct-value Ready candidate from this pass. `CF-W1-BT-02`, `CF-W1-HCTX-01`, and `CF-W1-MCTX-01` already have active or prepared routing context, so the next Team 03 recommendation is to move `CF-W1-CAL-01` through Team 04 QA confirmation and then Team 00 Ready evaluation. Keep every other item out of `12-ready-queue/ready-for-implementation.md` until a candidate has an accepted requirement, accepted architecture contract, accepted QA plan, exact file reservations, and no open Product Owner, Architect, shared-file, schema, route, package, provider, or upstream blocker.
 
-Next Team 03 recommendation: route `CF-W1-MCTX-01` to Team 04 QA prep now because the narrowed Market Context packet is fully bounded and does not carry schema, route, shared-UI, provider, Market Data source, or DQE source risk. Keep `CF-W1-DQ-02` as the strongest upstream follow-on QA-prep candidate. Keep `CF-W1-L3-PORT-01B` blocked behind accepted `CF-W1-L3-PORT-01A`. After `CF-W1-MD-02` ADR acceptance, prepare `CF-W1-MD-02A` as a schema/migration proposal packet only if Team 00 and Architect explicitly authorize that approval-gated path.
+Next Team 03 recommendation: route `CF-W1-CAL-01` to Team 04 QA confirmation now, then let Team 00 decide Ready promotion for one bounded `signal-calibration-engine` writer pass. Keep `CF-W1-DQ-02` as the strongest upstream follow-on QA-prep candidate. Keep `CF-W1-L3-PORT-01B` blocked behind accepted `CF-W1-L3-PORT-01A`. After `CF-W1-MD-02` ADR acceptance, prepare `CF-W1-MD-02A` as a schema/migration proposal packet only if Team 00 and Architect explicitly authorize that approval-gated path.
 
 ## Team 03 Discovery Refresh - 2026-05-18
 

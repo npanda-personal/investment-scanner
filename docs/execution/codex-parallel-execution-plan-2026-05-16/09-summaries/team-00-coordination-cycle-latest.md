@@ -1211,3 +1211,30 @@ Developer validation reported:
 ## Next Coordination Action
 
 Commit this routing update if staged scope is clean, then spawn Team 04 for `CF-W1-BT-02` QA rerun.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
+## QA Rerun Dispatch
+
+Spawned Team 04 QA Factory:
+
+- Agent: `019e3bef-6ec0-7d73-aa02-ccfaa1cdab49`
+- Work item: `CF-W1-BT-02`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-BT-02`
+- Gate: QA rerun after Team 06 bounded rework.
+
+## Active Agents
+
+- Team 03 `019e3bea-4818-7fa0-aea0-f0f8b4d13bfb`: `CF-W1-CAL-01` architecture prep.
+- Team 04 `019e3bef-6ec0-7d73-aa02-ccfaa1cdab49`: `CF-W1-BT-02` QA rerun.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 10: `CF-W1-BT-02` review after QA accepts.
+- Team 03: `CF-W1-BT-02` Architect Signoff after Team 10 accepts.
+- Team 04: `CF-W1-CAL-01` QA planning after Team 03 output.
+- Team 02: next persistent requirement discovery cycle when a slot opens.
