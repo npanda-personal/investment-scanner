@@ -156,6 +156,38 @@ Do not move any application-code item to Ready. Team 00 owns Ready movement.
 
 ---
 
+# Latest Standing Assignment
+
+Date: 2026-05-18
+
+## Assignment
+
+Continue persistent PO + Requirements discovery after Team 00 committed the prior requirement-refresh docs as `05c02ab`.
+
+The current active gate work is `CF-W1-BT-01A` QA verification. Do not duplicate that implementation or QA work.
+
+Continue ranking and discovery by direct investor/trader value:
+
+- market data reliability and Data Quality;
+- signals, strategy trust, trigger provenance, calibration, backtesting, Trade Plan research support;
+- historical context, market context, signal-quality learning, research evidence, reviewability, and explainability.
+
+Keep admin, settings, auth/subscription, notifications, and alert convenience work low unless it blocks correctness, privacy, or user-data safety.
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/**`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+## Required Output
+
+- Add or refine at least one high-user-value market-intelligence requirement if evidence supports it.
+- Keep already accepted, active, queued, parked, or schema-blocked branch work out of the active unassigned ranking.
+- Identify top parallel-safe candidates for Team 00 to route next.
+- Do not move any item to Ready.
+
+---
+
 # Current Active Assignment Override
 
 Date: 2026-05-18

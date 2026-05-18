@@ -184,6 +184,43 @@ This is docs-only architecture prep. Do not implement application code. Treat th
 
 ---
 
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Prepare architecture readiness for `CF-W1-STRAT-03` - Strategy Decision review provenance.
+
+This is docs-only architecture prep. The intended first child is backend-local, additive, no-schema, and no-route. Do not force a Ready recommendation if source inspection proves that schema, generated artifacts, route registry, shared utility/UI, or frontend scope is required.
+
+## Source Input
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-STRAT-03-strategy-decision-review-provenance-requirement.md`
+- Current ranked stack: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- Relevant source to inspect read-only:
+  - `backend/src/modules/strategy-decision-engine/strategy-decision-engine.service.ts`
+  - `backend/src/modules/strategy-decision-engine/strategy-decision-engine.types.ts`
+  - `backend/src/modules/strategy-decision-engine/strategy-decision-engine.md`
+  - `backend/tests/modules/strategy-decision-engine/strategy-decision-engine.service.test.ts`
+  - optional route-test inspection only if needed: `backend/tests/modules/strategy-decision-engine/strategy-decision-engine.routes.test.ts`
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-STRAT-03-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-STRAT-03-strategy-decision-review-provenance-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-STRAT-03-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+## Required Output
+
+- Exact allowed and forbidden future implementation files.
+- One-writer and parallel-safety notes against active `CF-W1-BT-01A`.
+- QA handoff notes for Team 04.
+- Ready recommendation: `Ready candidate`, `split required`, or `blocked`.
+
+---
+
 # Current Dispatcher Assignment
 
 Date: 2026-05-18

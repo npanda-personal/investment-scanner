@@ -2899,3 +2899,34 @@ Important sequencing:
 - Team 04: `CF-W1-BT-01A` QA after Team 06 handoff.
 - Team 02: active on persistent requirements discovery.
 - Team 00: keep `CF-W1-STRAT-02B1` blocked from implementation because it needs schema/generated consent.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## BT-01A Developer Handoff Consumed
+
+Team 06 completed `CF-W1-BT-01A` in the stacked Team 06 worktree with reserved characterization scope only.
+
+Team 00 closed Team 06 agent `019e3d0f-9c05-7f51-a421-85c6b75dd120` and routed the next gates.
+
+## Current Active Agents
+
+| Slot | Team | Agent | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | `019e3d15-9633-7762-afc2-555b7dbf020f` | QA verification | `CF-W1-BT-01A` in Team 06 worktree | active |
+| 2 | Team 02 - Requirement Factory | `019e3d15-9669-7221-9c29-55f6c777ac1b` | rolling requirements discovery | next direct investor/trader-value requirement | active |
+| 3 | Team 03 - Architecture Factory | `019e3d15-969c-77f2-a87e-ec6cf5f29a52` | architecture prep | `CF-W1-STRAT-03` no-schema provenance packet | active |
+| 4 | Open slot | none | queued | Team 10 review after BT-01A QA acceptance | waiting |
+| 5 | Open slot | none | queued | Team 03 Architect Signoff after review acceptance | waiting |
+| 6 | Open slot | none | queued | next implementation or QA handoff after agent outputs | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-BT-01A` QA verification now.
+- Team 02: rolling requirement discovery now.
+- Team 03: `CF-W1-STRAT-03` architecture packet now.
+- Team 10: `CF-W1-BT-01A` review after Team 04 accepts.
+- Team 03: `CF-W1-BT-01A` Architect Signoff after Team 10 accepts.

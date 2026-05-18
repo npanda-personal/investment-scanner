@@ -3025,3 +3025,33 @@ Teams ready to pick up new tasks:
 - Team 02: active on persistent requirements discovery.
 
 Product Owner action required: no for `BT-01A`. `STRAT-02B1` remains a true schema/generated consent gate before implementation.
+
+---
+
+# Team 00 Runtime Dispatch - BT-01A QA And Rolling Lanes
+
+Date: 2026-05-18
+
+## Consumed Output
+
+- Team 06 completed `CF-W1-BT-01A` characterization implementation in `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-BT-01A`.
+- Team 06 agent `019e3d0f-9c05-7f51-a421-85c6b75dd120` was closed.
+- Main workspace requirement-refresh docs were committed as `05c02ab`.
+
+## Active Agents
+
+| Team | Agent | Work item |
+| --- | --- | --- |
+| Team 04 | `019e3d15-9633-7762-afc2-555b7dbf020f` | `CF-W1-BT-01A` QA verification |
+| Team 02 | `019e3d15-9669-7221-9c29-55f6c777ac1b` | rolling requirement discovery |
+| Team 03 | `019e3d15-969c-77f2-a87e-ec6cf5f29a52` | `CF-W1-STRAT-03` architecture packet |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-BT-01A` QA verification now.
+- Team 02: rolling requirement discovery now.
+- Team 03: `CF-W1-STRAT-03` architecture packet now.
+- Team 10: `CF-W1-BT-01A` review after Team 04 accepts.
+- Team 03: `CF-W1-BT-01A` Architect Signoff after Team 10 accepts.
+
+Product Owner action required: no.

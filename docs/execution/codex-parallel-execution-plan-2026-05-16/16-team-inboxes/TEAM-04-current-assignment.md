@@ -247,6 +247,65 @@ State whether `CF-W1-BT-02` is QA-plan ready for Team 00 Ready evaluation and li
 
 ---
 
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Verify `CF-W1-BT-01A` - Backtesting DQ fail-closed characterization in the Team 06 stacked worktree.
+
+This override supersedes older Team 04 tails. This is QA verification, not implementation and not QA-plan drafting.
+
+## Worktree / Branch
+
+- Branch: `codex/team06-strategy-signal/CF-W1-BT-01A`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-BT-01A`
+- Base: accepted parked `CF-W1-BT-02` branch at `bb49ce2`
+
+## Source Input
+
+- Main workspace Ready handoff: `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/ready-for-implementation.md`
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-BT-01A-backtesting-dq-fail-closed-characterization-requirement.md`
+- Architecture review: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-BT-01A-architecture-review.md`
+- Contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-BT-01A-backtesting-dq-fail-closed-characterization-contract.md`
+- Work packet: `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-BT-01A-work-packet.md`
+- QA plan: `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-BT-01A-qa-plan.md`
+- Worktree developer handoff: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-BT-01A-developer-handoff.md`
+
+## Allowed Writes
+
+In the Team 06 worktree only:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-BT-01A-qa-verification.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+## Required Verification
+
+- Confirm implementation stayed inside reserved files:
+  - `backend/tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.test.ts`
+  - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+- Confirm no backtesting source, Prisma/schema, generated, route registry, frontend, shared utility/UI, package, provider/live/startup/backfill, paid/cloud, broker, telemetry, or unrelated accepted-branch files changed.
+- Confirm characterization covers:
+  - no DQ filter call when disabled;
+  - `WARN_AND_PROCESS` versus `SKIP` missing-quality behavior;
+  - enabled DQ filter failure persists a failed run;
+  - one-instrument history fetch failure completes with coverage diagnostics.
+- Run memory check before heavy commands.
+- Run in the Team 06 worktree:
+
+```powershell
+cd backend
+npm.cmd test -- backtesting-strategy-lab.service.test.ts --runInBand
+npm.cmd run build
+```
+
+## Output
+
+Return `ACCEPT` or `REJECT`, with exact commands, evidence, inspected files, skipped checks, residual risks, and next gate.
+
+---
+
 # Current Dispatcher Assignment
 
 Date: 2026-05-18
