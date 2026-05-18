@@ -754,3 +754,61 @@ State: Independent readyable items are now routed in parallel instead of waiting
 - Active spawned agents: 5 of 6.
 - Open slot: 1.
 - Product Owner action required: no.
+
+---
+
+# Market Data Acceptance And Today Review Ready Promotion
+
+Date: 2026-05-18
+
+State: `CF-W1-MD-01` committed on Team 05 branch; `CF-W1-L3-TREV-01` promoted and assigned.
+
+## `CF-W1-MD-01`
+
+Team 10 created the missing release-review artifact:
+
+- `18-integration-queue/CF-W1-MD-01-team10-review-release.md`
+
+Decision: Accepted.
+
+Team 00 created delegated Product Owner acceptance in the Team 05 worktree:
+
+- `09-summaries/CF-W1-MD-01-po-acceptance-packet.md`
+
+Scoped local commit:
+
+- Branch: `codex/team05-market-data/CF-W1-MD-01`
+- Worktree: `../investment-scanner-worktrees/team05-CF-W1-MD-01`
+- Commit: `913b56b fix: harden market data validation`
+
+Push/merge status: not pushed and not merged to `dev`. Shared `dev` is still dirty and needs a separate clean integration pass.
+
+## `CF-W1-L3-TREV-01`
+
+Team 00 evaluated the Today Review publication-evidence packet and promoted it to Ready.
+
+Gate evidence:
+
+- Requirement: `10-requirements/CF-W1-L3-TREV-01-today-review-publication-evidence-requirement.md`
+- Architecture review: `03-architecture/CF-W1-L3-TREV-01-architecture-review.md`
+- Contract: `06-contracts/CF-W1-L3-TREV-01-today-review-publication-evidence-contract.md`
+- Work packet: `08-work-packets/CF-W1-L3-TREV-01-work-packet.md`
+- QA plan: `04-qa/CF-W1-L3-TREV-01-qa-plan.md`
+- Open decisions: none
+
+Assignment written:
+
+- `16-team-inboxes/TEAM-07-current-assignment.md`
+
+Branch/worktree:
+
+- Branch: `codex/team07-portfolio-alerts/CF-W1-L3-TREV-01`
+- Worktree: `../investment-scanner-worktrees/team07-CF-W1-L3-TREV-01`
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 07 is ready to implement `CF-W1-L3-TREV-01` in the dedicated worktree once Team 00 creates/assigns it.
+- Team 02 remains active as persistent PO/Requirements discovery.
+- Team 04 is ready for QA once Team 07 produces a Today Review developer handoff.
+- Team 10 is ready for release review after QA evidence exists.
+- Team 03 is ready for Architect Signoff after release review accepts.

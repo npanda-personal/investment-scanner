@@ -133,3 +133,69 @@ Unaccepted / active worktrees:
 - Do not push `dev` while dirty.
 - Do not merge/cherry-pick accepted branch commits into `dev` until active docs/app changes are classified and exact scope is clean.
 - Do not close Team 02 by default.
+
+---
+
+# Latest Runtime Checkpoint
+
+Date: 2026-05-18
+
+## Current Git State
+
+Main workspace:
+
+- Branch: `dev`
+- Divergence: `dev` is ahead of `origin/dev` by 13 local commits.
+- Push status: not push-safe.
+- Reason: shared `dev` still has uncommitted active execution docs plus a dirty app-test file at `backend/tests/modules/alerts-monitoring/alerts-monitoring.ownership.test.ts`.
+
+Clean accepted branch commits:
+
+- `CF-W1-L3-PORT-01A`: `f1432e6 feat: add portfolio readiness dto evidence`.
+- `CF-W1-TP-01B`: `8ff22fd fix: harden trade plan readiness gates`.
+- `CF-W1-NOTIF-02`: `c77ece7 fix: redact notification log payloads`.
+- `CF-W1-L3-ALERT-01`: `2fb0cb6 fix: gate alerts on data quality readiness`.
+- `CF-W1-MD-01`: `913b56b fix: harden market data validation`.
+
+## Active Agents
+
+| Team | Agent | State | Resume Action |
+| --- | --- | --- | --- |
+| Team 02 - Requirement Factory | `019e3a50-ed56-71f0-bfb6-621445556b85` | active / persistent | Keep running. It should continue distinct high-value investor/trader requirement discovery and priority ordering. |
+
+Recently closed:
+
+- Team 04 `019e3a94-82de-7632-8e95-6e696c168b59`: completed `CF-W1-L3-TREV-01` QA plan.
+- Team 10 `019e3a99-3efc-7ad1-b16f-5cab1d3eb9fe`: accepted `CF-W1-MD-01` release/review and created the missing Team 10 artifact.
+
+## Current Workstream State
+
+`CF-W1-MD-01`
+
+- State: accepted and locally committed on Team 05 branch.
+- Commit: `913b56b`.
+- Next: integrate into `dev` only after a separate clean exact-scope integration pass; do not push while shared `dev` is dirty.
+
+`CF-W1-L3-TREV-01`
+
+- State: promoted to Ready by Team 00.
+- Team 07 inbox: `16-team-inboxes/TEAM-07-current-assignment.md`.
+- Branch to create: `codex/team07-portfolio-alerts/CF-W1-L3-TREV-01`.
+- Worktree to create: `../investment-scanner-worktrees/team07-CF-W1-L3-TREV-01`.
+- Next: spawn Team 07 implementation agent after docs checkpoint commit/worktree creation.
+
+## Queued Gates
+
+1. Commit active execution docs only from main `dev` if staged scope is clean.
+2. Create Team 07 Today Review worktree.
+3. Spawn Team 07 for `CF-W1-L3-TREV-01`.
+4. On Team 07 handoff, route Team 04 QA, Team 10 review, Team 03 Architect Signoff, then Team 00 delegated PO acceptance and scoped branch commit.
+5. Keep Team 02 running for backlog discovery.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 07 is ready to implement `CF-W1-L3-TREV-01`.
+- Team 04 is ready to QA the Today Review handoff after implementation exists.
+- Team 10 is ready to review after QA passes.
+- Team 03 is ready for Architect Signoff after Team 10 accepts.
+- Team 02 remains active and should not be closed.

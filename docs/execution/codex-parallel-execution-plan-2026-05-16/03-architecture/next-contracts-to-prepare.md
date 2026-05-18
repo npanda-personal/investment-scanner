@@ -12,12 +12,12 @@ Prepared by Team 03 Architecture Factory and refreshed after `CF-W1-L3-AUTH-02` 
 | 2 | `CF-W1-DQ-02` | Backend-only Lane 1 currentness packet prepared | Not Ready for Implementation | Exact Market Data session helper and DQE service/type/doc/test reservations are defined; QA prep should start here before downstream trust consumers. |
 | 3 | `CF-W1-AUTH-02` | Consumer-isolation packet prepared with Team 09 and Team 08 child reservations | Not Ready for Implementation | Alert event ownership is already accepted in `CF-W1-L3-AUTH-02`; remaining work is digest user propagation. Conflicts with `CF-W1-NOTIF-02`, `CF-W1-UX-02`, and `CF-W1-UX-05`. |
 | 4 | `CF-W1-TP-02` | Future Trade Plan semantics packet prepared | Not Ready for Implementation | Exact Trade Plan service/type/validation/geometry/doc/test reservations are defined, but the packet stays sequenced behind `CF-W1-TP-01B`. |
-| 5 | `CF-W1-TP-01B` | Backend-only child reservation confirmed in 2026-05-18 matrix | Not Ready for Implementation | Trade Plan compatibility/DQ hard-block contract, Team 04 QA plan, Team 06 inspection, and exact backend file reservations exist; needs Team 00 Ready promotion. |
-| 6 | `CF-W1-NOTIF-02` | Local log provider redaction reservation confirmed in 2026-05-18 matrix | Not Ready for Implementation | Notification requirement, architecture review, contract, work packet, QA plan, Team 09 inspection, and exact provider/test/doc reservations exist; needs Team 00/Team 09 Ready promotion. |
-| 7 | `CF-W1-L3-ALERT-01` | Alert readiness suppression reservation confirmed in 2026-05-18 matrix | Not Ready for Implementation | Alert readiness suppression contract, Team 04 QA plan, and exact backend file reservations exist; needs Team 00 Ready promotion. |
-| 8 | `CF-W1-L3-INTEL-01` | Child architecture signoff prepared | Not Ready for Implementation | Requirement, architecture review, contract, QA plan, work packet, and Team 03 signoff exist; blocked until `CF-W1-L3-PORT-01A` is implemented and accepted. |
-| 9 | `CF-W1-UX-02` | Option B contract/work-packet refresh prepared | Not Ready for Implementation | Needs Team 08 source-supported trust-field mapping, Team 04 QA acceptance, Team 00 Ready promotion, and no shared UI/navigation scope. |
-| 10 | `CF-W1-MD-02` | Formal ADR draft prepared | Source/schema implementation blocked | ADR draft recorded at `03-architecture/CF-W1-MD-02-durable-readiness-evidence-adr.md`; needs acceptance before split source/schema packets. |
+| 5 | `CF-W1-L3-INTEL-02` | Portfolio Intelligence review-traceability packet prepared | Not Ready for Implementation | Exact `portfolio-intelligence` reservations are defined. Depends on accepted `CF-W1-L3-PORT-01A`; does not depend on `PORT-01B`; conflicts with `CF-W1-L3-INTEL-01` because the file set is identical. |
+| 6 | `CF-W1-SQLAB-01` | Signal Quality Lab outcome-confidence packet prepared | Not Ready for Implementation | Exact `signal-quality-lab` service/type/doc/test reservations are defined. No schema/route/provider/frontend blocker for the first slice; keep aligned with `CF-W1-CAL-01` if Team 00 promotes both. |
+| 7 | `CF-W1-CAL-01` | Signal Calibration reliability-drift packet prepared | Not Ready for Implementation | Exact `signal-calibration-engine` service/type/doc/test reservations are defined. Calibration owns the slice; SQLAB and DQE are non-blocking public-contract dependencies only. |
+| 8 | `CF-W1-TP-01B` | Backend-only child reservation confirmed in 2026-05-18 matrix | Not Ready for Implementation | Trade Plan compatibility/DQ hard-block contract, Team 04 QA plan, Team 06 inspection, and exact backend file reservations exist; needs Team 00 Ready promotion. |
+| 9 | `CF-W1-NOTIF-02` | Local log provider redaction reservation confirmed in 2026-05-18 matrix | Not Ready for Implementation | Notification requirement, architecture review, contract, work packet, QA plan, Team 09 inspection, and exact provider/test/doc reservations exist; needs Team 00/Team 09 Ready promotion. |
+| 10 | `CF-W1-L3-ALERT-01` | Alert readiness suppression reservation confirmed in 2026-05-18 matrix | Not Ready for Implementation | Alert readiness suppression contract, Team 04 QA plan, and exact backend file reservations exist; needs Team 00 Ready promotion. |
 
 ## Completed Or No Longer Next
 
@@ -40,9 +40,9 @@ Resolved decision inputs:
 | `CF-W1-MD-02` | Option B accepted as ADR direction only. | Formal ADR draft is prepared; separate approval-gated source/schema split remains blocked. |
 | `CF-W1-AUTH-01` | Option A accepted. | Team 09 module-local backend packet and exact reservations remain. |
 | `CF-W1-SUB-01` | Option A accepted. | Team 09 backend-only packet, exact reservations, and frontend limitation notes remain. |
-| `CF-W1-UX-02` | Option B accepted. | Copilot-only trust contract refresh and exact reservations remain. |
-| `CF-W1-UX-05` | Option A accepted. | Copilot-only copy child sequencing with `CF-W1-UX-02` remains. |
-| `CF-W1-MD-01` | Option A accepted. | Market Data validation-only work packet and exact reservations remain. |
+| `CF-W1-UX-02` | Option B accepted. | Team 08 source mapping now supports one combined Copilot-only `CF-W1-UX-02 + CF-W1-UX-05A` packet with exact backend/frontend/test reservations. |
+| `CF-W1-UX-05` | Option A accepted. | `CF-W1-UX-05A` is no longer a standalone copy child; it should be folded into the combined `CF-W1-UX-02` Copilot packet. |
+| `CF-W1-MD-01` | Option A accepted. | Market Data packet is now narrowed to a reject-only validation child with exact validator/test/doc reservations. Team 04 QA refresh still needs to reflect the deferred warning/evidence scenarios. |
 
 ## Docs-Only Architecture Prep Can Continue
 
@@ -50,15 +50,18 @@ Resolved decision inputs:
 - `CF-W1-DQ-02`: route currentness-evidence packet to Team 04 QA prep first under the root upstream-dependency rule.
 - `CF-W1-AUTH-02`: keep digest-consumer user isolation split into Team 09 and Team 08 child reservations; do not reopen alert repository ownership.
 - `CF-W1-TP-02`: keep behind `CF-W1-TP-01B`; do not let broader semantics work collide with the active compatibility/DQ slice.
+- `CF-W1-L3-INTEL-02`: keep behind accepted `CF-W1-L3-PORT-01A`; no dependency on `PORT-01B`; combine or sequence with `CF-W1-L3-INTEL-01` because the file set is the same.
+- `CF-W1-SQLAB-01`: keep bounded to `signal-quality-lab` trust labeling; no route/schema/frontend scope in the first slice.
+- `CF-W1-CAL-01`: keep bounded to `signal-calibration-engine`; depend on SQLAB/DQE public evidence only and do not widen into shared/source dependency changes.
 - `CF-W1-L3-DQ-01`: continue child module contracts under approved Option B; portfolio/watchlist is prepared as `CF-W1-L3-PORT-01`.
 - `CF-W1-L3-PORT-01`: route to Team 04 for child QA plan before implementation promotion.
 - `CF-W1-TP-01B`: route to Team 04 for backend-only child QA refresh before implementation promotion.
 - `CF-W1-L3-ALERT-01`: route to Team 04 for alert child QA refresh before implementation promotion.
 - `CF-W1-L3-INTEL-01`: keep blocked until `CF-W1-L3-PORT-01A` implementation acceptance; do not promote before portfolio readiness DTOs exist.
-- `CF-W1-UX-02`: refresh Copilot-only UX trust architecture, trust-field fallback rules, and shared-file stop conditions.
+- `CF-W1-UX-02`: keep as the combined Copilot-only `CF-W1-UX-02 + CF-W1-UX-05A` packet; preserve additive backend trust fields plus Copilot feature UI changes only.
 - `CF-W1-MD-02`: route formal ADR draft to Team 00 / Architect / QA acceptance; no schema/source readiness.
-- `CF-W1-MD-01`: refresh validation policy implementation boundaries and QA alignment under Option A.
-- `CF-W1-UX-05`: refresh Copilot-only copy child and keep shared UI reservation future.
+- `CF-W1-MD-01`: keep narrowed to the reject-only validator child; defer missing-`adjustedClose` fallback evidence and zero/suspicious-volume warning evidence unless Team 00 opens a wider child.
+- `CF-W1-UX-05`: keep `CF-W1-UX-05A` folded into the combined Copilot-only packet; keep shared UI reservation future.
 - `CF-W1-AUTH-01`: refresh protected controller fail-closed packet under Option A.
 - `CF-W1-SUB-01`: refresh admin/manual-only subscription packet under Option A.
 
@@ -95,6 +98,9 @@ Result:
 - `CF-W1-AUTH-02` is prepared as a digest-consumer packet, not a second alert-event ownership rewrite.
 - `CF-W1-TP-02` is prepared as a future Trade Plan semantics packet and remains blocked behind `CF-W1-TP-01B`.
 - `CF-W1-L3-PORT-01B` now has exact watchlist reservations, but it still depends on accepted `CF-W1-L3-PORT-01A` implementation semantics before independent Ready evaluation.
+- `CF-W1-L3-INTEL-02` is prepared as a portfolio-intelligence traceability packet, depends on accepted `CF-W1-L3-PORT-01A`, does not depend on `CF-W1-L3-PORT-01B`, and shares the full file set with `CF-W1-L3-INTEL-01`.
+- `CF-W1-SQLAB-01` is prepared as a bounded `signal-quality-lab` trust-state packet with exact service/type/doc/test reservations and no first-slice schema/route/provider/frontend blocker.
+- `CF-W1-CAL-01` is prepared as a bounded `signal-calibration-engine` trust-state packet. Calibration owns the slice; SQLAB and DQE are non-blocking public-contract dependencies only.
 
 ## Team 03 Post-Decision Refresh - 2026-05-18
 

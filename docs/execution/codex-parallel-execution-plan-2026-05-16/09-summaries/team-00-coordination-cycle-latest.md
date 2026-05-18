@@ -9,16 +9,26 @@ Team: TEAM-00 - Master Orchestrator / Integration
 | Field | Current value |
 | --- | --- |
 | Branch | `dev` |
-| Branch status before decision-resolution commit | `dev...origin/dev [ahead 4]` |
-| Worktree safety | Safe for docs-only Team 00 coordination; dirty files are active execution docs/team outputs only. Implementation must use dedicated worktree. |
+| Branch status | `dev...origin/dev [ahead 13]` |
+| Worktree safety | Safe for docs-only Team 00 coordination only. Shared `dev` is not push-safe because active execution docs are dirty and `backend/tests/modules/alerts-monitoring/alerts-monitoring.ownership.test.ts` is dirty outside a current integration action. |
 | Open decisions | 0 |
-| Ready queue depth | 1 active application-code item: `CF-W1-L3-PORT-01A` |
-| Refinement queue depth | 12 active unique refinement / near-ready items |
-| Integration queue depth | 0 active application-code items |
+| Ready queue depth | 0 unassigned; `CF-W1-L3-TREV-01` is promoted and assigned to Team 07 |
+| Refinement queue depth | active; Team 02 continues persistent discovery/refinement |
+| Integration queue depth | branch-local accepted commits are parked; `dev` integration is deferred until clean scope |
 | Product Owner action required | No |
-| Daemon should continue | Yes, continue autonomous work |
+| Daemon should continue | Yes |
 
-## Decision State
+## Accepted Branch Commits Parked For Later Integration
+
+- `CF-W1-L3-PORT-01A`: `f1432e6 feat: add portfolio readiness dto evidence`
+- `CF-W1-TP-01B`: `8ff22fd fix: harden trade plan readiness gates`
+- `CF-W1-NOTIF-02`: `c77ece7 fix: redact notification log payloads`
+- `CF-W1-L3-ALERT-01`: `2fb0cb6 fix: gate alerts on data quality readiness`
+- `CF-W1-MD-01`: `913b56b fix: harden market data validation`
+
+None of these branch commits has been merged or pushed to `dev` in this cycle.
+
+## Current Decisions
 
 No open decisions.
 
@@ -26,71 +36,33 @@ Product Owner action not required.
 
 Daemon should continue autonomous work.
 
-Resolved this cycle:
+## Latest Gate Results
 
-- `DECISION-20260517-platform-auth-default-user-fallback-policy`: Option A.
-- `DECISION-20260517-local-manual-subscription-plan-change-policy`: Option A.
-- `DECISION-20260517-copilot-trust-ux-policy`: Option B.
-- `DECISION-20260517-ux-product-language-status-policy`: Option A.
-- `DECISION-20260517-market-data-validation-hardening-policy`: Option A.
+`CF-W1-MD-01`
 
-## Assignments Updated
+- Team 10 created the missing release-review artifact and accepted the release gate.
+- Team 00 created delegated PO acceptance.
+- Scoped local branch commit completed as `913b56b`.
+- Push/merge remains deferred until `dev` has a clean exact integration scope.
 
-Team inbox assignments were refreshed for post-decision routing:
+`CF-W1-L3-TREV-01`
 
-- Team 02: refresh requirements/queues for the resolved policy items without moving anything to Ready.
-- Team 03: refresh architecture and exact file reservations for resolved policy items.
-- Team 04: refresh QA plans and focused command guidance for resolved policy items.
-- Team 05: refresh `CF-W1-MD-01` validation-only packet.
-- Team 08: refresh Copilot-only `CF-W1-UX-02` / `CF-W1-UX-05` packets.
-- Team 09: refresh `CF-W1-AUTH-01` and `CF-W1-SUB-01` backend packets while keeping `CF-W1-NOTIF-02` near-ready.
+- Team 00 verified requirement, architecture review, contract, work packet, QA plan, open-decision state, and exact file reservations.
+- Ready promotion completed.
+- Team 07 current inbox now assigns Today Review implementation in branch `codex/team07-portfolio-alerts/CF-W1-L3-TREV-01` and worktree `../investment-scanner-worktrees/team07-CF-W1-L3-TREV-01`.
 
-## Worktree Direction
+## Teams Ready To Pick Up New Tasks
 
-Current assignments use shared `dev` because they are docs-only or review-only.
-
-Use dedicated worktrees only after Team 00 promotes an implementation item with exact file reservations:
-
-- Team 05 for `CF-W1-MD-01`.
-- Team 06 for `CF-W1-TP-01B`.
-- Team 07 for Lane 3 child implementation.
-- Team 08 for `CF-W1-UX-02` / `CF-W1-UX-05A`.
-- Team 09 for `CF-W1-NOTIF-02`, `CF-W1-AUTH-01`, or `CF-W1-SUB-01`.
-- Team 10 for isolated implementation review.
-
-## Ready Assessment
-
-`CF-W1-L3-PORT-01A` is Ready for Team 07 implementation.
-
-Team 07 must use:
-
-- Branch: `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A`
-- Worktree: `../investment-scanner-worktrees/team07-CF-W1-L3-PORT-01A`
-
-Allowed files:
-
-- `backend/src/modules/portfolio-management/portfolio-management.service.ts`
-- `backend/src/modules/portfolio-management/portfolio-management.types.ts`
-- `backend/src/modules/portfolio-management/portfolio-management.md`
-- `backend/tests/modules/portfolio-management/portfolio-management.service.test.ts`
-
-Near-ready but still requiring Team 00 promotion:
-
-- `CF-W1-TP-01B`
-- `CF-W1-NOTIF-02`
-- `CF-W1-L3-ALERT-01`
-- `CF-W1-L3-AUTH-03`
-
-Policy-resolved but still requiring packet refresh:
-
-- `CF-W1-AUTH-01`
-- `CF-W1-SUB-01`
-- `CF-W1-UX-02`
-- `CF-W1-UX-05`
-- `CF-W1-MD-01`
-
-Do not edit any other source/tests until a child is selected, exact reservations are copied into a team implementation inbox, and the ready queue is updated.
+- Team 07 is ready to implement `CF-W1-L3-TREV-01`.
+- Team 04 is ready for QA after Team 07 produces a developer handoff.
+- Team 10 is ready for release/code review after QA evidence exists.
+- Team 03 is ready for Architect Signoff after Team 10 accepts.
+- Team 02 remains active as persistent PO/Requirements discovery and should not be closed.
 
 ## Next Coordination Action
 
-Team 07 should start `CF-W1-L3-PORT-01A` in the dedicated worktree. Team 00 next evaluates `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, or `CF-W1-L3-ALERT-01` for the next Ready promotion while other factory teams continue docs-only packet refresh.
+1. Commit active execution docs only from shared `dev` if staged scope is clean.
+2. Create Team 07 Today Review worktree.
+3. Spawn Team 07 implementation agent for `CF-W1-L3-TREV-01`.
+4. Keep Team 02 running on high-value requirement discovery.
+5. Do not push `dev` until dirty app-test state is classified and integration scope is clean.

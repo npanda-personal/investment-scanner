@@ -4,7 +4,74 @@ Date: 2026-05-18
 
 Team: TEAM-10 - Review / Release
 
-State: `CF-W1-L3-PORT-01A` review complete; revision required before release acceptance.
+State: `CF-W1-NOTIF-02` preaccepted by code review with QA blocker; release acceptance blocked pending focused runtime verification.
+
+## 2026-05-18 `CF-W1-NOTIF-02` Review / Release Gate
+
+Team 10 reviewed the Team 09 developer handoff in branch `codex/team09-platform/CF-W1-NOTIF-02` at worktree `C:\work\repo\investment-scanner-worktrees\team09-CF-W1-NOTIF-02`.
+
+### Review Decision
+
+Preaccept with QA blocker.
+
+No source-level release finding was identified in the reviewed redaction patch. The provider log payload excludes raw recipient, subject, body, body preview, and payload contents; provider status/result behavior remains local/free; and notification persistence remains unchanged. Release acceptance remains blocked because Team 04 QA could not complete the required focused Jest runtime verification in the Team 09 worktree.
+
+### Findings
+
+- `P0 / QA blocker`: required runtime verification did not pass. `npm.cmd test -- notifications-delivery.service.test.ts --runInBand` failed because `jest` is unavailable in the Team 09 worktree, and the read-only fallback using the main workspace `node_modules` failed to resolve `@types/jest` and Jest globals. This blocks release acceptance until the focused notification test passes in a dependency-complete local environment without package installation in this slice.
+- No `P1/P2` source findings found by Team 10 static review.
+
+### Scope Evidence
+
+Changed application/test/doc files in Team 09 worktree:
+
+- `backend/src/modules/notifications-delivery/notifications-delivery.provider.ts`
+- `backend/tests/modules/notifications-delivery/notifications-delivery.service.test.ts`
+- `backend/src/modules/notifications-delivery/notifications-delivery.md`
+
+Additional Team 09 reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-09-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-NOTIF-02-developer-handoff.md`
+
+No staged files were present. No Prisma/schema, migrations, route registries, frontend, shared utilities, package manifests, generated files, auth/subscription files, server/env files, provider startup, SMTP/network path, paid/cloud service, telemetry, commit, push, or package install was used by Team 10.
+
+### Review Evidence
+
+- `notifications-delivery.provider.ts`: `status()` still reports `activeChannel: 'EMAIL_LOG'`, `providerName: 'log-email-provider'`, and `smtpAvailable: false`; `sendEmail()` still returns `EMAIL_LOG`, `SENT`, `log-email-provider`, and a `log-*` message id while logging only `providerName`, `channel`, `messageId`, `recipientRedacted`, `subjectLength`, and `bodyLength`.
+- `notifications-delivery.service.test.ts`: focused provider test now spies on `console.info`, asserts expected minimized metadata, rejects `to`, `subject`, `body`, `preview`, and `payload` properties, and rejects serialized raw recipient, subject, and body strings.
+- `notifications-delivery.service.ts`: persistence path remains unchanged; service still passes recipient, subject, body, and payload into the provider, then persists original event title/message and payload with provider metadata.
+- `notifications-delivery.md`: module docs now state local log delivery excludes raw recipient, subject, body, preview, and payload contents from `console.info`.
+- Team 04 QA evidence: static QA agreed the implementation appears correct but rejected the gate because focused runtime testing is blocked.
+
+### Validation
+
+Commands run by Team 10:
+
+- `git status --porcelain=v1`
+- `git diff --name-status`
+- `git diff --cached --name-status`
+- `git diff --check`
+- `rg -n "console\\.(info|log|warn|error)|preview|subject|body|payload|to:" backend/src/modules/notifications-delivery backend/tests/modules/notifications-delivery -g "*.ts"`
+- read-only line-reference inspection of provider, test, docs, service, QA evidence, requirement, architecture, contract, work packet, ready queue, Team 09 handoff, and Team 09 outbox.
+
+Result:
+
+- Static review passed with no source findings.
+- `git diff --check` returned exit code `0`; only CRLF normalization warnings were reported.
+
+Skipped:
+
+- Team 10 did not rerun the focused Jest test because Team 04 already proved the Team 09 worktree cannot resolve Jest/ts-jest dependencies, and package install is outside this review scope.
+- Backend build/typecheck skipped because the required focused runtime gate remains blocked.
+- UI smoke skipped because this is a backend-only provider slice.
+- SMTP, provider startup, network, paid/cloud, and live delivery checks skipped because they are explicitly forbidden for this packet.
+
+### Gate Outcome
+
+No commit created. No staging performed.
+
+Next required gate: runtime QA unblock and focused backend test pass for `notifications-delivery.service.test.ts` in a dependency-complete local environment, then Team 04 QA update and Team 10 release recheck before Architect signoff, Product Owner acceptance, scoped commit, or release acceptance.
 
 ## 2026-05-18 `CF-W1-L3-PORT-01A` Review / Release Gate
 

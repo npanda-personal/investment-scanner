@@ -165,3 +165,119 @@ This was a docs-only readiness inspection. No application implementation or exec
 ## Next Gate
 
 Return to Team 00 / Team 03 / Team 04 for packet narrowing or contract clarification before any Ready promotion.
+
+---
+
+## 2026-05-18 Readiness Refinement Addendum - CF-W1-MD-01
+
+### Result
+
+Recommendation: **Ready-recommended only for a narrowed child packet**, not for `CF-W1-MD-01` as currently written.
+
+Recommended narrowed child scope:
+
+- reject-only validation hardening inside Market Data validation source/tests;
+- no repository, provider, startup/backfill, Prisma/schema, route, shared utility, package, generated, frontend, or live-provider changes;
+- module doc update limited to validation limitations/non-goals.
+
+### Why The Narrowed Child Is Safe
+
+Source inspection confirms a bounded reject-only slice can stay module-local because the current validator already owns:
+
+- historical price row rejection via `validateHistoricalPrice(...)`;
+- duplicate batch-row rejection via `partitionHistoricalPrices(...)`;
+- opt-in spike rejection via `partitionHistoricalPrices(..., spikeThreshold)` and `defaultSpikeRejectionThreshold()`.
+
+Evidence:
+
+- `backend/src/modules/market-data-foundation/market-data-foundation.validation.ts:10`
+- `backend/src/modules/market-data-foundation/market-data-foundation.validation.ts:65`
+- `backend/src/modules/market-data-foundation/market-data-foundation.validation.ts:141`
+- `backend/tests/modules/market-data-foundation/market-data.validation.test.ts`
+
+### Exact Ready-Recommendable File Reservations
+
+Single-writer allowed files for the narrowed child:
+
+- `backend/src/modules/market-data-foundation/market-data-foundation.validation.ts`
+- `backend/tests/modules/market-data-foundation/market-data.validation.test.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.md`
+
+### Exact Forbidden Files For The Narrowed Child
+
+- `backend/src/modules/market-data-foundation/market-data-foundation.repository.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.provider.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.exchange-eod-adapter.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.angel-one-provider.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.scheduler.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.worker.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.queue.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.router.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.controller.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.types.ts`
+- `backend/tests/modules/market-data-foundation/market-data-readiness-evidence.invariants.test.ts`
+- `backend/tests/modules/market-data-foundation/market-data-storage-readiness.invariants.test.ts`
+- Data Quality Engine source/tests
+- Prisma schema, migrations, generated files
+- route registries
+- shared backend utilities
+- package manifests
+- frontend source, shared UI, Playwright tests
+
+### Required QA Scenario Split
+
+In-scope for the narrowed child:
+
+- future-dated candle rejection with explicit boundary input/default behavior;
+- invalid `adjustedClose` rejection when present but non-finite, zero, negative, or out-of-policy;
+- negative volume remains invalid;
+- duplicate row behavior remains deterministic;
+- spike rejection stays opt-in and off by default.
+
+Blocked from the narrowed child unless scope widens:
+
+- missing `adjustedClose` as fallback/incomplete evidence;
+- zero-volume or suspicious-volume warning/readiness evidence.
+
+Reason:
+
+- `validateHistoricalPrice(...)` returns `string[]` only and has no warning/evidence channel;
+- repository warnings are derived from `validation.invalid`, so valid rows with missing `adjustedClose` or zero volume produce no validator-owned evidence today;
+- provider/adapter/repository call sites currently invoke `partitionHistoricalPrices(prices)` without a future-date boundary input.
+
+Evidence:
+
+- `backend/src/modules/market-data-foundation/market-data-foundation.validation.ts:10`
+- `backend/src/modules/market-data-foundation/market-data-foundation.types.ts:1484`
+- `backend/src/modules/market-data-foundation/market-data-foundation.repository.ts:1306`
+- `backend/src/modules/market-data-foundation/market-data-foundation.provider.ts:183`
+- `backend/src/modules/market-data-foundation/market-data-foundation.exchange-eod-adapter.ts:157`
+- `backend/src/modules/market-data-foundation/market-data-foundation.angel-one-provider.ts:145`
+- `backend/tests/modules/market-data-foundation/market-data-readiness-evidence.invariants.test.ts:115`
+- `backend/tests/modules/market-data-foundation/market-data-storage-readiness.invariants.test.ts:227`
+
+### Required Upstream Updates Before Team 00 Promotion
+
+Team 03 architecture/work-packet update required:
+
+- narrow the first child explicitly to reject-only validation hardening;
+- define future-date boundary as a backward-compatible optional validator input or explicitly defer boundary plumb-through to a later packet;
+- defer missing-`adjustedClose` fallback evidence and zero/suspicious-volume warning evidence to a follow-on child unless scope is widened deliberately.
+
+Team 04 QA update required:
+
+- split QA matrix into reject-only scenarios versus deferred warning/evidence scenarios;
+- do not require readiness/storage invariant tests for the narrowed child;
+- keep focused test command on `market-data.validation.test.ts` only.
+
+Product Owner / Architect decision still required only if any team wants the first child to include:
+
+- missing `adjustedClose` fallback/incomplete evidence;
+- zero/suspicious-volume warning evidence;
+- deterministic suspicious-volume thresholds/reason strings;
+- repository/provider/readiness evidence behavior.
+
+### Next Gate
+
+Return to Team 00 for child-packet narrowing, then Team 03 contract/work-packet refresh and Team 04 QA refresh. Ready promotion should target the narrowed validation-only child, not the broader `CF-W1-MD-01` packet.

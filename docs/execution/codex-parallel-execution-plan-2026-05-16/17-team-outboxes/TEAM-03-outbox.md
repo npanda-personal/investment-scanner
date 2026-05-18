@@ -125,6 +125,260 @@ Blocker is sequencing, not a new consent decision: `CF-W1-L3-PORT-01A` must firs
 
 No builds, tests, services, Prisma commands, providers, UI checks, Playwright runs, commits, or pushes were run.
 
+## Continuation - CAL And HCTX Discovery Readiness
+
+Date: 2026-05-18
+
+State: Docs-only architecture verification complete.
+
+### Assignment
+
+Inspect Team 02 discovery items `CF-W1-CAL-01`, `CF-W1-HCTX-01`, and `CF-W1-SQLAB-01` against current source/docs and add only the missing bounded architecture packet.
+
+### Work Pulled
+
+No app-code work pulled.
+
+### Architecture / Contract / Work-Packet Evidence Prepared
+
+Created:
+
+- `03-architecture/CF-W1-HCTX-01-architecture-review.md`
+- `06-contracts/CF-W1-HCTX-01-historical-context-explainability-contract.md`
+- `08-work-packets/CF-W1-HCTX-01-work-packet.md`
+
+Updated:
+
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+- `17-team-outboxes/TEAM-03-outbox.md`
+
+### Readiness Result
+
+| Candidate | Team 03 result |
+| --- | --- |
+| `CF-W1-CAL-01` | Existing bounded `signal-calibration-engine` packet was revalidated against current source. Exact service/types/doc/test reservations still hold. No additional Team 03 doc delta was required. |
+| `CF-W1-HCTX-01` | Prepared as a bounded backend-only `historical-context-snapshots` explainability packet. Exact service/types/doc/service-test reservations are defined. No first-slice schema, route, provider, shared utility, package, generated, or frontend approval was required. |
+| `CF-W1-SQLAB-01` | Existing bounded `signal-quality-lab` packet was revalidated against current source and remains fully prepared. No additional Team 03 doc delta was required. |
+
+### Boundaries And Blockers
+
+- `CF-W1-HCTX-01` stays inside `historical-context-snapshots` and must not widen into repository, controller, router, validation, frontend, or upstream module changes.
+- `CF-W1-CAL-01` remains owned by `signal-calibration-engine`; SQLAB and DQE stay public evidence dependencies only.
+- `CF-W1-SQLAB-01` remains owned by `signal-quality-lab`; DQE stays the only public evidence dependency for the first slice.
+- None of the three items is promoted to Ready. Team 04 QA planning and Team 00 sequencing still gate any future implementation.
+
+### Validation
+
+No builds, tests, services, Prisma commands, providers, UI checks, Playwright runs, commits, or pushes were run.
+
+## Continuation - UX-02 Plus UX-05A Combined Copilot Packet
+
+Date: 2026-05-18
+
+State: Docs-only combined-packet refresh complete.
+
+### Assignment
+
+Incorporate Team 08 source mapping for `CF-W1-UX-02` / `CF-W1-UX-05` as one combined Copilot-only packet.
+
+### Work Pulled
+
+No app-code work pulled.
+
+### Architecture / Contract / Work-Packet Evidence Updated
+
+Updated:
+
+- `06-contracts/CF-W1-UX-02-copilot-trust-ux-contract.md`
+- `08-work-packets/CF-W1-UX-02-work-packet.md`
+- `06-contracts/CF-W1-UX-05-product-language-status-contract.md`
+- `08-work-packets/CF-W1-UX-05-work-packet.md`
+- `03-architecture/team03-post-decision-readiness-refresh-2026-05-18.md`
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+- `17-team-outboxes/TEAM-03-outbox.md`
+
+### Combined Scope Result
+
+Ready-recommendable only as one bounded `CF-W1-UX-02 + CF-W1-UX-05A` Copilot-only slice with this exact writer set:
+
+- `backend/src/modules/ai-investment-copilot/ai-investment-copilot.types.ts`
+- `backend/src/modules/ai-investment-copilot/ai-investment-copilot.service.ts`
+- `backend/src/modules/ai-investment-copilot/ai-investment-copilot.controller.ts`
+- `backend/src/modules/ai-investment-copilot/ai-investment-copilot.validation.ts` only if scope/query parsing is added
+- `backend/src/modules/ai-investment-copilot/ai-investment-copilot.md`
+- `backend/tests/modules/ai-investment-copilot/ai-investment-copilot.service.test.ts`
+- `backend/tests/modules/ai-investment-copilot/ai-investment-copilot.routes.test.ts`
+- `backend/tests/modules/ai-investment-copilot/ai-investment-copilot.validation.test.ts` only if validation logic changes
+- `frontend/src/features/ai-investment-copilot/types.ts`
+- `frontend/src/features/ai-investment-copilot/api/aiInvestmentCopilotService.ts`
+- `frontend/src/features/ai-investment-copilot/hooks/useAiInvestmentCopilot.ts`
+- `frontend/src/features/ai-investment-copilot/components/AiInvestmentCopilotPage.tsx`
+- `frontend/tests/ui/ai-investment-copilot.spec.ts`
+
+Preserved QA scenarios:
+
+- blocked state hides narrative and shows blocker reasons first
+- limited state shows warnings without recommendation-like framing
+- trusted state shows local deterministic research-only proof plus source modules/data gaps
+- latest trusted data date only when source timestamps exist, otherwise `null`
+- market brief scope pass-through if validation/controller changes are included
+- additive DTO changes do not break Notifications Delivery digest use
+
+### Remaining Blocker
+
+Team 04 QA still needs to align the QA handoff to the same combined packet shape before Team 00 can promote a bounded Ready packet.
+
+### Validation
+
+No builds, tests, services, Prisma commands, providers, UI checks, Playwright runs, commits, or pushes were run.
+
+## Continuation - MD-01 Narrowed Child Refresh
+
+Date: 2026-05-18
+
+State: Docs-only narrowing pass complete.
+
+### Assignment
+
+Incorporate Team 05 readiness inspection for `CF-W1-MD-01` by narrowing the Team 03 contract/work-packet to the Ready-recommendable reject-only validation child.
+
+### Work Pulled
+
+No app-code work pulled.
+
+### Architecture / Contract / Work-Packet Evidence Updated
+
+Updated:
+
+- `06-contracts/CF-W1-MD-01-market-data-validation-hardening-contract.md`
+- `08-work-packets/CF-W1-MD-01-work-packet.md`
+- `03-architecture/team03-post-decision-readiness-refresh-2026-05-18.md`
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+- `17-team-outboxes/TEAM-03-outbox.md`
+
+### Narrowed Scope
+
+In-scope Ready-recommendable child:
+
+- `backend/src/modules/market-data-foundation/market-data-foundation.validation.ts`
+- `backend/tests/modules/market-data-foundation/market-data.validation.test.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.md`
+
+Required scenarios kept in scope:
+
+- future-dated candle rejection
+- invalid `adjustedClose` rejection when present
+- negative volume invalid behavior
+- duplicate row determinism
+- spike rejection opt-in and off by default
+
+Deferred from this child:
+
+- missing `adjustedClose` fallback/incomplete evidence
+- zero-volume or suspicious-volume warning/readiness evidence
+
+### Remaining Blocker
+
+Team 04 QA still needs to narrow `CF-W1-MD-01` to the same reject-only scenario set before Team 00 can promote a bounded Ready packet.
+
+### Validation
+
+No builds, tests, services, Prisma commands, providers, UI checks, Playwright runs, commits, or pushes were run.
+
+## Continuation - SQLAB And CAL Trust-State Prep
+
+Date: 2026-05-18
+
+State: Docs-only architecture pass complete.
+
+### Assignment
+
+Add `CF-W1-SQLAB-01` to the active Team 03 backlog, then inspect and add `CF-W1-CAL-01` only if a bounded module-local slice was supported by current source/docs.
+
+### Work Pulled
+
+No app-code work pulled.
+
+### Architecture / Contract / Work-Packet Evidence Prepared
+
+Created:
+
+- `03-architecture/CF-W1-SQLAB-01-architecture-review.md`
+- `06-contracts/CF-W1-SQLAB-01-signal-quality-outcome-confidence-contract.md`
+- `08-work-packets/CF-W1-SQLAB-01-work-packet.md`
+- `03-architecture/CF-W1-CAL-01-architecture-review.md`
+- `06-contracts/CF-W1-CAL-01-signal-calibration-reliability-drift-contract.md`
+- `08-work-packets/CF-W1-CAL-01-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+- `17-team-outboxes/TEAM-03-outbox.md`
+
+### Readiness Result
+
+| Candidate | Team 03 result |
+| --- | --- |
+| `CF-W1-SQLAB-01` | Prepared as a bounded `signal-quality-lab` trust-labeling packet. Exact allowed files are module service/types/doc/service-test, with optional route test only if endpoint-level additive response assertions are added. |
+| `CF-W1-CAL-01` | Prepared as a bounded `signal-calibration-engine` trust-state packet. Exact allowed files are module service/types/doc/service-test, with optional route test only if endpoint-level additive response assertions are added. Calibration owns the slice. |
+
+### Dependency Notes
+
+- `CF-W1-SQLAB-01` depends only on current DQ public evaluation reads already used by Signal Quality Lab.
+- `CF-W1-CAL-01` depends on current Signal Quality Lab summary diagnostics and current DQ evaluation DTO semantics through public services only.
+- `CF-W1-SQLAB-01` is not a blocking prerequisite for `CF-W1-CAL-01`.
+- `CF-W1-DQ-02` is not a blocking prerequisite for `CF-W1-CAL-01`, though session-aware currentness should be absorbed later once that packet exists.
+
+### Blockers
+
+- No shared DTO, schema, route, package, generated, provider, or frontend blocker was required for the first bounded SQLAB or CAL slice.
+- Team 00 still must sequence Ready promotion, and Team 04 still must own QA prep before implementation.
+
+### Validation
+
+No builds, tests, services, Prisma commands, providers, UI checks, Playwright runs, commits, or pushes were run.
+
+## Continuation - Portfolio Intelligence Review Traceability
+
+Date: 2026-05-18
+
+State: Docs-only architecture pass complete.
+
+### Assignment
+
+Add `CF-W1-L3-INTEL-02` to the Team 03 architecture queue after `CF-W1-L3-PORT-01B` and the new discovery trio.
+
+### Architecture / Contract / Work-Packet Evidence Prepared
+
+Created:
+
+- `03-architecture/CF-W1-L3-INTEL-02-architecture-review.md`
+- `06-contracts/CF-W1-L3-INTEL-02-portfolio-intelligence-review-traceability-contract.md`
+- `08-work-packets/CF-W1-L3-INTEL-02-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+- `17-team-outboxes/TEAM-03-outbox.md`
+
+### Readiness Result
+
+`CF-W1-L3-INTEL-02` is prepared as a portfolio-intelligence-only traceability child.
+
+Recorded dependencies:
+
+- depends on accepted `CF-W1-L3-PORT-01A`;
+- does not depend on `CF-W1-L3-PORT-01B`;
+- shares the full `portfolio-intelligence` service/types/doc/test reservation with `CF-W1-L3-INTEL-01`, so Team 00 must combine or sequence them.
+
+### Validation
+
+No builds, tests, services, Prisma commands, providers, UI checks, Playwright runs, commits, or pushes were run.
+
 Validation was read-only source/docs inspection plus scoped markdown diff checks.
 
 ### Decisions
@@ -395,6 +649,59 @@ Validation was source/doc inspection plus file-reservation reconciliation only.
 If Team 00 wants the cleanest new slice after the active `CF-W1-L3-PORT-01A` rework, promote `CF-W1-NOTIF-02` next. It has the narrowest write scope, no cross-module dependency, no shared-file collision with the active Lane 3 work, and no remaining policy blocker.
 
 If Team 00 instead wants the next highest-value strategy/risk slice, `CF-W1-TP-01B` is the next strongest backend-only promotion.
+
+## Continuation - Today Review Publication Evidence
+
+Date: 2026-05-18
+
+State: Docs-only architecture packet prepared. Not Ready for Implementation.
+
+### Assignment
+
+Prepare architecture readiness, exact file reservations, and bounded contract/work-packet scope for `CF-W1-L3-TREV-01` Today Review publication evidence.
+
+### Work Pulled
+
+No app-code work pulled.
+
+### Architecture / Contract / Work-Packet Evidence Prepared
+
+Created:
+
+- `03-architecture/CF-W1-L3-TREV-01-architecture-review.md`
+- `06-contracts/CF-W1-L3-TREV-01-today-review-publication-evidence-contract.md`
+- `08-work-packets/CF-W1-L3-TREV-01-work-packet.md`
+
+Updated:
+
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+- `17-team-outboxes/TEAM-03-outbox.md`
+
+### Readiness Result
+
+`CF-W1-L3-TREV-01` is bounded enough for future Ready evaluation as a Today Review-owned vertical slice.
+
+Recorded boundaries:
+
+- module owner: `today-trade-review`
+- safe first-slice backend scope: Today Review service, repository, types, module doc, and focused service/repository tests
+- safe first-slice frontend scope: Today Review page, Today Review feature types, and Today Review UI spec
+- no first-slice Prisma, route, provider, package, generated-file, shared utility, or shared UI scope
+
+Recorded deferral:
+
+- run-level publication evidence on candidate detail is not part of the first slice
+- candidate detail remains a read-only research-support regression expectation only
+
+### QA / Gate Notes
+
+- Team 04 still needs the QA plan.
+- Team 00 still owns any Ready promotion.
+- Team 03 does not move this item to Ready.
+
+### Validation
+
+No builds, tests, services, Prisma commands, providers, UI checks, Playwright runs, commits, or pushes were run.
 
 ## Continuation - Discovery Items And Watchlist Child
 

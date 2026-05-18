@@ -137,6 +137,183 @@ No new Decision Packet was opened.
 
 No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
 
+## Team 03 Today Review Publication Evidence Prep - 2026-05-18
+
+Assignment: prepare docs-only architecture readiness for `CF-W1-L3-TREV-01` after Team 02 added the Today Review publication-evidence requirement.
+
+Prepared:
+
+- `03-architecture/CF-W1-L3-TREV-01-architecture-review.md`
+- `06-contracts/CF-W1-L3-TREV-01-today-review-publication-evidence-contract.md`
+- `08-work-packets/CF-W1-L3-TREV-01-work-packet.md`
+
+Updated:
+
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+- `17-team-outboxes/TEAM-03-outbox.md`
+
+Readiness result:
+
+- `CF-W1-L3-TREV-01` is source-supported as a bounded Today Review vertical slice.
+- The first slice can stay inside `today-trade-review` backend/frontend/docs/tests only.
+- No schema, route, provider, package, generated, shared utility, or shared UI approval is required for the first slice.
+- Recommended write scope is Today Review service/repository/types/docs/service-test plus Today Review page/types/UI spec.
+- Candidate-detail run-evidence expansion is intentionally deferred; the first slice keeps detail as a preserved read-only research-support regression.
+
+Remaining blockers:
+
+- Team 04 QA plan is still needed.
+- Team 00 still owns any future Ready promotion.
+- Do not widen the first slice into Market Data, DQ, Strategy Decision, Trade Plan, route, Prisma, or shared UI work.
+
+No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
+
+## Team 03 Discovery Verification - 2026-05-18
+
+Assignment: inspect Team 02 discovery items `CF-W1-CAL-01`, `CF-W1-HCTX-01`, and `CF-W1-SQLAB-01` against current source/docs and add only the missing bounded architecture packet.
+
+Prepared:
+
+- `03-architecture/CF-W1-HCTX-01-architecture-review.md`
+- `06-contracts/CF-W1-HCTX-01-historical-context-explainability-contract.md`
+- `08-work-packets/CF-W1-HCTX-01-work-packet.md`
+
+Result:
+
+- `CF-W1-CAL-01` remained source-aligned as an existing bounded `signal-calibration-engine` packet; no additional Team 03 artifact change was required.
+- `CF-W1-SQLAB-01` remained source-aligned as an existing bounded `signal-quality-lab` packet; no additional Team 03 artifact change was required.
+- `CF-W1-HCTX-01` is now prepared as a backend-only `historical-context-snapshots` explainability packet with exact service/types/doc/service-test reservations.
+
+Boundaries:
+
+- `CF-W1-HCTX-01` can proceed as a module-local backend slice because the service can derive selected-date lag and missing/metadata-gap provenance from existing lookup payloads.
+- The first `HCTX` slice does not require Prisma, route, provider, shared DTO, package, generated, or frontend approval.
+- Any future Historical Context page rendering of the new explainability fields is a separate consumer/UI follow-up and must not be folded into the first writer pass.
+
+Blockers:
+
+- Team 04 QA plan still needs to be prepared for `CF-W1-HCTX-01`.
+- Team 00 still owns sequencing and any future Ready promotion.
+- No new Decision Packet was opened.
+
+No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
+
+## Team 03 UX-02 + UX-05A Combined Packet Refresh - 2026-05-18
+
+Assignment: incorporate Team 08 source mapping for `CF-W1-UX-02` / `CF-W1-UX-05` as one combined Copilot-only packet without touching source/tests.
+
+Updated:
+
+- `06-contracts/CF-W1-UX-02-copilot-trust-ux-contract.md`
+- `08-work-packets/CF-W1-UX-02-work-packet.md`
+- `06-contracts/CF-W1-UX-05-product-language-status-contract.md`
+- `08-work-packets/CF-W1-UX-05-work-packet.md`
+- `03-architecture/team03-post-decision-readiness-refresh-2026-05-18.md`
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+- `17-team-outboxes/TEAM-03-outbox.md`
+
+Combined result:
+
+- Ready-recommendable only as one bounded `CF-W1-UX-02 + CF-W1-UX-05A` Copilot-only slice.
+- The slice requires additive `ai-investment-copilot` backend contract fields plus Copilot feature UI changes.
+- It stays out of shared UI/navigation/routes/packages/providers/generated/common fixtures and external AI.
+- Notifications Delivery digest compatibility is now a required preserved regression scenario.
+
+Remaining blocker:
+
+- Team 04 QA still needs to align the QA handoff to the same combined packet shape before Team 00 Ready promotion.
+
+No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
+
+## Team 03 MD-01 Narrowing Refresh - 2026-05-18
+
+Assignment: incorporate Team 05 readiness inspection for `CF-W1-MD-01` as a contract/work-packet narrowing pass without changing application source/tests.
+
+Updated:
+
+- `06-contracts/CF-W1-MD-01-market-data-validation-hardening-contract.md`
+- `08-work-packets/CF-W1-MD-01-work-packet.md`
+- `03-architecture/team03-post-decision-readiness-refresh-2026-05-18.md`
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+- `17-team-outboxes/TEAM-03-outbox.md`
+
+Narrowed result:
+
+- `CF-W1-MD-01` is no longer described as a broad validation/evidence packet.
+- The first promotable child is now explicitly reject-only and limited to:
+  - `backend/src/modules/market-data-foundation/market-data-foundation.validation.ts`
+  - `backend/tests/modules/market-data-foundation/market-data.validation.test.ts`
+  - `backend/src/modules/market-data-foundation/market-data-foundation.md`
+- Missing `adjustedClose` fallback/incomplete evidence and zero/suspicious-volume warning evidence are explicitly deferred.
+- Repository/provider/service/router/controller/types/readiness-storage tests, Prisma/schema/migrations/generated, route registries, shared utilities, package manifests, DQE source/tests, and frontend/shared UI/Playwright remain forbidden.
+
+Remaining blocker:
+
+- Team 04 QA plan still needs to split reject-only in-scope scenarios from deferred warning/evidence scenarios before Team 00 Ready promotion.
+
+No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
+
+## Team 03 SQLAB + CAL Refresh - 2026-05-18
+
+Assignment: add docs-only architecture/contracts/work-packet readiness for `CF-W1-SQLAB-01` and then `CF-W1-CAL-01` if source inspection supported bounded module-local slices.
+
+Prepared:
+
+- `03-architecture/CF-W1-SQLAB-01-architecture-review.md`
+- `06-contracts/CF-W1-SQLAB-01-signal-quality-outcome-confidence-contract.md`
+- `08-work-packets/CF-W1-SQLAB-01-work-packet.md`
+- `03-architecture/CF-W1-CAL-01-architecture-review.md`
+- `06-contracts/CF-W1-CAL-01-signal-calibration-reliability-drift-contract.md`
+- `08-work-packets/CF-W1-CAL-01-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+- `17-team-outboxes/TEAM-03-outbox.md`
+
+Readiness result:
+
+| Candidate | Team 03 result |
+| --- | --- |
+| `CF-W1-SQLAB-01` | Prepared as a bounded `signal-quality-lab` trust-labeling packet. Exact service/types/doc/test reservations are defined. No first-slice schema, route, provider, shared utility, package, generated, or frontend blocker was found. |
+| `CF-W1-CAL-01` | Prepared as a bounded `signal-calibration-engine` trust-state packet. Calibration owns the slice. Signal Quality Lab and DQ are non-blocking public-contract dependencies; no first-slice schema, route, provider, shared utility, package, generated, or frontend blocker was found. |
+
+Dependencies and sequencing:
+
+- `CF-W1-SQLAB-01` can proceed as a standalone module-local slice.
+- `CF-W1-CAL-01` does not require `CF-W1-SQLAB-01` or `CF-W1-DQ-02` first, but it should align vocabulary with those packets if they land earlier.
+- If Team 00 promotes both SQLAB and CAL, do not combine them into one writer pass unless Team 00 intentionally sequences them; they reserve different module files but share Lane 2 trust semantics.
+
+No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
+
+## Team 03 INTEL-02 Refresh - 2026-05-18
+
+Assignment: add docs-only architecture/contracts/work-packet readiness for `CF-W1-L3-INTEL-02` after `CF-W1-L3-PORT-01B` and the discovery trio without promoting Ready.
+
+Prepared:
+
+- `03-architecture/CF-W1-L3-INTEL-02-architecture-review.md`
+- `06-contracts/CF-W1-L3-INTEL-02-portfolio-intelligence-review-traceability-contract.md`
+- `08-work-packets/CF-W1-L3-INTEL-02-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+- `17-team-outboxes/TEAM-03-outbox.md`
+
+Readiness result:
+
+- `CF-W1-L3-INTEL-02` now has exact `portfolio-intelligence` service/types/doc/test reservations.
+- It depends on accepted `CF-W1-L3-PORT-01A`.
+- It does not depend on `CF-W1-L3-PORT-01B`.
+- It shares the same file set as `CF-W1-L3-INTEL-01`, so Team 00 must combine or sequence the two packets with one writer.
+
+No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
+
 ## Team 03 Discovery + Watchlist Child Refresh - 2026-05-18
 
 Assignment: prepare docs-only architecture/contracts/work-packet readiness for new Team 02 discovery items `CF-W1-AUTH-02`, `CF-W1-DQ-02`, `CF-W1-TP-02`, and add the newly prioritized `CF-W1-L3-PORT-01B` watchlist child without promoting Ready.

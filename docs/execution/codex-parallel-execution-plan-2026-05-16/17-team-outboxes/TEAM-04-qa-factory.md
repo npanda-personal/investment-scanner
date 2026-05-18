@@ -4,6 +4,103 @@ Date: 2026-05-18
 
 Mode: focused QA rerun plus docs-only QA planning.
 
+## 2026-05-18 `CF-W1-L3-TREV-01` Today Review Publication Evidence QA Planning
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only QA packet preparation
+- Work item: `CF-W1-L3-TREV-01`
+- Files changed:
+  - `04-qa/CF-W1-L3-TREV-01-qa-plan.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - `10-requirements/CF-W1-L3-TREV-01-today-review-publication-evidence-requirement.md`
+  - `03-architecture/CF-W1-L3-TREV-01-architecture-review.md`
+  - `06-contracts/CF-W1-L3-TREV-01-today-review-publication-evidence-contract.md`
+  - `08-work-packets/CF-W1-L3-TREV-01-work-packet.md`
+  - `17-team-outboxes/TEAM-03-architecture-factory.md`
+  - `03-architecture/team03-post-decision-readiness-refresh-2026-05-18.md`
+  - `03-architecture/team03-near-ready-file-reservation-matrix-2026-05-18.md`
+  - `backend/src/modules/today-trade-review/today-trade-review.md`
+  - `backend/tests/modules/today-trade-review/today-trade-review.service.test.ts`
+  - `frontend/tests/ui/today-trade-review.spec.ts`
+  - `docs/codex-agent-team-plan/qa-evidence/2026-05-14-p0-1b-today-review-readonly-context-qa-evidence.md`
+  - `backend/package.json`
+  - `frontend/package.json`
+- Result:
+  - Prepared a bounded QA plan for Today Review run/list publication evidence and readiness-coherence normalization in `04-qa/CF-W1-L3-TREV-01-qa-plan.md`.
+  - The first slice is explicitly limited to run/list publication evidence, legacy read-path synthesis if reserved, and feature-local Today Review page behavior only if the reserved frontend files are included.
+  - Candidate-detail run-evidence expansion is explicitly rejected from the first slice.
+  - Route registry, shared UI, Prisma, package, generated, provider/live, and upstream Market Data/Data Quality/Strategy/Trade Plan source changes remain forbidden in the QA plan.
+  - Focused future command guidance now covers Today Review backend service tests, optional repository synthesis coverage, feature-local Playwright smoke, and build-as-typecheck guidance for touched sides.
+- Tests run: none
+- Tests skipped:
+  - all executable validation was skipped because this was a docs-only QA planning pass with no Team 00 Ready promotion or implementation handoff
+- QA-ready for Team 00 Ready evaluation:
+  - `CF-W1-L3-TREV-01`: yes, as one bounded Today Review run/list publication-evidence slice
+- Remaining blockers:
+  - Team 00 has not yet promoted the packet to Ready or issued an implementation handoff
+  - executable QA remains blocked until exact file reservations are activated by implementation
+  - frontend/UI smoke remains conditional on whether the eventual implementation includes the reserved Today Review frontend files
+- Next gate:
+  - Team 00 Ready evaluation for `CF-W1-L3-TREV-01`
+- Evidence notes:
+  - Team 04 aligned the QA plan to the latest Team 03 Today Review contract/work-packet packet and the existing Today Review source/test surface without editing application source or tests
+
+## 2026-05-18 `CF-W1-MD-01` And `CF-W1-UX-02 + CF-W1-UX-05A` QA Narrowing / Consolidation Refresh
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only QA packet refinement
+- Work items:
+  - `CF-W1-MD-01` reject-only validator child
+  - combined `CF-W1-UX-02 + CF-W1-UX-05A` Copilot-only trust and product-language child
+- Files changed:
+  - `04-qa/CF-W1-MD-01-qa-plan.md`
+  - `04-qa/CF-W1-UX-02-qa-plan.md`
+  - `04-qa/CF-W1-UX-05-product-language-status-qa-plan.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - `06-contracts/CF-W1-MD-01-market-data-validation-hardening-contract.md`
+  - `08-work-packets/CF-W1-MD-01-work-packet.md`
+  - `04-qa/CF-W1-MD-01-qa-plan.md`
+  - `06-contracts/CF-W1-UX-02-copilot-trust-ux-contract.md`
+  - `08-work-packets/CF-W1-UX-02-work-packet.md`
+  - `06-contracts/CF-W1-UX-05-product-language-status-contract.md`
+  - `08-work-packets/CF-W1-UX-05-work-packet.md`
+  - `04-qa/CF-W1-UX-02-qa-plan.md`
+  - `04-qa/CF-W1-UX-05-product-language-status-qa-plan.md`
+  - `17-team-outboxes/TEAM-03-outbox.md`
+  - `17-team-outboxes/TEAM-05-outbox.md`
+  - `17-team-outboxes/TEAM-08-outbox.md`
+- Result:
+  - `CF-W1-MD-01` QA is now narrowed to the exact reject-only validator scenarios: future-dated rejection, invalid present `adjustedClose`, negative volume invalidity, duplicate determinism, and spike rejection opt-in/off-by-default behavior.
+  - missing `adjustedClose` fallback/incomplete evidence and zero/suspicious-volume warning/readiness evidence are explicitly deferred from `CF-W1-MD-01`.
+  - `CF-W1-UX-02` now carries the primary combined Copilot-only QA plan for `CF-W1-UX-02 + CF-W1-UX-05A`.
+  - `CF-W1-UX-05A` is explicitly folded into the combined Copilot-only packet and no longer stands as a separate executable QA slice.
+  - Preserved combined Copilot scenarios:
+    - blocked state hides narrative and shows blocker reasons first
+    - limited state shows warnings without recommendation framing
+    - trusted state shows local deterministic research-only proof plus source modules/data gaps
+    - `latestTrustedDataDate` is shown only when timestamps exist, otherwise `null`
+    - market brief scope pass-through is verified if controller/validation changes are included
+    - additive Copilot DTO changes do not break Notifications Delivery digest use
+    - advice-like wording and shared UI/navigation scope remain forbidden
+- Tests run: none
+- Tests skipped:
+  - all executable validation was skipped because this was a docs-only planning pass with no implementation handoff
+- QA-ready for Team 00 Ready evaluation:
+  - `CF-W1-MD-01`: yes, as one bounded validation-only handoff
+  - `CF-W1-UX-02 + CF-W1-UX-05A`: yes, as one bounded Copilot-only handoff
+- Remaining blockers:
+  - no implementation handoff is promoted yet for either candidate
+  - executable QA remains blocked until Team 00 promotes exact file reservations and a bounded implementation packet
+  - Copilot UI smoke remains blocked until the combined packet is implemented and `frontend/tests/ui/ai-investment-copilot.spec.ts` exists in the reserved scope
+- Next gate:
+  - Team 00 Ready evaluation for the narrowed `CF-W1-MD-01` validator child
+  - Team 00 Ready evaluation for one combined `CF-W1-UX-02 + CF-W1-UX-05A` Copilot-only child
+- Evidence notes:
+  - Team 04 aligned both QA plans to the latest Team 03 contract/work-packet updates and Team 05/08 outbox findings without editing source/tests
+
 ## 2026-05-18 `CF-W1-L3-PORT-01A` QA Rerun After Team 07 Rework
 
 - Team: `TEAM-04` - QA Factory
@@ -61,8 +158,9 @@ Prepared and refreshed QA plans for:
 - `CF-W1-TP-01B`: prepared backend-only Trade Plan compatibility and DQ hard-block child QA plan.
 - `CF-W1-NOTIF-02`: prepared focused notification local log redaction QA plan.
 - `CF-W1-MD-01`: refreshed Option A validation-hardening QA plan after Product Owner resolution.
-- `CF-W1-UX-02`: refreshed Option B Copilot-only trust QA plan after Product Owner resolution.
-- `CF-W1-UX-05`: refreshed Option A Copilot-only copy/status QA plan after Product Owner resolution.
+- `CF-W1-MD-01`: narrowed to the reject-only validator child after Team 03/05 alignment.
+- `CF-W1-UX-02`: consolidated into the combined Copilot-only `CF-W1-UX-02 + CF-W1-UX-05A` QA plan.
+- `CF-W1-UX-05`: folded into the combined Copilot-only `CF-W1-UX-02 + CF-W1-UX-05A` QA plan rather than a separate executable slice.
 - `CF-W1-AUTH-01` and `CF-W1-SUB-01`: refreshed Option A platform auth/subscription assertions in the combined Team 09 QA plan.
 
 Updated `04-qa/next-validation-plans.md` so the resolved-policy items show QA refresh prepared while executable QA remains blocked behind exact reservations and Team 00 Ready promotion.
@@ -218,10 +316,10 @@ Excluded by default:
 
 ## Blockers
 
-- `CF-W1-MD-01`: Option A QA refresh is prepared; executable validation is blocked until validation-only file reservations and Team 00 implementation handoff.
+- `CF-W1-MD-01`: narrowed reject-only validator-child QA plan is prepared and QA-ready for Team 00 Ready evaluation; executable validation is still blocked until Team 00 promotes the validation-only implementation handoff.
 - `CF-W1-L3-ALERT-01`: blocked by `CF-W1-L3-DQ-01`, alert readiness contract, and implementation handoff.
-- `CF-W1-UX-02`: Option B QA refresh is prepared; executable validation is blocked until Copilot-only trust-field contract refresh, exact file reservations, and Team 00 implementation handoff.
-- `CF-W1-UX-02` UI smoke is also blocked because `frontend/tests/ui/ai-investment-copilot.spec.ts` and `frontend/tests/ui/stock-research-workbench.spec.ts` do not currently exist.
+- `CF-W1-UX-02`: combined Copilot-only QA plan for `CF-W1-UX-02 + CF-W1-UX-05A` is prepared and QA-ready for Team 00 Ready evaluation; executable validation is blocked until Team 00 promotes the combined implementation handoff.
+- `CF-W1-UX-02` UI smoke is also blocked because `frontend/tests/ui/ai-investment-copilot.spec.ts` does not currently exist in the implementation scope.
 - `CF-W1-L3-DQ-01`: child scenario matrix is now recorded; QA execution is blocked until module-specific child contracts, exact file reservations, and implementation handoffs.
 - `CF-W1-TP-01A`: backend-only scenario matrix is now recorded; QA execution is blocked until accepted backend-only child packet, exact source/test reservations, and implementation handoff.
 - `CF-W1-MD-02`: ADR QA checklist is now recorded; schema/source/test execution remains blocked until a formal storage/natural-key ADR and separate implementation slice approval.
@@ -229,7 +327,7 @@ Excluded by default:
 - `CF-W1-L3-PORT-01A`: initial focused QA passed, but release acceptance is blocked by Team 10's code-review finding; next gates are Team 07 revision, Team 04 QA rerun, and Team 10 re-review.
 - `CF-W1-TP-01B`: child QA plan is prepared; executable QA is blocked until Team 00 Ready promotion and backend-only implementation handoff.
 - `CF-W1-NOTIF-02`: focused QA plan is prepared; executable QA is blocked until Team 00/Team 09 Ready promotion and implementation handoff.
-- `CF-W1-UX-05`: Option A QA refresh is prepared; executable validation is blocked until Copilot-only child sequencing with `CF-W1-UX-02`, exact copy/test reservations, and Team 00 implementation handoff.
+- `CF-W1-UX-05`: companion QA note is prepared; it must execute only inside the combined `CF-W1-UX-02 + CF-W1-UX-05A` handoff and remains blocked until that packet is promoted.
 - `CF-W1-AUTH-01`: Option A QA refresh is prepared; executable validation is blocked until exact controller/test reservations and Team 00 implementation handoff.
 - `CF-W1-SUB-01`: Option A QA refresh is prepared; executable validation is blocked until exact backend reservations, frontend limitation handling, and Team 00 implementation handoff.
 - Scoped commit/push is not attempted because the shared worktree contains many unrelated active docs changes from other teams.
@@ -240,6 +338,6 @@ Excluded by default:
 2. Team 04 should rerun `npm.cmd test -- portfolio-management.service.test.ts --runInBand` after that revision and update QA evidence.
 3. Team 10 should re-review after Team 04 rerun.
 4. Team 00 may consider Ready promotion for the next bounded slice after reconciling dirty docs state and copying exact reservations: `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, or `CF-W1-L3-ALERT-01`.
-5. Team 03 and module teams should refresh source-changing packets for `CF-W1-MD-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-AUTH-01`, and `CF-W1-SUB-01` using the resolved policies and Team 04 QA criteria.
+5. Team 00 can evaluate the narrowed `CF-W1-MD-01` validator child and the combined `CF-W1-UX-02 + CF-W1-UX-05A` Copilot child for Ready promotion; executable QA stays blocked until the corresponding implementation handoffs exist.
 6. Keep `CF-W1-L3-INTEL-01` queued behind accepted `CF-W1-L3-PORT-01A`.
 7. Keep `CF-W1-MD-02` source/schema/test work blocked until a formal ADR is accepted.

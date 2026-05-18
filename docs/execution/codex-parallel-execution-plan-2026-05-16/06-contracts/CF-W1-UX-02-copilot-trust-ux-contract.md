@@ -4,9 +4,9 @@ Date: 2026-05-17
 
 Owner: Team 08 UX / Research / Copilot
 
-Status: Post-decision contract refreshed. Not Ready for Implementation.
+Status: Post-decision contract refreshed with Team 08 source mapping. Not Ready for Implementation.
 
-This contract prepares the future Copilot trust UX slice. It does not authorize application source, test, shared UI, route, package, provider, Prisma, startup, or Playwright changes.
+This contract prepares the future combined Copilot trust UX slice. It does not authorize application source, test, shared UI, route, package, provider, Prisma, startup, or Playwright changes by itself.
 
 ## Requirement Source
 
@@ -44,7 +44,7 @@ Current gaps:
 
 ## Proposed Scope Boundary
 
-First implementation slice should be Copilot-only unless Product Owner explicitly includes Stock Research Workbench.
+First implementation slice should be one combined Copilot-only `CF-W1-UX-02 + CF-W1-UX-05A` packet unless Product Owner explicitly includes Stock Research Workbench.
 
 Included if approved:
 
@@ -61,6 +61,36 @@ Excluded from first slice unless separately approved:
 - Navigation or route label changes.
 - Prisma/schema/migration changes.
 - Provider, startup, sync, import, backfill, Angel One, paid AI, broker, cloud, telemetry, or external LLM behavior.
+
+## Source-Supported Mapping Result
+
+Team 08 completed source mapping and confirmed:
+
+- blocked narrative hiding is not safe as a frontend-only change;
+- additive Copilot backend contract fields are required inside `ai-investment-copilot`;
+- `CF-W1-UX-05A` should be folded into the same Copilot-only implementation pass as `CF-W1-UX-02`;
+- no shared UI, navigation, route registry, package, provider, generated-type, or external AI scope is required for the first slice.
+
+Safe to derive in the first slice from current source:
+
+- `researchSupportOnly: true`
+- `localOnly: true`
+- `deterministic: true`
+- `externalLlmUsed: false`
+- `paidProviderUsed: false`
+- `sourceModules`
+- `dataGaps`
+- `generatedAt`
+- `warningReasons`
+- `blockerReasons`
+- `latestTrustedDataDate` when upstream timestamps exist, otherwise `null`
+- `summaryVisibility` from Copilot trust-state rules
+
+Must remain additive or conservative in the first slice:
+
+- `dataQualityStatus` may be `UNKNOWN` where only generic module `dataStatus` exists
+- `scope` must not overclaim backend fidelity where current scope pass-through is unverified
+- market brief scope pass-through requires controller/service support if `region` or `assetType` parsing is included
 
 ## Trust Presentation Contract
 
@@ -123,6 +153,8 @@ Avoid:
 
 Final labels are resolved by Option B: use `Local Research Copilot` or `Research Copilot`, hide generated narrative in blocked states, and keep the first slice Copilot-only.
 
+`CF-W1-UX-05A` is part of this same implementation pass. Do not promote it separately as frontend-only copy.
+
 ## Scope Contract
 
 - Frontend Copilot must preserve current market scope from `useMarketScope()`.
@@ -132,16 +164,16 @@ Final labels are resolved by Option B: use `Local Research Copilot` or `Research
 
 ## File Reservations Proposed After Approval
 
-Allowed files for first Copilot-only implementation:
+Allowed files for the first combined `CF-W1-UX-02 + CF-W1-UX-05A` Copilot-only implementation:
 
 - `backend/src/modules/ai-investment-copilot/ai-investment-copilot.types.ts`
 - `backend/src/modules/ai-investment-copilot/ai-investment-copilot.service.ts`
 - `backend/src/modules/ai-investment-copilot/ai-investment-copilot.controller.ts`
-- `backend/src/modules/ai-investment-copilot/ai-investment-copilot.validation.ts`
+- `backend/src/modules/ai-investment-copilot/ai-investment-copilot.validation.ts` only if scope/query parsing is added
 - `backend/src/modules/ai-investment-copilot/ai-investment-copilot.md`
 - `backend/tests/modules/ai-investment-copilot/ai-investment-copilot.service.test.ts`
 - `backend/tests/modules/ai-investment-copilot/ai-investment-copilot.routes.test.ts`
-- `backend/tests/modules/ai-investment-copilot/ai-investment-copilot.validation.test.ts`
+- `backend/tests/modules/ai-investment-copilot/ai-investment-copilot.validation.test.ts` only if validation logic changes
 - `frontend/src/features/ai-investment-copilot/types.ts`
 - `frontend/src/features/ai-investment-copilot/api/aiInvestmentCopilotService.ts`
 - `frontend/src/features/ai-investment-copilot/hooks/useAiInvestmentCopilot.ts`
@@ -154,32 +186,35 @@ Forbidden without separate reservation:
 - `frontend/src/app/routes.tsx`
 - `frontend/src/app/navigationMetadata.tsx`
 - `frontend/src/features/stock-research-workbench/**`
+- `frontend/src/features/research-hub/**`
+- `frontend/src/features/market-data-foundation/**`
 - `backend/src/api/routes.ts`
 - `backend/prisma/**`
 - package manifests
 - generated/common fixtures
-- provider/startup/backfill files
+- provider/startup/sync/import/backfill files
+- external AI / telemetry / paid-service integration
 
 ## Architecture Gate
 
-The Product Owner decision is resolved, but implementation remains blocked until Team 08/03/04 and Team 00 confirm:
+The Product Owner decision and Team 08 source mapping are resolved enough for a combined Copilot-only packet, but implementation remains blocked until Team 04 and Team 00 confirm:
 
-- source-supported trust fields and fallback behavior for unknown or missing DQ evidence;
-- exact Copilot-only backend, frontend, and test file reservations;
+- one combined `CF-W1-UX-02 + CF-W1-UX-05A` handoff with one writer on the full Copilot file set;
+- focused backend and UI QA handoff that preserves blocked, limited, trusted, scope, and digest-regression scenarios;
 - no shared UI/navigation/route registry scope;
-- no Stock Research Workbench scope in the first slice;
-- focused backend and UI QA handoff.
+- no Stock Research Workbench scope in the first slice.
 
 ## Recommendation
 
-Approve a narrow Copilot-only first slice:
+Approve a narrow combined Copilot-only first slice:
 
 - Rename visible page-level copy to research-support language without changing route paths.
 - Add additive trust evidence to Copilot DTOs.
 - Hide generated narrative for blocked summaries.
+- Fold `CF-W1-UX-05A` into the same pass rather than a separate copy ticket.
 - Split Stock Research Workbench trust surfaces to `CF-W1-UX-01`.
 - Avoid shared UI/navigation changes in this slice.
 
 ## Post-Decision Refresh - 2026-05-18
 
-Option B is accepted. The proposed file reservations remain valid for Team 00 Ready evaluation, but source work is still blocked until Team 08 confirms current-source trust-field mapping and Team 04 accepts focused QA evidence. `CF-W1-UX-05A` may be folded into the same Copilot-only implementation handoff to avoid duplicate edits to the same files.
+Option B is accepted. Team 08 source mapping now supports one combined `CF-W1-UX-02 + CF-W1-UX-05A` Copilot-only implementation packet. Remaining blockers are Team 04 QA alignment and Team 00 Ready promotion with one writer on the full Copilot file set.

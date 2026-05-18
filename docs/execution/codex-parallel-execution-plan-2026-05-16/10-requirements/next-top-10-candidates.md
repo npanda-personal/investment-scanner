@@ -12,16 +12,17 @@ The top three Ready-promotion candidates are `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, a
 
 | Rank | ID | Next gate | Notes |
 | --- | --- | --- | --- |
-| 1 | CF-W1-TP-01B | Team 00 Ready evaluation | Trade Plan backend compatibility/DQ hard-block contract, Team 03 reservation matrix, backend reservations, QA plan, and Team 06 readiness inspection are prepared, but no app-code slice is Ready until Team 00 gates pass. |
-| 2 | CF-W1-NOTIF-02 | Team 00/Team 09 Ready evaluation | Requirement, architecture, contract, work packet, platform QA plan, and Team 03 reservation matrix exist, but no app-code slice is Ready until exact promotion and handoff. |
-| 3 | CF-W1-L3-ALERT-01 | Team 00 Ready evaluation | Alert readiness suppression contract, Team 03 reservation matrix, backend reservations, and QA plan are prepared, but no app-code slice is Ready until Team 00 gates pass. |
-| 4 | CF-W1-L3-AUTH-03 | Team 00 Ready evaluation | Alert rule target ownership requirement, architecture review, contract, work packet, and QA plan are prepared, but no app-code slice is Ready until Team 00 gates pass. |
-| 5 | CF-W1-MD-02 | Formal ADR + ADR QA checklist | Option B ADR direction is accepted. Schema/source implementation remains blocked until separate approval-gated slices are prepared. |
-| 6 | CF-W1-AUTH-01 | Team 00/Team 09 Ready evaluation | Option A auth fallback policy is resolved; Team 03 contract/work packet and Team 04 QA refresh are prepared, but implementation still needs Ready promotion and exact handoff. Sequence or combine with `CF-W1-SUB-01`. |
-| 7 | CF-W1-SUB-01 | Team 00/Team 09 Ready evaluation | Option A subscription policy is resolved; Team 03 contract/work packet and Team 04 QA refresh are prepared, but implementation still needs Ready promotion and exact handoff. Prefer sequencing with `CF-W1-AUTH-01`. |
-| 8 | CF-W1-MD-01 | Team 05 readiness acceptance + Team 00 Ready evaluation | Option A validation policy is resolved; Team 03 validation-only contract/work packet and Team 04 QA refresh are prepared, but source/test execution still needs readiness acceptance and promotion. |
-| 9 | CF-W1-UX-02 | Team 08 source mapping + Team 00 Ready evaluation | Option B Copilot trust UX policy is resolved; Team 03 contract/work packet and Team 04 QA refresh are prepared, but implementation still needs source-supported trust-field mapping and promotion. |
-| 10 | CF-W1-UX-05 | Sequence with `CF-W1-UX-02` | Option A Copilot-only copy policy is resolved; Team 03 contract/work packet and Team 04 QA refresh are prepared, but the first child should fold into or follow the `CF-W1-UX-02` Copilot handoff. |
+| 1 | CF-W1-L3-TREV-01 | Team 00/Team 03 reservation and QA plan | Today Review already persists readiness, review-universe, and scan-funnel evidence, but the trust gap needs a bounded coherence contract. |
+| 2 | CF-W1-BT-02 | Team 00/Team 03 reservation and QA plan | Backtesting already has availability, benchmark, exit, and repair evidence, but the review trust gap needs a bounded contract. |
+| 3 | CF-W1-L3-ALERT-03 | Team 00/Team 03 reservation and QA plan | Alert follow-through needs a bounded contract so trigger review outcomes and notes are traceable. |
+| 4 | CF-W1-CAL-01 | Team 00/Team 03 reservation and QA plan | Signal calibration already exposes trust-state machinery, but DQ gaps can still look authoritative unless calibration drift is labeled. |
+| 5 | CF-W1-HCTX-01 | Team 00/Team 03 reservation and QA plan | Historical context snapshots need selected-snapshot provenance, lag, and gap explanation. |
+| 6 | CF-W1-MCTX-01 | Team 00/Team 03 reservation and QA plan | Regime labels need evidence, denominators, and partial-context framing before downstream consumers trust them. |
+| 7 | CF-W1-TP-01B | Team 00 Ready evaluation | Trade Plan backend compatibility/DQ hard-block contract, Team 03 reservation matrix, backend reservations, QA plan, and Team 06 readiness inspection are prepared, but no app-code slice is Ready until Team 00 gates pass. |
+| 8 | CF-W1-NOTIF-02 | Team 00/Team 09 Ready evaluation | Requirement, architecture, contract, work packet, platform QA plan, and Team 03 reservation matrix exist, but no app-code slice is Ready until exact promotion and handoff. |
+| 9 | CF-W1-L3-ALERT-01 | Team 00 Ready evaluation | Alert readiness suppression contract, Team 03 reservation matrix, backend reservations, and QA plan are prepared, but no app-code slice is Ready until Team 00 gates pass. |
+| 10 | CF-W1-L3-AUTH-03 | Team 00 Ready evaluation | Alert rule target ownership requirement, architecture review, contract, work packet, and QA plan are prepared, but no app-code slice is Ready until Team 00 gates pass. |
+| 11 | CF-W1-MD-02 | Formal ADR + ADR QA checklist | Option B ADR direction is accepted. Schema/source implementation remains blocked until separate approval-gated slices are prepared. |
 
 ## Focused Priority Readiness Result
 
@@ -29,6 +30,8 @@ These are the current Team 02 priorities. None is app-code ready.
 
 | ID | What is proven | What is missing | Current disposition |
 | --- | --- | --- | --- |
+| CF-W1-L3-TREV-01 | Today Review readiness, review-universe, and scan-funnel evidence exist in the module snapshot; today-review UI already surfaces mismatch warnings and trust status. | Bounded publication-evidence contract, exact file reservation, and Team 00 Ready promotion. | Keep out of Ready until Team 00/03 prep exists. |
+| CF-W1-L3-ALERT-03 | Alert inbox read/dismiss flow exists, but no durable follow-through outcome or review-note state is persisted. | Bounded follow-through contract, exact file reservation, and Team 00/03 prep. | Keep out of Ready until Team 00/03 prep exists. |
 | CF-W1-L3-PORT-01A | Parent policy accepted; portfolio-only requirement, parent architecture contract, Team 03 reservation matrix, backend reservations, QA plan, and Team 07 readiness inspection exist. | None for Ready promotion. Team 07 implementation now begins. | Promoted to Ready by Team 00 on 2026-05-18. |
 | CF-W1-TP-01B | Parent policy accepted; backend-only child architecture contract, Team 03 reservation matrix, backend reservations, QA plan, and Team 06 readiness inspection exist. | Team 00 Ready promotion and implementation handoff. | Keep out of Ready until Team 00 gates pass. |
 | CF-W1-NOTIF-02 | Requirement, architecture, contract, work packet, platform QA plan, and Team 03 reservation matrix exist. | Team 00/Team 09 Ready promotion and implementation handoff. | Keep out of Ready until promotion gates pass. |
@@ -47,16 +50,17 @@ These items are not app-code ready. Some are ready-evaluation candidates; policy
 
 | Rank | ID | Prep gate | Guardrail |
 | --- | --- | --- | --- |
-| 1 | CF-W1-TP-01B | Team 00 Ready evaluation | No Trade Plan source changes until Team 00 gates pass. |
-| 2 | CF-W1-NOTIF-02 | Team 00/Team 09 Ready evaluation | No notification source changes until promotion gates pass. |
-| 3 | CF-W1-L3-ALERT-01 | Team 00 Ready evaluation | No alerts source changes until Team 00 gates pass. |
-| 4 | CF-W1-L3-AUTH-03 | Team 00 Ready evaluation | No alerts source changes until Team 00 gates pass. |
-| 5 | CF-W1-MD-02 | Formal ADR and ADR QA checklist | No Prisma, schema, source, provider, startup, or test changes until separate implementation approval. |
-| 6 | CF-W1-AUTH-01 | Ready evaluation for prepared Team 09 fail-closed controller packet | No platform source/test changes until Team 00 promotion and exact handoff exist; sequence or combine with `CF-W1-SUB-01`. |
-| 7 | CF-W1-SUB-01 | Ready evaluation for prepared Team 09 admin/manual subscription packet | No subscription source/test changes until Team 00 promotion and exact backend handoff exist; sequence or combine with `CF-W1-AUTH-01`. |
-| 8 | CF-W1-MD-01 | Team 05 readiness acceptance and Ready evaluation for prepared Market Data validation-only packet | No Market Data source/test changes until Team 05 acceptance and Team 00 promotion exist. |
-| 9 | CF-W1-UX-02 | Team 08 source-supported trust-field mapping and Ready evaluation for prepared Copilot-only trust UX packet | No Copilot source/UI/test changes until mapping, exact handoff, QA execution plan, and Team 00 promotion exist. |
-| 10 | CF-W1-UX-05 | Fold into or sequence after `CF-W1-UX-02` Copilot handoff | No shared UI, navigation, Research Hub, or Market Data UI changes in the first child. |
+| 1 | CF-W1-L3-TREV-01 | Team 00/Team 03 reservation and QA plan | No Today Review source changes until Team 00/Team 03 prep exists. |
+| 2 | CF-W1-BT-02 | Team 00/Team 03 reservation and QA plan | No backtesting source changes until Team 00/Team 03 prep exists. |
+| 3 | CF-W1-L3-ALERT-03 | Team 00/Team 03 reservation and QA plan | No alert follow-through source changes until Team 00/Team 03 prep exists. |
+| 4 | CF-W1-CAL-01 | Team 00/Team 03 reservation and QA plan | No Signal Calibration source changes until Team 00/Team 03 prep exists. |
+| 5 | CF-W1-HCTX-01 | Team 00/Team 03 reservation and QA plan | No Historical Context source changes until Team 00/Team 03 prep exists. |
+| 6 | CF-W1-MCTX-01 | Team 00/Team 03 reservation and QA plan | No Market Context source changes until Team 00/Team 03 prep exists. |
+| 6 | CF-W1-TP-01B | Team 00 Ready evaluation | No Trade Plan source changes until Team 00 gates pass. |
+| 7 | CF-W1-NOTIF-02 | Team 00/Team 09 Ready evaluation | No notification source changes until promotion gates pass. |
+| 8 | CF-W1-L3-ALERT-01 | Team 00 Ready evaluation | No alerts source changes until Team 00 gates pass. |
+| 9 | CF-W1-L3-AUTH-03 | Team 00 Ready evaluation | No alerts source changes until Team 00 gates pass. |
+| 10 | CF-W1-MD-02 | Formal ADR and ADR QA checklist | No Prisma, schema, source, provider, startup, or test changes until separate implementation approval. |
 
 ## Completed Or Removed From Active Top 10
 

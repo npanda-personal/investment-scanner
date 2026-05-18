@@ -6,6 +6,8 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+`CF-W1-L3-TREV-01` was promoted by Team 00 on 2026-05-18 and assigned to Team 07 in a dedicated worktree for bounded Today Review implementation.
+
 `CF-W1-L3-PORT-01A` was pulled by Team 07, implemented in its dedicated worktree, and moved through first-pass QA / Code Review. Team 10 rejected release acceptance and routed bounded rework back to Team 07. It remains uncommitted and unaccepted.
 
 `CF-W1-TP-01B` already has an implementation handoff in the Team 06 worktree and is routed to Team 10 review.
@@ -14,7 +16,7 @@ No available application-code item is currently waiting unassigned in Ready.
 
 `CF-W1-L3-ALERT-01` is promoted and pulled by Team 07 for bounded implementation in a dedicated worktree. It must not run in parallel with `CF-W1-L3-AUTH-03` because both reserve alerts-monitoring files.
 
-`CF-W1-MD-01` is promoted and pulled by Team 05 for a narrowed backend-only reject-only Market Data validator child.
+`CF-W1-MD-01` was promoted and pulled by Team 05 for a narrowed backend-only reject-only Market Data validator child. QA, Team 10 review, Architect Signoff, delegated PO acceptance, and scoped local commit are complete on the Team 05 branch.
 
 ## Pulled / In Review
 
@@ -24,7 +26,94 @@ No available application-code item is currently waiting unassigned in Ready.
 | `CF-W1-TP-01B` | Team 06 - Strategy / Signal / Risk | `codex/team06-strategy-signal/CF-W1-TP-01B` | `../investment-scanner-worktrees/team06-CF-W1-TP-01B` | Backend-only Trade Plan DQ hard-block and target compatibility | Implemented in worktree; Team 10 review pending |
 | `CF-W1-NOTIF-02` | Team 09 - Platform / Auth / Subscription / Notifications | `codex/team09-platform/CF-W1-NOTIF-02` | `../investment-scanner-worktrees/team09-CF-W1-NOTIF-02` | Backend-only local notification log redaction | Ready and pulled by Team 09 for implementation |
 | `CF-W1-L3-ALERT-01` | Team 07 - Portfolio / Watchlist / Alerts | `codex/team07-portfolio-alerts/CF-W1-L3-ALERT-01` | `../investment-scanner-worktrees/team07-CF-W1-L3-ALERT-01` | Backend-only alert readiness suppression | Ready and pulled by Team 07 for implementation |
-| `CF-W1-MD-01` | Team 05 - Market Data / Data Quality | `codex/team05-market-data/CF-W1-MD-01` | `../investment-scanner-worktrees/team05-CF-W1-MD-01` | Backend-only reject-only historical-price validator hardening | Ready and pulled by Team 05 for implementation |
+| `CF-W1-MD-01` | Team 05 - Market Data / Data Quality | `codex/team05-market-data/CF-W1-MD-01` | `../investment-scanner-worktrees/team05-CF-W1-MD-01` | Backend-only reject-only historical-price validator hardening | Accepted and locally committed as `913b56b`; awaiting later clean `dev` integration |
+| `CF-W1-L3-TREV-01` | Team 07 - Portfolio / Watchlist / Alerts | `codex/team07-portfolio-alerts/CF-W1-L3-TREV-01` | `../investment-scanner-worktrees/team07-CF-W1-L3-TREV-01` | Today Review run/list publication evidence and readiness-coherence normalization | Ready and assigned to Team 07 |
+
+## Active Ready Handoff - `CF-W1-L3-TREV-01`
+
+Date promoted: 2026-05-18
+
+Team 00 evaluated `CF-W1-L3-TREV-01` against Ready gates and promoted it as an independent Team 07 Today Review implementation slice.
+
+Gate evidence:
+
+- Requirement: `10-requirements/CF-W1-L3-TREV-01-today-review-publication-evidence-requirement.md`
+- Architecture review: `03-architecture/CF-W1-L3-TREV-01-architecture-review.md`
+- Contract: `06-contracts/CF-W1-L3-TREV-01-today-review-publication-evidence-contract.md`
+- Work packet: `08-work-packets/CF-W1-L3-TREV-01-work-packet.md`
+- QA plan: `04-qa/CF-W1-L3-TREV-01-qa-plan.md`
+- Open decisions: none.
+- Shared/high-risk blocker: none if implementation stays inside the reserved Today Review backend/feature/test files.
+
+Branch/worktree:
+
+- Branch: `codex/team07-portfolio-alerts/CF-W1-L3-TREV-01`
+- Worktree: `../investment-scanner-worktrees/team07-CF-W1-L3-TREV-01`
+
+Allowed files:
+
+- `backend/src/modules/today-trade-review/today-trade-review.service.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.repository.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.types.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.md`
+- `backend/tests/modules/today-trade-review/today-trade-review.service.test.ts`
+- `frontend/src/features/today-trade-review/types.ts`
+- `frontend/src/features/today-trade-review/components/TodayReviewPage.tsx`
+- `frontend/tests/ui/today-trade-review.spec.ts`
+
+Optional only if repository legacy-read-path synthesis is added:
+
+- `backend/tests/modules/today-trade-review/today-trade-review.repository.test.ts`
+
+Forbidden files:
+
+- Prisma schema or migrations
+- backend or frontend route registries
+- Market Data Foundation, Data Quality Engine, Strategy Decision Engine, or Trade Plan source/tests
+- Today Review controller, router, validation, controller tests, API hooks, and candidate-detail page
+- shared backend utilities or shared DTOs
+- shared frontend components
+- package manifests
+- generated files
+- providers, startup/backfill, live-provider, Angel One, broker, paid/cloud, telemetry, or automation flows
+
+Required behavior:
+
+- add stable additive `publicationEvidence` metadata to the Today Review run `sourceSnapshot`;
+- persist it for new runs without schema or route changes;
+- synthesize equivalent evidence on read for legacy runs that lack it;
+- expose run/list publication outcome, mode source, readiness state, trusted-universe availability, scan completion, membership-load status, failure reason, and outside-trusted-universe exclusion count;
+- keep candidate detail read-only research support and do not widen candidate-detail run evidence in this slice;
+- preserve outside-trusted-universe Strategy Decision exclusion from all Today Review candidate sections.
+
+Focused validation guidance:
+
+```powershell
+cd backend
+npm.cmd test -- today-trade-review.service.test.ts --runInBand
+```
+
+If repository synthesis is added:
+
+```powershell
+cd backend
+npm.cmd test -- today-trade-review.service.test.ts today-trade-review.repository.test.ts --runInBand
+```
+
+If frontend files are edited:
+
+```powershell
+cd frontend
+npm.cmd run test:ui -- today-trade-review.spec.ts --workers=1
+npm.cmd run build
+```
+
+Backend build after backend changes:
+
+```powershell
+cd backend
+npm.cmd run build
+```
 
 ## Active Ready Handoff - `CF-W1-MD-01`
 

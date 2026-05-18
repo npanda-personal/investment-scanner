@@ -191,3 +191,9 @@
 - This is a routine code-review rejection, not a Product Owner consent blocker, while the fix stays inside the existing Team 07 file reservation.
 - Team 07 must revise the mapper and add a focused automation-blocked Data Quality case before Team 04 reruns QA and Team 10 re-reviews.
 - No commit, push, Architect Signoff, or delegated Product Owner acceptance is authorized until the rework passes QA and review.
+
+## Team 00 Rolling Factory Risk Decisions - 2026-05-18
+
+- `CF-W1-MD-01` is accepted and locally committed on its Team 05 branch as `913b56b`; it must not be pushed or merged into `dev` until Team 00 performs a clean integration pass with exact scope.
+- `CF-W1-L3-TREV-01` is promoted only as a Today Review run/list publication-evidence slice. Candidate-detail run-evidence expansion, Today Review route/controller/validation changes, upstream Market Data/DQ/Strategy/Trade Plan changes, shared UI, Prisma, packages, generated files, providers, startup/backfill, live-provider, paid/cloud, telemetry, and broker scope remain blocked.
+- Shared `dev` remains not push-safe while `backend/tests/modules/alerts-monitoring/alerts-monitoring.ownership.test.ts` is dirty outside a current accepted integration action.

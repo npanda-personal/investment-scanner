@@ -158,3 +158,43 @@ Stop the rolling agent pool only for:
 - all workstreams blocked after Team 02, Team 00, and Team 03 attempt delegated resolution;
 - non-delegable paid-service, cloud, credential, broker, live-provider, force-push, or non-`dev` push risk;
 - explicit human Product Owner stop.
+
+---
+
+# Latest Active Snapshot
+
+Date: 2026-05-18
+
+## Active Subagent Pool
+
+| Slot | Team | Agent | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Team 02 - PO + Requirement Factory | `019e3a50-ed56-71f0-bfb6-621445556b85` | persistent docs-only value discovery | continuous module audits, requirement discovery, and priority reordering | active / persistent |
+| 2 | Open slot | none | queued work | Team 07 Today Review implementation | ready to spawn |
+| 3 | Open slot | none | queued work | Team 04 QA after Today Review handoff | waiting |
+| 4 | Open slot | none | queued work | Team 10 review after QA | waiting |
+| 5 | Open slot | none | queued work | Team 03 Architect Signoff after review | waiting |
+| 6 | Open slot | none | queued work | next architecture/QA prep from Team 02 priority stack | waiting |
+
+## Completed Since Previous Snapshot
+
+- Team 04 `019e3a94-82de-7632-8e95-6e696c168b59`: completed `CF-W1-L3-TREV-01` QA plan.
+- Team 10 `019e3a99-3efc-7ad1-b16f-5cab1d3eb9fe`: accepted `CF-W1-MD-01` review/release artifact.
+- Team 00 committed `CF-W1-MD-01` on Team 05 branch as `913b56b fix: harden market data validation`.
+
+## Next Spawn
+
+Team 07 should be spawned for:
+
+- Work item: `CF-W1-L3-TREV-01`
+- Branch: `codex/team07-portfolio-alerts/CF-W1-L3-TREV-01`
+- Worktree: `../investment-scanner-worktrees/team07-CF-W1-L3-TREV-01`
+- Prompt source: `16-team-inboxes/TEAM-07-current-assignment.md`
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 07: ready for `CF-W1-L3-TREV-01`.
+- Team 04: ready for QA after Today Review implementation handoff.
+- Team 10: ready for review after QA evidence exists.
+- Team 03: ready for Architect Signoff after Team 10 acceptance.
+- Team 02: active and should continue persistent requirement discovery.

@@ -43,3 +43,9 @@ The five former Decision Inbox items are resolved. They are no longer Product Ow
 `CF-W1-L3-PORT-01A` is no longer blocked by upstream readiness gates. Team 00 promoted it to `Ready for Implementation` after verifying the requirement, architecture review, contract, QA plan, Team 03 exact reservations, Team 07 readiness evidence, and open-decision state.
 
 `CF-W1-L3-PORT-01B` remains upstream-blocked behind the accepted portfolio-only slice. `CF-W1-L3-INTEL-01` remains blocked until `CF-W1-L3-PORT-01A` is implemented, validated, reviewed, accepted, and committed.
+
+## Team 00 Ready Promotion Note - 2026-05-18 - Today Review
+
+`CF-W1-L3-TREV-01` is no longer blocked by upstream readiness gates. Team 00 promoted it to `Ready for Implementation` after verifying the requirement, architecture review, contract, work packet, QA plan, open-decision state, and exact Today Review file reservations.
+
+Candidate-detail run-evidence expansion remains upstream-blocked as a future child packet.

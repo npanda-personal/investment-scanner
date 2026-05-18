@@ -12,7 +12,7 @@ Mode: persistent Team 02 PO + requirements value-discovery lane. No application 
 - Input source: root `AGENTS.md`, runtime bootstrap, standing delegation, escalation rules, worktree/branch policy, heartbeat protocol, Team 02 charter, Team 02 automation prompt, team inboxes, ready/blocked queues, Decision Inbox, Team 07/08 outboxes and prepared artifacts
 - Output target: `10-requirements/`, `12-ready-queue/`, this outbox
 - Branch/worktree: `dev`; shared workspace, no separate Team 02 worktree created
-- Active requirement ids: `CF-W1-L3-AUTH-03`, `CF-W1-L3-INTEL-01`, `CF-W1-L3-INTEL-02`, `CF-W1-L3-PORT-01`, `CF-W1-L3-PORT-01B`, `CF-W1-L3-ALERT-01`, `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-MD-01`, `CF-W1-AUTH-02`, `CF-W1-DQ-02`, `CF-W1-TP-02`, `CF-W1-SQLAB-01`
+- Active requirement ids: `CF-W1-L3-AUTH-03`, `CF-W1-L3-INTEL-01`, `CF-W1-L3-INTEL-02`, `CF-W1-L3-PORT-01`, `CF-W1-L3-PORT-01B`, `CF-W1-L3-ALERT-01`, `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-MD-01`, `CF-W1-AUTH-02`, `CF-W1-DQ-02`, `CF-W1-TP-02`, `CF-W1-SQLAB-01`, `CF-W1-HCTX-01`, `CF-W1-MCTX-01`, `CF-W1-L3-TREV-01`, `CF-W1-BT-02`
 - Ready work pulled: none
 - Can continue without human approval: yes for docs-only requirement refinement; no for app-code implementation or decision-blocked work
 
@@ -437,3 +437,234 @@ Team 00 should delegate `CF-W1-SQLAB-01` next for Signal Quality Lab outcome-con
 Ready work pulled: none by Team 02.
 
 No item moved to Ready. The new Signal Quality requirement is architecture-prep only and remains blocked until Team 00/03 reservation and contract work exists.
+
+## 2026-05-18 Continuation - Historical Context Explainability Cycle
+
+Mode: Team 02 value-discovery pass after historical-context audit review. No application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, providers, services, or frontend files changed.
+
+### Evidence Consumed
+
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.md`
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.md`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md`
+
+### Queue Delta
+
+- Created new requirement draft `CF-W1-HCTX-01` for Historical Context explainability and selected-snapshot provenance.
+- Re-ranked the discovery stack so Historical Context explainability now sits immediately after Signal Calibration reliability drift and ahead of Signal Quality output confidence.
+- Kept the Ready-promotion front-runners unchanged: `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-L3-ALERT-01`, and `CF-W1-L3-AUTH-03`.
+
+### New Requirement Candidates
+
+| Rank | ID | Value | Current next gate |
+| --- | --- | --- | --- |
+| 1 | CF-W1-CAL-01 | Signal Calibration reliability drift | Product refinement and bounded architecture contract. |
+| 2 | CF-W1-HCTX-01 | Historical Context explainability | Product refinement and bounded architecture contract. |
+| 3 | CF-W1-SQLAB-01 | Signal Quality outcome confidence | Product refinement and bounded architecture contract. |
+| 4 | CF-W1-L3-INTEL-02 | Portfolio Intelligence review traceability | Product refinement and architecture contract. |
+| 5 | CF-W1-AUTH-02 | Alert inbox user isolation | Product refinement and bounded architecture contract. |
+| 6 | CF-W1-DQ-02 | Data Quality currentness evidence | Architecture contract and QA plan. |
+| 7 | CF-W1-TP-02 | Trade Plan exit/invalidation semantics | Product refinement and architecture contract. |
+
+### Items Ready For Architecture
+
+- `CF-W1-CAL-01`
+- `CF-W1-HCTX-01`
+- `CF-W1-SQLAB-01`
+- `CF-W1-L3-INTEL-02`
+- `CF-W1-AUTH-02`
+- `CF-W1-DQ-02`
+- `CF-W1-TP-02`
+
+### Top Unassigned Item
+
+Team 00 should delegate `CF-W1-CAL-01` next for signal-calibration reliability drift discovery. `CF-W1-HCTX-01` is now the next downstream discovery item, and `CF-W1-L3-PORT-01B` remains fed to Team 03 for architecture prep.
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-HCTX-01-historical-context-explainability-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+## 2026-05-18 Continuation - Alert Follow-Through Traceability Consumption
+
+Mode: Team 02 monitor loop consumed the active trigger-monitor / review-workflow audit trail and added a bounded alert follow-through requirement. No application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, providers, services, or frontend files changed.
+
+### Evidence Consumed
+
+- `backend/src/modules/alerts-monitoring/alerts-monitoring.md`
+- `backend/src/modules/alerts-monitoring/alerts-monitoring.service.ts`
+- `backend/src/modules/alerts-monitoring/alerts-monitoring.repository.ts`
+- `backend/src/modules/alerts-monitoring/alerts-monitoring.types.ts`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-portfolio-watchlist-alerts.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/risk-register.md`
+
+### Queue Delta
+
+- Created new requirement draft `CF-W1-L3-ALERT-03` for alert follow-through traceability.
+- Re-ranked the discovery stack so the active trigger-monitor review gap now sits behind Today Review publication evidence and backtesting outcome review traceability.
+- Kept `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-L3-ALERT-01`, and `CF-W1-L3-AUTH-03` as the current Ready-promotion front-runners.
+- Left `CF-W1-L3-PORT-01B` in architecture-prep routing and left all ready-queue movement to Team 00.
+
+### Implementation Readiness
+
+Ready work pulled: none by Team 02.
+
+No item moved to Ready. `CF-W1-L3-ALERT-03` is architecture-prep only and remains blocked until Team 00/03 reservation and contract work exists.
+
+### Next Recommended Assignment
+
+Team 00 should delegate `CF-W1-L3-TREV-01` next for Today Review publication-evidence discovery. `CF-W1-BT-02` remains the next backtesting review item, and `CF-W1-L3-ALERT-03` is now the next trigger-monitor follow-through item after those two.
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-ALERT-03-alert-follow-through-traceability-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+### Implementation Readiness
+
+Ready work pulled: none by Team 02.
+
+No item moved to Ready. The new Historical Context requirement is architecture-prep only and remains blocked until Team 00/03 reservation and contract work exists.
+
+## 2026-05-18 Continuation - Market Context Regime Evidence Cycle
+
+Mode: Team 02 value-discovery pass after market-context audit review. No application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, providers, services, or frontend files changed.
+
+### Evidence Consumed
+
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.md`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.md`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md`
+- `frontend/src/features/market-context-intelligence/components/MarketContextPage.tsx`
+
+### Queue Delta
+
+- Created new requirement draft `CF-W1-MCTX-01` for Market Context regime evidence and partial-context explanation.
+- Re-ranked the discovery stack so Market Context regime evidence now sits after Historical Context explainability and ahead of Signal Quality output confidence.
+- Kept the Ready-promotion front-runners unchanged: `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-L3-ALERT-01`, and `CF-W1-L3-AUTH-03`.
+
+### New Requirement Candidates
+
+| Rank | ID | Value | Current next gate |
+| --- | --- | --- | --- |
+| 1 | CF-W1-CAL-01 | Signal Calibration reliability drift | Product refinement and bounded architecture contract. |
+| 2 | CF-W1-HCTX-01 | Historical Context explainability | Product refinement and bounded architecture contract. |
+| 3 | CF-W1-MCTX-01 | Market Context regime evidence | Product refinement and bounded architecture contract. |
+| 4 | CF-W1-SQLAB-01 | Signal Quality outcome confidence | Product refinement and bounded architecture contract. |
+| 5 | CF-W1-L3-INTEL-02 | Portfolio Intelligence review traceability | Product refinement and architecture contract. |
+| 6 | CF-W1-AUTH-02 | Alert inbox user isolation | Product refinement and bounded architecture contract. |
+| 7 | CF-W1-DQ-02 | Data Quality currentness evidence | Architecture contract and QA plan. |
+| 8 | CF-W1-TP-02 | Trade Plan exit/invalidation semantics | Product refinement and architecture contract. |
+
+### Items Ready For Architecture
+
+- `CF-W1-CAL-01`
+- `CF-W1-HCTX-01`
+- `CF-W1-MCTX-01`
+- `CF-W1-SQLAB-01`
+- `CF-W1-L3-INTEL-02`
+- `CF-W1-AUTH-02`
+- `CF-W1-DQ-02`
+- `CF-W1-TP-02`
+
+### Top Unassigned Item
+
+Team 00 should delegate `CF-W1-CAL-01` next for signal-calibration reliability drift discovery. `CF-W1-HCTX-01` and `CF-W1-MCTX-01` are the next downstream discovery items, and `CF-W1-L3-PORT-01B` remains fed to Team 03 for architecture prep.
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MCTX-01-market-context-regime-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+### Implementation Readiness
+
+Ready work pulled: none by Team 02.
+
+No item moved to Ready. The new Market Context requirement is architecture-prep only and remains blocked until Team 00/03 reservation and contract work exists.
+
+## 2026-05-18 Continuation - Today Review Publication Evidence Consumption
+
+Mode: Team 02 monitor loop consumed a distinct investor-facing review workflow audit and added a bounded Today Review publication-evidence requirement. No application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, providers, services, or frontend files changed.
+
+### Evidence Consumed
+
+- `backend/src/modules/today-trade-review/today-trade-review.md`
+- `backend/src/modules/today-trade-review/today-trade-review.service.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.types.ts`
+- `frontend/src/features/today-trade-review/components/TodayReviewPage.tsx`
+- `frontend/src/features/today-trade-review/components/TodayReviewCandidateDetailPage.tsx`
+
+### Queue Delta
+
+- Created new requirement draft `CF-W1-L3-TREV-01` for Today Review publication evidence and readiness coherence.
+- Re-ranked the discovery stack so Today Review now leads the uncovered investor/trader workflow candidates.
+- Kept `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-L3-ALERT-01`, and `CF-W1-L3-AUTH-03` as the current Ready-promotion front-runners.
+- Left `CF-W1-L3-PORT-01B` in architecture-prep routing and left all ready-queue movement to Team 00.
+
+### Implementation Readiness
+
+Ready work pulled: none by Team 02.
+
+No item moved to Ready. `CF-W1-L3-TREV-01` is architecture-prep only and remains blocked until Team 00/03 reservation and contract work exists.
+
+### Next Recommended Assignment
+
+Team 00 should delegate `CF-W1-L3-TREV-01` next for Today Review publication-evidence discovery. `CF-W1-CAL-01` and `CF-W1-HCTX-01` remain the next downstream discovery items after that, and `CF-W1-L3-PORT-01B` remains fed to Team 03 for architecture prep.
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-TREV-01-today-review-publication-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+## 2026-05-18 Continuation - Backtesting Outcome Review Traceability Consumption
+
+Mode: Team 02 monitor loop consumed a distinct backtesting review workflow audit and added a bounded backtesting outcome-review requirement. No application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, providers, services, or frontend files changed.
+
+### Evidence Consumed
+
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.types.ts`
+- `frontend/src/features/backtesting-strategy-lab/components/BacktestingStrategyLabPage.tsx`
+
+### Queue Delta
+
+- Created new requirement draft `CF-W1-BT-02` for backtesting outcome review traceability.
+- Re-ranked the discovery stack so backtesting outcome review now sits immediately behind Today Review publication evidence.
+- Kept `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-L3-ALERT-01`, and `CF-W1-L3-AUTH-03` as the current Ready-promotion front-runners.
+- Left `CF-W1-L3-PORT-01B` in architecture-prep routing and left all ready-queue movement to Team 00.
+
+### Implementation Readiness
+
+Ready work pulled: none by Team 02.
+
+No item moved to Ready. `CF-W1-BT-02` is architecture-prep only and remains blocked until Team 00/03 reservation and contract work exists.
+
+### Next Recommended Assignment
+
+Team 00 should delegate `CF-W1-L3-TREV-01` next for Today Review publication-evidence discovery. `CF-W1-BT-02` is the next distinct backtesting review item, and `CF-W1-CAL-01` remains the next downstream diagnostic review item after that.
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-BT-02-backtesting-outcome-review-traceability-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`

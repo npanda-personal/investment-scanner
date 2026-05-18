@@ -4,66 +4,69 @@ Date: 2026-05-18
 
 Owner: Team 04 QA Factory
 
-Status: Option A QA refresh prepared. Market Data validation hardening remains blocked from executable validation until Team 05/03/04 confirm validation-only file reservations and Team 00 promotes an implementation handoff.
+Status: Narrowed reject-only validator-child QA plan prepared. QA-ready for Team 00 Ready evaluation. Executable validation remains blocked until Team 00 promotes one validation-only implementation handoff.
 
-Current status refresh: Product Owner approved Option A on 2026-05-18. `CF-W1-MD-01` remains docs-only and QA-blocked for execution until Team 05/03/04 refresh exact validation-only file reservations and Team 00 promotes a handoff.
+Current status refresh: Team 03 narrowed the contract/work packet and Team 05 confirmed the same bounded first slice. Team 04 now aligns the QA plan to that exact reject-only child.
 
 ## Scope
 
-Validation plan for Market Data Foundation historical price validation hardening.
+Validation plan for the narrowed Market Data Foundation reject-only historical-price validator child.
 
-Target policy areas:
+In-scope surfaces after Team 00 Ready promotion:
 
-- future-dated candles,
-- invalid or missing `adjustedClose` behavior,
-- invalid OHLC shape and finite-number checks,
-- negative or suspicious volume,
-- duplicate provider rows in the same batch,
-- suspicious price spikes and corporate-action-safe spike policy.
+- `backend/src/modules/market-data-foundation/market-data-foundation.validation.ts`
+- `backend/tests/modules/market-data-foundation/market-data.validation.test.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.md`
 
-This plan does not approve application source edits, test edits, Prisma changes, routes, shared utilities/UI, packages, generated files, providers, services, startup/backfill, UI implementation, builds, broad suites, or live data checks.
+Required in-scope scenarios only:
 
-## Approved Policy
+- future-dated candle rejection
+- invalid `adjustedClose` rejection when `adjustedClose` is present
+- negative volume remains invalid
+- duplicate-row determinism regression
+- spike rejection remains opt-in and off by default
+
+Explicitly deferred from this child:
+
+- missing `adjustedClose` fallback or incomplete-evidence behavior
+- zero-volume or suspicious-volume warning/readiness evidence
+- repository/provider/startup plumbing for a formal latest-session boundary
+- readiness/storage invariant coverage under `CF-W1-MD-02`
+
+This plan does not approve application source edits, Prisma changes, routes, shared utilities/UI, packages, generated files, providers, services, startup/backfill, builds, broad suites, or live data checks.
+
+## Policy Alignment
 
 Decision reference: `07-decisions/DECISION-20260517-market-data-validation-hardening-policy-resolution.md`.
 
-Product Owner approved Option A:
+The broader Option A policy allows additional future warning/readiness follow-up. For this first child, Team 04 carries forward only the reject-only subset already preserved in the Team 03 contract/work packet:
 
-- reject future-dated candles relative to accepted evaluation date or latest completed market session date;
-- reject `adjustedClose` when present but non-finite, zero, negative, or outside accepted policy bounds;
-- allow missing `adjustedClose` only as fallback/incomplete evidence, not trusted completeness;
-- keep negative volume invalid;
-- treat zero or suspicious volume as warning/readiness evidence unless a later asset-class policy marks it invalid;
-- keep spike rejection opt-in until durable corporate-action evidence and source context exist.
-
-Durable readiness evidence remains separate under `CF-W1-MD-02`.
+- reject future-dated candles within validator-local, backward-compatible boundary behavior
+- reject invalid present `adjustedClose` values
+- keep negative volume invalid
+- preserve duplicate-row determinism
+- keep spike rejection opt-in and off by default
 
 ## Required QA Assertions
 
-- Future-dated candles cannot silently enter trusted Market Data or downstream readiness paths.
-- Existing OHLC checks remain fail-closed for missing symbol, invalid date, non-finite prices, non-positive OHLC prices, `low > high`, and open/close outside low/high.
-- `adjustedClose`, when present, must be finite and greater than zero unless the accepted policy says otherwise.
-- Missing `adjustedClose` behavior is explicit and covered by tests rather than inferred from duplicate-row scoring.
+- Future-dated candles are rejected and cannot silently pass through the validator as trusted rows.
+- `adjustedClose`, when present, is rejected if it is non-finite, zero, negative, or otherwise out of accepted policy bounds.
 - Negative volume remains invalid.
-- Suspicious zero or extreme volume is covered according to the accepted policy and does not create a trusted downstream signal by default.
-- Duplicate batch rows remain detected and the selected retained row is deterministic.
-- Suspicious price spikes are covered by explicit tests that do not erase legitimate corporate-action history without accepted policy.
-- Validation output remains explainable, with reason strings suitable for later Data Quality readiness evidence.
-- No provider, Angel One, startup/backfill, Prisma mutation, paid/cloud, broker, or live-service path is required for this validation slice.
+- Duplicate same-row inputs continue to resolve deterministically.
+- Spike rejection stays off by default and behaves deterministically only when the opt-in threshold is enabled.
+- Existing finite-number, positive-price, low/high, and duplicate-selection behavior remains explainable.
+- No repository, provider, scheduler, startup/backfill, Prisma, route, shared utility, frontend, or live-provider path is required for this child.
 
 ## Scenario Matrix
 
-| Scenario | Expected future assertion after policy acceptance |
+| Scenario | Expected assertion after implementation |
 | --- | --- |
-| Candle date is after the evaluation date or latest completed market session | Rejected or marked untrusted; cannot be counted as ready evidence. |
-| `adjustedClose` is `NaN`, infinite, zero, negative, or outside low/high when policy requires range validation | Invalid row with explicit reason. |
-| `adjustedClose` is missing | Accepted only if policy permits missing adjusted close; otherwise invalid or warning evidence. |
-| OHLC has non-finite values, non-positive prices, `low > high`, or open/close outside range | Invalid row with existing reason coverage preserved. |
-| Volume is negative | Invalid row. |
-| Volume is zero or suspiciously extreme for `IN/STOCK` | Warning or invalid according to accepted policy; never silently trusted for downstream action-like workflows. |
-| Duplicate provider rows share symbol/date | One deterministic valid row retained; duplicates recorded as invalid evidence. |
-| Large one-day price move with spike rejection enabled | Invalid only when above accepted threshold and no corporate-action exception applies. |
-| Large one-day price move with spike rejection disabled or policy-warning mode | Retained with explicit policy evidence; downstream DQ decides trust. |
+| Candle date is after the accepted evaluation boundary | Row is rejected with explicit validation failure; it does not remain in the valid partition. |
+| `adjustedClose` is present but `NaN`, infinite, zero, negative, or otherwise outside accepted bounds | Row is rejected with explicit validation failure. |
+| Volume is negative | Row is rejected; current invalid-volume behavior remains unchanged. |
+| Duplicate provider rows share the same symbol/date key | Validator output remains deterministic about which row is retained and which row is marked invalid. |
+| Large one-day price move with spike rejection disabled | Row is not rejected by spike logic by default. |
+| Large one-day price move with spike rejection enabled | Row is rejected only under the accepted opt-in threshold behavior. |
 
 ## Focused Command Guidance
 
@@ -76,13 +79,6 @@ cd backend
 npm.cmd test -- market-data.validation.test.ts --runInBand
 ```
 
-Focused regression if duplicate/readiness evidence or repository behavior is touched:
-
-```powershell
-cd backend
-npm.cmd test -- market-data.validation.test.ts market-data-readiness-evidence.invariants.test.ts market-data.repository.test.ts --runInBand
-```
-
 Approval-gated backend build after accepted implementation, Team 00 validation approval, and memory/resource check:
 
 ```powershell
@@ -92,32 +88,30 @@ npm.cmd run build
 
 ## Unsafe Or Broad Commands Excluded
 
-Do not run by default:
+Do not run by default for this narrowed child:
 
-- broad backend suites such as `npm.cmd test` with no file filters,
-- Playwright or UI smoke tests,
-- dev servers, live services, or provider services,
-- startup, scheduler, repair, sync, import, or backfill flows,
-- Prisma generate, migrate, db push, db execute, or any schema/data mutation,
-- provider tests unless explicitly mocked and approved,
-- Angel One or live provider checks,
-- paid/cloud, telemetry, broker, or real-money flows.
+- readiness/storage invariant tests such as `market-data-readiness-evidence.invariants.test.ts`
+- repository/provider tests
+- broad backend suites with no file filters
+- Playwright or UI smoke tests
+- dev servers, live services, provider services, startup flows, schedulers, repair/sync/import/backfill jobs
+- Prisma generate, migrate, db push, db execute, or any schema/data mutation
+- Angel One, live provider, paid/cloud, telemetry, broker, or real-money flows
 
 ## Stop Conditions
 
-Stop QA and return to Product Owner/Architect if:
+Stop QA and return to Team 00 / Architect if:
 
-- implementation asks for behavior outside the approved Option A validation policy,
-- implementation wants to change OHLC storage, Prisma schema, route registry, packages, provider behavior, scheduler/startup behavior, or shared utilities,
-- validation requires live provider data or generated provider credentials,
-- tests would preserve ambiguous behavior rather than proving accepted policy,
-- command scope broadens beyond focused backend Jest patterns.
+- implementation expands beyond the three reserved validator/test/doc files
+- implementation introduces warning/evidence semantics for missing `adjustedClose` or zero/suspicious volume
+- validation behavior now requires repository/provider/startup call-site changes
+- tests require readiness/storage invariant coverage to pass
+- command scope broadens beyond focused backend Jest patterns for the validation child
 
 ## Evidence Required Later
 
-- Accepted validation policy reference.
-- Exact implementation handoff with changed files.
-- Scenario matrix result for future-date, adjusted-close, volume, duplicate, OHLC, and spike cases.
-- Focused command output only after approval.
-- Confirmation no providers, services, startup/backfill, Prisma mutation, UI implementation, broad suites, Angel One, paid/cloud, broker, or live data checks were used.
-- Skipped checks with reason and next owner.
+- Exact implementation handoff limited to the reserved validator/test/doc file set
+- Scenario results for future-date rejection, invalid `adjustedClose`, negative volume, duplicate determinism, and opt-in spike behavior
+- Confirmation that missing `adjustedClose` fallback and zero/suspicious-volume evidence stayed deferred
+- Focused command output only after approval
+- Skipped checks with reason and next owner

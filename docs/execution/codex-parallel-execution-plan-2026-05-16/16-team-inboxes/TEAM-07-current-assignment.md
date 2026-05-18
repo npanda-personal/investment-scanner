@@ -8,48 +8,51 @@ Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automat
 
 ## Assignment
 
-Pull `CF-W1-L3-ALERT-01` for bounded implementation.
+Pull `CF-W1-L3-TREV-01` for bounded implementation.
 
 State: Ready for Implementation after Team 00 promotion.
 
-You are not alone in the codebase. Other teams have active docs-only edits in the shared `dev` workspace. Do not revert or overwrite edits made by others, and do not implement in the shared worktree.
+You are not alone in the codebase. Other teams have active docs-only edits in the shared `dev` workspace and accepted implementation branches are still parked in separate worktrees. Do not revert or overwrite edits made by others, and do not implement in the shared worktree.
 
 ## Branch / Worktree
 
 Create and use this dedicated implementation branch/worktree:
 
-- Branch: `codex/team07-portfolio-alerts/CF-W1-L3-ALERT-01`
-- Worktree: `../investment-scanner-worktrees/team07-CF-W1-L3-ALERT-01`
+- Branch: `codex/team07-portfolio-alerts/CF-W1-L3-TREV-01`
+- Worktree: `../investment-scanner-worktrees/team07-CF-W1-L3-TREV-01`
 - Base: current local `dev` after the Team 00 Ready-promotion docs update.
 
 Record the branch, worktree path, starting commit, and final status in `17-team-outboxes/TEAM-07-outbox.md`.
 
 ## Work Item
 
-`CF-W1-L3-ALERT-01` - alert readiness suppression for action-like alert event creation.
+`CF-W1-L3-TREV-01` - Today Review publication evidence and readiness-coherence normalization.
 
 ## Evidence To Use
 
-- Requirement: `10-requirements/CF-W1-L3-ALERT-01-alert-readiness-suppression-requirement.md`
-- Architecture review: `03-architecture/CF-W1-L3-ALERT-01-architecture-review.md`
-- Contract: `06-contracts/CF-W1-L3-ALERT-01-alert-readiness-suppression-contract.md`
-- Work packet: `08-work-packets/CF-W1-L3-ALERT-01-work-packet.md`
-- QA plan: `04-qa/CF-W1-L3-ALERT-01-qa-plan.md`
-- Team 03 reservation matrix: `03-architecture/team03-near-ready-file-reservation-matrix-2026-05-18.md`
+- Requirement: `10-requirements/CF-W1-L3-TREV-01-today-review-publication-evidence-requirement.md`
+- Architecture review: `03-architecture/CF-W1-L3-TREV-01-architecture-review.md`
+- Contract: `06-contracts/CF-W1-L3-TREV-01-today-review-publication-evidence-contract.md`
+- Work packet: `08-work-packets/CF-W1-L3-TREV-01-work-packet.md`
+- QA plan: `04-qa/CF-W1-L3-TREV-01-qa-plan.md`
 - Ready queue handoff: `12-ready-queue/ready-for-implementation.md`
 
 ## Allowed Files
 
 You may edit only:
 
-- `backend/src/modules/alerts-monitoring/alerts-monitoring.service.ts`
-- `backend/src/modules/alerts-monitoring/alerts-monitoring.types.ts`
-- `backend/src/modules/alerts-monitoring/alerts-monitoring.md`
-- `backend/tests/modules/alerts-monitoring/alerts-monitoring.service.test.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.service.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.repository.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.types.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.md`
+- `backend/tests/modules/today-trade-review/today-trade-review.service.test.ts`
+- `frontend/src/features/today-trade-review/types.ts`
+- `frontend/src/features/today-trade-review/components/TodayReviewPage.tsx`
+- `frontend/tests/ui/today-trade-review.spec.ts`
 
-Optional only if ownership-sensitive behavior is touched:
+Optional only if repository legacy-read-path synthesis is added:
 
-- `backend/tests/modules/alerts-monitoring/alerts-monitoring.ownership.test.ts`
+- `backend/tests/modules/today-trade-review/today-trade-review.repository.test.ts`
 
 ## Forbidden Files
 
@@ -57,32 +60,38 @@ Do not edit:
 
 - Prisma schema or migrations
 - backend or frontend route registries
+- `backend/src/modules/market-data-foundation/**`
+- `backend/src/modules/data-quality-engine/**`
+- `backend/src/modules/strategy-decision-engine/**`
+- `backend/src/modules/trade-plan-risk-engine/**`
+- `backend/src/modules/today-trade-review/today-trade-review.controller.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.router.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.validation.ts`
+- `backend/tests/modules/today-trade-review/today-trade-review.controller.test.ts`
+- `frontend/src/features/today-trade-review/components/TodayReviewCandidateDetailPage.tsx`
+- `frontend/src/features/today-trade-review/api/todayTradeReviewApi.ts`
+- `frontend/src/features/today-trade-review/hooks/useTodayReview.ts`
 - shared backend utilities or shared DTOs
 - shared frontend components
 - package manifests
 - generated files
-- Data Quality Engine source or public exports
-- Portfolio Management source/tests
-- watchlist-management source/tests
-- portfolio-intelligence source/tests
-- frontend files
-- notifications-delivery or copilot digest consumers
-- providers, startup/backfill, Angel One, broker, live-provider, paid/cloud, or telemetry flows
+- providers, startup/backfill, live-provider, Angel One, broker, paid/cloud, telemetry, or automation flows
 
-Do not run providers, startup/backfill flows, live provider calls, Prisma migrations, package installs, broad services, or UI smoke tests for this slice.
+Do not run providers, startup/backfill flows, live provider calls, Prisma migrations, package installs, broad services, or unrelated UI smoke tests for this slice.
 
 ## Implementation Requirements
 
-- Consume `DataQualityEngineService` through the public Data Quality module export.
-- Suppress stock, portfolio, and watchlist alert events unless the instrument has `READY` alert readiness.
-- Prefer `automation` use-case tier `READY` when available.
-- Fallback only when `automation` tier is absent: use `signal` tier `READY`, or `signalReadinessStatus = READY && eligibleForSignals = true` when tiers are absent.
-- Treat `LIMITED`, missing DQ, `NOT_READY`, blocked tier, stale hard blocker, unsupported, scope mismatch, provider gap, and `UNUSABLE` as suppressed.
-- Add readiness suppression evidence to `AlertEvaluationResult`.
-- Add Data Quality evidence to created event metadata.
-- Preserve duplicate suppression.
-- Preserve parent-rule event ownership behavior from `CF-W1-L3-AUTH-02`.
-- Keep wording research-support oriented; do not introduce advice, buy/sell, guarantee, target-price, or trade-instruction wording.
+- Add stable additive `publicationEvidence` metadata to the Today Review run `sourceSnapshot`.
+- Persist that metadata for new runs without schema, route, controller, router, validation, or provider changes.
+- Synthesize equivalent publication evidence on read for legacy runs that lack the field.
+- Make the Today Review page prefer normalized publication evidence while preserving existing additive snapshot fields.
+- Keep `NO_REVIEW`, `LIMITED_REVIEW`, `FULL_REVIEW`, and configured-partial behavior explicitly distinguishable.
+- Map `NO_REVIEW` and membership-load failure to suppression evidence.
+- Map `LIMITED_REVIEW` and configured partial scans to limited-publication evidence with research-support wording.
+- Preserve outside-trusted-universe Strategy Decision exclusion from all candidate sections.
+- Keep candidate detail as read-only research support and do not add a candidate-detail run-evidence contract in this slice.
+- Preserve existing Today Review routes and response compatibility.
+- Do not recalculate Market Data readiness, trusted-universe health, strategy math, Data Quality scoring, or Trade Plan semantics inside Today Review.
 
 ## Focused Validation
 
@@ -90,21 +99,45 @@ Run after implementation:
 
 ```powershell
 cd backend
-npm.cmd test -- alerts-monitoring.service.test.ts alerts-monitoring.validation.test.ts --runInBand
+npm.cmd test -- today-trade-review.service.test.ts --runInBand
 ```
 
-If the focused command cannot run, record the exact blocker, skipped command, risk, and next owner in the outbox.
+If repository legacy-read-path synthesis is implemented, also run:
+
+```powershell
+cd backend
+npm.cmd test -- today-trade-review.service.test.ts today-trade-review.repository.test.ts --runInBand
+```
+
+If frontend files are edited, also run:
+
+```powershell
+cd frontend
+npm.cmd run test:ui -- today-trade-review.spec.ts --workers=1
+npm.cmd run build
+```
+
+Run backend build after backend changes:
+
+```powershell
+cd backend
+npm.cmd run build
+```
+
+If any focused command cannot run, record the exact blocker, skipped command, risk, and next owner in the outbox.
 
 ## Stop Conditions
 
 Stop and return to Team 00 if implementation requires:
 
-- Data Quality Engine source or public export changes
-- shared DTO/helper files
-- portfolio-management, watchlist-management, portfolio-intelligence, notifications, copilot, frontend, route, Prisma, provider, startup/backfill, package, generated-file, or live-data changes
-- creating alert events from `LIMITED` or missing/non-ready DQ
-- changing alert ownership model or direct `AlertEvent.userId`
-- using live provider calls, paid services, broker credentials, cloud services, external telemetry, or provider-heavy startup behavior
+- Prisma or migration changes
+- route, controller, router, or validation changes
+- Market Data Foundation, Data Quality Engine, Strategy Decision Engine, or Trade Plan source/test changes
+- shared DTO/helper files or shared frontend components
+- package, generated-file, provider, startup/backfill, live-provider, paid/cloud, telemetry, or broker scope
+- candidate-detail run-evidence expansion
+- publishing Strategy Decision entries outside the trusted snapshot
+- advice-like labels, target-price framing, automation authorization, or trade-instruction wording
 - editing a file outside the allowed list
 
 ## Expected Outbox
