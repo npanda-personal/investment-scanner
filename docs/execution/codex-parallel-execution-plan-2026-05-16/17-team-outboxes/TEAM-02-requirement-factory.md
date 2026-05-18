@@ -2,6 +2,74 @@
 
 Date: 2026-05-18
 
+Mode: docs-only ranking refresh after rechecking the live runtime queue, Ready queue, blocked queues, and recent Team 00 / Team 03 / Team 04 / Team 06 outboxes. No application code, tests, Prisma, route registries, package manifests, generated files, Team 00 control docs, Ready queue files, or architecture / QA docs changed.
+
+## 2026-05-18 Ranking Refresh - Post-BT-01A / STRAT-02B State
+
+## Work Item
+
+Refresh the next direct-value ranking so Team 00 does not keep pulling from a stale unassigned stack after `CF-W1-BT-01A` promotion, `CF-W1-STRAT-02B` proposal completion, and Team 03 / Team 04 prep completion for `CF-W1-RH-01`, `CF-W1-L3-TREV-02`, and `CF-W1-SQLAB-02A`.
+
+## Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+## Files Inspected
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-STRAT-03-strategy-decision-review-provenance-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SQLAB-02-signal-outcome-journal-post-event-learning-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-RH-01-research-hub-actionability-evidence-wiring-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-TREV-02-today-review-candidate-snapshot-provenance-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/ready-for-implementation.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/blocked-by-decision.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/blocked-by-shared-file.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/blocked-by-upstream-dependency.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/team-agent-runtime-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-00-orchestrator-integration-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-outbox.md`
+
+## Result
+
+- Refreshed `next-top-10-candidates.md` to match the actual 2026-05-18 runtime state rather than the earlier stale unassigned stack.
+- Removed `CF-W1-BT-01A` from the unassigned stack because it is already promoted and active in Team 06.
+- Removed `CF-W1-STRAT-02B` from the unassigned stack because Team 03 completed the proposal packet and Team 04 accepted the proposal QA review; the actionable future opening is consent-gated child `CF-W1-STRAT-02B1`, not the parent packet itself.
+- Reclassified `CF-W1-SQLAB-02A`, `CF-W1-RH-01`, and `CF-W1-L3-TREV-02` as Team 00 sequencing / Ready-evaluation items rather than fresh Team 02 discovery gaps.
+- Promoted `CF-W1-STRAT-03` to the top unassigned direct-value requirement because it is still unassigned, additive, reviewability-focused, and likely backend-local in the first child.
+
+## Team 02 Dispatch Read
+
+- Next unassigned direct-value requirement: `CF-W1-STRAT-03`
+- Best current Team 00 parallel-safe routing candidates:
+  1. `CF-W1-STRAT-03` to Team 03 architecture prep, then Team 04 QA planning
+  2. `CF-W1-RH-01` to Team 00 Ready evaluation
+  3. `CF-W1-L3-TREV-02` to Team 00 Ready evaluation when Today Review writer sequencing is safe
+  4. `CF-W1-SQLAB-02A` as a Team 00 sequencing decision after `CF-W1-SQLAB-01`
+
+## Blockers / Guardrails
+
+- `CF-W1-STRAT-02B1` remains blocked until Team 00 intentionally opens an explicit schema / migration / generated / repository consent gate.
+- `CF-W1-RH-01` and `CF-W1-RH-02A` still must not run in parallel because they share Research Hub backend files.
+- `CF-W1-L3-TREV-02` still must not run in parallel with `CF-W1-L3-TREV-01`.
+- `CF-W1-SQLAB-02A` still must not be promoted or implemented in parallel with `CF-W1-SQLAB-01`.
+
+## Validation
+
+- Tests run: none
+- Builds run: none
+- UI checks run: none
+- Live local data checks run: none
+- Skipped reason: Team 02 stayed inside docs-only requirement ranking scope
+
+## Routing Note
+
+- Route to Team 03 / Team 04 now: `CF-W1-STRAT-03`
+- Do not route back to Team 03 / Team 04 for duplicate prep: `CF-W1-RH-01`, `CF-W1-L3-TREV-02`, `CF-W1-SQLAB-02A`
+
 Mode: docs-only backlog refresh after a Strategy Framework durable-history discovery cycle, a backtesting DQ characterization gap audit, and a Strategy Decision provenance gap audit. No application code, tests, Prisma, route registries, package manifests, generated files, Team 00 control docs, or Ready promotion files changed.
 
 ## Work Item

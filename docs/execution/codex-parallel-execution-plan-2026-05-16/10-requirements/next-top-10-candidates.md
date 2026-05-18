@@ -2,132 +2,86 @@
 
 Date: 2026-05-18
 
-Prepared by Team 02 Requirement Factory for the next docs-only value-discovery and prioritization cycle.
+Prepared by Team 02 Requirement Factory for the next direct-value requirement/ranking refresh after rechecking the live runtime queue, Ready queue, blocked queues, and recent Team 00 / Team 03 / Team 04 / Team 06 outboxes.
 
-Product Owner correction after this refresh:
+## Product Owner Priority Filter Still Applies
 
-- Prioritize direct investor/trader value first: market data reliability, Data Quality, signals, strategy trust, calibration, backtesting, historical context, market context, trade-plan research support, research evidence, reviewability, and explainability.
-- Admin, settings, auth/subscription, notifications, and user-alert convenience work should be lowest priority unless they block correctness, privacy, or user-data safety.
-- Alerts can return to the top only when they are tied to signal/backtest/market-data evidence quality, not as notification or inbox convenience work.
+- keep direct investor/trader value first: market data reliability, Data Quality, signals, strategy trust, calibration, backtesting, historical context, market context, trade-plan research support, research evidence, reviewability, and explainability;
+- keep admin/settings/auth/subscription/notification convenience low unless it blocks correctness, privacy, or user-data safety;
+- treat alert work as lower priority unless it improves evidence quality or reviewability rather than inbox convenience.
 
-## Current Dispatch Filter
+## Dispatch Filter Refresh
 
-Apply this extra filter before Team 00 chooses the next pull:
+The prior ranking became stale during the 2026-05-18 runtime cycle. Team 00 should exclude the following from the next unassigned pull:
 
-- exclude active implementation, active architecture/QA prep, accepted branch commits parked for later integration, and items already blocked behind schema/durable-storage/shared-file gates;
-- as of 2026-05-18, `CF-W1-MCTX-01` is already promoted in `12-ready-queue/ready-for-implementation.md` and assigned to Team 05, `CF-W1-RH-02A` is in active Team 03 architecture prep, `CF-W1-MD-03` is queued for Team 03 architecture after `CF-W1-RH-02A`, `CF-W1-TP-02` is in active implementation/review follow-up, `CF-W1-SMI-01` is in active Team 04 worktree QA verification, `CF-W1-RH-01` has a QA plan ready and is pending Team 00 Ready evaluation, `CF-W1-L3-TREV-02` is in active Team 04 QA planning, and `CF-W1-MD-02A` is queued for Team 04 QA review, so none of them belongs in the next unassigned pull;
-- after those exclusions, the next top unassigned requirement is `CF-W1-STRAT-02B`, followed by `CF-W1-BT-01A`, `CF-W1-SQLAB-02`, and the new Strategy Decision provenance child `CF-W1-STRAT-03`.
+- `CF-W1-BT-01A` is no longer unassigned. `12-ready-queue/ready-for-implementation.md` and `00-control/team-agent-runtime-queue.md` both show it promoted, stacked on accepted parked `CF-W1-BT-02`, and active in a Team 06 worktree.
+- `CF-W1-STRAT-02B` is no longer the next unassigned requirement. Team 03 finished the proposal packet, Team 04 accepted the proposal QA review, and the packet is now explicitly blocked behind future consent-gated children `CF-W1-STRAT-02B1` and `CF-W1-STRAT-02B2`.
+- `CF-W1-SQLAB-02A` already has Team 03 architecture and Team 04 QA planning. It is a sequencing decision for Team 00 after `CF-W1-SQLAB-01` clears shared `signal-quality-lab` files, not a fresh Team 02 discovery gap.
+- `CF-W1-RH-01` already has Team 03 architecture and Team 04 QA planning and is a Team 00 Ready-evaluation candidate, not a new Team 02 requirement gap.
+- `CF-W1-L3-TREV-02` already has Team 03 architecture and Team 04 QA planning and is a Team 00 Ready-evaluation candidate when the Today Review writer lane is safe.
 
-## Cycle Frame
+## Next Unassigned Direct-Value Requirement
 
-- Open decisions: `0`
-- This ranking is for the next requirement / contract / QA-prep pull, not for Ready queue movement.
-- Team 00 keeps ownership of Ready promotion and live implementation routing.
-- Team 03 currently owns active architecture prep for `CF-W1-MD-02A`, Team 06 currently owns active implementation for `CF-W1-SMI-01`, and Team 04 currently owns queued/active QA planning lanes for `CF-W1-RH-01` and `CF-W1-L3-TREV-02`, so backlog ranking must distinguish direct user value from current dispatchability.
+`CF-W1-STRAT-03` is now the next unassigned direct-value requirement.
 
-## Active Investor-Value Work Kept Visible
+Why it moves to the top:
 
-These items stay visible because they are already in active branch, review, or accepted-branch-gate flow. They are not part of the unassigned top-10 ranking below.
-
-| ID | Current state from current queue/docs | Why it stays visible |
-| --- | --- | --- |
-| `CF-W1-SIG-TRIGGER-02A` | Ready-promoted and actively implemented by Team 06 in a separate worktree | Direct signal auditability value is active already; do not route same-module follow-on prep that depends on its implementation outcome. |
-| `CF-W1-SQLAB-01` | Accepted on branch and parked for later clean integration | Direct signal-quality trust-state value is already out of discovery. |
-| `CF-W1-BT-02` | Accepted on branch and parked for later clean integration | Direct backtesting reviewability value is already out of discovery. |
-| `CF-W1-CAL-01` | Accepted on branch and parked for later clean integration | Direct calibration trust-state value is already out of discovery. |
-| `CF-W1-HCTX-01` | Accepted on branch and parked for later clean integration | Direct historical-context explainability value remains important even though it is no longer in discovery. |
-| `CF-W1-MCTX-01` | Ready-promoted and assigned to Team 05 in `12-ready-queue/ready-for-implementation.md` on 2026-05-18 | Direct market-context explainability work is already out of unassigned discovery and should stay excluded from the next pull. |
-| `CF-W1-MD-01` | Accepted on branch and parked for later clean integration | Upstream market-data validation value remains important even though it is no longer in discovery. |
-
-## Excluded From The Unassigned Ranking
-
-These items are already promoted, pulled, accepted, or in active QA / review flow:
-
-- `CF-W1-BT-02`
-- `CF-W1-CAL-01`
-- `CF-W1-DQ-02`
-- `CF-W1-DQ-02A`
-- `CF-W1-HCTX-01`
-- `CF-W1-L3-ALERT-01`
-- `CF-W1-L3-PORT-01A`
-- `CF-W1-L3-TREV-01`
-- `CF-W1-MD-01`
-- `CF-W1-NOTIF-02`
-- `CF-W1-MCTX-01`
-- `CF-W1-SQLAB-01`
-- `CF-W1-SQLAB-02A`
-- `CF-W1-SIG-TRIGGER-02A`
-- `CF-W1-STRAT-02A`
-- `CF-W1-TP-01B`
-- `CF-W1-UX-01A`
-- `CF-W1-AUTH-SUB-01`
+- it closes a live reviewability gap in `strategy-decision-engine`, which is already a direct decision/research surface;
+- it is still unassigned to Team 03/04 and does not depend on reopening any already-accepted packet;
+- it is additive, decision-math-neutral, and likely backend-local in the first child;
+- it improves explainability for downstream Research Hub, Today Review, and trade-plan review surfaces without requiring shared UI or schema work in the first pass.
 
 ## Re-Prioritized Top 10
 
-| Rank | ID | User value | Acceptance criteria focus | Non-goals | Likely owner team | Expected architecture / QA gate | Likely file ownership risk | Dependencies | Parallel with `CF-W1-SIG-TRIGGER-02A`? |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | `CF-W1-STRAT-02B` | Preserves durable strategy-definition history so future rule updates do not erase the exact persisted version that older signals, backtests, and reviews relied on. | Version-keyed persistence, additive rule-revision snapshots, current-vs-durable history distinction, idempotent reseed behavior, and focused repository/service compatibility tests. | No reopen of `STRAT-02A`, no evaluator-math rewrite, no proof-status rewrite, no route/shared-UI change, no duplicate DQ logic. | Team 00 routing, then Team 03 architecture prep and Team 04 durable-child QA planning. | New bounded child is now explicit; architecture should start from schema/generated/repository impact instead of another no-schema trust pass. | High: Prisma/schema, generated artifacts, repository/service mapping, and focused tests likely move together in one writer set. | `CF-W1-STRAT-02A` is already accepted; parent `CF-W1-STRAT-02` stays blocked until this durable child is opened explicitly. | `Yes` for docs-only prep. No active file overlap with `signal-generation-engine`. |
-| 2 | `CF-W1-BT-01A` | Backtesting still has an upstream DQ-fail-closed characterization gap, and the audit showed the current candidate list was thin on direct backtest trust evidence. | Characterization packet and QA plan for current backtesting DQ behavior. | No simulation rewrite, no route/shared-UI change, no schema/provider work. | Team 03 prep, Team 04 QA prep, later Team 06 implementation. | Characterization should start from the current optional/fail-open behavior instead of changing simulation math. | Low: module-local backtesting tests and docs only in the first pass. | `CF-W1-BT-01` remains the parent blocked item; this is the bounded characterization child. | `Yes` for docs-only prep. Different module from active Signal Generation work. |
-| 3 | `CF-W1-SQLAB-02` | Creates durable post-event learning so outcome review is not ephemeral. | Durable journal semantics, explicit evaluated vs unevaluable states, additive outcome-learning record, focused create/update/missing-data tests. | No signal scoring rewrite, no backtest rewrite, no alerting or execution behavior. | Team 03 prep, Team 04 QA prep, later Team 06 implementation. | Bounded child split after `CF-W1-SQLAB-02A`; docs-only contract and QA plan can proceed once the active preview child closes. | Medium: module-local backend/frontend/test files, but storage path may escalate later. | `CF-W1-SQLAB-02A` learning-preview child must stay separate; no schema jump in the first prep pass. | `Yes` for docs-only prep. Different module from active Signal Generation work. |
-| 4 | `CF-W1-STRAT-03` | Strategy Decision provenance is an under-served review surface for candidates, watch/avoid/exit decisions, and read-path-created rows. | Explicit provenance labeling, reason summaries, and opt-in legacy visibility without changing decision math. | No scoring rewrite, no route/shared-UI change, no framework math rewrite. | Team 03 prep, Team 04 QA prep, later Team 06 implementation. | Bounded backend provenance packet before any dashboard or widget surface widening. | Medium: strategy-decision-engine service/types/doc/test surfaces. | Best after current strategy/backtesting/outcome-learning tranche. | `Yes` for docs-only prep. No active file overlap with `signal-generation-engine`. |
-| 5 | `CF-W1-MD-02` | Keeps the upstream durable-evidence parent visible while active Market Data child work is already consuming the first schema packet. | Parent ADR direction, durable-vs-derived evidence boundary, and blocked packet sequence stay explicit. | No source or schema work from the parent itself; no bypassing the `MD-02A/B/C/D` split. | Team 03 architecture ownership, Team 04 ADR QA visibility. | Parent-only holding item after the new child split. | Low in docs, high if misrouted into implementation. | `CF-W1-MD-02A` remains active and later follow-ons must stay sequenced. | `Yes` for docs-only planning. |
-| 6 | `CF-W1-L3-INTEL-03` | Gives portfolio users explainable concentration review once upstream trust layers are stronger. | Explainable concentration findings, review-first language, deterministic reason summaries, focused bounded tests. | No optimizer, no rebalance advice, no alerting expansion. | Team 03 prep, Team 04 QA prep, later Team 07 implementation. | Lane 3 bounded contract after upstream trust stack stabilizes further. | Medium: portfolio-intelligence frontend/backend/test surfaces. | Better after stronger strategy/market-data/trade-plan trust evidence. | `Yes`. No Team 06 dependency. |
-| 7 | `CF-W1-L3-WATCH-01` | Helps triage watchlist ideas with deterministic review priority and reason summaries. | Explainable priority semantics, deterministic ranking reasons, safe empty states, focused tests. | No alerts convenience expansion, no provider changes, no speculative scoring engine. | Team 03 prep, Team 04 QA prep, later Team 07 implementation. | Lane 3 bounded contract and QA plan only. | Medium: watchlist-management and related frontend/test files. | Should stay behind upstream evidence items. | `Yes`. No Team 06 dependency. |
-| 8 | `CF-W1-L3-INTEL-02` | Improves portfolio review traceability once higher-value trust layers are in place. | Review-output explainability, traceable reason evidence, safe trust framing, focused tests. | No advisor-like recommendations, no wide portfolio workflow rewrite. | Team 03 prep, Team 04 QA prep, later Team 07 implementation. | Lane 3 bounded contract and QA plan. | Medium: portfolio-intelligence surfaces. | Better after concentration and upstream trust packets. | `Yes`. No Team 06 dependency. |
-| 9 | `CF-W1-L3-ALERT-03` | Adds post-trigger follow-through traceability after core evidence quality is stronger. | Outcome traceability, review-note semantics, additive alert history behavior, focused tests. | No scheduler/convenience scope, no notification-channel work. | Team 03 prep, Team 04 QA prep, later Team 07 implementation. | Must stay behind active alert ownership/readiness work and current upstream trust stack. | Medium-high: alerts-monitoring overlap risk if active alert writers reopen. | Active/nearby alert work and lower Product Owner priority for convenience surfaces. | `Yes`, but lower priority than upstream investor-value items. |
-| 10 | `CF-W1-UX-01` | Keeps the research workbench from overstating trust when source-backed proof is still incomplete. | Source-backed trust fields, blocker reasons, latest trusted data date, and downstream eligibility without advisory language. | No shared UI, no route changes, no provider/startup changes, no market-data or strategy-source rewrites. | Team 03 prep, Team 04 QA prep, later Team 08 implementation. | Backend trust-evidence parent remains blocked until source-supported fields are explicit. | High: stock-research-workbench spans backend and frontend trust surfaces. | Should stay behind core strategy, market-data, and signal evidence items. | `Yes`. No Team 06 dependency. |
+| Rank | ID | Current state | Why it matters now | Next Team 00 action | Team 03 / 04 routing? | Parallel-safety note |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | `CF-W1-STRAT-03` | Requirement exists; no Team 03 architecture packet yet | Makes Strategy Decision provenance explicit for framework-backed, legacy-fallback, and read-path-created rows; improves direct review trust with low first-child blast radius | Route to Team 03 for architecture/contract/work-packet prep | Yes: Team 03 now, then Team 04 QA planning | Safe now; distinct module from active Team 06 backtesting work |
+| 2 | `CF-W1-RH-01` | Team 03 architecture ready; Team 04 QA plan ready | Replaces Research Hub actionability placeholders with source-backed evidence from stable upstream public outputs | Team 00 Ready evaluation for one bounded backend-only Research Hub child | No new Team 03/04 pass needed before Ready evaluation | Safe if implemented alone; do not widen into `RH-02A` in the same writer pass |
+| 3 | `CF-W1-L3-TREV-02` | Team 03 architecture ready; Team 04 QA plan ready | Makes Today Review candidate detail auditable with publication-time provenance and compatibility labels | Team 00 Ready evaluation when Today Review writer sequencing is safe | No new Team 03/04 pass needed before Ready evaluation | Safe only if not parallelized with `CF-W1-L3-TREV-01` |
+| 4 | `CF-W1-SQLAB-02A` | Team 03 architecture ready; Team 04 QA plan ready; sequencing-blocked | Adds bounded no-schema journal-preview learning value after measured signal outcomes | Team 00 sequencing decision after `CF-W1-SQLAB-01` clears shared files, then Ready evaluation | No new Team 03/04 pass needed unless packet changes | Not parallel-safe with `CF-W1-SQLAB-01`; safe after that gate clears |
+| 5 | `CF-W1-STRAT-02B1` | Future child only; proposal packet says consent gate required | Durable strategy-definition history remains a real trust gap for old signals/backtests/reviews | Keep blocked until explicit schema/migration/generated/repository consent is granted | Later Team 03/04 only after consent | Not implementation-safe yet |
+| 6 | `CF-W1-RH-02A` | Team 03 architecture ready; Team 04 QA plan ready | Fails Research Hub delta claims closed when no valid comparison basis exists | Sequence behind `CF-W1-RH-01` or intentionally combine into one Research Hub writer pass | No immediate Team 03/04 work needed | Must not run in parallel with `CF-W1-RH-01` |
+| 7 | `CF-W1-L3-INTEL-03` | Requirement only | Adds explainable concentration review to portfolio intelligence once upstream trust layers are stronger | Keep in backlog; prep after current strategy/research review tranche | Later Team 03/04 | Safe later; lower immediate value than current review-evidence items |
+| 8 | `CF-W1-L3-WATCH-01` | Requirement and QA prep exist | Improves watchlist review priority with deterministic reason summaries | Keep below upstream trust and review-evidence items | No immediate routing change | Safe if kept separate from `L3-PORT-01B` |
+| 9 | `CF-W1-L3-INTEL-02` | Requirement and architecture packet exist | Improves portfolio review traceability after accepted readiness DTO groundwork | Keep behind concentration/research provenance items | No immediate routing change | Shares portfolio-intelligence files with other Lane 3 intelligence follow-ons |
+| 10 | `CF-W1-L3-ALERT-03` | Requirement and architecture packet exist | Adds post-trigger follow-through traceability, but remains below direct core evidence surfaces | Keep behind current trust/review stack and active alert-file work | No immediate routing change | Must stay sequenced behind active alert-module writers |
 
-## Top Parallel-Ready Prep Candidates
+## Top Parallel-Safe Candidates For Team 00 Now
 
-These are the clearest next docs-only candidates Team 00 can route now after excluding active, queued, accepted, parked, and blocked items:
+These are the clearest next moves that do not collide with the currently active Team 06 `CF-W1-BT-01A` writer set and stay aligned with the Product Owner's direct-value order:
 
-1. `CF-W1-STRAT-02B`
-2. `CF-W1-BT-01A`
-3. `CF-W1-SQLAB-02`
+1. `CF-W1-STRAT-03`
+   - route to Team 03 for new architecture prep now;
+   - then route to Team 04 for QA planning;
+   - this is the top unassigned direct-value requirement.
 
-## Additional Next-Wave Discovery Candidates
+2. `CF-W1-RH-01`
+   - route through Team 00 Ready evaluation now;
+   - Team 03 and Team 04 prep already exist;
+   - keep it backend-only and conservative on current-`dev` Signal Quality / Calibration caps.
 
-Ranking is unchanged. These were added because current source shows underdeveloped direct research-evidence value, but the existing top 5 still outrank them for the next routing cycle.
+3. `CF-W1-L3-TREV-02`
+   - route through Team 00 Ready evaluation when Today Review writer sequencing is safe;
+   - Team 03 and Team 04 prep already exist;
+   - keep it mutually exclusive with `CF-W1-L3-TREV-01`.
 
-| ID | User value | Acceptance criteria focus | Non-goals | Likely owner team | Dependencies | File-conflict risk | Parallel with active Team 06 and Team 03 work? |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `CF-W1-RH-01` | Makes Research Hub actionability stop treating stable upstream trust dimensions as permanent placeholders. | Wire Today Review / Trade Plan / Signal Quality / Calibration actionability dimensions through stable public outputs only, with additive evidence dates and blocker messages. | No new scoring engine, no upstream logic duplication, no shared UI/route/schema/provider scope. | Team 03 prep, Team 04 QA prep, later Team 08 implementation. | `CF-W1-L3-TREV-01`, `CF-W1-TP-02`, vocabulary alignment with `CF-W1-SQLAB-01` and `CF-W1-CAL-01`. | Medium. Clean child can stay in `research-hub`, but cross-module evidence pressure is real. | `Yes`. Discovery stays in `10-requirements/**`; later source work is outside Team 06's active files. |
-| `CF-W1-RH-02A` | Fails Research Hub delta claims closed so the overview stops implying review-history evidence it cannot prove. | Comparison-basis status, compared-against timestamp when auditable, and unavailable-basis fallback instead of fake delta labels. | No new scheduler/journal system, no broad Research Hub redesign, no upstream module rewrite, no storage/schema work. | Team 03 prep, Team 04 QA prep, later Team 08 implementation. | Keeps semantic alignment with `CF-W1-RH-01`, but can proceed as a bounded child without waiting for the broader actionability packet to finish. | Medium. Child stays local unless architecture proves a later storage split is required. | `Yes`. Requirement work does not collide with Team 06 or Team 03 architecture-file ownership. |
-| `CF-W1-SMI-01` | Makes Smart Money confirmation explain freshness, persisted-vs-missing evidence, and ownership-placeholder limits. | Persisted snapshot timing, range coverage, partial-trust semantics for missing ownership, and safe downstream "usable vs limited vs unavailable" framing. | No provider expansion, no market-data redesign, no DQ duplication, no schema/shared-UI work. | Team 03 prep, Team 04 QA prep, later Team 06 implementation. | Semantically adjacent to `CF-W1-MD-02`, `CF-W1-HCTX-01`, and `CF-W1-MCTX-01`, but does not reopen them. | Medium. Module-local first child is plausible. | `Yes`. No active Team 06 writer currently owns `smart-money-intelligence`; requirement work is isolated. |
-| `CF-W1-L3-TREV-02` | Makes Today Review candidate detail auditable by exposing source-module provenance and evidence timing for stored snapshots. | Candidate-level provenance labels, evidence dates, compatibility-only labels for partial/legacy snapshot shapes, and read-only detail semantics. | No scheduler rewrite, no Strategy Decision rewrite, no Trade Plan geometry rewrite, no schema/shared-UI scope. | Team 03 prep, Team 04 QA prep, later Team 07 implementation. | `CF-W1-L3-TREV-01` first; keep target-language cleanup separate under `CF-W1-TP-02`. | Medium. Child can stay in `today-trade-review`, but risk rises if snapshot normalization widens. | `Yes`. Requirement work is doc-only and does not overlap Team 06's active module. |
+4. `CF-W1-SQLAB-02A`
+   - treat as a Team 00 sequencing/Ready candidate after `CF-W1-SQLAB-01`;
+   - do not send it back through Team 03/04 unless the packet itself changes.
 
-## Next Unassigned Pull Stack
+## Items That Should Not Be Misrouted
 
-1. `CF-W1-STRAT-02B`
-2. `CF-W1-SQLAB-02`
-3. `CF-W1-MD-02`
-
-## Why This Ranking Changed
-
-- `CF-W1-SIG-TRIGGER-02A` is now explicitly treated as active implementation work, so same-module follow-on prep cannot be presented as immediately parallel-safe.
-- `CF-W1-TP-02` no longer belongs in the next unassigned pull because it is already in active Team 10 review after Team 04 QA ACCEPT.
-- `CF-W1-SMI-01` no longer belongs in the next unassigned pull because it is already in active Team 04 QA-planning flow.
-- `CF-W1-RH-01` no longer belongs in the next unassigned pull because it is already in active Team 03 architecture readiness.
-- `CF-W1-L3-TREV-02` no longer belongs in the next unassigned pull because it is already queued as the next architecture candidate after `CF-W1-RH-01`.
-- `CF-W1-MCTX-01` dropped out of the unassigned stack because `12-ready-queue/ready-for-implementation.md` now shows it promoted on 2026-05-18 and assigned to Team 05.
-- `CF-W1-STRAT-02` was too broad for the next pull because Team 03 already marked the parent blocked after accepted `CF-W1-STRAT-02A`; Team 02 therefore opened the bounded durable-history child `CF-W1-STRAT-02B`.
-- `CF-W1-RH-02A` and `CF-W1-MD-03` dropped out of the immediate unassigned pull because the latest Team 02 assignment exclusions place `RH-02A` in active Team 03 architecture prep and `MD-03` in active Team 03/QA follow-up.
-- `CF-W1-MD-03` remains high value, but it is no longer an unassigned pull under the current exclusion list.
-- `CF-W1-UX-01` stays in the upper half because it is a direct research surface, but it still trails upstream trust-evidence packets.
-- Lane 3 convenience items remain behind signal/strategy/market-data/trade-plan evidence work unless correctness, privacy, or user-data safety demands earlier action.
-
-## Why Lower-Value Items Stay Lower
-
-- `CF-W1-NOTIF-02`, `CF-W1-AUTH-01`, `CF-W1-SUB-01`, and similar platform items remain low unless they block correctness, privacy, or user-data safety.
-- `CF-W1-UX-02` and `CF-W1-UX-05` remain valid but are narrower Copilot-first trust/copy items and are less direct investor value than current signal, strategy, trade-plan, and market-data evidence gaps.
-- `CF-W1-L3-AUTH-03` remains a correctness/safety item, not a market-intelligence priority item, unless alert ownership blocks active investor-value work.
-
-## Next 3 Candidates Team 00 Should Evaluate
-
-1. `CF-W1-STRAT-02B`
-2. `CF-W1-BT-01A`
-3. `CF-W1-SQLAB-02`
+- Do not treat `CF-W1-STRAT-02B` itself as Ready. The current packet says the real implementation opening is `CF-W1-STRAT-02B1`, and that child needs explicit schema/migration/generated/repository consent.
+- Do not keep presenting `CF-W1-BT-01A` as an unassigned candidate. It is already active implementation.
+- Do not reopen `CF-W1-SQLAB-02` as a generic parent. The actionable near-term item is `CF-W1-SQLAB-02A`, while durable `02B` remains blocked.
+- Do not send `CF-W1-RH-01` or `CF-W1-L3-TREV-02` back to Team 03/04 for duplicate prep; both already have architecture and QA packets.
 
 ## Team 02 Recommendation
 
-Keep Team 00's live Ready / review routing unchanged for already-active branches. For the next new docs-only pull after excluding active, queued, accepted, parked, and blocked items, route `CF-W1-STRAT-02B` to Team 03 for the approval-gated durable-history architecture packet. Keep `CF-W1-BT-01A` and `CF-W1-SQLAB-02` immediately behind it, then treat `CF-W1-STRAT-03` as the next under-served review-provenance candidate. `CF-W1-MD-03` should stay visible but now in active Team 03/QA follow-up and `CF-W1-MD-02A` should stay queued behind it. Do not let admin/settings/auth/subscription/notifications or alert-convenience work preempt this stack unless a correctness, privacy, or user-data-safety blocker appears.
+For the next direct-value cycle, Team 00 should:
+
+1. route `CF-W1-STRAT-03` to Team 03 as the next unassigned requirement-prep packet;
+2. evaluate `CF-W1-RH-01` for Ready promotion without reopening requirement discovery;
+3. evaluate `CF-W1-L3-TREV-02` for Ready promotion when Today Review writer sequencing is safe;
+4. keep `CF-W1-SQLAB-02A` in sequencing control only;
+5. keep `CF-W1-STRAT-02B1` blocked until the explicit schema/generated consent gate is intentionally opened.
