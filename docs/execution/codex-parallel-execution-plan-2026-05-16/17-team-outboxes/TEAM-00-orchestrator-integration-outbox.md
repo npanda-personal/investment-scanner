@@ -262,6 +262,73 @@ State: spawned-agent coordination continued; DQ first-child accepted and committ
 
 Product Owner action required: no.
 
+## Spawned Agents
+
+- Team 06 `019e3d1d-e5df-7c91-b45b-8184cae31643`: `CF-W1-BT-01A` bounded QA-reject rework.
+- Team 04 `019e3d1d-e61a-7622-a5f5-ca7a6cc13a57`: `CF-W1-STRAT-03` QA planning.
+
+## Active Agents
+
+| Team | Agent | Work item |
+| --- | --- | --- |
+| Team 02 | `019e3d1a-cf1e-79a2-8c24-096b7d773616` | next distinct direct-value requirement discovery |
+| Team 06 | `019e3d1d-e5df-7c91-b45b-8184cae31643` | `CF-W1-BT-01A` bounded rework |
+| Team 04 | `019e3d1d-e61a-7622-a5f5-ca7a6cc13a57` | `CF-W1-STRAT-03` QA planning |
+
+---
+
+# Team 00 Runtime Dispatch - Team 02 Relaunch
+
+Date: 2026-05-18
+
+## Consumed Output
+
+- Team 02 completed a direct-value ranking refresh.
+- Team 00 committed the refresh as `7f38e9d`.
+- Team 00 relaunched Team 02 for the next distinct under-served direct-value requirement discovery cycle.
+
+## Active Agents
+
+| Team | Agent | Work item |
+| --- | --- | --- |
+| Team 04 | `019e3d15-9633-7762-afc2-555b7dbf020f` | `CF-W1-BT-01A` QA verification |
+| Team 03 | `019e3d15-969c-77f2-a87e-ec6cf5f29a52` | `CF-W1-STRAT-03` architecture packet |
+| Team 02 | `019e3d1a-cf1e-79a2-8c24-096b7d773616` | next distinct direct-value requirement discovery |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-BT-01A` QA verification now.
+- Team 03: `CF-W1-STRAT-03` architecture packet now.
+- Team 02: next distinct direct-value requirement discovery now.
+- Team 10: `CF-W1-BT-01A` review after Team 04 accepts.
+- Team 04: `CF-W1-STRAT-03` QA planning after Team 03 completes architecture.
+
+---
+
+# Team 00 Runtime Dispatch - BT-01A Rework And STRAT-03 QA Planning
+
+Date: 2026-05-18
+
+## Consumed Outputs
+
+- Team 04 rejected `CF-W1-BT-01A` for incomplete characterization coverage despite passing focused Jest and backend build.
+- Team 03 completed `CF-W1-STRAT-03` architecture as a backend-local no-schema Ready candidate after QA planning.
+
+## Routing
+
+- `CF-W1-BT-01A`: returned to Team 06 for bounded reserved-file rework in the existing Team 06 worktree.
+- `CF-W1-STRAT-03`: routed to Team 04 for docs-only QA planning.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06: `CF-W1-BT-01A` bounded QA-reject rework now.
+- Team 04: `CF-W1-STRAT-03` QA planning now.
+- Team 04: `CF-W1-BT-01A` QA rerun after Team 06 rework.
+- Team 10: `CF-W1-BT-01A` review only after QA accepts.
+- Team 00: `CF-W1-STRAT-03` Ready evaluation after Team 04 QA plan.
+
+Product Owner action required: no.
+
 ---
 
 # Runtime Checkpoint - SMI Accepted

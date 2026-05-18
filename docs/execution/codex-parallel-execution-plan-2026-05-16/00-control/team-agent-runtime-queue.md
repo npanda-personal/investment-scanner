@@ -2930,3 +2930,65 @@ Team 00 closed Team 06 agent `019e3d0f-9c05-7f51-a421-85c6b75dd120` and routed t
 - Team 03: `CF-W1-STRAT-03` architecture packet now.
 - Team 10: `CF-W1-BT-01A` review after Team 04 accepts.
 - Team 03: `CF-W1-BT-01A` Architect Signoff after Team 10 accepts.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Team 02 Relaunched
+
+Team 02 completed the direct-value ranking refresh and Team 00 committed it as `7f38e9d`.
+
+Team 00 relaunched Team 02 for the next distinct under-served direct-value requirement discovery cycle.
+
+## Current Active Agents
+
+| Slot | Team | Agent | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | `019e3d15-9633-7762-afc2-555b7dbf020f` | QA verification | `CF-W1-BT-01A` in Team 06 worktree | active |
+| 2 | Team 03 - Architecture Factory | `019e3d15-969c-77f2-a87e-ec6cf5f29a52` | architecture prep | `CF-W1-STRAT-03` no-schema provenance packet | active |
+| 3 | Team 02 - Requirement Factory | `019e3d1a-cf1e-79a2-8c24-096b7d773616` | rolling requirements discovery | next distinct direct investor/trader-value item | active |
+| 4 | Open slot | none | queued | Team 10 review after BT-01A QA acceptance | waiting |
+| 5 | Open slot | none | queued | Team 04 QA planning after STRAT-03 architecture output | waiting |
+| 6 | Open slot | none | queued | next implementation or Ready-eval handoff | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-BT-01A` QA verification now.
+- Team 03: `CF-W1-STRAT-03` architecture packet now.
+- Team 02: next distinct direct-value requirement discovery now.
+- Team 10: `CF-W1-BT-01A` review after Team 04 accepts.
+- Team 04: `CF-W1-STRAT-03` QA planning after Team 03 completes architecture.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## BT-01A QA Rejected And STRAT-03 Architecture Completed
+
+Team 04 rejected `CF-W1-BT-01A` because the characterization coverage is incomplete. The workstream returns to Team 06 for bounded reserved-file rework in the same worktree.
+
+Team 03 completed `CF-W1-STRAT-03` architecture as a Ready candidate after QA planning. The packet is backend-local, additive, no-schema, and no-route as long as `READ_PATH_CREATED` remains request-local provenance.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06: `CF-W1-BT-01A` bounded QA-reject rework now.
+- Team 04: `CF-W1-STRAT-03` QA planning now.
+- Team 04: `CF-W1-BT-01A` QA rerun after Team 06 rework.
+- Team 10: `CF-W1-BT-01A` review only after QA accepts.
+- Team 00: `CF-W1-STRAT-03` Ready evaluation after Team 04 QA plan.
+
+## Current Active Agents
+
+| Slot | Team | Agent | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Team 02 - Requirement Factory | `019e3d1a-cf1e-79a2-8c24-096b7d773616` | rolling requirements discovery | next distinct direct investor/trader-value item | active |
+| 2 | Team 06 - Strategy / Signal / Risk | `019e3d1d-e5df-7c91-b45b-8184cae31643` | QA-reject rework | `CF-W1-BT-01A` characterization gaps | active |
+| 3 | Team 04 - QA Factory | `019e3d1d-e61a-7622-a5f5-ca7a6cc13a57` | QA planning | `CF-W1-STRAT-03` | active |
+| 4 | Open slot | none | queued | Team 04 QA rerun after BT-01A rework | waiting |
+| 5 | Open slot | none | queued | Team 10 BT-01A review after QA accepts | waiting |
+| 6 | Open slot | none | queued | Team 00 STRAT-03 Ready evaluation after QA plan | waiting |

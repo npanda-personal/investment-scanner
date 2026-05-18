@@ -1607,6 +1607,61 @@ Teams ready to pick up new tasks:
 
 Product Owner action required: no.
 
+Spawned agents:
+
+- Team 06 `019e3d1d-e5df-7c91-b45b-8184cae31643`: `CF-W1-BT-01A` bounded QA-reject rework.
+- Team 04 `019e3d1d-e61a-7622-a5f5-ca7a6cc13a57`: `CF-W1-STRAT-03` QA planning.
+
+Active agents:
+
+- Team 02 `019e3d1a-cf1e-79a2-8c24-096b7d773616`: next distinct direct-value requirement discovery.
+- Team 06 `019e3d1d-e5df-7c91-b45b-8184cae31643`: `CF-W1-BT-01A` bounded rework.
+- Team 04 `019e3d1d-e61a-7622-a5f5-ca7a6cc13a57`: `CF-W1-STRAT-03` QA planning.
+
+---
+
+# Runtime Checkpoint - Requirement Lane Relaunched
+
+Date: 2026-05-18
+
+Team 02 completed the direct-value ranking refresh and Team 00 committed it as `7f38e9d`.
+
+Team 00 relaunched Team 02 as `019e3d1a-cf1e-79a2-8c24-096b7d773616` for the next distinct under-served direct-value requirement discovery cycle, excluding items already active, queued, parked, or sequencing-only.
+
+Active agents:
+
+- Team 04 `019e3d15-9633-7762-afc2-555b7dbf020f`: `CF-W1-BT-01A` QA verification.
+- Team 03 `019e3d15-969c-77f2-a87e-ec6cf5f29a52`: `CF-W1-STRAT-03` architecture packet.
+- Team 02 `019e3d1a-cf1e-79a2-8c24-096b7d773616`: next distinct direct-value requirement discovery.
+
+Teams ready to pick up new tasks:
+
+- Team 04: `CF-W1-BT-01A` QA verification now.
+- Team 03: `CF-W1-STRAT-03` architecture packet now.
+- Team 02: next distinct direct-value requirement discovery now.
+- Team 10: `CF-W1-BT-01A` review after Team 04 accepts.
+- Team 04: `CF-W1-STRAT-03` QA planning after Team 03 completes architecture.
+
+---
+
+# Runtime Checkpoint - BT-01A Rework And STRAT-03 QA Planning
+
+Date: 2026-05-18
+
+Team 04 rejected `CF-W1-BT-01A` after passing the focused test and backend build because required characterization coverage is incomplete. Team 00 routed only that workstream back to Team 06 for bounded reserved-file rework.
+
+Team 03 completed the `CF-W1-STRAT-03` architecture packet. Team 00 routed it to Team 04 for QA planning.
+
+Teams ready to pick up new tasks:
+
+- Team 06: `CF-W1-BT-01A` bounded QA-reject rework now.
+- Team 04: `CF-W1-STRAT-03` QA planning now.
+- Team 04: `CF-W1-BT-01A` QA rerun after Team 06 rework.
+- Team 10: `CF-W1-BT-01A` review only after QA accepts.
+- Team 00: `CF-W1-STRAT-03` Ready evaluation after Team 04 QA plan.
+
+Product Owner action required: no.
+
 ---
 
 # Latest Coordination State

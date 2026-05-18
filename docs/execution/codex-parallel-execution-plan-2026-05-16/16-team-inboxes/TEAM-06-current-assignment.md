@@ -142,6 +142,83 @@ Update `17-team-outboxes/TEAM-06-outbox.md` with:
 
 ---
 
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Revise `CF-W1-BT-01A` after Team 04 QA rejection.
+
+This is bounded rework in the existing Team 06 worktree. Stay inside the original reserved file scope.
+
+## Worktree / Branch
+
+- Branch: `codex/team06-strategy-signal/CF-W1-BT-01A`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-BT-01A`
+- Base: accepted parked `CF-W1-BT-02` branch at `bb49ce2`
+
+## QA Rejection Evidence
+
+- Worktree QA evidence: `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-BT-01A-qa-verification.md`
+- QA disposition: `REJECT`
+
+## Allowed Writes
+
+In the Team 06 worktree only:
+
+- `backend/tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.test.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-BT-01A-developer-handoff.md`
+
+## Required Rework
+
+Add only the missing characterization coverage/documentation called out by QA:
+
+- focused test for the full default enabled Data Quality call shape:
+  - `minSignalReadinessScore = 70`
+  - `excludeNotReady = true`
+  - `includeLimited = false`
+  - `excludeIlliquid = true`
+  - `excludeMissingQuality = false`
+  - `missingQualityBehavior = WARN_AND_PROCESS`
+- focused test for caller-allowed limited readiness:
+  - `excludeNotReady = false`
+  - `includeLimited = true`
+- focused registered-run mixed-history characterization proving `availabilityStatus = PARTIAL` with explicit coverage counts.
+- module doc update for:
+  - limited-readiness pass-through when `excludeNotReady = false`;
+  - registered `PARTIAL` and `INSUFFICIENT_HISTORY` outcomes;
+  - explicit note that this child characterizes current trust limits and does not claim a global fail-closed backtesting policy.
+
+## Forbidden Scope
+
+- no backtesting source file edits;
+- no simulation, scoring, route, DTO, persistence, or frontend behavior changes;
+- no Prisma/schema/migrations/generated files;
+- no route registries;
+- no shared backend utilities or shared UI;
+- no package manifests;
+- no provider/live/startup/backfill, paid/cloud, broker, or telemetry scope;
+- no unrelated accepted branch work.
+
+## Required Validation
+
+Run memory check before heavy commands, then in the worktree:
+
+```powershell
+cd backend
+npm.cmd test -- backtesting-strategy-lab.service.test.ts --runInBand
+npm.cmd run build
+```
+
+## Output
+
+Update the developer handoff and Team 06 outbox, then report the exact files changed, commands run, and whether QA rerun can proceed.
+
+---
+
 # Current Assignment - `CF-W1-BT-01A`
 
 Date assigned: 2026-05-18

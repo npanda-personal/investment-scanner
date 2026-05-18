@@ -253,6 +253,47 @@ Date: 2026-05-18
 
 ## Assignment
 
+Prepare docs-only QA planning for `CF-W1-STRAT-03` - Strategy Decision review provenance.
+
+This override supersedes the `CF-W1-BT-01A` verification assignment, which completed with QA rejection and has been routed back to Team 06.
+
+## Source Input
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-STRAT-03-strategy-decision-review-provenance-requirement.md`
+- Architecture review: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-STRAT-03-architecture-review.md`
+- Contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-STRAT-03-strategy-decision-review-provenance-contract.md`
+- Work packet: `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-STRAT-03-work-packet.md`
+- Team 03 outbox: `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-STRAT-03-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/next-validation-plans.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+## Required QA Plan Coverage
+
+- `FRAMEWORK_BACKED` mapping on persisted framework-backed rows.
+- `LEGACY_FALLBACK` mapping for non-framework-backed rows only when `includeLegacy=true`.
+- `legacyIncludedByRequest=true` only when legacy rows are explicitly included by request.
+- Default proof-safe reads still exclude legacy rows unless `includeLegacy=true`.
+- `READ_PATH_CREATED` is request-local on the response that creates a row through `latestForInstrument()` and any watchlist/portfolio path that delegates to it.
+- Later history/list reads must not fabricate durable read-path-created provenance.
+- `reasonSummary` follows the architecture precedence rule and remains research-support language.
+- No decision math, query parameter, route, persistence key, schema, repository, frontend, shared UI, package, provider, live-data, startup/backfill, paid/cloud, broker, or telemetry changes.
+
+## Output
+
+State whether `CF-W1-STRAT-03` is QA-plan ready for Team 00 Ready evaluation and list any blocker.
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
 Verify `CF-W1-BT-01A` - Backtesting DQ fail-closed characterization in the Team 06 stacked worktree.
 
 This override supersedes older Team 04 tails. This is QA verification, not implementation and not QA-plan drafting.

@@ -1920,3 +1920,75 @@ Current Team 03 recommendation to Team 00:
 3. Sequence `CF-W1-L3-AUTH-03` and `CF-W1-L3-ALERT-03` explicitly; do not allow parallel writers on `alerts-monitoring.service.ts`, `alerts-monitoring.types.ts`, `alerts-monitoring.md`, or focused tests.
 
 No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
+
+## Team 03 STRAT-03 Strategy Decision Provenance Prep - 2026-05-18
+
+Assignment: prepare the next parallel-safe architecture packet for `CF-W1-STRAT-03` in the shared `dev` workspace without touching application code, tests, Prisma/schema, migrations, generated files, routes, shared utilities, shared UI, package manifests, providers, startup/backfill, or live-data flows.
+
+Prepared:
+
+- `03-architecture/CF-W1-STRAT-03-architecture-review.md`
+- `06-contracts/CF-W1-STRAT-03-strategy-decision-review-provenance-contract.md`
+- `08-work-packets/CF-W1-STRAT-03-work-packet.md`
+
+Updated:
+
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Files inspected:
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-STRAT-03-strategy-decision-review-provenance-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/ready-for-implementation.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/team-agent-runtime-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/16-team-inboxes/TEAM-06-current-assignment.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-BT-01A-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-BT-01A-work-packet.md`
+- `backend/src/modules/strategy-decision-engine/strategy-decision-engine.md`
+- `backend/src/modules/strategy-decision-engine/strategy-decision-engine.service.ts`
+- `backend/src/modules/strategy-decision-engine/strategy-decision-engine.types.ts`
+- `backend/src/modules/strategy-decision-engine/strategy-decision-engine.repository.ts`
+- `backend/tests/modules/strategy-decision-engine/strategy-decision-engine.service.test.ts`
+- `backend/tests/modules/strategy-decision-engine/strategy-decision-engine.repository.test.ts`
+- `backend/prisma/schema.prisma`
+- `frontend/src/features/strategy-decision-engine/components/StrategyDecisionDashboard.tsx`
+- `frontend/src/features/strategy-decision-engine/components/StrategyDecisionWidget.tsx`
+
+Readiness result:
+
+- `CF-W1-STRAT-03` is a `Ready candidate`.
+- An honest no-schema backend-local first child exists.
+- The first child can stay inside `strategy-decision-engine` service/types/doc/service-test scope because:
+  - persisted rows already store `frameworkBacked` and related additive trust fields;
+  - `latestForInstrument()` already owns the read-path evaluate-and-create behavior;
+  - `includeLegacy=true` is already a current query path;
+  - a concise top-level `reasonSummary` can be derived from existing blockers, warnings, data gaps, reasons, and the existing nested risk-plan summary.
+- Exact future write scope is limited to:
+  - `backend/src/modules/strategy-decision-engine/strategy-decision-engine.service.ts`
+  - `backend/src/modules/strategy-decision-engine/strategy-decision-engine.types.ts`
+  - `backend/src/modules/strategy-decision-engine/strategy-decision-engine.md`
+  - `backend/tests/modules/strategy-decision-engine/strategy-decision-engine.service.test.ts`
+- Exact blocked scope:
+  - repository/controller/router/validation/module/index edits
+  - Prisma/schema and migrations
+  - generated files
+  - backend/frontend route registries
+  - frontend `strategy-decision-engine` files
+  - shared backend utilities or shared DTOs
+  - shared frontend components
+  - package manifests
+  - upstream/downstream source edits in Strategy Framework, Signal Generation, Calibration, DQE, Smart Money, Market Context, Research Hub, or Trade Plan
+  - providers, startup/backfill, live-provider, paid/cloud, broker, or telemetry work
+- Honest first-child limitation:
+  - `READ_PATH_CREATED` can only be labeled on the response that actually created the row on a lookup miss;
+  - current persisted rows do not store durable read-path-created origin, so later history/list reads must not fabricate that provenance.
+- No overlap exists with active Team 06 `CF-W1-BT-01A`; Team 06 currently reserves only `backtesting-strategy-lab.md` and `backtesting-strategy-lab.service.test.ts` in a dedicated stacked worktree.
+
+Current Team 03 recommendation to Team 00:
+
+1. Route `CF-W1-STRAT-03` to Team 04 QA planning now.
+2. Treat the first child as backend-only provenance decoration, not a persistence rewrite.
+3. Keep any future durable stored read-path provenance as a separate schema/repository child if Product direction later requires cross-request origin replay.
+
+No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
