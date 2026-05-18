@@ -47,13 +47,14 @@ Gate results:
 - `CF-W1-SIG-02`: Team 04 QA planning `ACCEPT/READY`; implementation remains sequencing-controlled against parked `CF-W1-SIG-TRIGGER-02A` commit `788c237`.
 - `CF-W1-SIG-02`: Team 00 sequencing decision is to stack implementation on accepted parked `CF-W1-SIG-TRIGGER-02A` commit `788c237`.
 - `CF-W1-BT-01A`: Team 04 QA rerun `ACCEPT`; routed to Team 10 review.
+- `CF-W1-BT-01A`: Team 10 review `ACCEPT`; routed to Team 03 Architect Signoff.
 
 Teams ready to pick up new tasks:
 
-- Team 10: active on `CF-W1-BT-01A` review as agent `019e3d52-a856-7551-ae80-3a3d354077b4`.
-- Team 03: next Architect Signoff or architecture prep after Team 00 assignment.
+- Team 03: active on `CF-W1-BT-01A` Architect Signoff as agent `019e3d57-ee47-74e3-a2c2-dd9a3f359935`.
+- Team 03: active on `CF-W1-SQLAB-02B` proposal-only storage architecture prep as agent `019e3d57-11b7-7a01-84ef-c2dafbfe5bf4`.
 - Team 06: active on `CF-W1-SIG-02` stacked Signal Generation implementation as agent `019e3d52-a82a-7e30-a217-00abc31fdc68`.
-- Team 02: next rolling requirements discovery after Team 00 assignment.
+- Team 02: active on rolling direct investor/trader-value requirements discovery as agent `019e3d57-11ed-7bf3-8b64-2e0f7e5481b2`.
 
 Product Owner action required: no.
 
