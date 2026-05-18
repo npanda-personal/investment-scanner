@@ -1687,6 +1687,24 @@ Teams ready to pick up new tasks:
 
 ---
 
+# Team 02 Requirements Discovery Relaunched
+
+Date: 2026-05-18
+
+Team 00 spawned Team 02 for a recurring Product/Requirement discovery cycle with the Product Owner's corrected priority direction:
+
+- Agent: `019e3c0f-0b02-7182-a4eb-2c66a3b0da70`
+- Priority: market data, data quality, signals, strategy trust, calibration, backtests, historical/market context, trade-plan research support, and research evidence before admin/settings/notifications convenience.
+- Allowed writes: `10-requirements/**` and Team 02 outbox only.
+
+Teams ready to pick up new tasks:
+
+- Team 00: `CF-W1-BT-02` delegated PO acceptance and scoped commit if Architect Signoff accepts.
+- Team 10: `CF-W1-CAL-01` review after QA accepts.
+- Team 03: next architecture-prep candidate after Team 02 output.
+
+---
+
 # CAL-01 QA Planning Dispatch
 
 Date: 2026-05-18

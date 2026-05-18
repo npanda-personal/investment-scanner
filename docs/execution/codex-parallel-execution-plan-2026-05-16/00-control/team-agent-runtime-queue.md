@@ -1339,6 +1339,34 @@ Date: 2026-05-18
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Team 03 - Architect Signoff | `019e3c02-4baa-77a3-a567-d5cf34e804db` | `gpt-5.4`, high | architect signoff | `CF-W1-BT-02` after Team 10 ACCEPT | active |
 | 2 | Team 04 - QA Factory | `019e3c0d-b69d-7ce2-9043-f363d350f8aa` | `gpt-5.4`, high | QA verification | `CF-W1-CAL-01` after Team 06 handoff | active |
+| 3 | Team 02 - Requirement Factory | `019e3c0f-0b02-7182-a4eb-2c66a3b0da70` | `gpt-5.4`, high | recurring requirement discovery | investor/trader-value backlog refresh | active |
+| 4 | Open slot | none | pending | review/release | `CF-W1-CAL-01` after QA accepts | waiting |
+| 5 | Open slot | none | pending | PO packet / commit | `CF-W1-BT-02` after Architect Signoff acceptance | waiting |
+| 6 | Open slot | none | pending | next architecture prep | next market-data/signal/backtest candidate after Team 02 cycle | waiting |
+
+## Queued Agents
+
+- Team 10 review for `CF-W1-CAL-01` after Team 04 ACCEPT.
+- Team 03 architecture prep for the next highest-value Team 02 candidate after Team 02 completes its refresh.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 00 is ready for `CF-W1-BT-02` delegated PO acceptance and scoped commit if Architect Signoff accepts.
+- Team 10 is ready for `CF-W1-CAL-01` review after QA accepts.
+- Team 03 is ready for the next architecture-prep candidate after Team 02 output.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 03 - Architect Signoff | `019e3c02-4baa-77a3-a567-d5cf34e804db` | `gpt-5.4`, high | architect signoff | `CF-W1-BT-02` after Team 10 ACCEPT | active |
+| 2 | Team 04 - QA Factory | `019e3c0d-b69d-7ce2-9043-f363d350f8aa` | `gpt-5.4`, high | QA verification | `CF-W1-CAL-01` after Team 06 handoff | active |
 | 3 | Open slot | none | pending | review/release | `CF-W1-CAL-01` after QA accepts | waiting |
 | 4 | Open slot | none | pending | PO packet / commit | `CF-W1-BT-02` after Architect Signoff acceptance | waiting |
 | 5 | Open slot | none | pending | requirements discovery | next persistent Team 02 cycle, investor/trader-value first | ready |
