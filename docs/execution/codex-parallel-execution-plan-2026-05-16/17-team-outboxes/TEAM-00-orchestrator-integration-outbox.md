@@ -674,8 +674,8 @@ Human Product Owner action is required only when those delegated roles cannot pr
 - Team 07: `CF-W1-L3-PORT-01A` rework.
 - Team 02: requirement/refinement queue maintenance.
 - Team 03: architecture/readiness prep.
+- Team 06: `CF-W1-TP-01B` readiness inspection.
 - Team 05: `CF-W1-MD-01` validation-only readiness inspection.
-- Team 08: `CF-W1-UX-02` / `CF-W1-UX-05` Copilot-only source mapping.
 - Team 09: `CF-W1-NOTIF-02`, `CF-W1-AUTH-01`, `CF-W1-SUB-01` readiness inspection.
 
 ## Queued Pool
@@ -683,7 +683,7 @@ Human Product Owner action is required only when those delegated roles cannot pr
 - Team 04: QA rerun after Team 07 rework.
 - Team 10: release re-review after Team 04 evidence.
 - Team 03: Architect Signoff after release re-review passes.
-- Team 06: `CF-W1-TP-01B` readiness or implementation after Team 00 promotion / slot availability.
+- Team 08: `CF-W1-UX-02` / `CF-W1-UX-05` Copilot-only source mapping after a slot opens.
 
 ## Runtime Queue Doc
 

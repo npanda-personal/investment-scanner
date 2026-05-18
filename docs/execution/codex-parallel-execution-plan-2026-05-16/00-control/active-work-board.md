@@ -74,8 +74,8 @@ Operating rules:
 | --- | --- |
 | Current daemon cycle id | `DAEMON-20260517` |
 | Current rolling iteration count | 22 |
-| Active teams | Team 00 spawned-subagent runtime pool; Teams 07/02/03/05/08/09 planned as first active subagents |
-| Queued teams | Team 04 QA rerun for `CF-W1-L3-PORT-01A`; Team 10 re-review for `CF-W1-L3-PORT-01A`; Team 03 Architect Signoff; Team 06 `CF-W1-TP-01B` readiness/implementation when promoted |
+| Active teams | Team 00 spawned-subagent runtime pool; Teams 07/02/03/06/05/09 planned as first active subagents |
+| Queued teams | Team 04 QA rerun for `CF-W1-L3-PORT-01A`; Team 10 re-review for `CF-W1-L3-PORT-01A`; Team 03 Architect Signoff; Team 08 Copilot trust/copy source mapping |
 | Idle teams | None fully idle; implementation lanes without Ready work stay docs-only |
 | Blocked teams | No team fully blocked; no open Decision Inbox items; source/test work remains blocked by missing Team 00 Ready promotion for all children except `CF-W1-L3-PORT-01A` |
 | Teams relaunched this cycle | Team 01 audit consumed; Teams 02, 03, 04, 06, 07, and 09 reassigned through current inbox files |

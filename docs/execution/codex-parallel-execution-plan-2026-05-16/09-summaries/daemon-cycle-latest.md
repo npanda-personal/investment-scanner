@@ -38,8 +38,8 @@ Date: 2026-05-18
 - Decision inbox count: 0 open decisions
 - Refinement queue depth: 12 active unique refinement / near-ready items
 - Active spawned subagent limit: 6
-- Active spawned subagents planned: Teams 07, 02, 03, 05, 08, 09
-- Queued spawned subagents: Team 04, Team 10, Team 03 Architect Signoff, Team 06
+- Active spawned subagents planned: Teams 07, 02, 03, 06, 05, 09
+- Queued spawned subagents: Team 04, Team 10, Team 03 Architect Signoff, Team 08
 
 ## Decision Resolution
 
@@ -82,7 +82,7 @@ Daemon should continue autonomous work.
 ## Next Assignments
 
 1. Spawn Team 07 to revise `CF-W1-L3-PORT-01A` in the existing dedicated worktree.
-2. Spawn Teams 02, 03, 05, 08, and 09 for non-conflicting readiness/refinement work.
+2. Spawn Teams 02, 03, 06, 05, and 09 for non-conflicting readiness/refinement work.
 3. Queue Team 04 for QA rerun immediately after Team 07 completes.
 4. Queue Team 10 for release re-review immediately after Team 04 returns evidence.
 5. Continue post-decision packet refresh for `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, and `CF-W1-MD-01`.
