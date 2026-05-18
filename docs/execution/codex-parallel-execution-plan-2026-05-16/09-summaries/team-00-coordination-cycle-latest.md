@@ -1177,3 +1177,37 @@ Team 03 Architecture Factory is now active:
 ## Next Coordination Action
 
 Record this dispatch, then continue monitoring Team 06 and Team 03.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
+## BT-02 Rework Complete
+
+Team 06 completed bounded `CF-W1-BT-02` rework in the Team 06 worktree.
+
+Developer validation reported:
+
+- `npm.cmd test -- backtesting-strategy-lab.service.test.ts --runInBand` passed.
+- `npm.cmd run build` in backend passed.
+- `npm.cmd run test:ui -- backtesting-strategy-lab.spec.ts --workers=1` passed against the Team 06 source-synchronized frontend target.
+- `npm.cmd run build` in frontend passed with existing chunk-size warning only.
+
+## Active / Next
+
+- Team 03 `019e3bea-4818-7fa0-aea0-f0f8b4d13bfb`: `CF-W1-CAL-01` architecture prep remains active.
+- Team 04 QA rerun for `CF-W1-BT-02` is ready to spawn.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-BT-02` QA rerun now.
+- Team 10: `CF-W1-BT-02` review after QA accepts.
+- Team 03: `CF-W1-BT-02` Architect Signoff after Team 10 accepts.
+- Team 04: `CF-W1-CAL-01` QA planning after Team 03 output.
+- Team 02: next persistent requirement discovery cycle when a slot opens.
+
+## Next Coordination Action
+
+Commit this routing update if staged scope is clean, then spawn Team 04 for `CF-W1-BT-02` QA rerun.

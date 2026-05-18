@@ -253,6 +253,73 @@ Date: 2026-05-18
 
 ## Assignment
 
+Run QA rerun for `CF-W1-BT-02` after Team 06 bounded rework.
+
+This latest override supersedes older QA-planning tails above. Team 06 reports the QA-rejection rework is complete and developer validation passed. Verify executable behavior in the same Team 06 worktree before Team 10 review.
+
+## Branch / Worktree
+
+- Branch: `codex/team06-strategy-signal/CF-W1-BT-02`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-BT-02`
+
+## Evidence To Review
+
+- Developer handoff: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-BT-02-developer-handoff.md`
+- Prior QA evidence: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-BT-02-qa-verification.md`
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-BT-02-backtesting-outcome-review-traceability-requirement.md`
+- Contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-BT-02-backtesting-outcome-review-traceability-contract.md`
+- QA plan: `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-BT-02-qa-plan.md`
+
+## QA Focus
+
+Verify the two rejected behaviors are fixed:
+
+1. trusted-review fixture returns `TRUSTED_REVIEW`, not `DIAGNOSTIC_ONLY`, and does not add false `NO_TRADES_GENERATED` from missing in-memory rows when persisted aggregate evidence exists;
+2. legacy-invalid saved-run UI renders `Review Disposition` evidence for `WITHHELD` fields in list and detail surfaces.
+
+Also confirm existing acceptance coverage still holds for `PARTIAL_REVIEW`, `DIAGNOSTIC_ONLY`, `LEGACY_REPAIRED`, `WITHHELD`, list/detail reason-summary consistency, research-support language, and no forbidden scope.
+
+## Allowed Writes
+
+Only in the Team 06 worktree:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-BT-02-qa-rerun-verification.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+Do not edit application source/tests unless Team 00 explicitly reassigns QA to fix its own test harness. Do not commit.
+
+## Required Commands
+
+Run in the Team 06 worktree:
+
+```powershell
+cd C:\work\repo\investment-scanner-worktrees\team06-CF-W1-BT-02\backend
+npm.cmd test -- backtesting-strategy-lab.service.test.ts --runInBand
+npm.cmd run build
+```
+
+Run because frontend files changed:
+
+```powershell
+cd C:\work\repo\investment-scanner-worktrees\team06-CF-W1-BT-02\frontend
+npm.cmd run test:ui -- backtesting-strategy-lab.spec.ts --workers=1
+npm.cmd run build
+```
+
+Use a source-synchronized frontend target. Do not rely on an unrelated long-running `5173` server if it is stale. If sandbox restrictions block Playwright, record the exact blocker and command.
+
+## Output
+
+Return `ACCEPT` or `REJECT`, commands run/results, scenario evidence, changed-file scope confirmation, skipped checks and reasons, residual risks, and whether Team 10 review can proceed.
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
 Run QA Verification for `CF-W1-HCTX-01` in the dedicated Team 05 worktree.
 
 This is independent from the active `CF-W1-BT-02` QA gate because it uses a separate worktree and a separate backend module. Do not edit application source/tests. Do not install packages or alter manifests.

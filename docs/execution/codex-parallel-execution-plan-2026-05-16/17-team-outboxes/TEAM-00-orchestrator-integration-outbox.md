@@ -1644,3 +1644,24 @@ Teams ready to pick up new tasks:
 - Team 04: `CF-W1-CAL-01` QA planning after Team 03 output.
 - Team 10: `CF-W1-BT-02` review after QA acceptance.
 - Team 02: next persistent market-intelligence discovery cycle when Team 00 relaunches it.
+
+---
+
+# BT-02 Rework Complete
+
+Date: 2026-05-18
+
+Team 06 completed bounded `CF-W1-BT-02` rework and developer validation passed.
+
+Team 00 routing:
+
+- Launch Team 04 QA rerun in `../investment-scanner-worktrees/team06-CF-W1-BT-02`.
+- If QA accepts, route to Team 10 review.
+- If QA rejects, return only the affected `BT-02` workstream to Team 06 unless a true consent blocker appears.
+
+Teams ready to pick up new tasks:
+
+- Team 04: `CF-W1-BT-02` QA rerun now.
+- Team 10: `CF-W1-BT-02` review after QA acceptance.
+- Team 03: `CF-W1-BT-02` Architect Signoff after Team 10 acceptance.
+- Team 04: `CF-W1-CAL-01` QA planning after Team 03 output.
