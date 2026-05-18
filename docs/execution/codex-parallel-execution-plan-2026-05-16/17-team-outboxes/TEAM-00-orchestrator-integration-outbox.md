@@ -50,9 +50,9 @@ Gate results:
 
 Teams ready to pick up new tasks:
 
-- Team 10: `CF-W1-BT-01A` review.
+- Team 10: active on `CF-W1-BT-01A` review as agent `019e3d52-a856-7551-ae80-3a3d354077b4`.
 - Team 03: next Architect Signoff or architecture prep after Team 00 assignment.
-- Team 06: `CF-W1-SIG-02` stacked Signal Generation implementation after worktree setup.
+- Team 06: active on `CF-W1-SIG-02` stacked Signal Generation implementation as agent `019e3d52-a82a-7e30-a217-00abc31fdc68`.
 - Team 02: next rolling requirements discovery after Team 00 assignment.
 
 Product Owner action required: no.

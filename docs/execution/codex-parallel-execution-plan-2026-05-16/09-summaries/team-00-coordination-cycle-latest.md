@@ -51,12 +51,13 @@ Team 02 completed a rolling direct-value requirements cycle and added `CF-W1-SQL
 
 ## Active Agents
 
-No active spawned agents at this checkpoint before the next launch wave.
+- Team 06 `019e3d52-a82a-7e30-a217-00abc31fdc68`: `CF-W1-SIG-02` stacked Signal Generation implementation.
+- Team 10 `019e3d52-a856-7551-ae80-3a3d354077b4`: `CF-W1-BT-01A` review.
 
 ## Teams Ready To Pick Up New Tasks
 
-- Team 10: `CF-W1-BT-01A` review.
-- Team 06: `CF-W1-SIG-02` stacked Signal Generation implementation after worktree setup.
+- Team 10: active on `CF-W1-BT-01A` review.
+- Team 06: active on `CF-W1-SIG-02` stacked Signal Generation implementation.
 - Team 03: available for the next Architect Signoff or architecture-prep assignment.
 - Team 02: next rolling requirements discovery cycle after Team 00 assigns it.
 - Team 00: Ready evaluation for `CF-W1-RH-01` or `CF-W1-L3-TREV-02` when current gate pressure clears.
