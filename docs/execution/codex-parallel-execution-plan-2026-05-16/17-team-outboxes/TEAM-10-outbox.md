@@ -6,6 +6,92 @@ Team: TEAM-10 - Review / Release
 
 State: `CF-W1-NOTIF-02` preaccepted by code review with QA blocker; release acceptance blocked pending focused runtime verification.
 
+## 2026-05-18 `CF-W1-UX-01A` Review / Release Gate
+
+Team 10 reviewed the Team 08 developer handoff in branch `codex/team08-ux-research/CF-W1-UX-01A` at worktree `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-UX-01A`.
+
+### Review Decision
+
+`ACCEPT`
+
+Architect Signoff may proceed.
+
+### Findings
+
+No blocking findings.
+
+Acceptance notes:
+
+- Reserved-scope compliance is intact. `git status --short` in the Team 08 worktree shows only the approved feature files plus Team 08 / Team 04 evidence docs and the expected integration handoff/QA files.
+- The new trust surface stays inside the feature boundary. `frontend/src/features/stock-research-workbench/types.ts:49` adds only feature-local trust-surface types, and `frontend/src/features/stock-research-workbench/components/StockResearchWorkbenchPage.tsx:67` builds the trust state only from existing `trust`, `overview`, `chart`, and requested market scope values.
+- Requested scope is explicitly framed as unverified, not proven scope. See `StockResearchWorkbenchPage.tsx:250`, `:264`, and `:294`.
+- `COMPLETE` remains limited context, not trusted or action-ready. See `StockResearchWorkbenchPage.tsx:94`, `:95`, and `:256`.
+- `PARTIAL` / `DELAYED` produce warning reasons without promoting downstream eligibility. See `StockResearchWorkbenchPage.tsx:88` to `:93`, `:286` to `:295`.
+- `MISSING` / `ERROR` produce blocked context with page-owned downstream suppression only. See `StockResearchWorkbenchPage.tsx:82` to `:87`, `:276` to `:305`.
+- Widget internals and shared files remain untouched. The reviewed worktree status shows no edits under `frontend/src/features/signal-generation-engine/**`, `frontend/src/features/strategy-decision-engine/**`, `frontend/src/shared/**`, routes, backend, Prisma, or package manifests.
+- Team 04 QA evidence is sufficient for this child. The QA packet documents the initial sandbox `EPERM`, the false-negative replay against an unrelated app on `5173`, and the final passing rerun against the Team 08 frontend instance on `http://127.0.0.1:5174`, with frontend build pass and focused UI smoke pass recorded in `18-integration-queue/CF-W1-UX-01A-qa-verification.md`.
+
+### Scope Evidence
+
+Approved application files reviewed:
+
+- `frontend/src/features/stock-research-workbench/components/StockResearchWorkbenchPage.tsx`
+- `frontend/src/features/stock-research-workbench/types.ts`
+- `frontend/tests/ui/stock-research-workbench.spec.ts`
+
+Additional bounded evidence docs reviewed:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-08-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-UX-01A-developer-handoff.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-UX-01A-qa-verification.md`
+
+No forbidden-file edits were found in backend source/tests, shared UI, route registries, Signal/Strategy widget internals, Prisma/schema/migrations, generated files, providers/startup/live-provider paths, package manifests, paid/cloud/broker paths, or telemetry.
+
+### Validation
+
+Commands run by Team 10:
+
+- read root `AGENTS.md`
+- read active work board, requirement, architecture review, contract, work packet, Team 08 assignment, developer handoff, Team 04 QA plan, Team 04 QA verification, and Team 08 / Team 04 outboxes
+- `git status --short`
+- `git diff --stat`
+- `git diff -- frontend/src/features/stock-research-workbench/components/StockResearchWorkbenchPage.tsx frontend/src/features/stock-research-workbench/types.ts frontend/tests/ui/stock-research-workbench.spec.ts`
+- `git diff --check -- frontend/src/features/stock-research-workbench/components/StockResearchWorkbenchPage.tsx frontend/src/features/stock-research-workbench/types.ts`
+- `rg -n -i "\b(trusted|ready|verified scope|data quality passed|eligible signal|eligible decision|reliable|safe to trade|buy now|sell now|must buy|must sell|profit target|price target|guaranteed|recommendation quality)\b" frontend/src/features/stock-research-workbench/components/StockResearchWorkbenchPage.tsx frontend/src/features/stock-research-workbench/types.ts frontend/tests/ui/stock-research-workbench.spec.ts`
+- `Get-Counter '\Memory\% Committed Bytes In Use'`
+
+Results:
+
+- Memory gate before review checks: approximately `74.95%`.
+- `git diff --check` returned no whitespace errors; only CRLF normalization warnings were emitted.
+- Product-language scan matched only the negative assertions inside the new Playwright spec, not production UI copy.
+
+Tests/build were not rerun by Team 10 because Team 04 already recorded a passing frontend build and focused UI smoke run for:
+
+- `npm.cmd run build`
+- `npm.cmd run test:ui -- stock-research-workbench.spec.ts --workers=1`
+
+### Release Risk
+
+Residual release risk is low for this narrowed child.
+
+Known non-blocking residual risk:
+
+- The parent `CF-W1-UX-01` backend trust-evidence gaps still remain by design. This child does not and should not claim verified scope, Data Quality readiness, latest trusted data date, or downstream eligibility proof.
+- Shared local frontend ports can cause false-negative UI replay if reviewers target `5173` instead of the Team 08 worktree app instance.
+
+### Next Gate
+
+Architect Signoff may proceed.
+
+### Teams Ready To Pick Up New Tasks
+
+- Team 08
+- Team 04
+- Team 10
+- Team 00
+
 ## 2026-05-18 `CF-W1-NOTIF-02` Review / Release Gate
 
 Team 10 reviewed the Team 09 developer handoff in branch `codex/team09-platform/CF-W1-NOTIF-02` at worktree `C:\work\repo\investment-scanner-worktrees\team09-CF-W1-NOTIF-02`.

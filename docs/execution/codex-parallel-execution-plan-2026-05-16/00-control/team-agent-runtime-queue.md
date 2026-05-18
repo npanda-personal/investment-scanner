@@ -559,3 +559,33 @@ Date: 2026-05-18
 - Team 03 is ready for `CF-W1-UX-01A` Architect Signoff after Team 10 accepts.
 - Team 02 is ready to relaunch persistent PO/Requirements discovery.
 - Team 03 / Team 04 can prep the next highest-value docs-only packet in parallel if it does not share files with active UX review evidence.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Completed Since Previous Snapshot
+
+- `CF-W1-UX-01A`: Team 04 QA, Team 10 review, Team 03 Architect Signoff, delegated PO acceptance, and scoped local branch commit completed as `246d5a3 feat: add workbench trust framing`.
+- Team 02 completed a docs-only priority refresh and recommended `CF-W1-AUTH-01` as the next Team 00 promotion candidate.
+
+## Current Pool
+
+| Slot | Team | Agent | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Open slot | none | Ready evaluation | `CF-W1-AUTH-01` sequencing with `CF-W1-SUB-01` | ready |
+| 2 | Open slot | none | implementation | Team 09 after `CF-W1-AUTH-01` Ready promotion | waiting |
+| 3 | Open slot | none | QA | next accepted implementation handoff | waiting |
+| 4 | Open slot | none | review | next QA-accepted handoff | waiting |
+| 5 | Open slot | none | architecture / QA prep | `CF-W1-HCTX-01` or `CF-W1-MCTX-01` after Team 00 assignment | ready |
+| 6 | Open slot | none | PO + requirements discovery | next discovery cycle after Team 00 consumes current output | ready |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03 is ready for architecture/readiness checks on `CF-W1-AUTH-01`, `CF-W1-HCTX-01`, or `CF-W1-MCTX-01`.
+- Team 09 can take `CF-W1-AUTH-01` only after Team 00 confirms Ready gates and sequencing with `CF-W1-SUB-01`.
+- Team 04 is ready for the next QA packet or QA verification.
+- Team 10 is ready for the next review/release gate.
+- Team 02 is ready for another requirements discovery cycle after Team 00 consumes this output.
