@@ -10,6 +10,8 @@ No available application-code item is currently waiting unassigned in Ready.
 
 `CF-W1-HCTX-01` is promoted and assigned to Team 05 for a bounded backend-only `historical-context-snapshots` implementation in a dedicated worktree.
 
+`CF-W1-CAL-01` is promoted and assigned to Team 06 for a bounded backend-only `signal-calibration-engine` implementation in a dedicated worktree.
+
 2026-05-18 Team 00 promotion update:
 
 - `CF-W1-BT-02` is promoted after Team 03 refreshed the narrowed architecture/contract/work packet and Team 04 accepted the narrowed QA plan. Implementation is limited to canonical run-level review disposition plus shared saved-list/detail reason summary.
@@ -44,6 +46,7 @@ No available application-code item is currently waiting unassigned in Ready.
 | `CF-W1-DQ-02A` | Team 05 - Market Data / Data Quality | `codex/team05-market-data/CF-W1-DQ-02A` | `../investment-scanner-worktrees/team05-CF-W1-DQ-02A` | Backend-only DQE currentness evidence and fail-closed propagation | Accepted and locally committed as `c2d6753`; awaiting later clean `dev` integration |
 | `CF-W1-BT-02` | Team 06 - Strategy / Signal / Risk | `codex/team06-strategy-signal/CF-W1-BT-02` | `../investment-scanner-worktrees/team06-CF-W1-BT-02` | Backtesting canonical review disposition and saved-list/detail reason-summary normalization | Promoted and assigned to Team 06 |
 | `CF-W1-HCTX-01` | Team 05 - Market Data / Data Quality | `codex/team05-market-data/CF-W1-HCTX-01` | `../investment-scanner-worktrees/team05-CF-W1-HCTX-01` | Backend-only Historical Context lookup explainability and provenance labeling | Promoted and assigned to Team 05 |
+| `CF-W1-CAL-01` | Team 06 - Strategy / Signal / Risk | `codex/team06-strategy-signal/CF-W1-CAL-01` | `../investment-scanner-worktrees/team06-CF-W1-CAL-01` | Backend-only Signal Calibration readiness trust-state and DQ hard-block framing | Promoted and assigned to Team 06 |
 | `CF-W1-L3-PORT-01A` | Team 07 - Portfolio / Watchlist / Alerts | `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A` | `../investment-scanner-worktrees/team07-CF-W1-L3-PORT-01A` | Backend-only portfolio-management readiness DTOs | Rejected / Rework after Team 10 review; Team 07 revision pending |
 | `CF-W1-TP-01B` | Team 06 - Strategy / Signal / Risk | `codex/team06-strategy-signal/CF-W1-TP-01B` | `../investment-scanner-worktrees/team06-CF-W1-TP-01B` | Backend-only Trade Plan DQ hard-block and target compatibility | Implemented in worktree; Team 10 review pending |
 | `CF-W1-NOTIF-02` | Team 09 - Platform / Auth / Subscription / Notifications | `codex/team09-platform/CF-W1-NOTIF-02` | `../investment-scanner-worktrees/team09-CF-W1-NOTIF-02` | Backend-only local notification log redaction | Ready and pulled by Team 09 for implementation |
@@ -212,6 +215,90 @@ npm.cmd run build
 ```
 
 Stop and return to Team 00 if implementation requires repository/controller/router/validation/index edits, schema/generated/route/shared/package/frontend/provider/startup/live changes, upstream Market Context, Smart Money, Market Data, Signal Calibration, or Signal Quality source changes, or a semantic rewrite of nearest-snapshot lookup.
+
+## Active Ready Handoff - `CF-W1-CAL-01`
+
+Date promoted: 2026-05-18
+
+Team 00 evaluated `CF-W1-CAL-01` against Ready gates and promoted it as an independent Team 06 backend-only implementation slice.
+
+Gate evidence:
+
+- Requirement: `10-requirements/CF-W1-CAL-01-signal-calibration-reliability-drift-requirement.md`
+- Architecture review: `03-architecture/CF-W1-CAL-01-architecture-review.md`
+- Contract: `06-contracts/CF-W1-CAL-01-signal-calibration-reliability-drift-contract.md`
+- Work packet: `08-work-packets/CF-W1-CAL-01-work-packet.md`
+- QA plan: `04-qa/CF-W1-CAL-01-qa-plan.md`
+- Team 03 architecture outbox: `17-team-outboxes/TEAM-03-architecture-factory.md`
+- Team 04 QA outbox: `17-team-outboxes/TEAM-04-qa-factory.md`
+- Open decisions: none.
+- Shared/high-risk blocker: none if implementation stays inside the reserved `signal-calibration-engine` files.
+
+Branch/worktree:
+
+- Branch: `codex/team06-strategy-signal/CF-W1-CAL-01`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-CAL-01`
+
+Allowed files:
+
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.service.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.types.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md`
+- `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.service.test.ts`
+
+Optional only if endpoint-level additive payload assertions are needed:
+
+- `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.routes.test.ts`
+
+Allowed branch-local evidence docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-CAL-01-developer-handoff.md`
+
+Forbidden files:
+
+- `backend/src/modules/signal-calibration-engine/index.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.repository.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.controller.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.router.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.validation.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.module.ts`
+- `backend/src/modules/signal-quality-lab/**`
+- `backend/src/modules/data-quality-engine/**`
+- `backend/src/modules/historical-context-snapshots/**`
+- Prisma schema or migrations
+- backend or frontend route registries
+- shared backend utilities or shared DTOs
+- shared frontend components
+- package manifests
+- generated files
+- frontend source/tests
+- providers, startup/backfill, live-provider, Angel One, broker, paid/cloud, telemetry, or automation flows
+
+Required behavior:
+
+- add additive calibration trust-state metadata inside existing `calibrationReadiness`;
+- represent trusted, limited, diagnostic-only, unavailable-no-evidence, and unavailable-blocking-DQ states;
+- fail closed for `eligibleForCalibration=false`, `eligibleForSignals=false`, `NOT_READY`, `UNUSABLE`, and `ILLIQUID`;
+- preserve existing score math, readiness/evidence fields, route behavior, response compatibility, and research-support language;
+- do not change Signal Quality Lab, Data Quality Engine, Historical Context, route contracts, schema, frontend, shared files, packages, or generated files.
+
+Focused validation command:
+
+```powershell
+cd backend
+npm.cmd test -- signal-calibration-engine.service.test.ts --runInBand
+npm.cmd run build
+```
+
+If route-level payload assertions are added:
+
+```powershell
+cd backend
+npm.cmd test -- signal-calibration-engine.service.test.ts signal-calibration-engine.routes.test.ts --runInBand
+```
+
+Stop and return to Team 00 if implementation requires any forbidden file, DQE/HCTX/SQLAB source changes, schema/generated/route/shared/package/frontend/provider/startup/live-provider scope, score-math rewrites, or vague missing-DQ/blocking-DQ messaging that does not preserve the QA-plan distinctions.
 
 ## Active Ready Handoff - `CF-W1-AUTH-SUB-01`
 

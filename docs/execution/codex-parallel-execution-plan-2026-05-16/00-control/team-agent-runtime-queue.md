@@ -1141,3 +1141,31 @@ Date: 2026-05-18
 - Team 06 can implement `CF-W1-CAL-01` if Team 00 promotes the bounded calibration slice.
 - Team 10 is ready for `CF-W1-BT-02` review after QA accepts.
 - Team 02 is ready for another persistent market-intelligence discovery cycle when a slot opens.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Ready Promotion
+
+`CF-W1-CAL-01` is promoted for Team 06 implementation.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | `019e3bef-6ec0-7d73-aa02-ccfaa1cdab49` | `gpt-5.4`, high | QA rerun | `CF-W1-BT-02` after Team 06 rework | active |
+| 2 | Team 06 - Strategy / Signal / Risk | pending spawn | `gpt-5.3-codex`, high | implementation | `CF-W1-CAL-01` | ready |
+| 3 | Open slot | none | pending | QA verification | `CF-W1-CAL-01` after Team 06 handoff | waiting |
+| 4 | Open slot | none | pending | review/release | next QA-accepted handoff | waiting |
+| 5 | Open slot | none | pending | architect signoff | next Team 10 accepted handoff | waiting |
+| 6 | Open slot | none | pending | requirements discovery | next persistent Team 02 cycle | ready |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06 is ready to implement `CF-W1-CAL-01`.
+- Team 04 is ready for `CF-W1-CAL-01` QA after Team 06 handoff.
+- Team 10 is ready for `CF-W1-BT-02` review after QA accepts.
+- Team 02 is ready for another persistent market-intelligence discovery cycle when relaunched.

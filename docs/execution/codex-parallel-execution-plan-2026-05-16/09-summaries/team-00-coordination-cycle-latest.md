@@ -1295,3 +1295,37 @@ Team 04 completed docs-only `CF-W1-CAL-01` QA planning:
 ## Next Coordination Action
 
 Commit the CAL QA-planning packet and run Team 00 Ready evaluation for `CF-W1-CAL-01`.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
+## CAL-01 Ready Promotion
+
+Team 00 evaluated `CF-W1-CAL-01` against Ready gates and promoted it for bounded Team 06 implementation.
+
+Gate result:
+
+- Requirement exists and has acceptance criteria.
+- Team 03 architecture review, contract, and work packet return `Ready candidate`.
+- Team 04 QA plan is ready.
+- Open decisions: 0.
+- Shared/high-risk blockers: none if implementation stays inside reserved `signal-calibration-engine` files.
+
+Branch/worktree:
+
+- Branch: `codex/team06-strategy-signal/CF-W1-CAL-01`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-CAL-01`
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06: `CF-W1-CAL-01` implementation now.
+- Team 04: `CF-W1-CAL-01` QA after Team 06 handoff.
+- Team 10: `CF-W1-BT-02` review after QA accepts.
+- Team 02: next persistent requirement discovery cycle when relaunched.
+
+## Next Coordination Action
+
+Commit the CAL Ready promotion docs, create the Team 06 CAL worktree, and spawn Team 06 implementation.

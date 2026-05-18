@@ -1700,6 +1700,26 @@ Teams ready to pick up new tasks:
 - Team 10: `CF-W1-BT-02` review after QA acceptance.
 - Team 02: next persistent market-intelligence discovery cycle when relaunched.
 
+---
+
+# CAL-01 Ready Promotion
+
+Date: 2026-05-18
+
+Team 00 promoted `CF-W1-CAL-01` for bounded Team 06 implementation.
+
+Branch/worktree:
+
+- Branch: `codex/team06-strategy-signal/CF-W1-CAL-01`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-CAL-01`
+
+Teams ready to pick up new tasks:
+
+- Team 06: `CF-W1-CAL-01` implementation now.
+- Team 04: `CF-W1-CAL-01` QA after Team 06 handoff.
+- Team 10: `CF-W1-BT-02` review after QA acceptance.
+- Team 02: next persistent market-intelligence discovery cycle when relaunched.
+
 ## Dispatch Result
 
 Spawned Team 04 QA Factory:

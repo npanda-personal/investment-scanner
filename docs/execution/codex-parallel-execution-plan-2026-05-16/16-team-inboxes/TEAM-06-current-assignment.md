@@ -370,6 +370,110 @@ Date: 2026-05-18
 
 ## Assignment
 
+Implement `CF-W1-CAL-01` in a dedicated Team 06 worktree after Team 00 Ready promotion.
+
+This latest override supersedes older Team 06 assignment tails above. `CF-W1-BT-02` remains in Team 04 QA rerun in its own worktree. Do not edit that worktree or reuse its files.
+
+## Branch / Worktree
+
+- Branch: `codex/team06-strategy-signal/CF-W1-CAL-01`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-CAL-01`
+
+## Work Item
+
+`CF-W1-CAL-01` - Signal Calibration readiness trust-state and DQ hard-block framing.
+
+## Evidence To Use
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-CAL-01-signal-calibration-reliability-drift-requirement.md`
+- Architecture review: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-CAL-01-architecture-review.md`
+- Contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-CAL-01-signal-calibration-reliability-drift-contract.md`
+- Work packet: `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-CAL-01-work-packet.md`
+- QA plan: `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-CAL-01-qa-plan.md`
+- Ready queue handoff: `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/ready-for-implementation.md`
+
+## Allowed Files
+
+You may edit only:
+
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.service.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.types.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md`
+- `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.service.test.ts`
+
+Optional only if endpoint-level additive payload assertions are needed:
+
+- `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.routes.test.ts`
+
+Allowed reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-CAL-01-developer-handoff.md`
+
+## Forbidden Files
+
+Do not edit:
+
+- `backend/src/modules/signal-calibration-engine/index.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.repository.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.controller.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.router.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.validation.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.module.ts`
+- `backend/src/modules/signal-quality-lab/**`
+- `backend/src/modules/data-quality-engine/**`
+- `backend/src/modules/historical-context-snapshots/**`
+- Prisma schema or migrations
+- backend or frontend route registries
+- shared backend utilities or shared DTOs
+- shared frontend components
+- package manifests
+- generated files
+- frontend source/tests
+- providers, startup/backfill, live-provider, Angel One, broker, paid/cloud, telemetry, or automation flows
+
+## Implementation Requirements
+
+- Add additive calibration trust-state metadata inside existing `calibrationReadiness`.
+- Represent trusted, limited, diagnostic-only, unavailable-no-evidence, and unavailable-blocking-DQ states.
+- Fail closed for `eligibleForCalibration=false`, `eligibleForSignals=false`, `NOT_READY`, `UNUSABLE`, and `ILLIQUID`.
+- Keep missing-DQ and blocking-DQ reasons distinct and explicit.
+- Preserve existing score math, current readiness/evidence fields, route behavior, response compatibility, and research-support language.
+- Do not change Signal Quality Lab, Data Quality Engine, Historical Context, route contracts, schema, frontend, shared files, packages, or generated files.
+
+## Focused Validation
+
+Run after implementation:
+
+```powershell
+cd backend
+npm.cmd test -- signal-calibration-engine.service.test.ts --runInBand
+npm.cmd run build
+```
+
+If route-level payload assertions are added:
+
+```powershell
+cd backend
+npm.cmd test -- signal-calibration-engine.service.test.ts signal-calibration-engine.routes.test.ts --runInBand
+```
+
+## Stop Conditions
+
+Stop and return to Team 00 if implementation requires any forbidden file, DQE/HCTX/SQLAB source changes, schema/generated/route/shared/package/frontend/provider/startup/live-provider scope, score-math rewrites, or vague missing-DQ/blocking-DQ messaging that does not preserve the QA-plan distinctions.
+
+## Expected Outbox
+
+Update `17-team-outboxes/TEAM-06-outbox.md` and `18-integration-queue/CF-W1-CAL-01-developer-handoff.md` with branch/worktree, starting commit, files changed/inspected, behavior changed, tests run, skipped checks, scope confirmation, risks, blockers, and whether Team 04 QA can proceed.
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
 Implement `CF-W1-STRAT-02A` in a dedicated Team 06 worktree after Team 00 Ready promotion.
 
 ## Branch / Worktree
