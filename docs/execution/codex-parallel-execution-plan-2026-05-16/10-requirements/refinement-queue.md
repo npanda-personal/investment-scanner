@@ -32,6 +32,17 @@ Current ordering is based on two filters:
 - `CF-W1-MD-02`
 - `CF-W1-UX-01`
 
+### Additional Discovery Candidates Added This Cycle
+
+These do not change the current top stack. They are next-wave requirement candidates created from current source gaps that still affect direct research trust and reviewability.
+
+| ID | User value | Likely owner team | Dependencies | File-conflict risk | Parallel with active Team 06 and Team 03 work? |
+| --- | --- | --- | --- | --- | --- |
+| `CF-W1-RH-01` | Research Hub actionability evidence wiring so stable upstream trust dimensions stop showing as permanent placeholders. | Team 03 prep, Team 04 QA prep, later Team 08 implementation. | `CF-W1-L3-TREV-01`, `CF-W1-TP-02`, semantic alignment with `CF-W1-SQLAB-01` / `CF-W1-CAL-01`. | Medium. Clean child is `research-hub`-local; cross-module evidence widening is the main risk. | `Yes` for docs-only prep. |
+| `CF-W1-RH-02` | Research Hub `whatChanged` traceability so delta labels have a real comparison basis. | Team 03 prep, Team 04 QA prep, later Team 08 implementation. | Best sequenced after `CF-W1-RH-01`; may split if no persisted comparison basis exists. | Medium. First child is local unless storage becomes necessary. | `Yes` for docs-only prep. |
+| `CF-W1-SMI-01` | Smart Money freshness/partial-trust semantics so accumulation/distribution labels do not overclaim completeness. | Team 03 prep, Team 04 QA prep, later Team 06 implementation. | Adjacent to `CF-W1-MD-02`, `CF-W1-HCTX-01`, and `CF-W1-MCTX-01` but does not block on them. | Medium. Module-local first child is plausible. | `Yes` for docs-only prep. |
+| `CF-W1-L3-TREV-02` | Today Review candidate snapshot provenance so detail pages show source-module evidence timing and compatibility-only gaps. | Team 03 prep, Team 04 QA prep, later Team 07 implementation. | `CF-W1-L3-TREV-01` first; keep target-language follow-on separate under `CF-W1-TP-02`. | Medium. `today-trade-review`-local if snapshot normalization does not widen. | `Yes` for docs-only prep. |
+
 Team 00 promoted `CF-W1-L3-PORT-01A` to Ready on 2026-05-18. It is no longer a refinement item.
 
 The current Ready-promotion front-runners after the PORT-01A rework routing are `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01`.
@@ -169,6 +180,17 @@ These items are not implementation-ready.
 | 8 | CF-W1-L3-WATCH-01 | Team 00/03 reservation and QA plan for prepared watchlist review-actionability packet. |
 | 9 | CF-W1-L3-INTEL-02 | Team 00/03 reservation and QA plan for portfolio intelligence review traceability. |
 | 10 | CF-W1-L3-ALERT-03 | Team 00/03 reservation and QA plan for prepared alert follow-through packet once active alert writers clear. |
+
+## Next-Wave Discovery Queue
+
+These candidates are intentionally outside the current top 10 routing stack but are now specific enough to feed a future Team 03 architecture cycle.
+
+| Rank | ID | Prep needed |
+| --- | --- | --- |
+| 11 | CF-W1-RH-01 | Team 03/04 contract and QA prep for bounded Research Hub actionability evidence wiring. |
+| 12 | CF-W1-SMI-01 | Team 03/04 contract and QA prep for Smart Money freshness and partial-trust semantics. |
+| 13 | CF-W1-L3-TREV-02 | Team 03/04 contract and QA prep for Today Review candidate snapshot provenance. |
+| 14 | CF-W1-RH-02 | Team 03/04 decision on no-schema delta basis vs later storage split for Research Hub `whatChanged`. |
 
 ## Current Priority Refinement Output
 
