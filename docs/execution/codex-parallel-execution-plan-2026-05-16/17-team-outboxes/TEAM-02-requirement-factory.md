@@ -1144,3 +1144,28 @@ No item moved to Ready.
 
 - Docs-only refinement; no builds, tests, UI checks, or live data checks run.
 - No application-code or ready-queue docs were edited.
+
+## 2026-05-18 Continuation - Calibration Reliability Follow-On Reprioritization
+
+Mode: Team 02 closed a bounded docs-only reprioritization pass to make the next post-trust-surface follow-on explicit. No application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, providers, services, or frontend files changed.
+
+### Queue Delta
+
+- Kept `CF-W1-UX-01`, `CF-W1-HCTX-01`, and `CF-W1-MCTX-01` as the current non-active trust/context focus.
+- Elevated `CF-W1-CAL-01` as the next highest user-value follow-on after that trio because calibration reliability is the most direct downstream trust refinement from the current evidence chain.
+- Left all Ready-promotion items unchanged; no item moved to Ready.
+
+### Implementation Readiness
+
+Ready work pulled: none by Team 02.
+
+No item moved to Ready.
+
+### Next Recommended Assignment
+
+Team 00 / Team 03 should keep the current trust/context trio in front of the queue, then pick up `CF-W1-CAL-01` as the next follow-on when the trio is packeted.
+
+### Validation
+
+- Docs-only reprioritization; no builds, tests, UI checks, or live data checks run.
+- No application-code or ready-queue docs were edited.

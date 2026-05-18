@@ -771,3 +771,67 @@ Start Team 04 prep with `CF-W1-DQ-02`. It is upstream, bounded, and aligns with 
 ### Validation
 
 No builds, tests, services, Prisma commands, providers, UI checks, Playwright runs, commits, or pushes were run.
+
+## Continuation - CF-W1-UX-01 Trust Surface Readiness
+
+Date: 2026-05-18
+
+State: Docs-only architecture pass complete.
+
+### Assignment
+
+Prepare architecture readiness for `CF-W1-UX-01` Stock Research Workbench trust surfaces without touching application source, tests, Prisma, route registries, package manifests, generated files, `docs/AGENTS.md`, or `docs/codex-agent-team-plan/**`.
+
+### Work Pulled
+
+No app-code work pulled.
+
+### Architecture / Contract / Work-Packet Evidence Prepared
+
+Created:
+
+- `03-architecture/CF-W1-UX-01-architecture-review.md`
+- `06-contracts/CF-W1-UX-01-stock-research-workbench-trust-surfaces-contract.md`
+- `08-work-packets/CF-W1-UX-01-work-packet.md`
+
+Updated:
+
+- `17-team-outboxes/TEAM-03-outbox.md`
+
+### Readiness Result
+
+Parent `CF-W1-UX-01` is not Ready for Implementation.
+
+One narrowed first child is architecture-ready for future Ready review:
+
+- frontend-only trust framing inside `stock-research-workbench`;
+- exact writer set: `StockResearchWorkbenchPage.tsx`, `frontend stock-research-workbench/types.ts`, and new `frontend/tests/ui/stock-research-workbench.spec.ts`;
+- no backend DTO expansion;
+- no shared UI, Signal, Strategy, route, package, Prisma, generated, provider, or active-gate-doc scope.
+
+### Recorded Boundaries
+
+- Current source proves only `source`, `last_updated_timestamp`, `data_status`, section statuses, and user-selected market scope from frontend context.
+- Current source does not prove DQ readiness, verified scope, latest trusted data date, blocker provenance, or downstream widget eligibility.
+- The first child therefore stays conservative: `COMPLETE` still renders limited context, and downstream panels remain unverified context unless blocked entirely.
+
+### Stop-Line Recorded
+
+Stop and return to Team 00 / Architect if a future implementation needs:
+
+- backend DTO or endpoint changes;
+- verified `region` / `assetType` behavior across the API boundary;
+- DQ-backed readiness or blocker evidence;
+- edits inside Signal Generation, Strategy Decision, or shared UI files.
+
+### Validation
+
+No builds, tests, services, Prisma commands, providers, UI checks, Playwright runs, commits, or pushes were run.
+
+Validation was read-only source/doc inspection plus scoped markdown authoring only.
+
+### Next Recommended Assignment
+
+- Team 04: prepare a focused `CF-W1-UX-01` UI QA plan for limited and blocked trust states.
+- Team 08 or Team 00-assigned Lane 3 frontend owner: review the narrowed first-child contract and confirm the exact page/types/UI-test reservation set.
+- Team 00: decide whether to promote the conservative frontend-only child now or hold for a later backend trust-evidence child.

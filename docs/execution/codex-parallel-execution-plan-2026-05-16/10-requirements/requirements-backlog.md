@@ -2,7 +2,7 @@
 
 Date: 2026-05-18
 
-Status: Refreshed by Team 02 after Team 03/04 post-decision readiness refresh evidence and after Team 00 promoted `CF-W1-L3-PORT-01A`. Product Owner action is not required; all other policy-resolved items remain refinement/architecture/QA-prep items only until Team 00 promotes exact implementation handoffs. After the PORT-01A rework routing, the next Ready-promotion candidates are `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-L3-ALERT-01`, and `CF-W1-L3-AUTH-03`. The current non-active discovery cycle is focused on direct research trust and context evidence: `CF-W1-UX-01`, `CF-W1-HCTX-01`, and `CF-W1-MCTX-01`, with `CF-W1-CAL-01` held as the next follow-on once those three are packeted.
+Status: Refreshed by Team 02 after Team 03/04 post-decision readiness refresh evidence and after Team 00 promoted `CF-W1-L3-PORT-01A`. Product Owner action is not required; all other policy-resolved items remain refinement/architecture/QA-prep items only until Team 00 promotes exact implementation handoffs. After the PORT-01A rework routing, the next Ready-promotion candidates are `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-L3-ALERT-01`, and `CF-W1-L3-AUTH-03`. The current non-active discovery cycle is focused on direct research trust and context evidence: `CF-W1-UX-01`, `CF-W1-HCTX-01`, and `CF-W1-MCTX-01`, with `CF-W1-CAL-01` as the next highest user-value follow-on once those three are packeted.
 
 ## New Audit-Derived Candidates
 
@@ -32,7 +32,7 @@ These are the investor/trader value priorities for this docs-only refinement cyc
 | 1 | CF-W1-UX-01 | Stock Research Workbench is already a user-facing research cockpit, but it still lacks readiness blockers, scope proof, latest trusted date, and downstream widget eligibility. | Team 03/08 product + UX contract prep for a bounded workbench trust child. |
 | 2 | CF-W1-HCTX-01 | Historical lookup provenance is too thin for post-event learning and calibration trust. | Architecture contract and QA plan for additive lookup provenance. |
 | 3 | CF-W1-MCTX-01 | Market regime labels still over-compress evidence and partial-context limits. | Architecture contract and QA plan for bounded regime-evidence framing. |
-| 4 | CF-W1-CAL-01 | Calibration trust-state drift is meaningful, but it should follow clearer upstream context evidence surfaces. | Architecture contract and QA plan after HCTX/MCTX packet prep. |
+| 4 | CF-W1-CAL-01 | Calibration trust-state drift is the next highest user-value follow-on after the current trust/context trio. | Architecture contract and QA plan after HCTX/MCTX packet prep. |
 
 ## Intake Rules
 

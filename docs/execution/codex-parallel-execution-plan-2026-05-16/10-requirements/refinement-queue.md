@@ -8,7 +8,7 @@ Team 00 promoted `CF-W1-L3-PORT-01A` to Ready on 2026-05-18. It is no longer a r
 
 The current Ready-promotion front-runners after the PORT-01A rework routing are `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01`.
 
-This non-active discovery cycle is focused on `CF-W1-UX-01`, `CF-W1-HCTX-01`, and `CF-W1-MCTX-01`, with `CF-W1-CAL-01` held as the next follow-on once the first three are packeted.
+This non-active discovery cycle is focused on `CF-W1-UX-01`, `CF-W1-HCTX-01`, and `CF-W1-MCTX-01`, with `CF-W1-CAL-01` held as the next highest user-value follow-on once the first three are packeted.
 
 ## New Audit-Derived Requirements
 
@@ -38,7 +38,7 @@ These are docs-only discovery priorities. They do not override Team 00's current
 | 1 | CF-W1-UX-01 | Research Workbench is already user-facing and still lacks readiness blockers, scope proof, latest trusted date, and downstream widget eligibility. | Team 03/08 contract prep and QA planning. |
 | 2 | CF-W1-HCTX-01 | Historical lookup provenance is still too thin for post-event learning and calibration trust. | Architecture contract and QA plan. |
 | 3 | CF-W1-MCTX-01 | Market regime labels still compress too much evidence into one chip/score. | Architecture contract and QA plan. |
-| 4 | CF-W1-CAL-01 | Calibration trust drift is still important, but it should follow clearer upstream context evidence. | Architecture contract and QA plan after HCTX/MCTX prep. |
+| 4 | CF-W1-CAL-01 | Calibration trust drift is the next highest user-value follow-on after the current trust/context trio. | Architecture contract and QA plan after HCTX/MCTX prep. |
 
 ## Decision Inbox State
 

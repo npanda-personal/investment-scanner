@@ -2,7 +2,7 @@
 
 Date: 2026-05-18
 
-Prepared by Team 02 Requirement Factory in daemon scheduler mode after prior bounded decision items were resolved, after the 2026-05-17 Product Owner resolutions for Lane 3 readiness, Trade Plan no-target/DQ hard-block behavior, and Market Data durable readiness ADR direction, and after Team 03/04 post-decision child prep. Refreshed by Team 02 on 2026-05-18 after Team 00 promoted `CF-W1-L3-PORT-01A`, routed the PORT-01A rework back through Team 07, and Team 03/04 prepared post-decision contracts, work packets, and QA refreshes. The current Ready-promotion front-runners are `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01`. This non-active discovery cycle is focused on `CF-W1-UX-01`, `CF-W1-HCTX-01`, and `CF-W1-MCTX-01`, with `CF-W1-CAL-01` next after those three are packeted.
+Prepared by Team 02 Requirement Factory in daemon scheduler mode after prior bounded decision items were resolved, after the 2026-05-17 Product Owner resolutions for Lane 3 readiness, Trade Plan no-target/DQ hard-block behavior, and Market Data durable readiness ADR direction, and after Team 03/04 post-decision child prep. Refreshed by Team 02 on 2026-05-18 after Team 00 promoted `CF-W1-L3-PORT-01A`, routed the PORT-01A rework back through Team 07, and Team 03/04 prepared post-decision contracts, work packets, and QA refreshes. The current Ready-promotion front-runners are `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01`. This non-active discovery cycle is focused on `CF-W1-UX-01`, `CF-W1-HCTX-01`, and `CF-W1-MCTX-01`, with `CF-W1-CAL-01` as the next highest user-value follow-on after those three are packeted.
 
 ## Current Cycle Non-Active Value Focus
 
@@ -13,7 +13,7 @@ These are docs-only refinement priorities for direct user trust, monitoring, and
 | 1 | CF-W1-UX-01 | Team 00/03/08 reservation and QA plan | Workbench trust is the most direct user-facing gap because the page already combines price context with signal and strategy widgets. |
 | 2 | CF-W1-HCTX-01 | Team 00/Team 03 reservation and QA plan | Historical lookup provenance is the clearest post-event learning gap in the current code. |
 | 3 | CF-W1-MCTX-01 | Team 00/Team 03 reservation and QA plan | Regime evidence still compresses partial context into one label and score. |
-| 4 | CF-W1-CAL-01 | Team 00/Team 03 reservation and QA plan | Calibration trust-state drift should follow clearer historical and market-context evidence. |
+| 4 | CF-W1-CAL-01 | Team 00/Team 03 reservation and QA plan | Calibration trust-state drift is the next highest user-value follow-on after the current trust/context trio. |
 
 ## Current Top Candidates
 
@@ -30,7 +30,7 @@ The top three Ready-promotion candidates are `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, a
 | 5 | CF-W1-L3-ALERT-03 | Team 00/Team 03 reservation and QA plan | Alert follow-through needs a bounded contract so trigger review outcomes and notes are traceable. |
 | 6 | CF-W1-L3-WATCH-01 | Team 00/Team 03 reservation and QA plan | Watchlist ideas need deterministic review-priority and reason-summary treatment before traders can action them confidently. |
 | 7 | CF-W1-L3-INTEL-03 | Team 00/Team 03 reservation and QA plan | Portfolio concentration and exposure review needs a bounded read-only contract over existing portfolio detail surfaces before traders can action it confidently. |
-| 8 | CF-W1-CAL-01 | Team 00/Team 03 reservation and QA plan | Signal calibration already exposes trust-state machinery, but DQ gaps can still look authoritative unless calibration drift is labeled. |
+| 8 | CF-W1-CAL-01 | Team 00/Team 03 reservation and QA plan | Signal calibration is the next highest user-value follow-on after the current trust/context trio, but DQ gaps can still look authoritative unless calibration drift is labeled. |
 | 9 | CF-W1-HCTX-01 | Team 00/Team 03 reservation and QA plan | Historical context snapshots need selected-snapshot provenance, lag, and gap explanation. |
 | 10 | CF-W1-MCTX-01 | Team 00/Team 03 reservation and QA plan | Regime labels need evidence, denominators, and partial-context framing before downstream consumers trust them. |
 | 11 | CF-W1-TP-01B | Team 00 Ready evaluation | Trade Plan backend compatibility/DQ hard-block contract, Team 03 reservation matrix, backend reservations, QA plan, and Team 06 readiness inspection are prepared, but no app-code slice is Ready until Team 00 gates pass. |

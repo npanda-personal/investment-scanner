@@ -2,7 +2,7 @@
 
 Date: 2026-05-18
 
-Status: Refreshed by Team 02 after Team 03/04 post-decision readiness refresh evidence and after Team 00 promoted `CF-W1-L3-PORT-01A`. This is a top-candidate list, not proof of implementation readiness. The current Ready-promotion front-runners after the PORT-01A rework routing are `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01`. This non-active discovery cycle is focused on `CF-W1-UX-01`, `CF-W1-HCTX-01`, and `CF-W1-MCTX-01`, with `CF-W1-CAL-01` next after those three are packeted. See `12-ready-queue/ready-for-implementation.md` for actual implementation-ready items.
+Status: Refreshed by Team 02 after Team 03/04 post-decision readiness refresh evidence and after Team 00 promoted `CF-W1-L3-PORT-01A`. This is a top-candidate list, not proof of implementation readiness. The current Ready-promotion front-runners after the PORT-01A rework routing are `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01`. This non-active discovery cycle is focused on `CF-W1-UX-01`, `CF-W1-HCTX-01`, and `CF-W1-MCTX-01`, with `CF-W1-CAL-01` as the next highest user-value follow-on after those three are packeted. See `12-ready-queue/ready-for-implementation.md` for actual implementation-ready items.
 
 ## Current Cycle Non-Active Value Focus
 
@@ -13,7 +13,7 @@ These are docs-only backlog priorities. They are not Ready-evaluation results.
 | 1 | CF-W1-UX-01 | Research Workbench already exposes signal and strategy context but still lacks bounded trust and eligibility framing. | Team 00/03/08 contract and QA prep. |
 | 2 | CF-W1-HCTX-01 | Historical lookup provenance is the clearest post-event learning gap. | Team 00/03 contract and QA prep. |
 | 3 | CF-W1-MCTX-01 | Regime labels still need fuller evidence and partial-context framing. | Team 00/03 contract and QA prep. |
-| 4 | CF-W1-CAL-01 | Calibration trust drift should follow clearer upstream context evidence. | Team 00/03 contract and QA prep. |
+| 4 | CF-W1-CAL-01 | Calibration trust drift is the next highest user-value follow-on after the current trust/context trio. | Team 00/03 contract and QA prep. |
 
 ## Current Top Candidates
 
@@ -28,7 +28,7 @@ There are eleven active top/refinement candidates in the current pull order afte
 | 5 | CF-W1-L3-ALERT-03 | Alert follow-through traceability | P1 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Alert inbox review needs durable outcome state so trigger follow-up is traceable beyond read/dismiss. |
 | 6 | CF-W1-L3-INTEL-03 | Portfolio Intelligence concentration review | P1 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Concentration and exposure review needs a deterministic review-priority layer over existing portfolio detail surfaces before traders can action it confidently. |
 | 7 | CF-W1-L3-WATCH-01 | Watchlist review actionability | P1 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Watchlist ideas need a deterministic review-priority and reason-summary layer before traders can action them confidently. |
-| 8 | CF-W1-CAL-01 | Signal Calibration reliability drift | P1 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Calibration already has trust-state machinery, but missing DQ and weak evidence can still look authoritative. |
+| 8 | CF-W1-CAL-01 | Signal Calibration reliability drift | P1 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Signal calibration is the next highest user-value follow-on after the current trust/context trio, but missing DQ and weak evidence can still look authoritative. |
 | 9 | CF-W1-HCTX-01 | Historical Context explainability | P1 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Historical lookups need selected-snapshot provenance, lag, and gap explanation for downstream trust. |
 | 10 | CF-W1-MCTX-01 | Market Context regime evidence | P1 | Requirement draft prepared; needs Team 00/03 architecture and QA prep | Regime labels need evidence, denominators, and partial-context framing before downstream consumers trust them. |
 | 11 | CF-W1-TP-01B | Trade Plan backend-only DQ hard-block child | P0 | Architecture, QA plan, Team 03 file-reservation matrix, and Team 06 readiness inspection prepared; needs Team 00 Ready promotion | Current Team 00 dispatch and Team 06 inspection keep this as the next Team 06 candidate after the PORT-01A routing. |
