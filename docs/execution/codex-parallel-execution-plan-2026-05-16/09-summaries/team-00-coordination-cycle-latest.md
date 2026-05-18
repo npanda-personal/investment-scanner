@@ -1635,6 +1635,28 @@ Teams ready to pick up new tasks:
 
 ---
 
+# Runtime Checkpoint - BT-03 Architecture Routed
+
+Date: 2026-05-18
+
+Team 03 completed `CF-W1-BT-03` architecture as a Ready candidate after QA planning. Team 00 routed it to Team 04 for docs-only QA planning.
+
+Active agents:
+
+- Team 06 `019e3d27-dd39-77a2-9208-2ffa61874af3`: `CF-W1-STRAT-03` implementation.
+- Team 02 `019e3d27-de23-7610-89aa-cfc738d7a131`: `CF-W1-SIG-02` discovery cycle.
+- Team 10 `019e3d2c-a14f-7a83-9fd3-d206e7acf7b5`: `CF-W1-BT-01A` review.
+
+Teams ready to pick up new tasks:
+
+- Team 04: `CF-W1-BT-03` QA planning now.
+- Team 04: `CF-W1-STRAT-03` QA after Team 06 handoff.
+- Team 03: Architect Signoff for `CF-W1-BT-01A` if Team 10 accepts.
+- Team 10: `CF-W1-STRAT-03` review after QA accepts.
+- Team 03: `CF-W1-SIG-02` architecture prep after Team 02 completes discovery.
+
+---
+
 # Runtime Checkpoint - Next Wave Spawned
 
 Date: 2026-05-18

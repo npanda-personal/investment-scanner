@@ -300,6 +300,29 @@ Date: 2026-05-18
 
 ---
 
+# Team 00 Runtime Dispatch - BT-03 QA Planning
+
+Date: 2026-05-18
+
+## Consumed Output
+
+- Team 03 completed `CF-W1-BT-03` architecture as a Ready candidate after QA planning.
+
+## Routing
+
+- `CF-W1-BT-03`: routed to Team 04 for docs-only QA planning.
+- Implementation remains sequenced because future BT-03 writer files overlap BT-02 and BT-01A backtesting files.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-BT-03` QA planning now.
+- Team 04: `CF-W1-STRAT-03` QA after Team 06 handoff.
+- Team 03: Architect Signoff for `CF-W1-BT-01A` if Team 10 accepts.
+- Team 10: `CF-W1-STRAT-03` review after QA accepts.
+- Team 03: `CF-W1-SIG-02` architecture prep after Team 02 completes discovery.
+
+---
+
 # Team 00 Runtime Dispatch - Next Wave Spawned
 
 Date: 2026-05-18

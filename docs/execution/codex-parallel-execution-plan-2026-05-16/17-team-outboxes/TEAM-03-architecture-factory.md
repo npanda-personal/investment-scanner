@@ -1029,6 +1029,76 @@ Current Team 03 recommendation to Team 00:
 
 No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
 
+## Team 03 BT-03 Backtesting Proof-Basis Guardrail Prep - 2026-05-19
+
+Assignment: prepare docs-only architecture readiness for `CF-W1-BT-03` backtesting proof-basis / overfit guardrail in the main workspace without touching application code, tests, requirements, QA docs, control docs, ready queues, Prisma/schema, generated files, routes, shared utilities, shared UI, or package manifests.
+
+Prepared:
+
+- `03-architecture/CF-W1-BT-03-architecture-review.md`
+- `06-contracts/CF-W1-BT-03-backtesting-proof-basis-overfit-guardrail-contract.md`
+- `08-work-packets/CF-W1-BT-03-work-packet.md`
+
+Updated:
+
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Files inspected:
+
+- `AGENTS.md`
+- `docs/instructions.md`
+- `docs/module-verification-register.md`
+- `10-requirements/CF-W1-BT-03-backtesting-proof-basis-overfit-guardrail-requirement.md`
+- `03-architecture/CF-W1-BT-01A-architecture-review.md`
+- `06-contracts/CF-W1-BT-01A-backtesting-dq-fail-closed-characterization-contract.md`
+- `08-work-packets/CF-W1-BT-01A-work-packet.md`
+- `03-architecture/CF-W1-BT-02-architecture-review.md`
+- `06-contracts/CF-W1-BT-02-backtesting-outcome-review-traceability-contract.md`
+- `08-work-packets/CF-W1-BT-02-work-packet.md`
+- `11-module-audits/audit-backtesting-trade-risk.md`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.types.ts`
+- `frontend/src/features/backtesting-strategy-lab/types.ts`
+- `frontend/src/features/backtesting-strategy-lab/components/BacktestingStrategyLabPage.tsx`
+
+Readiness result:
+
+- `CF-W1-BT-03` is a `Ready candidate`.
+- The smallest honest first child stays inside current `backtesting-strategy-lab` evidence and adds proof-basis disclosure only.
+- No walk-forward, holdout, parameter-sensitivity engine, schema, route, shared UI, simulation rewrite, or cross-module source change is required for the bounded child.
+- Exact future write scope is limited to:
+  - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.ts`
+  - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.types.ts`
+  - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+  - `backend/tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.test.ts`
+  - `frontend/src/features/backtesting-strategy-lab/types.ts`
+  - `frontend/src/features/backtesting-strategy-lab/components/BacktestingStrategyLabPage.tsx`
+  - `frontend/tests/ui/backtesting-strategy-lab.spec.ts`
+- Exact blocked scope:
+  - Prisma/schema and migrations
+  - generated files
+  - repository/controller/router/validation/module/index edits
+  - backend/frontend route registries
+  - frontend API client, hook, and feature-route edits
+  - shared backend utilities or shared frontend UI
+  - package manifests
+  - `data-quality-engine`, `market-data-foundation`, `strategy-framework`, and `trade-plan-risk-engine` source edits
+  - walk-forward engine, holdout engine, parameter sweep, optimizer, Monte Carlo, or benchmark/simulation math rewrites
+- Parallel-safety constraint:
+  - the future writer set exactly overlaps `CF-W1-BT-02`
+  - the backend doc/test subset overlaps `CF-W1-BT-01A`
+  - Team 00 must use one explicit backtesting writer and sequence or stack those child packets instead of running them in parallel in shared `dev`
+
+Current Team 03 recommendation to Team 00:
+
+1. Route `CF-W1-BT-03` to Team 04 QA planning now.
+2. Treat the first child as proof-basis disclosure only, not as a new validation engine.
+3. Keep BT-03 separate from BT-02 disposition semantics unless Team 00 explicitly approves a combined backtesting trust pass.
+4. Do not promote BT-03 into implementation while another backtesting child owns the same service/types/doc/test and page/types/UI-spec writer set.
+
+No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
+
 ## Team 03 SMI-01 Smart Money Evidence Freshness Prep - 2026-05-18
 
 Assignment: prepare docs-only architecture readiness for `CF-W1-SMI-01` in the shared `dev` workspace without touching application code, tests, Prisma/schema, route registries, shared utilities, shared UI, Market Data source, Data Quality source, providers, services, builds, UI smoke, package manifests, generated files, or frontend implementation.

@@ -3011,6 +3011,35 @@ Branch/worktree:
 
 Date: 2026-05-18
 
+## BT-03 Architecture Completed
+
+Team 03 completed `CF-W1-BT-03` architecture as a Ready candidate after QA planning. Team 00 routed it to Team 04 for docs-only QA planning.
+
+## Current Active Agents
+
+| Slot | Team | Agent | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Team 06 - Strategy / Signal / Risk | `019e3d27-dd39-77a2-9208-2ffa61874af3` | implementation | `CF-W1-STRAT-03` in dedicated worktree | active |
+| 2 | Team 02 - Requirement Factory | `019e3d27-de23-7610-89aa-cfc738d7a131` | rolling requirements discovery | `CF-W1-SIG-02` discovery cycle | active |
+| 3 | Team 10 - Review / Release | `019e3d2c-a14f-7a83-9fd3-d206e7acf7b5` | review | `CF-W1-BT-01A` after QA ACCEPT | active |
+| 4 | Team 04 - QA Factory | pending spawn | QA planning | `CF-W1-BT-03` | ready |
+| 5 | Open slot | none | queued | Team 04 `CF-W1-STRAT-03` QA after handoff | waiting |
+| 6 | Open slot | none | queued | Team 03/04 next packet from Team 02 output | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-BT-03` QA planning now.
+- Team 04: `CF-W1-STRAT-03` QA after Team 06 handoff.
+- Team 03: Architect Signoff for `CF-W1-BT-01A` if Team 10 accepts.
+- Team 10: `CF-W1-STRAT-03` review after QA accepts.
+- Team 03: `CF-W1-SIG-02` architecture prep after Team 02 completes discovery.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
 ## Next Wave Spawned
 
 Team 00 launched four independent spawned agents after the `3320c51` docs checkpoint.

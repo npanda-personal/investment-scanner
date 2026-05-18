@@ -294,6 +294,57 @@ Date: 2026-05-18
 
 ## Assignment
 
+Prepare docs-only QA planning for `CF-W1-BT-03` - Backtesting proof-basis / overfit guardrail.
+
+This override supersedes the prior `CF-W1-STRAT-03` QA-planning assignment, which completed with no blocker and was promoted by Team 00.
+
+## Source Input
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-BT-03-backtesting-proof-basis-overfit-guardrail-requirement.md`
+- Architecture review: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-BT-03-architecture-review.md`
+- Contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-BT-03-backtesting-proof-basis-overfit-guardrail-contract.md`
+- Work packet: `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-BT-03-work-packet.md`
+- Team 03 outbox: `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-BT-03-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/next-validation-plans.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+## Required QA Plan Coverage
+
+- `REVIEW_ONLY` run that still states single-window-only and no broader validation evidence.
+- `WEAK_EVIDENCE` runs for:
+  - low trade count;
+  - benchmark unavailable;
+  - weak end-of-test exit distribution;
+  - low data coverage.
+- `DO_NOT_USE_FOR_RELIABILITY` runs for:
+  - no trades;
+  - insufficient history;
+  - legacy invalid aggregate proof.
+- saved-run list and selected-run detail show the same proof-basis label and summary for the same run.
+- existing benchmark, availability, coverage, warning, and calculation-audit evidence remain visible.
+- no walk-forward, holdout, parameter-sensitivity, direct-advice, or validated-certainty language is fabricated.
+- explicit rejection if implementation widens into walk-forward/holdout engines, parameter sweeps, schema, route, shared UI, simulation rewrite, cross-module source, package, provider/live/startup/backfill, paid/cloud, broker, or telemetry.
+
+## Sequencing Note
+
+This future implementation writer set overlaps backtesting files used by `CF-W1-BT-02` and `CF-W1-BT-01A`. Team 04 should call out that Team 00 must sequence or stack the implementation under one backtesting writer after current BT gates clear.
+
+## Output
+
+State whether `CF-W1-BT-03` is QA-plan ready for Team 00 Ready evaluation and list sequencing blockers.
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
 Verify `CF-W1-BT-01A` - Backtesting DQ fail-closed characterization in the Team 06 stacked worktree.
 
 This override supersedes older Team 04 tails. This is QA verification, not implementation and not QA-plan drafting.
