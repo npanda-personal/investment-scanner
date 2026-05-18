@@ -1673,6 +1673,23 @@ Teams ready to pick up new tasks:
 2. Relaunch Team 02 persistent requirements discovery.
 3. Evaluate `CF-W1-MCTX-01` for Ready promotion while Team 06 and Team 04 continue independent work.
 
+## MCTX-01 Ready Promotion
+
+Team 00 promoted `CF-W1-MCTX-01` after verifying requirement, architecture review, contract, work packet, QA plan, open-decision state, exact file reservations, and live file conflicts.
+
+Assignment:
+
+- Team: Team 05 - Market Data / Data Quality
+- Branch: `codex/team05-market-data/CF-W1-MCTX-01`
+- Worktree: `../investment-scanner-worktrees/team05-CF-W1-MCTX-01`
+
+Teams ready to pick up new tasks:
+
+- Team 05: `CF-W1-MCTX-01` implementation after worktree setup.
+- Team 04: `CF-W1-MD-03` QA planning after active `MD-02A` QA review.
+- Team 04: `CF-W1-SMI-01` QA rerun after Team 06 handoff.
+- Team 10: `CF-W1-MCTX-01` review after Team 04 QA accepts.
+
 ---
 
 # Latest Coordination State

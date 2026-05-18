@@ -2679,3 +2679,32 @@ Teams ready to pick up new tasks:
 - Team 00: `CF-W1-MCTX-01` Ready evaluation.
 - Team 04: `CF-W1-MD-03` QA planning after active `MD-02A` QA review.
 - Team 04: `CF-W1-SMI-01` QA rerun after Team 06 rework.
+
+---
+
+# MCTX-01 Ready Promotion
+
+Date: 2026-05-18
+
+Team 00 promoted `CF-W1-MCTX-01` as an independent Team 05 implementation slice.
+
+Verified gates:
+
+- requirement exists;
+- architecture review and contract exist;
+- work packet exists;
+- QA plan exists;
+- open decisions are zero;
+- exact allowed and forbidden files are recorded;
+- active `SMI-01` and `MD-02A` workstreams do not share the reserved Market Context files.
+
+Assignment:
+
+- Branch: `codex/team05-market-data/CF-W1-MCTX-01`
+- Worktree: `../investment-scanner-worktrees/team05-CF-W1-MCTX-01`
+
+Teams ready to pick up new tasks:
+
+- Team 05: `CF-W1-MCTX-01` implementation after worktree setup.
+- Team 04: `CF-W1-MD-03` QA planning after active `MD-02A` QA review.
+- Team 04: `CF-W1-SMI-01` QA rerun after Team 06 handoff.

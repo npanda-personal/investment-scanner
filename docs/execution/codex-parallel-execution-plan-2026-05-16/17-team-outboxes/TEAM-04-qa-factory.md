@@ -4,6 +4,69 @@ Date: 2026-05-18
 
 Mode: focused QA rerun plus docs-only QA planning.
 
+## 2026-05-18 `CF-W1-MD-02A` Additive Companion Evidence Schema Packet QA Review
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only ADR/schema-proposal completeness gate
+- Work item: `CF-W1-MD-02A`
+- State/mode: proposal QA review only; no executable validation
+- Owner: Team 04 QA Factory
+- Lane/module: Lane 1 / `market-data-foundation` and future `data-quality-engine` handoff boundary
+- Files changed:
+  - `04-qa/CF-W1-MD-02A-qa-review.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - `AGENTS.md`
+  - `16-team-inboxes/TEAM-04-current-assignment.md`
+  - `10-requirements/CF-W1-MD-02A-additive-companion-evidence-schema-packet-requirement.md`
+  - `03-architecture/CF-W1-MD-02A-architecture-review.md`
+  - `06-contracts/CF-W1-MD-02A-additive-companion-evidence-schema-packet-contract.md`
+  - `08-work-packets/CF-W1-MD-02A-work-packet.md`
+  - `03-architecture/CF-W1-MD-02-durable-readiness-evidence-adr.md`
+  - `04-qa/CF-W1-MD-02-qa-plan.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Behavior changed:
+  - none; docs-only QA review
+- Docs changed:
+  - prepared `04-qa/CF-W1-MD-02A-qa-review.md`
+  - refreshed `04-qa/next-validation-plans.md`
+  - recorded this handoff in `17-team-outboxes/TEAM-04-qa-factory.md`
+- Contracts changed:
+  - none
+- Result:
+  - Accepted `CF-W1-MD-02A` as a complete docs-only proposal QA packet.
+  - Confirmed additive-only posture with no destructive rewrite of `PriceTick` or `LatestPrice` semantics in this pass.
+  - Confirmed the future companion-evidence natural key includes identity, scope, timeframe, trading date/timestamp, source, and source/provider symbol dimensions rather than `symbol + timestamp` only.
+  - Confirmed the minimum durable evidence coverage includes provenance, source timestamp, ingested timestamp, batch/run or fingerprint basis, validation-window evidence, duplicate/invalid/missing/stale/suspicious-volume/adjusted-close/provider-gap evidence, a durable-versus-derived marker, and audit timestamps.
+  - Confirmed the durable-versus-derived claim boundary remains explicit and that current product claims stay limited to derived/read-path evidence until later implementation is separately approved.
+  - Confirmed the exact split between `MD-02A`, `MD-02B`, `MD-02C`, and `MD-02D` is sharp enough for Team 00 routing.
+  - Confirmed implementation work remains rejected in this pass, including Prisma/schema, migrations, generated artifacts, Market Data source/tests, DQE source/tests, route registries, shared utilities/UI, package manifests, provider/live-data, startup/backfill, frontend/UI, paid/cloud, broker, telemetry, and downstream consumer implementation.
+  - Recorded an advisory that Team 00 should interpret schema/migration approval language as a future `MD-02B` consent gate rather than a blocker on this docs-only `MD-02A` review.
+- Tests run: none
+- Tests skipped:
+  - all executable validation was skipped because this was a docs-only ADR/schema-proposal completeness review with explicit instructions not to run tests, builds, services, providers, Prisma commands, UI smoke, or live data
+- Skipped-test reason:
+  - planning/review-only assignment; no executable validation was authorized or required
+- Assumptions:
+  - Team 03's architecture packet remains the authoritative child boundary unless the parent ADR is reopened
+  - Team 00 will keep `MD-02A` out of Ready-for-implementation routing
+- Risks:
+  - Team 00 could misroute `MD-02A` as an implementation slice if the docs-only boundary is not preserved
+  - later teams could blur durable versus derived evidence claims if `MD-02B` opens without the accepted packet as the gating reference
+- Blockers:
+  - no true consent blocker exists for this docs-only QA review
+  - future `MD-02B` implementation remains blocked by explicit schema/migration approval and exact writer reservations
+- Shared-file requests:
+  - none from Team 04; single-writer reservation remains a Team 00 implementation concern
+- QA-ready for Team 00 Ready evaluation:
+  - `CF-W1-MD-02A`: accepted as a proposal QA packet only; not eligible for Ready-for-implementation promotion
+- Next gate:
+  - Team 00 queue control to preserve `MD-02A` as docs-only and open `MD-02B` only after explicit schema/migration approval
+- Evidence notes:
+  - Team 04 used the active execution folder and governing QA/ADR packet docs only; no application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, builds, services, providers, or live data were modified or run
+
 ## 2026-05-18 `CF-W1-L3-TREV-02` Today Review Candidate Snapshot Provenance QA Planning
 
 - Team: `TEAM-04` - QA Factory

@@ -2544,3 +2544,25 @@ Date: 2026-05-18
 - Team 04: `CF-W1-MD-03` QA planning after `MD-02A` QA review completes.
 - Team 04: `CF-W1-SMI-01` QA rerun after Team 06 rework.
 - Team 03: `CF-W1-SMI-01` Architect Signoff only after QA and Team 10 re-accept.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## MCTX-01 Ready Promotion
+
+Team 00 promoted `CF-W1-MCTX-01` for Team 05 implementation.
+
+Branch/worktree:
+
+- Branch: `codex/team05-market-data/CF-W1-MCTX-01`
+- Worktree: `../investment-scanner-worktrees/team05-CF-W1-MCTX-01`
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 05: `CF-W1-MCTX-01` implementation after worktree setup.
+- Team 04: `CF-W1-MD-03` QA planning after active `MD-02A` QA review.
+- Team 04: `CF-W1-SMI-01` QA rerun after Team 06 handoff.
+- Team 10: `CF-W1-MCTX-01` review after Team 04 QA accepts.

@@ -232,3 +232,122 @@ Write:
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-HCTX-01-developer-handoff.md`
 
 Do not commit. Team 00 handles QA, review, Architect Signoff, delegated PO acceptance, scoped local commit, and later integration.
+
+---
+
+# Current Dispatcher Assignment
+
+Date: 2026-05-18
+
+## Assignment
+
+Implement `CF-W1-MCTX-01` in a dedicated Team 05 worktree.
+
+This override supersedes older Team 05 tails. The slice is Market Context regime evidence and partial-context framing. It is a bounded module-local vertical slice with backend and feature-local frontend work.
+
+Do not implement in the shared `dev` workspace.
+
+## Branch / Worktree
+
+- Branch: `codex/team05-market-data/CF-W1-MCTX-01`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team05-CF-W1-MCTX-01`
+
+## Gate Evidence
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MCTX-01-market-context-regime-evidence-requirement.md`
+- Architecture review: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-MCTX-01-architecture-review.md`
+- Contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-MCTX-01-market-context-regime-evidence-contract.md`
+- Work packet: `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-MCTX-01-work-packet.md`
+- QA plan: `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-MCTX-01-qa-plan.md`
+- Ready handoff: `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/ready-for-implementation.md`
+
+## Allowed Files
+
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.service.ts`
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.types.ts`
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.md`
+- `backend/tests/modules/market-context-intelligence/market-context-intelligence.service.test.ts`
+- `frontend/src/features/market-context-intelligence/types.ts`
+- `frontend/src/features/market-context-intelligence/components/MarketContextPage.tsx`
+- `frontend/src/features/market-context-intelligence/components/MarketRegimeWidget.tsx`
+- `frontend/tests/ui/market-context-intelligence.spec.ts`
+
+Allowed reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-05-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-MCTX-01-developer-handoff.md`
+
+## Forbidden Files
+
+- Prisma schema or migrations
+- generated files
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.repository.ts`
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.controller.ts`
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.router.ts`
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.validation.ts`
+- `backend/src/modules/market-context-intelligence/index.ts`
+- backend or frontend route registries
+- `frontend/src/features/market-context-intelligence/routes.tsx`
+- `frontend/src/features/market-context-intelligence/api/**`
+- `frontend/src/features/market-context-intelligence/hooks/**`
+- `backend/src/modules/market-data-foundation/**`
+- `backend/src/modules/data-quality-engine/**`
+- `backend/src/modules/historical-context-snapshots/**`
+- `backend/src/modules/signal-calibration-engine/**`
+- `backend/src/modules/signal-generation-engine/**`
+- shared backend utilities
+- shared frontend components
+- package manifests
+- providers, startup/backfill, live-provider, paid/cloud, broker, telemetry, credentials, or broad UX/navigation work
+
+## Required Behavior
+
+- Add additive market-context evidence metadata that distinguishes trustworthy, partial, low-evidence, and missing-evidence regime states.
+- Expose persisted-versus-fresh provenance explicitly.
+- Preserve exact fresh breadth denominators on the auto-generation path instead of collapsing them into persisted sector-derived counts immediately.
+- Label persisted breadth denominator source as derived when exact stored SMA denominators are unavailable.
+- Keep macro explicitly missing with stable reason framing.
+- Render evidence on the existing Market Context page and Market Regime widget without shared UI or route changes.
+- Preserve current routes, query params, and existing response fields.
+- Keep research-support language and avoid direct advice, price targets, guarantees, broker behavior, or automation wording.
+
+## Focused Validation
+
+Run after implementation:
+
+```powershell
+cd backend
+npm.cmd test -- market-context-intelligence.service.test.ts --runInBand
+npm.cmd run build
+```
+
+Because frontend files are in scope, also run when resource-safe:
+
+```powershell
+cd frontend
+npm.cmd run test:ui -- market-context-intelligence.spec.ts --workers=1
+npm.cmd run build
+```
+
+Before builds or UI smoke, check memory/resource safety if practical.
+
+## Stop Conditions
+
+Return to Team 00 without implementing further if the slice needs:
+
+- any forbidden file;
+- schema/generated/route/shared changes;
+- Market Data, Data Quality Engine, Historical Context, Signal Calibration, or Signal Generation source edits;
+- repository/controller/router/validation/index edits;
+- provider/live-data/startup/backfill work;
+- exact persisted denominator durability beyond derived framing;
+- package changes, paid/cloud, telemetry, broker, or credential scope.
+
+## Expected Output
+
+Write:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-05-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-MCTX-01-developer-handoff.md`
+
+Do not commit. Team 00 handles QA, review, Architect Signoff, delegated PO acceptance, scoped local commit, and later integration.

@@ -1057,3 +1057,81 @@ Move an app-code item here only when all of the following are proven:
 - exact allowed and forbidden file reservations,
 - no unresolved Product Owner, Architect, QA, shared-file, schema, route, package, provider, or upstream blocker,
 - local-first and zero-incremental-cost constraints preserved.
+
+---
+
+## Active Ready Handoff - `CF-W1-MCTX-01`
+
+Date promoted: 2026-05-18
+
+Team 00 evaluated `CF-W1-MCTX-01` against Ready gates and promoted it as an independent Team 05 implementation slice.
+
+Gate evidence:
+
+- Requirement: `10-requirements/CF-W1-MCTX-01-market-context-regime-evidence-requirement.md`
+- Architecture review: `03-architecture/CF-W1-MCTX-01-architecture-review.md`
+- Contract: `06-contracts/CF-W1-MCTX-01-market-context-regime-evidence-contract.md`
+- Work packet: `08-work-packets/CF-W1-MCTX-01-work-packet.md`
+- QA plan: `04-qa/CF-W1-MCTX-01-qa-plan.md`
+- Open decisions: none.
+- Shared/high-risk blocker: none if implementation stays inside the reserved `market-context-intelligence` backend and feature-local frontend files.
+
+Branch/worktree:
+
+- Branch: `codex/team05-market-data/CF-W1-MCTX-01`
+- Worktree: `../investment-scanner-worktrees/team05-CF-W1-MCTX-01`
+
+Allowed files:
+
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.service.ts`
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.types.ts`
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.md`
+- `backend/tests/modules/market-context-intelligence/market-context-intelligence.service.test.ts`
+- `frontend/src/features/market-context-intelligence/types.ts`
+- `frontend/src/features/market-context-intelligence/components/MarketContextPage.tsx`
+- `frontend/src/features/market-context-intelligence/components/MarketRegimeWidget.tsx`
+- `frontend/tests/ui/market-context-intelligence.spec.ts`
+
+Allowed reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-05-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-MCTX-01-developer-handoff.md`
+
+Forbidden files:
+
+- Prisma schema or migrations
+- generated files
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.repository.ts`
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.controller.ts`
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.router.ts`
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.validation.ts`
+- `backend/src/modules/market-context-intelligence/index.ts`
+- backend or frontend route registries
+- `frontend/src/features/market-context-intelligence/routes.tsx`
+- `frontend/src/features/market-context-intelligence/api/**`
+- `frontend/src/features/market-context-intelligence/hooks/**`
+- upstream/downstream module source, shared utilities/UI, package manifests, provider/live-data, startup/backfill, paid/cloud, broker, telemetry, and broad UX/navigation work.
+
+Required behavior:
+
+- add additive market-context evidence metadata for trustworthy, partial, low-evidence, and missing-evidence regime states;
+- expose persisted-versus-fresh provenance explicitly;
+- preserve exact fresh breadth denominators on the auto-generation path;
+- mark persisted denominator reconstruction as derived and partial when exact SMA denominators are unavailable;
+- keep macro explicitly missing with stable reason framing;
+- render the evidence on existing Market Context page and Market Regime widget surfaces only;
+- preserve current routes, query params, existing fields, and research-support language.
+
+Required validation after implementation:
+
+```powershell
+cd backend
+npm.cmd test -- market-context-intelligence.service.test.ts --runInBand
+npm.cmd run build
+```
+
+```powershell
+cd frontend
+npm.cmd run test:ui -- market-context-intelligence.spec.ts --workers=1
+npm.cmd run build
+```

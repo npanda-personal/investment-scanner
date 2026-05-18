@@ -6,6 +6,8 @@ Prepared by Team 04 QA Factory and refreshed after docs-only QA plans for `CF-W1
 
 Refresh note: docs-only QA refresh. No tests, builds, services, providers, UI checks, or application source/test edits were run or modified during this refresh.
 
+Latest MD-02A review note: Team 04 added the docs-only QA review for `CF-W1-MD-02A` on 2026-05-18. This accepted the child as a complete additive companion evidence schema proposal packet, confirmed the minimum natural key, minimum durable evidence coverage, durable-versus-derived claim boundary, and exact `MD-02A`/`MD-02B`/`MD-02C`/`MD-02D` split, and kept Prisma/schema/migration/generated/Market Data/DQE/downstream implementation blocked. It does not approve executable QA, schema work, source work, or Ready-for-implementation routing.
+
 Latest RH refresh note: Team 04 added the docs-only QA plan for `CF-W1-RH-01` on 2026-05-18. This records Today Review and Trade Plan public-output mapping for `READY`, `LIMITED`, `BLOCKED`, and `INSUFFICIENT_DATA`, conservative current-`dev` Signal Quality and Calibration mapping that replaces placeholder insufficiency without overstating trust, fail-closed handling for missing upstream public evidence, conservative `canReviewActionableSetups`, and exact reject conditions for frontend Research Hub, upstream source, route/schema/shared/provider/package/generated, or `CF-W1-RH-02` widening. It does not approve executable QA, frontend work, upstream source work, route work, or shared-file widening.
 
 Latest TREV-02 refresh note: Team 04 added the docs-only QA plan for `CF-W1-L3-TREV-02` on 2026-05-18. This records candidate-level provenance labels and evidence dates for stored snapshot detail, compatibility-only labels for partial or legacy snapshot shapes, explicit unavailable or unknown timing fallback when stored evidence cannot prove source timing, repository compatibility normalization without schema/route/backfill work, candidate-detail-only rendering, research-support wording constraints for changed provenance copy, and the exact reject condition that `CF-W1-L3-TREV-02` must not implement in parallel with `CF-W1-L3-TREV-01`. It does not approve executable QA, run/list Today Review redesign, frontend API/hook rewiring, upstream source work, route work, or shared-file widening.
@@ -68,6 +70,7 @@ Policy-resolution refresh note: Product Owner resolved the remaining five Decisi
 - `CF-W1-L3-DQ-01`: child scenario matrix for portfolio/watchlist passive display, alerts/action-like workflows, portfolio-intelligence reliability, and copilot/research trust handoff.
 - `CF-W1-TP-01A`: backend-only scenario matrix for no-target compatibility, DQ hard blockers, `LIMITED` handling, target-shaped compatibility fields, and forbidden product-language checks.
 - `CF-W1-MD-02`: ADR QA checklist for companion durable readiness/evidence storage, natural key, provenance, DQE handoff, migration/rollback, query/test strategy, and local/free constraints.
+- `CF-W1-MD-02A`: proposal QA review for additive companion evidence schema packet recorded in `04-qa/CF-W1-MD-02A-qa-review.md`.
 
 Matrix file: `04-qa/post-decision-child-scenario-matrix-2026-05-17.md`.
 
@@ -200,6 +203,7 @@ Provider-adjacent, startup-adjacent, frontend build, backend build, UI smoke, li
 - `CF-W1-L3-DQ-01`: blocked from executable validation until child contracts, exact file reservations, and implementation handoff exist.
 - `CF-W1-TP-01A`: blocked from executable validation until backend-only child packet, exact file reservations, and implementation handoff exist; full target geometry migration remains separate.
 - `CF-W1-MD-02`: blocked from executable validation because Option B is ADR direction only; formal ADR and source/schema/test work need separate approval.
+- `CF-W1-MD-02A`: proposal QA packet is accepted, but executable validation and implementation remain blocked because this child is docs-only and `CF-W1-MD-02B` still requires explicit schema/migration approval plus exact file reservations.
 - `CF-W1-MD-01`: executable validation remains blocked until Team 00 promotes the narrowed validation-only implementation handoff.
 - `CF-W1-L3-ALERT-01`: child QA plan is refreshed; blocked until Team 00 Ready promotion, exact reservations, and implementation handoff.
 - `CF-W1-L3-ALERT-03`: child QA plan is prepared, but the packet is not QA-ready for Team 00 Ready evaluation until Team 00 sequences it behind `CF-W1-L3-ALERT-01` and away from `CF-W1-L3-AUTH-03`.
