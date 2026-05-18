@@ -1749,6 +1749,47 @@ Teams ready to pick up new tasks:
 
 ---
 
+# BT-02 Committed And CAL-01 QA Rerun Dispatched
+
+Date: 2026-05-18
+
+`CF-W1-BT-02` completed all standing delegation gates and was committed locally:
+
+- Branch: `codex/team06-strategy-signal/CF-W1-BT-02`
+- Commit: `bb49ce2 feat: add backtesting review disposition`
+- Push: not pushed
+
+Team 06 completed `CF-W1-CAL-01` bounded rework for the QA rejection, and Team 00 spawned QA rerun:
+
+- Team 04 agent: `019e3c19-bc0f-7860-90fc-e02faf3411c0`
+- Scope: verify `context-gap -> LIMITED`, hard blockers, focused tests, and build.
+
+Teams ready to pick up new tasks:
+
+- Team 10: `CF-W1-CAL-01` review if QA rerun accepts.
+- Team 03: `CF-W1-SQLAB-02` architecture prep after Team 00 sequencing check.
+- Team 03: `CF-W1-STRAT-02` or `CF-W1-MD-02` architecture prep if `SQLAB-02` remains sequenced.
+
+---
+
+# CAL-01 Review Dispatched
+
+Date: 2026-05-18
+
+Team 04 accepted the `CF-W1-CAL-01` QA rerun and Team 00 spawned Team 10 Review / Release.
+
+- Team 04 closed: `019e3c19-bc0f-7860-90fc-e02faf3411c0`
+- Team 10 spawned: `019e3c1d-9dc4-7721-8831-5f9cee0be072`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-CAL-01`
+
+Teams ready to pick up new tasks:
+
+- Team 03: `CF-W1-CAL-01` Architect Signoff if Team 10 accepts.
+- Team 03: `CF-W1-SQLAB-02` architecture prep after Team 00 sequencing check.
+- Team 03: `CF-W1-STRAT-02` or `CF-W1-MD-02` architecture prep if `SQLAB-02` remains sequenced.
+
+---
+
 # BT-02 Architect Signoff Relaunched
 
 Date: 2026-05-18

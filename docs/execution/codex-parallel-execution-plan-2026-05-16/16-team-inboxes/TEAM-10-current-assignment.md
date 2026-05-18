@@ -120,3 +120,70 @@ Commit/release remains blocked until:
 - Architect signoff is recorded;
 - delegated Product Owner acceptance packet is recorded;
 - Team 00 verifies exact staged scope in the Team 07 worktree.
+
+---
+
+# Current Active Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Review `CF-W1-CAL-01` after Team 04 QA rerun `ACCEPT`.
+
+This final override supersedes older Team 10 queue text above. The CAL workstream is backend-only and uses a dedicated Team 06 worktree. Do not review unrelated Team 07, Trade Plan, or alert work in this pass.
+
+## Branch / Worktree
+
+- Branch: `codex/team06-strategy-signal/CF-W1-CAL-01`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-CAL-01`
+
+## Evidence To Review
+
+- Developer handoff: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-CAL-01-developer-handoff.md`
+- Initial QA reject: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-CAL-01-qa-verification.md`
+- QA rerun accept: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-CAL-01-qa-rerun-verification.md`
+- Team 06 outbox: `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-outbox.md`
+- Team 04 outbox: `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-CAL-01-signal-calibration-reliability-drift-requirement.md`
+- Architecture review: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-CAL-01-architecture-review.md`
+- Contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-CAL-01-signal-calibration-reliability-drift-contract.md`
+- Work packet: `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-CAL-01-work-packet.md`
+
+## Review Scope
+
+Review only the approved Team 06 changed files:
+
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.service.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.types.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md`
+- `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.service.test.ts`
+
+Verify:
+
+- implementation stays within Team 00 / Team 03 reserved file list;
+- context-gap evidence downgrades sufficient-sample, non-blocking-DQ calibration readiness to `LIMITED`, not `TRUSTED`;
+- hard blockers remain fail-closed: `eligibleForCalibration=false`, `eligibleForSignals=false`, `NOT_READY`, `UNUSABLE`, and `ILLIQUID`;
+- score math and existing response fields are preserved;
+- product language remains research-support and avoids direct advice, targets, guarantees, broker behavior, or automation instructions;
+- Prisma, routes, frontend, shared utilities/UI, packages, generated files, providers, startup/backfill, paid/cloud, live-provider, broker, and telemetry were not touched.
+
+## Commands / Evidence
+
+Team 10 may inspect diffs from the worktree. Do not run broad suites unless needed. If reviewing command evidence, use Team 04's accepted rerun:
+
+- `npm.cmd test -- signal-calibration-engine.service.test.ts --runInBand`: passed, `29/29`.
+- `npm.cmd run build`: passed.
+
+## Allowed Writes
+
+Only in the Team 06 CAL worktree:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-CAL-01-team10-review-release.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-10-review-release.md`
+
+Do not edit application source/tests. Do not commit.
+
+## Output
+
+Return pass/reject decision, findings with file/line references, changed-file scope confirmation, whether QA evidence is sufficient, release risk, rollback note, and whether Architect Signoff can proceed.

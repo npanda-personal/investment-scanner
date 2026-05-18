@@ -1423,6 +1423,76 @@ Date: 2026-05-18
 
 Date: 2026-05-18
 
+## Completed Since Previous Snapshot
+
+- Team 03 `019e3c10-711f-7ca2-9311-3a28736dd2d4`: accepted `CF-W1-BT-02` Architect Signoff and was closed.
+- Team 06 `019e3c15-5e77-79b1-b0c1-b52317bc1933`: completed `CF-W1-CAL-01` context-gap rework and was closed.
+
+## Branch Commit Completed
+
+- `CF-W1-BT-02` committed locally on branch `codex/team06-strategy-signal/CF-W1-BT-02`.
+- Commit: `bb49ce2 feat: add backtesting review disposition`.
+- Worktree status after commit: clean.
+- Push status: not pushed; branch commit remains parked for later integration.
+
+## Newly Spawned
+
+- Team 04 `019e3c19-bc0f-7860-90fc-e02faf3411c0`: `CF-W1-CAL-01` QA rerun after bounded Team 06 rework.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | `019e3c19-bc0f-7860-90fc-e02faf3411c0` | `gpt-5.4`, high | QA rerun | `CF-W1-CAL-01` context-gap downgrade | active |
+| 2 | Open slot | none | pending | review/release | `CF-W1-CAL-01` after QA rerun accepts | waiting |
+| 3 | Open slot | none | pending | architecture prep | `CF-W1-SQLAB-02` after Team 00 sequencing check | ready |
+| 4 | Open slot | none | pending | architecture prep | `CF-W1-STRAT-02` after `SQLAB-02` dispatch or if independent | ready |
+| 5 | Open slot | none | pending | architecture prep / ADR | `CF-W1-MD-02` docs-only ADR split prep | ready |
+| 6 | Open slot | none | pending | requirements discovery | next persistent Team 02 cycle after current dispatch | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 10 is ready for `CF-W1-CAL-01` review if QA rerun accepts.
+- Team 03 is ready for `CF-W1-SQLAB-02` architecture prep after Team 00 confirms it does not conflict with active `CF-W1-SQLAB-02A`.
+- Team 03 is also ready for `CF-W1-STRAT-02` or `CF-W1-MD-02` docs-only architecture prep if `SQLAB-02` remains sequenced.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Completed Since Previous Snapshot
+
+- Team 04 `019e3c19-bc0f-7860-90fc-e02faf3411c0`: accepted `CF-W1-CAL-01` QA rerun and was closed.
+
+## Newly Spawned
+
+- Team 10 `019e3c1d-9dc4-7721-8831-5f9cee0be072`: `CF-W1-CAL-01` review/release after QA rerun ACCEPT.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 10 - Review / Release | `019e3c1d-9dc4-7721-8831-5f9cee0be072` | `gpt-5.5`, high | review/release | `CF-W1-CAL-01` after QA ACCEPT | active |
+| 2 | Open slot | none | pending | architect signoff | `CF-W1-CAL-01` if Team 10 accepts | waiting |
+| 3 | Open slot | none | pending | architecture prep | `CF-W1-SQLAB-02` after Team 00 sequencing check | ready |
+| 4 | Open slot | none | pending | architecture prep | `CF-W1-STRAT-02` if independent from active branches | ready |
+| 5 | Open slot | none | pending | architecture prep / ADR | `CF-W1-MD-02` docs-only ADR split prep | ready |
+| 6 | Open slot | none | pending | requirements discovery | next persistent Team 02 cycle after architecture dispatch | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03 is ready for `CF-W1-CAL-01` Architect Signoff if Team 10 accepts.
+- Team 03 is ready for `CF-W1-SQLAB-02` architecture prep after Team 00 sequencing check.
+- Team 03 is ready for `CF-W1-STRAT-02` or `CF-W1-MD-02` architecture prep if `SQLAB-02` stays sequenced behind `CF-W1-SQLAB-02A`.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
 ## Runtime Recovery
 
 - Prior Team 03 architect agent `019e3c02-4baa-77a3-a567-d5cf34e804db` was no longer visible to the runtime and left no `CF-W1-BT-02` architect signoff files in the BT worktree.

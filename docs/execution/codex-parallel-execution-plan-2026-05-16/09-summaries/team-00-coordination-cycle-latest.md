@@ -1646,6 +1646,70 @@ Closed Team 02 after docs-only requirement discovery:
 
 Date: 2026-05-18
 
+## BT-02 Accepted Branch Commit
+
+`CF-W1-BT-02` completed delegated PO acceptance and local branch commit.
+
+- Branch: `codex/team06-strategy-signal/CF-W1-BT-02`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-BT-02`
+- Commit: `bb49ce2 feat: add backtesting review disposition`
+- Worktree status after commit: clean
+- Push status: not pushed
+
+## CAL-01 QA Rerun Dispatch
+
+Team 06 completed the bounded context-gap rework and Team 00 spawned Team 04 QA rerun.
+
+- Team 04 agent: `019e3c19-bc0f-7860-90fc-e02faf3411c0`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-CAL-01`
+- Gate: QA rerun after `context-gap -> LIMITED` fix.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 10: `CF-W1-CAL-01` review if QA rerun accepts.
+- Team 03: `CF-W1-SQLAB-02` architecture prep after Team 00 sequencing check against `CF-W1-SQLAB-02A`.
+- Team 03: `CF-W1-STRAT-02` or `CF-W1-MD-02` architecture prep if `SQLAB-02` remains sequenced behind active preview work.
+
+## Next Coordination Action
+
+Wait for Team 04 CAL QA rerun. In parallel, evaluate whether `CF-W1-SQLAB-02` is dispatchable now or must remain sequenced behind active `CF-W1-SQLAB-02A`; if sequenced, dispatch the next independent high-value architecture-prep item.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
+## CAL-01 Review Dispatch
+
+Team 04 accepted `CF-W1-CAL-01` QA rerun:
+
+- Agent closed: `019e3c19-bc0f-7860-90fc-e02faf3411c0`
+- Evidence: `CF-W1-CAL-01-qa-rerun-verification.md`
+- Focused service test passed `29/29`; backend build passed.
+
+Team 00 spawned Team 10 review/release:
+
+- Agent: `019e3c1d-9dc4-7721-8831-5f9cee0be072`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-CAL-01`
+- Gate: Review / Release after QA ACCEPT.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03: `CF-W1-CAL-01` Architect Signoff if Team 10 accepts.
+- Team 03: `CF-W1-SQLAB-02` architecture prep after Team 00 sequencing check.
+- Team 03: `CF-W1-STRAT-02` or `CF-W1-MD-02` architecture prep if `SQLAB-02` remains sequenced behind active preview work.
+
+## Next Coordination Action
+
+Wait for Team 10 CAL review result. If it accepts, spawn Team 03 Architect Signoff. In parallel, do the Team 00 sequencing check for `CF-W1-SQLAB-02` versus active `CF-W1-SQLAB-02A`.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
 ## BT-02 Architect Signoff Relaunched
 
 The saved Team 03 architect agent `019e3c02-4baa-77a3-a567-d5cf34e804db` was not recoverable from the runtime and no architect-signoff evidence existed in the BT worktree. Team 00 relaunched the same bounded gate.

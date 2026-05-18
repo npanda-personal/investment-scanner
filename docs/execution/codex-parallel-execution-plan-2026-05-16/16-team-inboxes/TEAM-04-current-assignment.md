@@ -298,6 +298,62 @@ Return `ACCEPT` or `REJECT`, commands run/results, scenario evidence, changed-fi
 
 ---
 
+# Current Active Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Run QA Rerun Verification for `CF-W1-CAL-01` after Team 06 bounded rework.
+
+This final override supersedes all older Team 04 tails above. Team 04 previously rejected the CAL implementation because context-gap evidence could still return `TRUSTED`. Team 06 reports the bounded fix is complete and backend developer validation passed.
+
+## Branch / Worktree
+
+- Branch: `codex/team06-strategy-signal/CF-W1-CAL-01`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-CAL-01`
+
+## Evidence To Review
+
+- Prior QA reject: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-CAL-01-qa-verification.md`
+- Developer handoff: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-CAL-01-developer-handoff.md`
+- Team 06 outbox: `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-outbox.md`
+- QA plan: `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-CAL-01-qa-plan.md`
+
+## QA Rerun Focus
+
+- Context-gap regression: sufficient-sample, non-blocking-DQ, missing regime / sector leadership / smart-money context must return `LIMITED`, not `TRUSTED`.
+- Existing hard blockers remain fail-closed: `eligibleForCalibration=false`, `eligibleForSignals=false`, `NOT_READY`, `UNUSABLE`, and `ILLIQUID`.
+- Score math and existing response fields remain preserved by focused regression coverage.
+- No forbidden source, route, schema, shared, package, provider, live-data, startup/backfill, frontend, or generated scope was touched.
+
+## Allowed Writes
+
+Only in the Team 06 CAL worktree:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-CAL-01-qa-rerun-verification.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+Do not edit application source/tests. Do not commit.
+
+## Required Commands
+
+Run in the Team 06 CAL worktree:
+
+```powershell
+cd C:\work\repo\investment-scanner-worktrees\team06-CF-W1-CAL-01\backend
+npm.cmd test -- signal-calibration-engine.service.test.ts --runInBand
+npm.cmd run build
+```
+
+Do not run providers, services, Prisma commands, UI smoke, live data, or package installs.
+
+## Output
+
+Return `ACCEPT` or `REJECT`, commands run/results, scenario evidence, changed-file scope confirmation, skipped checks and reasons, residual risks, and whether Team 10 review can proceed.
+
+---
+
 # Latest Assignment Override
 
 Date: 2026-05-18
