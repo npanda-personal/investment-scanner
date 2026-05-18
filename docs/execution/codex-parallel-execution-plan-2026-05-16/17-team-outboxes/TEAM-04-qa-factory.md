@@ -4,6 +4,73 @@ Date: 2026-05-18
 
 Mode: focused QA rerun plus docs-only QA planning.
 
+## 2026-05-18 `CF-W1-SIG-TRIGGER-02A` Signal Generation Trigger Audit QA Planning
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only QA packet preparation
+- Work item: `CF-W1-SIG-TRIGGER-02A`
+- State/mode: QA planning only; no executable validation
+- Owner: Team 04 QA Factory
+- Lane/module: Lane 2 / `signal-generation-engine`
+- Files changed:
+  - `04-qa/CF-W1-SIG-TRIGGER-02A-qa-plan.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - `AGENTS.md`
+  - `16-team-inboxes/TEAM-04-current-assignment.md`
+  - `03-architecture/CF-W1-SIG-TRIGGER-02-architecture-review.md`
+  - `06-contracts/CF-W1-SIG-TRIGGER-02-persisted-trigger-auditability-contract.md`
+  - `08-work-packets/CF-W1-SIG-TRIGGER-02-work-packet.md`
+  - `10-requirements/CF-W1-SIG-TRIGGER-02-persisted-trigger-auditability-requirement.md`
+  - `09-summaries/CF-W1-SIG-TRIGGER-01-po-acceptance-packet.md`
+  - `04-qa/CF-W1-SIG-TRIGGER-01-qa-plan.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+  - `backend/src/modules/signal-generation-engine/signal-generation-engine.md`
+  - `backend/src/modules/signal-generation-engine/signal-generation-engine.types.ts`
+  - `backend/src/modules/signal-generation-engine/signal-generation-engine.service.ts`
+  - `backend/src/modules/signal-generation-engine/signal-generation-engine.repository.ts`
+  - `backend/tests/modules/signal-generation-engine/signal-generation-engine.trigger-contract.test.ts`
+- Behavior changed:
+  - none; docs-only QA planning
+- Docs changed:
+  - prepared `04-qa/CF-W1-SIG-TRIGGER-02A-qa-plan.md`
+  - refreshed `04-qa/next-validation-plans.md`
+  - recorded this handoff in `17-team-outboxes/TEAM-04-qa-factory.md`
+- Contracts changed:
+  - none
+- Result:
+  - Prepared a bounded backend-only QA plan for additive persisted trigger-audit surfacing and provenance labeling in `04-qa/CF-W1-SIG-TRIGGER-02A-qa-plan.md`.
+  - Recorded required coverage for persisted `created_at` and `updated_at` exposure, additive run `status`/`startedAt`/`completedAt` audit metadata, explicit `trigger_timestamp` source-date semantics, compatibility-only provenance labeling for transient `strategyMatches[]`, continued unavailability for `trigger_price`, rule ids, `timeframe`, and any unproven lifecycle state, plus legacy incomplete handling.
+  - Preserved the Team 03 split boundary that the child must stay inside `signal-generation-engine` service/types/repository/doc/test only, with no schema, route, frontend, shared-file, downstream-consumer, or provider/live-data widening.
+  - Added exact reject conditions for Prisma/schema/migrations, generated files, controllers/routers/validation, frontend, shared utilities/UI, package manifests, downstream modules, providers/live data, paid/cloud, broker, or telemetry scope drift.
+  - Updated `04-qa/next-validation-plans.md` so `CF-W1-SIG-TRIGGER-02A` is visible in the QA queue as QA-ready for Team 00 Ready evaluation as one bounded `signal-generation-engine` child only.
+- Tests run: none
+- Tests skipped:
+  - all executable validation was skipped because this was a docs-only QA planning pass with no Team 00 Ready promotion or implementation handoff
+- Skipped-test reason:
+  - planning-only assignment; no builds/tests/services/providers were authorized or required
+- Assumptions:
+  - Team 00 will keep the child bounded to the reserved Signal Generation service/types/repository/doc/test files only
+  - `strategyMatches[]` remains transient enrichment and is not promoted to durable provenance in this packet
+  - any optional lifecycle exposure is limited to module-local `detected` semantics only if the implementation can prove it without widening scope
+- Risks:
+  - implementers could surface current row timestamps but still leave timestamp provenance ambiguous, which would keep `trigger_timestamp` easy to misread as a durable rule-fire time
+  - compatibility-only `strategyMatches[]` fields could be mislabeled as persisted provenance unless field-level provenance remains explicit
+  - scope could drift into schema, routes, frontend, Strategy Framework, or downstream consumer changes if Team 00 does not keep the reservation exact
+- Blockers:
+  - executable QA remains blocked until Team 00 promotes the bounded backend-only `signal-generation-engine` implementation handoff
+  - the broader `CF-W1-SIG-TRIGGER-02` parent remains blocked because durable rule provenance, rule-defined trigger price, broader lifecycle ownership, and downstream adoption still need separate approval-gated packets
+- Shared-file requests:
+  - none from Team 04; single-writer reservation remains a Team 00 implementation concern
+- QA-ready for Team 00 Ready evaluation:
+  - `CF-W1-SIG-TRIGGER-02A`: yes, as one bounded backend-only `signal-generation-engine` child only
+- Next gate:
+  - Team 00 Ready evaluation for `CF-W1-SIG-TRIGGER-02A` only, while keeping schema, routes, frontend, shared files, downstream consumer adoption, provider/live-data work, durable rule provenance, rule-defined trigger price, and broader lifecycle ownership out of scope
+- Evidence notes:
+  - Team 04 used the active execution folder plus current Signal Generation module/test/doc surfaces only; no application source, tests, package manifests, generated files, architecture docs outside the requested packet, Prisma, routes, shared files, builds, services, or providers were modified or run
+
 ## 2026-05-18 `CF-W1-CAL-01` Signal Calibration Reliability Drift QA Planning
 
 - Team: `TEAM-04` - QA Factory
