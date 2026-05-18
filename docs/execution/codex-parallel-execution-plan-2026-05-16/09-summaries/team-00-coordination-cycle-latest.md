@@ -1772,6 +1772,32 @@ Team 00 spawned Architect Signoff:
 
 Date: 2026-05-18
 
+## CAL-01 Accepted Branch Commit
+
+`CF-W1-CAL-01` completed delegated PO acceptance and local branch commit.
+
+- Branch: `codex/team06-strategy-signal/CF-W1-CAL-01`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-CAL-01`
+- Commit: `fd3d464 feat: add calibration readiness trust state`
+- Worktree status after commit: clean
+- Push status: not pushed
+
+## Active Agents
+
+- Team 03 `019e3c20-e9f8-7da2-83f1-ebe84851a830`: `CF-W1-SIG-TRIGGER-02` architecture readiness.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-SIG-TRIGGER-02` QA planning if Team 03 returns a bounded child.
+- Team 02: next persistent discovery cycle after current architecture output is consumed.
+- Team 06: next Strategy / Signal / Risk implementation only after Team 00 promotes a new Ready item.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
 ## BT-02 Architect Signoff Relaunched
 
 The saved Team 03 architect agent `019e3c02-4baa-77a3-a567-d5cf34e804db` was not recoverable from the runtime and no architect-signoff evidence existed in the BT worktree. Team 00 relaunched the same bounded gate.

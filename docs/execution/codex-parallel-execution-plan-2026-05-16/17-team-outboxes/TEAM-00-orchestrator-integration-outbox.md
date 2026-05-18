@@ -1825,6 +1825,24 @@ Teams ready to pick up new tasks:
 
 ---
 
+# CAL-01 Accepted Branch Commit
+
+Date: 2026-05-18
+
+`CF-W1-CAL-01` completed all standing delegation gates and was committed locally:
+
+- Branch: `codex/team06-strategy-signal/CF-W1-CAL-01`
+- Commit: `fd3d464 feat: add calibration readiness trust state`
+- Push: not pushed
+
+Teams ready to pick up new tasks:
+
+- Team 04: `CF-W1-SIG-TRIGGER-02` QA planning if Team 03 returns a bounded child.
+- Team 02: next persistent discovery cycle after current architecture output is consumed.
+- Team 06: next Strategy / Signal / Risk implementation only after Team 00 promotes a new Ready item.
+
+---
+
 # BT-02 Architect Signoff Relaunched
 
 Date: 2026-05-18

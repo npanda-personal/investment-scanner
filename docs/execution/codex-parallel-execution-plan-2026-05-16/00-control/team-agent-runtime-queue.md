@@ -1561,6 +1561,41 @@ Date: 2026-05-18
 
 Date: 2026-05-18
 
+## Completed Since Previous Snapshot
+
+- Team 03 `019e3c21-c96a-7e10-b5bf-26ec1ed4b417`: accepted `CF-W1-CAL-01` Architect Signoff and was closed.
+- Team 00 completed delegated PO acceptance and scoped local branch commit for `CF-W1-CAL-01`.
+
+## Branch Commit Completed
+
+- `CF-W1-CAL-01` committed locally on branch `codex/team06-strategy-signal/CF-W1-CAL-01`.
+- Commit: `fd3d464 feat: add calibration readiness trust state`.
+- Worktree status after commit: clean.
+- Push status: not pushed; branch commit remains parked for later integration.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 03 - Architecture Factory | `019e3c20-e9f8-7da2-83f1-ebe84851a830` | `gpt-5.4`, high | architecture readiness | `CF-W1-SIG-TRIGGER-02` | active |
+| 2 | Open slot | none | pending | QA planning | `CF-W1-SIG-TRIGGER-02` if Team 03 returns a bounded child | waiting |
+| 3 | Open slot | none | pending | requirements discovery | next persistent Team 02 cycle after architecture output | waiting |
+| 4 | Open slot | none | pending | next implementation | next promoted Ready item | waiting |
+| 5 | Open slot | none | pending | review/release | next QA-accepted handoff | waiting |
+| 6 | Open slot | none | pending | architect signoff | next Team 10 accepted handoff | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04 is ready for `CF-W1-SIG-TRIGGER-02` QA planning if Team 03 returns a bounded child.
+- Team 02 is ready for the next persistent discovery cycle after current architecture output is consumed.
+- Team 06 is ready for the next Strategy / Signal / Risk implementation only after Team 00 promotes a new Ready item.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
 ## Runtime Recovery
 
 - Prior Team 03 architect agent `019e3c02-4baa-77a3-a567-d5cf34e804db` was no longer visible to the runtime and left no `CF-W1-BT-02` architect signoff files in the BT worktree.
