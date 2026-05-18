@@ -1412,7 +1412,7 @@ Date: 2026-05-18
 ## Teams Ready To Pick Up New Tasks
 
 - Team 04 is ready for `CF-W1-TP-02` QA rerun after Team 06 rework.
-- Team 00 is ready to evaluate `CF-W1-SMI-01` for Ready promotion.
+- Team 06 is ready to implement `CF-W1-SMI-01` after worktree creation.
 - Team 10 is ready for `CF-W1-TP-02` re-review after QA rerun ACCEPT.
 - Team 03 is queued for `CF-W1-L3-TREV-02` architecture after `CF-W1-RH-01`.
 

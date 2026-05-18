@@ -6,6 +6,8 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+`CF-W1-SMI-01` is promoted and assigned to Team 06 for bounded backend-only Smart Money evidence freshness and partial-trust framing in a dedicated worktree. It can run in parallel with `CF-W1-TP-02` rework because the file reservations are disjoint.
+
 `CF-W1-TP-02` is promoted and assigned to Team 06 for bounded backend-only Trade Plan exit/invalidation semantics implementation. It must be based on accepted branch `codex/team06-strategy-signal/CF-W1-TP-01B` because upstream commit `8ff22fd` is not yet in `dev`.
 
 `CF-W1-BT-02` is promoted and assigned to Team 06 for a bounded `backtesting-strategy-lab` implementation in a dedicated worktree.
@@ -63,6 +65,7 @@ No available application-code item is currently waiting unassigned in Ready.
 | `CF-W1-AUTH-SUB-01` | Team 09 - Platform / Auth / Subscription / Notifications | `codex/team09-platform/CF-W1-AUTH-SUB-01` | `../investment-scanner-worktrees/team09-CF-W1-AUTH-SUB-01` | Combined backend-only auth fail-closed and admin/manual subscription controller-policy slice | Accepted and locally committed as `354499d`; awaiting later clean `dev` integration |
 | `CF-W1-SIG-TRIGGER-02A` | Team 06 - Strategy / Signal / Risk | `codex/team06-strategy-signal/CF-W1-SIG-TRIGGER-02A` | `../investment-scanner-worktrees/team06-CF-W1-SIG-TRIGGER-02A` | Backend-only Signal Generation trigger-audit surfacing and provenance labeling | Ready and assigned to Team 06 |
 | `CF-W1-TP-02` | Team 06 - Strategy / Signal / Risk | `codex/team06-strategy-signal/CF-W1-TP-02` | `../investment-scanner-worktrees/team06-CF-W1-TP-02` | Backend-only Trade Plan structured exit/invalidation semantics | Ready and assigned to Team 06; branch must be based on accepted `CF-W1-TP-01B` commit `8ff22fd` |
+| `CF-W1-SMI-01` | Team 06 - Strategy / Signal / Risk | `codex/team06-strategy-signal/CF-W1-SMI-01` | `../investment-scanner-worktrees/team06-CF-W1-SMI-01` | Backend-only Smart Money evidence freshness and partial-trust framing | Ready and assigned to Team 06; can run in parallel with TP-02 rework because files are disjoint |
 
 ## Active Ready Handoff - `CF-W1-BT-02`
 

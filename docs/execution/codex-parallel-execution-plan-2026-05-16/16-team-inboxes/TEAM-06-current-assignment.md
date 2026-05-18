@@ -215,6 +215,63 @@ Update the developer handoff and Team 06 outbox with:
 
 ---
 
+# Parallel Dispatcher Assignment
+
+Date: 2026-05-18
+
+## Assignment
+
+Implement `CF-W1-SMI-01` in a separate Team 06 worktree while `CF-W1-TP-02` rework continues.
+
+This is safe to parallelize because `CF-W1-SMI-01` reserves only `smart-money-intelligence` files, while `CF-W1-TP-02` reserves only `trade-plan-risk-engine` files.
+
+## Worktree / Branch
+
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-SMI-01`
+- Branch: `codex/team06-strategy-signal/CF-W1-SMI-01`
+
+## Source Input
+
+- Ready promotion: `docs/execution/codex-parallel-execution-plan-2026-05-16/09-summaries/team-00-CF-W1-SMI-01-ready-promotion.md`
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SMI-01-smart-money-evidence-freshness-partial-trust-requirement.md`
+- Architecture review: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-SMI-01-architecture-review.md`
+- Contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-SMI-01-smart-money-evidence-freshness-partial-trust-contract.md`
+- Work packet: `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-SMI-01-work-packet.md`
+- QA plan: `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-SMI-01-qa-plan.md`
+
+## Allowed Files
+
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.service.ts`
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.types.ts`
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.md`
+- `backend/tests/modules/smart-money-intelligence/smart-money-intelligence.service.test.ts`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-CF-W1-SMI-01-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-SMI-01-developer-handoff.md`
+
+## Forbidden Files
+
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.repository.ts`
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.controller.ts`
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.router.ts`
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.validation.ts`
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.provider.ts`
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.module.ts`
+- `backend/src/modules/smart-money-intelligence/index.ts`
+- routes, Prisma, generated files, shared backend utilities, shared UI, frontend source/tests, package manifests
+- `market-data-foundation` source, `data-quality-engine` source, downstream consumer source
+- provider/live-data, startup/backfill, paid/cloud, broker, telemetry
+
+## Required Validation
+
+```powershell
+npm.cmd test -- smart-money-intelligence.service.test.ts --runInBand
+npm.cmd run build
+```
+
+Do not commit. Report ready for Team 04 QA Verification when complete.
+
+---
+
 # Latest Assignment Override
 
 Date: 2026-05-18

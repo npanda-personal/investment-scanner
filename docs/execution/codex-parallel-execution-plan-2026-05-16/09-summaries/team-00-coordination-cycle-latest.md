@@ -1630,7 +1630,7 @@ Team 00 routed bounded Team 06 rework without Product Owner escalation:
 ## Teams Ready To Pick Up New Tasks
 
 - Team 04: `CF-W1-TP-02` QA rerun after Team 06 rework.
-- Team 00: `CF-W1-SMI-01` Ready evaluation.
+- Team 06: `CF-W1-SMI-01` implementation after worktree creation.
 - Team 10: `CF-W1-TP-02` re-review after QA rerun ACCEPT.
 
 ---
