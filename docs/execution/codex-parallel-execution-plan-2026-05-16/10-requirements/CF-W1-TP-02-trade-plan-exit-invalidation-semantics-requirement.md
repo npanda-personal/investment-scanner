@@ -15,13 +15,28 @@ Trade-plan output should describe exit and invalidation logic instead of looking
 - Audit `11-module-audits/audit-backtesting-trade-risk.md` found target values emitted from reward-risk geometry.
 - The same audit found backtest and trade-plan invalidation output is still string-based and does not carry structured exit or invalidation rule IDs in a durable way.
 - Root `AGENTS.md` forbids arbitrary target prices and direct advice language.
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.md` still documents target/reward geometry as a core part of plan output and explicitly notes that exit candidates may need a later separate exit-review flow.
+- The same module doc says trade-plan validity currently depends on entry zone, stop, target, and invalidation rules being present, which means exit/invalidation semantics are already central to user trust even when the first bounded compatibility child is handled elsewhere.
 - `CF-W1-TP-01A` and `CF-W1-TP-01B` already cover the backend compatibility hard-block slice, but the broader exit/invalidation semantics remain future work.
+
+## Bounded Requirement
+
+Define the next Trade Plan semantics slice so exit and invalidation logic is explicit, reviewable, and research-support safe.
+
+This follow-on should focus on:
+
+- replacing target-like user interpretation with modeled exit-level or reward-risk exit-condition language;
+- structured exit rule, invalidation rule, and reason evidence where the module owns that information;
+- a clear boundary between long-entry review plans and any future exit-review flow;
+- additive compatibility for existing plan persistence and list/detail reads where practical;
+- no broad schema, route, or UI migration in the first child.
 
 ## Acceptance Criteria
 
 - User-facing target semantics are replaced with modeled exit levels or reward-risk exit conditions.
 - `targetRewardRisk` or equivalent inputs are capped and validated.
 - Exit and invalidation output includes rule IDs, rule version, and reason evidence where the module owns that data.
+- Long-entry review plans and future exit-review semantics are clearly separated so the module does not mix incompatible plan intents.
 - Advice-like target-price wording does not reappear in the accepted contract.
 - Focused tests cover exit-level semantics, invalidation semantics, and rejection of unsupported target-like output.
 
@@ -30,6 +45,7 @@ Trade-plan output should describe exit and invalidation logic instead of looking
 - No broad schema, route, or UI migration without separate approval.
 - No paid service, broker, cloud, or external telemetry work.
 - No claim that the existing compatibility child slice is replaced or merged.
+- No attempt to redesign Today Review, Strategy Decision, or Backtesting in the same pass.
 
 ## Next Gate
 
