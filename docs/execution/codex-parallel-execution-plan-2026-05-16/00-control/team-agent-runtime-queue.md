@@ -2782,3 +2782,33 @@ Date: 2026-05-18
 - Team 00: `CF-W1-MCTX-01` delegated PO acceptance and scoped branch commit if Architect Signoff accepts.
 - Team 04: `CF-W1-BT-01A` QA planning after Team 03 returns architecture output.
 - Team 02: persistent requirements discovery after current gate pressure clears.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Completed Since Previous Snapshot
+
+- Team 03 `019e3cd9-734c-72b2-bd3c-fd50abedfb96`: accepted `CF-W1-MCTX-01` Architect Signoff; closed.
+- Team 00 completed delegated PO acceptance and committed `CF-W1-MCTX-01` locally on its feature branch as `e695f0c`.
+- Team 04 `019e3cdb-84a6-7d61-a53b-8daa212e0147`: completed `CF-W1-BT-01A` QA planning; closed.
+
+## Current Pool
+
+No spawned agents are active at this checkpoint.
+
+## Queued Work
+
+| Queue | Team | Assignment |
+| --- | --- | --- |
+| 1 | Team 00 | Decide `CF-W1-BT-01A` sequencing / stacking against accepted parked `CF-W1-BT-02`. |
+| 2 | Team 02 | Relaunch persistent requirements discovery. |
+| 3 | Team 03 | Next architecture prep after Team 00 selects an unblocked item. |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 00: `CF-W1-BT-01A` sequencing / Ready evaluation.
+- Team 02: persistent requirements discovery.
+- Team 03: next architecture prep after the sequencing decision.

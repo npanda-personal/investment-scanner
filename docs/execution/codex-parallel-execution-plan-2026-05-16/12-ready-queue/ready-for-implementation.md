@@ -49,6 +49,8 @@ No available application-code item is currently waiting unassigned in Ready.
 
 `CF-W1-MD-03` completed QA, Team 10 review, Architect Signoff, delegated PO acceptance, and scoped local branch commit `58c5404`; it is parked for later clean integration.
 
+`CF-W1-MCTX-01` completed QA rerun, Team 10 review, Architect Signoff, delegated PO acceptance, and scoped local branch commit `e695f0c`; it is parked for later clean integration.
+
 ## Pulled / In Review
 
 | ID | Owner | Branch | Worktree | Scope | Status |

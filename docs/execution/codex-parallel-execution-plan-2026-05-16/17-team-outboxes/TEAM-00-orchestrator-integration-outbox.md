@@ -323,6 +323,38 @@ No push or `dev` merge was performed.
 - Team 04: `CF-W1-BT-01A` QA planning after Team 03 architecture prep.
 - Team 02: persistent requirements discovery after current gate pressure clears.
 
+---
+
+# Runtime Checkpoint - MCTX Accepted
+
+Date: 2026-05-18
+
+## Gate Result
+
+`CF-W1-MCTX-01` completed all standing gates:
+
+- Team 04 QA rerun: ACCEPT.
+- Team 10 review: ACCEPT.
+- Team 03 Architect Signoff: ACCEPT.
+- Team 00 delegated PO acceptance: complete.
+- Scoped local branch commit: `e695f0c feat: add market context evidence framing`.
+
+No push or `dev` merge was performed.
+
+## Prep Result
+
+`CF-W1-BT-01A`
+
+- Team 03 architecture prep completed as characterization-only.
+- Team 04 QA planning completed.
+- Team 00 must sequence it against accepted parked `CF-W1-BT-02` before any implementation.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 00: evaluate `CF-W1-BT-01A` sequencing / stacking against `CF-W1-BT-02`.
+- Team 02: persistent requirements discovery.
+- Team 03: next architecture prep after Team 00 chooses the next unblocked item.
+
 Open decisions: 0.
 
 ---
