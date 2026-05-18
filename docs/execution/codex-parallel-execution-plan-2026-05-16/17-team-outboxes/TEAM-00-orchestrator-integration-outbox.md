@@ -1088,3 +1088,37 @@ Date: 2026-05-18
 ## Next Action
 
 Evaluate `CF-W1-AUTH-01` for Ready promotion and decide whether it must be sequenced or combined with `CF-W1-SUB-01`.
+
+---
+
+# Runtime Checkpoint - AUTH/SUB Combined Promotion
+
+Date: 2026-05-18
+
+## Promotion Result
+
+Team 00 promoted `CF-W1-AUTH-SUB-01` as one combined Team 09 backend-only controller-policy handoff.
+
+This combines:
+
+- `CF-W1-AUTH-01` - protected Team 09 controllers fail closed when `req.user.id` is missing.
+- `CF-W1-SUB-01` - ordinary users cannot self-change subscription plans or self-select `ADMIN`.
+
+The combination is intentional because standalone packets overlap on `subscription-billing.controller.ts`, `subscription-billing.controller.test.ts`, and `subscription-billing.md`.
+
+## Branch / Worktree
+
+- Branch: `codex/team09-platform/CF-W1-AUTH-SUB-01`
+- Worktree: `../investment-scanner-worktrees/team09-CF-W1-AUTH-SUB-01`
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 09 is ready to implement `CF-W1-AUTH-SUB-01`.
+- Team 04 is ready to verify after Team 09 handoff.
+- Team 10 is ready to review after Team 04 accepts.
+- Team 03 is ready for Architect Signoff after Team 10 accepts.
+- Team 02 can continue PO/requirements discovery when a slot is available.
+
+## Product Owner Action
+
+Not required. Both source policies are already resolved by Product Owner Option A decisions, and this handoff stays inside the approved module-local Team 09 boundaries.

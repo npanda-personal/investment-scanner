@@ -589,3 +589,33 @@ Date: 2026-05-18
 - Team 04 is ready for the next QA packet or QA verification.
 - Team 10 is ready for the next review/release gate.
 - Team 02 is ready for another requirements discovery cycle after Team 00 consumes this output.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Current Promotion
+
+- `CF-W1-AUTH-SUB-01` is promoted to Ready as a combined Team 09 controller-policy slice.
+- Branch/worktree queued: `codex/team09-platform/CF-W1-AUTH-SUB-01` / `../investment-scanner-worktrees/team09-CF-W1-AUTH-SUB-01`.
+
+## Current Pool
+
+| Slot | Team | Agent | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Team 09 - Platform / Auth / Subscription / Notifications | pending spawn | implementation | `CF-W1-AUTH-SUB-01` | ready |
+| 2 | Open slot | none | QA | `CF-W1-AUTH-SUB-01` after Team 09 handoff | waiting |
+| 3 | Open slot | none | review | `CF-W1-AUTH-SUB-01` after Team 04 ACCEPT | waiting |
+| 4 | Open slot | none | signoff | `CF-W1-AUTH-SUB-01` after Team 10 ACCEPT | waiting |
+| 5 | Open slot | none | PO + requirements discovery | next discovery cycle | ready |
+| 6 | Open slot | none | architecture / QA prep | next top docs-only item | ready |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 09 is ready to implement `CF-W1-AUTH-SUB-01`.
+- Team 04 is ready for the QA gate after Team 09 hands off.
+- Team 10 is ready after Team 04 accepts.
+- Team 03 is ready after Team 10 accepts.
+- Team 02 is ready for another PO/requirements cycle when a slot is available.

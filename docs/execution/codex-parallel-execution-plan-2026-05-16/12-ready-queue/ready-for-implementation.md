@@ -28,6 +28,8 @@ No available application-code item is currently waiting unassigned in Ready.
 
 `CF-W1-MD-01` was promoted and pulled by Team 05 for a narrowed backend-only reject-only Market Data validator child. QA, Team 10 review, Architect Signoff, delegated PO acceptance, and scoped local commit are complete on the Team 05 branch.
 
+`CF-W1-AUTH-SUB-01` is promoted and assigned to Team 09 in a dedicated worktree for one combined backend-only controller-policy handoff covering `CF-W1-AUTH-01` and `CF-W1-SUB-01`. This avoids the shared `subscription-billing.controller.ts` collision by using a single writer.
+
 ## Pulled / In Review
 
 | ID | Owner | Branch | Worktree | Scope | Status |
@@ -42,6 +44,81 @@ No available application-code item is currently waiting unassigned in Ready.
 | `CF-W1-MD-01` | Team 05 - Market Data / Data Quality | `codex/team05-market-data/CF-W1-MD-01` | `../investment-scanner-worktrees/team05-CF-W1-MD-01` | Backend-only reject-only historical-price validator hardening | Accepted and locally committed as `913b56b`; awaiting later clean `dev` integration |
 | `CF-W1-L3-TREV-01` | Team 07 - Portfolio / Watchlist / Alerts | `codex/team07-portfolio-alerts/CF-W1-L3-TREV-01` | `../investment-scanner-worktrees/team07-CF-W1-L3-TREV-01` | Today Review run/list publication evidence and readiness-coherence normalization | Ready and assigned to Team 07 |
 | `CF-W1-SQLAB-01` | Team 06 - Strategy / Signal / Risk | `codex/team06-strategy-signal/CF-W1-SQLAB-01` | `../investment-scanner-worktrees/team06-CF-W1-SQLAB-01` | Backend-only Signal Quality Lab outcome-confidence metadata | Ready and assigned to Team 06 |
+| `CF-W1-AUTH-SUB-01` | Team 09 - Platform / Auth / Subscription / Notifications | `codex/team09-platform/CF-W1-AUTH-SUB-01` | `../investment-scanner-worktrees/team09-CF-W1-AUTH-SUB-01` | Combined backend-only auth fail-closed and admin/manual subscription controller-policy slice | Ready and assigned to Team 09 |
+
+## Active Ready Handoff - `CF-W1-AUTH-SUB-01`
+
+Date promoted: 2026-05-18
+
+Team 00 evaluated `CF-W1-AUTH-01` and `CF-W1-SUB-01` against Ready gates and promoted one combined Team 09 backend-only controller-policy slice to avoid overlapping subscription controller/test/doc writers.
+
+Gate evidence:
+
+- Auth requirement: `10-requirements/CF-W1-AUTH-01-platform-auth-default-user-fallback-requirement.md`
+- Subscription requirement: `10-requirements/CF-W1-SUB-01-local-manual-subscription-plan-policy-requirement.md`
+- Auth contract: `06-contracts/CF-W1-AUTH-01-platform-auth-fail-closed-contract.md`
+- Subscription contract: `06-contracts/CF-W1-SUB-01-manual-subscription-plan-policy-contract.md`
+- Auth work packet: `08-work-packets/CF-W1-AUTH-01-work-packet.md`
+- Subscription work packet: `08-work-packets/CF-W1-SUB-01-work-packet.md`
+- Combined work packet: `08-work-packets/CF-W1-AUTH-SUB-01-combined-controller-policy-work-packet.md`
+- Combined QA plan: `04-qa/CF-W1-AUTH-SUB-01-controller-policy-qa-plan.md`
+- Team 09 readiness evidence: `17-team-outboxes/TEAM-09-outbox.md`
+- Open decisions: none.
+- Shared-file conflict: resolved by one combined Team 09 writer.
+
+Branch/worktree:
+
+- Branch: `codex/team09-platform/CF-W1-AUTH-SUB-01`
+- Worktree: `../investment-scanner-worktrees/team09-CF-W1-AUTH-SUB-01`
+
+Allowed files:
+
+- `backend/src/modules/subscription-billing/subscription-billing.controller.ts`
+- `backend/src/modules/notifications-delivery/notifications-delivery.controller.ts`
+- `backend/tests/modules/subscription-billing/subscription-billing.controller.test.ts`
+- `backend/tests/modules/notifications-delivery/notifications-delivery.controller.test.ts`
+- `backend/src/modules/subscription-billing/subscription-billing.md`
+- `backend/src/modules/notifications-delivery/notifications-delivery.md`
+
+Allowed branch-local evidence docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-09-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-AUTH-SUB-01-developer-handoff.md`
+
+Forbidden files:
+
+- `backend/src/modules/auth-identity/**`
+- shared auth middleware
+- backend route registries
+- subscription or notification routers
+- subscription or notification services, repositories, providers, or validation files
+- Prisma schema or migrations
+- shared backend utilities or shared DTOs
+- frontend files, routes, or shared UI
+- package manifests
+- generated files
+- backend server or env-example files
+- provider startup/backfill, live-provider, paid/cloud, broker, telemetry, or credential flows
+
+Required behavior:
+
+- protected subscription controller actions fail closed when `req.user.id` is missing;
+- protected notification controller actions fail closed when `req.user.id` is missing;
+- protected controllers must not call services with `default-user`;
+- authenticated controller actions pass the actual `req.user.id`;
+- ordinary users cannot self-change plans or self-select `ADMIN`;
+- admin/manual plan update remains guarded by `ADMIN_API_KEY`;
+- subscription/notification docs describe the controller policy and frontend subscription UI limitation.
+
+Focused validation command:
+
+```powershell
+cd backend
+npm.cmd test -- subscription-billing.controller.test.ts notifications-delivery.controller.test.ts --runInBand
+npm.cmd run build
+```
+
+Stop and return to Team 00 if implementation requires auth middleware, route registries, routers, services, repositories, providers, validation files, Prisma/schema/migrations, shared utilities/UI, frontend, package/generated/server/env files, paid/cloud/live-provider/startup/backfill/broker/telemetry/credential scope, or changing public route paths.
 
 ## Active Ready Handoff - `CF-W1-SQLAB-01`
 

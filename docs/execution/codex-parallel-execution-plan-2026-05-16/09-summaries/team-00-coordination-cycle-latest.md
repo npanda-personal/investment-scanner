@@ -365,3 +365,30 @@ Date: 2026-05-18
 ## Next Coordination Action
 
 Evaluate `CF-W1-AUTH-01` for Ready promotion, with explicit sequencing against `CF-W1-SUB-01` because subscription/auth files may overlap.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
+## Ready Promotion
+
+`CF-W1-AUTH-SUB-01`
+
+- Team 00 promoted one combined Team 09 backend-only controller-policy handoff covering `CF-W1-AUTH-01` and `CF-W1-SUB-01`.
+- The combined handoff resolves the shared `subscription-billing.controller.ts` / controller-test / module-doc conflict by assigning one writer.
+- Allowed source/test/doc files are limited to subscription and notification controllers, new focused controller tests, and module docs.
+- Forbidden scope remains auth middleware, route registries, routers, services, repositories, providers, validation files, Prisma/schema, shared utilities/UI, frontend, packages, generated files, startup/backfill, live providers, paid/cloud, broker, telemetry, and credentials.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 09 is ready to implement `CF-W1-AUTH-SUB-01` in `../investment-scanner-worktrees/team09-CF-W1-AUTH-SUB-01`.
+- Team 04 is ready for QA verification after Team 09 handoff.
+- Team 10 is ready for review after Team 04 accepts.
+- Team 03 is ready for Architect Signoff after Team 10 accepts.
+- Team 02 is ready for the next requirements discovery cycle after Team 00 starts the implementation lane.
+
+## Next Coordination Action
+
+Create the Team 09 worktree and spawn Team 09 implementation for `CF-W1-AUTH-SUB-01`.
