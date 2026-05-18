@@ -43,7 +43,7 @@ Strategy Framework durable rule-history and persisted strategy-definition proven
 
 ## Evidence Summary
 
-- `12-ready-queue/ready-for-implementation.md` shows `CF-W1-MCTX-01` was already promoted on 2026-05-18, so Team 02’s prior queue docs were stale in still treating it as the next unassigned pull.
+- `12-ready-queue/ready-for-implementation.md` shows `CF-W1-MCTX-01` was already promoted on 2026-05-18, so Team 02's prior queue docs were stale in still treating it as the next unassigned pull.
 - Team 03 architecture evidence shows `CF-W1-STRAT-02A` already solved the no-schema trust-surfacing slice on branch commit `359d0a3`.
 - The remaining Strategy Framework gap is durable persisted history because current persistence is still `code`-unique and repository seeding can overwrite older definition rows.
 - That remaining work is bounded enough to promote from blocked parent `CF-W1-STRAT-02` into explicit child `CF-W1-STRAT-02B`.
@@ -57,7 +57,7 @@ Strategy Framework durable rule-history and persisted strategy-definition proven
 
 ## Queue Delta
 
-- `CF-W1-MCTX-01` was removed from Team 02’s unassigned pull ranking because the current Ready queue already shows it promoted and assigned to Team 05 on 2026-05-18.
+- `CF-W1-MCTX-01` was removed from Team 02's unassigned pull ranking because the current Ready queue already shows it promoted and assigned to Team 05 on 2026-05-18.
 - `CF-W1-STRAT-02` is now treated as blocked parent lineage only, not as a direct next pull.
 - `CF-W1-STRAT-02B` is now the next top unassigned docs-only requirement for Team 00 routing.
 - `CF-W1-BT-01A` now sits immediately behind `CF-W1-STRAT-02B` as the next direct investor/trader-value unassigned pull.
@@ -91,3 +91,22 @@ Strategy Framework durable rule-history and persisted strategy-definition proven
 - No item was moved to Ready by Team 02.
 - No application files were reserved or modified.
 - No commit was created.
+
+## 2026-05-18 Direct-Value Stack Refresh
+
+This is the current Team 02 read on the unassigned direct investor/trader-value stack after rechecking the live queue against the post-`613959f` state.
+
+- `CF-W1-STRAT-02B` remains the top unassigned docs-only requirement and should stay the first Team 00 routing candidate.
+- `CF-W1-BT-01A` remains the next unassigned direct-value item, but Team 03 should prep it only after `CF-W1-STRAT-02B` is routed.
+- `CF-W1-SQLAB-02` remains third in the stack and stays sequenced behind active `CF-W1-SQLAB-02A`.
+- `CF-W1-MD-02` remains the next upstream parent after `BT-01A` and `SQLAB-02`.
+- `CF-W1-CAL-01` is not part of the unassigned stack; it is already accepted/committed and stays excluded from this discovery pass.
+
+Blockers that still hold the ordering:
+
+- `CF-W1-STRAT-02B` is approval-gated and likely needs schema/generated/repository impact in one writer set.
+- `CF-W1-BT-01A` is deliberately characterization-only and should stay ahead of any larger backtesting rewrite.
+- `CF-W1-SQLAB-02` remains sequenced behind active `CF-W1-SQLAB-02A`.
+- `CF-W1-MD-02` remains parent-only until the active child split finishes.
+
+Team 03 should prep `BT-01A` next only in the sense that it is the next direct-value prep candidate after `STRAT-02B`; it should not jump ahead of `STRAT-02B`.
