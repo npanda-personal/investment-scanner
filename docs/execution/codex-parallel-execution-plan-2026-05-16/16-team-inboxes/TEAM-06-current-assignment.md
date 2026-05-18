@@ -142,6 +142,98 @@ Update `17-team-outboxes/TEAM-06-outbox.md` with:
 
 ---
 
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Implement `CF-W1-TP-02` - bounded Trade Plan exit and invalidation semantics.
+
+This latest override supersedes older Team 06 assignment tails above. Do not implement in shared `dev`.
+
+## Branch / Worktree
+
+- Base branch: `codex/team06-strategy-signal/CF-W1-TP-01B`
+- Base commit: `8ff22fd`
+- Branch: `codex/team06-strategy-signal/CF-W1-TP-02`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-TP-02`
+
+`CF-W1-TP-01B` is accepted branch-locally but not yet an ancestor of `dev`; preserve its DQ hard-block behavior.
+
+## Evidence To Use
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-TP-02-trade-plan-exit-invalidation-semantics-requirement.md`
+- Architecture review: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-TP-02-architecture-review.md`
+- Contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-TP-02-exit-invalidation-semantics-contract.md`
+- Work packet: `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-TP-02-work-packet.md`
+- QA plan: `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-TP-02-qa-plan.md`
+- Ready promotion: `docs/execution/codex-parallel-execution-plan-2026-05-16/09-summaries/team-00-CF-W1-TP-02-ready-promotion.md`
+
+## Allowed Files
+
+You may edit only:
+
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.service.ts`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.types.ts`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.validation.ts`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.geometry.ts`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.md`
+- `backend/tests/modules/trade-plan-risk-engine/trade-plan-risk-engine.service.test.ts`
+- `backend/tests/trade-plan-risk-engine.paper-readiness.test.ts`
+
+Allowed reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-TP-02-developer-handoff.md`
+
+## Forbidden Files
+
+Do not edit:
+
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.repository.ts`
+- `backend/tests/modules/trade-plan-risk-engine/trade-plan-risk-engine.repository.test.ts`
+- Prisma schema or migrations
+- generated files
+- backend or frontend route registries
+- Today Review backend/frontend files
+- frontend Trade Plan files
+- Strategy Decision or backtesting source/tests
+- shared backend utilities
+- shared frontend components
+- package manifests
+- provider/live-data, startup/backfill, paid/cloud, broker, or telemetry scope
+
+## Required Behavior
+
+- Preserve accepted `CF-W1-TP-01B` DQ hard-block behavior.
+- Add additive `exitConditions` and `invalidationConditions`.
+- Keep legacy `target` and `invalidationRules` as compatibility output only.
+- Do not treat target-shaped fields as trusted readiness proof.
+- Reject non-finite `targetRewardRisk` and values outside `0.5` to `5.0` inclusive.
+- Use modeled exit/invalidation language, not target-price advice.
+- Preserve existing routes and avoid repository/schema/frontend migration.
+
+## Focused Validation
+
+Run in the Team 06 worktree:
+
+```powershell
+cd C:\work\repo\investment-scanner-worktrees\team06-CF-W1-TP-02\backend
+npm.cmd test -- trade-plan-risk-engine.service.test.ts trade-plan-risk-engine.paper-readiness.test.ts --runInBand
+npm.cmd run build
+```
+
+## Stop Conditions
+
+Stop and return to Team 00 if implementation requires repository, Prisma/schema, route, frontend, Today Review, Strategy Decision, backtesting, shared utility/UI, package, generated, provider/live-data, startup/backfill, paid/cloud, broker, or telemetry scope.
+
+## Expected Outbox
+
+Update `17-team-outboxes/TEAM-06-outbox.md` and `18-integration-queue/CF-W1-TP-02-developer-handoff.md` with exact files changed, behavior changed, tests run/results, skipped checks, forbidden files confirmed untouched, assumptions, risks, blockers, and next gate: Team 04 QA.
+
+---
+
 # Current Active Assignment Override
 
 Date: 2026-05-18

@@ -1428,6 +1428,39 @@ No spawned subagent is active at this checkpoint.
 
 Date: 2026-05-18
 
+## Ready Promotion
+
+`CF-W1-TP-02` is promoted and assigned to Team 06.
+
+Important sequencing:
+
+- `CF-W1-TP-01B` accepted branch commit `8ff22fd` is not an ancestor of `dev`.
+- `CF-W1-TP-02` must be based on branch `codex/team06-strategy-signal/CF-W1-TP-01B`, not plain `dev`, so DQ hard-block behavior is preserved.
+
+## Current Active Agents
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 06 - Strategy / Signal / Risk | pending spawn | `gpt-5.3-codex`, high | implementation | `CF-W1-TP-02` | ready |
+| 2 | Open slot | none | pending | QA verification | `CF-W1-TP-02` after Team 06 handoff | waiting |
+| 3 | Open slot | none | pending | review/release | `CF-W1-TP-02` after Team 04 ACCEPT | waiting |
+| 4 | Open slot | none | pending | architect signoff | `CF-W1-TP-02` after Team 10 ACCEPT | waiting |
+| 5 | Open slot | none | pending | rolling requirement discovery | next Team 02 task after Team 06 launch | waiting |
+| 6 | Open slot | none | pending | rolling architecture readiness | next Team 03 task after Team 06 launch | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06: implement `CF-W1-TP-02` now.
+- Team 04: QA after Team 06 handoff.
+- Team 10: review after Team 04 ACCEPT.
+- Team 03: Architect Signoff after Team 10 ACCEPT.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
 ## Team 00 Dispatcher Rule
 
 Team 00 is the explicit dispatcher for Team 02 and Team 03. Team 02 and Team 03 should not self-monitor for whether to switch between signoff support, acceptance support, discovery, or design work. Team 00 assigns the task type and records it here.

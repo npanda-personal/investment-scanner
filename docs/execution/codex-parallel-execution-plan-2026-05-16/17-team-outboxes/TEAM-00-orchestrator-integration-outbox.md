@@ -1714,6 +1714,32 @@ Date: 2026-05-18
 
 ---
 
+# Ready Promotion Checkpoint
+
+Date: 2026-05-18
+
+## Work Item
+
+`CF-W1-TP-02` - Trade Plan exit and invalidation semantics.
+
+## Result
+
+Promoted and assigned to Team 06 as a dependent branch based on accepted `CF-W1-TP-01B`.
+
+- Base branch: `codex/team06-strategy-signal/CF-W1-TP-01B`
+- Required base commit: `8ff22fd`
+- New branch: `codex/team06-strategy-signal/CF-W1-TP-02`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-TP-02`
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06: implement `CF-W1-TP-02`.
+- Team 04: QA after Team 06 handoff.
+- Team 10: review after QA ACCEPT.
+- Team 03: Architect Signoff after Team 10 ACCEPT.
+
+---
+
 # Dispatcher Runtime Checkpoint
 
 Date: 2026-05-18

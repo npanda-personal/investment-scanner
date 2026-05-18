@@ -1644,6 +1644,30 @@ No spawned subagent is active at this checkpoint.
 
 Date: 2026-05-18
 
+## Ready Promotion
+
+`CF-W1-TP-02` passed Team 00 sequencing / Ready evaluation as a dependent branch.
+
+Promotion notes:
+
+- Requirement, architecture review, contract, work packet, QA plan, exact reservations, and open-decision gates are present.
+- No Product Owner action is required.
+- No schema, route, shared-file, frontend, package, provider/live-data, startup/backfill, paid/cloud, broker, or telemetry scope is approved.
+- The implementation branch must be based on accepted `CF-W1-TP-01B` branch commit `8ff22fd`, because that commit is not in `dev`.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06: implement `CF-W1-TP-02`.
+- Team 04: QA after Team 06 handoff.
+- Team 10: review after Team 04 ACCEPT.
+- Team 03: Architect Signoff after Team 10 ACCEPT.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
 ## Dispatcher Model
 
 Team 00 now explicitly decides whether Team 02 and Team 03 receive signoff / acceptance support or rolling discovery / design tasks. Team 02 and Team 03 should not self-switch based on passive monitoring.
