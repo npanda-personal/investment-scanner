@@ -72,6 +72,11 @@ These are the clearest next moves that do not collide with the currently active 
    - do not send it back through Team 02 discovery;
    - hand it to Team 04 only after Team 03 finishes the packet.
 
+5. `CF-W1-L3-DQ-01`
+   - route through Team 00 evaluation for the Lane 3 readiness consumer policy next;
+   - Team 03 and Team 04 child prep already exists in the downstream portfolio/watchlist/alert packets;
+   - keep it ahead of watchlist and concentration-review follow-ons because it is a correctness and user-safety gate.
+
 ## Items That Should Not Be Misrouted
 
 - Do not treat `CF-W1-STRAT-02B` itself as Ready. The current packet says the real implementation opening is `CF-W1-STRAT-02B1`, and that child needs explicit schema/migration/generated/repository consent.
@@ -87,7 +92,8 @@ These are the clearest next moves that do not collide with the currently active 
 For the next direct-value cycle, Team 00 should:
 
 1. keep `CF-W1-SIG-02` in active Team 03 architecture prep and do not reopen it as a Team 02 discovery pull;
-2. evaluate `CF-W1-RH-01` for Ready promotion without reopening requirement discovery;
-3. evaluate `CF-W1-L3-TREV-02` for Ready promotion when Today Review writer sequencing is safe;
-4. keep `CF-W1-SQLAB-02A` in sequencing control only;
-5. open Team 03 / Team 04 storage-consent prep for `CF-W1-SQLAB-02B` only if Team 00 intentionally approves the Prisma/schema/repository/generated gate.
+2. evaluate `CF-W1-L3-DQ-01` for Lane 3 readiness contract prep before watchlist/concentration-review follow-ons;
+3. evaluate `CF-W1-RH-01` for Ready promotion without reopening requirement discovery;
+4. evaluate `CF-W1-L3-TREV-02` for Ready promotion when Today Review writer sequencing is safe;
+5. keep `CF-W1-SQLAB-02A` in sequencing control only;
+6. open Team 03 / Team 04 storage-consent prep for `CF-W1-SQLAB-02B` only if Team 00 intentionally approves the Prisma/schema/repository/generated gate.

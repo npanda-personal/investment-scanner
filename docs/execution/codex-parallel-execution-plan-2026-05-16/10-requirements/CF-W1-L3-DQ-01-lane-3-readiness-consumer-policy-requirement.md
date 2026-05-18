@@ -12,6 +12,8 @@ This is a parent policy requirement for Lane 3 consumers. Product Owner approved
 
 Portfolio, watchlist, and alert workflows must not treat market data or signal context as trusted unless Data Quality readiness has been proven. Users may still need research visibility, but action-like alerts, reliability claims, and portfolio intelligence labels must fail closed or show explicit blockers when readiness is missing, stale, limited, or not ready.
 
+This is the next direct trader-safety gate after the current market-data and signal-evidence slices because it stops unready evidence from leaking into portfolio, watchlist, alert, and portfolio-intelligence surfaces before the user can treat those surfaces as trustworthy.
+
 ## Current Evidence
 
 Latest inputs:
@@ -40,6 +42,10 @@ Approved policy:
 - Alerts, action-like workflows, reliability labels, and trusted summaries require `READY`.
 - Missing, stale hard blockers, unsupported, `NOT_READY`, and `UNUSABLE` remain blocked.
 - Child slices must not overclaim reliability and must implement one module at a time with focused tests.
+
+## Priority Position
+
+Keep this requirement ahead of watchlist-actionability, concentration-review, and workbench convenience slices. It is a correctness and user-safety gate, not a cosmetic refinement.
 
 ## Candidate Acceptance Criteria
 

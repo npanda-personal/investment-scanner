@@ -4,7 +4,7 @@ Date: 2026-05-18
 
 Mode: focused QA rerun plus docs-only QA planning.
 
-## 2026-05-19 `CF-W1-SIG-02` Canonical Trigger Evidence Compatibility QA Planning
+## 2026-05-18 `CF-W1-SIG-02` Canonical Trigger Evidence Compatibility QA Planning
 
 - Team: `TEAM-04` - QA Factory
 - Mode: docs-only QA packet preparation
@@ -71,7 +71,7 @@ Mode: focused QA rerun plus docs-only QA planning.
 - Evidence notes:
   - Team 04 used the active execution folder, source packet docs, the ready queue reference, and current Signal Generation source/test surfaces only; no application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, builds, services, providers, or live data were modified or run
 
-## 2026-05-19 `CF-W1-BT-03` Backtesting Proof-Basis / Overfit Guardrail QA Planning
+## 2026-05-18 `CF-W1-BT-03` Backtesting Proof-Basis / Overfit Guardrail QA Planning
 
 - Team: `TEAM-04` - QA Factory
 - Mode: docs-only QA packet preparation
@@ -146,7 +146,7 @@ Mode: focused QA rerun plus docs-only QA planning.
 - Evidence notes:
   - Team 04 used the active execution folder, current backtesting source/test surfaces, and comparable BT-02 QA-plan patterns only; no application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, builds, services, providers, or live data were modified or run
 
-## 2026-05-19 `CF-W1-STRAT-03` Strategy Decision Review Provenance QA Planning
+## 2026-05-18 `CF-W1-STRAT-03` Strategy Decision Review Provenance QA Planning
 
 - Team: `TEAM-04` - QA Factory
 - Mode: docs-only QA packet preparation

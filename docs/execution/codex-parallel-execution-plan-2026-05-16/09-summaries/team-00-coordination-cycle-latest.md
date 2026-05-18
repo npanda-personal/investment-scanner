@@ -49,21 +49,21 @@ Team 02 completed a rolling direct-value requirements cycle and added `CF-W1-SQL
 - `CF-W1-SIG-02` sequencing decision: promote as a stacked Team 06 implementation branch on accepted parked `CF-W1-SIG-TRIGGER-02A` commit `788c237`.
 - `CF-W1-BT-01A` Team 04 QA rerun accepted; next gate is Team 10 review.
 - `CF-W1-BT-01A` Team 10 review accepted; next gate is Team 03 Architect Signoff.
+- `CF-W1-BT-01A` completed Architect Signoff, delegated PO acceptance, and scoped local branch commit `83a69c0` on branch `codex/team06-strategy-signal/CF-W1-BT-01A`.
+- `CF-W1-SIG-02` Team 06 implementation completed in the stacked worktree; focused Signal Generation tests and backend build passed; next gate is Team 04 QA.
+- `CF-W1-SQLAB-02B` architecture is proposal-only and remains blocked from implementation until explicit schema/generated/repository consent is opened.
+- Team 02 moved `CF-W1-L3-DQ-01` up as the next trader-safety readiness gate before watchlist/actionability follow-ons.
 
 ## Active Agents
 
-- Team 06 `019e3d52-a82a-7e30-a217-00abc31fdc68`: `CF-W1-SIG-02` stacked Signal Generation implementation.
-- Team 03 `019e3d57-11b7-7a01-84ef-c2dafbfe5bf4`: `CF-W1-SQLAB-02B` proposal-only storage architecture prep.
-- Team 02 `019e3d57-11ed-7bf3-8b64-2e0f7e5481b2`: rolling direct-value requirements discovery.
-- Team 03 `019e3d57-ee47-74e3-a2c2-dd9a3f359935`: `CF-W1-BT-01A` Architect Signoff.
+No active spawned agents at this checkpoint before the next launch wave.
 
 ## Teams Ready To Pick Up New Tasks
 
-- Team 03: active on `CF-W1-BT-01A` Architect Signoff.
-- Team 06: active on `CF-W1-SIG-02` stacked Signal Generation implementation.
-- Team 03: active on `CF-W1-SQLAB-02B` proposal-only storage architecture prep.
-- Team 02: active on rolling requirements discovery.
-- Team 00: Ready evaluation for `CF-W1-RH-01` or `CF-W1-L3-TREV-02` when current gate pressure clears.
+- Team 04: `CF-W1-SIG-02` QA verification.
+- Team 03: `CF-W1-L3-DQ-01` architecture/contract prep.
+- Team 02: rolling direct-value requirements discovery.
+- Team 04: `CF-W1-SQLAB-02B` proposal QA review after SIG-02 QA slot clears or in parallel if write scopes stay isolated.
 
 ## Product Owner Action
 

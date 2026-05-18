@@ -55,7 +55,7 @@ Reason:
 
 ## Timestamp / Provenance Decision
 
-Decision recorded on 2026-05-19:
+Decision recorded on 2026-05-18:
 
 - current owned persisted row timestamps require repository reads/mapping and must be surfaced as proven evidence;
 - current owned run timing/status requires repository relation reads and must be surfaced when available;

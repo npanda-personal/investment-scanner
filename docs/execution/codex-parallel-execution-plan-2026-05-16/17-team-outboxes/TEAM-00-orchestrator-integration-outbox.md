@@ -51,10 +51,15 @@ Gate results:
 
 Teams ready to pick up new tasks:
 
-- Team 03: active on `CF-W1-BT-01A` Architect Signoff as agent `019e3d57-ee47-74e3-a2c2-dd9a3f359935`.
-- Team 03: active on `CF-W1-SQLAB-02B` proposal-only storage architecture prep as agent `019e3d57-11b7-7a01-84ef-c2dafbfe5bf4`.
-- Team 06: active on `CF-W1-SIG-02` stacked Signal Generation implementation as agent `019e3d52-a82a-7e30-a217-00abc31fdc68`.
-- Team 02: active on rolling direct investor/trader-value requirements discovery as agent `019e3d57-11ed-7bf3-8b64-2e0f7e5481b2`.
+- Team 04: `CF-W1-SIG-02` QA verification.
+- Team 03: `CF-W1-L3-DQ-01` architecture/contract prep.
+- Team 02: rolling direct investor/trader-value requirements discovery.
+- Team 04: `CF-W1-SQLAB-02B` proposal QA review after SIG-02 QA slot clears or in parallel with isolated files.
+
+Accepted branch commits recorded this cycle:
+
+- `CF-W1-STRAT-03`: `3c41e41 feat: add strategy decision provenance`
+- `CF-W1-BT-01A`: `83a69c0 test: characterize backtesting dq defaults`
 
 Product Owner action required: no.
 

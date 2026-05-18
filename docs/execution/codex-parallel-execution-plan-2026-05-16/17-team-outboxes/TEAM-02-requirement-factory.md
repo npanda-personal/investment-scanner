@@ -4,7 +4,46 @@ Date: 2026-05-18
 
 Mode: docs-only requirement discovery after rechecking root `AGENTS.md`, the live runtime queue, ready/blocked queues, next-top-10 candidates, backlog/refinement queues, current module audits, and current backtesting source docs. No application code, tests, Prisma, route registries, package manifests, generated files, Team 00 control docs, Ready queue files, architecture docs, or QA docs changed.
 
-## 2026-05-19 Watchlist Review Queue Priority Refresh
+## 2026-05-18 Lane 3 Readiness Gate Priority Refresh
+
+## Work Item
+
+Refresh the direct investor/trader-value queue so the Lane 3 readiness consumer policy no longer trails watchlist/concentration-review work when the actual blocker is unready market data leaking into trader-facing surfaces.
+
+## Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-DQ-01-lane-3-readiness-consumer-policy-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+## Priority Delta
+
+- `CF-W1-L3-DQ-01` is now the next direct trader-safety candidate after the current evidence-stack items.
+- `CF-W1-L3-WATCH-01`, `CF-W1-L3-INTEL-03`, and `CF-W1-UX-01` move behind the readiness gate because they are review/actionability conveniences, not the correctness blocker itself.
+- `CF-W1-SQLAB-02B` remains the next fresh Team 02 discovery item because the durable research-memory gap is still the next unassigned storage-consent pull.
+
+## Blockers
+
+- `CF-W1-SQLAB-02B` remains blocked on explicit Prisma/schema/repository/generated consent.
+- `CF-W1-L3-DQ-01` is not Ready for Implementation; it still needs Team 00 to route it for Team 03 architecture/contract prep and Team 04 QA planning.
+- No product blocker, schema blocker, route blocker, or code blocker was discovered during this docs-only pass.
+
+## Next Team 00 Routing Recommendation
+
+- Keep `CF-W1-SQLAB-02B` as the next fresh Team 02 discovery pull.
+- Route `CF-W1-L3-DQ-01` next for Team 03 architecture/contract prep and Team 04 QA planning before watchlist or concentration-review follow-ons.
+
+## Validation
+
+- Tests run: none
+- Builds run: none
+- UI checks run: none
+- Live local data checks run: none
+- Skipped reason: Team 02 stayed inside docs-only requirement and ranking scope
+
+## 2026-05-18 Watchlist Review Queue Priority Refresh
 
 ## Work Item
 
@@ -34,7 +73,7 @@ Refresh the direct investor/trader-value queue so the unblocked watchlist review
 
 - Route `CF-W1-L3-WATCH-01` next for Team 03 architecture/contract prep, then Team 04 QA planning, after the current `CF-W1-SQLAB-02B` and `CF-W1-MD-02` evidence-stack items.
 
-## 2026-05-19 Durable Signal Learning Memory Discovery
+## 2026-05-18 Durable Signal Learning Memory Discovery
 
 ## Work Item
 
@@ -131,7 +170,7 @@ Bounded scope:
 - Live local data checks run: none
 - Skipped reason: Team 02 stayed inside docs-only requirement and ranking scope
 
-## 2026-05-19 Signal Trigger Evidence Discovery
+## 2026-05-18 Signal Trigger Evidence Discovery
 
 ## Work Item
 
@@ -228,7 +267,7 @@ Bounded scope:
 - Live local data checks run: none
 - Skipped reason: Team 02 stayed inside docs-only requirement/ranking scope
 
-## 2026-05-19 Backtesting Proof-Basis Discovery
+## 2026-05-18 Backtesting Proof-Basis Discovery
 
 ## Work Item
 

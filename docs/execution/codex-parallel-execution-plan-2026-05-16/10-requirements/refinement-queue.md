@@ -39,10 +39,11 @@ Current ordering is based on two filters:
 | --- | --- | --- | --- |
 | 1 | `CF-W1-SQLAB-02B` | The no-schema preview child now exists, but the product still lacks durable post-event learning memory. This is the clearest remaining signal-learning evidence gap. | Keep as the next storage-consent requirement packet; route only if Team 00 intentionally opens schema/repository/generated consent. |
 | 2 | `CF-W1-MD-02` | Parent requirement remains useful for the durable-evidence program, but the active child split should still lead first. | Keep as parent only; do not route before `CF-W1-MD-02A`. |
-| 3 | `CF-W1-L3-WATCH-01` | Watchlist review actionability stays useful after higher-trust evidence lanes are better covered. | Keep below the Lane 1 and Lane 2 trust stack. |
-| 4 | `CF-W1-L3-INTEL-03` | Concentration review is still under-served and explainability-heavy, but it now follows the live review queue slice. | Keep visible for later Team 03/04 prep; not the immediate pull. |
-| 5 | `CF-W1-UX-01` | Workbench trust remains useful, but only after the more direct review-queue and concentration-review slices are in place. | Keep behind the Lane 2 trust stack. |
-| 6 | `CF-W1-RH-02` | Parent requirement remains useful for later true-delta history work if the bounded child exposes a storage gap. | Keep as parent only; do not route before `CF-W1-RH-02A`. |
+| 3 | `CF-W1-L3-DQ-01` | Lane 3 readiness gating is the next correctness and user-safety slice because it blocks unready market data from being treated as trusted in trader-facing surfaces. | Keep ahead of watchlist, concentration-review, and workbench convenience slices. |
+| 4 | `CF-W1-L3-WATCH-01` | Watchlist review actionability stays useful after higher-trust evidence lanes are better covered. | Keep below the Lane 1 and Lane 2 trust stack. |
+| 5 | `CF-W1-L3-INTEL-03` | Concentration review is still under-served and explainability-heavy, but it now follows the live review queue slice. | Keep visible for later Team 03/04 prep; not the immediate pull. |
+| 6 | `CF-W1-UX-01` | Workbench trust remains useful, but only after the more direct review-queue and concentration-review slices are in place. | Keep behind the Lane 2 trust stack. |
+| 7 | `CF-W1-RH-02` | Parent requirement remains useful for later true-delta history work if the bounded child exposes a storage gap. | Keep as parent only; do not route before `CF-W1-RH-02A`. |
 
 ### Candidates Team 00 Can Route In Parallel Right Now
 
@@ -66,7 +67,7 @@ Team 00 promoted `CF-W1-L3-PORT-01A` to Ready on 2026-05-18. It is no longer a r
 
 The current Ready-promotion front-runners after the PORT-01A rework routing are `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01`.
 
-This non-active discovery cycle is focused on `CF-W1-SQLAB-02B`, `CF-W1-MD-02`, `CF-W1-L3-WATCH-01`, `CF-W1-L3-INTEL-03`, `CF-W1-UX-01`, and `CF-W1-L3-INTEL-02`. `CF-W1-SIG-02`, `CF-W1-STRAT-03`, `CF-W1-BT-01A`, `CF-W1-BT-03`, `CF-W1-MCTX-01`, `CF-W1-RH-02A`, `CF-W1-MD-03`, `CF-W1-MD-02A`, `CF-W1-DQ-02`, `CF-W1-BT-02`, `CF-W1-HCTX-01`, `CF-W1-SMI-01`, `CF-W1-RH-01`, and `CF-W1-L3-TREV-02` are active, accepted, routed, queued, or already in Ready-evaluation flow and stay out of the immediate fresh-discovery ranking. `CF-W1-NOTIF-02`, `CF-W1-AUTH-01`, and `CF-W1-SUB-01` remain valid backlog items, but they stay behind the market-intelligence trust stack unless a correctness or user-data-safety blocker appears.
+This non-active discovery cycle is focused on `CF-W1-SQLAB-02B`, `CF-W1-MD-02`, `CF-W1-L3-DQ-01`, `CF-W1-L3-WATCH-01`, `CF-W1-L3-INTEL-03`, `CF-W1-UX-01`, and `CF-W1-L3-INTEL-02`. `CF-W1-SIG-02`, `CF-W1-STRAT-03`, `CF-W1-BT-01A`, `CF-W1-BT-03`, `CF-W1-MCTX-01`, `CF-W1-RH-02A`, `CF-W1-MD-03`, `CF-W1-MD-02A`, `CF-W1-DQ-02`, `CF-W1-BT-02`, `CF-W1-HCTX-01`, `CF-W1-SMI-01`, `CF-W1-RH-01`, and `CF-W1-L3-TREV-02` are active, accepted, routed, queued, or already in Ready-evaluation flow and stay out of the immediate fresh-discovery ranking. `CF-W1-NOTIF-02`, `CF-W1-AUTH-01`, and `CF-W1-SUB-01` remain valid backlog items, but they stay behind the market-intelligence trust stack unless a correctness or user-data-safety blocker appears.
 
 ## New Audit-Derived Requirements
 
@@ -95,10 +96,11 @@ These are docs-only discovery priorities. They do not override Team 00's current
 | --- | --- | --- | --- |
 | 1 | CF-W1-SQLAB-02B | Signal outcome learning now has a bounded preview child, so the remaining direct-value gap is durable local learning memory rather than another generic parent discussion. | Approval-gated Team 03/04 packet for a module-owned storage child after explicit consent. |
 | 2 | CF-W1-MD-02 | Durable market-data evidence remains foundational, but the active child split must lead. | ADR and later child follow-ons only. |
-| 3 | CF-W1-L3-WATCH-01 | Watchlist review actionability can improve the trader review queue without waiting on convenience work. | Architecture contract and QA plan for explainable review priority. |
-| 4 | CF-W1-L3-INTEL-03 | Portfolio concentration review is still useful, but it now follows the live review-queue slice. | Architecture contract and QA plan for bounded review-first language. |
-| 5 | CF-W1-UX-01 | Workbench trust remains useful, but it should follow the more direct review-queue and concentration-review slices unless backend trust evidence is source-supported. | Backend trust-evidence parent remains blocked until source-supported fields exist. |
-| 6 | CF-W1-L3-INTEL-02 | Review traceability remains useful once higher-value trust layers are settled. | Architecture contract and QA plan for review-output explainability. |
+| 3 | CF-W1-L3-DQ-01 | Lane 3 readiness gating is the next correctness and user-safety slice because it blocks unready market data from being treated as trusted in trader-facing surfaces. | Architecture contract and QA plan for display-versus-action readiness policy. |
+| 4 | CF-W1-L3-WATCH-01 | Watchlist review actionability can improve the trader review queue without waiting on convenience work. | Architecture contract and QA plan for explainable review priority. |
+| 5 | CF-W1-L3-INTEL-03 | Portfolio concentration review is still useful, but it now follows the live review-queue slice. | Architecture contract and QA plan for bounded review-first language. |
+| 6 | CF-W1-UX-01 | Workbench trust remains useful, but it should follow the more direct review-queue and concentration-review slices unless backend trust evidence is source-supported. | Backend trust-evidence parent remains blocked until source-supported fields exist. |
+| 7 | CF-W1-L3-INTEL-02 | Review traceability remains useful once higher-value trust layers are settled. | Architecture contract and QA plan for review-output explainability. |
 
 ## Next Unassigned Pull Stack
 
@@ -106,7 +108,8 @@ These are docs-only discovery priorities. They do not override Team 00's current
 | --- | --- | --- | --- |
 | 1 | CF-W1-SQLAB-02B | `SIG-02` is already in architecture prep and `SQLAB-02A` is already sequencing-only, so the next fresh Team 02 gap is the explicit durable-learning child for post-event signal memory. | Approval-gated Team 03 architecture/contract/work-packet prep and Team 04 QA planning after explicit Team 00 storage consent. |
 | 2 | CF-W1-MD-02 | Durable market-data evidence remains foundational, but the active child split must lead first. | ADR and later child follow-ons only. |
-| 3 | CF-W1-L3-WATCH-01 | The watchlist review queue is the next unblocked direct trader-value slice after the current evidence-storage work. | Later Team 03/04 prep after current evidence-storage decisions. |
+| 3 | CF-W1-L3-DQ-01 | The Lane 3 readiness consumer contract is the next unblocked correctness and user-safety slice after the current evidence-storage work. | Later Team 03/04 prep after current evidence-storage decisions. |
+| 4 | CF-W1-L3-WATCH-01 | The watchlist review queue is the next direct trader-value slice after the current safety-gate work. | Later Team 03/04 prep after current evidence-storage decisions. |
 
 ## Decision Inbox State
 
