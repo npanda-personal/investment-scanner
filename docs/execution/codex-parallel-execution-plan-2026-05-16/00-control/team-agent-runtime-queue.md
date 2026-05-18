@@ -2230,3 +2230,41 @@ Team 00 is dispatching independent work without file conflicts:
 - Team 06: `CF-W1-SMI-01` implementation after worktree setup.
 - Team 02: next rolling requirements discovery now.
 - Team 04: `CF-W1-L3-TREV-02` QA planning after `RH-01` QA plan completes.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Newly Spawned
+
+- Team 03 `019e3c90-fd78-7552-a58c-0347ded9578e`: `CF-W1-MD-02A` proposal-only architecture prep.
+- Team 04 `019e3c91-35dc-7b63-8a4d-732ca25eb873`: `CF-W1-RH-01` QA planning.
+- Team 06 `019e3c91-9007-7ea1-889c-6a93708de12c`: `CF-W1-SMI-01` implementation.
+- Team 02 `019e3c91-cd7c-7083-bee9-1f6f35688d72`: rolling market-intelligence requirements discovery.
+
+## Worktree Setup
+
+- `CF-W1-SMI-01` branch: `codex/team06-strategy-signal/CF-W1-SMI-01`
+- `CF-W1-SMI-01` worktree: `../investment-scanner-worktrees/team06-CF-W1-SMI-01`
+- Base commit: `1e1ec4b docs: route market evidence and today review prep`
+- Backend dependency junction: created from worktree `backend/node_modules` to main workspace `backend/node_modules`.
+- Memory check before launching implementation: `87.1%`.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 03 - Architecture Factory | `019e3c90-fd78-7552-a58c-0347ded9578e` | `gpt-5.4`, high | architecture prep | `CF-W1-MD-02A` proposal-only packet | active |
+| 2 | Team 04 - QA Factory | `019e3c91-35dc-7b63-8a4d-732ca25eb873` | `gpt-5.4`, high | QA planning | `CF-W1-RH-01` | active |
+| 3 | Team 06 - Strategy / Signal / Risk | `019e3c91-9007-7ea1-889c-6a93708de12c` | `gpt-5.3-codex`, high | implementation | `CF-W1-SMI-01` | active |
+| 4 | Team 02 - Requirement Factory | `019e3c91-cd7c-7083-bee9-1f6f35688d72` | `gpt-5.4`, medium | rolling requirements discovery | next under-served market-intelligence workflow | active |
+| 5 | Open slot | none | pending | QA planning | `CF-W1-L3-TREV-02` after Team 04 main-workspace writer frees | queued |
+| 6 | Open slot | none | pending | review/signoff | next QA-accepted implementation handoff | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-L3-TREV-02` QA planning after `CF-W1-RH-01` QA plan completes.
+- Team 10: `CF-W1-SMI-01` review after Team 06 implementation and Team 04 QA acceptance.
+- Team 03: next Architect Signoff after Team 10 acceptance.
