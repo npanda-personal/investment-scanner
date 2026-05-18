@@ -74,7 +74,7 @@ Operating rules:
 | --- | --- |
 | Current daemon cycle id | `DAEMON-20260517` |
 | Current rolling iteration count | 41 |
-| Active teams | Team 06 `CF-W1-BT-02` implementation; Team 05 `CF-W1-HCTX-01` queued for implementation launch |
+| Active teams | Team 06 `CF-W1-BT-02` implementation; Team 05 `CF-W1-HCTX-01` implementation |
 | Queued teams | Team 04 QA after Team 06/05 handoff; Team 10 review after QA; Team 03 Architect Signoff after review |
 | Idle teams | Team 03 can prep `CF-W1-MCTX-01` after Team 05 launches; Team 02 can relaunch market-intelligence discovery when a slot opens |
 | Blocked teams | No team fully blocked; no open Decision Inbox items; platform/notification/alert convenience work is intentionally low priority unless it blocks correctness, privacy, or user-data safety |
@@ -89,8 +89,8 @@ Operating rules:
 | Spawned subagent queue doc | `00-control/team-agent-runtime-queue.md` |
 | Ready-work pressure | `CF-W1-BT-02` assigned to Team 06; next gates are implementation, Team 04 QA, Team 10 review, Architect Signoff, delegated PO acceptance |
 | Blocked-work pressure | low-to-medium; blockers are readiness/packet gates, clean integration scope, and intentionally demoted low-value platform/notification/alert convenience items |
-| Next team to launch | Team 05 implementation for `CF-W1-HCTX-01` |
-| Next item to assign | After HCTX launch, continue docs prep with `CF-W1-MCTX-01`, then `CF-W1-CAL-01`, and `CF-W1-DQ-02` follow-up |
+| Next team to launch | Team 04 QA for whichever implementation handoff arrives first |
+| Next item to assign | Continue docs prep with `CF-W1-MCTX-01`, then `CF-W1-CAL-01`, and `CF-W1-DQ-02` follow-up |
 | Last commit at Team 00 resume start | `8450df1 docs: refresh requirements priority queue` |
 | Daemon should continue | Yes; Product Owner action is not required |
 
