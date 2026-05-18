@@ -14,6 +14,8 @@ No available application-code item is currently waiting unassigned in Ready.
 
 `CF-W1-L3-ALERT-01` is promoted and pulled by Team 07 for bounded implementation in a dedicated worktree. It must not run in parallel with `CF-W1-L3-AUTH-03` because both reserve alerts-monitoring files.
 
+`CF-W1-MD-01` is promoted and pulled by Team 05 for a narrowed backend-only reject-only Market Data validator child.
+
 ## Pulled / In Review
 
 | ID | Owner | Branch | Worktree | Scope | Status |
@@ -22,6 +24,65 @@ No available application-code item is currently waiting unassigned in Ready.
 | `CF-W1-TP-01B` | Team 06 - Strategy / Signal / Risk | `codex/team06-strategy-signal/CF-W1-TP-01B` | `../investment-scanner-worktrees/team06-CF-W1-TP-01B` | Backend-only Trade Plan DQ hard-block and target compatibility | Implemented in worktree; Team 10 review pending |
 | `CF-W1-NOTIF-02` | Team 09 - Platform / Auth / Subscription / Notifications | `codex/team09-platform/CF-W1-NOTIF-02` | `../investment-scanner-worktrees/team09-CF-W1-NOTIF-02` | Backend-only local notification log redaction | Ready and pulled by Team 09 for implementation |
 | `CF-W1-L3-ALERT-01` | Team 07 - Portfolio / Watchlist / Alerts | `codex/team07-portfolio-alerts/CF-W1-L3-ALERT-01` | `../investment-scanner-worktrees/team07-CF-W1-L3-ALERT-01` | Backend-only alert readiness suppression | Ready and pulled by Team 07 for implementation |
+| `CF-W1-MD-01` | Team 05 - Market Data / Data Quality | `codex/team05-market-data/CF-W1-MD-01` | `../investment-scanner-worktrees/team05-CF-W1-MD-01` | Backend-only reject-only historical-price validator hardening | Ready and pulled by Team 05 for implementation |
+
+## Active Ready Handoff - `CF-W1-MD-01`
+
+Date promoted: 2026-05-18
+
+Team 00 evaluated the narrowed `CF-W1-MD-01` child against Ready gates and promoted it as an independent Team 05 backend-only implementation slice.
+
+Gate evidence:
+
+- Requirement: `10-requirements/CF-W1-MD-01-market-data-validation-hardening-policy-requirement.md`
+- Architecture contract: `06-contracts/CF-W1-MD-01-market-data-validation-hardening-contract.md`
+- Work packet: `08-work-packets/CF-W1-MD-01-work-packet.md`
+- QA plan: `04-qa/CF-W1-MD-01-qa-plan.md`
+- Team 05 readiness inspection: `17-team-outboxes/TEAM-05-outbox.md`
+- Open decisions: none.
+- Shared/high-risk blocker: none if implementation stays inside the three reserved Market Data validator/test/doc files.
+
+Allowed files:
+
+- `backend/src/modules/market-data-foundation/market-data-foundation.validation.ts`
+- `backend/tests/modules/market-data-foundation/market-data.validation.test.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.md`
+
+Forbidden files:
+
+- Market Data repository, provider, adapter, Angel One provider, service, scheduler, worker, queue, router, controller, and types files
+- Market Data readiness/storage invariant tests
+- Data Quality Engine source/tests
+- Prisma schema or migrations
+- generated files
+- route registries
+- shared backend utilities
+- package manifests
+- providers, schedulers, startup/backfill, repair, sync, import, Angel One, broker, live-provider, paid/cloud, or telemetry flows
+- frontend source, shared UI, or Playwright tests
+- durable readiness storage or natural-key implementation under `CF-W1-MD-02`
+
+Required behavior:
+
+- reject future-dated candles using validator-local, backward-compatible boundary behavior;
+- reject invalid present `adjustedClose` values;
+- keep negative volume invalid;
+- preserve duplicate-row determinism;
+- keep spike rejection opt-in and off by default.
+
+Explicitly deferred:
+
+- missing `adjustedClose` fallback/incomplete evidence;
+- zero/suspicious-volume warning/readiness evidence;
+- repository/provider/startup plumbing for a formal latest-session boundary.
+
+Focused validation command:
+
+```powershell
+cd backend
+npm.cmd test -- market-data.validation.test.ts --runInBand
+npm.cmd run build
+```
 
 ## Active Ready Handoff - `CF-W1-L3-ALERT-01`
 

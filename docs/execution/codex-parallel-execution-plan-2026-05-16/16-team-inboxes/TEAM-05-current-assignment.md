@@ -1,6 +1,6 @@
 # TEAM-05 Current Assignment
 
-Date: 2026-05-17
+Date: 2026-05-18
 
 Team: TEAM-05 - Market Data / Data Quality
 
@@ -8,25 +8,51 @@ Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automat
 
 ## Assignment
 
-No Market Data / Data Quality app-code item is Ready. Continue audit/refinement only.
+Pull `CF-W1-MD-01` as a narrowed, backend-only Market Data validator implementation slice.
 
-Current priority:
+Branch/worktree:
 
-1. Support `CF-W1-MD-02` ADR acceptance with evidence, without source/schema/test implementation.
-2. Refresh `CF-W1-MD-01` after Option A validation policy resolution as a validation-only packet; do not edit source or tests.
-3. Identify source-readiness gaps and exact future file reservations for `market-data-foundation.validation.ts` and focused validation tests.
+- Branch: `codex/team05-market-data/CF-W1-MD-01`
+- Worktree: `../investment-scanner-worktrees/team05-CF-W1-MD-01`
+
+Ready evidence:
+
+- Requirement: `10-requirements/CF-W1-MD-01-market-data-validation-hardening-policy-requirement.md`
+- Narrowed architecture contract: `06-contracts/CF-W1-MD-01-market-data-validation-hardening-contract.md`
+- Work packet: `08-work-packets/CF-W1-MD-01-work-packet.md`
+- QA plan: `04-qa/CF-W1-MD-01-qa-plan.md`
+- Team 05 readiness inspection: `17-team-outboxes/TEAM-05-outbox.md`
+
+Required implementation behavior:
+
+- reject future-dated candles using validator-local, backward-compatible boundary behavior;
+- reject invalid present `adjustedClose` values;
+- keep negative volume invalid;
+- preserve duplicate-row determinism;
+- keep spike rejection opt-in and off by default;
+- update module docs to record the narrowed validator-only behavior.
+
+Explicitly deferred:
+
+- missing `adjustedClose` fallback/incomplete evidence;
+- zero/suspicious-volume warning/readiness evidence;
+- repository/provider/startup plumbing for a formal latest-session boundary;
+- durable readiness storage or `CF-W1-MD-02` natural-key work.
 
 ## Scope
 
 Allowed writes:
 
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/**`
-- Team 05-owned requirement/architecture/QA comments only when coordinated with Teams 02-04
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-05*.md`
+- `backend/src/modules/market-data-foundation/market-data-foundation.validation.ts`
+- `backend/tests/modules/market-data-foundation/market-data.validation.test.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-05-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-MD-01-developer-handoff.md`
 
 Forbidden:
 
-- Market Data source or tests
+- Market Data repository, provider, adapter, Angel One provider, service, scheduler, worker, queue, router, controller, and types files
+- Market Data readiness/storage invariant tests
 - Data Quality Engine source or tests
 - Prisma schema or migrations
 - generated types
@@ -35,12 +61,20 @@ Forbidden:
 
 ## Branch / Worktree
 
-Use shared `dev` for docs-only work. If Team 00 later promotes a Market Data implementation slice, use `codex/team05-md-dq/{requirement-id}` and `../investment-scanner-worktrees/team05-{requirement-id}`.
+Use the dedicated branch/worktree above. Do not work in the shared `dev` workspace.
 
 ## Blockers
 
-`CF-W1-MD-01` is no longer decision-blocked, but it still lacks a refreshed validation-only work packet, focused QA refresh, exact file reservations, and Team 00 Ready promotion. `CF-W1-MD-02` is ADR-only and source/schema blocked.
+No Product Owner decision blocker remains for this narrowed child. Stop and return to Team 00 if implementation needs any forbidden file, repository/provider plumbing, warning/evidence semantics, schema, route, shared utility, package, generated, provider/live, startup/backfill, frontend, or DQE changes.
 
 ## Expected Outbox
 
-Update `17-team-outboxes/TEAM-05-outbox.md`.
+Update `17-team-outboxes/TEAM-05-outbox.md` and create `18-integration-queue/CF-W1-MD-01-developer-handoff.md`.
+
+Required validation target:
+
+```powershell
+cd backend
+npm.cmd test -- market-data.validation.test.ts --runInBand
+npm.cmd run build
+```

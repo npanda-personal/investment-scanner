@@ -52,37 +52,71 @@ Do not spawn a seventh active team. Put it in the queued pool and launch it when
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Write Scope | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Team 02 - PO + Requirement Factory | `019e3a50-ed56-71f0-bfb6-621445556b85` | `gpt-5.4-mini`, medium | persistent docs-only value discovery | continuous module audits, requirement discovery, and priority reordering | `10-requirements/`, Team 02 outbox only | active / persistent |
-| 2 | Team 03 - Architecture Factory | `019e3a5d-c2d9-7b90-b65d-11b31d4b3999` | `gpt-5.4`, high | docs-only architecture prep | `CF-W1-L3-PORT-01B`, `CF-W1-AUTH-02`, `CF-W1-DQ-02`, `CF-W1-TP-02`, `CF-W1-L3-INTEL-02` | `03-architecture/`, `06-contracts/`, `08-work-packets/`, Team 03 outbox only | active |
-| 3 | Team 07 - Portfolio / Watchlist / Alerts | `019e3a69-8bd2-77e0-a9b7-ce0e6ea85a40` | `gpt-5.3-codex`, high | implementation | `CF-W1-L3-ALERT-01` | Team 07 alert worktree only; alerts-monitoring reserved files | active |
-| 4 | Team 04 - QA Factory | `019e3a6a-2a91-79b2-b183-29499a49b592` | `gpt-5.4`, high | QA rerun | `CF-W1-TP-01B` | Team 06 worktree QA docs only | active |
-| 5 | Team 10 - Review / Release | `019e3a6a-2ac8-7271-9ef4-2ea9834d10d7` | `gpt-5.5`, high | review / release precheck | `CF-W1-NOTIF-02` | Team 09 worktree review docs only; QA blocker carried | active |
-| 6 | Open slot | none | pending | queued work | next independent QA/review/implementation task | n/a | open |
+| 2 | Team 04 - QA Factory | `019e3a7b-9b97-7073-a2d9-6db28aaf0923` | `gpt-5.4`, high | QA plan consolidation | narrowed `CF-W1-MD-01`; combined `CF-W1-UX-02` / `CF-W1-UX-05A` | `04-qa/`, Team 04 outbox only | active |
+| 3 | Team 07 - Portfolio / Watchlist / Alerts | `019e3a7a-9f41-7240-84a1-a905365f1b1c` | `gpt-5.3-codex`, high | implementation rework | `CF-W1-L3-ALERT-01` | Team 07 alert worktree only; alerts-monitoring reserved files | active |
+| 4 | Team 03 - Architect Signoff | `019e3a78-6f2a-7100-8608-dce4dfc974f9` | `gpt-5.4`, high | architect signoff | `CF-W1-TP-01B` | Team 06 worktree architecture signoff docs only | active |
+| 5 | Team 03 - Architecture Factory | `019e3a7e-fcae-7521-8dc4-68e523570d92` | `gpt-5.4`, high | docs-only architecture prep | `CF-W1-CAL-01`, `CF-W1-HCTX-01`, `CF-W1-SQLAB-01` | `03-architecture/`, `06-contracts/`, `08-work-packets/`, Team 03 outbox only | active |
+| 6 | Team 10 - Review / Release | `019e3a77-b88e-7ab0-a7e2-e3522a2fc2b0` | `gpt-5.5`, high | release recheck | `CF-W1-NOTIF-02` | Team 09 notification worktree review docs only | active |
 
 ## Queued Subagents
 
 | Queue | Team | Launch Trigger | Model / Reasoning | Assignment |
 | --- | --- | --- | --- | --- |
-| 1 | Team 10 - Review / Release | Team 04 passes `CF-W1-TP-01B` QA rerun | `gpt-5.5`, high | `CF-W1-TP-01B` release re-review |
-| 2 | Team 04 - QA Factory | Team 07 completes `CF-W1-L3-ALERT-01` implementation | `gpt-5.4`, high | alert readiness suppression QA in Team 07 worktree |
-| 3 | Team 10 - Review / Release | Team 04 passes `CF-W1-L3-ALERT-01` QA | `gpt-5.5`, high | alert readiness suppression release review |
-| 4 | Team 00 - PO Packet / Commit | Architect signoff passes for a work item | inherited | delegated PO acceptance packet, exact staged-scope verification, local commit if allowed |
-| 5 | Team 07 - Portfolio / Watchlist / Alerts | `CF-W1-L3-AUTH-03` is promoted and `CF-W1-L3-ALERT-01` clears shared alerts-monitoring files | `gpt-5.3-codex`, high | alert rule target ownership implementation |
-| 6 | Team 09 - Platform / Auth / Subscription / Notifications | `CF-W1-AUTH-01` / `CF-W1-SUB-01` sequencing is promoted | `gpt-5.3-codex`, high | backend-only auth/subscription protected-route slice |
+| 1 | Team 00 - PO Packet / Commit | Team 03 accepts `CF-W1-TP-01B` Architect Signoff | inherited | delegated PO acceptance packet, exact staged-scope verification, local commit if allowed |
+| 2 | Team 04 - QA Factory | Team 07 completes `CF-W1-L3-ALERT-01` bounded rework | `gpt-5.4`, high | alert readiness suppression QA rerun |
+| 3 | Team 00 - PO Packet / Commit | Architect signoff passes for a work item | inherited | delegated PO acceptance packet, exact staged-scope verification, local commit if allowed |
+| 4 | Team 07 - Portfolio / Watchlist / Alerts | `CF-W1-L3-AUTH-03` is promoted and `CF-W1-L3-ALERT-01` clears shared alerts-monitoring files | `gpt-5.3-codex`, high | alert rule target ownership implementation |
+| 5 | Team 09 - Platform / Auth / Subscription / Notifications | `CF-W1-AUTH-01` / `CF-W1-SUB-01` sequencing is promoted | `gpt-5.3-codex`, high | backend-only auth/subscription protected-route slice |
+| 6 | Team 03 - Architect Signoff | Team 10 accepts `CF-W1-NOTIF-02` release recheck | `gpt-5.4`, high | notification redaction architecture signoff |
+| 7 | Team 03 - Architecture Factory | Team 02 discovers another high-value requirement and an active slot opens | `gpt-5.4`, high | next architecture prep packet |
 
 ## Current Ready Teams
 
 - Team 02 is active as persistent PO + Requirements value-discovery lane.
-- Team 03 is active for new architecture prep.
-- Team 07 is active on `CF-W1-L3-ALERT-01` in a dedicated worktree.
-- Team 04 is active on `CF-W1-TP-01B` QA rerun.
-- Team 10 is active on `CF-W1-NOTIF-02` review with the QA runtime blocker carried.
+- Team 04 is active for QA-plan consolidation on narrowed Market Data and combined Copilot packets.
+- Team 03 is active for architecture prep on `CF-W1-CAL-01`, `CF-W1-HCTX-01`, and `CF-W1-SQLAB-01`.
+- Team 07 is active on `CF-W1-L3-ALERT-01` bounded QA rework.
+- Team 03 is active on `CF-W1-TP-01B` Architect Signoff after QA and Team 10 acceptance.
+- Team 10 is active on `CF-W1-NOTIF-02` release recheck after runtime QA pass.
+
+Status correction after completed agents:
+
+- Team 04 QA-plan consolidation completed; `CF-W1-MD-01` and combined `CF-W1-UX-02` / `CF-W1-UX-05A` are QA-ready for Team 00 Ready evaluation.
+- Team 07 alert rework completed; Team 04 alert QA rerun is active.
+- Team 03 Trade Plan signoff completed; Team 00 created scoped local commit `8ff22fd` on `codex/team06-strategy-signal/CF-W1-TP-01B`.
+- Team 10 notification recheck completed and Team 03 signoff completed; Team 00 created scoped local commit `c77ece7` on `codex/team09-platform/CF-W1-NOTIF-02`.
+- Team 05 is active on newly promoted `CF-W1-MD-01` in `codex/team05-market-data/CF-W1-MD-01`.
+
+Updated active snapshot:
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Write Scope | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 02 - PO + Requirement Factory | `019e3a50-ed56-71f0-bfb6-621445556b85` | `gpt-5.4-mini`, medium | persistent docs-only value discovery | continuous module audits, requirement discovery, and priority reordering | `10-requirements/`, Team 02 outbox only | active / persistent |
+| 2 | Team 03 - Architecture Factory | `019e3a7e-fcae-7521-8dc4-68e523570d92` | `gpt-5.4`, high | docs-only architecture prep | `CF-W1-CAL-01`, `CF-W1-HCTX-01`, `CF-W1-SQLAB-01` | `03-architecture/`, `06-contracts/`, `08-work-packets/`, Team 03 outbox only | active |
+| 3 | Team 04 - QA Factory | `019e3a80-0700-7373-a66e-c1cbace95b55` | `gpt-5.4`, high | QA rerun | `CF-W1-L3-ALERT-01` | Team 07 alert worktree QA docs only | active |
+| 4 | Team 05 - Market Data / Data Quality | `019e3a84-0c18-7420-8bc6-c5dd05464833` | `gpt-5.3-codex`, high | implementation | `CF-W1-MD-01` | Team 05 Market Data worktree only; validator reserved files | active |
+| 5 | Open slot | none | pending | queued work | next independent review / QA / implementation task | n/a | open |
+| 6 | Open slot | none | pending | queued work | next independent review / QA / implementation task | n/a | open |
+
+Latest active snapshot:
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Write Scope | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 02 - PO + Requirement Factory | `019e3a50-ed56-71f0-bfb6-621445556b85` | `gpt-5.4-mini`, medium | persistent docs-only value discovery | continuous module audits, requirement discovery, and priority reordering | `10-requirements/`, Team 02 outbox only | active / persistent |
+| 2 | Team 03 - Architect Signoff | `019e3a8a-c54d-7413-b247-c88de3852974` | `gpt-5.4`, high | architect signoff | `CF-W1-L3-ALERT-01` | Team 07 alert worktree architecture signoff docs only | active |
+| 3 | Team 04 - QA Factory | `019e3a8c-69e3-7c83-8a14-79210734cccb` | `gpt-5.4`, high | QA verification | `CF-W1-MD-01` | Team 05 Market Data worktree QA docs only | active |
+| 4 | Open slot | none | pending | queued work | next independent review / QA / implementation task | n/a | open |
+| 5 | Open slot | none | pending | queued work | next independent review / QA / implementation task | n/a | open |
+| 6 | Open slot | none | pending | queued work | next independent review / QA / implementation task | n/a | open |
+- Team 10 completed `CF-W1-NOTIF-02` source review with no source findings; release remains blocked by notification runtime QA.
 
 ## Current Waiting Teams
 
-- Team 10 Trade Plan re-review waits for Team 04 `CF-W1-TP-01B` QA result.
-- Team 04 alert QA waits for Team 07 `CF-W1-L3-ALERT-01` developer handoff.
+- Team 00 Trade Plan PO packet / scoped commit waits for Team 03 `CF-W1-TP-01B` Architect Signoff.
+- Team 04 alert QA waits for Team 07 `CF-W1-L3-ALERT-01` bounded rework.
 - Team 10 alert review waits for alert QA.
 - Team 09 auth/subscription implementation waits for Team 00 sequencing of `CF-W1-AUTH-01` and `CF-W1-SUB-01`.
+- Team 03 notification Architect Signoff waits for Team 10 release recheck acceptance.
 
 ## Completed Subagents This Cycle
 
@@ -100,6 +134,20 @@ Do not spawn a seventh active team. Put it in the queued pool and launch it when
 | Team 03 | `019e3a5f-7a39-7112-933e-c8eee3c82272` | `CF-W1-L3-PORT-01A` Architect Signoff passed. Closed. |
 | Team 06 | `019e3a61-6c87-7e70-b4cd-59cb3883909d` | `CF-W1-TP-01B` rework complete; focused tests and backend build passed; routed to Team 04 QA rerun. Closed. |
 | Team 04 | `019e3a63-9ad2-7b90-930d-4be9b00646f0` | `CF-W1-NOTIF-02` QA rejected at runtime-test gate because Jest cannot resolve in the worktree; static redaction inspection passed; routed to Team 10 with QA blocker carried. Closed. |
+| Team 10 | `019e3a6a-2ac8-7271-9ef4-2ea9834d10d7` | `CF-W1-NOTIF-02` preaccepted at source-review level with no source findings; release remains blocked until focused Jest runtime QA passes. Closed. |
+| Team 04 | `019e3a6a-2a91-79b2-b183-29499a49b592` | `CF-W1-TP-01B` QA rerun passed; focused tests and backend build passed; routed to Team 10 re-review. Closed. |
+| Team 07 | `019e3a69-8bd2-77e0-a9b7-ce0e6ea85a40` | `CF-W1-L3-ALERT-01` implementation complete in worktree; initial validation blocked by missing worktree toolchain; dependency link created and routed to Team 04 QA. Closed. |
+| Team 05 | `019e3a6f-61d5-7153-8214-615d5db2fd78` | `CF-W1-MD-01` ready-recommended only as narrowed reject-only validation child; routed to Team 03/04 for contract and QA narrowing. Closed. |
+| Team 08 | `019e3a6f-6208-7841-b950-853fb3c1b49e` | `CF-W1-UX-02` / `CF-W1-UX-05A` ready-recommended only as one combined Copilot-only backend+frontend slice; routed to Team 03 for packet consolidation. Closed. |
+| Team 04 | `019e3a73-5537-72b1-8914-2bc8b8eec25c` | `CF-W1-NOTIF-02` runtime QA passed after dependency-link unblock; focused test and backend build passed; routed to Team 10 release recheck. Closed. |
+| Team 10 | `019e3a70-b8e2-75a2-b2ac-7e1cf570caed` | `CF-W1-TP-01B` re-review accepted with no blocking findings; routed to Architect Signoff. Closed. |
+| Team 04 | `019e3a73-54b2-7341-94c6-313138baf858` | `CF-W1-L3-ALERT-01` QA rejected because ownership regression was not proven under runnable READY DQ evidence; routed to Team 07 bounded rework. Closed. |
+| Team 03 | `019e3a5d-c2d9-7b90-b65d-11b31d4b3999` | Narrowed `CF-W1-MD-01` to reject-only validator child and consolidated `CF-W1-UX-02` / `CF-W1-UX-05A` into one Copilot-only packet; routed to Team 04 QA-plan consolidation. Closed. |
+| Team 04 | `019e3a7b-9b97-7073-a2d9-6db28aaf0923` | QA plans updated; narrowed `CF-W1-MD-01` and combined `CF-W1-UX-02` / `CF-W1-UX-05A` are QA-ready for Team 00 Ready evaluation. Closed. |
+| Team 03 | `019e3a78-6f2a-7100-8608-dce4dfc974f9` | `CF-W1-TP-01B` Architect Signoff accepted; Team 00 committed `8ff22fd` on the Team 06 branch. Closed. |
+| Team 10 | `019e3a77-b88e-7ab0-a7e2-e3522a2fc2b0` | `CF-W1-NOTIF-02` release recheck accepted; routed to Architect Signoff. Closed. |
+| Team 03 | `019e3a7d-68ce-7cc3-a8df-1f3b986f5046` | `CF-W1-NOTIF-02` Architect Signoff accepted; Team 00 committed `c77ece7` on the Team 09 branch. Closed. |
+| Team 07 | `019e3a7a-9f41-7240-84a1-a905365f1b1c` | `CF-W1-L3-ALERT-01` bounded rework passed developer validation; routed to Team 04 QA rerun. Closed. |
 
 ## Stop Conditions
 
