@@ -1,8 +1,83 @@
 # TEAM-04 QA Factory Outbox
 
-Date: 2026-05-18
+Date: 2026-05-19
 
 Mode: focused QA rerun plus docs-only QA planning.
+
+## 2026-05-19 `CF-W1-BT-03` Backtesting Proof-Basis / Overfit Guardrail QA Planning
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only QA packet preparation
+- Work item: `CF-W1-BT-03`
+- State/mode: QA planning only; no executable validation
+- Owner: Team 04 QA Factory
+- Lane/module: Lane 2 / `backtesting-strategy-lab`
+- Files changed:
+  - `04-qa/CF-W1-BT-03-qa-plan.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - `AGENTS.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/16-team-inboxes/TEAM-04-current-assignment.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-BT-03-backtesting-proof-basis-overfit-guardrail-requirement.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-BT-03-architecture-review.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-BT-03-backtesting-proof-basis-overfit-guardrail-contract.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-BT-03-work-packet.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-BT-02-qa-plan.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/next-validation-plans.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+  - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+  - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.ts`
+  - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.types.ts`
+  - `backend/tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.test.ts`
+  - `frontend/src/features/backtesting-strategy-lab/types.ts`
+  - `frontend/src/features/backtesting-strategy-lab/components/BacktestingStrategyLabPage.tsx`
+  - `frontend/tests/ui/backtesting-strategy-lab.spec.ts`
+- Behavior changed:
+  - none; docs-only QA planning
+- Docs changed:
+  - prepared `04-qa/CF-W1-BT-03-qa-plan.md`
+  - refreshed `04-qa/next-validation-plans.md`
+  - recorded this handoff in `17-team-outboxes/TEAM-04-qa-factory.md`
+- Contracts changed:
+  - none
+- Result:
+  - Prepared a bounded backtesting proof-basis QA plan in `04-qa/CF-W1-BT-03-qa-plan.md`.
+  - Recorded additive proof-basis assertions for stable equivalents of `reliabilityStatus`, explicit single-window-only disclosure, and explicit no-holdout/no-walk-forward/no-parameter-sensitivity states.
+  - Recorded exact `REVIEW_ONLY` coverage so even a clean completed run still states historical single-window proof only and does not overstate validation.
+  - Recorded exact `WEAK_EVIDENCE` coverage for low trade count, benchmark unavailable, weak end-of-test exit distribution, and low data coverage.
+  - Recorded exact `DO_NOT_USE_FOR_RELIABILITY` coverage for no trades, insufficient history, and `LEGACY_INVALID` aggregate proof.
+  - Recorded list/detail normalization so the same saved run must show the same proof-basis label and summary in both surfaces.
+  - Recorded regression coverage that benchmark, availability, coverage, warning, exit-diagnostic, and calculation-audit evidence remain visible after the additive proof-basis fields are added.
+  - Recorded explicit reject conditions for fabricated holdout/walk-forward/parameter-sensitivity claims, engine widening, schema/route/shared-file widening, simulation-math or benchmark-math rewrites, and cross-module source changes.
+  - Recorded the sequencing blocker that Team 00 must stack or sequence BT-03 under one backtesting writer because the full writer set overlaps `CF-W1-BT-02` and the backend doc/test subset overlaps `CF-W1-BT-01A`.
+  - Updated `04-qa/next-validation-plans.md` so `CF-W1-BT-03` is visible in the Team 04 queue as QA-plan ready for Team 00 Ready evaluation only with explicit backtesting writer sequencing.
+- Tests run: none
+- Tests skipped:
+  - all executable validation was skipped because this was a docs-only QA planning pass with explicit instructions not to run tests, builds, services, providers, Prisma commands, UI smoke, or live data
+- Skipped-test reason:
+  - planning-only assignment; no executable validation was authorized or required
+- Assumptions:
+  - Team 00 will keep the child bounded to the reserved `backtesting-strategy-lab` service/types/doc/test plus feature-local types/page/UI spec files only
+  - current module evidence remains the only allowed basis for proof framing, with no fabricated broader-validation engine results
+  - Team 00 will resolve the overlap with `CF-W1-BT-02` and `CF-W1-BT-01A` by using one explicit backtesting writer rather than parallel writers in shared `dev`
+- Risks:
+  - implementers could overstate confidence by treating a clean historical run as validated proof instead of `REVIEW_ONLY`
+  - implementers could smuggle in fabricated holdout, walk-forward, or parameter-sensitivity claims through copy changes rather than explicit engine work
+  - scope could drift into simulation math, benchmark math, schema, routes, shared UI, or cross-module backtesting trust work unless Team 00 keeps the writer set exact
+- Blockers:
+  - executable QA remains blocked until Team 00 promotes the bounded no-schema `backtesting-strategy-lab` implementation handoff
+  - Team 00 must explicitly stack or sequence BT-03 behind the shared backtesting writer set used by `CF-W1-BT-02` and `CF-W1-BT-01A`; parallel implementation is not acceptable
+  - any widening into walk-forward/holdout/parameter-sensitivity engines, schema, routes, shared UI, simulation-math, benchmark-math, or cross-module source remains an explicit reject condition
+- Shared-file requests:
+  - none from Team 04; single-writer reservation remains a Team 00 implementation concern
+- QA-ready for Team 00 Ready evaluation:
+  - `CF-W1-BT-03`: yes, as one bounded no-schema `backtesting-strategy-lab` proof-basis child only, with mandatory one-writer sequencing against `CF-W1-BT-02` and `CF-W1-BT-01A`
+- Next gate:
+  - Team 00 Ready evaluation for `CF-W1-BT-03`, with exact reservation of the backtesting service/types/doc/test plus feature-local types/page/UI spec writer set and an explicit one-writer sequencing decision across BT-02, BT-03, and the BT-01A backend doc/test overlap
+- Evidence notes:
+  - Team 04 used the active execution folder, current backtesting source/test surfaces, and comparable BT-02 QA-plan patterns only; no application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, builds, services, providers, or live data were modified or run
 
 ## 2026-05-19 `CF-W1-STRAT-03` Strategy Decision Review Provenance QA Planning
 

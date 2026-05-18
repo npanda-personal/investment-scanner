@@ -3040,6 +3040,30 @@ Team 03 completed `CF-W1-BT-03` architecture as a Ready candidate after QA plann
 
 Date: 2026-05-18
 
+## STRAT-03 Handoff, BT-01A Review Reject, BT-03 QA Ready, SIG-02 Discovered
+
+Team 06 completed `CF-W1-STRAT-03` implementation and it is ready for Team 04 QA verification.
+
+Team 10 rejected `CF-W1-BT-01A` because the contract/test/doc characterization of the enabled DQ default path does not match current source when `excludeNotReady` is omitted. Team 00 routed this to Team 03 architecture triage before any further Team 06 rework.
+
+Team 04 completed `CF-W1-BT-03` QA planning. BT-03 is QA-plan ready but not implementation-ready until Team 00 declares the one-writer backtesting sequence.
+
+Team 02 completed `CF-W1-SIG-02` requirement discovery and Team 00 routed it to Team 03 architecture prep.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-STRAT-03` QA verification now.
+- Team 03: `CF-W1-BT-01A` contract/default triage now.
+- Team 03: `CF-W1-SIG-02` architecture prep now.
+- Team 00: keep `CF-W1-BT-03` in sequencing control until BT writer overlap is resolved.
+- Team 02: next distinct direct-value discovery after this docs checkpoint.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
 ## Next Wave Spawned
 
 Team 00 launched four independent spawned agents after the `3320c51` docs checkpoint.

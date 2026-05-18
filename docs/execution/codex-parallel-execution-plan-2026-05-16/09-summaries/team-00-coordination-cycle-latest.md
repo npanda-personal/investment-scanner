@@ -1657,6 +1657,29 @@ Teams ready to pick up new tasks:
 
 ---
 
+# Runtime Checkpoint - Mixed Gate Routing
+
+Date: 2026-05-18
+
+Consumed outputs:
+
+- Team 06 completed `CF-W1-STRAT-03`; next gate is Team 04 QA.
+- Team 10 rejected `CF-W1-BT-01A`; next gate is Team 03 contract/default triage.
+- Team 04 completed `CF-W1-BT-03` QA planning; Team 00 must resolve backtesting writer sequencing before Ready promotion.
+- Team 02 completed `CF-W1-SIG-02` discovery; next gate is Team 03 architecture.
+
+Teams ready to pick up new tasks:
+
+- Team 04: `CF-W1-STRAT-03` QA verification now.
+- Team 03: `CF-W1-BT-01A` contract/default triage now.
+- Team 03: `CF-W1-SIG-02` architecture prep now.
+- Team 00: keep `CF-W1-BT-03` in sequencing control until BT writer overlap is resolved.
+- Team 02: next distinct direct-value discovery after this docs checkpoint.
+
+Product Owner action required: no.
+
+---
+
 # Runtime Checkpoint - Next Wave Spawned
 
 Date: 2026-05-18

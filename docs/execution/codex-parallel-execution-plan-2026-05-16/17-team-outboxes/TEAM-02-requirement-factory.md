@@ -4,6 +4,103 @@ Date: 2026-05-19
 
 Mode: docs-only requirement discovery after rechecking root `AGENTS.md`, the live runtime queue, ready/blocked queues, next-top-10 candidates, backlog/refinement queues, current module audits, and current backtesting source docs. No application code, tests, Prisma, route registries, package manifests, generated files, Team 00 control docs, Ready queue files, architecture docs, or QA docs changed.
 
+## 2026-05-19 Signal Trigger Evidence Discovery
+
+## Work Item
+
+Pick the next under-served direct investor/trader-value workflow after `CF-W1-BT-03` routing, then add one bounded requirement and refresh Team 02 ranking docs to match the live queue state.
+
+## Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SIG-02-canonical-trigger-evidence-compatibility-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+## Files Inspected
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/team-agent-runtime-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/ready-for-implementation.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-strategy-signal-rules.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-backtesting-trade-risk.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-market-data-data-quality.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SIG-TRIGGER-01-full-trigger-object-contract-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SIG-TRIGGER-02-persisted-trigger-auditability-requirement.md`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.md`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.types.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.service.ts`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-strategy-signal-risk-daemon-2026-05-17-iteration-2.md`
+
+## Audited Workflow
+
+Signal Generation trigger provenance and canonical trigger-evidence compatibility: making it explicit which trigger fields are actually proven today, which are compatibility-only, and which remain unavailable so downstream review workflows stop inferring certainty.
+
+## Evidence Summary
+
+- `audit-strategy-signal-rules.md` still records that the trigger object contract is incomplete for canonical trigger fields, lifecycle status, and timestamps.
+- `signal-generation-engine.md` explicitly says the current `triggerContract` is an optional module-local projection and that several key fields remain unavailable or separate future decisions.
+- `signal-generation-engine.types.ts` shows `SignalResultDto` is still the practical downstream payload while `SignalTriggerContractDto` remains additive and incomplete.
+- `signal-generation-engine.service.ts` still marks `trigger_price`, `timeframe`, rule ids, lifecycle state, and in current `dev` also `created_at` / `updated_at` as unavailable when it builds the trigger projection.
+- `latestForInstrument()` can still create a signal on the read path, so any canonical trigger-evidence child must remain explicit about persisted versus request-local provenance.
+- The live queue now routes `CF-W1-BT-03` to Team 03 architecture, keeps `CF-W1-STRAT-03` in implementation, and keeps `CF-W1-BT-01A`, `CF-W1-RH-01`, `CF-W1-L3-TREV-02`, and `CF-W1-SQLAB-02A` out of the fresh Team 02 discovery opening.
+
+## Requirement Added
+
+Added `CF-W1-SIG-02-canonical-trigger-evidence-compatibility-requirement.md`.
+
+Bounded scope:
+
+- one additive canonical trigger-evidence packet for Signal Generation read surfaces;
+- explicit proven-versus-compatibility-only-versus-unavailable semantics;
+- proof-safe timestamp and strategy-provenance semantics;
+- no schema, route, frontend, downstream-consumer, or shared-contract rewrite in the first child.
+
+## Queue Delta
+
+- `CF-W1-SIG-02` is now the top fresh Team 02 discovery item.
+- `CF-W1-BT-03` is demoted from "next Team 02 discovery item" because it is already routed to Team 03 architecture in the live runtime queue.
+- `CF-W1-RH-01` and `CF-W1-L3-TREV-02` remain strong Team 00 parallel-safe candidates, but as Ready-evaluation/routing work rather than new requirement discovery.
+- `CF-W1-SQLAB-02A` remains sequencing-only after `CF-W1-SQLAB-01`.
+- `CF-W1-STRAT-02B1` remains explicit consent-blocked and should not be substituted in as the next fresh Team 02 discovery item.
+
+## Team 00 Parallel-Safe Candidates
+
+1. `CF-W1-SIG-02`
+   - route to Team 03 for architecture/contract/work-packet prep;
+   - then Team 04 for QA planning.
+2. `CF-W1-RH-01`
+   - keep as Team 00 Ready evaluation; no duplicate Team 03/04 prep.
+3. `CF-W1-L3-TREV-02`
+   - keep as Team 00 Ready evaluation when Today Review writer sequencing is safe.
+4. `CF-W1-SQLAB-02A`
+   - keep as sequencing-only after `CF-W1-SQLAB-01`.
+
+## Blockers / Guardrails
+
+- Do not reopen `CF-W1-SIG-TRIGGER-01`; the new gap is canonical trigger-evidence compatibility, not the already accepted optional trigger projection.
+- Do not reopen `CF-W1-SIG-TRIGGER-02` as a generic persistence rewrite; the new child stays additive and no-schema until Architecture proves otherwise.
+- Stop if `CF-W1-SIG-02` widens into schema work, route changes, shared contracts, frontend adoption, downstream consumer rewrites, or durable rule-version persistence work.
+- `CF-W1-STRAT-02B1` remains explicit consent-blocked and should not be substituted in as the next fresh Team 02 discovery item.
+
+## Routing Recommendation
+
+- Team 03 routing recommended: yes, for new `CF-W1-SIG-02` prep.
+- Team 04 routing recommended: yes, immediately after Team 03 packet completion.
+- Team 03/04 rerouting not recommended for `CF-W1-RH-01`, `CF-W1-L3-TREV-02`, or `CF-W1-SQLAB-02A`; those already have prep and now need Team 00 sequencing or Ready evaluation instead.
+
+## Validation
+
+- Tests run: none
+- Builds run: none
+- UI checks run: none
+- Live local data checks run: none
+- Skipped reason: Team 02 stayed inside docs-only requirement/ranking scope
+
 ## 2026-05-19 Backtesting Proof-Basis Discovery
 
 ## Work Item

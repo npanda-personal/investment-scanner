@@ -323,6 +323,34 @@ Date: 2026-05-18
 
 ---
 
+# Team 00 Runtime Dispatch - Mixed Gate Routing
+
+Date: 2026-05-18
+
+## Consumed Outputs
+
+- Team 06 completed `CF-W1-STRAT-03` implementation.
+- Team 10 rejected `CF-W1-BT-01A` for inaccurate DQ default characterization.
+- Team 04 completed `CF-W1-BT-03` QA planning with sequencing constraint.
+- Team 02 completed `CF-W1-SIG-02` discovery.
+
+## Routing
+
+- `CF-W1-STRAT-03`: Team 04 QA verification.
+- `CF-W1-BT-01A`: Team 03 contract/default triage before more implementation rework.
+- `CF-W1-BT-03`: keep out of implementation until one-writer BT sequencing is declared.
+- `CF-W1-SIG-02`: Team 03 architecture prep.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-STRAT-03` QA verification now.
+- Team 03: `CF-W1-BT-01A` contract/default triage now.
+- Team 03: `CF-W1-SIG-02` architecture prep now.
+- Team 00: keep `CF-W1-BT-03` in sequencing control until BT writer overlap is resolved.
+- Team 02: next distinct direct-value discovery after this docs checkpoint.
+
+---
+
 # Team 00 Runtime Dispatch - Next Wave Spawned
 
 Date: 2026-05-18
