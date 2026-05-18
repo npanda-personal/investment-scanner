@@ -2,7 +2,7 @@
 
 Date: 2026-05-18
 
-Status: Refreshed by Team 02 after Team 03/04 post-decision readiness refresh evidence and after Team 00 promoted `CF-W1-L3-PORT-01A`. Product Owner action is not required; all other policy-resolved items remain refinement/architecture/QA-prep items only until Team 00 promotes exact implementation handoffs. After the PORT-01A rework routing, the next Ready-promotion candidates are `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, `CF-W1-L3-ALERT-01`, and `CF-W1-L3-AUTH-03`. The current non-active discovery cycle is focused on direct research trust and context evidence: `CF-W1-UX-01`, `CF-W1-HCTX-01`, and `CF-W1-MCTX-01`, with `CF-W1-CAL-01` as the next highest user-value follow-on once those three are packeted.
+Status: Refreshed by Team 02 after Team 09 pulled combined `CF-W1-AUTH-SUB-01` into a separate worktree and after Team 00 promoted `CF-W1-L3-PORT-01A`. Product Owner action is not required; all other policy-resolved items remain refinement/architecture/QA-prep items only until Team 00 promotes exact implementation handoffs. The current non-active discovery cycle is focused on direct investor/trader review value: `CF-W1-BT-02`, `CF-W1-HCTX-01`, `CF-W1-MCTX-01`, `CF-W1-CAL-01`, `CF-W1-L3-WATCH-01`, and `CF-W1-L3-INTEL-03`, with `CF-W1-L3-ALERT-03` held behind active `alerts-monitoring` reservations.
 
 ## New Audit-Derived Candidates
 
@@ -29,10 +29,12 @@ These are the investor/trader value priorities for this docs-only refinement cyc
 
 | Rank | ID | Why now | Next gate |
 | --- | --- | --- | --- |
-| 1 | CF-W1-UX-01 | Stock Research Workbench is already a user-facing research cockpit, but it still lacks readiness blockers, scope proof, latest trusted date, and downstream widget eligibility. | Team 03/08 product + UX contract prep for a bounded workbench trust child. |
+| 1 | CF-W1-BT-02 | Backtesting already exposes trust diagnostics, but it still needs one canonical review-disposition label across saved-run list and detail surfaces. | Refresh Team 03/04 packet to the narrower canonical-label scope. |
 | 2 | CF-W1-HCTX-01 | Historical lookup provenance is too thin for post-event learning and calibration trust. | Architecture contract and QA plan for additive lookup provenance. |
 | 3 | CF-W1-MCTX-01 | Market regime labels still over-compress evidence and partial-context limits. | Architecture contract and QA plan for bounded regime-evidence framing. |
-| 4 | CF-W1-CAL-01 | Calibration trust-state drift is the next highest user-value follow-on after the current trust/context trio. | Architecture contract and QA plan after HCTX/MCTX packet prep. |
+| 4 | CF-W1-CAL-01 | Calibration trust-state drift is the next highest user-value follow-on after HCTX/MCTX evidence prep. | Architecture contract and QA plan after HCTX/MCTX packet prep. |
+| 5 | CF-W1-L3-WATCH-01 | Watchlist still behaves like a sortable container, not an explainable review queue. | Architecture contract and QA plan for deterministic review priority and reason summaries. |
+| 6 | CF-W1-L3-INTEL-03 | Portfolio concentration review still lacks bounded research-support review language and explicit exposure ranking. | Architecture contract and QA plan after portfolio readiness groundwork. |
 
 ## Intake Rules
 
@@ -130,21 +132,21 @@ These are documentation-prep candidates only. None is app-code Ready for Impleme
 
 | Rank | ID | Prep owner | Next prep gate | Why it can proceed now |
 | --- | --- | --- | --- | --- |
-| 1 | CF-W1-BT-02 | Team 00 / Team 03 | Product refinement and architecture contract for backtesting review disposition traceability | Backtesting already has availability, benchmark, exit, and repair evidence; the remaining trust gap is a canonical review label and reason summary. |
-| 2 | CF-W1-STRAT-02 | Team 00 / Team 03 | Product refinement and architecture contract for Strategy Framework rule versioning and DQ gate policy | Strategy Framework is the source of truth for reusable strategy definitions and proof; durable rule provenance should be resolved before any rule behavior changes. |
-| 3 | CF-W1-CAL-01 | Team 00 / Team 03 | Product refinement and architecture contract for trusted versus diagnostic calibration outputs | Calibration trust-state machinery already exists; the drift-label gap is explicit enough to refine. |
-| 4 | CF-W1-HCTX-01 | Team 00 / Team 03 | Product refinement and architecture contract for selected-snapshot provenance and gap explanation | Historical context lookups already expose selected-snapshot data and need clearer provenance. |
-| 5 | CF-W1-MCTX-01 | Team 00 / Team 03 | Product refinement and bounded architecture contract for regime evidence and partial-context explanation | Market context regime labels already exist; the evidence gap is now bounded. |
-| 6 | CF-W1-SQLAB-01 | Team 00 / Team 03 | Product refinement and architecture contract for trusted versus untrusted signal-quality outputs | Signal-quality dashboards already exist; the trust-state gap is bounded enough for refinement. |
-| 7 | CF-W1-DQ-02 | Team 00 / Team 03 | Product refinement and architecture contract for market-session-aware currentness evidence | Upstream currentness is the first trust gate downstream consumers should inherit rather than recreate. |
-| 8 | CF-W1-L3-ALERT-03 | Team 00 / Team 03 | Product refinement and bounded architecture contract for post-trigger review outcomes and review-note persistence | Trigger review outcomes are traceable enough now to support a bounded contract. |
-| 9 | CF-W1-L3-WATCH-01 | Team 00 / Team 03 | Product refinement and bounded architecture contract for explainable watchlist review priority and reason summaries | Existing watchlist enrichment and sort signals make a deterministic review-actionability contract possible. |
-| 10 | CF-W1-L3-INTEL-03 | Team 00 / Team 03 | Product refinement and bounded architecture contract for concentration and exposure review over existing portfolio detail surfaces | Existing allocation, score breakdown, and red-flag evidence make a bounded concentration-review contract possible. |
+| 1 | CF-W1-BT-02 | Team 00 / Team 03 | Refresh product refinement and architecture contract for backtesting review disposition traceability | Backtesting already has availability, benchmark, exit, and repair evidence; the remaining trust gap is a canonical review label and reason summary. |
+| 2 | CF-W1-HCTX-01 | Team 00 / Team 03 | Product refinement and architecture contract for selected-snapshot provenance and gap explanation | Historical context lookups already expose selected-snapshot data and need clearer provenance. |
+| 3 | CF-W1-MCTX-01 | Team 00 / Team 03 | Product refinement and bounded architecture contract for regime evidence and partial-context explanation | Market context regime labels already exist; the evidence gap is now bounded. |
+| 4 | CF-W1-CAL-01 | Team 00 / Team 03 | Product refinement and architecture contract for trusted versus diagnostic calibration outputs | Calibration trust-state machinery already exists; the drift-label gap is explicit enough to refine after HCTX/MCTX prep. |
+| 5 | CF-W1-L3-WATCH-01 | Team 00 / Team 03 | Product refinement and bounded architecture contract for explainable watchlist review priority and reason summaries | Existing watchlist enrichment and sort signals make a deterministic review-actionability contract possible. |
+| 6 | CF-W1-L3-INTEL-03 | Team 00 / Team 03 | Product refinement and bounded architecture contract for concentration and exposure review over existing portfolio detail surfaces | Existing allocation, score breakdown, and red-flag evidence make a bounded concentration-review contract possible. |
+| 7 | CF-W1-STRAT-02 | Team 00 / Team 03 | Product refinement and architecture contract for Strategy Framework rule versioning and DQ gate policy | Strategy Framework is the source of truth for reusable strategy definitions and proof; durable rule provenance should be resolved before any rule behavior changes. |
+| 8 | CF-W1-SQLAB-01 | Team 00 / Team 03 | Product refinement and architecture contract for trusted versus untrusted signal-quality outputs | Signal-quality dashboards already exist; the trust-state gap is bounded enough for refinement. |
+| 9 | CF-W1-DQ-02 | Team 00 / Team 03 | Product refinement and architecture contract for market-session-aware currentness evidence | Upstream currentness is the first trust gate downstream consumers should inherit rather than recreate. |
+| 10 | CF-W1-L3-ALERT-03 | Team 00 / Team 03 | Product refinement and bounded architecture contract for post-trigger review outcomes and review-note persistence | Trigger review outcomes are traceable enough now to support a bounded contract, but active `alerts-monitoring` writers make it a later pickup. |
 | 11 | CF-W1-TP-01B | Team 00 | Ready decision for backend-only Trade Plan child | Child architecture and QA plan are prepared; not Ready until Team 00 promotion passes. |
 | 12 | CF-W1-NOTIF-02 | Team 00 / Team 09 | Ready decision and exact implementation handoff for notification log redaction | Requirement, architecture, contract, work packet, and platform QA plan exist; not Ready until promoted. |
 
-`CF-W1-UX-05` remains a valid Product/UX copy-policy candidate in the active ten because its approved first child should be sequenced with `CF-W1-UX-02`; shared `StatusBadge` work remains future.
+`CF-W1-UX-05` remains a valid Product/UX copy-policy candidate, but it is outside this cycle's top investor/trader review priorities because its approved first child should be sequenced with `CF-W1-UX-02`; shared `StatusBadge` work remains future.
 
 `CF-W1-SQLAB-02A` is now the active no-schema Signal Quality Lab child in Team 04 QA planning. The filtered next unassigned item for Team 00 routing is `CF-W1-L3-INTEL-03`.
 
-Excluding the actively routed/recent items in this cycle (`CF-W1-SQLAB-01`, `CF-W1-SQLAB-02A`, `CF-W1-STRAT-02A`, `CF-W1-BT-02`, `CF-W1-DQ-02`, `CF-W1-L3-WATCH-01`), the next unassigned route Team 00 should consider is `CF-W1-L3-INTEL-03`.
+With Team 09 actively implementing `CF-W1-AUTH-SUB-01` in a separate worktree and with current alert writer contention still active, the next docs-only Team 00 architecture/QA prep target should be `CF-W1-BT-02`.

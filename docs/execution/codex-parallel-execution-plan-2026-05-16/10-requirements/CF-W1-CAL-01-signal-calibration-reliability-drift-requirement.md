@@ -17,12 +17,29 @@ Signal Calibration is a trust surface for research and review, not just a score 
 - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md` shows calibration already exposes `calibrationReadiness`, `downstreamInfluence`, `authoritativeScore`, and evidence metadata, so a bounded trust-state refinement is viable.
 - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.md` shows calibration depends on historical regime and context snapshots, so missing or sparse context can silently weaken trust unless surfaced clearly.
 
+## Dependencies
+
+- Best sequenced after `CF-W1-HCTX-01` and `CF-W1-MCTX-01` contract prep so calibration can consume clearer upstream context provenance instead of inventing its own explanation layer.
+- The first child should tighten trust-state semantics around existing readiness fields rather than widen calibration into new scoring or data-quality ownership.
+
+## Bounded Requirement
+
+Define a bounded calibration trust-state contract that clarifies when existing calibration output is trusted, limited, unavailable, or diagnostic-only.
+
+The first child slice should focus on:
+
+- preserving the current `calibrationReadiness`, `downstreamInfluence`, and `authoritativeScore` structure while tightening the reason and blocker story;
+- fail-closed trust framing when DQ evidence is missing, insufficient, or explicitly blocking even if a numeric score still exists;
+- explicit distinction between calibrated proof, raw-score fallback, and no-score states;
+- no new calibration model, no route/schema work, and no duplicate DQ scoring logic outside the module.
+
 ## Acceptance Criteria
 
 - Calibration responses distinguish trusted, limited, unavailable, and diagnostic-only states with stable reasons.
 - Missing DQ, insufficient sample, or blocking DQ evidence does not present normal downstream influence.
 - The user can see why calibration is limited or unavailable, including the relevant evidence gap or blocker.
 - Calibration keeps its current score math and response compatibility unless a later accepted contract explicitly changes the DTO.
+- The child does not relabel limited output as trusted simply because a calibrated score was computed.
 - Focused tests cover trusted, limited, unavailable, missing-DQ, and insufficient-context scenarios.
 
 ## Non-Goals

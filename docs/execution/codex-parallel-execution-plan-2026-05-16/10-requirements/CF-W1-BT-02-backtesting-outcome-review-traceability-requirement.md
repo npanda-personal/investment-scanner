@@ -17,6 +17,22 @@ Backtesting is a review workflow, not just a simulation engine. Investors need t
 - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.ts` withholds or repairs legacy aggregate proof, records `calculationAudit`, and emits `benchmarkComparison` and `exitDiagnostics`, but does not yet frame the outcome as a canonical review-disposition value.
 - `frontend/src/features/backtesting-strategy-lab/components/BacktestingStrategyLabPage.tsx` already renders performance cards, charts, trade logs, warnings, availability, rating, readiness, and data coverage diagnostics, so the missing requirement is about a shared review label and reason summary rather than a new backtesting UI.
 
+## Dependencies
+
+- Team 03 and Team 04 already prepared architecture/QA docs against an earlier broader draft. Those packets need a refresh against this narrower canonical-label requirement before any Ready evaluation.
+- The first child should stay additive across existing saved-run list and detail surfaces rather than widen into simulation, benchmark, or strategy-framework changes.
+
+## Bounded Requirement
+
+Define a bounded review-disposition contract that normalizes how existing backtest diagnostics are summarized across saved-run list and detail views.
+
+The first child slice should focus on:
+
+- one canonical disposition label derived from existing availability, calculation-audit, coverage, benchmark, and exit-diagnostic evidence;
+- a concise reason summary that explains why the run is trusted, partial, diagnostic, or withheld;
+- additive list/detail projection so the same run does not tell two different trust stories depending on view;
+- no simulation-math rewrite, no benchmark engine work, no route/schema change, and no new ranking model.
+
 ## Acceptance Criteria
 
 - Backtest results expose one canonical review-disposition label that distinguishes trusted review outcomes, partial outcomes, diagnostic outcomes, and legacy-repaired or withheld outcomes.
@@ -45,4 +61,4 @@ Backtesting is a review workflow, not just a simulation engine. Investors need t
 
 ## Next Gate
 
-Product refinement and an architecture contract for canonical backtesting review-disposition labels and list/detail traceability, then QA planning and Team 00 Ready evaluation after an exact implementation handoff exists.
+Refresh the existing architecture/QA packet to this narrower canonical-label scope, then hand `CF-W1-BT-02` back to Team 00/03 for exact file reservation and Team 04 QA-plan confirmation before any Ready evaluation.

@@ -29,6 +29,7 @@ The first child slice should stay read-only and deterministic. It should focus o
 - a clear concentration-review taxonomy for holding, sector, country, and portfolio-level exposure;
 - deterministic ranking of which exposures deserve review first;
 - reason summaries grounded in existing allocation, signal overlay, loss, and red-flag evidence;
+- research-support review language that avoids leaning on the current action-suggestion vocabulary as if it were advice;
 - portfolio-level and holding-level concentration explanations that stay research-supportive;
 - no optimizer, no rebalance suggestion, no tax engine, and no direct financial advice language;
 - keep `INTEL-02` as the review-traceability work, not this concentration-exposure layer;
@@ -46,6 +47,12 @@ If the first child needs to split further, the next split point should be the di
 - `backend/src/modules/portfolio-management/portfolio-management.service.ts`
 - `frontend/src/features/portfolio-intelligence/components/PortfolioIntelligencePanel.tsx`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-portfolio-watchlist-alerts.md`
+
+## Source-Backed Refinement
+
+- `portfolio-intelligence.service.ts` already emits concentration red flags for holding, sector, country, and portfolio-level exposure, so the gap is explanation and review ordering, not missing raw concentration evidence.
+- `reviewRanking()` currently returns `decisionLabel`, `actionSuggestion`, and short reasons, while `PortfolioIntelligencePanel.tsx` renders `Action: {item.actionSuggestion}`. The first child should reduce action-like ambiguity instead of widening it.
+- Existing thresholds are already explicit in `portfolio-intelligence.validation.ts`, which makes a bounded concentration-review taxonomy possible without inventing a new scoring model.
 
 ## What This Is Not
 
@@ -67,7 +74,7 @@ The first pass should stay inside the portfolio-intelligence workflow and should
 
 ## Priority Position
 
-This requirement is ranked behind the currently routed backtesting/alert front-runners and ahead of watchlist/calibration/context items because current-holdings concentration review is a higher-value investor workflow than idea-list actionability.
+This requirement remains a next-lane investor workflow, but in this cycle it is sequenced behind `CF-W1-BT-02`, `CF-W1-HCTX-01`, `CF-W1-MCTX-01`, `CF-W1-CAL-01`, and `CF-W1-L3-WATCH-01` because those items either unlock upstream trust evidence or improve the active idea-review queue with less language-risk.
 
 ## Next Gate
 

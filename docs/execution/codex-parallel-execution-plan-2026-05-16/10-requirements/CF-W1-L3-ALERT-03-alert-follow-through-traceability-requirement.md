@@ -26,6 +26,7 @@ The first child slice should focus on:
 - a small, explicit follow-through outcome taxonomy;
 - a concise reason summary or review note;
 - timestamps for review/follow-up state transitions;
+- additive use of existing alert-event metadata/DTO paths rather than schema expansion;
 - no overclaiming of action taken when the user only dismissed or read the event;
 - clear distinction between alert creation, alert inbox state, and post-review follow-through outcome.
 
@@ -37,6 +38,12 @@ The first child slice should focus on:
 - `backend/src/modules/alerts-monitoring/alerts-monitoring.types.ts`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-portfolio-watchlist-alerts.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/risk-register.md`
+
+## Source-Backed Refinement
+
+- `alerts-monitoring.md` and controller/service paths show inbox behavior is currently limited to list, read, dismiss, mark-all-read, and summary; there is no post-review follow-through state yet.
+- `AlertEvent` already carries `metadata` plus `triggeredAt`, `readAt`, and `dismissedAt`, so the first child can stay additive and bounded without reopening alert history storage design.
+- Active `alerts-monitoring` source/test reservations remain a real sequencing constraint in this cycle, so this item should be refined but not treated as the next unblocked lane pickup.
 
 ## What This Is Not
 
@@ -58,7 +65,7 @@ Frontend follow-up is optional and should not be assumed in the first contract u
 
 ## Priority Position
 
-This requirement is ranked behind `CF-W1-L3-TREV-01` and `CF-W1-BT-02`, and ahead of the calibration/context traceability items because it closes a live investor/trader review loop rather than only improving derived diagnostics.
+This requirement remains high user value, but it is intentionally sequenced behind unblocked `CF-W1-L3-WATCH-01` and `CF-W1-L3-INTEL-03` in the current cycle because `alerts-monitoring` still has active writer contention and Ready-lane alert work ahead of it.
 
 ## Next Gate
 

@@ -30,6 +30,7 @@ The first child slice should focus on:
 - reason summaries based on existing signal score, direction, recency, daily move, and user notes/tags;
 - stable ordering that can be explained to the user and reproduced with fixed tie-breaks;
 - additive summary counts for how many items fall into each priority band;
+- stale or missing evidence should push an item toward `refresh evidence`, not make it look high-conviction by accident;
 - no advice language, no alert creation, no note parsing, and no trust overclaiming;
 - keep `PORT-01B` as readiness metadata work, not this actionability layer.
 
@@ -42,6 +43,12 @@ The first child slice should focus on:
 - `backend/src/modules/watchlist-management/watchlist-management.types.ts`
 - `frontend/src/features/watchlist-management/components/WatchlistManagementPage.tsx`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-portfolio-watchlist-alerts.md`
+
+## Source-Backed Refinement
+
+- `watchlist-management.service.ts` currently sorts only by `recentlyAdded`, `signalScoreDesc`, `dailyChangeDesc`, `dailyChangeAsc`, and `symbolAsc`, which means existing review order is mechanical rather than investor-review oriented.
+- The enriched watchlist DTO already carries `dailyChangePercent`, `latestSignal`, `notes`, and `tags`, so the first child can stay module-local and deterministic without inventing new upstream data.
+- `WatchlistManagementPage.tsx` is already table-first and exposes the current sort selector, making one bounded review-priority sort and reason-summary layer a better fit than a larger UI expansion.
 
 ## What This Is Not
 
@@ -63,7 +70,7 @@ The first pass should stay inside the watchlist workflow and should not depend o
 
 ## Priority Position
 
-This requirement is ranked behind `CF-W1-BT-02` and `CF-W1-L3-ALERT-03`, and ahead of `CF-W1-L3-INTEL-03`, `CF-W1-CAL-01`, `CF-W1-HCTX-01`, and `CF-W1-MCTX-01` because it closes a direct investor workflow that already exists in the product and can be explained entirely from module-local fields.
+This requirement is one of the best unblocked Lane 3 discovery candidates in the current cycle. It now ranks behind `CF-W1-BT-02`, `CF-W1-HCTX-01`, `CF-W1-MCTX-01`, and `CF-W1-CAL-01`, and ahead of `CF-W1-L3-INTEL-03` and blocked `CF-W1-L3-ALERT-03` because it improves a live trader review queue without waiting on active `alerts-monitoring` reservations.
 
 ## Next Gate
 

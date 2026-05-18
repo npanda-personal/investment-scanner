@@ -23,6 +23,19 @@ Historical context snapshots are the evidence layer behind regime review, calibr
 - Market Context and Smart Money persisted snapshot reads must remain bounded and explainable.
 - Any new lookup provenance must stay additive and must not break current downstream consumers such as Signal Calibration.
 - Future currentness policy work from Data Quality should be referenced, not duplicated, when historical evidence is stale or absent.
+- The first contract should prefer a backend lookup-provenance slice over a larger frontend redesign because the current API/DTO is where requested-date versus selected-snapshot ambiguity starts.
+
+## Bounded Requirement
+
+Define a bounded historical-context lookup provenance contract that makes nearest-snapshot selection visible without changing the existing lookup semantics.
+
+The first child slice should focus on:
+
+- additive lookup provenance for requested date, selected snapshot date, lag days, lookback window, region, and asset class;
+- per-slice explanation for `market`, `sector`, `country`, `smartMoney`, and `dataQuality` so the user can tell whether each slice is present, missing, metadata-gapped, or outside lookback;
+- stable reason text for metadata-gap and no-snapshot cases instead of generic partial output;
+- backend-first DTO enrichment that downstream consumers can reuse without duplicating explanation logic;
+- no nearest-date algorithm rewrite, no schema work, and no silent fallback that makes a stale snapshot read as same-day evidence.
 
 ## Acceptance Criteria
 
@@ -30,6 +43,7 @@ Historical context snapshots are the evidence layer behind regime review, calibr
 - The response or review surface exposes requested date, selected snapshot date, lag days, lookback window, scope, and explicit gap reasons for missing market, sector, country, smart-money, or data-quality context.
 - Partial lookups are visibly diagnostic, not silently complete.
 - Downstream consumers can tell when context is persisted evidence versus a missing, metadata-gap, or out-of-lookback fallback.
+- Existing `market`, `sector`, `country`, `smartMoney`, `dataQuality`, `dataStatus`, and `gaps[]` behavior remains backward-compatible; new provenance is additive.
 - Focused tests cover complete, partial, missing, and metadata-gap lookup cases.
 
 ## Non-Goals
