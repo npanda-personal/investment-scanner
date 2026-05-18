@@ -33,14 +33,14 @@ Do not spawn a seventh active team. Put it in the queued pool and launch it when
 
 ## Active Subagent Pool
 
-| Slot | Team | Model / Reasoning | Mode | Work Item | Write Scope | Status |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | Team 07 - Portfolio / Watchlist / Alerts | `gpt-5.3-codex`, high | implementation rework | `CF-W1-L3-PORT-01A` | Team 07 worktree only; reserved portfolio-management files | ready to spawn |
-| 2 | Team 02 - Requirement Factory | `gpt-5.4-mini`, medium | docs-only refinement | top candidates and readiness queue sync | `10-requirements/`, Team 02 outbox only | ready to spawn |
-| 3 | Team 03 - Architecture Factory | `gpt-5.4`, high | docs-only architecture/readiness | near-ready packets and signoff prep | `03-architecture/`, `06-contracts/`, `08-work-packets/`, Team 03 outbox only | ready to spawn |
-| 4 | Team 06 - Strategy / Signal / Risk | `gpt-5.4`, medium | docs-only readiness inspection | `CF-W1-TP-01B` Ready-promotion support | Team 06 outbox only, unless Team 00 later assigns exact docs | ready to spawn |
-| 5 | Team 05 - Market Data / Data Quality | `gpt-5.4`, medium | docs-only readiness inspection | `CF-W1-MD-01` acceptance for validation-only Ready evaluation | Team 05 outbox only, unless Team 00 later assigns exact docs | ready to spawn |
-| 6 | Team 09 - Platform / Auth / Subscription / Notifications | `gpt-5.4`, medium | docs-only readiness inspection | `CF-W1-NOTIF-02`, `CF-W1-AUTH-01`, `CF-W1-SUB-01` sequencing | Team 09 outbox only, unless Team 00 later assigns exact docs | ready to spawn |
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Write Scope | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 07 - Portfolio / Watchlist / Alerts | `019e3a50-ed1c-7872-952b-7b73f8488ce8` | `gpt-5.3-codex`, high | implementation rework | `CF-W1-L3-PORT-01A` | Team 07 worktree only; reserved portfolio-management files | active |
+| 2 | Team 02 - Requirement Factory | `019e3a50-ed56-71f0-bfb6-621445556b85` | `gpt-5.4-mini`, medium | docs-only refinement | top candidates and readiness queue sync | `10-requirements/`, Team 02 outbox only | active |
+| 3 | Team 03 - Architecture Factory | `019e3a50-edbe-7df0-8e99-567e7c864abb` | `gpt-5.4`, high | docs-only architecture/readiness | near-ready packets and signoff prep | `03-architecture/`, `06-contracts/`, `08-work-packets/`, Team 03 outbox only | active |
+| 4 | Team 06 - Strategy / Signal / Risk | `019e3a50-ee96-7d80-9df0-44c5911850ad` | `gpt-5.4`, medium | docs-only readiness inspection | `CF-W1-TP-01B` Ready-promotion support | Team 06 outbox only, unless Team 00 later assigns exact docs | active |
+| 5 | Team 05 - Market Data / Data Quality | `019e3a50-ef97-7be3-adee-e5cc8a7def81` | `gpt-5.4`, medium | docs-only readiness inspection | `CF-W1-MD-01` acceptance for validation-only Ready evaluation | Team 05 outbox only, unless Team 00 later assigns exact docs | active |
+| 6 | Team 09 - Platform / Auth / Subscription / Notifications | `019e3a50-f10e-7cb3-9951-9b07394831e2` | `gpt-5.4`, medium | docs-only readiness inspection | `CF-W1-NOTIF-02`, `CF-W1-AUTH-01`, `CF-W1-SUB-01` sequencing | Team 09 outbox only, unless Team 00 later assigns exact docs | active |
 
 ## Queued Subagents
 
