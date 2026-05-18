@@ -1691,6 +1691,29 @@ Date: 2026-05-18
 
 ---
 
+# Acceptance Checkpoint
+
+Date: 2026-05-18
+
+## Completed Item
+
+`CF-W1-SIG-TRIGGER-02A` completed all gates and was locally committed.
+
+- Branch: `codex/team06-strategy-signal/CF-W1-SIG-TRIGGER-02A`
+- Commit: `788c237 feat: add signal trigger audit provenance`
+- Worktree status after commit: clean
+- Push: not performed
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 00: evaluate `CF-W1-TP-02` for sequencing / Ready.
+- Team 04: next QA task after Team 00 assignment.
+- Team 03: next signoff or architecture task after Team 00 assignment.
+- Team 02: next requirement discovery after Team 00 assignment.
+- Team 05: Market Data / DQ implementation only after Team 00 promotes an isolated Ready item.
+
+---
+
 # Dispatcher Runtime Checkpoint
 
 Date: 2026-05-18

@@ -1392,6 +1392,42 @@ Team 04 completed `CF-W1-TP-02` QA planning and Team 00 committed it:
 
 Date: 2026-05-18
 
+## Accepted Branch Commit
+
+`CF-W1-SIG-TRIGGER-02A` completed all standing gates:
+
+- Team 06 developer validation: PASS.
+- Team 04 QA: ACCEPT.
+- Team 10 review: ACCEPT.
+- Team 03 Architect Signoff: ACCEPT.
+- Team 00 delegated PO acceptance: ACCEPT.
+
+Scoped local branch commit:
+
+- Branch: `codex/team06-strategy-signal/CF-W1-SIG-TRIGGER-02A`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-SIG-TRIGGER-02A`
+- Commit: `788c237 feat: add signal trigger audit provenance`
+- Worktree status after commit: clean.
+- Push / merge status: not pushed and not merged to `dev`.
+
+## Current Active Agents
+
+No spawned subagent is active at this checkpoint.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 00: evaluate `CF-W1-TP-02` for sequencing / Ready.
+- Team 04: next QA planning or QA verification task after Team 00 assignment.
+- Team 03: next Architect Signoff or architecture-readiness task after Team 00 assignment.
+- Team 02: next requirement discovery cycle after Team 00 assignment.
+- Team 05: Market Data / DQ implementation only after Team 00 promotes an isolated Ready item.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
 ## Team 00 Dispatcher Rule
 
 Team 00 is the explicit dispatcher for Team 02 and Team 03. Team 02 and Team 03 should not self-monitor for whether to switch between signoff support, acceptance support, discovery, or design work. Team 00 assigns the task type and records it here.
