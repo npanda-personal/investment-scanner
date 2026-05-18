@@ -4,6 +4,67 @@ Date: 2026-05-18
 
 Mode: focused QA rerun plus docs-only QA planning.
 
+## 2026-05-18 `CF-W1-CAL-01` Signal Calibration Reliability Drift QA Planning
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only QA packet preparation
+- Work item: `CF-W1-CAL-01`
+- State/mode: QA planning only; no executable validation
+- Owner: Team 04 QA Factory
+- Lane/module: Lane 2 / `signal-calibration-engine`
+- Files changed:
+  - `04-qa/CF-W1-CAL-01-qa-plan.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - `AGENTS.md`
+  - `10-requirements/CF-W1-CAL-01-signal-calibration-reliability-drift-requirement.md`
+  - `03-architecture/CF-W1-CAL-01-architecture-review.md`
+  - `06-contracts/CF-W1-CAL-01-signal-calibration-reliability-drift-contract.md`
+  - `08-work-packets/CF-W1-CAL-01-work-packet.md`
+  - `04-qa/CF-W1-CAL-01-qa-plan.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Behavior changed:
+  - none; docs-only QA planning
+- Docs changed:
+  - refreshed `04-qa/CF-W1-CAL-01-qa-plan.md`
+  - refreshed `04-qa/next-validation-plans.md`
+  - recorded this handoff in `17-team-outboxes/TEAM-04-qa-factory.md`
+- Contracts changed:
+  - none
+- Result:
+  - Refreshed the bounded CAL-01 QA plan so the first child is judged on direct investor/trader value: whether calibration trust is clear enough for research comparison, cautionary review, diagnostic-only inspection, or explicit unavailability.
+  - Recorded required proof for `TRUSTED`, `LIMITED`, `DIAGNOSTIC_ONLY`, and `UNAVAILABLE` outcomes without widening beyond the reserved `signal-calibration-engine` service/types/doc/test packet.
+  - Split limited coverage into low-sample and context-gap scenarios so cautionary output is not conflated with unavailable or diagnostic-only states.
+  - Added explicit fail-closed assertions for `eligibleForCalibration=false`, `eligibleForSignals=false`, `NOT_READY`, `UNUSABLE`, and `ILLIQUID` so blocker handling cannot stay penalty-only.
+  - Added explicit preservation checks for score math and current compatibility fields plus reject conditions for forbidden scope.
+  - Updated `04-qa/next-validation-plans.md` so `CF-W1-CAL-01` is visible as QA-plan ready for Team 00 Ready evaluation as one bounded backend-only `signal-calibration-engine` trust-state handoff.
+- Tests run: none
+- Tests skipped:
+  - all executable validation was skipped because this was a docs-only QA planning pass with no Team 00 Ready promotion or implementation handoff
+- Skipped-test reason:
+  - planning-only assignment; no builds/tests/services/providers were authorized or required
+- Assumptions:
+  - Team 00 will keep the child bounded to the reserved `signal-calibration-engine` files only
+  - route-level assertions remain optional unless implementation widens explicit payload checks
+  - SQLAB, DQE, and Historical Context remain read-only evidence providers for this slice
+- Risks:
+  - implementers could map missing-DQ and blocking-DQ cases to vague or merged reasons, weakening the trust signal even if status enums change
+  - one blocker path could retain penalty-only behavior unless each listed DQ state gets focused service-test proof
+  - scope could drift into SQLAB, DQE, routes, schema, or frontend if Team 00 does not keep the reservation exact
+- Blockers:
+  - executable QA remains blocked until Team 00 promotes the bounded backend-only `signal-calibration-engine` implementation handoff
+  - any widening into SQLAB/DQE source, controller/router/validation/repository/schema work, frontend work, shared files, packages, or generated files remains an explicit reject condition for the first child
+- Shared-file requests:
+  - none from Team 04; single-writer reservation remains a Team 00 implementation concern
+- QA-ready for Team 00 Ready evaluation:
+  - `CF-W1-CAL-01`: yes, as one bounded backend-only `signal-calibration-engine` trust-state child only
+- Next gate:
+  - Team 00 Ready evaluation for `CF-W1-CAL-01` only, while keeping score-math rewrites, route/schema widening, upstream source edits, shared-file changes, and frontend expansion out of scope
+- Evidence notes:
+  - Team 04 used the active execution folder and the requested CAL-01 planning artifacts only; no application source, tests, package manifests, generated files, architecture docs outside the requested packet, Prisma, routes, shared files, builds, services, or providers were modified or run
+
 ## 2026-05-18 `CF-W1-MCTX-01` Market Context Regime Evidence QA Planning
 
 - Team: `TEAM-04` - QA Factory

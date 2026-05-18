@@ -1685,6 +1685,21 @@ Teams ready to pick up new tasks:
 - Team 00: `CF-W1-CAL-01` Ready evaluation after QA plan acceptance.
 - Team 02: next persistent market-intelligence discovery cycle when relaunched.
 
+---
+
+# CAL-01 QA Planning Complete
+
+Date: 2026-05-18
+
+Team 04 completed docs-only `CF-W1-CAL-01` QA planning and returned `QA-plan ready`.
+
+Teams ready to pick up new tasks:
+
+- Team 00: `CF-W1-CAL-01` Ready evaluation now.
+- Team 06: `CF-W1-CAL-01` implementation if Team 00 promotes it.
+- Team 10: `CF-W1-BT-02` review after QA acceptance.
+- Team 02: next persistent market-intelligence discovery cycle when relaunched.
+
 ## Dispatch Result
 
 Spawned Team 04 QA Factory:

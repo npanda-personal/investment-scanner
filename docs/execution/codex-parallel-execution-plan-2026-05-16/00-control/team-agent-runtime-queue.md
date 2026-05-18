@@ -1113,3 +1113,31 @@ Date: 2026-05-18
 - Team 03 is ready for `CF-W1-BT-02` Architect Signoff after Team 10 accepts.
 - Team 00 is ready to evaluate `CF-W1-CAL-01` for Ready after Team 04 QA plan accepts.
 - Team 02 is ready for another persistent market-intelligence discovery cycle when a slot opens.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Completed Since Previous Snapshot
+
+- Team 04 `019e3bf0-ea7e-7ee0-bf0d-37e9ca02c408`: completed docs-only `CF-W1-CAL-01` QA planning and was closed. Result: QA-plan ready for Team 00 Ready evaluation.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | `019e3bef-6ec0-7d73-aa02-ccfaa1cdab49` | `gpt-5.4`, high | QA rerun | `CF-W1-BT-02` after Team 06 rework | active |
+| 2 | Open slot | none | pending | Ready evaluation | `CF-W1-CAL-01` | ready |
+| 3 | Open slot | none | pending | implementation | `CF-W1-CAL-01` if Team 00 promotes | waiting |
+| 4 | Open slot | none | pending | review/release | `CF-W1-BT-02` after QA accepts | waiting |
+| 5 | Open slot | none | pending | requirements discovery | next persistent Team 02 cycle | ready |
+| 6 | Open slot | none | pending | next architecture prep | next high-value item after Team 02 cycle | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 00 is ready to evaluate `CF-W1-CAL-01` for implementation promotion.
+- Team 06 can implement `CF-W1-CAL-01` if Team 00 promotes the bounded calibration slice.
+- Team 10 is ready for `CF-W1-BT-02` review after QA accepts.
+- Team 02 is ready for another persistent market-intelligence discovery cycle when a slot opens.
