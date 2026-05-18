@@ -6,6 +6,8 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+`CF-W1-SIG-02` is promoted and assigned to Team 06 as a stacked Signal Generation implementation on accepted parked `CF-W1-SIG-TRIGGER-02A` commit `788c237`.
+
 `CF-W1-STRAT-03` is promoted and assigned to Team 06 for a bounded backend-only Strategy Decision provenance implementation in a dedicated worktree. It can run in parallel with `CF-W1-BT-01A` rework because the file reservations are disjoint.
 
 `CF-W1-SMI-01` is promoted and assigned to Team 06 for bounded backend-only Smart Money evidence freshness and partial-trust framing in a dedicated worktree. It can run in parallel with `CF-W1-TP-02` rework because the file reservations are disjoint.
@@ -1348,3 +1350,79 @@ npm.cmd run build
 ```
 
 Stop and return to Team 00 if implementation requires repository/controller/router/validation/module/index edits, schema/generated/route/shared/package/frontend/provider/startup/live changes, durable stored read-path provenance, decision math changes, query/route changes, persistence-key changes, or downstream consumer adoption.
+
+---
+
+## Active Ready Handoff - `CF-W1-SIG-02`
+
+Date promoted: 2026-05-18
+
+Team 00 evaluated `CF-W1-SIG-02` after Team 03 architecture and Team 04 QA planning. The slice is promoted only as a stacked backend-only `signal-generation-engine` child on accepted parked `CF-W1-SIG-TRIGGER-02A`.
+
+Sequencing decision:
+
+- Base branch: `codex/team06-strategy-signal/CF-W1-SIG-TRIGGER-02A`
+- Base commit: `788c237`
+- New branch: `codex/team06-strategy-signal/CF-W1-SIG-02`
+- New worktree: `../investment-scanner-worktrees/team06-CF-W1-SIG-02`
+- Rationale: `CF-W1-SIG-02` consumes the same Signal Generation writer set as the accepted parked trigger-audit child, so it must stack on that accepted branch rather than start from current `dev`.
+
+Gate evidence:
+
+- Requirement: `10-requirements/CF-W1-SIG-02-canonical-trigger-evidence-compatibility-requirement.md`
+- Architecture review: `03-architecture/CF-W1-SIG-02-architecture-review.md`
+- Contract: `06-contracts/CF-W1-SIG-02-canonical-trigger-evidence-compatibility-contract.md`
+- Work packet: `08-work-packets/CF-W1-SIG-02-work-packet.md`
+- QA plan: `04-qa/CF-W1-SIG-02-qa-plan.md`
+- Open decisions: none.
+- Shared/high-risk blocker: none if implementation stays in the stacked Signal Generation reservation and avoids schema/routes/shared/frontend/package/provider scope.
+
+Allowed files:
+
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.types.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.repository.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.service.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.md`
+- `backend/tests/modules/signal-generation-engine/signal-generation-engine.repository.test.ts`
+- `backend/tests/modules/signal-generation-engine/signal-generation-engine.service.test.ts`
+- `backend/tests/modules/signal-generation-engine/signal-generation-engine.trigger-contract.test.ts`
+- `backend/tests/modules/signal-generation-engine/signal-generation-dq-enforcement.invariants.test.ts`
+
+Allowed branch-local evidence docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-CF-W1-SIG-02-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-SIG-02-developer-handoff.md`
+
+Forbidden files:
+
+- Prisma schema or migrations
+- generated files
+- backend/frontend route registries
+- `backend/src/modules/signal-generation-engine/index.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.controller.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.router.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.validation.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.module.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.config.ts`
+- `backend/tests/modules/signal-generation-engine/signal-generation-engine.routes.test.ts`
+- `backend/tests/modules/signal-generation-engine/signal-generation-engine.validation.test.ts`
+- all frontend, downstream, shared utility/UI, package, provider/live/startup/backfill, paid/cloud, broker, telemetry, and credential files
+
+Required behavior:
+
+- keep `SignalResultDto.triggerContract` as the one canonical trigger-evidence packet;
+- avoid adding a second sibling trigger packet;
+- add explicit field provenance and packet-origin semantics;
+- surface persisted `created_at` / `updated_at` and linked run timing/status when repository-backed evidence exists;
+- label source-price-date vs source-data-date timestamp semantics;
+- label request-local `latestForInstrument()` generation honestly;
+- keep compatibility-only and unavailable fields explicit;
+- preserve strict DQ fail-closed behavior and research-support language.
+
+Focused validation:
+
+```powershell
+cd backend
+npm.cmd test -- signal-generation-engine.repository.test.ts signal-generation-engine.service.test.ts signal-generation-engine.trigger-contract.test.ts signal-generation-dq-enforcement.invariants.test.ts --runInBand
+npm.cmd run build
+```

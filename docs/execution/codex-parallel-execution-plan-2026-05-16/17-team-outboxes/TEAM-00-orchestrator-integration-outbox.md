@@ -45,14 +45,15 @@ Gate results:
 - `CF-W1-STRAT-03`: Architect Signoff `ACCEPT`; delegated PO acceptance completed; local feature-branch commit `3c41e41 feat: add strategy decision provenance`.
 - `CF-W1-BT-01A`: Team 06 corrected characterization rework completed; focused backend test and backend build passed; routed to Team 04 QA rerun.
 - `CF-W1-SIG-02`: Team 04 QA planning `ACCEPT/READY`; implementation remains sequencing-controlled against parked `CF-W1-SIG-TRIGGER-02A` commit `788c237`.
+- `CF-W1-SIG-02`: Team 00 sequencing decision is to stack implementation on accepted parked `CF-W1-SIG-TRIGGER-02A` commit `788c237`.
+- `CF-W1-BT-01A`: Team 04 QA rerun `ACCEPT`; routed to Team 10 review.
 
 Teams ready to pick up new tasks:
 
-- Team 04: active on `CF-W1-BT-01A` QA rerun as agent `019e3d4b-9d27-7d52-b387-123f5b3ad84a`.
-- Team 10: `CF-W1-BT-01A` review after QA accepts.
+- Team 10: `CF-W1-BT-01A` review.
 - Team 03: next Architect Signoff or architecture prep after Team 00 assignment.
-- Team 06: next non-conflicting implementation only after Team 00 Ready promotion.
-- Team 02: active rolling requirements discovery.
+- Team 06: `CF-W1-SIG-02` stacked Signal Generation implementation after worktree setup.
+- Team 02: next rolling requirements discovery after Team 00 assignment.
 
 Product Owner action required: no.
 

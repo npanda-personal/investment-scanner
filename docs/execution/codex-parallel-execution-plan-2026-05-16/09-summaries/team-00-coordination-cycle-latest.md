@@ -46,19 +46,19 @@ Team 02 completed a rolling direct-value requirements cycle and added `CF-W1-SQL
 - `CF-W1-STRAT-03` completed Team 03 Architect Signoff, delegated PO acceptance, and scoped local branch commit `3c41e41` on branch `codex/team06-strategy-signal/CF-W1-STRAT-03`.
 - `CF-W1-BT-01A` Team 06 corrected characterization rework passed focused backend test and backend build; next gate is Team 04 QA rerun.
 - `CF-W1-SIG-02` Team 04 QA planning is `ACCEPT/READY`; implementation remains Team 00 sequencing-controlled against parked `CF-W1-SIG-TRIGGER-02A` commit `788c237`.
+- `CF-W1-SIG-02` sequencing decision: promote as a stacked Team 06 implementation branch on accepted parked `CF-W1-SIG-TRIGGER-02A` commit `788c237`.
+- `CF-W1-BT-01A` Team 04 QA rerun accepted; next gate is Team 10 review.
 
 ## Active Agents
 
-- Team 04 `019e3d4b-9d27-7d52-b387-123f5b3ad84a`: `CF-W1-BT-01A` QA rerun.
-- Team 02 `019e3d43-2f37-72b0-9d4e-9c53da4cf62f`: rolling direct-value requirements discovery.
+No active spawned agents at this checkpoint before the next launch wave.
 
 ## Teams Ready To Pick Up New Tasks
 
-- Team 04: `CF-W1-BT-01A` QA rerun.
-- Team 10: `CF-W1-BT-01A` review if Team 04 accepts.
-- Team 06: implementation slot is available only for a non-conflicting Ready item after Team 00 sequencing.
+- Team 10: `CF-W1-BT-01A` review.
+- Team 06: `CF-W1-SIG-02` stacked Signal Generation implementation after worktree setup.
 - Team 03: available for the next Architect Signoff or architecture-prep assignment.
-- Team 02: active on rolling requirements discovery.
+- Team 02: next rolling requirements discovery cycle after Team 00 assigns it.
 - Team 00: Ready evaluation for `CF-W1-RH-01` or `CF-W1-L3-TREV-02` when current gate pressure clears.
 
 ## Product Owner Action

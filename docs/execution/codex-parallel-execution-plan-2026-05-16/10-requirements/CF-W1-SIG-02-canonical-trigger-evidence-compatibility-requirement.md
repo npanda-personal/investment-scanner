@@ -1,6 +1,6 @@
 # CF-W1-SIG-02 - Canonical Trigger Evidence Compatibility Requirement
 
-Date: 2026-05-19
+Date: 2026-05-18
 
 ## Status
 
