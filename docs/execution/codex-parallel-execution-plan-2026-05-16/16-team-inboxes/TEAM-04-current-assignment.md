@@ -283,6 +283,103 @@ Date: 2026-05-18
 
 ## Assignment
 
+Run QA Verification for `CF-W1-BT-02` in the dedicated Team 06 worktree.
+
+Team 06 implementation is complete in reserved scope. Developer validation attempted the focused backend test, backend build, frontend UI smoke, and frontend build, but the worktree lacked local tool binaries (`jest`, `tsc`, and `playwright`). QA should rerun validation in the worktree if dependency access is available. Do not install packages without Team 00 approval.
+
+## Source Handoff
+
+- Requirement: `CF-W1-BT-02`
+- Branch: `codex/team06-strategy-signal/CF-W1-BT-02`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-BT-02`
+- Developer handoff: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-BT-02-developer-handoff.md`
+- Team 06 outbox: `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-outbox.md`
+- QA plan: `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-BT-02-qa-plan.md`
+
+## Files To Verify
+
+Allowed implementation files:
+
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.types.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+- `backend/tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.test.ts`
+- `frontend/src/features/backtesting-strategy-lab/types.ts`
+- `frontend/src/features/backtesting-strategy-lab/components/BacktestingStrategyLabPage.tsx`
+- `frontend/tests/ui/backtesting-strategy-lab.spec.ts`
+
+Allowed evidence docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-BT-02-developer-handoff.md`
+
+Forbidden scope to confirm untouched:
+
+- Prisma schema or migrations
+- generated files
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.repository.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.controller.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.router.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.validation.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.module.ts`
+- `backend/src/modules/backtesting-strategy-lab/index.ts`
+- backend or frontend route registries
+- `backend/src/modules/strategy-framework/**`
+- `backend/src/modules/trade-plan-risk-engine/**`
+- `frontend/src/features/backtesting-strategy-lab/api/**`
+- `frontend/src/features/backtesting-strategy-lab/hooks/**`
+- `frontend/src/features/backtesting-strategy-lab/routes.tsx`
+- shared backend utilities, shared DTOs, shared frontend components
+- package manifests
+- providers, startup/backfill, live-provider, paid/cloud, broker, telemetry, or automation flows
+
+## Required QA Checks
+
+- Confirm additive review-disposition fields exist and preserve existing payload compatibility.
+- Verify backend service coverage for `TRUSTED_REVIEW`, `PARTIAL_REVIEW`, `DIAGNOSTIC_ONLY`, `LEGACY_REPAIRED`, and `WITHHELD`.
+- Verify diagnostic-only reasons for insufficient history, no trades, benchmark unavailable, weak end-of-test exit dominance, and low sample size.
+- Verify withheld outcome for `LEGACY_INVALID` aggregate proof.
+- Verify saved-run list and selected-run detail show the same disposition label and reason summary for the same run.
+- Confirm existing benchmark, availability, data-coverage, exit-diagnostic, realism-warning, and calculation-audit evidence remains visible.
+- Confirm frontend copy remains research-support only, with no direct advice, target-price, guarantee, broker, or automation wording.
+
+## Focused Commands
+
+Run in the Team 06 worktree if environment is available:
+
+```powershell
+cd C:\work\repo\investment-scanner-worktrees\team06-CF-W1-BT-02\backend
+npm.cmd test -- backtesting-strategy-lab.service.test.ts --runInBand
+npm.cmd run build
+```
+
+Because frontend files changed, also run if environment is available:
+
+```powershell
+cd C:\work\repo\investment-scanner-worktrees\team06-CF-W1-BT-02\frontend
+npm.cmd run test:ui -- backtesting-strategy-lab.spec.ts --workers=1
+npm.cmd run build
+```
+
+If dependency binaries are missing, record the exact blocker and whether QA can accept static source/test inspection only. Do not install packages or alter package manifests.
+
+## Output
+
+Write QA evidence in the Team 06 worktree:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-BT-02-qa-verification.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+Return pass/reject decision, commands run, scenario evidence, changed-file scope confirmation, skipped checks and reasons, residual risks, and whether Team 10 review can proceed.
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
 Prepare docs-only QA planning for `CF-W1-DQ-02A`, the bounded Data Quality Engine currentness-evidence first child.
 
 Do not QA or implement the full DQ-02 parent. The parent remains split-required because persisted evaluations do not store session-aware currentness evidence and broader read-side/public-contract or schema work may be needed later.

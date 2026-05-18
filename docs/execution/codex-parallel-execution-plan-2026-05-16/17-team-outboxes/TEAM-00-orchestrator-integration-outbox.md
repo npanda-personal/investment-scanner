@@ -1373,3 +1373,30 @@ Teams ready to pick up new tasks:
 - Team 10: review after QA accepts.
 - Team 03: `CF-W1-MCTX-01` architecture prep when Team 00 opens the next docs-only lane.
 - Team 02: market-intelligence requirements discovery when a slot opens.
+
+---
+
+# BT-02 Developer Handoff Routed
+
+Date: 2026-05-18
+
+## Consumed Result
+
+Team 06 completed `CF-W1-BT-02` in the dedicated worktree:
+
+- Branch: `codex/team06-strategy-signal/CF-W1-BT-02`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-BT-02`
+- Handoff: `18-integration-queue/CF-W1-BT-02-developer-handoff.md`
+
+Changed files are within the Team 00 reservation. No forbidden files were touched.
+
+## Validation Status
+
+Developer validation attempted backend test/build and frontend UI/build, but local worktree tool binaries were unavailable. QA must rerun or carry the exact validation blocker.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-BT-02` QA now.
+- Team 10: `CF-W1-BT-02` review after QA accepts.
+- Team 05: continues active `CF-W1-HCTX-01` implementation.
+- Team 03: `CF-W1-MCTX-01` architecture prep when a docs-only slot opens.
