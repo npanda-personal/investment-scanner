@@ -1452,3 +1452,29 @@ Team 10 recorded one non-blocking documentation hygiene note: `git diff --check`
 ## Next Coordination Action
 
 Commit this routing update if staged scope is clean, then spawn Team 03 Architect Signoff for `CF-W1-BT-02`.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
+## BT-02 Architect Signoff Dispatch
+
+Spawned Team 03 Architect Signoff:
+
+- Agent: `019e3c02-4baa-77a3-a567-d5cf34e804db`
+- Work item: `CF-W1-BT-02`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-BT-02`
+- Gate: Architect Signoff after Team 10 ACCEPT.
+
+## Active Agents
+
+- Team 03 `019e3c02-4baa-77a3-a567-d5cf34e804db`: `CF-W1-BT-02` Architect Signoff.
+- Team 06 `019e3bf9-059e-75a0-8419-fa14b45dadbe`: `CF-W1-CAL-01` implementation.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-CAL-01` QA after Team 06 handoff.
+- Team 00: `CF-W1-BT-02` delegated PO acceptance and scoped commit if Architect Signoff accepts.
+- Team 02: next persistent requirement discovery cycle when relaunched.
