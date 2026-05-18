@@ -2,7 +2,35 @@
 
 Date: 2026-05-18
 
-Status: Refreshed by Team 02 after Team 03/04 post-decision readiness refresh evidence. This queue is refinement-only; Team 00 owns Ready queue movement.
+Status: Refreshed by Team 02 after Team 06 `CF-W1-SIG-TRIGGER-02A` launch and the Product Owner investor-value priority correction. This queue is refinement-only; Team 00 owns Ready queue movement.
+
+## Team 02 Current Priority Override
+
+This section is the latest Team 02 ordering and supersedes older ranking text below where they conflict.
+
+Current ordering is based on two filters:
+
+1. direct investor/trader value first;
+2. independence from Team 06's active `CF-W1-SIG-TRIGGER-02A` implementation files.
+
+### Current Top Parallel-Safe Docs-Only Prep Stack
+
+| Rank | ID | Why it is ahead now | Team 00 routing note |
+| --- | --- | --- | --- |
+| 1 | `CF-W1-SQLAB-02` | Durable post-event learning closes a direct measured-signal review gap and can be prepared without touching Team 06 active files. | Route to Team 03 and Team 04 now. |
+| 2 | `CF-W1-STRAT-02` | Strategy provenance and DQ gate trust remain upstream to signal, backtest, and trade-plan credibility. | Route to Team 03 and Team 04 now. |
+| 3 | `CF-W1-TP-02` | Exit/invalidation semantics are direct user value and cleaner to prep than same-module signal follow-ons. | Route to Team 03 and Team 04 now. |
+| 4 | `CF-W1-MD-02` | Durable market-data evidence remains the largest upstream trust gap, but only as ADR prep. | Route to Team 03 plus Team 04 ADR QA checklist. |
+| 5 | `CF-W1-UX-01` | Research Workbench trust proof is direct user value after the upstream trust stack above. | Route to Team 03, Team 08, and Team 04 after higher upstream prep starts. |
+| 6 | `CF-W1-SIG-TRIGGER-02` | High user value, but not immediate parallel-safe because Team 06 actively owns `signal-generation-engine` for `02A`. | Keep visible, but do not dispatch until `02A` stabilizes. |
+
+### Candidates Team 00 Can Route In Parallel Right Now
+
+- `CF-W1-SQLAB-02`
+- `CF-W1-STRAT-02`
+- `CF-W1-TP-02`
+- `CF-W1-MD-02`
+- `CF-W1-UX-01`
 
 Team 00 promoted `CF-W1-L3-PORT-01A` to Ready on 2026-05-18. It is no longer a refinement item.
 

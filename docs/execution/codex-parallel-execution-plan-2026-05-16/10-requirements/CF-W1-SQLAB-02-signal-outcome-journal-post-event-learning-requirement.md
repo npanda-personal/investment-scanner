@@ -49,6 +49,36 @@ First child slice should focus on:
 - No paid providers, telemetry, broker execution, or external storage.
 - No broad redesign of Today Review or Signal Calibration.
 
+## Likely Owner Team
+
+- Team 03 for the next architecture split and file-reservation packet.
+- Team 04 for the next QA plan covering journal-state semantics and missing-data handling.
+- Team 06 later for bounded implementation if the child remains module-local and additive.
+
+## Expected Architecture / QA Gate
+
+- Keep `CF-W1-SQLAB-02A` as the active no-schema preview child and do not merge its scope into this parent.
+- Prepare the next bounded child as a docs-only contract first: either a no-schema additive journal-state child or a later durable-storage child that is explicitly separated.
+- QA should prepare focused scenarios for evaluated, insufficient-future-data, missing-history, and duplicate-update cases before any implementation handoff.
+
+## Likely File Ownership Risk
+
+Risk: Medium.
+
+The first safe child can stay mostly inside `signal-quality-lab` backend/frontend/test files, but storage pressure can escalate quickly into broader repository/type/test changes if the child is not split tightly.
+
+## Dependencies
+
+- `CF-W1-SQLAB-02A` remains the active preview child and must not be reopened or widened during this pass.
+- `CF-W1-SQLAB-01` outcome-confidence trust state should remain the accepted upstream framing for trusted versus limited outcome interpretation.
+- Any durable storage path must remain separate from calibration or Today Review persistence until Architecture records exact ownership.
+
+## Parallel With `CF-W1-SIG-TRIGGER-02A`
+
+Yes for docs-only architecture and QA prep.
+
+This work is in `signal-quality-lab`, while the active Team 06 implementation is in `signal-generation-engine`. Team 00 can route Team 03 and Team 04 prep without waiting for Team 06 implementation files.
+
 ## Future Candidate Files After Ready Promotion
 
 - `backend/src/modules/signal-quality-lab/signal-quality-lab.service.ts`

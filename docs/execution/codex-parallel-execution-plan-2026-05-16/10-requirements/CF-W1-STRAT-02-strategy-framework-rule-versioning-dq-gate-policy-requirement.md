@@ -46,6 +46,36 @@ First child slice should focus on:
 - No paid providers, telemetry, broker execution, or external services.
 - No broad UI redesign beyond the trust fields needed for the bounded slice.
 
+## Likely Owner Team
+
+- Team 03 for the bounded Strategy Framework contract, split decision, and reservations.
+- Team 04 for QA planning around rule-revision visibility, DQ gate exposure, and blocked-vs-limited states.
+- Team 06 later for implementation if the slice stays inside Strategy Framework owned files.
+
+## Expected Architecture / QA Gate
+
+- Architecture should keep the first child additive and avoid silent rule-behavior changes.
+- If durable rule revision cannot be expressed safely without schema or generated-type work, Team 03 should split the problem before any Ready consideration.
+- QA should prepare focused coverage for versioned versus unversioned rules, trusted versus limited versus blocked proof states, and backward-compatible consumer reads.
+
+## Likely File Ownership Risk
+
+Risk: Medium.
+
+The first child can likely stay within `strategy-framework` backend/frontend/test files, but risk rises if downstream shared contracts or durable uniqueness/storage semantics are pulled in too early.
+
+## Dependencies
+
+- The root trigger/strategy trust policy in `AGENTS.md` still requires explicit strategy versioning and explainable DQ handling.
+- `CF-W1-STRAT-02A` accepted bounded work should remain separate; this parent must define the next provenance-oriented child rather than reopen the accepted slice.
+- Downstream consumers should keep treating Strategy Framework trust as additive metadata until the bounded child is accepted.
+
+## Parallel With `CF-W1-SIG-TRIGGER-02A`
+
+Yes for docs-only architecture and QA prep.
+
+This work stays in `strategy-framework` and does not require Team 06's active `signal-generation-engine` implementation files.
+
 ## Future Candidate Files After Ready Promotion
 
 - `backend/src/modules/strategy-framework/strategy-framework.registry.ts`

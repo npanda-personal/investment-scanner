@@ -47,6 +47,36 @@ This follow-on should focus on:
 - No claim that the existing compatibility child slice is replaced or merged.
 - No attempt to redesign Today Review, Strategy Decision, or Backtesting in the same pass.
 
+## Likely Owner Team
+
+- Team 03 for the next Trade Plan contract split and exact reservation packet.
+- Team 04 for QA planning around exit-condition semantics, invalidation evidence, and target-like wording rejection.
+- Team 06 later for bounded implementation if the child stays inside `trade-plan-risk-engine`.
+
+## Expected Architecture / QA Gate
+
+- The next child must stay separate from the already accepted `CF-W1-TP-01B` compatibility hard-block slice.
+- Architecture should define whether the first child is backend-only wording/contract normalization or a broader backend+frontend semantics child.
+- QA should prepare focused checks for exit rule IDs, invalidation rule IDs, rule version, target-like wording rejection, and unsupported output rejection.
+
+## Likely File Ownership Risk
+
+Risk: Medium.
+
+The cleanest first pass is module-local inside `trade-plan-risk-engine`, but risk rises if the slice pulls in route shape changes, shared DTOs, or frontend surfaces in the same pass.
+
+## Dependencies
+
+- `CF-W1-TP-01A` and `CF-W1-TP-01B` already cover the earlier no-target compatibility direction and should not be reopened.
+- Root `AGENTS.md` still forbids arbitrary target prices and direct financial-advice wording.
+- Any broader exit-review workflow must remain future work unless Team 03 explicitly splits it out.
+
+## Parallel With `CF-W1-SIG-TRIGGER-02A`
+
+Yes for docs-only architecture and QA prep.
+
+This stays in `trade-plan-risk-engine` and can be routed now without waiting for Team 06's active `signal-generation-engine` implementation files.
+
 ## Next Gate
 
 Product refinement and architecture contract for the broader Trade Plan exit/invalidation semantics slice, then later Team 00 Ready evaluation if the scope remains bounded.

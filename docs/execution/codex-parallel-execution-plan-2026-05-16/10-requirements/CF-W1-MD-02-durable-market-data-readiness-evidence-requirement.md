@@ -81,6 +81,18 @@ For the ADR / decision phase:
 - Downstream consumers know which evidence is durable and which remains derived or not available.
 - No source, test, Prisma, provider, service, route, package, generated, startup/backfill, repair, or UI work is performed in this phase.
 
+## Likely Owner Team
+
+- Team 03 for ADR preparation, storage-model comparison, and contract split.
+- Team 04 for an ADR QA checklist that proves what must be validated before later implementation.
+- Team 05 later for implementation only after ADR acceptance and explicit source/schema approval.
+
+## Expected Architecture / QA Gate
+
+- This remains architecture-first only. The next safe gate is an ADR packet, not a Ready-for-implementation packet.
+- Team 03 should define the storage model, natural key, provenance fields, DQE handoff, and rollback/query/test strategy.
+- Team 04 should prepare an ADR QA checklist for migration risk, durable-versus-derived evidence claims, and downstream trust impact.
+
 ## Current Allowed Files
 
 For this documentation-only requirement pass:
@@ -121,6 +133,12 @@ These are not source reservations.
 Risk: High.
 
 Any implementation could affect Prisma schema, OHLC storage semantics, generated types, Market Data repository/service contracts, Data Quality handoff behavior, and downstream trust claims. No source or schema reservation is safe until the ADR is accepted. This item must remain docs-only until the Product Owner and Architect choose the storage model.
+
+## Parallel With `CF-W1-SIG-TRIGGER-02A`
+
+Yes for docs-only ADR and QA-checklist prep.
+
+This work is entirely in execution docs and future Market Data / Data Quality architecture, with no dependency on Team 06's active Signal Generation implementation files.
 
 ## Stop Conditions
 

@@ -41,6 +41,30 @@ The active `CF-W1-UX-01A` child only fixes the presentation risk by adding conse
 - No shared UI, navigation, route registry, Prisma, package, provider, paid/cloud, broker, or telemetry work in the first child.
 - No new external AI, recommendation, optimizer, or portfolio-action workflow.
 
+## Likely Owner Team
+
+- Team 03 for the backend trust-evidence child contract and reservation plan.
+- Team 08 for feature-level UX/source mapping and later implementation inside `stock-research-workbench`.
+- Team 04 for QA planning, including focused UI smoke expectations once a bounded child exists.
+
+## Expected Architecture / QA Gate
+
+- Keep `CF-W1-UX-01A` as the already accepted frontend-only framing child and do not reopen that scope.
+- Architecture should define a backend trust-evidence child that is additive to current workbench outputs and uses public upstream readiness outputs only.
+- QA should prepare trusted, limited, blocked, stale, and scope-mismatch scenarios before any Team 08 handoff.
+
+## Likely File Ownership Risk
+
+Risk: Medium.
+
+The clean child can stay inside `stock-research-workbench` backend/frontend files plus UI smoke coverage, but risk rises quickly if the child needs shared UI, widget internals, route changes, or fabricated readiness fields.
+
+## Parallel With `CF-W1-SIG-TRIGGER-02A`
+
+Yes for docs-only architecture and QA prep.
+
+This work is in Stock Research Workbench and Team 08's later implementation lane, not in the active Team 06 Signal Generation worktree.
+
 ## Next Gate
 
 For the parent follow-on, product refinement is complete enough for Team 03 and Team 08 to prepare the backend trust-evidence child after the active frontend-only child closes. That follow-on must stay bounded to stock-research-workbench-owned files plus approved UI smoke coverage; it must stop if it needs shared UI, widget internals, route changes, or fabricated trust proof.
