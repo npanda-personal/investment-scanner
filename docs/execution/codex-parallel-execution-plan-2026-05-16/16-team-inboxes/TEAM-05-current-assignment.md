@@ -235,6 +235,95 @@ Do not commit. Team 00 handles QA, review, Architect Signoff, delegated PO accep
 
 ---
 
+# Current Dispatcher Assignment - Parallel Team 05 Slice
+
+Date: 2026-05-18
+
+## Assignment
+
+Implement `CF-W1-MD-03` in a dedicated Team 05 worktree.
+
+This is independent from active `CF-W1-MCTX-01`: `MCTX-01` reserves `market-context-intelligence` backend and feature-local frontend files, while `MD-03` reserves only `market-data-foundation` backend service/doc/tests.
+
+Do not implement in the shared `dev` workspace.
+
+## Branch / Worktree
+
+- Branch: `codex/team05-market-data/CF-W1-MD-03`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team05-CF-W1-MD-03`
+
+## Gate Evidence
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MD-03-market-data-signoff-threshold-contract-requirement.md`
+- Architecture review: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-MD-03-architecture-review.md`
+- Contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-MD-03-market-data-signoff-threshold-contract.md`
+- Work packet: `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-MD-03-work-packet.md`
+- QA plan: `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-MD-03-qa-plan.md`
+- Ready handoff: `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/ready-for-implementation.md`
+
+## Allowed Files
+
+- `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.md`
+- `backend/tests/modules/market-data-foundation/market-data.service.test.ts`
+- `backend/tests/modules/market-data-foundation/market-data.universe.test.ts`
+
+Allowed reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-05-CF-W1-MD-03-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-MD-03-developer-handoff.md`
+
+## Forbidden Files
+
+- Prisma schema or migrations
+- generated files
+- Market Data repository, provider, validation, types, controller, router, scheduler, worker, and queue files
+- all Data Quality Engine source/tests
+- backend or frontend route registries
+- shared backend utilities
+- frontend source or shared UI files
+- package manifests
+- provider/live-data/startup/backfill redesign
+- `CF-W1-MD-02A` and future `CF-W1-MD-02B` durable evidence/schema work
+- paid/cloud, broker, telemetry, or credentials
+
+## Required Behavior
+
+- Add explicit universe signoff blockers for price coverage below `95%` and metadata coverage below `90%`.
+- Keep `downstreamAllowed=false` whenever either threshold misses.
+- Preserve existing review-ready minimum-count and `10%` review-ready-share gates.
+- Keep signoff explanation output specific enough to distinguish price-threshold failure from metadata-threshold failure.
+- Preserve current response shape, coverage fields, route behavior, and current universe-state classification.
+- Update module docs so Universe Signoff describes the enforced threshold policy.
+- Do not merge this work with `CF-W1-MD-02A` durable evidence/schema proposal work.
+
+## Focused Validation
+
+Run after implementation:
+
+```powershell
+cd backend
+npm.cmd test -- market-data.service.test.ts market-data.universe.test.ts --runInBand
+npm.cmd run build
+```
+
+Before build/test work, check memory/resource safety if practical.
+
+## Stop Conditions
+
+Return to Team 00 without implementing further if the slice needs any forbidden file, schema/generated/route/shared changes, DQE source/test changes, provider/startup/backfill work, frontend/UI work, package changes, paid/cloud, broker, telemetry, credentials, or durable evidence storage work.
+
+## Expected Output
+
+Write:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-05-CF-W1-MD-03-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-MD-03-developer-handoff.md`
+
+Do not commit. Team 00 handles QA, review, Architect Signoff, delegated PO acceptance, scoped local commit, and later integration.
+
+---
+
 # Current Dispatcher Assignment
 
 Date: 2026-05-18

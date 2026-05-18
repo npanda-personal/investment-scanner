@@ -2,15 +2,15 @@
 
 Date: 2026-05-18
 
-Mode: docs-only backlog refresh after a Market Context dispatchability audit. No application code, tests, Prisma, route registries, package manifests, generated files, Team 00 control docs, or Ready queue files changed.
+Mode: docs-only backlog refresh after a Strategy Framework durable-history discovery cycle. No application code, tests, Prisma, route registries, package manifests, generated files, Team 00 control docs, or Ready promotion files changed.
 
 ## Work Item
 
-Audit one under-served market-intelligence workflow, refine the requirement where needed, and realign queue docs to the actual 2026-05-18 active, queued, routed, and Ready-evaluation state.
+Audit one under-served market-intelligence workflow, add or refine one bounded requirement, and realign queue docs to the actual 2026-05-18 active, queued, routed, accepted, and Ready-promoted state.
 
 ## Files Changed
 
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MCTX-01-market-context-regime-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-STRAT-02B-strategy-definition-durable-revision-history-requirement.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
@@ -21,16 +21,16 @@ Audit one under-served market-intelligence workflow, refine the requirement wher
 
 - `AGENTS.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/16-team-inboxes/TEAM-02-current-assignment.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MCTX-01-market-context-regime-evidence-requirement.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-MCTX-01-architecture-review.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-MCTX-01-market-context-regime-evidence-contract.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-MCTX-01-work-packet.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-MCTX-01-qa-plan.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/ready-for-implementation.md`
-- `backend/src/modules/market-context-intelligence/market-context-intelligence.md`
-- `backend/src/modules/market-context-intelligence/market-context-intelligence.service.ts`
-- `frontend/src/features/market-context-intelligence/components/MarketContextPage.tsx`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-STRAT-02-strategy-framework-rule-versioning-dq-gate-policy-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-STRAT-02-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-STRAT-02-strategy-framework-rule-versioning-dq-gate-policy-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-STRAT-02-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/09-summaries/CF-W1-STRAT-02A-po-acceptance-packet.md`
+- `backend/src/modules/strategy-framework/strategy-framework.md`
+- `backend/src/modules/strategy-framework/strategy-framework.registry.ts`
+- `backend/src/modules/strategy-framework/strategy-framework.repository.ts`
+- `frontend/src/features/strategy-framework/components/StrategyFrameworkPage.tsx`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
@@ -38,44 +38,39 @@ Audit one under-served market-intelligence workflow, refine the requirement wher
 
 ## Audited Workflow
 
-Market Context regime-evidence dispatchability for a live investor review surface.
+Strategy Framework durable rule-history and persisted strategy-definition provenance after accepted `CF-W1-STRAT-02A`.
 
 ## Evidence Summary
 
-- `CF-W1-MCTX-01` already had a bounded source-backed requirement for regime evidence, but Team 02 queue docs were still ranking it behind prep-only parent items.
-- Team 03 already prepared `CF-W1-MCTX-01` architecture, contract, and work-packet docs with exact module-local file reservations and no schema/route/shared-file widening.
-- Team 04 already prepared a focused QA plan that covers trustworthy, partial, low-evidence, and missing-evidence regime states plus module-local UI smoke.
-- `ready-for-implementation.md` still shows no unassigned application-code item in Ready, so the correct Team 02 action was to surface `CF-W1-MCTX-01` as the next Team 00 evaluation candidate without moving it to Ready.
+- `12-ready-queue/ready-for-implementation.md` shows `CF-W1-MCTX-01` was already promoted on 2026-05-18, so Team 02’s prior queue docs were stale in still treating it as the next unassigned pull.
+- Team 03 architecture evidence shows `CF-W1-STRAT-02A` already solved the no-schema trust-surfacing slice on branch commit `359d0a3`.
+- The remaining Strategy Framework gap is durable persisted history because current persistence is still `code`-unique and repository seeding can overwrite older definition rows.
+- That remaining work is bounded enough to promote from blocked parent `CF-W1-STRAT-02` into explicit child `CF-W1-STRAT-02B`.
 
-## Requirement Refined This Cycle
+## Requirement Added This Cycle
 
-`CF-W1-MCTX-01` was refined to make its dispatchability explicit: requirement, architecture, contract, work packet, and QA plan are already complete for one bounded `market-context-intelligence` slice. The slice stays inside module-local backend evidence framing plus the existing feature-local page/widget surfaces. It must not widen into schema/storage, routes, shared UI, Market Data source, or DQE source work.
+`CF-W1-STRAT-02B` was added as the approval-gated durable-history child for Strategy Framework. It isolates version-keyed persisted definition history, rule-revision snapshots, and additive current-vs-durable history metadata without reopening accepted `CF-W1-STRAT-02A`.
 
 ## Queue Delta
 
-- `CF-W1-RH-02A` is active Team 03 architecture prep and is removed from the immediate unassigned pull stack.
-- `CF-W1-MD-03` is now treated as queued behind `CF-W1-RH-02A`, not as the immediate next unassigned pull.
-- `CF-W1-TP-02` remains in active implementation/review follow-up and stays excluded from the next unassigned pull.
-- `CF-W1-SMI-01` remains in active Team 04 worktree QA verification and stays excluded from the next unassigned pull.
-- `CF-W1-RH-01` now has a QA plan ready and stays excluded from the next unassigned pull pending Team 00 Ready evaluation.
-- `CF-W1-L3-TREV-02` remains in active Team 04 QA planning and stays excluded from this cycle.
-- `CF-W1-MD-02A` remains queued for Team 04 QA review and stays excluded from this cycle.
-- `CF-W1-MCTX-01` is now recorded as the next top unassigned requirement for Team 00 because it is direct investor-value work and is already fully packeted for one bounded slice.
-- `CF-W1-SQLAB-02` and `CF-W1-STRAT-02` now sit immediately behind `CF-W1-MCTX-01` in the filtered stack.
+- `CF-W1-MCTX-01` was removed from Team 02’s unassigned pull ranking because the current Ready queue already shows it promoted and assigned to Team 05 on 2026-05-18.
+- `CF-W1-STRAT-02` is now treated as blocked parent lineage only, not as a direct next pull.
+- `CF-W1-STRAT-02B` is now the next top unassigned docs-only requirement for Team 00 routing.
+- `CF-W1-SQLAB-02` stays immediately behind `CF-W1-STRAT-02B`, but remains sequenced behind active `CF-W1-SQLAB-02A`.
+- `CF-W1-MD-02` remains third in the filtered stack as parent-only ADR follow-on while `CF-W1-MD-02A` stays active.
+- `CF-W1-RH-02A`, `CF-W1-MD-03`, `CF-W1-RH-01`, `CF-W1-L3-TREV-02`, `CF-W1-SMI-01`, and accepted/parked branch work remain excluded from the immediate unassigned pull.
 
 ## Blockers
 
-- `CF-W1-MCTX-01`: stop if Team 00 or a downstream writer widens the packet into Prisma/schema/storage work, repository/controller/router/validation edits, route/shared-file changes, Market Data source changes, DQE source changes, or broad UX work.
-- `CF-W1-MCTX-01`: stop if the slice rewrites regime math instead of adding bounded provenance, denominator framing, and missing-component evidence.
-- `CF-W1-RH-02A` and `CF-W1-MD-03` remain active/queued and should not be reopened by Team 02 unless Team 00 routes a rejection back to requirements.
+- `CF-W1-STRAT-02B` is approval-gated because it likely needs Prisma/schema, generated artifacts, repository mapping, and focused service/repository tests in one writer set.
+- Stop if Team 00 or downstream routing tries to reopen `CF-W1-STRAT-02A` instead of the durable-history child.
+- Stop if the child widens into evaluator math, proof-status rewrites, route changes, shared UI, or duplicate DQ logic.
 
 ## Recommended Next Team 00 Action
 
-Use `CF-W1-MCTX-01` as the next top unassigned requirement handoff.
-
-1. Evaluate `CF-W1-MCTX-01` for exact Ready handoff sequencing without moving it to Ready from Team 02.
-2. Keep `CF-W1-SQLAB-02` and `CF-W1-STRAT-02` next in the filtered pull stack while they remain bounded docs-only follow-ons.
-3. Keep `CF-W1-RH-02A`, `CF-W1-MD-03`, `CF-W1-MD-02A`, `CF-W1-RH-01`, and `CF-W1-L3-TREV-02` out of this cycle's immediate unassigned routing because they are already active, queued, or pending another gate.
+1. Route `CF-W1-STRAT-02B` to Team 03 for an approval-gated architecture packet focused on version-keyed persisted Strategy Framework history.
+2. Keep `CF-W1-SQLAB-02` second in the filtered pull stack for post-preview follow-up after `CF-W1-SQLAB-02A`.
+3. Keep `CF-W1-MD-02` third as parent-only ADR sequencing while `CF-W1-MD-02A` and queued `CF-W1-MD-03` stay out of the immediate pull.
 
 ## Validation
 
@@ -88,6 +83,6 @@ Use `CF-W1-MCTX-01` as the next top unassigned requirement handoff.
 ## Notes
 
 - No delegated Product Owner acceptance/support gate was routed to Team 02 in this cycle.
-- No item was moved to Ready.
+- No item was moved to Ready by Team 02.
 - No application files were reserved or modified.
 - No commit was created.

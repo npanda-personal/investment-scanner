@@ -4,6 +4,74 @@ Date: 2026-05-18
 
 Mode: focused QA rerun plus docs-only QA planning.
 
+## 2026-05-18 `CF-W1-MD-03` Market Data Signoff Threshold QA Planning
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only QA packet preparation
+- Work item: `CF-W1-MD-03`
+- State/mode: QA planning only; no executable validation
+- Owner: Team 04 QA Factory
+- Lane/module: Lane 1 / `market-data-foundation`
+- Files changed:
+  - `04-qa/CF-W1-MD-03-qa-plan.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - `AGENTS.md`
+  - `docs/instructions.md`
+  - `docs/architecture.md`
+  - `docs/module-verification-register.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/active-work-board.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MD-03-market-data-signoff-threshold-contract-requirement.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-MD-03-architecture-review.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-MD-03-market-data-signoff-threshold-contract.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-MD-03-work-packet.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/next-validation-plans.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+- Behavior changed:
+  - none; docs-only QA planning
+- Docs changed:
+  - prepared `04-qa/CF-W1-MD-03-qa-plan.md`
+  - refreshed `04-qa/next-validation-plans.md`
+  - recorded this handoff in `17-team-outboxes/TEAM-04-qa-factory.md`
+- Contracts changed:
+  - none
+- Result:
+  - Prepared a bounded backend-only QA plan for Market Data signoff-threshold enforcement in `04-qa/CF-W1-MD-03-qa-plan.md`.
+  - Recorded required pass coverage when scoped price-ready share is at least `95%` and metadata-ready share is at least `90%`, with current legacy gates still satisfied.
+  - Recorded explicit fail-closed coverage for price-threshold miss below `95%`, metadata-threshold miss below `90%`, and dual-threshold miss with both blocker reasons preserved.
+  - Recorded parity assertions so `universeHealth()` and `repairPlan()` must not disagree on signoff status or `downstreamAllowed` for the same threshold state.
+  - Preserved existing minimum review-ready count and minimum `10%` review-ready share gates as additive existing blockers rather than replacement logic.
+  - Preserved current coverage field meanings and review-ready counts/shares as backward-compatible outputs rather than a denominator-policy rewrite.
+  - Added research-support wording constraints and direct-advice rejection for signoff explanation output and module-doc wording.
+  - Added exact reject conditions for Prisma/schema, repository/provider/startup/backfill, DQE source/tests, route/controller/types, frontend/UI, shared files, package/generated files, and any widening into `CF-W1-MD-02A` or future `CF-W1-MD-02B`.
+  - Updated `04-qa/next-validation-plans.md` so `CF-W1-MD-03` is visible in the Team 04 queue as QA-plan ready for Team 00 Ready evaluation as one bounded backend-only `market-data-foundation` child only.
+- Tests run: none
+- Tests skipped:
+  - all executable validation was skipped because this was a docs-only QA planning pass with explicit instructions not to run tests, builds, services, providers, Prisma commands, UI smoke, or live data
+- Skipped-test reason:
+  - planning-only assignment; no executable validation was authorized or required
+- Assumptions:
+  - Team 00 will keep the child bounded to the reserved `market-data-foundation` service/doc/test files only
+  - current coverage metrics and signoff DTO shape remain the preserved source of truth for this first child
+  - current review-ready minimum count and `10%` share gates remain active alongside the new threshold checks
+- Risks:
+  - implementers could treat threshold enforcement as a pretext to redefine coverage denominators, trust-status semantics, or broader universe-state modeling
+  - implementers could collapse dual-threshold misses into one generic low-coverage reason, weakening auditability
+  - scope could drift into repository/provider/startup/backfill, DQE, schema, frontend, or durable-evidence parent work unless Team 00 keeps the writer set exact
+- Blockers:
+  - executable QA remains blocked until Team 00 promotes the bounded backend-only `market-data-foundation` implementation handoff
+  - any widening into Prisma/schema, repository/provider/startup/backfill, DQE, routes/controllers/types, frontend, shared files, package/generated files, or durable-evidence parent scope remains an explicit reject condition
+- Shared-file requests:
+  - none from Team 04; single-writer reservation remains a Team 00 implementation concern
+- QA-ready for Team 00 Ready evaluation:
+  - `CF-W1-MD-03`: yes, as one bounded backend-only `market-data-foundation` signoff-threshold child only
+- Next gate:
+  - Team 00 Ready evaluation for `CF-W1-MD-03`, with exact reservation of the Market Data service/doc/test writer set and explicit preservation of existing review-ready count/share gates
+- Evidence notes:
+  - Team 04 used the active execution folder and governing QA/contract docs only; no application source, tests, Prisma, route registries, shared utilities/UI, package manifests, generated files, builds, services, providers, or live data were modified or run
+
 ## 2026-05-18 `CF-W1-MD-02A` Additive Companion Evidence Schema Packet QA Review
 
 - Team: `TEAM-04` - QA Factory

@@ -2727,3 +2727,48 @@ Teams ready to pick up new tasks:
 - Team 04: `CF-W1-SMI-01` QA rerun now.
 - Team 04: `CF-W1-MD-03` QA planning now.
 - Team 10: `CF-W1-SMI-01` re-review after QA accepts.
+
+---
+
+# SMI-01 QA Rerun Accepted
+
+Date: 2026-05-18
+
+Team 04 accepted the `CF-W1-SMI-01` QA rerun after Team 06 bounded rework.
+
+Team 00 routing:
+
+- Closed Team 04 QA rerun agent `019e3cb0-4d26-76a2-9cea-b705288140e2`.
+- Spawned Team 10 re-review agent `019e3cb3-ca1c-7280-baaa-bfb338c7ddfe`.
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-SMI-01`.
+
+Teams ready to pick up new tasks:
+
+- Team 03: `CF-W1-SMI-01` Architect Signoff if Team 10 accepts.
+- Team 04: `CF-W1-MCTX-01` QA after Team 05 handoff.
+- Team 00: `CF-W1-MD-03` Ready evaluation after Team 04 QA plan completes.
+
+---
+
+# MD-03 Promoted And STRAT-02B Routed
+
+Date: 2026-05-18
+
+Team 00 promoted `CF-W1-MD-03` as an independent Team 05 Market Data implementation slice.
+
+Verified gates:
+
+- requirement exists;
+- architecture review, contract, and work packet exist;
+- QA plan exists;
+- open decisions are zero;
+- exact allowed and forbidden files are recorded;
+- active `MCTX-01`, `SMI-01`, and docs-only `STRAT-02B` workstreams do not share the reserved Market Data Foundation files.
+
+Team 00 also routed `CF-W1-STRAT-02B` to Team 03 for docs-only approval-gated architecture prep.
+
+Teams ready to pick up new tasks:
+
+- Team 05: `CF-W1-MD-03` implementation after worktree setup.
+- Team 03: `CF-W1-STRAT-02B` architecture packet now.
+- Team 03: `CF-W1-SMI-01` Architect Signoff if Team 10 accepts.

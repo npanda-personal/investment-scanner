@@ -2,9 +2,11 @@
 
 Date: 2026-05-18
 
-Prepared by Team 04 QA Factory and refreshed after docs-only QA plans for `CF-W1-MD-01`, `CF-W1-L3-ALERT-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-HCTX-01`, `CF-W1-CAL-01`, `CF-W1-SQLAB-01`, `CF-W1-L3-ALERT-03`, `CF-W1-L3-WATCH-01`, `CF-W1-SQLAB-02A`, `CF-W1-STRAT-02A`, `CF-W1-BT-02`, `CF-W1-DQ-02A`, `CF-W1-L3-INTEL-03`, `CF-W1-MCTX-01`, `CF-W1-SMI-01`, `CF-W1-SIG-TRIGGER-02A`, `CF-W1-RH-01`, and `CF-W1-L3-TREV-02`.
+Prepared by Team 04 QA Factory and refreshed after docs-only QA plans for `CF-W1-MD-01`, `CF-W1-MD-03`, `CF-W1-L3-ALERT-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-HCTX-01`, `CF-W1-CAL-01`, `CF-W1-SQLAB-01`, `CF-W1-L3-ALERT-03`, `CF-W1-L3-WATCH-01`, `CF-W1-SQLAB-02A`, `CF-W1-STRAT-02A`, `CF-W1-BT-02`, `CF-W1-DQ-02A`, `CF-W1-L3-INTEL-03`, `CF-W1-MCTX-01`, `CF-W1-SMI-01`, `CF-W1-SIG-TRIGGER-02A`, `CF-W1-RH-01`, and `CF-W1-L3-TREV-02`.
 
 Refresh note: docs-only QA refresh. No tests, builds, services, providers, UI checks, or application source/test edits were run or modified during this refresh.
+
+Latest MD-03 refresh note: Team 04 added the docs-only QA plan for `CF-W1-MD-03` on 2026-05-18. This records strict signoff pass criteria at price-ready share `>=95%` and metadata-ready share `>=90%`, fail-closed price-threshold, metadata-threshold, and dual-threshold blocker coverage, `universeHealth()` / `repairPlan()` signoff parity, preserved review-ready minimum count/share gates, research-support wording constraints, and exact reject conditions for schema, repository/provider/startup/backfill, DQE, route/controller/types, frontend, shared-file, package, generated-file, or durable-evidence widening. It does not approve executable QA, source work, builds, services, providers, Prisma work, or Ready-for-implementation routing by itself.
 
 Latest MD-02A review note: Team 04 added the docs-only QA review for `CF-W1-MD-02A` on 2026-05-18. This accepted the child as a complete additive companion evidence schema proposal packet, confirmed the minimum natural key, minimum durable evidence coverage, durable-versus-derived claim boundary, and exact `MD-02A`/`MD-02B`/`MD-02C`/`MD-02D` split, and kept Prisma/schema/migration/generated/Market Data/DQE/downstream implementation blocked. It does not approve executable QA, schema work, source work, or Ready-for-implementation routing.
 
@@ -64,6 +66,7 @@ Policy-resolution refresh note: Product Owner resolved the remaining five Decisi
 21. `CF-W1-SIG-TRIGGER-02A`: Signal Generation persisted trigger-audit surfacing and provenance-labeling QA plan recorded in `04-qa/CF-W1-SIG-TRIGGER-02A-qa-plan.md`.
 22. `CF-W1-RH-01`: Research Hub actionability evidence wiring QA plan recorded in `04-qa/CF-W1-RH-01-qa-plan.md`.
 23. `CF-W1-L3-TREV-02`: Today Review candidate snapshot provenance QA plan recorded in `04-qa/CF-W1-L3-TREV-02-qa-plan.md`.
+24. `CF-W1-MD-03`: Market Data signoff threshold contract QA plan recorded in `04-qa/CF-W1-MD-03-qa-plan.md`.
 
 ## Post-Decision Scenario Matrix Prepared
 
@@ -89,6 +92,7 @@ Matrix file: `04-qa/post-decision-child-scenario-matrix-2026-05-17.md`.
 - `CF-W1-SIG-TRIGGER-02A`: bounded Signal Generation persisted trigger-audit surfacing and provenance-labeling QA plan recorded in `04-qa/CF-W1-SIG-TRIGGER-02A-qa-plan.md`.
 - `CF-W1-RH-01`: backend-only Research Hub actionability evidence wiring QA plan recorded in `04-qa/CF-W1-RH-01-qa-plan.md`.
 - `CF-W1-L3-TREV-02`: Today Review candidate snapshot provenance QA plan recorded in `04-qa/CF-W1-L3-TREV-02-qa-plan.md`.
+- `CF-W1-MD-03`: backend-only Market Data signoff-threshold QA plan recorded in `04-qa/CF-W1-MD-03-qa-plan.md`.
 
 These child plans are not executable validation approval. Source/test execution still requires Team 00 Ready promotion, exact file reservations, and implementation handoff.
 
@@ -111,6 +115,7 @@ These child plans are not executable validation approval. Source/test execution 
 | `CF-W1-AUTH-01` | Option A QA refresh prepared; executable validation still blocked | Platform plan now requires protected Team 09 controllers to fail closed when `req.user.id` is missing and forbids `default-user` controller fallback. | Team 09 module-local controller/test reservations and Team 00 Ready promotion. |
 | `CF-W1-SUB-01` | Option A QA refresh prepared; executable validation still blocked | Platform plan now requires admin/manual-only subscription plan changes and records frontend mismatch handling as a limitation/future UX path. | Team 09 backend-only reservations and Team 00 Ready promotion. |
 | `CF-W1-HCTX-01` | Backend-only QA plan prepared; QA-ready for Team 00 Ready evaluation | Team 03 prepared a bounded Historical Context explainability packet; Team 04 aligned exact provenance, lag, metadata-gap, and additive-compatibility scenarios to the reserved `historical-context-snapshots` files. | Team 00 Ready evaluation for one backend-only `historical-context-snapshots` explainability handoff. |
+| `CF-W1-MD-03` | Backend-only QA plan prepared; QA-ready for Team 00 Ready evaluation | Team 03 prepared a bounded Market Data signoff-threshold packet; Team 04 aligned threshold pass, price-fail, metadata-fail, dual-fail, preserved review-ready count/share fail behavior, `universeHealth()` / `repairPlan()` parity, backward-compatible coverage outputs, research-support wording, and forbidden-scope rejection to the reserved `market-data-foundation` service/doc/test files only. | Team 00 Ready evaluation for the bounded backend-only `CF-W1-MD-03` child only, while keeping schema, repository/provider/startup/backfill, DQE, routes/controllers/types, frontend, shared files, package/generated changes, and durable-evidence parent work out of scope. |
 | `CF-W1-CAL-01` | Backend-only QA plan prepared; QA-ready for Team 00 Ready evaluation | Team 03 revalidated the bounded calibration trust-state packet; Team 04 refreshed the QA plan around direct investor/trader value, explicit trusted/limited-low-sample/limited-context-gap/diagnostic-only/unavailable scenarios, exact fail-closed DQ blockers, score-math preservation, current-field preservation, and forbidden-scope rejection for the reserved `signal-calibration-engine` files only. | Team 00 Ready evaluation for one backend-only `signal-calibration-engine` trust-state handoff. |
 | `CF-W1-SQLAB-01` | Backend-only QA plan prepared; QA-ready for Team 00 Ready evaluation | Team 03 revalidated the bounded Signal Quality Lab confidence packet; Team 04 aligned trusted/limited/diagnostic/untrusted scenarios and additive compatibility assertions to the reserved `signal-quality-lab` files. | Team 00 Ready evaluation for one backend-only `signal-quality-lab` outcome-confidence handoff. |
 | `CF-W1-SQLAB-02A` | Child QA plan prepared; QA-ready for Team 00 Ready evaluation only with explicit sequencing behind `CF-W1-SQLAB-01` | Team 03 split the requirement into a no-schema derived journal preview child and a blocked durable parent; Team 04 aligned favorable/adverse/flat, pending-future-data, missing-price-history, derived-not-persisted UI, and additive history/outcome compatibility scenarios to the reserved `signal-quality-lab` service/types/doc/test plus feature-local types/page/UI spec files. | Team 00 sequencing decision after `CF-W1-SQLAB-01` clears the shared backend `signal-quality-lab` files, then Ready evaluation for the bounded `CF-W1-SQLAB-02A` child only. |
@@ -125,7 +130,6 @@ These child plans are not executable validation approval. Source/test execution 
 ## Remaining Next QA Plans
 
 1. `CF-W1-BT-01`: backtesting DQ fail-closed characterization after upstream readiness policy and backtest use-case policy.
-2. `CF-W1-MD-03`: Market Data signoff threshold contract tests after signoff threshold policy and implementation scope are accepted.
 
 ## Focused Command Guidance
 
@@ -143,6 +147,7 @@ Commands below are guidance only. They were not run during this documentation-on
 | `CF-W1-TP-01A` | `cd backend` then `npm.cmd test -- trade-plan-risk-engine.service.test.ts trade-plan-risk-engine.paper-readiness.test.ts --runInBand` | Blocked until backend-only child implementation handoff. |
 | `CF-W1-MD-02` | `cd backend` then `npm.cmd test -- market-data-readiness-evidence.invariants.test.ts market-data-storage-readiness.invariants.test.ts market-data.universe.test.ts market-data.validation.test.ts market-data.repository.test.ts --runInBand` | Blocked until separate approved scoped implementation. |
 | `CF-W1-MD-01` | `cd backend` then `npm.cmd test -- market-data.validation.test.ts --runInBand` | Reject-only validator-child QA plan prepared; blocked from execution until the validation-only implementation handoff exists. |
+| `CF-W1-MD-03` | `cd backend` then `npm.cmd test -- market-data.service.test.ts market-data.universe.test.ts --runInBand` | Backend-only signoff-threshold QA plan prepared; blocked until Team 00 promotes the bounded `market-data-foundation` implementation handoff. |
 | `CF-W1-L3-ALERT-01` | `cd backend` then `npm.cmd test -- alerts-monitoring.service.test.ts alerts-monitoring.validation.test.ts --runInBand` | Plan prepared; blocked until `CF-W1-L3-DQ-01`, alert readiness contract, and implementation handoff. |
 | `CF-W1-L3-ALERT-01` | `cd backend` then `npm.cmd test -- alerts-monitoring.service.test.ts alerts-monitoring.ownership.test.ts alerts-monitoring.routes.test.ts --runInBand` | Approval-gated regression if alert event listing, mutation, or parent rule ownership is touched. |
 | `CF-W1-L3-ALERT-03` | `cd backend` then `npm.cmd test -- alerts-monitoring.service.test.ts alerts-monitoring.validation.test.ts --runInBand` | Plan prepared; blocked until Team 00 sequences the packet after `CF-W1-L3-ALERT-01` and away from `CF-W1-L3-AUTH-03`, then issues an implementation handoff. |
@@ -205,6 +210,7 @@ Provider-adjacent, startup-adjacent, frontend build, backend build, UI smoke, li
 - `CF-W1-MD-02`: blocked from executable validation because Option B is ADR direction only; formal ADR and source/schema/test work need separate approval.
 - `CF-W1-MD-02A`: proposal QA packet is accepted, but executable validation and implementation remain blocked because this child is docs-only and `CF-W1-MD-02B` still requires explicit schema/migration approval plus exact file reservations.
 - `CF-W1-MD-01`: executable validation remains blocked until Team 00 promotes the narrowed validation-only implementation handoff.
+- `CF-W1-MD-03`: child QA plan is prepared and QA-ready for Team 00 Ready evaluation, but executable validation remains blocked until Team 00 promotes the bounded backend-only `market-data-foundation` handoff; any schema, repository/provider/startup/backfill, DQE, route/controller/types, frontend, shared-file, package/generated, or durable-evidence widening remains an explicit reject condition.
 - `CF-W1-L3-ALERT-01`: child QA plan is refreshed; blocked until Team 00 Ready promotion, exact reservations, and implementation handoff.
 - `CF-W1-L3-ALERT-03`: child QA plan is prepared, but the packet is not QA-ready for Team 00 Ready evaluation until Team 00 sequences it behind `CF-W1-L3-ALERT-01` and away from `CF-W1-L3-AUTH-03`.
 - `CF-W1-L3-WATCH-01`: executable validation remains blocked until Team 00 promotes the watchlist-owned implementation handoff; the packet is QA-ready for Ready evaluation only if Team 00 keeps it separate from `CF-W1-L3-PORT-01B`.

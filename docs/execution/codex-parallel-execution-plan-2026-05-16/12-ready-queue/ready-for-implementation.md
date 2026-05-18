@@ -1135,3 +1135,69 @@ cd frontend
 npm.cmd run test:ui -- market-context-intelligence.spec.ts --workers=1
 npm.cmd run build
 ```
+
+---
+
+## Active Ready Handoff - `CF-W1-MD-03`
+
+Date promoted: 2026-05-18
+
+Team 00 evaluated `CF-W1-MD-03` against Ready gates and promoted it as an independent Team 05 backend-only Market Data implementation slice.
+
+Gate evidence:
+
+- Requirement: `10-requirements/CF-W1-MD-03-market-data-signoff-threshold-contract-requirement.md`
+- Architecture review: `03-architecture/CF-W1-MD-03-architecture-review.md`
+- Contract: `06-contracts/CF-W1-MD-03-market-data-signoff-threshold-contract.md`
+- Work packet: `08-work-packets/CF-W1-MD-03-work-packet.md`
+- QA plan: `04-qa/CF-W1-MD-03-qa-plan.md`
+- Open decisions: none.
+- Shared/high-risk blocker: none if implementation stays inside reserved Market Data service/doc/focused tests.
+
+Branch/worktree:
+
+- Branch: `codex/team05-market-data/CF-W1-MD-03`
+- Worktree: `../investment-scanner-worktrees/team05-CF-W1-MD-03`
+
+Allowed files:
+
+- `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.md`
+- `backend/tests/modules/market-data-foundation/market-data.service.test.ts`
+- `backend/tests/modules/market-data-foundation/market-data.universe.test.ts`
+
+Allowed reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-05-CF-W1-MD-03-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-MD-03-developer-handoff.md`
+
+Forbidden files:
+
+- Prisma schema or migrations
+- generated files
+- Market Data repository, provider, validation, types, controller, router, scheduler, worker, and queue files
+- Data Quality Engine source/tests
+- route registries
+- shared backend utilities
+- package manifests
+- frontend or shared UI files
+- provider/live-data/startup/backfill redesign
+- `CF-W1-MD-02A` and future `CF-W1-MD-02B` durable evidence/schema work
+- paid/cloud, broker, telemetry, or credentials
+
+Required behavior:
+
+- add explicit universe signoff blockers for price coverage below `95%` and metadata coverage below `90%`;
+- keep `downstreamAllowed=false` whenever either threshold misses;
+- preserve existing review-ready minimum-count and `10%` review-ready-share gates;
+- keep threshold blocker reasoning separate and specific;
+- preserve current coverage fields, response shape, route behavior, and universe-state classification;
+- update module docs for the enforced Universe Signoff threshold policy.
+
+Required validation after implementation:
+
+```powershell
+cd backend
+npm.cmd test -- market-data.service.test.ts market-data.universe.test.ts --runInBand
+npm.cmd run build
+```

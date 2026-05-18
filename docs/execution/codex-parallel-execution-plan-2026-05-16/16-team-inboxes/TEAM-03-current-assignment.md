@@ -184,6 +184,52 @@ This is docs-only architecture prep. Do not implement application code. Treat th
 
 ---
 
+# Current Dispatcher Assignment
+
+Date: 2026-05-18
+
+## Assignment
+
+Prepare architecture readiness for `CF-W1-STRAT-02B` - Strategy Framework durable revision history.
+
+This is docs-only architecture prep. Do not implement application code. Treat this as approval-gated until proven otherwise because Team 02 expects likely Prisma/schema, generated artifact, and repository mapping impact.
+
+## Source Input
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-STRAT-02B-strategy-definition-durable-revision-history-requirement.md`
+- Parent lineage:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-STRAT-02-strategy-framework-rule-versioning-dq-gate-policy-requirement.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-STRAT-02-architecture-review.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-STRAT-02-strategy-framework-rule-versioning-dq-gate-policy-contract.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-STRAT-02-work-packet.md`
+- Relevant source/docs to inspect read-only:
+  - `backend/src/modules/strategy-framework/strategy-framework.md`
+  - `backend/src/modules/strategy-framework/strategy-framework.registry.ts`
+  - `backend/src/modules/strategy-framework/strategy-framework.repository.ts`
+  - `backend/src/modules/strategy-framework/strategy-framework.service.ts`
+  - `backend/src/modules/strategy-framework/strategy-framework.types.ts`
+  - `backend/tests/modules/strategy-framework/**` as needed
+  - `backend/prisma/schema.prisma` read-only only for impact analysis
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-STRAT-02B-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-STRAT-02B-durable-revision-history-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-STRAT-02B-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+## Required Output
+
+- Determine whether any no-schema/no-generated first child exists; if not, say so clearly.
+- If schema/generated/repository work is needed, define the exact future consent gate and split into later implementation children.
+- Keep `CF-W1-STRAT-02A` closed; do not reopen evaluator math, proof-status semantics, route changes, shared UI, or duplicate DQ logic.
+- Recommend exact future file reservations only as proposed, not approved.
+- Provide Team 04 QA handoff notes for proposal review.
+- Return one of: `proposal packet ready`, `split required`, or `blocked`.
+
+---
+
 # Current Active Assignment Override
 
 Date: 2026-05-18

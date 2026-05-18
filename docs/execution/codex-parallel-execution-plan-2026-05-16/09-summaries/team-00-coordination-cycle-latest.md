@@ -1704,6 +1704,34 @@ Teams ready to pick up new tasks:
 - Team 04: `CF-W1-MD-03` QA planning now.
 - Team 10: `CF-W1-SMI-01` re-review after QA accepts.
 
+## SMI-01 QA Rerun Accepted
+
+Team 04 accepted `CF-W1-SMI-01` QA rerun after Team 06 rework.
+
+Team 00 spawned Team 10 re-review:
+
+- Agent: `019e3cb3-ca1c-7280-baaa-bfb338c7ddfe`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-SMI-01`
+
+Teams ready to pick up new tasks:
+
+- Team 03: `CF-W1-SMI-01` Architect Signoff if Team 10 re-review accepts.
+- Team 04: `CF-W1-MCTX-01` QA after Team 05 handoff.
+- Team 00: `CF-W1-MD-03` Ready evaluation after Team 04 QA plan completes.
+
+## MD-03 Ready Promotion And STRAT-02B Routing
+
+Team 00 promoted `CF-W1-MD-03` for Team 05 implementation after Team 04 completed QA planning.
+
+Team 02 completed the latest discovery cycle and added `CF-W1-STRAT-02B` as a schema/generated approval-gated Strategy Framework durable revision-history requirement. Team 00 routes it to Team 03 for docs-only architecture packet prep.
+
+Teams ready to pick up new tasks:
+
+- Team 05: `CF-W1-MD-03` implementation after worktree setup.
+- Team 03: `CF-W1-STRAT-02B` architecture packet now.
+- Team 03: `CF-W1-SMI-01` Architect Signoff if Team 10 accepts.
+- Team 04: `CF-W1-MCTX-01` QA after Team 05 handoff.
+
 ---
 
 # Latest Coordination State

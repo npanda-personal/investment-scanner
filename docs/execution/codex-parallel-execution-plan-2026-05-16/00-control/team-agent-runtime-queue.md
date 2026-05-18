@@ -2588,3 +2588,54 @@ Team 05 `CF-W1-MCTX-01` worktree was created from `dev` at `01cb386` and depende
 - Team 04: `CF-W1-MD-03` QA planning now in the main workspace.
 - Team 10: `CF-W1-SMI-01` re-review after QA rerun accepts.
 - Team 10: `CF-W1-MCTX-01` review after Team 04 QA accepts.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## SMI-01 QA Rerun Accepted
+
+Team 04 accepted `CF-W1-SMI-01` QA rerun after Team 06 bounded rework.
+
+Team 00 closed Team 04 QA agent `019e3cb0-4d26-76a2-9cea-b705288140e2` and spawned Team 10 re-review:
+
+- Team 10 agent: `019e3cb3-ca1c-7280-baaa-bfb338c7ddfe`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-SMI-01`
+
+## Active Agents
+
+| Slot | Team | Agent | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Team 05 - Market Data / Data Quality | `019e3cb0-4ceb-7ad1-bf4b-0fbcf07a65db` | implementation | `CF-W1-MCTX-01` | active |
+| 2 | Team 04 - QA Factory | `019e3cb0-4d76-7fe2-bb6a-90f6cb8c9ff8` | QA planning | `CF-W1-MD-03` | active |
+| 3 | Team 02 - Requirement Factory | `019e3cab-1d25-7183-9250-25045f612264` | requirements discovery | next market-intelligence item | active |
+| 4 | Team 10 - Review / Release | `019e3cb3-ca1c-7280-baaa-bfb338c7ddfe` | re-review | `CF-W1-SMI-01` | active |
+| 5 | Open slot | none | QA | `CF-W1-MCTX-01` after Team 05 handoff | waiting |
+| 6 | Open slot | none | signoff | `CF-W1-SMI-01` after Team 10 ACCEPT | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03: `CF-W1-SMI-01` Architect Signoff if Team 10 re-review accepts.
+- Team 04: `CF-W1-MCTX-01` QA after Team 05 handoff.
+- Team 00: evaluate `CF-W1-MD-03` after Team 04 QA plan completes.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## MD-03 Ready Promotion And STRAT-02B Routing
+
+Team 00 promoted `CF-W1-MD-03` as a backend-only Market Data signoff-threshold slice. It is independent from active `CF-W1-MCTX-01`.
+
+Team 02 completed discovery and added `CF-W1-STRAT-02B`; Team 00 routes it to Team 03 for docs-only approval-gated architecture prep.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 05: `CF-W1-MD-03` implementation after worktree setup.
+- Team 03: `CF-W1-STRAT-02B` architecture packet now.
+- Team 03: `CF-W1-SMI-01` Architect Signoff if Team 10 re-review accepts.
+- Team 04: `CF-W1-MCTX-01` QA after Team 05 handoff.

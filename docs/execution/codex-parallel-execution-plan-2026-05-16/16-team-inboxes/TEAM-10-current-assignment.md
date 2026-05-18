@@ -196,6 +196,62 @@ Date: 2026-05-18
 
 ## Assignment
 
+Re-review `CF-W1-SMI-01` after Team 06 bounded rework and Team 04 QA rerun `ACCEPT`.
+
+This assignment supersedes older Team 10 tails. Work only in the dedicated Team 06 Smart Money worktree.
+
+## Branch / Worktree
+
+- Branch: `codex/team06-strategy-signal/CF-W1-SMI-01`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-SMI-01`
+
+## Evidence To Review
+
+From the worktree:
+
+- Original Team 10 reject: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-SMI-01-team10-review-release.md`
+- Developer handoff after rework: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-SMI-01-developer-handoff.md`
+- Team 06 outbox after rework: `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-CF-W1-SMI-01-outbox.md`
+- Team 04 QA rerun accept: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-SMI-01-qa-rerun-verification.md`
+
+## Review Scope
+
+Review only the approved changed files:
+
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.service.ts`
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.types.ts`
+- `backend/src/modules/smart-money-intelligence/smart-money-intelligence.md`
+- `backend/tests/modules/smart-money-intelligence/smart-money-intelligence.service.test.ts`
+
+Verify:
+
+- original rejection is fixed: only `ownershipDataStatus === 'COMPLETE'` maps to complete ownership trust;
+- persisted/current `PARTIAL` and `ERROR` ownership statuses remain `LIMITED`, not `USABLE`;
+- existing Smart Money evidence behavior remains intact;
+- forbidden scope remained untouched;
+- product language remains research-support.
+
+## Allowed Writes
+
+Only in the Team 06 SMI worktree:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-SMI-01-team10-rereview-release.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-10-CF-W1-SMI-01-rereview-outbox.md`
+
+Do not edit application source/tests. Do not commit.
+
+## Output
+
+Return pass/reject decision, whether QA evidence is sufficient, release risk, rollback note, and whether Architect Signoff can proceed.
+
+---
+
+# Current Dispatcher Assignment
+
+Date: 2026-05-18
+
+## Assignment
+
 Review `CF-W1-SMI-01` after Team 04 QA `ACCEPT`.
 
 This assignment supersedes older Team 10 tails above. The workstream is backend-only Smart Money Intelligence in a dedicated Team 06 worktree. Do not review unrelated Calibration, Trade Plan, Today Review, Research Hub, or Market Data work in this pass.
