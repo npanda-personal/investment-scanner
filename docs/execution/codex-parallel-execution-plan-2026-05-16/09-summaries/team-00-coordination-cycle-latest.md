@@ -1583,6 +1583,50 @@ Spawned Team 02 Requirement Factory:
 
 Date: 2026-05-18
 
+## Runtime Update
+
+`CF-W1-TP-02` is now dispatched.
+
+- Docs checkpoint commit on `dev`: `8e82e13 docs: promote trade plan semantics slice`.
+- Implementation branch: `codex/team06-strategy-signal/CF-W1-TP-02`.
+- Implementation worktree: `../investment-scanner-worktrees/team06-CF-W1-TP-02`.
+- Base branch: `codex/team06-strategy-signal/CF-W1-TP-01B`.
+- Required base commit: `8ff22fd`.
+- Active implementation agent: Team 06 `019e3c58-1357-7401-a41d-f3f22e08b159`.
+
+## Dispatcher-Owned PO / Architect Routing
+
+Team 00 explicitly assigns Team 02 and Team 03 work instead of expecting them to monitor and self-switch.
+
+- Team 02 next assignment: rolling market-intelligence requirement discovery and ranking, excluding active/accepted/parked work.
+- Team 03 next assignment: docs-only architecture readiness for `CF-W1-SMI-01`.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 02: rolling requirement discovery now.
+- Team 03: `CF-W1-SMI-01` architecture readiness now.
+- Team 04: `CF-W1-TP-02` QA after Team 06 handoff.
+- Team 10: `CF-W1-TP-02` review after QA ACCEPT.
+- Team 00: delegated PO acceptance and scoped branch commit after Architect Signoff ACCEPT.
+
+## Product Owner Action
+
+Product Owner action required: no.
+
+Open decisions: 0.
+
+## Active Agents
+
+- Team 06 `019e3c58-1357-7401-a41d-f3f22e08b159`: `CF-W1-TP-02` implementation.
+- Team 02 `019e3c5a-d381-7e23-9231-6e7915b465f5`: rolling market-intelligence requirement discovery.
+- Team 03 `019e3c5b-2ba4-77f2-93ab-81b3a54f7f06`: `CF-W1-SMI-01` architecture readiness.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
 ## Gate Results
 
 `CF-W1-SIG-TRIGGER-02A`

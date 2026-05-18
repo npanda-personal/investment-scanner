@@ -1359,6 +1359,39 @@ Date: 2026-05-18
 
 Date: 2026-05-18
 
+## Completed Since Previous Snapshot
+
+- Team 00 committed the `CF-W1-TP-02` Ready promotion checkpoint on `dev` as `8e82e13 docs: promote trade plan semantics slice`.
+- Team 00 created the dependent Team 06 worktree from accepted `CF-W1-TP-01B` commit `8ff22fd`.
+
+## Newly Spawned
+
+- Team 06 `019e3c58-1357-7401-a41d-f3f22e08b159`: bounded `CF-W1-TP-02` implementation.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 06 - Strategy / Signal / Risk | `019e3c58-1357-7401-a41d-f3f22e08b159` | `gpt-5.3-codex`, high | implementation | `CF-W1-TP-02` Trade Plan exit/invalidation semantics | active |
+| 2 | Open slot | none | pending | QA verification | `CF-W1-TP-02` after Team 06 handoff | waiting |
+| 3 | Open slot | none | pending | review/release | `CF-W1-TP-02` after Team 04 ACCEPT | waiting |
+| 4 | Open slot | none | pending | Architect Signoff | `CF-W1-TP-02` after Team 10 ACCEPT | waiting |
+| 5 | Team 02 - Requirement Factory | `019e3c5a-d381-7e23-9231-6e7915b465f5` | `gpt-5.4`, medium | requirements discovery | next market-intelligence value cycle | active |
+| 6 | Team 03 - Architecture Factory | `019e3c5b-2ba4-77f2-93ab-81b3a54f7f06` | `gpt-5.4`, high | architecture prep | `CF-W1-SMI-01` | active |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 02 is active on a rolling market-intelligence requirement discovery cycle.
+- Team 03 is active on `CF-W1-SMI-01` architecture readiness.
+- Team 04 is ready for `CF-W1-TP-02` QA after Team 06 handoff.
+- Team 10 is ready for `CF-W1-TP-02` review after Team 04 accepts.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
 ## Gate And Prep Dispatch
 
 Team 10 accepted `CF-W1-SIG-TRIGGER-02A`; Team 00 routed the next gate to Team 03 Architect Signoff.

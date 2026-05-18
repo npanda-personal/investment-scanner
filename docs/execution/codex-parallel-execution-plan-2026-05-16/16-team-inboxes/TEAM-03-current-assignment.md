@@ -184,6 +184,51 @@ This is docs-only architecture prep. Do not implement application code. Treat th
 
 ---
 
+# Current Dispatcher Assignment
+
+Date: 2026-05-18
+
+## Assignment
+
+Prepare architecture readiness for `CF-W1-SMI-01` - Smart Money evidence freshness and partial-trust framing.
+
+This is docs-only architecture prep. Do not implement application code. Do not edit tests. Do not run providers, services, Prisma commands, builds, or UI smoke.
+
+Team 00 is assigning this because higher-ranked candidates are either already active, accepted and parked, already split into blocked durable children, or currently being implemented by Team 06. `CF-W1-SMI-01` is an unassigned direct market-intelligence evidence item with plausible module-local first-slice potential.
+
+## Source Input
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SMI-01-smart-money-evidence-freshness-partial-trust-requirement.md`
+- Active priority queue:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- Relevant source/docs to inspect read-only:
+  - `backend/src/modules/smart-money-intelligence/smart-money-intelligence.md`
+  - `backend/src/modules/smart-money-intelligence/smart-money-intelligence.service.ts`
+  - `backend/src/modules/smart-money-intelligence/smart-money-intelligence.types.ts`
+  - `backend/tests/modules/smart-money-intelligence/**`
+  - `backend/src/modules/market-data-foundation/**` read-only only if needed for evidence provenance context
+  - `backend/src/modules/data-quality-engine/**` read-only only if needed for downstream trust framing
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-SMI-01-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-SMI-01-smart-money-evidence-freshness-partial-trust-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-SMI-01-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+## Required Output
+
+- Recommend the smallest module-local first child if feasible.
+- Define exact allowed and forbidden future implementation files.
+- Explicitly block schema, route registry, shared utility/UI, Market Data source changes, Data Quality source changes, provider/live-data, startup/backfill, packages, generated files, and frontend implementation unless separately approved.
+- Preserve research-support language and avoid direct advice, target-price, guarantee, broker, or automation wording.
+- Provide QA planning handoff notes for Team 04.
+- Return one of: `Ready candidate`, `split required`, or `blocked`.
+
+---
+
 # Current Active Assignment Override
 
 Date: 2026-05-18

@@ -156,6 +156,42 @@ Do not move any application-code item to Ready. Team 00 owns Ready movement.
 
 ---
 
+# Current Dispatcher Assignment
+
+Date: 2026-05-18
+
+## Assignment
+
+Team 00 is relaunching Team 02 as the rolling PO + Requirements discovery lane while Team 06 implements `CF-W1-TP-02`.
+
+Do not monitor passively or self-switch to signoff work. Team 00 will explicitly assign gate-support work if needed. This cycle is requirement discovery and ranking only.
+
+## Current Active / Routed Items To Exclude
+
+- `CF-W1-TP-02`: active Team 06 implementation on dependent Trade Plan branch.
+- `CF-W1-SIG-TRIGGER-02A`: accepted and locally committed on Team 06 branch.
+- `CF-W1-SQLAB-01`, `CF-W1-BT-02`, `CF-W1-CAL-01`, `CF-W1-HCTX-01`, `CF-W1-MD-01`, `CF-W1-DQ-02A`, `CF-W1-STRAT-02A`, `CF-W1-UX-01A`, and `CF-W1-AUTH-SUB-01`: accepted branch commits parked for later clean integration.
+- Items already documented as split/blocked by schema, durable storage, shared files, route registries, or frontend scope must remain out of Ready until Team 00 promotes a bounded child.
+
+## Product Priority
+
+Prioritize direct investor/trader value:
+
+- market data and Data Quality evidence;
+- signals, strategy trust, calibration, backtesting, Trade Plan research support;
+- historical context, market context, signal-quality learning, smart-money evidence freshness, Research Hub evidence wiring, reviewability, and explainability.
+
+Keep admin, settings, auth/subscription, notifications, and alert convenience work lowest unless they block correctness, privacy, user-data safety, or an accepted branch gate.
+
+## Required Output
+
+- Audit one under-served market-intelligence workflow and add or refine at least one bounded requirement if evidence supports it.
+- Keep `next-top-10-candidates.md`, `top-10-ready-candidates.md`, `requirements-backlog.md`, and `refinement-queue.md` aligned.
+- Identify the next top unassigned requirement for Team 00 after excluding active, accepted, parked, and blocked items.
+- Do not move application-code work to Ready.
+
+---
+
 # Latest Standing Assignment
 
 Date: 2026-05-18

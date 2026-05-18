@@ -1668,6 +1668,55 @@ Teams ready to pick up new tasks:
 
 ---
 
+# Runtime Checkpoint - CF-W1-TP-02 Dispatched
+
+Date: 2026-05-18
+
+## Current Git State
+
+- Branch: `dev`.
+- Latest Team 00 docs commit: `8e82e13 docs: promote trade plan semantics slice`.
+- Shared `dev` remains not push-safe because `backend/tests/modules/alerts-monitoring/alerts-monitoring.ownership.test.ts` is dirty outside the current Team 00 orchestration scope.
+- Push was not performed.
+
+## Active Implementation
+
+Team 06 is active on `CF-W1-TP-02`.
+
+- Agent: `019e3c58-1357-7401-a41d-f3f22e08b159`.
+- Branch: `codex/team06-strategy-signal/CF-W1-TP-02`.
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-TP-02`.
+- Base: accepted `CF-W1-TP-01B` branch commit `8ff22fd`.
+- Backend dependency junction: created from the worktree backend to main workspace backend `node_modules`.
+
+## Rolling Factory Routing
+
+Team 00 will keep independent work moving while Team 06 implements.
+
+- Team 02 is queued for rolling market-intelligence requirement discovery.
+- Team 03 is queued for docs-only `CF-W1-SMI-01` architecture readiness.
+- Team 04 is queued for `CF-W1-TP-02` QA after Team 06 handoff.
+- Team 10 is queued for `CF-W1-TP-02` review after QA acceptance.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 02: rolling requirement discovery.
+- Team 03: `CF-W1-SMI-01` architecture readiness.
+- Team 04: `CF-W1-TP-02` QA after Team 06 handoff.
+- Team 10: `CF-W1-TP-02` review after QA acceptance.
+
+## Product Owner Action
+
+Product Owner action required: no.
+
+## Active Agents
+
+- Team 06 `019e3c58-1357-7401-a41d-f3f22e08b159`: active implementation.
+- Team 02 `019e3c5a-d381-7e23-9231-6e7915b465f5`: active rolling requirement discovery.
+- Team 03 `019e3c5b-2ba4-77f2-93ab-81b3a54f7f06`: active rolling architecture readiness.
+
+---
+
 # Gate Dispatch Checkpoint
 
 Date: 2026-05-18
