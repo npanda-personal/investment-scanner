@@ -15,15 +15,15 @@ Product Owner correction after this refresh:
 Apply this extra filter before Team 00 chooses the next pull:
 
 - exclude active implementation, active architecture/QA prep, accepted branch commits parked for later integration, and items already blocked behind schema/durable-storage/shared-file gates;
-- as of 2026-05-18, `CF-W1-TP-02` is in active Team 10 review after Team 04 QA ACCEPT, `CF-W1-SMI-01` is in active Team 04 QA-planning flow, `CF-W1-RH-01` is in active Team 03 architecture readiness, and `CF-W1-L3-TREV-02` is already queued as the next architecture candidate after `CF-W1-RH-01`, so none of them belongs in the next unassigned pull;
-- after those exclusions, the next top unassigned requirement is `CF-W1-MD-02A`.
+- as of 2026-05-18, `CF-W1-MD-02A` is in active Team 03 architecture prep, `CF-W1-TP-02` is in active implementation/review follow-up, `CF-W1-SMI-01` is in active Team 06 implementation, `CF-W1-RH-01` is routed to Team 04 QA planning, and `CF-W1-L3-TREV-02` is already queued for Team 04 QA planning, so none of them belongs in the next unassigned pull;
+- after those exclusions, the next top unassigned requirement is `CF-W1-MD-03`.
 
 ## Cycle Frame
 
 - Open decisions: `0`
 - This ranking is for the next requirement / contract / QA-prep pull, not for Ready queue movement.
 - Team 00 keeps ownership of Ready promotion and live implementation routing.
-- Team 10 currently owns active review flow for `CF-W1-TP-02`, Team 04 currently owns active QA planning for `CF-W1-SMI-01`, and Team 03 currently owns active architecture readiness for `CF-W1-RH-01`, so backlog ranking must distinguish direct user value from current dispatchability.
+- Team 03 currently owns active architecture prep for `CF-W1-MD-02A`, Team 06 currently owns active implementation for `CF-W1-SMI-01`, and Team 04 currently owns queued/active QA planning lanes for `CF-W1-RH-01` and `CF-W1-L3-TREV-02`, so backlog ranking must distinguish direct user value from current dispatchability.
 
 ## Active Investor-Value Work Kept Visible
 
@@ -65,11 +65,11 @@ These items are already promoted, pulled, accepted, or in active QA / review flo
 
 | Rank | ID | User value | Acceptance criteria focus | Non-goals | Likely owner team | Expected architecture / QA gate | Likely file ownership risk | Dependencies | Parallel with `CF-W1-SIG-TRIGGER-02A`? |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | `CF-W1-MD-02A` | Turns the accepted durable-evidence ADR direction into the next bounded upstream packet so market-data trust can advance without opening source work. | Additive schema-proposal-only boundary, explicit natural key, minimum durable evidence fields, additive migration posture, and named blocked follow-on packets. | No Prisma edits, migrations, repository/service/DQE implementation, startup/backfill, provider, or UI work. | Team 03 prep, Team 04 ADR QA prep, later Team 05 only after explicit approval. | Docs-only child packet after existing ADR draft; stop if anyone tries to treat it as app-code work. | Low now, high later: current pass stays in docs; later packet touches schema and generated types. | Parent `CF-W1-MD-02` ADR draft already exists; child must stay additive and approval-gated. | `Yes` for docs-only prep. No active Team 06 overlap. |
+| 1 | `CF-W1-MD-03` | Closes a direct upstream trust gap by making Market Data signoff fail closed when contract price-coverage or metadata-coverage thresholds are missed. | Explicit `95%` price-ready and `90%` metadata-coverage signoff gates, stable blocker reasons, downstreamAllowed blocking, and focused threshold characterization tests. | No schema/storage ADR work, no provider/startup redesign, no route/shared-UI work, and no universe redesign beyond the threshold gates. | Team 03 prep, Team 04 QA prep, later Team 05 implementation. | Bounded Market Data signoff contract and QA packet can proceed now from existing audit and contract evidence. | Medium: module-local Market Data service/docs/tests only. | Existing universe health/signoff outputs and threshold language already exist in docs/contracts; child must stay bounded to signoff logic and tests. | `Yes` for docs-only prep. No active file overlap in the current exclusions. |
 | 2 | `CF-W1-RH-02A` | Fails Research Hub delta claims closed so the overview stops implying review-history evidence it cannot prove. | Comparison-basis status, compared-against timestamp when auditable, and unavailable-basis fallback instead of fake delta labels. | No new scheduler/journal system, no broad Research Hub redesign, no upstream module rewrite, no storage/schema work. | Team 03 prep, Team 04 QA prep, later Team 08 implementation. | Bounded child can proceed now and remains local unless architecture proves a storage split is required. | Medium. Child stays local unless architecture proves a later storage split is required. | Keeps semantic alignment with `CF-W1-RH-01`, but can proceed as a bounded child without waiting for the broader actionability packet to finish. | `Yes`. Docs-only and isolated from current implementation writers. |
 | 3 | `CF-W1-SQLAB-02` | Creates durable post-event learning so outcome review is not ephemeral. | Durable journal semantics, explicit evaluated vs unevaluable states, additive outcome-learning record, focused create/update/missing-data tests. | No signal scoring rewrite, no backtest rewrite, no alerting or execution behavior. | Team 03 prep, Team 04 QA prep, later Team 06 implementation. | Bounded child split after `CF-W1-SQLAB-02A`; docs-only contract and QA plan can proceed now. | Medium: module-local backend/frontend/test files, but storage path may escalate later. | `CF-W1-SQLAB-02A` learning-preview child must stay separate; no schema jump in the first prep pass. | `Yes` for docs-only prep. Different module from active Signal Generation work. |
 | 4 | `CF-W1-STRAT-02` | Makes strategy provenance and DQ gate policy explicit before more signals, backtests, and trade plans rely on strategy trust. | Stable strategy version plus durable rule revision marker, explicit DQ gate policy, blocked vs limited trust exposure, focused proof-state tests. | No strategy math rewrite, no signal math rewrite, no backtest realism rewrite. | Team 03 prep, Team 04 QA prep, later Team 06 implementation. | Bounded Strategy Framework contract and QA packet; stop if schema uniqueness is required. | Medium: strategy-framework backend/frontend/test files; possible later shared contract pressure. | Must preserve existing strategy behavior; may need later schema decision if rule revision persistence is not additive. | `Yes` for docs-only prep. No active Team 06 write overlap with `signal-generation-engine`. |
-| 5 | `CF-W1-MD-02` | Keeps the upstream durable-evidence parent visible while the first bounded child is routed. | Parent ADR direction, durable-vs-derived evidence boundary, and blocked packet sequence stay explicit. | No source or schema work; no bypassing the `MD-02A/B/C/D` split. | Team 03 architecture ownership, Team 04 ADR QA visibility. | Parent-only holding item after the new child split. | Low in docs, high if misrouted into implementation. | `CF-W1-MD-02A` must lead. | `Yes` for docs-only planning. |
+| 5 | `CF-W1-MD-02` | Keeps the upstream durable-evidence parent visible while the first bounded child is already in active architecture prep. | Parent ADR direction, durable-vs-derived evidence boundary, and blocked packet sequence stay explicit. | No source or schema work; no bypassing the `MD-02A/B/C/D` split. | Team 03 architecture ownership, Team 04 ADR QA visibility. | Parent-only holding item after the new child split. | Low in docs, high if misrouted into implementation. | `CF-W1-MD-02A` remains active and later follow-ons must stay sequenced. | `Yes` for docs-only planning. |
 | 6 | `CF-W1-SIG-TRIGGER-02` | Closes remaining trigger auditability gaps for direct signal review evidence. | Bounded persisted or owned trigger evidence for trigger price/timestamp/status/rule provenance, explicit incomplete-field signaling, additive read compatibility tests. | No downstream consumer rewrite, no normalized trigger table, no schema jump without separate split. | Team 03 prep, Team 04 QA prep, later Team 06 implementation. | Must wait for current `CF-W1-SIG-TRIGGER-02A` implementation outcome before the next same-module child is routed. | Medium-high: same module as active Team 06 work, with repository/type/test overlap risk. | Active `CF-W1-SIG-TRIGGER-02A` branch outcome; any schema need forces another split. | `No` for immediate dispatch. Same module as Team 06 active implementation. |
 | 7 | `CF-W1-L3-INTEL-03` | Gives portfolio users explainable concentration review once upstream trust layers are stronger. | Explainable concentration findings, review-first language, deterministic reason summaries, focused bounded tests. | No optimizer, no rebalance advice, no alerting expansion. | Team 03 prep, Team 04 QA prep, later Team 07 implementation. | Lane 3 bounded contract after upstream trust stack stabilizes further. | Medium: portfolio-intelligence frontend/backend/test surfaces. | Better after stronger strategy/market-data/trade-plan trust evidence. | `Yes`. No Team 06 dependency. |
 | 8 | `CF-W1-L3-WATCH-01` | Helps triage watchlist ideas with deterministic review priority and reason summaries. | Explainable priority semantics, deterministic ranking reasons, safe empty states, focused tests. | No alerts convenience expansion, no provider changes, no speculative scoring engine. | Team 03 prep, Team 04 QA prep, later Team 07 implementation. | Lane 3 bounded contract and QA plan only. | Medium: watchlist-management and related frontend/test files. | Should stay behind upstream evidence items. | `Yes`. No Team 06 dependency. |
@@ -80,7 +80,7 @@ These items are already promoted, pulled, accepted, or in active QA / review flo
 
 These are the clearest next docs-only candidates Team 00 can route now after excluding active, queued, accepted, parked, and blocked items:
 
-1. `CF-W1-MD-02A`
+1. `CF-W1-MD-03`
 2. `CF-W1-RH-02A`
 3. `CF-W1-SQLAB-02`
 
@@ -97,7 +97,7 @@ Ranking is unchanged. These were added because current source shows underdevelop
 
 ## Next Unassigned Pull Stack
 
-1. `CF-W1-MD-02A`
+1. `CF-W1-MD-03`
 2. `CF-W1-RH-02A`
 3. `CF-W1-SQLAB-02`
 
@@ -108,8 +108,9 @@ Ranking is unchanged. These were added because current source shows underdevelop
 - `CF-W1-SMI-01` no longer belongs in the next unassigned pull because it is already in active Team 04 QA-planning flow.
 - `CF-W1-RH-01` no longer belongs in the next unassigned pull because it is already in active Team 03 architecture readiness.
 - `CF-W1-L3-TREV-02` no longer belongs in the next unassigned pull because it is already queued as the next architecture candidate after `CF-W1-RH-01`.
-- `CF-W1-MD-02` was refined into bounded child `CF-W1-MD-02A` because the ADR draft already exists and the additive schema-proposal packet is now the strongest upstream docs-only follow-on.
-- `CF-W1-RH-02A` remains high value, but it now follows the new upstream market-data evidence child.
+- `CF-W1-MD-02A` moved out of the unassigned stack because Team 03 now owns the active architecture-prep cycle for that child.
+- `CF-W1-MD-03` was added because current audits and Market Data docs show a bounded upstream trust gap: signoff still does not hard-enforce the active `95%` price-ready / `90%` metadata-ready contract.
+- `CF-W1-RH-02A` remains high value, but it now follows the new upstream Market Data signoff-threshold packet.
 - `CF-W1-UX-01` stays in the upper half because it is a direct research surface, but it still trails upstream trust-evidence packets.
 - Lane 3 convenience items remain behind signal/strategy/market-data/trade-plan evidence work unless correctness, privacy, or user-data safety demands earlier action.
 
@@ -121,10 +122,10 @@ Ranking is unchanged. These were added because current source shows underdevelop
 
 ## Next 3 Candidates Team 00 Should Evaluate
 
-1. `CF-W1-MD-02A`
+1. `CF-W1-MD-03`
 2. `CF-W1-RH-02A`
 3. `CF-W1-SQLAB-02`
 
 ## Team 02 Recommendation
 
-Keep Team 00's live Ready / review routing unchanged for already-active branches. For the next new docs-only pull after excluding active, queued, accepted, parked, and blocked items, route `CF-W1-MD-02A` first. Keep `CF-W1-RH-02A` and `CF-W1-SQLAB-02` immediately behind it, with `CF-W1-MD-02` remaining visible as the governing parent only. Do not let admin/settings/auth/subscription/notifications or alert-convenience work preempt this stack unless a correctness, privacy, or user-data-safety blocker appears.
+Keep Team 00's live Ready / review routing unchanged for already-active branches. For the next new docs-only pull after excluding active, queued, accepted, parked, and blocked items, route `CF-W1-MD-03` first. Keep `CF-W1-RH-02A` and `CF-W1-SQLAB-02` immediately behind it, with `CF-W1-MD-02` remaining visible as the governing parent only and `CF-W1-MD-02A` staying in its active architecture lane. Do not let admin/settings/auth/subscription/notifications or alert-convenience work preempt this stack unless a correctness, privacy, or user-data-safety blocker appears.

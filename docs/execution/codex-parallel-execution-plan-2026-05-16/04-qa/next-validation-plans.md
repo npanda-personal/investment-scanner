@@ -2,9 +2,11 @@
 
 Date: 2026-05-18
 
-Prepared by Team 04 QA Factory and refreshed after docs-only QA plans for `CF-W1-MD-01`, `CF-W1-L3-ALERT-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-HCTX-01`, `CF-W1-CAL-01`, `CF-W1-SQLAB-01`, `CF-W1-L3-ALERT-03`, `CF-W1-L3-WATCH-01`, `CF-W1-SQLAB-02A`, `CF-W1-STRAT-02A`, `CF-W1-BT-02`, `CF-W1-DQ-02A`, `CF-W1-L3-INTEL-03`, `CF-W1-MCTX-01`, `CF-W1-SMI-01`, and `CF-W1-SIG-TRIGGER-02A`.
+Prepared by Team 04 QA Factory and refreshed after docs-only QA plans for `CF-W1-MD-01`, `CF-W1-L3-ALERT-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-HCTX-01`, `CF-W1-CAL-01`, `CF-W1-SQLAB-01`, `CF-W1-L3-ALERT-03`, `CF-W1-L3-WATCH-01`, `CF-W1-SQLAB-02A`, `CF-W1-STRAT-02A`, `CF-W1-BT-02`, `CF-W1-DQ-02A`, `CF-W1-L3-INTEL-03`, `CF-W1-MCTX-01`, `CF-W1-SMI-01`, `CF-W1-SIG-TRIGGER-02A`, and `CF-W1-RH-01`.
 
 Refresh note: docs-only QA refresh. No tests, builds, services, providers, UI checks, or application source/test edits were run or modified during this refresh.
+
+Latest RH refresh note: Team 04 added the docs-only QA plan for `CF-W1-RH-01` on 2026-05-18. This records Today Review and Trade Plan public-output mapping for `READY`, `LIMITED`, `BLOCKED`, and `INSUFFICIENT_DATA`, conservative current-`dev` Signal Quality and Calibration mapping that replaces placeholder insufficiency without overstating trust, fail-closed handling for missing upstream public evidence, conservative `canReviewActionableSetups`, and exact reject conditions for frontend Research Hub, upstream source, route/schema/shared/provider/package/generated, or `CF-W1-RH-02` widening. It does not approve executable QA, frontend work, upstream source work, route work, or shared-file widening.
 
 Latest SMI refresh note: Team 04 added the docs-only QA plan for `CF-W1-SMI-01` on 2026-05-18. This records persisted snapshot provenance, on-demand derived fallback framing, downstream-safe persisted-only data-gap behavior, ownership-placeholder partial trust, stale persisted snapshot handling, insufficient-history unavailable evidence, `top()`/`distribution()` ordering preservation with additive evidence metadata, and exact reject conditions for frontend, repository, schema, route, shared-file, provider/live-data, package, generated-file, or downstream-consumer widening. It does not approve executable QA, frontend work, repository work, schema work, route work, or downstream adoption.
 
@@ -56,6 +58,7 @@ Policy-resolution refresh note: Product Owner resolved the remaining five Decisi
 19. `CF-W1-MCTX-01`: Market Context regime-evidence and partial-context framing QA plan recorded in `04-qa/CF-W1-MCTX-01-qa-plan.md`.
 20. `CF-W1-SMI-01`: Smart Money evidence freshness and partial-trust QA plan recorded in `04-qa/CF-W1-SMI-01-qa-plan.md`.
 21. `CF-W1-SIG-TRIGGER-02A`: Signal Generation persisted trigger-audit surfacing and provenance-labeling QA plan recorded in `04-qa/CF-W1-SIG-TRIGGER-02A-qa-plan.md`.
+22. `CF-W1-RH-01`: Research Hub actionability evidence wiring QA plan recorded in `04-qa/CF-W1-RH-01-qa-plan.md`.
 
 ## Post-Decision Scenario Matrix Prepared
 
@@ -78,6 +81,7 @@ Matrix file: `04-qa/post-decision-child-scenario-matrix-2026-05-17.md`.
 - `CF-W1-MCTX-01`: Market Context regime-evidence and partial-context framing QA plan recorded in `04-qa/CF-W1-MCTX-01-qa-plan.md`.
 - `CF-W1-SMI-01`: Smart Money evidence freshness and partial-trust QA plan recorded in `04-qa/CF-W1-SMI-01-qa-plan.md`.
 - `CF-W1-SIG-TRIGGER-02A`: bounded Signal Generation persisted trigger-audit surfacing and provenance-labeling QA plan recorded in `04-qa/CF-W1-SIG-TRIGGER-02A-qa-plan.md`.
+- `CF-W1-RH-01`: backend-only Research Hub actionability evidence wiring QA plan recorded in `04-qa/CF-W1-RH-01-qa-plan.md`.
 
 These child plans are not executable validation approval. Source/test execution still requires Team 00 Ready promotion, exact file reservations, and implementation handoff.
 
@@ -213,3 +217,4 @@ Provider-adjacent, startup-adjacent, frontend build, backend build, UI smoke, li
 - `CF-W1-MCTX-01`: child QA plan is prepared and QA-ready for Team 00 Ready evaluation, but executable validation remains blocked until Team 00 promotes the bounded `market-context-intelligence` handoff; any schema, route, repository/controller/router/validation/index, upstream module source, shared utility/UI, package/generated, provider/live-data, or broad-UX widening remains an explicit reject condition.
 - `CF-W1-SMI-01`: child QA plan is prepared and QA-ready for Team 00 Ready evaluation, but executable validation remains blocked until Team 00 promotes the bounded backend-only `smart-money-intelligence` handoff; any frontend trust surfacing, repository, schema, route, shared utility/UI, provider/live-data, package, generated-file, or downstream-consumer widening remains an explicit reject condition.
 - `CF-W1-SIG-TRIGGER-02A`: child QA plan is prepared and QA-ready for Team 00 Ready evaluation, but executable validation remains blocked until Team 00 promotes the bounded backend-only `signal-generation-engine` handoff; any schema/generated/route/controller/router/validation/frontend/shared/package/downstream/provider/live-data widening remains an explicit reject condition, and the broader parent remains blocked pending separate durable rule provenance, trigger-price, lifecycle, and downstream adoption packets.
+- `CF-W1-RH-01`: child QA plan is prepared and QA-ready for Team 00 Ready evaluation, but executable validation remains blocked until Team 00 promotes the bounded backend-only `research-hub` handoff; Signal Quality and Calibration must stay capped below `READY` on current `dev`, `canReviewActionableSetups` must stay conservative, and any frontend Research Hub, upstream source, route/schema/shared/provider/package/generated, or `CF-W1-RH-02` widening remains an explicit reject condition.

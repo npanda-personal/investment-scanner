@@ -4,6 +4,96 @@ Date: 2026-05-18
 
 Mode: focused QA rerun plus docs-only QA planning.
 
+## 2026-05-18 `CF-W1-RH-01` Research Hub Actionability Evidence Wiring QA Planning
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only QA packet preparation
+- Work item: `CF-W1-RH-01`
+- State/mode: QA planning only; no executable validation
+- Owner: Team 04 QA Factory
+- Lane/module: Cross-lane research aggregation / `research-hub`
+- Files changed:
+  - `04-qa/CF-W1-RH-01-qa-plan.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - `AGENTS.md`
+  - `16-team-inboxes/TEAM-04-current-assignment.md`
+  - `10-requirements/CF-W1-RH-01-research-hub-actionability-evidence-wiring-requirement.md`
+  - `03-architecture/CF-W1-RH-01-architecture-review.md`
+  - `06-contracts/CF-W1-RH-01-research-hub-actionability-evidence-wiring-contract.md`
+  - `08-work-packets/CF-W1-RH-01-work-packet.md`
+  - `17-team-outboxes/TEAM-03-architecture-factory.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+  - `04-qa/CF-W1-SQLAB-01-qa-plan.md`
+  - `04-qa/CF-W1-CAL-01-qa-plan.md`
+  - `04-qa/CF-W1-SMI-01-qa-plan.md`
+  - `04-qa/CF-W1-MCTX-01-qa-plan.md`
+  - `backend/src/modules/research-hub/research-hub.service.ts`
+  - `backend/src/modules/research-hub/research-hub.types.ts`
+  - `backend/src/modules/research-hub/research-hub.md`
+  - `backend/tests/modules/research-hub/research-hub.service.test.ts`
+  - `backend/src/modules/today-trade-review/index.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.service.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.types.ts`
+  - `backend/src/modules/trade-plan-risk-engine/index.ts`
+  - `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.service.ts`
+  - `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.types.ts`
+  - `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.md`
+  - `backend/src/modules/signal-quality-lab/index.ts`
+  - `backend/src/modules/signal-quality-lab/signal-quality-lab.service.ts`
+  - `backend/src/modules/signal-quality-lab/signal-quality-lab.types.ts`
+  - `backend/src/modules/signal-quality-lab/signal-quality-lab.md`
+  - `backend/src/modules/signal-calibration-engine/index.ts`
+  - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.service.ts`
+  - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.types.ts`
+  - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md`
+  - `frontend/src/features/research-hub/api/researchHubApi.ts`
+  - `frontend/src/features/research-hub/hooks/useResearchOverview.ts`
+  - `frontend/src/features/research-hub/components/ResearchOverviewPage.tsx`
+  - `frontend/tests/ui/research-hub.spec.ts`
+- Behavior changed:
+  - none; docs-only QA planning
+- Docs changed:
+  - prepared `04-qa/CF-W1-RH-01-qa-plan.md`
+  - refreshed `04-qa/next-validation-plans.md`
+  - recorded this handoff in `17-team-outboxes/TEAM-04-qa-factory.md`
+- Contracts changed:
+  - none
+- Result:
+  - Prepared a bounded backend-only QA plan for Research Hub actionability evidence wiring in `04-qa/CF-W1-RH-01-qa-plan.md`.
+  - Recorded required coverage for Today Review public latest-run mapping and Trade Plan public paper-readiness mapping across `READY`, `LIMITED`, `BLOCKED`, and `INSUFFICIENT_DATA`.
+  - Recorded the current-`dev` cap that Signal Quality and Calibration must replace placeholder insufficiency when public evidence exists but must not claim `READY` until richer upstream trust-state packets are actually merged into `dev`.
+  - Added fail-closed assertions so missing upstream public evidence cannot inherit trust from market-open status, raw signal counts, or other healthy dimensions.
+  - Added the conservative boolean rule that `canReviewActionableSetups` remains research-support only and stays `false` on current `dev` if any newly wired dimension remains below `READY`.
+  - Added exact reject conditions for frontend Research Hub files, upstream source edits, route changes, schema/generated changes, shared utility/UI, provider/live-data, startup/backfill, package, paid/cloud, broker, telemetry, or `CF-W1-RH-02` widening.
+  - Updated `04-qa/next-validation-plans.md` so `CF-W1-RH-01` is visible in the Team 04 queue as QA-plan ready for Team 00 Ready evaluation as one bounded backend-only `research-hub` child only.
+- Tests run: none
+- Tests skipped:
+  - all executable validation was skipped because this was a docs-only QA planning pass with no Team 00 Ready promotion or implementation handoff
+- Skipped-test reason:
+  - planning-only assignment; no builds/tests/services/providers/UI smoke/live data were authorized or required
+- Assumptions:
+  - Team 00 will keep the child bounded to `research-hub.service.ts`, `research-hub.md`, `research-hub.service.test.ts`, and optional module-local `research-hub.types.ts` only
+  - accepted `CF-W1-SQLAB-01` and `CF-W1-CAL-01` packets are not assumed merged into current `dev`
+  - existing frontend Research Hub rendering remains unchanged because the current page already consumes the actionability object generically
+- Risks:
+  - implementers could set `canReviewActionableSetups=true` from only Today Review and Trade Plan readiness, overstating reviewability on current `dev`
+  - implementers could replace placeholders with stronger-looking Signal Quality or Calibration states than current public `dev` semantics justify
+  - scope could drift into frontend Research Hub files or upstream modules unless Team 00 keeps the writer set exact
+- Blockers:
+  - executable QA remains blocked until Team 00 promotes the bounded backend-only `research-hub` implementation handoff
+  - any widening into frontend Research Hub, Today Review, Trade Plan, Signal Quality Lab, Signal Calibration Engine, routes, schema/generated, shared files, providers/live data, package manifests, or `CF-W1-RH-02` remains an explicit reject condition for the first child
+- Shared-file requests:
+  - none from Team 04; single-writer reservation remains a Team 00 implementation concern
+- QA-ready for Team 00 Ready evaluation:
+  - `CF-W1-RH-01`: yes, as one bounded backend-only `research-hub` actionability-evidence child only
+- Next gate:
+  - Team 00 Ready evaluation for `CF-W1-RH-01`, with exact reservation of the backend-only Research Hub writer set and explicit preservation of current-`dev` conservative Signal Quality/Calibration caps
+- Evidence notes:
+  - Team 04 used the active execution folder, current Research Hub module/test/doc surfaces, and current public upstream service/type/doc surfaces only; no application source, tests, package manifests, generated files, Prisma, routes, shared files, builds, services, providers, or live data were modified or run
+
 ## 2026-05-18 `CF-W1-TP-02` Trade Plan Exit/Invalidation Semantics QA Planning
 
 - Team: `TEAM-04` - QA Factory

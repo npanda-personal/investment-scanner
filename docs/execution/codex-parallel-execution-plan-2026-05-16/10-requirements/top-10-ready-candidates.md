@@ -6,7 +6,7 @@ Status: Refreshed after Product Owner priority correction. This is a docs-only c
 
 Team 02 discovery note: this file remains a docs-only candidate view, not a Ready decision. Use the dispatch correction below for the actual next unassigned pull.
 
-Current dispatch correction on 2026-05-18: `CF-W1-TP-02` is in active Team 10 review after Team 04 QA ACCEPT, `CF-W1-SMI-01` is in active Team 04 QA-planning flow, `CF-W1-RH-01` is in active Team 03 architecture readiness, and `CF-W1-L3-TREV-02` is already queued as the next architecture candidate after `CF-W1-RH-01`. After excluding active, queued, accepted, parked, and blocked items, the next top unassigned docs-only requirement is `CF-W1-MD-02A`.
+Current dispatch correction on 2026-05-18: `CF-W1-MD-02A` is in active Team 03 architecture prep, `CF-W1-TP-02` is in active implementation/review follow-up, `CF-W1-SMI-01` is in active Team 06 implementation, `CF-W1-RH-01` is routed to Team 04 QA planning, and `CF-W1-L3-TREV-02` is queued for Team 04 QA planning. After excluding active, queued, accepted, parked, and blocked items, the next top unassigned docs-only requirement is `CF-W1-MD-03`.
 
 ## Priority Rule
 
@@ -24,11 +24,11 @@ These are docs-only backlog priorities. They are not Ready-evaluation results.
 
 | Rank | ID | Why now | Next gate |
 | --- | --- | --- | --- |
-| 1 | `CF-W1-MD-02A` | Market Data already has an accepted ADR draft, and the next bounded child can now define the additive schema proposal that all durable readiness evidence depends on. | Team 03 additive schema-packet prep, then Team 04 ADR QA review. |
+| 1 | `CF-W1-MD-03` | Market Data signoff still does not hard-enforce the active `95%` price-ready / `90%` metadata-ready contract, which is a direct upstream trust gap. | Team 03 bounded signoff-threshold contract prep, then Team 04 QA-plan prep. |
 | 2 | `CF-W1-RH-02A` | Research Hub still implies auditable change detection even though `whatChanged` is simulated from the current response; the fail-closed child can remove false temporal claims now. | Team 03 comparison-basis child contract decision, then Team 04 QA-plan prep. |
 | 3 | `CF-W1-SQLAB-02` | Signal outcome learning connects measured outcomes to future judgment; durable storage remains split, but the post-preview path needs definition. | Team 03 post-preview packet prep after `SQLAB-02A` closes. |
 | 4 | `CF-W1-STRAT-02` | Strategy provenance and DQ-gated trust are upstream to every signal/backtest claim. | Team 03/04 child-packet follow-up after accepted `STRAT-02A`. |
-| 5 | `CF-W1-MD-02` | Durable market-data readiness/evidence remains the governing parent, but the child split should lead now. | Hold parent only; keep `CF-W1-MD-02A` in front. |
+| 5 | `CF-W1-MD-02` | Durable market-data readiness/evidence remains the governing parent, but `MD-02A` is already active and later follow-ons still need bounded sequencing. | Hold parent only; keep `CF-W1-MD-02A` in its active lane. |
 | 6 | `CF-W1-UX-01` | Workbench trust remains useful, but it follows market-data/signals/backtest evidence unless backend trust evidence is source-supported. | Backend trust-evidence parent remains blocked until source-supported fields exist. |
 | 7 | `CF-W1-L3-INTEL-03` | Portfolio concentration review is still useful, but it remains below the upstream market-intelligence trust stack unless a safety blocker requires earlier attention. | Team 03 architecture/contract prep, then Team 04 QA prep. |
 | 8 | `CF-W1-L3-WATCH-01` | Watchlist review actionability can improve the trader review queue without waiting on convenience work. | Team 03 architecture/contract prep, then Team 04 QA prep. |
@@ -73,7 +73,7 @@ Already promoted, pulled, accepted, or parked branch work should stay out of the
 
 ## Next Team 00 Pull
 
-Next docs-only handoff after excluding active, queued, accepted, parked, and blocked items: `CF-W1-MD-02A` to Team 03 for architecture/contract prep and Team 04 for ADR QA review.
+Next docs-only handoff after excluding active, queued, accepted, parked, and blocked items: `CF-W1-MD-03` to Team 03 for architecture/contract prep and Team 04 for QA-plan prep.
 
 Next live Ready routing stays outside this docs-only candidate list; the routed market-context and Data Quality lanes remain excluded until Team 00 changes live routing.
 
