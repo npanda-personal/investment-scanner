@@ -31,8 +31,9 @@ Prepared:
 Result:
 
 - `CF-W1-BT-02` is source-supported as one bounded `backtesting-strategy-lab` no-schema packet.
-- Existing run `metrics` and `trades` JSON payloads are sufficient for additive review-outcome and trade-traceability fields.
-- No Prisma/schema/generated/shared-route approval is required for the packet.
+- The narrowed first child is canonical run-level review disposition plus reason-summary normalization across saved-run list and selected-run detail.
+- Existing run `metrics` JSON already contains the evidence needed for additive disposition fields. Trade-level structured rule-traceability work is explicitly deferred from this child.
+- No Prisma/schema/generated/shared-route/shared-UI approval is required for the packet.
 - Team 04 QA planning can start now.
 - Team 00 must keep the packet isolated to the reserved `backtesting-strategy-lab` service/types/doc/test and page/types/UI spec writer set.
 
@@ -121,7 +122,7 @@ Result:
 
 | Priority | Candidate | Architecture status | Implementation status | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | `CF-W1-BT-02` | Backtesting-only review-traceability packet prepared | Ready candidate pending QA handoff | Exact `backtesting-strategy-lab` service/types/doc/test and page/types/UI spec reservations are defined. No schema, route, shared UI, package, or generated blocker exists. |
+| 1 | `CF-W1-BT-02` | Backtesting-only disposition-normalization packet prepared | Ready candidate pending QA handoff | Exact `backtesting-strategy-lab` service/types/doc/test and page/types/UI spec reservations are defined. First child is run-level disposition plus summary only. No schema, route, shared UI, package, or generated blocker exists. |
 | 2 | `CF-W1-L3-PORT-01B` | Watchlist-only child architecture packet prepared | Not Ready for Implementation | High user-value watchlist child now has exact watchlist reservations, but it remains blocked until `CF-W1-L3-PORT-01A` is accepted so the readiness DTO shape is stable in accepted source. |
 | 3 | `CF-W1-DQ-02` | Split-required bounded first child prepared | Not Ready for Implementation | Only a DQE service/types/doc/test child is source-supported. Full persisted/public currentness exposure remains blocked from one-pass promotion because current DQ rows do not store session-aware evidence. |
 | 4 | `CF-W1-AUTH-02` | Consumer-isolation packet prepared with Team 09 and Team 08 child reservations | Not Ready for Implementation | Alert event ownership is already accepted in `CF-W1-L3-AUTH-02`; remaining work is digest user propagation. Conflicts with `CF-W1-NOTIF-02`, `CF-W1-UX-02`, and `CF-W1-UX-05`. |
@@ -187,7 +188,7 @@ Resolved decision inputs:
 
 `CF-W1-BT-02` is the clearest new Ready candidate from this pass, but it still needs the Team 04 QA handoff before Team 00 promotion. Keep every other item out of `12-ready-queue/ready-for-implementation.md` until a candidate has an accepted requirement, accepted architecture contract, accepted QA plan, exact file reservations, and no open Product Owner, Architect, shared-file, schema, route, package, provider, or upstream blocker.
 
-Next Team 03 recommendation: route `CF-W1-BT-02` to Team 04 QA prep now because the backtesting packet is fully bounded and does not carry schema or route risk. Keep `CF-W1-DQ-02` as the strongest upstream follow-on QA-prep candidate. Keep `CF-W1-L3-PORT-01B` blocked behind accepted `CF-W1-L3-PORT-01A`. After `CF-W1-MD-02` ADR acceptance, prepare `CF-W1-MD-02A` as a schema/migration proposal packet only if Team 00 and Architect explicitly authorize that approval-gated path.
+Next Team 03 recommendation: route `CF-W1-BT-02` to Team 04 QA prep now because the narrowed backtesting packet is fully bounded and does not carry schema, route, shared-UI, or shared-contract risk. Keep `CF-W1-DQ-02` as the strongest upstream follow-on QA-prep candidate. Keep `CF-W1-L3-PORT-01B` blocked behind accepted `CF-W1-L3-PORT-01A`. After `CF-W1-MD-02` ADR acceptance, prepare `CF-W1-MD-02A` as a schema/migration proposal packet only if Team 00 and Architect explicitly authorize that approval-gated path.
 
 ## Team 03 Discovery Refresh - 2026-05-18
 

@@ -673,3 +673,32 @@ Date: 2026-05-18
 - Team 05 is ready for market-data / DQ work after Team 00 selects the next item.
 - Team 06 is ready for signal / strategy / Trade Plan work after Team 00 selects the next item.
 - Team 10 is idle until the next QA-accepted implementation handoff.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Completed Since Previous Snapshot
+
+- Team 03 `019e3ba9-a6af-7650-88cd-2e7533d4b9e4`: completed `CF-W1-BT-02` architecture/contract refresh. Result: Ready candidate after Team 04 QA planning.
+- Team 02 `019e3ba9-ee7f-7143-aeb4-3952fe30d96d`: completed a market-intelligence requirement cycle. Result: `CF-W1-HCTX-01` is the next top unassigned item after `CF-W1-BT-02`.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 05 - Market Data / Data Quality | `019e3bae-63f2-75f2-b48b-b9bae671eefa` | `gpt-5.4`, medium | readiness scout | next Market Data / DQ item after accepted `DQ-02A` and `MD-01` | active |
+| 2 | Open slot | none | pending | QA planning | `CF-W1-BT-02` | ready to spawn |
+| 3 | Open slot | none | pending | architecture prep | `CF-W1-HCTX-01` after `BT-02` QA handoff | ready |
+| 4 | Open slot | none | pending | signal / strategy / Trade Plan | next Team 06 item after Team 00 selection | ready |
+| 5 | Open slot | none | pending | review/signoff | next accepted implementation gate | waiting |
+| 6 | Open slot | none | pending | requirements discovery | next market-intelligence cycle after Team 00 selection | ready |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04 is ready to prepare the `CF-W1-BT-02` QA plan now.
+- Team 03 is ready to prepare `CF-W1-HCTX-01` after the `BT-02` QA handoff is launched.
+- Team 06 is ready for signal / strategy / Trade Plan work after Team 00 selects the next item.
+- Team 10 is idle until the next QA-accepted implementation handoff.

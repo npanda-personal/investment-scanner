@@ -10,7 +10,7 @@ Backtesting outcome review traceability.
 
 Ready candidate.
 
-This packet is bounded to one no-schema `backtesting-strategy-lab` implementation pass. It is not yet approved for application code until Team 04 QA planning and Team 00 Ready promotion are complete.
+This packet is bounded to one no-schema `backtesting-strategy-lab` implementation pass. It is not approved for application code until Team 04 QA planning and Team 00 Ready promotion are complete.
 
 ## Owner / Lane / Modules
 
@@ -19,6 +19,15 @@ This packet is bounded to one no-schema `backtesting-strategy-lab` implementatio
 - Lane: Lane 2
 - Backend module: `backtesting-strategy-lab`
 - Frontend feature: `backtesting-strategy-lab`
+
+## Smallest First Child
+
+Add one canonical run-level review-disposition label plus a concise reason summary that stays consistent between:
+
+- the saved-run list; and
+- the selected-run detail view.
+
+This child is intentionally narrower than earlier BT-02 drafts. It does not include trade-level structured rule-ID expansion.
 
 ## Allowed Files After Ready Promotion
 
@@ -42,8 +51,6 @@ This packet is bounded to one no-schema `backtesting-strategy-lab` implementatio
 - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.validation.ts`
 - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.module.ts`
 - `backend/src/modules/backtesting-strategy-lab/index.ts`
-- `backend/tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.routes.test.ts`
-- `backend/tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.validation.test.ts`
 - `backend/src/modules/strategy-framework/**`
 - `backend/src/modules/trade-plan-risk-engine/**`
 - `frontend/src/features/backtesting-strategy-lab/api/backtestingStrategyLabService.ts`
@@ -53,46 +60,53 @@ This packet is bounded to one no-schema `backtesting-strategy-lab` implementatio
 - shared backend utilities
 - shared frontend components
 - package manifests
-- paid/cloud, provider/startup, broker, or telemetry flows
+- any shared or generated source-contract file
 
 ## Required Behavior
 
 Future implementation must:
 
-- add additive run-level review-outcome and review-traceability fields;
-- add additive trade-level structured traceability fields for entry, exit, invalidation/risk, rule version, and legacy repair;
-- classify runs into trusted, partial, diagnostic, legacy-repaired, or withheld review states using current module evidence;
-- preserve current availability, benchmark, exit diagnostics, and calculation-audit fields;
-- render the new traceability contract on the current Backtesting Strategy Lab page;
-- preserve current registered/custom execution behavior and current research-support wording.
+- add additive run-level `reviewDisposition`, `reviewDispositionReasonSummary`, and `reviewDispositionReasons` fields, or stable equivalents
+- derive the new fields from current module evidence only:
+  - `availabilityStatus`
+  - `benchmarkComparison`
+  - `exitDiagnostics`
+  - `dataCoverage` or `dataCoveragePercent`
+  - `calculationAudit`
+  - existing trade count
+- classify runs into `TRUSTED_REVIEW`, `PARTIAL_REVIEW`, `DIAGNOSTIC_ONLY`, `LEGACY_REPAIRED`, or `WITHHELD`
+- render the same disposition label and same summary in both saved-run list and selected-run detail
+- preserve current supporting evidence panels and current research-support wording
 
 ## Explicitly Deferred
 
-- Prisma/schema or generated-file changes;
-- repository/controller/router/validation work;
-- Strategy Framework source changes;
-- Trade Plan Risk Engine traceability work;
-- simulation-math, benchmark-math, or strategy-semantic changes;
-- shared UI/navigation work.
+- trade-level structured rule IDs or invalidation trace IDs
+- Prisma/schema or generated-file changes
+- repository/controller/router/validation work
+- frontend API client, hook, or feature-route work
+- Strategy Framework source changes
+- Trade Plan Risk Engine changes
+- simulation-math, benchmark-math, or ranking-model changes
+- shared UI/navigation work
 
 ## Dependency Notes
 
-- No schema or route blocker exists for this packet.
-- Existing run `metrics` and `trades` JSON payloads are sufficient for additive fields.
-- Existing Strategy Framework evaluator outputs are sufficient for registered-run rule IDs and strategy version traceability.
-- Team 00 must keep this packet as the only active writer set for `backtesting-strategy-lab` service/types/doc/test and page/types/UI spec during the implementation pass.
+- No schema, route, shared UI, or generated-file blocker exists for this first child.
+- Existing run `metrics` JSON is sufficient for additive run-level fields.
+- Existing saved-run list and detail surfaces already render most supporting evidence, so the UI work stays page-local.
+- Team 00 must keep this packet as the only active writer set for `backtesting-strategy-lab` service/types/doc/test and page/types/UI-spec files during the implementation pass.
 
 ## QA Handoff Needed
 
-Team 04 should prepare the QA plan for this packet now.
+Team 04 should prepare the QA plan for this narrowed packet now.
 
 Required QA focus:
 
-- backend service coverage for trusted, partial, diagnostic-only, legacy-repaired, and withheld review outcomes;
-- backend service coverage for registered and custom trade traceability mapping;
-- explicit proof that benchmark unavailable, weak end-of-test exits, and insufficient history become visible review evidence;
-- UI smoke coverage for review-outcome labeling, traceability reason text, and trade-level structured trace fields;
-- regression coverage that current legacy-invalid warning behavior remains visible and that no direct-advice language appears.
+- backend service coverage for trusted, partial, diagnostic-only, legacy-repaired, and withheld review outcomes
+- explicit proof that benchmark unavailable, weak end-of-test exits, insufficient history, and low trade count become visible disposition reasons
+- list/detail normalization coverage for the same run
+- feature-local UI smoke coverage for disposition label plus reason summary in both list and detail
+- regression coverage that current calculation-audit and benchmark evidence remain visible and that no direct-advice language appears
 
 Suggested focused commands after implementation exists:
 
@@ -111,12 +125,13 @@ npm.cmd run build
 
 Stop and return to Team 00 / Architect if implementation requires:
 
-- Prisma/schema, migrations, or generated files;
-- repository/controller/router/validation or route-registry changes;
-- Strategy Framework source edits;
-- Trade Plan Risk Engine edits;
-- shared utility/UI or package changes;
-- simulation or benchmark math changes beyond additive traceability.
+- Prisma/schema, migrations, or generated files
+- repository/controller/router/validation or route-registry changes
+- shared UI or shared backend utility changes
+- frontend API client, hook, or feature-route changes
+- `strategy-framework` or `trade-plan-risk-engine` source edits
+- simulation or benchmark math changes
+- any trade-level structured rule-traceability expansion beyond this child
 
 ## Next Gate
 

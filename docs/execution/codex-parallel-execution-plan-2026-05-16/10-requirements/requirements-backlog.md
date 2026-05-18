@@ -37,6 +37,7 @@ These are the investor/trader value priorities for this docs-only refinement cyc
 | 6 | CF-W1-STRAT-02 | Strategy provenance and DQ-gated strategy trust are upstream to every signal/backtest claim. | Post-child durable provenance contract refresh. |
 | 7 | CF-W1-DQ-02 | Upstream currentness and provider-gap evidence affect every downstream market-intelligence output. | Follow-on packet after accepted DQE child; no schema/provider widening. |
 | 8 | CF-W1-TP-01B | Trade Plan no-target/DQ hard-block behavior protects research-readiness language. | Reconcile existing branch/review state before more work. |
+| 9 | CF-W1-MD-02 | Durable market-data readiness/evidence remains the foundation for trustworthy signals and backtests. | ADR/source/schema split only; no schema/source promotion without separate approval. |
 
 ## Intake Rules
 
@@ -140,7 +141,7 @@ These are documentation-prep candidates only. None is app-code Ready for Impleme
 | 4 | CF-W1-CAL-01 | Team 00 / Team 03 | Product refinement and architecture contract for trusted versus diagnostic calibration outputs | Calibration trust-state machinery already exists; the drift-label gap is explicit enough to refine after HCTX/MCTX prep. |
 | 5 | CF-W1-SQLAB-02 | Team 00 / Team 03 | Post-preview architecture/QA prep for signal outcome learning loop | Directly improves signal learning and future judgment. |
 | 6 | CF-W1-STRAT-02 | Team 00 / Team 03 | Product refinement and architecture contract for Strategy Framework rule versioning and DQ gate policy | Strategy Framework is the source of truth for reusable strategy definitions and proof; durable rule provenance should be resolved before any rule behavior changes. |
-| 7 | CF-W1-DQ-02 | Team 00 / Team 03 | Product refinement and architecture contract for market-session-aware currentness evidence | Upstream currentness is the first trust gate downstream consumers should inherit rather than recreate. |
+| 7 | CF-W1-DQ-02 | Team 00 / Team 03 | Product refinement and architecture contract for session-aware currentness evidence | Upstream currentness is the first trust gate downstream consumers should inherit rather than recreate. |
 | 8 | CF-W1-TP-01B | Team 00 | Reconcile backend-only Trade Plan child branch/review state | Directly protects paper-readiness and no-target research language. |
 | 9 | CF-W1-MD-02 | Team 00 / Team 03 | ADR/persistence split-packet prep only | Market-data readiness is foundational, but source/schema changes remain approval-gated. |
 | 10 | CF-W1-L3-WATCH-01 | Team 00 / Team 03 | Later product refinement and bounded architecture contract for explainable watchlist review priority | Useful but below market-data/signal/backtest/calibration work. |

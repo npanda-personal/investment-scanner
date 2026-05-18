@@ -8,7 +8,7 @@ Audit-derived requirement draft. Not Ready for Implementation.
 
 ## Product Value
 
-Data Quality is a gate for every downstream trust surface. Currentness needs to reflect the latest completed market session, not just a calendar-age heuristic, or traders and research users can be shown stale evidence as if it were fresh. This is an upstream trust contract for market data, signal-quality, calibration, alerts, portfolio context, and review workflows.
+Data Quality is a gate for every downstream trust surface. Currentness needs to reflect the latest completed market session, not just a calendar-age heuristic, or traders and research users can be shown stale evidence as if it were fresh. This is an upstream trust contract for market data, signal-quality, calibration, backtesting, strategy trust, and review workflows that depend on currentness being explicit rather than inferred.
 
 ## Evidence
 
@@ -25,6 +25,7 @@ Data Quality is a gate for every downstream trust surface. Currentness needs to 
 - Missing latest price, session-unavailable, provider-gap, and lagging-session states use stable, explainable reason codes.
 - Currentness logic does not silently claim freshness from incomplete, blocked, or provider-gapped evidence.
 - Existing strict DQ callers can fail closed without duplicating market-session logic.
+- The output distinguishes latest-session freshness from calendar-age heuristics so downstream trust surfaces can show why a signal, backtest, or research summary is blocked or only partially current.
 - Focused tests cover current, stale, missing, blocked, pre-finalization, and session-gap scenarios.
 
 ## Non-Goals

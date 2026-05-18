@@ -151,17 +151,19 @@ Files inspected:
 Readiness result:
 
 - `CF-W1-BT-02` is source-supported as one bounded `backtesting-strategy-lab` packet.
-- Existing run `metrics` and `trades` JSON payloads are sufficient for additive review-outcome and trade-traceability fields.
-- No Prisma/schema/generated/shared-route approval is required.
+- The refreshed first child is narrower than the earlier BT-02 draft: it adds a canonical run-level review-disposition label plus a concise reason summary that stays consistent between the saved-run list and selected-run detail.
+- Existing run `metrics` JSON already contains the evidence needed for additive disposition fields. Trade-level structured rule-traceability work is explicitly deferred from this child.
+- No Prisma/schema/generated/shared-route/shared-UI approval is required.
 - Exact future write scope is limited to `backtesting-strategy-lab.service.ts`, `backtesting-strategy-lab.types.ts`, `backtesting-strategy-lab.md`, the focused backend service test, the feature `types.ts`, `BacktestingStrategyLabPage.tsx`, and `frontend/tests/ui/backtesting-strategy-lab.spec.ts`.
-- Repository/controller/router/validation files, Strategy Framework source, Trade Plan source, API/hook/route files, shared UI/utilities, package manifests, and generated/schema files remain forbidden.
+- Repository/controller/router/validation files, Strategy Framework source, Trade Plan source, API/hook/route files, shared UI/utilities, package manifests, generated/schema files, and any shared source-contract file remain forbidden.
 - Team 04 QA planning can start now.
 
 Current Team 03 recommendation to Team 00:
 
 1. Route `CF-W1-BT-02` to Team 04 QA planning immediately.
-2. Treat the packet as one no-schema Ready candidate after QA handoff acceptance.
+2. Treat the narrowed packet as one no-schema `Ready candidate` after QA handoff acceptance.
 3. Do not promote another `backtesting-strategy-lab` source packet in parallel with this one; the reserved service/types/doc/test and page/types/UI spec are one writer set.
+4. Keep any broader trade-level rule-ID or cross-module traceability work out of this child and split it later if still needed.
 
 No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
 

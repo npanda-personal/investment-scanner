@@ -6,13 +6,15 @@ Owner: Team 03 Architecture Factory
 
 ## Status
 
-Ready-candidate contract prepared.
+Ready-candidate contract prepared for the narrowed first child.
 
-This contract covers one bounded no-schema `backtesting-strategy-lab` packet only.
+This contract covers one bounded no-schema `backtesting-strategy-lab` packet only. It supersedes the earlier broader BT-02 interpretation for the first child.
 
 ## Contract Intent
 
-Backtesting output must tell the user whether a run is suitable for review, only partially usable, diagnostic only, legacy repaired, or withheld. The contract is additive. It must preserve current simulation math, preserve current registered/custom behavior, and keep review evidence visible instead of implicit.
+Backtesting output must give the user one canonical review-disposition label plus a concise reason summary that stays consistent between the saved-run list and the selected-run detail view.
+
+This first child is additive and module-local. It must preserve current simulation behavior and use existing run evidence instead of widening into a broader traceability rewrite.
 
 ## Required Source Boundary
 
@@ -20,150 +22,115 @@ Implementation must stay inside `backtesting-strategy-lab` service/types/doc/tes
 
 Allowed direction:
 
-- add additive run-level review-outcome fields;
-- add additive run-level review-traceability evidence fields;
-- add additive trade-level traceability fields for entry, exit, invalidation/risk, rule version, and legacy repair;
-- render the new fields on the current Backtesting Strategy Lab page;
-- update focused module tests and UI smoke coverage.
+- add additive run-level review-disposition fields
+- derive those fields from existing module evidence only
+- render the same disposition label and summary in both saved-run list and selected-run detail
+- update focused module tests and feature-local UI smoke coverage
 
 Forbidden:
 
-- Prisma/schema, migrations, generated files, or repository identity changes;
-- controller/router/validation/route-registry changes;
-- Strategy Framework source changes;
-- Trade Plan Risk Engine changes;
-- simulation math, signal proxy math, benchmark math, or Strategy Framework semantics changes;
-- shared utility/UI, package, provider, startup, paid/cloud, telemetry, broker, or historical-doc edits.
+- Prisma/schema, migrations, generated files, or repository identity changes
+- controller/router/validation/route-registry changes
+- shared backend utility or shared UI changes
+- `strategy-framework` source changes
+- `trade-plan-risk-engine` source changes
+- API client, hook, feature-route, or broad frontend navigation changes
+- simulation math, benchmark math, ranking math, or rule-evaluator semantic changes
+- trade-level structured rule-ID traceability expansion in this first child
 
 ## Required Run-Level Contract
 
-Every completed run with metrics must expose additive review-outcome semantics equivalent to:
+Returned completed-run metrics must expose additive review-disposition semantics equivalent to:
 
 ```ts
-type BacktestReviewOutcome =
+type BacktestReviewDisposition =
   | 'TRUSTED_REVIEW'
   | 'PARTIAL_REVIEW'
   | 'DIAGNOSTIC_ONLY'
   | 'LEGACY_REPAIRED'
   | 'WITHHELD';
 
-interface BacktestReviewTraceability {
-  reviewOutcome: BacktestReviewOutcome;
-  reviewReasons: string[];
-  benchmarkEvidence: 'AVAILABLE' | 'FALLBACK_EQUAL_WEIGHT' | 'UNAVAILABLE';
-  availabilityEvidence: 'AVAILABLE' | 'PARTIAL' | 'INSUFFICIENT_HISTORY' | 'NOT_RUN' | 'ERROR';
-  calculationAuditEvidence: 'OK' | 'REPAIRED' | 'LEGACY_INVALID';
-  sampleEvidence: 'SUFFICIENT' | 'LOW_SAMPLE' | 'NO_TRADES';
-  exitEvidence: 'RULE_TRACED' | 'WEAK_END_OF_TEST_DOMINANCE' | 'UNTRACED';
-  dataQualityEvidence: 'READY' | 'LIMITED' | 'UNKNOWN';
+interface BacktestMetrics {
+  reviewDisposition?: BacktestReviewDisposition;
+  reviewDispositionReasonSummary?: string;
+  reviewDispositionReasons?: string[];
 }
 ```
 
 Exact names may differ, but the behavior must remain stable.
 
-## Required Trade-Level Contract
-
-Every returned trade row must expose additive structured traceability equivalent to:
-
-```ts
-interface BacktestTradeTraceability {
-  strategyCode?: string | null;
-  strategyVersion?: string | null;
-  ruleVersion?: string | null;
-  entryRuleIds: string[];
-  exitRuleIds: string[];
-  invalidationRuleIds: string[];
-  exitDecisionSource:
-    | 'REGISTERED_EXIT_RULE'
-    | 'CUSTOM_EXIT_RULE'
-    | 'RISK_RULE'
-    | 'END_OF_TEST'
-    | 'LEGACY_NORMALIZED';
-  reasonEvidence: string[];
-  legacyRepairApplied: boolean;
-}
-```
-
-Required mapping rules:
-
-- registered strategy trades:
-  - `strategyCode` and `strategyVersion` from current run config;
-  - `entryRuleIds` from Strategy Framework evaluator `entryRulesPassed`;
-  - `exitRuleIds` from Strategy Framework evaluator `exitRulesTriggered` when a registered exit fired;
-  - `ruleVersion` from strategy version unless a later accepted contract introduces finer rule revisioning;
-- custom rule trades:
-  - `entryRuleIds` from `config.entryRule.type`;
-  - `exitRuleIds` from `config.exitRule.type` when a configured exit fired;
-- forced risk/invalidation exits:
-  - `STOP_LOSS`, `TRAILING_STOP`, `TAKE_PROFIT`, and `MAX_HOLDING_PERIOD` must map to structured `invalidationRuleIds` instead of reason text only;
-- end-of-test closures:
-  - `exitDecisionSource = END_OF_TEST`;
-  - no fabricated exit rule ID;
-- legacy normalized rows:
-  - `legacyRepairApplied = true` when display normalization changed the row;
-  - `exitDecisionSource = LEGACY_NORMALIZED` only when no safer current trace source can be proven.
-
 ## Required Outcome Mapping
 
-- `WITHHELD`:
+- `WITHHELD`
   - failed runs; or
-  - `aggregateStatus = LEGACY_INVALID`; or
-  - unreconciled aggregate proof.
-- `LEGACY_REPAIRED`:
-  - repaired trade rows exist;
-  - aggregate proof is still usable.
-- `DIAGNOSTIC_ONLY`:
-  - insufficient history;
-  - no trades;
-  - benchmark unavailable;
-  - weak exit dominance from end-of-test exits;
-  - low sample size;
-  - low or unknown DQ confidence.
-- `PARTIAL_REVIEW`:
-  - availability or coverage is limited, but aggregate proof is still usable.
-- `TRUSTED_REVIEW`:
-  - no withheld proof;
-  - no diagnostic-only blocker;
-  - structured traceability is present.
+  - `availabilityStatus = ERROR`; or
+  - `calculationAudit.aggregateStatus = LEGACY_INVALID`; or
+  - any other explicit aggregate-proof quarantine
+- `LEGACY_REPAIRED`
+  - `calculationAudit.repairedTradeReturnCount > 0`; and
+  - aggregate proof remains usable
+- `DIAGNOSTIC_ONLY`
+  - `availabilityStatus = INSUFFICIENT_HISTORY`; or
+  - `numberOfTrades = 0`; or
+  - `benchmarkComparison.benchmarkDataStatus = UNAVAILABLE`; or
+  - `exitDiagnostics.endOfTestExitPercent >= 0.4`; or
+  - `numberOfTrades < 10`
+- `PARTIAL_REVIEW`
+  - `availabilityStatus = PARTIAL`; or
+  - limited data coverage while aggregate proof remains usable
+- `TRUSTED_REVIEW`
+  - completed run;
+  - no withheld-proof, legacy-repair, diagnostic-only, or partial-review condition applies
 
-The service may derive these outcomes from current metrics, calculation audit, benchmark status, exit diagnostics, and trade count. It must not change simulation behavior to manufacture a better outcome.
+The service may derive these outcomes from current metrics, calculation audit, benchmark status, exit diagnostics, and coverage signals. It must not change run behavior to manufacture a better outcome.
+
+## Required Summary Behavior
+
+- `reviewDispositionReasonSummary` must be concise and user-facing, not an implementation dump.
+- `reviewDispositionReasons` must preserve the specific evidence categories behind the summary.
+- List and detail must use the same derived fields for the same run.
+- Existing evidence fields remain visible as supporting proof, not replaced by the summary.
 
 ## Compatibility Rules
 
-- Existing `availabilityStatus`, `benchmarkComparison`, `exitDiagnostics`, `realismWarnings`, `calculationAudit`, and trade reason fields remain present.
-- New traceability fields are additive only.
+- Existing `availabilityStatus`, `benchmarkComparison`, `exitDiagnostics`, `realismWarnings`, `dataCoverage`, `dataQualityMetadata`, and `calculationAudit` remain present and unrenamed.
+- Existing `trades` payload shape remains unchanged in this first child.
 - Existing run routes, query parameters, saved-run loading behavior, and scope behavior remain unchanged.
-- Registered and custom-rule run execution behavior remains unchanged.
+- Existing registered-strategy and custom-rule run execution behavior remains unchanged.
 
 ## Required UI Contract
 
 The current Backtesting Strategy Lab page must show:
 
-- a clear review-outcome label for the selected run;
-- a concise reason summary explaining why the run is trusted, partial, diagnostic, legacy repaired, or withheld;
-- trade-level structured traceability for current displayed rows;
-- legacy repair and withheld-proof evidence without hiding current calculation audit warnings;
-- current benchmark, availability, data coverage, and exit diagnostics as review evidence, not isolated implementation detail.
+- a clear review-disposition label for the selected run
+- a concise reason summary for the selected run
+- the same disposition label and reason summary in the saved-run list row for that run
+- existing benchmark, availability, data-coverage, exit-diagnostic, realism-warning, and calculation-audit evidence as supporting context
 
-The UI must stay research-support oriented and must not introduce direct trade advice.
+The UI must stay research-support oriented and must not introduce direct trade advice or target-price language.
 
-## Forbidden Behavior
+## Explicit Deferrals
 
-- Do not change simulation math, benchmark math, or exit math in this packet.
-- Do not widen into Trade Plan invalidation output.
-- Do not edit Strategy Framework source to get richer rule metadata.
-- Do not fabricate exit/invalidation IDs when current source evidence is genuinely absent.
-- Do not collapse all outcomes into one ambiguous status chip.
+The following remain out of scope for this first child:
+
+- trade-level structured rule IDs
+- trade-level invalidation trace IDs
+- route/controller/repository or source-contract widening
+- `strategy-framework` metadata expansion
+- `trade-plan-risk-engine` alignment work
+- any schema/generated/shared-route/shared-UI change
+
+If later work needs those paths, it must be split into a separate approval-gated child packet.
 
 ## Test Contract
 
 Focused coverage must prove:
 
-- trusted review outcome;
-- partial review outcome;
-- diagnostic-only outcomes for benchmark unavailable, weak exits, insufficient history, and low sample size;
-- legacy-repaired outcome;
-- withheld outcome for `LEGACY_INVALID`;
-- registered strategy trade traceability;
-- custom-rule trade traceability;
-- backward-compatible existing run payload fields and existing research-support page wording.
+- trusted review outcome
+- partial review outcome
+- diagnostic-only outcomes for insufficient history, no trades, benchmark unavailable, weak exits, and low sample size
+- legacy-repaired outcome
+- withheld outcome for `LEGACY_INVALID`
+- list/detail normalization for the same run
+- backward-compatible existing metrics payload fields
+- research-support wording remains intact

@@ -320,3 +320,44 @@ Prepare docs-only QA planning for `CF-W1-L3-INTEL-03` - Portfolio Intelligence c
 ## Output
 
 State whether `CF-W1-L3-INTEL-03` is QA-plan ready for Team 00 Ready evaluation and list sequencing blockers.
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Prepare docs-only QA planning for `CF-W1-BT-02` - Backtesting outcome review traceability.
+
+This final override supersedes older Team 04 tails above. Team 03 refreshed `CF-W1-BT-02` as a Ready candidate for one narrow, no-schema, no-shared first child: canonical run-level review disposition plus a shared list/detail reason summary.
+
+Do not implement application code. Do not run tests. Do not widen the packet into trade-level structured rule IDs, Prisma/schema, routes, shared UI, API hooks, Strategy Framework source, or Trade Plan source.
+
+## Source Input
+
+- Architecture review: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-BT-02-architecture-review.md`
+- Contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-BT-02-backtesting-outcome-review-traceability-contract.md`
+- Work packet: `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-BT-02-work-packet.md`
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-BT-02-backtesting-outcome-review-traceability-requirement.md`
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-BT-02-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/next-validation-plans.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+## Required QA Plan Coverage
+
+- backend service coverage for `TRUSTED_REVIEW`, `PARTIAL_REVIEW`, `DIAGNOSTIC_ONLY`, `LEGACY_REPAIRED`, and `WITHHELD`;
+- diagnostic-only reasons for insufficient history, no trades, benchmark unavailable, weak end-of-test exit dominance, and low sample size;
+- withheld outcome for `LEGACY_INVALID` aggregate proof;
+- list/detail normalization proving the same run shows the same disposition label and reason summary in both surfaces;
+- regression coverage that existing benchmark, availability, data-coverage, exit-diagnostic, realism-warning, and calculation-audit evidence remains visible;
+- feature-local UI smoke coverage for visible review evidence and research-support language;
+- explicit rejection if implementation touches forbidden files or changes simulation math, benchmark math, route contracts, shared UI, or cross-module source.
+
+## Output
+
+State whether `CF-W1-BT-02` is QA-plan ready for Team 00 Ready evaluation and list any blocker.

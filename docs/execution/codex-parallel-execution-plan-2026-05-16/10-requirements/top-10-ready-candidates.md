@@ -26,7 +26,7 @@ These are docs-only backlog priorities. They are not Ready-evaluation results.
 | 4 | `CF-W1-CAL-01` | Calibration trust drift is the next investor-value layer after historical and market-context provenance. | Team 03 architecture/contract prep, then Team 04 QA prep. |
 | 5 | `CF-W1-SQLAB-02` | Signal outcome learning connects measured outcomes to future judgment; durable storage remains split, but the post-preview path needs definition. | Team 03 post-preview packet prep after `SQLAB-02A` closes. |
 | 6 | `CF-W1-STRAT-02` | Strategy provenance and DQ-gated trust are upstream to every signal/backtest claim. | Team 03/04 child-packet follow-up after accepted `STRAT-02A`. |
-| 7 | `CF-W1-DQ-02` | Upstream currentness and provider-gap evidence affect downstream signals, strategies, backtests, and research surfaces. | Team 03/04 follow-up after accepted `DQ-02A`. |
+| 7 | `CF-W1-DQ-02` | Session-aware currentness and provider-gap evidence affect downstream signals, strategies, backtests, and research surfaces. | Team 03/04 follow-up after accepted `DQ-02A`. |
 | 8 | `CF-W1-TP-01B` | Trade Plan no-target/DQ hard-block behavior protects paper-readiness language. | Reconcile branch/review state before any new work. |
 | 9 | `CF-W1-MD-02` | Durable market-data readiness/evidence remains the foundation for trustworthy signals and backtests. | ADR and split-packet prep only; no schema/source promotion. |
 | 10 | `CF-W1-UX-01` | Workbench trust remains useful, but it follows market-data/signals/backtest evidence unless backend trust evidence is source-supported. | Backend trust-evidence parent remains blocked until source-supported fields exist. |

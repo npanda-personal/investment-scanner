@@ -1196,3 +1196,37 @@ Team 00 corrected the priority stack to direct investor/trader value and committ
 ## Product Owner Action
 
 Not required. Open decisions remain zero.
+
+---
+
+# BT-02 Architecture Consumption
+
+Date: 2026-05-18
+
+## Consumed Outputs
+
+Team 03 `019e3ba9-a6af-7650-88cd-2e7533d4b9e4` completed `CF-W1-BT-02` architecture/contract refresh.
+
+Result:
+
+- Ready recommendation: `Ready candidate`.
+- Scope: canonical run-level review disposition plus list/detail reason summary.
+- Deferred: trade-level rule/invalidation IDs, schema/generated files, route/controller/repository/validation changes, shared UI, Strategy Framework source, Trade Plan source, and simulation/benchmark math changes.
+
+Team 02 `019e3ba9-ee7f-7143-aeb4-3952fe30d96d` completed the market-intelligence requirements cycle.
+
+Result:
+
+- `CF-W1-HCTX-01` is the next top unassigned market-intelligence item after `CF-W1-BT-02`.
+- `CF-W1-DQ-02` currentness requirement was refined as session-aware currentness evidence.
+
+## Next Gate
+
+Team 04 should prepare `CF-W1-BT-02` QA planning now. Team 00 must still evaluate Ready after QA planning is accepted; no application code is authorized yet.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-BT-02` QA planning.
+- Team 03: `CF-W1-HCTX-01` architecture/contract prep after Team 04 is launched.
+- Team 05: market-data / DQ recommendation output pending.
+- Team 06: signal / strategy / Trade Plan work after Team 00 selection.

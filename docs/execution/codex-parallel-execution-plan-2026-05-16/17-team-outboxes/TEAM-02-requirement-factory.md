@@ -13,13 +13,8 @@ Run the next persistent Product Owner / requirements cycle while implementation 
 - `10-requirements/next-top-10-candidates.md`
 - `10-requirements/requirements-backlog.md`
 - `10-requirements/refinement-queue.md`
-- `10-requirements/CF-W1-HCTX-01-historical-context-explainability-requirement.md`
-- `10-requirements/CF-W1-MCTX-01-market-context-regime-evidence-requirement.md`
-- `10-requirements/CF-W1-CAL-01-signal-calibration-reliability-drift-requirement.md`
-- `10-requirements/CF-W1-BT-02-backtesting-outcome-review-traceability-requirement.md`
-- `10-requirements/CF-W1-L3-WATCH-01-watchlist-review-actionability-requirement.md`
-- `10-requirements/CF-W1-L3-INTEL-03-portfolio-intelligence-concentration-review-requirement.md`
-- `10-requirements/CF-W1-L3-ALERT-03-alert-follow-through-traceability-requirement.md`
+- `10-requirements/top-10-ready-candidates.md`
+- `10-requirements/CF-W1-DQ-02-dq-currentness-evidence-requirement.md`
 - `17-team-outboxes/TEAM-02-requirement-factory.md`
 
 ## Files Inspected
@@ -30,29 +25,20 @@ Run the next persistent Product Owner / requirements cycle while implementation 
 - `12-ready-queue/ready-for-implementation.md`
 - `10-requirements/refinement-queue.md`
 - `10-requirements/top-10-ready-candidates.md`
+- `10-requirements/CF-W1-DQ-02-dq-currentness-evidence-requirement.md`
 - `16-team-inboxes/TEAM-09-current-assignment.md`
-- `backend/src/modules/historical-context-snapshots/**`
-- `frontend/src/features/historical-context-snapshots/**`
-- `backend/src/modules/market-context-intelligence/**`
-- `frontend/src/features/market-context-intelligence/**`
-- `backend/src/modules/signal-calibration-engine/**`
-- `backend/src/modules/backtesting-strategy-lab/**`
-- `frontend/src/features/backtesting-strategy-lab/**`
-- `backend/src/modules/watchlist-management/**`
-- `frontend/src/features/watchlist-management/**`
-- `backend/src/modules/portfolio-intelligence/**`
-- `frontend/src/features/portfolio-intelligence/**`
-- `backend/src/modules/alerts-monitoring/**`
+- `11-module-audits/audit-market-data-data-quality.md`
+- `11-module-audits/audit-backtesting-trade-risk.md`
 
 ## Source-Backed Findings
 
 - The queue needed to move away from auth/sub promotion-watch work because Team 09 has already pulled combined `CF-W1-AUTH-SUB-01` into a separate implementation worktree.
-- `CF-W1-BT-02` is now the cleanest next Team 00 architecture/QA prep target because the product already exposes the relevant diagnostics and only the canonical review-disposition layer remains unclear.
+- `CF-W1-BT-02` is still the cleanest next Team 00 architecture/QA prep target because the product already exposes the relevant diagnostics and only the canonical review-disposition layer remains unclear.
 - `CF-W1-HCTX-01` and `CF-W1-MCTX-01` remain the strongest upstream trust-evidence gaps because their missing provenance flows directly into calibration and market review trust.
 - `CF-W1-CAL-01` stays high, but it is best sequenced behind HCTX and MCTX because those two modules still hide the evidence chain calibration relies on.
-- `CF-W1-L3-WATCH-01` is the best unblocked Lane 3 review-workflow candidate because existing watchlist enrichment can support a deterministic review queue without touching active alert reservations.
-- `CF-W1-L3-INTEL-03` remains valuable, but its current `actionSuggestion` language risk means it should follow watchlist review actionability, not lead it.
-- `CF-W1-L3-ALERT-03` remains high value but is temporarily de-prioritized by active `alerts-monitoring` writer contention and Ready-lane alert slices.
+- `CF-W1-DQ-02` now has a sharper session-aware currentness focus so downstream trust surfaces can fail closed instead of treating calendar age as freshness.
+- `CF-W1-TP-01B` and `CF-W1-MD-02` remain high-value upstream support items, but both stay out of Ready movement and implementation routing in this docs-only cycle.
+- `CF-W1-L3-WATCH-01` and `CF-W1-L3-INTEL-03` remain useful but stay lower than the market-intelligence trust stack unless correctness or user-data safety changes the ordering.
 
 ## Re-Prioritized Top 10
 
@@ -60,12 +46,12 @@ Run the next persistent Product Owner / requirements cycle while implementation 
 2. `CF-W1-HCTX-01`
 3. `CF-W1-MCTX-01`
 4. `CF-W1-CAL-01`
-5. `CF-W1-L3-WATCH-01`
-6. `CF-W1-L3-INTEL-03`
-7. `CF-W1-UX-01`
-8. `CF-W1-L3-ALERT-03`
-9. `CF-W1-L3-INTEL-02`
-10. `CF-W1-SQLAB-02`
+5. `CF-W1-SQLAB-02`
+6. `CF-W1-STRAT-02`
+7. `CF-W1-DQ-02`
+8. `CF-W1-TP-01B`
+9. `CF-W1-MD-02`
+10. `CF-W1-UX-01`
 
 ## New / Refined Requirement Output
 
@@ -73,9 +59,7 @@ Run the next persistent Product Owner / requirements cycle while implementation 
 - Refined `CF-W1-MCTX-01` with persisted-versus-fresh regime provenance and denominator clarity.
 - Refined `CF-W1-CAL-01` so the first child stays on trust-state semantics and is explicitly sequenced behind HCTX/MCTX.
 - Refined `CF-W1-BT-02` to a narrower canonical review-disposition requirement and flagged the need to refresh existing Team 03/04 packets to that scope.
-- Refined `CF-W1-L3-WATCH-01` around one deterministic review-priority sort and `refresh evidence` handling.
-- Refined `CF-W1-L3-INTEL-03` to explicitly address current `actionSuggestion` language risk while keeping the slice read-only.
-- Refined `CF-W1-L3-ALERT-03` to stay additive on existing alert-event metadata and to reflect current `alerts-monitoring` reservation pressure.
+- Refined `CF-W1-DQ-02` to make session-aware currentness explicit so downstream consumers can distinguish latest-session freshness from calendar-age heuristics.
 
 ## Ready / Promotion Read
 
@@ -114,8 +98,8 @@ Reason:
 
 ## Teams Ready To Pick Up New Tasks
 
-- Team 03: `CF-W1-BT-02`, `CF-W1-HCTX-01`, `CF-W1-MCTX-01`, `CF-W1-CAL-01`, `CF-W1-L3-WATCH-01`, `CF-W1-L3-INTEL-03`
-- Team 04: QA-plan prep for `CF-W1-BT-02`, HCTX, MCTX, CAL, WATCH, and INTEL once Team 03 contract packets land or refresh
+- Team 03: `CF-W1-BT-02`, `CF-W1-HCTX-01`, `CF-W1-MCTX-01`, `CF-W1-CAL-01`, `CF-W1-SQLAB-02`, `CF-W1-STRAT-02`, `CF-W1-DQ-02`, `CF-W1-MD-02`
+- Team 04: QA-plan prep for `CF-W1-BT-02`, HCTX, MCTX, CAL, SQLAB-02, STRAT-02, DQ-02, and MD-02 once Team 03 contract packets land or refresh
 - Team 07 lane teams: `CF-W1-L3-WATCH-01` and then `CF-W1-L3-INTEL-03` when current portfolio / alert lane reservations free up
 - Team 08: `CF-W1-UX-01` follow-on definition after the active frontend child closes
 
@@ -129,4 +113,4 @@ Reason:
 
 ## Next Gate
 
-Keep Team 00 live implementation routing unchanged. Use the refreshed backtesting/context/calibration/watchlist ordering for the next docs-only contract / QA-prep delegation cycle while Team 09 continues `CF-W1-AUTH-SUB-01` in its separate worktree.
+Keep Team 00 live implementation routing unchanged. Use the refreshed backtesting/context/calibration/signal-quality/strategy/DQ/market-data ordering for the next docs-only contract / QA-prep delegation cycle while Team 09 continues `CF-W1-AUTH-SUB-01` in its separate worktree.
