@@ -2407,6 +2407,29 @@ Teams ready to pick up new tasks:
 
 ---
 
+# Team 00 Consumes MD-02A Architecture
+
+Date: 2026-05-18
+
+## Result
+
+Team 03 completed `CF-W1-MD-02A` as a proposal-only architecture packet.
+
+Decision:
+
+- Keep `CF-W1-MD-02A` out of Ready for Implementation.
+- Queue Team 04 ADR/schema-proposal QA review behind active Team 04 main-workspace QA-plan work.
+- Relaunch Team 03 on `CF-W1-RH-02A` because it is the next independent architecture-prep item and does not share writer files with active agents.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03: `CF-W1-RH-02A` architecture prep now.
+- Team 04: `CF-W1-L3-TREV-02` QA planning after `CF-W1-RH-01`.
+- Team 04: `CF-W1-MD-02A` QA review after `TREV-02`.
+- Team 10: `CF-W1-SMI-01` review after implementation and QA acceptance.
+
+---
+
 # BT-02 Review Accepted
 
 Date: 2026-05-18

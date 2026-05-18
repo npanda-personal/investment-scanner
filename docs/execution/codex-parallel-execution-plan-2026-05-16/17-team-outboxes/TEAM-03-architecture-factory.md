@@ -2,6 +2,75 @@
 
 Date: 2026-05-17
 
+## Team 03 MD-02A Additive Companion Evidence Schema Packet Prep - 2026-05-18
+
+Assignment: prepare docs-only architecture readiness for `CF-W1-MD-02A` in the shared `dev` workspace without touching application code, Prisma/schema, migrations, generated files, repositories, services, providers, startup/backfill, route registries, shared utilities/UI, package manifests, or tests.
+
+Prepared:
+
+- `03-architecture/CF-W1-MD-02A-architecture-review.md`
+- `06-contracts/CF-W1-MD-02A-additive-companion-evidence-schema-packet-contract.md`
+- `08-work-packets/CF-W1-MD-02A-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Files inspected:
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/16-team-inboxes/TEAM-03-current-assignment.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MD-02A-additive-companion-evidence-schema-packet-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MD-02-durable-market-data-readiness-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-MD-02-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-MD-02-durable-readiness-evidence-adr.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-MD-02-durable-readiness-evidence-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-MD-02-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-MD-02-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/TEAM-05-market-data-data-quality-domain-audit-2026-05-17.md`
+- `backend/prisma/schema.prisma`
+- `backend/src/modules/market-data-foundation/market-data-foundation.md`
+- `backend/src/modules/market-data-foundation/market-data-foundation.types.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.md`
+- `backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
+
+Files changed:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-MD-02A-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-MD-02A-additive-companion-evidence-schema-packet-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-MD-02A-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Readiness result:
+
+- `CF-W1-MD-02A` is `proposal packet ready`.
+- The packet is intentionally proposal-only and authorizes no application writer.
+- The minimum natural key is fixed to instrument-or-canonical-symbol plus `region`, `assetType`, `timeframe`, `tradingDate/timestamp`, `source`, and `sourceSymbol/providerSymbol` where needed.
+- The minimum durable evidence fields are explicit and cover source provenance, run/fingerprint evidence, validation window, duplicate/invalid rows, missing/stale candle evidence, suspicious-volume evidence, adjusted-close fallback evidence, provider-gap evidence, durable-versus-derived marking, and audit timestamps.
+- The first implementation packet remains `CF-W1-MD-02B` and must carry the true high-risk approvals for `backend/prisma/schema.prisma`, `backend/prisma/migrations/**`, generated Prisma artifacts, and `market-data-foundation` repository/service/types/doc/test changes.
+- `CF-W1-MD-02C` remains the DQE handoff packet only after `02B`.
+- `CF-W1-MD-02D` remains downstream adoption only after `02C`.
+
+Exact blockers:
+
+- no Prisma/schema edit is authorized now;
+- no migration is authorized now;
+- no generated Prisma/types work is authorized now;
+- no Market Data repository/service/provider/startup/backfill implementation is authorized now;
+- no DQE handoff implementation is authorized now;
+- no downstream adoption is authorized now;
+- no UI, shared utility/UI, route, package, paid/cloud, broker, telemetry, or live-provider scope is authorized now.
+
+Current Team 03 recommendation to Team 00:
+
+1. Route `CF-W1-MD-02A` to Team 04 for ADR/schema-proposal QA review now.
+2. Keep `CF-W1-MD-02A` out of `Ready for Implementation`.
+3. Open `CF-W1-MD-02B` only through a separate explicit approval if Team 00 wants schema/migration/generated and `market-data-foundation` implementation work to begin.
+
+No tests, builds, Prisma commands, services, providers, UI smoke runs, live-data checks, commits, or pushes were run.
+
 ## Team 03 TREV-02 Candidate Snapshot Provenance Prep - 2026-05-18
 
 Assignment: prepare docs-only architecture readiness for `CF-W1-L3-TREV-02` in the shared `dev` workspace without touching application code, application tests outside the future Today Review writer set, Prisma/schema, route registries, shared utilities, shared UI, package manifests, generated files, providers, services, builds, UI smoke, or live data.

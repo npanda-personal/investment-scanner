@@ -1654,6 +1654,23 @@ Teams ready to pick up new tasks:
 - Team 10: `CF-W1-SMI-01` review after implementation and QA acceptance.
 - Team 03: next Architect Signoff after Team 10 acceptance.
 
+## MD-02A Architecture Consumed
+
+Team 03 `019e3c90-fd78-7552-a58c-0347ded9578e` completed `CF-W1-MD-02A` as `proposal packet ready` and was closed.
+
+Routing:
+
+- Keep `CF-W1-MD-02A` out of Ready for Implementation.
+- Queue Team 04 ADR/schema-proposal QA review behind current main-workspace Team 04 work.
+- Relaunch Team 03 on `CF-W1-RH-02A` architecture prep.
+
+Teams ready to pick up new tasks:
+
+- Team 03: `CF-W1-RH-02A` architecture prep now.
+- Team 04: `CF-W1-L3-TREV-02` QA planning after `CF-W1-RH-01`.
+- Team 04: `CF-W1-MD-02A` QA review after `TREV-02` unless a higher-priority gate appears.
+- Team 10: `CF-W1-SMI-01` review after Team 06 and Team 04 gates.
+
 ---
 
 # Latest Coordination State

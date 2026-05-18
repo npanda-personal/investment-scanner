@@ -2268,3 +2268,37 @@ Date: 2026-05-18
 - Team 04: `CF-W1-L3-TREV-02` QA planning after `CF-W1-RH-01` QA plan completes.
 - Team 10: `CF-W1-SMI-01` review after Team 06 implementation and Team 04 QA acceptance.
 - Team 03: next Architect Signoff after Team 10 acceptance.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Completed Since Previous Snapshot
+
+- Team 03 `019e3c90-fd78-7552-a58c-0347ded9578e`: completed `CF-W1-MD-02A` architecture as `proposal packet ready`; closed.
+
+## Routing Result
+
+- `CF-W1-MD-02A` stays out of Ready for Implementation.
+- Team 04 ADR/schema-proposal QA review for `CF-W1-MD-02A` is queued behind active `CF-W1-RH-01` QA planning and queued `CF-W1-L3-TREV-02` QA planning because all three use the same main-workspace Team 04 queue/outbox files.
+- Team 03 is being relaunched on `CF-W1-RH-02A` architecture prep, which is independent from active Team 04 and Team 06 work.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | `019e3c91-35dc-7b63-8a4d-732ca25eb873` | `gpt-5.4`, high | QA planning | `CF-W1-RH-01` | active |
+| 2 | Team 06 - Strategy / Signal / Risk | `019e3c91-9007-7ea1-889c-6a93708de12c` | `gpt-5.3-codex`, high | implementation | `CF-W1-SMI-01` | active |
+| 3 | Team 02 - Requirement Factory | `019e3c91-cd7c-7083-bee9-1f6f35688d72` | `gpt-5.4`, medium | rolling requirements discovery | next under-served market-intelligence workflow | active |
+| 4 | Team 03 - Architecture Factory | pending spawn | `gpt-5.4`, high | architecture prep | `CF-W1-RH-02A` | ready |
+| 5 | Open slot | none | pending | QA planning | `CF-W1-L3-TREV-02`, then `CF-W1-MD-02A` | queued |
+| 6 | Open slot | none | pending | review/signoff | next QA-accepted implementation handoff | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03: `CF-W1-RH-02A` architecture prep now.
+- Team 04: `CF-W1-L3-TREV-02` QA planning after `CF-W1-RH-01`.
+- Team 04: `CF-W1-MD-02A` ADR/schema-proposal QA review after `TREV-02` unless a higher-priority gate appears.
+- Team 10: `CF-W1-SMI-01` review after Team 06 implementation and Team 04 QA acceptance.

@@ -4,6 +4,34 @@ Date: 2026-05-17
 
 Prepared by Team 03 Architecture Factory and refreshed after `CF-W1-L3-AUTH-02` commit `503bcd9`, `CF-W1-SIG-TRIGGER-01` commit `6ab3999`, and checkpoint protocol fix commit `f75808f`.
 
+## Team 03 MD-02A Additive Companion Evidence Schema Packet - 2026-05-18
+
+Prepared:
+
+- `03-architecture/CF-W1-MD-02A-architecture-review.md`
+- `06-contracts/CF-W1-MD-02A-additive-companion-evidence-schema-packet-contract.md`
+- `08-work-packets/CF-W1-MD-02A-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Result:
+
+- `CF-W1-MD-02A` is `proposal packet ready`.
+- The packet is proposal-only and authorizes no application writer.
+- The minimum future natural key is fixed to instrument-or-canonical-symbol plus scope, timeframe, date/timestamp, source, and source symbol/provider symbol when needed.
+- The minimum durable evidence field set now explicitly covers source provenance, run/fingerprint evidence, validation-window evidence, duplicate/invalid-row evidence, missing/stale candle evidence, suspicious-volume evidence, adjusted-close fallback evidence, provider-gap evidence, and a durable-versus-derived marker.
+- The additive migration posture is explicit: no destructive `PriceTick` / `LatestPrice` rewrite in the first implementation packet.
+- The future split is exact:
+  - `MD-02A` proposal-only docs;
+  - `MD-02B` schema/migration/generated plus Market Data repository/service implementation;
+  - `MD-02C` DQE handoff implementation;
+  - `MD-02D` downstream DQE-consumer adoption.
+- Team 04 QA planning should review the packet as ADR/schema-proposal completeness only.
+- Team 00 must keep `CF-W1-MD-02A` out of Ready-for-implementation routing and decide separately whether to open `CF-W1-MD-02B` with explicit schema/migration/generated approval.
+
 ## Team 03 TREV-02 Candidate Snapshot Provenance Prep - 2026-05-18
 
 Prepared:

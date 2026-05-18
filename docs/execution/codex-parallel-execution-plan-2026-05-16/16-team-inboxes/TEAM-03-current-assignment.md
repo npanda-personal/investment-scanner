@@ -276,6 +276,54 @@ Team 02 refined `CF-W1-MD-02` into a parent-only ADR and added `CF-W1-MD-02A` as
 
 ---
 
+# Current Active Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Prepare architecture readiness for `CF-W1-RH-02A` - Research Hub what-changed fail-closed comparison-basis semantics.
+
+This is docs-only architecture prep. Do not implement application code. Do not run tests, builds, services, providers, Prisma commands, UI smoke, or live data.
+
+## Why This Item
+
+Team 03 completed `CF-W1-MD-02A` as a proposal-only packet. Team 04 QA review for `MD-02A` is queued behind the current Team 04 main-workspace writer. The next independent architecture candidate from Team 02's ranked stack is `CF-W1-RH-02A`.
+
+## Source Input
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-RH-02A-research-hub-what-changed-fail-closed-basis-requirement.md`
+- Parent requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-RH-02-research-hub-what-changed-traceability-requirement.md`
+- Related Research Hub actionability packet:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-RH-01-architecture-review.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-RH-01-research-hub-actionability-evidence-wiring-contract.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-RH-01-work-packet.md`
+- Relevant source/docs to inspect read-only:
+  - `backend/src/modules/research-hub/research-hub.md`
+  - `backend/src/modules/research-hub/research-hub.service.ts`
+  - `backend/src/modules/research-hub/research-hub.types.ts`
+  - `backend/tests/modules/research-hub/**`
+  - `frontend/src/features/research-hub/**` read-only only if needed for future UI reservation notes
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-RH-02A-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-RH-02A-research-hub-what-changed-fail-closed-basis-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-RH-02A-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+## Required Output
+
+- Determine whether a bounded no-schema first child can make `whatChanged` fail closed when no comparison basis exists.
+- Recommend exact allowed and forbidden future implementation files.
+- Explicitly block scheduler/journal storage, Prisma/schema, migrations, generated files, route changes, shared utilities/UI, package manifests, upstream module source edits, provider/live-data, startup/backfill, paid/cloud, broker, telemetry, and broad UI redesign unless separately approved.
+- Identify sequencing with `CF-W1-RH-01` so Team 00 can avoid one-writer conflicts in `research-hub` source/tests.
+- Provide QA planning handoff notes for Team 04.
+- Return one of: `Ready candidate`, `split required`, or `blocked`.
+
+---
+
 # Current Dispatcher Assignment
 
 Date: 2026-05-18
