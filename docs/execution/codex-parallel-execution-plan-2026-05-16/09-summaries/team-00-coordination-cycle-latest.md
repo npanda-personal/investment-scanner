@@ -1478,3 +1478,41 @@ Spawned Team 03 Architect Signoff:
 - Team 04: `CF-W1-CAL-01` QA after Team 06 handoff.
 - Team 00: `CF-W1-BT-02` delegated PO acceptance and scoped commit if Architect Signoff accepts.
 - Team 02: next persistent requirement discovery cycle when relaunched.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
+## CAL-01 Developer Handoff Consumed
+
+Team 06 completed `CF-W1-CAL-01` implementation in the dedicated CAL worktree.
+
+Scope check:
+
+- Changed files match the reserved `signal-calibration-engine` service/types/doc/service-test set plus Team 06 outbox and developer handoff.
+- Forbidden files were not touched.
+- No Product Owner decision is required.
+
+Validation reported by Team 06:
+
+- `npm.cmd test -- signal-calibration-engine.service.test.ts --runInBand` passed (`28/28`).
+- `npm.cmd run build` passed.
+- Route test not run because no route-level assertions were added.
+
+## Active / Next
+
+- Team 03 `019e3c02-4baa-77a3-a567-d5cf34e804db`: `CF-W1-BT-02` Architect Signoff remains active.
+- Team 04 QA Verification for `CF-W1-CAL-01` is ready to spawn.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-CAL-01` QA now.
+- Team 10: `CF-W1-CAL-01` review after QA accepts.
+- Team 00: `CF-W1-BT-02` delegated PO acceptance and scoped commit if Architect Signoff accepts.
+- Team 02: next persistent requirement discovery cycle when relaunched.
+
+## Next Coordination Action
+
+Commit this routing update if staged scope is clean, then spawn Team 04 for `CF-W1-CAL-01` QA verification.

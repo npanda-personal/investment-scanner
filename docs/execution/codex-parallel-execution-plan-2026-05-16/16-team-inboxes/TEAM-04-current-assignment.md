@@ -247,6 +247,57 @@ State whether `CF-W1-BT-02` is QA-plan ready for Team 00 Ready evaluation and li
 
 ---
 
+# Current Active Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Run QA Verification for `CF-W1-CAL-01` after Team 06 developer handoff.
+
+This final override supersedes all older Team 04 tails above. Team 06 reports implementation and developer validation passed in the dedicated CAL worktree. Verify executable behavior before Team 10 review.
+
+## Branch / Worktree
+
+- Branch: `codex/team06-strategy-signal/CF-W1-CAL-01`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-CAL-01`
+
+## Evidence To Review
+
+- Developer handoff: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-CAL-01-developer-handoff.md`
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-CAL-01-signal-calibration-reliability-drift-requirement.md`
+- Architecture review: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-CAL-01-architecture-review.md`
+- Contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-CAL-01-signal-calibration-reliability-drift-contract.md`
+- Work packet: `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-CAL-01-work-packet.md`
+- QA plan: `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-CAL-01-qa-plan.md`
+
+## Allowed Writes
+
+Only in the Team 06 CAL worktree:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-CAL-01-qa-verification.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+Do not edit application source/tests unless Team 00 explicitly reassigns QA to fix its own test harness. Do not commit.
+
+## Required Commands
+
+Run in the Team 06 CAL worktree:
+
+```powershell
+cd C:\work\repo\investment-scanner-worktrees\team06-CF-W1-CAL-01\backend
+npm.cmd test -- signal-calibration-engine.service.test.ts --runInBand
+npm.cmd run build
+```
+
+Route-level tests are not required unless Team 06 added route-level assertions. Do not run providers, services, Prisma commands, UI smoke, live data, or package installs.
+
+## Output
+
+Return `ACCEPT` or `REJECT`, commands run/results, scenario evidence, changed-file scope confirmation, skipped checks and reasons, residual risks, and whether Team 10 review can proceed.
+
+---
+
 # Latest Assignment Override
 
 Date: 2026-05-18
@@ -307,6 +358,75 @@ npm.cmd run build
 ```
 
 Use a source-synchronized frontend target. Do not rely on an unrelated long-running `5173` server if it is stale. If sandbox restrictions block Playwright, record the exact blocker and command.
+
+## Output
+
+Return `ACCEPT` or `REJECT`, commands run/results, scenario evidence, changed-file scope confirmation, skipped checks and reasons, residual risks, and whether Team 10 review can proceed.
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Run QA Verification for `CF-W1-CAL-01` after Team 06 developer handoff.
+
+This latest override supersedes older Team 04 tails above. Team 06 reports implementation and developer validation passed in the dedicated CAL worktree. Verify executable behavior before Team 10 review.
+
+## Branch / Worktree
+
+- Branch: `codex/team06-strategy-signal/CF-W1-CAL-01`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-CAL-01`
+
+## Evidence To Review
+
+- Developer handoff: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-CAL-01-developer-handoff.md`
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-CAL-01-signal-calibration-reliability-drift-requirement.md`
+- Architecture review: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-CAL-01-architecture-review.md`
+- Contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-CAL-01-signal-calibration-reliability-drift-contract.md`
+- Work packet: `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-CAL-01-work-packet.md`
+- QA plan: `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-CAL-01-qa-plan.md`
+
+## QA Focus
+
+Verify the accepted CAL behavior:
+
+- `TRUSTED`;
+- `LIMITED` low-sample;
+- `LIMITED` context-gap;
+- `DIAGNOSTIC_ONLY` missing DQ;
+- `UNAVAILABLE` no selected-horizon evidence;
+- fail-closed `eligibleForCalibration=false`;
+- fail-closed `eligibleForSignals=false`;
+- fail-closed `NOT_READY`;
+- fail-closed `UNUSABLE`;
+- fail-closed `ILLIQUID`;
+- score-math preservation;
+- current-field preservation;
+- no forbidden scope.
+
+## Allowed Writes
+
+Only in the Team 06 CAL worktree:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-CAL-01-qa-verification.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+Do not edit application source/tests unless Team 00 explicitly reassigns QA to fix its own test harness. Do not commit.
+
+## Required Commands
+
+Run in the Team 06 CAL worktree:
+
+```powershell
+cd C:\work\repo\investment-scanner-worktrees\team06-CF-W1-CAL-01\backend
+npm.cmd test -- signal-calibration-engine.service.test.ts --runInBand
+npm.cmd run build
+```
+
+Route-level tests are not required unless Team 06 added route-level assertions. Do not run providers, services, Prisma commands, UI smoke, live data, or package installs.
 
 ## Output
 

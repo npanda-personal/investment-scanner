@@ -1298,3 +1298,31 @@ Date: 2026-05-18
 - Team 04 is ready for `CF-W1-CAL-01` QA after Team 06 handoff.
 - Team 00 is ready for `CF-W1-BT-02` delegated PO acceptance and scoped commit if Architect Signoff accepts.
 - Team 02 is ready for another persistent market-intelligence discovery cycle when relaunched.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Completed Since Previous Snapshot
+
+- Team 06 `019e3bf9-059e-75a0-8419-fa14b45dadbe`: completed `CF-W1-CAL-01` implementation and was closed. Developer validation passed: focused backend test `28/28` and backend build.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 03 - Architect Signoff | `019e3c02-4baa-77a3-a567-d5cf34e804db` | `gpt-5.4`, high | architect signoff | `CF-W1-BT-02` after Team 10 ACCEPT | active |
+| 2 | Team 04 - QA Factory | pending spawn | `gpt-5.4`, high | QA verification | `CF-W1-CAL-01` after Team 06 handoff | ready |
+| 3 | Open slot | none | pending | review/release | `CF-W1-CAL-01` after QA accepts | waiting |
+| 4 | Open slot | none | pending | PO packet / commit | `CF-W1-BT-02` after Architect Signoff acceptance | waiting |
+| 5 | Open slot | none | pending | requirements discovery | next persistent Team 02 cycle | ready |
+| 6 | Open slot | none | pending | next architecture prep | next high-value item after Team 02 cycle | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04 is ready for `CF-W1-CAL-01` QA now.
+- Team 00 is ready for `CF-W1-BT-02` delegated PO acceptance and scoped commit if Architect Signoff accepts.
+- Team 10 is ready for `CF-W1-CAL-01` review after QA accepts.
+- Team 02 is ready for another persistent market-intelligence discovery cycle when relaunched.

@@ -1788,6 +1788,26 @@ Teams ready to pick up new tasks:
 - Team 00: `CF-W1-BT-02` delegated PO acceptance and scoped commit if Architect Signoff accepts.
 - Team 02: next persistent market-intelligence discovery cycle when relaunched.
 
+---
+
+# CAL-01 Developer Handoff Consumed
+
+Date: 2026-05-18
+
+Team 06 completed `CF-W1-CAL-01` implementation and developer validation passed.
+
+Team 00 routing:
+
+- Launch Team 04 QA Verification in `../investment-scanner-worktrees/team06-CF-W1-CAL-01`.
+- If QA accepts, route to Team 10 review.
+- If QA rejects, return only the CAL workstream to bounded Team 06 rework unless a true consent blocker appears.
+
+Teams ready to pick up new tasks:
+
+- Team 04: `CF-W1-CAL-01` QA now.
+- Team 10: `CF-W1-CAL-01` review after QA acceptance.
+- Team 00: `CF-W1-BT-02` delegated PO packet and scoped commit if Architect Signoff accepts.
+
 ## Dispatch Result
 
 Team 00 created the Team 06 CAL worktree and spawned implementation:
