@@ -1576,3 +1576,31 @@ Spawned Team 02 Requirement Factory:
 - Team 00: `CF-W1-BT-02` delegated PO acceptance and scoped commit if Architect Signoff accepts.
 - Team 10: `CF-W1-CAL-01` review after QA accepts.
 - Team 03: next architecture-prep candidate after Team 02 output.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
+## BT-02 Architect Signoff Relaunched
+
+The saved Team 03 architect agent `019e3c02-4baa-77a3-a567-d5cf34e804db` was not recoverable from the runtime and no architect-signoff evidence existed in the BT worktree. Team 00 relaunched the same bounded gate.
+
+Spawned Team 03 Architect Signoff:
+
+- Agent: `019e3c10-711f-7ca2-9311-3a28736dd2d4`
+- Work item: `CF-W1-BT-02`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-BT-02`
+
+## Active Agents
+
+- Team 03 `019e3c10-711f-7ca2-9311-3a28736dd2d4`: `CF-W1-BT-02` Architect Signoff.
+- Team 04 `019e3c0d-b69d-7ce2-9043-f363d350f8aa`: `CF-W1-CAL-01` QA Verification.
+- Team 02 `019e3c0f-0b02-7182-a4eb-2c66a3b0da70`: recurring market-intelligence requirements discovery.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 00: `CF-W1-BT-02` delegated PO acceptance and scoped commit if Architect Signoff accepts.
+- Team 10: `CF-W1-CAL-01` review after QA accepts.
+- Team 03: next architecture-prep candidate after Team 02 output.

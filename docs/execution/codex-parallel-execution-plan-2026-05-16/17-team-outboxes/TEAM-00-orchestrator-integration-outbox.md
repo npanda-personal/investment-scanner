@@ -1705,6 +1705,24 @@ Teams ready to pick up new tasks:
 
 ---
 
+# BT-02 Architect Signoff Relaunched
+
+Date: 2026-05-18
+
+The prior saved Team 03 architect agent ID was not recoverable from the runtime and had not written architect-signoff evidence. Team 00 relaunched the same bounded signoff.
+
+- Agent: `019e3c10-711f-7ca2-9311-3a28736dd2d4`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-BT-02`
+- Allowed writes: `CF-W1-BT-02-architect-signoff.md` and `TEAM-03-architect-signoff.md` only.
+
+Teams ready to pick up new tasks:
+
+- Team 00: `CF-W1-BT-02` delegated PO acceptance and scoped commit if Architect Signoff accepts.
+- Team 10: `CF-W1-CAL-01` review after QA accepts.
+- Team 03: next architecture-prep candidate after Team 02 output.
+
+---
+
 # CAL-01 QA Planning Dispatch
 
 Date: 2026-05-18
