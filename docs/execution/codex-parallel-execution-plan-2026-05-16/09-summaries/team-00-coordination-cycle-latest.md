@@ -713,3 +713,33 @@ Validation status:
 ## Next Coordination Action
 
 Spawn Team 04 for `CF-W1-BT-02` QA. Keep Team 05 running on HCTX in parallel.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
+## QA Dispatch
+
+Team 04 QA Verification is active for `CF-W1-BT-02`:
+
+- Agent: `019e3bc4-d5b6-7031-aa78-7e921f6659d2`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-BT-02`
+- Gate: rerun focused validation or record exact worktree toolchain blocker
+
+## Current Pool
+
+- Team 04 QA Verification: active on `CF-W1-BT-02`.
+- Team 05 implementation: active on `CF-W1-HCTX-01`.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 10 is ready for `CF-W1-BT-02` review after Team 04 accepts.
+- Team 04 will be ready for `CF-W1-HCTX-01` QA after Team 05 hands off and the current QA agent completes.
+- Team 03 is ready for `CF-W1-MCTX-01` architecture prep.
+- Team 02 is ready for persistent market-intelligence requirements discovery when a slot is opened.
+
+## Next Coordination Action
+
+Launch Team 03 docs-only `CF-W1-MCTX-01` architecture prep in parallel, because it does not share Team 04 or Team 05 implementation write scope.
