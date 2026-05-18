@@ -3011,6 +3011,36 @@ Branch/worktree:
 
 Date: 2026-05-18
 
+## Next Wave Spawned
+
+Team 00 launched four independent spawned agents after the `3320c51` docs checkpoint.
+
+## Current Active Agents
+
+| Slot | Team | Agent | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | `019e3d27-dd06-7aa2-8808-1c4cbb1dfed5` | QA rerun | `CF-W1-BT-01A` in Team 06 BT worktree | active |
+| 2 | Team 06 - Strategy / Signal / Risk | `019e3d27-dd39-77a2-9208-2ffa61874af3` | implementation | `CF-W1-STRAT-03` in dedicated worktree | active |
+| 3 | Team 03 - Architecture Factory | `019e3d27-dd71-7303-b35f-ce78ce5244ea` | architecture prep | `CF-W1-BT-03` | active |
+| 4 | Team 02 - Requirement Factory | `019e3d27-de23-7610-89aa-cfc738d7a131` | rolling requirements discovery | next distinct direct-value item | active |
+| 5 | Open slot | none | queued | Team 04 `CF-W1-STRAT-03` QA after handoff | waiting |
+| 6 | Open slot | none | queued | Team 10 review after QA-accepted handoff | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-BT-01A` QA rerun is active.
+- Team 06: `CF-W1-STRAT-03` implementation is active.
+- Team 03: `CF-W1-BT-03` architecture prep is active.
+- Team 02: next distinct direct-value discovery is active.
+- Team 04: `CF-W1-STRAT-03` QA after Team 06 handoff.
+- Team 10: review after each QA-accepted handoff.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
 ## BT-01A Rework Complete And BT-03 Discovered
 
 Team 06 completed `CF-W1-BT-01A` QA-reject rework. Team 04 QA rerun can proceed.
