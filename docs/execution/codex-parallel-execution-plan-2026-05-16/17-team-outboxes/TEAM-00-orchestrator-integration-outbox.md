@@ -560,3 +560,59 @@ Allowed files:
 
 - No application code was modified.
 - No tests, builds, services, providers, migrations, package installs, live calls, or pushes were run.
+
+---
+
+# `CF-W1-L3-PORT-01A` Developer Handoff Routing
+
+Date: 2026-05-18
+
+State: Developer handoff received; QA and Code Review assigned
+
+## Evidence Verified
+
+Team 00 verified the Team 07 implementation worktree:
+
+- Branch: `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-L3-PORT-01A`
+- Starting commit: `4642470 docs: promote portfolio readiness dto slice`
+- Developer handoff: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-L3-PORT-01A-developer-handoff.md`
+
+Changed files in Team 07 worktree are within the Team 00 reserved implementation scope:
+
+- `backend/src/modules/portfolio-management/portfolio-management.service.ts`
+- `backend/src/modules/portfolio-management/portfolio-management.types.ts`
+- `backend/src/modules/portfolio-management/portfolio-management.md`
+- `backend/tests/modules/portfolio-management/portfolio-management.service.test.ts`
+
+Additional docs/evidence in the Team 07 worktree:
+
+- `17-team-outboxes/TEAM-07-outbox.md`
+- `18-integration-queue/CF-W1-L3-PORT-01A-developer-handoff.md`
+
+Developer-reported validation:
+
+- `npm.cmd test -- portfolio-management.service.test.ts --runInBand`: pass, 7 tests.
+- `npm.cmd run build`: pass.
+
+## Routing Written
+
+- `16-team-inboxes/TEAM-04-current-assignment.md`: assigned QA Verification.
+- `16-team-inboxes/TEAM-10-current-assignment.md`: assigned Code Review / Release Readiness precheck.
+- `18-integration-queue/CF-W1-L3-PORT-01A-review-routing.md`: records source worktree, changed files, validation, and next gates.
+
+## Current Gate
+
+No commit is authorized yet.
+
+Pending:
+
+- Team 04 QA Verification.
+- Team 10 Code Review.
+- Architect Signoff.
+- Delegated Product Owner acceptance packet.
+- Team 00 exact staged-scope verification in the Team 7 worktree.
+
+## Product Owner Action
+
+No human Product Owner action is required unless QA, review, or Architect Signoff finds a true consent blocker.

@@ -1,6 +1,6 @@
 # TEAM-10 Current Assignment
 
-Date: 2026-05-17
+Date: 2026-05-18
 
 Team: TEAM-10 - Review / Release
 
@@ -8,36 +8,74 @@ Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automat
 
 ## Assignment
 
-Monitor team outboxes and integration queue. Review docs-only outputs and reject any application-code release claim until Ready promotion, implementation, focused tests, QA evidence, code review, Architect signoff, and acceptance packet exist.
+Perform Code Review / Release Readiness precheck for `CF-W1-L3-PORT-01A`.
 
-Current priority:
+Team 07 submitted a developer handoff from its dedicated worktree. Review is read-only unless Team 00 later asks for a release evidence doc update. Do not stage, commit, push, or edit application source/tests.
 
-1. Review Team 00 coordination commit scope after staging if requested.
-2. Keep integration queue depth at zero for app-code unless a team submits accepted implementation evidence.
-3. Validate that `open-decisions.md` remains at zero and no app-code release claim bypasses Ready promotion.
+## Source Handoff
 
-## Scope
+- Requirement: `CF-W1-L3-PORT-01A`
+- Branch: `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-L3-PORT-01A`
+- Handoff path in worktree: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-L3-PORT-01A-developer-handoff.md`
+- Team 00 routing note: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-L3-PORT-01A-review-routing.md`
+- QA gate: Team 04 is assigned QA verification in parallel; final acceptance waits for QA result.
 
-Allowed writes:
+## Review Scope
 
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-10*.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/**`
-- release/review active docs explicitly assigned by Team 00
+Review only the approved Team 07 changed files:
 
-Forbidden:
+- `backend/src/modules/portfolio-management/portfolio-management.service.ts`
+- `backend/src/modules/portfolio-management/portfolio-management.types.ts`
+- `backend/src/modules/portfolio-management/portfolio-management.md`
+- `backend/tests/modules/portfolio-management/portfolio-management.service.test.ts`
 
-- application source/tests unless explicitly reviewing read-only
-- staging, committing, or pushing without Team 00 scoped instruction
-- high-risk/shared file edits
+Verify:
 
-## Branch / Worktree
+- implementation stays within Team 00 reserved file list;
+- DTO additions are additive and preserve existing response compatibility;
+- `READY`, `LIMITED`, missing, blocked, stale, unsupported, and scope-mismatch mappings follow the accepted contract;
+- `LIMITED` cannot become action-ready;
+- `dataStatus = COMPLETE` does not imply Data Quality trust;
+- Data Quality Engine is consumed through public service/type outputs only;
+- no DQE scoring, stale threshold, liquidity scoring, or coverage scoring is duplicated;
+- no forbidden product language or financial-advice wording was introduced;
+- tests are meaningful and cover the QA matrix;
+- local/free/no-provider constraints are preserved.
 
-Use shared `dev` for docs-only review. Use a dedicated worktree only for isolated accepted implementation review, named `codex/team10-review-release/{requirement-id}` and `../investment-scanner-worktrees/team10-{requirement-id}`.
+## Commands / Evidence
+
+Team 10 may inspect diffs from the worktree. Do not run broad suites unless Team 00 asks. If reviewing command evidence, use Team 07's reported:
+
+- `npm.cmd test -- portfolio-management.service.test.ts --runInBand`: passed, 7 tests.
+- `npm.cmd run build`: passed.
+
+Team 04 owns QA rerun/verification.
+
+## Output
+
+Write review result to:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-10-outbox.md`
+
+Include:
+
+- pass/reject decision;
+- findings with file/line references;
+- changed-file scope confirmation;
+- whether QA evidence is sufficient or pending;
+- release risk;
+- rollback note;
+- whether Architect Signoff can proceed after QA.
 
 ## Blockers
 
-No Team 10 workstream is fully blocked. App-code release is closed because no implementation item is currently Ready or submitted.
+No Product Owner decision is open.
 
-## Expected Outbox
+Commit/release remains blocked until:
 
-Update `17-team-outboxes/TEAM-10-outbox.md`.
+- Team 04 QA passes;
+- Team 10 code review passes;
+- Architect signoff is recorded;
+- delegated Product Owner acceptance packet is recorded;
+- Team 00 verifies exact staged scope in the Team 07 worktree.

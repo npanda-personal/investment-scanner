@@ -4,15 +4,21 @@ Date: 2026-05-18
 
 ## Current Ready Queue
 
-One active application-code item is currently Ready for Implementation.
+No available application-code item is currently Ready for a team to pull.
+
+`CF-W1-L3-PORT-01A` was pulled by Team 07, implemented in its dedicated worktree, and moved to QA Verification / Code Review routing. It remains uncommitted and unaccepted.
+
+## Pulled / In Review
 
 | ID | Owner | Branch | Worktree | Scope | Status |
 | --- | --- | --- | --- | --- | --- |
-| `CF-W1-L3-PORT-01A` | Team 07 - Portfolio / Watchlist / Alerts | `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A` | `../investment-scanner-worktrees/team07-CF-W1-L3-PORT-01A` | Backend-only portfolio-management readiness DTOs | Ready for implementation handoff |
+| `CF-W1-L3-PORT-01A` | Team 07 - Portfolio / Watchlist / Alerts | `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A` | `../investment-scanner-worktrees/team07-CF-W1-L3-PORT-01A` | Backend-only portfolio-management readiness DTOs | Developer handoff submitted; QA/Code Review pending |
 
 ## Active Ready Handoff - `CF-W1-L3-PORT-01A`
 
 Date promoted: 2026-05-18
+
+Current status: Pulled by Team 07; developer handoff routed to Team 04 and Team 10 on 2026-05-18.
 
 Team 00 evaluated `CF-W1-L3-PORT-01A` against the Ready gates and promoted it as the first Lane 3 readiness implementation slice.
 
@@ -106,15 +112,15 @@ Product Owner resolved the five current Decision Inbox items on 2026-05-18:
 - `CF-W1-UX-05`: Option A, first product-language cleanup is Copilot-only after or with the Copilot trust slice; shared `StatusBadge` remains future.
 - `CF-W1-MD-01`: Option A, future-dated candles and invalid adjusted close are rejected; missing adjusted close is fallback/incomplete evidence; suspicious volume is warning evidence; spike rejection remains opt-in.
 
-Those decisions remove the Decision Inbox blockers, but they are not app-code implementation handoffs. The affected items still need module-specific contract/QA refresh, exact file reservations, source/test evidence, and Team 00 Ready promotion before any app-code team can pull them.
+Those decisions remove the Decision Inbox blockers, but they are not app-code implementation handoffs. Team 03/04 have since prepared module-specific contract/work-packet and QA refreshes for the affected items; each still needs its remaining upstream owner check, exact Team 00 implementation handoff, and Ready promotion before any app-code team can pull it.
 
 Newly resolved but still not Ready:
 
-- `CF-W1-AUTH-01`: needs Team 09/Team 03/Team 04 module-local backend packet and controller/test reservations.
-- `CF-W1-SUB-01`: needs Team 09/Team 03/Team 04 backend-only packet and known frontend limitation handling.
-- `CF-W1-UX-02`: needs Team 08/Team 03/Team 04 Copilot-only trust contract refresh, source-supported trust-field mapping, focused QA plan, and exact backend/frontend/test reservations.
-- `CF-W1-UX-05`: needs Copilot-only child sequencing with `CF-W1-UX-02`; shared UI remains forbidden.
-- `CF-W1-MD-01`: needs Market Data validation-only work packet, focused QA refresh, and no storage/provider/schema scope.
+- `CF-W1-AUTH-01`: Team 03 contract/work packet and Team 04 QA refresh are prepared; needs Team 00 Ready promotion, Team 09 handoff, and sequencing/combining with `CF-W1-SUB-01` because subscription files overlap.
+- `CF-W1-SUB-01`: Team 03 contract/work packet and Team 04 QA refresh are prepared; needs Team 00 Ready promotion, Team 09 handoff, and sequencing/combining with `CF-W1-AUTH-01` because subscription files overlap.
+- `CF-W1-UX-02`: Team 03 Copilot-only contract/work packet and Team 04 QA refresh are prepared; needs Team 08 source-supported trust-field mapping, exact handoff, and Team 00 Ready promotion.
+- `CF-W1-UX-05`: Team 03 Copilot-only contract/work packet and Team 04 QA refresh are prepared; needs folding into or sequencing after `CF-W1-UX-02`; shared UI remains forbidden.
+- `CF-W1-MD-01`: Team 03 validation-only work packet and Team 04 QA refresh are prepared; needs Team 05 readiness acceptance, Team 00 Ready promotion, and no storage/provider/schema scope.
 
 ## Completed Slices Not Active For Pull
 
@@ -170,19 +176,26 @@ Next Team 00/owner work should evaluate the remaining prepared child artifacts f
 - `CF-W1-L3-AUTH-03`: promote the alert rule target ownership child if the prepared requirement, contract, work packet, and QA plan pass Ready gates.
 - `CF-W1-L3-INTEL-01`: keep queued behind `CF-W1-L3-PORT-01A`; promote only after portfolio readiness DTOs are implemented and accepted.
 - `CF-W1-MD-02`: formal ADR and later approval-gated source/schema split packets.
-- `CF-W1-AUTH-01`: refresh Team 09 backend fail-closed controller packet after Option A.
-- `CF-W1-SUB-01`: refresh Team 09 backend manual/admin-only subscription packet after Option A.
-- `CF-W1-UX-02`: refresh Copilot-only trust UX packet after Option B.
+- `CF-W1-AUTH-01`: evaluate prepared Team 09 backend fail-closed controller packet for Ready, sequenced or combined with `CF-W1-SUB-01`.
+- `CF-W1-SUB-01`: evaluate prepared Team 09 backend manual/admin-only subscription packet for Ready, sequenced or combined with `CF-W1-AUTH-01`.
+- `CF-W1-UX-02`: complete Team 08 source-supported trust-field mapping, then evaluate prepared Copilot-only trust UX packet for Ready.
 - `CF-W1-UX-05`: fold Copilot-only copy cleanup into or behind `CF-W1-UX-02`; keep shared status work future.
-- `CF-W1-MD-01`: refresh Market Data validation-only packet after Option A.
+- `CF-W1-MD-01`: complete Team 05 readiness acceptance, then evaluate prepared Market Data validation-only packet for Ready.
 
 No app-code item became Ready during decision resolution itself. `CF-W1-L3-PORT-01A` was later promoted by Team 00 after requirement, architecture, QA, reservation, and Team 07 readiness gates passed.
 
 2026-05-18 Ready promotion result:
 
-- `CF-W1-L3-PORT-01A` is Ready for Team 07 implementation in `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A`.
-- Team 07 must use `../investment-scanner-worktrees/team07-CF-W1-L3-PORT-01A`.
-- The shared `dev` workspace currently contains unrelated active-doc changes from other teams; Team 07 must not implement in the shared worktree.
+- `CF-W1-L3-PORT-01A` was promoted for Team 07 implementation in `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A`.
+- Team 07 used `../investment-scanner-worktrees/team07-CF-W1-L3-PORT-01A`.
+- The shared `dev` workspace contains unrelated active-doc changes from other teams; Team 07 implementation remains isolated in the dedicated worktree.
+
+2026-05-18 Developer handoff routing result:
+
+- `CF-W1-L3-PORT-01A` developer handoff was submitted from the Team 07 worktree.
+- Team 04 owns QA Verification.
+- Team 10 owns Code Review / Release Readiness precheck.
+- No commit is authorized until QA, review, Architect Signoff, delegated PO acceptance, and Team 00 staged-scope verification pass.
 
 2026-05-18 routing result:
 

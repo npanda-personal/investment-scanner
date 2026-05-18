@@ -8,50 +8,93 @@ Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automat
 
 ## Assignment
 
-Prepare QA plans, focused command guidance, and validation evidence requirements. `CF-W1-L3-PORT-01A` has been promoted; executable QA for that slice begins only after Team 07 implementation handoff exists.
+Run QA Verification for `CF-W1-L3-PORT-01A`.
 
-Current priority after Team 01 audit consumption:
+Team 07 submitted developer handoff from its dedicated worktree. QA may inspect and run focused validation in that worktree, but must not edit application source or tests.
 
-1. Stand by for `CF-W1-L3-PORT-01A` QA after Team 07 implementation; use `04-qa/CF-W1-L3-PORT-01-qa-plan.md`.
-2. Prepare or revise QA plans and focused test commands for `CF-W1-TP-01B`.
-3. Prepare or revise QA plans and focused test commands for `CF-W1-NOTIF-02`.
-4. Prepare or revise QA plans and focused test commands for `CF-W1-L3-ALERT-01`.
-5. Keep `CF-W1-L3-INTEL-01` QA blocked behind accepted `CF-W1-L3-PORT-01A`.
-6. Refresh QA plans for `CF-W1-MD-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, `CF-W1-AUTH-01`, and `CF-W1-SUB-01` against the resolved policies; executable QA remains blocked until Team 00 promotes exact implementation handoffs.
+## Source Handoff
 
-No executable QA is authorized until the matching implementation exists. For `CF-W1-L3-PORT-01A`, Team 00 has promoted the handoff, but Team 04 must wait for Team 07's implementation outbox before running or reviewing executable QA.
+- Requirement: `CF-W1-L3-PORT-01A`
+- Branch: `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-L3-PORT-01A`
+- Handoff path in worktree: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-L3-PORT-01A-developer-handoff.md`
+- QA plan: `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-L3-PORT-01-qa-plan.md`
+- Team 00 routing note: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-L3-PORT-01A-review-routing.md`
 
-## Scope
+## Files To Verify
 
-Allowed writes:
+Changed files reported by Team 07:
 
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/**`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04*.md`
+- `backend/src/modules/portfolio-management/portfolio-management.service.ts`
+- `backend/src/modules/portfolio-management/portfolio-management.types.ts`
+- `backend/src/modules/portfolio-management/portfolio-management.md`
+- `backend/tests/modules/portfolio-management/portfolio-management.service.test.ts`
 
-Forbidden without Team 00 implementation handoff:
+Forbidden scope to confirm untouched:
 
-- tests
-- builds
-- Playwright
-- dev servers
-- provider/live data calls
-- Prisma commands
-- application source edits
+- Prisma schema or migrations
+- route registries
+- shared backend utilities or shared DTOs
+- shared UI
+- package manifests
+- generated files
+- Data Quality Engine source/public exports
+- watchlist-management
+- alerts-monitoring
+- portfolio-intelligence
+- frontend files
+- providers, startup/backfill, live provider, paid/cloud, broker, telemetry
 
-## Branch / Worktree
+## Required QA Checks
 
-Use shared `dev` for docs-only QA planning. For future executable QA tied to an implementation worktree, Team 00 will name the branch/worktree in a new inbox.
+Verify the QA plan scenarios for portfolio-only readiness DTOs:
 
-## Blockers
+- READY evidence maps to trusted display/action eligibility according to contract.
+- LIMITED evidence remains passive display only and action-blocked.
+- missing DQ is blocked/untrusted and does not inherit trust from non-null price or signal.
+- NOT_READY, UNUSABLE, stale, unsupported, scope mismatch, or blocked-tier evidence is blocked/untrusted.
+- mixed holdings produce accurate summary counts.
+- existing portfolio fields, `dataStatus`, valuation, price, and signal compatibility are preserved.
+- Data Quality is consumed through public service/type outputs only.
+- no direct advice, target-price, buy/sell, guarantee, or trade-instruction wording is introduced.
 
-Executable QA is blocked until implementation output exists. `CF-W1-L3-PORT-01A` is Ready for Team 07 implementation, but QA is not executable before Team 07 changes and developer validation.
+## Focused Commands
 
-Decision reconciliation:
+Run in the Team 07 worktree if environment is available:
 
-- No open decisions remain.
-- Product Owner action is not required.
-- The former decision-blocked items now need QA refresh, exact file reservations, and Team 00 Ready promotion before executable QA.
+```powershell
+cd C:\work\repo\investment-scanner-worktrees\team07-CF-W1-L3-PORT-01A\backend
+npm.cmd test -- portfolio-management.service.test.ts --runInBand
+npm.cmd run build
+```
 
-## Expected Outbox
+If `node_modules` is unavailable, do not install packages without Team 00 approval. Record the exact blocker and whether Team 07's reported local junction/no-install validation is acceptable QA evidence.
 
-Update `17-team-outboxes/TEAM-04-qa-factory.md` with QA-plan status and blocked executable commands.
+## Output
+
+Write QA result to:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+Include:
+
+- pass/reject decision;
+- commands run and results;
+- scenario evidence;
+- changed-file scope confirmation;
+- skipped checks and reasons;
+- risks/blockers;
+- whether Code Review / Architect Signoff can proceed.
+
+## Other QA Work
+
+Continue docs-only QA prep only after this review:
+
+- `CF-W1-TP-01B`
+- `CF-W1-NOTIF-02`
+- `CF-W1-L3-ALERT-01`
+- `CF-W1-MD-01`
+- `CF-W1-UX-02`
+- `CF-W1-UX-05`
+- `CF-W1-AUTH-01`
+- `CF-W1-SUB-01`
