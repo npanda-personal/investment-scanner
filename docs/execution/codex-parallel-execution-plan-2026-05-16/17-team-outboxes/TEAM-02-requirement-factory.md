@@ -14,7 +14,6 @@ Run the next persistent Product Owner / requirements cycle while implementation 
 - `10-requirements/requirements-backlog.md`
 - `10-requirements/refinement-queue.md`
 - `10-requirements/top-10-ready-candidates.md`
-- `10-requirements/CF-W1-DQ-02-dq-currentness-evidence-requirement.md`
 - `17-team-outboxes/TEAM-02-requirement-factory.md`
 
 ## Files Inspected
@@ -29,37 +28,40 @@ Run the next persistent Product Owner / requirements cycle while implementation 
 - `16-team-inboxes/TEAM-09-current-assignment.md`
 - `11-module-audits/audit-market-data-data-quality.md`
 - `11-module-audits/audit-backtesting-trade-risk.md`
+- `11-module-audits/audit-strategy-signal-rules.md`
+- `11-module-audits/audit-ux-research-copilot.md`
+- `11-module-audits/audit-portfolio-watchlist-alerts.md`
+- `11-module-audits/audit-qa-test-infrastructure.md`
 
 ## Source-Backed Findings
 
 - The queue needed to move away from auth/sub promotion-watch work because Team 09 has already pulled combined `CF-W1-AUTH-SUB-01` into a separate implementation worktree.
-- `CF-W1-BT-02` is still the cleanest next Team 00 architecture/QA prep target because the product already exposes the relevant diagnostics and only the canonical review-disposition layer remains unclear.
-- `CF-W1-HCTX-01` and `CF-W1-MCTX-01` remain the strongest upstream trust-evidence gaps because their missing provenance flows directly into calibration and market review trust.
-- `CF-W1-CAL-01` stays high, but it is best sequenced behind HCTX and MCTX because those two modules still hide the evidence chain calibration relies on.
-- `CF-W1-DQ-02` now has a sharper session-aware currentness focus so downstream trust surfaces can fail closed instead of treating calendar age as freshness.
-- `CF-W1-TP-01B` and `CF-W1-MD-02` remain high-value upstream support items, but both stay out of Ready movement and implementation routing in this docs-only cycle.
-- `CF-W1-L3-WATCH-01` and `CF-W1-L3-INTEL-03` remain useful but stay lower than the market-intelligence trust stack unless correctness or user-data safety changes the ordering.
+- `CF-W1-DQ-02` is the clearest next unassigned item because currentness is the upstream fail-closed gate for every downstream trust surface.
+- `CF-W1-MCTX-01` and `CF-W1-CAL-01` remain the next direct trust-evidence layers once currentness is made explicit.
+- `CF-W1-SQLAB-02`, `CF-W1-STRAT-02`, and `CF-W1-MD-02` remain high-value support items that keep learning, provenance, and durable evidence aligned.
+- `CF-W1-TP-01B`, `CF-W1-SQLAB-01`, `CF-W1-UX-01`, and `CF-W1-L3-INTEL-03` stay useful but remain below the upstream trust stack.
+- `CF-W1-BT-02` and `CF-W1-HCTX-01` are active lanes and should not be re-routed as new discovery work.
 
 ## Re-Prioritized Top 10
 
-1. `CF-W1-BT-02`
-2. `CF-W1-HCTX-01`
-3. `CF-W1-MCTX-01`
-4. `CF-W1-CAL-01`
-5. `CF-W1-SQLAB-02`
-6. `CF-W1-STRAT-02`
-7. `CF-W1-DQ-02`
-8. `CF-W1-TP-01B`
-9. `CF-W1-MD-02`
-10. `CF-W1-UX-01`
+1. `CF-W1-DQ-02`
+2. `CF-W1-MCTX-01`
+3. `CF-W1-CAL-01`
+4. `CF-W1-SQLAB-02`
+5. `CF-W1-STRAT-02`
+6. `CF-W1-MD-02`
+7. `CF-W1-TP-01B`
+8. `CF-W1-SQLAB-01`
+9. `CF-W1-UX-01`
+10. `CF-W1-L3-INTEL-03`
 
 ## New / Refined Requirement Output
 
-- Refined `CF-W1-HCTX-01` with an explicit backend-first additive lookup-provenance slice.
-- Refined `CF-W1-MCTX-01` with persisted-versus-fresh regime provenance and denominator clarity.
-- Refined `CF-W1-CAL-01` so the first child stays on trust-state semantics and is explicitly sequenced behind HCTX/MCTX.
-- Refined `CF-W1-BT-02` to a narrower canonical review-disposition requirement and flagged the need to refresh existing Team 03/04 packets to that scope.
 - Refined `CF-W1-DQ-02` to make session-aware currentness explicit so downstream consumers can distinguish latest-session freshness from calendar-age heuristics.
+- Refined `CF-W1-MCTX-01` with persisted-versus-fresh regime provenance and denominator clarity.
+- Refined `CF-W1-CAL-01` so the first child stays on trust-state semantics and is sequenced behind context evidence.
+- Refined `CF-W1-SQLAB-02` so the next post-preview path remains learning-focused and separate from durable storage.
+- Refined `CF-W1-STRAT-02` so rule provenance and DQ-gated trust stay explicit before rule behavior changes.
 
 ## Ready / Promotion Read
 
@@ -76,25 +78,23 @@ Reason:
 
 Recommended next Team 00 architecture / QA prep target:
 
-- `CF-W1-BT-02`
+- `CF-W1-DQ-02`
 
 Reason:
 
-- the module already exposes the relevant diagnostics in source and UI;
-- the remaining gap is bounded to one canonical review-disposition label and reason summary;
-- Team 03 / Team 04 packets exist already and only need scope refresh instead of fresh discovery.
+- currentness is the upstream fail-closed gate for downstream trust surfaces;
+- the remaining gap is bounded to session-aware currentness evidence and QA prep;
+- Team 03 can refresh contract/QA prep without touching active `BT-02` or `HCTX-01` lanes.
 
 ## Dependencies / Blockers
 
-- `CF-W1-UX-01`: active `CF-W1-UX-01A` child must finish; current feature boundary still does not prove `region`, `assetType`, DQ-backed blockers, or latest trusted date.
-- `CF-W1-BT-02`: existing Team 03 / Team 04 packet must be refreshed to match the narrower canonical-label requirement before Team 00 evaluates prep completeness.
-- `CF-W1-HCTX-01`: must stay additive and backward-compatible for downstream consumers.
+- `CF-W1-DQ-02`: must stay additive and session-aware without widening into durable storage or provider rewrites.
 - `CF-W1-MCTX-01`: must clarify persisted-versus-fresh provenance and denominator quality without changing regime math.
-- `CF-W1-CAL-01`: should follow HCTX / MCTX contract prep rather than race ahead of the evidence chain.
-- `CF-W1-L3-WATCH-01`: should not widen into alerting, recommendation language, or shared-component scope.
-- `CF-W1-L3-INTEL-03`: should not widen into optimizer, rebalance, or advice-like action semantics.
-- `CF-W1-L3-ALERT-03`: should not overlap active `alerts-monitoring` writers and should stay behind `CF-W1-L3-ALERT-01` / `CF-W1-L3-AUTH-03` lane contention.
+- `CF-W1-CAL-01`: should follow context evidence prep rather than race ahead of the evidence chain.
 - `CF-W1-SQLAB-02`: durable-storage child remains blocked behind a separate storage packet even if the no-schema preview child continues.
+- `CF-W1-STRAT-02`: should stay upstream of any rule-behavior change and keep DQ gate policy explicit.
+- `CF-W1-TP-01B`: should stay bounded to no-target/DQ hard-block semantics and not widen into UI/schema migration.
+- `CF-W1-UX-01`: active `CF-W1-UX-01A` child must finish before any follow-on UX trust-surface expansion.
 
 ## Teams Ready To Pick Up New Tasks
 

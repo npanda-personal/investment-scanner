@@ -2,7 +2,7 @@
 
 Date: 2026-05-18
 
-Status: Refreshed by Team 02 after Team 09 pulled combined `CF-W1-AUTH-SUB-01` into a separate worktree and after Team 00 promoted `CF-W1-L3-PORT-01A`. Product Owner action is not required; all other policy-resolved items remain refinement/architecture/QA-prep items only until Team 00 promotes exact implementation handoffs. Product Owner corrected the priority model on 2026-05-18: direct investor/trader value should lead, especially market data, Data Quality, signals, strategies, backtests, calibration, historical context, market context, trade-plan research support, and research evidence. Admin, settings, auth/subscription, notifications, and alert convenience work should be lowest priority unless needed for correctness, privacy, or user-data safety.
+Status: Refreshed by Team 02 after Team 09 pulled combined `CF-W1-AUTH-SUB-01` into a separate worktree and after Team 00 promoted `CF-W1-L3-PORT-01A`. Product Owner action is not required; all other policy-resolved items remain refinement/architecture/QA-prep items only until Team 00 promotes exact implementation handoffs. Product Owner corrected the priority model on 2026-05-18: direct investor/trader value should lead, especially market data, Data Quality, signals, strategies, backtests, calibration, historical context, market context, trade-plan research support, and research evidence. Admin, settings, auth/subscription, notifications, and alert convenience work should be lowest priority unless needed for correctness, privacy, or user-data safety. Active lanes `CF-W1-BT-02` and `CF-W1-HCTX-01` stay excluded from the non-active backlog ranking; the top unassigned investor/trader-value item is `CF-W1-DQ-02`.
 
 ## New Audit-Derived Candidates
 
@@ -29,15 +29,16 @@ These are the investor/trader value priorities for this docs-only refinement cyc
 
 | Rank | ID | Why now | Next gate |
 | --- | --- | --- | --- |
-| 1 | CF-W1-BT-02 | Backtesting already exposes trust diagnostics, but it still needs one canonical review-disposition label across saved-run list and detail surfaces. | Refresh Team 03/04 packet to the narrower canonical-label scope. |
-| 2 | CF-W1-HCTX-01 | Historical lookup provenance is too thin for post-event learning and calibration trust. | Architecture contract and QA plan for additive lookup provenance. |
-| 3 | CF-W1-MCTX-01 | Market regime labels still over-compress evidence and partial-context limits. | Architecture contract and QA plan for bounded regime-evidence framing. |
-| 4 | CF-W1-CAL-01 | Calibration trust-state drift is the next highest user-value follow-on after HCTX/MCTX evidence prep. | Architecture contract and QA plan after HCTX/MCTX packet prep. |
-| 5 | CF-W1-SQLAB-02 | Signal outcome learning loop is a direct trader-value feature after the no-schema preview child closes. | Post-preview architecture/QA prep; durable storage remains separate. |
-| 6 | CF-W1-STRAT-02 | Strategy provenance and DQ-gated strategy trust are upstream to every signal/backtest claim. | Post-child durable provenance contract refresh. |
-| 7 | CF-W1-DQ-02 | Upstream currentness and provider-gap evidence affect every downstream market-intelligence output. | Follow-on packet after accepted DQE child; no schema/provider widening. |
-| 8 | CF-W1-TP-01B | Trade Plan no-target/DQ hard-block behavior protects research-readiness language. | Reconcile existing branch/review state before more work. |
-| 9 | CF-W1-MD-02 | Durable market-data readiness/evidence remains the foundation for trustworthy signals and backtests. | ADR/source/schema split only; no schema/source promotion without separate approval. |
+| 1 | CF-W1-DQ-02 | Upstream currentness evidence should fail closed before any downstream signal, strategy, backtest, or research surface can claim freshness. | Architecture contract and QA plan for session-aware currentness. |
+| 2 | CF-W1-MCTX-01 | Market regime labels still over-compress evidence and partial-context limits. | Architecture contract and QA plan for bounded regime-evidence framing. |
+| 3 | CF-W1-CAL-01 | Calibration trust-state drift is the next highest user-value follow-on after context evidence prep. | Architecture contract and QA plan after HCTX/MCTX packet prep. |
+| 4 | CF-W1-SQLAB-02 | Signal outcome learning loop is a direct trader-value feature after the no-schema preview child closes. | Post-preview architecture/QA prep; durable storage remains separate. |
+| 5 | CF-W1-STRAT-02 | Strategy provenance and DQ-gated strategy trust are upstream to every signal/backtest claim. | Post-child durable provenance contract refresh. |
+| 6 | CF-W1-MD-02 | Durable market-data readiness/evidence remains the foundation for trustworthy signals and backtests. | ADR/source/schema split only; no schema/source promotion without separate approval. |
+| 7 | CF-W1-TP-01B | Trade Plan no-target/DQ hard-block behavior protects research-readiness language. | Reconcile existing branch/review state before more work. |
+| 8 | CF-W1-SQLAB-01 | Signal Quality outcome confidence needs a clear trusted-versus-untrusted contract before quality summaries shape judgment. | Architecture contract and QA plan for trust-state outputs. |
+| 9 | CF-W1-UX-01 | Workbench trust remains useful, but it should follow market-data/signals/backtest evidence unless backend trust evidence is source-supported. | Backend trust-evidence parent remains blocked until source-supported fields exist. |
+| 10 | CF-W1-L3-INTEL-03 | Portfolio concentration review is still useful, but it remains below the upstream market-intelligence trust stack unless a safety blocker requires earlier attention. | Architecture contract and QA plan for bounded review-first language. |
 
 ## Intake Rules
 
@@ -135,21 +136,21 @@ These are documentation-prep candidates only. None is app-code Ready for Impleme
 
 | Rank | ID | Prep owner | Next prep gate | Why it can proceed now |
 | --- | --- | --- | --- | --- |
-| 1 | CF-W1-BT-02 | Team 00 / Team 03 | Refresh product refinement and architecture contract for backtesting review disposition traceability | Backtesting already has availability, benchmark, exit, and repair evidence; the remaining trust gap is a canonical review label and reason summary. |
-| 2 | CF-W1-HCTX-01 | Team 00 / Team 03 | Product refinement and architecture contract for selected-snapshot provenance and gap explanation | Historical context lookups already expose selected-snapshot data and need clearer provenance. |
-| 3 | CF-W1-MCTX-01 | Team 00 / Team 03 | Product refinement and bounded architecture contract for regime evidence and partial-context explanation | Market context regime labels already exist; the evidence gap is now bounded. |
-| 4 | CF-W1-CAL-01 | Team 00 / Team 03 | Product refinement and architecture contract for trusted versus diagnostic calibration outputs | Calibration trust-state machinery already exists; the drift-label gap is explicit enough to refine after HCTX/MCTX prep. |
-| 5 | CF-W1-SQLAB-02 | Team 00 / Team 03 | Post-preview architecture/QA prep for signal outcome learning loop | Directly improves signal learning and future judgment. |
-| 6 | CF-W1-STRAT-02 | Team 00 / Team 03 | Product refinement and architecture contract for Strategy Framework rule versioning and DQ gate policy | Strategy Framework is the source of truth for reusable strategy definitions and proof; durable rule provenance should be resolved before any rule behavior changes. |
-| 7 | CF-W1-DQ-02 | Team 00 / Team 03 | Product refinement and architecture contract for session-aware currentness evidence | Upstream currentness is the first trust gate downstream consumers should inherit rather than recreate. |
-| 8 | CF-W1-TP-01B | Team 00 | Reconcile backend-only Trade Plan child branch/review state | Directly protects paper-readiness and no-target research language. |
-| 9 | CF-W1-MD-02 | Team 00 / Team 03 | ADR/persistence split-packet prep only | Market-data readiness is foundational, but source/schema changes remain approval-gated. |
-| 10 | CF-W1-L3-WATCH-01 | Team 00 / Team 03 | Later product refinement and bounded architecture contract for explainable watchlist review priority | Useful but below market-data/signal/backtest/calibration work. |
+| 1 | CF-W1-DQ-02 | Team 00 / Team 03 | Product refinement and architecture contract for session-aware currentness evidence | Upstream currentness is the first trust gate downstream consumers should inherit rather than recreate. |
+| 2 | CF-W1-MCTX-01 | Team 00 / Team 03 | Product refinement and bounded architecture contract for regime evidence and partial-context explanation | Market context regime labels already exist; the evidence gap is now bounded. |
+| 3 | CF-W1-CAL-01 | Team 00 / Team 03 | Product refinement and architecture contract for trusted versus diagnostic calibration outputs | Calibration trust-state machinery already exists; the drift-label gap is explicit enough to refine after context prep. |
+| 4 | CF-W1-SQLAB-02 | Team 00 / Team 03 | Post-preview architecture/QA prep for signal outcome learning loop | Directly improves signal learning and future judgment. |
+| 5 | CF-W1-STRAT-02 | Team 00 / Team 03 | Product refinement and architecture contract for Strategy Framework rule versioning and DQ gate policy | Strategy Framework is the source of truth for reusable strategy definitions and proof; durable rule provenance should be resolved before any rule behavior changes. |
+| 6 | CF-W1-MD-02 | Team 00 / Team 03 | ADR/persistence split-packet prep only | Market-data readiness is foundational, but source/schema changes remain approval-gated. |
+| 7 | CF-W1-TP-01B | Team 00 | Reconcile backend-only Trade Plan child branch/review state | Directly protects paper-readiness and no-target research language. |
+| 8 | CF-W1-SQLAB-01 | Team 00 / Team 03 | Product refinement and architecture contract for trusted versus untrusted signal-quality outputs | Signal-quality summaries should stay research-only until trust semantics are explicit. |
+| 9 | CF-W1-UX-01 | Team 00 / Team 03 / Team 08 | Product refinement and architecture contract for workbench trust surfaces | Workbench trust remains useful, but it should follow upstream evidence prep. |
+| 10 | CF-W1-L3-INTEL-03 | Team 00 / Team 03 | Later product refinement and bounded architecture contract for explainable concentration review | Useful but below the market-data/signal/backtest/calibration stack. |
 | 11 | CF-W1-L3-INTEL-03 | Team 00 / Team 03 | Later product refinement and bounded architecture contract for concentration and exposure review | Useful but below market-data/signal/backtest/calibration work. |
 | 12 | CF-W1-L3-ALERT-03 | Team 00 / Team 03 | Later product refinement only after alert writer contention clears | Lowest-priority convenience lane unless correctness depends on it. |
 
 `CF-W1-UX-05` remains a valid Product/UX copy-policy candidate, but it is outside this cycle's top investor/trader review priorities because its approved first child should be sequenced with `CF-W1-UX-02`; shared `StatusBadge` work remains future.
 
-`CF-W1-SQLAB-02A` is now the active no-schema Signal Quality Lab child in Team 04 QA planning. After the 2026-05-18 Product Owner priority correction, the filtered next unassigned docs-only item for Team 00 routing is `CF-W1-BT-02`, not a Lane 3 convenience or platform item.
+`CF-W1-SQLAB-02A` is now the active no-schema Signal Quality Lab child in Team 04 QA planning. After the 2026-05-18 Product Owner priority correction, the filtered next unassigned docs-only item for Team 00 routing is `CF-W1-DQ-02`, not a Lane 3 convenience or platform item.
 
-With Team 09 `CF-W1-AUTH-SUB-01` now parked as a completed branch and with the latest Product Owner priority correction, the next docs-only Team 00 architecture/QA prep target should be `CF-W1-BT-02`, followed by historical context, market context, calibration, signal-quality learning, Strategy Framework provenance, DQ currentness, and Trade Plan readiness. Admin/settings/auth/subscription/notification and alert convenience work should not preempt those lanes.
+With Team 09 `CF-W1-AUTH-SUB-01` now parked as a completed branch and with the latest Product Owner priority correction, the next docs-only Team 00 architecture/QA prep target should be `CF-W1-DQ-02`, followed by market context, calibration, signal-quality learning, Strategy Framework provenance, market-data readiness, and Trade Plan readiness. `CF-W1-BT-02` and `CF-W1-HCTX-01` remain active and should not be preempted by new routing. Admin/settings/auth/subscription/notification and alert convenience work should not preempt those lanes.
