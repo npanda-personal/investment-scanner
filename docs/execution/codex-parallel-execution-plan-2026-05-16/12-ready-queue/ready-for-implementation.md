@@ -45,6 +45,8 @@ No available application-code item is currently waiting unassigned in Ready.
 
 `CF-W1-SIG-TRIGGER-02A` completed QA, Team 10 review, Architect Signoff, delegated PO acceptance, and scoped local branch commit `788c237`; it is parked for later clean integration.
 
+`CF-W1-SMI-01` completed QA reruns, Team 10 rereviews, Architect Re-Signoff, delegated PO acceptance, and scoped local branch commit `aee7c49`; it is parked for later clean integration.
+
 ## Pulled / In Review
 
 | ID | Owner | Branch | Worktree | Scope | Status |

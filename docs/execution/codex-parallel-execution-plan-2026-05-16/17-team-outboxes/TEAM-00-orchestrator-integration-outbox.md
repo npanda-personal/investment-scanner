@@ -262,6 +262,35 @@ State: spawned-agent coordination continued; DQ first-child accepted and committ
 
 Product Owner action required: no.
 
+---
+
+# Runtime Checkpoint - SMI Accepted
+
+Date: 2026-05-18
+
+## Gate Result
+
+`CF-W1-SMI-01` completed all standing gates:
+
+- Team 04 QA second rerun: ACCEPT.
+- Team 10 second rereview: ACCEPT.
+- Team 03 Architect Re-Signoff: ACCEPT.
+- Team 00 delegated PO acceptance: complete.
+- Scoped local branch commit: `aee7c49 feat: add smart money evidence trust metadata`.
+
+No push or `dev` merge was performed.
+
+## Requirement Output Consumed
+
+Team 02 completed a docs-only requirements cycle and added `CF-W1-BT-01A` as a new backtesting DQ fail-closed characterization candidate.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03: `CF-W1-BT-01A` architecture prep after this docs checkpoint.
+- Team 02: persistent requirements discovery relaunch after this docs checkpoint.
+- Team 03: `CF-W1-MD-03` Architect Signoff is active.
+- Team 04: `CF-W1-MCTX-01` QA rerun is active.
+
 Open decisions: 0.
 
 ---

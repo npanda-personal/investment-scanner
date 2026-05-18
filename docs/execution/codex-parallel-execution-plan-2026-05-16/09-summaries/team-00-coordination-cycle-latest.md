@@ -1647,6 +1647,47 @@ Open decisions: 0.
 
 Date: 2026-05-18
 
+## Accepted Branch Commit
+
+`CF-W1-SMI-01`
+
+- Team 04 second QA rerun accepted.
+- Team 10 second rereview accepted.
+- Team 03 Architect Re-Signoff accepted.
+- Team 00 delegated PO acceptance completed.
+- Scoped local branch commit: `aee7c49 feat: add smart money evidence trust metadata`.
+- Branch: `codex/team06-strategy-signal/CF-W1-SMI-01`.
+- Worktree status after commit: clean.
+- Push / merge status: not pushed and not merged to `dev`.
+
+## Requirement Discovery
+
+Team 02 completed the latest requirements cycle.
+
+- Added `CF-W1-BT-01A` as a docs-only backtesting DQ fail-closed characterization requirement.
+- Updated ranking/backlog docs to keep direct investor/trader value ahead of admin, settings, notification, and alert-convenience work.
+- No item was promoted to Ready.
+
+## Active Agents
+
+- Team 04 `019e3ccf-97e5-7410-9eb1-1f5de92d7927`: `CF-W1-MCTX-01` QA rerun.
+- Team 03 `019e3cd2-1a4a-7191-aa51-1de6082982d7`: `CF-W1-MD-03` Architect Signoff.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 00: delegated PO acceptance and scoped branch commit for `CF-W1-MD-03` if Architect Signoff accepts.
+- Team 10: `CF-W1-MCTX-01` review after Team 04 QA rerun accepts.
+- Team 03: `CF-W1-BT-01A` architecture prep once the current requirements docs are committed and an isolated Team 03 outbox is assigned.
+- Team 02: persistent requirements discovery can relaunch after this docs checkpoint commit.
+
+Product Owner action required: no.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
 ## Gate Results
 
 `CF-W1-SMI-01`

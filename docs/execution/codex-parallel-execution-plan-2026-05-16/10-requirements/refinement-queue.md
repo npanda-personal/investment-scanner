@@ -8,13 +8,13 @@ Current dispatch correction on 2026-05-18 after the Strategy Framework durable-h
 
 - `CF-W1-MCTX-01` is already promoted in `12-ready-queue/ready-for-implementation.md` and should stay out of the next unassigned pull.
 - `CF-W1-RH-02A` is in active Team 03 architecture prep and should stay out of the next unassigned pull.
-- `CF-W1-MD-03` is queued for Team 03 architecture after `CF-W1-RH-02A` and should stay out of the immediate next unassigned pull.
+- `CF-W1-MD-03` is in active Team 03/QA follow-up and should stay out of the immediate next unassigned pull.
 - `CF-W1-TP-02` is in active implementation/review follow-up and should stay out of the next unassigned pull.
 - `CF-W1-SMI-01` is in active Team 04 worktree QA verification and should stay out of the next unassigned pull.
 - `CF-W1-RH-01` has a QA plan ready and is pending Team 00 Ready evaluation, so it should stay out of the next unassigned pull.
 - `CF-W1-L3-TREV-02` is in active Team 04 QA planning and should stay out of the next unassigned pull.
 - `CF-W1-MD-02A` is queued for Team 04 QA review and should stay out of the next unassigned pull.
-- `CF-W1-SQLAB-02` and `CF-W1-MD-02` remain high-value parent items but are still sequenced for new bounded routing.
+- `CF-W1-BT-01A`, `CF-W1-SQLAB-02`, and `CF-W1-MD-02` remain high-value parent/child items but are still sequenced for new bounded routing.
 - `CF-W1-STRAT-02` remains parent-only blocked after accepted `CF-W1-STRAT-02A`; the new bounded child is `CF-W1-STRAT-02B`.
 - After excluding active, queued, accepted, parked, and blocked items, the next top unassigned requirement is `CF-W1-STRAT-02B`.
 
@@ -32,15 +32,16 @@ Current ordering is based on two filters:
 | Rank | ID | Why it is ahead now | Team 00 routing note |
 | --- | --- | --- | --- |
 | 1 | `CF-W1-STRAT-02B` | Strategy Framework now has a bounded durable-history child with direct investor-value provenance impact, and it is no longer competing with the already-promoted Market Context slice. | Ask Team 00 to route the approval-gated Team 03 architecture packet next; do not self-promote it. |
-| 2 | `CF-W1-SQLAB-02` | Highest-value parent item still visible after the active/queued context and market-data lanes, but the post-preview path is sequenced. | Keep visible; do not present as the immediate pull ahead of `STRAT-02B`. |
-| 3 | `CF-W1-MD-02` | Parent requirement remains useful for the durable-evidence program, but the active child split should still lead first. | Keep as parent only; do not route before `CF-W1-MD-02A`. |
-| 4 | `CF-W1-MD-03` | Market Data signoff still does not hard-enforce the active `95%` price-ready / `90%` metadata-ready thresholds, but the packet is already queued behind active `RH-02A`. | Keep visible; do not present as the immediate pull. |
+| 2 | `CF-W1-BT-01A` | Backtesting DQ characterization is the next direct investor/trader-value gap after Strategy provenance. | Route after `STRAT-02B`; keep as characterization-only backtesting prep. |
+| 3 | `CF-W1-SQLAB-02` | Highest-value parent item still visible after the active/queued context and market-data lanes, but the post-preview path is sequenced. | Keep visible; do not present as the immediate pull ahead of `STRAT-02B`. |
+| 4 | `CF-W1-MD-02` | Parent requirement remains useful for the durable-evidence program, but the active child split should still lead first. | Keep as parent only; do not route before `CF-W1-MD-02A`. |
 | 5 | `CF-W1-STRAT-02` | Parent requirement remains useful only as lineage for accepted `02A` and new child `02B`. | Keep blocked as parent; do not route directly. |
 | 6 | `CF-W1-RH-02` | Parent requirement remains useful for later true-delta history work if the bounded child exposes a storage gap. | Keep as parent only; do not route before `CF-W1-RH-02A`. |
 
 ### Candidates Team 00 Can Route In Parallel Right Now
 
 - `CF-W1-STRAT-02B`
+- `CF-W1-BT-01A` remains visible but is not the immediate pull.
 - `CF-W1-SQLAB-02` remains visible but is not the immediate pull.
 - `CF-W1-MD-02` remains visible as the next upstream durable-evidence parent.
 
@@ -59,7 +60,7 @@ Team 00 promoted `CF-W1-L3-PORT-01A` to Ready on 2026-05-18. It is no longer a r
 
 The current Ready-promotion front-runners after the PORT-01A rework routing are `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-ALERT-01`.
 
-This non-active discovery cycle is focused on `CF-W1-STRAT-02B`, `CF-W1-SQLAB-02`, `CF-W1-MD-02`, `CF-W1-MD-03`, `CF-W1-SQLAB-01`, `CF-W1-UX-01`, `CF-W1-L3-INTEL-03`, `CF-W1-L3-WATCH-01`, and `CF-W1-L3-INTEL-02`. `CF-W1-MCTX-01`, `CF-W1-RH-02A`, `CF-W1-MD-02A`, `CF-W1-DQ-02`, `CF-W1-BT-02`, `CF-W1-HCTX-01`, and `CF-W1-SMI-01` are active, accepted, routed, or already queued and stay out of the immediate unassigned ranking. `CF-W1-NOTIF-02`, `CF-W1-AUTH-01`, and `CF-W1-SUB-01` remain valid backlog items, but they stay behind the market-intelligence trust stack unless a correctness or user-data-safety blocker appears.
+This non-active discovery cycle is focused on `CF-W1-STRAT-02B`, `CF-W1-BT-01A`, `CF-W1-SQLAB-02`, `CF-W1-MD-02`, `CF-W1-SQLAB-01`, `CF-W1-UX-01`, `CF-W1-L3-INTEL-03`, `CF-W1-L3-WATCH-01`, and `CF-W1-L3-INTEL-02`. `CF-W1-MCTX-01`, `CF-W1-RH-02A`, `CF-W1-MD-03`, `CF-W1-MD-02A`, `CF-W1-DQ-02`, `CF-W1-BT-02`, `CF-W1-HCTX-01`, and `CF-W1-SMI-01` are active, accepted, routed, or already queued and stay out of the immediate unassigned ranking. `CF-W1-NOTIF-02`, `CF-W1-AUTH-01`, and `CF-W1-SUB-01` remain valid backlog items, but they stay behind the market-intelligence trust stack unless a correctness or user-data-safety blocker appears.
 
 ## New Audit-Derived Requirements
 
@@ -71,12 +72,13 @@ These are the newest high-value discovery items from read-only module audits. No
 | 2 | CF-W1-CAL-01 | Product refinement and architecture contract for trusted versus diagnostic calibration outputs. |
 | 3 | CF-W1-SQLAB-02A | Product refinement and Team 04 QA planning for the no-schema Signal Quality Lab derived preview child. |
 | 4 | CF-W1-STRAT-02B | Product refinement and approval-gated architecture packet for durable Strategy Framework revision history. |
-| 5 | CF-W1-SQLAB-01 | Product refinement and architecture contract for trusted versus untrusted signal-quality outputs. |
-| 6 | CF-W1-UX-01 | Product refinement and bounded architecture contract for stock research workbench trust surfaces. |
-| 7 | CF-W1-L3-INTEL-03 | Product refinement and bounded architecture contract for explainable concentration and exposure review over existing portfolio detail surfaces. |
-| 8 | CF-W1-L3-WATCH-01 | Product refinement and bounded architecture contract for explainable watchlist review priority and reason summaries. |
-| 9 | CF-W1-L3-INTEL-02 | Product refinement and architecture contract for explainable portfolio intelligence review output. |
-| 10 | CF-W1-L3-ALERT-03 | Product refinement and bounded architecture contract for post-trigger review outcomes and review-note persistence. |
+| 5 | CF-W1-BT-01A | Product refinement and Team 04 QA planning for current backtesting DQ behavior. |
+| 6 | CF-W1-SQLAB-01 | Product refinement and architecture contract for trusted versus untrusted signal-quality outputs. |
+| 7 | CF-W1-UX-01 | Product refinement and bounded architecture contract for stock research workbench trust surfaces. |
+| 8 | CF-W1-L3-INTEL-03 | Product refinement and bounded architecture contract for explainable concentration and exposure review over existing portfolio detail surfaces. |
+| 9 | CF-W1-L3-WATCH-01 | Product refinement and bounded architecture contract for explainable watchlist review priority and reason summaries. |
+| 10 | CF-W1-L3-INTEL-02 | Product refinement and architecture contract for explainable portfolio intelligence review output. |
+| 11 | CF-W1-L3-ALERT-03 | Product refinement and bounded architecture contract for post-trigger review outcomes and review-note persistence. |
 
 ## Current Cycle Non-Active Value Order
 
@@ -85,9 +87,9 @@ These are docs-only discovery priorities. They do not override Team 00's current
 | Rank | ID | Why now | Next refinement need |
 | --- | --- | --- | --- |
 | 1 | CF-W1-STRAT-02B | Strategy provenance and historical rule identity remain the clearest upstream unassigned trust gap after Market Context promotion. | Team 03 approval-gated architecture packet and Team 04 durable-child QA planning. |
-| 2 | CF-W1-SQLAB-02 | Signal outcome learning already supports a no-schema preview child, but the next post-preview path still needs definition. | Team 03/04 packet follow-up after `SQLAB-02A` closes. |
-| 3 | CF-W1-MD-02 | Durable market-data evidence remains foundational, but the active child split must lead. | ADR and later child follow-ons only. |
-| 4 | CF-W1-MD-03 | Market Data signoff still overstates trust when contract coverage thresholds are missed, but the packet is queued behind `RH-02A`. | Architecture contract and QA plan for one bounded signoff-threshold slice. |
+| 2 | CF-W1-BT-01A | Backtesting DQ fail-closed characterization is now the next direct investor/trader-value gap after strategy provenance. | Team 03 characterization packet and Team 04 QA plan. |
+| 3 | CF-W1-SQLAB-02 | Signal outcome learning already supports a no-schema preview child, but the next post-preview path still needs definition. | Team 03/04 packet follow-up after `SQLAB-02A` closes. |
+| 4 | CF-W1-MD-02 | Durable market-data evidence remains foundational, but the active child split must lead. | ADR and later child follow-ons only. |
 | 5 | CF-W1-SQLAB-01 | Signal Quality outcome confidence needs a clear trusted-versus-untrusted contract before quality summaries shape judgment. | Architecture contract and QA plan. |
 | 6 | CF-W1-UX-01 | Workbench trust remains useful, but it should follow market-data/signals/backtest evidence unless backend trust evidence is source-supported. | Backend trust-evidence parent remains blocked until source-supported fields exist. |
 | 7 | CF-W1-L3-INTEL-03 | Portfolio concentration review is still useful, but it remains below the upstream market-intelligence trust stack unless a safety blocker requires earlier attention. | Architecture contract and QA plan for bounded review-first language. |
@@ -100,8 +102,8 @@ These are docs-only discovery priorities. They do not override Team 00's current
 | Rank | ID | Why now | Next refinement need |
 | --- | --- | --- | --- |
 | 1 | CF-W1-STRAT-02B | Team 03 already proved the parent is blocked and the remaining work is a bounded durable-history child, so this is the next clean Team 00 routing candidate. | Team 03 approval-gated architecture packet and Team 04 durable-child QA planning. |
-| 2 | CF-W1-SQLAB-02 | Signal outcome learning remains the next higher-value parent item after the current dispatch correction, but it stays sequenced behind `CF-W1-SQLAB-02A`. | Team 03 post-preview follow-up once `CF-W1-SQLAB-02A` closes. |
-| 3 | CF-W1-MD-02 | Durable market-data evidence remains the next upstream parent after the new Strategy Framework child. | Team 03 ADR follow-up while `MD-02A` stays active. |
+| 2 | CF-W1-BT-01A | Backtesting DQ characterization is the next direct investor/trader-value gap after Strategy provenance, and it can be defined without changing simulation math. | Team 03 characterization packet and Team 04 QA plan. |
+| 3 | CF-W1-SQLAB-02 | Signal outcome learning remains the next higher-value parent item after the current dispatch correction, but it stays sequenced behind `CF-W1-SQLAB-02A`. | Team 03 post-preview follow-up once `CF-W1-SQLAB-02A` closes. |
 
 ## Decision Inbox State
 
@@ -195,7 +197,7 @@ These items are not implementation-ready.
 | Rank | ID | Prep needed |
 | --- | --- | --- |
 | 1 | CF-W1-STRAT-02B | Team 00/03 approval-gated architecture packet and QA plan for durable Strategy Framework revision history. |
-| 2 | CF-W1-MD-03 | Team 00/03 reservation and QA plan for explicit Market Data signoff threshold gates after the queued `RH-02A` lane. |
+| 2 | CF-W1-BT-01A | Team 00/03 reservation and QA plan for current backtesting DQ characterization after Strategy provenance. |
 | 3 | CF-W1-CAL-01 | Team 00/03 reservation and QA plan for signal-calibration trust-state evidence. |
 | 4 | CF-W1-SQLAB-02 | Team 00/03 follow-up for the post-preview signal outcome journal path. |
 | 5 | CF-W1-MD-02 | Team 00/03 ADR and split-packet prep for durable market-data readiness evidence. |
@@ -220,7 +222,7 @@ These candidates are not the immediate next unassigned pull because they are eit
 | ID | Useful next output | Owner to route |
 | --- | --- | --- |
 | CF-W1-STRAT-02B | Approval-gated architecture packet for durable Strategy Framework revision history. | Team 00 / Team 03 |
-| CF-W1-MD-03 | Market Data signoff-threshold contract and QA plan. | Team 00 / Team 03 |
+| CF-W1-BT-01A | Backtesting DQ fail-closed characterization packet and QA plan. | Team 00 / Team 03 |
 | CF-W1-CAL-01 | Signal Calibration trust-state contract and QA plan. | Team 00 / Team 03 |
 | CF-W1-SQLAB-02 | Signal outcome journal parent and future durable-storage contract path. | Team 00 / Team 03 |
 | CF-W1-STRAT-02 | Keep parent blocked; do not route directly. | Team 00 / Team 03 |

@@ -2,7 +2,7 @@
 
 Date: 2026-05-18
 
-Mode: docs-only backlog refresh after a Strategy Framework durable-history discovery cycle. No application code, tests, Prisma, route registries, package manifests, generated files, Team 00 control docs, or Ready promotion files changed.
+Mode: docs-only backlog refresh after a Strategy Framework durable-history discovery cycle and a backtesting DQ characterization gap audit. No application code, tests, Prisma, route registries, package manifests, generated files, Team 00 control docs, or Ready promotion files changed.
 
 ## Work Item
 
@@ -11,6 +11,7 @@ Audit one under-served market-intelligence workflow, add or refine one bounded r
 ## Files Changed
 
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-STRAT-02B-strategy-definition-durable-revision-history-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-BT-01A-backtesting-dq-fail-closed-characterization-requirement.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
@@ -38,7 +39,7 @@ Audit one under-served market-intelligence workflow, add or refine one bounded r
 
 ## Audited Workflow
 
-Strategy Framework durable rule-history and persisted strategy-definition provenance after accepted `CF-W1-STRAT-02A`.
+Strategy Framework durable rule-history and persisted strategy-definition provenance after accepted `CF-W1-STRAT-02A`, plus the new backtesting DQ characterization gap that was thin in the current candidate list.
 
 ## Evidence Summary
 
@@ -46,17 +47,21 @@ Strategy Framework durable rule-history and persisted strategy-definition proven
 - Team 03 architecture evidence shows `CF-W1-STRAT-02A` already solved the no-schema trust-surfacing slice on branch commit `359d0a3`.
 - The remaining Strategy Framework gap is durable persisted history because current persistence is still `code`-unique and repository seeding can overwrite older definition rows.
 - That remaining work is bounded enough to promote from blocked parent `CF-W1-STRAT-02` into explicit child `CF-W1-STRAT-02B`.
+- Backtesting still lacks a direct DQ-fail-closed characterization child in the top unassigned docs-only stack, even though the audit shows the current behavior is optional/fail-open when DQ filtering is not strict.
 
 ## Requirement Added This Cycle
 
 `CF-W1-STRAT-02B` was added as the approval-gated durable-history child for Strategy Framework. It isolates version-keyed persisted definition history, rule-revision snapshots, and additive current-vs-durable history metadata without reopening accepted `CF-W1-STRAT-02A`.
+
+`CF-W1-BT-01A` was added as the smaller backtesting characterization child. It stays test-led and descriptive so Team 00 can route a direct trust-evidence gap without forcing a simulation rewrite.
 
 ## Queue Delta
 
 - `CF-W1-MCTX-01` was removed from Team 02’s unassigned pull ranking because the current Ready queue already shows it promoted and assigned to Team 05 on 2026-05-18.
 - `CF-W1-STRAT-02` is now treated as blocked parent lineage only, not as a direct next pull.
 - `CF-W1-STRAT-02B` is now the next top unassigned docs-only requirement for Team 00 routing.
-- `CF-W1-SQLAB-02` stays immediately behind `CF-W1-STRAT-02B`, but remains sequenced behind active `CF-W1-SQLAB-02A`.
+- `CF-W1-BT-01A` now sits immediately behind `CF-W1-STRAT-02B` as the next direct investor/trader-value unassigned pull.
+- `CF-W1-SQLAB-02` stays behind `CF-W1-BT-01A`, but remains sequenced behind active `CF-W1-SQLAB-02A`.
 - `CF-W1-MD-02` remains third in the filtered stack as parent-only ADR follow-on while `CF-W1-MD-02A` stays active.
 - `CF-W1-RH-02A`, `CF-W1-MD-03`, `CF-W1-RH-01`, `CF-W1-L3-TREV-02`, `CF-W1-SMI-01`, and accepted/parked branch work remain excluded from the immediate unassigned pull.
 
@@ -69,8 +74,8 @@ Strategy Framework durable rule-history and persisted strategy-definition proven
 ## Recommended Next Team 00 Action
 
 1. Route `CF-W1-STRAT-02B` to Team 03 for an approval-gated architecture packet focused on version-keyed persisted Strategy Framework history.
-2. Keep `CF-W1-SQLAB-02` second in the filtered pull stack for post-preview follow-up after `CF-W1-SQLAB-02A`.
-3. Keep `CF-W1-MD-02` third as parent-only ADR sequencing while `CF-W1-MD-02A` and queued `CF-W1-MD-03` stay out of the immediate pull.
+2. Keep `CF-W1-BT-01A` second in the filtered pull stack for backtesting DQ characterization after the strategy provenance gap.
+3. Keep `CF-W1-SQLAB-02` third for post-preview follow-up after `CF-W1-SQLAB-02A`.
 
 ## Validation
 

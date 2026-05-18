@@ -2721,3 +2721,35 @@ Date: 2026-05-18
 - Team 00: delegated PO acceptance and scoped branch commit for `CF-W1-SMI-01` if Architect Re-Signoff accepts.
 - Team 00: `CF-W1-SQLAB-02A` Ready sequencing after current gate pressure clears.
 - Team 03: a new rolling architecture task can be spawned in an isolated outbox if capacity remains below six.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Completed Since Previous Snapshot
+
+- Team 02 `019e3cc6-66fc-7813-abbc-e5c987bc0f61`: completed requirements refresh and added `CF-W1-BT-01A`; closed.
+- Team 03 `019e3ccb-3888-71a1-870b-6b7417db3af3`: accepted `CF-W1-SMI-01` Architect Re-Signoff; closed.
+- Team 00 completed delegated PO acceptance and committed `CF-W1-SMI-01` locally on its feature branch as `aee7c49`.
+- Team 10 `019e3ccb-0ae8-7433-b6ec-9e720acb3ff4`: accepted `CF-W1-MD-03` review; closed.
+- Team 05 `019e3cca-b86b-7581-a013-53de9c4f6df0`: completed `CF-W1-MCTX-01` bounded rework; closed.
+
+## Current Pool
+
+| Slot | Team | Agent | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | `019e3ccf-97e5-7410-9eb1-1f5de92d7927` | QA rerun | `CF-W1-MCTX-01` | active |
+| 2 | Team 03 - Architect Signoff | `019e3cd2-1a4a-7191-aa51-1de6082982d7` | signoff | `CF-W1-MD-03` | active |
+| 3 | Open slot | none | queued | Team 03 `CF-W1-BT-01A` architecture prep | ready after docs checkpoint |
+| 4 | Open slot | none | queued | Team 02 persistent discovery | ready after docs checkpoint |
+| 5 | Open slot | none | queued | Team 10 `CF-W1-MCTX-01` review after QA ACCEPT | waiting |
+| 6 | Open slot | none | queued | Team 00 `CF-W1-MD-03` delegated PO commit after signoff ACCEPT | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 03: `CF-W1-BT-01A` architecture prep after the requirements docs are committed.
+- Team 02: persistent requirements discovery after the requirements docs are committed.
+- Team 10: `CF-W1-MCTX-01` review after QA rerun accepts.
+- Team 00: `CF-W1-MD-03` delegated PO acceptance and scoped commit if Architect Signoff accepts.
