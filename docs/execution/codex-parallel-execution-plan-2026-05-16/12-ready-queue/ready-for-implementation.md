@@ -6,6 +6,8 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+`CF-W1-SQLAB-01` was promoted by Team 00 on 2026-05-18 and assigned to Team 06 in a dedicated worktree for bounded backend-only Signal Quality Lab implementation.
+
 `CF-W1-L3-TREV-01` was promoted by Team 00 on 2026-05-18 and assigned to Team 07 in a dedicated worktree for bounded Today Review implementation.
 
 `CF-W1-L3-PORT-01A` was pulled by Team 07, implemented in its dedicated worktree, and moved through first-pass QA / Code Review. Team 10 rejected release acceptance and routed bounded rework back to Team 07. It remains uncommitted and unaccepted.
@@ -28,6 +30,79 @@ No available application-code item is currently waiting unassigned in Ready.
 | `CF-W1-L3-ALERT-01` | Team 07 - Portfolio / Watchlist / Alerts | `codex/team07-portfolio-alerts/CF-W1-L3-ALERT-01` | `../investment-scanner-worktrees/team07-CF-W1-L3-ALERT-01` | Backend-only alert readiness suppression | Ready and pulled by Team 07 for implementation |
 | `CF-W1-MD-01` | Team 05 - Market Data / Data Quality | `codex/team05-market-data/CF-W1-MD-01` | `../investment-scanner-worktrees/team05-CF-W1-MD-01` | Backend-only reject-only historical-price validator hardening | Accepted and locally committed as `913b56b`; awaiting later clean `dev` integration |
 | `CF-W1-L3-TREV-01` | Team 07 - Portfolio / Watchlist / Alerts | `codex/team07-portfolio-alerts/CF-W1-L3-TREV-01` | `../investment-scanner-worktrees/team07-CF-W1-L3-TREV-01` | Today Review run/list publication evidence and readiness-coherence normalization | Ready and assigned to Team 07 |
+| `CF-W1-SQLAB-01` | Team 06 - Strategy / Signal / Risk | `codex/team06-strategy-signal/CF-W1-SQLAB-01` | `../investment-scanner-worktrees/team06-CF-W1-SQLAB-01` | Backend-only Signal Quality Lab outcome-confidence metadata | Ready and assigned to Team 06 |
+
+## Active Ready Handoff - `CF-W1-SQLAB-01`
+
+Date promoted: 2026-05-18
+
+Team 00 evaluated `CF-W1-SQLAB-01` against Ready gates and promoted it as an independent Team 06 backend-only Signal Quality Lab implementation slice.
+
+Gate evidence:
+
+- Requirement: `10-requirements/CF-W1-SQLAB-01-signal-quality-outcome-confidence-requirement.md`
+- Architecture review: `03-architecture/CF-W1-SQLAB-01-architecture-review.md`
+- Contract: `06-contracts/CF-W1-SQLAB-01-signal-quality-outcome-confidence-contract.md`
+- Work packet: `08-work-packets/CF-W1-SQLAB-01-work-packet.md`
+- QA plan: `04-qa/CF-W1-SQLAB-01-qa-plan.md`
+- Open decisions: none.
+- Shared/high-risk blocker: none if implementation stays inside reserved `signal-quality-lab` service/types/doc/test files.
+
+Branch/worktree:
+
+- Branch: `codex/team06-strategy-signal/CF-W1-SQLAB-01`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-SQLAB-01`
+
+Allowed files:
+
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.service.ts`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.types.ts`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.md`
+- `backend/tests/modules/signal-quality-lab/signal-quality-lab.service.test.ts`
+
+Optional only if endpoint-level additive response assertions are added:
+
+- `backend/tests/modules/signal-quality-lab/signal-quality-lab.routes.test.ts`
+
+Forbidden files:
+
+- Prisma schema or migrations
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.repository.ts`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.controller.ts`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.router.ts`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.validation.ts`
+- Data Quality Engine source or exports
+- Signal Generation, Signal Calibration, Strategy Decision, or Trade Plan source/tests
+- backend and frontend route registries
+- shared backend utilities or shared DTOs
+- shared frontend components
+- package manifests
+- generated files
+- frontend source/tests
+- providers, startup/backfill, live-provider, Angel One, broker, paid/cloud, telemetry, or automation flows
+
+Required behavior:
+
+- add additive outcome-confidence metadata that distinguishes `TRUSTED`, `LIMITED`, `DIAGNOSTIC`, and `UNTRUSTED`;
+- derive those states from existing selected-horizon evidence and Data Quality evaluation presence/blockers;
+- preserve existing evidence diagnostics, grouped metric statuses, `recommendedAction`, warnings, and summary/group payload compatibility;
+- do not make DQ required by default or change query/filter behavior in this slice;
+- preserve research-support wording and avoid direct advice, target-price framing, broker, or automation wording.
+
+Focused validation guidance:
+
+```powershell
+cd backend
+npm.cmd test -- signal-quality-lab.service.test.ts --runInBand
+npm.cmd run build
+```
+
+If route-level additive assertions are added:
+
+```powershell
+cd backend
+npm.cmd test -- signal-quality-lab.service.test.ts signal-quality-lab.routes.test.ts --runInBand
+```
 
 ## Active Ready Handoff - `CF-W1-L3-TREV-01`
 

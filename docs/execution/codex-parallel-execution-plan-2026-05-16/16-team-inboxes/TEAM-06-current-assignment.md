@@ -8,41 +8,134 @@ Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automat
 
 ## Assignment
 
-No Team 06 app-code item is Ready. Keep `CF-W1-TP-01B` as the next Strategy / Risk implementation candidate, but do not edit source or tests until Team 00 promotes it.
+Pull `CF-W1-SQLAB-01` for bounded backend-only implementation.
 
-Current priority after Team 01 audit consumption:
+State: Ready for Implementation after Team 00 promotion.
 
-1. Inspect whether `CF-W1-TP-01B` can become module-local implementation-ready.
-2. Verify the prepared architecture, contract, QA plan, work packet, and Team 06 readiness check still align.
-3. Report any missing exact file reservation, QA scenario, target-compatibility ambiguity, DQ hard-block ambiguity, or forbidden-scope need.
-4. Continue read-only evidence refresh for `backtesting-strategy-lab`, `signal-quality-lab`, and `signal-calibration-engine` only if it does not delay `CF-W1-TP-01B` readiness inspection.
-
-Do not implement. Do not edit source or tests until Team 03 and Team 04 provide readiness confirmation and Team 00 promotes an exact implementation handoff.
-
-## Scope
-
-Allowed writes:
-
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/**`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/13-implementation-evidence/CF-W1-TP-01B-*.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06*.md`
-
-Forbidden:
-
-- Strategy, Signal, Backtesting, Trade Plan, or Smart Money source/tests
-- shared rule contracts not explicitly reserved
-- Prisma, route registries, shared utilities, packages, generated files, frontend/UI
+You are not alone in the codebase. Other teams have active docs-only edits in the shared `dev` workspace and accepted implementation branches are parked in separate worktrees. Do not revert or overwrite edits made by others, and do not implement in the shared worktree.
 
 ## Branch / Worktree
 
-Use shared `dev` for docs-only evidence. If `CF-W1-TP-01B` is promoted, use `codex/team06-strategy-signal/CF-W1-TP-01B` and `../investment-scanner-worktrees/team06-CF-W1-TP-01B`.
+Create and use this dedicated implementation branch/worktree:
 
-## Blockers
+- Branch: `codex/team06-strategy-signal/CF-W1-SQLAB-01`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-SQLAB-01`
+- Base: current local `dev` after the Team 00 Ready-promotion docs update.
 
-Implementation is blocked until Team 00 Ready promotion and exact Trade Plan file reservations are copied into a new Team 06 implementation inbox.
+Record the branch, worktree path, starting commit, and final status in `17-team-outboxes/TEAM-06-outbox.md`.
 
-Open decisions do not currently block `CF-W1-TP-01B`; its blocker is Ready promotion, exact reservations, and implementation handoff.
+## Work Item
+
+`CF-W1-SQLAB-01` - Signal Quality Lab outcome-confidence and readiness labeling.
+
+## Evidence To Use
+
+- Requirement: `10-requirements/CF-W1-SQLAB-01-signal-quality-outcome-confidence-requirement.md`
+- Architecture review: `03-architecture/CF-W1-SQLAB-01-architecture-review.md`
+- Contract: `06-contracts/CF-W1-SQLAB-01-signal-quality-outcome-confidence-contract.md`
+- Work packet: `08-work-packets/CF-W1-SQLAB-01-work-packet.md`
+- QA plan: `04-qa/CF-W1-SQLAB-01-qa-plan.md`
+- Ready queue handoff: `12-ready-queue/ready-for-implementation.md`
+
+## Allowed Files
+
+You may edit only:
+
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.service.ts`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.types.ts`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.md`
+- `backend/tests/modules/signal-quality-lab/signal-quality-lab.service.test.ts`
+
+Optional only if endpoint-level additive response assertions are added:
+
+- `backend/tests/modules/signal-quality-lab/signal-quality-lab.routes.test.ts`
+
+Allowed reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-SQLAB-01-developer-handoff.md`
+
+## Forbidden Files
+
+Do not edit:
+
+- Prisma schema or migrations
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.repository.ts`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.controller.ts`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.router.ts`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.validation.ts`
+- Data Quality Engine source or exports
+- Signal Generation, Signal Calibration, Strategy Decision, or Trade Plan source/tests
+- backend and frontend route registries
+- shared backend utilities or shared DTOs
+- shared frontend components
+- package manifests
+- generated files
+- frontend source/tests
+- providers, startup/backfill, live-provider, Angel One, broker, paid/cloud, telemetry, or automation flows
+
+Do not run providers, startup/backfill flows, live provider calls, Prisma migrations, package installs, broad services, or UI smoke tests for this slice.
+
+## Implementation Requirements
+
+- Add additive outcome-confidence metadata equivalent to `TRUSTED`, `LIMITED`, `DIAGNOSTIC`, and `UNTRUSTED`.
+- Use stable reason codes equivalent to:
+  - `TRUSTED_READY_EVIDENCE`
+  - `LIMITED_PARTIAL_SELECTED_HORIZON`
+  - `DIAGNOSTIC_DQ_OPTIONAL_OR_MISSING`
+  - `UNTRUSTED_NO_SELECTED_HORIZON_EVIDENCE`
+  - `UNTRUSTED_DQ_LOOKUP_FAILED`
+- Derive states from existing selected-horizon evidence and Data Quality evaluation presence/blockers.
+- Consume only existing Data Quality Engine public evaluation outputs already used by the module.
+- Preserve existing `evidenceUsability`, `evaluationDiagnostics`, grouped metric statuses, `recommendedAction`, warnings, and response field compatibility.
+- Do not make DQ required by default or change existing query/filter behavior.
+- Do not duplicate DQ scoring logic.
+- Keep wording research-support oriented; do not introduce advice, target-price, guarantee, trade-instruction, broker, or automation wording.
+
+## Focused Validation
+
+Run after implementation:
+
+```powershell
+cd backend
+npm.cmd test -- signal-quality-lab.service.test.ts --runInBand
+npm.cmd run build
+```
+
+If route-level additive assertions are added:
+
+```powershell
+cd backend
+npm.cmd test -- signal-quality-lab.service.test.ts signal-quality-lab.routes.test.ts --runInBand
+```
+
+If any focused command cannot run, record the exact blocker, skipped command, risk, and next owner in the outbox.
+
+## Stop Conditions
+
+Stop and return to Team 00 if implementation requires:
+
+- Prisma/schema changes
+- route, controller, router, validation, repository, or query-contract changes
+- Data Quality Engine source/export changes
+- Signal Generation, Signal Calibration, Strategy Decision, or Trade Plan source/test changes
+- shared DTO/helper files or shared frontend components
+- package, generated-file, provider, startup/backfill, live-provider, paid/cloud, telemetry, or broker scope
+- frontend/UI work
+- changing default DQ filtering behavior instead of adding additive confidence metadata
+- editing a file outside the allowed list
 
 ## Expected Outbox
 
-Update `17-team-outboxes/TEAM-06-outbox.md`.
+Update `17-team-outboxes/TEAM-06-outbox.md` with:
+
+- exact branch/worktree used
+- starting commit
+- exact files changed
+- exact files inspected
+- behavior changed
+- tests run and results
+- tests skipped and reasons
+- forbidden files confirmed untouched
+- assumptions, risks, blockers
+- next gate: Team 04 QA, Team 10 review, Architect Signoff, delegated PO acceptance, or Team 00 blocker routing
