@@ -2,6 +2,104 @@
 
 Date: 2026-05-17
 
+## Team 03 SIG-TRIGGER-02 Persisted Trigger Auditability Prep - 2026-05-18
+
+Assignment: prepare docs-only architecture readiness for `CF-W1-SIG-TRIGGER-02` in the shared `dev` workspace without touching application code, tests, Prisma/schema, route registries, shared utilities, shared UI, package manifests, generated files, providers, services, builds, UI smoke, or live data.
+
+Prepared:
+
+- `03-architecture/CF-W1-SIG-TRIGGER-02-architecture-review.md`
+- `06-contracts/CF-W1-SIG-TRIGGER-02-persisted-trigger-auditability-contract.md`
+- `08-work-packets/CF-W1-SIG-TRIGGER-02-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Files inspected:
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/16-team-inboxes/TEAM-03-current-assignment.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SIG-TRIGGER-02-persisted-trigger-auditability-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SIG-TRIGGER-01-full-trigger-object-contract-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/09-summaries/CF-W1-SIG-TRIGGER-01-po-acceptance-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-strategy-signal-rules.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-SIG-TRIGGER-01-architecture-readiness.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-SIG-TRIGGER-01-trigger-object-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-SIG-TRIGGER-01-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-SIG-TRIGGER-01-qa-plan.md`
+- `backend/prisma/schema.prisma`
+- `backend/src/modules/signal-generation-engine/index.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.md`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.repository.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.service.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.types.ts`
+- `backend/src/modules/strategy-decision-engine/strategy-decision-engine.service.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.service.ts`
+- `frontend/src/features/signal-generation-engine/types.ts`
+- `backend/tests/modules/signal-generation-engine/signal-generation-engine.repository.test.ts`
+- `backend/tests/modules/signal-generation-engine/signal-generation-engine.service.test.ts`
+- `backend/tests/modules/signal-generation-engine/signal-generation-engine.trigger-contract.test.ts`
+- `backend/tests/modules/signal-generation-engine/signal-generation-dq-enforcement.invariants.test.ts`
+
+Readiness result:
+
+- `CF-W1-SIG-TRIGGER-02` is `split required`.
+- The only bounded no-schema first child is `CF-W1-SIG-TRIGGER-02A`, limited to persisted Signal Generation audit surfacing and provenance labeling inside `signal-generation-engine`.
+- Exact future writer set:
+  - `backend/src/modules/signal-generation-engine/signal-generation-engine.types.ts`
+  - `backend/src/modules/signal-generation-engine/signal-generation-engine.repository.ts`
+  - `backend/src/modules/signal-generation-engine/signal-generation-engine.service.ts`
+  - `backend/src/modules/signal-generation-engine/signal-generation-engine.md`
+  - `backend/tests/modules/signal-generation-engine/signal-generation-engine.repository.test.ts`
+  - `backend/tests/modules/signal-generation-engine/signal-generation-engine.service.test.ts`
+  - `backend/tests/modules/signal-generation-engine/signal-generation-engine.trigger-contract.test.ts`
+  - `backend/tests/modules/signal-generation-engine/signal-generation-dq-enforcement.invariants.test.ts`
+- Exact forbidden files and scopes for the first child:
+  - `backend/prisma/schema.prisma`
+  - `backend/prisma/migrations/**`
+  - generated Prisma/types files
+  - backend and frontend route registries
+  - `backend/src/modules/signal-generation-engine/index.ts`
+  - `backend/src/modules/signal-generation-engine/signal-generation-engine.controller.ts`
+  - `backend/src/modules/signal-generation-engine/signal-generation-engine.router.ts`
+  - `backend/src/modules/signal-generation-engine/signal-generation-engine.validation.ts`
+  - `backend/src/modules/signal-generation-engine/signal-generation-engine.module.ts`
+  - `backend/src/modules/signal-generation-engine/signal-generation-engine.config.ts`
+  - `backend/tests/modules/signal-generation-engine/signal-generation-engine.routes.test.ts`
+  - `backend/tests/modules/signal-generation-engine/signal-generation-engine.validation.test.ts`
+  - all `backend/src/modules/strategy-framework/**`
+  - all `backend/src/modules/strategy-decision-engine/**`
+  - all `backend/src/modules/today-trade-review/**`
+  - all `backend/src/modules/trade-plan-risk-engine/**`
+  - all `backend/src/modules/alerts-monitoring/**`
+  - all `backend/src/modules/portfolio-management/**`
+  - all `backend/src/modules/portfolio-intelligence/**`
+  - all `backend/src/modules/watchlist-management/**`
+  - all `backend/src/modules/ai-investment-copilot/**`
+  - all `backend/src/modules/market-data-foundation/**`
+  - all `frontend/src/**`
+  - shared backend utilities
+  - shared frontend components
+  - package manifests
+  - provider/live-data integration files
+  - paid/cloud, broker, or telemetry files
+- Explicit parent blockers preserved:
+  - durable rule provenance still depends on separate Strategy Framework durability work outside the no-schema boundary;
+  - rule-defined `trigger_price` is not stored today;
+  - richer lifecycle ownership is not safely owned by Signal Generation alone;
+  - downstream adoption in Strategy Decision, Today Review, Trade Plan, Alerts, Portfolio, Watchlists, and Copilot remains out of scope.
+- Team 04 QA planning should stay bounded to persisted audit timestamps, run audit metadata, trigger timestamp semantics, compatibility-only strategy provenance labeling, legacy-row handling, and DQ fail-closed regression only.
+
+Current Team 03 recommendation to Team 00:
+
+1. Do not treat `CF-W1-SIG-TRIGGER-02` as a single Ready candidate.
+2. If Team 00 wants a no-schema follow-on, route only `CF-W1-SIG-TRIGGER-02A` to Team 04 QA planning.
+3. Reject any attempt to fold schema/shared/downstream adoption, Strategy Framework durability, route work, frontend work, provider/live-data work, paid/cloud, broker, or telemetry scope into this child.
+
+No tests, builds, Prisma commands, services, providers, UI smoke runs, live-data checks, commits, or pushes were run.
+
 ## Team 03 CAL-01 Architecture Readiness Refresh - 2026-05-18
 
 Assignment: refresh docs-only architecture readiness for `CF-W1-CAL-01` in the shared dev workspace under the Product Owner correction that direct investor/trader value comes first, without touching application code, tests, Prisma/schema, routes, shared utilities, shared UI, package manifests, generated files, providers, services, builds, UI smoke, or live data.

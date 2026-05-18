@@ -4,6 +4,28 @@ Date: 2026-05-17
 
 Prepared by Team 03 Architecture Factory and refreshed after `CF-W1-L3-AUTH-02` commit `503bcd9`, `CF-W1-SIG-TRIGGER-01` commit `6ab3999`, and checkpoint protocol fix commit `f75808f`.
 
+## Team 03 SIG-TRIGGER-02 Persisted Trigger Auditability Prep - 2026-05-18
+
+Prepared:
+
+- `03-architecture/CF-W1-SIG-TRIGGER-02-architecture-review.md`
+- `06-contracts/CF-W1-SIG-TRIGGER-02-persisted-trigger-auditability-contract.md`
+- `08-work-packets/CF-W1-SIG-TRIGGER-02-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Result:
+
+- `CF-W1-SIG-TRIGGER-02` is `split required`.
+- The only bounded no-schema first child is `CF-W1-SIG-TRIGGER-02A`: a `signal-generation-engine` audit-surfacing slice that exposes already-persisted row/run audit evidence and labels persisted versus compatibility-only trigger fields.
+- Exact future writer set is limited to Signal Generation service/types/repository/doc plus focused repository/service/trigger-contract/DQ-invariant tests.
+- No schema, route, shared utility/UI, package, generated-file, Strategy Framework source, Strategy Decision source, Today Review source, Trade Plan source, Alerts source, Portfolio source, Watchlists source, Copilot source, provider/live-data, paid/cloud, broker, or telemetry change is allowed in the first child.
+- Durable rule provenance, rule-defined trigger price, richer lifecycle ownership, and downstream consumer adoption remain explicit parent blockers.
+- Team 04 QA planning can start for the first child only; the full parent must stay out of Ready promotion.
+
 ## Team 03 CAL-01 Direct-Value Readiness Refresh - 2026-05-18
 
 Prepared:
