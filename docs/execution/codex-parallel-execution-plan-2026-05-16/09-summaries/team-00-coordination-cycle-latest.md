@@ -1329,3 +1329,69 @@ Branch/worktree:
 ## Next Coordination Action
 
 Commit the CAL Ready promotion docs, create the Team 06 CAL worktree, and spawn Team 06 implementation.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
+## CAL-01 Implementation Dispatch
+
+Team 00 created the dedicated CAL worktree and spawned Team 06 implementation:
+
+- Agent: `019e3bf9-059e-75a0-8419-fa14b45dadbe`
+- Branch: `codex/team06-strategy-signal/CF-W1-CAL-01`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-CAL-01`
+- Base commit: `31d9c8a docs: promote calibration reliability slice`
+
+Backend `node_modules` is junctioned to the main backend dependency tree. No package install or manifest change was performed.
+
+## Active Agents
+
+- Team 04 `019e3bef-6ec0-7d73-aa02-ccfaa1cdab49`: `CF-W1-BT-02` QA rerun.
+- Team 06 `019e3bf9-059e-75a0-8419-fa14b45dadbe`: `CF-W1-CAL-01` implementation.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-CAL-01` QA after Team 06 handoff.
+- Team 10: `CF-W1-BT-02` review after QA accepts.
+- Team 02: next persistent requirement discovery cycle when relaunched.
+
+## Next Coordination Action
+
+Consume whichever active agent completes first, then route only that workstream to the next gate.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
+## BT-02 QA Rerun Accepted
+
+Team 04 accepted `CF-W1-BT-02` QA rerun in the Team 06 worktree.
+
+Validation evidence:
+
+- Backend focused test passed: `21/21`.
+- Backend build passed.
+- Frontend focused UI smoke passed: `3/3`.
+- Frontend build passed.
+- Worktree-local Vite target used; unrelated `5173` listener was not used.
+
+## Active / Next
+
+- Team 06 `019e3bf9-059e-75a0-8419-fa14b45dadbe`: `CF-W1-CAL-01` implementation remains active.
+- Team 10 review for `CF-W1-BT-02` is ready to spawn.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 10: `CF-W1-BT-02` review now.
+- Team 03: `CF-W1-BT-02` Architect Signoff after Team 10 accepts.
+- Team 04: `CF-W1-CAL-01` QA after Team 06 handoff.
+- Team 02: next persistent requirement discovery cycle when relaunched.
+
+## Next Coordination Action
+
+Commit this routing update if staged scope is clean, then spawn Team 10 for `CF-W1-BT-02` review.

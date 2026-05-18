@@ -1169,3 +1169,59 @@ Date: 2026-05-18
 - Team 04 is ready for `CF-W1-CAL-01` QA after Team 06 handoff.
 - Team 10 is ready for `CF-W1-BT-02` review after QA accepts.
 - Team 02 is ready for another persistent market-intelligence discovery cycle when relaunched.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | `019e3bef-6ec0-7d73-aa02-ccfaa1cdab49` | `gpt-5.4`, high | QA rerun | `CF-W1-BT-02` after Team 06 rework | active |
+| 2 | Team 06 - Strategy / Signal / Risk | `019e3bf9-059e-75a0-8419-fa14b45dadbe` | `gpt-5.3-codex`, high | implementation | `CF-W1-CAL-01` | active |
+| 3 | Open slot | none | pending | QA verification | `CF-W1-CAL-01` after Team 06 handoff | waiting |
+| 4 | Open slot | none | pending | review/release | next QA-accepted handoff | waiting |
+| 5 | Open slot | none | pending | architect signoff | next Team 10 accepted handoff | waiting |
+| 6 | Open slot | none | pending | requirements discovery | next persistent Team 02 cycle | ready |
+
+## Branch / Worktree
+
+- `CF-W1-CAL-01`: `codex/team06-strategy-signal/CF-W1-CAL-01` / `../investment-scanner-worktrees/team06-CF-W1-CAL-01`
+- Team 06 CAL backend dependency junction: `backend/node_modules` -> main repo backend `node_modules`
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04 is ready for `CF-W1-CAL-01` QA after Team 06 handoff.
+- Team 10 is ready for `CF-W1-BT-02` review after QA accepts.
+- Team 02 is ready for another persistent market-intelligence discovery cycle when relaunched.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Completed Since Previous Snapshot
+
+- Team 04 `019e3bef-6ec0-7d73-aa02-ccfaa1cdab49`: accepted `CF-W1-BT-02` QA rerun and was closed. Team 10 review can proceed.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 06 - Strategy / Signal / Risk | `019e3bf9-059e-75a0-8419-fa14b45dadbe` | `gpt-5.3-codex`, high | implementation | `CF-W1-CAL-01` | active |
+| 2 | Team 10 - Review / Release | pending spawn | `gpt-5.5`, high | review/release | `CF-W1-BT-02` after QA ACCEPT | ready |
+| 3 | Open slot | none | pending | architect signoff | `CF-W1-BT-02` after Team 10 accepts | waiting |
+| 4 | Open slot | none | pending | QA verification | `CF-W1-CAL-01` after Team 06 handoff | waiting |
+| 5 | Open slot | none | pending | review/release | `CF-W1-CAL-01` after QA accepts | waiting |
+| 6 | Open slot | none | pending | requirements discovery | next persistent Team 02 cycle | ready |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 10 is ready for `CF-W1-BT-02` review now.
+- Team 03 is ready for `CF-W1-BT-02` Architect Signoff after Team 10 accepts.
+- Team 04 is ready for `CF-W1-CAL-01` QA after Team 06 handoff.
+- Team 02 is ready for another persistent market-intelligence discovery cycle when relaunched.

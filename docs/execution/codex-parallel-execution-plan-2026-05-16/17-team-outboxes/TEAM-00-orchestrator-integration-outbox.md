@@ -1720,6 +1720,41 @@ Teams ready to pick up new tasks:
 - Team 10: `CF-W1-BT-02` review after QA acceptance.
 - Team 02: next persistent market-intelligence discovery cycle when relaunched.
 
+---
+
+# BT-02 QA Rerun Accepted
+
+Date: 2026-05-18
+
+Team 04 accepted `CF-W1-BT-02` QA rerun in the Team 06 worktree.
+
+Team 00 routing:
+
+- Launch Team 10 review for `CF-W1-BT-02`.
+- If Team 10 accepts, route to Team 03 Architect Signoff.
+- If Team 10 rejects, return only the BT workstream to bounded Team 06 rework unless a true consent blocker appears.
+
+Teams ready to pick up new tasks:
+
+- Team 10: `CF-W1-BT-02` review now.
+- Team 03: `CF-W1-BT-02` Architect Signoff after Team 10 acceptance.
+- Team 04: `CF-W1-CAL-01` QA after Team 06 handoff.
+
+## Dispatch Result
+
+Team 00 created the Team 06 CAL worktree and spawned implementation:
+
+- Agent: `019e3bf9-059e-75a0-8419-fa14b45dadbe`
+- Branch: `codex/team06-strategy-signal/CF-W1-CAL-01`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-CAL-01`
+- Base commit: `31d9c8a docs: promote calibration reliability slice`
+
+Teams ready to pick up new tasks:
+
+- Team 04: `CF-W1-CAL-01` QA after Team 06 handoff.
+- Team 10: `CF-W1-BT-02` review after QA acceptance.
+- Team 02: next persistent market-intelligence discovery cycle when relaunched.
+
 ## Dispatch Result
 
 Spawned Team 04 QA Factory:
