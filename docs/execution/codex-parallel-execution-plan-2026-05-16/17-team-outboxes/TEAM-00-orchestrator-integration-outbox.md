@@ -1298,3 +1298,62 @@ Forbidden scope includes schema/generated files, repository/controller/router/va
 - Team 04: QA after Team 06 handoff.
 - Team 10: review after Team 04 accepts.
 - Team 03: continue `CF-W1-HCTX-01`.
+
+---
+
+# BT-02 Implementation Dispatch
+
+Date: 2026-05-18
+
+## Team 06 Spawned
+
+- Agent: `019e3bb7-c64a-7331-a4fa-db05776ca055`
+- Branch: `codex/team06-strategy-signal/CF-W1-BT-02`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-BT-02`
+- Base commit: `1f50d0e docs: promote backtesting review disposition slice`
+
+## Current Active Agents
+
+- Team 06: `CF-W1-BT-02` implementation.
+- Team 03: `CF-W1-HCTX-01` architecture/contract refresh.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-BT-02` QA after Team 06 handoff.
+- Team 10: `CF-W1-BT-02` review after QA accepts.
+- Team 03: `CF-W1-MCTX-01` after HCTX.
+
+---
+
+# HCTX-01 Ready Promotion
+
+Date: 2026-05-18
+
+## Gate Result
+
+Team 00 promoted `CF-W1-HCTX-01` as the next direct investor/trader-value implementation slice after `CF-W1-BT-02`.
+
+Approved handoff:
+
+- Owner: Team 05 - Market Data / Data Quality
+- Branch: `codex/team05-market-data/CF-W1-HCTX-01`
+- Worktree: `../investment-scanner-worktrees/team05-CF-W1-HCTX-01`
+- Scope: backend-only `historical-context-snapshots` lookup explainability and provenance labeling
+
+Allowed files:
+
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.service.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.types.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.md`
+- `backend/tests/modules/historical-context-snapshots/historical-context-snapshots.service.test.ts`
+- Team 05 outbox and `CF-W1-HCTX-01` developer handoff docs only
+
+Forbidden scope remains schema, routes, repository/controller/router/validation/index, shared utilities/UI, frontend, packages/generated files, upstream Market Context / Smart Money / Market Data / Signal Calibration source changes, providers, startup/backfill, live-provider, paid/cloud, broker, or telemetry.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 05: implement `CF-W1-HCTX-01`.
+- Team 04: QA after Team 05 or Team 06 submits developer handoff.
+- Team 10: review after QA accepts.
+- Team 03: prepare `CF-W1-MCTX-01` after Team 05 is launched.
+- Team 02: continue market-intelligence requirements discovery when a slot opens.

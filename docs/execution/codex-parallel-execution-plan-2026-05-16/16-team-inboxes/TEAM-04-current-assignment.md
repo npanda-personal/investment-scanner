@@ -253,6 +253,36 @@ Date: 2026-05-18
 
 ## Assignment
 
+Stand by for QA Verification on the next active implementation handoff.
+
+Do not run QA before a developer handoff exists. Do not start a new docs-only QA plan ahead of direct investor/trader value work unless Team 00 assigns it.
+
+## Expected Next QA Targets
+
+1. `CF-W1-BT-02` after Team 06 submits developer handoff from `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-BT-02`.
+2. `CF-W1-HCTX-01` after Team 05 submits developer handoff from `C:\work\repo\investment-scanner-worktrees\team05-CF-W1-HCTX-01`.
+
+## Priority Rule
+
+Prioritize direct investor/trader value: market data, Data Quality, signals, strategy trust, backtests, calibration, historical context, market context, Trade Plan research support, and research evidence.
+
+Admin/settings/auth/subscription/notifications and alert convenience work stay lowest priority unless they block correctness, privacy, user-data safety, or an already accepted branch gate.
+
+## Output Location
+
+When Team 00 launches the next QA agent, write QA evidence to the relevant implementation worktree under:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
 Prepare docs-only QA planning for `CF-W1-DQ-02A`, the bounded Data Quality Engine currentness-evidence first child.
 
 Do not QA or implement the full DQ-02 parent. The parent remains split-required because persisted evaluations do not store session-aware currentness evidence and broader read-side/public-contract or schema work may be needed later.

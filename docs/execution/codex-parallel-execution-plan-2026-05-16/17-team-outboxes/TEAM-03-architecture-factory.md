@@ -2,6 +2,62 @@
 
 Date: 2026-05-17
 
+## Team 03 HCTX-01 Historical Context Explainability Refresh - 2026-05-18
+
+Assignment: refresh architecture readiness for `CF-W1-HCTX-01` as the next top unassigned market-intelligence item after `CF-W1-BT-02`, without touching application code, tests, Prisma/schema, route registries, shared utilities, shared UI, package manifests, generated files, historical docs, or Team 04 files.
+
+Updated:
+
+- `03-architecture/CF-W1-HCTX-01-architecture-review.md`
+- `06-contracts/CF-W1-HCTX-01-historical-context-explainability-contract.md`
+- `08-work-packets/CF-W1-HCTX-01-work-packet.md`
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Files inspected:
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/16-team-inboxes/TEAM-03-current-assignment.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-HCTX-01-historical-context-explainability-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-HCTX-01-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-HCTX-01-historical-context-explainability-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-HCTX-01-work-packet.md`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.md`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.service.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.types.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.repository.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.validation.ts`
+- `backend/src/modules/historical-context-snapshots/index.ts`
+- `backend/tests/modules/historical-context-snapshots/historical-context-snapshots.service.test.ts`
+- `backend/tests/modules/historical-context-snapshots/historical-context-snapshots.routes.test.ts`
+- `backend/tests/modules/historical-context-snapshots/historical-context-snapshots.repository.test.ts`
+- `frontend/src/features/historical-context-snapshots/types.ts`
+- `frontend/src/features/historical-context-snapshots/components/HistoricalContextSnapshotsPage.tsx`
+
+Readiness result:
+
+- `CF-W1-HCTX-01` is a `Ready candidate` as a bounded `historical-context-snapshots` backend-first child.
+- The narrowed first child is additive lookup provenance only: requested date, lookback, region, asset type, selected snapshot date, lag, per-slice source, and stable reason codes over the existing lookup result.
+- Exact future implementation scope is limited to:
+  - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.service.ts`
+  - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.types.ts`
+  - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.md`
+  - `backend/tests/modules/historical-context-snapshots/historical-context-snapshots.service.test.ts`
+- Prisma/schema, route registry, repository/controller/router/validation, shared utilities/UI, Market Context source, Smart Money source, Market Data source, Signal Calibration source, provider files, package/generated files, and frontend implementation remain explicitly blocked.
+- Team 04 QA planning can start now.
+- Team 00 should treat this as the next top unassigned market-intelligence handoff after `CF-W1-BT-02`.
+
+Current Team 03 recommendation to Team 00:
+
+1. Route `CF-W1-HCTX-01` to Team 04 QA planning now.
+2. Treat it as one no-schema backend-first `Ready candidate`, not as a route, shared, provider, or frontend packet.
+3. Keep any Historical Context frontend rendering follow-up separate from this child.
+4. Do not allow parallel writers on `historical-context-snapshots.service.ts`, `historical-context-snapshots.types.ts`, `historical-context-snapshots.md`, or `historical-context-snapshots.service.test.ts`.
+
+No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
+
 ## Team 03 INTEL-03 Portfolio Concentration Review Prep - 2026-05-18
 
 Assignment: prepare architecture readiness for `CF-W1-L3-INTEL-03` portfolio-intelligence concentration review in the main worktree without touching application code, tests, Prisma/schema, route registries, package manifests, generated files, shared utilities, shared UI, historical docs, or the decision inbox.

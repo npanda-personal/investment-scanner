@@ -145,3 +145,90 @@ npm.cmd test -- market-data.market-session.test.ts --runInBand
 ## Next Gate
 
 Return developer handoff to Team 00 for Team 04 QA, Team 10 review, Architect Signoff, delegated PO acceptance, and scoped local commit.
+
+---
+
+# Latest Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Implement `CF-W1-HCTX-01` in a dedicated Team 05 worktree.
+
+This override supersedes older Team 05 tails. The Product Owner priority correction puts market-data, Data Quality, signals, backtests, calibration, historical context, market context, and research evidence ahead of admin/settings/auth/subscription/notifications and alert convenience work.
+
+Do not implement in the shared `dev` workspace.
+
+## Branch / Worktree
+
+- Branch: `codex/team05-market-data/CF-W1-HCTX-01`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team05-CF-W1-HCTX-01`
+
+## Gate Evidence
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-HCTX-01-historical-context-explainability-requirement.md`
+- Architecture review: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-HCTX-01-architecture-review.md`
+- Contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-HCTX-01-historical-context-explainability-contract.md`
+- Work packet: `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-HCTX-01-work-packet.md`
+- QA plan: `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-HCTX-01-qa-plan.md`
+- Ready handoff: `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/ready-for-implementation.md`
+
+## Allowed Files
+
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.service.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.types.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.md`
+- `backend/tests/modules/historical-context-snapshots/historical-context-snapshots.service.test.ts`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-05-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-HCTX-01-developer-handoff.md`
+
+## Forbidden Files
+
+- Prisma schema or migrations
+- generated files
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.repository.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.controller.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.router.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.validation.ts`
+- `backend/src/modules/historical-context-snapshots/index.ts`
+- backend or frontend route registries
+- `backend/src/modules/market-context-intelligence/**`
+- `backend/src/modules/smart-money-intelligence/**`
+- `backend/src/modules/market-data-foundation/**`
+- `backend/src/modules/signal-calibration-engine/**`
+- shared backend utilities or shared DTOs
+- shared frontend components
+- frontend source or tests
+- package manifests
+- providers, startup/backfill, live-provider, Angel One, broker, paid/cloud, telemetry, or automation flows
+
+## Required Behavior
+
+- Add additive lookup explainability metadata for market, sector, country, smart-money, and data-quality selection evidence.
+- Distinguish `PERSISTED_EXACT_DATE`, `PERSISTED_NEAREST_PRIOR_DATE`, `MISSING_WITHIN_LOOKBACK`, `METADATA_GAP_INPUT`, and `NOT_REQUESTED`.
+- Include requested date, lookback days, region, asset type, selected snapshot date, lag days, per-slice source, top-level selected nearest snapshot date, max lag, partial flag, and concise research-support summary.
+- Preserve current lookup fields, route/query behavior, `dataStatus`, and `gaps[]`.
+- Do not add a second repository search to distinguish never-generated from older-than-lookback evidence; bounded absence is `MISSING_WITHIN_LOOKBACK`.
+- Do not edit upstream producers or downstream consumers in this slice.
+
+## Focused Validation
+
+```powershell
+cd backend
+npm.cmd test -- historical-context-snapshots.service.test.ts --runInBand
+npm.cmd run build
+```
+
+## Stop Conditions
+
+Return to Team 00 without implementing further if the slice needs any forbidden file, route/schema/package/generated/shared/frontend/provider/startup/live scope, upstream Market Context / Smart Money / Market Data / Signal Calibration source changes, or a semantic rewrite of nearest-snapshot lookup.
+
+## Expected Output
+
+Write:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-05-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-HCTX-01-developer-handoff.md`
+
+Do not commit. Team 00 handles QA, review, Architect Signoff, delegated PO acceptance, scoped local commit, and later integration.

@@ -205,3 +205,11 @@
 - Future routing must prioritize direct investor/trader value: market data, Data Quality, signals, strategy trust, backtests, calibration, historical context, market context, Trade Plan research support, and research evidence.
 - Admin, settings, auth/subscription, notifications, and alert convenience work are lowest priority unless they block correctness, privacy, user-data safety, or an already accepted branch gate.
 - The next safe docs-only handoff is `CF-W1-BT-02` architecture/contract refresh, followed by historical context, market context, calibration, signal-quality learning, Strategy Framework provenance, DQ currentness, Trade Plan readiness, and Market Data durable-readiness ADR prep.
+
+## Team 00 HCTX Ready Promotion Risk Decisions - 2026-05-18
+
+- `CF-W1-HCTX-01` is promoted only as a backend-only `historical-context-snapshots` lookup-explainability slice.
+- Team 05 must use branch `codex/team05-market-data/CF-W1-HCTX-01` and worktree `../investment-scanner-worktrees/team05-CF-W1-HCTX-01`.
+- Allowed implementation files are limited to `historical-context-snapshots.service.ts`, `historical-context-snapshots.types.ts`, `historical-context-snapshots.md`, and `historical-context-snapshots.service.test.ts`.
+- Shared/high-risk boundaries remain blocked: Prisma/schema/migrations, repository/controller/router/validation/index, route registries, shared utilities or DTOs, shared UI, package manifests, generated files, frontend, Market Context, Smart Money, Market Data, Signal Calibration source changes, providers, startup/backfill, live providers, paid/cloud, broker, and telemetry.
+- If Team 05 discovers the need for a second repository lookup, upstream module source changes, frontend rendering, or any forbidden file, the workstream stops and returns to Team 00.

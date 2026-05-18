@@ -8,6 +8,8 @@ No available application-code item is currently waiting unassigned in Ready.
 
 `CF-W1-BT-02` is promoted and assigned to Team 06 for a bounded `backtesting-strategy-lab` implementation in a dedicated worktree.
 
+`CF-W1-HCTX-01` is promoted and assigned to Team 05 for a bounded backend-only `historical-context-snapshots` implementation in a dedicated worktree.
+
 2026-05-18 Team 00 promotion update:
 
 - `CF-W1-BT-02` is promoted after Team 03 refreshed the narrowed architecture/contract/work packet and Team 04 accepted the narrowed QA plan. Implementation is limited to canonical run-level review disposition plus shared saved-list/detail reason summary.
@@ -41,6 +43,7 @@ No available application-code item is currently waiting unassigned in Ready.
 | `CF-W1-UX-01A` | Team 08 - UX / Research / Copilot | `codex/team08-ux-research/CF-W1-UX-01A` | `../investment-scanner-worktrees/team08-CF-W1-UX-01A` | Frontend-only Stock Research Workbench trust framing from current page evidence | Accepted and locally committed as `246d5a3`; awaiting later clean `dev` integration |
 | `CF-W1-DQ-02A` | Team 05 - Market Data / Data Quality | `codex/team05-market-data/CF-W1-DQ-02A` | `../investment-scanner-worktrees/team05-CF-W1-DQ-02A` | Backend-only DQE currentness evidence and fail-closed propagation | Accepted and locally committed as `c2d6753`; awaiting later clean `dev` integration |
 | `CF-W1-BT-02` | Team 06 - Strategy / Signal / Risk | `codex/team06-strategy-signal/CF-W1-BT-02` | `../investment-scanner-worktrees/team06-CF-W1-BT-02` | Backtesting canonical review disposition and saved-list/detail reason-summary normalization | Promoted and assigned to Team 06 |
+| `CF-W1-HCTX-01` | Team 05 - Market Data / Data Quality | `codex/team05-market-data/CF-W1-HCTX-01` | `../investment-scanner-worktrees/team05-CF-W1-HCTX-01` | Backend-only Historical Context lookup explainability and provenance labeling | Promoted and assigned to Team 05 |
 | `CF-W1-L3-PORT-01A` | Team 07 - Portfolio / Watchlist / Alerts | `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A` | `../investment-scanner-worktrees/team07-CF-W1-L3-PORT-01A` | Backend-only portfolio-management readiness DTOs | Rejected / Rework after Team 10 review; Team 07 revision pending |
 | `CF-W1-TP-01B` | Team 06 - Strategy / Signal / Risk | `codex/team06-strategy-signal/CF-W1-TP-01B` | `../investment-scanner-worktrees/team06-CF-W1-TP-01B` | Backend-only Trade Plan DQ hard-block and target compatibility | Implemented in worktree; Team 10 review pending |
 | `CF-W1-NOTIF-02` | Team 09 - Platform / Auth / Subscription / Notifications | `codex/team09-platform/CF-W1-NOTIF-02` | `../investment-scanner-worktrees/team09-CF-W1-NOTIF-02` | Backend-only local notification log redaction | Ready and pulled by Team 09 for implementation |
@@ -136,6 +139,79 @@ npm.cmd run build
 ```
 
 Stop and return to Team 00 if implementation requires any forbidden file, schema/generated/route/shared changes, `strategy-framework` or `trade-plan-risk-engine` source edits, frontend API/hook/route changes, simulation math changes, benchmark math changes, route-contract changes, shared UI, cross-module source changes, or trade-level structured rule-ID expansion.
+
+## Active Ready Handoff - `CF-W1-HCTX-01`
+
+Date promoted: 2026-05-18
+
+Team 00 evaluated `CF-W1-HCTX-01` against Ready gates and promoted it as an independent Team 05 backend-only implementation slice.
+
+Gate evidence:
+
+- Requirement: `10-requirements/CF-W1-HCTX-01-historical-context-explainability-requirement.md`
+- Architecture review: `03-architecture/CF-W1-HCTX-01-architecture-review.md`
+- Contract: `06-contracts/CF-W1-HCTX-01-historical-context-explainability-contract.md`
+- Work packet: `08-work-packets/CF-W1-HCTX-01-work-packet.md`
+- QA plan: `04-qa/CF-W1-HCTX-01-qa-plan.md`
+- Team 03 architecture outbox: `17-team-outboxes/TEAM-03-architecture-factory.md`
+- Open decisions: none.
+- Shared/high-risk blocker: none if implementation stays inside the reserved backend module files.
+
+Branch/worktree:
+
+- Branch: `codex/team05-market-data/CF-W1-HCTX-01`
+- Worktree: `../investment-scanner-worktrees/team05-CF-W1-HCTX-01`
+
+Allowed files:
+
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.service.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.types.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.md`
+- `backend/tests/modules/historical-context-snapshots/historical-context-snapshots.service.test.ts`
+
+Allowed branch-local evidence docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-05-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-HCTX-01-developer-handoff.md`
+
+Forbidden files:
+
+- Prisma schema or migrations
+- generated files
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.repository.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.controller.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.router.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.validation.ts`
+- `backend/src/modules/historical-context-snapshots/index.ts`
+- backend or frontend route registries
+- `backend/src/modules/market-context-intelligence/**`
+- `backend/src/modules/smart-money-intelligence/**`
+- `backend/src/modules/market-data-foundation/**`
+- `backend/src/modules/signal-calibration-engine/**`
+- shared backend utilities or shared DTOs
+- shared frontend components
+- frontend source or tests
+- package manifests
+- providers, startup/backfill, live-provider, Angel One, broker, paid/cloud, telemetry, or automation flows
+
+Required behavior:
+
+- add additive lookup explainability metadata for market, sector, country, smart-money, and data-quality selection evidence;
+- distinguish exact-date, nearest-prior, missing-within-lookback, metadata-gap, and not-requested states;
+- expose requested date, lookback days, region, asset type, selected snapshot date, lag days, per-slice source, top-level selected nearest snapshot date, max lag, partial flag, and concise research-support summary;
+- preserve current lookup fields, route behavior, query behavior, `dataStatus`, and `gaps[]`;
+- do not add a second repository search to distinguish never-generated from older-than-lookback evidence;
+- do not edit upstream producers or downstream consumers in this slice.
+
+Focused validation guidance:
+
+```powershell
+cd backend
+npm.cmd test -- historical-context-snapshots.service.test.ts --runInBand
+npm.cmd run build
+```
+
+Stop and return to Team 00 if implementation requires repository/controller/router/validation/index edits, schema/generated/route/shared/package/frontend/provider/startup/live changes, upstream Market Context, Smart Money, Market Data, Signal Calibration, or Signal Quality source changes, or a semantic rewrite of nearest-snapshot lookup.
 
 ## Active Ready Handoff - `CF-W1-AUTH-SUB-01`
 

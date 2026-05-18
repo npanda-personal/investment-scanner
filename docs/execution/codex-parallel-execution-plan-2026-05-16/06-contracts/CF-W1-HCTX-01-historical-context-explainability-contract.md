@@ -6,7 +6,7 @@ Owner: Team 03 Architecture Factory
 
 ## Status
 
-Backend-only Historical Context explainability contract prepared. Not Ready for Implementation.
+Ready candidate contract for a bounded backend-first child. Not yet promoted for implementation.
 
 ## Contract Intent
 
@@ -28,7 +28,7 @@ Downstream modules such as Signal Calibration and Signal Quality must consume th
 
 ## Required Source Boundary
 
-Implementation must stay inside `historical-context-snapshots` service/types/docs/tests and must derive explainability from existing lookup results only.
+Implementation must stay inside `historical-context-snapshots` service/types/docs/service-test only and must derive explainability from existing lookup results only.
 
 Forbidden:
 
@@ -51,17 +51,18 @@ type SnapshotLookupReasonCode =
 
 interface SnapshotLookupSelectionEvidence {
   requested: boolean;
-  requestedDate: string;
-  lookbackDays: number;
+  source: string | null;
   selectedSnapshotDate: string | null;
   lagDays: number | null;
   reasonCode: SnapshotLookupReasonCode;
-  reason: string;
+  reasonSummary: string;
 }
 
 interface SnapshotLookupExplainability {
   requestedDate: string;
   lookbackDays: number;
+  region: string;
+  assetType: string;
   market: SnapshotLookupSelectionEvidence;
   sector: SnapshotLookupSelectionEvidence;
   country: SnapshotLookupSelectionEvidence;
@@ -76,13 +77,34 @@ interface SnapshotLookupExplainability {
 
 The exact type name may differ, but the semantics must stay stable.
 
+Recommended additive placement:
+
+```ts
+interface SnapshotLookupResult {
+  market: any | null;
+  sector: any | null;
+  country: any | null;
+  smartMoney: any | null;
+  dataQuality: any | null;
+  dataStatus: SnapshotDataStatus;
+  gaps: string[];
+  lookupExplainability: SnapshotLookupExplainability;
+}
+```
+
 ## Required Mapping Rules
 
 - `PERSISTED_EXACT_DATE` means the selected snapshot date matches the requested date.
 - `PERSISTED_NEAREST_PRIOR_DATE` means the selected snapshot date is before the requested date but still inside lookback.
-- `MISSING_WITHIN_LOOKBACK` means no persisted snapshot exists for the requested component inside lookback.
+- `MISSING_WITHIN_LOOKBACK` means no persisted snapshot exists for the requested component on or before the requested date inside lookback.
 - `METADATA_GAP_INPUT` means the caller requested a metadata-gap sector such as `Unknown`, so ranked sector evidence is intentionally unavailable.
 - `NOT_REQUESTED` means the optional component was not requested and must not be described as missing evidence.
+- `source` should echo the selected persisted row source where present and stay `null` for missing, metadata-gap, or not-requested states.
+
+Important bounded-scope rule:
+
+- do not widen the first child into second-pass repository searches just to differentiate "never generated" from "older than lookback";
+- explain absence honestly as "missing within lookback" for this child.
 
 ## Compatibility Rule
 
@@ -96,6 +118,8 @@ The exact type name may differ, but the semantics must stay stable.
 - Do not collapse metadata-gap input into a generic missing message.
 - Do not imply that `NOT_REQUESTED` is a data gap.
 - Do not add frontend-only wording or UI-specific formatting to the backend contract.
+- Do not edit `backend/src/api/routes.ts`, `frontend/src/app/routes.tsx`, shared utilities, shared UI, `market-context-intelligence`, `smart-money-intelligence`, `market-data-foundation`, or `signal-calibration-engine`.
+- Do not add providers, package changes, generated-file changes, or frontend implementation under this child.
 
 ## Test Contract
 
@@ -106,4 +130,11 @@ Focused backend tests must prove:
 - partial lookup provenance for missing sector, smart-money, and data-quality evidence;
 - metadata-gap sector provenance;
 - missing market provenance within lookback;
+- `NOT_REQUESTED` provenance for optional slices omitted from the request;
 - additive compatibility of existing lookup response fields.
+
+## Ready Recommendation
+
+`Ready candidate`
+
+This contract is small enough for Team 04 QA planning and Team 00 Ready evaluation without schema, route, shared, upstream-source, provider, package, generated, or frontend approvals.

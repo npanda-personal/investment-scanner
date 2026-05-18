@@ -784,3 +784,59 @@ Date: 2026-05-18
 - Team 04 is ready for `CF-W1-BT-02` QA after Team 06 handoff.
 - Team 10 is ready for review after QA accepts.
 - Team 03 is active on `CF-W1-HCTX-01`; next architecture item is `CF-W1-MCTX-01`.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 03 - Architecture Factory | `019e3bb2-2657-7e92-8a79-ad7b7521bcbd` | `gpt-5.4`, high | architecture/contract refresh | `CF-W1-HCTX-01` | active |
+| 2 | Team 06 - Strategy / Signal / Risk | `019e3bb7-c64a-7331-a4fa-db05776ca055` | `gpt-5.3-codex`, high | implementation | `CF-W1-BT-02` | active |
+| 3 | Open slot | none | pending | QA verification | `CF-W1-BT-02` after Team 06 handoff | waiting |
+| 4 | Open slot | none | pending | review/release | `CF-W1-BT-02` after Team 04 accepts | waiting |
+| 5 | Open slot | none | pending | architect signoff | `CF-W1-BT-02` after Team 10 accepts | waiting |
+| 6 | Open slot | none | pending | architecture prep | `CF-W1-MCTX-01` after HCTX handoff or clear scope | ready |
+
+## Branch / Worktree
+
+- `CF-W1-BT-02`: `codex/team06-strategy-signal/CF-W1-BT-02` / `../investment-scanner-worktrees/team06-CF-W1-BT-02`
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04 is ready for `CF-W1-BT-02` QA after Team 06 developer handoff.
+- Team 10 is ready for review after QA accepts.
+- Team 03 next architecture target is `CF-W1-MCTX-01` after HCTX.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Priority Override
+
+Current routing follows the Product Owner correction: prioritize direct investor/trader value first. Market data, Data Quality, signals, strategy trust, backtests, calibration, historical context, market context, Trade Plan research support, and research evidence outrank admin/settings/auth/subscription/notifications and alert convenience work unless a lower-priority item blocks correctness, privacy, user-data safety, or an already accepted branch gate.
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 06 - Strategy / Signal / Risk | `019e3bb7-c64a-7331-a4fa-db05776ca055` | `gpt-5.3-codex`, high | implementation | `CF-W1-BT-02` | active |
+| 2 | Team 05 - Market Data / Data Quality | pending spawn | `gpt-5.3-codex`, high | implementation | `CF-W1-HCTX-01` | ready |
+| 3 | Open slot | none | pending | QA verification | `CF-W1-BT-02` after Team 06 handoff or `CF-W1-HCTX-01` after Team 05 handoff | waiting |
+| 4 | Open slot | none | pending | review/release | next QA-accepted handoff | waiting |
+| 5 | Open slot | none | pending | architect signoff | next Team 10 accepted handoff | waiting |
+| 6 | Open slot | none | pending | architecture prep | `CF-W1-MCTX-01`, then `CF-W1-CAL-01`, then `CF-W1-DQ-02` follow-up | ready |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 05 is ready to implement `CF-W1-HCTX-01`.
+- Team 04 is ready for `CF-W1-BT-02` QA after Team 06 handoff or `CF-W1-HCTX-01` QA after Team 05 handoff.
+- Team 10 is ready for review after QA accepts a handoff.
+- Team 03 is ready for `CF-W1-MCTX-01` architecture prep after the HCTX implementation lane is launched.
+- Team 02 should relaunch persistent market-intelligence requirements discovery when an active slot is available.

@@ -6,39 +6,39 @@ Owner: Team 03 Architecture Factory
 
 ## Status
 
-Backend-only Historical Context explainability packet prepared. Not Ready for Implementation.
+Ready candidate for a bounded backend-first child. Not yet promoted for implementation.
 
-This packet is intentionally module-local for the first slice. It adds additive lookup provenance and gap explanation without opening Prisma, route, provider, shared utility, package, generated, or frontend scope.
+This refresh narrows `CF-W1-HCTX-01` to a four-file `historical-context-snapshots` writer set. The first child stays additive, no-schema, no-route, no-provider, no-shared, and no-frontend.
 
 ## Evidence Inspected
 
 - `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/16-team-inboxes/TEAM-03-current-assignment.md`
 - `10-requirements/CF-W1-HCTX-01-historical-context-explainability-requirement.md`
-- `10-requirements/requirements-backlog.md`
 - `10-requirements/next-top-10-candidates.md`
 - `10-requirements/top-10-ready-candidates.md`
-- `17-team-outboxes/TEAM-02-requirement-factory-2026-05-17.md`
+- `03-architecture/CF-W1-HCTX-01-architecture-review.md`
+- `06-contracts/CF-W1-HCTX-01-historical-context-explainability-contract.md`
+- `08-work-packets/CF-W1-HCTX-01-work-packet.md`
 - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.md`
 - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.types.ts`
 - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.service.ts`
 - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.repository.ts`
-- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.controller.ts`
 - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.validation.ts`
+- `backend/src/modules/historical-context-snapshots/index.ts`
 - `backend/tests/modules/historical-context-snapshots/historical-context-snapshots.service.test.ts`
 - `backend/tests/modules/historical-context-snapshots/historical-context-snapshots.routes.test.ts`
 - `backend/tests/modules/historical-context-snapshots/historical-context-snapshots.repository.test.ts`
-- `frontend/src/features/historical-context-snapshots/components/HistoricalContextSnapshotsPage.tsx`
 - `frontend/src/features/historical-context-snapshots/types.ts`
-- `frontend/src/features/historical-context-snapshots/api/historicalContextSnapshotsService.ts`
-- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md`
+- `frontend/src/features/historical-context-snapshots/components/HistoricalContextSnapshotsPage.tsx`
 
 ## Current Source Findings
 
-- `historical-context-snapshots.lookup(...)` already returns nearest persisted context on or before the requested date within the requested lookback window.
-- The lookup response already includes raw snapshot objects with `snapshotDate`, but the contract only exposes coarse `dataStatus` plus `gaps[]`; it does not provide an explicit selected-date provenance story.
-- The service can derive selected-date lag, exact-date versus nearest-prior selection, and per-component missing status from existing snapshot payloads without repository, controller, router, or schema changes.
-- Sector metadata-gap handling already exists and is surfaced through `gaps[]`, so the first explainability packet can upgrade that into stable provenance semantics rather than inventing new persistence behavior.
-- The current frontend lookup card renders only `dataStatus`, a regime chip, raw component labels, and a single gaps string. It does not force selected-date lag, persisted-versus-missing evidence, or partial lookup semantics, but that UI follow-up is not required for the first bounded backend packet.
+- `historical-context-snapshots.service.lookup(...)` already owns the response assembly for `dataStatus` and `gaps[]`, so additive explainability belongs in this service layer.
+- `historical-context-snapshots.repository.lookup(...)` already returns nearest persisted rows on or before the requested date inside the caller-provided lookback. Each row carries `snapshotDate`, and several rows already carry `source` and `dataStatus`.
+- Current `SnapshotLookupResult` exposes only `market`, `sector`, `country`, `smartMoney`, `dataQuality`, `dataStatus`, and `gaps[]`. Requested date, selected snapshot date, lag days, scope, and per-slice provenance are still implicit.
+- Existing service tests already cover partial and metadata-gap flows. The smallest safe first child is to extend the service DTO and service test, not to widen into repository, route, or frontend files.
+- The current frontend page renders only `dataStatus`, chips, and `gaps[]`. That consumer gap is real, but frontend implementation is not required for the first backend-first child and is explicitly deferred.
 
 ## Module Boundary Review
 
@@ -54,15 +54,20 @@ Upstream modules remain evidence producers only:
 
 - `market-context-intelligence`
 - `smart-money-intelligence`
-- `market-data-foundation`
+- `market-data-foundation` for data-quality snapshot inputs only
 
-The first slice does not require frontend approval. A later consumer-only UX pass may use the additive fields, but that is separate work.
+Downstream consumers remain read-only:
+
+- `signal-calibration-engine`
+- future `historical-context-snapshots` frontend consumers
+
+The first child must not edit upstream or downstream module code.
 
 ## Architecture Decision
 
-Prepare `CF-W1-HCTX-01` as a bounded `historical-context-snapshots` slice that adds additive lookup explainability metadata on top of the current lookup response.
+Prepare `CF-W1-HCTX-01` as one bounded `historical-context-snapshots` child that enriches the lookup DTO with persisted-evidence provenance derived from existing lookup rows.
 
-The first implementation should introduce stable additive metadata equivalent to:
+The first implementation should introduce stable additive metadata semantically equivalent to:
 
 ```ts
 type SnapshotLookupReasonCode =
@@ -74,17 +79,18 @@ type SnapshotLookupReasonCode =
 
 interface SnapshotLookupSelectionEvidence {
   requested: boolean;
-  requestedDate: string;
-  lookbackDays: number;
+  source: string | null;
   selectedSnapshotDate: string | null;
   lagDays: number | null;
   reasonCode: SnapshotLookupReasonCode;
-  reason: string;
+  reasonSummary: string;
 }
 
 interface SnapshotLookupExplainability {
   requestedDate: string;
   lookbackDays: number;
+  region: string;
+  assetType: string;
   market: SnapshotLookupSelectionEvidence;
   sector: SnapshotLookupSelectionEvidence;
   country: SnapshotLookupSelectionEvidence;
@@ -97,15 +103,23 @@ interface SnapshotLookupExplainability {
 }
 ```
 
-The exact type names may differ, but the semantics must stay stable.
+The exact property and type names may differ, but the semantics must stay stable and additive.
 
 Recommended first-pass mapping:
 
 - `PERSISTED_EXACT_DATE`: matching snapshot exists on the requested date.
 - `PERSISTED_NEAREST_PRIOR_DATE`: lookup selected a persisted snapshot before the requested date within lookback.
-- `MISSING_WITHIN_LOOKBACK`: requested component has no persisted snapshot inside lookback.
+- `MISSING_WITHIN_LOOKBACK`: requested component has no persisted snapshot on or before the requested date inside the lookback window.
 - `METADATA_GAP_INPUT`: the request asked for a metadata-gap sector such as `Unknown`, so ranked sector evidence is intentionally unavailable.
 - `NOT_REQUESTED`: optional component was not part of the lookup request.
+
+Important narrowing: this first child must not add a second repository lookup just to distinguish "never generated" from "older than lookback." The honest bounded explanation is "missing within lookback."
+
+Recommended response shape:
+
+- keep existing `market`, `sector`, `country`, `smartMoney`, `dataQuality`, `dataStatus`, and `gaps[]`;
+- add one top-level explainability object such as `lookupExplainability`;
+- keep reason text stable and backend-owned so downstream consumers do not recreate it.
 
 ## Exact Future File Reservations
 
@@ -113,7 +127,6 @@ Recommended first-pass mapping:
 - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.types.ts`
 - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.md`
 - `backend/tests/modules/historical-context-snapshots/historical-context-snapshots.service.test.ts`
-- optional only if endpoint-level additive response assertions are added: `backend/tests/modules/historical-context-snapshots/historical-context-snapshots.routes.test.ts`
 
 ## Forbidden Files
 
@@ -123,39 +136,58 @@ Recommended first-pass mapping:
 - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.controller.ts`
 - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.router.ts`
 - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.validation.ts`
-- Market Context Intelligence source or exports
-- Smart Money Intelligence source or exports
-- Market Data Foundation source or exports
-- Signal Calibration source
-- Signal Quality Lab source
-- backend and frontend route registries
-- shared backend utilities
-- shared frontend components
+- `backend/src/modules/historical-context-snapshots/index.ts`
+- `backend/src/api/routes.ts`
+- `frontend/src/app/routes.tsx`
+- `backend/src/modules/market-context-intelligence/**`
+- `backend/src/modules/smart-money-intelligence/**`
+- `backend/src/modules/market-data-foundation/**`
+- `backend/src/modules/signal-calibration-engine/**`
+- `backend/src/shared/**`
+- `frontend/src/features/historical-context-snapshots/**`
+- `frontend/src/shared/**`
 - package manifests
 - generated files
-- frontend source/tests
-- provider/live-market, paid/cloud, broker, or telemetry flows
+- provider files
+- frontend implementation or tests unless separately approved
+- live-market, paid/cloud, broker, or telemetry flows
 
 ## Dependency And Conflict Notes
 
 - No Prisma, route, provider, shared DTO, generated-type, package, or frontend blocker is required for the first bounded slice.
 - This packet depends on persisted snapshot rows already carrying `snapshotDate` and current lookup behavior returning those rows intact.
-- The first slice must remain backend-only. If a later packet wants the Historical Context frontend page to render the new explainability fields, that is a separate consumer/UI follow-up and should not be folded into this writer pass.
-- This packet conflicts with any active Lane 1 work reserving `historical-context-snapshots.service.ts`, `historical-context-snapshots.types.ts`, or the same service test file.
+- The first child must remain backend-only. If a later packet wants the Historical Context page or Calibration surfaces to render the new fields, that is a separate consumer pass and needs its own reservation.
+- This packet conflicts with any active Lane 1 work reserving `historical-context-snapshots.service.ts`, `historical-context-snapshots.types.ts`, `historical-context-snapshots.md`, or the focused service test.
 
-## Required QA Scenarios
+## QA Handoff Notes For Team 04
 
 Focused backend QA should prove:
 
-- complete exact-date lookup with zero lag;
-- nearest-prior lookup within lookback with explicit lag explanation;
-- partial lookup with missing sector, smart-money, or data-quality evidence and stable reason codes;
-- metadata-gap sector lookup returns provenance explaining that ranked sector evidence is intentionally unavailable;
-- missing market snapshot inside lookback produces a missing provenance result rather than silently looking complete;
-- backward-compatible existing lookup fields remain present while the new explainability metadata is additive.
+- exact-date lookup returns `PERSISTED_EXACT_DATE`, `lagDays = 0`, and the expected selected snapshot date;
+- nearest-prior lookup within lookback returns `PERSISTED_NEAREST_PRIOR_DATE`, positive lag, and correct top-level `maxLagDays`;
+- partial lookup with missing sector, smart-money, or data-quality evidence returns `MISSING_WITHIN_LOOKBACK` only for requested slices and keeps unrequested slices out of generic gap treatment;
+- metadata-gap sector lookup returns `METADATA_GAP_INPUT` and does not describe the sector as a ranked missing snapshot;
+- missing market snapshot inside lookback returns a clearly partial or missing response and never reads as exact-date evidence;
+- existing response fields remain present and backward-compatible while the new explainability object is additive.
 
-## Readiness Result
+Suggested future focused command after implementation:
 
-Architecture packet prepared. Not Ready for Implementation.
+```powershell
+cd backend
+npm.cmd test -- historical-context-snapshots.service.test.ts --runInBand
+```
 
-The slice is bounded and module-local, but Team 04 QA planning and Team 00 sequencing are still required.
+## Ready Recommendation
+
+`Ready candidate`
+
+Reason:
+
+- additive backend-owned DTO enrichment is source-supported today;
+- the smallest child fits inside one module with one four-file writer set;
+- no schema, route registry, shared utility/UI, Market Context source, Smart Money source, Signal Calibration source, provider, package, generated, or frontend implementation work is needed.
+
+Remaining gate:
+
+- Team 04 QA planning handoff;
+- Team 00 sequencing and Ready promotion.

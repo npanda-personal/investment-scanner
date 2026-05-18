@@ -566,3 +566,80 @@ Gate result:
 ## Next Coordination Action
 
 Commit the active-doc Ready promotion if staged scope is clean, create the Team 06 worktree, and spawn Team 06 implementation.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
+## Implementation Dispatch
+
+Team 00 created the dedicated `CF-W1-BT-02` worktree and spawned Team 06 implementation:
+
+- Agent: `019e3bb7-c64a-7331-a4fa-db05776ca055`
+- Branch: `codex/team06-strategy-signal/CF-W1-BT-02`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-BT-02`
+- Base commit: `1f50d0e docs: promote backtesting review disposition slice`
+
+## Current Pool
+
+- Team 06 implementation: active on `CF-W1-BT-02`.
+- Team 03 architecture: active on `CF-W1-HCTX-01`.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04 is ready for `CF-W1-BT-02` QA after Team 06 handoff.
+- Team 10 is ready for review after QA accepts.
+- Team 03 next architecture target is `CF-W1-MCTX-01` after HCTX.
+
+## Next Coordination Action
+
+Consume Team 06 developer handoff when available, then launch Team 04 QA. Consume Team 03 HCTX architecture output when available and decide whether HCTX should go to Team 04 QA planning.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
+## Priority Correction Applied
+
+Team 00 is keeping future routing centered on direct investor/trader value: market data, Data Quality, signals, strategy trust, backtests, calibration, historical context, market context, Trade Plan research support, and research evidence.
+
+Admin/settings/auth/subscription/notifications and alert convenience work remain parked unless they block correctness, privacy, user-data safety, or an already accepted branch gate.
+
+## Ready Promotion
+
+`CF-W1-HCTX-01` is promoted and assigned to Team 05.
+
+Gate result:
+
+- Requirement exists and has acceptance criteria.
+- Team 03 architecture review, contract, and work packet are refreshed and return `Ready candidate`.
+- Team 04 QA plan is prepared and QA-ready for Team 00 Ready evaluation.
+- Open decisions: 0.
+- Shared/high-risk blockers: none if implementation stays in the reserved `historical-context-snapshots` service/types/doc/service-test files.
+
+## Branch / Worktree
+
+- Branch: `codex/team05-market-data/CF-W1-HCTX-01`
+- Worktree: `../investment-scanner-worktrees/team05-CF-W1-HCTX-01`
+
+## Current Git State
+
+- Branch: `dev`.
+- Shared `dev` remains not push-safe because `backend/tests/modules/alerts-monitoring/alerts-monitoring.ownership.test.ts` is dirty outside the current docs checkpoint.
+- No push performed.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 05 is ready to implement `CF-W1-HCTX-01`.
+- Team 04 is ready for `CF-W1-BT-02` QA after Team 06 handoff or `CF-W1-HCTX-01` QA after Team 05 handoff.
+- Team 10 is ready for review after QA accepts.
+- Team 03 is ready for `CF-W1-MCTX-01` architecture prep after Team 05 is launched.
+- Team 02 is ready for persistent market-intelligence requirements discovery when a slot is opened.
+
+## Next Coordination Action
+
+Commit the active-doc HCTX promotion if staged scope is clean, create the Team 05 worktree, and spawn Team 05 implementation.

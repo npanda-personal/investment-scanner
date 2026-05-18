@@ -4,7 +4,7 @@ Date: 2026-05-18
 
 ## Status
 
-Audit-derived requirement draft. Not Ready for Implementation.
+Promoted by Team 00 on 2026-05-18 as a bounded backend-only `historical-context-snapshots` implementation slice after requirement, architecture, contract, work-packet, QA-plan, file-reservation, and open-decision gates passed.
 
 ## Product Value
 

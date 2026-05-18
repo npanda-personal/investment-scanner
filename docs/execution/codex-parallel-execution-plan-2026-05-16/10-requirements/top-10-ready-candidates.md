@@ -21,7 +21,7 @@ These are docs-only backlog priorities. They are not Ready-evaluation results.
 | Rank | ID | Why now | Next gate |
 | --- | --- | --- | --- |
 | 1 | `CF-W1-BT-02` | Backtesting already exposes availability, benchmark, repair, and weak-exit evidence, but users still lack one canonical review-disposition label across list and detail views. | Team 03 architecture/contract refresh, then Team 04 QA refresh. |
-| 2 | `CF-W1-HCTX-01` | Historical lookup provenance is a direct post-event learning gap: requested date, selected snapshot date, lag, and gaps should be explicit. | Team 03 architecture/contract prep, then Team 04 QA prep. |
+| 2 | `CF-W1-HCTX-01` | Historical lookup provenance is a direct post-event learning gap: requested date, selected snapshot date, lag, and gaps should be explicit. | Promoted and assigned to Team 05; next gate is implementation handoff. |
 | 3 | `CF-W1-MCTX-01` | Market regime labels need evidence, denominator clarity, and partial-context framing before downstream trust claims. | Team 03 architecture/contract prep, then Team 04 QA prep. |
 | 4 | `CF-W1-CAL-01` | Calibration trust drift is the next investor-value layer after historical and market-context provenance. | Team 03 architecture/contract prep, then Team 04 QA prep. |
 | 5 | `CF-W1-SQLAB-02` | Signal outcome learning connects measured outcomes to future judgment; durable storage remains split, but the post-preview path needs definition. | Team 03 post-preview packet prep after `SQLAB-02A` closes. |
@@ -67,8 +67,8 @@ Already promoted, pulled, accepted, or parked branch work should stay out of the
 
 ## Next Team 00 Pull
 
-Next docs-only handoff: `CF-W1-BT-02` to Team 03 for architecture/contract refresh.
+Next docs-only handoff after active `BT-02` and `HCTX-01`: `CF-W1-MCTX-01` to Team 03 for architecture/contract prep.
 
-Next dependent handoff: Team 04 QA refresh for `CF-W1-BT-02` after Team 03 completes.
+Next dependent handoff: Team 04 QA verification for active implementation handoffs after Team 06 or Team 05 submits developer evidence.
 
 Team 02 should keep discovering and reprioritizing market-intelligence requirements instead of filling the top queue with platform, notification, or alert convenience work.
