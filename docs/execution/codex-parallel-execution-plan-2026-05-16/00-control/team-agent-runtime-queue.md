@@ -916,3 +916,31 @@ Future routing is now biased toward direct investor/trader value:
 ## Next Coordination Action
 
 Spawn Team 06 for `CF-W1-BT-02` rework, Team 03 for `CF-W1-HCTX-01` Architect Signoff, Team 03 for `CF-W1-DQ-02` architecture prep, and Team 02 for persistent market-intelligence discovery. Keep admin/platform/notification/alert convenience work out of the active queue unless it becomes a correctness or accepted-branch gate.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Current Pool
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 06 - Strategy / Signal / Risk | `019e3bdf-8c03-7d22-a081-90ff86b279af` | `gpt-5.3-codex`, high | bounded QA rework | `CF-W1-BT-02` trusted disposition and UI evidence | active |
+| 2 | Team 03 - Architect Signoff | `019e3bdf-b187-7f13-9e92-7de4b45b3bd6` | `gpt-5.4`, high | architect signoff | `CF-W1-HCTX-01` in Team 05 worktree | active |
+| 3 | Team 03 - Architecture Factory | `019e3bdf-e323-72c3-bdc6-a2f792d1aa83` | `gpt-5.4`, high | docs-only architecture prep | `CF-W1-DQ-02` | active |
+| 4 | Team 02 - PO + Requirement Factory | `019e3be0-06d7-78d3-853b-707d92419a35` | `gpt-5.4-mini`, medium | persistent discovery | next high-value market-intelligence requirement | active |
+| 5 | Open slot | none | pending | QA rerun / QA planning | `CF-W1-BT-02` after Team 06 rework; `CF-W1-DQ-02` after Team 03 output | waiting |
+| 6 | Open slot | none | pending | review/signoff | next QA-accepted handoff | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04 is ready for `CF-W1-BT-02` QA rerun after Team 06 rework.
+- Team 04 is ready for `CF-W1-DQ-02` QA planning after Team 03 output.
+- Team 10 is ready for `CF-W1-BT-02` review after QA accepts.
+- Team 00 is ready to prepare delegated PO acceptance and scoped local branch commit if `CF-W1-HCTX-01` Architect Signoff accepts.
+
+## Next Coordination Action
+
+Consume whichever active agent completes first, then route only that workstream's next gate. Keep unrelated work moving in parallel.
