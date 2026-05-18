@@ -3064,6 +3064,35 @@ Team 02 completed `CF-W1-SIG-02` requirement discovery and Team 00 routed it to 
 
 Date: 2026-05-18
 
+## Next Wave Spawned After `8384f7b`
+
+Team 00 launched four independent agents after committing mixed gate routing.
+
+## Current Active Agents
+
+| Slot | Team | Agent | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | `019e3d37-7bba-7b73-8c05-e760179f957b` | QA verification | `CF-W1-STRAT-03` | active |
+| 2 | Team 03 - Architecture Factory | `019e3d37-7bf5-7373-845a-6671317d31c4` | contract triage | `CF-W1-BT-01A` review reject | active |
+| 3 | Team 03 - Architecture Factory | `019e3d37-7c2a-70b2-960f-4ddde704492c` | architecture prep | `CF-W1-SIG-02` | active |
+| 4 | Team 02 - Requirement Factory | `019e3d37-7c86-7cc2-8f32-1cec1743b369` | rolling requirements discovery | next distinct direct-value item | active |
+| 5 | Open slot | none | queued | Team 10 `CF-W1-STRAT-03` review after QA accepts | waiting |
+| 6 | Open slot | none | queued | next gate from BT-01A triage or SIG-02 architecture | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-STRAT-03` QA verification is active.
+- Team 03: `CF-W1-BT-01A` contract/default triage is active.
+- Team 03: `CF-W1-SIG-02` architecture prep is active.
+- Team 02: next distinct direct-value discovery is active.
+- Team 10: `CF-W1-STRAT-03` review after Team 04 accepts.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
 ## Next Wave Spawned
 
 Team 00 launched four independent spawned agents after the `3320c51` docs checkpoint.
