@@ -2,6 +2,116 @@
 
 Date: 2026-05-17
 
+## Team 03 RH-01 Research Hub Actionability Prep - 2026-05-18
+
+Assignment: prepare docs-only architecture readiness for `CF-W1-RH-01` in the shared `dev` workspace without touching application code, tests outside the Research Hub future writer set, Prisma/schema, route registries, shared utilities, shared UI, package manifests, generated files, providers, services, builds, or UI smoke.
+
+Prepared:
+
+- `03-architecture/CF-W1-RH-01-architecture-review.md`
+- `06-contracts/CF-W1-RH-01-research-hub-actionability-evidence-wiring-contract.md`
+- `08-work-packets/CF-W1-RH-01-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Files inspected:
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/16-team-inboxes/TEAM-03-current-assignment.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-RH-01-research-hub-actionability-evidence-wiring-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-L3-TREV-01-today-review-publication-evidence-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-L3-TREV-01-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-TP-02-exit-invalidation-semantics-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-TP-02-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-SQLAB-01-signal-quality-outcome-confidence-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-CAL-01-signal-calibration-reliability-drift-contract.md`
+- `backend/src/modules/research-hub/research-hub.md`
+- `backend/src/modules/research-hub/research-hub.service.ts`
+- `backend/src/modules/research-hub/research-hub.types.ts`
+- `backend/tests/modules/research-hub/research-hub.service.test.ts`
+- `frontend/src/features/research-hub/api/researchHubApi.ts`
+- `frontend/src/features/research-hub/components/ResearchOverviewPage.tsx`
+- `frontend/src/features/research-hub/hooks/useResearchOverview.ts`
+- `backend/src/modules/today-trade-review/index.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.service.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.types.ts`
+- `backend/src/modules/trade-plan-risk-engine/index.ts`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.service.ts`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.types.ts`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.md`
+- `backend/src/modules/signal-quality-lab/index.ts`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.service.ts`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.types.ts`
+- `backend/src/modules/signal-calibration-engine/index.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.service.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.types.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md`
+
+Files changed:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-RH-01-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-RH-01-research-hub-actionability-evidence-wiring-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-RH-01-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Readiness result:
+
+- `CF-W1-RH-01` is a `Ready candidate`.
+- The smallest bounded first child is backend-only and stays inside `research-hub` service/doc/tests, with `research-hub.types.ts` optional only if helper aliases are needed without widening the response shape.
+- Exact future writer set:
+  - `backend/src/modules/research-hub/research-hub.service.ts`
+  - `backend/src/modules/research-hub/research-hub.md`
+  - `backend/tests/modules/research-hub/research-hub.service.test.ts`
+  - optional only if helper aliases are needed without response-shape expansion: `backend/src/modules/research-hub/research-hub.types.ts`
+- Exact forbidden files and scopes for the first child:
+  - `backend/src/modules/research-hub/index.ts`
+  - `backend/src/modules/research-hub/research-hub.controller.ts`
+  - `backend/src/modules/research-hub/research-hub.router.ts`
+  - all `frontend/src/features/research-hub/**`
+  - all `frontend/tests/ui/**`
+  - `backend/src/api/routes.ts`
+  - `frontend/src/app/routes.tsx`
+  - all `backend/src/modules/today-trade-review/**`
+  - all `backend/src/modules/trade-plan-risk-engine/**`
+  - all `backend/src/modules/signal-quality-lab/**`
+  - all `backend/src/modules/signal-calibration-engine/**`
+  - shared backend utilities
+  - shared frontend components
+  - `backend/prisma/schema.prisma`
+  - `backend/prisma/migrations/**`
+  - package manifests
+  - generated files
+  - provider/live-data integration
+  - startup/backfill workflows
+  - paid/cloud, broker, or telemetry scope
+  - broad frontend redesign
+- Explicit upstream boundary result:
+  - use only current public service reads on `dev`;
+  - do not treat accepted/active branch docs for `CF-W1-L3-TREV-01`, `CF-W1-TP-02`, `CF-W1-SQLAB-01`, or `CF-W1-CAL-01` as proof that those commits are already merged into `dev`;
+  - `CF-W1-L3-TREV-01` and `CF-W1-TP-02` are compatibility dependencies only;
+  - `CF-W1-SQLAB-01` and `CF-W1-CAL-01` are semantic-upgrade dependencies only;
+  - until the SQLAB/CAL trust-state packets are actually present on `dev`, Research Hub must cap those two dimensions below `READY` and keep `canReviewActionableSetups` conservative.
+
+Blockers / stop conditions:
+
+- no implementation blocker exists inside the bounded child itself;
+- stop and return to Team 00 if implementation asks for frontend Research Hub changes, upstream source edits, upstream repository/private-internal access, route changes, schema/generated changes, shared utility/UI edits, provider/live-data work, startup/backfill work, package work, or coupling to `CF-W1-RH-02`.
+
+Current Team 03 recommendation to Team 00:
+
+1. Route `CF-W1-RH-01` to Team 04 QA planning now as a backend-only Research Hub packet.
+2. After QA planning exists, evaluate one bounded writer pass on the reserved Research Hub backend file set only.
+3. Do not bundle `CF-W1-RH-02`, frontend redesign, or upstream module edits into this child.
+4. Preserve the dependency rule that accepted/active TREV/TP/SQLAB/CAL branch artifacts are not assumed merged into `dev`.
+
+No tests, builds, Prisma commands, services, providers, UI smoke runs, commits, or pushes were run.
+
 ## Rolling Cycle Result - 2026-05-18
 
 Assignment frame:

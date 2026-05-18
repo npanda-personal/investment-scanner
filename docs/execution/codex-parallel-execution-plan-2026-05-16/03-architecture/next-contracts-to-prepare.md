@@ -4,6 +4,29 @@ Date: 2026-05-17
 
 Prepared by Team 03 Architecture Factory and refreshed after `CF-W1-L3-AUTH-02` commit `503bcd9`, `CF-W1-SIG-TRIGGER-01` commit `6ab3999`, and checkpoint protocol fix commit `f75808f`.
 
+## Team 03 RH-01 Research Hub Actionability Prep - 2026-05-18
+
+Prepared:
+
+- `03-architecture/CF-W1-RH-01-architecture-review.md`
+- `06-contracts/CF-W1-RH-01-research-hub-actionability-evidence-wiring-contract.md`
+- `08-work-packets/CF-W1-RH-01-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Result:
+
+- `CF-W1-RH-01` is a `Ready candidate`.
+- The smallest bounded first child is backend-only and stays inside `research-hub` service/doc/tests, with `research-hub.types.ts` optional only if helper aliases are needed without widening the response shape.
+- The child rewires Today Review, Trade Plan, Signal Quality, and Calibration actionability dimensions through current public service reads on `dev`; no frontend, schema, route, shared utility/UI, provider/live-data, startup/backfill, package, or generated-file scope is required.
+- Private upstream internals and upstream module source edits remain explicitly blocked.
+- `CF-W1-L3-TREV-01` and `CF-W1-TP-02` are compatibility dependencies only; `CF-W1-SQLAB-01` and `CF-W1-CAL-01` are semantic-upgrade dependencies only. None blocks this child, but their accepted branch docs must not be treated as already merged into `dev`.
+- Until `SQLAB-01` and `CAL-01` trust-state packets are actually present on `dev`, Research Hub must cap Signal Quality and Calibration below `READY` and keep `canReviewActionableSetups` conservative.
+- Team 04 QA planning can start now.
+
 ## Rolling Triage - 2026-05-18
 
 Input update consumed:
