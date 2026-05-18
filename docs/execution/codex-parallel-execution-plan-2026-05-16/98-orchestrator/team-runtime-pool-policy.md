@@ -15,6 +15,9 @@ Runtime slots are reusable execution capacity. A completed team report frees a s
 - If a previously shut-down team receives new ready work, add it back to the queue immediately.
 - If implementation teams have no ready work, assign them audit/refinement/prep work in their module domain.
 - Do not wait for the human Product Owner to choose the next team unless there is a product-priority conflict that Team 00 cannot resolve.
+- Team 00 may spawn Codex subagents to run team roles directly. Keep at most six active spawned subagents; queue additional teams in `00-control/team-agent-runtime-queue.md`.
+- When a spawned subagent finishes, Team 00 consumes the output, closes the agent, updates queues, and spawns the next queued team if safe.
+- Requirement-specific decisions are delegated to Team 02, structure/process decisions to Team 00, and architecture/design decisions to Team 03. Ask the human Product Owner only if those delegated roles cannot proceed or a non-delegable safety/cost/git/credential/live-provider blocker exists.
 
 ## Default Rolling Launch Priority
 

@@ -648,3 +648,43 @@ Team 10 found that the first implementation can treat automation-only Data Quali
 - Open decisions: 0.
 - Product Owner action required: no.
 - Commit/push authorization: blocked until Team 07 rework, Team 04 QA rerun, Team 10 re-review, Architect Signoff, delegated PO acceptance, and exact staged-scope verification pass.
+
+---
+
+# Spawned Subagent Runtime Update
+
+Date: 2026-05-18
+
+State: Runtime model changed from human-mediated team chats to Team 00 managed spawned subagents.
+
+## Product Owner Direction
+
+The Product Owner directed Team 00 to spawn team subagents directly, maintain a six-agent active limit, queue additional teams, and keep the factory rolling without requiring the human Product Owner to mediate routine handoffs.
+
+Decision ownership is delegated as follows:
+
+- Team 02: requirement-specific decisions.
+- Team 00: structure, process, queueing, and runtime decisions.
+- Team 03: architecture and design decisions.
+
+Human Product Owner action is required only when those delegated roles cannot proceed or when a non-delegable safety/cost/git/credential/live-provider blocker exists.
+
+## Active Pool Plan
+
+- Team 07: `CF-W1-L3-PORT-01A` rework.
+- Team 02: requirement/refinement queue maintenance.
+- Team 03: architecture/readiness prep.
+- Team 05: `CF-W1-MD-01` validation-only readiness inspection.
+- Team 08: `CF-W1-UX-02` / `CF-W1-UX-05` Copilot-only source mapping.
+- Team 09: `CF-W1-NOTIF-02`, `CF-W1-AUTH-01`, `CF-W1-SUB-01` readiness inspection.
+
+## Queued Pool
+
+- Team 04: QA rerun after Team 07 rework.
+- Team 10: release re-review after Team 04 evidence.
+- Team 03: Architect Signoff after release re-review passes.
+- Team 06: `CF-W1-TP-01B` readiness or implementation after Team 00 promotion / slot availability.
+
+## Runtime Queue Doc
+
+`00-control/team-agent-runtime-queue.md`

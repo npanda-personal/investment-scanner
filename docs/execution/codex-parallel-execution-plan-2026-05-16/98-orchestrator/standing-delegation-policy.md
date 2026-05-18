@@ -108,3 +108,15 @@ This policy does not authorize Codex to touch forbidden/high-risk files, use liv
 ## Multi-Team Rule
 
 Routine gates are handled by the assigned team and Review / Release Factory. Team 0 should coordinate and integrate; it should not become a human-style approval router.
+
+## Spawned Team Agent Delegation
+
+As of 2026-05-18, the Product Owner directed Team 00 to reduce manual mediation by spawning and managing team subagents directly.
+
+Delegated decision ownership:
+
+- Team 02 owns requirement-specific decisions.
+- Team 00 owns structure, process, runtime, queueing, and integration decisions.
+- Team 03 owns architecture and design decisions.
+
+Team 00 should consult the human Product Owner only when those delegated roles cannot proceed after applying the active docs and root `AGENTS.md`, or when a non-delegable safety/cost/git/credential/live-provider blocker exists.

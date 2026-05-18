@@ -6,7 +6,7 @@ Date: 2026-05-18
 
 - Cycle id: `DAEMON-20260517`
 - Rolling iteration count: 22
-- Current mode: Team 00 routed `CF-W1-L3-PORT-01A` Team 10 rejection back to Team 07 rework
+- Current mode: Team 00 switched to spawned-subagent rolling runtime and queued Team 07 rework first
 - Daemon continuing: yes
 - Git status at checkpoint start: dirty with active execution docs/team outputs only
 - Resume prompt path: `09-summaries/daemon-resume-prompt.md`
@@ -17,7 +17,7 @@ Date: 2026-05-18
 
 | Team | State | Current assignment | Next relaunch condition |
 | --- | --- | --- | --- |
-| Team 00 | coordinating | `CF-W1-L3-PORT-01A` rework routing | After Team 07 rework, route QA rerun and release re-review. |
+| Team 00 | coordinating | spawned-subagent runtime pool | Maintain up to six active agents, consume completed outputs, and rotate queued Team 04/10 gates. |
 | Team 01 | completed audit | Current-assignment readiness drift audit consumed | Re-audit after Ready promotion or new drift. |
 | Team 02 | assigned | Refresh requirements and top candidates after resolved decisions | Continue from `16-team-inboxes/TEAM-02-current-assignment.md`. |
 | Team 03 | assigned | Architecture/file-reservation readiness and post-decision packet refresh | Continue from `16-team-inboxes/TEAM-03-current-assignment.md`. |
@@ -37,6 +37,9 @@ Date: 2026-05-18
 - Integration queue depth: 1 active developer handoff in rejected/rework state: `CF-W1-L3-PORT-01A`
 - Decision inbox count: 0 open decisions
 - Refinement queue depth: 12 active unique refinement / near-ready items
+- Active spawned subagent limit: 6
+- Active spawned subagents planned: Teams 07, 02, 03, 05, 08, 09
+- Queued spawned subagents: Team 04, Team 10, Team 03 Architect Signoff, Team 06
 
 ## Decision Resolution
 
@@ -78,11 +81,12 @@ Daemon should continue autonomous work.
 
 ## Next Assignments
 
-1. Team 07 revises `CF-W1-L3-PORT-01A` in the existing dedicated worktree.
-2. Team 04 reruns focused QA in the Team 07 worktree.
-3. Team 10 performs code review / release readiness re-review in the Team 07 worktree.
-3. Continue post-decision packet refresh for `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, and `CF-W1-MD-01`.
-4. Evaluate the next near-ready child only when review bandwidth is safe:
+1. Spawn Team 07 to revise `CF-W1-L3-PORT-01A` in the existing dedicated worktree.
+2. Spawn Teams 02, 03, 05, 08, and 09 for non-conflicting readiness/refinement work.
+3. Queue Team 04 for QA rerun immediately after Team 07 completes.
+4. Queue Team 10 for release re-review immediately after Team 04 returns evidence.
+5. Continue post-decision packet refresh for `CF-W1-AUTH-01`, `CF-W1-SUB-01`, `CF-W1-UX-02`, `CF-W1-UX-05`, and `CF-W1-MD-01`.
+6. Evaluate the next near-ready child only when review bandwidth is safe:
    - `CF-W1-TP-01B`
    - `CF-W1-NOTIF-02`
    - `CF-W1-L3-ALERT-01`
@@ -90,4 +94,4 @@ Daemon should continue autonomous work.
 
 ## Stop State
 
-Runtime checkpoint after Team 00 routed `CF-W1-L3-PORT-01A` Team 10 rejection back to Team 07. This is not project completion. Product Owner action is not required; autonomous work should continue with Team 07 rework, Team 04 QA rerun, Team 10 re-review, and parallel docs-only refinement.
+Runtime checkpoint after Team 00 switched to a spawned-subagent rolling runtime model. This is not project completion. Product Owner action is not required; autonomous work should continue with Team 07 rework, Team 04 QA rerun, Team 10 re-review, and parallel docs-only refinement.
