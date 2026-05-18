@@ -142,6 +142,71 @@ Update `17-team-outboxes/TEAM-06-outbox.md` with:
 
 ---
 
+# Current Active Assignment Override
+
+Date: 2026-05-18
+
+## Assignment
+
+Rework `CF-W1-CAL-01` after Team 04 QA REJECT.
+
+Do not broaden scope. Fix only the QA finding that context-gap cases can still return `TRUSTED` instead of the required `LIMITED` readiness. Add focused regression coverage for `context-gap -> LIMITED`.
+
+## Branch / Worktree
+
+- Branch: `codex/team06-strategy-signal/CF-W1-CAL-01`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-CAL-01`
+
+## QA Reject Evidence
+
+- QA evidence: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-CAL-01-qa-verification.md`
+- QA outbox: `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+## Allowed Files
+
+You may edit only:
+
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.service.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.types.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md`
+- `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.service.test.ts`
+
+Allowed reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-CAL-01-developer-handoff.md`
+
+## Required Fix
+
+- Sufficient-sample, non-blocking-DQ calibration evidence with missing regime / sector leadership / smart-money context must return `LIMITED`, not `TRUSTED`.
+- Keep fail-closed hard blockers unchanged: `eligibleForCalibration=false`, `eligibleForSignals=false`, `NOT_READY`, `UNUSABLE`, and `ILLIQUID`.
+- Preserve existing score math and current response fields.
+- Do not invent external data, durable evidence, new providers, route contracts, shared utilities, frontend behavior, schema changes, generated files, or package changes.
+
+## Focused Validation
+
+Run after rework:
+
+```powershell
+cd C:\work\repo\investment-scanner-worktrees\team06-CF-W1-CAL-01\backend
+npm.cmd test -- signal-calibration-engine.service.test.ts --runInBand
+npm.cmd run build
+```
+
+Before build, check memory/resource safety if practical.
+
+## Expected Outbox
+
+Update the Team 06 outbox and developer handoff with:
+
+- exact fix applied;
+- regression test added for `context-gap -> LIMITED`;
+- commands run/results;
+- forbidden files confirmed untouched;
+- next gate: Team 04 QA rerun.
+
+---
+
 # Latest Assignment Override
 
 Date: 2026-05-18

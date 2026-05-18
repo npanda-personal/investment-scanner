@@ -1705,6 +1705,27 @@ Teams ready to pick up new tasks:
 
 ---
 
+# CAL-01 QA Reject Routed
+
+Date: 2026-05-18
+
+Team 04 rejected `CF-W1-CAL-01` QA because context-gap evidence can still return `TRUSTED` instead of `LIMITED`.
+
+Team 00 routing:
+
+- Stop only `CF-W1-CAL-01`.
+- Send back to Team 06 for bounded rework in `../investment-scanner-worktrees/team06-CF-W1-CAL-01`.
+- Keep `CF-W1-BT-02` Architect Signoff and Team 02 requirements discovery running.
+- Team 10 review remains queued until CAL QA rerun accepts.
+
+Teams ready to pick up new tasks:
+
+- Team 06: `CF-W1-CAL-01` bounded QA-reject rework now.
+- Team 00: `CF-W1-BT-02` delegated PO acceptance and scoped commit if Architect Signoff accepts.
+- Team 03: next architecture-prep candidate after Team 02 output.
+
+---
+
 # BT-02 Architect Signoff Relaunched
 
 Date: 2026-05-18

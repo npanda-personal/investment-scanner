@@ -1583,6 +1583,38 @@ Spawned Team 02 Requirement Factory:
 
 Date: 2026-05-18
 
+## CAL-01 QA Rejected
+
+Team 04 `019e3c0d-b69d-7ce2-9043-f363d350f8aa` completed QA Verification for `CF-W1-CAL-01` with `REJECT`.
+
+Blocking finding:
+
+- Context-gap cases are not downgraded to `LIMITED`; missing regime / sector leadership / smart-money context is added to data gaps but does not prevent `TRUSTED` readiness when samples and DQ otherwise pass.
+
+Routing:
+
+- Stop only the CAL workstream.
+- Route bounded Team 06 rework in `../investment-scanner-worktrees/team06-CF-W1-CAL-01`.
+- Rerun Team 04 QA after Team 06 rework.
+
+## Active / Next
+
+- Team 03 `019e3c10-711f-7ca2-9311-3a28736dd2d4`: `CF-W1-BT-02` Architect Signoff remains active.
+- Team 02 `019e3c0f-0b02-7182-a4eb-2c66a3b0da70`: investor/trader-value requirements discovery remains active.
+- Team 06 `CF-W1-CAL-01` bounded rework is ready to spawn.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06: `CF-W1-CAL-01` bounded QA-reject rework now.
+- Team 00: `CF-W1-BT-02` delegated PO acceptance and scoped commit if Architect Signoff accepts.
+- Team 03: next architecture-prep candidate after Team 02 output.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
 ## BT-02 Architect Signoff Relaunched
 
 The saved Team 03 architect agent `019e3c02-4baa-77a3-a567-d5cf34e804db` was not recoverable from the runtime and no architect-signoff evidence existed in the BT worktree. Team 00 relaunched the same bounded gate.
