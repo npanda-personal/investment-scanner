@@ -1690,6 +1690,20 @@ Teams ready to pick up new tasks:
 - Team 04: `CF-W1-SMI-01` QA rerun after Team 06 handoff.
 - Team 10: `CF-W1-MCTX-01` review after Team 04 QA accepts.
 
+## Dispatch Update
+
+- `CF-W1-MD-02A`: Team 04 accepted the proposal QA packet; no implementation is authorized.
+- `CF-W1-SMI-01`: Team 06 completed bounded rework and Team 04 QA rerun is ready.
+- `CF-W1-MCTX-01`: Team 05 worktree exists and dependency junctions are ready.
+- `CF-W1-MD-03`: Team 04 QA planning is ready after MD-02A QA review cleared the main QA lane.
+
+Teams ready to pick up new tasks:
+
+- Team 05: `CF-W1-MCTX-01` implementation now.
+- Team 04: `CF-W1-SMI-01` QA rerun now.
+- Team 04: `CF-W1-MD-03` QA planning now.
+- Team 10: `CF-W1-SMI-01` re-review after QA accepts.
+
 ---
 
 # Latest Coordination State

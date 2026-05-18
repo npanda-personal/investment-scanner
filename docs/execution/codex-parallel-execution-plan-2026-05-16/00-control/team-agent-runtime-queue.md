@@ -2566,3 +2566,25 @@ Branch/worktree:
 - Team 04: `CF-W1-MD-03` QA planning after active `MD-02A` QA review.
 - Team 04: `CF-W1-SMI-01` QA rerun after Team 06 handoff.
 - Team 10: `CF-W1-MCTX-01` review after Team 04 QA accepts.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Dispatch Update
+
+Team 04 accepted `CF-W1-MD-02A` as a proposal QA packet; it remains not Ready for Implementation and future `MD-02B` schema/migration work remains a separate consent gate.
+
+Team 06 completed `CF-W1-SMI-01` bounded rework after Team 10 reject. QA rerun can proceed in the SMI worktree.
+
+Team 05 `CF-W1-MCTX-01` worktree was created from `dev` at `01cb386` and dependency junctions were added for backend and frontend validation.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 05: `CF-W1-MCTX-01` implementation now.
+- Team 04: `CF-W1-SMI-01` QA rerun now in the Team 06 SMI worktree.
+- Team 04: `CF-W1-MD-03` QA planning now in the main workspace.
+- Team 10: `CF-W1-SMI-01` re-review after QA rerun accepts.
+- Team 10: `CF-W1-MCTX-01` review after Team 04 QA accepts.

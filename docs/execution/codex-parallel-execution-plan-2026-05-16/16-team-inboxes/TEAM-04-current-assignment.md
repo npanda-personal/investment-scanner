@@ -291,6 +291,47 @@ Return whether `CF-W1-MD-02A` is accepted as a proposal QA packet, rejected for 
 
 ---
 
+# Current Dispatcher Assignment
+
+Date: 2026-05-18
+
+## Assignment
+
+Prepare docs-only QA planning for `CF-W1-MD-03` - Market Data signoff threshold contract enforcement.
+
+This assignment supersedes older Team 04 tails. Team 03 returned `CF-W1-MD-03` as a Ready candidate only after QA planning. Do not implement application code and do not run tests.
+
+## Source Input
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MD-03-market-data-signoff-threshold-contract-requirement.md`
+- Architecture review: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-MD-03-architecture-review.md`
+- Contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-MD-03-market-data-signoff-threshold-contract.md`
+- Work packet: `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-MD-03-work-packet.md`
+- Team 03 outbox: `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+## Allowed Writes
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-MD-03-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/next-validation-plans.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+## Required QA Plan Coverage
+
+- passing universe signoff when price-ready share is at least `95%` and metadata-ready share is at least `90%`;
+- price-threshold failure below `95%` with explicit blocker reasoning;
+- metadata-threshold failure below `90%` with explicit blocker reasoning;
+- dual-threshold failure with both blocker reasons preserved;
+- `universeHealth()` and `repairPlan()` signoff parity;
+- preservation of existing review-ready counts and shares;
+- research-support wording and no direct advice;
+- explicit rejection if implementation widens into schema, repository/provider/startup/backfill, DQE source, routes/controllers, shared utilities/UI, frontend, packages, generated files, durable storage, provider/live-data, paid/cloud, broker, or telemetry.
+
+## Expected Output
+
+State whether `CF-W1-MD-03` is QA-plan ready for Team 00 Ready evaluation and list any blocker. No executable validation is authorized in this planning pass.
+
+---
+
 # Current Active Assignment Override
 
 Date: 2026-05-18

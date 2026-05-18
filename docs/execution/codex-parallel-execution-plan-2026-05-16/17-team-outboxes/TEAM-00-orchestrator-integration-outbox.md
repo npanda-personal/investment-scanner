@@ -2708,3 +2708,22 @@ Teams ready to pick up new tasks:
 - Team 05: `CF-W1-MCTX-01` implementation after worktree setup.
 - Team 04: `CF-W1-MD-03` QA planning after active `MD-02A` QA review.
 - Team 04: `CF-W1-SMI-01` QA rerun after Team 06 handoff.
+
+---
+
+# MD-02A Accepted, SMI QA Rerun, MCTX Dispatch
+
+Date: 2026-05-18
+
+Team 04 accepted `CF-W1-MD-02A` as a proposal QA packet. It remains docs-only and not Ready for Implementation.
+
+Team 06 completed `CF-W1-SMI-01` rework after Team 10 rejection. Team 04 QA rerun is ready in the Team 06 SMI worktree.
+
+Team 00 created the Team 05 `CF-W1-MCTX-01` worktree and dependency junctions.
+
+Teams ready to pick up new tasks:
+
+- Team 05: `CF-W1-MCTX-01` implementation now.
+- Team 04: `CF-W1-SMI-01` QA rerun now.
+- Team 04: `CF-W1-MD-03` QA planning now.
+- Team 10: `CF-W1-SMI-01` re-review after QA accepts.
