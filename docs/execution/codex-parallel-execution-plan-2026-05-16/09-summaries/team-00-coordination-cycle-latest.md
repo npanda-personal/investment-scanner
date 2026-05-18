@@ -1516,3 +1516,37 @@ Validation reported by Team 06:
 ## Next Coordination Action
 
 Commit this routing update if staged scope is clean, then spawn Team 04 for `CF-W1-CAL-01` QA verification.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
+## CAL-01 QA Dispatch
+
+Spawned Team 04 QA Verification:
+
+- Agent: `019e3c0d-b69d-7ce2-9043-f363d350f8aa`
+- Work item: `CF-W1-CAL-01`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-CAL-01`
+- Gate: QA Verification after Team 06 developer handoff.
+
+## Active Agents
+
+- Team 03 `019e3c02-4baa-77a3-a567-d5cf34e804db`: `CF-W1-BT-02` Architect Signoff.
+- Team 04 `019e3c0d-b69d-7ce2-9043-f363d350f8aa`: `CF-W1-CAL-01` QA Verification.
+
+## Priority Correction
+
+Product Owner priority direction is investor/trader value first. Team 00 should keep the rolling queue biased toward market data, data quality, signals, strategy trust, calibration, backtesting, historical/market context, trade-plan research support, and research evidence. Admin/settings/auth/subscription/notifications/alert convenience work should remain lower priority unless it is correctness, privacy, user-data safety, or an accepted branch gate.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 00: `CF-W1-BT-02` delegated PO acceptance and scoped commit if Architect Signoff accepts.
+- Team 10: `CF-W1-CAL-01` review after QA accepts.
+- Team 02: persistent investor/trader-value requirements discovery when relaunched.
+
+## Next Coordination Action
+
+Wait for whichever completes first: `CF-W1-BT-02` Architect Signoff or `CF-W1-CAL-01` QA Verification. If both remain active after this checkpoint, relaunch Team 02 with the corrected market-intelligence priority direction.

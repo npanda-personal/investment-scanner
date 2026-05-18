@@ -1668,6 +1668,25 @@ Teams ready to pick up new tasks:
 
 ---
 
+# CAL-01 QA Verification Dispatched
+
+Date: 2026-05-18
+
+Team 00 spawned Team 04 QA Verification for `CF-W1-CAL-01`.
+
+- Agent: `019e3c0d-b69d-7ce2-9043-f363d350f8aa`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-CAL-01`
+- Allowed writes: `CF-W1-CAL-01-qa-verification.md` and `TEAM-04-qa-factory.md` only.
+- Required validation: focused signal-calibration service test and backend build.
+
+Teams ready to pick up new tasks:
+
+- Team 00: `CF-W1-BT-02` delegated PO acceptance and scoped commit if Architect Signoff accepts.
+- Team 10: `CF-W1-CAL-01` review after QA accepts.
+- Team 02: persistent investor/trader-value requirements discovery when relaunched.
+
+---
+
 # CAL-01 QA Planning Dispatch
 
 Date: 2026-05-18
