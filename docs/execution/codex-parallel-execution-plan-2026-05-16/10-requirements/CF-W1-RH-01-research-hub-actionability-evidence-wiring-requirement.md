@@ -15,6 +15,7 @@ Research Hub is supposed to be the daily research command center, but its action
 - `backend/src/modules/research-hub/research-hub.md` defines `actionability` as a conservative adapter over stable public outputs.
 - The same module doc still says Signal Quality evidence maturity, Calibration readiness, Today Review readiness, and Trade Plan readiness are "not yet wired" into Research Hub actionability.
 - `backend/src/modules/research-hub/research-hub.service.ts` hard-codes `signalEvidence`, `calibrationReadiness`, `todayReviewReadiness`, and `tradePlanReadiness` as unstable placeholders instead of consuming module-owned public outputs.
+- The same service already consumes stable read paths from Strategy Decision, Market Context, Signal Generation, Smart Money, and Strategy Framework, so the gap is selective evidence wiring rather than a missing Research Hub shell.
 - `backend/src/modules/research-hub/research-hub.types.ts` already supports per-dimension status, count, evidence date, and message, which means the contract surface can absorb bounded actionability proof without a route redesign.
 - `frontend/src/features/research-hub/components/ResearchOverviewPage.tsx` renders the actionability summary and next-best action, so a bounded child could improve direct research trust without a broad UI rewrite.
 
@@ -24,17 +25,19 @@ Define the first bounded Research Hub actionability follow-on so the overview co
 
 The first child should focus on:
 
-- Today Review readiness as a stable read-only dimension when public publication evidence is available;
-- Trade Plan review readiness as a stable read-only dimension when public paper-review outputs are available;
+- Today Review readiness as a stable read-only dimension when public publication evidence is available through accepted `CF-W1-L3-TREV-01` surfaces;
+- Trade Plan review readiness as a stable read-only dimension when public paper-review outputs are available from the accepted/active Trade Plan chain without reopening Trade Plan semantics inside Research Hub;
 - Signal Quality and Calibration trust-state wiring only through stable public outputs already approved for downstream consumption;
 - additive evidence dates, counts, and blocker messages on the existing `actionability` contract;
-- no new scoring engine and no recomputation of upstream logic inside Research Hub.
+- no new scoring engine and no recomputation of upstream logic inside Research Hub;
+- no `whatChanged` work in this child; delta traceability stays separate under `CF-W1-RH-02`.
 
 ## Acceptance Criteria
 
 - Research Hub actionability no longer uses placeholder insufficiency for dimensions whose stable public evidence is already available.
 - Each actionability dimension explains trusted, limited, blocked, unproven, or insufficient-data status using upstream-owned semantics only.
 - Evidence dates and counts are exposed when the upstream module already owns them.
+- Research Hub fails closed to explicit `LIMITED`, `UNPROVEN`, or `INSUFFICIENT_DATA` when an upstream module lacks a stable public read surface, rather than fabricating a positive trust state.
 - `canReviewActionableSetups` remains conservative and research-support only; it must not imply broker authorization or direct advice.
 - Missing or unavailable upstream evidence is surfaced explicitly rather than inferred as healthy.
 - Focused tests later prove at least one trusted/limited/blocked/unavailable path for each newly wired dimension.
@@ -77,4 +80,4 @@ This is a `10-requirements/**` discovery item now, with later work centered in `
 
 ## Next Gate
 
-Product refinement is sufficient for Team 03 and Team 04 to prepare a bounded Research Hub actionability contract and QA plan. Team 00 should keep it below the current top 5 stack and route it only after the nearer upstream trust packets advance.
+Product refinement is sufficient for Team 03 and Team 04 to prepare a bounded Research Hub actionability contract and QA plan. After the 2026-05-18 routing changes that put `CF-W1-TP-02` into active Team 06 implementation and `CF-W1-SMI-01` into active Team 03 architecture prep, this is the next top unassigned non-blocked requirement Team 00 should pull for docs-only prep.

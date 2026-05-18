@@ -4,6 +4,13 @@ Date: 2026-05-18
 
 Status: Refreshed by Team 02 after Team 06 `CF-W1-SIG-TRIGGER-02A` launch and the Product Owner investor-value priority correction. This queue is refinement-only; Team 00 owns Ready queue movement.
 
+Current dispatch correction on 2026-05-18 after the Research Hub audit:
+
+- `CF-W1-TP-02` is active Team 06 implementation and should stay out of the next unassigned pull.
+- `CF-W1-SMI-01` is active Team 03 architecture prep and should stay out of the next unassigned pull.
+- `CF-W1-SQLAB-02`, `CF-W1-STRAT-02`, and `CF-W1-MD-02` remain high-value parent items but are still sequenced or blocked for new bounded routing.
+- After excluding active, accepted, parked, and blocked items, the next top unassigned non-blocked requirement is `CF-W1-RH-01`.
+
 ## Team 02 Current Priority Override
 
 This section is the latest Team 02 ordering and supersedes older ranking text below where they conflict.
@@ -17,20 +24,18 @@ Current ordering is based on two filters:
 
 | Rank | ID | Why it is ahead now | Team 00 routing note |
 | --- | --- | --- | --- |
-| 1 | `CF-W1-SQLAB-02` | Durable post-event learning closes a direct measured-signal review gap and can be prepared without touching Team 06 active files. | Route to Team 03 and Team 04 now. |
-| 2 | `CF-W1-STRAT-02` | Strategy provenance and DQ gate trust remain upstream to signal, backtest, and trade-plan credibility. | Route to Team 03 and Team 04 now. |
-| 3 | `CF-W1-TP-02` | Exit/invalidation semantics are direct user value and cleaner to prep than same-module signal follow-ons. | Route to Team 03 and Team 04 now. |
-| 4 | `CF-W1-MD-02` | Durable market-data evidence remains the largest upstream trust gap, but only as ADR prep. | Route to Team 03 plus Team 04 ADR QA checklist. |
-| 5 | `CF-W1-UX-01` | Research Workbench trust proof is direct user value after the upstream trust stack above. | Route to Team 03, Team 08, and Team 04 after higher upstream prep starts. |
-| 6 | `CF-W1-SIG-TRIGGER-02` | High user value, but not immediate parallel-safe because Team 06 actively owns `signal-generation-engine` for `02A`. | Keep visible, but do not dispatch until `02A` stabilizes. |
+| 1 | `CF-W1-RH-01` | Research Hub already exposes the actionability panel but still hard-codes major trust dimensions as unwired placeholders. | Route to Team 03 and Team 04 now. |
+| 2 | `CF-W1-L3-TREV-02` | Today Review detail can expose candidate-level provenance and evidence timing without reopening active implementation slices. | Route after `CF-W1-RH-01` enters prep. |
+| 3 | `CF-W1-RH-02` | Research Hub should stop implying auditable deltas until a comparison basis exists. | Route behind `CF-W1-RH-01`; split if storage is required. |
+| 4 | `CF-W1-SQLAB-02` | High-value parent item, but still sequenced behind earlier accepted/blocked child work. | Keep visible; do not present as the next unassigned pull. |
+| 5 | `CF-W1-STRAT-02` | High-value parent item, but durable revision history remains blocked. | Keep visible; do not present as the next unassigned pull. |
+| 6 | `CF-W1-MD-02` | High-value ADR item, but still schema/storage-blocked for implementation-facing prep. | Keep visible as ADR-only. |
 
 ### Candidates Team 00 Can Route In Parallel Right Now
 
-- `CF-W1-SQLAB-02`
-- `CF-W1-STRAT-02`
-- `CF-W1-TP-02`
-- `CF-W1-MD-02`
-- `CF-W1-UX-01`
+- `CF-W1-RH-01`
+- `CF-W1-L3-TREV-02`
+- `CF-W1-RH-02`
 
 ### Additional Discovery Candidates Added This Cycle
 
@@ -82,6 +87,14 @@ These are docs-only discovery priorities. They do not override Team 00's current
 | 8 | CF-W1-L3-WATCH-01 | Watchlist review actionability can improve the trader review queue without waiting on convenience work. | Architecture contract and QA plan for explainable review priority. |
 | 9 | CF-W1-L3-INTEL-02 | Review traceability remains useful once higher-value trust layers are settled. | Architecture contract and QA plan for review-output explainability. |
 | 10 | CF-W1-L3-ALERT-03 | Post-trigger follow-through only matters after the evidence stack is stronger. | Architecture contract and QA plan for outcome traceability. |
+
+## Next Unassigned Non-Blocked Pull
+
+| Rank | ID | Why now | Next refinement need |
+| --- | --- | --- | --- |
+| 1 | CF-W1-RH-01 | Research Hub already exposes the actionability surface but still hard-codes major trust dimensions as unwired placeholders. | Team 03/04 packet prep for bounded actionability evidence wiring. |
+| 2 | CF-W1-L3-TREV-02 | Today Review candidate detail can become auditable through provenance labels and evidence timing without broad upstream rewrites. | Team 03/04 packet prep after `CF-W1-RH-01`. |
+| 3 | CF-W1-RH-02 | Research Hub `whatChanged` should stop simulating deltas unless a safe prior comparison basis exists. | Team 03 decision on no-schema comparison vs later storage split. |
 
 ## Decision Inbox State
 
@@ -206,6 +219,9 @@ These candidates are intentionally outside the current top 10 routing stack but 
 | CF-W1-L3-WATCH-01 | Watchlist review-actionability contract and QA plan. | Team 00 / Team 03 |
 | CF-W1-L3-INTEL-02 | Portfolio intelligence review traceability contract and QA plan. | Team 00 / Team 03 |
 | CF-W1-L3-ALERT-03 | Alert follow-through contract and QA plan. | Team 00 / Team 03 |
+| CF-W1-RH-01 | Research Hub actionability evidence-wiring contract and QA plan. | Team 00 / Team 03 / Team 04 |
+| CF-W1-L3-TREV-02 | Today Review candidate snapshot provenance contract and QA plan. | Team 00 / Team 03 / Team 04 |
+| CF-W1-RH-02 | Research Hub `whatChanged` comparison-basis contract and QA plan or storage split decision. | Team 00 / Team 03 / Team 04 |
 | CF-W1-TP-01B | Ready-promotion check for backend-only Trade Plan DQ hard-block implementation. | Team 00 |
 | CF-W1-NOTIF-02 | Ready-promotion check and implementation handoff for notification log redaction. | Team 00 + Team 09 |
 | CF-W1-L3-ALERT-01 | Ready-promotion check for alert readiness suppression implementation. | Team 00 |

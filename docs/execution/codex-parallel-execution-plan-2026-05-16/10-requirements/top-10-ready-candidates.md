@@ -4,7 +4,9 @@ Date: 2026-05-18
 
 Status: Refreshed after Product Owner priority correction. This is a docs-only candidate list, not proof of implementation readiness. Team 00 owns all Ready queue movement.
 
-Team 02 discovery note: after the active `CF-W1-BT-02`, `CF-W1-HCTX-01`, `CF-W1-DQ-02`, and `CF-W1-MCTX-01` lanes, `CF-W1-CAL-01` is the top unassigned investor/trader-value item. This does not change Team 00's live Ready routing.
+Team 02 discovery note: this file remains a docs-only candidate view, not a Ready decision. Use the dispatch correction below for the actual next unassigned pull.
+
+Current dispatch correction on 2026-05-18: `CF-W1-CAL-01` is no longer unassigned; it was accepted and committed as parked branch work. `CF-W1-TP-02` is active Team 06 implementation, and `CF-W1-SMI-01` is active Team 03 architecture prep. After excluding active, accepted, parked, and blocked items, the next top unassigned docs-only requirement is `CF-W1-RH-01`.
 
 ## Priority Rule
 
@@ -71,7 +73,7 @@ Already promoted, pulled, accepted, or parked branch work should stay out of the
 
 ## Next Team 00 Pull
 
-Next docs-only handoff after the active `BT-02` and `HCTX-01` lanes: `CF-W1-CAL-01` to Team 03 for architecture/contract prep.
+Next docs-only handoff after excluding active, accepted, parked, and blocked items: `CF-W1-RH-01` to Team 03 for architecture/contract prep and Team 04 for QA-plan prep.
 
 Next live Ready routing stays outside this docs-only candidate list; the routed market-context and Data Quality lanes remain excluded until Team 00 changes live routing.
 

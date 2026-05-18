@@ -10,12 +10,20 @@ Product Owner correction after this refresh:
 - Admin, settings, auth/subscription, notifications, and user-alert convenience work should be lowest priority unless they block correctness, privacy, or user-data safety.
 - Alerts can return to the top only when they are tied to signal/backtest/market-data evidence quality, not as notification or inbox convenience work.
 
+## Current Dispatch Filter
+
+Apply this extra filter before Team 00 chooses the next pull:
+
+- exclude active implementation, active architecture/QA prep, accepted branch commits parked for later integration, and items already blocked behind schema/durable-storage/shared-file gates;
+- as of 2026-05-18, `CF-W1-TP-02` is active Team 06 implementation and `CF-W1-SMI-01` is active Team 03 architecture prep, so neither belongs in the next unassigned pull;
+- after those exclusions, the next top unassigned non-blocked requirement is `CF-W1-RH-01`.
+
 ## Cycle Frame
 
 - Open decisions: `0`
 - This ranking is for the next requirement / contract / QA-prep pull, not for Ready queue movement.
 - Team 00 keeps ownership of Ready promotion and live implementation routing.
-- Team 06 currently owns active implementation for `CF-W1-SIG-TRIGGER-02A`, so backlog ranking must distinguish direct user value from same-module dispatch safety.
+- Team 06 currently owns active implementation for `CF-W1-TP-02`, and Team 03 currently owns active architecture prep for `CF-W1-SMI-01`, so backlog ranking must distinguish direct user value from current dispatchability.
 
 ## Active Investor-Value Work Kept Visible
 
@@ -70,13 +78,11 @@ These items are already promoted, pulled, accepted, or in active QA / review flo
 
 ## Top Parallel-Ready Prep Candidates
 
-These are the clearest next docs-only candidates Team 00 can route to Team 03 and Team 04 without waiting for Team 06 implementation files from `CF-W1-SIG-TRIGGER-02A`:
+These are the clearest next docs-only candidates Team 00 can route now after excluding active, accepted, parked, and blocked items:
 
-1. `CF-W1-SQLAB-02`
-2. `CF-W1-STRAT-02`
-3. `CF-W1-TP-02`
-4. `CF-W1-MD-02`
-5. `CF-W1-UX-01`
+1. `CF-W1-RH-01`
+2. `CF-W1-L3-TREV-02`
+3. `CF-W1-RH-02`
 
 ## Additional Next-Wave Discovery Candidates
 
@@ -89,10 +95,16 @@ Ranking is unchanged. These were added because current source shows underdevelop
 | `CF-W1-SMI-01` | Makes Smart Money confirmation explain freshness, persisted-vs-missing evidence, and ownership-placeholder limits. | Persisted snapshot timing, range coverage, partial-trust semantics for missing ownership, and safe downstream "usable vs limited vs unavailable" framing. | No provider expansion, no market-data redesign, no DQ duplication, no schema/shared-UI work. | Team 03 prep, Team 04 QA prep, later Team 06 implementation. | Semantically adjacent to `CF-W1-MD-02`, `CF-W1-HCTX-01`, and `CF-W1-MCTX-01`, but does not reopen them. | Medium. Module-local first child is plausible. | `Yes`. No active Team 06 writer currently owns `smart-money-intelligence`; requirement work is isolated. |
 | `CF-W1-L3-TREV-02` | Makes Today Review candidate detail auditable by exposing source-module provenance and evidence timing for stored snapshots. | Candidate-level provenance labels, evidence dates, compatibility-only labels for partial/legacy snapshot shapes, and read-only detail semantics. | No scheduler rewrite, no Strategy Decision rewrite, no Trade Plan geometry rewrite, no schema/shared-UI scope. | Team 03 prep, Team 04 QA prep, later Team 07 implementation. | `CF-W1-L3-TREV-01` first; keep target-language cleanup separate under `CF-W1-TP-02`. | Medium. Child can stay in `today-trade-review`, but risk rises if snapshot normalization widens. | `Yes`. Requirement work is doc-only and does not overlap Team 06's active module. |
 
+## Next Unassigned Non-Blocked Pull
+
+1. `CF-W1-RH-01`
+2. `CF-W1-L3-TREV-02`
+3. `CF-W1-RH-02`
+
 ## Why This Ranking Changed
 
 - `CF-W1-SIG-TRIGGER-02A` is now explicitly treated as active implementation work, so same-module follow-on prep cannot be presented as immediately parallel-safe.
-- `CF-W1-TP-02` moved ahead of `CF-W1-MD-02` and `CF-W1-SIG-TRIGGER-02` because it is both direct investor/trader value and cleaner to prep in parallel right now.
+- `CF-W1-TP-02` no longer belongs in the next unassigned pull because it is already active Team 06 work.
 - `CF-W1-MD-02` stays near the top because it is upstream and high value, but it remains ADR-only and therefore less dispatchable than the first three items.
 - `CF-W1-UX-01` stays in the upper half because it is a direct research surface, but it still trails upstream trust-evidence packets.
 - Lane 3 convenience items remain behind signal/strategy/market-data/trade-plan evidence work unless correctness, privacy, or user-data safety demands earlier action.
@@ -105,10 +117,10 @@ Ranking is unchanged. These were added because current source shows underdevelop
 
 ## Next 3 Candidates Team 00 Should Evaluate
 
-1. `CF-W1-SQLAB-02`
-2. `CF-W1-STRAT-02`
-3. `CF-W1-TP-02`
+1. `CF-W1-RH-01`
+2. `CF-W1-L3-TREV-02`
+3. `CF-W1-RH-02`
 
 ## Team 02 Recommendation
 
-Keep Team 00's live Ready / review routing unchanged for already-active branches. For the next docs-only prep pull, route `CF-W1-SQLAB-02`, `CF-W1-STRAT-02`, and `CF-W1-TP-02` first, with `CF-W1-MD-02` as the parallel ADR packet and `CF-W1-UX-01` as the next frontend-facing trust child. Keep `CF-W1-SIG-TRIGGER-02` visible as a high-value follow-on, but do not dispatch it until Team 06 finishes the active `CF-W1-SIG-TRIGGER-02A` slice and Team 00 can verify the next same-module reservation. Do not let admin/settings/auth/subscription/notifications or alert-convenience work preempt this stack unless a correctness, privacy, or user-data-safety blocker appears.
+Keep Team 00's live Ready / review routing unchanged for already-active branches. For the next new docs-only pull after excluding active, accepted, parked, and blocked items, route `CF-W1-RH-01` first. Keep `CF-W1-L3-TREV-02` and `CF-W1-RH-02` as the next Research-Hub-adjacent follow-ons, with `CF-W1-SQLAB-02`, `CF-W1-STRAT-02`, and `CF-W1-MD-02` remaining visible as high-value but currently sequenced or blocked parent items. Do not let admin/settings/auth/subscription/notifications or alert-convenience work preempt this stack unless a correctness, privacy, or user-data-safety blocker appears.
