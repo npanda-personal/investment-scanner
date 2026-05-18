@@ -52,7 +52,7 @@ Gap still uncharacterized by current tests/docs:
 
 - fail-open baseline when `useDataQualityFilter` is false
 - default enabled-path `WARN_AND_PROCESS` missing-quality semantics
-- caller-allowed limited readiness when `excludeNotReady=false`
+- honest no-override `includeLimited=true` call shape and explicit `excludeNotReady=false` flag pass-through
 - mixed-history registered `PARTIAL` outcome
 - module-doc explanation that these are current descriptive semantics, not a fail-closed endorsement
 
@@ -66,10 +66,11 @@ Gap still uncharacterized by current tests/docs:
 - `useDataQualityFilter=true` with no stricter overrides currently calls DQE with:
   - `minSignalReadinessScore = 70` when unset
   - `excludeNotReady = true`
-  - `includeLimited = false`
+  - `includeLimited = true`
   - `excludeIlliquid = true`
   - `excludeMissingQuality = false`
   - `missingQualityBehavior = WARN_AND_PROCESS`
+  - current evidence must describe this as an honest call-shape characterization, not as a fail-closed policy endorsement
 - `excludeMissingQuality=true` currently changes the DQE call to:
   - `excludeMissingQuality = true`
   - `missingQualityBehavior = SKIP`
@@ -77,7 +78,7 @@ Gap still uncharacterized by current tests/docs:
 - `excludeNotReady=false` currently changes the DQE call to:
   - `excludeNotReady = false`
   - `includeLimited = true`
-  - caller-allowed limited readiness remains processable
+  - QA must treat this as flag pass-through only and must not claim that `NOT_READY` becomes eligible unless a future source packet changes the allowed-status wiring
 - registered backtests still map history completeness honestly:
   - no qualifying instrument history -> `availabilityStatus = INSUFFICIENT_HISTORY`
   - mixed qualifying plus insufficient/missing history -> `availabilityStatus = PARTIAL`
@@ -96,9 +97,9 @@ Gap still uncharacterized by current tests/docs:
 | Scenario | Expected QA assertion after implementation |
 | --- | --- |
 | DQ disabled baseline | `useDataQualityFilter=false` or absent bypasses DQE filtering and preserves the full candidate universe as current behavior. |
-| Default enabled DQ call shape | `useDataQualityFilter=true` with no stricter flags calls DQE with `excludeNotReady=true`, `includeLimited=false`, `excludeMissingQuality=false`, and `missingQualityBehavior=WARN_AND_PROCESS`. |
+| Default enabled DQ call shape | `useDataQualityFilter=true` with no stricter flags calls DQE with `excludeNotReady=true`, `includeLimited=true`, `excludeMissingQuality=false`, and `missingQualityBehavior=WARN_AND_PROCESS`. |
 | Strict missing-quality option | `excludeMissingQuality=true` flips the DQE call to `missingQualityBehavior=SKIP` and the filtered-universe metadata reflects returned exclusions. |
-| Caller-allowed limited readiness | `excludeNotReady=false` flips the DQE call to `includeLimited=true`, proving limited readiness remains processable when the caller asks for it. |
+| Explicit `excludeNotReady` pass-through | `excludeNotReady=false` passes the flag through while `includeLimited=true` remains unchanged; QA must not claim this alone makes `NOT_READY` eligible under the current DQE semantics. |
 | Registered insufficient history | No qualifying registered-history instrument returns `availabilityStatus=INSUFFICIENT_HISTORY` and explicit insufficient-history counts. |
 | Registered partial history | Mixed qualifying and insufficient/missing registered history returns `availabilityStatus=PARTIAL` and explicit mixed coverage counts. |
 | Existing warning wording | Data-coverage and realism warnings remain research-support oriented and avoid direct-advice or target language. |
@@ -110,7 +111,8 @@ The module doc update for this child should remain additive and descriptive only
 
 - the DQ filter is optional and disabled by default on current `dev`
 - current enabled defaults still use warning/process semantics for missing DQ unless the caller requests strict skip behavior
-- caller-allowed limited readiness is still processable when `excludeNotReady=false`
+- the no-override path currently passes `includeLimited = true` together with `excludeNotReady = true`
+- explicit `excludeNotReady=false` is currently only a flag pass-through and does not by itself broaden allowed statuses to `NOT_READY`
 - `PARTIAL` and `INSUFFICIENT_HISTORY` are current registered-run history outcomes
 - these notes characterize current trust limits and do not claim a fail-closed backtesting policy
 
@@ -189,7 +191,7 @@ Stop QA and return the packet to Team 00 / Architect if:
   - DQ-disabled fail-open baseline
   - default enabled `WARN_AND_PROCESS` semantics
   - strict missing-quality skip
-  - caller-allowed limited readiness
+  - honest no-override `includeLimited=true` behavior and explicit `excludeNotReady=false` pass-through
   - `INSUFFICIENT_HISTORY`
   - mixed-history `PARTIAL`
 - module-doc evidence that current trust limits are described without claiming a fail-closed policy

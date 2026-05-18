@@ -25,7 +25,7 @@ Characterize the current `backtesting-strategy-lab` DQ gate behavior without cha
 
 - DQ disabled baseline;
 - DQ enabled default missing-quality warning/process behavior;
-- limited/not-ready option pass-through;
+- honest no-override limited-readiness call shape plus explicit `excludeNotReady` flag pass-through;
 - strict missing-quality skip option;
 - registered history-completeness outcomes.
 
@@ -73,8 +73,10 @@ The future execution pass must:
 Required assertions:
 
 - `useDataQualityFilter` absent or false leaves the universe unchanged;
-- enabled DQ defaults to `excludeNotReady=true`, `includeLimited=false`, `excludeMissingQuality=false`, and `missingQualityBehavior=WARN_AND_PROCESS`;
-- `excludeNotReady=false` flips the current call shape to allow limited readiness;
+- enabled DQ defaults to `excludeNotReady=true`, `includeLimited=true`, `excludeMissingQuality=false`, and `missingQualityBehavior=WARN_AND_PROCESS`;
+- the no-override call shape is documented as current behavior only, not as a fail-closed endorsement;
+- `excludeNotReady=false` passes the caller flag through while `includeLimited` remains `true`;
+- the packet must not claim that `excludeNotReady=false` alone makes `NOT_READY` eligible under the current DQE semantics;
 - `excludeMissingQuality=true` flips the current call shape to skip missing DQ;
 - registered runs with no qualifying history return `INSUFFICIENT_HISTORY`;
 - registered runs with mixed qualifying and non-qualifying history return `PARTIAL`.
@@ -103,8 +105,9 @@ Required QA focus:
 
 - prove the DQ-disabled fail-open baseline;
 - prove the DQ-enabled default missing-quality warning/process call shape;
+- prove the honest no-override `includeLimited=true` call shape;
 - prove explicit strict missing-quality skip behavior when requested;
-- prove explicit limited/not-ready pass-through when requested;
+- prove explicit `excludeNotReady=false` flag pass-through without claiming broader `NOT_READY` eligibility;
 - prove `INSUFFICIENT_HISTORY` and `PARTIAL` history outcomes for registered runs;
 - confirm research-support wording remains intact.
 

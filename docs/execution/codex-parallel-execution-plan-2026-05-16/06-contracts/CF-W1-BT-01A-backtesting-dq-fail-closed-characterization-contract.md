@@ -57,10 +57,12 @@ When `useDataQualityFilter` is true and no stricter flags are supplied, the serv
 
 - `minSignalReadinessScore = 70` when unset;
 - `excludeNotReady = true`;
-- `includeLimited = false`;
+- `includeLimited = true`;
 - `excludeIlliquid = true`;
 - `excludeMissingQuality = false`;
 - `missingQualityBehavior = WARN_AND_PROCESS`.
+
+This current no-override combination is descriptive only. Under the current DQE implementation it keeps `LIMITED` processable while still excluding `NOT_READY`.
 
 ### 3. Missing-Quality Strict Option
 
@@ -71,14 +73,14 @@ When `excludeMissingQuality = true`, the characterization must prove the current
 
 The resulting filtered universe should reflect DQE exclusions returned by the mocked public dependency.
 
-### 4. Limited / Not-Ready Option Pass-Through
+### 4. Explicit `excludeNotReady` Pass-Through
 
 When `excludeNotReady = false`, the characterization must prove the current service changes the DQE call to:
 
 - `excludeNotReady = false`;
 - `includeLimited = true`.
 
-This proves that limited readiness can remain processable when the caller asks for it.
+This proves the service passes the caller flag through. The characterization must not claim that this flag alone makes `NOT_READY` eligible, because the current DQE allowed-status path still remains `READY` / `LIMITED` unless a future source packet changes that call shape.
 
 ### 5. Registered History Completeness
 
@@ -127,7 +129,7 @@ Focused coverage must prove:
 - DQ-disabled fail-open baseline
 - DQ-enabled default missing-quality warning/process semantics
 - strict missing-quality skip semantics when explicitly requested
-- limited/not-ready option pass-through when explicitly requested
+- current no-override `includeLimited = true` behavior and explicit `excludeNotReady` flag pass-through
 - `INSUFFICIENT_HISTORY` for no qualifying registered history
 - `PARTIAL` for mixed registered history completeness
 - research-support warning wording remains intact
