@@ -20,6 +20,16 @@ The runtime model is a rolling pool:
 
 Independent items should run in parallel by default. Do not make one implementation, QA, review, architecture, or requirement-prep stream wait for another unless there is a real dependency, shared-file conflict, runtime/resource limit, or unresolved blocker.
 
+## Gate Priority Override
+
+Latest Product Owner direction on 2026-05-18:
+
+1. Pending Architect Signoff is higher priority than rolling architecture prep.
+2. Pending delegated Product Owner acceptance / scoped commit is higher priority than requirement discovery.
+3. Pending QA or code-review gates for already implemented work outrank new discovery when a matching team slot is available.
+4. If no signoff, acceptance, QA, or review gate is pending, Team 02 should keep working requirements and Team 03 should keep working design / architecture readiness.
+5. Rolling discovery and architecture prep must not block independent gate work.
+
 ## Delegated Decision Path
 
 Latest Product Owner direction on 2026-05-18:
@@ -54,6 +64,8 @@ Team 03 must continuously:
 - leave Ready promotion to Team 00.
 
 Team 03 should not wait for active implementation work unless the same files or contracts are involved.
+
+If a Team 03 Architect Signoff becomes available, Team 00 should route that signoff before assigning Team 03 more rolling architecture-prep work. If Team 03 is already working on docs-only architecture prep and a signoff becomes urgent, Team 00 may spawn a separate Team 03 signoff agent when capacity allows and write scopes are isolated, or queue the signoff as the next Team 03 task.
 
 ## Active Pool Limit
 

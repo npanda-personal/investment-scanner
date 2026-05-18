@@ -1589,6 +1589,8 @@ Team 00 confirmed the queue is not inherently one-at-a-time. Work can proceed in
 
 Team 03 is now also treated as a rolling docs-only architecture-readiness lane, parallel to Team 02. Its job is to keep top-priority items moving through architecture reviews, contracts, work packets, file reservations, split decisions, and QA handoff notes without waiting for implementation agents unless file ownership overlaps.
 
+Gate priority override: Architect Signoff and delegated Product Owner acceptance / scoped commit gates preempt rolling discovery and architecture prep. If no signoff or acceptance gate is pending, Team 02 continues requirements discovery and Team 03 continues design / architecture readiness.
+
 ## Active Agents
 
 - Team 06 `019e3c36-5758-7052-839d-479fdbe261e7`: `CF-W1-SIG-TRIGGER-02A` implementation in `../investment-scanner-worktrees/team06-CF-W1-SIG-TRIGGER-02A`.
@@ -1612,6 +1614,8 @@ Team 03 is now also treated as a rolling docs-only architecture-readiness lane, 
 ## Next Coordination Action
 
 Consume the next completed agent. Route Team 06 output to QA if implementation completes first. Feed Team 02 output into Team 03 if discovery completes first. Route Team 03 output to Team 04 QA planning or Team 00 Ready evaluation if architecture readiness completes first.
+
+If a review-accepted implementation produces an Architect Signoff gate, route that before more Team 03 prep. If Architect Signoff accepts, Team 00 should immediately perform delegated PO acceptance and scoped branch commit when the standing gates and staged scope pass.
 
 ---
 

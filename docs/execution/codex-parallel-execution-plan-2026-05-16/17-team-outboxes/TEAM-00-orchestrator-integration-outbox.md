@@ -1676,6 +1676,8 @@ Date: 2026-05-18
 
 Not every item is dependent. Team 00 should not serialize the factory by default. Parallel work is allowed when exact file reservations do not overlap and the active lane has enough reviewer / QA capacity.
 
+Signoff gates override discovery. Pending Architect Signoff and delegated Product Owner acceptance / scoped commit are high priority. When no signoff or acceptance gate exists, Team 02 keeps requirements moving and Team 03 keeps design / architecture readiness moving.
+
 ## Runtime Action
 
 Team 00 kept active Team 06 implementation running and launched a parallel Team 02 requirement-discovery agent:
