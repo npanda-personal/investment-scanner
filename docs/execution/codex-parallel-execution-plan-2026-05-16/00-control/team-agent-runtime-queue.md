@@ -826,7 +826,7 @@ Current routing follows the Product Owner correction: prioritize direct investor
 
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Team 04 - QA Factory | pending spawn | `gpt-5.4`, high | QA rerun after dependency junction | `CF-W1-BT-02` in Team 06 worktree | ready |
+| 1 | Team 04 - QA Factory | `019e3bcf-03ae-7583-8feb-6869b40b6b54` | `gpt-5.4`, high | QA rerun after dependency junction | `CF-W1-BT-02` in Team 06 worktree | active |
 | 2 | Team 04 - QA Factory | `019e3bcc-350d-79e1-9b11-9bd69e859a28` | `gpt-5.4`, high | QA verification | `CF-W1-HCTX-01` in Team 05 worktree | active |
 | 3 | Open slot | none | pending | review/release | `CF-W1-HCTX-01` after QA accepts | waiting |
 | 4 | Team 03 - Architecture Factory | `019e3bc6-dfda-72f1-8db1-2b7730d337c1` | `gpt-5.4`, high | architecture prep | `CF-W1-MCTX-01` | active |
@@ -835,7 +835,7 @@ Current routing follows the Product Owner correction: prioritize direct investor
 
 ## Teams Ready To Pick Up New Tasks
 
-- Team 04 is ready for `CF-W1-BT-02` QA rerun after dependency junction unblock.
+- Team 04 is active on `CF-W1-BT-02` QA rerun after dependency junction unblock.
 - Team 04 is active on `CF-W1-HCTX-01` QA.
 - Team 10 is ready for review after QA accepts a handoff.
 - Team 03 is active on `CF-W1-MCTX-01` architecture prep.

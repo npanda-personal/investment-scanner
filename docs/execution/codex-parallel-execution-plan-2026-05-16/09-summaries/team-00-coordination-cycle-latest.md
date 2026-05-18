@@ -879,3 +879,31 @@ Team 00 resolved this as a local validation-environment blocker without package 
 ## Next Coordination Action
 
 Spawn Team 04 QA rerun for `CF-W1-BT-02`.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
+## BT-02 QA Rerun Dispatch
+
+Team 04 QA rerun is active for `CF-W1-BT-02`:
+
+- Agent: `019e3bcf-03ae-7583-8feb-6869b40b6b54`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-BT-02`
+- Gate: rerun backend focused test/build and frontend UI/build after dependency-junction unblock
+
+## Current Pool
+
+- Team 04 QA rerun: active on `CF-W1-BT-02`.
+- Team 04 QA Verification: active on `CF-W1-HCTX-01`.
+- Team 03 architecture prep: completed `CF-W1-MCTX-01`; output awaiting Team 00 docs commit and QA-planning route.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 10 is ready for `CF-W1-BT-02` review after BT QA accepts.
+- Team 10 is ready for `CF-W1-HCTX-01` review after HCTX QA accepts.
+- Team 04 is ready for `CF-W1-MCTX-01` QA planning after Team 00 commits Team 03 output.
+- Team 03 next architecture target after MCTX is `CF-W1-CAL-01`.
+- Team 02 is ready for persistent market-intelligence requirements discovery when a non-conflicting docs-only slot is opened.

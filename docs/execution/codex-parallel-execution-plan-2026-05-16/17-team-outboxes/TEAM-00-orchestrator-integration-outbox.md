@@ -1468,3 +1468,16 @@ Teams ready to pick up new tasks:
 - Team 10: `CF-W1-BT-02` review after QA accepts.
 - Team 04: `CF-W1-HCTX-01` QA remains active in the separate Team 05 worktree.
 - Team 03: `CF-W1-MCTX-01` architecture prep remains active.
+
+## Dispatch Result
+
+Team 04 QA rerun is active:
+
+- Agent: `019e3bcf-03ae-7583-8feb-6869b40b6b54`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-BT-02`
+
+Teams ready to pick up new tasks:
+
+- Team 10: `CF-W1-BT-02` review after QA accepts.
+- Team 10: `CF-W1-HCTX-01` review after QA accepts.
+- Team 04: `CF-W1-MCTX-01` QA planning after Team 00 commits Team 03 output.
