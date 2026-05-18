@@ -1583,6 +1583,42 @@ Spawned Team 02 Requirement Factory:
 
 Date: 2026-05-18
 
+## Parallel Work Model
+
+Team 00 confirmed the queue is not inherently one-at-a-time. Work can proceed in parallel when file ownership is isolated. The current source-code bottleneck is Team 06 ownership around Strategy / Signal / Risk modules, so parallel implementation should use other module lanes or wait for Team 06 handoff when the next candidate touches the same files.
+
+Team 03 is now also treated as a rolling docs-only architecture-readiness lane, parallel to Team 02. Its job is to keep top-priority items moving through architecture reviews, contracts, work packets, file reservations, split decisions, and QA handoff notes without waiting for implementation agents unless file ownership overlaps.
+
+## Active Agents
+
+- Team 06 `019e3c36-5758-7052-839d-479fdbe261e7`: `CF-W1-SIG-TRIGGER-02A` implementation in `../investment-scanner-worktrees/team06-CF-W1-SIG-TRIGGER-02A`.
+- Team 02 `019e3c39-a5f1-7353-ab62-b55c19f94a3f`: docs-only market-intelligence requirement discovery and parallel-candidate refresh.
+- Team 03 `019e3c3c-0da0-7d81-a077-6a2a65616095`: rolling docs-only architecture readiness for the next independent top-priority candidate.
+
+## Current Git State
+
+- Branch: `dev`.
+- Latest local Team 00 docs commit before this checkpoint: `ef431ab docs: record trigger audit implementation agent`.
+- Shared `dev` remains not push-safe because `backend/tests/modules/alerts-monitoring/alerts-monitoring.ownership.test.ts` is dirty outside Team 00 scope.
+- Push was not performed.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: `CF-W1-SIG-TRIGGER-02A` QA after Team 06 handoff.
+- Team 10: next QA-accepted review handoff.
+- Team 05: Market Data / DQ implementation after a Ready item is promoted with isolated files.
+- Team 06: occupied by `CF-W1-SIG-TRIGGER-02A`; no second same-lane implementation until file ownership is clear.
+
+## Next Coordination Action
+
+Consume the next completed agent. Route Team 06 output to QA if implementation completes first. Feed Team 02 output into Team 03 if discovery completes first. Route Team 03 output to Team 04 QA planning or Team 00 Ready evaluation if architecture readiness completes first.
+
+---
+
+# Latest Coordination State
+
+Date: 2026-05-18
+
 ## CAL-01 QA Rejected
 
 Team 04 `019e3c0d-b69d-7ce2-9043-f363d350f8aa` completed QA Verification for `CF-W1-CAL-01` with `REJECT`.

@@ -41,6 +41,20 @@ Team 02 must continuously:
 
 If the current top-candidate list is thin, Team 02 should audit another module or workflow and add requirement candidates rather than idling.
 
+## Persistent Architecture Readiness Lane
+
+Team 03 should also run as a rolling docs-only architecture-readiness lane when subagent capacity allows.
+
+Team 03 must continuously:
+
+- triage Team 02's ranked backlog against existing architecture reviews, contracts, and work packets;
+- prepare or refresh architecture artifacts for top investor/trader-value items;
+- record exact file reservations, forbidden files, one-writer constraints, dependencies, and QA handoff needs;
+- split parent requirements into bounded first children when schema, route, shared-file, durable-storage, package, generated-file, provider, or frontend scope would otherwise block implementation;
+- leave Ready promotion to Team 00.
+
+Team 03 should not wait for active implementation work unless the same files or contracts are involved.
+
 ## Active Pool Limit
 
 Maximum active spawned subagents: 6.
@@ -1326,6 +1340,38 @@ Date: 2026-05-18
 - Team 00 is ready for `CF-W1-BT-02` delegated PO acceptance and scoped commit if Architect Signoff accepts.
 - Team 10 is ready for `CF-W1-CAL-01` review after QA accepts.
 - Team 02 is ready for another persistent market-intelligence discovery cycle when relaunched.
+
+---
+
+# Active Spawned Pool
+
+Date: 2026-05-18
+
+## Parallelism Clarification
+
+Not all work is dependent. Team 00 should parallelize requirement discovery, architecture prep, QA planning, QA verification, review, and implementation when the write scopes are isolated. Current direct investor/trader-value implementation pressure is concentrated in Team 06 modules, so Team 00 should avoid running two Strategy / Signal / Risk implementations that touch the same module files at the same time.
+
+## Current Active Agents
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 06 - Strategy / Signal / Risk | `019e3c36-5758-7052-839d-479fdbe261e7` | `gpt-5.3-codex`, high | implementation | `CF-W1-SIG-TRIGGER-02A` | active |
+| 2 | Team 02 - Requirement Factory | `019e3c39-a5f1-7353-ab62-b55c19f94a3f` | `gpt-5.4`, high | docs-only product / requirement discovery | parallelizable investor/trader-value backlog refresh | active |
+| 3 | Team 03 - Architecture Factory | `019e3c3c-0da0-7d81-a077-6a2a65616095` | `gpt-5.4`, high | rolling docs-only architecture readiness | next independent top-priority architecture packet | active |
+| 4 | Open slot | none | pending | review/release | next QA-accepted handoff | waiting |
+| 5 | Open slot | none | pending | architect signoff | next Team 10 accepted handoff | waiting |
+| 6 | Open slot | none | pending | next implementation | next promoted Ready item with isolated files | waiting |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: ready for `CF-W1-SIG-TRIGGER-02A` QA after Team 06 handoff.
+- Team 10: ready for the next QA-accepted review handoff.
+- Team 05: ready for Market Data / DQ implementation only after Team 00 promotes a Ready item with isolated file reservations.
+- Team 06: occupied by `CF-W1-SIG-TRIGGER-02A`; do not assign a second Strategy / Signal / Risk implementation until file ownership is clear.
+
+## Next Coordination Action
+
+Wait for Team 06, Team 02, or Team 03 to complete. If Team 06 completes first, route `CF-W1-SIG-TRIGGER-02A` to Team 04 QA. If Team 02 completes first, feed its ranked candidates into the rolling Team 03 lane. If Team 03 completes first, route any architecture-ready candidate to Team 04 QA planning or Team 00 Ready evaluation as appropriate.
 
 ---
 

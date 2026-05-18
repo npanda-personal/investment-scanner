@@ -1668,6 +1668,35 @@ Teams ready to pick up new tasks:
 
 ---
 
+# Parallel Coordination Checkpoint
+
+Date: 2026-05-18
+
+## Product Owner Question Answered
+
+Not every item is dependent. Team 00 should not serialize the factory by default. Parallel work is allowed when exact file reservations do not overlap and the active lane has enough reviewer / QA capacity.
+
+## Runtime Action
+
+Team 00 kept active Team 06 implementation running and launched a parallel Team 02 requirement-discovery agent:
+
+- Team 06 `019e3c36-5758-7052-839d-479fdbe261e7`: `CF-W1-SIG-TRIGGER-02A` implementation.
+- Team 02 `019e3c39-a5f1-7353-ab62-b55c19f94a3f`: docs-only high-value requirement refresh and parallel-candidate identification.
+- Team 03 `019e3c3c-0da0-7d81-a077-6a2a65616095`: rolling docs-only architecture readiness for the next independent high-value candidate.
+
+## Constraint
+
+Do not launch a second Team 06 implementation that may edit the same Strategy / Signal / Risk files while `CF-W1-SIG-TRIGGER-02A` is active. Parallel implementation should use isolated Market Data / DQ, UX/research, or portfolio-intelligence scopes only after Team 00 promotes a Ready item with exact reservations.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 04: ready for `CF-W1-SIG-TRIGGER-02A` QA after Team 06 handoff.
+- Team 10: ready for the next QA-accepted review handoff.
+- Team 05: ready for a Market Data / DQ Ready item after Team 00 promotion.
+- Team 06: active, not ready for an additional same-lane implementation.
+
+---
+
 # CAL-01 QA Verification Dispatched
 
 Date: 2026-05-18
