@@ -300,7 +300,13 @@ describe('MarketDataFoundationRepository', () => {
   it('selects active stale sync tasks by per-symbol latest stored candle', async () => {
     const prisma = {
       $queryRaw: jest.fn().mockResolvedValue([
-        { id: 'stock-1', symbol: 'STALE.NS', providerSymbol: 'STALE.NS', lastSuccessfulDataLoadTimestamp: new Date('2026-05-17T00:00:00.000Z') },
+        {
+          id: 'stock-1',
+          symbol: 'STALE.NS',
+          providerSymbol: 'STALE.NS',
+          lastSuccessfulDataLoadTimestamp: new Date('2026-05-17T00:00:00.000Z'),
+          latestStoredTimestamp: new Date('2026-05-16T00:00:00.000Z'),
+        },
       ]),
     };
     const repository = new MarketDataFoundationRepository(prisma as any);
@@ -313,6 +319,10 @@ describe('MarketDataFoundationRepository', () => {
     );
 
     expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      symbol: 'STALE.NS',
+      latestStoredTimestamp: new Date('2026-05-16T00:00:00.000Z'),
+    });
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
     const query = prisma.$queryRaw.mock.calls[0][0];
     expect(query.text).toContain('MAX(price_ticks.timestamp)');

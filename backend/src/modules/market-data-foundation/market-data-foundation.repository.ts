@@ -245,7 +245,7 @@ export class MarketDataFoundationRepository {
     targetTradingDate: string,
     take?: number,
     excludeIds: string[] = []
-  ): Promise<Array<{ id: string; symbol: string; providerSymbol: string | null; lastSuccessfulDataLoadTimestamp: Date | null }>> {
+  ): Promise<Array<{ id: string; symbol: string; providerSymbol: string | null; lastSuccessfulDataLoadTimestamp: Date | null; latestStoredTimestamp: Date | null }>> {
     const target = new Date(`${targetTradingDate}T00:00:00.000Z`);
     const excludeFilter = excludeIds.length > 0
       ? Prisma.sql`AND stocks.id NOT IN (${Prisma.join(excludeIds)})`
@@ -254,7 +254,7 @@ export class MarketDataFoundationRepository {
       ? Prisma.sql`LIMIT ${Math.max(1, take)}`
       : Prisma.sql``;
 
-    return this.prisma.$queryRaw<Array<{ id: string; symbol: string; providerSymbol: string | null; lastSuccessfulDataLoadTimestamp: Date | null }>>(Prisma.sql`
+    return this.prisma.$queryRaw<Array<{ id: string; symbol: string; providerSymbol: string | null; lastSuccessfulDataLoadTimestamp: Date | null; latestStoredTimestamp: Date | null }>>(Prisma.sql`
       WITH latest_by_stock AS (
         SELECT
           stocks.id,
@@ -272,7 +272,8 @@ export class MarketDataFoundationRepository {
         id,
         symbol,
         "providerSymbol",
-        "lastSuccessfulDataLoadTimestamp"
+        "lastSuccessfulDataLoadTimestamp",
+        "latestStoredTimestamp"
       FROM latest_by_stock
       WHERE "latestStoredTimestamp" IS NULL OR "latestStoredTimestamp" < ${target}
       ORDER BY "latestStoredTimestamp" ASC NULLS FIRST, "lastSuccessfulDataLoadTimestamp" ASC NULLS FIRST, symbol ASC

@@ -3619,7 +3619,8 @@ export class MarketDataFoundationService {
     for (const task of tasks) {
       try {
         await this.throttleIngestion(250);
-        const result = await this.ingestSymbol(task.symbol, undefined, providerEndDate, false, {
+        const startDate = this.catalogSyncTaskStartDate({ force: false, fullReload: false, providerEndDate }, task);
+        const result = await this.ingestSymbol(task.symbol, startDate, providerEndDate, false, {
           region,
           assetType,
           skipFreshnessGate: true,
@@ -4407,7 +4408,8 @@ export class MarketDataFoundationService {
     for (const chunk of this.chunkArray(tasks, concurrency)) {
       const chunkResults = await Promise.all(chunk.map(async (task) => {
         try {
-          const summary = await this.ingestSymbol(task.symbol, undefined, run.providerEndDate || new Date(), run.fullReload, {
+          const startDate = this.catalogSyncTaskStartDate(run, task);
+          const summary = await this.ingestSymbol(task.symbol, startDate, run.providerEndDate || new Date(), run.fullReload, {
             force: run.force,
             region: run.region,
             assetType: run.assetType,
@@ -4432,6 +4434,32 @@ export class MarketDataFoundationService {
       results.push(...chunkResults);
     }
     return results;
+  }
+
+  private catalogSyncTaskStartDate(
+    run: Pick<CatalogSyncRunRecord, 'force' | 'fullReload' | 'providerEndDate'>,
+    task: StockSyncTask
+  ): Date | undefined {
+    if (run.force || run.fullReload || !run.providerEndDate) return undefined;
+
+    if (!Object.prototype.hasOwnProperty.call(task, 'latestStoredTimestamp')) {
+      return undefined;
+    }
+
+    if (!task.latestStoredTimestamp) {
+      return this.defaultBackfillStartDate();
+    }
+
+    const latestStored = task.latestStoredTimestamp instanceof Date
+      ? task.latestStoredTimestamp
+      : new Date(task.latestStoredTimestamp);
+    if (Number.isNaN(latestStored.getTime())) {
+      return this.defaultBackfillStartDate();
+    }
+
+    const startDate = this.startOfUtcDay(latestStored);
+    startDate.setUTCDate(startDate.getUTCDate() - 3);
+    return startDate;
   }
 
   private normalizeCatalogSyncRunRequest(request: CatalogSyncRunRequest) {

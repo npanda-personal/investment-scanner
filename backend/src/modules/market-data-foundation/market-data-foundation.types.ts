@@ -1494,6 +1494,7 @@ export interface StockSyncTask {
   symbol: string;
   providerSymbol?: string | null;
   lastSuccessfulDataLoadTimestamp: Date | null;
+  latestStoredTimestamp?: Date | null;
 }
 
 export interface WorkerResult {

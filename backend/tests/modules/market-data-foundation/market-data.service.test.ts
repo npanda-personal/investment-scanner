@@ -1702,6 +1702,105 @@ describe('MarketDataFoundationService syncV1', () => {
     }));
   });
 
+  it('uses per-symbol stored candle basis for scheduled stale catch-up', async () => {
+    const tasks = [
+      {
+        id: 'stock-1',
+        symbol: 'STALE.NS',
+        providerSymbol: 'STALE.NS',
+        lastSuccessfulDataLoadTimestamp: new Date('2026-05-19T00:00:00.000Z'),
+        latestStoredTimestamp: new Date('2026-05-17T00:00:00.000Z'),
+      },
+    ];
+    const repository = {
+      countStaleActiveStockSyncTasks: jest.fn().mockResolvedValue(tasks.length),
+      listStaleActiveStockSyncTasks: jest.fn().mockResolvedValue(tasks),
+      listActiveStockSyncTasks: jest.fn(),
+      upsertSyncState: jest.fn().mockResolvedValue({}),
+      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue('2026-05-18'),
+      getSyncState: jest.fn().mockResolvedValue({
+        status: 'SYNCED',
+        lastCheckedAt: new Date('2026-05-18T12:00:00.000Z').toISOString(),
+      }),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+    jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
+      rowsReceived: 1,
+      rowsInserted: 1,
+      rowsUpdated: 0,
+      rowsSkipped: 0,
+      rowsNoOp: 0,
+      warningCount: 0,
+      warnings: [],
+    });
+
+    await service.syncScheduledRegion('IN', {
+      assetType: 'STOCK',
+      batchSize: 1,
+      now: new Date('2026-05-18T12:00:00.000Z'),
+    });
+
+    expect(repository.listStaleActiveStockSyncTasks).toHaveBeenCalledWith(
+      { region: 'IN', assetType: 'STOCK' },
+      '2026-05-18',
+      1,
+      []
+    );
+    expect(repository.listActiveStockSyncTasks).not.toHaveBeenCalled();
+    expect(service.ingestSymbol).toHaveBeenCalledWith(
+      'STALE.NS',
+      new Date('2026-05-14T00:00:00.000Z'),
+      new Date('2026-05-18T23:59:59.999Z'),
+      false,
+      expect.objectContaining({
+        region: 'IN',
+        assetType: 'STOCK',
+        skipFreshnessGate: true,
+      })
+    );
+  });
+
+  it('preserves incremental start-date selection for ordinary scheduled tasks', async () => {
+    const repository = {
+      listActiveStockSyncTasks: jest.fn().mockResolvedValue([{
+        id: 'stock-1',
+        symbol: 'CURRENT.NS',
+        lastSuccessfulDataLoadTimestamp: new Date('2026-05-17T00:00:00.000Z'),
+      }]),
+      upsertSyncState: jest.fn().mockResolvedValue({}),
+      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue('2026-05-18'),
+      getSyncState: jest.fn().mockResolvedValue(null),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+    jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
+      rowsReceived: 1,
+      rowsInserted: 0,
+      rowsUpdated: 0,
+      rowsSkipped: 0,
+      rowsNoOp: 1,
+      warningCount: 0,
+      warnings: [],
+    });
+
+    await service.syncScheduledRegion('IN', {
+      assetType: 'STOCK',
+      batchSize: 1,
+      now: new Date('2026-05-18T10:30:00.000Z'),
+    });
+
+    expect(service.ingestSymbol).toHaveBeenCalledWith(
+      'CURRENT.NS',
+      undefined,
+      expect.any(Date),
+      false,
+      expect.objectContaining({
+        region: 'IN',
+        assetType: 'STOCK',
+        skipFreshnessGate: true,
+      })
+    );
+  });
+
   it('skips recently synced catalog before provider workers are started', async () => {
     const lastCheckedAt = new Date(Date.now() - 5 * 60_000).toISOString();
     const repository = {
@@ -1879,7 +1978,13 @@ describe('MarketDataFoundationService syncV1', () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-05-18T12:00:00.000Z'));
     const timeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation((() => 0) as any);
     const tasks = [
-      { id: 'stock-1', symbol: 'STALE.NS', providerSymbol: 'STALE.NS', lastSuccessfulDataLoadTimestamp: new Date('2026-05-17T00:00:00.000Z') },
+      {
+        id: 'stock-1',
+        symbol: 'STALE.NS',
+        providerSymbol: 'STALE.NS',
+        lastSuccessfulDataLoadTimestamp: new Date('2026-05-19T00:00:00.000Z'),
+        latestStoredTimestamp: new Date('2026-05-17T00:00:00.000Z'),
+      },
     ];
     const repository = {
       countStaleActiveStockSyncTasks: jest.fn().mockResolvedValue(tasks.length),
@@ -1927,7 +2032,7 @@ describe('MarketDataFoundationService syncV1', () => {
       expect(repository.listActiveStockSyncTasks).not.toHaveBeenCalled();
       expect(service.ingestSymbol).toHaveBeenCalledWith(
         'STALE.NS',
-        undefined,
+        new Date('2026-05-14T00:00:00.000Z'),
         new Date('2026-05-18T23:59:59.999Z'),
         false,
         expect.objectContaining({
