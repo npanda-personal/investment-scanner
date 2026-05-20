@@ -8,7 +8,9 @@ Research Hub what-changed fail-closed comparison-basis semantics.
 
 ## State
 
-Architecture packet prepared. Ready candidate after Team 04 QA planning and Team 00 sequencing.
+Architecture packet refreshed 2026-05-19 against accepted `CF-W1-RH-01` baseline commit `fd88c62`.
+
+READY-CANDIDATE after Team 04 QA planning and Team 00 sequencing, provided implementation is stacked from `fd88c62` or from a `dev` head that already contains `fd88c62`.
 
 This is a bounded Research Hub module-owned slice. It is no-schema and no-shared, but it includes both backend and module-owned frontend because the current page hard-codes misleading temporal copy.
 
@@ -19,6 +21,7 @@ This is a bounded Research Hub module-owned slice. It is no-schema and no-shared
 - Lane: Cross-lane research aggregation
 - Backend module: `research-hub`
 - Frontend feature: `research-hub`
+- Required stacking base: `fd88c62` on `codex/team08-ux-research/CF-W1-RH-01`, or any later `dev` head containing that accepted baseline
 
 ## Allowed Files After Ready Promotion
 
@@ -33,6 +36,7 @@ This is a bounded Research Hub module-owned slice. It is no-schema and no-shared
 ## Current Forbidden Files
 
 - application source or tests before Team 00 promotion
+- implementation from an unstacked `dev` base that omits accepted `RH-01` commit `fd88c62`
 - `backend/src/modules/research-hub/index.ts`
 - `backend/src/modules/research-hub/research-hub.controller.ts`
 - `backend/src/modules/research-hub/research-hub.router.ts`
@@ -80,7 +84,7 @@ Future implementation must not:
 
 ## Sequencing Rule
 
-This packet conflicts directly with `CF-W1-RH-01`.
+This packet conflicts directly with `CF-W1-RH-01` and must be stacked after accepted `RH-01`.
 
 Shared writer files:
 
@@ -92,6 +96,7 @@ Shared writer files:
 Team 00 must:
 
 - sequence `RH-01` and `RH-02A`;
+- use `fd88c62` as the future implementation base, or merge/apply accepted `RH-01` into `dev` before creating the `RH-02A` worktree;
 - avoid parallel Research Hub writers;
 - combine them only through an explicit one-writer re-pack if desired.
 
@@ -136,9 +141,10 @@ Stop and return to Team 00 / Architect if implementation requires:
 ## Notes For Team 00
 
 - This is a genuine bounded first child for `CF-W1-RH-02`.
-- It is Ready-candidate only as a fail-closed unavailable-basis slice.
+- It is READY-CANDIDATE only as a fail-closed unavailable-basis slice stacked after accepted `RH-01` commit `fd88c62`.
 - True delta history remains a later `RH-02B` style follow-on and must not be silently folded into this packet.
 - Keep the packet isolated to the exact Research Hub file reservations above.
+- Block routing if the implementation base does not include `fd88c62`, if another Research Hub writer is active, or if implementation needs route/schema/package/provider/live/startup/shared scope.
 
 ## Next Gate
 

@@ -1,99 +1,131 @@
 # CF-W1-TP-01A Trade Plan No-Target Compatibility And DQ Hard-Block Contract
 
-Date: 2026-05-17
+Date: 2026-05-19
 
 ## Status
 
-Product policy accepted. Implementation remains blocked.
+ACCEPT / READY-CANDIDATE contract for Team 00 Ready evaluation.
 
-Product Owner approved Option B on 2026-05-17. Resolution: `07-decisions/DECISION-20260517-trade-plan-no-target-dq-hard-block-resolution.md`.
+Product Owner policy was already resolved on 2026-05-17 through Option B. 2026-05-19 sequencing refresh: this contract is READY-CANDIDATE only as a stacked one-writer Trade Plan slice on accepted `CF-W1-TP-02` commit `1222daf`; it must not be implemented from current `dev`.
 
-Implementation still requires a backend-only child work packet, refreshed QA scenarios, exact file reservations, and proof that frontend, Today Review, Prisma/schema, route, shared, package, generated, provider, startup/backfill, broad UI, and live-provider changes are excluded.
+This refresh defines the exact backend-only child boundary that can finish or characterize residual TP-01A trust behavior without reopening frontend, Today Review, Prisma, repository, route, shared, package, generated, provider/live, startup, or schema scope.
 
 ## Contract Intent
 
-Trade Plan Risk Engine must support research review without arbitrary target-price semantics, advice-like language, or paper-readiness claims when Data Quality is missing or blocked.
+Trade Plan Risk Engine must support research review without arbitrary target-price trust semantics and without fail-open paper-readiness when Data Quality is missing, limited, blocked, or stale.
 
-This contract is separate from completed `CF-W1-STRAT-01`, which only handled the bounded Strategy Decision compatibility slice.
+This contract stays separate from:
 
-## Proposed No-Target Rule
+- `CF-W1-STRAT-01`, which handled Strategy Decision no-target compatibility only;
+- `CF-W1-TP-02`, which is now accepted at local branch commit `1222daf` and must be the stacking base for any future TP-01A residual slice.
 
-Trusted Trade Plan output should emphasize:
+## Accepted Stacking Base
 
-- entry condition,
-- stop/invalidation condition,
-- exit condition,
-- risk review condition,
-- reward/risk geometry only as a review calculation when approved,
-- data quality proof,
-- strategy proof,
-- reason summary and blockers.
+- Base branch: `codex/team06-strategy-signal/CF-W1-TP-02`
+- Base commit: `1222daf`
+- Commit title: `feat: add trade plan exit invalidation semantics`
+- Reason: TP-02 and TP-01A reserve overlapping Trade Plan service/types/doc/test files, and TP-02 already preserves accepted TP-01B Data Quality hard-block behavior.
+- Current `dev` is not a valid TP-01A implementation base because it does not include accepted parked TP-01B/TP-02 Trade Plan source changes.
 
-Trusted output should not present a projected price as a target, profit target, recommendation, guaranteed outcome, or direct financial advice.
+If Team 00 promotes TP-01A, the future branch should be created from `1222daf` and should treat accepted TP-02 behavior as baseline, not as work to reimplement.
 
-## Compatibility Constraint
+## Approved Compatibility Rule
 
-The current Trade Plan API and UI still expose `target` fields and target/reward displays. Removing, renaming, nulling, or reinterpreting those fields is a product/API/UI compatibility decision.
+The first child must preserve existing `target` fields for compatibility only:
 
-A future bounded backend slice may keep the persisted `target` JSON field as a compatibility field only if Product Owner and Architect acceptance explicitly define the allowed semantics.
+- `target.price`
+- `target.expectedReturnPercent`
+- `target.method`
+- `target.quality`
+- `target.rationale`
 
-## Proposed DQ Hard-Block Rule
+The child must not treat those fields as:
 
-The following states should block paper-readiness and trusted plan publication if accepted:
+- trusted paper-readiness proof;
+- a price target or profit target;
+- a recommendation or promise;
+- a direct buy/sell instruction.
 
-- missing Data Quality snapshot,
-- `coverageStatus = UNUSABLE`,
-- `signalReadinessStatus = NOT_READY`,
-- `liquidityStatus = ILLIQUID`,
-- stale price blocker present in DQ evidence,
-- required use-case tier is `BLOCKED`,
-- `eligibleForSignals = false` when the plan depends on signal/strategy evidence.
+Allowed first-child behavior:
 
-`LIMITED` is blocked or limited-review-only until a later Product Owner-approved policy narrows it.
+- `target` may remain in the DTO and persisted JSON snapshot;
+- `target = null` must not be the sole trusted-readiness blocker;
+- positive readiness reasons must not cite target-shaped fields;
+- module-local copy may rephrase target-related warnings/rationale so trusted output reads as modeled review geometry, exit review, invalidation review, or risk review rather than objective target guidance.
 
-## Forbidden Until Decision
+## Approved DQ Hard-Block Rule
 
-Do not change:
+Trusted paper-readiness must fail closed on the first child when any of the following is true:
 
-- Trade Plan source or tests,
-- Today Review source or tests,
-- frontend Trade Plan or Today Review displays,
-- Prisma schema or migrations,
-- route registries,
-- shared UI/utilities,
-- package files or generated types.
+- Data Quality snapshot is missing;
+- `coverageStatus = UNUSABLE`;
+- `signalReadinessStatus = NOT_READY`;
+- `signalReadinessStatus = LIMITED`;
+- `liquidityStatus = ILLIQUID`;
+- stale hard-blocker evidence is present in DQ blockers;
+- `eligibleForSignals = false`;
+- `useCaseTiers.signal.status = BLOCKED` when tier evidence is present.
 
-Do not silently change the meaning of existing stored Trade Plan rows.
+`LIMITED` may surface as limited review only, but it must not become `READY_FOR_PAPER_REVIEW`.
 
-## Decision Resolution Note
+## Allowed First-Child Type/Service Adjustment
 
-The parent Decision Packet was resolved on 2026-05-17 as Option B. A future Decision Packet is needed only if implementation will:
+The child may extend module-local Trade Plan snapshot/proof types so the classifier can consume DQ fields already available from Data Quality Engine output, including:
 
-- remove, rename, or migrate target-shaped API/stored fields,
-- change `LIMITED` from blocked or limited-review-only into a broader trusted state,
-- migrate Today Review or frontend copy,
-- require Prisma/schema, route, shared, package, generated, provider, startup/backfill, broad UI, or live-provider changes.
+- `signalReadinessStatus`
+- `eligibleForSignals`
+- `useCaseTiers`
 
-## Acceptance Criteria For Future Approval
+No Data Quality Engine source or public export change is approved. The Trade Plan module must consume the existing public DQ output and persist any additive JSON snapshot data through its current module-owned snapshot object only.
 
-- No arbitrary target-price wording or advice language in trusted Trade Plan output.
-- Data Quality hard blockers prevent paper-readiness claims.
-- Existing API/UI compatibility impact is explicitly accepted or split into child slices.
-- Tests prove missing/blocked DQ fails closed.
-- Tests prove forbidden wording is absent from trusted outputs.
+## Exact Future File Reservations
 
-## Team 03 Relaunch Architecture Notes - 2026-05-17
+Allowed future implementation files after stacking on `1222daf`:
 
-Readiness result: docs-only contract remains valid, but app-code work is blocked.
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.service.ts`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.types.ts`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.geometry.ts`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.md`
+- `backend/tests/modules/trade-plan-risk-engine/trade-plan-risk-engine.service.test.ts`
+- `backend/tests/trade-plan-risk-engine.paper-readiness.test.ts`
 
-Current source structure confirms Trade Plan still has target geometry and Data Quality snapshot fields. The architecture risk is not only wording; it includes API compatibility, persisted JSON interpretation, Today Review adjacency, and frontend display semantics.
+## Exact Forbidden Future Implementation Files
 
-Recommended decision posture:
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.repository.ts`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.validation.ts`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.controller.ts`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.router.ts`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.module.ts`
+- `backend/src/modules/trade-plan-risk-engine/index.ts`
+- `backend/tests/modules/trade-plan-risk-engine/trade-plan-risk-engine.repository.test.ts`
+- `backend/prisma/schema.prisma`
+- `backend/prisma/migrations/**`
+- backend and frontend route registries
+- `backend/src/modules/today-trade-review/**`
+- `frontend/src/features/trade-plan-risk-engine/**`
+- `frontend/src/features/today-trade-review/**`
+- `backend/src/modules/data-quality-engine/**`
+- shared backend utilities
+- shared frontend components
+- package manifests
+- generated files
+- provider, startup/backfill, live-provider, paid/cloud, broker, and telemetry flows
 
-- keep any `target` field as compatibility-only unless a separate migration removes or renames it,
-- exclude compatibility target data from trusted paper-readiness,
-- hard-block trusted paper-readiness on missing DQ, `coverageStatus = UNUSABLE`, `signalReadinessStatus = NOT_READY`, `liquidityStatus = ILLIQUID`, stale hard blockers, required use-case tier `BLOCKED`, and `eligibleForSignals = false`,
-- treat `LIMITED` as blocked or limited-review-only until Product Owner and Architect decide otherwise,
-- keep frontend and Today Review changes out of the first backend-only child slice unless explicitly reserved.
+## Acceptance Criteria For Future Promotion
 
-No source, test, API, UI, Prisma, route, shared, package, generated, provider, startup, or live-data files are reserved by this contract.
+- missing `target` is no longer the sole blocker for trusted paper-readiness;
+- `NOT_READY`, `LIMITED`, missing DQ, `UNUSABLE`, `ILLIQUID`, stale blockers, signal ineligibility, and blocked signal-tier evidence fail closed;
+- positive readiness reasons do not cite target-shaped compatibility fields;
+- trusted output and focused tests avoid `price target`, `profit target`, `must buy`, `must sell`, `guaranteed`, `buy now`, and `sell now`;
+- API field names, persisted row structure, route shapes, and frontend contracts remain unchanged in this first child.
+- accepted TP-02 `exitConditions[]` and `invalidationConditions[]` behavior is preserved and not duplicated or downgraded.
+
+## New Decision Packet Threshold
+
+A new Decision Packet is required if implementation needs any of the following:
+
+- remove, rename, null-migrate, or reinterpret persisted/API target fields;
+- widen `LIMITED` into a paper-ready state;
+- change frontend or Today Review copy/behavior;
+- change Prisma/schema, repository behavior, routes, shared utilities, packages, generated files, provider/startup behavior, or live-provider flows.
+- implement TP-01A from current `dev` instead of stacking on accepted TP-02 commit `1222daf`.

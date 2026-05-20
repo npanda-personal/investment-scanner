@@ -1,116 +1,87 @@
-# TEAM-01 Audit Factory Outbox
+# TEAM-01 Outbox
 
-Date: 2026-05-18
+Date: 2026-05-20
 
-## Team
+Team: TEAM-01 - Audit Factory
 
-- Team id: TEAM-01
-- Team name: Audit Factory
-- Branch/worktree: `dev` / `c:\work\repo\investment-scanner`
-- State: Audit Complete
-- Subagents used: none
+State: Docs-only direct-value audit complete
 
-## Ready Work Pulled
+## Branch / Worktree
 
-None.
+- Branch: `dev`
+- Worktree: shared repository worktree under `docs/execution/codex-parallel-execution-plan-2026-05-16/`
 
-`12-ready-queue/ready-for-implementation.md` has no active application-code item. Team 00 consumed Team 01's 2026-05-18 readiness drift audit and kept the Ready queue closed. Team 01 did not implement, test, stage, commit, or push.
+## Assignment
 
-## Audits Completed
+Refresh the next unclaimed direct investor/trader-value surfaces after excluding accepted, parked, and active queue items.
 
-- `11-module-audits/post-decision-source-readiness-audit-2026-05-17.md`
-- `11-module-audits/child-contract-readiness-audit-2026-05-17.md`
-- `11-module-audits/runtime-queue-stale-doc-audit-2026-05-17.md`
-- `11-module-audits/current-assignment-readiness-drift-audit-2026-05-18.md`
+## Files Inspected
 
-## Requirements Refined
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/active-work-board.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/team-agent-runtime-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/ready-for-implementation.md`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.md`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.service.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.types.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.types.ts`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.md`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.service.ts`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.types.ts`
+- `backend/src/modules/strategy-decision-engine/strategy-decision-engine.md`
+- `backend/src/modules/strategy-decision-engine/strategy-decision-engine.service.ts`
+- `backend/src/modules/strategy-decision-engine/strategy-decision-engine.types.ts`
+- Selected source/tests in the same modules
 
-No requirement files were edited by Team 01.
+## Summary
 
-Candidate findings were recorded for:
+The current queue already owns the obvious signal-trigger, trade-plan semantics, strategy freshness, and backtesting proof-basis tracks. The fresh gaps that still look directly useful are narrower proof-currentness labels on downstream review surfaces:
 
-- `CF-W1-L3-PORT-01A`
-- `CF-W1-L3-PORT-01B`
-- `CF-W1-L3-ALERT-01`
-- `CF-W1-TP-01B`
-- `CF-W1-MD-02-ADR`
-- `CF-W1-NOTIF-02`
-- `CF-W1-L3-INTEL-01`
+1. Trade Plan generated-plan proof snapshot freshness labels.
+2. Backtesting saved-run proof-currentness labels.
 
-## Contracts Prepared
+I did not re-route any of the explicitly excluded active or parked items named in the prompt.
 
-None by Team 01.
+## Recommendation
 
-Team 01 audited existing Team 03 child contracts for:
+Team 02 should turn the audit into two fresh requirement candidates in this order:
 
-- `CF-W1-L3-PORT-01`
-- `CF-W1-L3-ALERT-01`
-- `CF-W1-TP-01B`
-- `CF-W1-NOTIF-02`
-- `CF-W1-L3-INTEL-01`
+1. `CF-W1-TP-03 - Trade Plan proof snapshot freshness labels for generated plans`
+2. `CF-W1-BT-04 - Backtesting run freshness and current-proof labels`
 
-## QA Plans Prepared
+## Dependencies / Consent Gates
 
-None by Team 01.
+- Keep the first child of each candidate backend-local and additive.
+- Do not introduce schema, migration, route-registry, shared UI, package-manifest, or provider/live/backfill changes in the first child.
+- Do not fold these into the already active signal-trigger, strategy-freshness, or trade-plan semantics workstreams.
 
-Audit finding: `CF-W1-L3-PORT-01`, `CF-W1-L3-ALERT-01`, `CF-W1-TP-01B`, `CF-W1-NOTIF-02`, and `CF-W1-L3-INTEL-01` now have child QA plans. They still should not be promoted without Team 00 Ready queue entry, exact selected slice, and implementation handoff. `CF-W1-L3-INTEL-01` also waits for accepted `CF-W1-L3-PORT-01A`.
+## Parallel-Safety
 
-## Implementation Completed
+- Safe to refine in parallel as docs-only requirement candidates because they touch different module boundaries.
+- If promoted later, each should keep a single writer and a separate reservation plan.
 
-None.
+## Product Owner Review Needed
 
-No application source, tests, Prisma, route registries, shared files, package manifests, generated files, providers, startup/backfill flows, or UI files were changed.
+- No immediate PO decision is required for the audit record itself.
+- PO approval will be needed later before any of these become implementation-ready or touch shared/schema/route scope.
 
 ## Tests Run
 
-None.
+- None
 
-Skipped because Team 01 work was docs-only read-only audit/refinement. No implementation or executable QA was approved.
+## Changes Made
 
-## Commits Created
+- Added `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/audit-fresh-direct-value-gaps-2026-05-20.md`
+- Replaced `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-01-outbox.md`
 
-None.
+## Blockers / Decision Needs
 
-Reason: this was a docs-only status refresh and no accepted implementation requirement was completed.
+- None for the docs-only audit.
 
-## Files Changed By Team 01
+## Next Gate
 
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/post-decision-source-readiness-audit-2026-05-17.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/child-contract-readiness-audit-2026-05-17.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/runtime-queue-stale-doc-audit-2026-05-17.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/current-assignment-readiness-drift-audit-2026-05-18.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-01-audit-factory-post-decision-2026-05-17.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-01-outbox.md`
-
-## Decisions Opened
-
-None by Team 01.
-
-Current open decisions observed:
-
-None.
-
-`99-decision-inbox/open-decisions.md` now says Product Owner action is not required and the daemon should continue autonomous work.
-
-## Blockers
-
-- No app-code Ready queue item exists.
-- Open decisions are resolved, but the five newly resolved items still need module-specific contract/QA refresh, exact file reservations, source/test evidence, and Team 00 Ready promotion before app-code teams can pull them.
-- `CF-W1-L3-PORT-01`, `CF-W1-L3-ALERT-01`, `CF-W1-TP-01B`, and `CF-W1-NOTIF-02` have child QA/readiness plans but still need Team 00 Ready promotion and implementation handoff.
-- `CF-W1-L3-INTEL-01` is blocked behind accepted `CF-W1-L3-PORT-01A`.
-- `CF-W1-MD-02` remains ADR-only before any Prisma/source/test implementation.
-- `16-team-inboxes/TEAM-07-CF-W1-L3-AUTH-01.md` is stale and still advertises completed `CF-W1-L3-AUTH-01` work as Ready.
-- `09-summaries/daemon-cycle-latest.md` is no longer stale on Decision Inbox count; it now reports zero open decisions and Product Owner action not required.
-
-## Next Recommended Assignment
-
-1. Team 00: evaluate one exact child for Ready promotion. Best candidates by dependency order: `CF-W1-L3-PORT-01A`, then `CF-W1-TP-01B`, then `CF-W1-NOTIF-02`, then `CF-W1-L3-ALERT-01`.
-2. Team 00 / Team 07: retire or mark completed the stale `TEAM-07-CF-W1-L3-AUTH-01` inbox before relying on older inbox files.
-3. Team 03: continue `CF-W1-MD-02` formal ADR prep.
-4. Team 01: re-audit after Ready promotion, inbox cleanup, or Market Data ADR draft.
-
-## Can Continue Without Human Approval
-
-Yes, for docs-only audits and readiness checks.
-
-No, for application-code implementation until a Ready queue item and exact implementation handoff exist.
+- Team 00 review of the two fresh requirement candidates.
+- Team 02 refinement of the top unclaimed requirement draft.

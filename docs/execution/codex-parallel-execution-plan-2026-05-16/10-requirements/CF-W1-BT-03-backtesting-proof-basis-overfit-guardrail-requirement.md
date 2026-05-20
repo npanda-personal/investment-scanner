@@ -8,7 +8,7 @@ Audit-derived requirement. Not Ready for Implementation.
 
 ## Product Value
 
-Backtesting is one of the highest-trust research surfaces in the product. A user can currently see returns, drawdown, benchmark comparison, availability, rating, and realism warnings, but the workflow still does not make one core truth explicit: a single historical run is not the same thing as validated forward proof. Without an explicit proof-basis guardrail, a strong-looking run can overstate reliability even when the module has no walk-forward, holdout, or parameter-sensitivity evidence.
+Backtesting is one of the highest-trust research surfaces in the product. A user can currently see returns, drawdown, benchmark comparison, availability, rating, and realism warnings, but the workflow still does not make one core truth explicit: a single historical run is not the same thing as validated forward proof. Without an explicit proof-basis guardrail, a strong-looking run can overstate reliability even when the module has no walk-forward, holdout, or parameter-sensitivity evidence. This requirement should stay ahead of durable-memory follow-ons because it explains already-produced strategy evidence rather than expanding the validation engine.
 
 This requirement closes that reviewability gap without widening into advanced quant infrastructure.
 
@@ -68,7 +68,7 @@ The requirement must not imply that advanced validation exists when it does not.
 
 ## Priority Position
 
-This belongs ahead of Lane 3 convenience work because it improves direct strategy-review trust on a core research surface and stays inside the Product Owner's corrected direct-value order.
+This belongs ahead of Lane 3 convenience work and ahead of consent-gated storage follow-ons because it improves direct strategy-review trust on a core research surface and stays inside the Product Owner's corrected direct-value order.
 
 ## Next Gate
 

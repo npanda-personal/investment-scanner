@@ -12,6 +12,8 @@ Product Owner approved Option B on 2026-05-17. This does not authorize Trade Pla
 
 Trade Plan outputs must stay aligned with the no-arbitrary-target-price product rule. Paper-review readiness should be based on rule-based exit, invalidation, risk, and Data Quality evidence rather than implied target-price promises or fail-open readiness.
 
+This remains one of the highest-value strategy-side trust gaps because it affects how the product explains paper-review readiness before a user reads a target-shaped field as advice. It is still separate from the active `CF-W1-TP-01B` implementation child and should stay compatibility-only until Team 00 approves the exact backend-only handoff.
+
 ## Current Evidence
 
 Latest inputs:
@@ -28,6 +30,8 @@ Observed gaps:
 - Paper readiness blocks missing target and low reward/risk.
 - `NOT_READY` DQ can remain warning/watch behavior instead of a hard paper-readiness blocker.
 - Today Review and Trade Plan UI may still render target price or modeled reward fields.
+
+The remaining gap is not target geometry itself. It is the contract boundary that keeps target-shaped fields compatibility-only while the approved DQ blocker states hard-fail trusted readiness.
 
 ## Requirement Split
 
@@ -102,3 +106,5 @@ Likely implementation files after accepted contract, QA plan, and work packet:
 ## Next Gate
 
 Post-decision backend-only architecture and QA refresh. Do not move to Ready for Implementation until the child work packet reserves exact backend source/test files and confirms no broader API/UI/stored-row migration is needed.
+
+Priority note: after the calibration DQ gate, this is the next direct strategy/trade-plan trust slice that should remain visible ahead of review-surface convenience work.

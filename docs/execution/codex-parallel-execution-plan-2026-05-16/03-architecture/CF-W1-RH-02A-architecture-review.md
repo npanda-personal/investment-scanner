@@ -6,9 +6,13 @@ Owner: Team 03 Architecture Factory
 
 ## Status
 
-Ready candidate architecture packet prepared.
+READY-CANDIDATE after 2026-05-19 refresh against accepted `CF-W1-RH-01` baseline commit `fd88c62` on branch `codex/team08-ux-research/CF-W1-RH-01`.
+
+Stacking base recommendation: create the future `CF-W1-RH-02A` implementation branch/worktree from `fd88c62` or from a `dev` head that already contains `fd88c62`. Do not implement this packet from the current unstacked `dev` checkout unless Team 00 first applies/merges the accepted `RH-01` baseline.
 
 This is a bounded no-schema first child, but it is not backend-only. Current `dev` source can fail `whatChanged` closed without new storage by adding explicit comparison-basis semantics in `research-hub` and by replacing the hard-coded frontend fallback copy that currently overclaims temporal evidence.
+
+2026-05-19 refresh result: `fd88c62` does not make `RH-02A` blocked. The accepted `RH-01` slice changes only Research Hub backend actionability evidence wiring in `research-hub.service.ts`, `research-hub.md`, and `research-hub.service.test.ts`; it preserves the Research Hub response shape, does not touch frontend files, and leaves the simulated `whatChanged` construction intact. `RH-02A` remains a bounded stacked Research Hub slice when sequenced after `fd88c62`.
 
 ## Evidence Inspected
 
@@ -23,11 +27,19 @@ This is a bounded no-schema first child, but it is not backend-only. Current `de
 - `backend/src/modules/research-hub/research-hub.service.ts`
 - `backend/src/modules/research-hub/research-hub.types.ts`
 - `backend/tests/modules/research-hub/research-hub.service.test.ts`
+- `fd88c62` accepted `CF-W1-RH-01` branch/evidence, read-only:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-RH-01-qa-evidence.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/09-summaries/CF-W1-RH-01-po-acceptance-packet.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-00-CF-W1-RH-01-delegated-po-acceptance.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-RH-01-architect-signoff.md`
 - `backend/src/modules/today-trade-review/today-trade-review.types.ts`
 - `backend/src/modules/today-trade-review/today-trade-review.service.ts`
 - `frontend/src/features/research-hub/api/researchHubApi.ts`
 - `frontend/src/features/research-hub/components/ResearchOverviewPage.tsx`
 - `frontend/tests/ui/research-hub.spec.ts`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/99-decision-inbox/open-decisions.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/module-ownership-map.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/dependency-graph.md`
 
 ## Current Source Findings
 
@@ -37,6 +49,8 @@ This is a bounded no-schema first child, but it is not backend-only. Current `de
 - `frontend/tests/ui/research-hub.spec.ts` currently asserts that misleading sentence.
 - Current `dev` does not contain a module-owned persisted Research Hub overview snapshot, journal row, or scheduler-produced previous-overview record that would allow candidate-level Research Hub delta claims.
 - Existing Today Review persisted runs are not a safe comparison basis for this child. Today Review candidates are a downstream published review set with trusted-universe, trade-plan, and review-state semantics that do not match Research Hub's overview-level `tradeCandidates` contract. Using Today Review as a proxy would still fabricate Research Hub delta meaning.
+- Accepted `RH-01` commit `fd88c62` is not an ancestor of the current `dev` checkout at refresh time. The future implementation must therefore be stacked on the accepted branch/commit, or Team 00 must first integrate that accepted baseline into `dev`.
+- `fd88c62` preserves the `whatChanged` gap: it still derives `newTradeCandidates` from current `tradeCandidates`, does not add `comparisonBasis`, and does not modify Research Hub frontend/API UI types. This means `RH-02A` still has a clean additive contract path.
 
 ## Architecture Decision
 
@@ -132,9 +146,10 @@ Team 00 should not run `CF-W1-RH-01` and `CF-W1-RH-02A` in parallel.
 
 Recommended sequencing:
 
-1. keep `CF-W1-RH-01` on its current QA-to-Ready path;
-2. promote `CF-W1-RH-02A` only after `CF-W1-RH-01` is accepted/merged or intentionally re-packed into one combined Research Hub writer pass;
-3. if Team 00 combines them, treat the combined packet as a fresh one-writer Research Hub reservation rather than as two simultaneous passes.
+1. treat accepted `CF-W1-RH-01` commit `fd88c62` as the required base;
+2. promote `CF-W1-RH-02A` only as a stacked branch/worktree from `fd88c62` or from a `dev` head that already contains `fd88c62`;
+3. if Team 00 cannot provide that base, keep the packet out of implementation routing until the accepted baseline is integrated;
+4. if Team 00 combines them, treat the combined packet as a fresh one-writer Research Hub reservation rather than as two simultaneous passes.
 
 ## QA Planning Handoff For Team 04
 
@@ -166,9 +181,11 @@ Team 04 should also record that true prior-basis detection remains outside `RH-0
 
 ## Readiness Result
 
-Ready candidate.
+READY-CANDIDATE.
 
 - A bounded no-schema first child is feasible.
+- It is ready only as a stacked Research Hub slice after accepted `RH-01` baseline commit `fd88c62`.
 - The child improves trust by failing `whatChanged` closed rather than inventing deltas.
 - The child requires only module-local Research Hub backend/frontend files plus the existing module UI smoke.
 - Scheduler/journal storage, Prisma/schema, migrations, generated files, route changes, shared utilities/UI, package manifests, upstream module source edits, provider/live-data, startup/backfill, paid/cloud, broker, telemetry, and broad UI redesign remain explicitly blocked.
+- Block condition: attempting implementation from the current unstacked `dev` checkout without first applying `fd88c62`.

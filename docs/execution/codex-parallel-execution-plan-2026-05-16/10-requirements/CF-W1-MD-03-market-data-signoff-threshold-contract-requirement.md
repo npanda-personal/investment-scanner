@@ -10,6 +10,8 @@ Audit-derived requirement draft. Not Ready for Implementation.
 
 Universe signoff is the upstream trust gate for every review workflow that depends on Market Data being good enough to trust. Today the module exposes price coverage, metadata coverage, review-ready counts, and a PASS/FAIL signoff, but the active contract's `95%` price-ready and `90%` metadata-ready thresholds are not yet enforced as explicit hard downstream gates. Traders and research users should not see a review universe described as trustworthy when contract-level coverage targets remain below threshold.
 
+This is the next Market Data evidence gap after the current backtesting and Research Hub trust stack because it keeps stale or incomplete coverage from being treated as a valid basis for downstream review, research, or signal work.
+
 ## Evidence
 
 - `11-module-audits/audit-market-data-data-quality.md` found that universe signoff still relies on provider-unknown, retry, identity, metadata, backfill, latest EOD, minimum review-ready count, and `10%` review-ready share, but does not fully encode the active `95%` price-ready / `90%` metadata-ready contract as hard signoff gates.

@@ -6,7 +6,7 @@ Owner: Team 03 Architecture Factory
 
 ## Status
 
-Watchlist review-actionability contract prepared. Not Ready for Implementation.
+Watchlist review-actionability contract refreshed after accepted `CF-W1-L3-PORT-01B` evidence. READY-CANDIDATE for Team 00 sequencing only on base `a2edfb6` or later clean `dev` containing `a2edfb6`.
 
 ## Contract Intent
 
@@ -23,7 +23,7 @@ This contract is intentionally separate from `CF-W1-L3-PORT-01B`.
 - `CF-W1-L3-PORT-01B` owns Data Quality readiness DTOs.
 - `CF-W1-L3-WATCH-01` owns review actionability derived from existing watchlist enrichment fields.
 
-The first slice must not consume `DataQualityEngineService`, portfolio holdings, alert state, or notification state.
+The first slice must not consume `DataQualityEngineService`, portfolio holdings, alert state, or notification state. When implemented on top of accepted `PORT-01B`, it must preserve `readiness` and `readinessSummary` fields but must not treat readiness status as a review-priority input.
 
 ## Required Additive DTO Fields
 
@@ -194,7 +194,7 @@ The first slice must not introduce new pages, shared UI components, or route cha
 
 ## Exact Future File Reservations
 
-Allowed files after Team 00 promotion and after the watchlist backend writer set is clear:
+Allowed files after Team 00 promotion, after using base `a2edfb6` or later clean `dev` containing `a2edfb6`, and after the watchlist writer set is clear:
 
 - `backend/src/modules/watchlist-management/watchlist-management.service.ts`
 - `backend/src/modules/watchlist-management/watchlist-management.types.ts`
@@ -205,6 +205,12 @@ Allowed files after Team 00 promotion and after the watchlist backend writer set
 - `frontend/src/features/watchlist-management/types.ts`
 - `frontend/src/features/watchlist-management/components/WatchlistManagementPage.tsx`
 - optional new focused UI smoke: `frontend/tests/ui/watchlist-management.spec.ts`
+
+Forbidden base/scope:
+
+- current unstacked `dev` while it lacks accepted `a2edfb6`
+- Research Hub source/UI files or current unrelated dirty Research Hub changes
+- Prisma/schema/migrations, route registries, shared UI/backend utilities, package manifests, generated files, providers/live/startup/backfill, paid/cloud, telemetry, broker, portfolio, alerts, notifications, or Data Quality Engine source changes
 
 ## Test Contract
 

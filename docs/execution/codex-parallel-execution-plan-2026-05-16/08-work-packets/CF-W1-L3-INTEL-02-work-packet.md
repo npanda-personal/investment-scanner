@@ -1,6 +1,6 @@
 # CF-W1-L3-INTEL-02 Work Packet
 
-Date: 2026-05-18
+Date: 2026-05-20
 
 ## Work Item
 
@@ -8,18 +8,25 @@ Portfolio Intelligence review traceability.
 
 ## State
 
-Architecture packet prepared. Not Ready for Implementation.
+Architecture-readiness refreshed. Not Ready for Implementation.
 
-This child is downstream of accepted `CF-W1-L3-PORT-01A` and shares the exact `portfolio-intelligence` file set with `CF-W1-L3-INTEL-01`.
+Do not promote this child to Ready from Team 03.
+
+Current blockers before any Team 00 Ready evaluation:
+
+- active `CF-W1-L3-WATCH-01` remains ahead of this child in Lane 3 direct-value sequencing;
+- hard upstream dependency on accepted `CF-W1-L3-PORT-01A` readiness semantics remains unmet on plain current `dev`;
+- `CF-W1-L3-INTEL-01` still shares the exact same `portfolio-intelligence` writer set;
+- no dedicated `CF-W1-L3-INTEL-02` QA plan exists yet.
 
 ## Owner / Lane / Module
 
-- Architecture owner: Team 03 Architecture Factory.
-- Future implementation owner: Team 07 Portfolio / Watchlists / Alerts.
-- Lane: Lane 3.
-- Module: `portfolio-intelligence`.
+- Architecture owner: Team 03 Architecture Factory
+- Future implementation owner: Lane 3 implementer assigned by Team 00 after `WATCH-01` clears
+- Lane: Lane 3
+- Module: `portfolio-intelligence`
 
-## Allowed Files After Ready Promotion
+## Allowed Files After Team 00 Promotion
 
 - `backend/src/modules/portfolio-intelligence/portfolio-intelligence.service.ts`
 - `backend/src/modules/portfolio-intelligence/portfolio-intelligence.types.ts`
@@ -28,8 +35,15 @@ This child is downstream of accepted `CF-W1-L3-PORT-01A` and shares the exact `p
 
 ## Current Forbidden Files
 
-- application source or tests before Ready promotion
+- application source/tests before Team 00 Ready promotion
+- `backend/src/modules/portfolio-intelligence/portfolio-intelligence.repository.ts`
+- `backend/src/modules/portfolio-intelligence/portfolio-intelligence.controller.ts`
+- `backend/src/modules/portfolio-intelligence/portfolio-intelligence.router.ts`
+- `backend/src/modules/portfolio-intelligence/portfolio-intelligence.validation.ts`
+- `backend/src/modules/portfolio-intelligence/portfolio-intelligence.module.ts`
+- `backend/src/modules/portfolio-intelligence/index.ts`
 - `backend/src/modules/portfolio-management/**`
+- `backend/src/modules/watchlist-management/**`
 - `backend/src/modules/data-quality-engine/**`
 - `backend/prisma/schema.prisma`
 - `backend/prisma/migrations/**`
@@ -38,28 +52,50 @@ This child is downstream of accepted `CF-W1-L3-PORT-01A` and shares the exact `p
 - shared frontend components
 - package manifests
 - generated files
+- all `frontend/src/features/portfolio-intelligence/**`
+- all `frontend/tests/ui/**`
 - alerts-monitoring source/tests
-- watchlist-management source/tests
-- frontend feature files
+- notifications-delivery source/tests
 - providers, startup/backfill, paid/cloud, broker, or telemetry flows
+- `CF-W1-L3-WATCH-01` docs or Team 07 worktree
+
+## Dependency Summary
+
+- `CF-W1-L3-WATCH-01`: sequencing dependency only. This child should stay behind the active WATCH-01 path in Team 00 routing, but it does not share application files with WATCH-01.
+- `CF-W1-L3-PORT-01A`: hard contract and implementation-base dependency. Current plain `dev` lacks the accepted readiness DTO fields, so future implementation must stack on accepted `f1432e6` or a later clean `dev` that includes it.
+- `CF-W1-L3-PORT-01B`: no code dependency. `INTEL-02` must not read watchlist readiness DTOs or widen into watchlist-management scope.
+- `CF-W1-L3-INTEL-01`: same writer set. Team 00 must combine or strictly sequence the two `portfolio-intelligence` children.
 
 ## Required Behavior
 
 Future implementation must:
 
-- consume accepted portfolio readiness metadata from Portfolio Management;
-- add review traceability metadata that distinguishes reliable, limited, diagnostic, and blocked states;
+- consume accepted portfolio readiness metadata through `PortfolioManagementService.summary()`;
+- add additive review-traceability metadata that distinguishes reliable, limited, diagnostic, and blocked states;
 - surface source modules, blocker reasons, and latest trusted data date where available;
-- preserve existing Portfolio Intelligence response fields and route behavior;
-- avoid duplicating DQ scoring logic.
+- preserve current Portfolio Intelligence response fields and route behavior;
+- avoid duplicating DQE scoring logic;
+- stay backend-only for the first child.
 
 ## QA Handoff Needed
 
-Team 04 should prepare focused backend QA for:
+Yes. QA plan refresh is required.
+
+Current state:
+
+- `CF-W1-L3-INTEL-01` has a QA plan.
+- `CF-W1-L3-INTEL-02` does not yet have a dedicated QA plan file.
+
+Team 04 should either:
+
+1. create `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-L3-INTEL-02-qa-plan.md`, or
+2. explicitly merge INTEL-02 scenarios into a combined `INTEL-01 + INTEL-02` QA packet after Team 00 chooses the single-writer sequencing path.
+
+Minimum QA scope:
 
 - reliable review traceability;
 - limited review traceability;
-- diagnostic review traceability;
+- diagnostic-only review traceability;
 - blocked review traceability;
 - source-module and blocker propagation;
 - backward-compatible existing response fields.
@@ -75,16 +111,18 @@ npm.cmd test -- portfolio-intelligence.service.test.ts --runInBand
 
 Stop and return to Team 00 / Architect if implementation requires:
 
-- Portfolio Management source changes;
-- DQE source/export changes;
-- watchlist readiness changes;
-- route or Prisma changes;
-- frontend/shared UI work;
-- splitting this child in parallel with `CF-W1-L3-INTEL-01`.
+- Portfolio Management source changes
+- watchlist-management source changes
+- DQE source/export changes
+- Prisma/schema/generated changes
+- route or shared-utility/shared-UI changes
+- frontend or UI smoke scope
+- plain current `dev` as the base when `f1432e6` is still absent
+- splitting this child in parallel with `CF-W1-L3-INTEL-01`
 
 ## Next Gate
 
-Wait for accepted `CF-W1-L3-PORT-01A`, then Team 00 may choose either:
-
-- one combined `CF-W1-L3-INTEL-01` plus `CF-W1-L3-INTEL-02` implementation packet, or
-- a strict sequence with one writer on `portfolio-intelligence` at a time.
+1. let active `CF-W1-L3-WATCH-01` stay ahead in Team 00 Lane 3 sequencing;
+2. keep `CF-W1-L3-INTEL-02` parked until Team 00 chooses a safe base that includes accepted `PORT-01A` semantics;
+3. refresh QA planning through Team 04;
+4. have Team 00 choose one writer strategy for `INTEL-01` plus `INTEL-02` before any future Ready evaluation.

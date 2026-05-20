@@ -6,9 +6,11 @@ Owner: Team 03 Architecture Factory
 
 ## Status
 
-Contract prepared from current source and module-boundary review.
+Contract refreshed 2026-05-19 against accepted `CF-W1-RH-01` baseline commit `fd88c62` on branch `codex/team08-ux-research/CF-W1-RH-01`.
 
-Ready recommendation: `Ready candidate` for Team 04 QA handoff and Team 00 sequencing.
+Ready recommendation: `READY-CANDIDATE` for Team 04 QA handoff and Team 00 sequencing as a stacked Research Hub slice after `fd88c62`.
+
+Do not route implementation from the current unstacked `dev` checkout unless Team 00 first applies/merges accepted `RH-01`. At refresh time, `fd88c62` is not an ancestor of `dev`.
 
 ## Contract Intent
 
@@ -34,11 +36,12 @@ Those modules remain public evidence inputs only. None of them owns prior Resear
 
 ## Current Basis Determination
 
-Architecture finding on current `dev`:
+Architecture finding after comparing current `dev` and accepted `RH-01` commit `fd88c62`:
 
 - there is no module-owned persisted Research Hub overview history;
 - there is no safe current public DTO on merged `dev` that represents a previous Research Hub review-priority snapshot with matching semantics;
 - Today Review persisted runs are not a valid proxy basis because they are a downstream published review set, not the same object as Research Hub `tradeCandidates`.
+- accepted `RH-01` improves actionability evidence wiring but keeps `whatChanged` simulated and does not add frontend/API comparison-basis fields.
 
 Therefore the bounded child must fail closed by default.
 
@@ -107,7 +110,8 @@ This child must preserve:
 - `/api/v1/research/overview`
 - existing top-level `ResearchOverview` route and fetch flow
 - current module ownership
-- current actionability, market readiness, strategy proof, confirmation, next-actions, and data-gap behavior
+- accepted `RH-01` actionability evidence behavior from `fd88c62`
+- current market readiness, strategy proof, confirmation, next-actions, and data-gap behavior
 
 This child changes only the trust semantics of `whatChanged`.
 
@@ -139,7 +143,7 @@ Focused implementation tests must prove:
 
 ## File Reservation Contract
 
-Allowed future implementation files only:
+Allowed future implementation files only, on a branch/worktree stacked from `fd88c62` or from a `dev` head containing `fd88c62`:
 
 - `backend/src/modules/research-hub/research-hub.service.ts`
 - `backend/src/modules/research-hub/research-hub.types.ts`
@@ -153,7 +157,7 @@ Everything else is out of scope for this child.
 
 ## Sequencing Rule
 
-`CF-W1-RH-02A` must not run in parallel with `CF-W1-RH-01`.
+`CF-W1-RH-02A` must not run in parallel with `CF-W1-RH-01` and must not start from a base that omits accepted `RH-01`.
 
 Reason:
 
@@ -161,5 +165,6 @@ Reason:
 - both packets require `research-hub.md`;
 - both packets require `research-hub.service.test.ts`;
 - `RH-02A` additionally requires `research-hub.types.ts`.
+- accepted `RH-01` commit `fd88c62` is the comparison baseline for this refreshed contract.
 
 If Team 00 wants one combined writer pass, it must explicitly re-pack the work and keep one writer on the full Research Hub reserved file set.

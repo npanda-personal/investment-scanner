@@ -1,5 +1,46 @@
 # TEAM-04 Current Assignment
 
+Date: 2026-05-20
+
+## Latest Assignment Override
+
+Date: 2026-05-20
+
+Assignment: prepare docs-only QA planning for `CF-W1-STRAT-04` and `CF-W1-SQLAB-03`.
+
+This is planning only. Do not implement application code. Do not run tests, builds, services, providers, Prisma commands, UI smoke, or live data. Do not move either item to Ready.
+
+Source inputs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-STRAT-04-strategy-evidence-freshness-and-stale-summary-labels-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-STRAT-04-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-STRAT-04-strategy-evidence-freshness-and-stale-summary-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-STRAT-04-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SQLAB-03-signal-quality-review-loop-actionability-for-noisy-and-limited-outcomes-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-SQLAB-03-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-SQLAB-03-signal-quality-review-loop-actionability-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-SQLAB-03-work-packet.md`
+
+Allowed writes:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-STRAT-04-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-SQLAB-03-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/next-validation-plans.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+Required QA plan coverage:
+
+- For `CF-W1-STRAT-04`: stale/generated/persisted evidence freshness labels, no arbitrary target/advice wording, feature-local Strategy Framework UI proof, additive DTO compatibility, and no strategy math or route/schema/shared-file changes.
+- For `CF-W1-SQLAB-03`: visible review-loop actionability for noisy/limited outcomes, deterministic research-support wording, feature-local Signal Quality Lab UI proof, additive DTO compatibility, and no journal persistence or route/schema/shared-file changes.
+- Explicitly record that `CF-W1-SQLAB-03` implementation must wait until `CF-W1-SQLAB-02A` is accepted/committed because the writer set overlaps.
+
+Output:
+
+- State whether each item is QA-plan ready for Team 00 Ready evaluation.
+- List file-reservation, sequencing, and validation blockers separately.
+
+---
+
 Date: 2026-05-18
 
 Team: TEAM-04 - QA Factory

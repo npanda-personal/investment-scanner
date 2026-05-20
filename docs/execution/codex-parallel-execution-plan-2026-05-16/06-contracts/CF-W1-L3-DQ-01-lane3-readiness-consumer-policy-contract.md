@@ -1,95 +1,191 @@
 # CF-W1-L3-DQ-01 Lane 3 Readiness Consumer Policy Contract
 
-Date: 2026-05-17
+Date: 2026-05-19
+
+Owner: Team 03 Architecture Factory
 
 ## Status
 
-Parent policy accepted. Child implementation remains blocked.
+Parent policy accepted for child routing, but the parent item itself is `BLOCKED` for Ready promotion.
 
-Product Owner approved Option B on 2026-05-17. Resolution: `07-decisions/DECISION-20260517-lane3-readiness-consumer-policy-resolution.md`.
+This contract does not approve a broad Lane 3 implementation pass. It defines the consumer policy, the split model, and the current gate dependency that must clear before the next fresh readiness-consumer child can move.
 
-Implementation still requires child contracts, QA scenarios, exact file reservations, and one-module-at-a-time work packets.
+Resolved policy decision:
+
+- `07-decisions/DECISION-20260517-lane3-readiness-consumer-policy-resolution.md`
 
 ## Contract Intent
 
-Lane 3 modules must consume Data Quality Engine public readiness outputs instead of duplicating readiness logic or treating market/signal data as trusted just because price or signal fields are present.
+Lane 3 consumers must treat Data Quality readiness as an explicit trust gate, not as an inferred property of populated market or signal fields.
 
-This contract covers the policy surface for:
+This contract governs:
 
-- portfolio summaries and holdings context,
-- watchlist enrichment,
-- alerts monitoring,
-- portfolio intelligence,
-- research or copilot trust surfaces that consume Lane 3 context.
+- passive portfolio/watchlist/research display,
+- trusted summaries,
+- reliability labels,
+- alert and other action-like workflows,
+- child-slice routing and split conditions.
 
-## Proposed Conservative Policy
+## Approved Data Source Boundary
 
-This parent policy is accepted as Product Owner direction. It is not approved for source implementation yet.
+Lane 3 consumers may use `DataQualityEngineService` through the public module boundary only.
 
-| Consumer behavior | `READY` | `LIMITED` | `NOT_READY`, `BLOCKED`, missing DQ, stale hard blocker |
-| --- | --- | --- | --- |
-| Passive display of current price, latest signal, or context | Allowed with DQ status shown | Allowed only with visible warning/status and no action-like language | Block trusted display or show domain empty/warning state |
-| Portfolio/watchlist review context | Allowed | Allowed as limited review context if reasons/blockers are shown | Block reliability claims and downstream trusted use |
-| Alerts or action-like event creation | Allowed only when required use-case tier is ready | Block unless Product Owner explicitly accepts limited alert behavior | Block |
-| Portfolio intelligence scoring, risk labels, or action suggestions | Allowed only with DQ evidence | Degrade to limited/untrusted status, no action wording | Block or return not-enough-trusted-data state |
-| Copilot/research summary trust claims | Allowed with sources | Must disclose limitations and avoid recommendations | Block trusted summary or return data-gap summary |
+Approved public read methods:
 
-## Required Data Source
+- `getLatestEvaluationForInstrument(instrumentId)`
+- `getEvaluationsForInstruments(instrumentIds)`
 
-Lane 3 consumers must use public Data Quality Engine outputs such as:
+Not approved in Lane 3 consumer reads:
 
-- latest instrument evaluation,
-- batch evaluation lookup,
-- use-case tier status where present,
-- readiness reasons and blockers,
-- coverage, signal-readiness, and liquidity statuses.
+- `diagnostics()` as a default consumer-read path, because it can evaluate and persist on miss;
+- `DataQualityEngineRepository` imports;
+- recreated readiness scoring, stale thresholds, liquidity scoring, coverage scoring, or use-case-tier scoring inside Lane 3 modules.
 
-Consumers must not reimplement DQ scoring, stale-data policy, liquidity scoring, or readiness thresholds.
+## Parent Policy Mapping
 
-## Implementation Blockers
+| State | Passive display | Trusted summary | Reliability labels | Alerts / action-like workflows |
+| --- | --- | --- | --- | --- |
+| `READY` | Allowed | Allowed only within the child contract for that module | Allowed only within the child contract for that module | Allowed only within the child contract for that module |
+| `LIMITED` | Allowed only as passive limited context with visible reasons/warnings | Blocked | Blocked | Blocked |
+| Missing DQ | Blocked or untrusted state only | Blocked | Blocked | Blocked |
+| `NOT_READY` | Blocked or untrusted state only | Blocked | Blocked | Blocked |
+| `UNUSABLE` coverage | Blocked or untrusted state only | Blocked | Blocked | Blocked |
+| stale hard blocker | Blocked or untrusted state only | Blocked | Blocked | Blocked |
+| unsupported / scope mismatch / provider-gap blocker | Blocked or untrusted state only | Blocked | Blocked | Blocked |
 
-Source work is blocked until the Product Owner and Architect choose and accept:
+Parent rule:
 
-- whether `LIMITED` data can appear in passive portfolio/watchlist displays,
-- whether any alert can be created from `LIMITED` data,
-- which use-case tier maps to portfolio/watchlist display versus alert/action workflows,
-- whether missing DQ should render empty state, warning state, or block state per module,
-- how much DQ evidence must be added to DTOs before frontend work.
+- populated `currentPrice`, valuation, signal, health, review, or threshold data never proves trust on its own;
+- missing or blocked readiness may still be shown only as blocked/untrusted context when the child contract allows passive display of the surrounding surface.
 
-## Future Slice Guidance
+## Use-Case Tier Mapping
 
-After policy acceptance, do not implement all Lane 3 consumers in one broad pass.
+Default tier interpretation for Lane 3:
 
-Use child work items with one module owner per implementation pass:
+- passive portfolio/watchlist display should use `useCaseTiers.dailyReview` when present;
+- trusted summaries and reliability labels should require all referenced module-owned readiness inputs to be `READY` for the relevant child surface;
+- alert/action-like workflows require a stricter child rule and must never treat `LIMITED` as eligible.
 
-- portfolio/watchlist readiness DTO slice,
-- alerts readiness suppression slice,
-- portfolio intelligence reliability gate,
-- copilot/research trust surface slice,
-- frontend display slice only after UX acceptance.
+Current alert child precedent:
+
+- `CF-W1-L3-ALERT-01` treats alerts as action-like and requires `READY` gating through the alert child contract.
+- Because `automation` is currently phase-zero blocked in DQE, the alert child uses a stricter fallback gate rather than broadening this parent policy.
+
+## Child Split Model
+
+This parent packet must stay split by module. Do not reopen all Lane 3 consumers in one pass.
+
+### Upstream baseline child
+
+`CF-W1-L3-PORT-01A` was the smallest valid first child and remains the required upstream baseline:
+
+- module: `portfolio-management`
+- purpose: readiness DTO evidence for passive display and downstream trust gating
+- exact reserved files:
+  - `backend/src/modules/portfolio-management/portfolio-management.service.ts`
+  - `backend/src/modules/portfolio-management/portfolio-management.types.ts`
+  - `backend/src/modules/portfolio-management/portfolio-management.md`
+  - `backend/tests/modules/portfolio-management/portfolio-management.service.test.ts`
+
+Gate note:
+
+- the dedicated worktree evidence shows `CF-W1-L3-PORT-01A` already passed Team 10 re-review and Team 03 Architect Signoff;
+- the accepted DTO shape is still absent from shared `dev`;
+- downstream child routing must therefore wait for delegated Product Owner acceptance plus Team 00 staged-scope verification/local commit before treating the portfolio readiness DTOs as an accepted source on clean `dev`.
+
+### Next fresh readiness-consumer child
+
+`CF-W1-L3-PORT-01B`
+
+- module: `watchlist-management`
+- next fresh Lane 3 readiness-consumer candidate after `CF-W1-L3-PORT-01A` is accepted and present on clean `dev`
+- exact reserved files:
+  - `backend/src/modules/watchlist-management/watchlist-management.service.ts`
+  - `backend/src/modules/watchlist-management/watchlist-management.types.ts`
+  - `backend/src/modules/watchlist-management/watchlist-management.md`
+  - `backend/tests/modules/watchlist-management/watchlist-management.service.test.ts`
+- module-local only if it stays inside those files and consumes DQ through the public service boundary only
+
+### Other children
+
+`CF-W1-L3-ALERT-01`
+
+- module: `alerts-monitoring`
+- separate active child contract
+- must not run in parallel with `CF-W1-L3-AUTH-03` because the file set overlaps
+
+`CF-W1-L3-INTEL-01`
+
+- module: `portfolio-intelligence`
+- blocked until `CF-W1-L3-PORT-01A` is accepted and committed on clean `dev`
+- exact reserved files:
+  - `backend/src/modules/portfolio-intelligence/portfolio-intelligence.service.ts`
+  - `backend/src/modules/portfolio-intelligence/portfolio-intelligence.types.ts`
+  - `backend/src/modules/portfolio-intelligence/portfolio-intelligence.md`
+  - `backend/tests/modules/portfolio-intelligence/portfolio-intelligence.service.test.ts`
+
+Copilot/research trust surfaces
+
+- remain docs-only until separate UX approval and explicit frontend reservations exist
 
 ## Forbidden Behavior
 
-- Do not duplicate Data Quality Engine scoring logic in Lane 3 modules.
-- Do not create alert events from missing or blocked DQ.
-- Do not use direct financial advice language.
-- Do not change Data Quality Engine public contract without Architect approval.
-- Do not edit Prisma, route registries, shared UI, package files, generated types, providers, scheduler/startup behavior, or live-provider flows in this parent policy slice.
+- Do not treat `LIMITED` as alert-ready, action-ready, or reliability-bearing.
+- Do not use price/signal presence as a trust proxy.
+- Do not import `DataQualityEngineRepository` into Lane 3 modules.
+- Do not change DQE source or public exports under this parent packet.
+- Do not edit Prisma/schema, migrations, route registries, shared backend utilities, shared DTOs, shared UI, package manifests, generated files, providers, startup/backfill flows, or frontend files under this parent packet.
 
-## Decision Resolution Note
+## Split / Block Conditions
 
-The parent policy Decision Packet was resolved on 2026-05-17 as Option B. Future Decision Packets are needed only if a child slice tries to broaden `LIMITED` behavior, add action-like exceptions, touch shared/high-risk files, or expand into UI/source scope outside the approved child packet.
+Return a child to blocked status if implementation would require:
 
-## Team 03 Relaunch Architecture Notes - 2026-05-17
+- schema or migration work;
+- backend or frontend route changes;
+- shared utility or shared DTO extraction;
+- shared UI work;
+- package or generated-file changes;
+- provider/live/startup/backfill behavior;
+- broad UX scope;
+- auth/subscription ownership changes in the same pass.
 
-Readiness result: docs-only policy contract remains valid, but app-code work is blocked.
+Also keep the parent packet blocked when the only missing dependency is that the accepted upstream child DTO shape is not yet present on clean `dev`. In that case, do not promote a new child from this parent packet ahead of the upstream acceptance/commit gate.
 
-Current evidence confirms the Data Quality Engine exposes public readiness outputs, including `coverageStatus`, `signalReadinessStatus`, `liquidityStatus`, `eligibleForSignals`, readiness reasons/blockers, and use-case tiers. Lane 3 consumers must consume those outputs through public module boundaries and must not calculate their own readiness scores.
+## QA Hooks
 
-Recommended decision posture:
+Team 04 should validate by child packet, not by one combined Lane 3 suite.
 
-- `READY` can support trusted display and action-like workflows after module-specific contract checks.
-- `LIMITED` should be display-only with visible reasons unless Product Owner explicitly accepts a narrower exception.
-- `NOT_READY`, `UNUSABLE`, stale hard blockers, missing DQ, unsupported scope, and scope mismatch should block trusted display, alerts, reliability labels, and action-like workflow states.
+Required policy checks across every child:
 
-No app-code files are reserved by this contract. Future implementation must be split into child slices for portfolio/watchlist DTO readiness, alerts readiness suppression, portfolio-intelligence reliability gating, and UX-approved frontend display work.
+1. DQ is consumed through the approved public service boundary.
+2. Missing DQ does not silently become trusted.
+3. `LIMITED` remains passive-only.
+4. `NOT_READY`, `UNUSABLE`, stale, unsupported, scope-mismatched, and provider-gap evidence fail closed for trusted/action-like use.
+5. Product language remains research-support oriented.
+
+Reference QA plans:
+
+- `04-qa/CF-W1-L3-DQ-01-qa-plan.md`
+- `04-qa/CF-W1-L3-PORT-01-qa-plan.md`
+- `04-qa/CF-W1-L3-ALERT-01-qa-plan.md`
+
+## Product Owner Action
+
+No additional Product Owner action is required for the accepted Option B parent policy.
+
+Product Owner action is required only if a future child wants to:
+
+- broaden `LIMITED` into trusted or action-like use;
+- add a UI exception outside approved UX scope;
+- reopen shared/high-risk files;
+- change the meaning of readiness tiers for Lane 3 consumers.
+
+## Current Next Gate
+
+Do not promote `CF-W1-L3-DQ-01` itself as Ready.
+
+Current routing order:
+
+1. delegated Product Owner acceptance for `CF-W1-L3-PORT-01A`;
+2. Team 00 staged-scope verification and scoped local commit for `CF-W1-L3-PORT-01A`;
+3. once clean `dev` contains the accepted portfolio readiness DTOs, Team 00 may evaluate `CF-W1-L3-PORT-01B` as the next fresh readiness-consumer Ready candidate.

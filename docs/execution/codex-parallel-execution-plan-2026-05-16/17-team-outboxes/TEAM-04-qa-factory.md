@@ -4,6 +4,291 @@ Date: 2026-05-18
 
 Mode: focused QA rerun plus docs-only QA planning.
 
+## 2026-05-20 `CF-W1-MCTX-02` / `CF-W1-HCTX-03` / `CF-W1-DQ-03` QA Planning
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only QA packet preparation
+- Work items:
+  - `CF-W1-MCTX-02` - market context freshness basis labels for persisted vs generated summaries
+  - `CF-W1-HCTX-03` - historical context nearest-snapshot age and provenance warnings
+  - `CF-W1-DQ-03` - data quality residual reason summary for downstream trust consumers
+- State/mode: QA planning only; no executable validation
+- Owner: Team 04 QA Factory
+- Lane/module:
+  - `market-context-intelligence`
+  - `historical-context-snapshots`
+  - `data-quality-engine`
+- Files changed:
+  - `04-qa/CF-W1-MCTX-02-qa-plan.md`
+  - `04-qa/CF-W1-HCTX-03-qa-plan.md`
+  - `04-qa/CF-W1-DQ-03-qa-plan.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - `AGENTS.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MCTX-02-market-context-freshness-basis-labels-for-persisted-vs-generated-summaries-requirement.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-HCTX-03-historical-context-nearest-snapshot-age-and-provenance-warnings-requirement.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-DQ-03-data-quality-residual-reason-summary-for-downstream-trust-consumers-requirement.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-MCTX-02-architecture-review.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-HCTX-03-architecture-review.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-DQ-03-architecture-review.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-MCTX-02-market-context-freshness-basis-contract.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-HCTX-03-historical-context-nearest-snapshot-age-and-provenance-contract.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-DQ-03-data-quality-residual-reason-summary-contract.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-MCTX-02-work-packet.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-HCTX-03-work-packet.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-DQ-03-work-packet.md`
+  - `backend/src/modules/market-context-intelligence/market-context-intelligence.md`
+  - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.md`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.md`
+  - `backend/tests/modules/market-context-intelligence/market-context-intelligence.service.test.ts`
+  - `backend/tests/modules/historical-context-snapshots/historical-context-snapshots.service.test.ts`
+  - `backend/tests/modules/data-quality-engine/data-quality-engine.service.test.ts`
+- QA verdicts:
+  - `CF-W1-MCTX-02`: `ACCEPT / READY-FOR-TEAM00-EVALUATION`
+  - `CF-W1-HCTX-03`: `ACCEPT / READY-FOR-TEAM00-EVALUATION`
+  - `CF-W1-DQ-03`: `ACCEPT / READY-FOR-TEAM00-EVALUATION`
+- Why ready:
+  - Team 03 published matching architecture/contract/work-packet artifacts for all three children.
+  - Each plan is now bounded to the exact backend writer set and no longer claims schema, route, shared, provider, or broad UI scope.
+  - QA can now hand the bounded packets to Team 00 for promotion, while executable validation remains blocked until implementation handoffs exist.
+- Ranked Team 00 promotion order:
+  1. `CF-W1-MCTX-02` - highest direct trust value because the basis label feeds the Market Context summary story.
+  2. `CF-W1-HCTX-03` - direct review-support value because the lookup age/provenance signal prevents stale historical context from looking fresh.
+  3. `CF-W1-DQ-03` - important downstream trust support, but the most backend-facing of the three.
+- Commands not run:
+  - no backend tests
+  - no frontend tests
+  - no builds
+  - no UI smoke
+  - no browser checks
+  - no schema, route, or package commands
+- Reason commands were not run:
+  - this was docs-only QA planning and the implementation handoffs do not exist yet
+- Next recommended Team 00 action:
+  - promote the three ready packets in the ranked order above, starting with `CF-W1-MCTX-02`, then `CF-W1-HCTX-03`, then `CF-W1-DQ-03`, and hand the bounded implementation slices back to Team 04 for executable QA
+
+
+## 2026-05-20 `CF-W1-RH-03` Research Hub Explainability / Trust Labels QA Planning
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only QA packet preparation
+- Work item: `CF-W1-RH-03`
+- State/mode: QA planning only; no executable validation
+- Owner: Team 04 QA Factory
+- Lane/module: Cross-lane research aggregation / `research-hub`
+- Files changed:
+  - `04-qa/CF-W1-RH-03-qa-plan.md`
+  - `17-team-outboxes/TEAM-04-CF-W1-RH-03-qa-plan.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - `AGENTS.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-RH-03-research-hub-explainability-trust-labels-requirement.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-RH-03-architecture-review.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-RH-03-research-hub-explainability-trust-labels-contract.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-RH-03-work-packet.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-RH-01-qa-plan.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-RH-02A-qa-plan.md`
+  - `backend/src/modules/research-hub/research-hub.service.ts`
+  - `backend/src/modules/research-hub/research-hub.types.ts`
+  - `backend/tests/modules/research-hub/research-hub.service.test.ts`
+  - `frontend/src/features/research-hub/api/researchHubApi.ts`
+  - `frontend/src/features/research-hub/components/ResearchOverviewPage.tsx`
+  - `frontend/tests/ui/research-hub.spec.ts`
+- Behavior changed:
+  - none; docs-only QA planning
+- Docs changed:
+  - prepared `04-qa/CF-W1-RH-03-qa-plan.md`
+  - prepared `17-team-outboxes/TEAM-04-CF-W1-RH-03-qa-plan.md`
+  - recorded this outbox entry
+- Contracts changed:
+  - none
+- Tests run:
+  - none
+- Tests skipped:
+  - all executable validation was skipped because this is a planning pass with no implementation handoff
+- Skipped-test reason:
+  - docs-only planning; the child is not at executable QA
+- Assumptions:
+  - `CF-W1-RH-03` will stack on accepted `CF-W1-RH-02A` commit `f391a6d`, which already contains accepted `CF-W1-RH-01` commit `fd88c62`
+  - durable snapshot/history storage remains out of scope and must not be reopened inside this child
+- Risks:
+  - implementers may preserve route-substring inference for `nextBestAction.sourceModule`
+  - implementers may continue treating raw signal counts as reliability proof
+  - implementers may leave stale temporal What Changed copy in the unavailable-basis path
+- Blockers:
+  - no implementation handoff exists yet
+  - executable QA remains blocked until Team 00 promotes the bounded Research Hub handoff
+  - there is no true consent blocker for the bounded child
+- Shared-file requests:
+  - none from Team 04
+- QA-ready for Team 00 Ready evaluation:
+  - `CF-W1-RH-03`: yes
+- Next gate:
+  - Team 00 Ready evaluation and exact writer reservation on the `f391a6d` base
+
+## 2026-05-20 `CF-W1-L3-INTEL-02` Portfolio Intelligence Review Traceability QA Planning
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only QA packet preparation
+- Work item: `CF-W1-L3-INTEL-02`
+- State/mode: QA planning only; no executable validation
+- Owner: Team 04 QA Factory
+- Lane/module: Lane 3 / `portfolio-intelligence` review traceability
+- Files changed:
+  - `04-qa/CF-W1-L3-INTEL-02-qa-plan.md`
+  - `17-team-outboxes/TEAM-04-CF-W1-L3-INTEL-02-qa-plan.md`
+- Files inspected:
+  - `AGENTS.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-INTEL-02-portfolio-intelligence-review-traceability-requirement.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-L3-INTEL-02-architecture-review.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-L3-INTEL-02-portfolio-intelligence-review-traceability-contract.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-L3-INTEL-02-work-packet.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-CF-W1-L3-INTEL-02-architecture.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-L3-INTEL-01-qa-plan.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-L3-DQ-01B-qa-plan.md`
+  - `backend/src/modules/portfolio-intelligence/portfolio-intelligence.service.ts`
+  - `backend/src/modules/portfolio-intelligence/portfolio-intelligence.types.ts`
+  - `backend/src/modules/portfolio-management/portfolio-management.types.ts`
+- Behavior changed:
+  - none; docs-only QA planning
+- Docs changed:
+  - prepared `04-qa/CF-W1-L3-INTEL-02-qa-plan.md`
+  - recorded this outbox entry
+- Contracts changed:
+  - none
+- Tests run:
+  - none
+- Tests skipped:
+  - all executable validation was skipped because this is a planning pass with no implementation handoff
+- Skipped-test reason:
+  - docs-only planning; the child is not Ready for Implementation yet
+- Assumptions:
+  - `CF-W1-L3-INTEL-02` must stack on accepted `CF-W1-L3-PORT-01A` commit `f1432e6` or a later clean `dev` containing it
+  - `CF-W1-L3-DQ-01B` is necessary but not sufficient by itself
+  - `CF-W1-L3-INTEL-01` remains a same-file writer conflict
+- Risks:
+  - implementers may overclaim trusted review standing from `dataStatus = COMPLETE` unless the traceability gate stays fail-closed
+  - scope could drift into portfolio-management, watchlist-management, DQE internals, routes, Prisma, frontend, or DQ-01B-only reliability fields if Team 00 does not keep the writer set exact
+- Blockers:
+  - no implementation handoff exists yet
+  - current `dev` does not yet satisfy the accepted `PORT-01A` base requirement
+  - Team 00 should not evaluate Ready until the base and writer sequencing are confirmed
+- Shared-file requests:
+  - none from Team 04
+- QA-ready for Team 00 Ready evaluation:
+  - `CF-W1-L3-INTEL-02`: no, not yet
+- Next gate:
+  - Team 00 confirmation of the implementation base, the DQ-01B dependency landing, and the one-writer decision for `INTEL-01` plus `INTEL-02`
+
+## 2026-05-20 `CF-W1-L3-DQ-01B` Portfolio Intelligence Reliability Gate QA Planning
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only QA packet preparation
+- Work item: `CF-W1-L3-DQ-01B`
+- State/mode: QA planning only; no executable validation
+- Owner: Team 04 QA Factory
+- Lane/module: Lane 3 / `portfolio-intelligence` reliability gating
+- Files changed:
+  - `04-qa/CF-W1-L3-DQ-01B-qa-plan.md`
+  - `17-team-outboxes/TEAM-04-CF-W1-L3-DQ-01B-qa-plan.md`
+- Files inspected:
+  - `AGENTS.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-DQ-01B-portfolio-intelligence-reliability-gate-requirement.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-L3-DQ-01B-architecture-review.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-L3-DQ-01B-portfolio-intelligence-reliability-gate-contract.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-L3-DQ-01B-work-packet.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-CF-W1-L3-DQ-01B-architecture.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-L3-DQ-01A-qa-plan.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-L3-DQ-01A-lane-3-passive-readiness-dto-contract.md`
+  - current `portfolio-intelligence` source/test surfaces for file-name alignment only:
+    - `backend/src/modules/portfolio-intelligence/portfolio-intelligence.service.ts`
+    - `backend/src/modules/portfolio-intelligence/portfolio-intelligence.types.ts`
+    - `backend/tests/modules/portfolio-intelligence/portfolio-intelligence.service.test.ts`
+    - `backend/tests/modules/portfolio-intelligence/portfolio-intelligence.routes.test.ts`
+- Behavior changed:
+  - none; docs-only QA planning
+- Docs changed:
+  - prepared `04-qa/CF-W1-L3-DQ-01B-qa-plan.md`
+  - recorded this outbox entry
+- Contracts changed:
+  - none
+- Tests run:
+  - none
+- Tests skipped:
+  - all executable validation was skipped because this is a planning pass with no implementation handoff
+- Skipped-test reason:
+  - docs-only planning; the child is not Ready for Implementation yet
+- Assumptions:
+  - `CF-W1-L3-DQ-01B` must stack on accepted `CF-W1-L3-PORT-01A` commit `f1432e6` or a later clean `dev` containing it
+  - `CF-W1-L3-DQ-01A` remains the hard contract prerequisite
+  - `CF-W1-L3-INTEL-02` stays downstream and must not be merged into this child
+- Risks:
+  - implementers may overclaim trust from `dataStatus = COMPLETE` unless the reliability gate stays fail-closed
+  - scope could drift into portfolio-management, watchlist-management, DQE internals, routes, Prisma, frontend, or traceability-only fields if Team 00 does not keep the writer set exact
+- Blockers:
+  - no implementation handoff exists yet
+  - current `dev` does not yet satisfy the accepted `PORT-01A` base requirement
+  - Team 00 should not evaluate Ready until that base is confirmed
+- Shared-file requests:
+  - none from Team 04
+- QA-ready for Team 00 Ready evaluation:
+  - `CF-W1-L3-DQ-01B`: no, not yet
+- Next gate:
+  - Team 00 confirmation of the implementation base and later backend-only implementation handoff
+
+## 2026-05-20 `CF-W1-L3-DQ-01A` Passive Readiness DTO Contract Gate QA Planning
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only QA packet preparation
+- Work item: `CF-W1-L3-DQ-01A`
+- State/mode: QA planning only; no executable validation
+- Owner: Team 04 QA Factory
+- Lane/module: Lane 3 / contract gate for passive portfolio and watchlist readiness semantics
+- Files changed:
+  - `04-qa/CF-W1-L3-DQ-01A-qa-plan.md`
+  - `17-team-outboxes/TEAM-04-CF-W1-L3-DQ-01A-qa-plan.md`
+- Files inspected:
+  - `AGENTS.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-DQ-01A-lane-3-passive-readiness-dto-contract-requirement.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-L3-DQ-01A-architecture-review.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-L3-DQ-01A-lane-3-passive-readiness-dto-contract.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-L3-DQ-01A-work-packet.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-CF-W1-L3-DQ-01A-architecture.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-DQ-01B-portfolio-intelligence-reliability-gate-requirement.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-INTEL-02-portfolio-intelligence-review-traceability-requirement.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-L3-INTEL-02-portfolio-intelligence-review-traceability-contract.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-CF-W1-L3-INTEL-02-architecture.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-L3-PORT-01B-qa-plan.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-L3-WATCH-01-qa-plan.md`
+- Behavior changed:
+  - none; docs-only QA planning
+- Docs changed:
+  - prepared `04-qa/CF-W1-L3-DQ-01A-qa-plan.md`
+  - recorded this outbox entry
+- Contracts changed:
+  - none
+- Tests run:
+  - none
+- Tests skipped:
+  - all executable validation was skipped because this is a contract-gate planning pass with no implementation handoff
+- Skipped-test reason:
+  - docs-only planning; the child is not an implementation packet
+- Assumptions:
+  - `CF-W1-L3-DQ-01B` can be routed to Team 03 architecture once this contract is acknowledged
+  - `CF-W1-L3-INTEL-02` still needs a dedicated QA refresh and one-writer sequencing before Ready evaluation
+- Risks:
+  - implementers could try to reopen passive DTO implementation files under this contract gate
+  - downstream children could drift into route/shared/schema/frontend scope if Team 00 does not keep the writer set exact
+- Blockers:
+  - executable QA remains blocked until a later implementation child exists
+  - `CF-W1-L3-INTEL-02` remains behind active `CF-W1-L3-WATCH-01` in current Lane 3 sequencing
+- Shared-file requests:
+  - none from Team 04
+- QA-ready for Team 00 Ready evaluation:
+  - `CF-W1-L3-DQ-01A`: yes, as a docs-only contract gate only
+- Next gate:
+  - Team 00 contract acknowledgement, then Team 03 architecture routing for `CF-W1-L3-DQ-01B`
+
 ## 2026-05-18 `CF-W1-SIG-02` Canonical Trigger Evidence Compatibility QA Planning
 
 - Team: `TEAM-04` - QA Factory

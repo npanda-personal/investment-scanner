@@ -6,6 +6,375 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+2026-05-20 Team 00 Ready promotion:
+
+- `CF-W1-HCTX-03` is promoted and assigned to Team 05 as a bounded backend-only Historical Context nearest-snapshot age/provenance implementation.
+- Team 00 sequencing decision: implement `HCTX-03` on accepted `CF-W1-HCTX-02` commit `f52c024`, because both slices reserve overlapping `historical-context-snapshots` service/types/doc/test files and `HCTX-02` is not merged into plain `dev`.
+- Parallel-safety decision: `HCTX-03` can run in parallel with active `TREV-02`, `SQLAB-02A`, and `MCTX-02` gates because file scopes are disjoint.
+- Branch: `codex/team05-market-data/CF-W1-HCTX-03`
+- Worktree: `../investment-scanner-worktrees/team05-CF-W1-HCTX-03`
+- Base: `f52c024 feat: add historical context dq coverage evidence`
+- Allowed implementation files:
+  - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.types.ts`
+  - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.service.ts`
+  - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.md`
+  - `backend/tests/modules/historical-context-snapshots/historical-context-snapshots.service.test.ts`
+- Allowed branch-local evidence docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-05-CF-W1-HCTX-03-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-HCTX-03-developer-handoff.md`
+- Required developer validation:
+  - `cd backend && npm.cmd test -- historical-context-snapshots.service.test.ts --runInBand`
+  - `cd backend && npm.cmd run build`
+  - optional copy drift scan: `rg -n "same-day|near|fallback|lag|lookback|metadata gap|provenance" backend/src/modules/historical-context-snapshots backend/tests/modules/historical-context-snapshots`
+- Forbidden scope:
+  - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.repository.ts`
+  - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.controller.ts`
+  - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.router.ts`
+  - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.validation.ts`
+  - `backend/src/modules/historical-context-snapshots/index.ts`
+  - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.module.ts`
+  - `backend/tests/modules/historical-context-snapshots/historical-context-snapshots.repository.test.ts`
+  - `backend/tests/modules/historical-context-snapshots/historical-context-snapshots.routes.test.ts`
+  - `backend/tests/modules/historical-context-snapshots/historical-context-snapshots.validation.test.ts`
+  - all frontend `historical-context-snapshots` files/tests
+  - all `market-context-intelligence` source/tests
+  - all `signal-quality-lab` source/tests
+  - Prisma schema or migrations
+  - generated files
+  - backend/frontend route registries
+  - shared backend utilities or shared frontend components
+  - package manifests
+  - provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential files
+- Next gate after implementation: Team 04 QA verification.
+
+2026-05-20 Team 00 Ready promotion:
+
+- `CF-W1-MCTX-02` is promoted and assigned to Team 05 as a bounded backend-only Market Context freshness-basis implementation.
+- Team 00 sequencing decision: implement `MCTX-02` on accepted `CF-W1-MCTX-01` commit `e695f0c`, because both slices reserve overlapping `market-context-intelligence` service/types/doc/test files and `MCTX-01` is not merged into plain `dev`.
+- Parallel-safety decision: `MCTX-02` can run in parallel with active Team 07 `TREV-02` rework and active Team 10 reviews for `INTEL-03` / `SQLAB-02A` because the write scopes are disjoint.
+- Branch: `codex/team05-market-data/CF-W1-MCTX-02`
+- Worktree: `../investment-scanner-worktrees/team05-CF-W1-MCTX-02`
+- Base: `e695f0c feat: add market context evidence framing`
+- Allowed implementation files:
+  - `backend/src/modules/market-context-intelligence/market-context-intelligence.service.ts`
+  - `backend/src/modules/market-context-intelligence/market-context-intelligence.types.ts`
+  - `backend/src/modules/market-context-intelligence/market-context-intelligence.md`
+  - `backend/tests/modules/market-context-intelligence/market-context-intelligence.service.test.ts`
+- Allowed branch-local evidence docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-05-CF-W1-MCTX-02-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-MCTX-02-developer-handoff.md`
+- Required developer validation:
+  - `cd backend && npm.cmd test -- market-context-intelligence.service.test.ts --runInBand`
+  - `cd backend && npm.cmd run build`
+  - optional copy drift scan: `rg -n "persisted|generated|fallback|derived|fresh|partial|missing|macro|basis" backend/src/modules/market-context-intelligence backend/tests/modules/market-context-intelligence`
+- Forbidden scope:
+  - `backend/src/modules/market-context-intelligence/market-context-intelligence.repository.ts`
+  - `backend/src/modules/market-context-intelligence/market-context-intelligence.controller.ts`
+  - `backend/src/modules/market-context-intelligence/market-context-intelligence.router.ts`
+  - `backend/src/modules/market-context-intelligence/market-context-intelligence.validation.ts`
+  - `backend/src/modules/market-context-intelligence/index.ts`
+  - `backend/tests/modules/market-context-intelligence/market-context-intelligence.repository.test.ts`
+  - `backend/tests/modules/market-context-intelligence/market-context-intelligence.routes.test.ts`
+  - all frontend `market-context-intelligence` files/tests
+  - all downstream consumer module source/tests
+  - Prisma schema or migrations
+  - generated files
+  - backend/frontend route registries
+  - shared backend utilities or shared frontend components
+  - package manifests
+  - provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential files
+- Next gate after implementation: Team 04 QA verification.
+
+2026-05-20 Team 00 Ready promotion:
+
+- `CF-W1-SQLAB-02A` is promoted and assigned to Team 06 as a bounded no-schema Signal Quality Lab derived journal-preview implementation.
+- Team 00 sequencing decision: implement `SQLAB-02A` on accepted `CF-W1-SQLAB-01` commit `1a41d95`, because both slices reserve overlapping Signal Quality Lab service/types/doc/test files and `SQLAB-01` is not merged into plain `dev`.
+- Parallel-safety decision: `SQLAB-02A` can run in parallel with active Team 07 `TREV-02` and `INTEL-03` rework because the write scopes are disjoint.
+- Branch: `codex/team06-strategy-signal/CF-W1-SQLAB-02A`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-SQLAB-02A`
+- Base: `1a41d95 feat: add signal quality outcome confidence`
+- Allowed implementation files:
+  - `backend/src/modules/signal-quality-lab/signal-quality-lab.service.ts`
+  - `backend/src/modules/signal-quality-lab/signal-quality-lab.types.ts`
+  - `backend/src/modules/signal-quality-lab/signal-quality-lab.md`
+  - `backend/tests/modules/signal-quality-lab/signal-quality-lab.service.test.ts`
+  - `frontend/src/features/signal-quality-lab/types.ts`
+  - `frontend/src/features/signal-quality-lab/components/SignalQualityLabPage.tsx`
+  - `frontend/tests/ui/signal-quality-lab.spec.ts`
+- Allowed branch-local evidence docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-CF-W1-SQLAB-02A-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-SQLAB-02A-developer-handoff.md`
+- Required developer validation:
+  - `cd backend && npm.cmd test -- signal-quality-lab.service.test.ts --runInBand`
+  - `cd frontend && npm.cmd run test:ui -- signal-quality-lab.spec.ts --workers=1`
+  - copy scan proving visible copy keeps derived-not-persisted and research-support framing without advice, target, guaranteed-outcome, broker, automation, save/edit, or durable-journal claims.
+- Forbidden scope:
+  - `backend/prisma/schema.prisma`
+  - `backend/prisma/migrations/**`
+  - `backend/src/modules/signal-quality-lab/signal-quality-lab.repository.ts`
+  - `backend/src/modules/signal-quality-lab/signal-quality-lab.controller.ts`
+  - `backend/src/modules/signal-quality-lab/signal-quality-lab.router.ts`
+  - `backend/src/modules/signal-quality-lab/signal-quality-lab.validation.ts`
+  - `backend/tests/modules/signal-quality-lab/signal-quality-lab.routes.test.ts`
+  - `backend/tests/modules/signal-quality-lab/signal-quality-lab.validation.test.ts`
+  - `backend/src/modules/signal-generation-engine/**`
+  - `backend/src/modules/signal-calibration-engine/**`
+  - `backend/src/modules/today-trade-review/**`
+  - `frontend/src/features/signal-quality-lab/api/signalQualityLabService.ts`
+  - backend/frontend route registries
+  - shared backend utilities, shared frontend components, package manifests, generated files
+  - provider/live-market/startup/backfill/paid-cloud/broker/telemetry files
+  - durable journal storage, save/edit actions, schema, persistence, or separate journal routes
+- Next gate after implementation: Team 04 QA verification.
+
+2026-05-20 Team 00 Ready promotion:
+
+- `CF-W1-L3-INTEL-03` is promoted and assigned to Team 07 as a bounded Portfolio Intelligence concentration-review implementation.
+- Team 00 sequencing decision: implement `INTEL-03` on accepted `CF-W1-L3-INTEL-02` commit `d0305c8`, which already includes `DQ-01B` commit `56b286f` and the accepted portfolio readiness baseline.
+- Parallel-safety decision: `INTEL-03` can run in parallel with active `TREV-02` because it reserves `portfolio-intelligence` files while `TREV-02` reserves `today-trade-review` files.
+- Branch: `codex/team07-portfolio-alerts/CF-W1-L3-INTEL-03`
+- Worktree: `../investment-scanner-worktrees/team07-CF-W1-L3-INTEL-03`
+- Base: `d0305c8 feat: add portfolio intelligence review traceability`
+- Allowed implementation files:
+  - `backend/src/modules/portfolio-intelligence/portfolio-intelligence.service.ts`
+  - `backend/src/modules/portfolio-intelligence/portfolio-intelligence.types.ts`
+  - `backend/src/modules/portfolio-intelligence/portfolio-intelligence.md`
+  - `backend/tests/modules/portfolio-intelligence/portfolio-intelligence.service.test.ts`
+  - `frontend/src/features/portfolio-intelligence/types.ts`
+  - `frontend/src/features/portfolio-intelligence/components/PortfolioIntelligencePanel.tsx`
+  - optional new focused UI smoke: `frontend/tests/ui/portfolio-intelligence.spec.ts`
+- Allowed branch-local evidence docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-07-CF-W1-L3-INTEL-03-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-L3-INTEL-03-developer-handoff.md`
+- Required developer validation:
+  - `cd backend && npm.cmd test -- portfolio-intelligence.service.test.ts --runInBand`
+  - `cd frontend && npm.cmd run test:ui -- portfolio-intelligence.spec.ts --workers=1` if the UI smoke is added or already exists
+  - copy scan proving concentration-review copy stays research-support only and avoids optimizer/rebalance/advice wording.
+- Forbidden scope:
+  - `backend/src/modules/portfolio-intelligence/portfolio-intelligence.router.ts`
+  - `backend/src/modules/portfolio-intelligence/portfolio-intelligence.controller.ts`
+  - `backend/src/modules/portfolio-intelligence/portfolio-intelligence.repository.ts`
+  - `backend/src/modules/portfolio-intelligence/portfolio-intelligence.validation.ts`
+  - `backend/tests/modules/portfolio-intelligence/portfolio-intelligence.routes.test.ts`
+  - all `backend/src/modules/portfolio-management/**`
+  - all `backend/src/modules/data-quality-engine/**`
+  - all `backend/src/modules/strategy-decision-engine/**`
+  - backend/frontend route registries
+  - `frontend/src/features/portfolio-intelligence/api/portfolioIntelligenceService.ts`
+  - `frontend/src/features/portfolio-intelligence/hooks/usePortfolioIntelligence.ts`
+  - `frontend/src/features/portfolio-intelligence/routes.tsx`
+  - shared backend utilities, shared frontend components, package manifests, generated files
+  - Prisma/schema/migrations
+  - optimizer, rebalance, tax, broker, provider/startup, paid/cloud, telemetry, or live-flow work
+- Next gate after implementation: Team 04 QA verification.
+
+2026-05-20 Team 00 Ready promotion:
+
+- `CF-W1-L3-TREV-02` is promoted and assigned to Team 07 as a bounded Today Review candidate-detail provenance implementation.
+- Team 00 sequencing decision: implement `TREV-02` on accepted `CF-W1-L3-TREV-01` commit `e0673c3`, because both slices reserve overlapping Today Review writer files and `TREV-01` is not merged into plain `dev`.
+- Branch: `codex/team07-portfolio-alerts/CF-W1-L3-TREV-02`
+- Worktree: `../investment-scanner-worktrees/team07-CF-W1-L3-TREV-02`
+- Base: `e0673c3 feat: add today review publication evidence`
+- Allowed implementation files:
+  - `backend/src/modules/today-trade-review/today-trade-review.types.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.repository.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.service.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.md`
+  - `backend/tests/modules/today-trade-review/today-trade-review.service.test.ts`
+  - exact new focused compatibility-read test only if needed: `backend/tests/modules/today-trade-review/today-trade-review.repository.test.ts`
+  - `frontend/src/features/today-trade-review/types.ts`
+  - `frontend/src/features/today-trade-review/components/TodayReviewCandidateDetailPage.tsx`
+  - `frontend/tests/ui/today-trade-review.spec.ts`
+- Allowed branch-local evidence docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-07-CF-W1-L3-TREV-02-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-L3-TREV-02-developer-handoff.md`
+- Required developer validation:
+  - `cd backend && npm.cmd test -- today-trade-review.service.test.ts today-trade-review.repository.test.ts --runInBand` if the repository test exists; otherwise run the focused Today Review service suite and document why the repository test was unnecessary.
+  - `cd frontend && npm.cmd run test:ui -- today-trade-review.spec.ts --workers=1`
+  - copy scan proving changed provenance copy stays research-support only and does not introduce target/advice/broker/execution wording.
+- Forbidden scope:
+  - `backend/prisma/schema.prisma`
+  - `backend/prisma/migrations/**`
+  - `backend/src/api/routes.ts`
+  - `frontend/src/app/routes.tsx`
+  - `backend/src/modules/today-trade-review/index.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.controller.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.router.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.validation.ts`
+  - `backend/tests/modules/today-trade-review/today-trade-review.controller.test.ts`
+  - `frontend/src/features/today-trade-review/components/TodayReviewPage.tsx`
+  - `frontend/src/features/today-trade-review/api/todayTradeReviewApi.ts`
+  - `frontend/src/features/today-trade-review/hooks/useTodayReview.ts`
+  - `frontend/src/features/today-trade-review/routes.tsx`
+  - `frontend/src/features/today-trade-review/index.ts`
+  - upstream Market Data, Data Quality, Market Context, Strategy Decision, Trade Plan, Signal Generation, Calibration, and Smart Money source/test files
+  - shared backend utilities, shared frontend components, package manifests, generated files
+  - provider/live-data/startup/backfill/paid-cloud/broker/telemetry files
+  - broad Today Review UI redesign
+  - Trade Plan target/geometry wording cleanup or Strategy Decision semantics rewrite
+- Next gate after implementation: Team 04 QA verification.
+
+2026-05-20 Team 00 Ready promotion:
+
+- `CF-W1-RH-03` is promoted and assigned to Team 08 as a bounded Research Hub explainability/trust-label implementation.
+- Team 00 sequencing decision: implement `RH-03` on accepted `CF-W1-RH-02A` commit `f391a6d`, which already includes accepted `CF-W1-RH-01` commit `fd88c62`.
+- Branch: `codex/team08-ux-research/CF-W1-RH-03`
+- Worktree: `../investment-scanner-worktrees/team08-CF-W1-RH-03`
+- Base: `f391a6d feat: fail closed research hub comparison basis`
+- Allowed implementation files:
+  - `backend/src/modules/research-hub/research-hub.service.ts`
+  - `backend/src/modules/research-hub/research-hub.types.ts`
+  - `backend/src/modules/research-hub/research-hub.md`
+  - `backend/tests/modules/research-hub/research-hub.service.test.ts`
+  - `frontend/src/features/research-hub/api/researchHubApi.ts`
+  - `frontend/src/features/research-hub/components/ResearchOverviewPage.tsx`
+  - `frontend/tests/ui/research-hub.spec.ts`
+- Allowed branch-local evidence docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-08-CF-W1-RH-03-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-RH-03-developer-handoff.md`
+- Required developer validation:
+  - `cd backend && npm.cmd test -- --runInBand --runTestsByPath tests/modules/research-hub/research-hub.service.test.ts`
+  - `cd frontend && npm.cmd run test:ui -- research-hub.spec.ts --workers=1`
+  - `rg` scan proving stale copy such as `since the last evaluation` and forbidden advice/target language is not introduced.
+- Forbidden scope:
+  - `backend/src/modules/research-hub/index.ts`
+  - `backend/src/modules/research-hub/research-hub.controller.ts`
+  - `backend/src/modules/research-hub/research-hub.router.ts`
+  - `frontend/src/features/research-hub/index.ts`
+  - `frontend/src/features/research-hub/hooks/**`
+  - all upstream module source/tests outside Research Hub
+  - Prisma/schema/migrations/generated files
+  - backend/frontend route registries
+  - shared backend utilities
+  - shared frontend components
+  - package manifests
+  - durable snapshot/history storage
+  - provider/live-data/startup/backfill/paid-cloud/broker/telemetry files
+  - broad UX redesign or unrelated Research Hub feature work
+- Next gate after implementation: Team 04 QA verification.
+- Acceptance update:
+  - `CF-W1-RH-03` completed Team 08 implementation, Team 04 QA verification, Team 10 review/review rework cycle, Team 03 Architect Signoff, delegated PO acceptance, and scoped local branch commit `5bd176b`.
+  - Branch remains parked for later clean integration.
+  - Push performed: no.
+
+2026-05-20 Team 00 Ready promotion:
+
+- `CF-W1-L3-DQ-01B` is promoted and assigned to Team 07 as a bounded backend-only Portfolio Intelligence reliability-gate implementation.
+- Team 00 sequencing decision: current plain `dev` still lacks accepted `PORT-01A`, but the dedicated implementation branch is based on accepted commit `f1432e6`; this satisfies the implementation-base prerequisite without waiting for `dev` integration.
+- Branch: `codex/team07-portfolio-alerts/CF-W1-L3-DQ-01B`
+- Worktree: `../investment-scanner-worktrees/team07-CF-W1-L3-DQ-01B`
+- Base: `f1432e6 feat: add portfolio readiness dto evidence`
+- Allowed implementation files:
+  - `backend/src/modules/portfolio-intelligence/portfolio-intelligence.service.ts`
+  - `backend/src/modules/portfolio-intelligence/portfolio-intelligence.types.ts`
+  - `backend/src/modules/portfolio-intelligence/portfolio-intelligence.md`
+  - `backend/tests/modules/portfolio-intelligence/portfolio-intelligence.service.test.ts`
+- Allowed branch-local evidence docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-07-CF-W1-L3-DQ-01B-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-L3-DQ-01B-developer-handoff.md`
+- Forbidden scope:
+  - all other `backend/src/modules/portfolio-intelligence/**`
+  - all `backend/src/modules/portfolio-management/**`
+  - all `backend/src/modules/watchlist-management/**`
+  - all `backend/src/modules/data-quality-engine/**`
+  - Prisma/schema/migrations/generated files
+  - route registries
+  - shared backend utilities or DTOs
+  - frontend files/tests
+  - package manifests
+  - provider/live-data/startup/backfill/paid-cloud/broker/telemetry files
+  - `CF-W1-L3-INTEL-02` traceability scope
+- Next gate after implementation: Team 04 QA verification.
+
+2026-05-20 Team 00 Ready promotion:
+
+- `CF-W1-L3-INTEL-02` is promoted and assigned to Team 07 as the next stacked `portfolio-intelligence` writer after accepted `CF-W1-L3-DQ-01B`.
+- Team 00 one-writer decision: do not run `CF-W1-L3-INTEL-01` as a separate competing writer. `INTEL-02` is the active downstream traceability child and must stack on `DQ-01B`.
+- Branch: `codex/team07-portfolio-alerts/CF-W1-L3-INTEL-02`
+- Worktree: `../investment-scanner-worktrees/team07-CF-W1-L3-INTEL-02`
+- Base: `56b286f feat: add portfolio intelligence reliability gate`
+- Allowed implementation files:
+  - `backend/src/modules/portfolio-intelligence/portfolio-intelligence.service.ts`
+  - `backend/src/modules/portfolio-intelligence/portfolio-intelligence.types.ts`
+  - `backend/src/modules/portfolio-intelligence/portfolio-intelligence.md`
+  - `backend/tests/modules/portfolio-intelligence/portfolio-intelligence.service.test.ts`
+- Allowed branch-local evidence docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-07-CF-W1-L3-INTEL-02-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-L3-INTEL-02-developer-handoff.md`
+- Forbidden scope:
+  - all other `backend/src/modules/portfolio-intelligence/**`
+  - all `backend/src/modules/portfolio-management/**`
+  - all `backend/src/modules/watchlist-management/**`
+  - all `backend/src/modules/data-quality-engine/**`
+  - Prisma/schema/migrations/generated files
+  - route registries
+  - shared backend utilities or DTOs
+  - frontend files/tests
+  - package manifests
+  - provider/live-data/startup/backfill/paid-cloud/broker/telemetry files
+  - separate `INTEL-01` writer work
+- Next gate after implementation: Team 04 QA verification.
+
+2026-05-19 Team 00 post-restart update:
+
+- `CF-W1-SIG-02` returned to Rejected / Rework after Team 10 review. It is not accepted for Architect Signoff or commit until Team 06 fixes current-row contract status and supported-field provenance metadata, then Team 04 QA and Team 10 re-review accept.
+- `CF-W1-MD-04` is the top fresh Market Data requirement from Team 02, but it is not Ready. It needs Team 03 architecture/contract/work-packet prep, Team 04 QA planning, exact file reservations, and Team 00 Ready promotion.
+- `CF-W1-SQLAB-02B` is proposal-QA accepted only and remains blocked from implementation until explicit schema/migration/generated/repository consent is recorded.
+
+2026-05-19 Team 00 Ready promotion:
+
+- `CF-W1-MD-04` is promoted and assigned to Team 05 after requirement, architecture, contract, work packet, QA plan, exact file reservations, and open-decision checks passed.
+- Branch: `codex/team05-market-data/CF-W1-MD-04`
+- Worktree: `../investment-scanner-worktrees/team05-CF-W1-MD-04`
+- Allowed implementation files:
+  - `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`
+  - `backend/src/modules/market-data-foundation/market-data-foundation.types.ts`
+  - `backend/src/modules/market-data-foundation/market-data-foundation.md`
+  - `backend/tests/modules/market-data-foundation/market-data.service.test.ts`
+- Next gate after implementation: Team 04 QA verification.
+
+2026-05-19 acceptance update:
+
+- `CF-W1-MD-04` completed Team 05 implementation, Team 04 QA, Team 10 review, Team 03 Architect Signoff, delegated PO acceptance, and scoped local branch commit `5e973e0`.
+- `CF-W1-HCTX-02` completed Team 05 implementation, Team 04 QA, Team 10 review, Team 03 Architect Signoff, delegated PO acceptance, and scoped local branch commit `f52c024`.
+- Both branches are parked for later clean integration and have not been pushed or merged to `dev`.
+
+2026-05-19 Team 00 Ready promotion:
+
+- `CF-W1-RH-01` is promoted and assigned to Team 08 after requirement, architecture review, contract, work packet, QA plan, exact file reservations, no-open-decision check, and shared-file conflict check passed.
+- Branch: `codex/team08-ux-research/CF-W1-RH-01`
+- Worktree: `../investment-scanner-worktrees/team08-CF-W1-RH-01`
+- Allowed implementation files:
+  - `backend/src/modules/research-hub/research-hub.service.ts`
+  - `backend/src/modules/research-hub/research-hub.md`
+  - `backend/tests/modules/research-hub/research-hub.service.test.ts`
+  - optional only if module-local helper aliases are needed without expanding the response shape: `backend/src/modules/research-hub/research-hub.types.ts`
+- Forbidden files:
+  - `backend/src/modules/research-hub/index.ts`
+  - `backend/src/modules/research-hub/research-hub.controller.ts`
+  - `backend/src/modules/research-hub/research-hub.router.ts`
+  - all `frontend/src/features/research-hub/**`
+  - all `frontend/tests/ui/**`
+  - backend/frontend route registries
+  - Today Review, Trade Plan, Signal Quality Lab, or Signal Calibration Engine source/test edits
+  - upstream repositories or private helpers
+  - shared backend utilities, shared frontend components, Prisma schema/migrations, generated files, package manifests, providers/live data, startup/backfill, paid/cloud, broker, telemetry, and `CF-W1-RH-02` scope
+- Next gate after implementation: Team 04 QA verification.
+
+2026-05-19 Team 00 Ready promotion:
+
+- `CF-W1-HCTX-02` is promoted and assigned to Team 05 after requirement, architecture, contract, work packet, QA plan, exact file reservations, and open-decision checks passed.
+- Branch: `codex/team05-market-data/CF-W1-HCTX-02`
+- Worktree: `../investment-scanner-worktrees/team05-CF-W1-HCTX-02`
+- Allowed implementation files:
+  - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.types.ts`
+  - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.repository.ts`
+  - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.service.ts`
+  - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.md`
+  - `backend/tests/modules/historical-context-snapshots/historical-context-snapshots.repository.test.ts`
+  - `backend/tests/modules/historical-context-snapshots/historical-context-snapshots.service.test.ts`
+- Next gate after implementation: Team 04 QA verification.
+
 `CF-W1-SIG-02` is promoted and assigned to Team 06 as a stacked Signal Generation implementation on accepted parked `CF-W1-SIG-TRIGGER-02A` commit `788c237`.
 
 `CF-W1-STRAT-03` is promoted and assigned to Team 06 for a bounded backend-only Strategy Decision provenance implementation in a dedicated worktree. It can run in parallel with `CF-W1-BT-01A` rework because the file reservations are disjoint.

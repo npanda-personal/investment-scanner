@@ -1,76 +1,381 @@
 # Team 00 Coordination Cycle Latest
 
-Date: 2026-05-18
+Date: 2026-05-20
+
+## Latest Runtime Checkpoint - Dirty Docs Checkpoint And Gate Closures
+
+Date: 2026-05-20
+
+Trigger: Product Owner observed a large unstaged-change count and asked why docs were not being committed.
+
+Current git state:
+
+- Branch: `dev`.
+- Latest local `dev` commit before this checkpoint: `65a4a4d test: align market data repair expectations`.
+- Current unstaged inventory before checkpoint: 154 paths.
+- Inventory split: 150 active execution docs under `docs/execution/codex-parallel-execution-plan-2026-05-16/`; 4 pre-existing Research Hub app-source files.
+- Scope decision: create a scoped active-execution-docs checkpoint only; do not stage or touch the 4 Research Hub app-source files.
+- Open decisions: 0.
+- Product Owner action required: no.
+
+Completed gate updates:
+
+- Team 03 architecture prep for `CF-W1-STRAT-04` and `CF-W1-SQLAB-03` completed and the agent was closed.
+- `CF-W1-STRAT-04` is architecture-prepared as a bounded no-schema/no-route/no-shared-file first slice owned by `strategy-framework`; it needs Team 04 QA planning before Team 00 can evaluate Ready.
+- `CF-W1-SQLAB-03` is architecture-prepared as a bounded no-schema/no-route/no-shared-file first slice owned by `signal-quality-lab`; it is explicitly sequenced behind active `CF-W1-SQLAB-02A`.
+- Team 03 Architect Signoff for `CF-W1-SQLAB-02A` returned `ACCEPT` and the agent was closed.
+- `CF-W1-SQLAB-02A` next gate: Team 00 delegated PO acceptance, then scoped local branch commit if staged scope is exact.
+- `CF-W1-MCTX-02` next gate remains Team 00 delegated PO acceptance and scoped local branch commit after accepted QA/review/signoff evidence.
+
+Active agents:
+
+| Slot | Team | Agent | Work Item | Status |
+| --- | --- | --- | --- | --- |
+| 1 | Team 07 | `019e44dc-48ab-7713-ac26-81c1f01093e0` | `CF-W1-L3-TREV-02` Team 10 rejection rework | active |
+| 2 | Team 05 | `019e44c8-0899-7263-85e7-c82795f1fa72` | `CF-W1-HCTX-03` implementation | active |
+| 3 | Open | none | Team 04 QA planning for `CF-W1-STRAT-04` / `CF-W1-SQLAB-03` | ready |
+| 4 | Open | none | Team 00 delegated PO acceptance for `CF-W1-MCTX-02` | ready |
+| 5 | Open | none | Team 00 delegated PO acceptance for `CF-W1-SQLAB-02A` | ready |
+| 6 | Open | none | next QA/review/signoff gate after active handoff | ready |
+
+Teams ready to pick up new tasks:
+
+- Team 04: docs-only QA planning for `CF-W1-STRAT-04` now.
+- Team 04: docs-only QA planning for `CF-W1-SQLAB-03` now, with implementation sequencing behind `CF-W1-SQLAB-02A`.
+- Team 10: ready for review after the next QA-accepted implementation handoff.
+- Team 03: ready for Architect Signoff after Team 10 accepts the next gated implementation.
+- Team 02: ready for the next rolling requirement pass, but must read root `AGENTS.md` before creating or changing requirements.
+- Team 00: ready to complete delegated PO acceptance and scoped commits for `CF-W1-MCTX-02` and `CF-W1-SQLAB-02A`.
+
+Next coordination actions:
+
+1. Commit only active execution docs from the main `dev` workspace as a checkpoint.
+2. Leave Research Hub app-source dirty files unstaged and untouched.
+3. Complete delegated PO acceptance and scoped commits for `CF-W1-MCTX-02` and `CF-W1-SQLAB-02A` in their dedicated worktrees.
+4. Launch Team 04 QA planning for `CF-W1-STRAT-04` and `CF-W1-SQLAB-03`.
+5. Continue active `TREV-02` and `HCTX-03` workstreams without Product Owner approval unless a true consent blocker appears.
+
+Product Owner action required: no.
+
+---
+
+Date: 2026-05-19
+
+## Latest Runtime Checkpoint - Rolling Pool After Interruption Resume
+
+Date: 2026-05-20
+
+Trigger: user asked Team 00 to continue after an interrupted turn and reminded that Product Owner / Requirement Factory agents must read root `AGENTS.md` before creating new requirements.
+
+Current state:
+
+- Branch: `dev`.
+- Latest local commit: `65a4a4d test: align market data repair expectations`.
+- Catalog stale-sync hotfix remains present as `7bad648 fix: use stored candle basis for stale catalog sync`.
+- Open decisions: 0.
+- Product Owner action required: no.
+- Push performed: no.
+- Main workspace remains dirty with active execution docs and pre-existing Research Hub source status; current implementation and rework remain isolated in worktrees.
+
+Active agents:
+
+| Slot | Team | Agent | Work Item | Status |
+| --- | --- | --- | --- | --- |
+| 1 | Team 07 | `019e4324-207b-73f0-aa7c-10aeae6146ff` | `CF-W1-L3-TREV-02` UI/provenance rework | active |
+| 2 | Team 03 | `019e44b8-4ec6-7d61-a62a-60708c5556ea` | `CF-W1-L3-INTEL-03` Architect Signoff after Team 10 ACCEPT | active |
+| 3 | Team 06 | `019e44b8-9282-7651-873f-007e2138c707` | `CF-W1-SQLAB-02A` derived/not-persisted UI trust rework | active |
+| 4 | Team 05 | `019e44b8-efff-79e0-88f4-004fd86a6a0d` | `CF-W1-MCTX-02` backend-only implementation | active |
+| 5 | Open | none | Team 02 draft `TP-03` / `BT-04` from Team 01 audit | ready |
+| 6 | Open | none | next QA/review/signoff gate | ready |
+
+Routing:
+
+- Team 02 / Product Owner delegate has an explicit active override to read root `AGENTS.md` before creating or changing requirements.
+- Team 03 completed architecture readiness for the top three fresh direct investor/trader-value candidates.
+- Team 04 finalized QA plans for `HCTX-03`, `DQ-03`, and `MCTX-02`.
+- `CF-W1-L3-INTEL-03` is QA-accepted and Team-10-accepted; Team 03 Architect Signoff is active.
+- `CF-W1-SQLAB-02A` is QA-accepted but Team 10 rejected the UI for missing visible derived/not-persisted trust copy; Team 06 bounded rework is active.
+- `CF-W1-MCTX-02` is promoted to Team 05 in a dedicated worktree stacked on accepted `MCTX-01` commit `e695f0c`.
+- `CF-W1-L3-TREV-02` remains in Team 07 rework.
+- Team 01 audit returned `CF-W1-TP-03` and `CF-W1-BT-04` as the next requirement handoff candidates.
+
+Teams ready to pick up new tasks:
+
+- Team 04: next verification gate is `CF-W1-L3-TREV-02` after rework handoff.
+- Team 04: ready for `CF-W1-SQLAB-02A` QA rerun after Team 06 rework.
+- Team 04: ready for `CF-W1-MCTX-02` QA after Team 05 handoff.
+- Team 10: ready after QA acceptance for `TREV-02`, `SQLAB-02A`, or `MCTX-02`.
+- Team 03: Architect Signoff is active for `CF-W1-L3-INTEL-03`.
+- Team 02: ready to draft `CF-W1-TP-03` and `CF-W1-BT-04` from Team 01 audit with mandatory root `AGENTS.md` intake.
+- Team 00: next Ready evaluation after Team 03 and Team 04 evidence exists.
 
 Team: TEAM-00 - Master Orchestrator / Integration
+
+## Latest Runtime Checkpoint - Laptop Restart Recovery RH-03 Wave
+
+Date: 2026-05-19
+
+Trigger: laptop restart shut down local runtime and prior spawned-agent sessions.
+
+Recovery actions:
+
+- Re-synced git state on `dev`.
+- Confirmed latest local `dev` commit: `7bad648 fix: use stored candle basis for stale catalog sync`.
+- Confirmed `dev` is ahead of `origin/dev` by 140 commits.
+- Confirmed Decision Inbox has no open decisions.
+- Relaunched the rolling factory with disjoint docs-only write scopes.
+- Left pre-existing main-workspace Research Hub source status untouched; Team 00 is not implementing application code in the shared workspace.
+
+Active agents:
+
+| Slot | Team | Agent | Model / Reasoning | Work Item | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Open | none | pending | rolling queue correction after RH-03 commit | ready |
+
+Current queued gates:
+
+1. Team 02 rolling queue correction after RH-03 completion.
+2. Team 03 architecture prep for the next unassigned direct-value item after Team 02 correction.
+3. Team 00 Ready evaluation after fresh requirement/architecture/QA evidence exists.
+
+Teams ready to pick up new tasks:
+
+- Team 08: RH-03 accepted and locally committed as `5bd176b`.
+- Team 02: ready to relaunch rolling requirements and remove completed/stale top items from the next pull.
+- Team 03: ready for next direct-value architecture prep after Team 02 output.
+- Team 04 / Team 10 / Team 03: ready for QA/review/signoff gates after the next implementation handoff.
+- Team 01: ready for another direct-value audit if Team 02 runs out of strong candidates.
+
+Product Owner action required: no.
+
+Latest routing decision:
+
+- Team 03 completed RH-03 architecture and closed.
+- Team 00 resolved RH sequencing internally: use accepted RH-02A commit `f391a6d` as the implementation base because it already includes RH-01 commit `fd88c62`.
+- Team 04 completed RH-03 QA planning and closed.
+- Team 00 promoted RH-03 to Ready, created `codex/team08-ux-research/CF-W1-RH-03`, and launched Team 08.
+- Team 08 completed RH-03 implementation and developer validation; Team 04 QA verification is active.
+- Team 10 initially rejected RH-03 on bounded trust-message and missing `UNPROVEN` evidence issues.
+- Team 08 completed bounded rework.
+- Team 04 QA rerun accepted.
+- Team 10 rereview accepted.
+- Team 03 Architect Signoff accepted.
+- Team 00 delegated PO accepted and created scoped local branch commit `5bd176b feat: add research hub trust labels`.
+- Durable comparison-history or snapshot storage remains future consent-gated work.
+
+## Latest Runtime Checkpoint - Restart Recovery WATCH-01 Wave
+
+Date: 2026-05-19
+
+Trigger: laptop restart shut down local runtime and prior spawned-agent sessions.
+
+Recovery actions:
+
+- Re-synced git state on `dev`.
+- Confirmed latest local `dev` commit: `7bad648 fix: use stored candle basis for stale catalog sync`.
+- Confirmed Decision Inbox has no open decisions.
+- Created stacked Team 07 worktree for `CF-W1-L3-WATCH-01` on accepted `PORT-01B` baseline `a2edfb6`.
+- Linked backend/frontend dependency folders in the new worktree.
+- Relaunched active factory agents with disjoint write scopes.
+
+Active agents:
+
+| Slot | Team | Agent | Model / Reasoning | Work Item | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Team 07 - Portfolio / Watchlist / Alerts | `019e426c-dfd7-76f3-80ef-b0ecb0ba6941` | `gpt-5.3-codex`, high | `CF-W1-L3-WATCH-01` implementation in dedicated worktree | active |
+| 2 | Team 02 - PO + Requirement Factory | `019e426d-1cc5-74e3-bab5-4fddc0a7c546` | `gpt-5.4-mini`, medium | rolling direct investor/trader-value requirements | active |
+| 3 | Team 03 - Architecture Factory | `019e426d-5c3b-7c93-b785-7186015b4e18` | `gpt-5.4`, high | `CF-W1-L3-INTEL-02` architecture readiness | active |
+
+Current queued gates:
+
+1. Team 04 QA verification for `CF-W1-L3-WATCH-01` after Team 07 developer handoff.
+2. Team 10 code/release review after QA accepts.
+3. Team 03 Architect Signoff after review accepts.
+4. Team 00 delegated PO acceptance and scoped local commit if all gates pass.
+
+Teams ready to pick up new tasks:
+
+- Team 07: `CF-W1-L3-WATCH-01` implementation is active.
+- Team 02: rolling requirements discovery is active.
+- Team 03: `CF-W1-L3-INTEL-02` architecture readiness is active.
+- Team 04: ready for WATCH-01 QA after developer handoff.
+- Team 10: ready for WATCH-01 review after QA acceptance.
+
+Product Owner action required: no.
+
+## Latest Runtime Update - WATCH-01 Review And DQ-01B Prep
+
+Date: 2026-05-19
+
+Completed since the restart checkpoint:
+
+- Team 07 completed `CF-W1-L3-WATCH-01` implementation in the dedicated worktree.
+- Team 04 accepted `CF-W1-L3-WATCH-01` QA verification.
+- Team 02 added/ranked `CF-W1-L3-DQ-01A` and `CF-W1-L3-DQ-01B` ahead of `CF-W1-L3-INTEL-02`.
+- Team 03 completed `CF-W1-L3-INTEL-02` architecture refresh; it remains Not Ready.
+- Team 03 completed `CF-W1-L3-DQ-01A` architecture as a contract-only gate.
+- Team 04 completed `CF-W1-L3-DQ-01A` QA planning and cleared `CF-W1-L3-DQ-01B` for architecture prep.
+- Team 10 accepted `CF-W1-L3-WATCH-01` review.
+- Team 03 accepted `CF-W1-L3-WATCH-01` Architect Signoff.
+- Team 00 delegated Product Owner accepted `CF-W1-L3-WATCH-01` and created local branch commit `807fef6 feat: add watchlist review actionability`.
+- Team 03 completed `CF-W1-L3-DQ-01B` architecture readiness.
+- Team 04 completed `CF-W1-L3-DQ-01B` QA planning.
+- Team 00 promoted `CF-W1-L3-DQ-01B` by creating a dedicated implementation branch from accepted `PORT-01A` baseline `f1432e6`.
+- Team 07 completed `CF-W1-L3-DQ-01B` implementation.
+- Team 04 accepted QA, Team 10 accepted review, and Team 03 accepted Architect Signoff.
+- Team 00 delegated Product Owner accepted `CF-W1-L3-DQ-01B` and created local branch commit `56b286f feat: add portfolio intelligence reliability gate`.
+- Team 00 promoted `CF-W1-L3-INTEL-02` as the next stacked `portfolio-intelligence` writer.
+- Team 07 completed `CF-W1-L3-INTEL-02` implementation.
+- Team 04 accepted QA, Team 10 accepted review, and Team 03 accepted Architect Signoff.
+- Team 00 delegated Product Owner accepted `CF-W1-L3-INTEL-02` and created local branch commit `d0305c8 feat: add portfolio intelligence review traceability`.
+
+Current active agents:
+
+| Slot | Team | Agent | Work Item | Status |
+| --- | --- | --- | --- | --- |
+| 1 | Open | none | rolling discovery / next Ready evaluation | ready |
+
+Queued gates:
+
+1. Team 02 rolling discovery / stale queue correction.
+2. Team 03 architecture prep after Team 02 identifies the next top unassigned item.
+3. Team 00 Ready evaluation only after fresh queue correction.
+
+Teams ready to pick up new tasks:
+
+- Team 07: DQ-01B accepted and locally committed as `56b286f`.
+- Team 07: INTEL-02 accepted and locally committed as `d0305c8`.
+- Team 02: rolling discovery ready.
+- Team 03: next architecture prep ready after Team 02 output.
+- Team 04: INTEL-02 QA after handoff.
+- Team 10 / Team 03: INTEL-02 review/signoff after QA acceptance.
+- Team 07: WATCH-01 accepted and locally committed as `807fef6`; no further WATCH-01 action unless integration/push is separately authorized.
+- Team 02: rolling discovery can relaunch after current docs churn settles.
+
+## Latest Runtime Checkpoint - Catalog Stale Sync Hotfix Committed
+
+Date: 2026-05-19
+
+Trigger: human Product Owner reported that Sync Catalog processed all `IN/STOCK` rows but skipped all instruments while individual instruments still showed stale data-through dates.
+
+Outcome:
+
+- Team 00 implemented a bounded Market Data hotfix on `dev`.
+- Local commit created: `7bad648 fix: use stored candle basis for stale catalog sync`.
+- Staged scope was limited to:
+  - `backend/src/modules/market-data-foundation/market-data-foundation.repository.ts`
+  - `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`
+  - `backend/src/modules/market-data-foundation/market-data-foundation.types.ts`
+  - `backend/tests/modules/market-data-foundation/market-data.repository.test.ts`
+  - `backend/tests/modules/market-data-foundation/market-data.service.test.ts`
+- No push performed.
+
+Behavior fixed:
+
+- Stale catalog-sync tasks now carry their own `latestStoredTimestamp`.
+- Catalog sync and scheduled stale catch-up now derive the fetch start date from the instrument's latest stored candle with the existing 3-day overlap.
+- Ordinary scheduled tasks without `latestStoredTimestamp` still pass `undefined` as start date, preserving existing `lastSuccessfulDataLoadTimestamp - 3 days` incremental behavior inside `ingestSymbol`.
+
+Validation:
+
+- `npm.cmd test -- tests/modules/market-data-foundation/market-data.service.test.ts --runInBand --testNamePattern "continues catalog sync for stale instruments|uses per-symbol stored candle basis for scheduled stale catch-up|preserves incremental start-date selection for ordinary scheduled tasks|marks scheduled post-close no-op runs as final confirmed"` passed.
+- `npm.cmd test -- tests/modules/market-data-foundation/market-data.repository.test.ts --runInBand --testNamePattern "selects active stale sync tasks"` passed.
+- `npm.cmd run build` passed.
+- Team 04 QA accepted.
+- Team 10 review accepted after one regression was fixed.
+- Team 03 architecture accepted.
+
+Active agents after hotfix:
+
+| Slot | Team | Agent | Model / Reasoning | Work Item | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Team 02 - Requirement Factory | `019e41d4-9fd5-7ba2-b675-b6b9fb589995` | `gpt-5.4-mini`, medium | rolling investor/trader-value requirements; `CF-W1-BT-03` / `CF-W1-RH-02A` focus | active |
+| 2 | Team 03 - Architecture Factory | `019e41d4-a003-7c53-a468-19af3e1482e7` | `gpt-5.5`, high | `CF-W1-BT-03` architecture/contract/work-packet | active |
+| 3 | Team 04 - QA Factory | `019e41d4-a047-7650-b788-1807b83f63a7` | `gpt-5.4-mini`, medium | `CF-W1-RH-01` QA verification in Team 08 worktree | active |
+| 4 | Team 00 - Delegated PO | `019e41d4-a096-7150-af91-d855949f9793` | `gpt-5.4-mini`, medium | `CF-W1-TP-02` delegated PO acceptance packet | active |
+| 5 | Open slot | none | pending | next review/signoff after active agents return | waiting |
+| 6 | Open slot | none | pending | next implementation/QA/architecture item from queues | waiting |
+
+Next coordination actions:
+
+1. `CF-W1-TP-02` delegated PO acceptance completed and Team 00 created local commit `1222daf feat: add trade plan exit invalidation semantics` on `codex/team06-strategy-signal/CF-W1-TP-02`. No push performed.
+2. Consume `CF-W1-RH-01` QA. If accepted, route Team 10 review; if rejected, return to Team 08 bounded rework.
+3. Consume `CF-W1-BT-03` architecture. If architecture-ready, route Team 04 QA planning.
+4. Consume Team 02 rolling requirements output and keep requirement discovery active.
+
+Teams ready to pick up new tasks:
+
+- Team 02: rolling requirements discovery is active.
+- Team 03: `CF-W1-BT-03` architecture prep is active.
+- Team 04: `CF-W1-RH-01` QA verification is active.
+- Team 10: next ready review will be `CF-W1-RH-01` after QA acceptance.
+- Team 10: `CF-W1-RH-01` review is active after QA acceptance.
+- Team 00: `CF-W1-TP-01A` Ready sequencing can resume after `CF-W1-TP-02` commit `1222daf`.
+- Team 06: `CF-W1-TP-01A` remains queued behind `CF-W1-TP-02` shared Trade Plan files.
+
+Product Owner action required: no.
 
 ## Runtime State
 
 | Field | Current value |
 | --- | --- |
 | Branch | `dev` |
-| Branch status | `dev...origin/dev [ahead 138]` after local docs checkpoint `74a3198` |
-| Worktree safety | Safe for scoped docs commits and isolated worktree implementation. Shared `dev` is clean at this checkpoint; active spawned agents must keep to assigned write scopes. |
+| Branch status | `dev...origin/dev [ahead 139]` at main-workspace sync; accepted feature branches remain parked separately |
+| Worktree safety | Main `dev` is safe but dirty with active execution docs only. Dedicated implementation worktrees carry their own scoped branch changes. |
 | Open decisions | 0 |
-| Ready queue depth | 0 unassigned implementation items waiting in Ready; active Ready/review work is assigned to dedicated teams/worktrees. |
-| Refinement queue depth | Active; Team 02 is running persistent direct investor/trader-value discovery. |
-| Integration queue depth | Active branch-local handoffs and reviews; accepted feature branches remain parked for clean later integration. |
+| Ready queue depth | 0 unassigned implementation items waiting in Ready; active Ready/review work is assigned to dedicated teams/worktrees |
+| Refinement queue depth | Active; Team 02 rolling requirement discovery is running |
+| Integration queue depth | Active branch-local handoffs/reviews: `CF-W1-MD-04`, `CF-W1-HCTX-02`; `CF-W1-SIG-02` accepted and locally committed |
 | Product Owner action required | No |
 | Daemon should continue | Yes |
 
-## Consumed Output
+## Completed Since Restart Resume
 
-Team 03 completed the docs-only architecture packet for `CF-W1-SIG-02`.
-
-Result:
-
-- status is `Ready candidate`;
-- no app code, tests, routes, Prisma, generated files, frontend, shared files, or package files changed;
-- exact future Signal Generation file reservations are defined;
-- implementation has a sequencing dependency on accepted parked `CF-W1-SIG-TRIGGER-02A` commit `788c237`.
-
-Team 10 accepted `CF-W1-STRAT-03` review after Team 04 QA ACCEPT.
-
-Team 02 completed a rolling direct-value requirements cycle and added `CF-W1-SQLAB-02B` as the durable Signal Quality Lab post-event learning-memory requirement.
-
-## Routing
-
-- `CF-W1-SIG-02` is routed to Team 04 for docs-only QA planning.
-- `CF-W1-SIG-02` is not implementation-ready until Team 04 QA planning completes and Team 00 resolves the stack/reconcile decision against parked `CF-W1-SIG-TRIGGER-02A`.
-- `CF-W1-BT-01A` is routed back to Team 06 for bounded test/doc-only rework using the corrected Team 03 triage.
-- `CF-W1-STRAT-03` is routed to Team 03 for Architect Signoff.
-- `CF-W1-SQLAB-02B` remains blocked from implementation because durable learning memory requires explicit schema/repository/generated approval before any source work.
-
-## Latest Gate Results
-
-- `CF-W1-STRAT-03` completed Team 03 Architect Signoff, delegated PO acceptance, and scoped local branch commit `3c41e41` on branch `codex/team06-strategy-signal/CF-W1-STRAT-03`.
-- `CF-W1-BT-01A` Team 06 corrected characterization rework passed focused backend test and backend build; next gate is Team 04 QA rerun.
-- `CF-W1-SIG-02` Team 04 QA planning is `ACCEPT/READY`; implementation remains Team 00 sequencing-controlled against parked `CF-W1-SIG-TRIGGER-02A` commit `788c237`.
-- `CF-W1-SIG-02` sequencing decision: promote as a stacked Team 06 implementation branch on accepted parked `CF-W1-SIG-TRIGGER-02A` commit `788c237`.
-- `CF-W1-BT-01A` Team 04 QA rerun accepted; next gate is Team 10 review.
-- `CF-W1-BT-01A` Team 10 review accepted; next gate is Team 03 Architect Signoff.
-- `CF-W1-BT-01A` completed Architect Signoff, delegated PO acceptance, and scoped local branch commit `83a69c0` on branch `codex/team06-strategy-signal/CF-W1-BT-01A`.
-- `CF-W1-SIG-02` Team 06 implementation completed in the stacked worktree; focused Signal Generation tests and backend build passed; next gate is Team 04 QA.
-- `CF-W1-SQLAB-02B` architecture is proposal-only and remains blocked from implementation until explicit schema/generated/repository consent is opened.
-- Team 02 moved `CF-W1-L3-DQ-01` up as the next trader-safety readiness gate before watchlist/actionability follow-ons.
+- `CF-W1-SIG-02`: Team 04 QA accepted, Team 10 final re-review accepted, Team 03 Architect Signoff accepted, delegated PO acceptance accepted, and Team 00 created scoped local branch commit `9a8e329 feat: add signal trigger evidence compatibility` on `codex/team06-strategy-signal/CF-W1-SIG-02`.
+- `CF-W1-MD-04`: Team 10 code review accepted and Team 03 Architect Signoff accepted after Team 04 QA accepted. The broader Market Data service suite still has three unrelated known failing assertions, carried as broader-suite debt and not as a slice blocker.
+- `CF-W1-MD-04`: delegated PO acceptance accepted and Team 00 created scoped local branch commit `5e973e0 feat: add market data freshness provenance` on `codex/team05-market-data/CF-W1-MD-04`.
+- `CF-W1-HCTX-02`: Team 05 implementation, Team 04 QA verification, Team 10 code review, Team 03 Architect Signoff, and delegated PO acceptance accepted. Team 00 created scoped local branch commit `f52c024 feat: add historical context dq coverage evidence` on `codex/team05-market-data/CF-W1-HCTX-02`.
+- Team 02 added `CF-W1-CAL-01A` as the next bounded calibration trust requirement and re-ranked high-value investor/trader items ahead of lower-value admin/notification convenience work.
+- Team 02 refined `CF-W1-TP-01A` and recommended Team 03 backend-only architecture prep for no-target / DQ hard-block trust behavior.
+- Team 03 completed `CF-W1-TP-01A` architecture as `ACCEPT / READY-CANDIDATE`; Team 04 QA planning is active.
+- Team 02 refined `CF-W1-CAL-01A` as a calibration trust-state requirement; Team 03 architecture prep is active.
+- Team 04 completed `CF-W1-TP-01A` QA planning as `ACCEPT / READY-FOR-TEAM00-EVALUATION`, but Team 00 found an active uncommitted `CF-W1-TP-02` workstream on the same `trade-plan-risk-engine` writer set. `TP-01A` implementation is queued behind the `TP-02` gate.
+- Team 03 completed `CF-W1-CAL-01A` architecture as `ACCEPT / READY-CANDIDATE`; Team 04 QA planning is active.
+- Team 00 promoted `CF-W1-RH-01` as a bounded backend-only Research Hub implementation slice and launched Team 08 in `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-RH-01`.
+- Team 04 completed `CF-W1-CAL-01A` QA planning as `ACCEPT / READY-FOR-TEAM00-EVALUATION`; Team 00 must sequence it against parked `CF-W1-CAL-01` commit `fd3d464`.
+- Team 10 accepted `CF-W1-TP-02` re-review after Team 06 rework and Team 04 QA rerun. Team 03 Architect Signoff is active.
 
 ## Active Agents
 
 | Slot | Team | Agent | Model / Reasoning | Work Item | Status |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Team 04 - QA Factory | `019e3d64-63ec-7233-8b30-597de8b99ca7` | `gpt-5.4`, high | `CF-W1-SIG-02` QA verification in stacked Team 06 worktree | active |
-| 2 | Team 03 - Architecture Factory | `019e3d64-6421-7922-bb13-6d868bca1456` | `gpt-5.4`, high | `CF-W1-L3-DQ-01` architecture/contract/work-packet prep | active |
-| 3 | Team 02 - Requirement Factory / PO delegate | `019e3d64-a317-7e21-bd64-69e1eac8563b` | `gpt-5.4-mini`, high | rolling direct investor/trader-value requirements discovery | active |
-| 4 | Open slot | none | pending | Team 10 `CF-W1-SIG-02` review after QA accepts | queued |
-| 5 | Open slot | none | pending | Team 04 `CF-W1-SQLAB-02B` proposal QA review | queued |
-| 6 | Open slot | none | pending | next implementation or signoff gate from active handoffs | queued |
+| 1 | Team 03 - Architect Signoff | `019e41c2-be1b-7ca0-8738-bac297cdfca9` | `gpt-5.4`, medium | `CF-W1-TP-02` Architect Signoff | active |
+| 2 | Team 08 - UX / Research / Copilot | `019e41c2-064e-7fa1-950e-b395ef574d85` | `gpt-5.3-codex`, high | `CF-W1-RH-01` implementation | active |
+| 3 | Open slot | none | pending | Team 00 `CF-W1-TP-02` delegated PO packet and scoped commit after signoff | waiting |
+| 4 | Open slot | none | pending | Team 00 `CF-W1-TP-01A` Ready evaluation after `CF-W1-TP-02` clears or is parked | waiting |
+| 5 | Open slot | none | pending | Team 00 `CF-W1-CAL-01A` Ready evaluation and sequencing against `CF-W1-CAL-01` | waiting |
+| 6 | Open slot | none | pending | Team 04 `CF-W1-RH-01` QA verification after Team 08 handoff | waiting |
+
+## Routing
+
+- `CF-W1-SIG-02`: complete through all gates and locally committed. Do not push; keep parked for later clean integration.
+- `CF-W1-MD-04`: complete through all gates and locally committed. Do not push; keep parked for later clean integration.
+- `CF-W1-HCTX-02`: complete through all gates and locally committed. Do not push; keep parked for later clean integration.
+- `CF-W1-TP-01A`: Team 03 architecture and Team 04 QA planning accepted it as a backend-only Ready candidate, but implementation is blocked by the active `CF-W1-TP-02` shared-file worktree. Do not launch `TP-01A` until the Trade Plan writer set is free or an explicit stacked sequence is approved.
+- `CF-W1-TP-02`: Team 06 reworked the Team 10 rejection, Team 04 QA rerun accepted, and Team 10 re-review accepted. Architect Signoff is active.
+- `CF-W1-CAL-01A`: Team 03 architecture and Team 04 QA planning accepted it as a backend-only Ready candidate. Team 00 sequencing is required against parked `CF-W1-CAL-01`.
+- `CF-W1-L3-DQ-01`: parent packet remains blocked/routing-only. Next children depend on accepted branch integration or explicit stacked sequencing.
+- `CF-W1-RH-01`: promoted as a bounded backend-only Research Hub implementation slice. Team 08 implementation is active.
+- Team 02 must continue direct investor/trader-value discovery. Market data, DQ, signal, strategy, backtesting, calibration, historical context, explainability, and research evidence remain higher priority than admin/settings/notification convenience work.
 
 ## Teams Ready To Pick Up New Tasks
 
-- Team 04: `CF-W1-SIG-02` QA verification.
-- Team 03: `CF-W1-L3-DQ-01` architecture/contract prep.
-- Team 02: rolling direct-value requirements discovery.
-- Team 04: `CF-W1-SQLAB-02B` proposal QA review after SIG-02 QA slot clears or in parallel if write scopes stay isolated.
+- Team 03: `CF-W1-TP-02` Architect Signoff is active now.
+- Team 08: `CF-W1-RH-01` implementation is active now.
+- Team 00: `CF-W1-CAL-01A` Ready evaluation and sequencing against `CF-W1-CAL-01`.
+- Team 00: `CF-W1-TP-01A` Ready evaluation after `CF-W1-TP-02` clears or is parked.
+- Team 04: child QA planning for `CF-W1-L3-DQ-01` only after Team 00 selects an unblocked child.
+- Team 03: next architecture prep for `CF-W1-CAL-01A` or `CF-W1-BT-03` when signoff pressure clears.
 
 ## Product Owner Action
 

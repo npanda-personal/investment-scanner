@@ -4,6 +4,40 @@ Date: 2026-05-18
 
 Team: TEAM-02 - Requirement Factory
 
+## Current Active Override - Root Constitution Required
+
+Date: 2026-05-20
+
+Before creating or changing any requirement, Team 02 / Product Owner delegate must read root `AGENTS.md` and use it as the product constitution.
+
+Requirement discovery must align with:
+
+- localhost-first and zero-incremental-cost constraints;
+- research-support / market-intelligence mission;
+- no direct financial advice, no arbitrary target prices, no broker or live-trading workflow;
+- Data Quality gating before downstream signal, strategy, alert, portfolio, review, or copilot workflows;
+- current Product Owner priority: direct investor/trader value first.
+
+Highest-priority discovery themes:
+
+- market data freshness, provenance, and coverage;
+- Data Quality readiness and residual reason evidence;
+- historical and market context freshness;
+- signal/trigger explainability;
+- strategy evidence;
+- backtesting and calibration trust;
+- trade-plan research support;
+- Today Review and Signal Quality review loops.
+
+Lowest priority unless they block correctness, privacy, trust, or user-data safety:
+
+- admin/settings;
+- auth/subscription;
+- notifications;
+- alert convenience work.
+
+Team 02 must keep accepted, committed, parked, active, schema-gated, or already-routed items out of fresh-pull recommendations. Team 00 owns Ready movement.
+
 Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automation-prompts/AUTO-02-requirement-factory.md`
 
 ## Assignment

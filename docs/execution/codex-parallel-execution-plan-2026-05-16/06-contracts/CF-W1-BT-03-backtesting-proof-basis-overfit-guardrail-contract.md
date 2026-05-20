@@ -10,6 +10,8 @@ Ready-candidate contract prepared for the bounded first child.
 
 This contract covers one no-schema `backtesting-strategy-lab` packet only. It is additive, module-local, and separate from both BT-02 review-disposition work and BT-01A DQ characterization.
 
+2026-05-19 Team 03 refresh: contract remains `ACCEPT/READY-CANDIDATE` for Team 00 evaluation. Team 04 QA planning exists. Implementation still requires Team 00 Ready promotion and an explicit one-writer backtesting worktree/stacking decision.
+
 ## Contract Intent
 
 Backtesting output must explicitly tell the user when a result is:
@@ -24,6 +26,16 @@ This first child must do that without fabricating walk-forward, holdout, or para
 
 Implementation must stay inside `backtesting-strategy-lab` service/types/doc/test plus the module-owned frontend types/page/UI smoke test.
 
+Exact future implementation reservations after Team 00 promotion:
+
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.types.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+- `backend/tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.test.ts`
+- `frontend/src/features/backtesting-strategy-lab/types.ts`
+- `frontend/src/features/backtesting-strategy-lab/components/BacktestingStrategyLabPage.tsx`
+- `frontend/tests/ui/backtesting-strategy-lab.spec.ts`
+
 Allowed direction:
 
 - add additive proof-basis fields under existing run metrics, or stable equivalents
@@ -35,12 +47,24 @@ Forbidden:
 
 - Prisma/schema, migrations, generated files, or repository identity changes
 - controller/router/validation/route-registry changes
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.repository.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.controller.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.router.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.validation.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.module.ts`
+- `backend/src/modules/backtesting-strategy-lab/index.ts`
 - shared backend utility or shared UI changes
 - `data-quality-engine`, `market-data-foundation`, `strategy-framework`, or `trade-plan-risk-engine` source changes
 - API client, hook, feature-route, or broad frontend navigation changes
 - walk-forward engine, holdout engine, parameter sweep, optimizer, or Monte Carlo work
 - simulation math, benchmark math, ranking math, or rule-evaluator semantic changes
 - BT-02 review-disposition coupling as a prerequisite for this child
+
+Required implementation isolation:
+
+- use a dedicated future Team 06 backtesting worktree
+- stack on accepted `CF-W1-BT-02` if `BT-02` is not yet integrated into `dev`
+- do not run in parallel with `CF-W1-BT-01A` doc/test edits unless Team 00 deliberately combines the overlapping writer set under one owner
 
 ## Required Run-Level Contract
 

@@ -1,99 +1,57 @@
 # Next Top 10 Candidates
 
-Date: 2026-05-18
+Date: 2026-05-20
 
-Prepared by Team 02 Requirement Factory for the next direct-value requirement/ranking refresh after rechecking the live runtime queue, Ready queue, blocked queues, recent Team 00 / Team 03 / Team 04 outboxes, current module audits, and current backtesting source docs.
+Status: Team 00 branch-evidence correction after the `7bad648` catalog-freshness hotfix and Team 02 refresh. This is a docs-only priority and routing view. Team 00 still owns Ready movement, exact file reservations, and one-writer sequencing.
 
-## Product Owner Priority Filter Still Applies
+Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-02A` are already accepted and locally committed parked branches. They must not be presented as fresh implementation pulls.
 
-- keep direct investor/trader value first: market data reliability, Data Quality, signals, strategy trust, calibration, backtesting, historical context, market context, trade-plan research support, research evidence, reviewability, and explainability;
-- keep admin/settings/auth/subscription/notification convenience low unless it blocks correctness, privacy, or user-data safety;
-- treat alert work as lower priority unless it improves evidence quality or reviewability rather than inbox convenience.
+## Current Priority Order
 
-## Dispatch Filter Refresh
+| Rank | ID | Current state | Why it matters now | Next Team 00 action |
+| --- | --- | --- | --- | --- |
+| 1 | `CF-W1-HCTX-03` | Draft requirement | Historical context needs age and provenance warnings so nearest snapshots do not read like same-day evidence. | Team 03 architecture contract and QA planning. |
+| 2 | `CF-W1-DQ-03` | Draft requirement | Downstream trust consumers need a compact residual reason summary instead of raw DQ arrays. | Team 03 architecture contract and QA planning. |
+| 3 | `CF-W1-MCTX-02` | Draft requirement | Market Context needs an explicit persisted-versus-generated freshness basis label. | Team 03 architecture contract and QA planning. |
+| 4 | `CF-W1-STRAT-04` | Draft requirement | Strategy evidence needs freshness and stale-summary labels so compact summaries do not overclaim recency. | Team 03 architecture contract and QA planning. |
+| 5 | `CF-W1-SQLAB-03` | Draft requirement | Signal Quality Lab needs review-loop actionability for noisy and limited outcomes. | Team 03 architecture contract and QA planning. |
+| 6 | `CF-W1-TP-03` | Draft requirement | Trade Plan needs proof snapshot freshness/currentness labels so older generated plans do not read like current proof. | Team 03 architecture contract and QA planning, with stop/split if the first child leaves additive module-local scope. |
+| 7 | `CF-W1-BT-04` | Draft requirement | Backtesting needs saved-run freshness/current-proof labels so older simulations do not read like latest proof. | Team 03 architecture contract and QA planning, with stop/split if the first child leaves additive module-local scope. |
+| 8 | `CF-W1-DQ-02` residual parent | Needs Team 03 follow-up split | `DQ-02A` currentness evidence is accepted, but the parent still has read-side/public-contract residual scope. | Team 03 should identify whether a no-schema `DQ-02B` child exists or keep the parent blocked. |
+| 9 | `CF-W1-L3-DQ-01A` | Contract-only child | Passive readiness display remains a Lane 3 trust contract gap, but not the next app-code pull. | Keep as contract refresh unless Team 03/04 produce a bounded child. |
+| 10 | `CF-W1-MD-02A` | Consent-gated schema proposal | Durable market-data evidence storage remains valuable but schema/generated/repository scope is gated. | Keep proposal-only unless a true consent packet is opened. |
 
-The prior ranking became stale during the 2026-05-18 runtime cycle. Team 00 should exclude the following from the next unassigned pull:
+## Dispatch Notes
 
-- `CF-W1-BT-01A` is no longer unassigned. `12-ready-queue/ready-for-implementation.md` and `00-control/team-agent-runtime-queue.md` both show it promoted, stacked on accepted parked `CF-W1-BT-02`, and active in a Team 06 worktree.
-- `CF-W1-STRAT-02B` is no longer the next unassigned requirement. Team 03 finished the proposal packet, Team 04 accepted the proposal QA review, and the packet is now explicitly blocked behind future consent-gated children `CF-W1-STRAT-02B1` and `CF-W1-STRAT-02B2`.
-- `CF-W1-STRAT-03` is already routed to Team 03 architecture in the live runtime queue and should not be treated as the next fresh Team 02 discovery gap.
-- `CF-W1-BT-03` is already routed to Team 03 architecture in the live runtime queue and should not be treated as the next fresh Team 02 discovery gap.
-- `CF-W1-SIG-02` is no longer the next fresh Team 02 discovery gap. It is already in active Team 03 architecture prep and should not be reopened as a new requirement-discovery pull.
-- `CF-W1-SQLAB-02A` already has Team 03 architecture and Team 04 QA planning. It is a sequencing decision for Team 00 after `CF-W1-SQLAB-01` clears shared `signal-quality-lab` files, not a fresh Team 02 discovery gap.
-- `CF-W1-RH-01` already has Team 03 architecture and Team 04 QA planning and is a Team 00 Ready-evaluation candidate, not a new Team 02 requirement gap.
-- `CF-W1-L3-TREV-02` already has Team 03 architecture and Team 04 QA planning and is a Team 00 Ready-evaluation candidate when the Today Review writer lane is safe.
+- `CF-W1-HCTX-03`, `CF-W1-DQ-03`, `CF-W1-MCTX-02`, `CF-W1-STRAT-04`, and `CF-W1-SQLAB-03` are fresh draft requirements from the 2026-05-20 Team 01 audit. They are not Ready and do not move to Ready in this update.
+- `CF-W1-TP-03` and `CF-W1-BT-04` are new refinement-only drafts from the 2026-05-20 Team 01 follow-up audit. They stay behind the current top five and do not move to Ready in this update.
+- `CF-W1-RH-03` is accepted and locally committed as `5bd176b`; do not treat it as a fresh Team 02 pull.
+- `CF-W1-RH-02A` is accepted and locally committed as `f391a6d`; do not treat it as a fresh Team 02 pull.
+- `CF-W1-BT-03` is accepted and locally committed as `8f984b1`; do not treat it as a fresh Team 02 pull.
+- `CF-W1-CAL-01A` is accepted and locally committed as `308cee3`; do not treat it as a fresh Team 02 pull.
+- `CF-W1-TP-01A` is accepted and locally committed as `309a853`; do not treat it as a fresh Team 02 pull.
+- `CF-W1-DQ-02A` is accepted and locally committed as `c2d6753`; do not treat the completed first child as fresh.
+- `CF-W1-SQLAB-01` is accepted and locally committed as `1a41d95`; `SQLAB-02A` must stack on it.
+- `CF-W1-SQLAB-02A` is promoted and assigned to Team 06; do not re-rank it as unassigned work.
+- `CF-W1-L3-TREV-02` and `CF-W1-L3-INTEL-03` are already promoted and assigned to Team 07. Do not re-rank them as fresh Team 02 work.
+- `CF-W1-L3-AUTH-03` is already promoted and assigned; do not treat it as fresh Team 02 discovery.
+- `CF-W1-L3-DQ-01B` is already promoted and assigned to Team 07. Do not treat it as a fresh Team 02 pull.
+- `CF-W1-L3-INTEL-02` is already promoted and assigned to Team 07. Do not re-rank it as unassigned work.
+- `CF-W1-RH-01`, `CF-W1-MD-01`, `CF-W1-MD-04`, `CF-W1-HCTX-02`, `CF-W1-MD-03`, `CF-W1-MCTX-01`, `CF-W1-TP-02`, `CF-W1-SIG-02`, `CF-W1-STRAT-03`, `CF-W1-L3-WATCH-01`, `CF-W1-BT-02`, and `CF-W1-CAL-01` are accepted, committed, parked, or otherwise already in the live gate path and stay out of fresh Team 02 discovery.
+- `CF-W1-TP-03` must stay separate from active/accepted `TP-01A`, `TP-01B`, and `TP-02`.
+- `CF-W1-BT-04` must stay separate from accepted `BT-03` and must not be widened into advanced validation work.
 
-## Next Unassigned Direct-Value Requirement
+## Priority Rule
 
-`CF-W1-SQLAB-02B` is now the next under-served direct-value requirement.
+Direct investor/trader value stays first:
 
-Why it moves to the top:
+1. market-data freshness and provenance,
+2. data-quality readiness,
+3. historical and market context,
+4. explainable signals/triggers and strategy evidence,
+5. trade-plan research support,
+6. backtesting and calibration trust,
+7. research explainability and reviewability,
+8. user-owned alert correctness and traceability.
 
-- it closes the remaining durable post-event learning gap after `CF-W1-SQLAB-02A` narrowed the no-schema preview child;
-- current source and architecture evidence are already explicit that the product still has no module-owned persistence surface for signal-outcome learning memory;
-- it is distinct from `CF-W1-SQLAB-02A`, which is sequencing-only and intentionally cannot claim persistence;
-- it strengthens research evidence continuity and reviewability without reopening Strategy, Backtesting, or Trade Plan semantics in the same pass.
-
-## Re-Prioritized Top 10
-
-| Rank | ID | Current state | Why it matters now | Next Team 00 action | Team 03 / 04 routing? | Parallel-safety note |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | `CF-W1-SQLAB-02B` | New child requirement; no Team 03 or Team 04 packet yet | Converts transient measured outcomes into durable local learning memory so post-event research does not disappear after the preview child | Keep it as the next docs-only storage-consent candidate; route to Team 03/04 only if Team 00 intentionally opens schema/repository/generated consent | Yes, but only after explicit storage consent | Not parallel-safe for implementation until consent opens |
-| 2 | `CF-W1-RH-01` | Team 03 architecture ready; Team 04 QA plan ready | Replaces Research Hub actionability placeholders with source-backed evidence from stable upstream public outputs | Team 00 Ready evaluation for one bounded backend-only Research Hub child | No new Team 03/04 pass needed before Ready evaluation | Safe if implemented alone; do not widen into `RH-02A` in the same writer pass |
-| 3 | `CF-W1-L3-TREV-02` | Team 03 architecture ready; Team 04 QA plan ready | Makes Today Review candidate detail auditable with publication-time provenance and compatibility labels | Team 00 Ready evaluation when Today Review writer sequencing is safe | No new Team 03/04 pass needed before Ready evaluation | Safe only if not parallelized with `CF-W1-L3-TREV-01` |
-| 4 | `CF-W1-SQLAB-02A` | Team 03 architecture ready; Team 04 QA plan ready; sequencing-blocked | Adds bounded no-schema journal-preview learning value after measured signal outcomes | Team 00 sequencing decision after `CF-W1-SQLAB-01` clears shared files, then Ready evaluation | No new Team 03/04 pass needed unless packet changes | Not parallel-safe with `CF-W1-SQLAB-01`; safe after that gate clears |
-| 5 | `CF-W1-STRAT-02B1` | Future child only; proposal packet says consent gate required | Durable strategy-definition history remains a real trust gap for old signals/backtests/reviews | Keep blocked until explicit schema/migration/generated/repository consent is granted | Later Team 03/04 only after consent | Not implementation-safe yet |
-| 6 | `CF-W1-RH-02A` | Team 03 architecture ready; Team 04 QA plan ready | Fails Research Hub delta claims closed when no valid comparison basis exists | Sequence behind `CF-W1-RH-01` or intentionally combine into one Research Hub writer pass | No immediate Team 03/04 work needed | Must not run in parallel with `CF-W1-RH-01` |
-| 7 | `CF-W1-SIG-02` | Team 03 architecture prep active | Signal trigger-evidence compatibility is still high value, but Team 02 discovery is already complete | Let the active Team 03 architecture packet finish; do not reopen discovery | No duplicate Team 03/04 pass now | Not a fresh Team 02 pull anymore |
-| 8 | `CF-W1-L3-WATCH-01` | Requirement and QA prep exist | Improves watchlist review priority with deterministic reason summaries | Keep below upstream trust and review-evidence items | No immediate routing change | Safe if kept separate from `L3-PORT-01B` |
-| 9 | `CF-W1-L3-INTEL-03` | Requirement only | Adds explainable concentration review to portfolio intelligence once upstream trust layers are stronger | Keep in backlog; prep after current strategy/research review tranche | Later Team 03/04 | Safe later; lower immediate value than current review-evidence items |
-| 10 | `CF-W1-L3-INTEL-02` | Requirement and architecture packet exist | Improves portfolio review traceability after accepted readiness DTO groundwork | Keep behind concentration/research provenance items | No immediate routing change | Shares portfolio-intelligence files with other Lane 3 intelligence follow-ons |
-
-## Top Parallel-Safe Candidates For Team 00 Now
-
-These are the clearest next moves that do not collide with the currently active Team 06 `CF-W1-BT-01A` writer set and stay aligned with the Product Owner's direct-value order:
-
-1. `CF-W1-RH-01`
-   - route through Team 00 Ready evaluation now;
-   - Team 03 and Team 04 prep already exist;
-   - keep it backend-only and conservative on current-`dev` Signal Quality / Calibration caps.
-
-2. `CF-W1-L3-TREV-02`
-   - route through Team 00 Ready evaluation when Today Review writer sequencing is safe;
-   - Team 03 and Team 04 prep already exist;
-   - keep it mutually exclusive with `CF-W1-L3-TREV-01`.
-
-3. `CF-W1-SQLAB-02A`
-   - treat as a Team 00 sequencing/Ready candidate after `CF-W1-SQLAB-01`;
-   - do not send it back through Team 03/04 unless the packet itself changes.
-
-4. `CF-W1-SIG-02`
-   - keep it with Team 03 architecture prep;
-   - do not send it back through Team 02 discovery;
-   - hand it to Team 04 only after Team 03 finishes the packet.
-
-5. `CF-W1-L3-DQ-01`
-   - route through Team 00 evaluation for the Lane 3 readiness consumer policy next;
-   - Team 03 and Team 04 child prep already exists in the downstream portfolio/watchlist/alert packets;
-   - keep it ahead of watchlist and concentration-review follow-ons because it is a correctness and user-safety gate.
-
-## Items That Should Not Be Misrouted
-
-- Do not treat `CF-W1-STRAT-02B` itself as Ready. The current packet says the real implementation opening is `CF-W1-STRAT-02B1`, and that child needs explicit schema/migration/generated/repository consent.
-- Do not keep presenting `CF-W1-BT-01A` as an unassigned candidate. It is already in QA and is not the next fresh discovery gap.
-- Do not treat `CF-W1-STRAT-03` as the next Team 02 discovery candidate. It is already routed to Team 03 architecture in the live runtime queue.
-- Do not treat `CF-W1-BT-03` as the next Team 02 discovery candidate. It is already routed to Team 03 architecture in the live runtime queue.
-- Do not reopen `CF-W1-SQLAB-02` as a generic parent. The actionable near-term item is `CF-W1-SQLAB-02A`, while durable `CF-W1-SQLAB-02B` now exists as the explicit consent-gated storage child.
-- Do not treat `CF-W1-SQLAB-02B` as implicitly approved for implementation. The point of the new requirement is to isolate the storage gate, not to bypass it.
-- Do not send `CF-W1-RH-01` or `CF-W1-L3-TREV-02` back to Team 03/04 for duplicate prep; both already have architecture and QA packets.
-
-## Team 02 Recommendation
-
-For the next direct-value cycle, Team 00 should:
-
-1. keep `CF-W1-SIG-02` in active Team 03 architecture prep and do not reopen it as a Team 02 discovery pull;
-2. evaluate `CF-W1-L3-DQ-01` for Lane 3 readiness contract prep before watchlist/concentration-review follow-ons;
-3. evaluate `CF-W1-RH-01` for Ready promotion without reopening requirement discovery;
-4. evaluate `CF-W1-L3-TREV-02` for Ready promotion when Today Review writer sequencing is safe;
-5. keep `CF-W1-SQLAB-02A` in sequencing control only;
-6. open Team 03 / Team 04 storage-consent prep for `CF-W1-SQLAB-02B` only if Team 00 intentionally approves the Prisma/schema/repository/generated gate.
+Admin, auth, subscription, notifications, and alert convenience stay behind that stack unless they block correctness, privacy, or user-data safety.

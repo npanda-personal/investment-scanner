@@ -8,9 +8,11 @@ Watchlist-only readiness DTO child under `CF-W1-L3-PORT-01`.
 
 ## State
 
-Child architecture packet prepared. Not Ready for Implementation.
+Child architecture packet refreshed. READY-CANDIDATE for Team 00 sequencing.
 
-This child is user-valuable, but it stays blocked until `CF-W1-L3-PORT-01A` is accepted so watchlist readiness reuses an accepted portfolio readiness shape.
+Team 00 confirmed `CF-W1-L3-PORT-01A` is stable and accepted on branch `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A` at commit `f1432e6`, with delegated Product Owner acceptance recorded in `09-summaries/CF-W1-L3-PORT-01A-po-acceptance-packet.md`.
+
+This child is now bounded enough for Team 00 Ready evaluation. Current `dev` does not contain `f1432e6`, so implementation should stack on `f1432e6` unless Team 00 first confirms a later clean `dev` contains `f1432e6`.
 
 ## Owner / Lane / Module
 
@@ -79,8 +81,8 @@ Stop and return to Team 00 / Architect if implementation requires:
 - route or Prisma changes;
 - frontend/shared UI work;
 - alerts or portfolio-intelligence behavior changes;
-- promoting before `CF-W1-L3-PORT-01A` acceptance.
+- starting from an unstacked `dev` base that omits accepted `CF-W1-L3-PORT-01A` commit `f1432e6`.
 
 ## Next Gate
 
-Wait for accepted `CF-W1-L3-PORT-01A`, then route to Team 04 QA prep and Team 00 Ready evaluation as an independent watchlist-only slice.
+Team 00 Ready evaluation as an independent watchlist-only slice. If promoted before `f1432e6` is integrated into `dev`, create the implementation branch/worktree from `f1432e6`; otherwise use the later clean `dev` containing `f1432e6`.

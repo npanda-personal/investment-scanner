@@ -1,109 +1,126 @@
 # CF-W1-TP-01A Work Packet
 
-Date: 2026-05-17
+Date: 2026-05-19
 
 ## Work Item
 
-Trade Plan no-target compatibility and Data Quality hard-block contract.
+Trade Plan no-target compatibility and DQ hard-block trust behavior.
+
+This is the backend-only first child for the approved `CF-W1-TP-01A` policy and the next direct Trade Plan trust packet after the current safety-gate slices.
 
 ## State
 
-Product policy accepted. Application implementation is blocked until the backend-only child packet is prepared.
+ACCEPT / READY-CANDIDATE for Team 00 sequencing review.
+
+2026-05-19 sequencing refresh after TP-02 acceptance: this packet is architecture-ready only as a stacked residual Trade Plan slice on accepted `CF-W1-TP-02` commit `1222daf`. It is not valid as a current-`dev` implementation because `dev` does not contain accepted TP-01B/TP-02 Trade Plan source changes.
+
+This packet is not self-promoted. Team 00 must still copy the exact file reservation into the Ready queue, create the future branch from `1222daf`, and keep one writer on the `trade-plan-risk-engine` file set.
 
 ## Owner / Lane / Module
 
-- Owner: Team 03 Architecture Factory for post-decision backend-only child packet preparation.
+- Owner: Team 03 Architecture Factory for docs-only readiness prep.
+- Future implementation owner: Team 06 Strategy / Signal / Risk unless Team 00 assigns another Lane 2 writer.
 - Lane: Lane 2.
-- Module: trade-plan-risk-engine.
+- Module: `trade-plan-risk-engine`.
 
-## Current Allowed Files
+## Stacking Base Recommendation
 
-Only active execution documentation under:
+- Base branch: `codex/team06-strategy-signal/CF-W1-TP-02`
+- Base commit: `1222daf`
+- New branch recommendation: `codex/team06-strategy-signal/CF-W1-TP-01A`
+- Rationale: accepted TP-02 overlaps TP-01A's Trade Plan source/doc/test writer set and already preserves accepted TP-01B DQ hard-block behavior. TP-01A must preserve TP-02 exit/invalidation semantics and should only address residual no-target/DQ-hard-block trust gaps or characterization.
 
-- `03-architecture/**`
-- `06-contracts/**`
-- `08-work-packets/**`
+## Exact Future File Reservation
 
-## Current Forbidden Files
+Allowed implementation files after stacking on `1222daf`:
 
-- `backend/src/modules/trade-plan-risk-engine/**`
-- `backend/tests/modules/trade-plan-risk-engine/**`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.service.ts`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.types.ts`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.geometry.ts`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.md`
+- `backend/tests/modules/trade-plan-risk-engine/trade-plan-risk-engine.service.test.ts`
 - `backend/tests/trade-plan-risk-engine.paper-readiness.test.ts`
+
+## Exact Forbidden Future Implementation Files
+
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.repository.ts`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.validation.ts`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.controller.ts`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.router.ts`
+- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.module.ts`
+- `backend/src/modules/trade-plan-risk-engine/index.ts`
+- `backend/tests/modules/trade-plan-risk-engine/trade-plan-risk-engine.repository.test.ts`
 - `backend/src/modules/today-trade-review/**`
 - `backend/tests/modules/today-trade-review/**`
 - `frontend/src/features/trade-plan-risk-engine/**`
 - `frontend/src/features/today-trade-review/**`
-- Prisma schema or migrations
-- route registries
-- shared UI/utilities
+- `backend/prisma/schema.prisma`
+- `backend/prisma/migrations/**`
+- backend and frontend route registries
+- shared backend utilities
+- shared frontend components
 - package manifests
-- generated types
-- provider, scheduler, startup, Angel One, broker, live-provider files
+- generated files
+- `backend/src/modules/data-quality-engine/**`
+- provider, scheduler, startup/backfill, live-provider, paid/cloud, broker, and telemetry files
 
-## Decisions Needed
+## Required Behavior
 
-Product Owner approved Option B:
+The future child must:
 
-- existing target-shaped fields remain compatibility-only for now,
-- target-shaped fields must not be trusted paper-readiness,
-- no arbitrary predefined target-price semantics,
-- trusted output language uses rule-based exit, invalidation, risk-review, evidence, and reason-summary wording,
-- missing or blocked DQ hard-blocks trusted Trade Plan readiness,
-- `LIMITED` is blocked or limited-review-only until later narrowed by Product Owner.
+- preserve existing `target` fields for compatibility only;
+- stop treating missing `target` as trusted paper-readiness failure by itself;
+- hard-block trusted paper-readiness on missing DQ, `UNUSABLE`, `NOT_READY`, `LIMITED`, `ILLIQUID`, stale blockers, `eligibleForSignals = false`, and blocked signal-tier evidence when present;
+- keep `LIMITED` non-ready;
+- rephrase module-local trusted wording away from target-promise semantics and toward exit review, invalidation review, risk review, and evidence wording;
+- preserve accepted TP-02 `exitConditions[]`, `invalidationConditions[]`, and `targetRewardRisk` validation behavior;
+- preserve current API field names, persisted row structure, routes, and module boundaries.
 
-## Future Reservation Model After Decision
+## Required QA Focus
 
-If a bounded backend-only compatibility slice is accepted, reserve exact files in one pass, likely:
+Team 04 should reuse the focused `CF-W1-TP-01B` backend-only QA plan and confirm:
 
-- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.service.ts`
-- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.types.ts`
-- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.repository.ts`
-- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.geometry.ts`
-- `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.md`
-- `backend/tests/modules/trade-plan-risk-engine/trade-plan-risk-engine.service.test.ts`
-- `backend/tests/modules/trade-plan-risk-engine/trade-plan-risk-engine.repository.test.ts`
-- `backend/tests/trade-plan-risk-engine.paper-readiness.test.ts`
+- missing DQ blocks trusted paper-readiness;
+- `NOT_READY` and `LIMITED` never become `READY_FOR_PAPER_REVIEW`;
+- `eligibleForSignals = false` blocks trusted paper-readiness;
+- `useCaseTiers.signal.status = BLOCKED` blocks trusted paper-readiness when tier evidence is present;
+- `target = null` is not the sole blocker;
+- positive readiness reasons do not cite target-shaped fields;
+- trusted outputs/tests avoid `price target`, `profit target`, `must buy`, `must sell`, `guaranteed`, `buy now`, and `sell now`.
 
-Frontend and Today Review changes must be separate UX/API slices unless the decision explicitly reserves them.
+## Sequencing Constraint
 
-## Stop Conditions
+This child must not run in parallel with any other `trade-plan-risk-engine` source packet. Since `CF-W1-TP-02` is accepted and parked at `1222daf`, TP-01A must stack on that commit rather than branch from `dev`.
 
-Stop if implementation would:
+## Focused Validation Commands After Future Implementation
 
-- remove or reinterpret API fields without Product Owner acceptance,
-- change frontend display copy without UX acceptance,
-- require Prisma changes,
-- require route registry changes,
-- alter Strategy Decision semantics already completed by `CF-W1-STRAT-01`.
-
-## Future Validation Commands
-
-Do not run during docs-only prep. Later implementation owner should use focused tests after code changes:
+Do not run during this docs-only pass.
 
 ```powershell
 cd backend
-npm.cmd test -- trade-plan-risk-engine.service.test.ts trade-plan-risk-engine.repository.test.ts trade-plan-risk-engine.paper-readiness.test.ts --runInBand
+npm.cmd test -- trade-plan-risk-engine.service.test.ts trade-plan-risk-engine.paper-readiness.test.ts --runInBand
 ```
 
-## Acceptance Criteria For This Packet
+Product-language scan:
 
-- Trade Plan target/no-target decision points are explicit.
-- DQ hard-block policy gaps are explicit.
-- No source implementation is opened.
-- Future reservations are bounded and separated from frontend/Today Review unless approved.
+```powershell
+rg -n "price target|profit target|must buy|must sell|guaranteed|buy now|sell now" backend/src/modules/trade-plan-risk-engine backend/tests/modules/trade-plan-risk-engine backend/tests/trade-plan-risk-engine.paper-readiness.test.ts
+```
 
-## Team 03 Relaunch Update - 2026-05-17
+## Stop Conditions
 
-Current state remains docs-only and blocked from app-code implementation.
+Stop and return to Team 00 / Architect if implementation needs:
 
-Exact current write scope for this Team 03 pass:
+- a current-`dev` implementation base instead of accepted TP-02 commit `1222daf`;
+- repository behavior changes;
+- Prisma/schema or migration changes;
+- route registry changes;
+- Today Review or frontend changes;
+- shared utility or shared UI changes;
+- package or generated-file changes;
+- DQE source changes;
+- a Product Owner exception that lets `LIMITED` become paper-ready.
 
-- `03-architecture/next-contracts-to-prepare.md`
-- `03-architecture/CF-W1-TP-01A-architecture-review.md`
-- `06-contracts/CF-W1-TP-01A-trade-plan-no-target-dq-hard-block-contract.md`
-- `08-work-packets/CF-W1-TP-01A-work-packet.md`
-- `17-team-outboxes/TEAM-03-architecture-factory.md`
+## Next Gate
 
-Future implementation is not reserved. If Product Owner and Architect accept a backend-only child slice, reserve exact Trade Plan files only and keep frontend/Today Review files excluded unless explicitly approved.
-
-Current blocker: exact backend-only file reservations, child QA scenarios, and proof that broader API/UI/stored-row migration is not required.
+Team 00 Ready evaluation and writer-lane sequencing.

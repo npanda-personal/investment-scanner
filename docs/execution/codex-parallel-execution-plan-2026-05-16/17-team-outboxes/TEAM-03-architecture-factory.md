@@ -2,6 +2,556 @@
 
 Date: 2026-05-17
 
+## Team 03 STRAT-04 + SQLAB-03 Fresh Architecture Readiness Prep - 2026-05-20
+
+Assignment: prepare architecture readiness for `CF-W1-STRAT-04` and `CF-W1-SQLAB-03` inside the active execution folder, without touching application source/tests, QA docs, ready queue, schema/routes/shared files, package/generated scope, or historical planning folders.
+
+Updated:
+
+- `03-architecture/CF-W1-STRAT-04-architecture-review.md`
+- `06-contracts/CF-W1-STRAT-04-strategy-evidence-freshness-and-stale-summary-contract.md`
+- `08-work-packets/CF-W1-STRAT-04-work-packet.md`
+- `03-architecture/CF-W1-SQLAB-03-architecture-review.md`
+- `06-contracts/CF-W1-SQLAB-03-signal-quality-review-loop-actionability-contract.md`
+- `08-work-packets/CF-W1-SQLAB-03-work-packet.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Read-only evidence inspected:
+
+- root `AGENTS.md`
+- both fresh requirement drafts
+- existing adjacent Team 03 architecture/contract/work-packet patterns: `STRAT-02B`, `STRAT-03`, `SQLAB-01`, `SQLAB-02`
+- current `strategy-framework` backend/frontend source and focused tests
+- current `signal-quality-lab` backend/frontend source and focused tests
+- active Team 06 `SQLAB-02A` implementation assignment and runtime-queue conflict notes
+
+Architecture verdict by candidate:
+
+1. `CF-W1-STRAT-04`
+   - verdict: bounded first slice is feasible
+   - module owner: `strategy-framework`
+   - no-schema/no-route/no-shared-file: yes
+   - backend-only first slice: no; visible catalog/performance value needs feature-local UI in the same owned feature
+   - first-slice writer set:
+     - `backend/src/modules/strategy-framework/strategy-framework.service.ts`
+     - `backend/src/modules/strategy-framework/strategy-framework.types.ts`
+     - `backend/src/modules/strategy-framework/strategy-framework.md`
+     - `backend/tests/modules/strategy-framework/strategy-framework.service.test.ts`
+     - `frontend/src/features/strategy-framework/types.ts`
+     - `frontend/src/features/strategy-framework/components/StrategyFrameworkPage.tsx`
+     - `frontend/tests/ui/strategy-framework.spec.ts`
+   - stop condition: if Team 00 wants persisted rerun history, repository/schema changes, or Backtesting Lab source coupling, split a second child instead of widening
+   - sequencing/conflict note: no active file conflict found in this pass
+
+2. `CF-W1-SQLAB-03`
+   - verdict: bounded first slice is feasible
+   - module owner: `signal-quality-lab`
+   - no-schema/no-route/no-shared-file: yes
+   - backend-only first slice: no; direct review-loop value needs visible action labels in the existing page
+   - first-slice writer set:
+     - `backend/src/modules/signal-quality-lab/signal-quality-lab.service.ts`
+     - `backend/src/modules/signal-quality-lab/signal-quality-lab.types.ts`
+     - `backend/src/modules/signal-quality-lab/signal-quality-lab.md`
+     - `backend/tests/modules/signal-quality-lab/signal-quality-lab.service.test.ts`
+     - `frontend/src/features/signal-quality-lab/types.ts`
+     - `frontend/src/features/signal-quality-lab/components/SignalQualityLabPage.tsx`
+     - `frontend/tests/ui/signal-quality-lab.spec.ts`
+   - stop condition: if Team 00 wants journal persistence, repo/schema/route changes, or downstream module rewrites, split a second child instead of widening
+   - sequencing/conflict note: must be sequenced behind active `CF-W1-SQLAB-02A` because the required writer set overlaps exactly with the active Team 06 reservation
+
+Guardrails applied across both:
+
+- do not treat draft requirements as Ready
+- do not approve Prisma/schema/migration, route-registry, shared utility/UI, package, generated, provider/live-data, startup/backfill, paid/cloud, broker, or telemetry scope
+- keep the first implementation slice additive and module-owned
+
+Next handoff to Team 04 QA Planning:
+
+- `CF-W1-STRAT-04`: prepare a focused QA plan for current/stale/partial/structurally-limited strategy evidence freshness labels across catalog, proof, and performance surfaces
+- `CF-W1-SQLAB-03`: prepare a focused QA plan for shorter-horizon, rerun-later, missing-price-history, insufficient-evidence, and ignore-noisy review-loop actionability, explicitly sequenced behind `SQLAB-02A`
+
+Recommended Team 00 action:
+
+- keep both items in draft/prep state
+- route Team 04 QA planning next for both packets
+- do not move either item to Ready from this outbox alone
+- if Team 00 later promotes `SQLAB-03`, enforce explicit sequencing behind active `CF-W1-SQLAB-02A`
+
+No tests, builds, Prisma commands, services, providers, UI checks, commits, or pushes were run.
+
+## Team 03 Fresh Direct-Value Readiness Prep - 2026-05-20
+
+Assignment: prepare architecture readiness for the refreshed top direct investor/trader value drafts `CF-W1-HCTX-03`, `CF-W1-DQ-03`, and `CF-W1-MCTX-02`, without moving any item to Ready and without touching application source/tests, schema/routes/shared files, package/generated scope, or historical plan folders.
+
+Updated:
+
+- `03-architecture/CF-W1-HCTX-03-architecture-review.md`
+- `06-contracts/CF-W1-HCTX-03-historical-context-nearest-snapshot-age-and-provenance-contract.md`
+- `08-work-packets/CF-W1-HCTX-03-work-packet.md`
+- `03-architecture/CF-W1-DQ-03-architecture-review.md`
+- `06-contracts/CF-W1-DQ-03-data-quality-residual-reason-summary-contract.md`
+- `08-work-packets/CF-W1-DQ-03-work-packet.md`
+- `03-architecture/CF-W1-MCTX-02-architecture-review.md`
+- `06-contracts/CF-W1-MCTX-02-market-context-freshness-basis-contract.md`
+- `08-work-packets/CF-W1-MCTX-02-work-packet.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Read-only evidence inspected:
+
+- root `AGENTS.md`
+- Team 02 refreshed top-candidate docs and Team 01 fresh-gap audit
+- requirement drafts for `HCTX-03`, `DQ-03`, and `MCTX-02`
+- existing adjacent Team 03 architecture/contract/work-packet patterns: `HCTX-01`, `HCTX-02`, `DQ-02`, `MCTX-01`, `TREV-02`, `INTEL-03`, `SQLAB-02`
+- live module docs/source/tests for:
+  - `historical-context-snapshots`
+  - `data-quality-engine`
+  - `market-context-intelligence`
+  - relevant downstream read-only consumer evidence in `signal-quality-lab`
+- active Team 06 / Team 07 implementation assignments for `SQLAB-02A`, `TREV-02`, and `INTEL-03`
+
+Architecture verdict by candidate:
+
+1. `CF-W1-HCTX-03`
+   - verdict: bounded backend-only first slice is feasible
+   - module owner: `historical-context-snapshots`
+   - no-schema/no-route/no-shared-file: yes
+   - first-slice writer set:
+     - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.types.ts`
+     - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.service.ts`
+     - `backend/src/modules/historical-context-snapshots/historical-context-snapshots.md`
+     - `backend/tests/modules/historical-context-snapshots/historical-context-snapshots.service.test.ts`
+   - stop condition: if the current lookup payload on `dev` cannot expose selected-row date/source metadata without repository edits, re-split instead of widening
+   - parallel with active Team 06/07 scopes: yes, file sets are disjoint
+
+2. `CF-W1-DQ-03`
+   - verdict: bounded backend-only first slice is feasible
+   - module owner: `data-quality-engine`
+   - no-schema/no-route/no-shared-file: yes
+   - first-slice writer set:
+     - `backend/src/modules/data-quality-engine/data-quality-engine.service.ts`
+     - `backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
+     - `backend/src/modules/data-quality-engine/data-quality-engine.md`
+     - `backend/tests/modules/data-quality-engine/data-quality-engine.service.test.ts`
+     - `backend/tests/modules/data-quality-engine/data-quality-engine.invariants.test.ts`
+   - stop condition: if Team 00 requires durable repository persistence or downstream rewrites, split a second child instead of widening
+   - parallel with active Team 06/07 scopes: yes, file sets are disjoint
+
+3. `CF-W1-MCTX-02`
+   - verdict: bounded backend-only first slice is feasible
+   - module owner: `market-context-intelligence`
+   - no-schema/no-route/no-shared-file: yes
+   - first-slice writer set:
+     - `backend/src/modules/market-context-intelligence/market-context-intelligence.service.ts`
+     - `backend/src/modules/market-context-intelligence/market-context-intelligence.types.ts`
+     - `backend/src/modules/market-context-intelligence/market-context-intelligence.md`
+     - `backend/tests/modules/market-context-intelligence/market-context-intelligence.service.test.ts`
+   - stop condition: if Team 00 requires repository-persisted basis metadata or immediate page/widget adoption, split a follow-on child instead of widening
+   - parallel with active Team 06/07 scopes: yes, file sets are disjoint
+
+Guardrail applied across all three:
+
+- do not treat draft requirements as Ready
+- do not approve Prisma/schema/migration, route-registry, shared utility/UI, package, generated, provider/live-data, startup/backfill, or broad UI scope
+- keep the first implementation slice additive and backend-first
+
+Ranked handoff to Team 00:
+
+1. `CF-W1-HCTX-03`
+   - strongest direct trader trust value
+   - smallest bounded module-local slice
+   - no active file conflict
+2. `CF-W1-DQ-03`
+   - strong downstream reuse value across trust consumers
+   - still bounded service/types/tests only
+   - no active file conflict
+3. `CF-W1-MCTX-02`
+   - bounded and additive, but visible user value is more likely to need a later feature-local follow-on after backend basis metadata lands
+
+Recommended Team 00 action:
+
+- keep all three in draft/prep state
+- send Team 04 to prep QA only after Team 00 decides whether backend-first child packets should stay separate or be paired with later feature-local adoption
+- do not route any of the three to Ready from this outbox alone
+
+No tests, builds, Prisma commands, services, providers, UI checks, commits, or pushes were run.
+
+## Team 03 RH-03 Explainability / Trust Labels Prep - 2026-05-20
+
+Assignment: prepare architecture/file-reservation readiness for `CF-W1-RH-03` Research Hub explainability/trust labels as a docs-only packet in the shared `dev` workspace, without touching application code/tests, QA docs, requirements/audit docs, shared files, schema/routes/packages/generated scope, or historical plan folders.
+
+Updated:
+
+- `03-architecture/CF-W1-RH-03-architecture-review.md`
+- `06-contracts/CF-W1-RH-03-research-hub-explainability-trust-labels-contract.md`
+- `08-work-packets/CF-W1-RH-03-work-packet.md`
+- `17-team-outboxes/TEAM-03-CF-W1-RH-03-architecture.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Read-only evidence inspected:
+
+- root `AGENTS.md`
+- `CF-W1-RH-03` requirement and explainability audit
+- existing `RH-01` and `RH-02A` architecture/contract/QA/work-packet docs
+- current Research Hub backend service/types/tests
+- current Research Hub frontend API/page/UI smoke
+- current `dev` base check showing accepted `RH-01` commit `fd88c62` is not present on 2026-05-20
+
+Readiness result:
+
+- `CF-W1-RH-03` is `READY-CANDIDATE`.
+- The child remains no-schema.
+- It is not backend-only; bounded feature-local frontend copy is included because current Research Hub page and UI smoke still hard-code the misleading What Changed fallback sentence.
+- Exact future writer set:
+  - `backend/src/modules/research-hub/research-hub.service.ts`
+  - `backend/src/modules/research-hub/research-hub.types.ts`
+  - `backend/src/modules/research-hub/research-hub.md`
+  - `backend/tests/modules/research-hub/research-hub.service.test.ts`
+  - `frontend/src/features/research-hub/api/researchHubApi.ts`
+  - `frontend/src/features/research-hub/components/ResearchOverviewPage.tsx`
+  - `frontend/tests/ui/research-hub.spec.ts`
+- Exact blocked scope:
+  - implementation from current unstacked `dev` while it lacks accepted `RH-01` base `fd88c62`
+  - parallel Research Hub writers
+  - Research Hub controller/router/index files and feature hook/index files
+  - backend/frontend route registries
+  - upstream module source/tests
+  - Prisma/schema/migrations, generated files, package manifests
+  - shared backend utilities, shared frontend components
+  - durable Research Hub snapshot/history storage
+  - provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or broad redesign scope
+
+Dependency recommendation:
+
+- `RH-01` is a hard base dependency.
+- `RH-02A` is a functional dependency for truthful What Changed unavailable-basis semantics; Team 00 should either sequence it first or combine `RH-02A + RH-03` into one writer pass.
+- No true consent blocker exists for the bounded `RH-03` child itself. If durable snapshot/storage is later required, split it as a separate consent-gated child.
+
+QA recommendation:
+
+- Team 04 can prepare QA now.
+- Minimum QA should cover explicit next-action source ownership, honest signal-evidence wording, honest data-readiness wording, unavailable-basis What Changed copy, feature-local UI smoke, and research-support language preservation.
+
+No tests, builds, Prisma commands, services, providers, UI checks, commits, or pushes were run.
+
+## Team 03 INTEL-02 Architecture-Readiness Refresh - 2026-05-20
+
+Assignment: refresh architecture readiness for `CF-W1-L3-INTEL-02` as the next Lane 3 direct-value item behind active `CF-W1-L3-WATCH-01`, without editing application code, tests, Team 02 queue docs, Team 04 QA docs, `WATCH-01` docs, or Team 07 worktree files.
+
+Updated:
+
+- `03-architecture/CF-W1-L3-INTEL-02-architecture-review.md`
+- `06-contracts/CF-W1-L3-INTEL-02-portfolio-intelligence-review-traceability-contract.md`
+- `08-work-packets/CF-W1-L3-INTEL-02-work-packet.md`
+- `17-team-outboxes/TEAM-03-CF-W1-L3-INTEL-02-architecture.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Read-only evidence inspected:
+
+- root `AGENTS.md`
+- `CF-W1-L3-INTEL-02` requirement and existing architecture/contract/work-packet docs
+- `CF-W1-L3-INTEL-01` architecture and contract
+- `CF-W1-L3-WATCH-01` and `CF-W1-L3-PORT-01B` architecture reviews
+- current active board, ready queue, and Team 02 outbox
+- current `portfolio-intelligence` service/types/docs/tests
+- current `portfolio-management.types.ts`
+- existing `CF-W1-L3-INTEL-01` QA plan
+
+Readiness result:
+
+- `CF-W1-L3-INTEL-02` is refreshed as a backend-only, module-local `portfolio-intelligence` child.
+- It is not Ready for Implementation and is not promoted.
+- It sits behind active `WATCH-01` in Team 00 sequencing, but `WATCH-01` is not a source-file dependency.
+- It has a hard dependency on accepted `PORT-01A` readiness semantics, and plain current `dev` still lacks those fields.
+- It does not depend on `PORT-01B` code or watchlist readiness DTOs.
+- It still shares the exact `portfolio-intelligence` writer set with `INTEL-01`, so Team 00 must combine or strictly sequence them.
+- QA plan refresh is still required because no dedicated `04-qa/CF-W1-L3-INTEL-02-qa-plan.md` exists.
+
+Exact future writer set:
+
+- `backend/src/modules/portfolio-intelligence/portfolio-intelligence.service.ts`
+- `backend/src/modules/portfolio-intelligence/portfolio-intelligence.types.ts`
+- `backend/src/modules/portfolio-intelligence/portfolio-intelligence.md`
+- `backend/tests/modules/portfolio-intelligence/portfolio-intelligence.service.test.ts`
+
+Exact blocked scope:
+
+- all other `portfolio-intelligence` backend files
+- all `portfolio-management`, `watchlist-management`, and `data-quality-engine` source/tests
+- Prisma/schema/migrations, route registries, shared utilities/UI, package manifests, generated files
+- frontend `portfolio-intelligence` files and UI tests
+- alerts/notifications files, provider/live/startup/backfill scope, paid/cloud, broker, telemetry
+- `WATCH-01` docs or Team 07 worktree
+
+QA recommendation:
+
+- Team 04 should create a dedicated backend-only `INTEL-02` QA plan or document a combined `INTEL-01 + INTEL-02` QA packet after Team 00 chooses the single-writer strategy.
+- Minimum QA must cover reliable, limited, diagnostic-only, and blocked review-traceability states plus backward-compatible existing response fields.
+
+No tests, builds, Prisma commands, services, providers, UI checks, commits, or pushes were run.
+
+## Team 03 WATCH-01 Readiness Refresh After PORT-01B - 2026-05-20
+
+Assignment: refresh architecture readiness for `CF-W1-L3-WATCH-01` watchlist actionability/review-priority after Team 00 confirmed accepted/stable `CF-W1-L3-PORT-01A` at `f1432e6` and accepted/stable `CF-W1-L3-PORT-01B` at `a2edfb6`, without implementing application code.
+
+Updated:
+
+- `03-architecture/CF-W1-L3-WATCH-01-architecture-review.md`
+- `06-contracts/CF-W1-L3-WATCH-01-watchlist-review-actionability-contract.md`
+- `08-work-packets/CF-W1-L3-WATCH-01-work-packet.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Read-only evidence inspected:
+
+- root `AGENTS.md`
+- current `dev` status and branch containment for `a2edfb6` and `f1432e6`
+- `CF-W1-L3-WATCH-01` requirement, architecture review, contract, work packet, and QA plan
+- accepted `CF-W1-L3-PORT-01B` commit `a2edfb6`, changed-file list, delegated Product Owner acceptance packet, and accepted watchlist readiness source/types
+- current `watchlist-management` backend source, frontend feature types/page, and focused tests read-only
+- ready queue, blocked queues, open decisions, and current dirty-worktree status
+
+Readiness result:
+
+- `CF-W1-L3-WATCH-01` is `READY-CANDIDATE` for Team 00 sequencing.
+- It should be a bounded watchlist-owned frontend/backend slice, not backend-only, because the review-priority and reason summary must be visible on the existing watchlist detail table to satisfy the user workflow.
+- It remains separate from `CF-W1-L3-PORT-01B`: accepted readiness fields must be preserved, but readiness status must not be used as actionability ranking evidence.
+- Current `dev` does not contain accepted `a2edfb6`; future implementation must stack on `a2edfb6` or use a later clean `dev` only after Team 00 confirms it contains `a2edfb6`.
+
+Exact future writer set:
+
+- `backend/src/modules/watchlist-management/watchlist-management.service.ts`
+- `backend/src/modules/watchlist-management/watchlist-management.types.ts`
+- `backend/src/modules/watchlist-management/watchlist-management.validation.ts`
+- `backend/src/modules/watchlist-management/watchlist-management.md`
+- `backend/tests/modules/watchlist-management/watchlist-management.service.test.ts`
+- `backend/tests/modules/watchlist-management/watchlist-management.validation.test.ts`
+- `frontend/src/features/watchlist-management/types.ts`
+- `frontend/src/features/watchlist-management/components/WatchlistManagementPage.tsx`
+- optional focused UI smoke: `frontend/tests/ui/watchlist-management.spec.ts`
+
+Exact blocked scope:
+
+- implementation from current unstacked `dev` while it lacks accepted `a2edfb6`
+- Research Hub source/UI files and current unrelated dirty Research Hub changes
+- Prisma schema/migrations, backend/frontend route registries, shared backend utilities, shared frontend components, package manifests, generated files
+- watchlist repository/controller/router/routes/ownership tests unless Team 00 explicitly widens scope
+- Data Quality Engine source/exports, portfolio, alerts, notifications, portfolio-intelligence, providers/live/startup/backfill, paid/cloud, broker, telemetry, or broad Lane 3 behavior
+
+QA recommendation:
+
+- Team 04's existing WATCH-01 QA plan remains usable but should validate from the `a2edfb6` baseline or later clean `dev` containing it.
+- Minimum QA should cover high/medium/refresh/background mapping, deterministic `reviewPriorityDesc`, sort fallback, preserved PORT-01B readiness fields, watchlist detail UI rendering, and notes/tags editing preservation.
+- Reject if implementation consumes DQE readiness as review-priority evidence, touches forbidden files, starts from current unstacked `dev`, or introduces advice/target/alert/portfolio semantics.
+
+No tests, builds, Prisma commands, services, providers, UI checks, commits, or pushes were run.
+
+## Team 03 PORT-01B Watchlist Readiness Refresh - 2026-05-20
+
+Assignment: refresh architecture readiness for `CF-W1-L3-PORT-01B` after Team 00 confirmed accepted `CF-W1-L3-PORT-01A` commit `f1432e6` on branch `codex/team07-portfolio-alerts/CF-W1-L3-PORT-01A`, without implementing application code.
+
+Updated:
+
+- `03-architecture/CF-W1-L3-PORT-01B-architecture-review.md`
+- `06-contracts/CF-W1-L3-PORT-01B-watchlist-readiness-dto-contract.md`
+- `08-work-packets/CF-W1-L3-PORT-01B-work-packet.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Read-only evidence inspected:
+
+- root `AGENTS.md`
+- current `dev` status and branch containment for `f1432e6`
+- `CF-W1-L3-PORT-01B` requirement, architecture review, contract, and work packet
+- parent `CF-W1-L3-PORT-01` requirement, architecture review, contract, and work packet
+- `CF-W1-L3-PORT-01A` delegated Product Owner acceptance packet and developer handoff from `f1432e6`
+- accepted `CF-W1-L3-PORT-01A` readiness DTO/type semantics from `f1432e6`
+- current `watchlist-management` service, types, docs, and focused service test
+- current Data Quality Engine public export/service/type evidence
+- ready queue, blocked queues, open decisions, and Team 03 near-ready matrix
+
+Readiness result:
+
+- `CF-W1-L3-PORT-01B` is `READY-CANDIDATE`.
+- The slice is bounded backend-only watchlist-management work.
+- Exact future writer set:
+  - `backend/src/modules/watchlist-management/watchlist-management.service.ts`
+  - `backend/src/modules/watchlist-management/watchlist-management.types.ts`
+  - `backend/src/modules/watchlist-management/watchlist-management.md`
+  - `backend/tests/modules/watchlist-management/watchlist-management.service.test.ts`
+- Current `dev` does not contain accepted `PORT-01A` commit `f1432e6`.
+- Base recommendation: stack on `f1432e6` if Team 00 promotes implementation before integration; use a later clean `dev` only after Team 00 confirms it contains `f1432e6`.
+
+Exact blocked scope:
+
+- implementation from an unstacked `dev` base that omits `f1432e6`
+- portfolio-management source/tests
+- Data Quality Engine source/exports
+- Prisma schema/migrations
+- backend or frontend route registries
+- shared backend utilities, shared frontend components, packages, generated files
+- frontend source/tests
+- alerts-monitoring, portfolio-intelligence, providers/live/startup/backfill, paid/cloud, broker, telemetry, or broad Lane 3 behavior
+
+QA recommendation:
+
+- Team 04 can keep QA backend-only and focused on `watchlist-management.service.test.ts`.
+- Minimum QA should cover ready, limited, missing, blocked/stale, and backward-compatible watchlist fields.
+- Reject if implementation duplicates DQE scoring, edits DQE exports, touches portfolio/watchlist actionability scope, or starts from a base that omits accepted `PORT-01A` semantics.
+
+No tests, builds, Prisma commands, services, providers, UI checks, commits, or pushes were run.
+
+## Team 03 RH-02A Readiness Refresh Against Accepted RH-01 - 2026-05-19
+
+Assignment: refresh architecture readiness for `CF-W1-RH-02A` against accepted Research Hub baseline commit `fd88c62` on branch `codex/team08-ux-research/CF-W1-RH-01`, without implementing application code.
+
+Updated:
+
+- `03-architecture/CF-W1-RH-02A-architecture-review.md`
+- `06-contracts/CF-W1-RH-02A-research-hub-what-changed-fail-closed-basis-contract.md`
+- `08-work-packets/CF-W1-RH-02A-work-packet.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Read-only evidence inspected:
+
+- root `AGENTS.md`
+- dirty working-tree status on `dev`
+- `CF-W1-RH-02A` requirement, contract, architecture review, and work packet
+- accepted `CF-W1-RH-01` branch status and commit `fd88c62`
+- accepted `RH-01` QA evidence, PO acceptance packet, Team 00 delegated PO acceptance, and Architect Signoff from `fd88c62`
+- current and accepted Research Hub service/types/docs/tests read-only
+- current Research Hub frontend API/page/UI smoke test read-only
+- open decisions, module ownership map, and dependency graph
+
+Readiness result:
+
+- `CF-W1-RH-02A` remains `READY-CANDIDATE`.
+- It is ready only as a bounded stacked Research Hub slice after accepted `RH-01` commit `fd88c62`.
+- `fd88c62` is not an ancestor of the current `dev` checkout at refresh time, so Team 00 should create the future implementation branch/worktree from `fd88c62` or first integrate `fd88c62` into `dev`.
+- Accepted `RH-01` does not block this child: it preserves response shape, touches no frontend files, leaves `whatChanged` simulated, and keeps the false-delta trust gap intact.
+- The slice must keep investor/trader value focused on explainability and trust/readiness evidence by failing `whatChanged` closed when no auditable prior Research Hub basis exists.
+
+Exact future writer set:
+
+- `backend/src/modules/research-hub/research-hub.service.ts`
+- `backend/src/modules/research-hub/research-hub.types.ts`
+- `backend/src/modules/research-hub/research-hub.md`
+- `backend/tests/modules/research-hub/research-hub.service.test.ts`
+- `frontend/src/features/research-hub/api/researchHubApi.ts`
+- `frontend/src/features/research-hub/components/ResearchOverviewPage.tsx`
+- `frontend/tests/ui/research-hub.spec.ts`
+
+Exact blocked scope:
+
+- implementation from an unstacked `dev` base that omits `fd88c62`
+- parallel Research Hub writers
+- Research Hub controller/router/index or feature hook/index files
+- backend/frontend route registries
+- upstream module source/tests
+- scheduler, journal, durable overview snapshot, schema, migration, generated, package, provider/live-data, startup/backfill, shared backend utility, shared frontend component, paid/cloud, broker, telemetry, or broad UI redesign scope
+
+QA recommendation:
+
+- Team 04 should plan `RH-02A` against the stacked `fd88c62` base.
+- Minimum QA must cover unavailable comparison basis, empty delta arrays/null market gate change under unavailable basis, no Today Review surrogate basis, removal of `since the last evaluation` unavailable-basis copy, research-support language, focused backend service tests, and the existing Research Hub UI smoke.
+- Reject if implementation starts from unstacked `dev`, widens into true durable delta history, or needs any forbidden file/scope.
+
+No tests, builds, Prisma commands, services, providers, UI checks, commits, or pushes were run.
+
+## Team 03 CAL-01A Sequencing Revalidation - 2026-05-19
+
+Assignment: prepare architecture sequencing/readiness for `CF-W1-CAL-01A` as the next high-value calibration candidate after active gates, without touching application code, tests, Prisma/schema, routes, generated files, packages, provider/live/startup scope, or BT-03/RH-01 evidence docs.
+
+Updated:
+
+- `03-architecture/CF-W1-CAL-01A-architecture-review.md`
+- `06-contracts/CF-W1-CAL-01A-signal-calibration-dq-readiness-gate-contract.md`
+- `08-work-packets/CF-W1-CAL-01A-work-packet.md`
+- `17-team-outboxes/TEAM-03-CF-W1-CAL-01A-architecture.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Read-only evidence inspected:
+
+- root `AGENTS.md`
+- current requirements queue and Ready queue
+- open decisions
+- current `signal-calibration-engine` service/types/doc/service test files on `dev`
+- accepted parked `CF-W1-CAL-01` commit `fd3d464`
+
+Readiness result:
+
+- `CF-W1-CAL-01A` remains `READY-CANDIDATE` for Team 00 sequencing.
+- It is not self-promoted to Ready for Implementation.
+- Current `dev` still lacks explicit DQ gate semantics; missing latest DQ is still only a data gap and blocking DQ states are still penalty inputs.
+- Accepted parked parent `fd3d464` already adds parent trust-state metadata in the same four calibration files, so the preferred path is stacking `CAL-01A` on that commit.
+- The child must add explicit `dqGateState = PASS | MISSING | BLOCKED` semantics and focused assertions for `eligibleForCalibration=false`, `eligibleForSignals=false`, `NOT_READY`, `UNUSABLE`, and `ILLIQUID`.
+
+Exact future writer set:
+
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.service.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.types.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md`
+- `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.service.test.ts`
+
+Exact blocked scope:
+
+- calibration repository/controller/router/validation/module/index files
+- other calibration tests
+- Signal Quality Lab, Data Quality Engine, Historical Context, Trade Plan, Lane 3, or other upstream/downstream module source/tests
+- Prisma schema, migrations, generated files
+- backend/frontend route registries
+- package manifests
+- shared backend utilities or shared frontend components
+- all frontend source/tests
+- provider/live-data/startup/backfill, paid/cloud, broker, telemetry, or credentials
+
+QA recommendation:
+
+- Team 04 can keep the QA packet service-local and backend-only.
+- Expected validation after implementation: `cd backend; npm.cmd test -- signal-calibration-engine.service.test.ts --runInBand` and `npm.cmd run build`.
+- Reject if implementation arrives from an unapproved base, runs in parallel with another calibration writer, or opens any forbidden scope.
+
+No tests, builds, Prisma commands, services, providers, UI checks, commits, or pushes were run.
+
+## Team 03 TP-01A Trade Plan Trust Refresh - 2026-05-19
+
+Assignment: prepare docs-only architecture readiness for `CF-W1-TP-01A` in the shared `dev` workspace without touching application code, tests, Prisma/schema, routes, generated files, packages, shared utilities/UI, or frontend scope.
+
+Prepared:
+
+- `03-architecture/CF-W1-TP-01A-architecture-review.md`
+- `06-contracts/CF-W1-TP-01A-trade-plan-no-target-dq-hard-block-contract.md`
+- `08-work-packets/CF-W1-TP-01A-work-packet.md`
+- `17-team-outboxes/TEAM-03-CF-W1-TP-01A-architecture.md`
+
+Readiness result:
+
+- `CF-W1-TP-01A` is a `Ready candidate`.
+- The first child stays backend-only and module-local.
+- Exact future writer set:
+  - `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.service.ts`
+  - `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.types.ts`
+  - `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.geometry.ts`
+  - `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.md`
+  - `backend/tests/modules/trade-plan-risk-engine/trade-plan-risk-engine.service.test.ts`
+  - `backend/tests/trade-plan-risk-engine.paper-readiness.test.ts`
+- Exact blocked scope:
+  - repository, validation, controller, router, module, and index files
+  - Prisma/schema and migrations
+  - route registries
+  - Today Review backend/frontend
+  - frontend Trade Plan
+  - Data Quality Engine source
+  - shared utilities/UI
+  - packages
+  - generated files
+  - provider/startup/backfill/live-data/paid-cloud/broker/telemetry scope
+- Key current-`dev` finding:
+  - trusted readiness still depends on `target` presence, while DQ proof does not yet carry `signalReadinessStatus`, `eligibleForSignals`, or signal-tier evidence.
+
+Current Team 03 recommendation to Team 00:
+
+1. Treat `CF-W1-TP-01A` as the next backend-only Trade Plan trust candidate after the current safety-gate slices.
+2. Promote only with the exact writer set above.
+3. Do not run it in parallel with any other `trade-plan-risk-engine` source packet.
+
 ## Team 03 STRAT-02B Durable Revision History Prep - 2026-05-18
 
 Assignment: prepare docs-only architecture readiness for `CF-W1-STRAT-02B` in the shared `dev` workspace without touching application code, tests, Prisma/schema, migrations, generated files, routes, shared utilities, shared UI, package manifests, providers, services, builds, UI smoke, or live data.
@@ -1026,6 +1576,119 @@ Current Team 03 recommendation to Team 00:
 2. Treat it as one no-schema backend-first `Ready candidate`, not as a route, shared, provider, or frontend packet.
 3. Keep any Historical Context frontend rendering follow-up separate from this child.
 4. Do not allow parallel writers on `historical-context-snapshots.service.ts`, `historical-context-snapshots.types.ts`, `historical-context-snapshots.md`, or `historical-context-snapshots.service.test.ts`.
+
+No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
+
+## Team 03 DQ-02 Residual Revalidation - 2026-05-20
+
+Assignment: evaluate the residual parent `CF-W1-DQ-02` after Team 00 verified first child `CF-W1-DQ-02A` is already accepted and locally committed as `c2d6753`, without duplicating the accepted child and without touching application code, tests, queues, requirements, QA docs, Prisma/schema, routes, repositories, or ready-state control files.
+
+Updated:
+
+- `03-architecture/CF-W1-DQ-02-architecture-review.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Files inspected:
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-DQ-02-dq-currentness-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-DQ-02-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-DQ-02-dq-currentness-evidence-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-DQ-02-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-DQ-02A-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/ready-for-implementation.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/team-agent-runtime-queue.md`
+- `backend/src/modules/data-quality-engine/data-quality-engine.service.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.repository.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.controller.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.router.ts`
+- accepted parked branch evidence via:
+  - `git branch --contains c2d6753`
+  - `git show --stat --oneline c2d6753`
+  - `git show --name-only --format=fuller c2d6753`
+  - `git show c2d6753:backend/src/modules/data-quality-engine/data-quality-engine.service.ts`
+  - `git show c2d6753:backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
+  - `git show c2d6753:backend/src/modules/data-quality-engine/data-quality-engine.md`
+  - `git show c2d6753:docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-DQ-02A-developer-handoff.md`
+  - `git show c2d6753:docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-DQ-02A-qa-verification.md`
+  - `git show c2d6753:docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-DQ-02A-code-review.md`
+  - `git show c2d6753:docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-DQ-02A-architect-signoff.md`
+  - `git show c2d6753:docs/execution/codex-parallel-execution-plan-2026-05-16/09-summaries/CF-W1-DQ-02A-po-acceptance-packet.md`
+
+Residual result:
+
+- `CF-W1-DQ-02A` is confirmed accepted and must not be duplicated.
+- The residual parent is `BLOCKED`; no honest `CF-W1-DQ-02B` exists inside a no-schema, no-route, no-repository boundary.
+- Remaining direct investor/trader value sits in DQE persisted read-side/public-contract exposure:
+  - `summary()` still only knows blocker/gap aggregates
+  - `list()` still returns persisted repository DTOs
+  - `diagnostics()` still returns an existing persisted row without additive accepted-branch `currentness`
+- A service-only workaround would create selective endpoint behavior or extra live read-time fetch/recompute behavior that is not durably represented in DQE persistence.
+
+Current Team 03 recommendation to Team 00:
+
+1. Keep the residual parent out of Ready promotion.
+2. Treat the next real follow-up as consent-gated DQE read-side/public-contract work stacked on accepted branch `codex/team05-market-data/CF-W1-DQ-02A` at commit `c2d6753`, not as a fresh child from current `dev`.
+3. Require explicit reservation for `data-quality-engine.repository.ts` plus repository/service/tests and additive API-response consent before reopening `CF-W1-DQ-02`.
+4. If durable stored currentness dates/reason codes are required, route the item to separate Prisma/schema approval instead of forcing a fake no-schema child.
+
+Parallel-safety note:
+
+- Safe in parallel now: docs-only evaluation artifacts.
+- Not safe in parallel now: any implementation pass that promises investor-facing currentness on persisted DQ list/summary/diagnostics without the explicit read-side consent gate.
+
+No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
+
+## Team 03 DQ-01A Passive Contract Prep - 2026-05-20
+
+Assignment: prepare architecture readiness for `CF-W1-L3-DQ-01A` as the next Lane 3 passive-readiness contract after accepted `PORT-01B` and ahead of `DQ-01B` / `INTEL-02`, without editing application code, tests, Team 02 requirement docs, Team 04 QA docs, `WATCH-01` docs, or the other Team 03 `INTEL-02` packet.
+
+Prepared:
+
+- `03-architecture/CF-W1-L3-DQ-01A-architecture-review.md`
+- `06-contracts/CF-W1-L3-DQ-01A-lane-3-passive-readiness-dto-contract.md`
+- `08-work-packets/CF-W1-L3-DQ-01A-work-packet.md`
+- `17-team-outboxes/TEAM-03-CF-W1-L3-DQ-01A-architecture.md`
+
+Updated:
+
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Readiness result:
+
+- `CF-W1-L3-DQ-01A` is architecture-ready only as a docs-only contract gate, not as a fresh code packet.
+- Plain current `dev` still lacks accepted passive readiness source from `f1432e6` and `a2edfb6`.
+- The honest architecture move is to freeze the accepted passive DTO semantics rather than reopen `portfolio-management` and `watchlist-management` while `WATCH-01` is active.
+- No fresh application-file reservation is recommended under `DQ-01A`; accepted `PORT-01A` and `PORT-01B` remain inherited baselines only.
+- Team 04 QA planning can start now against the frozen passive contract.
+- Recommended next bounded implementation child is `CF-W1-L3-DQ-01B`, not a combined passive-DTO rewrite.
+
+No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
+
+## Team 03 CF-W1-L3-DQ-01 Parent Refresh - 2026-05-19
+
+Assignment: refresh the parent `CF-W1-L3-DQ-01` architecture/contract/work-packet state without touching application code, tests, queues, or other teams' files.
+
+Prepared:
+
+- `03-architecture/CF-W1-L3-DQ-01-architecture-review.md`
+- `06-contracts/CF-W1-L3-DQ-01-lane3-readiness-consumer-policy-contract.md`
+- `08-work-packets/CF-W1-L3-DQ-01-work-packet.md`
+- `17-team-outboxes/TEAM-03-CF-W1-L3-DQ-01-architecture.md`
+
+Readiness result:
+
+- the parent item is architecture-ready as a split-child reservation packet;
+- the smallest first child remains `CF-W1-L3-PORT-01A` with portfolio-management-only reservations;
+- `CF-W1-L3-PORT-01B` and `CF-W1-L3-INTEL-01` remain dependency-blocked behind accepted and committed `PORT-01A` semantics;
+- alert work remains isolated under `CF-W1-L3-ALERT-01` and must stay single-writer against `CF-W1-L3-AUTH-03`;
+- the parent packet must not be promoted as a direct broad implementation item.
+
+Doc drift recorded:
+
+- the parent packet previously described child reservations as future-only even though child packets now exist;
+- `blocked-by-upstream-dependency.md` still conflicts with the Ready queue/runtime queue about `CF-W1-L3-ALERT-01` promotion state.
 
 No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
 

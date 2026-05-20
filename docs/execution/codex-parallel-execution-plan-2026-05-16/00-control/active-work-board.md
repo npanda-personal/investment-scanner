@@ -67,31 +67,170 @@ Operating rules:
 - Active implementation teams should not wait for Orchestrator if the ready queue has safe matching work.
 - Team 0 integrates and resolves conflicts; it does not implement by default.
 - Human Product Owner reviews only true consent blockers in Decision Inbox.
+- Team 02 / Product Owner delegate must read root `AGENTS.md` before creating or changing requirements, and must rank direct investor/trader value ahead of admin/settings/auth/subscription/notification convenience work unless correctness, privacy, or trust is blocked.
+
+## Latest Team 00 Routing Update - Dirty Docs Checkpoint And Gate Closures
+
+Date: 2026-05-20
+
+Runtime state:
+
+- Branch: `dev`.
+- Latest local `dev` commit before checkpoint: `65a4a4d test: align market data repair expectations`.
+- Current dirty inventory before checkpoint: 154 paths, split into 150 active execution docs and 4 pre-existing Research Hub app-source files.
+- Checkpoint policy: stage and commit only `docs/execution/codex-parallel-execution-plan-2026-05-16/**`; do not stage or touch Research Hub source files.
+- Open decisions: 0.
+- Product Owner action required: no.
+
+Gate movement:
+
+- Team 03 completed architecture prep for `CF-W1-STRAT-04` and `CF-W1-SQLAB-03`.
+- `CF-W1-STRAT-04` moves to Team 04 docs-only QA planning; no Ready promotion yet.
+- `CF-W1-SQLAB-03` moves to Team 04 docs-only QA planning, but implementation remains sequenced behind active `CF-W1-SQLAB-02A`.
+- Team 03 Architect Signoff accepted `CF-W1-SQLAB-02A`; Team 00 delegated PO acceptance and scoped branch commit are next.
+- `CF-W1-MCTX-02` also awaits Team 00 delegated PO acceptance and scoped branch commit after accepted QA/review/signoff.
+
+Active teams:
+
+- Team 07: `CF-W1-L3-TREV-02` bounded rework is active.
+- Team 05: `CF-W1-HCTX-03` implementation is active.
+- Team 00: docs checkpoint and delegated PO/commit gates are active.
+
+Teams ready to pick up new tasks:
+
+- Team 04: QA planning for `CF-W1-STRAT-04`.
+- Team 04: QA planning for `CF-W1-SQLAB-03`, sequenced behind `CF-W1-SQLAB-02A` for implementation.
+- Team 10: review after the next QA-accepted handoff.
+- Team 03: Architect Signoff after Team 10 accepts the next gated implementation.
+- Team 02: rolling direct investor/trader-value requirements after reading root `AGENTS.md`.
+
+## Latest Team 00 Routing Update - Rolling Pool After Interruption Resume
+
+Date: 2026-05-20
+
+Runtime state:
+
+- Branch: `dev`.
+- Latest local commit: `65a4a4d test: align market data repair expectations`.
+- Open decisions: 0.
+- Push performed: no.
+- Product Owner action required: no.
+- Main workspace remains dirty with active execution docs and pre-existing Research Hub source status; active app work remains isolated in dedicated worktrees.
+
+Active teams:
+
+- Team 07: `CF-W1-L3-TREV-02` bounded UI/provenance rework is active.
+- Team 03: `CF-W1-L3-INTEL-03` Architect Signoff is active after QA and Team 10 review acceptance.
+- Team 06: `CF-W1-SQLAB-02A` bounded UI trust-copy rework is active after Team 10 rejected missing visible derived/not-persisted copy.
+- Team 05: `CF-W1-MCTX-02` backend-only implementation is active in the dedicated worktree.
+- Team 02: next ready requirement handoff is `CF-W1-TP-03` / `CF-W1-BT-04` from Team 01 audit and must read root `AGENTS.md`.
+
+Teams ready to pick up new tasks:
+
+- Team 04: QA rerun for `CF-W1-L3-TREV-02` after Team 07 returns the rework handoff.
+- Team 04: QA rerun for `CF-W1-SQLAB-02A` after Team 06 returns the rework handoff.
+- Team 04: QA verification for `CF-W1-MCTX-02` after Team 05 returns the developer handoff.
+- Team 10: review after any QA acceptance.
+- Team 03: Architect Signoff for `CF-W1-L3-INTEL-03` is active.
+- Team 00: Ready evaluation after Team 03 and Team 04 evidence exists for the top fresh candidates.
+
+## Latest Team 00 Routing Update - RH-03
+
+Date: 2026-05-20
+
+`CF-W1-RH-03` is promoted to Ready and assigned to Team 08.
+
+Routing evidence:
+
+- Requirement, audit, architecture review, contract, work packet, QA plan, exact file reservations, and no-open-decision check are present.
+- Team 00 sequencing decision: use accepted `CF-W1-RH-02A` commit `f391a6d` as the implementation base because it already contains accepted `CF-W1-RH-01` commit `fd88c62`.
+- Branch: `codex/team08-ux-research/CF-W1-RH-03`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-RH-03`.
+- Current state: Implementation In Progress once Team 08 starts.
+- Product Owner action required: no.
+
+Teams ready to pick up new tasks:
+
+- Team 08: `CF-W1-RH-03` implementation in the dedicated worktree.
+- Team 04: QA verification after Team 08 developer handoff.
+- Team 10: code/release review after Team 04 accepts QA.
+- Team 03: Architect Signoff after Team 10 accepts review.
+- Team 02: rolling requirement prioritization can continue when a free slot is available.
+- Team 01: direct-value audit can run if the requirement queue thins.
+
+## Latest Team 00 Routing Update - TREV-02
+
+Date: 2026-05-20
+
+`CF-W1-L3-TREV-02` is promoted to Ready and assigned to Team 07.
+
+Routing evidence:
+
+- Requirement, architecture review, contract, work packet, QA plan, exact file reservations, and no-open-decision check are present.
+- Team 00 verified `CF-W1-L3-TREV-01` is accepted and locally committed as `e0673c3`.
+- Team 00 sequencing decision: stack `TREV-02` on accepted `TREV-01` commit `e0673c3` because both slices reserve overlapping Today Review writer files and `TREV-01` is not merged into plain `dev`.
+- Branch: `codex/team07-portfolio-alerts/CF-W1-L3-TREV-02`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-L3-TREV-02`.
+- Current state: Implementation In Progress once Team 07 starts.
+- Product Owner action required: no.
+
+Teams ready to pick up new tasks:
+
+- Team 07: `CF-W1-L3-TREV-02` implementation in the dedicated worktree.
+- Team 04: QA verification after Team 07 developer handoff.
+- Team 10: code/release review after Team 04 accepts QA.
+- Team 03: Architect Signoff after Team 10 accepts review.
+- Team 02: stale queue correction remains active and should exclude accepted branch commits.
+- Team 01: direct-value audit can continue when capacity is available.
+
+## Latest Team 00 Routing Update - INTEL-03
+
+Date: 2026-05-20
+
+`CF-W1-L3-INTEL-03` is promoted to Ready and assigned to Team 07.
+
+Routing evidence:
+
+- Requirement, architecture review, contract, work packet, QA plan, exact file reservations, and no-open-decision check are present.
+- Team 00 verified `CF-W1-L3-INTEL-02` is accepted and locally committed as `d0305c8`.
+- Team 00 sequencing decision: stack `INTEL-03` on accepted `INTEL-02` commit `d0305c8`.
+- Parallel-safety decision: `INTEL-03` may run in parallel with active `TREV-02` because `INTEL-03` reserves `portfolio-intelligence` files while `TREV-02` reserves `today-trade-review` files.
+- Branch: `codex/team07-portfolio-alerts/CF-W1-L3-INTEL-03`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-L3-INTEL-03`.
+- Current state: Implementation In Progress once Team 07 starts.
+- Product Owner action required: no.
+
+Teams ready to pick up new tasks:
+
+- Team 07: `CF-W1-L3-INTEL-03` implementation in the dedicated worktree.
+- Team 04: QA verification after Team 07 developer handoff.
+- Team 10: code/release review after Team 04 accepts QA.
+- Team 03: Architect Signoff after Team 10 accepts review.
 
 ## Daemon Runtime State
 
 | Field | Current Value |
 | --- | --- |
 | Current daemon cycle id | `DAEMON-20260517` |
-| Current rolling iteration count | 43 |
-| Active teams | Team 04 `CF-W1-SIG-02` QA verification; Team 03 `CF-W1-L3-DQ-01` architecture prep; Team 02 rolling PO/requirements discovery |
-| Queued teams | Team 10 `CF-W1-SIG-02` review after QA ACCEPT; Team 04 `CF-W1-SQLAB-02B` proposal QA review; next implementation/signoff gate from accepted handoffs |
-| Idle teams | Team 05/06/07/08/09 implementation lanes available for the next promoted, isolated Ready item; Team 10 available after SIG-02 QA gate |
-| Blocked teams | No team fully blocked; no open Decision Inbox items; platform/notification/alert convenience work is intentionally low priority unless it blocks correctness, privacy, or user-data safety |
+| Current rolling iteration count | 47 |
+| Active teams | Team 07 `CF-W1-L3-INTEL-03` QA-reject rework; Team 06 `CF-W1-SQLAB-02A` implementation; Team 04 `CF-W1-L3-TREV-02` QA rerun; Team 03 `CF-W1-DQ-02` residual split; Team 02 corrected direct-value requirement refresh |
+| Queued teams | Team 04 QA rerun for `INTEL-03`; Team 04 QA verification for `SQLAB-02A`; Team 10 review after QA acceptance; Team 01 fresh direct-value audit |
+| Idle teams | Team 05/06/07/08/09 implementation lanes available for the next promoted, isolated Ready item; Team 10 available for the next QA-accepted implementation review |
+| Blocked teams | No team fully blocked; no open Decision Inbox items; admin/settings/notification convenience work remains low priority unless correctness, privacy, or user-data safety is affected |
 | Teams relaunched this cycle | Team 03/04/10/03 completed `CF-W1-CAL-01` gates; Team 03 and Team 04 completed `CF-W1-SIG-TRIGGER-02A` prep; Team 06 is assigned implementation |
 | Teams shut down due to no work | None permanently; Teams without ready implementation move to audit/refinement |
 | Teams re-added due to new work | Team 07 completed `CF-W1-L3-AUTH-02`; Team 06 completed `CF-W1-SIG-TRIGGER-01` |
-| Ready queue depth | 0 unassigned; active Ready/review work is already assigned to isolated worktrees |
-| Refinement queue depth | Active direct investor/trader-value queue; Team 02 is refreshing requirements while Team 03 prepares `CF-W1-L3-DQ-01` architecture |
+| Ready queue depth | 0 unassigned; `CF-W1-SQLAB-02A`, `TREV-02`, and `INTEL-03` are assigned to isolated worktrees |
+| Refinement queue depth | Corrected direct investor/trader-value queue; accepted parked branches are excluded from fresh-pull routing |
 | Integration queue depth | Active branch-local handoffs/reviews; accepted branch commits remain parked for clean later integration |
 | Decision inbox count | 0 open decisions |
 | Spawned subagent active limit | 6 |
 | Spawned subagent queue doc | `00-control/team-agent-runtime-queue.md` |
-| Ready-work pressure | `CF-W1-SIG-02` is in QA after implementation; next gate is Team 10 review if QA accepts |
-| Blocked-work pressure | low-to-medium; blockers are readiness/packet gates, explicit SQLAB durable-storage consent, clean integration scope, and intentionally demoted low-value platform/notification/alert convenience items |
-| Next team to launch | Team 10 review for `CF-W1-SIG-02` after Team 04 QA ACCEPT |
-| Next item to assign | Team 04 proposal QA for `CF-W1-SQLAB-02B`, or implementation lane after Team 03/04 make a top item Ready |
-| Last commit at Team 00 resume start | `74a3198 docs: route sig qa and lane3 readiness prep` |
+| Ready-work pressure | `TREV-02` and `INTEL-03` are in bounded Team 07 rework; `SQLAB-02A` is in Team 06 implementation |
+| Blocked-work pressure | low-to-medium; current blockers are QA rework, residual parent splits, schema/storage consent gates, clean integration scope, and intentionally demoted low-value platform/notification/alert convenience items |
+| Next team to launch | Team 04 QA rerun for whichever of `TREV-02`, `INTEL-03`, or `SQLAB-02A` returns first |
+| Next item to assign | Team 03 `CF-W1-DQ-02` residual split / possible next no-schema child; Team 01/02 corrected direct-value discovery |
+| Last commit at Team 00 resume start | `65a4a4d test: align market data repair expectations` |
 | Daemon should continue | Yes; Product Owner action is not required |
 
 ## Sprint 0 Items

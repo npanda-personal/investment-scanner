@@ -17,6 +17,27 @@ This packet stays separate from:
 
 If implementation pressure pulls those packets together, Team 00 must make that sequencing decision explicitly instead of silently widening this child.
 
+## 2026-05-19 Readiness Refresh
+
+Team 03 rechecked the current direct investor/trader-value queue and current `backtesting-strategy-lab` source evidence. `CF-W1-BT-03` remains architecture-ready as a bounded proof-basis / overfit-guardrail child.
+
+Current Team 03 verdict: `ACCEPT/READY-CANDIDATE`.
+
+Ready criteria that pass for Team 00 evaluation:
+
+- accepted requirement exists in `10-requirements/CF-W1-BT-03-backtesting-proof-basis-overfit-guardrail-requirement.md`
+- architecture review, contract, work packet, and Team 04 QA plan exist
+- exact allowed files and forbidden files are defined below and in the work packet
+- no schema, route, generated-file, package, shared UI, provider, broker, telemetry, or paid/cloud scope is required
+- current source exposes the needed evidence fields without adding a new validation engine
+- Product language remains research-support only
+
+Ready criteria that remain gate-dependent:
+
+- Team 00 must explicitly promote this packet before any application source/test work starts
+- Team 00 must record the one-writer sequencing decision against accepted/parked `CF-W1-BT-02` and active/stacked `CF-W1-BT-01A`
+- future implementation should use a dedicated Team 06 backtesting worktree stacked on the accepted `CF-W1-BT-02` baseline if `BT-02` is still parked outside `dev`
+
 ## Evidence Inspected
 
 - `AGENTS.md`
@@ -199,6 +220,7 @@ If implementation pressure creates any of those needs, stop and split the requir
 
 - No schema, route, shared UI, or generated-file blocker exists for the bounded first child.
 - The child depends only on evidence already computed inside `backtesting-strategy-lab`.
+- Team 04 QA plan exists at `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-BT-03-qa-plan.md`.
 - The future implementation writer set exactly overlaps `CF-W1-BT-02`.
 - The future backend doc/test subset overlaps `CF-W1-BT-01A`.
 - Team 00 must not run BT-03 in parallel with BT-02, and must not stack BT-03 on top of BT-01A doc/test edits in shared `dev` without one explicit writer. Safe options:
@@ -207,6 +229,18 @@ If implementation pressure creates any of those needs, stop and split the requir
   - defer BT-01A until the service/doc/test writer set is clear.
 
 That is a sequencing constraint, not a source-architecture blocker.
+
+## Worktree Requirement
+
+Worktree required for implementation: yes.
+
+Recommended future branch/worktree after Team 00 promotion:
+
+- Branch: `codex/team06-strategy-signal/CF-W1-BT-03`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-BT-03`
+- Base: accepted `CF-W1-BT-02` branch/commit if that work is still parked outside `dev`; otherwise current `dev` after `BT-02` is integrated
+
+Reason: `BT-03` reserves the same backtesting service/types/doc/test/frontend page/UI spec writer set as `BT-02` and overlaps `BT-01A` doc/test surfaces. It is not parallel-safe in the main shared workspace.
 
 ## Required QA Planning Handoff For Team 04
 

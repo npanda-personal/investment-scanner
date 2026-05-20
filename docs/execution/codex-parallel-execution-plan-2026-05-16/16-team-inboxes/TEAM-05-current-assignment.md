@@ -1,5 +1,185 @@
 # TEAM-05 Current Assignment
 
+Date: 2026-05-20
+
+Team: TEAM-05 - Market Data / Data Quality
+
+## Current Assignment Override - CF-W1-HCTX-03
+
+Implement `CF-W1-HCTX-03` in the dedicated Team 05 worktree.
+
+This override supersedes older tails below for the current Team 05 run. Do not implement in the shared `dev` workspace.
+
+## Branch / Worktree
+
+- Branch: `codex/team05-market-data/CF-W1-HCTX-03`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team05-CF-W1-HCTX-03`
+- Base: accepted `CF-W1-HCTX-02` commit `f52c024`
+
+## Gate Evidence
+
+- Requirement: `10-requirements/CF-W1-HCTX-03-historical-context-nearest-snapshot-age-and-provenance-warnings-requirement.md`
+- Architecture review: `03-architecture/CF-W1-HCTX-03-architecture-review.md`
+- Contract: `06-contracts/CF-W1-HCTX-03-historical-context-nearest-snapshot-age-and-provenance-contract.md`
+- Work packet: `08-work-packets/CF-W1-HCTX-03-work-packet.md`
+- QA plan: `04-qa/CF-W1-HCTX-03-qa-plan.md`
+
+## Allowed Files
+
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.types.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.service.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.md`
+- `backend/tests/modules/historical-context-snapshots/historical-context-snapshots.service.test.ts`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-05-CF-W1-HCTX-03-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-HCTX-03-developer-handoff.md`
+
+## Forbidden Files
+
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.repository.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.controller.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.router.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.validation.ts`
+- `backend/src/modules/historical-context-snapshots/index.ts`
+- `backend/src/modules/historical-context-snapshots/historical-context-snapshots.module.ts`
+- `backend/tests/modules/historical-context-snapshots/historical-context-snapshots.repository.test.ts`
+- `backend/tests/modules/historical-context-snapshots/historical-context-snapshots.routes.test.ts`
+- `backend/tests/modules/historical-context-snapshots/historical-context-snapshots.validation.test.ts`
+- all frontend `historical-context-snapshots` files/tests
+- all `market-context-intelligence` source/tests
+- all `signal-quality-lab` source/tests
+- Prisma schema or migrations
+- generated files
+- backend or frontend route registries
+- shared backend utilities or shared frontend components
+- package manifests
+- provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential scope
+
+## Required Behavior
+
+- Preserve current nearest-on-or-before lookup semantics.
+- Add additive age/provenance metadata only.
+- Expose requested date, selected date, lag days, lookback days, and stable status labels.
+- Distinguish same-day, near-date, fallback, metadata-gap, missing, and not-requested cases.
+- Keep summary wording research-support oriented.
+- Avoid downstream consumer rewrites in this first slice.
+
+## Focused Validation
+
+```powershell
+cd backend
+npm.cmd test -- historical-context-snapshots.service.test.ts --runInBand
+npm.cmd run build
+```
+
+Optional drift scan:
+
+```powershell
+rg -n "same-day|near|fallback|lag|lookback|metadata gap|provenance" backend/src/modules/historical-context-snapshots backend/tests/modules/historical-context-snapshots
+```
+
+## Stop Conditions
+
+Return to Team 00 without implementing further if the slice needs repository, controller, router, validation, index, module, schema, migration, generated, route registry, shared utility/UI, package, frontend, market-context, signal-quality, provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential scope.
+
+## Expected Output
+
+Write:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-05-CF-W1-HCTX-03-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-HCTX-03-developer-handoff.md`
+
+Do not commit. Team 00 handles QA, review, Architect Signoff, delegated PO acceptance, scoped local commit, and later integration.
+
+---
+
+Date: 2026-05-20
+
+Team: TEAM-05 - Market Data / Data Quality
+
+## Current Assignment Override - CF-W1-MCTX-02
+
+Implement `CF-W1-MCTX-02` in the dedicated Team 05 worktree.
+
+This override supersedes older tails below for the current Team 05 run. Do not implement in the shared `dev` workspace.
+
+## Branch / Worktree
+
+- Branch: `codex/team05-market-data/CF-W1-MCTX-02`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team05-CF-W1-MCTX-02`
+- Base: accepted `CF-W1-MCTX-01` commit `e695f0c`
+
+## Gate Evidence
+
+- Requirement: `10-requirements/CF-W1-MCTX-02-market-context-freshness-basis-labels-for-persisted-vs-generated-summaries-requirement.md`
+- Architecture review: `03-architecture/CF-W1-MCTX-02-architecture-review.md`
+- Contract: `06-contracts/CF-W1-MCTX-02-market-context-freshness-basis-contract.md`
+- Work packet: `08-work-packets/CF-W1-MCTX-02-work-packet.md`
+- QA plan: `04-qa/CF-W1-MCTX-02-qa-plan.md`
+
+## Allowed Files
+
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.service.ts`
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.types.ts`
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.md`
+- `backend/tests/modules/market-context-intelligence/market-context-intelligence.service.test.ts`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-05-CF-W1-MCTX-02-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-MCTX-02-developer-handoff.md`
+
+## Forbidden Files
+
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.repository.ts`
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.controller.ts`
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.router.ts`
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.validation.ts`
+- `backend/src/modules/market-context-intelligence/index.ts`
+- `backend/tests/modules/market-context-intelligence/market-context-intelligence.repository.test.ts`
+- `backend/tests/modules/market-context-intelligence/market-context-intelligence.routes.test.ts`
+- all frontend `market-context-intelligence` files/tests
+- all downstream consumer module source/tests
+- Prisma schema or migrations
+- generated files
+- backend or frontend route registries
+- shared backend utilities or shared frontend components
+- package manifests
+- provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential scope
+
+## Required Behavior
+
+- Add additive persisted-vs-generated freshness basis metadata to `MarketContextSummary`.
+- Preserve current regime math, scope behavior, route shape, and persisted-save behavior.
+- Keep basis derivation in the service layer.
+- Preserve explicit macro-missing and partial-evidence wording.
+- Do not implement frontend adoption, downstream consumer adoption, repository persistence, route changes, schema changes, or provider/live-data changes in this slice.
+
+## Focused Validation
+
+```powershell
+cd backend
+npm.cmd test -- market-context-intelligence.service.test.ts --runInBand
+npm.cmd run build
+```
+
+Optional copy drift scan:
+
+```powershell
+rg -n "persisted|generated|fallback|derived|fresh|partial|missing|macro|basis" backend/src/modules/market-context-intelligence backend/tests/modules/market-context-intelligence
+```
+
+## Stop Conditions
+
+Return to Team 00 without implementing further if the slice needs repository, controller, router, validation, index, schema, migration, generated, route registry, shared utility/UI, package, frontend, downstream consumer, provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential scope.
+
+## Expected Output
+
+Write:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-05-CF-W1-MCTX-02-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-MCTX-02-developer-handoff.md`
+
+Do not commit. Team 00 handles QA, review, Architect Signoff, delegated PO acceptance, scoped local commit, and later integration.
+
+---
+
 Date: 2026-05-18
 
 Team: TEAM-05 - Market Data / Data Quality

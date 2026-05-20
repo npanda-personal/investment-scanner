@@ -17,6 +17,8 @@ This packet is additive and separate from:
 - `CF-W1-BT-02` backtesting outcome review traceability
 - `CF-W1-BT-01A` backtesting DQ fail-closed characterization
 
+2026-05-19 Team 03 refresh: Team 04 QA planning now exists for this packet, so the remaining readiness gate is Team 00 Ready promotion plus explicit one-writer sequencing. Verdict remains `ACCEPT/READY-CANDIDATE`.
+
 ## Owner / Lane / Modules
 
 - Architecture owner: Team 03 Architecture Factory
@@ -45,6 +47,18 @@ This child is intentionally bounded to current module evidence only. It does not
 - `frontend/src/features/backtesting-strategy-lab/types.ts`
 - `frontend/src/features/backtesting-strategy-lab/components/BacktestingStrategyLabPage.tsx`
 - `frontend/tests/ui/backtesting-strategy-lab.spec.ts`
+
+## Branch / Worktree Requirement
+
+Worktree required: yes.
+
+Recommended future isolation after Team 00 promotion:
+
+- Branch: `codex/team06-strategy-signal/CF-W1-BT-03`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-BT-03`
+- Base rule: stack on accepted `CF-W1-BT-02` branch/commit if that accepted work remains parked outside `dev`; otherwise use current `dev` after `BT-02` is integrated
+
+Reason: the implementation reservation is the same writer set as `CF-W1-BT-02` and overlaps the `CF-W1-BT-01A` backend doc/test subset. It must be one explicit backtesting writer, not a parallel shared-workspace edit.
 
 ## Current Forbidden Files
 
@@ -117,6 +131,7 @@ Future implementation must:
 - No schema, route, shared UI, or generated-file blocker exists for this first child.
 - Existing run `metrics` JSON is sufficient for additive proof-basis fields.
 - Existing saved-run list and detail surfaces already render most supporting evidence, so the UI work stays page-local.
+- Team 04 QA plan exists at `04-qa/CF-W1-BT-03-qa-plan.md`.
 - Team 00 must keep this packet out of parallel implementation with `CF-W1-BT-02`; the future writer set is the same.
 - Team 00 must also sequence the BT-01A doc/test writer overlap explicitly if that characterization child remains active.
 
@@ -126,9 +141,9 @@ Recommended sequencing:
 2. run `CF-W1-BT-03` as the next backtesting trust child; and
 3. keep BT-01A as a separate characterization-only pass unless Team 00 deliberately combines the writer sets.
 
-## QA Handoff Needed
+## QA Handoff
 
-Team 04 should prepare the QA plan for this bounded packet now.
+Team 04 has prepared the QA plan for this bounded packet. Future executable QA remains blocked until Team 00 promotes the packet and Team 06 submits a bounded implementation handoff.
 
 Required QA focus:
 

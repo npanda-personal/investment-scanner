@@ -6,11 +6,11 @@ Owner: Team 03 Architecture Factory
 
 ## Status
 
-Watchlist review-actionability architecture packet prepared. Not Ready for Implementation.
+Watchlist review-actionability architecture packet refreshed after accepted `CF-W1-L3-PORT-01B` evidence. READY-CANDIDATE for Team 00 sequencing.
 
 The first slice is source-supported as a bounded watchlist-owned vertical packet. It can stay inside the `watchlist-management` backend module, the `watchlist-management` frontend feature, module docs, and focused module/UI tests without Prisma/schema changes, route-registry edits, shared utility/UI work, package changes, generated-file changes, provider/startup scope, or paid/cloud scope.
 
-It is not parallel-safe with the future `CF-W1-L3-PORT-01B` watchlist readiness DTO child, because both packets need the same `watchlist-management` backend service/types/doc/test surfaces.
+It was not parallel-safe with `CF-W1-L3-PORT-01B` while that watchlist readiness DTO child was active. Team 00 has now accepted/stabilized `CF-W1-L3-PORT-01B` at commit `a2edfb6`, so the prior writer conflict is cleared only for an implementation branch that stacks on `a2edfb6` or a later clean `dev` that contains it. Current `dev` at this refresh does not contain `a2edfb6`, so plain current `dev` is not a safe implementation base.
 
 ## Evidence Inspected
 
@@ -26,6 +26,11 @@ It is not parallel-safe with the future `CF-W1-L3-PORT-01B` watchlist readiness 
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-L3-PORT-01B-architecture-review.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-L3-PORT-01-portfolio-watchlist-readiness-dto-contract.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-L3-PORT-01B-work-packet.md`
+- accepted `CF-W1-L3-PORT-01B` commit `a2edfb6`
+- `git show a2edfb6:docs/execution/codex-parallel-execution-plan-2026-05-16/09-summaries/CF-W1-L3-PORT-01B-po-acceptance-packet.md`
+- `git show a2edfb6:docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-00-CF-W1-L3-PORT-01B-delegated-po-acceptance.md`
+- `git show a2edfb6:backend/src/modules/watchlist-management/watchlist-management.types.ts`
+- `git show a2edfb6:backend/src/modules/watchlist-management/watchlist-management.service.ts`
 - `backend/src/modules/watchlist-management/watchlist-management.md`
 - `backend/src/modules/watchlist-management/watchlist-management.service.ts`
 - `backend/src/modules/watchlist-management/watchlist-management.types.ts`
@@ -44,6 +49,7 @@ It is not parallel-safe with the future `CF-W1-L3-PORT-01B` watchlist readiness 
 
 - `watchlist-management.detail()` already owns the watchlist review table response. It enriches each item with price, daily move, latest signal, notes, and tags, then applies deterministic backend sorting before the frontend renders the table.
 - `WatchlistDashboardItemDto` and `WatchlistDetailDto` currently expose no explicit review-priority or reason-summary fields.
+- Accepted `PORT-01B` adds backend-only `readiness` fields and `readinessSummary` to the watchlist detail DTO. WATCH-01 must preserve those fields when stacked on `a2edfb6`, but it must not reinterpret Data Quality readiness as review-priority evidence.
 - `WatchlistManagementPage.tsx` already renders a sortable table with a dedicated sort selector, notes/tags editing, and enough local UI space to add a review-priority column and reason summary without touching shared UI components.
 - The current sort contract is module-local and extensible through `WatchlistSortOption` plus `parseSortOption()`. Adding one additive sort key is lower risk than creating a new endpoint.
 - Existing item inputs already contain the only user-authored context this slice needs: note presence and tag presence. No text classification or note parsing is required for the first packet.
@@ -75,7 +81,9 @@ This packet must stay distinct from `CF-W1-L3-PORT-01B`.
 
 ## Architecture Decision
 
-Prepare `CF-W1-L3-WATCH-01` as a module-local watchlist vertical slice with additive review-actionability DTO fields plus one additive backend sort option.
+Prepare `CF-W1-L3-WATCH-01` as a module-local watchlist vertical slice with additive review-actionability DTO fields plus one additive backend sort option and a feature-local watchlist table update.
+
+This is not recommended as backend-only for the first implementation pass. A backend-only DTO/sort addition would be technically bounded but would not satisfy the review-queue user value because the user could not see why items were prioritized. The recommended minimal slice is frontend/backend, limited to `watchlist-management` backend files and the existing `watchlist-management` frontend feature.
 
 Recommended additive taxonomy:
 
@@ -155,7 +163,7 @@ The backend parser may keep `recentlyAdded` as the fallback sort for backward co
 
 ## Exact Future File Reservations
 
-Allowed files after Team 00 promotion and after any conflicting watchlist writer clears:
+Allowed files after Team 00 promotion, after using base `a2edfb6` or later `dev` containing `a2edfb6`, and after any conflicting watchlist writer clears:
 
 - `backend/src/modules/watchlist-management/watchlist-management.service.ts`
 - `backend/src/modules/watchlist-management/watchlist-management.types.ts`
@@ -189,12 +197,16 @@ Allowed files after Team 00 promotion and after any conflicting watchlist writer
 - generated files
 - provider/startup/backfill/live-provider scope
 - paid/cloud, telemetry, broker, or automation flows
+- implementation from current unstacked `dev` while it lacks accepted `a2edfb6`
+- Research Hub source or UI files, including current unrelated dirty `research-hub` changes
 
 ## Dependency And Conflict Notes
 
 - No current Product Owner decision blocker exists.
 - No active Today Review conflict exists. `CF-W1-L3-TREV-01` uses `today-trade-review` files and can proceed independently in its own worktree.
-- This packet must not be promoted or implemented in parallel with `CF-W1-L3-PORT-01B`, because both slices reserve `watchlist-management.service.ts`, `watchlist-management.types.ts`, `watchlist-management.md`, and focused watchlist tests.
+- `CF-W1-L3-PORT-01B` is accepted/stable at `a2edfb6`, so the former parallel-writer blocker is resolved only if WATCH-01 stacks on that accepted baseline or a later clean `dev` containing it.
+- Current `dev` does not contain `a2edfb6`; Team 00 should not start WATCH-01 from current plain `dev`.
+- Base recommendation: create the future WATCH-01 branch/worktree from `a2edfb6` if Team 00 promotes before integration, or from a later clean `dev` after Team 00 confirms `a2edfb6` is an ancestor.
 - This packet should not be folded into `CF-W1-L3-PORT-01B`. Readiness DTOs and review actionability are different contracts and should stay independently reviewable.
 - If implementation later needs persisted actionability, alert creation, portfolio linkage, readiness gating, or shared UI extraction, that is a separate child packet and out of scope here.
 
@@ -215,12 +227,12 @@ Minimum focused scenarios:
 
 ## Readiness Result
 
-Architecture packet prepared.
+Architecture packet refreshed after PORT-01B acceptance.
 
 Result:
 
 - first slice can stay module-local and bounded;
-- first slice should be a watchlist-owned vertical slice, not a readiness DTO child;
+- first slice should be a watchlist-owned frontend/backend vertical slice, not a readiness DTO child;
 - no Prisma/schema, route-registry, shared utility/UI, package, generated, provider/startup, live-provider, paid/cloud, telemetry, or broker scope is required;
-- Team 04 QA planning can start now;
-- app-code readiness still depends on Team 00 sequencing because `CF-W1-L3-PORT-01B` is a direct one-writer-per-file conflict on the watchlist backend surfaces.
+- Team 04 QA planning already exists and remains usable;
+- app-code readiness depends on Team 00 sequencing and a safe base: `a2edfb6` or later clean `dev` containing it.

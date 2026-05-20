@@ -146,3 +146,70 @@ Split required.
 - Module-local first slice feasible: yes.
 - Ready recommendation for the parent as written: no.
 - Current recommendation to Team 00: route the bounded first child to Team 04 QA planning, keep the broader parent blocked until DQE read-side/public-contract scope is intentionally approved.
+
+## 2026-05-20 Residual Parent Revalidation After Accepted `CF-W1-DQ-02A`
+
+Residual review against the accepted parked branch commit `c2d6753` (`codex/team05-market-data/CF-W1-DQ-02A`) confirms that `CF-W1-DQ-02A` should not be duplicated and that no honest `CF-W1-DQ-02B` exists inside a no-schema, no-route, no-repository boundary.
+
+### Additional Evidence Inspected
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/ready-for-implementation.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/team-agent-runtime-queue.md`
+- accepted branch evidence via `git show --stat --oneline c2d6753`
+- accepted branch application/docs state via:
+  - `git show c2d6753:backend/src/modules/data-quality-engine/data-quality-engine.service.ts`
+  - `git show c2d6753:backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
+  - `git show c2d6753:backend/src/modules/data-quality-engine/data-quality-engine.md`
+  - `git show c2d6753:docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-DQ-02A-developer-handoff.md`
+  - `git show c2d6753:docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-DQ-02A-qa-verification.md`
+  - `git show c2d6753:docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-DQ-02A-code-review.md`
+  - `git show c2d6753:docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-DQ-02A-architect-signoff.md`
+  - `git show c2d6753:docs/execution/codex-parallel-execution-plan-2026-05-16/09-summaries/CF-W1-DQ-02A-po-acceptance-packet.md`
+- current shared-branch source:
+  - `backend/src/modules/data-quality-engine/data-quality-engine.service.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.repository.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.controller.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.router.ts`
+
+### Residual Findings
+
+- `c2d6753` only touched the approved DQE service/types/doc/test writer set plus execution-plan evidence docs. The accepted child boundary held exactly.
+- On the accepted branch, additive `currentness` exists only on service-evaluated payloads. Persisted DQE read paths still reconstruct DTOs from repository rows that store blocker/gap arrays, not durable session-aware currentness fields.
+- `summary()` still aggregates stale/missing counts from persisted `dataGaps`; it cannot expose currentness status/reason/date breakdowns without read-side widening.
+- `list()`, `getLatestEvaluationForInstrument()`, and `getEvaluationsForInstruments()` still return repository projections. `diagnostics()` returns the persisted repository row whenever one already exists, so accepted `currentness` is not consistently visible on the investor-facing diagnostics path after the first persisted evaluation.
+- A service-only workaround would either:
+  - fabricate partial read-time currentness on selected endpoints while leaving list/summary projections inconsistent, or
+  - refetch Market Data per persisted row and create a second live read-path contract that is not durably represented in DQE storage.
+
+### Residual Decision
+
+`BLOCKED`
+
+No honest `READY-CANDIDATE` child exists inside a no-schema, no-route, no-repository boundary after accepted `CF-W1-DQ-02A`.
+
+Why:
+
+1. The remaining value is read-side/public-contract value, not more service-local classification.
+2. Direct investor/trader trust requires currentness to be consistent on persisted diagnostics/list/summary surfaces, not only on freshly evaluated payloads.
+3. Any bounded child that avoids repository scope would create selective exposure, duplicated fetch behavior, or misleading confidence about what persisted DQ rows actually know.
+
+### Exact Consent Gate Required For Any Real Follow-up
+
+Team 00 must explicitly authorize a DQE read-side/public-contract packet stacked on accepted commit `c2d6753`, with at least:
+
+- `backend/src/modules/data-quality-engine/data-quality-engine.repository.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.service.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.md`
+- focused repository/service tests
+- controller/route-response test coverage if existing HTTP responses (`summary`, `list`, `diagnostics`) become additively currentness-aware
+
+If Team 00 wants durable replayable currentness dates/reason codes rather than read-time reconstruction from blocker strings, the packet must stop and request separate Prisma/schema approval before implementation.
+
+### Parallel-Safety Result
+
+This residual parent is not parallel-safe for a new implementation child under the current no-schema/no-route/no-repository constraint.
+
+- Safe now: docs-only architecture/outbox updates.
+- Unsafe without consent: any implementation that touches DQE persisted read paths or promises investor-facing currentness on existing API responses.

@@ -47,6 +47,8 @@ Approved policy:
 
 Keep this requirement ahead of watchlist-actionability, concentration-review, and workbench convenience slices. It is a correctness and user-safety gate, not a cosmetic refinement.
 
+It should also stay ahead of durable research-memory storage follow-ons because unready data leaking into action-like trader surfaces is a correctness failure, not a retention or convenience choice.
+
 ## Candidate Acceptance Criteria
 
 Future accepted implementation must satisfy all approved contract details, including:

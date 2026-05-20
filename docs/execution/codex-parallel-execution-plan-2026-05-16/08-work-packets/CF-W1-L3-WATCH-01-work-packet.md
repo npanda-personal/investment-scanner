@@ -8,9 +8,11 @@ Watchlist review actionability and explainable review-priority ordering.
 
 ## State
 
-Architecture packet prepared. Not Ready for Implementation.
+Architecture packet refreshed after accepted `CF-W1-L3-PORT-01B` evidence. READY-CANDIDATE for Team 00 sequencing.
 
-This is a bounded watchlist-owned vertical slice. It stays inside the watchlist backend module, watchlist frontend feature, module docs, and focused module/UI tests.
+This is a bounded watchlist-owned frontend/backend vertical slice. It stays inside the watchlist backend module, watchlist frontend feature, module docs, and focused module/UI tests.
+
+Base requirement: implement only from accepted `CF-W1-L3-PORT-01B` commit `a2edfb6` or a later clean `dev` after Team 00 confirms `a2edfb6` is an ancestor. Current `dev` at refresh time does not contain `a2edfb6`, so current unstacked `dev` is not a safe implementation base.
 
 ## Owner / Lane / Modules
 
@@ -54,6 +56,8 @@ This is a bounded watchlist-owned vertical slice. It stays inside the watchlist 
 - generated files
 - provider/startup/backfill/live-provider scope
 - paid/cloud, telemetry, broker, or automation flows
+- implementation from current unstacked `dev` while it lacks accepted `a2edfb6`
+- Research Hub source/UI files, including current unrelated dirty Research Hub changes
 
 ## Required Behavior
 
@@ -62,6 +66,7 @@ Future implementation must:
 - add additive review-actionability fields to watchlist item and watchlist detail DTOs;
 - derive actionability from existing watchlist enrichment fields only;
 - add additive `reviewPriorityDesc` backend sorting;
+- preserve accepted `PORT-01B` `readiness` and `readinessSummary` fields when stacked on `a2edfb6`;
 - keep existing sort options and parser fallback behavior;
 - keep notes/tags editing behavior unchanged;
 - show actionability on the existing watchlist detail page without changing routes or shared UI;
@@ -69,13 +74,14 @@ Future implementation must:
 
 ## Sequencing Rule
 
-Do not promote or implement this packet in parallel with:
+The prior no-parallel blocker with `CF-W1-L3-PORT-01B` is cleared only by accepted/stable commit `a2edfb6`.
 
-- `CF-W1-L3-PORT-01B`
+Team 00 base recommendation:
 
-Reason:
+- If WATCH-01 is promoted before `a2edfb6` is integrated into `dev`, create the implementation branch/worktree from `a2edfb6`.
+- If Team 00 first integrates `a2edfb6` into `dev`, create the implementation branch/worktree from that later clean `dev`.
 
-- both packets need `watchlist-management.service.ts`, `watchlist-management.types.ts`, `watchlist-management.md`, and focused watchlist backend tests.
+Do not promote or implement from current unstacked `dev` while it lacks `a2edfb6`.
 
 No active Today Review conflict exists. `CF-W1-L3-TREV-01` uses different module and feature files.
 
@@ -124,9 +130,9 @@ Stop and return to Team 00 / Architect if implementation requires:
 ## Notes For Team 00
 
 - This packet is bounded enough for Team 04 QA planning now.
-- It should stay separate from `CF-W1-L3-PORT-01B`; the two packets solve different problems even though they share watchlist backend files.
-- If Team 00 later promotes this packet, use a dedicated Team 07 worktree because the shared `dev` workspace is dirty and this packet has no overlap advantage from staying in the main worktree.
+- It should stay separate from `CF-W1-L3-PORT-01B`; the two packets solve different problems even though WATCH-01 must preserve accepted `PORT-01B` fields.
+- If Team 00 later promotes this packet, use a dedicated Team 07 worktree from `a2edfb6` or later clean `dev` containing it because the shared `dev` workspace is dirty and has unrelated Research Hub app-code changes.
 
 ## Next Gate
 
-Team 04 QA planning, then Team 00 sequencing and Ready evaluation. Team 03 does not promote it to Ready.
+Team 00 sequencing and Ready evaluation. Team 04 QA planning already exists. Team 03 does not self-promote it to Ready.
