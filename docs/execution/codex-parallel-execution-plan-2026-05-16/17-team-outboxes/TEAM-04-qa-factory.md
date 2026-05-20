@@ -4,6 +4,72 @@ Date: 2026-05-18
 
 Mode: focused QA rerun plus docs-only QA planning.
 
+## 2026-05-20 `CF-W1-STRAT-04` / `CF-W1-SQLAB-03` QA Planning
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only QA packet preparation
+- Work items:
+  - `CF-W1-STRAT-04` - strategy evidence freshness and stale-summary labels
+  - `CF-W1-SQLAB-03` - signal quality review-loop actionability for noisy and limited outcomes
+- State/mode: QA planning only; no executable validation
+- Owner: Team 04 QA Factory
+- Lane/module:
+  - `strategy-framework`
+  - `signal-quality-lab`
+- Files changed:
+  - `04-qa/CF-W1-STRAT-04-qa-plan.md`
+  - `04-qa/CF-W1-SQLAB-03-qa-plan.md`
+  - `04-qa/next-validation-plans.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - `AGENTS.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/16-team-inboxes/TEAM-04-current-assignment.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-STRAT-04-strategy-evidence-freshness-and-stale-summary-labels-requirement.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-STRAT-04-architecture-review.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-STRAT-04-strategy-evidence-freshness-and-stale-summary-contract.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-STRAT-04-work-packet.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SQLAB-03-signal-quality-review-loop-actionability-for-noisy-and-limited-outcomes-requirement.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-SQLAB-03-architecture-review.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-SQLAB-03-signal-quality-review-loop-actionability-contract.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-SQLAB-03-work-packet.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-STRAT-03-qa-plan.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-SQLAB-02A-qa-plan.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/next-validation-plans.md`
+- Behavior changed:
+  - none; docs-only QA planning
+- Docs changed:
+  - prepared `04-qa/CF-W1-STRAT-04-qa-plan.md`
+  - prepared `04-qa/CF-W1-SQLAB-03-qa-plan.md`
+  - refreshed `04-qa/next-validation-plans.md`
+  - recorded this outbox entry
+- Contracts changed:
+  - none
+- Tests run:
+  - none
+- Tests skipped:
+  - all executable validation was skipped because this is a planning pass with no implementation handoff
+- Skipped-test reason:
+  - docs-only planning; the two children are not at executable QA yet
+- Assumptions:
+  - `CF-W1-STRAT-04` stays inside the owned `strategy-framework` service/types/docs/test plus feature-local UI files only
+  - `CF-W1-SQLAB-03` must stack behind accepted or committed `CF-W1-SQLAB-02A` work because the writer set overlaps
+  - current accepted local commit boundary for the overlapping `signal-quality-lab` writer set is `abac241 feat: add signal quality journal preview evidence`
+- Risks:
+  - implementers may widen either child into schema, route, shared UI, package, provider/live-data, or cross-module source changes
+  - `CF-W1-STRAT-04` could drift into strategy-math or proof-derivation rewrites if the freshness packet is not kept additive
+  - `CF-W1-SQLAB-03` could drift into durable journal persistence if the review-loop packet is widened
+- Blockers:
+  - `CF-W1-STRAT-04`: no implementation handoff exists yet; executable QA remains blocked until Team 00 promotes the bounded `strategy-framework` handoff
+  - `CF-W1-SQLAB-03`: sequencing blocker against `CF-W1-SQLAB-02A`; executable QA remains blocked until Team 00 clears the shared writer set and promotes the bounded `signal-quality-lab` handoff
+- Shared-file requests:
+  - none from Team 04
+- QA-ready for Team 00 Ready evaluation:
+  - `CF-W1-STRAT-04`: yes
+  - `CF-W1-SQLAB-03`: yes, but only after Team 00 sequences it behind `CF-W1-SQLAB-02A`
+- Next gate:
+  - Team 00 Ready evaluation for `CF-W1-STRAT-04`
+  - Team 00 sequencing decision for `CF-W1-SQLAB-03` after `CF-W1-SQLAB-02A`
+
 ## 2026-05-20 `CF-W1-MCTX-02` / `CF-W1-HCTX-03` / `CF-W1-DQ-03` QA Planning
 
 - Team: `TEAM-04` - QA Factory

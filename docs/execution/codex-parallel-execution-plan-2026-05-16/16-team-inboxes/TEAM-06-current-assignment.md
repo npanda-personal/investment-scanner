@@ -1,5 +1,61 @@
 # TEAM-06 Current Assignment
 
+Date: 2026-05-20
+
+## Latest Assignment Override
+
+Team 06 has two independent active implementation assignments. They may run in parallel because their write scopes are disjoint.
+
+### `CF-W1-STRAT-04`
+
+- Branch: `codex/team06-strategy-signal/CF-W1-STRAT-04`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-STRAT-04`
+- Base commit: `359d0a3 feat: add strategy trust metadata`
+- Scope: Strategy Framework evidence freshness and stale-summary labels.
+
+Allowed files:
+
+- `backend/src/modules/strategy-framework/strategy-framework.service.ts`
+- `backend/src/modules/strategy-framework/strategy-framework.types.ts`
+- `backend/src/modules/strategy-framework/strategy-framework.md`
+- `backend/tests/modules/strategy-framework/strategy-framework.service.test.ts`
+- `frontend/src/features/strategy-framework/types.ts`
+- `frontend/src/features/strategy-framework/components/StrategyFrameworkPage.tsx`
+- `frontend/tests/ui/strategy-framework.spec.ts`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-CF-W1-STRAT-04-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-STRAT-04-developer-handoff.md`
+
+### `CF-W1-SQLAB-03`
+
+- Branch: `codex/team06-strategy-signal/CF-W1-SQLAB-03`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-SQLAB-03`
+- Base commit: `abac241 feat: add signal quality journal preview evidence`
+- Scope: Signal Quality review-loop actionability for noisy and limited outcomes.
+
+Allowed files:
+
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.service.ts`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.types.ts`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.md`
+- `backend/tests/modules/signal-quality-lab/signal-quality-lab.service.test.ts`
+- `frontend/src/features/signal-quality-lab/types.ts`
+- `frontend/src/features/signal-quality-lab/components/SignalQualityLabPage.tsx`
+- `frontend/tests/ui/signal-quality-lab.spec.ts`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-CF-W1-SQLAB-03-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-SQLAB-03-developer-handoff.md`
+
+Forbidden for both assignments:
+
+- Prisma schema/migrations, generated files, package manifests
+- backend/frontend route registries
+- shared backend utilities or shared frontend components
+- provider/live-data, startup/backfill, paid/cloud, broker, or telemetry scope
+- cross-module source/test edits outside each assignment's file set
+
+Product Owner action required: no.
+
+---
+
 Date: 2026-05-18
 
 Team: TEAM-06 - Strategy / Signal / Risk

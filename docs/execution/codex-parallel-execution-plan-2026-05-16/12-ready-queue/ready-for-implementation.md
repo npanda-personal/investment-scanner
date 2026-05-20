@@ -8,6 +8,88 @@ No available application-code item is currently waiting unassigned in Ready.
 
 2026-05-20 Team 00 Ready promotion:
 
+- `CF-W1-STRAT-04` is promoted and assigned to Team 06 as a bounded no-schema/no-route/no-shared-file Strategy Framework evidence-freshness and stale-summary implementation.
+- Team 00 sequencing decision: implement `STRAT-04` on accepted Strategy Framework baseline `359d0a3 feat: add strategy trust metadata`.
+- Parallel-safety decision: `STRAT-04` can run in parallel with `SQLAB-03`, `TREV-02`, and `HCTX-03` because file scopes are disjoint.
+- Branch: `codex/team06-strategy-signal/CF-W1-STRAT-04`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-STRAT-04`
+- Base: `359d0a3 feat: add strategy trust metadata`
+- Allowed implementation files:
+  - `backend/src/modules/strategy-framework/strategy-framework.service.ts`
+  - `backend/src/modules/strategy-framework/strategy-framework.types.ts`
+  - `backend/src/modules/strategy-framework/strategy-framework.md`
+  - `backend/tests/modules/strategy-framework/strategy-framework.service.test.ts`
+  - `frontend/src/features/strategy-framework/types.ts`
+  - `frontend/src/features/strategy-framework/components/StrategyFrameworkPage.tsx`
+  - `frontend/tests/ui/strategy-framework.spec.ts`
+- Allowed branch-local evidence docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-CF-W1-STRAT-04-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-STRAT-04-developer-handoff.md`
+- Required developer validation:
+  - `cd backend && npm.cmd test -- strategy-framework.service.test.ts --runInBand`
+  - `cd backend && npm.cmd run build`
+  - `cd frontend && npm.cmd run build`
+  - `cd frontend && npm.cmd run test:ui -- strategy-framework.spec.ts --workers=1`
+- Forbidden scope:
+  - `backend/src/modules/strategy-framework/strategy-framework.repository.ts`
+  - `backend/src/modules/strategy-framework/strategy-framework.evaluator.ts`
+  - `backend/src/modules/strategy-framework/strategy-framework.registry.ts`
+  - `backend/src/modules/strategy-framework/strategy-framework.controller.ts`
+  - `backend/src/modules/strategy-framework/strategy-framework.router.ts`
+  - `backend/src/modules/strategy-framework/strategy-framework.validation.ts`
+  - `backend/src/modules/strategy-framework/index.ts`
+  - repository or evaluator tests
+  - `frontend/src/features/strategy-framework/api/strategyFrameworkApi.ts`
+  - `frontend/src/features/strategy-framework/routes.tsx`
+  - all `backtesting-strategy-lab` source/tests
+  - Prisma schema or migrations
+  - backend/frontend route registries
+  - shared backend utilities or shared frontend components
+  - package manifests, generated files, provider/live-data, startup/backfill, paid/cloud, broker, or telemetry scope
+- Stop if implementation needs any forbidden file or changes strategy math, proof derivation, rating logic, route contracts, shared UI, schema, provider/live flow, or Backtesting Strategy Lab source.
+
+2026-05-20 Team 00 Ready promotion:
+
+- `CF-W1-SQLAB-03` is promoted and assigned to Team 06 as a bounded no-schema/no-route/no-shared-file Signal Quality Lab review-loop actionability implementation.
+- Team 00 sequencing decision: implement `SQLAB-03` on accepted `CF-W1-SQLAB-02A` baseline `abac241 feat: add signal quality journal preview evidence`, because both slices reserve the same Signal Quality Lab writer set and `SQLAB-02A` is not merged into plain `dev`.
+- Parallel-safety decision: `SQLAB-03` can run in parallel with `STRAT-04`, `TREV-02`, and `HCTX-03` because file scopes are disjoint.
+- Branch: `codex/team06-strategy-signal/CF-W1-SQLAB-03`
+- Worktree: `../investment-scanner-worktrees/team06-CF-W1-SQLAB-03`
+- Base: `abac241 feat: add signal quality journal preview evidence`
+- Allowed implementation files:
+  - `backend/src/modules/signal-quality-lab/signal-quality-lab.service.ts`
+  - `backend/src/modules/signal-quality-lab/signal-quality-lab.types.ts`
+  - `backend/src/modules/signal-quality-lab/signal-quality-lab.md`
+  - `backend/tests/modules/signal-quality-lab/signal-quality-lab.service.test.ts`
+  - `frontend/src/features/signal-quality-lab/types.ts`
+  - `frontend/src/features/signal-quality-lab/components/SignalQualityLabPage.tsx`
+  - `frontend/tests/ui/signal-quality-lab.spec.ts`
+- Allowed branch-local evidence docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-CF-W1-SQLAB-03-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-SQLAB-03-developer-handoff.md`
+- Required developer validation:
+  - `cd backend && npm.cmd test -- signal-quality-lab.service.test.ts --runInBand`
+  - `cd backend && npm.cmd run build`
+  - `cd frontend && npm.cmd run build`
+  - `cd frontend && npm.cmd run test:ui -- signal-quality-lab.spec.ts --workers=1`
+- Forbidden scope:
+  - Prisma schema or migrations
+  - generated files
+  - `backend/src/modules/signal-quality-lab/signal-quality-lab.repository.ts`
+  - `backend/src/modules/signal-quality-lab/signal-quality-lab.controller.ts`
+  - `backend/src/modules/signal-quality-lab/signal-quality-lab.router.ts`
+  - `backend/src/modules/signal-quality-lab/signal-quality-lab.validation.ts`
+  - `backend/tests/modules/signal-quality-lab/signal-quality-lab.routes.test.ts`
+  - `backend/tests/modules/signal-quality-lab/signal-quality-lab.validation.test.ts`
+  - `frontend/src/features/signal-quality-lab/api/signalQualityLabService.ts`
+  - Signal Generation, Signal Calibration, Trade Plan, or Today Review source/tests
+  - backend/frontend route registries
+  - shared backend utilities or shared frontend components
+  - package manifests, provider/live-data, startup/backfill, paid/cloud, broker, or telemetry scope
+- Stop if implementation needs journal persistence, repository/schema/route/API/shared-file changes, downstream module rewrites, provider/live flow, or advice/target/automation wording.
+
+2026-05-20 Team 00 Ready promotion:
+
 - `CF-W1-HCTX-03` is promoted and assigned to Team 05 as a bounded backend-only Historical Context nearest-snapshot age/provenance implementation.
 - Team 00 sequencing decision: implement `HCTX-03` on accepted `CF-W1-HCTX-02` commit `f52c024`, because both slices reserve overlapping `historical-context-snapshots` service/types/doc/test files and `HCTX-02` is not merged into plain `dev`.
 - Parallel-safety decision: `HCTX-03` can run in parallel with active `TREV-02`, `SQLAB-02A`, and `MCTX-02` gates because file scopes are disjoint.

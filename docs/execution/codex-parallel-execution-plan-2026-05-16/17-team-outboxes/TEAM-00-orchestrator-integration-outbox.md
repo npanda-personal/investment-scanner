@@ -3606,6 +3606,21 @@ Validation:
 
 Date: 2026-05-20
 
+Update:
+
+- `CF-W1-HCTX-03` Team 05 rework, Team 04 QA rerun, and Team 10 re-review accepted; Team 03 Architect Signoff launched as `019e44f3-96a7-74f1-8df9-34fff423f7c4`.
+- `CF-W1-L3-TREV-02` Team 04 QA rerun and Team 10 re-review accepted; Team 03 Architect Signoff launched as `019e44f5-1780-75c1-be9f-b841ff1a5b13`.
+- `CF-W1-STRAT-04` promoted to Team 06 implementation in `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-STRAT-04`.
+- `CF-W1-SQLAB-03` promoted to Team 06 implementation in `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-SQLAB-03`.
+- Main active-docs checkpoint created: `59a909e docs: checkpoint orchestrator factory state`.
+- `CF-W1-MCTX-02` delegated PO accepted and committed: `0c802c2 feat: add market context freshness basis`.
+- `CF-W1-SQLAB-02A` delegated PO accepted and committed: `abac241 feat: add signal quality journal preview evidence`.
+- Team 04 QA verification accepted `CF-W1-HCTX-03`; agent `019e44e4-f6b0-7b42-984a-776e63a9a4bc` closed.
+- Team 10 review rejected `CF-W1-HCTX-03` on aggregate provenance consistency; Team 05 bounded rework launched as `019e44ea-2264-7960-98ea-c3bd15bfe39f`.
+- Team 04 QA planning launched for `CF-W1-STRAT-04` and `CF-W1-SQLAB-03`: agent `019e44e5-4d6c-7692-b902-94d4d5eb1400`.
+- Team 07 completed `CF-W1-L3-TREV-02` rework; Team 04 QA re-verification launched as `019e44ea-9b62-76c2-9cd6-1b1d8f07a8bc`.
+- Main workspace remaining dirty scope is 4 Research Hub app-source files, not staged by Team 00.
+
 Branch: `dev`.
 
 Workspace inventory before checkpoint:

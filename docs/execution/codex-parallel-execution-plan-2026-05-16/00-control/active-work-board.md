@@ -73,6 +73,21 @@ Operating rules:
 
 Date: 2026-05-20
 
+Update:
+
+- `CF-W1-HCTX-03` Team 05 rework, Team 04 QA rerun, and Team 10 re-review accepted; Architect Signoff active as `019e44f3-96a7-74f1-8df9-34fff423f7c4`.
+- `CF-W1-L3-TREV-02` Team 04 QA rerun and Team 10 re-review accepted; Architect Signoff active as `019e44f5-1780-75c1-be9f-b841ff1a5b13`.
+- `CF-W1-STRAT-04` promoted to Team 06 implementation in `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-STRAT-04`, stacked on `359d0a3`.
+- `CF-W1-SQLAB-03` promoted to Team 06 implementation in `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-SQLAB-03`, stacked on `abac241`.
+- Active-docs checkpoint committed on `dev`: `59a909e docs: checkpoint orchestrator factory state`.
+- `CF-W1-MCTX-02` accepted and locally committed: `0c802c2 feat: add market context freshness basis`.
+- `CF-W1-SQLAB-02A` accepted and locally committed: `abac241 feat: add signal quality journal preview evidence`.
+- Main `dev` now has only 4 dirty paths, all pre-existing Research Hub app-source files.
+- Team 04 QA verification accepted `CF-W1-HCTX-03`.
+- Team 10 review rejected `CF-W1-HCTX-03` for internally inconsistent aggregate `lookupProvenance`; Team 05 bounded rework launched as `019e44ea-2264-7960-98ea-c3bd15bfe39f`.
+- Team 04 QA planning launched for `CF-W1-STRAT-04` and `CF-W1-SQLAB-03`.
+- Team 07 completed `CF-W1-L3-TREV-02` bounded rework; Team 04 QA re-verification launched as `019e44ea-9b62-76c2-9cd6-1b1d8f07a8bc`.
+
 Runtime state:
 
 - Branch: `dev`.

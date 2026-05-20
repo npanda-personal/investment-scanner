@@ -6,6 +6,106 @@ Date: 2026-05-20
 
 Date: 2026-05-20
 
+### Update - HCTX/TREV Signoff And STRAT/SQLAB Implementation
+
+Date: 2026-05-20
+
+Gate movement:
+
+- `CF-W1-HCTX-03`: Team 05 rework completed, Team 04 QA rerun accepted, Team 10 re-review accepted, Team 03 Architect Signoff launched as `019e44f3-96a7-74f1-8df9-34fff423f7c4`.
+- `CF-W1-L3-TREV-02`: Team 04 QA rerun passed after Team 07 rework, Team 10 re-review accepted, Team 03 Architect Signoff launched as `019e44f5-1780-75c1-be9f-b841ff1a5b13`.
+- `CF-W1-STRAT-04`: promoted to Team 06 implementation in `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-STRAT-04`, branch `codex/team06-strategy-signal/CF-W1-STRAT-04`, base `359d0a3`.
+- `CF-W1-SQLAB-03`: promoted to Team 06 implementation in `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-SQLAB-03`, branch `codex/team06-strategy-signal/CF-W1-SQLAB-03`, base `abac241`.
+
+Active agents:
+
+| Team | Agent | Work Item | Scope |
+| --- | --- | --- | --- |
+| Team 03 | `019e44f3-96a7-74f1-8df9-34fff423f7c4` | `CF-W1-HCTX-03` Architect Signoff | Team 05 HCTX-03 worktree only |
+| Team 03 | `019e44f5-1780-75c1-be9f-b841ff1a5b13` | `CF-W1-L3-TREV-02` Architect Signoff | Team 07 TREV-02 worktree only |
+| Team 06 | `019e44f2-b127-7d23-b1dc-422241e61fab` | `CF-W1-STRAT-04` implementation | Team 06 STRAT-04 worktree only |
+| Team 06 | `019e44f3-1852-7040-826a-d7ff78215cc7` | `CF-W1-SQLAB-03` implementation | Team 06 SQLAB-03 worktree only |
+
+Teams ready to pick up new tasks:
+
+- Team 03: HCTX-03 Architect Signoff is active.
+- Team 03: TREV-02 Architect Signoff is active.
+- Team 06: STRAT-04 implementation is active.
+- Team 06: SQLAB-03 implementation is active.
+- Team 04: ready for QA verification after STRAT-04 or SQLAB-03 handoff.
+- Team 00: delegated PO acceptance and scoped branch commits after HCTX/TREV signoff if accepted.
+
+### Update - Scoped Commits And QA Routing
+
+Date: 2026-05-20
+
+Scoped commits created:
+
+- Main `dev` active-docs checkpoint: `59a909e docs: checkpoint orchestrator factory state`.
+- `CF-W1-MCTX-02` branch commit: `0c802c2 feat: add market context freshness basis`.
+- `CF-W1-SQLAB-02A` branch commit: `abac241 feat: add signal quality journal preview evidence`.
+
+Workspace state after docs checkpoint:
+
+- Main `dev` dirty paths dropped from 154 to 4.
+- Remaining dirty paths are pre-existing Research Hub app-source files only:
+  - `backend/src/modules/research-hub/research-hub.service.ts`
+  - `backend/src/modules/research-hub/research-hub.types.ts`
+  - `frontend/src/features/research-hub/api/researchHubApi.ts`
+  - `frontend/src/features/research-hub/components/ResearchOverviewPage.tsx`
+- Team 00 did not stage, commit, revert, or edit those Research Hub files.
+
+New active agents:
+
+| Team | Agent | Work Item | Scope |
+| --- | --- | --- | --- |
+| Team 04 | `019e44e5-4d6c-7692-b902-94d4d5eb1400` | `CF-W1-STRAT-04` / `CF-W1-SQLAB-03` QA planning | Main active docs only |
+| Team 10 | `019e44e7-31e3-75b1-87c7-9ce118c3cabb` | `CF-W1-HCTX-03` review after QA ACCEPT | Team 05 HCTX-03 worktree only |
+
+Completed gate update:
+
+- Team 04 QA verification for `CF-W1-HCTX-03`: `ACCEPT`.
+- Team 04 QA agent `019e44e4-f6b0-7b42-984a-776e63a9a4bc` closed.
+- Team 10 review for `CF-W1-HCTX-03` launched as `019e44e7-31e3-75b1-87c7-9ce118c3cabb`.
+
+Teams ready to pick up new tasks:
+
+- Team 10: `CF-W1-HCTX-03` review is active.
+- Team 04: `CF-W1-STRAT-04` and `CF-W1-SQLAB-03` QA planning is active.
+- Team 03: ready for `CF-W1-HCTX-03` Architect Signoff if Team 10 accepts.
+- Team 04: `CF-W1-L3-TREV-02` QA re-verification is active after Team 07 rework.
+- Team 05: `CF-W1-HCTX-03` bounded rework is active after Team 10 rejection.
+- Team 02: rolling requirement pass is ready after current QA/review pressure drops, with mandatory root `AGENTS.md` intake.
+
+### Update - HCTX Reject And TREV QA Rerun
+
+Date: 2026-05-20
+
+Gate movement:
+
+- Team 10 rejected `CF-W1-HCTX-03` because aggregate `lookupProvenance` mixed newest `selectedDate` with stalest `lagDays`.
+- Team 05 bounded rework launched for `CF-W1-HCTX-03`: `019e44ea-2264-7960-98ea-c3bd15bfe39f`.
+- Team 07 completed `CF-W1-L3-TREV-02` bounded rework for the prior Team 10 rejection.
+- Team 07 rework agent `019e44dc-48ab-7713-ac26-81c1f01093e0` closed.
+- Team 04 QA re-verification launched for `CF-W1-L3-TREV-02`: `019e44ea-9b62-76c2-9cd6-1b1d8f07a8bc`.
+
+Active agents now:
+
+| Team | Agent | Work Item | Scope |
+| --- | --- | --- | --- |
+| Team 04 | `019e44e5-4d6c-7692-b902-94d4d5eb1400` | `CF-W1-STRAT-04` / `CF-W1-SQLAB-03` QA planning | Main active docs only |
+| Team 05 | `019e44ea-2264-7960-98ea-c3bd15bfe39f` | `CF-W1-HCTX-03` rejection rework | Team 05 HCTX-03 worktree only |
+| Team 04 | `019e44ea-9b62-76c2-9cd6-1b1d8f07a8bc` | `CF-W1-L3-TREV-02` QA re-verification | Team 07 TREV-02 worktree only |
+
+Teams ready to pick up new tasks:
+
+- Team 04: `CF-W1-L3-TREV-02` QA re-verification is active.
+- Team 05: `CF-W1-HCTX-03` bounded rework is active.
+- Team 04: `CF-W1-STRAT-04` / `CF-W1-SQLAB-03` QA planning is active.
+- Team 10: ready for TREV re-review if QA accepts.
+- Team 04: ready for HCTX QA rerun after Team 05 rework.
+- Team 02: next rolling direct-value requirement pass after current gate pressure drops.
+
 Trigger: Product Owner observed a large unstaged-change count and asked why docs were not being committed.
 
 Current git state:

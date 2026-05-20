@@ -8,6 +8,60 @@ Owner: Team 00 - Master Orchestrator / Integration
 
 Date: 2026-05-20
 
+### Update - HCTX/TREV Signoff And STRAT/SQLAB Implementation
+
+Date: 2026-05-20
+
+Current active agents:
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 03 - Architect Signoff | `019e44f3-96a7-74f1-8df9-34fff423f7c4` | `gpt-5.4`, medium | signoff | `CF-W1-HCTX-03` after Team 10 ACCEPT | active |
+| 2 | Team 03 - Architect Signoff | `019e44f5-1780-75c1-be9f-b841ff1a5b13` | `gpt-5.4`, medium | signoff | `CF-W1-L3-TREV-02` after Team 10 ACCEPT | active |
+| 3 | Team 06 - Strategy / Signal / Risk | `019e44f2-b127-7d23-b1dc-422241e61fab` | `gpt-5.3-codex`, high | implementation | `CF-W1-STRAT-04` | active |
+| 4 | Team 06 - Strategy / Signal / Risk | `019e44f3-1852-7040-826a-d7ff78215cc7` | `gpt-5.3-codex`, high | implementation | `CF-W1-SQLAB-03` | active |
+| 5 | Open slot | none | pending | QA verification | `STRAT-04` or `SQLAB-03` after handoff | ready |
+| 6 | Open slot | none | pending | acceptance/commit or requirements | HCTX/TREV next gate or Team 02 | ready |
+
+Teams ready to pick up new tasks:
+
+- Team 03: `CF-W1-HCTX-03` Architect Signoff is active.
+- Team 03: `CF-W1-L3-TREV-02` Architect Signoff is active.
+- Team 06: `CF-W1-STRAT-04` implementation is active.
+- Team 06: `CF-W1-SQLAB-03` implementation is active.
+- Team 04: ready for QA verification after `STRAT-04` or `SQLAB-03` developer handoff.
+- Team 02: ready for rolling direct-value requirements after active gate pressure drops; must read root `AGENTS.md`.
+
+### Update - Scoped Commits And Active QA Agents
+
+Date: 2026-05-20
+
+Committed checkpoints:
+
+- Main `dev`: `59a909e docs: checkpoint orchestrator factory state`.
+- `codex/team05-market-data/CF-W1-MCTX-02`: `0c802c2 feat: add market context freshness basis`.
+- `codex/team06-strategy-signal/CF-W1-SQLAB-02A`: `abac241 feat: add signal quality journal preview evidence`.
+
+Active agents:
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | `019e44ea-9b62-76c2-9cd6-1b1d8f07a8bc` | `gpt-5.4-mini`, medium | QA re-verification | `CF-W1-L3-TREV-02` after Team 07 rework | active |
+| 2 | Team 05 - Market Data / Data Quality | `019e44ea-2264-7960-98ea-c3bd15bfe39f` | `gpt-5.3-codex`, high | bounded rework | `CF-W1-HCTX-03` after Team 10 rejection | active |
+| 3 | Team 04 - QA Factory | `019e44e5-4d6c-7692-b902-94d4d5eb1400` | `gpt-5.4-mini`, medium | QA planning | `CF-W1-STRAT-04` and `CF-W1-SQLAB-03` | active |
+| 4 | Open slot | none | pending | review | Team 10 after TREV-02 QA acceptance | ready |
+| 5 | Open slot | none | pending | QA/review/signoff | HCTX-03 after Team 05 rework | ready |
+| 6 | Open slot | none | pending | requirements/audit | Team 02 or Team 01 next direct-value cycle | ready |
+
+Teams ready to pick up new tasks:
+
+- Team 04: `CF-W1-L3-TREV-02` QA re-verification is active.
+- Team 05: `CF-W1-HCTX-03` bounded rework is active after Team 10 rejection.
+- Team 04: `CF-W1-STRAT-04` / `CF-W1-SQLAB-03` QA planning is active.
+- Team 10: ready for TREV-02 review if QA accepts.
+- Team 04: ready for HCTX-03 QA rerun after Team 05 rework.
+- Team 02: ready for rolling direct-value requirements after active gate pressure drops; must read root `AGENTS.md`.
+
 Checkpoint basis:
 
 - Branch: `dev`.
