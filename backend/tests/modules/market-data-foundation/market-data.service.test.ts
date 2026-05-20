@@ -347,7 +347,7 @@ describe('MarketDataFoundationService syncV1', () => {
             id: 'future-1',
             symbol: 'NIFTY26MAYFUT',
             name: 'Nifty Future',
-            assetType: 'EQUITY',
+            assetType: 'FUTURE',
           },
           {
             ...stock,
@@ -6123,7 +6123,11 @@ describe('MarketDataFoundationService operational repair run', () => {
       actions: ['CATALOG_IDENTITY_REPAIR'],
     });
 
-    expect(catalogSpy).toHaveBeenCalledWith(expect.objectContaining({ offset: 100 }), expect.objectContaining({ sourceFingerprint: 'catalog-same' }));
+    expect(catalogSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ offset: 100 }),
+      expect.objectContaining({ sourceFingerprint: 'catalog-same' }),
+      expect.objectContaining({ actionableOnly: true })
+    );
   });
 
   it('resets catalog source-list offset when configured URL content fingerprint changes', async () => {
@@ -6166,7 +6170,11 @@ describe('MarketDataFoundationService operational repair run', () => {
       catalogSource: 'BSE_EQUITY_SECURITIES',
     });
 
-    expect(catalogSpy).toHaveBeenCalledWith(expect.objectContaining({ offset: 0 }), expect.objectContaining({ sourceFingerprint: 'catalog-new' }));
+    expect(catalogSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ offset: 0 }),
+      expect.objectContaining({ sourceFingerprint: 'catalog-new' }),
+      expect.objectContaining({ actionableOnly: true })
+    );
     expect(result.actions[0].warnings.join(' ')).toContain('Source changed; restart from offset 0');
   });
 
