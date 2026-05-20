@@ -157,6 +157,25 @@ Next coordination actions:
 
 Product Owner action required: no.
 
+## Rolling Lane Relaunch
+
+Date: 2026-05-20
+
+- Team 02 PO/Requirement Factory relaunched as `019e4500-2a11-7b12-a23b-3078f82e0a05` for rolling direct investor/trader-value discovery.
+- Team 03 Architecture Factory relaunched as `019e4500-5703-7f52-8c03-dd3dadcf7d50` for rolling architecture/signoff prep.
+- Both assignments explicitly require reading root `AGENTS.md` before producing requirements or architecture docs.
+- Active pool is now four agents: Team 06 `STRAT-04`, Team 06 `SQLAB-03`, Team 02 requirements, and Team 03 architecture.
+- Two slots remain available for Team 04 QA and Team 10 review when implementation handoffs arrive.
+
+Teams ready to pick up new tasks:
+
+- Team 06: active `STRAT-04`.
+- Team 06: active `SQLAB-03`.
+- Team 02: active rolling PO/requirements discovery.
+- Team 03: active rolling architecture/signoff prep.
+- Team 04: queued for next QA verification.
+- Team 10: queued for next review.
+
 ---
 
 Date: 2026-05-19

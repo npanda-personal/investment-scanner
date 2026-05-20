@@ -240,6 +240,28 @@ Date: 2026-05-20
 - Team 03: pick up Architect Signoff after Team 10 acceptance.
 - Team 02: pick up rolling requirements discovery when Team 00 frees a slot.
 
+## Relaunch Update
+
+Date: 2026-05-20
+
+| Slot | Team | Agent | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Team 06 - Strategy / Signal / Risk | `019e44f2-b127-7d23-b1dc-422241e61fab` | implementation | `CF-W1-STRAT-04` | active |
+| 2 | Team 06 - Strategy / Signal / Risk | `019e44f3-1852-7040-826a-d7ff78215cc7` | implementation | `CF-W1-SQLAB-03` | active |
+| 3 | Team 02 - PO + Requirement Factory | `019e4500-2a11-7b12-a23b-3078f82e0a05` | rolling requirements discovery | next direct investor/trader-value candidates | active |
+| 4 | Team 03 - Architecture Factory | `019e4500-5703-7f52-8c03-dd3dadcf7d50` | rolling architecture/signoff prep | highest-value unassigned candidates or pending signoff | active |
+| 5 | Open slot | none | queued QA | Team 04 QA verification for next handoff | waiting |
+| 6 | Open slot | none | queued review/signoff | Team 10 review or Team 03 signoff after QA/review acceptance | waiting |
+
+Teams ready to pick up new tasks:
+
+- Team 06: continue active `STRAT-04` implementation.
+- Team 06: continue active `SQLAB-03` implementation.
+- Team 02: active rolling PO/requirements discovery, with root `AGENTS.md` read requirement in the assignment.
+- Team 03: active rolling architecture/signoff preparation, with root `AGENTS.md` read requirement in the assignment.
+- Team 04: ready for the next QA verification handoff.
+- Team 10: ready for the next QA-accepted review handoff.
+
 ## Latest Active Snapshot - Laptop Restart Recovery RH-03 Wave
 
 Date: 2026-05-19

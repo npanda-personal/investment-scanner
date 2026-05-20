@@ -228,6 +228,27 @@ Teams ready to pick up new tasks:
 
 Product Owner action required: no.
 
+## Active Agent Relaunch
+
+Date: 2026-05-20
+
+- Spawned Team 02 PO/Requirement Factory: `019e4500-2a11-7b12-a23b-3078f82e0a05`.
+- Spawned Team 03 Architecture Factory: `019e4500-5703-7f52-8c03-dd3dadcf7d50`.
+- Both prompts require reading root `AGENTS.md`.
+- Team 02 writes requirements/audit/outbox docs only.
+- Team 03 writes architecture/contracts/work-packets/outbox docs only.
+- Implementation remains with active Team 06 workers for `STRAT-04` and `SQLAB-03`.
+- Team 04 and Team 10 remain queued for QA/review gates.
+
+Teams ready to pick up new tasks:
+
+- Team 06: active implementation `STRAT-04`.
+- Team 06: active implementation `SQLAB-03`.
+- Team 02: active rolling requirements discovery.
+- Team 03: active rolling architecture/signoff prep.
+- Team 04: next QA handoff.
+- Team 10: next review handoff.
+
 ---
 
 # Team 00 Runtime Checkpoint
