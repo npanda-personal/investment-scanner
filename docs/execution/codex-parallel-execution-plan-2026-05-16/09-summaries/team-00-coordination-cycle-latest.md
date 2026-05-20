@@ -484,3 +484,47 @@ Product Owner action required: no.
 No open decisions.
 
 Daemon should continue autonomous work.
+
+---
+
+# Latest Active Snapshot
+
+Date: 2026-05-20
+
+## Dirty Workspace Reconciliation
+
+- Main `dev` docs checkpoint committed: `1c4cea6 docs: checkpoint rolling factory coordination`.
+- Main `dev` now has only four pre-existing Research Hub app-source edits unstaged:
+  - `backend/src/modules/research-hub/research-hub.service.ts`
+  - `backend/src/modules/research-hub/research-hub.types.ts`
+  - `frontend/src/features/research-hub/api/researchHubApi.ts`
+  - `frontend/src/features/research-hub/components/ResearchOverviewPage.tsx`
+- Team 00 did not stage, revert, or modify those Research Hub files.
+
+## Accepted Branch Commits Since Last Checkpoint
+
+- `CF-W1-HCTX-03`: accepted and locally committed on `codex/team05-market-data/CF-W1-HCTX-03` as `f6034c6 feat: add historical context lookup provenance`.
+- `CF-W1-L3-TREV-02`: accepted and locally committed on `codex/team07-portfolio-alerts/CF-W1-L3-TREV-02` as `f1de1d5 feat: add today review provenance traceability`.
+- `CF-W1-L3-TREV-02` worktree still contains untracked generated UI evidence under `frontend/test-results-team04/`; it was not committed.
+
+## Active Agents
+
+| Slot | Team | Agent | Work Item | Status |
+| --- | --- | --- | --- | --- |
+| 1 | Team 06 - Strategy / Signal / Risk | `019e44f2-b127-7d23-b1dc-422241e61fab` | `CF-W1-STRAT-04` implementation | active |
+| 2 | Team 06 - Strategy / Signal / Risk | `019e44f3-1852-7040-826a-d7ff78215cc7` | `CF-W1-SQLAB-03` implementation | active |
+| 3 | Open slot | none | Team 04 QA verification for `STRAT-04` after developer handoff | queued |
+| 4 | Open slot | none | Team 04 QA verification for `SQLAB-03` after developer handoff | queued |
+| 5 | Open slot | none | Team 10 review after QA acceptance | queued |
+| 6 | Open slot | none | Team 02 rolling PO/requirements discovery when gate pressure clears | queued |
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06: `CF-W1-STRAT-04` implementation is active.
+- Team 06: `CF-W1-SQLAB-03` implementation is active.
+- Team 04: ready to verify `STRAT-04` immediately after Team 06 handoff.
+- Team 04: ready to verify `SQLAB-03` immediately after Team 06 handoff.
+- Team 10: ready for review after Team 04 QA acceptance.
+- Team 02: ready for rolling direct investor/trader-value requirements discovery once a slot is available.
+
+Product Owner action required: no.

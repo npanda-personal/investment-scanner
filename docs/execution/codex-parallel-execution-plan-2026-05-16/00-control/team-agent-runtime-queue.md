@@ -209,6 +209,37 @@ Teams ready to pick up new tasks:
 
 Product Owner action required: no.
 
+---
+
+# Runtime Queue Snapshot
+
+Date: 2026-05-20
+
+## Active Subagent Pool
+
+| Slot | Team | Agent | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Team 06 - Strategy / Signal / Risk | `019e44f2-b127-7d23-b1dc-422241e61fab` | implementation | `CF-W1-STRAT-04` | active |
+| 2 | Team 06 - Strategy / Signal / Risk | `019e44f3-1852-7040-826a-d7ff78215cc7` | implementation | `CF-W1-SQLAB-03` | active |
+| 3 | Open slot | none | queued QA | Team 04 `CF-W1-STRAT-04` QA verification | waiting for handoff |
+| 4 | Open slot | none | queued QA | Team 04 `CF-W1-SQLAB-03` QA verification | waiting for handoff |
+| 5 | Open slot | none | queued review | Team 10 review | waiting for QA acceptance |
+| 6 | Open slot | none | queued PO/requirements | Team 02 rolling direct-value discovery | waiting for gate pressure to clear |
+
+## Recently Closed / Committed
+
+- `CF-W1-HCTX-03`: committed on branch `codex/team05-market-data/CF-W1-HCTX-03` as `f6034c6`.
+- `CF-W1-L3-TREV-02`: committed on branch `codex/team07-portfolio-alerts/CF-W1-L3-TREV-02` as `f1de1d5`.
+- Main active execution docs checkpoint: committed on `dev` as `1c4cea6`.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06: continue active `STRAT-04` and `SQLAB-03` implementation.
+- Team 04: pick up QA verification for whichever Team 06 handoff arrives first.
+- Team 10: pick up review after QA acceptance.
+- Team 03: pick up Architect Signoff after Team 10 acceptance.
+- Team 02: pick up rolling requirements discovery when Team 00 frees a slot.
+
 ## Latest Active Snapshot - Laptop Restart Recovery RH-03 Wave
 
 Date: 2026-05-19

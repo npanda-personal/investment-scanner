@@ -230,6 +230,41 @@ Product Owner action required: no.
 
 ---
 
+# Team 00 Runtime Checkpoint
+
+Date: 2026-05-20
+
+## Git / Dirty State
+
+- Main branch: `dev`.
+- Main docs checkpoint committed: `1c4cea6 docs: checkpoint rolling factory coordination`.
+- Main dirty files now limited to four pre-existing Research Hub app-source files; Team 00 did not touch or stage them.
+- `CF-W1-L3-TREV-02` accepted branch commit created: `f1de1d5 feat: add today review provenance traceability`.
+- `CF-W1-HCTX-03` accepted branch commit exists: `f6034c6 feat: add historical context lookup provenance`.
+- No push performed.
+
+## Current Routing
+
+- Team 06 active on `CF-W1-STRAT-04`.
+- Team 06 active on `CF-W1-SQLAB-03`.
+- Team 04 queued for QA verification when either implementation handoff arrives.
+- Team 10 queued for review after QA acceptance.
+- Team 03 queued for Architect Signoff after review acceptance.
+- Team 02 queued for rolling PO/requirements discovery when Team 00 can safely assign a slot.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06: active implementation for `STRAT-04`.
+- Team 06: active implementation for `SQLAB-03`.
+- Team 04: ready for next implementation QA handoff.
+- Team 10: ready for next QA-accepted review handoff.
+- Team 03: ready for next review-accepted signoff.
+- Team 02: ready for direct investor/trader-value requirement discovery when a slot opens.
+
+Product Owner action required: no.
+
+---
+
 ## Latest Runtime Checkpoint - MD-04 And HCTX-02 Implementation Active
 
 Date: 2026-05-19

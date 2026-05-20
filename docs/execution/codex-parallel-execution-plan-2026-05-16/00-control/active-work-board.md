@@ -330,6 +330,16 @@ Blocking gates:
 
 Old work items in `docs/codex-agent-team-plan/` may be used only as evidence or revalidation candidates. They are not active work.
 
+## Team 00 Checkpoint - 2026-05-20
+
+| ID | Work Item | Owner | State | Scope | Notes |
+|---|---|---|---|---|---|
+| CF-W1-HCTX-03 | Historical Context lookup provenance | Teams 05, 04, 10, 03, 00 | Committed on implementation branch | Team 05 HCTX worktree | QA, review, Architect Signoff, delegated PO acceptance, and scoped local commit `f6034c6` completed. No push or `dev` integration yet. |
+| CF-W1-L3-TREV-02 | Today Review provenance traceability | Teams 07, 04, 10, 03, 00 | Committed on implementation branch | Team 07 TREV worktree | QA rerun, re-review, Architect Signoff, delegated PO acceptance, and scoped local commit `f1de1d5` completed. Untracked generated `frontend/test-results-team04/` remains outside commit. |
+| ORCH-20260520-DOCS | Rolling factory docs checkpoint | Team 00 | Committed on `dev` | Active execution docs | Main docs checkpoint `1c4cea6` completed. Main dirty state is now limited to four pre-existing Research Hub app-source files. |
+| CF-W1-STRAT-04 | Strategy trust/readiness implementation | Team 06 | Active implementation | Dedicated Team 06 worktree | Team 04 QA is queued after handoff. |
+| CF-W1-SQLAB-03 | Signal Quality Lab implementation | Team 06 | Active implementation | Dedicated Team 06 worktree | Team 04 QA is queued after handoff. |
+
 ## Autonomous Orchestrator Setup
 
 | ID | Work Item | Owner | State | Scope | Notes |
