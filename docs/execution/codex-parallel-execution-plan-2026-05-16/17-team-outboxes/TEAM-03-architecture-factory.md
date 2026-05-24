@@ -1,5 +1,92 @@
 # Team 03 Architecture Factory Outbox
 
+## Team 03 Rolling Architecture Prep - BT-04 / TSC-02 - 2026-05-24
+
+Assignment: keep architecture moving on independent high-value items while Team 07 and Team 04 handle `CF-W1-TSC-01A-TREV`, using only reserved docs under the active execution folder and no application-code changes.
+
+Workspace state:
+
+- main workspace: `C:\work\repo\investment-scanner`
+- branch observed: `dev`
+- worktree state before edits: clean
+- open decisions: none
+
+Updated:
+
+- `03-architecture/CF-W1-BT-04-architecture-review.md`
+- `06-contracts/CF-W1-BT-04-backtesting-run-current-proof-freshness-contract.md`
+- `08-work-packets/CF-W1-BT-04-work-packet.md`
+- `03-architecture/CF-W1-TSC-02-architecture-review.md`
+- `06-contracts/CF-W1-TSC-02-active-signal-health-rule-evidence-contract.md`
+- `08-work-packets/CF-W1-TSC-02-work-packet.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Read-only evidence inspected:
+
+- root `AGENTS.md`
+- `10-requirements/next-top-10-candidates.md`
+- `10-requirements/CF-W1-BT-04-backtesting-run-freshness-and-current-proof-labels-requirement.md`
+- `10-requirements/CF-W1-TSC-02-active-signal-health-rule-evidence-requirement.md`
+- `12-ready-queue/ready-for-implementation.md`
+- `99-decision-inbox/open-decisions.md`
+- `03-architecture/CF-W1-TSC-01-architecture-review.md`
+- `03-architecture/CF-W1-TSC-01A-architecture-review.md`
+- `06-contracts/CF-W1-TSC-01-trusted-signal-candidate-contract.md`
+- `06-contracts/CF-W1-TSC-01A-trigger-evidence-adoption-contract.md`
+- `06-contracts/CF-W1-DQ-03-data-quality-residual-reason-summary-contract.md`
+- `06-contracts/CF-W1-SIG-TRIGGER-ENTRY-01-rule-trigger-entry-price-evidence-contract.md`
+- `04-qa/CF-W1-TSC-01A-qa-plan.md`
+- current Backtesting, Signal Generation, and Today Review file inventories and targeted source scans
+- `git branch --contains 40c00f1`
+- `git show --stat 40c00f1`
+- `git show --stat 8f984b1`
+
+Readiness verdict by item:
+
+1. `CF-W1-BT-04`
+   - verdict: `ARCHITECTURE-READY-CANDIDATE`
+   - Team 00 promotion-ready now: no
+   - exact blocker: Team 04 QA plan is missing
+   - recommended implementation owner after promotion: Team 06 - Strategy / Signal / Risk
+   - required base: accepted `CF-W1-BT-03` commit `8f984b1`
+   - allowed files after Ready promotion:
+     - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.ts`
+     - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.types.ts`
+     - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+     - `backend/tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.test.ts`
+     - `frontend/src/features/backtesting-strategy-lab/types.ts`
+     - `frontend/src/features/backtesting-strategy-lab/components/BacktestingStrategyLabPage.tsx`
+     - `frontend/tests/ui/backtesting-strategy-lab.spec.ts`
+   - forbidden files: Backtesting repository/controller/router/validation/module/index, route registries, Prisma/schema/migrations/generated, shared utilities/UI, package manifests, frontend API/hooks/routes, upstream/downstream modules, provider/live, startup/backfill, paid/cloud, broker, telemetry, and credentials
+
+2. `CF-W1-TSC-02`
+   - verdict: `BOUNDED FOLLOW-ON / NOT READY`
+   - Team 00 promotion-ready now: no
+   - exact blockers: accepted `CF-W1-TSC-01A-TREV` implementation and `CF-W1-TSC-02` QA plan are missing
+   - recommended implementation owner after blockers clear: Team 07 - Portfolio / Watchlist / Alerts / Today Review
+   - required base: accepted `CF-W1-TSC-01A-TREV` commit, stacked on accepted Team 06 bridge commit `40c00f1`
+   - conditional allowed files after future Ready promotion:
+     - `backend/src/modules/today-trade-review/today-trade-review.types.ts`
+     - `backend/src/modules/today-trade-review/today-trade-review.service.ts`
+     - `backend/src/modules/today-trade-review/today-trade-review.md`
+     - `backend/tests/modules/today-trade-review/today-trade-review.service.test.ts`
+     - `frontend/src/features/today-trade-review/types.ts`
+     - `frontend/src/features/today-trade-review/components/TodayReviewPage.tsx`
+     - `frontend/src/features/today-trade-review/components/TodayReviewCandidateDetailPage.tsx`
+     - `frontend/tests/ui/today-trade-review.spec.ts`
+   - forbidden files: Today Review repository/controller/router/validation/module/index, route registries, Prisma/schema/migrations/generated, shared utilities/UI, package manifests, frontend API/hooks/routes, all upstream/downstream module source/tests, provider/live, startup/backfill, paid/cloud, broker, telemetry, and credentials
+
+Recommended Team 00 routing:
+
+1. send `CF-W1-BT-04` to Team 04 QA planning next if Team 00 wants an independent backtesting trust item while Today Review implementation continues;
+2. keep `CF-W1-TSC-02` parked as a follow-on until `CF-W1-TSC-01A-TREV` is accepted;
+3. after `TSC-01A-TREV` acceptance, send `TSC-02` to Team 04 QA planning before any Ready movement;
+4. do not run `TSC-02` in parallel with active Today Review source work.
+
+No tests, builds, Prisma commands, services, providers, UI checks, commits, or pushes were run.
+
+---
+
 ## Team 03 Architecture Reframe - Trusted Signal Candidates - 2026-05-24
 
 Product Owner redirected signal workflow priority away from Trade Plan, R:R, arbitrary targets, synthetic targets, and target-price framing.

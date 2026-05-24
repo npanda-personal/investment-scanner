@@ -1,5 +1,77 @@
 # TEAM-02 Requirement Factory
 
+## Team 02 Rolling Queue Refresh - 2026-05-24
+
+Root `AGENTS.md` intake completed first. Workspace was clean at the start of this pass. Team 02 stayed docs-only and wrote only inside the reserved requirement files.
+
+### Current PO Priority Applied
+
+- Highest user value for investor/trader comes before admin/settings/notifications.
+- Priority remains: market data trust, Data Quality trust, signal quality and backtesting trust, calibration, trusted candidate workflow, and active signal health.
+- Today Review remains the primary daily workflow.
+- No Trade Plan-first framing, no R:R framing, and no arbitrary target-price framing.
+
+### Requirement Refinement Result
+
+Refined and tightened:
+
+- `CF-W1-BT-04-backtesting-run-freshness-and-current-proof-labels-requirement.md`
+- `CF-W1-TSC-02-active-signal-health-rule-evidence-requirement.md`
+
+Result:
+
+- `CF-W1-TSC-02` is now requirement-ready for Team 03 architecture prep.
+- `CF-W1-BT-04` is now requirement-ready for Team 03 architecture prep.
+- Neither item is Ready for implementation.
+- No item was moved to `12-ready-queue/ready-for-implementation.md`.
+
+### Queue Re-Sort Result
+
+Active items excluded from fresh discovery:
+
+- `CF-W1-TSC-01A-TREV` is already active with Team 07 / Team 04.
+- `CF-W1-DQ-03` is already active with Team 05.
+- `CF-W1-TSC-01A-SIG` is already accepted upstream.
+
+Next unassigned queue after active pulls:
+
+1. `CF-W1-TSC-02`
+2. `CF-W1-BT-04`
+3. `CF-W1-DQ-02` residual parent
+4. `CF-W1-MD-02A`
+5. `CF-W1-SQLAB-02B`
+6. `CF-W1-STRAT-02B`
+7. `CF-W1-L3-DQ-01A`
+8. `CF-W1-UX-02`
+9. `CF-W1-UX-05`
+10. `CF-W1-TSC-01` parent residual
+
+### Team 00 / Team 03 Handoff Recommendation
+
+Recommended next Team 00 routing:
+
+1. Send `CF-W1-TSC-02` to Team 03 for bounded architecture prep now, using the active `TSC-01A-TREV` direction but without touching Team 07 files.
+2. Queue `CF-W1-BT-04` immediately behind it as the next Team 03 architecture-prep packet, or run it in parallel only if Team 03 can keep file ownership isolated.
+3. Keep `CF-W1-DQ-02` as the next residual upstream review only after Team 03 confirms there is a bounded no-schema child to write.
+
+Reason:
+
+- `TSC-02` is the next direct-value extension of the primary Today Review workflow.
+- `BT-04` is the next direct backtesting trust slice with clear user value and bounded additive scope.
+- `DQ-02` still matters, but only after the residual split question is resolved.
+
+### Files Changed In This Pass
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-BT-04-backtesting-run-freshness-and-current-proof-labels-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-TSC-02-active-signal-health-rule-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+### Ready Result
+
+No item was moved to Ready by Team 02.
+
 ## Team 02 Rolling PO Discovery - Active Pull Exclusion - 2026-05-24
 
 Root `AGENTS.md` intake completed for this pass. Product direction remains direct investor/trader value first: market data, Data Quality, source-proven signal evidence, rule-based health, backtesting/calibration trust, and research explainability. Admin, settings, auth, subscription, notifications, and alert convenience stay low priority unless they block correctness, privacy, or trust.

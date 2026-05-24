@@ -1,6 +1,7 @@
 # CF-W1-BT-04 Work Packet
 
 Date: 2026-05-20
+Refresh: 2026-05-24
 
 ## Work Item
 
@@ -9,6 +10,8 @@ Backtesting saved-run freshness and current-proof labels.
 ## State
 
 Architecture-ready candidate. Not Ready for Implementation until Team 04 QA planning exists and Team 00 confirms stacked sequencing.
+
+2026-05-24 readiness verdict: still architecture-ready and independent of active `CF-W1-TSC-01A-TREV` work. It is not Team 00 promotion-ready yet because no `CF-W1-BT-04` QA plan exists.
 
 ## Owner / Lane / Module
 
@@ -145,3 +148,13 @@ Stop and return to Team 00 / Architect if implementation requires:
 Route `CF-W1-BT-04` to Team 04 QA planning next.
 
 After Team 04 QA planning exists, Team 00 can evaluate it for Ready promotion on the stacked backtesting base.
+
+## Team 00 Promotion Checklist
+
+Before promotion, Team 00 should copy these exact reservations into the Ready queue:
+
+- allowed files: the seven files listed in `Allowed Files After Ready Promotion`
+- forbidden files: the full forbidden list above, including repository, route, schema, shared UI/utility, package, generated, provider/live, startup/backfill, paid/cloud, broker, and telemetry scope
+- recommended branch: `codex/team06-strategy-signal/CF-W1-BT-04`
+- recommended worktree: `../investment-scanner-worktrees/team06-CF-W1-BT-04`
+- required base: accepted `CF-W1-BT-03` commit `8f984b1`

@@ -1,6 +1,7 @@
 # CF-W1-BT-04 Architecture Review
 
 Date: 2026-05-20
+Refresh: 2026-05-24
 
 Owner: Team 03 Architecture Factory
 
@@ -10,12 +11,16 @@ ACCEPT / ARCHITECTURE-READY-CANDIDATE.
 
 This packet is not Ready for Implementation yet. Team 04 QA planning is still required, and Team 00 must sequence it behind the accepted parked backtesting writer set.
 
+2026-05-24 refresh: this remains the next high-value independent backtesting item while Team 07 and Team 04 handle `CF-W1-TSC-01A-TREV`. The Product Owner's no Trade Plan / no R:R / no arbitrary target-price direction does not invalidate this packet because `BT-04` is confined to saved-run proof freshness labels and does not introduce target or advice framing.
+
 ## Evidence Inspected
 
 - `AGENTS.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-BT-04-backtesting-run-freshness-and-current-proof-labels-requirement.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/ready-for-implementation.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/99-decision-inbox/open-decisions.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-BT-03-architecture-review.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-BT-03-work-packet.md`
 - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.ts`
@@ -145,6 +150,8 @@ Allowed future writer set:
 - Do not branch this child from current `dev`
 - The reserved writer set is the same module-local writer set as `BT-03`
 - Team 00 must keep the packet isolated to one dedicated backtesting writer worktree
+- Team 04 QA planning is the only missing readiness gate currently identified by Team 03.
+- No open Product Owner decision blocks the bounded first child as of the 2026-05-24 Decision Inbox check.
 
 ## Shared-File Risk Assessment
 
@@ -170,4 +177,6 @@ Team 04 should prepare QA for:
 - Item: `CF-W1-BT-04`
 - Result: `ARCHITECTURE-READY-CANDIDATE`
 - Blocked: no
+- Recommended implementation owner after Ready promotion: Team 06 - Strategy / Signal / Risk
+- Ready for Team 00 promotion now: no, because Team 04 QA planning is still missing
 - Next gate: Team 04 QA planning, then Team 00 Ready evaluation on stacked backtesting base `8f984b1`

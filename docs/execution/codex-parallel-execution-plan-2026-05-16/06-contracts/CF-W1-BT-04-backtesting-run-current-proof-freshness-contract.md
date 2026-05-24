@@ -1,6 +1,7 @@
 # CF-W1-BT-04 Backtesting Run Current-Proof Freshness Contract
 
 Date: 2026-05-20
+Refresh: 2026-05-24
 
 ## Purpose
 
@@ -10,6 +11,8 @@ Give saved backtesting runs an additive current-proof contract so users can dist
 - an older stale proof,
 - a repaired legacy historical proof, and
 - a structurally limited historical proof.
+
+The contract is research-support only. It must not imply forward proof, direct financial advice, Trade Plan readiness, R:R, arbitrary target prices, or guaranteed outcomes.
 
 ## Scope
 
@@ -90,6 +93,7 @@ Do not create a second persistence model or a new validation engine in this slic
 - The saved-run list and selected-run panel must show the same label and same summary for the same run.
 - The new label must be additive to existing benchmark, coverage, warning, and audit panels.
 - The UI must not imply walk-forward validation, holdout validation, optimization proof, or forward predictive certainty.
+- The UI must avoid target-price, profit-target, R:R, buy/sell, or advice-like wording.
 
 ## Backward Compatibility
 
@@ -110,3 +114,7 @@ Stop and split the child if truthful behavior requires:
 ## One-Writer Rule
 
 This contract reserves one writer across the backtesting backend/frontend file set in the future implementation pass. No parallel `backtesting-strategy-lab` writer is allowed.
+
+## Readiness Note
+
+As of 2026-05-24, Team 03 considers this contract architecture-ready but not Ready for Implementation until Team 04 prepares the matching QA plan and Team 00 records the stacked `8f984b1` base in the Ready queue.

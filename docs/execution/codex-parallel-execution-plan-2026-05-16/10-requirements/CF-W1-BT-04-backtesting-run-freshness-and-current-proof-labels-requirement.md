@@ -1,10 +1,12 @@
 # CF-W1-BT-04 - Backtesting Run Freshness And Current-Proof Labels Requirement
 
-Date: 2026-05-20
+Date: 2026-05-24
+
+Owner: Team 02 - Product / Requirement Factory
 
 ## Status
 
-Audit-derived requirement draft. Refinement-only. Not Ready for Implementation.
+Requirement-ready for Team 03 architecture prep and Team 04 QA planning. Not Ready for Implementation.
 
 ## Product Value
 
@@ -37,14 +39,27 @@ The first child should focus on:
 - additive DTO/read-surface enrichment that downstream consumers can reuse without recomputing freshness;
 - no change to the existing backtest simulation, scoring, or proof-basis math.
 
+## Required Proof States
+
+The first child must let the user distinguish at least these cases:
+
+- `Current Proof` - the saved run still reflects the latest available proof window for the selected scope;
+- `Stale Proof` - a newer proof window exists or the saved run is no longer the latest trustworthy basis;
+- `Repaired Historical` - the run is still reviewable, but repaired or corrected historical math means it should not read like untouched current proof;
+- `Limited Historical Proof` - the run is historical-only, incomplete, or otherwise useful for review but not current proof.
+
+If a run is unavailable, quarantined, or otherwise not trustworthy enough to map into one of the four user-facing states, the output must show a visible reason instead of implying freshness.
+
 ## Acceptance Criteria
 
-- Backtesting saved-run outputs expose a compact freshness/current-proof label.
-- The user can distinguish current, stale, repaired-historical, and limited historical proof states without relying on raw timestamps alone.
-- Repaired or quarantined historical runs explain why they should be reviewed cautiously.
-- Existing simulation outputs, proof-basis warnings, and review-traceability behavior remain unchanged.
-- Historical saved runs remain backward-compatible even if the current-proof label is derived from existing fields.
-- Focused tests later cover current, stale, repaired-historical, and invalid/quarantined states.
+- Saved-run list rows and selected-run detail outputs expose the same compact freshness/current-proof story for the same run.
+- The user can distinguish `Current Proof`, `Stale Proof`, `Repaired Historical`, and `Limited Historical Proof` without relying on raw timestamps alone.
+- The label and concise reason summary are derived from existing backtesting evidence such as generated timestamp, availability state, and calculation-audit state rather than from newly invented persistence or validation engines.
+- Repaired, quarantined, or otherwise caution-worthy historical runs explain why they should be reviewed cautiously.
+- Existing simulation outputs, proof-basis warnings, review-traceability behavior, and saved-run compatibility remain unchanged.
+- Historical saved runs stay backward-compatible even when the new label is derived at read time from existing fields.
+- No surface claims walk-forward, holdout, forward-validation, or parameter-sensitivity proof that the module does not currently own.
+- Focused tests later cover current, stale, repaired-historical, limited-historical, and unavailable/quarantined cases.
 
 ## Consent Gates
 
@@ -54,10 +69,18 @@ The first child should focus on:
 ## Non-Goals
 
 - No walk-forward, holdout, or optimization engine work.
+- No forward-validation engine or reliability-score rewrite.
 - No simulation-math rewrite.
+- No new persistence model for saved runs.
+- No backtesting run deletion, reseeding, or repair workflow redesign.
+- No Trade Plan, target-price, or advice-like framing.
 - No schema, route registry, shared UI, package, provider/live, broker, paid/cloud, or telemetry work.
 - No duplicate proof-currentness logic in downstream consumers.
 
 ## Next Gate
 
-Architecture contract and QA plan for a bounded Backtesting current-proof labeling slice, with later implementation reserved to `backtesting-strategy-lab` only if Team 03 confirms the child stays no-schema and additive.
+Team 03 should prepare a bounded architecture/contract packet for a no-schema, additive `backtesting-strategy-lab` child that enriches saved-run read outputs only.
+
+Team 04 should later prepare a QA plan covering list/detail consistency, derived-state precedence, stale-vs-current proof labeling, repaired-history caution text, and no false forward-proof claims.
+
+Team 00 must keep this item out of Ready until architecture, QA, exact file reservations, and no-conflict checks are complete.

@@ -6,32 +6,32 @@ Status: Team 00 updated after Product Owner redirected the signal workflow away 
 
 Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-02A` are already accepted and locally committed parked branches. They must not be presented as fresh implementation pulls.
 
-Team 02 rolling update: `CF-W1-TSC-01A-SIG` is active with Team 06 and `CF-W1-DQ-03` is active with Team 05. The order below is the next unassigned queue after those active pulls.
+Team 02 rolling update: `CF-W1-TSC-01A-TREV` is active with Team 07 / Team 04, `CF-W1-DQ-03` is active with Team 05, and `CF-W1-TSC-01A-SIG` is already accepted upstream. The order below is the next unassigned queue after those active pulls.
 
 ## Current Priority Order
 
 | Rank | ID | Current state | Why it matters now | Next Team 00 action |
 | --- | --- | --- | --- | --- |
-| 1 | `CF-W1-TSC-01A-TREV` | Dependent follow-on | Today Review should adopt the accepted Team 06 signal bridge into candidate groups, counts, reasons, and conservative health. | Promote only after Team 06 acceptance and Team 03/04 confirm Today Review reservations. |
-| 2 | `CF-W1-BT-04` | Architecture prepared | Backtesting needs saved-run freshness/current-proof labels so older saved simulations do not read like current proof. | Team 04 QA planning later; keep first child additive and no-schema. |
-| 3 | `CF-W1-TSC-02` | New requirement draft | Trusted candidates need ongoing rule-based health tracking until exit, invalidation, expiry, or blockage. | Team 03 refinement after active TSC-01A/DQ-03 gates settle. |
-| 4 | `CF-W1-DQ-02` residual parent | Needs Team 03 follow-up split | `DQ-02A` currentness evidence is accepted, but the parent still has read-side/public-contract residual scope. | Team 03 should identify whether a no-schema `DQ-02B` child exists or keep the parent blocked. |
-| 5 | `CF-W1-L3-DQ-01A` | Contract-only child | Passive readiness display remains a Lane 3 trust contract gap, but not the next app-code pull. | Keep as contract refresh unless Team 03/04 produce a bounded child. |
-| 6 | `CF-W1-MD-02A` | Consent-gated schema proposal | Durable market-data evidence storage remains valuable but schema/generated/repository scope is gated. | Keep proposal-only unless a true consent packet is opened. |
-| 7 | `CF-W1-SQLAB-02B` | Consent-gated storage proposal | Durable Signal Quality learning memory remains useful after current read/review trust slices. | Keep proposal-only unless storage consent opens. |
-| 8 | `CF-W1-STRAT-02B` | Consent-gated storage proposal | Durable strategy revision history is useful but schema/generated/repository-gated. | Keep proposal-only unless consent opens. |
-| 9 | `CF-W1-UX-02` | Copilot-only trust UX pending | Valuable downstream trust surface, but behind core signal/data/backtest evidence. | Keep Copilot-only behind direct investor/trader value items. |
-| 10 | `CF-W1-UX-05` | Copilot-only product-language cleanup | Product-language cleanup matters, but shared status/UI changes remain out of scope. | Fold into or follow `CF-W1-UX-02`; do not touch shared UI yet. |
+| 1 | `CF-W1-TSC-02` | Requirement-ready | Today Review is the primary daily workflow, and the next direct user gap after candidate adoption is ongoing active-signal health backed by rule evidence rather than Trade Plan framing. | Route to Team 03 next for bounded architecture prep; keep out of Ready. |
+| 2 | `CF-W1-BT-04` | Requirement-ready | Backtesting remains a core investor/trader trust surface, and saved runs still need current-proof labels so older simulations do not read like fresh proof. | Route to Team 03 after or alongside `TSC-02` for bounded architecture prep; keep no-schema and additive. |
+| 3 | `CF-W1-DQ-02` residual parent | Split-required residual | Upstream DQ currentness still matters to signal, backtesting, and review trust, but only if Team 03 can isolate a no-schema public/read-path child. | Ask Team 03 to confirm whether a bounded `DQ-02B` exists or keep the parent blocked. |
+| 4 | `CF-W1-MD-02A` | Consent-gated proposal | Durable market-data evidence storage remains high-value upstream trust work, but it is still docs-only until schema consent opens. | Keep proposal-only; use only for Team 03 / Team 04 packet prep when consent is intentionally opened. |
+| 5 | `CF-W1-SQLAB-02B` | Consent-gated proposal | Durable Signal Quality learning memory would strengthen research continuity and calibration review after current trust slices. | Keep proposal-only unless Team 00 deliberately opens storage consent. |
+| 6 | `CF-W1-STRAT-02B` | Consent-gated proposal | Durable strategy revision history preserves exact rule/version provenance for signals and backtests, but it is still storage-gated. | Keep proposal-only unless schema/generated/repository consent is opened. |
+| 7 | `CF-W1-L3-DQ-01A` | Contract-only child | Passive readiness display is still useful, but it sits behind core data, candidate-health, and backtesting trust work. | Keep as contract refresh unless Team 03/04 define a bounded child. |
+| 8 | `CF-W1-UX-02` | Copilot-only requirement-ready | Useful downstream trust UX, but behind direct data/signal/backtesting value and the primary Today Review workflow. | Keep Copilot-only and behind the higher direct-value queue. |
+| 9 | `CF-W1-UX-05` | Copilot-only child | Product-language cleanup still matters, but only after Copilot trust UX scope is settled. | Fold into or follow `CF-W1-UX-02`; do not touch shared UI yet. |
+| 10 | `CF-W1-TSC-01` parent residual | Parent stays out of implementation | The parent still governs the trusted-candidate workflow, but fresh execution should continue through bounded children only. | Keep parent out of Ready and route only through approved children. |
 
 ## Dispatch Notes
 
 - `CF-W1-HCTX-03`, `CF-W1-MCTX-02`, `CF-W1-STRAT-04`, and `CF-W1-SQLAB-03` are accepted parked branch commits, not fresh pulls.
-- `CF-W1-TSC-01A-SIG` is active with Team 06 and `CF-W1-DQ-03` is active with Team 05; do not duplicate either as fresh Team 02 work.
+- `CF-W1-TSC-01A-TREV` is already promoted and assigned to Team 07 with Team 04 QA handling; do not re-rank it as an unassigned Team 02 candidate.
+- `CF-W1-TSC-01A-SIG` is accepted and locally committed upstream; `CF-W1-DQ-03` is active with Team 05. Do not duplicate either as fresh Team 02 work.
 - `CF-W1-SIG-TRIGGER-ENTRY-01` is accepted and locally committed as `649e645`; it is no longer a fresh prep item.
-- `CF-W1-TSC-01A-TREV` is the next downstream follow-on after Team 06 acceptance: adopt source-proven trigger evidence into Today Review with conservative candidate grouping and health language.
-- `CF-W1-TSC-02` is a new requirement draft for active signal health tracking after candidate adoption.
+- `CF-W1-TSC-02` is now requirement-ready for architecture prep, but remains out of Ready for implementation.
 - `CF-W1-TP-03` is paused/stale as framed because Product Owner rejected Trade Plan-first, R:R, and arbitrary target workflow direction. Do not execute it unless reframed into Trusted Signal Candidate health without targets/R:R.
-- `CF-W1-BT-04` remains a later refinement-only draft behind Trusted Signal Candidate work.
+- `CF-W1-BT-04` is now requirement-ready for architecture prep and remains behind active Today Review adoption work.
 - The 2026-05-20 backtesting proof-basis audit keeps `CF-W1-BT-03` parked and reinforces `CF-W1-BT-04` as the fresh backtesting current-proof slice.
 - `CF-W1-RH-03` is accepted and locally committed as `5bd176b`; do not treat it as a fresh Team 02 pull.
 - `CF-W1-RH-02A` is accepted and locally committed as `f391a6d`; do not treat it as a fresh Team 02 pull.
@@ -58,8 +58,8 @@ Direct investor/trader value stays first:
 1. market-data freshness and provenance,
 2. data-quality readiness,
 3. historical and market context,
-4. explainable signals/triggers and strategy evidence,
-5. trusted signal candidate health and rule-based exit/invalidation,
+4. explainable signals/triggers and Today Review trusted-candidate workflow,
+5. active signal health and rule-based exit/invalidation,
 6. backtesting and calibration trust,
 7. research explainability and reviewability,
 8. user-owned alert correctness and traceability.
