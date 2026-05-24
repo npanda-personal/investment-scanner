@@ -4,6 +4,80 @@ Date: 2026-05-20
 
 Team: TEAM-05 - Market Data / Data Quality
 
+## Latest Assignment Override - 2026-05-24 DQ-03
+
+Team 00 promotes `CF-W1-DQ-03` as an independent backend-only Data Quality Engine implementation slice.
+
+This assignment can run in parallel with Team 06 `CF-W1-TSC-01A-SIG` because the file reservations are disjoint.
+
+## Branch / Worktree
+
+- Branch: `codex/team05-market-data/CF-W1-DQ-03`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team05-CF-W1-DQ-03`
+- Base: current local `dev` commit `48e9183 docs: promote tsc signal bridge`
+
+## Gate Evidence
+
+- Requirement: `10-requirements/CF-W1-DQ-03-data-quality-residual-reason-summary-for-downstream-trust-consumers-requirement.md`
+- Architecture review: `03-architecture/CF-W1-DQ-03-architecture-review.md`
+- Contract: `06-contracts/CF-W1-DQ-03-data-quality-residual-reason-summary-contract.md`
+- Work packet: `08-work-packets/CF-W1-DQ-03-work-packet.md`
+- QA plan: `04-qa/CF-W1-DQ-03-qa-plan.md`
+- Ready queue handoff: `12-ready-queue/ready-for-implementation.md`
+
+## Allowed Files
+
+- `backend/src/modules/data-quality-engine/data-quality-engine.service.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.md`
+- `backend/tests/modules/data-quality-engine/data-quality-engine.service.test.ts`
+- `backend/tests/modules/data-quality-engine/data-quality-engine.invariants.test.ts`
+
+Allowed reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-05-CF-W1-DQ-03-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-DQ-03-developer-handoff.md`
+
+## Required Behavior
+
+- Add an additive residual-summary packet to Data Quality outputs.
+- Derive the summary only from existing DQ fields and current service evidence.
+- Preserve existing DQ filters, gating, scoring, and response fields.
+- Decorate freshly evaluated and service-returned DTOs without repository persistence.
+- Keep wording research-support oriented and avoid advice, target, broker, or automation claims.
+- Do not rewrite downstream consumers in this child.
+
+## Forbidden Files
+
+- `backend/src/modules/data-quality-engine/data-quality-engine.repository.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.controller.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.router.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.validation.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.module.ts`
+- `backend/src/modules/data-quality-engine/index.ts`
+- repository/routes/validation tests
+- `backend/src/modules/market-data-foundation/**`
+- downstream consumer modules
+- all frontend files/tests
+- Prisma schema or migrations
+- backend/frontend route registries
+- shared backend utilities or shared frontend components
+- package manifests
+- generated files
+- provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential files
+
+## Focused Validation
+
+```powershell
+cd backend
+npm.cmd test -- data-quality-engine.service.test.ts data-quality-engine.invariants.test.ts --runInBand
+npm.cmd run build
+```
+
+## Stop Conditions
+
+Stop and return to Team 00 if the implementation requires repository persistence, schema/migration, route/controller/validation, frontend/UI, Market Data source, downstream consumer edits, shared files, package/generated files, provider/live/startup/backfill, paid/cloud, broker, telemetry, or credentials.
+
 ## Current Assignment Override - CF-W1-HCTX-03
 
 Implement `CF-W1-HCTX-03` in the dedicated Team 05 worktree.

@@ -6,6 +6,48 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+2026-05-24 Team 00 Ready promotion - `CF-W1-DQ-03`:
+
+- `CF-W1-DQ-03` is promoted and assigned to Team 05 as an independent backend-only Data Quality Engine residual-summary implementation.
+- Parallel-safety decision: safe to run in parallel with Team 06 `CF-W1-TSC-01A-SIG` because file reservations are disjoint (`data-quality-engine` vs `signal-generation-engine`).
+- Branch recommendation: `codex/team05-market-data/CF-W1-DQ-03`
+- Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team05-CF-W1-DQ-03`
+- Gate evidence:
+  - Requirement: `10-requirements/CF-W1-DQ-03-data-quality-residual-reason-summary-for-downstream-trust-consumers-requirement.md`
+  - Architecture review: `03-architecture/CF-W1-DQ-03-architecture-review.md`
+  - Contract: `06-contracts/CF-W1-DQ-03-data-quality-residual-reason-summary-contract.md`
+  - Work packet: `08-work-packets/CF-W1-DQ-03-work-packet.md`
+  - QA plan: `04-qa/CF-W1-DQ-03-qa-plan.md`
+  - Open decisions: none.
+- Allowed implementation files:
+  - `backend/src/modules/data-quality-engine/data-quality-engine.service.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.md`
+  - `backend/tests/modules/data-quality-engine/data-quality-engine.service.test.ts`
+  - `backend/tests/modules/data-quality-engine/data-quality-engine.invariants.test.ts`
+- Allowed reporting docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-05-CF-W1-DQ-03-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-DQ-03-developer-handoff.md`
+- Forbidden scope:
+  - DQE repository, controller, router, validation, module, or index files
+  - repository/routes/validation tests
+  - Market Data source/tests
+  - downstream consumer module edits
+  - all frontend files
+  - Prisma schema or migrations
+  - backend/frontend route registries
+  - shared backend utilities or shared frontend components
+  - package manifests, generated files, provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential files
+- Required validation:
+
+```powershell
+cd backend
+npm.cmd test -- data-quality-engine.service.test.ts data-quality-engine.invariants.test.ts --runInBand
+npm.cmd run build
+```
+
+- Stop if implementation requires repository persistence, schema/migration, route/controller/validation, frontend/UI, Market Data source, or downstream consumer edits.
+
 2026-05-24 Team 00 Ready promotion - `CF-W1-TSC-01A-SIG`:
 
 - `CF-W1-TSC-01A-SIG` is promoted and assigned to Team 06 as the first executable child of the Trusted Signal Candidate adoption path.

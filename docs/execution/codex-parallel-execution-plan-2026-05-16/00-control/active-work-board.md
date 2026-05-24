@@ -104,6 +104,33 @@ Teams ready to pick up new tasks:
 - Team 02: next rolling PO/requirements item is `CF-W1-DQ-03`.
 - Team 03: rolling architecture prep may continue on `CF-W1-DQ-03` while Team 06 works.
 
+## Latest Team 00 Routing Update - DQ-03 Parallel Promotion
+
+Date: 2026-05-24
+
+`CF-W1-DQ-03` is promoted to Team 05 as an independent backend-only Data Quality Engine residual-summary implementation.
+
+Parallel-safety decision:
+
+- Safe to run in parallel with Team 06 `CF-W1-TSC-01A-SIG`.
+- Team 05 reserves only `data-quality-engine` service/types/docs/tests.
+- Team 06 reserves only `signal-generation-engine` service/types/docs/tests.
+
+Current state:
+
+- Branch recommendation: `codex/team05-market-data/CF-W1-DQ-03`.
+- Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team05-CF-W1-DQ-03`.
+- Open decisions: 0.
+- Product Owner action required: no.
+
+Teams ready to pick up new tasks:
+
+- Team 05: implement `CF-W1-DQ-03`.
+- Team 04: QA Verification after Team 05 developer handoff.
+- Team 10: Code Review after QA acceptance.
+- Team 03: Architect Signoff after Team 10 acceptance.
+- Team 02: continue rolling direct-value requirements after `DQ-03`, with admin/settings/notifications low priority.
+
 ## Current Operating Model: Multi-Team Parallel Execution
 
 The active execution plan now uses persistent Codex teams, not a single sequential Orchestrator wave.
