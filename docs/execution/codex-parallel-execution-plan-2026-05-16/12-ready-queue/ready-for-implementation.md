@@ -6,6 +6,13 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+2026-05-24 Team 00 closure update:
+
+- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` completed all gates and was locally committed on its Team 07 branch as `09bbf9b feat: add today review supporting trust evidence`.
+- `CF-W2-BT-05` completed all gates and was locally committed on its Team 06 branch as `f645d0b feat: add backtesting rule evidence projection`.
+- No unassigned Ready implementation item is waiting after those closures.
+- Next Today Review work (`CF-W2-TSC-04`, `CF-W2-TSC-05`) remains planning/architecture prep until Team 00 promotes a bounded Ready slice.
+
 2026-05-24 Team 00 Ready promotion - `CF-W2-BT-05`:
 
 - `CF-W2-BT-05` is promoted and assigned to Team 06 as a bounded backend-only Backtesting Strategy Lab implementation slice.

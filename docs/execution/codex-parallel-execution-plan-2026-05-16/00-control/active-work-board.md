@@ -34,6 +34,40 @@ No historical active work items have been migrated as active.
 - Rejected / Rework
 - Deferred
 
+## Latest Team 00 Routing Update - Open Gate Closure And Stop
+
+Date: 2026-05-24
+
+Completed branch commits:
+
+- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`: accepted through Team 04 QA, Team 10 review, Team 03 Architect Signoff, delegated PO acceptance, staged-scope verification, and committed on `codex/team07-portfolio-alerts/CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` as `09bbf9b feat: add today review supporting trust evidence`.
+- `CF-W2-BT-05`: accepted through Team 04 QA, Team 10 review, Team 03 Architect Signoff, delegated PO acceptance, staged-scope verification, and committed on `codex/team06-strategy-signal/CF-W2-BT-05` as `f645d0b feat: add backtesting rule evidence projection`.
+
+Current state:
+
+- Open decisions: 0.
+- Open implementation gate items from the current engagement: 0.
+- Product Owner action required: no.
+- Push performed: no.
+- Team 00 stop condition reached per Product Owner instruction: stop after open items are finished and report backlog/priority recommendations.
+
+Recommended next order for a future resume:
+
+1. `CF-W2-TSC-04` - Today Review no-target / Trade Plan-language cleanup.
+2. `CF-W2-TSC-05` - Today Review no-target ranking and eligibility reframe.
+3. `OPEN-PO-DISCOVERY-01` - rolling PO discovery across Market Data, DQ, Signal Generation, Backtesting, Calibration, and Today Review.
+4. `CF-W1-DQ-02` residual parent - only after Team 00 opens an explicit DQE read-side/public-contract packet.
+5. `CF-W1-MD-02A` and `CF-W1-SQLAB-02B` - keep proposal-only until schema/storage consent is intentionally opened.
+
+Teams ready to pick up new tasks after resume:
+
+- Team 02: rolling direct investor/trader-value discovery and priority refresh.
+- Team 03: architecture prep for `CF-W2-TSC-04` or `CF-W2-TSC-05`.
+- Team 04: QA planning for whichever Today Review follow-up Team 00 promotes.
+- Team 06: Strategy/Signal/Backtesting implementation only after Ready promotion.
+- Team 07: Today Review implementation only after Team 00 promotes the next bounded slice.
+- Team 10: review after QA acceptance.
+
 ## Latest Team 00 Routing Update - SIG-01A Closure And TSC-03A Active Implementation
 
 Date: 2026-05-24

@@ -65,6 +65,7 @@
 
 ## Current Blockers
 
+- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` and `CF-W2-BT-05` are no longer active blockers; both completed QA, review, Architect Signoff, delegated PO acceptance, and scoped local branch commits on 2026-05-24.
 - Market Data durable readiness evidence is incomplete for full contract compliance.
 - `CF-W1-DQ-02B` is blocked from implementation because Team 03 found the residual `DQ-02` value requires an explicit DQE persisted read-side/public-contract packet after accepted `DQ-02A`; no honest second no-schema service-local child exists.
 - Current Market Data natural-key behavior is symbol/date-centric and narrower than the active contract target.
