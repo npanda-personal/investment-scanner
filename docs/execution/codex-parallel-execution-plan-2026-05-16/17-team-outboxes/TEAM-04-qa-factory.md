@@ -1,5 +1,74 @@
 # TEAM-04 QA Factory Outbox
 
+Date: 2026-05-24
+
+Mode: docs-only QA planning for bounded Ready-evaluation packets.
+
+## 2026-05-24 `CF-W1-BT-04` QA Planning
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only QA packet preparation
+- Work item: `CF-W1-BT-04` - backtesting saved-run freshness and current-proof labels
+- State/mode: QA planning only; no executable validation
+- Owner: Team 04 QA Factory
+- Lane/module: Lane 2 / `backtesting-strategy-lab`
+- Files changed:
+  - `04-qa/CF-W1-BT-04-qa-plan.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - `AGENTS.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-BT-04-backtesting-run-freshness-and-current-proof-labels-requirement.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-BT-04-architecture-review.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-BT-04-backtesting-run-current-proof-freshness-contract.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-BT-04-work-packet.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/99-decision-inbox/open-decisions.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-BT-03-qa-plan.md`
+  - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.ts`
+  - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.types.ts`
+  - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+  - `backend/tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.test.ts`
+  - `frontend/src/features/backtesting-strategy-lab/types.ts`
+  - `frontend/src/features/backtesting-strategy-lab/components/BacktestingStrategyLabPage.tsx`
+  - `frontend/tests/ui/backtesting-strategy-lab.spec.ts`
+  - `backend/package.json`
+  - `frontend/package.json`
+- Behavior changed:
+  - none; docs-only QA planning
+- Docs changed:
+  - prepared `04-qa/CF-W1-BT-04-qa-plan.md`
+  - refreshed this Team 04 outbox with the readiness verdict and Team 00 next gate
+- Contracts changed:
+  - none
+- Tests run:
+  - none
+- Tests skipped:
+  - all executable validation was skipped because this is a planning pass with no implementation handoff
+- Skipped-test reason:
+  - docs-only planning; the child is not at executable QA yet
+- Assumptions:
+  - `CF-W1-BT-04` remains strictly additive and module-local
+  - Team 00 will keep the future implementation on accepted `CF-W1-BT-03` base `8f984b1`
+  - the existing `frontend/tests/ui/backtesting-strategy-lab.spec.ts` remains the only UI smoke surface for this child
+- Risks:
+  - implementers may widen into repository, route, shared UI, schema, package, generated-file, or cross-module work
+  - implementers may overclaim freshness, forward proof, or advice-like confidence from saved historical runs
+  - implementers may skip feature-local UI smoke even though the trust label is user-visible in both list and detail surfaces
+- Blockers:
+  - no Team 04 planning blocker remains
+  - executable QA remains blocked until Team 00 promotes the exact seven-file handoff and preserves one-writer sequencing on base `8f984b1`
+- Shared-file requests:
+  - none from Team 04
+- QA readiness verdict:
+  - `CF-W1-BT-04`: `ACCEPT / READY-FOR-TEAM00-EVALUATION`
+- Recommendation for Team 00:
+  - Team 00 can evaluate and promote `CF-W1-BT-04` now as an independent Team 06 item while `CF-W1-TSC-01A-TREV` rework continues, but only if it copies the exact reservations into the Ready queue, records required base `8f984b1`, and reserves one dedicated backtesting writer worktree
+- Exact next Team 00 action:
+  - copy the `CF-W1-BT-04` allowed file set, forbidden scope list, Team 06 owner, dedicated worktree recommendation, and required stacked base `8f984b1` into the Ready queue, then issue or defer Ready promotion explicitly without coupling the item to Today Review rework
+- Next gate:
+  - Team 00 Ready evaluation and sequencing decision on the stacked backtesting base
+
+# TEAM-04 QA Factory Outbox
+
 Date: 2026-05-18
 
 Mode: focused QA rerun plus docs-only QA planning.
