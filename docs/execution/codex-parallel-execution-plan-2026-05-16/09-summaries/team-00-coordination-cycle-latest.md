@@ -20,18 +20,21 @@ Gate movement:
 - `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` is active with Team 07 in `C:\work\repo\investment-scanner-worktrees\t7-tsc03a`, stacked on accepted commit `34c9993`.
 - `CF-W1-SIG-LATEST-01` is already accepted from 2026-05-17; Team 00 corrected the Top 10 queues so it is no longer routed as fresh work.
 - `CF-W2-TSC-04` stays planning-only until the active Today Review writer set is free.
-- `CF-W2-BT-05` is safe for architecture prep because it is disjoint from active Today Review files.
+- `CF-W2-BT-05` completed Team 03 architecture prep and Team 04 QA planning, then Team 00 promoted it to Team 06 as a bounded backend-only stacked Backtesting implementation slice.
+- `CF-W2-TSC-05` was added by Team 02 as a planning-only no-target ranking / eligibility reframe requirement.
 
 Active agents:
 
-- Team 07 implementation agent `019e5b8f-2386-7d52-a356-f62d43740eb5`: `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`.
+- Team 04 QA agent `019e5ba2-19d8-7803-81b3-9afc984eab5c`: `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` verification.
+- Team 06 implementation agent: queued to start `CF-W2-BT-05` after worktree creation.
 
 Teams ready to pick up new tasks:
 
-- Team 07: continue `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` implementation now.
+- Team 06: implement `CF-W2-BT-05` in the dedicated stacked Backtesting worktree.
 - Team 04: QA verification after Team 07 handoff.
+- Team 04: QA verification after Team 06 `BT-05` handoff.
 - Team 10: review after QA acceptance.
-- Team 03: architecture prep for `CF-W2-BT-05` while no signoff packet is waiting.
+- Team 03: Architect Signoff after Team 10 acceptance; otherwise prepare next Today Review no-target packet after file release.
 - Team 02: rolling direct investor/trader-value discovery, reading root `AGENTS.md` first.
 
 Product Owner action required: no.

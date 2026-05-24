@@ -2,6 +2,100 @@
 
 Date: 2026-05-20
 
+## Latest Assignment Override - 2026-05-24 BT-05
+
+Team 00 promotes `CF-W2-BT-05` as a bounded Backtesting Strategy Lab implementation item.
+
+Work item:
+
+- `CF-W2-BT-05` - Backtesting documented-rule exit / invalidation supporting evidence separated from optional take-profit simulation assumptions.
+
+Branch / worktree:
+
+- Branch: `codex/team06-strategy-signal/CF-W2-BT-05`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-BT-05`
+- Required base: accepted `CF-W1-BT-04` commit `2bd794f feat: add backtesting proof freshness labels`
+
+Evidence to use:
+
+- Requirement: `10-requirements/CF-W2-BT-05-backtesting-rule-exit-invalidation-evidence-requirement.md`
+- Architecture review: `03-architecture/CF-W2-BT-05-architecture-review.md`
+- Contract: `06-contracts/CF-W2-BT-05-backtesting-rule-exit-invalidation-evidence-contract.md`
+- Work packet: `08-work-packets/CF-W2-BT-05-work-packet.md`
+- QA plan: `04-qa/CF-W2-BT-05-qa-plan.md`
+- Ready handoff: `12-ready-queue/ready-for-implementation.md`
+
+Allowed implementation files:
+
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.types.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+- `backend/tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.test.ts`
+
+Allowed reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-CF-W2-BT-05-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W2-BT-05-developer-handoff.md`
+
+Required behavior:
+
+- Add an additive rule-evidence projection for saved backtesting runs.
+- Use existing run timestamps for latest-comparable run freshness.
+- Separate documented registered-strategy exit evidence from operational exits and simulation assumptions.
+- Keep `TAKE_PROFIT` only as a simulation-assumption exit count; it must not become documented exit proof, invalidation proof, target evidence, or trusted candidate support.
+- Mark invalidation evidence missing or unsupported unless the module has explicit proof.
+- Mark custom-rule or missing-strategy-code runs unsupported for trusted candidate supporting evidence.
+- Preserve existing run DTO compatibility and research-support language.
+- Do not introduce target-price, profit-target, reward/risk, `R:R`, Trade Plan-first, buy/sell, guarantee, or financial-advice language.
+
+Forbidden files:
+
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.repository.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.controller.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.router.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.validation.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.module.ts`
+- `backend/src/modules/backtesting-strategy-lab/index.ts`
+- `backend/tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.routes.test.ts`
+- `backend/tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.validation.test.ts`
+- `backend/src/modules/strategy-framework/**`
+- `backend/src/modules/signal-quality-lab/**`
+- `backend/src/modules/strategy-decision-engine/**`
+- `backend/src/modules/trade-plan-risk-engine/**`
+- `backend/src/modules/market-data-foundation/**`
+- `frontend/src/features/backtesting-strategy-lab/**`
+- `frontend/src/features/today-review/**`
+- `frontend/tests/ui/backtesting-strategy-lab.spec.ts`
+- `frontend/tests/ui/today-review*.spec.ts`
+- Prisma schema or migrations
+- backend or frontend route registries
+- shared backend utilities or shared frontend components
+- package manifests
+- generated files
+- provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential files
+
+Required validation:
+
+```powershell
+cd backend
+npm.cmd test -- backtesting-strategy-lab.service.test.ts --runInBand
+npm.cmd run build
+```
+
+Required language guard:
+
+```powershell
+rg -n "target price|price target|profit target|reward/risk|R:R|buy now|sell now|must buy|must sell|guaranteed|financial advice|automated trade instruction|target evidence" backend/src/modules/backtesting-strategy-lab backend/tests/modules/backtesting-strategy-lab
+```
+
+Expected handoff:
+
+- Update `17-team-outboxes/TEAM-06-CF-W2-BT-05-outbox.md`.
+- Create `18-integration-queue/CF-W2-BT-05-developer-handoff.md`.
+- Record exact branch/worktree, base commit, changed files, inspected files, behavior changed, tests run, skipped checks, forbidden files confirmed untouched, risks, blockers, and next gate: Team 04 QA Verification.
+
+Stop and return to Team 00 if implementation needs repository, controller, router, validation, module, index, frontend, Today Review, Strategy Framework, Signal Quality, Strategy Decision, Trade Plan, Market Data, Prisma/schema, route, shared utility/UI, package, generated, provider/live, startup/backfill, target/R:R/profit-target, or advice scope.
+
 ## Latest Assignment Override - 2026-05-24 SIG-01A
 
 Team 00 promotes `CF-W2-SIG-01A` as a bounded Signal Generation implementation/validation item.

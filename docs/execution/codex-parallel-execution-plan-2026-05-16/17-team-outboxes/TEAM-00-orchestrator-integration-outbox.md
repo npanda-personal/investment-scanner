@@ -18,14 +18,17 @@ Current gate state:
 - `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` is active with Team 07 in `C:\work\repo\investment-scanner-worktrees\t7-tsc03a`, stacked on accepted `34c9993`.
 - `CF-W1-SIG-LATEST-01` was reconciled as already accepted from 2026-05-17 and removed from fresh-candidate routing.
 - `CF-W2-TSC-04` remains planning-only and cannot implement until the Today Review writer set is free.
-- `CF-W2-BT-05` is the next safe non-overlapping architecture-prep item.
+- `CF-W2-BT-05` completed Team 03 architecture prep and Team 04 QA planning; Team 00 promoted it to Team 06 in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-BT-05`.
+- `CF-W2-TSC-05` was added as planning-only follow-up for no-target ranking / eligibility semantics.
 
 Teams ready to pick up new tasks:
 
 - Team 07: continue `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` implementation now.
+- Team 06: implement `CF-W2-BT-05` now in the dedicated stacked Backtesting worktree.
 - Team 04: QA verification after Team 07 developer handoff.
+- Team 04: QA verification after Team 06 `BT-05` handoff.
 - Team 10: review after QA acceptance.
-- Team 03: architecture prep for `CF-W2-BT-05` while no signoff packet is waiting.
+- Team 03: Architect Signoff after review acceptance; otherwise prepare `CF-W2-TSC-05` after Today Review writer release.
 - Team 02: rolling direct investor/trader-value discovery, reading root `AGENTS.md` first.
 
 ---

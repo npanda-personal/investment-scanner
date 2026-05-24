@@ -15,13 +15,13 @@ Team 00 correction: `CF-W1-SIG-LATEST-01` is already accepted from 2026-05-17 an
 | Rank | ID | Why now | Next gate |
 | --- | --- | --- | --- |
 | 1 | `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` | Today Review needs one compact supporting-trust evidence chain after DQ, calibration, and backtesting trust slices, without inventing a score or target framing. | Active Team 07 implementation in short worktree `C:\work\repo\investment-scanner-worktrees\t7-tsc03a`. |
-| 2 | `CF-W2-TSC-04` | Today Review source/docs still expose target/reward and Trade Plan-style language that conflicts with trusted signal candidate workflow. | Planning-only; implementation waits for `TSC-03A` to release Today Review files. |
-| 3 | `CF-W2-BT-05` | Backtesting exit evidence must separate documented rule exits/invalidation from optional take-profit simulation assumptions. | Route to Team 03 architecture prep now; disjoint from active Today Review writer set. |
-| 4 | `CF-W1-DQ-02` residual parent | `DQ-02A` is complete, but parent read-side/public-contract scope still holds an upstream trust gap for signals and backtesting. | Team 03 found the residual blocked until Team 00 opens a DQE persisted read-side/public-contract packet. |
-| 5 | `CF-W1-MD-02A` | Market-data durable evidence storage remains high-value upstream trust work, even though it is still consent-gated. | Proposal-only until explicit schema/storage consent opens. |
-| 6 | `CF-W1-SQLAB-02B` | Durable Signal Quality learning memory would strengthen post-event review and calibration continuity. | Proposal-only until storage consent opens. |
-| 7 | `OPEN-PO-DISCOVERY-01` | Keep the backlog filled with direct investor/trader-value candidates. | Team 02 rolling audit should continue across Market Data, DQ, Signal Generation, Backtesting, Calibration, and Today Review. |
-| 8 | `OPEN-ARCH-PREP-01` | Keep architecture prep ahead of available implementation capacity. | Team 03 should prepare non-overlapping direct-value packets or signoff packets as they appear. |
+| 2 | `CF-W2-BT-05` | Backtesting exit evidence must separate documented rule exits/invalidation from optional take-profit simulation assumptions. | Promoted and assigned to Team 06 in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-BT-05`, stacked on `2bd794f`. |
+| 3 | `CF-W2-TSC-04` | Today Review source/docs still expose target/reward and Trade Plan-style language that conflicts with trusted signal candidate workflow. | Planning-only; implementation waits for `TSC-03A` to release Today Review files. |
+| 4 | `CF-W2-TSC-05` | Today Review ranking/eligibility must not continue relying on target/reward geometry after copy cleanup. | Planning-only; route to Team 03 after Today Review writer set is released. |
+| 5 | `CF-W1-DQ-02` residual parent | `DQ-02A` is complete, but parent read-side/public-contract scope still holds an upstream trust gap for signals and backtesting. | Team 03 found the residual blocked until Team 00 opens a DQE persisted read-side/public-contract packet. |
+| 6 | `CF-W1-MD-02A` | Market-data durable evidence storage remains high-value upstream trust work, even though it is still consent-gated. | Proposal-only until explicit schema/storage consent opens. |
+| 7 | `CF-W1-SQLAB-02B` | Durable Signal Quality learning memory would strengthen post-event review and calibration continuity. | Proposal-only until storage consent opens. |
+| 8 | `OPEN-PO-DISCOVERY-01` | Keep the backlog filled with direct investor/trader-value candidates. | Team 02 rolling audit should continue across Market Data, DQ, Signal Generation, Backtesting, Calibration, and Today Review. |
 | 9 | `CF-W2-SIG-01A` | Signal generation runs should fail closed on missing/unavailable DQ before downstream candidates trust generated output. | Accepted and locally committed on Team 06 branch as `24f938b`; do not reassign. |
 | 10 | `CF-W1-SIG-LATEST-01` | Latest instrument signal reads must not expose legacy or auto-generated trusted-looking signals without DQ readiness evidence. | Accepted on 2026-05-17; do not reassign. |
 
@@ -49,7 +49,8 @@ Do not treat these as the next fresh Team 02 pull:
 - `CF-W1-TP-03` is paused/stale as currently framed. Do not execute Trade Plan proof-snapshot freshness work unless it is reframed into Trusted Signal Candidate health with no R:R, arbitrary targets, synthetic targets, or Trade Plan-first UX.
 - `CF-W2-SIG-01A` is accepted and locally committed as `24f938b`; it is no longer a fresh Team 02 or Team 06 pull.
 - `CF-W1-SIG-LATEST-01` is already accepted from 2026-05-17; it is no longer a fresh Team 02 or Team 06 pull.
-- `CF-W2-TSC-04` and `CF-W2-BT-05` were created by the 2026-05-24 rolling PO audit and remain planning-only.
+- `CF-W2-BT-05` is promoted and assigned to Team 06; do not treat it as fresh planning work.
+- `CF-W2-TSC-04` and `CF-W2-TSC-05` remain planning-only Today Review follow-ons.
 - `CF-W1-BT-04` remains separate from accepted `BT-03` and must not widen into advanced validation scope.
 
 ## Routing Guidance

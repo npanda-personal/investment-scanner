@@ -55,7 +55,8 @@ Current implementation:
 Current rolling prep:
 
 - `CF-W2-TSC-04`: planning-only Today Review no-target language cleanup; implementation blocked until `TSC-03A` releases Today Review files.
-- `CF-W2-BT-05`: planning-only Backtesting rule exit/invalidation evidence; safe for Team 03 architecture prep because it is disjoint from active Today Review work.
+- `CF-W2-BT-05`: promoted to Team 06 as a bounded backend-only Backtesting Strategy Lab implementation slice after Team 03 architecture prep and Team 04 QA planning.
+- `CF-W2-TSC-05`: new planning-only Today Review no-target ranking / eligibility reframe requirement; implementation blocked until `TSC-03A` releases Today Review files and Team 03 prepares a bounded split.
 - `CF-W1-SIG-LATEST-01`: already accepted from 2026-05-17; not a fresh candidate.
 
 Current state:
@@ -64,15 +65,18 @@ Current state:
 - `CF-W1-TSC-02A-TREV-HEALTH`: Committed on implementation branch; no push.
 - `CF-W2-SIG-01A`: Committed on Team 06 branch; no push.
 - `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`: Implementation in progress with Team 07 in a dedicated stacked worktree.
+- `CF-W2-BT-05`: Ready for Implementation / assigned to Team 06 on stacked backtesting worktree `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-BT-05`.
 - Open decisions: 0.
 - Product Owner action required: no.
 
 Teams ready to pick up new tasks:
 
 - Team 07: continue `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` implementation now.
+- Team 06: implement `CF-W2-BT-05` in the dedicated stacked Backtesting worktree.
 - Team 04: QA verification after Team 07 handoff.
+- Team 04: QA verification after Team 06 `BT-05` handoff.
 - Team 10: review after QA acceptance.
-- Team 03: architecture prep for `CF-W2-BT-05` while no signoff packet is waiting.
+- Team 03: architecture prep for `CF-W2-TSC-05` after Today Review files are free, or Architect Signoff after Team 10 acceptance.
 - Team 02: continue rolling requirements discovery focused on direct investor/trader value.
 
 ## Latest Team 00 Routing Update - MD-05 Rework And TSC-02A Resource Gate

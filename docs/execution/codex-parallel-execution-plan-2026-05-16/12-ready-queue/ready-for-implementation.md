@@ -6,6 +6,57 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+2026-05-24 Team 00 Ready promotion - `CF-W2-BT-05`:
+
+- `CF-W2-BT-05` is promoted and assigned to Team 06 as a bounded backend-only Backtesting Strategy Lab implementation slice.
+- Purpose: add documented-rule exit / invalidation supporting evidence separated from optional take-profit simulation assumptions.
+- Parallel-safety decision: safe to run while Team 07 owns Today Review `TSC-03A`, because the writer set is isolated to Backtesting Strategy Lab backend files.
+- Branch recommendation: `codex/team06-strategy-signal/CF-W2-BT-05`.
+- Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-BT-05`.
+- Required base: accepted `CF-W1-BT-04` commit `2bd794f feat: add backtesting proof freshness labels`, not plain `dev`.
+- Gate evidence:
+  - Requirement: `10-requirements/CF-W2-BT-05-backtesting-rule-exit-invalidation-evidence-requirement.md`
+  - Architecture review: `03-architecture/CF-W2-BT-05-architecture-review.md`
+  - Contract: `06-contracts/CF-W2-BT-05-backtesting-rule-exit-invalidation-evidence-contract.md`
+  - Work packet: `08-work-packets/CF-W2-BT-05-work-packet.md`
+  - QA plan: `04-qa/CF-W2-BT-05-qa-plan.md`
+  - Open decisions: none.
+- Allowed implementation files:
+  - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.ts`
+  - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.types.ts`
+  - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+  - `backend/tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.test.ts`
+- Allowed reporting docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-CF-W2-BT-05-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W2-BT-05-developer-handoff.md`
+- Forbidden scope:
+  - Backtesting repository/controller/router/validation/module/index files
+  - backtesting route/validation tests outside the focused service test
+  - Strategy Framework, Signal Quality Lab, Strategy Decision Engine, Trade Plan Risk Engine, Market Data, Today Review, or other upstream/downstream source/tests
+  - all frontend files and frontend tests
+  - Prisma schema or migrations
+  - backend or frontend route registries
+  - shared backend utilities or shared frontend components
+  - package manifests
+  - generated files
+  - provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential files
+  - target-price, profit-target, reward/risk, `R:R`, Trade Plan-first, buy/sell, guarantee, or financial-advice wording
+- Required validation:
+
+```powershell
+cd backend
+npm.cmd test -- backtesting-strategy-lab.service.test.ts --runInBand
+npm.cmd run build
+```
+
+- Required language guard:
+
+```powershell
+rg -n "target price|price target|profit target|reward/risk|R:R|buy now|sell now|must buy|must sell|guaranteed|financial advice|automated trade instruction|target evidence" backend/src/modules/backtesting-strategy-lab backend/tests/modules/backtesting-strategy-lab
+```
+
+- Stop if implementation requires repository, route/controller, validation/module/index, frontend, Today Review, Strategy Framework, Signal Quality, Strategy Decision, Trade Plan, Market Data, Prisma/schema, shared, package, generated, provider/live, startup/backfill, or target/R:R/profit-target/advice scope.
+
 2026-05-24 Team 00 Ready promotion - `CF-W2-SIG-01A`:
 
 - `CF-W2-SIG-01A` is promoted and assigned to Team 06 as a bounded Signal Generation run-path Data Quality fail-closed implementation/validation slice.
