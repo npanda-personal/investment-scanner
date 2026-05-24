@@ -6,6 +6,61 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+2026-05-24 Team 00 Ready promotion - `CF-W1-BT-04`:
+
+- `CF-W1-BT-04` is promoted and assigned to Team 06 as an independent Backtesting Strategy Lab implementation slice.
+- Purpose: add additive saved-run freshness/current-proof labels so users can distinguish current proof, stale proof, repaired historical evidence, limited historical proof, and unavailable proof basis without overclaiming forward reliability.
+- Parallel-safety decision: safe to run in parallel with Team 07 `CF-W1-TSC-01A-TREV` rework because file reservations are disjoint (`backtesting-strategy-lab` vs `today-trade-review`).
+- Required base: accepted `CF-W1-BT-03` branch commit `8f984b1 feat: add backtesting proof basis guardrail`.
+- Branch recommendation: `codex/team06-strategy-signal/CF-W1-BT-04`.
+- Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-BT-04`.
+- Gate evidence:
+  - Requirement: `10-requirements/CF-W1-BT-04-backtesting-run-freshness-and-current-proof-labels-requirement.md`
+  - Architecture review: `03-architecture/CF-W1-BT-04-architecture-review.md`
+  - Contract: `06-contracts/CF-W1-BT-04-backtesting-run-current-proof-freshness-contract.md`
+  - Work packet: `08-work-packets/CF-W1-BT-04-work-packet.md`
+  - QA plan: `04-qa/CF-W1-BT-04-qa-plan.md`
+  - Open decisions: none.
+- Allowed implementation files:
+  - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.ts`
+  - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.types.ts`
+  - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+  - `backend/tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.test.ts`
+  - `frontend/src/features/backtesting-strategy-lab/types.ts`
+  - `frontend/src/features/backtesting-strategy-lab/components/BacktestingStrategyLabPage.tsx`
+  - `frontend/tests/ui/backtesting-strategy-lab.spec.ts`
+- Allowed reporting docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-CF-W1-BT-04-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-BT-04-developer-handoff.md`
+- Forbidden scope:
+  - Prisma schema or migrations
+  - generated files
+  - Backtesting repository, controller, router, validation, module, or index files
+  - route registries
+  - `frontend/src/features/backtesting-strategy-lab/api/**`
+  - `frontend/src/features/backtesting-strategy-lab/hooks/**`
+  - `frontend/src/features/backtesting-strategy-lab/routes.tsx`
+  - Strategy Framework, Trade Plan, Market Data, Data Quality, Signal Generation, Today Review, or other upstream/downstream module source/tests
+  - shared backend utilities or shared frontend components
+  - package manifests
+  - provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential files
+  - simulation-math, benchmark-math, proof-basis, ranking, persistence, route-contract, or saved-run storage rewrites
+- Required validation:
+
+```powershell
+cd backend
+npm.cmd test -- backtesting-strategy-lab.service.test.ts --runInBand
+npm.cmd run build
+```
+
+```powershell
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- backtesting-strategy-lab.spec.ts --workers=1
+```
+
+- Stop if implementation needs any forbidden file, fabricates current proof from stale/repaired/limited evidence, introduces target/R:R/advice wording, or cannot preserve list/detail consistency for the same saved run.
+
 2026-05-24 Team 00 Ready promotion - `CF-W1-TSC-01A-TREV`:
 
 - `CF-W1-TSC-01A-TREV` is promoted and assigned to Team 07 as the Today Review adoption child for Trusted Signal Candidate evidence.

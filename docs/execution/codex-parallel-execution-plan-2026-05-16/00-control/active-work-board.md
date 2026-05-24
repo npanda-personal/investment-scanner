@@ -34,6 +34,42 @@ No historical active work items have been migrated as active.
 - Rejected / Rework
 - Deferred
 
+## Latest Team 00 Routing Update - BT-04 Ready Promotion
+
+Date: 2026-05-24
+
+`CF-W1-BT-04` is promoted to Team 06 as an independent Backtesting Strategy Lab implementation slice.
+
+Runtime evidence:
+
+- Team 02 refined the requirement with explicit acceptance criteria and no-target/no-R:R guardrails.
+- Team 03 prepared architecture, contract, and work packet evidence.
+- Team 04 prepared the QA plan and marked the packet `ACCEPT / READY-FOR-TEAM00-EVALUATION`.
+- Open decisions: 0.
+- Product Owner action required: no.
+
+Routing:
+
+- Team 06 owns implementation in `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-BT-04`.
+- Branch: `codex/team06-strategy-signal/CF-W1-BT-04`.
+- Required base: accepted `CF-W1-BT-03` commit `8f984b1 feat: add backtesting proof basis guardrail`.
+- Team 07 `CF-W1-TSC-01A-TREV` remains in rejected/rework state and is unaffected because the writer sets are disjoint.
+
+Current state:
+
+- `CF-W1-BT-04`: Ready for Implementation / assigned to Team 06.
+- `CF-W1-TSC-01A-TREV`: Rejected / Rework in Team 07 after Team 10 trust-safety findings.
+- `CF-W1-DQ-03`: Committed on Team 05 branch as `26398aa feat: add data quality residual summary`.
+
+Teams ready to pick up new tasks:
+
+- Team 06: implement `CF-W1-BT-04`.
+- Team 07: complete `CF-W1-TSC-01A-TREV` rework.
+- Team 04: QA Verification after either Team 06 or Team 07 handoff.
+- Team 10: Code Review after QA acceptance.
+- Team 03: Architect Signoff after Team 10 acceptance.
+- Team 02: rolling PO/requirements discovery can continue on direct investor/trader-value items.
+
 ## Latest Team 00 Routing Update - SIG Trigger Entry Evidence
 
 Date: 2026-05-24

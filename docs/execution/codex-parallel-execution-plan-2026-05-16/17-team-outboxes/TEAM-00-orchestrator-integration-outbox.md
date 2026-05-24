@@ -1,5 +1,38 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - BT-04 Ready Promotion
+
+Date: 2026-05-24
+
+Status:
+
+- Branch: `dev`.
+- Open decisions: 0.
+- Product Owner action required: no.
+- Team 02/03 rolling requirement and architecture prep committed as `a7c8e2d docs: prepare rolling tsc and backtesting requirements`.
+- Team 04 BT-04 QA plan committed as `a5e7482 docs: add backtesting proof freshness qa plan`.
+
+Completed:
+
+- Team 10 rejected `CF-W1-TSC-01A-TREV` on trust-safety issues; Team 00 returned only that workstream to Team 07 rework.
+- Team 05 `CF-W1-DQ-03` completed gates and was committed in its worktree as `26398aa feat: add data quality residual summary`.
+- Team 00 promoted `CF-W1-BT-04` to Team 06 as the next independent implementation item.
+
+Routing:
+
+- `CF-W1-BT-04`: Team 06 implementation in `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-BT-04`, branch `codex/team06-strategy-signal/CF-W1-BT-04`, stacked on accepted BT-03 commit `8f984b1`.
+- `CF-W1-TSC-01A-TREV`: Team 07 rework remains active in `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-TSC-01A-TREV`.
+- Push performed: no.
+
+Teams ready to pick up new tasks:
+
+- Team 06: `CF-W1-BT-04` implementation.
+- Team 07: `CF-W1-TSC-01A-TREV` trust-safety rework.
+- Team 04: QA Verification after next developer handoff.
+- Team 10: Code Review after Team 04 accepts QA.
+- Team 03: Architect Signoff after Team 10 accepts review.
+- Team 02: rolling PO/requirements discovery for direct investor/trader value.
+
 ## Latest Runtime Checkpoint - TSC-01A Signal Bridge Promotion
 
 Date: 2026-05-24

@@ -2,6 +2,35 @@
 
 Date: 2026-05-20
 
+## Latest Runtime Checkpoint - BT-04 Promotion And TREV Rework
+
+Date: 2026-05-24
+
+Completed:
+
+- Team 10 rejected `CF-W1-TSC-01A-TREV` on two blocking trust-safety issues: nullable/blank trigger prices passing finite checks and legacy rows without trusted-candidate evidence falling into trusted review.
+- Team 00 returned `CF-W1-TSC-01A-TREV` to Team 07 rework without escalating to the human Product Owner.
+- Team 02 and Team 03 completed rolling requirement/architecture prep for `CF-W1-TSC-02` and `CF-W1-BT-04`; docs committed as `a7c8e2d`.
+- Team 04 completed the `CF-W1-BT-04` QA plan; docs committed as `a5e7482`.
+- Team 05 `CF-W1-DQ-03` completed all gates and was committed in its dedicated branch as `26398aa`.
+
+Routing:
+
+- `CF-W1-BT-04`: promoted to Team 06 in a dedicated worktree, required base `8f984b1`.
+- `CF-W1-TSC-01A-TREV`: still active in Team 07 rework.
+- `CF-W1-TSC-02`: parked until `CF-W1-TSC-01A-TREV` is accepted.
+- Open decisions: 0.
+- Product Owner action required: no.
+
+Teams ready to pick up new tasks:
+
+- Team 06: implement `CF-W1-BT-04`.
+- Team 07: complete `CF-W1-TSC-01A-TREV` rework.
+- Team 04: QA Verification after either implementation handoff.
+- Team 10: Code Review after QA acceptance.
+- Team 03: Architect Signoff after Team 10 acceptance.
+- Team 02: continue rolling requirements discovery.
+
 ## Latest Runtime Checkpoint - TSC-01A Ready Promotion
 
 Date: 2026-05-24

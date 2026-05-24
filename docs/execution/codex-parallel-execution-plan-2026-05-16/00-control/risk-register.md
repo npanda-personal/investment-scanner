@@ -186,6 +186,15 @@
 - Shared/high-risk boundaries remain blocked: Prisma, route registries, shared backend utilities or DTOs, shared UI, package manifests, generated files, Data Quality Engine source/exports, watchlist, alerts, portfolio-intelligence, frontend, providers, startup/backfill, live providers, paid/cloud, broker, and telemetry.
 - If Team 07 discovers a need for any forbidden file or for `LIMITED` to become action-ready, the workstream stops and returns to Team 00 for blocker routing.
 
+## Team 00 BT-04 Ready Promotion Risk Decisions - 2026-05-24
+
+- `CF-W1-BT-04` is promoted only as a `backtesting-strategy-lab` saved-run freshness/current-proof labeling slice.
+- Team 06 must use a dedicated worktree and stack on accepted `CF-W1-BT-03` commit `8f984b1`; plain `dev` is not an acceptable implementation base for this slice.
+- The allowed writer set is limited to Backtesting service/types/docs/service-test, feature-local Backtesting page/types, and the focused Backtesting UI spec.
+- Repository/controller/router/validation/module/index, route registries, Prisma/schema/migrations, generated files, shared utilities/UI, packages, provider/live/startup/backfill, and upstream/downstream module source remain blocked.
+- Any implementation that fabricates current proof from stale, repaired, limited, unavailable, or missing proof evidence is a QA/review reject.
+- Any target-price, reward/risk, `R:R`, Trade Plan-first, buy/sell, guarantee, broker, automation, or financial-advice wording is a QA/review reject.
+
 ## Team 00 Review Rework Risk Decisions - 2026-05-18
 
 - Team 04 first-pass QA passed for `CF-W1-L3-PORT-01A`, but Team 10 rejected release acceptance because the portfolio mapper can treat automation-only Data Quality blockers as portfolio display hard blockers.

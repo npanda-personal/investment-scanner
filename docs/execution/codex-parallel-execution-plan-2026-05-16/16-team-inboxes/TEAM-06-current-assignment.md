@@ -2,6 +2,95 @@
 
 Date: 2026-05-20
 
+## Latest Assignment Override - 2026-05-24 BT-04
+
+Team 00 promotes `CF-W1-BT-04` as an independent Team 06 implementation item while Team 07 continues `CF-W1-TSC-01A-TREV` rework.
+
+Work item:
+
+- `CF-W1-BT-04` - Backtesting saved-run freshness and current-proof labels.
+
+Branch / worktree:
+
+- Branch: `codex/team06-strategy-signal/CF-W1-BT-04`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-BT-04`
+- Required base: accepted `CF-W1-BT-03` commit `8f984b1 feat: add backtesting proof basis guardrail`
+
+Evidence to use:
+
+- Requirement: `10-requirements/CF-W1-BT-04-backtesting-run-freshness-and-current-proof-labels-requirement.md`
+- Architecture review: `03-architecture/CF-W1-BT-04-architecture-review.md`
+- Contract: `06-contracts/CF-W1-BT-04-backtesting-run-current-proof-freshness-contract.md`
+- Work packet: `08-work-packets/CF-W1-BT-04-work-packet.md`
+- QA plan: `04-qa/CF-W1-BT-04-qa-plan.md`
+- Ready handoff: `12-ready-queue/ready-for-implementation.md`
+
+Allowed files:
+
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.types.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+- `backend/tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.test.ts`
+- `frontend/src/features/backtesting-strategy-lab/types.ts`
+- `frontend/src/features/backtesting-strategy-lab/components/BacktestingStrategyLabPage.tsx`
+- `frontend/tests/ui/backtesting-strategy-lab.spec.ts`
+
+Allowed reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-CF-W1-BT-04-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-BT-04-developer-handoff.md`
+
+Required behavior:
+
+- Add additive current-proof freshness metadata for saved Backtesting Strategy Lab runs.
+- Distinguish `CURRENT_PROOF`, `STALE_PROOF`, `REPAIRED_HISTORICAL`, `LIMITED_HISTORICAL_PROOF`, and unavailable proof basis with visible reasons.
+- Ensure saved-run list and selected-run detail show the same label and same reason summary for the same run.
+- Preserve benchmark, availability, data coverage, realism-warning, exit-diagnostic, and calculation-audit evidence.
+- Preserve existing execution behavior, routes, query params, API paths, payload compatibility, and feature-local UI boundaries.
+- Keep wording research-support oriented; do not introduce arbitrary target, reward/risk, `R:R`, Trade Plan-first, buy/sell, guaranteed, broker, automation, or financial-advice language.
+
+Forbidden files:
+
+- Prisma schema or migrations
+- generated files
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.repository.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.controller.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.router.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.validation.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.module.ts`
+- `backend/src/modules/backtesting-strategy-lab/index.ts`
+- backend or frontend route registries
+- `frontend/src/features/backtesting-strategy-lab/api/**`
+- `frontend/src/features/backtesting-strategy-lab/hooks/**`
+- `frontend/src/features/backtesting-strategy-lab/routes.tsx`
+- Strategy Framework, Trade Plan Risk Engine, Market Data, Data Quality, Signal Generation, Today Review, or other upstream/downstream module source/tests
+- shared backend utilities or shared frontend components
+- package manifests
+- provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential files
+- simulation-math, benchmark-math, proof-basis, ranking, persistence, route-contract, or saved-run storage rewrites
+
+Required validation:
+
+```powershell
+cd backend
+npm.cmd test -- backtesting-strategy-lab.service.test.ts --runInBand
+npm.cmd run build
+```
+
+```powershell
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- backtesting-strategy-lab.spec.ts --workers=1
+```
+
+Expected handoff:
+
+- Update `17-team-outboxes/TEAM-06-CF-W1-BT-04-outbox.md`.
+- Create/update `18-integration-queue/CF-W1-BT-04-developer-handoff.md`.
+- Record exact branch/worktree, base commit, changed files, inspected files, behavior changed, tests run, skipped checks, forbidden files confirmed untouched, risks, blockers, and next gate: Team 04 QA Verification.
+
+Stop and return to Team 00 if implementation needs any forbidden file, cannot run on the required accepted base, overclaims stale/repaired/limited evidence as current proof, or introduces target/R:R/advice semantics.
+
 ## Latest Assignment Override - 2026-05-24 TSC Signal Bridge
 
 Team 00 promotes `CF-W1-TSC-01A-SIG` as the first executable Trusted Signal Candidate child.
