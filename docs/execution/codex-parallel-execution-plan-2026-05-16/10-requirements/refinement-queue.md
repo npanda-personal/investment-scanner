@@ -11,15 +11,15 @@ Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-
 | Rank | ID | Why it stays next | Team 00 routing note |
 | --- | --- | --- | --- |
 | 1 | `CF-W1-TSC-01` | Trusted Signal Candidates should become the `/today-review` workflow and replace Trade Plan/R:R/target-first framing. | Requirement, architecture, contract, work packet, and QA plan are drafted; implementation is blocked until rule-triggered entry price evidence is source-proven. |
-| 2 | `CF-W1-BT-04` | Backtesting saved runs need a current-proof label so older saved simulations do not read like the latest proof window. | Keep refinement-only behind TSC work; Team 04 QA planning can run later. |
-| 3 | `CF-W1-DQ-02` residual parent | `DQ-02A` is complete, but the parent still has read-side/public-contract scope that may need a bounded no-schema child. | Team 03 should identify a bounded follow-up or keep the residual parent blocked. |
-| 4 | `CF-W1-L3-DQ-01A` | Passive readiness display semantics remain a real Lane 3 trust contract gap. | Keep contract-only unless Team 03/04 define a bounded child that does not collide with active Lane 3 work. |
-| 5 | `CF-W1-MD-02A` | Durable market-data evidence storage still has clear investor value, but it is consent-gated. | Keep proposal-only until schema/generated/repository consent opens. |
-| 6 | `CF-W1-SQLAB-02B` | Durable Signal Quality learning memory remains useful after the current read/review trust slices. | Keep proposal-only until storage/schema/repository/generated consent opens. |
-| 7 | `CF-W1-STRAT-02B` | Durable strategy revision history still matters for explainability and review trust. | Keep proposal-only until schema/migration/generated/repository approval opens. |
-| 8 | `CF-W1-L3-ALERT-03` | Alert follow-through traceability is useful, but it is lower value than current market-data, DQ, strategy, trade-plan, and backtesting trust gaps. | Keep behind the direct-value trust stack unless it becomes a correctness or privacy blocker. |
-| 9 | `CF-W1-UX-02` | Copilot trust UX still matters, but it remains downstream of the core data and strategy trust stack. | Keep behind direct investor/trader value unless a trust blocker appears. |
-| 10 | `CF-W1-UX-05` | Research-support copy cleanup is still useful, but not ahead of core evidence gaps. | Keep proposal-only until higher-value trust slices clear. |
+| 2 | `CF-W1-SIG-TRIGGER-ENTRY-01` | TSC cannot produce `Highly Trusted` candidates without source-proven trigger price, trigger timestamp, and rule provenance. | Team 02 should define the requirement; Team 03/04 should test whether a no-schema/no-route/no-shared child exists or route a consent packet. |
+| 3 | `CF-W1-BT-04` | Backtesting saved runs need a current-proof label so older saved simulations do not read like the latest proof window. | Keep refinement-only behind TSC dependency work; Team 04 QA planning can run later. |
+| 4 | `CF-W1-DQ-02` residual parent | `DQ-02A` is complete, but the parent still has read-side/public-contract scope that may need a bounded no-schema child. | Team 03 should identify a bounded follow-up or keep the residual parent blocked. |
+| 5 | `CF-W1-L3-DQ-01A` | Passive readiness display semantics remain a real Lane 3 trust contract gap. | Keep contract-only unless Team 03/04 define a bounded child that does not collide with active Lane 3 work. |
+| 6 | `CF-W1-MD-02A` | Durable market-data evidence storage still has clear investor value, but it is consent-gated. | Keep proposal-only until schema/generated/repository consent opens. |
+| 7 | `CF-W1-SQLAB-02B` | Durable Signal Quality learning memory remains useful after the current read/review trust slices. | Keep proposal-only until storage/schema/repository/generated consent opens. |
+| 8 | `CF-W1-STRAT-02B` | Durable strategy revision history still matters for explainability and review trust. | Keep proposal-only until schema/migration/generated/repository approval opens. |
+| 9 | `CF-W1-L3-ALERT-03` | Alert follow-through traceability is useful, but it is lower value than current market-data, DQ, strategy, trade-plan, and backtesting trust gaps. | Keep behind the direct-value trust stack unless it becomes a correctness or privacy blocker. |
+| 10 | `CF-W1-UX-02` | Copilot trust UX still matters, but it remains downstream of the core data and strategy trust stack. | Keep behind direct investor/trader value unless a trust blocker appears. |
 
 ## Audit-Backed Notes
 
@@ -60,9 +60,10 @@ Reason: active, accepted, parked, or already assigned in the Ready flow.
 
 ## Teams Ready For New Prep
 
-- Team 03: continue active architecture prep for `CF-W1-HCTX-03`, `CF-W1-DQ-03`, and `CF-W1-MCTX-02`; next follow-ons remain `CF-W1-STRAT-04` and `CF-W1-SQLAB-03`.
-- Team 04: keep QA planning aligned with the same order; do not pull residual or consent-gated items ahead of the current top five.
-- Team 00: prioritize the upstream Signal Trigger entry-price evidence gap before `CF-W1-TSC-01A` Ready promotion. Keep `CF-W1-TP-03` paused as framed.
+- Team 02: define `CF-W1-SIG-TRIGGER-ENTRY-01` as the next requirement child for rule-triggered entry-price evidence.
+- Team 03: prepare architecture/file-reservation readiness for `CF-W1-SIG-TRIGGER-ENTRY-01`, proving whether a no-schema/no-route/no-shared Signal Generation child exists.
+- Team 04: prepare a QA plan for `CF-W1-SIG-TRIGGER-ENTRY-01`, including rejection checks for invented trigger prices, target/R:R leakage, and direct advice wording.
+- Team 00: keep `CF-W1-TSC-01A` out of Ready until the upstream evidence gap closes. Keep `CF-W1-TP-03` paused as framed.
 
 ## Team 02 Constraint Reminder
 

@@ -11,11 +11,12 @@ Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-
 | ID | Why it matters now | Next gate |
 | --- | --- | --- |
 | `CF-W1-TSC-01` | `/today-review` should become the Trusted Signal Candidate workflow: high-trust counts, rule-triggered entry price, reason summary, health, and rule-based exit/invalidation without R:R or targets. | Blocked from implementation until rule-triggered entry price evidence is source-proven or PO/Architect accept a zero-highly-trusted first slice. |
-| `CF-W1-HCTX-03` | Historical context needs age and provenance warnings so nearest snapshots do not read like same-day evidence. | Team 03 architecture contract and QA planning. |
+| `CF-W1-SIG-TRIGGER-ENTRY-01` | Signal Trigger needs source-proven rule-triggered entry price, trigger timestamp, and rule provenance before Today Review can classify any candidate as `Highly Trusted`. | Team 02 requirement refinement, Team 03 architecture/file-reservation prep, and Team 04 QA planning. |
+| `CF-W1-HCTX-03` | Historical context needs age and provenance warnings so nearest snapshots do not read like same-day evidence. | Accepted and locally committed as `f6034c6`; wait for clean integration sequencing. |
 | `CF-W1-DQ-03` | Downstream trust consumers need a compact residual reason summary instead of raw DQ arrays. | Team 03 architecture contract and QA planning. |
-| `CF-W1-MCTX-02` | Market Context needs an explicit persisted-versus-generated freshness basis label. | Team 03 architecture contract and QA planning. |
-| `CF-W1-STRAT-04` | Strategy evidence needs freshness and stale-summary labels so compact summaries do not overclaim recency. | Team 03 architecture contract and QA planning. |
-| `CF-W1-SQLAB-03` | Signal Quality Lab needs review-loop actionability for noisy and limited outcomes. | Team 03 architecture contract and QA planning. |
+| `CF-W1-MCTX-02` | Market Context needs an explicit persisted-versus-generated freshness basis label. | Accepted and locally committed as `0c802c2`; wait for clean integration sequencing. |
+| `CF-W1-STRAT-04` | Strategy evidence needs freshness and stale-summary labels so compact summaries do not overclaim recency. | Accepted and locally committed as `8b3498e`; wait for clean integration sequencing. |
+| `CF-W1-SQLAB-03` | Signal Quality Lab needs review-loop actionability for noisy and limited outcomes. | Accepted and locally committed as `5db98f2`; wait for clean integration sequencing. |
 | `CF-W1-TP-03` | Paused/stale as framed; Trade Plan proof snapshot freshness does not match the new Trusted Signal Candidate direction. | Do not execute unless reframed into signal health with no R:R, targets, or Trade Plan-first UX. |
 | `CF-W1-BT-04` | Backtesting saved runs need freshness/current-proof labels so older simulations do not read like latest proof. | Team 03 architecture contract and QA planning; keep first child additive and no-schema. |
 | `CF-W1-DQ-02` residual parent | `DQ-02A` currentness evidence is accepted, but read-side/public-contract residual scope remains split-required. | Team 03 should identify a bounded no-schema follow-up or keep the parent blocked. |
@@ -27,21 +28,21 @@ Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-
 | Rank | ID | State | Why now |
 | --- | --- | --- | --- |
 | 1 | `CF-W1-TSC-01` | Draft / blocked by trigger price evidence | Trusted Signal Candidates are now the primary workflow direction for daily signal review. |
-| 2 | `CF-W1-HCTX-03` | Accepted branch commit | Fresh nearest-snapshot age and provenance warnings are accepted and parked as `f6034c6`. |
+| 2 | `CF-W1-SIG-TRIGGER-ENTRY-01` | Draft requirement / architecture pending | It is the direct upstream dependency for TSC high-trust classification. |
 | 3 | `CF-W1-DQ-03` | Draft | Residual reason summary is the cleanest downstream trust gap on top of current DQ outputs. |
-| 4 | `CF-W1-MCTX-02` | Accepted branch commit | Persisted-versus-generated freshness basis labels are accepted and parked as `0c802c2`. |
-| 5 | `CF-W1-STRAT-04` | Implementation gate active | Strategy evidence freshness and stale-summary labels keep compact summaries honest. |
-| 6 | `CF-W1-SQLAB-03` | Implementation gate active | Review-loop actionability is the next useful Signal Quality trust surface. |
-| 7 | `CF-W1-BT-04` | Architecture prepared | Backtesting saved runs need explicit freshness/current-proof labeling. |
-| 8 | `CF-W1-DQ-02` residual parent | Split-required | Remaining read-side/public-contract scope after accepted `DQ-02A`. |
-| 9 | `CF-W1-L3-DQ-01A` | Contract-only | Lane 3 passive readiness DTOs still matter, but not as the next fresh implementation pull. |
-| 10 | `CF-W1-MD-02A` | Proposal-only | Market-data evidence storage remains gated. |
+| 4 | `CF-W1-BT-04` | Architecture prepared | Backtesting saved runs need explicit freshness/current-proof labeling. |
+| 5 | `CF-W1-DQ-02` residual parent | Split-required | Remaining read-side/public-contract scope after accepted `DQ-02A`. |
+| 6 | `CF-W1-L3-DQ-01A` | Contract-only | Lane 3 passive readiness DTOs still matter, but not as the next fresh implementation pull. |
+| 7 | `CF-W1-MD-02A` | Proposal-only | Market-data evidence storage remains gated. |
+| 8 | `CF-W1-SQLAB-02B` | Proposal-only | Durable Signal Quality learning memory remains useful but storage-gated. |
+| 9 | `CF-W1-STRAT-02B` | Proposal-only | Durable strategy revision history remains useful but schema/generated/repository-gated. |
+| 10 | `CF-W1-UX-02` | Copilot-only trust UX pending | Useful downstream trust work, but behind core signal evidence. |
 
 ## Rolling Audit Notes
 
 - The 2026-05-20 `audit-backtesting-proof-basis-2026-05-20.md` confirms `CF-W1-BT-03` stays parked and does not become a fresh Team 02 discovery item.
 - That same audit reinforces `CF-W1-BT-04` as the next backtesting trust slice because the queue still needs a compact current-proof label on saved runs.
-- No new evidence from the backtesting refresh outranks the current top five.
+- No new evidence from the backtesting refresh outranks the current Trusted Signal Candidate entry-price dependency.
 
 ## Active Or Parked Exclusions
 
@@ -59,6 +60,10 @@ Keep these out of fresh Team 02 discovery:
 - `CF-W1-DQ-02A`
 - `CF-W1-SQLAB-01`
 - `CF-W1-SQLAB-02A`
+- `CF-W1-SQLAB-03`
+- `CF-W1-STRAT-04`
+- `CF-W1-HCTX-03`
+- `CF-W1-MCTX-02`
 - `CF-W1-RH-01`
 - `CF-W1-RH-02A`
 - `CF-W1-MD-04`
@@ -78,16 +83,16 @@ These are already promoted, active, accepted, parked, or otherwise in the live R
 
 These can move toward architecture/QA next without creating duplicate application-code work:
 
-1. `CF-W1-HCTX-03` as the next bounded historical-context freshness/provenance child
+1. `CF-W1-SIG-TRIGGER-ENTRY-01` as the next upstream Signal Trigger entry-price evidence child
 2. `CF-W1-DQ-03` as the next bounded downstream DQ residual-summary child
-3. `CF-W1-MCTX-02` as the next bounded Market Context freshness-basis child
-4. `CF-W1-STRAT-04` as the next bounded Strategy Framework freshness child
-5. `CF-W1-SQLAB-03` as the next bounded Signal Quality review-loop child
-6. `CF-W1-TP-03` as the next bounded Trade Plan proof-freshness child
-7. `CF-W1-BT-04` as the next bounded Backtesting current-proof labeling child
-8. `CF-W1-DQ-02` residual parent split for a possible bounded follow-up after accepted `DQ-02A`
-9. `CF-W1-L3-DQ-01A` as a contract-only child if Team 00 wants the passive Lane 3 display slice refreshed
-10. `CF-W1-MD-02A` as a consent-gated companion evidence packet
+3. `CF-W1-BT-04` as the next bounded Backtesting current-proof labeling child
+4. `CF-W1-DQ-02` residual parent split for a possible bounded follow-up after accepted `DQ-02A`
+5. `CF-W1-L3-DQ-01A` as a contract-only child if Team 00 wants the passive Lane 3 display slice refreshed
+6. `CF-W1-MD-02A` as a consent-gated companion evidence packet
+7. `CF-W1-SQLAB-02B` as a consent-gated durable Signal Quality memory packet
+8. `CF-W1-STRAT-02B` as a consent-gated durable strategy revision history packet
+9. `CF-W1-UX-02` as a Copilot-only trust UX packet behind core signal evidence
+10. `CF-W1-UX-05` as Copilot-only product-language cleanup behind `CF-W1-UX-02`
 
 ## Sequencing Candidates For Team 00
 

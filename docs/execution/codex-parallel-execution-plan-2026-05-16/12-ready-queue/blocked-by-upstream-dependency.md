@@ -4,6 +4,8 @@ Date: 2026-05-18
 
 | ID | Blocked item | Upstream dependency |
 | --- | --- | --- |
+| CF-W1-TSC-01 | Trusted Signal Candidate Workflow on `/today-review` | Source-proven rule-triggered entry price, trigger timestamp, and rule provenance. Current Today Review has reference/entry-zone values only, and current Signal Trigger contracts mark `trigger_price` unavailable. |
+| CF-W1-SIG-TRIGGER-ENTRY-01 | Signal Trigger entry-price evidence child | Team 02 requirement refinement, Team 03 architecture/file reservations, Team 04 QA plan, and current source inspection proving a no-schema/no-route/no-shared-file path or a separate decision packet if persistence/route/shared scope is needed. |
 | CF-W1-BT-01 | Backtesting DQ fail-closed behavior | DQ fail-closed policy and signal/strategy trust policy |
 | CF-W1-TP-01 | Trade Plan DQ hard blockers and no-target migration | Backend-only child contract, Team 03 reservation matrix, Team 06 inspection, and child QA plan are prepared as `CF-W1-TP-01B`; still needs Team 00 Ready promotion |
 | CF-W1-L3-ALERT-01 | Alert readiness consumer tests | Child architecture contract, Team 03 reservation matrix, exact backend file reservations, and child QA plan are prepared; still needs Team 00 Ready promotion |

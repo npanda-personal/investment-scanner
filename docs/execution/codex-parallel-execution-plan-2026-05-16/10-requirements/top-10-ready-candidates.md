@@ -11,15 +11,15 @@ Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-
 | Rank | ID | Why now | Next gate |
 | --- | --- | --- | --- |
 | 1 | `CF-W1-TSC-01` | `/today-review` should become the Trusted Signal Candidate workflow: high-trust counts, rule-triggered entry price, reason summary, health, and rule-based exit/invalidation without R:R or targets. | Blocked from implementation until source-proven rule-triggered entry price evidence exists or PO/Architect accept a zero-highly-trusted first slice. |
-| 2 | `CF-W1-HCTX-03` | Historical context needs age and provenance warnings so nearest snapshots do not read like same-day evidence. | Accepted and locally committed as `f6034c6`; wait for clean integration sequencing. |
+| 2 | `CF-W1-SIG-TRIGGER-ENTRY-01` | TSC needs source-proven trigger price, trigger timestamp, and rule provenance before any `Highly Trusted` candidate can be honest. | Team 02 requirement refinement, Team 03 architecture/file-reservation prep, and Team 04 QA planning. |
 | 3 | `CF-W1-DQ-03` | Downstream trust consumers need a compact residual reason summary instead of raw DQ arrays. | Team 03 architecture contract and QA planning. |
-| 4 | `CF-W1-MCTX-02` | Market Context needs an explicit persisted-versus-generated freshness basis label. | Accepted and locally committed as `0c802c2`; wait for clean integration sequencing. |
-| 5 | `CF-W1-STRAT-04` | Strategy evidence needs freshness and stale-summary labels so compact summaries do not overclaim recency. | Implementation complete; Team 04 QA verification active. |
-| 6 | `CF-W1-SQLAB-03` | Signal Quality Lab needs review-loop actionability for noisy and limited outcomes. | Implementation complete; Team 04 QA verification active. |
-| 7 | `CF-W1-BT-04` | Backtesting saved runs need current-proof labels so older saved simulations do not read like current proof. | Architecture prepared; needs Team 04 QA planning after higher-priority signal candidate direction. |
-| 8 | `CF-W1-DQ-02` residual parent | `DQ-02A` is complete, but parent read-side/public-contract scope remains split-required. | Team 03 should identify a bounded no-schema follow-up or keep the parent blocked. |
-| 9 | `CF-W1-L3-DQ-01A` | Passive readiness DTO semantics remain a contract gap, but not a fresh implementation pull. | Contract refresh only unless Team 03/04 define a bounded child. |
-| 10 | `CF-W1-MD-02A` | Market-data evidence storage is useful, but schema / generated / repository consent is required. | Proposal-only until explicit storage consent opens. |
+| 4 | `CF-W1-BT-04` | Backtesting saved runs need current-proof labels so older saved simulations do not read like current proof. | Architecture prepared; needs Team 04 QA planning after higher-priority signal candidate dependency. |
+| 5 | `CF-W1-DQ-02` residual parent | `DQ-02A` is complete, but parent read-side/public-contract scope remains split-required. | Team 03 should identify a bounded no-schema follow-up or keep the parent blocked. |
+| 6 | `CF-W1-L3-DQ-01A` | Passive readiness DTO semantics remain a contract gap, but not a fresh implementation pull. | Contract refresh only unless Team 03/04 define a bounded child. |
+| 7 | `CF-W1-MD-02A` | Market-data evidence storage is useful, but schema / generated / repository consent is required. | Proposal-only until explicit storage consent opens. |
+| 8 | `CF-W1-SQLAB-02B` | Durable Signal Quality learning memory remains useful after current read/review trust slices. | Proposal-only until storage consent opens. |
+| 9 | `CF-W1-STRAT-02B` | Durable strategy revision history remains useful for explainability. | Proposal-only until schema/generated/repository consent opens. |
+| 10 | `CF-W1-UX-02` | Copilot trust UX is still valuable but downstream of core signal evidence. | Keep Copilot-only and wait behind core TSC dependency work. |
 
 ## Fresh Pull Exclusions
 
@@ -31,6 +31,8 @@ Do not treat these as the next fresh Team 02 pull:
 - `CF-W1-CAL-01A` is accepted and locally committed as `308cee3`.
 - `CF-W1-TP-01A` is accepted and locally committed as `309a853`.
 - `CF-W1-DQ-02A` is accepted and locally committed as `c2d6753`.
+- `CF-W1-STRAT-04` is accepted and locally committed as `8b3498e`.
+- `CF-W1-SQLAB-03` is accepted and locally committed as `5db98f2`.
 - `CF-W1-SQLAB-01` is accepted and locally committed as `1a41d95`.
 - `CF-W1-SQLAB-02A` is now promoted and assigned to Team 06; do not treat it as unassigned.
 - `CF-W1-L3-TREV-02` and `CF-W1-L3-INTEL-03` are already promoted and assigned to Team 07.
@@ -45,9 +47,9 @@ Do not treat these as the next fresh Team 02 pull:
 ## Routing Guidance
 
 - Use `CF-W1-TSC-01` as the next product-direction requirement path, but do not promote implementation until trigger price evidence is source-proven.
-- Route the upstream Signal Trigger entry-price evidence gap through `CF-W1-SIG-TRIGGER-02` or a follow-on child before `TSC-01A`.
+- Route the upstream Signal Trigger entry-price evidence gap through `CF-W1-SIG-TRIGGER-ENTRY-01` as the next requirements/architecture/QA prep child before `TSC-01A`.
 - Do not execute `CF-W1-TP-03` as framed; pause and reframe only if needed for Trusted Signal Candidate health.
-- Continue gates for `CF-W1-STRAT-04` and `CF-W1-SQLAB-03` before new implementation.
+- `CF-W1-STRAT-04` and `CF-W1-SQLAB-03` gates are closed and parked as accepted branch commits; do not reopen them for fresh implementation.
 - Use `CF-W1-BT-04` as a later backtesting trust slice behind the Trusted Signal Candidate direction.
 - Treat `CF-W1-DQ-02` as the next Market Data / Data Quality residual parent only after the two new trade-plan/backtesting drafts are placed.
 - Keep `CF-W1-MD-02A` and `CF-W1-SQLAB-02B` proposal-only until explicit consent opens the gated paths.

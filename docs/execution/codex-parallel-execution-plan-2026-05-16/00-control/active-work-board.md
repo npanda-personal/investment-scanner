@@ -346,10 +346,9 @@ Old work items in `docs/codex-agent-team-plan/` may be used only as evidence or 
 |---|---|---|---|---|---|
 | CF-W1-TSC-01 | Trusted Signal Candidate Workflow | Teams 02, 03, 04, 00 | Drafted / Blocked By Trigger Price Evidence | Active execution docs | `/today-review` is the preferred first surface, but current source lacks rule-triggered entry price. No app-code implementation is Ready yet. |
 | CF-W1-TP-03 | Trade Plan proof snapshot freshness | Team 00 | Paused / Stale As Framed | Active execution docs | Product Owner rejected Trade Plan/R:R/target-first direction. Do not execute unless reframed into Trusted Signal Candidate health without targets/R:R. |
-| CF-W1-STRAT-04 | Strategy evidence freshness | Team 04 | QA Verification | Team 06 STRAT-04 worktree | Team 04 QA verification relaunched as `019e59c5-8123-74e2-b027-16bcd2e7baa5`. |
-| CF-W1-SQLAB-03 | Signal Quality review-loop actionability | Team 04 | QA Verification | Team 06 SQLAB-03 worktree | Team 04 QA verification relaunched as `019e59c5-c4e4-7881-b09c-16c0b65ecd4c`. |
 | CF-W1-STRAT-04 | Strategy evidence freshness | Teams 06, 04, 10, 03, 00 | Committed on implementation branch | Team 06 STRAT-04 worktree | QA, review, Architect Signoff, delegated PO acceptance, and scoped local commit `8b3498e` completed. No push or `dev` integration yet. |
-| CF-W1-SQLAB-03 | Signal Quality review-loop actionability | Teams 06, 04, 10 | Code Review | Team 06 SQLAB-03 worktree | QA accepted. Team 10 review relaunched as `019e59e4-2387-7873-aed7-abf179b72361` after prior reviewer stalled. |
+| CF-W1-SQLAB-03 | Signal Quality review-loop actionability | Teams 06, 04, 10, 03, 00 | Committed on implementation branch | Team 06 SQLAB-03 worktree | QA, review, Architect Signoff, delegated PO acceptance, and scoped local commit `5db98f2` completed. No push or `dev` integration yet. |
+| CF-W1-SIG-TRIGGER-ENTRY-01 | Signal trigger entry-price evidence dependency | Teams 02, 03, 04, 06 | Needs Requirement / Architecture / QA Prep | Active execution docs first | TSC implementation is blocked until source-proven rule-triggered entry price, trigger timestamp, and rule provenance exist without invented target/R:R semantics. |
 
 ## Autonomous Orchestrator Setup
 

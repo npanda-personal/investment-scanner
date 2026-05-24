@@ -6,6 +6,14 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+2026-05-24 Team 00 gate-closure update:
+
+- `CF-W1-STRAT-04` completed QA, review, Architect Signoff, delegated PO acceptance, and scoped local implementation-branch commit `8b3498e feat: add strategy evidence freshness labels`.
+- `CF-W1-SQLAB-03` completed QA, review, Architect Signoff, delegated PO acceptance, and scoped local implementation-branch commit `5db98f2 feat: add signal quality review actions`.
+- Neither branch has been pushed or integrated into `dev`.
+- `CF-W1-TSC-01` remains out of Ready because source-proven rule-triggered entry price, trigger timestamp, and rule provenance are missing.
+- Next Ready-prep dependency is a Signal Trigger entry-price evidence child (`CF-W1-SIG-TRIGGER-ENTRY-01`) before any Trusted Signal Candidate implementation can be promoted.
+
 2026-05-20 Team 00 Ready promotion:
 
 - `CF-W1-STRAT-04` is promoted and assigned to Team 06 as a bounded no-schema/no-route/no-shared-file Strategy Framework evidence-freshness and stale-summary implementation.

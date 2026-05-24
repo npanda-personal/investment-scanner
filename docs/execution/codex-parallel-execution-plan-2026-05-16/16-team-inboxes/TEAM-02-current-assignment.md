@@ -4,6 +4,29 @@ Date: 2026-05-18
 
 Team: TEAM-02 - Requirement Factory
 
+## Latest Assignment Override - 2026-05-24 Trusted Signal Candidate Dependency
+
+Before creating or changing requirements, read root `AGENTS.md` and preserve the Product Owner direction: direct investor/trader value first, no Trade Plan/R:R/target-price framing, no financial-advice wording, and no app-code implementation from Team 02.
+
+Assignment:
+
+1. Define `CF-W1-SIG-TRIGGER-ENTRY-01` as the next upstream requirement child for source-proven rule-triggered entry price, trigger timestamp, and rule provenance.
+2. Keep `CF-W1-TSC-01` as the top product-direction requirement, but do not move it to Ready while trigger price evidence is missing.
+3. Keep `CF-W1-TP-03` paused/stale unless reframed into Trusted Signal Candidate health without targets, R:R, synthetic profit targets, or Trade Plan-first UX.
+4. Update requirement queues only; Team 00 owns Ready movement.
+
+Allowed writes:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/**`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/**`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+Required output:
+
+- Requirement draft or queue update for `CF-W1-SIG-TRIGGER-ENTRY-01`.
+- Explicit acceptance criteria rejecting invented trigger prices, reference-zone substitution, target/R:R leakage, direct advice, and unsupported `Highly Trusted` classification.
+- Current queue depth and next recommended Team 03/04 handoff.
+
 ## Current Active Override - Root Constitution Required
 
 Date: 2026-05-20

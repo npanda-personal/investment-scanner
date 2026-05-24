@@ -11,6 +11,7 @@
 | Dirty worktree implementation risk | High | Low | Orchestrator | git status shows uncommitted source changes | no implementation until resolved | run `git status --short` before implementation |
 | Data correctness risk | High | High | Market Data + DQE | trust/readiness counters fail | revalidate data chain first | Sprint 1 candidate |
 | False trigger risk | High | Medium | Signal Generation + QA | trigger lacks rule/DQ/audit fields | contract-first signal gate | audit trigger contract |
+| Trusted candidate entry-price evidence gap | High | High | Team 00 + Team 03 + Team 06 | `CF-W1-TSC-01` requires rule-triggered entry price but Today Review lacks it and Signal Trigger marks `trigger_price` unavailable | keep TSC implementation out of Ready; prepare upstream Signal Trigger entry-price evidence packet | route `CF-W1-SIG-TRIGGER-ENTRY-01` requirement/architecture/QA prep |
 | Signal quality risk | High | Medium | Signal Quality Lab | no outcome proof | forward validation plan | contract inventory |
 | Overfit/backtest risk | High | Medium | Backtesting + Architect | metrics without DQ/source proof | require DQ and assumption docs | inspect backtest contract |
 | Free data limitation risk | High | High | Market Data + PO | provider gaps or paid requirement | PO/Architect source policy | block paid providers |

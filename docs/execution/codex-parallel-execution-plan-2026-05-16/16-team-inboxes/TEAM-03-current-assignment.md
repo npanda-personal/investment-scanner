@@ -6,6 +6,39 @@ Team: TEAM-03 - Architecture Factory
 
 Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automation-prompts/AUTO-03-architecture-factory.md`
 
+## Latest Assignment Override - 2026-05-24 Trusted Signal Candidate Dependency
+
+Prepare docs-only architecture readiness for `CF-W1-SIG-TRIGGER-ENTRY-01`.
+
+Goal:
+
+- Determine whether Signal Generation can expose source-proven rule-triggered entry price, trigger timestamp, and rule provenance through a bounded no-schema/no-route/no-shared-file child.
+- If current source cannot prove those fields without Prisma/schema, route registry, shared utility, generated type, repository persistence, provider/live, startup/backfill, or package changes, record the exact blocker instead of marking the child Ready.
+- Keep `CF-W1-TSC-01A` out of Ready until this upstream evidence is source-proven.
+
+Allowed writes:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/**`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/**`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/**`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03*.md`
+
+Forbidden writes:
+
+- application source or tests
+- Prisma schema or migrations
+- route registries
+- shared backend utilities
+- shared UI
+- package manifests
+- generated files
+
+Required output:
+
+- Architecture recommendation: `Ready candidate`, `split required`, or `blocked`.
+- Exact allowed/forbidden file reservation only if a no-schema/no-route child is viable.
+- QA handoff notes for rejecting invented entry price, target/R:R leakage, and direct advice wording.
+
 ## Assignment
 
 Prepare contracts, exact file reservations, and architecture readiness for the highest-priority candidates. No application-code item is Ready.

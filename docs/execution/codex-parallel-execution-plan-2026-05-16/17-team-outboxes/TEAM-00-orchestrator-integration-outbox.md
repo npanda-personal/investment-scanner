@@ -1,5 +1,41 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - Trusted Signal Candidate Goal Gate Closure
+
+Date: 2026-05-24
+
+Status:
+
+- Branch: `dev`.
+- Latest local `dev` commit before this docs checkpoint: `7f62969 docs: record trusted candidate blocker and strat closure`.
+- Main workspace dirty scope before docs updates: four pre-existing Research Hub source files only.
+- Open decisions: 0.
+- Product Owner action required: no.
+- Push performed: no.
+
+Completed:
+
+- `CF-W1-STRAT-04` passed QA, Team 10 review, Architect Signoff, delegated PO acceptance, and scoped local branch commit `8b3498e feat: add strategy evidence freshness labels`.
+- `CF-W1-SQLAB-03` passed QA, Team 10 review, Architect Signoff, delegated PO acceptance, and scoped local branch commit `5db98f2 feat: add signal quality review actions`.
+- `CF-W1-TP-03` remains paused/stale as framed because it is Trade Plan-first and conflicts with the Trusted Signal Candidate direction.
+- `CF-W1-TSC-01` requirement, architecture path, contract, work packet, and QA plan exist, but implementation remains blocked by missing source-proven rule-triggered entry price.
+
+Routing:
+
+- Created `CF-W1-SIG-TRIGGER-ENTRY-01` as the next requirement child for source-proven trigger price, trigger timestamp, and rule provenance.
+- Team 02 owns requirement refinement for `CF-W1-SIG-TRIGGER-ENTRY-01`.
+- Team 03 owns architecture/file-reservation readiness for the same child.
+- Team 04 owns QA plan prep for the same child.
+- Team 06 may inspect Signal Generation source read-only only when Team 00 asks; no app-code implementation is authorized.
+
+Teams ready to pick up new tasks:
+
+- Team 02: `CF-W1-SIG-TRIGGER-ENTRY-01` requirement refinement.
+- Team 03: `CF-W1-SIG-TRIGGER-ENTRY-01` architecture and file-reservation prep.
+- Team 04: `CF-W1-SIG-TRIGGER-ENTRY-01` QA planning after Team 02/03 output.
+- Team 06: standby for bounded Signal Generation implementation only after Team 00 Ready promotion.
+- Team 10: available for next QA-accepted review handoff.
+
 ## Latest Runtime Checkpoint - Laptop Restart Recovery RH-03 Wave
 
 Date: 2026-05-19

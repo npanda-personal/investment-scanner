@@ -4,6 +4,21 @@ Date: 2026-05-17
 
 Prepared by Team 03 Architecture Factory and refreshed after `CF-W1-L3-AUTH-02` commit `503bcd9`, `CF-W1-SIG-TRIGGER-01` commit `6ab3999`, and checkpoint protocol fix commit `f75808f`.
 
+## Team 03 Next Dispatch - TSC Entry-Price Dependency - 2026-05-24
+
+Next architecture prep item:
+
+- `CF-W1-SIG-TRIGGER-ENTRY-01`
+
+Reason:
+
+- `CF-W1-TSC-01` is blocked because `/today-review` cannot honestly classify `Highly Trusted` candidates without source-proven rule-triggered entry price, trigger timestamp, and rule provenance.
+- Current Signal Trigger contracts explicitly keep `trigger_price` unavailable.
+
+Team 03 should determine whether a bounded no-schema/no-route/no-shared Signal Generation child can expose the missing evidence. If not, Team 03 should mark the child `split required` or `blocked` and identify the exact forbidden scope that would require a separate Decision Packet.
+
+Do not promote `CF-W1-TSC-01A` to Ready until this evidence gap closes.
+
 ## Team 03 STRAT-02B Durable Revision History Prep - 2026-05-18
 
 Prepared:

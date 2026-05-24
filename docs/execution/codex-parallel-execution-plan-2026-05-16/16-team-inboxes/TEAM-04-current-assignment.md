@@ -2,6 +2,31 @@
 
 Date: 2026-05-20
 
+## Latest Assignment Override - 2026-05-24 Trusted Signal Candidate Dependency
+
+Prepare docs-only QA planning for `CF-W1-SIG-TRIGGER-ENTRY-01` after Team 02/03 refine the requirement and architecture packet.
+
+This is planning only. Do not implement application code. Do not run tests, builds, services, providers, Prisma commands, UI smoke, or live data. Do not move the item to Ready.
+
+Required QA coverage:
+
+- source-proven rule-triggered entry price is required before any `Highly Trusted` candidate classification;
+- trigger timestamp and rule provenance must be source-proven, not inferred from reference zones or Trade Plan geometry;
+- missing trigger price must block or downgrade trusted candidate classification;
+- no R:R, arbitrary target, synthetic profit target, buy/sell advice, guaranteed outcome, or trade-instruction wording;
+- strict Data Quality readiness remains required for high-trust candidates;
+- exit/invalidation status remains rule-based only.
+
+Allowed writes:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/**`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+Output:
+
+- QA plan or queue note for `CF-W1-SIG-TRIGGER-ENTRY-01`.
+- Explicit reject conditions and focused validation command recommendations, without running them.
+
 ## Latest Assignment Override
 
 Date: 2026-05-20
