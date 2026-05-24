@@ -1,121 +1,68 @@
 # CF-W1-SQLAB-02B Architecture Review
 
-Date: 2026-05-18
+Date: 2026-05-24
 
-Owner: Team 03 Architecture Factory
+Owner: Team 03 - Architecture Factory
 
 ## Status
 
-Proposal-only packet ready.
+Not Ready for Implementation.
 
-`CF-W1-SQLAB-02B` is not Ready for Implementation. Durable Signal Quality Lab learning memory still requires explicit Team 00 and Architect consent to open Prisma/schema, migrations, generated Prisma artifacts, and module-local repository work.
+This is a docs-only readiness packet for durable Signal Quality Lab learning memory. It is explicitly storage-consent-gated. No Prisma/schema, migration, generated artifact, repository, service, controller, router, validation, frontend, test, package, or shared-file implementation work is authorized by this pass.
 
-No honest no-schema durable child exists on current `dev`. `CF-W1-SQLAB-02A` remains the bounded derived-preview child and must stay closed. Durable value requires a module-owned persisted row.
+`CF-W1-SQLAB-02A` remains the only honest no-schema child. `CF-W1-SQLAB-02B` stays blocked until Team 00 deliberately records schema/repository/generated approval for a `signal-quality-lab` owned persistence slice.
 
 ## Evidence Inspected
 
 - `AGENTS.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/16-team-inboxes/TEAM-03-CF-W1-SQLAB-02B-architecture-assignment.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SQLAB-02B-signal-outcome-journal-durable-learning-memory-requirement.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SQLAB-02-signal-outcome-journal-post-event-learning-requirement.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-SQLAB-02-architecture-review.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-SQLAB-02-signal-outcome-journal-post-event-learning-contract.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-SQLAB-02-work-packet.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-SQLAB-02A-qa-plan.md`
-- `backend/prisma/schema.prisma`
 - `backend/src/modules/signal-quality-lab/signal-quality-lab.md`
-- `backend/src/modules/signal-quality-lab/signal-quality-lab.repository.ts`
 - `backend/src/modules/signal-quality-lab/signal-quality-lab.service.ts`
 - `backend/src/modules/signal-quality-lab/signal-quality-lab.types.ts`
-- `backend/src/modules/signal-quality-lab/signal-quality-lab.controller.ts`
-- `backend/src/modules/signal-quality-lab/signal-quality-lab.router.ts`
-- `backend/src/modules/signal-quality-lab/signal-quality-lab.validation.ts`
-- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md`
-- `backend/src/modules/today-trade-review/today-trade-review.md`
-- `backend/tests/modules/signal-quality-lab/signal-quality-lab.service.test.ts`
-- `backend/tests/modules/signal-quality-lab/signal-quality-lab.routes.test.ts`
-- `backend/tests/modules/signal-quality-lab/signal-quality-lab.validation.test.ts`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.repository.ts`
+- `backend/prisma/schema.prisma`
 
 ## Current Source Findings
 
-- `signal-quality-lab` still computes outcomes on demand only. The module doc explicitly says no `SignalOutcome` table exists and `recalculate` still reports `outcomesPersisted = false`.
-- `SignalQualityLabRepository` is a stub and owns no persisted journal path today.
-- Existing `SignalOutcomeSet` rows carry measured forward-return evidence, but no durable learning-memory identity, persistence timestamp, or idempotent update path.
-- Prisma has no `signal-quality-lab` owned journal model. Reusing `SignalResult`, `SignalCalibrationResult`, or `TodayReviewRun` would cross ownership boundaries and mix unrelated lifecycles.
-- Existing Signal Quality Lab routes are already sufficient for a bounded durable child shape:
-  - `POST /signals/quality/recalculate` is the existing bounded batch orchestration entrypoint.
-  - `GET /signals/:instrumentId/outcomes` is the existing read surface for per-signal measured outcomes.
-- Current controller/router/validation code does not need to change for the first durable child if the implementation keeps the existing endpoints and adds only additive response fields.
-
-## No-Schema Durable Determination
-
-No.
-
-Reason:
-
-- `CF-W1-SQLAB-02A` already covers the only honest no-schema precursor: derived preview metadata on top of on-demand measurement.
-- A durable learning memory claim requires a module-owned persisted row with idempotent update behavior.
-- Reusing foreign persisted rows would violate module ownership.
-- Introducing a file-based or ad hoc local store would bypass the current Prisma-backed modular-monolith architecture and would require a separate architecture decision.
+- `signal-quality-lab` still measures outcomes on demand. The module doc says no outcome persistence table exists in the MVP.
+- `SignalQualityLabService.recalculate(...)` still returns `inserted = 0`, `updated = 0`, and `outcomesPersisted = false`, which confirms there is no current durable journal write path.
+- `SignalQualityLabRepository` is still a stub and does not own any durable learning-memory row.
+- `SignalOutcomeSet` and related types expose measured outcomes, maturity, and missing-history evidence only. They do not expose a durable learning-memory identity or persistence timestamp.
+- Prisma currently has `SignalResult`, `SignalCalibrationResult`, and `TodayReviewRun`, but no `signal-quality-lab` owned durable learning-memory model. Reusing those foreign models would cross module ownership.
 
 ## Architecture Decision
 
-Keep the parent split explicit:
+Keep durable learning memory owned by `signal-quality-lab`.
 
-1. `CF-W1-SQLAB-02A`
-   - derived journal preview only;
-   - no persistence;
-   - sequenced after accepted `CF-W1-SQLAB-01`.
-2. `CF-W1-SQLAB-02B`
-   - proposal-only durable learning-memory packet;
-   - future implementation split required before any code starts.
+Do not invent a shared research-memory abstraction. Do not reuse `SignalResult`, `SignalCalibrationResult`, `TodayReviewRun`, or any other foreign row as storage for post-event learning.
 
-Recommended future implementation split under `02B`:
+The smallest honest future implementation child is:
 
-### `CF-W1-SQLAB-02B1` - Durable Journal Storage Foundation
+### `CF-W1-SQLAB-02B1` - Durable Learning Memory Storage Foundation
 
 Purpose:
 
-- add one module-owned persisted learning-memory model for Signal Quality Lab;
-- enforce idempotent identity for one measured signal-result plus one selected horizon plus one market scope;
-- keep storage ownership inside `signal-quality-lab`.
+- add one module-owned durable row for post-event learning memory;
+- establish the idempotent natural key;
+- keep all storage ownership inside `signal-quality-lab`;
+- stop before service/read-path widening.
 
-### `CF-W1-SQLAB-02B2` - Service/API Compatibility
+Only after `02B1` exists should Team 00 open:
+
+### `CF-W1-SQLAB-02B2` - Durable Read/Write Compatibility
 
 Purpose:
 
-- use the `02B1` storage foundation from existing `recalculate` and `outcomes` flows;
-- preserve the additive journal-preview contract established by `02A`;
-- upgrade persistence semantics without inventing a second parallel journal DTO.
+- consume the `02B1` storage row from existing Signal Quality Lab flows;
+- attach durable-memory presence and state additively to current read surfaces;
+- preserve the derived semantics already defined by `CF-W1-SQLAB-02A`.
 
-Dependency:
+## Natural Key And Idempotency Shape
 
-- `CF-W1-SQLAB-02A` must remain the only preview/UI child and should be accepted or cleanly restacked before `02B2`, because `02A` and `02B2` overlap on `signal-quality-lab.service.ts`, `signal-quality-lab.types.ts`, `signal-quality-lab.md`, and the service test.
-
-## Module-Owned Storage Boundary
-
-Durable learning memory should be a `signal-quality-lab` owned persisted record, logically equivalent to a model such as `SignalOutcomeLearningMemory`.
-
-The persisted row should store:
-
-- identity of the measured signal result;
-- selected horizon and market scope;
-- current durable learning status;
-- concise lesson classification and reason summary;
-- enough measured-outcome snapshot data to explain what was persisted at derivation time;
-- audit timestamps for creation and latest update.
-
-It should not become:
-
-- a free-form research note system;
-- a second outcome engine;
-- a calibration-result table;
-- a Today Review snapshot clone;
-- a strategy-rule history surface.
-
-## Natural Key / Uniqueness Candidates
-
-Minimum idempotent uniqueness candidate:
+Minimum durable identity:
 
 ```text
 signalResultId
@@ -124,24 +71,21 @@ region
 assetType
 ```
 
-Recommended supporting indexed fields:
+Idempotency rule:
 
-- `instrumentId`
-- `symbol`
-- `signalGeneratedAt`
-- `derivedAt`
-- `outcomeStatus`
+- one durable memory row per measured signal-result plus selected horizon plus market scope;
+- repeated processing of the same measured result must update that row;
+- derived fields such as `reasonSummary`, lesson classification, or outcome snapshot are update payload, not identity.
 
 Rationale:
 
-- `signalResultId` anchors the durable row to one measured signal source row.
-- `selectedHorizon` is required because one signal can have multiple valid learning-memory rows across horizons.
-- `region` and `assetType` preserve scoped auditability even though the source signal row already carries instrument identity.
-- Repeated reprocessing of the same signal-result and selected horizon should update the same durable row rather than create duplicates.
+- `signalResultId` anchors the row to an already-persisted signal source record;
+- `selectedHorizon` is required because one signal can legitimately produce multiple horizon-specific learning rows;
+- `region` and `assetType` keep the stored memory auditable to the market scope contract even if the source signal already carries instrument identity.
 
-## Minimum Durable Fields
+## Minimum Durable Field Set
 
-The future persisted row should cover, at minimum:
+The first durable row should cover, at minimum:
 
 - identity and scope:
   - `signalResultId`
@@ -153,90 +97,46 @@ The future persisted row should cover, at minimum:
 - signal provenance:
   - `signalDirection`
   - `signalModelVersion`
+  - `signalRulesetVersion` when available
   - `signalGeneratedAt`
 - durable learning state:
-  - `outcomeStatus`
+  - `outcomeStatus` with bounded states:
+    - `EVALUATED`
+    - `PENDING_FUTURE_DATA`
+    - `MISSING_PRICE_HISTORY`
   - `lessonClassification`
   - `reasonSummary`
-  - `persistenceStatus`
 - measured-outcome snapshot:
   - `forwardReturnPercent` when available
   - `priceHistoryAvailable`
   - `futureRowsAvailable`
   - `startPriceDate`
   - `latestAvailablePriceDate`
-- derivation/audit fields:
+- audit fields:
   - `derivedAt`
   - `createdAt`
   - `updatedAt`
 
-Optional but recommended:
+Optional but acceptable later:
 
-- `outcomeSnapshotJson`
-- `derivationVersion`
 - `sourceOutcomeGeneratedAt`
+- `derivationVersion`
+- `outcomeSnapshotJson`
 
-## Repository / Service / API Impact
+## Explicit Storage Consent Gate
 
-### Repository Impact
-
-`02B1` requires real repository ownership, not the current stub:
-
-- upsert one durable row by the natural key;
-- fetch durable rows by `instrumentId` plus scope;
-- fetch durable rows by `signalResultId` plus selected horizon for batch write/read compatibility.
-
-### Service Impact
-
-`02B2` requires `SignalQualityLabService` changes to:
-
-- derive the durable journal payload from the existing measured outcome, not from new math;
-- write/update durable rows from the existing bounded `recalculate(...)` workflow;
-- attach durable learning memory to `outcomes(...)` results additively;
-- preserve `CF-W1-SQLAB-01` trust framing and `CF-W1-SQLAB-02A` preview semantics.
-
-### API Impact
-
-First durable child can stay on current routes:
-
-- keep `POST /signals/quality/recalculate` as the bounded write/update orchestration path;
-- keep `GET /signals/:instrumentId/outcomes` as the read surface;
-- keep route registry, router, controller, and validation untouched unless later implementation widens into manual save/edit behavior.
-
-Additive API changes only:
-
-- `recalculate` may truthfully change from `outcomesPersisted = false` to durable insert/update counts when `02B2` lands;
-- outcome items may expose durable learning-memory metadata or promote the existing `02A` preview object from derived-only to durable-persisted semantics.
-
-## Generated Type / Migration Impact
-
-Durable value truly requires all of the following:
-
-- `backend/prisma/schema.prisma`
-- a new migration under `backend/prisma/migrations/**`
-- generated Prisma client or generated types
-- module repository code
-
-This is not optional if the requirement is to be honest about durability.
-
-## Exact Future Consent Gate
-
-Before any application writer opens `CF-W1-SQLAB-02B1`, Team 00 and Architect must explicitly approve all of the following together:
+Do not open implementation unless Team 00 later records explicit approval for all of:
 
 1. `backend/prisma/schema.prisma`
 2. `backend/prisma/migrations/**`
 3. generated Prisma client or generated types
 4. `backend/src/modules/signal-quality-lab/signal-quality-lab.repository.ts`
 
-Required gate conditions:
+This consent gate exists because there is no honest way to claim durability inside the current source baseline without opening those files.
 
-- `CF-W1-SQLAB-02A` remains separately scoped and is not widened in place.
-- No other `signal-quality-lab` source writer is active on overlapping files.
-- One writer owns the full `02B1` or `02B2` file set at a time.
+## Future Allowed Files
 
-## Proposed Future File Reservations Only
-
-### `CF-W1-SQLAB-02B1`
+### Allowed future files for `CF-W1-SQLAB-02B1`
 
 - `backend/prisma/schema.prisma`
 - `backend/prisma/migrations/**`
@@ -246,69 +146,53 @@ Required gate conditions:
 - `backend/src/modules/signal-quality-lab/signal-quality-lab.md`
 - `backend/tests/modules/signal-quality-lab/signal-quality-lab.repository.test.ts`
 
-### `CF-W1-SQLAB-02B2`
+### Allowed future files for `CF-W1-SQLAB-02B2`
 
 - `backend/src/modules/signal-quality-lab/signal-quality-lab.service.ts`
 - `backend/src/modules/signal-quality-lab/signal-quality-lab.types.ts`
 - `backend/src/modules/signal-quality-lab/signal-quality-lab.md`
 - `backend/tests/modules/signal-quality-lab/signal-quality-lab.service.test.ts`
+- `backend/src/modules/signal-quality-lab/index.ts` only if stable public exports are required
 
-If `02B2` needs to export new stable types from the module root, reserve this only at handoff time:
+## Forbidden Until Consent
 
-- `backend/src/modules/signal-quality-lab/index.ts`
-
-## Exact Forbidden Files Before Consent
-
-- all application source and tests outside the proposal docs
-- `backend/prisma/schema.prisma`
-- `backend/prisma/migrations/**`
-- generated Prisma client or generated types
-- `backend/src/modules/signal-quality-lab/signal-quality-lab.repository.ts`
-- `backend/src/modules/signal-quality-lab/signal-quality-lab.service.ts`
-- `backend/src/modules/signal-quality-lab/signal-quality-lab.types.ts`
+- all application source and tests outside the future allowed file sets above
 - `backend/src/modules/signal-quality-lab/signal-quality-lab.controller.ts`
 - `backend/src/modules/signal-quality-lab/signal-quality-lab.router.ts`
 - `backend/src/modules/signal-quality-lab/signal-quality-lab.validation.ts`
-- `backend/src/modules/signal-quality-lab/index.ts`
-- `backend/tests/modules/signal-quality-lab/**`
 - all frontend `signal-quality-lab` files
 - backend and frontend route registries
+- shared backend utilities
+- shared frontend components
 - `backend/src/modules/signal-generation-engine/**`
 - `backend/src/modules/signal-calibration-engine/**`
 - `backend/src/modules/today-trade-review/**`
-- shared backend utilities
-- shared frontend components
 - package manifests
-- providers, startup/backfill flows, paid/cloud, broker, or telemetry scope
+- providers, startup/backfill flows, paid/cloud services, broker scope, telemetry, or any shared research-memory abstraction
 
-## Team 04 QA Handoff Notes
+## Stop Conditions
 
-Team 04 should review `CF-W1-SQLAB-02B` as proposal completeness only.
+Stop and return to Team 00 if future work requires any of the following before explicit storage consent is recorded:
 
-Review focus:
+- Prisma/schema or migration edits;
+- generated Prisma output;
+- repository implementation;
+- service/controller/router/validation changes;
+- frontend or shared UI work;
+- reuse of foreign persistence surfaces;
+- widening into Today Review, calibration ownership, alerts, strategy revision history, or generic research notes.
 
-- confirm there is no honest no-schema durable child left after `02A`;
-- confirm the module-owned storage boundary stays inside `signal-quality-lab`;
-- confirm the natural key is tight enough to prevent duplicate durable rows;
-- confirm `02B1` and `02B2` are separated sharply enough that schema/generated work cannot be smuggled into the service child;
-- confirm route/controller/validation widening is not implied for the first durable child;
-- reject any attempt to reuse `SignalResult`, `SignalCalibrationResult`, or `TodayReviewRun` as durable journal storage.
+Also stop if Team 00 attempts to merge `02B1` and `02B2` into one writer pass. The split is the control.
 
-No executable QA command is in scope for this packet.
+## Readiness Verdict
 
-## Decision Packet Recommendation
+`CF-W1-SQLAB-02B` is not Ready.
 
-No new Decision Packet is required from this pass.
+What is ready:
 
-Reason:
+- Team 00 can make a storage-consent decision with an exact file gate.
+- Team 04 can review the packet for QA completeness.
 
-- the blocker is explicit consent for known high-risk files, not unresolved product ambiguity;
-- this architecture packet already captures the required split, file reservations, and consent boundary.
+What is not ready:
 
-Open a Decision Packet later only if Team 00 wants to choose between competing storage models outside this proposal boundary.
-
-## Ready Recommendation
-
-- `CF-W1-SQLAB-02B` is `proposal-only`.
-- It is blocked from implementation until Team 00 and Architect open the schema/generated/repository consent gate.
-- Do not move `CF-W1-SQLAB-02B` to Ready.
+- Team 06 or any implementation writer starting application changes.
