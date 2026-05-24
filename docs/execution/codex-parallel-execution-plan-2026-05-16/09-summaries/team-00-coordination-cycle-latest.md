@@ -181,6 +181,21 @@ Teams ready to pick up new tasks:
 
 Product Owner action required: no.
 
+### TSC Source Mapping Result
+
+- Read-only source mapping completed for `CF-W1-TSC-01`.
+- Current Today Review lacks source-proven rule-triggered entry price, trigger timestamp, and rule IDs.
+- Current Signal Trigger contract marks `trigger_price` unavailable.
+- Because Product Owner requires high-trust candidates to include entry price, `CF-W1-TSC-01A` is not Ready.
+- Next TSC dependency: upstream Signal Trigger entry-price evidence, likely through `CF-W1-SIG-TRIGGER-02` or a follow-on child.
+
+### STRAT-04 / SQLAB-03 Gate Update
+
+- `CF-W1-STRAT-04` is accepted through QA, review, Architect Signoff, delegated PO acceptance, and local branch commit `8b3498e`.
+- `CF-W1-SQLAB-03` passed Team 04 QA and is in Team 10 review.
+- Initial SQLAB-03 Team 10 agent stalled and was closed.
+- Active SQLAB-03 Team 10 review agent: `019e59e4-2387-7873-aed7-abf179b72361`.
+
 ## Rolling Lane Relaunch
 
 Date: 2026-05-20

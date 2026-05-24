@@ -10,7 +10,7 @@ Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-
 
 | ID | Why it matters now | Next gate |
 | --- | --- | --- |
-| `CF-W1-TSC-01` | `/today-review` should become the Trusted Signal Candidate workflow: high-trust counts, rule-triggered entry price, reason summary, health, and rule-based exit/invalidation without R:R or targets. | Team 00 source inspection and Ready evaluation for a bounded `TSC-01A` child after QA plan/file reservations are confirmed. |
+| `CF-W1-TSC-01` | `/today-review` should become the Trusted Signal Candidate workflow: high-trust counts, rule-triggered entry price, reason summary, health, and rule-based exit/invalidation without R:R or targets. | Blocked from implementation until rule-triggered entry price evidence is source-proven or PO/Architect accept a zero-highly-trusted first slice. |
 | `CF-W1-HCTX-03` | Historical context needs age and provenance warnings so nearest snapshots do not read like same-day evidence. | Team 03 architecture contract and QA planning. |
 | `CF-W1-DQ-03` | Downstream trust consumers need a compact residual reason summary instead of raw DQ arrays. | Team 03 architecture contract and QA planning. |
 | `CF-W1-MCTX-02` | Market Context needs an explicit persisted-versus-generated freshness basis label. | Team 03 architecture contract and QA planning. |
@@ -26,7 +26,7 @@ Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-
 
 | Rank | ID | State | Why now |
 | --- | --- | --- | --- |
-| 1 | `CF-W1-TSC-01` | Draft | Trusted Signal Candidates are now the primary workflow direction for daily signal review. |
+| 1 | `CF-W1-TSC-01` | Draft / blocked by trigger price evidence | Trusted Signal Candidates are now the primary workflow direction for daily signal review. |
 | 2 | `CF-W1-HCTX-03` | Accepted branch commit | Fresh nearest-snapshot age and provenance warnings are accepted and parked as `f6034c6`. |
 | 3 | `CF-W1-DQ-03` | Draft | Residual reason summary is the cleanest downstream trust gap on top of current DQ outputs. |
 | 4 | `CF-W1-MCTX-02` | Accepted branch commit | Persisted-versus-generated freshness basis labels are accepted and parked as `0c802c2`. |

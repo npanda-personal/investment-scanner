@@ -256,6 +256,27 @@ Date: 2026-05-24
 
 Product Owner action required: no.
 
+## TSC Source Mapping Result
+
+- Read-only source mapping completed for `CF-W1-TSC-01`.
+- Current Today Review can support identity, state, reason, strategy proof, DQ snapshot, run trust state, signal/calibration/smart-money snapshots, and market context evidence.
+- Current Today Review does not source-prove rule-triggered entry price, trigger timestamp, or rule IDs.
+- Current Signal Trigger contract marks `trigger_price` unavailable.
+- Team 00 must not promote `TSC-01A` while `HIGHLY_TRUSTED` requires entry price unless upstream Signal Trigger evidence closes that gap or PO/Architect accept a zero-highly-trusted first slice.
+- Current routing: keep `CF-W1-TSC-01` drafted/blocked from implementation; route upstream trigger price evidence next after STRAT-04/SQLAB-03 gates.
+
+## STRAT-04 Closure
+
+- `CF-W1-STRAT-04` passed Team 04 QA, Team 10 review, Team 03 Architect Signoff, and Team 00 delegated PO acceptance.
+- Scoped local branch commit created on `codex/team06-strategy-signal/CF-W1-STRAT-04`: `8b3498e feat: add strategy evidence freshness labels`.
+- No push performed.
+
+## SQLAB-03 Routing
+
+- Team 04 QA accepted `CF-W1-SQLAB-03`.
+- Initial Team 10 review agent did not respond and was closed.
+- Team 10 review relaunched as `019e59e4-2387-7873-aed7-abf179b72361`.
+
 ## Active Agent Relaunch
 
 Date: 2026-05-20

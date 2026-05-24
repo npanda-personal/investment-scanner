@@ -261,6 +261,23 @@ Teams ready to pick up new tasks:
 - Team 03: ready for Architect Signoff after Team 10 acceptance.
 - Team 00: source inspection and Ready evaluation for `CF-W1-TSC-01A` after current gates.
 
+## Runtime Queue Update
+
+Date: 2026-05-24
+
+| Slot | Team | Agent | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Team 10 - Review / Release | `019e59e4-2387-7873-aed7-abf179b72361` | code/release review | `CF-W1-SQLAB-03` | active |
+| 2 | Open slot | none | queued signoff | Team 03 `CF-W1-SQLAB-03` Architect Signoff after Team 10 acceptance | waiting |
+| 3 | Open slot | none | queued acceptance | Team 00 delegated PO acceptance for `SQLAB-03` after signoff | waiting |
+| 4 | Open slot | none | queued prerequisite | Signal Trigger entry-price evidence path for `TSC-01` | waiting |
+| 5 | Open slot | none | queued integration | Parked accepted branch integration planning | waiting |
+| 6 | Open slot | none | queued docs | next checkpoint | waiting |
+
+Completed:
+
+- `CF-W1-STRAT-04` committed on its implementation branch as `8b3498e`.
+
 ## Relaunch Update
 
 Date: 2026-05-20

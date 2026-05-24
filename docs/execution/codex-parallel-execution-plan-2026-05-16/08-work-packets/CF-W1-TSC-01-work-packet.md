@@ -4,7 +4,7 @@ Date: 2026-05-24
 
 Owner: Team 00 - Orchestrator / Integration
 
-Status: Work Packet Draft - Not Ready For Implementation
+Status: Work Packet Draft - Blocked From Implementation By Missing Trigger Price Evidence
 
 ## Objective
 
@@ -59,13 +59,12 @@ Candidate source/test files:
 
 ## Readiness Gaps Before Implementation
 
-- Team 04 QA plan is required.
-- Team 00 must inspect current Today Review source/tests and exact branch state.
+- Current Today Review source does not prove rule-triggered entry price.
+- Current Signal Trigger contract marks `trigger_price` unavailable.
+- Team 00 must not promote a `HIGHLY_TRUSTED` candidate workflow until trigger price evidence is source-proven or a Product Owner/Architect decision accepts zero highly trusted candidates in the first slice.
 - Team 00 must sequence against accepted `CF-W1-L3-TREV-02` branch commit `f1de1d5`.
 - Team 00 must decide whether this child stacks on `CF-W1-L3-TREV-02` or waits for branch integration.
 
 ## Next Gate
 
-Team 04 prepares QA plan.
-
-Team 00 performs Ready evaluation only after QA plan and source inspection are complete.
+Team 00 should route the upstream Signal Trigger entry-price evidence gap before promoting this work packet.

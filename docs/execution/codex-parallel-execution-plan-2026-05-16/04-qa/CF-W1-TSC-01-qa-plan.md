@@ -4,7 +4,7 @@ Date: 2026-05-24
 
 Owner: Team 04 - QA Factory
 
-Status: QA Plan Draft - Not Ready For Implementation
+Status: QA Plan Draft - Blocked From Implementation By Missing Trigger Price Evidence
 
 ## QA Objective
 
@@ -45,4 +45,4 @@ npm.cmd run test:ui -- today-trade-review.spec.ts --workers=1
 
 ## Next Gate
 
-Team 00 Ready evaluation after source inspection and exact file reservation.
+Team 00 should not promote implementation until rule-triggered entry price evidence exists or a Product Owner/Architect decision explicitly accepts a zero-highly-trusted first slice with visible missing-evidence blockers.

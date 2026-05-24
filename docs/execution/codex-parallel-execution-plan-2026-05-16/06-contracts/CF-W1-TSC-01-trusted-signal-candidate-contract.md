@@ -4,7 +4,7 @@ Date: 2026-05-24
 
 Owner: Team 03 - Architecture Factory
 
-Status: Draft Contract - Not Ready For Implementation
+Status: Draft Contract - Blocked From Implementation By Missing Trigger Price Evidence
 
 ## Purpose
 
@@ -57,6 +57,8 @@ For `HIGHLY_TRUSTED`, the display model must include:
 - no target-price/R:R/profit-target fields.
 
 If any required field is missing, the candidate must be downgraded or blocked with a visible reason.
+
+Current source note: as of 2026-05-24, rule-triggered entry price is not source-proven in Today Review, and the current Signal Trigger contract marks `trigger_price` unavailable. Therefore no candidate may be classified as `HIGHLY_TRUSTED` until that evidence exists.
 
 ## Exit / Invalidation Contract
 

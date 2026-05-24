@@ -10,7 +10,7 @@ Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-
 
 | Rank | ID | Current state | Why it matters now | Next Team 00 action |
 | --- | --- | --- | --- | --- |
-| 1 | `CF-W1-TSC-01` | Requirement/architecture/QA path drafted | Trusted Signal Candidates should replace Trade Plan/R:R/target-first review framing and use `/today-review` as the daily cockpit. | Inspect current source/tests and evaluate a bounded `TSC-01A` Ready child after STRAT-04/SQLAB-03 gates. |
+| 1 | `CF-W1-TSC-01` | Requirement/architecture/QA path drafted, implementation blocked | Trusted Signal Candidates should replace Trade Plan/R:R/target-first review framing and use `/today-review` as the daily cockpit. | Do not promote until rule-triggered entry price evidence is source-proven or PO/Architect accept a zero-highly-trusted first slice. |
 | 2 | `CF-W1-HCTX-03` | Accepted branch commit | Historical context age/provenance is accepted and parked as `f6034c6`. | Keep parked until clean integration sequencing. |
 | 3 | `CF-W1-DQ-03` | Draft requirement | Downstream trust consumers need a compact residual reason summary instead of raw DQ arrays. | Team 03 architecture contract and QA planning. |
 | 4 | `CF-W1-MCTX-02` | Accepted branch commit | Market Context freshness-basis work is accepted and parked as `0c802c2`. | Keep parked until clean integration sequencing. |
@@ -24,6 +24,7 @@ Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-
 ## Dispatch Notes
 
 - `CF-W1-HCTX-03`, `CF-W1-DQ-03`, `CF-W1-MCTX-02`, `CF-W1-STRAT-04`, and `CF-W1-SQLAB-03` are fresh draft requirements from the 2026-05-20 Team 01 audit. They are not Ready and do not move to Ready in this update.
+- `CF-W1-TSC-01` source mapping found that Today Review lacks source-proven rule-triggered entry price and current Signal Trigger contracts mark `trigger_price` unavailable.
 - `CF-W1-TP-03` is paused/stale as framed because Product Owner rejected Trade Plan-first, R:R, and arbitrary target workflow direction. Do not execute it unless reframed into Trusted Signal Candidate health without targets/R:R.
 - `CF-W1-BT-04` remains a later refinement-only draft behind Trusted Signal Candidate work.
 - The 2026-05-20 backtesting proof-basis audit keeps `CF-W1-BT-03` parked and reinforces `CF-W1-BT-04` as the fresh backtesting current-proof slice.

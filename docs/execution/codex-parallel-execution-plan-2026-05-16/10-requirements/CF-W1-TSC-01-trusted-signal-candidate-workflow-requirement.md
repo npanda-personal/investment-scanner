@@ -4,7 +4,7 @@ Date: 2026-05-24
 
 Owner: Team 02 - Product / Requirement Factory
 
-Status: Requirement Draft - Architecture Path Needed
+Status: Requirement Draft - Blocked From Implementation By Missing Rule-Triggered Entry Price Evidence
 
 ## Product Goal
 
@@ -92,6 +92,18 @@ Prefer a bounded read-path/additive first slice:
 
 If the first implementation requires persistence, route registry changes, shared UI, generated types, Trade Plan source changes, or broader API changes, stop and create a separate decision/architecture packet.
 
+## Source Mapping Result - 2026-05-24
+
+Read-only source inspection found that current Today Review can support identity, state, grade, confidence score, rank, strategy proof snapshot, Data Quality snapshot, run/trust status, signal/calibration/smart-money snapshots, and market context snapshot.
+
+However, the Product Owner requires high-trust candidates to include a source-proven rule-triggered entry price. Current source does not prove that field:
+
+- Today Review has entry zones/reference prices, not a rule-triggered entry price.
+- Current Signal Trigger contract marks `trigger_price` unavailable.
+- Trigger timestamp and rule IDs are also not source-proven in Today Review snapshots.
+
+Therefore a `Highly Trusted` candidate must remain blocked or absent until rule-triggered entry price evidence is available. Do not invent an entry price from target zones, reference prices, Trade Plan geometry, or R:R fields.
+
 ## Acceptance Criteria
 
 - `/today-review` remains the primary daily workflow surface.
@@ -114,8 +126,8 @@ If the first implementation requires persistence, route registry changes, shared
 
 ## Next Gate
 
-Team 03 should prepare the bounded architecture/contract/work-packet path.
+Team 00 should keep `CF-W1-TSC-01` out of Ready until rule-triggered entry price evidence is source-proven or a Product Owner/Architect decision explicitly accepts a zero-highly-trusted first slice.
 
-Team 04 should prepare a QA plan after Team 03 defines exact file reservations.
+The likely upstream dependency is the existing Signal Trigger evidence line, including `CF-W1-SIG-TRIGGER-02` or a future child that can provide trusted `trigger_price`, trigger timestamp, and rule provenance without schema/route/shared scope drift unless separately approved.
 
-Team 00 must not promote implementation until requirement, architecture, QA, file reservations, current source inspection, and no-conflict checks pass.
+Team 00 must not promote implementation until requirement, architecture, QA, file reservations, current source inspection, no-conflict checks, and source-proven trigger price evidence pass.

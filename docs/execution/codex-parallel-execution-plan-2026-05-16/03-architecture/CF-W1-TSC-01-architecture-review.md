@@ -4,7 +4,7 @@ Date: 2026-05-24
 
 Owner: Team 03 - Architecture Factory
 
-Status: Architecture Path Prepared - Not Ready For Implementation
+Status: Architecture Path Prepared - Blocked From Implementation By Missing Trigger Price Evidence
 
 ## Decision
 
@@ -107,9 +107,14 @@ Likely allowed source/test files for a first Today Review-owned child:
 
 `CF-W1-TSC-01` is not implementation-ready yet.
 
+Read-only source mapping on 2026-05-24 found that current Today Review does not have a source-proven rule-triggered entry price, trigger timestamp, or rule ID evidence. Current Signal Trigger contracts still mark `trigger_price` unavailable.
+
+Because Product Owner requires high-trust candidates to include entry price, Team 00 should not promote `TSC-01A` until one of these is true:
+
+- upstream Signal Trigger evidence provides source-proven `trigger_price` and trigger timestamp/rule provenance; or
+- Product Owner and Architect explicitly accept a first slice where `Highly Trusted` can be zero and missing trigger price is shown as blocker evidence.
+
 Team 00 should request:
 
-- Team 04 QA plan;
-- current source inspection for exact evidence fields;
-- exact first-child file reservations;
+- exact first-child file reservations after trigger price evidence is resolved;
 - one-writer sequencing against active `CF-W1-L3-TREV-02` branch commit `f1de1d5`.

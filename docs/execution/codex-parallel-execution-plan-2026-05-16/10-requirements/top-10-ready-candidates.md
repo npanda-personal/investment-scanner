@@ -10,7 +10,7 @@ Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-
 
 | Rank | ID | Why now | Next gate |
 | --- | --- | --- | --- |
-| 1 | `CF-W1-TSC-01` | `/today-review` should become the Trusted Signal Candidate workflow: high-trust counts, rule-triggered entry price, reason summary, health, and rule-based exit/invalidation without R:R or targets. | Team 00 source inspection and Ready evaluation for a bounded `TSC-01A` child after QA plan/file reservations are confirmed. |
+| 1 | `CF-W1-TSC-01` | `/today-review` should become the Trusted Signal Candidate workflow: high-trust counts, rule-triggered entry price, reason summary, health, and rule-based exit/invalidation without R:R or targets. | Blocked from implementation until source-proven rule-triggered entry price evidence exists or PO/Architect accept a zero-highly-trusted first slice. |
 | 2 | `CF-W1-HCTX-03` | Historical context needs age and provenance warnings so nearest snapshots do not read like same-day evidence. | Accepted and locally committed as `f6034c6`; wait for clean integration sequencing. |
 | 3 | `CF-W1-DQ-03` | Downstream trust consumers need a compact residual reason summary instead of raw DQ arrays. | Team 03 architecture contract and QA planning. |
 | 4 | `CF-W1-MCTX-02` | Market Context needs an explicit persisted-versus-generated freshness basis label. | Accepted and locally committed as `0c802c2`; wait for clean integration sequencing. |
@@ -44,7 +44,8 @@ Do not treat these as the next fresh Team 02 pull:
 
 ## Routing Guidance
 
-- Use `CF-W1-TSC-01` as the next product-direction requirement path.
+- Use `CF-W1-TSC-01` as the next product-direction requirement path, but do not promote implementation until trigger price evidence is source-proven.
+- Route the upstream Signal Trigger entry-price evidence gap through `CF-W1-SIG-TRIGGER-02` or a follow-on child before `TSC-01A`.
 - Do not execute `CF-W1-TP-03` as framed; pause and reframe only if needed for Trusted Signal Candidate health.
 - Continue gates for `CF-W1-STRAT-04` and `CF-W1-SQLAB-03` before new implementation.
 - Use `CF-W1-BT-04` as a later backtesting trust slice behind the Trusted Signal Candidate direction.
