@@ -735,6 +735,7 @@ Product Owner action required: no.
 - `CF-W1-MD-05`: committed on Team 05 branch as `93c29e2 feat: add catalog sync freshness explainability`; no push.
 - `CF-W1-TSC-02A-TREV-HEALTH`: committed on Team 07 branch as `34c9993 feat: add today review active signal health`; no push.
 - `CF-W2-SIG-01A`: promoted to Team 06 implementation/validation in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SIG-01A`.
+- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`: promoted to Team 07 implementation in `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`, stacked on `34c9993`.
 - Open decisions: zero.
 - Product Owner action required: no.
 

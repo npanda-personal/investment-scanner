@@ -230,6 +230,15 @@
 - Explicit `useDataQualityFilter: false` must remain a legacy/research bypass and must not be described as trusted DQ enforcement.
 - Any target-price, synthetic target, `R:R`, Trade Plan-first, buy/sell, guarantee, or financial-advice wording is a QA/review reject.
 
+## Team 00 TSC-03A Ready Promotion Risk Decisions - 2026-05-24
+
+- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` is promoted only as a Today Review-owned supporting-trust evidence projection stacked on accepted `CF-W1-TSC-02A-TREV-HEALTH` commit `34c9993`.
+- Plain `dev` is not an acceptable base for this slice.
+- The allowed writer set is limited to the existing Today Review backend/frontend source and focused Today Review service/UI tests.
+- DQ, Calibration, Backtesting, Signal Generation, Strategy Decision, Trade Plan, route, schema, repository/controller/router/validation/module/index, shared utilities/UI, package, generated, provider/live/startup/backfill, paid/cloud, broker, telemetry, and credential scope remain blocked.
+- Absent `DQ-03`, `CAL-01A`, or `BT-04` evidence must render explicit unavailable/missing states. Today Review must not recreate upstream trust logic.
+- Supporting evidence must not become a new score, ranking formula, target, R:R, Trade Plan-first workflow, direct-action instruction, or advice-like prioritization.
+
 ## Team 00 HCTX Ready Promotion Risk Decisions - 2026-05-18
 
 - `CF-W1-HCTX-01` is promoted only as a backend-only `historical-context-snapshots` lookup-explainability slice.

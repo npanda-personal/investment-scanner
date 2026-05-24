@@ -6,6 +6,97 @@ Team: TEAM-07 - Portfolio / Watchlist / Alerts
 
 Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automation-prompts/AUTO-07-portfolio-watchlist-alerts.md`
 
+## Latest Assignment Override - 2026-05-24 TSC-03A
+
+Team 00 promotes `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` as a bounded Today Review implementation slice.
+
+Work item:
+
+- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` - Today Review supporting trust evidence chain.
+
+Branch / worktree:
+
+- Branch: `codex/team07-portfolio-alerts/CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`
+- Required base: accepted `CF-W1-TSC-02A-TREV-HEALTH` commit `34c9993 feat: add today review active signal health`
+
+Base decision:
+
+- Use explicit unavailable/missing states for absent `DQ-03`, `CAL-01A`, or `BT-04` fields.
+- Do not recreate Data Quality residual logic, calibration trust logic, or backtesting proof-currentness logic inside Today Review.
+
+Evidence to use:
+
+- Requirement: `10-requirements/CF-W1-TSC-03-today-review-supporting-trust-evidence-requirement.md`
+- Architecture review: `03-architecture/CF-W1-TSC-03-architecture-review.md`
+- Contract: `06-contracts/CF-W1-TSC-03-supporting-trust-evidence-contract.md`
+- Work packet: `08-work-packets/CF-W1-TSC-03-work-packet.md`
+- QA plan: `04-qa/CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE-qa-plan.md`
+- Ready handoff: `12-ready-queue/ready-for-implementation.md`
+
+Allowed files:
+
+- `backend/src/modules/today-trade-review/today-trade-review.types.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.service.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.md`
+- `backend/tests/modules/today-trade-review/today-trade-review.service.test.ts`
+- `frontend/src/features/today-trade-review/types.ts`
+- `frontend/src/features/today-trade-review/components/TodayReviewPage.tsx`
+- `frontend/src/features/today-trade-review/components/TodayReviewCandidateDetailPage.tsx`
+- `frontend/tests/ui/today-trade-review.spec.ts`
+
+Allowed reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-07-CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE-developer-handoff.md`
+
+Required behavior:
+
+- Add one additive Today Review supporting-trust projection for Data Quality, calibration readiness, and backtesting proof-currentness.
+- Candidate list/detail must tell the same supporting-trust story for the same candidate.
+- Missing or unsupported supporting evidence must be explicit and must not silently upgrade a candidate.
+- Data Quality remains the hard gate; blocked/missing/unsupported DQ must not become supportive trust evidence.
+- Calibration and backtesting semantics must remain module-owned; do not synthesize absent richer fields.
+- Existing `TSC-02A` active-health semantics remain separate and compatible.
+- No new score, ranking formula, target, R:R, Trade Plan-first, buy/sell, guarantee, or advice framing.
+
+Forbidden files:
+
+- Today Review repository/controller/router/validation/module/index files
+- `frontend/src/features/today-trade-review/api/**`
+- `frontend/src/features/today-trade-review/hooks/**`
+- `frontend/src/features/today-trade-review/routes.tsx`
+- backend/frontend route registries
+- Prisma schema or migrations
+- generated files
+- package manifests
+- shared backend utilities or shared frontend components
+- upstream/downstream module source/tests outside the reserved Today Review set
+- provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential files
+
+Required validation:
+
+```powershell
+git merge-base --is-ancestor 34c9993 HEAD
+cd backend
+npm.cmd test -- today-trade-review.service.test.ts --runInBand
+npm.cmd run build
+```
+
+```powershell
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- today-trade-review.spec.ts --workers=1
+```
+
+Expected handoff:
+
+- Update `17-team-outboxes/TEAM-07-CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE-outbox.md`.
+- Create/update `18-integration-queue/CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE-developer-handoff.md`.
+- Record exact branch/worktree, base commit, changed files, inspected files, behavior changed, tests run, skipped checks, forbidden files confirmed untouched, risks, blockers, and next gate: Team 04 QA Verification.
+
+Stop and return to Team 00 if implementation needs any forbidden file, upstream source changes, recreated DQ/calibration/backtesting trust logic, health-state rewrites, route/schema/shared/package/provider/live/startup changes, or target/R:R/advice semantics.
+
 ## Latest Assignment Override - 2026-05-24 TSC Active Health
 
 Team 00 promotes `CF-W1-TSC-02A-TREV-HEALTH` as an independent Today Review active-signal-health child.

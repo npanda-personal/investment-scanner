@@ -4,7 +4,7 @@ Date: 2026-05-24
 
 Owner: Team 04 QA Factory
 
-Status: QA plan prepared but `blocked by active writer sequencing`.
+Status: QA plan prepared; Team 00 promoted the split child after `CF-W1-TSC-02A-TREV-HEALTH` accepted and committed as `34c9993`.
 
 Parent: `CF-W1-TSC-03 - Today Review supporting trust evidence`
 
@@ -16,15 +16,13 @@ Work packet: `08-work-packets/CF-W1-TSC-03-work-packet.md`
 
 ## QA Verdict
 
-Do not promote this child to Ready yet.
+Team 00 promoted this child after the Today Review writer set cleared.
 
-The QA plan is prepared for the bounded child `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`, but executable QA and Ready evaluation remain blocked until:
+Executable QA still waits for Team 07's implementation handoff from the required base:
 
-- Team 07 clears the active Today Review writer set from `CF-W1-TSC-02A-TREV-HEALTH`;
-- Team 00 records the exact post-`TSC-02A` implementation base; and
-- Team 07 provides an implementation handoff limited to the reserved Today Review files.
-
-This planning pass does not approve implementation, executable validation, builds, servers, Playwright, commits, pushes, or Ready movement.
+- accepted `CF-W1-TSC-02A-TREV-HEALTH` commit `34c9993`;
+- reserved Today Review files only;
+- explicit unavailable/missing states for absent `DQ-03`, `CAL-01A`, or `BT-04` fields.
 
 ## Scope
 

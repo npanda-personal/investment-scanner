@@ -546,11 +546,18 @@ Date: 2026-05-24
 - Branch: `codex/team06-strategy-signal/CF-W2-SIG-01A`.
 - Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SIG-01A`.
 - Current-source note: prior DQ enforcement behavior appears present on `dev`; Team 06 must inspect first and implement only proved gaps inside the reservation.
+- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` promoted to Team 07 for bounded Today Review supporting-trust evidence implementation.
+- Branch: `codex/team07-portfolio-alerts/CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`.
+- Required base: `34c9993 feat: add today review active signal health`.
+- Base decision: use explicit unavailable/missing states for absent DQ/calibration/backtesting richer fields; do not recreate upstream trust logic.
 
 ## Teams Ready To Pick Up New Tasks
 
 - Team 06: `CF-W2-SIG-01A` implementation/validation now.
+- Team 07: `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` implementation now.
 - Team 04: QA verification after Team 06 handoff.
+- Team 04: QA verification after Team 07 handoff.
 - Team 10: review after QA acceptance.
 - Team 03: Architect Signoff after Team 10 acceptance, or rolling architecture prep if no signoff is ready.
 - Team 02: rolling direct investor/trader-value requirement discovery.

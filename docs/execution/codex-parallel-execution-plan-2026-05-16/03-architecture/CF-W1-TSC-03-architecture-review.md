@@ -8,13 +8,13 @@ Owner: Team 03 - Architecture Factory
 
 Docs-only architecture prep completed.
 
-Current verdict: `blocked by active writer sequencing`.
+Current verdict: split child `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` is promotable after Team 00 recorded accepted `CF-W1-TSC-02A-TREV-HEALTH` commit `34c9993` as the required base.
 
 `CF-W1-TSC-03` should not move as one unsplit parent packet. The honest executable path is one bounded Today Review child:
 
 - `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`
 
-That child is technically feasible without schema, route, shared UI, shared backend utility, package, generated-file, provider/live-data, startup/backfill, or persistence-contract changes, but it is not promotable while Team 07 actively owns the same Today Review writer set for `CF-W1-TSC-02A-TREV-HEALTH`.
+That child is technically feasible without schema, route, shared UI, shared backend utility, package, generated-file, provider/live-data, startup/backfill, or persistence-contract changes. The prior Team 07 writer-set blocker is cleared by local branch commit `34c9993`.
 
 ## Evidence Inspected
 
@@ -294,9 +294,8 @@ Future Team 04 planning should verify:
 
 ## Ready Recommendation
 
-Current result: `blocked by active writer sequencing`.
+Current result: `promoted by Team 00 as split child`.
 
-After Team 07 completes or releases the `TSC-02A` Today Review writer set, the split child can become a Team 00 Ready-candidate packet if Team 00 records one of these base choices explicitly:
+Team 00 selected this base choice:
 
-1. post-`TSC-02A` base with explicit unavailable fallback for any absent `DQ-03` / `CAL-01A` / `BT-04` fields; or
-2. post-`TSC-02A` integration base that already contains the accepted upstream trust slices whose semantics the child should display.
+1. accepted `TSC-02A` commit `34c9993` with explicit unavailable fallback for any absent `DQ-03` / `CAL-01A` / `BT-04` fields.

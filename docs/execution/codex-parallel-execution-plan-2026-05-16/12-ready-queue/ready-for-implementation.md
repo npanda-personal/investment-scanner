@@ -59,13 +59,77 @@ rg -n "targetPrice|profitTarget|priceTarget|rewardRiskRatio|R:R|buy now|sell now
 
 - Stop if implementation requires any forbidden file, a new Data Quality Engine public contract, response type changes, route/schema/shared/package/frontend/provider/live/startup/backfill changes, or if another active writer owns a reserved Signal Generation file.
 
+2026-05-24 Team 00 Ready promotion - `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`:
+
+- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` is promoted and assigned to Team 07 as a bounded Today Review supporting-trust evidence implementation slice.
+- Purpose: add a compact supporting evidence chain for Data Quality, calibration readiness, and backtesting proof-currentness on existing Today Review candidate list/detail surfaces without a new score, ranking formula, target, R:R, or advice framing.
+- Sequencing decision: the prior Today Review writer set is cleared by accepted Team 07 branch commit `34c9993 feat: add today review active signal health`.
+- Required base: accepted `CF-W1-TSC-02A-TREV-HEALTH` commit `34c9993`, not plain `dev`.
+- Base decision: implement with explicit unavailable/missing states for absent `DQ-03`, `CAL-01A`, or `BT-04` fields. Do not recreate Data Quality residual logic, calibration trust logic, or backtesting proof-currentness logic inside Today Review.
+- Branch recommendation: `codex/team07-portfolio-alerts/CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`.
+- Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`.
+- Gate evidence:
+  - Requirement: `10-requirements/CF-W1-TSC-03-today-review-supporting-trust-evidence-requirement.md`
+  - Architecture review: `03-architecture/CF-W1-TSC-03-architecture-review.md`
+  - Contract: `06-contracts/CF-W1-TSC-03-supporting-trust-evidence-contract.md`
+  - Work packet: `08-work-packets/CF-W1-TSC-03-work-packet.md`
+  - QA plan: `04-qa/CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE-qa-plan.md`
+  - Open decisions: none.
+- Allowed implementation files:
+  - `backend/src/modules/today-trade-review/today-trade-review.types.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.service.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.md`
+  - `backend/tests/modules/today-trade-review/today-trade-review.service.test.ts`
+  - `frontend/src/features/today-trade-review/types.ts`
+  - `frontend/src/features/today-trade-review/components/TodayReviewPage.tsx`
+  - `frontend/src/features/today-trade-review/components/TodayReviewCandidateDetailPage.tsx`
+  - `frontend/tests/ui/today-trade-review.spec.ts`
+- Allowed reporting docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-07-CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE-developer-handoff.md`
+- Forbidden scope:
+  - Today Review repository/controller/router/validation/module/index files
+  - `frontend/src/features/today-trade-review/api/**`
+  - `frontend/src/features/today-trade-review/hooks/**`
+  - `frontend/src/features/today-trade-review/routes.tsx`
+  - backend/frontend route registries
+  - Prisma schema or migrations
+  - generated files
+  - package manifests
+  - shared backend utilities or shared frontend components
+  - Data Quality, Signal Calibration, Backtesting, Signal Generation, Strategy Decision, Trade Plan, or other upstream/downstream source/tests
+  - provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential files
+  - new composite score, ranking engine, health-state rewrite, target/R:R, Trade Plan-first, buy/sell, guarantee, or financial-advice language
+- Required validation:
+
+```powershell
+git merge-base --is-ancestor 34c9993 HEAD
+cd backend
+npm.cmd test -- today-trade-review.service.test.ts --runInBand
+npm.cmd run build
+```
+
+```powershell
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- today-trade-review.spec.ts --workers=1
+```
+
+- Required language guard:
+
+```powershell
+rg -n "R:R|reward/risk|profit target|price target|target price|target / reward|buy now|sell now|must buy|must sell|guaranteed|financial advice|Trade Plan|trade-plan" backend/src/modules/today-trade-review backend/tests/modules/today-trade-review frontend/src/features/today-trade-review frontend/tests/ui/today-trade-review.spec.ts
+```
+
+- Stop if implementation requires upstream module edits, recreated DQ/calibration/backtesting trust logic, broad UI or route changes, unavailable evidence silently upgrading a candidate, or any forbidden file.
+
 2026-05-24 Team 00 status update:
 
 - `CF-W1-TSC-01A-TREV` completed QA, Team 10 review, Architect Signoff, delegated PO acceptance, staged-scope verification, and scoped local branch commit `9fbc989 feat: add trusted signal candidates to today review`.
 - `CF-W1-BT-04` completed Team 06 implementation, Team 04 QA, Team 10 review, Architect Signoff, delegated PO acceptance, staged-scope verification, and scoped local Team 06 branch commit `2bd794f feat: add backtesting proof freshness labels`.
 - `CF-W1-MD-05` completed all gates and is committed on Team 05 branch as `93c29e2 feat: add catalog sync freshness explainability`.
 - `CF-W1-TSC-02A-TREV-HEALTH` completed all gates and is committed on Team 07 branch as `34c9993 feat: add today review active signal health`.
-- `CF-W1-TSC-03` is a new Team 02 requirement draft and is not Ready. It waits behind `CF-W1-TSC-02A` and Team 03 architecture prep.
+- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` is promoted and assigned to Team 07, stacked on accepted `34c9993`.
 - `CF-W1-DQ-02B` is blocked from implementation pending explicit DQE read-side/public-contract reopening; no source reservation is active.
 
 2026-05-24 Team 00 Ready promotion - `CF-W1-MD-05`:

@@ -4,7 +4,7 @@ Date: 2026-05-24
 
 Owner: Team 02 - Product / Requirement Factory
 
-Status: New requirement draft for Team 03 architecture prep after current gate dependencies clear. Not Ready for Implementation.
+Status: Split child `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` promoted by Team 00 after `CF-W1-TSC-02A-TREV-HEALTH` accepted and committed as `34c9993`.
 
 Parent: `CF-W1-TSC-01 - Trusted Signal Candidate Workflow`
 
@@ -130,11 +130,6 @@ Recommended future implementation owner after Team 00 promotion:
 
 ## Next Gate
 
-Do not move this item to Ready from the requirement lane.
+Team 00 promoted only the split child `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`.
 
-Team 00 should treat this as the next bounded review-surface gap to consider after:
-
-1. `CF-W1-TSC-01A-TREV` clears rework and is accepted; and
-2. `CF-W1-BT-04` closes its current Team 06 implementation/review path.
-
-After those bases are recorded, Team 03 should prepare architecture/file reservations and decide whether backtesting proof currentness can stay additive on Today Review or needs an explicit split child.
+The child must stack on accepted `CF-W1-TSC-02A-TREV-HEALTH` commit `34c9993` and must use explicit unavailable/missing states for absent DQ, calibration, or backtesting richer fields.

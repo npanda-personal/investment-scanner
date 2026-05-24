@@ -50,20 +50,27 @@ Current Ready promotion:
 - Branch recommendation: `codex/team06-strategy-signal/CF-W2-SIG-01A`.
 - Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SIG-01A`.
 - Base recommendation: current `dev` at Team 00 docs checkpoint.
+- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`: promoted to Team 07 for bounded Today Review supporting-trust evidence implementation.
+- Branch recommendation: `codex/team07-portfolio-alerts/CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`.
+- Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`.
+- Required base: accepted `CF-W1-TSC-02A-TREV-HEALTH` commit `34c9993 feat: add today review active signal health`.
+- Base decision: use explicit unavailable/missing states for absent `DQ-03`, `CAL-01A`, or `BT-04` fields instead of recreating upstream logic.
 
 Current state:
 
 - `CF-W1-MD-05`: Committed on implementation branch; no push.
 - `CF-W1-TSC-02A-TREV-HEALTH`: Committed on implementation branch; no push.
 - `CF-W2-SIG-01A`: Ready for Team 06 implementation/validation in a dedicated worktree.
-- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`: next Today Review candidate after TSC-02A, now eligible for Team 00 Ready evaluation once SIG-01A dispatch is stable.
+- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`: Ready for Team 07 implementation in a dedicated stacked worktree.
 - Open decisions: 0.
 - Product Owner action required: no.
 
 Teams ready to pick up new tasks:
 
 - Team 06: `CF-W2-SIG-01A` implementation/validation now.
+- Team 07: `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` implementation now.
 - Team 04: QA verification after Team 06 handoff.
+- Team 04: QA verification after Team 07 handoff.
 - Team 10: review after QA acceptance.
 - Team 03: Architect Signoff after Team 10 acceptance; otherwise architecture prep for the next direct-value item.
 - Team 02: continue rolling requirements discovery focused on direct investor/trader value.

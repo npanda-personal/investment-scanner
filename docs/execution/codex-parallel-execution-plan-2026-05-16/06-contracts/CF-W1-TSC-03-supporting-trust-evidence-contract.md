@@ -8,7 +8,7 @@ Owner: Team 03 - Architecture Factory
 
 Split-child contract prepared for docs-only readiness.
 
-Current verdict: `blocked by active writer sequencing`.
+Current verdict: split child promoted by Team 00 after `CF-W1-TSC-02A-TREV-HEALTH` accepted and committed as `34c9993`.
 
 This contract applies to the bounded child:
 
@@ -28,7 +28,7 @@ This remains research-support only. It must not become a Trade Plan-first workfl
 
 ## Required Base
 
-The child must stack on the accepted outcome of `CF-W1-TSC-02A-TREV-HEALTH`, not plain `dev` and not the currently active Team 07 writer worktree while that writer set is reserved.
+The child must stack on accepted `CF-W1-TSC-02A-TREV-HEALTH` commit `34c9993`, not plain `dev`.
 
 Optional richer base behavior:
 
@@ -221,5 +221,6 @@ Do not run this child in parallel with any other Today Review source packet.
 As of 2026-05-24:
 
 - parent `CF-W1-TSC-03` is not Ready;
-- child `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` is the only honest executable path;
-- implementation remains blocked until Team 07 clears the active `TSC-02A` Today Review writer set and Team 00 records the selected post-`TSC-02A` base.
+- child `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` is the only honest executable path and has been promoted by Team 00;
+- required base is accepted `TSC-02A` commit `34c9993`;
+- absent upstream richer fields must render explicit unavailable/missing states.
