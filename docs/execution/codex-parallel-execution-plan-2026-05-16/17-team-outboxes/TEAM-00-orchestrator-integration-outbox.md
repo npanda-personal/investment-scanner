@@ -15,8 +15,9 @@ Status:
 Current gate state:
 
 - `CF-W2-SIG-01A` is accepted through QA, Team 10 review, Architect Signoff, delegated PO acceptance, staged-scope verification, and local Team 06 branch commit `24f938b docs: accept signal dq fail-closed validation`.
-- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` was rejected by Team 04 QA, reworked by Team 07, and accepted by Team 04 QA rerun in `C:\work\repo\investment-scanner-worktrees\t7-tsc03a`, stacked on accepted `34c9993`.
-- Team 10 review is active for `TSC-03A`; Architect Signoff is next if review accepts.
+- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` was rejected by Team 04 QA, reworked by Team 07, accepted by Team 04 QA rerun, and then rejected by Team 10 review in `C:\work\repo\investment-scanner-worktrees\t7-tsc03a`, stacked on accepted `34c9993`.
+- Team 10 rejection scope is bounded: backend calibration support must not upgrade compatibility-only calibration payloads (`dataStatus`, calibrated confidence, or confidence-like fields) to available supporting evidence.
+- Team 07 calibration-support rework is active; Team 04 QA rerun is next.
 - `CF-W1-SIG-LATEST-01` was reconciled as already accepted from 2026-05-17 and removed from fresh-candidate routing.
 - `CF-W2-TSC-04` remains planning-only and cannot implement until the Today Review writer set is free.
 - `CF-W2-BT-05` completed Team 03 architecture prep and Team 04 QA planning; Team 00 promoted it to Team 06 in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-BT-05`.
@@ -26,7 +27,8 @@ Current gate state:
 
 Teams ready to pick up new tasks:
 
-- Team 10: review `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` now.
+- Team 07: complete bounded `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` calibration-support rework.
+- Team 04: QA rerun after Team 07 `TSC-03A` rework handoff.
 - Team 04: QA rerun `CF-W2-BT-05` now.
 - Team 10: re-review `CF-W2-BT-05` after Team 04 accepts the rerun.
 - Team 03: Architect Signoff after Team 10 acceptance.

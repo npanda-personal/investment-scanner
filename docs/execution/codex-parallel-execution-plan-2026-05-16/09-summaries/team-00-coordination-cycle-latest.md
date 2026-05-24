@@ -17,8 +17,8 @@ Current status:
 Gate movement:
 
 - `CF-W2-SIG-01A` completed QA, Team 10 review, Architect Signoff, delegated PO acceptance, staged-scope verification, and local Team 06 branch commit `24f938b docs: accept signal dq fail-closed validation`.
-- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` was rejected by Team 04 QA, reworked by Team 07, and accepted by Team 04 QA rerun in `C:\work\repo\investment-scanner-worktrees\t7-tsc03a`, stacked on accepted commit `34c9993`.
-- TSC-03A Team 10 review is active; Architect Signoff is next if review accepts.
+- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` was rejected by Team 04 QA, reworked by Team 07, accepted by Team 04 QA rerun, and then rejected by Team 10 review in `C:\work\repo\investment-scanner-worktrees\t7-tsc03a`, stacked on accepted commit `34c9993`.
+- TSC-03A Team 07 rework is active for backend calibration support: compatibility-only calibration payloads must not become available supporting evidence.
 - `CF-W1-SIG-LATEST-01` is already accepted from 2026-05-17; Team 00 corrected the Top 10 queues so it is no longer routed as fresh work.
 - `CF-W2-TSC-04` stays planning-only until the active Today Review writer set is free.
 - `CF-W2-BT-05` completed Team 03 architecture prep and Team 04 QA planning, then Team 00 promoted it to Team 06 as a bounded backend-only stacked Backtesting implementation slice.
@@ -28,12 +28,13 @@ Gate movement:
 
 Active agents:
 
-- Team 10 review agent `019e5bc4-1292-72b0-8f49-180dc0b34450`: `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`.
+- Team 07 rework agent `019e5bec-fac9-7d71-8731-ffc88ed4409d`: `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` calibration-support fix.
 - Team 04 QA rerun agent `019e5be8-252a-75d2-b1f3-fbc3a2aa66bc`: `CF-W2-BT-05`.
 
 Teams ready to pick up new tasks:
 
-- Team 10: review `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`.
+- Team 07: complete bounded `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` calibration-support rework.
+- Team 04: QA rerun after Team 07 `TSC-03A` rework handoff.
 - Team 04: QA rerun `CF-W2-BT-05`.
 - Team 10: re-review `CF-W2-BT-05` after Team 04 accepts the rerun.
 - Team 03: Architect Signoff after Team 10 acceptance; otherwise prepare next Today Review no-target packet after file release.
