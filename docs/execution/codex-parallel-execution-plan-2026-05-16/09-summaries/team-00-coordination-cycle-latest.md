@@ -55,6 +55,31 @@ Teams ready to pick up new tasks:
 - Team 03: Architect Signoff after Team 10 acceptance.
 - Team 02: rolling PO/requirements discovery after `DQ-03`.
 
+## Latest Runtime Checkpoint - TSC-01A Today Review Ready Promotion
+
+Date: 2026-05-24
+
+Completed:
+
+- Team 06 `CF-W1-TSC-01A-SIG` passed QA, Team 10 review, Architect Signoff, delegated PO acceptance, and local branch commit `40c00f1`.
+- Team 00 promoted `CF-W1-TSC-01A-TREV` to Team 07.
+
+Routing:
+
+- Team 07 branch: `codex/team07-portfolio-alerts/CF-W1-TSC-01A-today-review-trigger-evidence`.
+- Team 07 worktree: `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-TSC-01A-TREV`.
+- Base: latest `dev` plus accepted Team 06 bridge commit `40c00f1`.
+- Open decisions: 0.
+- Product Owner action required: no.
+
+Teams ready to pick up new tasks:
+
+- Team 07: implement `CF-W1-TSC-01A-TREV`.
+- Team 04: QA Verification after Team 07 handoff.
+- Team 10: Code Review after QA acceptance.
+- Team 03: Architect Signoff after Team 10 acceptance.
+- Team 05: continue `CF-W1-DQ-03` gates.
+
 ## Latest Runtime Checkpoint - SIG Trigger Entry Evidence
 
 Date: 2026-05-24

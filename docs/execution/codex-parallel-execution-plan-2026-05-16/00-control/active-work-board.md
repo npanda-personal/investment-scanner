@@ -131,6 +131,32 @@ Teams ready to pick up new tasks:
 - Team 03: Architect Signoff after Team 10 acceptance.
 - Team 02: continue rolling direct-value requirements after `DQ-03`, with admin/settings/notifications low priority.
 
+## Latest Team 00 Routing Update - TSC-01A Today Review Promotion
+
+Date: 2026-05-24
+
+`CF-W1-TSC-01A-TREV` is promoted to Team 07 after Team 06 bridge acceptance.
+
+Dependency evidence:
+
+- Team 06 bridge accepted and committed on branch `codex/team06-strategy-signal/CF-W1-TSC-01A-signal-latest-strategy-context` as `40c00f1 feat: add signal latest strategy context bridge`.
+- QA, Team 10 review, Architect Signoff, and delegated PO acceptance are recorded in the Team 06 worktree.
+
+Routing:
+
+- Team 07 owns Today Review adoption in `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-TSC-01A-TREV`.
+- The Team 07 branch must include the accepted Signal Generation bridge before implementation starts.
+- Open decisions: 0.
+- Product Owner action required: no.
+
+Teams ready to pick up new tasks:
+
+- Team 07: implement `CF-W1-TSC-01A-TREV`.
+- Team 04: QA Verification after Team 07 handoff.
+- Team 10: Code Review after QA acceptance.
+- Team 03: Architect Signoff after Team 10 acceptance.
+- Team 05: continue `CF-W1-DQ-03` gates.
+
 ## Current Operating Model: Multi-Team Parallel Execution
 
 The active execution plan now uses persistent Codex teams, not a single sequential Orchestrator wave.

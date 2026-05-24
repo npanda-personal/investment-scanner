@@ -4,8 +4,7 @@ Date: 2026-05-18
 
 | ID | Blocked item | Upstream dependency |
 | --- | --- | --- |
-| CF-W1-TSC-01 | Trusted Signal Candidate Workflow on `/today-review` | Parent remains routed through split child `CF-W1-TSC-01A`. The Team 06 Signal Generation bridge child is promoted first; the Team 07 Today Review adoption child remains blocked until the bridge is accepted. |
-| CF-W1-TSC-01A-TREV | Today Review trusted candidate adoption | Blocked until `CF-W1-TSC-01A-SIG` is accepted, committed, and available as the implementation base. |
+| CF-W1-TSC-01 | Trusted Signal Candidate Workflow on `/today-review` | Parent remains routed through split child `CF-W1-TSC-01A`. `CF-W1-TSC-01A-SIG` is accepted and committed; `CF-W1-TSC-01A-TREV` is promoted as the downstream adoption child. |
 | CF-W1-BT-01 | Backtesting DQ fail-closed behavior | DQ fail-closed policy and signal/strategy trust policy |
 | CF-W1-TP-01 | Trade Plan DQ hard blockers and no-target migration | Backend-only child contract, Team 03 reservation matrix, Team 06 inspection, and child QA plan are prepared as `CF-W1-TP-01B`; still needs Team 00 Ready promotion |
 | CF-W1-L3-ALERT-01 | Alert readiness consumer tests | Child architecture contract, Team 03 reservation matrix, exact backend file reservations, and child QA plan are prepared; still needs Team 00 Ready promotion |

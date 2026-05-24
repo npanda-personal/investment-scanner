@@ -52,6 +52,30 @@ Teams ready to pick up new tasks:
 - Team 03: Architect Signoff after Team 10 acceptance.
 - Team 02: continue rolling direct investor/trader-value requirements after `DQ-03`.
 
+## Latest Runtime Checkpoint - TSC-01A Today Review Promotion
+
+Date: 2026-05-24
+
+Status:
+
+- Branch: `dev`.
+- Team 06 `CF-W1-TSC-01A-SIG` accepted and committed as `40c00f1`.
+- Open decisions: 0.
+- Product Owner action required: no.
+
+Completed:
+
+- Team 00 promoted `CF-W1-TSC-01A-TREV` to Team 07 as the Today Review adoption child.
+- Team 07 must stack on the accepted Team 06 Signal Generation bridge.
+
+Teams ready to pick up new tasks:
+
+- Team 07: `CF-W1-TSC-01A-TREV` implementation.
+- Team 04: QA Verification after Team 07 handoff.
+- Team 10: Code Review after Team 04 acceptance.
+- Team 03: Architect Signoff after Team 10 acceptance.
+- Team 05: continue `CF-W1-DQ-03` QA/review/signoff path.
+
 ## Latest Runtime Checkpoint - SIG Trigger Entry Evidence Implementation
 
 Date: 2026-05-24

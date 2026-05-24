@@ -6,6 +6,87 @@ Team: TEAM-07 - Portfolio / Watchlist / Alerts
 
 Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automation-prompts/AUTO-07-portfolio-watchlist-alerts.md`
 
+## Latest Assignment Override - 2026-05-24 TSC Today Review Adoption
+
+Team 00 promotes `CF-W1-TSC-01A-TREV` as the downstream Today Review adoption child after accepted Team 06 bridge commit `40c00f1`.
+
+Do not implement in the shared `dev` workspace. Use the dedicated stacked worktree.
+
+## Branch / Worktree
+
+- Branch: `codex/team07-portfolio-alerts/CF-W1-TSC-01A-today-review-trigger-evidence`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-TSC-01A-TREV`
+- Base: latest `dev` plus accepted Team 06 bridge commit `40c00f1 feat: add signal latest strategy context bridge`
+
+## Work Item
+
+`CF-W1-TSC-01A-TREV` - Today Review Trusted Signal Candidate trigger evidence adoption.
+
+## Evidence To Use
+
+- Requirement: `10-requirements/CF-W1-TSC-01A-today-review-trusted-signal-candidate-adoption-requirement.md`
+- Architecture review: `03-architecture/CF-W1-TSC-01A-architecture-review.md`
+- Contract: `06-contracts/CF-W1-TSC-01A-trigger-evidence-adoption-contract.md`
+- Work packet: `08-work-packets/CF-W1-TSC-01A-work-packet.md`
+- QA plan: `04-qa/CF-W1-TSC-01A-qa-plan.md`
+- Ready handoff: `12-ready-queue/ready-for-implementation.md`
+
+## Allowed Files
+
+- `backend/src/modules/today-trade-review/today-trade-review.types.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.service.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.md`
+- `backend/tests/modules/today-trade-review/today-trade-review.service.test.ts`
+- `frontend/src/features/today-trade-review/types.ts`
+- `frontend/src/features/today-trade-review/components/TodayReviewPage.tsx`
+- `frontend/src/features/today-trade-review/components/TodayReviewCandidateDetailPage.tsx`
+- `frontend/tests/ui/today-trade-review.spec.ts`
+
+Allowed reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-07-CF-W1-TSC-01A-TREV-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-TSC-01A-TREV-developer-handoff.md`
+
+## Required Behavior
+
+- Pass Strategy Decision strategy code and review scope into the accepted Signal Generation bridge.
+- Project `triggerContract.trigger_price_evidence` through Today Review source signal snapshots.
+- Add Trusted Signal Candidate grouping/counts from available evidence.
+- Allow `Highly Trusted` only when Data Quality is trusted, trigger evidence is `SOURCE_PROVEN`, trigger price/timestamp/rule/version/reason are present, and no blocker exists.
+- Downgrade or block missing trigger evidence, blocked/missing DQ, unsupported scope, strategy mismatch, and missing rule evidence with visible reasons.
+- Preserve table filtering, sorting, pagination, and no-wrap hover behavior.
+- Remove or reword touched Today Review target, R:R, synthetic reward, direct advice, and Trade Plan-first visible labels.
+
+## Forbidden Files
+
+- Prisma schema or migrations
+- generated files
+- Today Review repository, controller, router, validation, module, or index files
+- backend/frontend route registries
+- shared backend utilities or shared frontend components
+- package manifests
+- Signal Generation source/tests beyond accepted bridge commit `40c00f1`
+- Strategy Decision, Strategy Framework, Data Quality, Market Data, Trade Plan, Portfolio, Watchlist, Alerts, Copilot, or Research Hub source/tests
+- provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential files
+
+## Focused Validation
+
+```powershell
+cd backend
+npm.cmd test -- today-trade-review.service.test.ts --runInBand
+npm.cmd run build
+```
+
+```powershell
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- today-trade-review.spec.ts --workers=1
+```
+
+## Stop Conditions
+
+Stop and return to Team 00 if implementation requires schema, route, repository, shared UI, shared utility, package, generated, provider/live, startup/backfill, Trade Plan source, downstream/upstream module source changes beyond accepted bridge `40c00f1`, or target/R:R/advice semantics.
+
 ## Assignment
 
 Pull `CF-W1-L3-TREV-01` for bounded implementation.

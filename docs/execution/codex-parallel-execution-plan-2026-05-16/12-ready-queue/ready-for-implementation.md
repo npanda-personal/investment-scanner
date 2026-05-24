@@ -6,6 +6,60 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+2026-05-24 Team 00 Ready promotion - `CF-W1-TSC-01A-TREV`:
+
+- `CF-W1-TSC-01A-TREV` is promoted and assigned to Team 07 as the Today Review adoption child for Trusted Signal Candidate evidence.
+- Dependency satisfied: Team 06 `CF-W1-TSC-01A-SIG` passed QA, Code Review, Architect Signoff, delegated PO acceptance, and scoped branch commit `40c00f1 feat: add signal latest strategy context bridge`.
+- Sequencing decision: Team 07 must stack on the accepted Signal Generation bridge commit so the optional strategy-aware `latestForInstrument` contract is available.
+- Branch recommendation: `codex/team07-portfolio-alerts/CF-W1-TSC-01A-today-review-trigger-evidence`
+- Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-TSC-01A-TREV`
+- Base recommendation: latest `dev` plus accepted Team 06 bridge commit `40c00f1`.
+- Gate evidence:
+  - Requirement: `10-requirements/CF-W1-TSC-01A-today-review-trusted-signal-candidate-adoption-requirement.md`
+  - Architecture review: `03-architecture/CF-W1-TSC-01A-architecture-review.md`
+  - Contract: `06-contracts/CF-W1-TSC-01A-trigger-evidence-adoption-contract.md`
+  - Work packet: `08-work-packets/CF-W1-TSC-01A-work-packet.md`
+  - QA plan: `04-qa/CF-W1-TSC-01A-qa-plan.md`
+  - Signal bridge acceptance: `codex/team06-strategy-signal/CF-W1-TSC-01A-signal-latest-strategy-context` commit `40c00f1`
+  - Open decisions: none.
+- Allowed implementation files:
+  - `backend/src/modules/today-trade-review/today-trade-review.types.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.service.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.md`
+  - `backend/tests/modules/today-trade-review/today-trade-review.service.test.ts`
+  - `frontend/src/features/today-trade-review/types.ts`
+  - `frontend/src/features/today-trade-review/components/TodayReviewPage.tsx`
+  - `frontend/src/features/today-trade-review/components/TodayReviewCandidateDetailPage.tsx`
+  - `frontend/tests/ui/today-trade-review.spec.ts`
+- Allowed reporting docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-07-CF-W1-TSC-01A-TREV-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-TSC-01A-TREV-developer-handoff.md`
+- Forbidden scope:
+  - Prisma schema or migrations
+  - generated files
+  - Today Review repository, controller, router, validation, module, or index files
+  - backend/frontend route registries
+  - shared backend utilities or shared frontend components
+  - package manifests
+  - Signal Generation source/tests beyond the accepted Team 06 bridge
+  - Strategy Decision, Strategy Framework, Data Quality, Market Data, Trade Plan, Portfolio, Watchlist, Alerts, Copilot, or Research Hub source/tests
+  - provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential files
+- Required validation:
+
+```powershell
+cd backend
+npm.cmd test -- today-trade-review.service.test.ts --runInBand
+npm.cmd run build
+```
+
+```powershell
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- today-trade-review.spec.ts --workers=1
+```
+
+- Stop if implementation requires schema, route, repository, shared UI, shared utility, package, generated, provider/live, startup/backfill, Trade Plan source, or downstream/upstream module source changes beyond the accepted Signal Generation bridge.
+
 2026-05-24 Team 00 Ready promotion - `CF-W1-DQ-03`:
 
 - `CF-W1-DQ-03` is promoted and assigned to Team 05 as an independent backend-only Data Quality Engine residual-summary implementation.
