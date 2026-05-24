@@ -34,6 +34,39 @@ No historical active work items have been migrated as active.
 - Rejected / Rework
 - Deferred
 
+## Latest Team 00 Routing Update - SIG Trigger Entry Evidence
+
+Date: 2026-05-24
+
+`CF-W1-SIG-TRIGGER-ENTRY-01` moved from upstream dependency prep into bounded Signal Generation implementation and gate review.
+
+Runtime evidence:
+
+- Product Owner delegate confirmed this remains the top Trusted Signal Candidate dependency.
+- Team 03 architecture review accepted a module-local Signal Generation scope.
+- Team 04 QA plan identified focused trigger-contract, service, and DQ invariant validation.
+- Team 00 implemented the bounded additive compatibility evidence packet in approved Signal Generation files only.
+
+Current state:
+
+- `CF-W1-SIG-TRIGGER-ENTRY-01`: accepted through QA Verification, Code Review, Architect Signoff, and delegated PO acceptance; scoped local commit pending.
+- `CF-W1-TSC-01`: still not Ready for downstream Today Review implementation until the trigger-evidence slice is accepted/committed and a separate Today Review/TSC adoption child is promoted with exact file reservations.
+- Open decisions: 0.
+- Product Owner action required: no.
+
+Validation completed by Team 00:
+
+- `cd backend && npm.cmd test -- signal-generation-engine.trigger-contract.test.ts signal-generation-engine.service.test.ts signal-generation-dq-enforcement.invariants.test.ts --runInBand`
+- `cd backend && npm.cmd run build`
+
+Teams ready to pick up new tasks:
+
+- Team 04: QA Verification for `CF-W1-SIG-TRIGGER-ENTRY-01` is active.
+- Team 10: Code Review for `CF-W1-SIG-TRIGGER-ENTRY-01` is active.
+- Team 03: Architect Signoff for `CF-W1-SIG-TRIGGER-ENTRY-01` is active.
+- Team 02: rolling Product Owner / requirements audit remains ready for the next direct investor/trader-value item.
+- Team 03: rolling Architecture Factory should prepare the next TSC downstream adoption child after signoff.
+
 ## Current Operating Model: Multi-Team Parallel Execution
 
 The active execution plan now uses persistent Codex teams, not a single sequential Orchestrator wave.

@@ -1,5 +1,6 @@
 /// <reference types="@types/jest" />
 import { SignalGenerationEngineService } from '../../../src/modules/signal-generation-engine';
+import { StrategyFrameworkRegistry } from '../../../src/modules/strategy-framework';
 
 const trustedReadEvidence = {
   auditStatus: 'CURRENT' as const,
@@ -43,16 +44,39 @@ const baseSignal = {
   ...trustedReadEvidence,
 };
 
-const createService = (signal: any = baseSignal, instrument: any = { id: 'stock-1', symbol: 'ABC', asset_type: 'STOCK', region: 'IN', currency: 'INR' }) => {
+const price = (index: number, close: number, volume = 1000) => {
+  const date = new Date('2026-05-16T00:00:00.000Z');
+  date.setUTCDate(date.getUTCDate() - index);
+  return {
+    date: date.toISOString(),
+    open: close - 0.5,
+    high: close + 1,
+    low: close - 1,
+    close,
+    adjusted_close: close,
+    volume,
+  };
+};
+
+const defaultPrices = [price(0, 105), price(1, 100)];
+
+const createService = (
+  signal: any = baseSignal,
+  instrument: any = { id: 'stock-1', symbol: 'ABC', asset_type: 'STOCK', region: 'IN', currency: 'INR' },
+  prices: any[] = defaultPrices
+) => {
   const repository = {
     latestSignals: jest.fn().mockResolvedValue({ signals: [signal], total: 1 }),
   };
   const marketDataService = {
     getInstrumentsByIds: jest.fn().mockResolvedValue([instrument]),
-    getLatestPricesBySymbols: jest.fn().mockResolvedValue([{ symbol: 'ABC', adjusted_close: 105, date: '2026-05-16T00:00:00.000Z' }]),
-    listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: [{ adjusted_close: 105 }, { adjusted_close: 100 }] }),
+    getLatestPricesBySymbols: jest.fn().mockResolvedValue([{ symbol: 'ABC', adjusted_close: prices[0]?.adjusted_close ?? 105, date: prices[0]?.date ?? '2026-05-16T00:00:00.000Z' }]),
+    listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices }),
   };
-  return new SignalGenerationEngineService(repository as any, marketDataService as any, {} as any);
+  const strategyFrameworkService = {
+    performance: jest.fn().mockResolvedValue([{ ratingGrade: 'GOOD', readinessLabel: 'PAPER_TEST_CANDIDATE' }]),
+  };
+  return new SignalGenerationEngineService(repository as any, marketDataService as any, {} as any, {} as any, new StrategyFrameworkRegistry(), strategyFrameworkService as any);
 };
 
 describe('signal generation trigger contract projection', () => {
@@ -93,6 +117,91 @@ describe('signal generation trigger contract projection', () => {
       'created_at',
       'updated_at',
     ]));
+  });
+
+  it('exposes source-proven entry trigger price evidence from Strategy Framework enrichment without target or R:R fields', async () => {
+    const prices = Array.from({ length: 260 }, (_, index) => price(index, 220 - index * 0.1, index === 0 ? 4000 : 1000));
+    const service = createService({ ...baseSignal, sourcePriceDate: prices[0].date }, undefined, prices);
+
+    const result = await service.topSignals({ limit: 5, includeStrategyMatches: true, strategyCode: 'BREAKOUT_CONFIRMATION' });
+    const trigger = result.signals[0].triggerContract;
+
+    expect(trigger).toMatchObject({
+      strategy_id: 'BREAKOUT_CONFIRMATION',
+      strategy_version: '1.0.0',
+      trigger_price: 220,
+      trigger_timestamp: prices[0].date,
+      timeframe: 'DAILY_SWING',
+      data_quality_status: 'READY',
+      trigger_price_evidence: {
+        status: 'SOURCE_PROVEN',
+        source_module: 'signal-generation-engine',
+        source_field: 'strategyContext.prices[0].adjusted_close',
+        source_timestamp: prices[0].date,
+        strategy_id: 'BREAKOUT_CONFIRMATION',
+        strategy_version: '1.0.0',
+        timeframe: 'DAILY_SWING',
+        compatibility_only: true,
+      },
+    });
+    expect(trigger?.entry_rule_id).toEqual(expect.any(String));
+    expect(trigger?.trigger_price_evidence.entry_rule_ids.length).toBeGreaterThan(0);
+    expect(trigger?.unavailable_fields).not.toContain('trigger_price');
+    expect(trigger?.unavailable_fields).not.toContain('entry_rule_id');
+    expect(JSON.stringify(trigger)).not.toMatch(/targetPrice|profitTarget|priceTarget|rewardRiskRatio|R:R|buy now|sell now|guaranteed/i);
+  });
+
+  it('downgrades strategy-aware trigger price evidence when the local price row date does not match the signal source date', async () => {
+    const prices = Array.from({ length: 260 }, (_, index) => price(index, 220 - index * 0.1, index === 0 ? 4000 : 1000));
+    const service = createService({ ...baseSignal, sourcePriceDate: '2026-05-15T00:00:00.000Z' }, undefined, prices);
+
+    const result = await service.topSignals({ limit: 5, includeStrategyMatches: true, strategyCode: 'BREAKOUT_CONFIRMATION' });
+    const trigger = result.signals[0].triggerContract;
+
+    expect(trigger?.trigger_price).toBeNull();
+    expect(trigger?.trigger_timestamp).toBeNull();
+    expect(trigger?.entry_rule_id).toBeNull();
+    expect(trigger?.trigger_price_evidence).toMatchObject({
+      status: 'UNAVAILABLE',
+      source_module: null,
+      source_field: null,
+      source_timestamp: null,
+      strategy_id: 'BREAKOUT_CONFIRMATION',
+      strategy_version: '1.0.0',
+      timeframe: 'DAILY_SWING',
+      compatibility_only: true,
+    });
+    expect(trigger?.trigger_price_evidence.unavailable_reason).toContain('does not match the signal source price date');
+    expect(trigger?.unavailable_fields).toEqual(expect.arrayContaining(['trigger_price', 'trigger_timestamp', 'entry_rule_id']));
+  });
+
+  it('does not emit source-proven entry trigger price evidence for non-entry strategy matches', async () => {
+    const prices = Array.from({ length: 260 }, (_, index) => price(index, 220 - index * 0.1, index === 0 ? 4000 : 1000));
+    const service = createService({ ...baseSignal, sourcePriceDate: prices[0].date }, undefined, prices);
+
+    const result = await service.topSignals({ limit: 5, includeStrategyMatches: true, strategyCode: 'LOW_QUALITY_DATA_REJECTION' });
+    const trigger = result.signals[0].triggerContract;
+
+    expect(trigger).toMatchObject({
+      strategy_id: 'LOW_QUALITY_DATA_REJECTION',
+      strategy_version: '1.0.0',
+      trigger_price: null,
+      trigger_timestamp: null,
+      entry_rule_id: null,
+      timeframe: 'DAILY',
+      trigger_price_evidence: {
+        status: 'UNAVAILABLE',
+        source_module: null,
+        source_field: null,
+        source_timestamp: null,
+        strategy_id: 'LOW_QUALITY_DATA_REJECTION',
+        strategy_version: '1.0.0',
+        timeframe: 'DAILY',
+        compatibility_only: true,
+      },
+    });
+    expect(trigger?.trigger_price_evidence.unavailable_reason).toContain('Strategy category is FILTER, not ENTRY');
+    expect(trigger?.unavailable_fields).toEqual(expect.arrayContaining(['trigger_price', 'trigger_timestamp', 'entry_rule_id']));
   });
 
   it('marks legacy records incomplete instead of inventing Data Quality or trigger evidence', async () => {

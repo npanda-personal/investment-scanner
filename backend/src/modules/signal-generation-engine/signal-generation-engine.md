@@ -87,7 +87,17 @@ Supported request/query flags:
 
 When enabled, signal results may include `strategyMatches[]` and `blockedStrategies[]` explaining which registered strategies matched or were blocked by noise filters/data gaps. These arrays are derived on demand and are not part of raw `SignalResult` persistence.
 
-`strategyMatches[]` includes `strategyCode`, `strategyName`, `strategyVersion`, `decision`, `score`, `confidence`, `reasons`, `entryRulesPassed`, `readinessLabel`, and `ratingGrade`.
+`strategyMatches[]` includes `strategyCode`, `strategyName`, `strategyVersion`, `decision`, `score`, `confidence`, `reasons`, `entryRulesPassed`, `timeframe`, `readinessLabel`, and `ratingGrade`.
+
+When a strategy-aware enrichment pass evaluates an ENTRY strategy against a local stored price row, the match may also include `triggerPriceEvidence`. This is compatibility-only evidence, not durable trigger persistence. It is marked `SOURCE_PROVEN` only when:
+
+- the Strategy Framework result is bullish;
+- at least one entry rule id/code is present;
+- the latest local price row has a finite adjusted close;
+- the latest local price row timestamp is available and, when the signal row has a source-price date, the two dates match;
+- the strategy timeframe is available.
+
+If any of those inputs is missing or mismatched, `triggerPriceEvidence.status` remains `UNAVAILABLE` with a reason. This prevents downstream consumers from confusing reference prices, entry zones, Trade Plan geometry, target prices, or R:R-derived values with a source-proven rule-trigger price.
 
 `blockedStrategies[]` includes `strategyCode`, `strategyName`, `strategyVersion`, `blockers`, `warnings`, `dataGaps`, `noiseFiltersTriggered`, and a compact `reason`.
 
@@ -95,10 +105,13 @@ When enabled, signal results may include `strategyMatches[]` and `blockedStrateg
 
 Signal responses add an optional module-local `triggerContract` projection for the first bounded `TriggerObjectV1` compatibility slice. The projection is derived only from current signal records and enrichment context.
 
-The projection includes explicit `contractStatus`, `unavailable_fields`, and `incomplete_reasons` markers. It does not invent rule versions, trigger prices, lifecycle states, Data Quality evidence, strategy versions, timestamps, source data, or audit evidence when the current record cannot prove them.
+The projection includes explicit `contractStatus`, `unavailable_fields`, `incomplete_reasons`, and `trigger_price_evidence` markers. It does not invent rule versions, trigger prices, lifecycle states, Data Quality evidence, strategy versions, timestamps, source data, or audit evidence when the current record cannot prove them.
+
+When strategy-aware enrichment attaches source-proven trigger-price evidence, `triggerContract.trigger_price`, `trigger_timestamp`, `timeframe`, and `entry_rule_id` are populated from that evidence. The packet remains `CONTRACT_INCOMPLETE` while other required future fields such as exit/invalidation rule ids, lifecycle state, and persistence timestamps are unavailable.
 
 Known limitations:
-- `trigger_price`, lifecycle status, rule IDs, timeframe, persistence `created_at`, and persistence `updated_at` remain unavailable unless future persistence work records them.
+- `trigger_price` is available only as compatibility evidence during strategy-aware enrichment when the local source price row and Strategy Framework rule evidence prove it. It is not persisted as durable trigger audit evidence.
+- lifecycle status, exit/invalidation rule IDs, persistence `created_at`, and persistence `updated_at` remain unavailable unless future persistence work records them.
 - Legacy rows without current audit or Data Quality snapshots are marked `LEGACY_INCOMPLETE`.
 - Persisted trigger snapshots, normalized trigger tables, route changes, shared type changes, frontend changes, and downstream consumer adoption are separate future decisions.
 

@@ -2,6 +2,53 @@
 
 Date: 2026-05-20
 
+## Latest Runtime Checkpoint - SIG Trigger Entry Evidence
+
+Date: 2026-05-24
+
+Trigger: Product Owner asked Team 00 to clean the workspace, commit/remove as needed, and continue the Trusted Signal Candidate top-10 execution stream with spawned team agents.
+
+Completed:
+
+- Cleaned the four Research Hub unstaged files by resetting line-ending-only working-tree noise.
+- Committed the Today Review table UX slice on `dev` as `9b09d8d feat: improve today review candidate table`.
+- Spawned Product Owner, Architect, and QA agents for `CF-W1-SIG-TRIGGER-ENTRY-01`.
+- Product Owner confirmed `CF-W1-SIG-TRIGGER-ENTRY-01` is still the highest-value immediate dependency for `CF-W1-TSC-01`.
+- Architect confirmed a bounded module-local Signal Generation implementation may proceed under standing delegation.
+- QA provided the focused validation plan.
+- Team 00 implemented the bounded Signal Generation trigger-price evidence child.
+
+Current validation:
+
+- Initial validation passed.
+- Team 10 rejected the first pass because `SOURCE_PROVEN` could fall back to the signal source date when the local price row lacked its own timestamp.
+- Team 00 reworked the trust boundary so source-proven evidence requires the local latest price-row timestamp directly and added downgrade tests for source-date mismatch and non-entry strategy matches.
+- Team 10 rejected the rereview because top-level `trigger_timestamp` still fell back to signal source dates in strategy-aware downgrade cases.
+- Team 00 reworked the projection so strategy-aware `trigger_timestamp` is exposed only from `SOURCE_PROVEN` evidence and added downgrade assertions.
+- Rework validation passed: `cd backend && npm.cmd test -- signal-generation-engine.trigger-contract.test.ts signal-generation-engine.service.test.ts signal-generation-dq-enforcement.invariants.test.ts --runInBand` with 34 tests.
+- Broader Signal Generation regression passed: `cd backend && npm.cmd test -- signal-generation-engine --runInBand` with 50 tests.
+- Rework backend build passed: `cd backend && npm.cmd run build`.
+
+Active review/signoff agents:
+
+| Team | Agent | Work Item | Status |
+| --- | --- | --- | --- |
+| Team 04 | `019e5a2c-1158-7fc1-9914-2c50305558e4` | `CF-W1-SIG-TRIGGER-ENTRY-01` QA Verification | accepted |
+| Team 10 | `019e5a38-ebc1-7210-8950-46979719aca8` | `CF-W1-SIG-TRIGGER-ENTRY-01` Code Review | accepted after rework |
+| Team 03 | `019e5a2c-8427-7f41-861b-2a1dacacb9f8` | `CF-W1-SIG-TRIGGER-ENTRY-01` Architect Signoff | accepted |
+| Team 00 | n/a | delegated PO acceptance | accepted |
+
+Teams ready to pick up new tasks:
+
+- Team 04: QA Verification is active.
+- Team 10: Code Review is active.
+- Team 03: Architect Signoff is active.
+- Team 02: next rolling requirement/value audit after this gate.
+- Team 03: next TSC downstream architecture child after this gate.
+- Team 06: standby for the next Strategy/Signal implementation slice after Ready promotion.
+
+Product Owner action required: no.
+
 ## Latest Runtime Checkpoint - Dirty Docs Checkpoint And Gate Closures
 
 Date: 2026-05-20

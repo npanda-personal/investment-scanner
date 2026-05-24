@@ -6,6 +6,13 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+2026-05-24 Team 00 Trusted Signal Candidate dependency update:
+
+- `CF-W1-SIG-TRIGGER-ENTRY-01` was implemented as a bounded Signal Generation compatibility-evidence child after Product Owner, Architect, and QA agent review confirmed the module-local path.
+- Current state: accepted through QA, Code Review, Architect Signoff, and delegated PO acceptance; scoped local commit pending.
+- Validation passed: `cd backend && npm.cmd test -- signal-generation-engine.trigger-contract.test.ts signal-generation-engine.service.test.ts signal-generation-dq-enforcement.invariants.test.ts --runInBand`; `cd backend && npm.cmd run build`.
+- This does not move `CF-W1-TSC-01` into Ready yet. A downstream Today Review/TSC adoption child still needs accepted trigger-evidence dependency, architecture contract, QA plan, exact file reservations, and Team 00 promotion.
+
 2026-05-24 Team 00 gate-closure update:
 
 - `CF-W1-STRAT-04` completed QA, review, Architect Signoff, delegated PO acceptance, and scoped local implementation-branch commit `8b3498e feat: add strategy evidence freshness labels`.

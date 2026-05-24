@@ -1,5 +1,54 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - SIG Trigger Entry Evidence Implementation
+
+Date: 2026-05-24
+
+Status:
+
+- Branch: `dev`.
+- Workspace cleaned before new implementation; Research Hub line-ending-only dirty files were reset.
+- Today Review table implementation committed as `9b09d8d feat: improve today review candidate table`.
+- Open decisions: 0.
+- Product Owner action required: no.
+
+Completed:
+
+- Product Owner agent confirmed `CF-W1-SIG-TRIGGER-ENTRY-01` remains the highest-value immediate dependency for Trusted Signal Candidate.
+- Architect agent approved bounded Signal Generation implementation under standing delegation.
+- QA agent supplied focused validation requirements.
+- Team 00 implemented additive Signal Generation trigger-price evidence:
+  - source-proven only from local stored price row plus Strategy Framework entry rule evidence;
+  - compatibility-only, not durable trigger persistence;
+  - unavailable when price/rule/date/timeframe evidence is missing or mismatched;
+  - no target/R:R/advice wording.
+
+Validation:
+
+- `cd backend && npm.cmd test -- signal-generation-engine.trigger-contract.test.ts signal-generation-engine.service.test.ts signal-generation-dq-enforcement.invariants.test.ts --runInBand` passed.
+- `cd backend && npm.cmd run build` passed.
+
+Active gates:
+
+- Team 04 QA Verification: accepted.
+- Team 10 Code Review: accepted after two bounded rework passes.
+- Team 03 Architect Signoff: accepted; downstream TSC adoption must trust only `trigger_price_evidence.status === SOURCE_PROVEN`.
+- Team 00 delegated PO acceptance: accepted under standing delegation.
+
+Rework validation:
+
+- `cd backend && npm.cmd test -- signal-generation-engine.trigger-contract.test.ts signal-generation-engine.service.test.ts signal-generation-dq-enforcement.invariants.test.ts --runInBand` passed after rework with 34 tests.
+- `cd backend && npm.cmd test -- signal-generation-engine --runInBand` passed after rework with 50 tests.
+- `cd backend && npm.cmd run build` passed after rework.
+
+Teams ready to pick up new tasks:
+
+- Team 04: active QA Verification for `CF-W1-SIG-TRIGGER-ENTRY-01`.
+- Team 10: active Code Review for `CF-W1-SIG-TRIGGER-ENTRY-01`.
+- Team 03: active Architect Signoff for `CF-W1-SIG-TRIGGER-ENTRY-01`.
+- Team 02: rolling Product Owner / requirements audit ready for the next direct investor/trader-value item.
+- Team 06: standby for the next bounded Strategy/Signal implementation after Ready promotion.
+
 ## Latest Runtime Checkpoint - Trusted Signal Candidate Goal Gate Closure
 
 Date: 2026-05-24

@@ -53,6 +53,21 @@ export type SignalWriteStatus = 'CREATED' | 'UPDATED' | 'NO_OP';
 
 export type SignalTriggerContractStatus = 'COMPLETE' | 'CONTRACT_INCOMPLETE' | 'LEGACY_INCOMPLETE';
 export type SignalTriggerType = 'bullish_entry_trigger' | 'bearish_trigger' | 'risk_warning';
+export type SignalTriggerPriceEvidenceStatus = 'SOURCE_PROVEN' | 'UNAVAILABLE';
+
+export interface SignalTriggerPriceEvidence {
+  status: SignalTriggerPriceEvidenceStatus;
+  triggerPrice: number | null;
+  triggerTimestamp: string | null;
+  sourceModule: 'signal-generation-engine';
+  sourceField: string | null;
+  strategyCode: string | null;
+  strategyVersion: string | null;
+  timeframe: string | null;
+  entryRuleIds: string[];
+  compatibilityOnly: boolean;
+  unavailableReason?: string;
+}
 
 export interface SignalTriggerConditionEvidence {
   code: string;
@@ -89,6 +104,18 @@ export interface SignalTriggerContractDto {
     generationRunId: string | null;
     modelVersion: string | null;
     rulesetVersion: string | null;
+  };
+  trigger_price_evidence: {
+    status: SignalTriggerPriceEvidenceStatus;
+    source_module: string | null;
+    source_field: string | null;
+    source_timestamp: string | null;
+    strategy_id: string | null;
+    strategy_version: string | null;
+    timeframe: string | null;
+    entry_rule_ids: string[];
+    compatibility_only: boolean;
+    unavailable_reason?: string;
   };
   unavailable_fields: string[];
   incomplete_reasons: string[];
@@ -157,6 +184,8 @@ export interface SignalStrategyMatchSummary {
   confidence: SignalConfidence;
   reasons: string[];
   entryRulesPassed: string[];
+  timeframe?: string | null;
+  triggerPriceEvidence?: SignalTriggerPriceEvidence | null;
   readinessLabel?: StrategyReadinessLabel | null;
   ratingGrade?: StrategyRatingGrade | null;
 }

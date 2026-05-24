@@ -22,6 +22,7 @@ import type {
   SignalDataQualityEligibility,
   SignalScoringInputSummary,
   SignalTriggerContractDto,
+  SignalTriggerPriceEvidence,
   SignalTriggerType,
 } from './signal-generation-engine.types';
 import {
@@ -667,8 +668,16 @@ export class SignalGenerationEngineService {
     const region = this.stringOrNull(instrument?.region);
     const strategyId = primaryStrategy?.strategyCode ?? null;
     const strategyVersion = primaryStrategy?.strategyVersion ?? null;
-    const triggerTimestamp = signal.sourcePriceDate ?? signal.sourceDataDate ?? null;
+    const sourceProvenPriceEvidence = primaryStrategy?.triggerPriceEvidence?.status === 'SOURCE_PROVEN'
+      ? primaryStrategy.triggerPriceEvidence
+      : null;
+    const attemptedPriceEvidence = primaryStrategy?.triggerPriceEvidence ?? null;
+    const triggerTimestamp = primaryStrategy
+      ? sourceProvenPriceEvidence?.triggerTimestamp ?? null
+      : signal.sourcePriceDate ?? signal.sourceDataDate ?? null;
     const dataQualityStatus = signal.dataQualityEligibility?.signalReadinessStatus ?? null;
+    const entryRuleId = sourceProvenPriceEvidence?.entryRuleIds[0] ?? null;
+    const timeframe = sourceProvenPriceEvidence?.timeframe ?? primaryStrategy?.timeframe ?? null;
 
     const mark = (field: string, reason: string) => {
       unavailable.add(field);
@@ -680,10 +689,14 @@ export class SignalGenerationEngineService {
     if (!region) mark('region', 'instrument market region is unavailable from the current signal record.');
     if (!strategyId) mark('strategy_id', 'no Strategy Framework match is attached to this signal.');
     if (!strategyVersion) mark('strategy_version', 'no Strategy Framework version is attached to this signal.');
-    mark('trigger_price', 'rule-defined trigger price is not persisted in the current signal record.');
-    if (!triggerTimestamp) mark('trigger_timestamp', 'source price/data timestamp is unavailable from the current signal record.');
-    mark('timeframe', 'rule timeframe is not persisted in the current signal record.');
-    mark('entry_rule_id', 'entry rule id is not persisted in the current signal record.');
+    if (!sourceProvenPriceEvidence) {
+      mark('trigger_price', primaryStrategy?.triggerPriceEvidence?.unavailableReason || 'source-proven rule-trigger price is unavailable from attached Strategy Framework context.');
+    }
+    if (!triggerTimestamp) {
+      mark('trigger_timestamp', attemptedPriceEvidence?.unavailableReason || 'source-proven trigger timestamp is unavailable from attached Strategy Framework context.');
+    }
+    if (!timeframe) mark('timeframe', 'rule timeframe is unavailable from attached Strategy Framework context.');
+    if (!entryRuleId) mark('entry_rule_id', 'source-proven entry rule id is unavailable from attached Strategy Framework context.');
     mark('exit_rule_id', 'exit rule id is not persisted in the current signal record.');
     mark('invalidation_rule_id', 'invalidation rule id is not persisted in the current signal record.');
     if (!dataQualityStatus) mark('data_quality_status', 'Data Quality readiness snapshot is unavailable from the current signal record.');
@@ -706,10 +719,10 @@ export class SignalGenerationEngineService {
       strategy_id: strategyId,
       strategy_version: strategyVersion,
       trigger_type: this.triggerTypeFor(signal.direction),
-      trigger_price: null,
+      trigger_price: sourceProvenPriceEvidence?.triggerPrice ?? null,
       trigger_timestamp: triggerTimestamp,
-      timeframe: null,
-      entry_rule_id: null,
+      timeframe,
+      entry_rule_id: entryRuleId,
       exit_rule_id: null,
       invalidation_rule_id: null,
       reason_summary: signal.explanation,
@@ -725,6 +738,7 @@ export class SignalGenerationEngineService {
         modelVersion: signal.modelVersion ?? null,
         rulesetVersion: signal.rulesetVersion ?? null,
       },
+      trigger_price_evidence: this.toTriggerPriceEvidenceDto(sourceProvenPriceEvidence, attemptedPriceEvidence),
       unavailable_fields: Array.from(unavailable),
       incomplete_reasons: incompleteReasons,
     };
@@ -734,6 +748,22 @@ export class SignalGenerationEngineService {
     if (direction === 'BULLISH') return 'bullish_entry_trigger';
     if (direction === 'BEARISH') return 'bearish_trigger';
     return 'risk_warning';
+  }
+
+  private toTriggerPriceEvidenceDto(sourceProven: SignalTriggerPriceEvidence | null, attempted: SignalTriggerPriceEvidence | null) {
+    const evidence = sourceProven ?? attempted;
+    return {
+      status: evidence?.status ?? 'UNAVAILABLE',
+      source_module: evidence?.status === 'SOURCE_PROVEN' ? evidence.sourceModule : null,
+      source_field: evidence?.status === 'SOURCE_PROVEN' ? evidence.sourceField : null,
+      source_timestamp: evidence?.status === 'SOURCE_PROVEN' ? evidence.triggerTimestamp : null,
+      strategy_id: evidence?.strategyCode ?? null,
+      strategy_version: evidence?.strategyVersion ?? null,
+      timeframe: evidence?.timeframe ?? null,
+      entry_rule_ids: evidence?.entryRuleIds ?? [],
+      compatibility_only: evidence?.compatibilityOnly ?? true,
+      unavailable_reason: evidence?.status === 'UNAVAILABLE' ? evidence.unavailableReason : undefined,
+    };
   }
 
   private stringOrNull(value: unknown): string | null {
@@ -756,7 +786,7 @@ export class SignalGenerationEngineService {
       try {
         const result = new StrategyFrameworkEvaluator(strategy).evaluateSignalCandidate(context);
         const rating = await this.latestStrategyPerformance(strategy.code, context.region || 'IN', context.assetType || 'STOCK', ratingCache);
-        if (result.eligibleForSignalGeneration && result.blockers.length === 0) strategyMatches.push(this.summarizeMatch(result, strategy.name, rating));
+        if (result.eligibleForSignalGeneration && result.blockers.length === 0) strategyMatches.push(this.summarizeMatch(result, strategy, rating, context));
         else blockedStrategies.push(this.summarizeBlocked(result, strategy.name));
       } catch (error: any) {
         blockedStrategies.push({
@@ -816,10 +846,10 @@ export class SignalGenerationEngineService {
     };
   }
 
-  private summarizeMatch(result: StrategySignalOutput, strategyName: string, rating: StrategyPerformanceSummaryDto | null): SignalStrategyMatchSummary {
+  private summarizeMatch(result: StrategySignalOutput, strategy: { name: string; timeframe?: string | null; category?: string | null }, rating: StrategyPerformanceSummaryDto | null, context: StrategyContext): SignalStrategyMatchSummary {
     return {
       strategyCode: result.strategyCode,
-      strategyName,
+      strategyName: strategy.name,
       strategyVersion: result.strategyVersion,
       decision: result.decision,
       direction: result.direction,
@@ -827,9 +857,66 @@ export class SignalGenerationEngineService {
       confidence: result.confidence,
       reasons: result.reasons,
       entryRulesPassed: result.entryRulesPassed,
+      timeframe: strategy.timeframe ?? null,
+      triggerPriceEvidence: this.triggerPriceEvidenceFor(result, strategy, context),
       readinessLabel: rating?.readinessLabel ?? null,
       ratingGrade: rating?.ratingGrade ?? null,
     };
+  }
+
+  private triggerPriceEvidenceFor(result: StrategySignalOutput, strategy: { timeframe?: string | null; category?: string | null }, context: StrategyContext): SignalTriggerPriceEvidence {
+    const timeframe = strategy.timeframe ?? null;
+    const latestPricePoint = context.prices?.[0] ?? null;
+    const signalSourceDate = context.rawSignal?.sourcePriceDate ?? context.rawSignal?.sourceDataDate ?? null;
+    const triggerTimestamp = latestPricePoint?.date ?? null;
+    const triggerPrice = latestPricePoint?.adjusted_close ?? null;
+    const entryRuleIds = result.entryRulesPassed.filter(Boolean);
+    const missingReasons: string[] = [];
+    if (strategy.category !== 'ENTRY') missingReasons.push(`Strategy category is ${strategy.category || 'UNKNOWN'}, not ENTRY.`);
+    if (result.direction !== 'BULLISH') missingReasons.push(`Strategy direction is ${result.direction}, not BULLISH.`);
+    if (typeof triggerPrice !== 'number' || !Number.isFinite(triggerPrice)) missingReasons.push('Source price row adjusted close is unavailable.');
+    if (!triggerTimestamp) missingReasons.push('Local source price row timestamp is unavailable.');
+    if (triggerTimestamp && signalSourceDate && !this.sameUtcDay(triggerTimestamp, signalSourceDate)) {
+      missingReasons.push('Latest source price row does not match the signal source price date.');
+    }
+    if (entryRuleIds.length === 0) missingReasons.push('No passed entry rule id is available.');
+    if (!timeframe) missingReasons.push('Strategy timeframe is unavailable.');
+
+    if (missingReasons.length > 0) {
+      return {
+        status: 'UNAVAILABLE',
+        triggerPrice: null,
+        triggerTimestamp: null,
+        sourceModule: 'signal-generation-engine',
+        sourceField: null,
+        strategyCode: result.strategyCode,
+        strategyVersion: result.strategyVersion,
+        timeframe,
+        entryRuleIds,
+        compatibilityOnly: true,
+        unavailableReason: missingReasons.join(' '),
+      };
+    }
+
+    return {
+      status: 'SOURCE_PROVEN',
+      triggerPrice: triggerPrice!,
+      triggerTimestamp,
+      sourceModule: 'signal-generation-engine',
+      sourceField: 'strategyContext.prices[0].adjusted_close',
+      strategyCode: result.strategyCode,
+      strategyVersion: result.strategyVersion,
+      timeframe,
+      entryRuleIds,
+      compatibilityOnly: true,
+    };
+  }
+
+  private sameUtcDay(left: string, right: string): boolean {
+    const leftDate = new Date(left);
+    const rightDate = new Date(right);
+    if (!Number.isFinite(leftDate.getTime()) || !Number.isFinite(rightDate.getTime())) return false;
+    return leftDate.toISOString().slice(0, 10) === rightDate.toISOString().slice(0, 10);
   }
 
   private summarizeBlocked(result: StrategySignalOutput, strategyName: string): SignalBlockedStrategySummary {
