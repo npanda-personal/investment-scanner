@@ -548,7 +548,7 @@ Date: 2026-05-24
 - Current-source note: prior DQ enforcement behavior appears present on `dev`; Team 06 must inspect first and implement only proved gaps inside the reservation.
 - `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` promoted to Team 07 for bounded Today Review supporting-trust evidence implementation.
 - Branch: `codex/team07-portfolio-alerts/CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`.
-- Worktree: `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\t7-tsc03a` (shortened from the recommended name because Windows path length blocked checkout of long requirement filenames).
 - Required base: `34c9993 feat: add today review active signal health`.
 - Base decision: use explicit unavailable/missing states for absent DQ/calibration/backtesting richer fields; do not recreate upstream trust logic.
 

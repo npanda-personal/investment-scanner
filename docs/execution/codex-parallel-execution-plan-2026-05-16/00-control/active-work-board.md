@@ -52,7 +52,7 @@ Current Ready promotion:
 - Base recommendation: current `dev` at Team 00 docs checkpoint.
 - `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`: promoted to Team 07 for bounded Today Review supporting-trust evidence implementation.
 - Branch recommendation: `codex/team07-portfolio-alerts/CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`.
-- Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\t7-tsc03a` (shortened from the recommended name because Windows path length blocked checkout of long requirement filenames).
 - Required base: accepted `CF-W1-TSC-02A-TREV-HEALTH` commit `34c9993 feat: add today review active signal health`.
 - Base decision: use explicit unavailable/missing states for absent `DQ-03`, `CAL-01A`, or `BT-04` fields instead of recreating upstream logic.
 

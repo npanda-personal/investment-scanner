@@ -17,7 +17,8 @@ Work item:
 Branch / worktree:
 
 - Branch: `codex/team07-portfolio-alerts/CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`
-- Worktree: `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\t7-tsc03a`
+- Note: Team 00 shortened the worktree directory because Windows path length blocked checkout at the full recommended name.
 - Required base: accepted `CF-W1-TSC-02A-TREV-HEALTH` commit `34c9993 feat: add today review active signal health`
 
 Base decision:

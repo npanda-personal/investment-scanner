@@ -67,7 +67,7 @@ rg -n "targetPrice|profitTarget|priceTarget|rewardRiskRatio|R:R|buy now|sell now
 - Required base: accepted `CF-W1-TSC-02A-TREV-HEALTH` commit `34c9993`, not plain `dev`.
 - Base decision: implement with explicit unavailable/missing states for absent `DQ-03`, `CAL-01A`, or `BT-04` fields. Do not recreate Data Quality residual logic, calibration trust logic, or backtesting proof-currentness logic inside Today Review.
 - Branch recommendation: `codex/team07-portfolio-alerts/CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`.
-- Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\t7-tsc03a` (shortened from the recommended name because Windows path length blocked checkout of long requirement filenames).
 - Gate evidence:
   - Requirement: `10-requirements/CF-W1-TSC-03-today-review-supporting-trust-evidence-requirement.md`
   - Architecture review: `03-architecture/CF-W1-TSC-03-architecture-review.md`
