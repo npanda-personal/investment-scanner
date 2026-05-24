@@ -1,5 +1,50 @@
 # TEAM-02 Requirement Factory
 
+## Team 02 Rolling PO Discovery - Active Pull Exclusion - 2026-05-24
+
+Root `AGENTS.md` intake completed for this pass. Product direction remains direct investor/trader value first: market data, Data Quality, source-proven signal evidence, rule-based health, backtesting/calibration trust, and research explainability. Admin, settings, auth, subscription, notifications, and alert convenience stay low priority unless they block correctness, privacy, or trust.
+
+### Active Pulls Excluded From Fresh Discovery
+
+- `CF-W1-TSC-01A-SIG` is active with Team 06.
+- `CF-W1-DQ-03` is active with Team 05.
+
+Team 02 did not move any item to Ready and did not edit application code.
+
+### Next Unassigned Candidates
+
+| Rank | ID | Product value | Dependency / next gate |
+| --- | --- | --- | --- |
+| 1 | `CF-W1-TSC-01A-TREV` | Today Review should consume the Team 06 trigger-evidence bridge and show trusted candidate grouping, counts, reasons, and conservative health without Trade Plan/R:R framing. | Wait for Team 06 acceptance, then Team 00/03/04 confirm Team 07 reservations. |
+| 2 | `CF-W1-BT-04` | Saved backtests need current-proof labels so old simulations do not read like fresh proof. | Team 04 QA planning and Team 00 Ready evaluation later; keep additive and no-schema. |
+| 3 | `CF-W1-TSC-02` | Active Trusted Signal Candidates need rule-based health tracking until exit, invalidation, expiry, or blockage. | New requirement draft; Team 03 refinement after active TSC/DQ gates settle. |
+| 4 | `CF-W1-DQ-02` residual parent | Currentness parent still may need a bounded no-schema public/read-side follow-up after accepted `DQ-02A`. | Team 03 should split `DQ-02B` or keep parent blocked. |
+| 5 | `CF-W1-L3-DQ-01A` | Lane 3 passive readiness display semantics still need stable contract language. | Contract refresh only unless Team 03/04 define a bounded child. |
+| 6 | `CF-W1-MD-02A` | Durable market-data evidence storage has high value but needs schema/generated/repository consent. | Proposal-only until Team 00 opens a consent packet. |
+| 7 | `CF-W1-SQLAB-02B` | Durable Signal Quality learning memory would preserve post-event research evidence. | Proposal-only until storage/schema consent opens. |
+| 8 | `CF-W1-STRAT-02B` | Durable strategy revision history would preserve exact rule/version provenance. | Proposal-only until schema/generated/repository consent opens. |
+| 9 | `CF-W1-UX-02` | Copilot trust UX remains useful after core data/signal trust paths are stronger. | Keep Copilot-only and behind direct market/signal/backtest value. |
+| 10 | `CF-W1-UX-05` | Copilot-only product-language cleanup can reduce advice-like wording. | Fold into or follow `CF-W1-UX-02`; no shared UI reservation. |
+
+### New Requirement Created
+
+- `10-requirements/CF-W1-TSC-02-active-signal-health-rule-evidence-requirement.md`
+
+Reason: the Product Owner explicitly wants ongoing signal health tracking after a source-proven entry trigger. `CF-W1-TSC-01A` should stay focused on Today Review adoption; `CF-W1-TSC-02` captures the next rule-evidence health gap without widening the active implementation.
+
+### Files Changed In This Pass
+
+- `10-requirements/CF-W1-TSC-02-active-signal-health-rule-evidence-requirement.md`
+- `10-requirements/next-top-10-candidates.md`
+- `10-requirements/top-10-ready-candidates.md`
+- `10-requirements/refinement-queue.md`
+- `10-requirements/requirements-backlog.md`
+- `17-team-outboxes/TEAM-02-requirement-factory.md`
+
+### Ready Result
+
+No item was moved to Ready by Team 02.
+
 ## Team 02 Rolling PO Requirement Report - TSC-01A - 2026-05-24
 
 Root `AGENTS.md` intake completed. Product direction remains: direct investor/trader value first, no Trade Plan-first framing, no R:R, no arbitrary targets, no direct financial advice, and `/today-review` is the preferred daily signal-review cockpit.

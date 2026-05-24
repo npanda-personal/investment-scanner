@@ -6,13 +6,15 @@ Status: Team 00 updated after Product Owner redirected the signal workflow away 
 
 Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-02A` are accepted parked branch commits, not fresh refinement-front items.
 
+Team 02 rolling update: `CF-W1-TSC-01A-SIG` is active with Team 06 and `CF-W1-DQ-03` is active with Team 05. The current front below is the next unassigned refinement stack after those active pulls.
+
 ## Current Refinement Stack Behind The Top Five
 
 | Rank | ID | Why it stays next | Team 00 routing note |
 | --- | --- | --- | --- |
-| 1 | `CF-W1-TSC-01A` | Today Review should adopt source-proven trigger evidence into Trusted Signal Candidate groups and daily review counts. | Team 03 architecture/file-reservation prep and Team 04 QA planning next; not Ready until Team 00 promotes it. |
-| 2 | `CF-W1-DQ-03` | Downstream trust consumers need a compact residual reason summary instead of raw DQ arrays. | Team 03 architecture contract and QA planning. |
-| 3 | `CF-W1-BT-04` | Backtesting saved runs need a current-proof label so older saved simulations do not read like the latest proof window. | Keep refinement-only behind TSC adoption work; Team 04 QA planning can run later. |
+| 1 | `CF-W1-TSC-01A-TREV` | Today Review should adopt the accepted Team 06 signal bridge into Trusted Signal Candidate groups and daily review counts. | Not Ready until Team 06 bridge acceptance and Team 03/04 Today Review reservations pass. |
+| 2 | `CF-W1-BT-04` | Backtesting saved runs need a current-proof label so older saved simulations do not read like the latest proof window. | Keep refinement-only behind active TSC/DQ work; Team 04 QA planning can run later. |
+| 3 | `CF-W1-TSC-02` | Trusted candidates need rule-based health tracking after entry until exit, invalidation, expiry, or blockage. | New requirement draft; Team 03 refinement after active TSC-01A/DQ-03 gates settle. |
 | 4 | `CF-W1-DQ-02` residual parent | `DQ-02A` is complete, but the parent still has read-side/public-contract scope that may need a bounded no-schema child. | Team 03 should identify a bounded follow-up or keep the residual parent blocked. |
 | 5 | `CF-W1-L3-DQ-01A` | Passive readiness display semantics remain a real Lane 3 trust contract gap. | Keep contract-only unless Team 03/04 define a bounded child that does not collide with active Lane 3 work. |
 | 6 | `CF-W1-MD-02A` | Durable market-data evidence storage still has clear investor value, but it is consent-gated. | Keep proposal-only until schema/generated/repository consent opens. |
@@ -31,7 +33,9 @@ Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-
 - The 2026-05-20 backtesting proof-basis audit keeps `CF-W1-BT-03` parked and reinforces `CF-W1-BT-04` as the fresh backtesting current-proof slice.
 - `audit-research-hub-explainability-2026-05-20.md` does not justify a new requirement ID. Its findings map to the already drafted `CF-W1-RH-03` explainability child, so Team 02 should not duplicate that work.
 - No fresh unclaimed Today Review requirement was found beyond active `CF-W1-L3-TREV-02`.
-- `CF-W1-DQ-02A` is accepted and locally committed as `c2d6753`; only the `DQ-02` residual parent stays in this stack behind `TP-03` and `BT-04`.
+- `CF-W1-TSC-01A-SIG` is active with Team 06 and `CF-W1-DQ-03` is active with Team 05; neither should be duplicated in the unassigned refinement stack.
+- `CF-W1-TSC-02` now captures the next active signal health gap after candidate adoption.
+- `CF-W1-DQ-02A` is accepted and locally committed as `c2d6753`; only the `DQ-02` residual parent stays in this stack behind active TSC/DQ work and `BT-04`.
 - `CF-W1-SQLAB-01` is accepted and locally committed as `1a41d95`; `CF-W1-SQLAB-02A` is promoted and assigned, so the next Signal Quality storage child remains `CF-W1-SQLAB-02B`.
 
 ## Not Fresh Discovery
