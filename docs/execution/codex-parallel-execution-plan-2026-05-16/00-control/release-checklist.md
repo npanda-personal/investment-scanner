@@ -40,3 +40,31 @@ This checklist is for future accepted requirements. Sprint 0 artifact creation i
 ## Release Decision
 
 No requirement is released until Product Owner acceptance and release evidence are recorded in the active execution plan.
+
+## CF-W3-MDPIPE-01A - Market Data Official EOD Bulk
+
+Date: 2026-05-25
+
+Status: Accepted; scoped local commit pending.
+
+Evidence:
+
+- Requirement: `10-requirements/CF-W3-MDPIPE-01-incremental-market-data-pipeline-requirement.md`
+- Architecture: `03-architecture/CF-W3-MDPIPE-01-incremental-market-data-pipeline-architecture.md`
+- QA verification: `04-qa/CF-W3-MDPIPE-01A-qa-verification.md`
+- Architect signoff: `03-architecture/CF-W3-MDPIPE-01A-architect-signoff.md`
+- PO acceptance: `09-summaries/CF-W3-MDPIPE-01A-po-acceptance-packet.md`
+- Release record: `18-integration-queue/CF-W3-MDPIPE-01A-release-record.md`
+
+Validation:
+
+- Focused Market Data tests passed: 3 suites, 196 tests.
+- Backend build passed.
+- Product-language phrase scan passed.
+- `git diff --check` passed with normal CRLF warnings only.
+
+Skipped:
+
+- Live provider/public-download execution.
+- Frontend checks.
+- Downstream module checks.

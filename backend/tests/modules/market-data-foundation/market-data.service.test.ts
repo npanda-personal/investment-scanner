@@ -1722,6 +1722,7 @@ describe('MarketDataFoundationService syncV1', () => {
         status: 'SYNCED',
         lastCheckedAt: new Date('2026-05-18T12:00:00.000Z').toISOString(),
       }),
+      updateStockLoadTimestampBySymbol: jest.fn().mockResolvedValue({}),
     };
     const service = new MarketDataFoundationService(repository as any, {} as any);
     jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
@@ -1758,6 +1759,274 @@ describe('MarketDataFoundationService syncV1', () => {
         skipFreshnessGate: true,
       })
     );
+  });
+
+  it('attempts one official NSE EOD bulk file first and stores matched rows under canonical symbols', async () => {
+    const previousFlag = process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED;
+    const previousFetch = global.fetch;
+    process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED = 'true';
+    const csvText = [
+      'SYMBOL,SERIES,DATE1,OPEN_PRICE,HIGH_PRICE,LOW_PRICE,CLOSE_PRICE,TTL_TRD_QNTY',
+      'RELIANCE,EQ,18-05-2026,100,110,95,108,1000',
+    ].join('\n');
+    const payload = Buffer.from(csvText);
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: (name: string) => (name.toLowerCase() === 'content-length' ? String(payload.length) : null) },
+      arrayBuffer: async () => payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.byteLength),
+    }) as any;
+
+    const tasks = [
+      {
+        id: 'stock-1',
+        symbol: 'RELIANCE',
+        providerSymbol: 'RELIANCE.NS',
+        sourceSymbol: 'RELIANCE',
+        displaySymbol: 'RELIANCE',
+        lastSuccessfulDataLoadTimestamp: new Date('2026-05-19T00:00:00.000Z'),
+        latestStoredTimestamp: new Date('2026-05-17T00:00:00.000Z'),
+      },
+      {
+        id: 'stock-2',
+        symbol: 'UNMATCHED.NS',
+        providerSymbol: 'UNMATCHED.NS',
+        sourceSymbol: 'UNMATCHED',
+        displaySymbol: 'UNMATCHED',
+        lastSuccessfulDataLoadTimestamp: new Date('2026-05-19T00:00:00.000Z'),
+        latestStoredTimestamp: new Date('2026-05-17T00:00:00.000Z'),
+      },
+    ];
+    const repository = {
+      countStaleActiveStockSyncTasks: jest.fn().mockResolvedValue(tasks.length),
+      listStaleActiveStockSyncTasks: jest.fn().mockResolvedValue(tasks),
+      listActiveStockSyncTasks: jest.fn(),
+      upsertSyncState: jest.fn().mockResolvedValue({}),
+      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue('2026-05-18'),
+      getSyncState: jest.fn().mockResolvedValue({
+        status: 'SYNCED',
+        lastCheckedAt: new Date('2026-05-18T12:00:00.000Z').toISOString(),
+      }),
+      updateStockLoadTimestampBySymbol: jest.fn().mockResolvedValue({}),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+    const storeHistorical = jest.spyOn(service, 'storeHistorical').mockResolvedValue({
+      rowsReceived: 1,
+      rowsInserted: 1,
+      rowsUpdated: 0,
+      rowsSkipped: 0,
+      rowsNoOp: 0,
+      warningCount: 0,
+      warnings: [],
+    });
+    const ingestSymbol = jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
+      rowsReceived: 1,
+      rowsInserted: 0,
+      rowsUpdated: 0,
+      rowsSkipped: 0,
+      rowsNoOp: 1,
+      warningCount: 0,
+      warnings: [],
+    });
+
+    try {
+      const summary = await service.syncScheduledRegion('IN', {
+        assetType: 'STOCK',
+        batchSize: 2,
+        now: new Date('2026-05-18T12:00:00.000Z'),
+      });
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://archives.nseindia.com/products/content/sec_bhavdata_full_18052026.csv',
+        expect.any(Object)
+      );
+      expect(storeHistorical).toHaveBeenCalledWith([
+        expect.objectContaining({
+          symbol: 'RELIANCE',
+          source: 'NSE_SECURITY_BHAVDATA',
+          date: new Date('2026-05-18T00:00:00.000Z'),
+        }),
+      ]);
+      expect(repository.updateStockLoadTimestampBySymbol).toHaveBeenCalledWith('RELIANCE');
+      expect(ingestSymbol).toHaveBeenCalledTimes(1);
+      expect(ingestSymbol).toHaveBeenCalledWith(
+        'UNMATCHED.NS',
+        new Date('2026-05-14T00:00:00.000Z'),
+        new Date('2026-05-18T23:59:59.999Z'),
+        false,
+        expect.objectContaining({
+          region: 'IN',
+          assetType: 'STOCK',
+          skipFreshnessGate: true,
+        })
+      );
+      expect(summary).toMatchObject({
+        instrumentsProcessed: 2,
+        rowsInserted: 1,
+        rowsNoOp: 1,
+        officialEodBulk: {
+          attempted: true,
+          sourceName: 'NSE_SECURITY_BHAVDATA',
+          matchedInstruments: 1,
+          fallbackReason: 'OFFICIAL_EOD_PARTIAL_MATCH:1_UNMATCHED',
+        },
+      });
+    } finally {
+      if (previousFlag === undefined) delete process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED;
+      else process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED = previousFlag;
+      global.fetch = previousFetch;
+    }
+  });
+
+  it('does not match BSE tasks to official NSE EOD rows by bare symbol and falls back to per-symbol ingest', async () => {
+    const previousFlag = process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED;
+    const previousFetch = global.fetch;
+    process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED = 'true';
+    const csvText = [
+      'SYMBOL,SERIES,DATE1,OPEN_PRICE,HIGH_PRICE,LOW_PRICE,CLOSE_PRICE,TTL_TRD_QNTY',
+      'RELIANCE,EQ,18-05-2026,100,110,95,108,1000',
+    ].join('\n');
+    const payload = Buffer.from(csvText);
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: (name: string) => (name.toLowerCase() === 'content-length' ? String(payload.length) : null) },
+      arrayBuffer: async () => payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.byteLength),
+    }) as any;
+
+    const tasks = [
+      {
+        id: 'stock-bse',
+        symbol: 'RELIANCE.BO',
+        providerSymbol: 'RELIANCE.BO',
+        sourceSymbol: 'RELIANCE',
+        displaySymbol: 'RELIANCE',
+        exchange: 'BSE',
+        lastSuccessfulDataLoadTimestamp: new Date('2026-05-19T00:00:00.000Z'),
+        latestStoredTimestamp: new Date('2026-05-17T00:00:00.000Z'),
+      },
+      {
+        id: 'stock-nse',
+        symbol: 'RELIANCE.NS',
+        providerSymbol: 'RELIANCE.NS',
+        sourceSymbol: 'RELIANCE',
+        displaySymbol: 'RELIANCE',
+        exchange: 'NSE',
+        lastSuccessfulDataLoadTimestamp: new Date('2026-05-19T00:00:00.000Z'),
+        latestStoredTimestamp: new Date('2026-05-17T00:00:00.000Z'),
+      },
+    ];
+    const repository = {
+      countStaleActiveStockSyncTasks: jest.fn().mockResolvedValue(tasks.length),
+      listStaleActiveStockSyncTasks: jest.fn().mockResolvedValue(tasks),
+      listActiveStockSyncTasks: jest.fn(),
+      upsertSyncState: jest.fn().mockResolvedValue({}),
+      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue('2026-05-18'),
+      getSyncState: jest.fn().mockResolvedValue({
+        status: 'SYNCED',
+        lastCheckedAt: new Date('2026-05-18T12:00:00.000Z').toISOString(),
+      }),
+      updateStockLoadTimestampBySymbol: jest.fn().mockResolvedValue({}),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+    const storeHistorical = jest.spyOn(service, 'storeHistorical').mockResolvedValue({
+      rowsReceived: 1,
+      rowsInserted: 1,
+      rowsUpdated: 0,
+      rowsSkipped: 0,
+      rowsNoOp: 0,
+      warningCount: 0,
+      warnings: [],
+    });
+    const ingestSymbol = jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
+      rowsReceived: 1,
+      rowsInserted: 0,
+      rowsUpdated: 0,
+      rowsSkipped: 0,
+      rowsNoOp: 1,
+      warningCount: 0,
+      warnings: [],
+    });
+
+    try {
+      await service.syncScheduledRegion('IN', {
+        assetType: 'STOCK',
+        batchSize: 2,
+        now: new Date('2026-05-18T12:00:00.000Z'),
+      });
+
+      expect(storeHistorical).toHaveBeenCalledTimes(1);
+      expect(storeHistorical).toHaveBeenCalledWith([
+        expect.objectContaining({
+          symbol: 'RELIANCE.NS',
+          source: 'NSE_SECURITY_BHAVDATA',
+          date: new Date('2026-05-18T00:00:00.000Z'),
+        }),
+      ]);
+      expect(storeHistorical).not.toHaveBeenCalledWith([
+        expect.objectContaining({
+          symbol: 'RELIANCE.BO',
+        }),
+      ]);
+      expect(repository.updateStockLoadTimestampBySymbol).toHaveBeenCalledWith('RELIANCE.NS');
+      expect(ingestSymbol).toHaveBeenCalledTimes(1);
+      expect((ingestSymbol as jest.Mock).mock.calls[0][0]).toBe('RELIANCE.BO');
+    } finally {
+      if (previousFlag === undefined) delete process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED;
+      else process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED = previousFlag;
+      global.fetch = previousFetch;
+    }
+  });
+
+  it('falls back to per-symbol provider loop when official NSE EOD bulk is disabled', async () => {
+    const previousFlag = process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED;
+    const previousFetch = global.fetch;
+    process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED = 'false';
+    global.fetch = jest.fn() as any;
+
+    const repository = {
+      listActiveStockSyncTasks: jest.fn().mockResolvedValue([{
+        id: 'stock-1',
+        symbol: 'CURRENT.NS',
+        providerSymbol: 'CURRENT.NS',
+        sourceSymbol: 'CURRENT',
+        displaySymbol: 'CURRENT',
+        lastSuccessfulDataLoadTimestamp: new Date('2026-05-17T00:00:00.000Z'),
+      }]),
+      upsertSyncState: jest.fn().mockResolvedValue({}),
+      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue(null),
+      getSyncState: jest.fn().mockResolvedValue(null),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+    const ingestSymbol = jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
+      rowsReceived: 1,
+      rowsInserted: 0,
+      rowsUpdated: 0,
+      rowsSkipped: 0,
+      rowsNoOp: 1,
+      warningCount: 0,
+      warnings: [],
+    });
+
+    try {
+      const summary = await service.syncScheduledRegion('IN', {
+        assetType: 'STOCK',
+        batchSize: 1,
+        now: new Date('2026-05-18T10:30:00.000Z'),
+      });
+
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(ingestSymbol).toHaveBeenCalledTimes(1);
+      expect(summary.officialEodBulk).toMatchObject({
+        enabled: false,
+        attempted: false,
+        fallbackReason: 'OFFICIAL_EOD_DISABLED',
+      });
+    } finally {
+      if (previousFlag === undefined) delete process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED;
+      else process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED = previousFlag;
+      global.fetch = previousFetch;
+    }
   });
 
   it('preserves incremental start-date selection for ordinary scheduled tasks', async () => {

@@ -1,10 +1,10 @@
 # Daemon Resume Prompt
 
-Date: 2026-05-24
+Date: 2026-05-25
 
 Path: `docs/execution/codex-parallel-execution-plan-2026-05-16/09-summaries/daemon-resume-prompt.md`
 
-This file exists and was updated after Team 00 promoted `CF-W1-MD-05` and `CF-W1-TSC-02A-TREV-HEALTH` for parallel implementation.
+This file exists and was updated after Team 00 accepted `CF-W3-MDPIPE-01A-MDF-OFFICIAL-EOD` for the Market Data pipeline redesign.
 
 ```text
 You are Team 00 - Master Orchestrator / Integration.
@@ -19,9 +19,14 @@ docs/execution/codex-parallel-execution-plan-2026-05-16/
 Resume Continuous Daemon Scheduler Mode from cycle DAEMON-20260517, rolling iteration 24.
 
 Current goal:
-Implement the Trusted Signal Candidate workflow plan without app-code implementation until a bounded Ready slice is promoted.
+Fix Market Data load performance first by implementing the first bounded slice of the incremental automated data pipeline. After accepted completion, resume the Trusted Signal Candidate and rolling requirements factory work.
 
 Product direction:
+- Backend automated freshness should become the source of truth; manual buttons are ad hoc requests only.
+- `IN/STOCK` latest EOD should use official exchange bulk files where supported before per-symbol provider calls.
+- Angel One must not be the broad-universe primary loader.
+- Routine refresh must be incremental and must not run complete operations from scratch.
+- Downstream stages must be wired in later bounded slices with DQ gating and resumable stage contracts.
 - `/today-review` is the preferred first surface.
 - No Trade Plan-first UX.
 - No R:R.
@@ -38,6 +43,7 @@ Evidence sync first:
 - git log --oneline -10
 
 Read:
+- 09-summaries/team-00-market-data-pipeline-redesign-checkpoint.md
 - 09-summaries/daemon-cycle-latest.md
 - 09-summaries/team-00-trusted-signal-candidate-goal-summary.md
 - 00-control/active-work-board.md
@@ -47,6 +53,10 @@ Read:
 - 12-ready-queue/blocked-by-upstream-dependency.md
 - 10-requirements/refinement-queue.md
 - 10-requirements/next-top-10-candidates.md
+- 10-requirements/CF-W3-MDPIPE-01-incremental-market-data-pipeline-requirement.md
+- 03-architecture/CF-W3-MDPIPE-01-incremental-market-data-pipeline-architecture.md
+- 04-qa/CF-W3-MDPIPE-01A-MDF-OFFICIAL-EOD-qa-plan.md
+- 13-implementation-evidence/CF-W3-MDPIPE-01A-ready-promotion.md
 - 10-requirements/CF-W1-TSC-01-trusted-signal-candidate-workflow-requirement.md
 - 10-requirements/CF-W1-SIG-TRIGGER-ENTRY-01-rule-trigger-entry-price-evidence-requirement.md
 - 03-architecture/CF-W1-TSC-01-architecture-review.md
@@ -58,7 +68,12 @@ Read:
 Current status:
 - Open decisions: none.
 - Product Owner action required: no.
-- Ready queue: no unassigned app-code item.
+- Ready queue: no unassigned Ready implementation item is waiting.
+- `CF-W3-MDPIPE-01A-MDF-OFFICIAL-EOD` is accepted through Team 05 implementation/rework, Team 04 QA rerun, Team 10 re-review, Team 03 Architect re-signoff, and Team 00 delegated PO acceptance; scoped local commit is pending.
+- Team 03 Architect and read-only explorer completed the pipeline redesign/audit and were closed.
+- First slice scope is Market Data Foundation official NSE EOD bulk latest-candle ingestion only.
+- The Team 10 cross-exchange rejection was resolved: BSE / `.BO` / non-NSE / ambiguous tasks skip official NSE matching and fall back to provider ingestion.
+- Forbidden in the first slice: Prisma/schema, route registries, shared utilities/UI, package/generated, frontend, downstream modules, provider credentials, live provider execution, startup/backfill expansion, durable pipeline ledger.
 - `CF-W1-STRAT-04` accepted and locally committed on its implementation branch as `8b3498e`.
 - `CF-W1-SQLAB-03` accepted and locally committed on its implementation branch as `5db98f2`.
 - `CF-W1-TP-03` is paused/stale as framed.
@@ -75,13 +90,16 @@ Current status:
 - `CF-W1-DQ-02B` is blocked from implementation until Team 00 explicitly opens a DQE persisted read-side/public-contract packet.
 
 Next autonomous actions:
-1. Recheck memory. If below 90%, rerun `cd frontend; npm.cmd run test:ui -- market-data-foundation.spec.ts --workers=1` in the MD-05 worktree.
-2. If MD-05 Playwright passes, reroute Team 04 QA rerun, Team 10 re-review, Team 03 re-signoff, delegated PO acceptance, and scoped branch commit.
-3. If MD-05 Playwright still fails, return only MD-05 to Team 05 rework in the same file reservation.
-4. When memory is below 90%, run `TSC-02A` developer validation in the Team 07 worktree before QA handoff.
-5. Do not promote `CF-W1-TSC-03A` until `TSC-02A` clears or Team 00 explicitly records a safe stacked base.
-6. Keep Team 02 out of duplicate drafting; its latest audit confirmed the next real no-schema candidate is already `TSC-03A`.
-7. Do not promote `CF-W1-DQ-02B`, `CF-W1-MD-02A`, `CF-W1-SQLAB-02B`, or `CF-W1-STRAT-02B` without the required reopened/consent-gated packet.
+1. Wait for Team 05 worker `019e5c1d-0933-77c3-9052-5fad8aa163bf`.
+2. Verify changed files match the `CF-W3-MDPIPE-01A` reservation.
+3. Run focused backend validation if resource-safe:
+   - `cd backend`
+   - `npm.cmd test -- market-data.service.test.ts market-data.repository.test.ts market-data.scheduler.test.ts --runInBand`
+   - `npm.cmd run build`
+4. Route Team 04 QA, Team 10 review, Team 03 signoff, delegated PO acceptance, and scoped commit if accepted.
+5. If Team 05 hits forbidden scope, stop only this workstream and create/update a decision packet.
+6. Do not wire downstream modules until a separate architecture/QA packet exists.
+7. After Market Data hot path is accepted, resume rolling Team 02/03/04 requirements/architecture/QA prep with direct investor/trader-value priority.
 
 Stop only for:
 - true consent blockers,

@@ -1,5 +1,53 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - Market Data Pipeline Redesign Started
+
+Date: 2026-05-25
+
+Status:
+
+- Branch: `dev`.
+- Git state at intake: clean, ahead of `origin/dev` by 175 commits.
+- Open decisions: 0.
+- Product Owner action required: no for the first bounded Market Data slice.
+- Push performed: no.
+
+Completed in this checkpoint:
+
+- Spawned Team 03 Architect for the data-load redesign; result accepted phased architecture with official exchange EOD as `IN/STOCK` broad-universe primary and Angel One as fallback/validation/deep-gap support.
+- Spawned read-only explorer for downstream pipeline entry points; result confirmed several modules have batch entry points, but durable resumability still requires later orchestration work.
+- Created requirement, architecture, QA, and Ready-promotion docs for `CF-W3-MDPIPE-01A-MDF-OFFICIAL-EOD`.
+- Assigned Team 05 worker `019e5c1d-0933-77c3-9052-5fad8aa163bf` to the first bounded implementation slice.
+
+Current implementation:
+
+- `CF-W3-MDPIPE-01A-MDF-OFFICIAL-EOD`: Team 05 implementation complete; Team 04 QA accepted; Team 10 review rejected for bounded rework; Team 05 rework complete; Team 04 QA rerun accepted; Team 10 re-review accepted; Team 03 Architect re-signoff accepted; delegated PO acceptance recorded.
+- Scope: Market Data Foundation service/repository/types/docs/tests only.
+- Forbidden: Prisma/schema, route registry, shared utility/UI, package/generated, frontend, downstream modules, provider credentials, live provider runs, startup/backfill expansion, durable pipeline ledger.
+- Rework assignment: Team 05 worker `019e5c2e-69b9-7621-8170-f3d14594d916` completed and closed.
+- Rework reason: official NSE bulk matching must not persist NSE bhavdata rows into BSE/ambiguous instruments through bare-symbol alias matches.
+- Completed rework: exchange identity is carried through stale sync tasks, official matching is limited to explicit NSE / `.NS` tasks, BSE / `.BO` / ambiguous tasks fall back to provider ingestion, and negative repository/service coverage was added.
+
+Validation:
+
+- `cd backend && npm.cmd test -- market-data.service.test.ts market-data.repository.test.ts market-data.scheduler.test.ts --runInBand` passed after Team 00 timestamp integration fix.
+- `cd backend && npm.cmd test -- market-data.service.test.ts market-data.repository.test.ts market-data.scheduler.test.ts --runInBand` passed after Team 05 cross-exchange rework with 196 tests.
+- `cd backend && npm.cmd run build` passed.
+- Market Data phrase scan had no target/R:R/advice matches.
+- `git diff --check` passed with normal CRLF warnings only.
+
+Teams ready to pick up new tasks:
+
+- Team 00: scoped staging and local commit now.
+- Team 02: rolling investor/trader-value requirements after Market Data hot path is stabilized.
+- Team 03: next architecture packet after commit, with durable pipeline ledger / DQ stage requiring explicit gate handling.
+
+Next action:
+
+- Stage the accepted `CF-W3-MDPIPE-01A` scope exactly, verify staged files, and create one local commit. Do not push.
+
+---
+
 ## Latest Runtime Checkpoint - Open Items Closed And Stop
 
 Date: 2026-05-24

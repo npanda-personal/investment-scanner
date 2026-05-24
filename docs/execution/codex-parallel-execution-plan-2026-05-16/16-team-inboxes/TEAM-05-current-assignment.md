@@ -1,8 +1,75 @@
 # TEAM-05 Current Assignment
 
-Date: 2026-05-20
+Date: 2026-05-25
 
 Team: TEAM-05 - Market Data / Data Quality
+
+## Latest Assignment Override - 2026-05-25 MDPIPE-01A
+
+Team 00 promotes `CF-W3-MDPIPE-01A-MDF-OFFICIAL-EOD` as the first bounded implementation slice for the incremental Market Data / intelligence pipeline redesign.
+
+This assignment supersedes older Team 05 tails for the current run. It is scoped to Market Data Foundation latest EOD performance only. Do not wire downstream pipeline stages in this slice.
+
+## Branch / Worktree
+
+- Branch: `dev` shared workspace for this bounded hot-path fix, unless Team 00 later moves it to a dedicated worktree.
+- Worktree: `C:\work\repo\investment-scanner`
+- Prior worker agent: Team 05 spawned worker `019e5c1d-0933-77c3-9052-5fad8aa163bf`.
+- Active rework agent: Team 05 spawned worker `019e5c2e-69b9-7621-8170-f3d14594d916`.
+- Rework state: Team 10 `Rejected / Rework`; fix official NSE cross-exchange matching before QA rerun.
+
+## Gate Evidence
+
+- Requirement: `10-requirements/CF-W3-MDPIPE-01-incremental-market-data-pipeline-requirement.md`
+- Architecture: `03-architecture/CF-W3-MDPIPE-01-incremental-market-data-pipeline-architecture.md`
+- QA plan: `04-qa/CF-W3-MDPIPE-01A-MDF-OFFICIAL-EOD-qa-plan.md`
+- Ready promotion: `13-implementation-evidence/CF-W3-MDPIPE-01A-ready-promotion.md`
+- Open decisions: none.
+
+## Allowed Files
+
+- `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.repository.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.types.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.md`
+- `backend/tests/modules/market-data-foundation/market-data.service.test.ts`
+- `backend/tests/modules/market-data-foundation/market-data.repository.test.ts`
+- `backend/tests/modules/market-data-foundation/market-data.scheduler.test.ts`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/**`
+
+## Required Behavior
+
+- Scheduled `IN/STOCK` latest-candle sync should attempt one official NSE EOD bulk file before per-symbol provider fetches.
+- Match parsed official rows to active stale local instruments by canonical symbol, provider symbol, source symbol, and display symbol aliases.
+- Store matched rows under canonical local symbols using existing idempotent storage.
+- Record official source name, URL, fingerprint, rows read/parsed, matched count, stored counts, and fallback reason in sync summary evidence.
+- Fall back to existing per-symbol provider behavior if the official EOD source is unavailable, disabled, unsupported for the scope, or has no matching rows.
+- Official NSE bulk matching must not match BSE, `.BO`, non-NSE, or ambiguous no-exchange tasks through bare-symbol aliases. Those tasks must fall back to the existing per-symbol provider path.
+- Do not trigger Data Quality or downstream stages in this first slice.
+
+## Forbidden Files
+
+- Prisma schema or migrations.
+- Route registries.
+- Shared backend utilities or shared UI.
+- Package manifests.
+- Generated files.
+- Frontend files/tests.
+- Downstream module source/tests.
+- Provider credentials, paid/cloud/broker/telemetry files.
+- Startup/backfill behavior expansion beyond the existing Market Data scheduler path.
+
+## Focused Validation
+
+```powershell
+cd backend
+npm.cmd test -- market-data.service.test.ts market-data.repository.test.ts market-data.scheduler.test.ts --runInBand
+npm.cmd run build
+```
+
+## Stop Conditions
+
+Stop and return to Team 00 if the implementation needs schema/migration, route registry, shared utility, package/generated files, frontend, downstream module wiring, startup/backfill expansion, provider credentials, live provider execution, or a new durable pipeline ledger.
 
 ## Latest Assignment Override - 2026-05-24 MD-05
 

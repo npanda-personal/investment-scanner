@@ -34,6 +34,46 @@ No historical active work items have been migrated as active.
 - Rejected / Rework
 - Deferred
 
+## Latest Team 00 Routing Update - Market Data Pipeline Redesign
+
+Date: 2026-05-25
+
+Current goal:
+
+- Redesign data load so `IN/STOCK` latest EOD refresh is incremental and source-first instead of per-symbol Angel One primary.
+- Use automated backend freshness as the source of truth over manual buttons.
+- Wire downstream stages only after bounded architecture/QA gates.
+
+Architect result:
+
+- Team 03 confirmed the current 15-minute scheduler exists but only calls Market Data sync.
+- Angel One is too slow for broad-universe daily latest EOD because it is per-symbol, throttled, and chunked.
+- Official exchange EOD parsing/URL support exists and should become the primary broad-universe latest-candle path.
+- A future `pipeline-orchestration` module with durable run/stage ledger is recommended, but requires Prisma/schema and route decisions later.
+
+Ready promotion:
+
+- `CF-W3-MDPIPE-01A-MDF-OFFICIAL-EOD` is promoted as the first bounded implementation slice.
+- Team 05 worker `019e5c1d-0933-77c3-9052-5fad8aa163bf` completed implementation.
+- Team 04 QA accepted after Team 00 reran focused validation.
+- Team 10 review rejected the slice on a release-blocking cross-exchange matching risk: the official NSE bulk path could match bare NSE symbols into non-NSE `IN/STOCK` instruments when the stale task lacked exchange-safe gating.
+- Team 05 rework agent `019e5c2e-69b9-7621-8170-f3d14594d916` completed the bounded fix: exchange identity is carried through sync tasks, non-NSE/ambiguous tasks skip official NSE matching, and negative BSE-style coverage was added.
+- Team 00 reran focused validation after rework: Market Data service/repository/scheduler tests passed, backend build passed, phrase scan found no target/R:R/advice matches, and `git diff --check` passed with normal CRLF warnings only.
+- Team 04 QA rerun accepted the rework.
+- Team 10 re-review accepted the rework.
+- Team 03 Architect re-signoff accepted the rework.
+- Team 00 delegated PO acceptance is recorded.
+- Scoped local commit is pending.
+- Scope is Market Data Foundation latest EOD bulk path only; no downstream orchestration in this slice.
+- Open decisions: 0.
+- Product Owner action required: no for Slice 1.
+
+Teams ready to pick up new tasks:
+
+- Team 00: scoped staging and local commit for `CF-W3-MDPIPE-01A`.
+- Team 02: prepare next direct investor/trader-value requirement slice after commit.
+- Team 03: prepare next architecture packet after commit, prioritizing Market Data pipeline ledger / DQ stage only if the true consent gates are opened.
+
 ## Latest Team 00 Routing Update - Open Gate Closure And Stop
 
 Date: 2026-05-24

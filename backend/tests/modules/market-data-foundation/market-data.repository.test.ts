@@ -303,7 +303,10 @@ describe('MarketDataFoundationRepository', () => {
         {
           id: 'stock-1',
           symbol: 'STALE.NS',
+          exchange: 'NSE',
           providerSymbol: 'STALE.NS',
+          sourceSymbol: 'STALE',
+          displaySymbol: 'STALE',
           lastSuccessfulDataLoadTimestamp: new Date('2026-05-17T00:00:00.000Z'),
           latestStoredTimestamp: new Date('2026-05-16T00:00:00.000Z'),
         },
@@ -321,6 +324,9 @@ describe('MarketDataFoundationRepository', () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({
       symbol: 'STALE.NS',
+      exchange: 'NSE',
+      sourceSymbol: 'STALE',
+      displaySymbol: 'STALE',
       latestStoredTimestamp: new Date('2026-05-16T00:00:00.000Z'),
     });
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
@@ -328,6 +334,7 @@ describe('MarketDataFoundationRepository', () => {
     expect(query.text).toContain('MAX(price_ticks.timestamp)');
     expect(query.text).toContain('stocks."isActive" = TRUE');
     expect(query.text).toContain('stocks."providerSupportStatus"');
+    expect(query.text).toContain('stocks.exchange');
     expect(query.text).toContain('"latestStoredTimestamp" IS NULL OR "latestStoredTimestamp" <');
     expect(query.text).toContain('stocks.id NOT IN');
     expect(query.text).toContain('LIMIT');
@@ -692,6 +699,11 @@ describe('MarketDataFoundationRepository', () => {
 
     expect(prisma.stock.findMany).toHaveBeenCalledWith(expect.objectContaining({
       take: 25,
+      select: expect.objectContaining({
+        exchange: true,
+        sourceSymbol: true,
+        displaySymbol: true,
+      }),
       where: expect.objectContaining({
         isActive: true,
         OR: [

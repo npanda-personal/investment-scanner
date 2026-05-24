@@ -231,7 +231,15 @@ export class MarketDataFoundationRepository {
           { providerSupportStatus: { in: ['SUPPORTED', 'UNKNOWN'], mode: 'insensitive' } },
         ],
       },
-      select: { id: true, symbol: true, providerSymbol: true, lastSuccessfulDataLoadTimestamp: true },
+      select: {
+        id: true,
+        symbol: true,
+        exchange: true,
+        providerSymbol: true,
+        sourceSymbol: true,
+        displaySymbol: true,
+        lastSuccessfulDataLoadTimestamp: true,
+      },
       take,
       orderBy: [
         { lastSuccessfulDataLoadTimestamp: { sort: 'asc', nulls: 'first' } },
@@ -245,7 +253,16 @@ export class MarketDataFoundationRepository {
     targetTradingDate: string,
     take?: number,
     excludeIds: string[] = []
-  ): Promise<Array<{ id: string; symbol: string; providerSymbol: string | null; lastSuccessfulDataLoadTimestamp: Date | null; latestStoredTimestamp: Date | null }>> {
+  ): Promise<Array<{
+    id: string;
+    symbol: string;
+    exchange: string | null;
+    providerSymbol: string | null;
+    sourceSymbol: string | null;
+    displaySymbol: string | null;
+    lastSuccessfulDataLoadTimestamp: Date | null;
+    latestStoredTimestamp: Date | null;
+  }>> {
     const target = new Date(`${targetTradingDate}T00:00:00.000Z`);
     const excludeFilter = excludeIds.length > 0
       ? Prisma.sql`AND stocks.id NOT IN (${Prisma.join(excludeIds)})`
@@ -254,24 +271,39 @@ export class MarketDataFoundationRepository {
       ? Prisma.sql`LIMIT ${Math.max(1, take)}`
       : Prisma.sql``;
 
-    return this.prisma.$queryRaw<Array<{ id: string; symbol: string; providerSymbol: string | null; lastSuccessfulDataLoadTimestamp: Date | null; latestStoredTimestamp: Date | null }>>(Prisma.sql`
+    return this.prisma.$queryRaw<Array<{
+      id: string;
+      symbol: string;
+      exchange: string | null;
+      providerSymbol: string | null;
+      sourceSymbol: string | null;
+      displaySymbol: string | null;
+      lastSuccessfulDataLoadTimestamp: Date | null;
+      latestStoredTimestamp: Date | null;
+    }>>(Prisma.sql`
       WITH latest_by_stock AS (
         SELECT
           stocks.id,
           stocks.symbol,
+          stocks.exchange,
           stocks."providerSymbol",
+          stocks."sourceSymbol",
+          stocks."displaySymbol",
           stocks."lastSuccessfulDataLoadTimestamp",
           MAX(price_ticks.timestamp) AS "latestStoredTimestamp"
         FROM stocks
         LEFT JOIN price_ticks ON price_ticks.symbol = stocks.symbol
         WHERE ${this.activeStockSyncTaskSqlWhere(options)}
         ${excludeFilter}
-        GROUP BY stocks.id, stocks.symbol, stocks."providerSymbol", stocks."lastSuccessfulDataLoadTimestamp"
+        GROUP BY stocks.id, stocks.symbol, stocks.exchange, stocks."providerSymbol", stocks."sourceSymbol", stocks."displaySymbol", stocks."lastSuccessfulDataLoadTimestamp"
       )
       SELECT
         id,
         symbol,
+        exchange,
         "providerSymbol",
+        "sourceSymbol",
+        "displaySymbol",
         "lastSuccessfulDataLoadTimestamp",
         "latestStoredTimestamp"
       FROM latest_by_stock

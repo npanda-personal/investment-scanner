@@ -6,6 +6,50 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+2026-05-25 Team 00 Ready promotion - `CF-W3-MDPIPE-01A-MDF-OFFICIAL-EOD`:
+
+- `CF-W3-MDPIPE-01A-MDF-OFFICIAL-EOD` is promoted and assigned to Team 05 as the first bounded Market Data Foundation implementation slice for the incremental data-load redesign.
+- Current gate state: accepted through Team 04 QA rerun, Team 10 re-review, Team 03 Architect re-signoff, and Team 00 delegated PO acceptance; scoped local commit pending.
+- Purpose: replace the current broad-universe latest-candle dependence on per-symbol provider calls with one official NSE EOD bulk-file attempt for scheduled `IN/STOCK` latest-candle catch-up.
+- Parallel-safety decision: no other active writer owns Market Data Foundation files in this shared workspace; Team 00 has assigned one Team 05 worker for this reservation.
+- Branch/worktree: shared `dev` workspace for this hot-path fix, with one writer and strict staged-scope checks before any commit.
+- Gate evidence:
+  - Requirement: `10-requirements/CF-W3-MDPIPE-01-incremental-market-data-pipeline-requirement.md`
+  - Architecture: `03-architecture/CF-W3-MDPIPE-01-incremental-market-data-pipeline-architecture.md`
+  - QA plan: `04-qa/CF-W3-MDPIPE-01A-MDF-OFFICIAL-EOD-qa-plan.md`
+  - Ready promotion: `13-implementation-evidence/CF-W3-MDPIPE-01A-ready-promotion.md`
+  - Open decisions: none.
+- Allowed implementation files:
+  - `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`
+  - `backend/src/modules/market-data-foundation/market-data-foundation.repository.ts`
+  - `backend/src/modules/market-data-foundation/market-data-foundation.types.ts`
+  - `backend/src/modules/market-data-foundation/market-data-foundation.md`
+  - `backend/tests/modules/market-data-foundation/market-data.service.test.ts`
+  - `backend/tests/modules/market-data-foundation/market-data.repository.test.ts`
+  - `backend/tests/modules/market-data-foundation/market-data.scheduler.test.ts`
+- Allowed reporting docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-05-CF-W3-MDPIPE-01A-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W3-MDPIPE-01A-developer-handoff.md`
+- Forbidden scope:
+  - Prisma schema or migrations
+  - backend/frontend route registries
+  - shared backend utilities or shared UI
+  - package manifests
+  - generated files
+  - frontend source/tests
+  - downstream module source/tests
+  - provider credentials, live provider execution, startup/backfill expansion, paid/cloud, broker, telemetry, or durable pipeline ledger
+- Required validation:
+
+```powershell
+cd backend
+npm.cmd test -- market-data.service.test.ts market-data.repository.test.ts market-data.scheduler.test.ts --runInBand
+npm.cmd run build
+```
+
+- Stop if implementation requires any forbidden file, durable source-file cache schema, new route, new package, broad downstream orchestration, live provider execution, or startup/backfill behavior changes beyond the existing scheduler path.
+- Rework completed: official NSE bulk matching requires explicit NSE / `.NS` evidence and skips BSE / `.BO` / ambiguous instruments to fallback.
+
 2026-05-24 Team 00 closure update:
 
 - `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` completed all gates and was locally committed on its Team 07 branch as `09bbf9b feat: add today review supporting trust evidence`.

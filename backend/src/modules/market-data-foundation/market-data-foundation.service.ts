@@ -58,6 +58,7 @@ import type {
   TrustedBaselineResidualState,
   UniverseTrustStatus,
   ScheduledRegionSyncSummary,
+  OfficialEodBulkSyncEvidence,
   PaginationOptions,
   CatalogBackfillRequest,
   CatalogBackfillSummary,
@@ -429,6 +430,12 @@ type IndianExchangeFallbackResult = {
   sourceName: string | null;
   daysAttempted: number;
   rowsParsed: number;
+};
+
+type OfficialNseEodBulkSyncResult = {
+  evidence: OfficialEodBulkSyncEvidence;
+  matchedTaskIds: Set<string>;
+  summaryByTaskId: Map<string, SyncSummary>;
 };
 
 export class MarketDataFoundationService {
@@ -3616,7 +3623,32 @@ export class MarketDataFoundationService {
 
     await this.repository.upsertSyncState({ region, assetType, tradingDate, status: 'PENDING', summary, lastCheckedAt: now });
 
+    const officialBulk = await this.tryOfficialNseEodBulkLatestCandle({
+      region,
+      assetType,
+      targetTradingDate,
+      tasks,
+    });
+    summary.officialEodBulk = officialBulk.evidence;
+    for (const taskId of officialBulk.matchedTaskIds) {
+      const taskSummary = officialBulk.summaryByTaskId.get(taskId);
+      if (!taskSummary) continue;
+      summary.instrumentsProcessed += 1;
+      summary.rowsReceived += taskSummary.rowsReceived || 0;
+      summary.rowsInserted += taskSummary.rowsInserted || 0;
+      summary.rowsUpdated += taskSummary.rowsUpdated || 0;
+      summary.rowsSkipped += taskSummary.rowsSkipped || 0;
+      summary.rowsNoOp += taskSummary.rowsNoOp || 0;
+      summary.warningCount += taskSummary.warningCount || 0;
+      summary.warnings.push(...(taskSummary.warnings || []));
+    }
+    if (officialBulk.evidence.fallbackReason) {
+      summary.warningCount += 1;
+      summary.warnings.push(`Official NSE EOD bulk fallback: ${officialBulk.evidence.fallbackReason}`);
+    }
+
     for (const task of tasks) {
+      if (officialBulk.matchedTaskIds.has(task.id)) continue;
       try {
         await this.throttleIngestion(250);
         const startDate = this.catalogSyncTaskStartDate({ force: false, fullReload: false, providerEndDate }, task);
@@ -3665,6 +3697,177 @@ export class MarketDataFoundationService {
       warnings: summary.warnings.slice(0, 10),
       errors: summary.errors.slice(0, 10),
     };
+  }
+
+  private async tryOfficialNseEodBulkLatestCandle(input: {
+    region: string;
+    assetType: string;
+    targetTradingDate: string;
+    tasks: StockSyncTask[];
+  }): Promise<OfficialNseEodBulkSyncResult> {
+    const evidence: OfficialEodBulkSyncEvidence = {
+      enabled: this.officialNseEodBulkEnabled(),
+      attempted: false,
+      sourceName: null,
+      sourceUrl: null,
+      sourceFileName: null,
+      targetTradingDate: input.targetTradingDate || null,
+      sourceFingerprint: null,
+      rowsRead: 0,
+      rowsParsed: 0,
+      matchedInstruments: 0,
+      rowsInserted: 0,
+      rowsUpdated: 0,
+      rowsNoOp: 0,
+      fallbackReason: null,
+      warnings: [],
+    };
+    const result: OfficialNseEodBulkSyncResult = {
+      evidence,
+      matchedTaskIds: new Set<string>(),
+      summaryByTaskId: new Map<string, SyncSummary>(),
+    };
+
+    if (!evidence.enabled) {
+      evidence.fallbackReason = 'OFFICIAL_EOD_DISABLED';
+      return result;
+    }
+    if (input.region !== 'IN' || input.assetType !== 'STOCK') {
+      evidence.fallbackReason = 'OFFICIAL_EOD_SCOPE_UNSUPPORTED';
+      return result;
+    }
+    if (input.tasks.length === 0) {
+      evidence.fallbackReason = 'OFFICIAL_EOD_NO_TASKS';
+      return result;
+    }
+
+    const tradingDate = new Date(`${input.targetTradingDate}T00:00:00.000Z`);
+    if (Number.isNaN(tradingDate.getTime())) {
+      evidence.fallbackReason = 'OFFICIAL_EOD_INVALID_TRADING_DATE';
+      return result;
+    }
+
+    const archive = buildNseSecurityBhavdataArchiveUrl(tradingDate);
+    evidence.attempted = true;
+    evidence.sourceName = archive.sourceName;
+    evidence.sourceUrl = archive.url;
+    evidence.sourceFileName = archive.fileName;
+
+    try {
+      const csvText = await this.downloadOfficialExchangeText(archive.url);
+      const parsed = parseIndianExchangeEodCsv(csvText, {
+        source: archive.sourceName,
+        sourceUrl: archive.url,
+        exchange: 'NSE',
+        includeSeries: ['EQ', 'BE'],
+        tradingDate,
+      });
+      evidence.sourceFingerprint = parsed.sourceFingerprint;
+      evidence.rowsRead = parsed.rowsRead;
+      evidence.rowsParsed = parsed.rowsParsed;
+      evidence.warnings = parsed.warnings.slice(0, 10);
+
+      const priceByAlias = new Map<string, HistoricalPrice>();
+      for (const price of parsed.prices) {
+        for (const alias of this.symbolAliasCandidates(price.symbol)) {
+          if (!priceByAlias.has(alias)) {
+            priceByAlias.set(alias, price);
+          }
+        }
+      }
+
+      for (const task of input.tasks) {
+        if (!this.canUseOfficialNseEodForTask(task)) continue;
+
+        let matched: HistoricalPrice | null = null;
+        for (const alias of this.taskSymbolAliases(task)) {
+          const candidate = priceByAlias.get(alias);
+          if (candidate) {
+            matched = candidate;
+            break;
+          }
+        }
+        if (!matched) continue;
+
+        try {
+          const taskSummary = await this.storeHistorical([{
+            ...matched,
+            symbol: task.symbol,
+            date: this.startOfUtcDay(matched.date),
+          }]);
+          result.matchedTaskIds.add(task.id);
+          result.summaryByTaskId.set(task.id, taskSummary);
+          evidence.matchedInstruments += 1;
+          evidence.rowsInserted += taskSummary.rowsInserted || 0;
+          evidence.rowsUpdated += taskSummary.rowsUpdated || 0;
+          evidence.rowsNoOp += taskSummary.rowsNoOp || 0;
+          await this.repository.updateStockLoadTimestampBySymbol(task.symbol).catch(() => null);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'unknown storage error';
+          evidence.warnings.push(`${task.symbol}: official EOD row matched but store failed (${message}).`);
+        }
+      }
+
+      if (evidence.matchedInstruments <= 0) {
+        evidence.fallbackReason = 'OFFICIAL_EOD_NO_MATCHED_ROWS';
+      } else if (evidence.matchedInstruments < input.tasks.length) {
+        evidence.fallbackReason = `OFFICIAL_EOD_PARTIAL_MATCH:${input.tasks.length - evidence.matchedInstruments}_UNMATCHED`;
+      }
+      evidence.warnings = evidence.warnings.slice(0, 10);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'download or parse failed';
+      evidence.fallbackReason = 'OFFICIAL_EOD_UNAVAILABLE';
+      evidence.warnings = [`${archive.sourceName} ${archive.fileName}: ${message}`];
+    }
+
+    return result;
+  }
+
+  private officialNseEodBulkEnabled(): boolean {
+    const value = process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED;
+    if (value !== undefined) return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase());
+    return process.env.NODE_ENV !== 'test';
+  }
+
+  private canUseOfficialNseEodForTask(task: StockSyncTask): boolean {
+    const exchange = this.trimmedUpper(task.exchange);
+    const identifiers = [task.symbol, task.providerSymbol, task.sourceSymbol, task.displaySymbol];
+    const hasNsEvidence = identifiers.some((value) => this.hasExplicitExchangeSuffix(value, '.NS'));
+    const hasBoEvidence = identifiers.some((value) => this.hasExplicitExchangeSuffix(value, '.BO'));
+
+    if (hasBoEvidence) return false;
+    if (exchange) return this.isNseLikeExchange(exchange);
+    return hasNsEvidence;
+  }
+
+  private isNseLikeExchange(exchange: string): boolean {
+    return exchange === 'NSE'
+      || exchange === 'NSE_EQ'
+      || exchange === 'NSE_EQUITY'
+      || exchange.startsWith('NSE');
+  }
+
+  private hasExplicitExchangeSuffix(symbol: string | null | undefined, suffix: '.NS' | '.BO'): boolean {
+    return this.trimmedUpper(symbol)?.endsWith(suffix) || false;
+  }
+
+  private taskSymbolAliases(task: StockSyncTask): string[] {
+    const aliases = new Set<string>();
+    for (const value of [task.symbol, task.providerSymbol, task.sourceSymbol, task.displaySymbol]) {
+      for (const alias of this.symbolAliasCandidates(value)) {
+        aliases.add(alias);
+      }
+    }
+    return [...aliases];
+  }
+
+  private symbolAliasCandidates(symbol: string | null | undefined): string[] {
+    const normalized = String(symbol || '').trim().toUpperCase();
+    if (!normalized) return [];
+    const base = this.baseSymbolFromProviderSymbol(normalized);
+    const aliases = new Set<string>([normalized, base]);
+    if (base) aliases.add(`${base}.NS`);
+    return [...aliases].filter(Boolean);
   }
 
   async ingestSymbol(symbol: string, startDate?: Date, endDate?: Date, fullReload = false, options: {

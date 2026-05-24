@@ -196,6 +196,25 @@ export interface ScheduledRegionSyncSummary {
   warningCount: number;
   warnings: string[];
   errors: string[];
+  officialEodBulk?: OfficialEodBulkSyncEvidence | null;
+}
+
+export interface OfficialEodBulkSyncEvidence {
+  enabled: boolean;
+  attempted: boolean;
+  sourceName: string | null;
+  sourceUrl: string | null;
+  sourceFileName: string | null;
+  targetTradingDate: string | null;
+  sourceFingerprint: string | null;
+  rowsRead: number;
+  rowsParsed: number;
+  matchedInstruments: number;
+  rowsInserted: number;
+  rowsUpdated: number;
+  rowsNoOp: number;
+  fallbackReason: string | null;
+  warnings: string[];
 }
 
 export interface MarketDataSchedulerRegionStatus {
@@ -1492,7 +1511,10 @@ export interface ValidationResult<T> {
 export interface StockSyncTask {
   id: string;
   symbol: string;
+  exchange?: string | null;
   providerSymbol?: string | null;
+  sourceSymbol?: string | null;
+  displaySymbol?: string | null;
   lastSuccessfulDataLoadTimestamp: Date | null;
   latestStoredTimestamp?: Date | null;
 }

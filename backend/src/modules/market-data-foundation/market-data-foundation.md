@@ -420,6 +420,7 @@ Environment defaults:
 | `MARKET_DATA_SCHEDULER_POST_CLOSE_WINDOW_MINUTES` | `120` | Window after close where final candle capture is useful. |
 | `MARKET_DATA_SCHEDULER_FINALIZATION_GRACE_MINUTES` | `15` | Grace period after close before final confirmation can be trusted. |
 | `MARKET_DATA_SCHEDULER_SKIP_WEEKENDS` | `true` | Skips non-trading weekends by default. |
+| `MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED` | `true` in non-test, `false` in test | Enables one-file official NSE latest completed EOD bulk attempt for scheduled `IN/STOCK` sync before per-symbol provider fallback. |
 | `MARKET_DATA_MANUAL_SYNC_COOLDOWN_MINUTES` | `15` | Cooldown for manual catalog/instrument freshness checks before another provider fetch is eligible. |
 
 ### Session Model
@@ -439,6 +440,8 @@ Scheduler decision states:
 ### Scheduled Sync Behavior
 
 Scheduled sync is incremental only. It processes a bounded batch of active instruments for the configured region and asset type, using a recent lookback rather than the 15-year manual backfill path.
+
+For scheduled `IN/STOCK` runs, the service first attempts one official NSE security bhavdata CSV for the latest completed trading date, parses it once, and matches only tasks that are safely NSE-identified. Official matching is allowed when the task exchange is NSE-like or symbol identity explicitly proves `.NS`; it is skipped for BSE/non-NSE exchange values, any `.BO` symbol evidence, and ambiguous tasks without explicit NSE evidence. Eligible tasks are matched by canonical/provider/source/display symbol aliases and stored under canonical local symbols with existing idempotent `PriceTick` semantics. Unmatched, skipped, disabled, or unavailable official-path rows fall back to the existing per-symbol provider loop. The scheduled summary stores official-path evidence (`sourceName`, `sourceUrl`, `sourceFingerprint`, row counts, matched count, stored counts, fallback reason).
 
 The scheduler avoids overlapping runs with an in-process lock. Each region is evaluated independently, so `IN,US` will only run the region whose market window is useful at that moment.
 
