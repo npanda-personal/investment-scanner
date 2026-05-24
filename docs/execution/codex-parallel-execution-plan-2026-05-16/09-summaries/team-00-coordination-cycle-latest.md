@@ -17,7 +17,8 @@ Current status:
 Gate movement:
 
 - `CF-W2-SIG-01A` completed QA, Team 10 review, Architect Signoff, delegated PO acceptance, staged-scope verification, and local Team 06 branch commit `24f938b docs: accept signal dq fail-closed validation`.
-- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` is active with Team 07 in `C:\work\repo\investment-scanner-worktrees\t7-tsc03a`, stacked on accepted commit `34c9993`.
+- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` was rejected by Team 04 QA and returned to Team 07 rework in `C:\work\repo\investment-scanner-worktrees\t7-tsc03a`, stacked on accepted commit `34c9993`.
+- TSC-03A rework target: keep backtesting proof-currentness `MISSING` unless explicit module-owned proof exists, and remove calibration UI fallback from confidence-like legacy fields when the explicit support block is missing.
 - `CF-W1-SIG-LATEST-01` is already accepted from 2026-05-17; Team 00 corrected the Top 10 queues so it is no longer routed as fresh work.
 - `CF-W2-TSC-04` stays planning-only until the active Today Review writer set is free.
 - `CF-W2-BT-05` completed Team 03 architecture prep and Team 04 QA planning, then Team 00 promoted it to Team 06 as a bounded backend-only stacked Backtesting implementation slice.
@@ -25,13 +26,13 @@ Gate movement:
 
 Active agents:
 
-- Team 04 QA agent `019e5ba2-19d8-7803-81b3-9afc984eab5c`: `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` verification.
-- Team 06 implementation agent: queued to start `CF-W2-BT-05` after worktree creation.
+- Team 07 rework agent `019e5bae-5f24-7143-8e1a-c033d0a46130`: `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` bounded QA fixes.
+- Team 06 implementation agent `019e5baa-669e-7621-8809-06fc9d392ed0`: `CF-W2-BT-05`.
 
 Teams ready to pick up new tasks:
 
 - Team 06: implement `CF-W2-BT-05` in the dedicated stacked Backtesting worktree.
-- Team 04: QA verification after Team 07 handoff.
+- Team 04: QA rerun after Team 07 rework handoff.
 - Team 04: QA verification after Team 06 `BT-05` handoff.
 - Team 10: review after QA acceptance.
 - Team 03: Architect Signoff after Team 10 acceptance; otherwise prepare next Today Review no-target packet after file release.

@@ -64,7 +64,7 @@ Current state:
 - `CF-W1-MD-05`: Committed on implementation branch; no push.
 - `CF-W1-TSC-02A-TREV-HEALTH`: Committed on implementation branch; no push.
 - `CF-W2-SIG-01A`: Committed on Team 06 branch; no push.
-- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`: Implementation in progress with Team 07 in a dedicated stacked worktree.
+- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`: Rejected / Rework after Team 04 QA found two trust-evidence overclaim paths; Team 07 rework is active in the same dedicated stacked worktree.
 - `CF-W2-BT-05`: Ready for Implementation / assigned to Team 06 on stacked backtesting worktree `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-BT-05`.
 - Open decisions: 0.
 - Product Owner action required: no.
@@ -73,7 +73,7 @@ Teams ready to pick up new tasks:
 
 - Team 07: continue `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` implementation now.
 - Team 06: implement `CF-W2-BT-05` in the dedicated stacked Backtesting worktree.
-- Team 04: QA verification after Team 07 handoff.
+- Team 04: QA rerun after Team 07 `TSC-03A` rework handoff.
 - Team 04: QA verification after Team 06 `BT-05` handoff.
 - Team 10: review after QA acceptance.
 - Team 03: architecture prep for `CF-W2-TSC-05` after Today Review files are free, or Architect Signoff after Team 10 acceptance.

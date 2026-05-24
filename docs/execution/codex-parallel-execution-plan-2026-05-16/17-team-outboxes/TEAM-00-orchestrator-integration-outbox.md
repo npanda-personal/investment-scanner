@@ -15,7 +15,8 @@ Status:
 Current gate state:
 
 - `CF-W2-SIG-01A` is accepted through QA, Team 10 review, Architect Signoff, delegated PO acceptance, staged-scope verification, and local Team 06 branch commit `24f938b docs: accept signal dq fail-closed validation`.
-- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` is active with Team 07 in `C:\work\repo\investment-scanner-worktrees\t7-tsc03a`, stacked on accepted `34c9993`.
+- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` was rejected by Team 04 QA and returned to Team 07 rework in `C:\work\repo\investment-scanner-worktrees\t7-tsc03a`, stacked on accepted `34c9993`.
+- QA rejection scope is bounded to two Today Review trust-evidence issues: backtesting support must not become `AVAILABLE` from generic `strategyRating?.backtesting`, and calibration UI support must not fall back to confidence-like legacy fields when the explicit supporting-trust block is missing.
 - `CF-W1-SIG-LATEST-01` was reconciled as already accepted from 2026-05-17 and removed from fresh-candidate routing.
 - `CF-W2-TSC-04` remains planning-only and cannot implement until the Today Review writer set is free.
 - `CF-W2-BT-05` completed Team 03 architecture prep and Team 04 QA planning; Team 00 promoted it to Team 06 in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-BT-05`.
@@ -23,9 +24,9 @@ Current gate state:
 
 Teams ready to pick up new tasks:
 
-- Team 07: continue `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` implementation now.
+- Team 07: complete bounded `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` rework now.
 - Team 06: implement `CF-W2-BT-05` now in the dedicated stacked Backtesting worktree.
-- Team 04: QA verification after Team 07 developer handoff.
+- Team 04: QA rerun after Team 07 rework handoff.
 - Team 04: QA verification after Team 06 `BT-05` handoff.
 - Team 10: review after QA acceptance.
 - Team 03: Architect Signoff after review acceptance; otherwise prepare `CF-W2-TSC-05` after Today Review writer release.
