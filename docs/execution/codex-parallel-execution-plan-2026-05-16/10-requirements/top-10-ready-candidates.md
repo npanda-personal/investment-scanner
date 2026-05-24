@@ -6,22 +6,22 @@ Status: Team 00 updated after Product Owner redirected signal workflow away from
 
 Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-02A` are accepted and locally committed parked branches, not fresh candidates.
 
-Team 00 integration update: `CF-W1-TSC-01A-TREV` is accepted and locally committed on the Team 07 branch as `9fbc989`; `CF-W1-BT-04` is accepted and locally committed on the Team 06 branch as `2bd794f`. `CF-W1-TSC-03` is a new Team 02 draft to consider after `CF-W1-TSC-02`; this file still does not move any item to Ready.
+Team 00 integration update: `CF-W1-MD-05` is now the top upstream trust candidate after the user's stale catalog-sync report. `CF-W1-TSC-02A-TREV-HEALTH` is prepared as a split child but should not outrank the market-data freshness fix.
 
 ## Team 02 Current Read
 
 | Rank | ID | Why now | Next gate |
 | --- | --- | --- | --- |
-| 1 | `CF-W1-TSC-02` | Today Review is the primary daily workflow, and the next direct investor/trader gap is ongoing active-signal health with rule-backed exit/invalidation evidence. | Requirement-ready; route to Team 03 architecture prep next, but do not move to Ready. |
-| 2 | `CF-W1-TSC-03` | Today Review needs one compact supporting-trust evidence chain after DQ, calibration, and backtesting trust slices, without inventing a score or target framing. | New requirement draft; route to Team 03 after `TSC-02`. |
-| 3 | `CF-W1-DQ-02` residual parent | `DQ-02A` is complete, but parent read-side/public-contract scope still holds an upstream trust gap for signals and backtesting. | Team 03 found the residual blocked until Team 00 opens a DQE persisted read-side/public-contract packet. |
-| 4 | `CF-W1-MD-02A` | Market-data durable evidence storage remains high-value upstream trust work, even though it is still consent-gated. | Proposal-only until explicit schema/storage consent opens. |
-| 5 | `CF-W1-SQLAB-02B` | Durable Signal Quality learning memory would strengthen post-event review and calibration continuity. | Proposal-only until storage consent opens. |
-| 6 | `CF-W1-STRAT-02B` | Durable strategy revision history preserves exact rule/version provenance for signals and backtests. | Proposal-only until schema/generated/repository consent opens. |
-| 7 | `CF-W1-L3-DQ-01A` | Passive readiness DTO semantics still matter, but they sit behind core signal/backtest/data trust work. | Contract refresh only unless Team 03/04 define a bounded child. |
-| 8 | `CF-W1-UX-02` | Copilot trust UX is useful, but downstream of direct data/signal/backtesting value. | Keep Copilot-only behind the higher-value queue. |
-| 9 | `CF-W1-UX-05` | Product-language cleanup can reduce advice-like wording after Copilot trust UX scope is clear. | Fold into or follow `CF-W1-UX-02`; no shared UI reservation. |
-| 10 | `CF-W1-TSC-01` parent residual | The parent remains important, but fresh implementation should continue through bounded children only. | Keep the parent out of implementation and route only through children. |
+| 1 | `CF-W1-MD-05` | Catalog sync latest-session ambiguity undermines every downstream trust surface when users see stale candles after "no new data" sync messaging. | Promoted and assigned to Team 05 in a dedicated worktree. |
+| 2 | `CF-W1-TSC-02A-TREV-HEALTH` | Today Review active signal health remains important after candidate adoption, but must stack on accepted Team 07 branch `9fbc989`. | Promoted and assigned to Team 07 in a dedicated stacked worktree. |
+| 3 | `CF-W1-TSC-03` | Today Review needs one compact supporting-trust evidence chain after DQ, calibration, and backtesting trust slices, without inventing a score or target framing. | New requirement draft; route to Team 03 after `TSC-02A`. |
+| 4 | `CF-W1-DQ-02` residual parent | `DQ-02A` is complete, but parent read-side/public-contract scope still holds an upstream trust gap for signals and backtesting. | Team 03 found the residual blocked until Team 00 opens a DQE persisted read-side/public-contract packet. |
+| 5 | `CF-W1-MD-02A` | Market-data durable evidence storage remains high-value upstream trust work, even though it is still consent-gated. | Proposal-only until explicit schema/storage consent opens. |
+| 6 | `CF-W1-SQLAB-02B` | Durable Signal Quality learning memory would strengthen post-event review and calibration continuity. | Proposal-only until storage consent opens. |
+| 7 | `CF-W1-STRAT-02B` | Durable strategy revision history preserves exact rule/version provenance for signals and backtests. | Proposal-only until schema/generated/repository consent opens. |
+| 8 | `CF-W1-L3-DQ-01A` | Passive readiness DTO semantics still matter, but they sit behind core signal/backtest/data trust work. | Contract refresh only unless Team 03/04 define a bounded child. |
+| 9 | `CF-W1-UX-02` | Copilot trust UX is useful, but downstream of direct data/signal/backtesting value. | Keep Copilot-only behind the higher-value queue. |
+| 10 | `CF-W1-UX-05` | Product-language cleanup can reduce advice-like wording after Copilot trust UX scope is clear. | Fold into or follow `CF-W1-UX-02`; no shared UI reservation. |
 
 ## Fresh Pull Exclusions
 
@@ -52,8 +52,9 @@ Do not treat these as the next fresh Team 02 pull:
 - `CF-W1-SIG-TRIGGER-ENTRY-01` is accepted and locally committed as `649e645`; keep it out of fresh Team 02 pulls.
 - `CF-W1-TSC-01A-SIG` is accepted upstream and `CF-W1-DQ-03` is active with Team 05; do not duplicate either as a fresh Team 02 pull.
 - Do not execute `CF-W1-TP-03` as framed; pause and reframe only if needed for Trusted Signal Candidate health.
-- Use `CF-W1-TSC-02` as the next Team 03 requirement-factory handoff after the current `BT-04` signoff gate closes.
-- Use `CF-W1-TSC-03` as the next Today Review supporting-trust architecture-prep candidate after `TSC-02`.
+- `CF-W1-MD-05` is promoted and assigned to Team 05; do not pull it as fresh Team 02 work.
+- `CF-W1-TSC-02A-TREV-HEALTH` is promoted and assigned to Team 07; do not pull it as fresh Team 02 work.
+- Use `CF-W1-TSC-03` as the next Today Review supporting-trust architecture-prep candidate after `TSC-02A`.
 - `CF-W1-BT-04` is accepted and locally committed as `2bd794f`; it is no longer a fresh Team 03 architecture-prep candidate.
 - `CF-W1-STRAT-04` and `CF-W1-SQLAB-03` gates are closed and parked as accepted branch commits; do not reopen them for fresh implementation.
 - Treat `CF-W1-DQ-02` as the next Market Data / Data Quality residual parent only after the two requirement-ready direct-value slices above are placed.

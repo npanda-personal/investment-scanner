@@ -6,6 +6,90 @@ Team: TEAM-07 - Portfolio / Watchlist / Alerts
 
 Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automation-prompts/AUTO-07-portfolio-watchlist-alerts.md`
 
+## Latest Assignment Override - 2026-05-24 TSC Active Health
+
+Team 00 promotes `CF-W1-TSC-02A-TREV-HEALTH` as an independent Today Review active-signal-health child.
+
+Do not implement in the shared `dev` workspace. Use the dedicated stacked worktree from accepted Team 07 commit `9fbc989`.
+
+This assignment can run in parallel with Team 05 `CF-W1-MD-05` because the file reservations are disjoint.
+
+## Branch / Worktree
+
+- Branch: `codex/team07-portfolio-alerts/CF-W1-TSC-02A-TREV-HEALTH`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-TSC-02A-TREV-HEALTH`
+- Base: accepted Team 07 branch commit `9fbc989 feat: add trusted signal candidates to today review`
+
+## Work Item
+
+`CF-W1-TSC-02A-TREV-HEALTH` - Today Review active signal health states backed by documented rule evidence.
+
+## Evidence To Use
+
+- Requirement: `10-requirements/CF-W1-TSC-02-active-signal-health-rule-evidence-requirement.md`
+- Architecture review: `03-architecture/CF-W1-TSC-02-architecture-review.md`
+- Contract: `06-contracts/CF-W1-TSC-02-active-signal-health-rule-evidence-contract.md`
+- Work packet: `08-work-packets/CF-W1-TSC-02-work-packet.md`
+- QA plan: `04-qa/CF-W1-TSC-02A-TREV-HEALTH-qa-plan.md`
+- Ready handoff: `12-ready-queue/ready-for-implementation.md`
+
+## Allowed Files
+
+- `backend/src/modules/today-trade-review/today-trade-review.types.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.service.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.md`
+- `backend/tests/modules/today-trade-review/today-trade-review.service.test.ts`
+- `frontend/src/features/today-trade-review/types.ts`
+- `frontend/src/features/today-trade-review/components/TodayReviewPage.tsx`
+- `frontend/src/features/today-trade-review/components/TodayReviewCandidateDetailPage.tsx`
+- `frontend/tests/ui/today-trade-review.spec.ts`
+
+Allowed reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-07-CF-W1-TSC-02A-TREV-HEALTH-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-TSC-02A-TREV-HEALTH-developer-handoff.md`
+
+## Required Behavior
+
+- Add active signal health states: `ACTIVE`, `HEALTHY`, `WEAKENING`, `RISK_WARNING`, `EXIT_TRIGGERED`, `INVALIDATED`, `EXPIRED`, and `BLOCKED`.
+- Derive health only from documented rule evidence carried by accepted Today Review / Trusted Signal Candidate inputs.
+- Hard-block or downgrade missing rule evidence, blocked DQ, legacy snapshots, and unsupported evidence with visible reasons.
+- Preserve list/detail consistency.
+- Keep wording research-support oriented and avoid Trade Plan-first, R:R, arbitrary target, synthetic target, direct advice, guarantee, or buy/sell action language.
+
+## Forbidden Files
+
+- Today Review repository, controller, router, validation, module, or index files
+- `frontend/src/features/today-trade-review/api/**`
+- `frontend/src/features/today-trade-review/hooks/**`
+- `frontend/src/features/today-trade-review/routes.tsx`
+- backend/frontend route registries
+- shared backend utilities or shared frontend components
+- Prisma schema or migrations
+- generated files
+- package manifests
+- upstream/downstream source/tests outside the reserved Today Review set
+- provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential files
+
+## Focused Validation
+
+```powershell
+git merge-base --is-ancestor 9fbc989 HEAD
+cd backend
+npm.cmd test -- today-trade-review.service.test.ts --runInBand
+npm.cmd run build
+```
+
+```powershell
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- today-trade-review.spec.ts --workers=1
+```
+
+## Stop Conditions
+
+Stop and return to Team 00 if implementation starts from plain `dev`, touches files outside the reserved Today Review set, overclaims `HEALTHY` without documented rule evidence, weakens DQ hard-blocking, regresses legacy snapshots, creates list/detail inconsistency, or introduces target/R:R/Trade Plan/advice language.
+
 ## Latest Assignment Override - 2026-05-24 TSC Today Review Adoption
 
 Team 00 promotes `CF-W1-TSC-01A-TREV` as the downstream Today Review adoption child after accepted Team 06 bridge commit `40c00f1`.

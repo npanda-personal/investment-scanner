@@ -1,5 +1,40 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - MD-05 Priority / TSC-02A Prep
+
+Date: 2026-05-24
+
+Status:
+
+- Branch: `dev`.
+- Open decisions: 0.
+- Product Owner action required: no.
+- Push performed: no.
+
+Completed:
+
+- Team 02 drafted `CF-W1-MD-05` from the stale catalog-sync user report.
+- Team 03 marked `CF-W1-MD-05` as a Ready candidate with bounded Market Data Foundation reservations.
+- Team 03 split `CF-W1-TSC-02` into stacked Today Review child `CF-W1-TSC-02A-TREV-HEALTH`.
+- Team 04 prepared the `CF-W1-TSC-02A-TREV-HEALTH` QA plan.
+- Team 04 prepared the `CF-W1-MD-05` QA plan.
+- Team 00 promoted both independent items for parallel implementation.
+
+Routing:
+
+- `CF-W1-MD-05`: Team 05 implementation in `C:\work\repo\investment-scanner-worktrees\team05-CF-W1-MD-05`, branch `codex/team05-market-data/CF-W1-MD-05`.
+- `CF-W1-TSC-02A-TREV-HEALTH`: Team 07 implementation in `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-TSC-02A-TREV-HEALTH`, branch `codex/team07-portfolio-alerts/CF-W1-TSC-02A-TREV-HEALTH`, base `9fbc989`.
+- `CF-W1-TSC-03`: requirement draft only, behind `TSC-02A`.
+
+Teams ready to pick up new tasks:
+
+- Team 05: implement `CF-W1-MD-05`.
+- Team 07: implement `CF-W1-TSC-02A-TREV-HEALTH`.
+- Team 04: standby for QA after either implementation handoff.
+- Team 10: standby for review after QA acceptance.
+- Team 02: continue rolling direct-value requirement discovery.
+- Team 03: standby for `TSC-03` architecture after current routing.
+
 ## Latest Runtime Checkpoint - TREV Commit / BT-04 Signoff / Rolling Prep
 
 Date: 2026-05-24

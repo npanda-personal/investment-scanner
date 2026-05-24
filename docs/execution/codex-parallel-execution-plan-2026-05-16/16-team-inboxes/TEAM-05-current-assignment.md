@@ -4,6 +4,94 @@ Date: 2026-05-20
 
 Team: TEAM-05 - Market Data / Data Quality
 
+## Latest Assignment Override - 2026-05-24 MD-05
+
+Team 00 promotes `CF-W1-MD-05` as a bounded Market Data Foundation implementation slice.
+
+This assignment can run in parallel with Team 07 `CF-W1-TSC-02A-TREV-HEALTH` because the file reservations are disjoint.
+
+## Branch / Worktree
+
+- Branch: `codex/team05-market-data/CF-W1-MD-05`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team05-CF-W1-MD-05`
+- Base: current local `dev` after Team 00 promotion docs
+
+## Gate Evidence
+
+- Requirement: `10-requirements/CF-W1-MD-05-catalog-sync-latest-session-freshness-requirement.md`
+- Architecture review: `03-architecture/CF-W1-MD-05-architecture-review.md`
+- Contract: `06-contracts/CF-W1-MD-05-catalog-sync-freshness-contract.md`
+- Work packet: `08-work-packets/CF-W1-MD-05-work-packet.md`
+- QA plan: `04-qa/CF-W1-MD-05-qa-plan.md`
+- Ready queue handoff: `12-ready-queue/ready-for-implementation.md`
+
+## Allowed Files
+
+- `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.types.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.md`
+- `backend/tests/modules/market-data-foundation/market-data.service.test.ts`
+- `frontend/src/features/market-data-foundation/types.ts`
+- `frontend/src/features/market-data-foundation/components/MarketDataFoundationPage.tsx`
+- `frontend/tests/ui/market-data-foundation.spec.ts`
+
+Allowed reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-05-CF-W1-MD-05-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-MD-05-developer-handoff.md`
+
+## Required Behavior
+
+- Add additive catalog sync freshness basis and explainability fields.
+- Show latest completed session and latest stored session together.
+- Distinguish latest-session missing, region-current with stale-instrument catch-up pending, region-current final-confirmed, and session-unknown states.
+- Keep pre-fetch skipped reason counts, no-op counts, failed counts, and stale catch-up pending evidence distinct.
+- Update catalog sync panel and row freshness copy so stale stored dates do not read as fully synced/current.
+- Keep unsupported-provider handling explanatory only; do not add numeric unsupported-provider exclusion counts without reopening repository scope.
+
+## Forbidden Files
+
+- Prisma schema or migrations
+- generated files
+- `backend/src/modules/market-data-foundation/market-data-foundation.repository.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.controller.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.router.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.validation.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.provider.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.scheduler.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.worker.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.queue.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.market-session.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.universe.ts`
+- `backend/src/modules/market-data-foundation/index.ts`
+- `frontend/src/features/market-data-foundation/api/marketDataFoundationService.ts`
+- `frontend/src/features/market-data-foundation/components/InstrumentDetailPage.tsx`
+- `frontend/src/features/market-data-foundation/components/MarketDataStatusPanel.tsx`
+- `frontend/src/features/market-data-foundation/routes.tsx`
+- `frontend/tests/ui/market-data-foundation-instrument.spec.ts`
+- backend and frontend route registries
+- shared backend utilities or shared frontend components
+- package manifests
+- provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential files
+
+## Focused Validation
+
+```powershell
+cd backend
+npm.cmd test -- market-data.service.test.ts --runInBand
+npm.cmd run build
+```
+
+```powershell
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- market-data-foundation.spec.ts --workers=1
+```
+
+## Stop Conditions
+
+Stop and return to Team 00 if implementation requires repository edits for unsupported exclusion counts, controller/router/route-registry changes, schema/migration/generated changes, shared UI/backend utility changes, provider/startup/backfill changes, Instrument Detail page scope expansion, package changes, live provider calls, paid/cloud/broker scope, telemetry, or credentials.
+
 ## Latest Assignment Override - 2026-05-24 DQ-03
 
 Team 00 promotes `CF-W1-DQ-03` as an independent backend-only Data Quality Engine implementation slice.

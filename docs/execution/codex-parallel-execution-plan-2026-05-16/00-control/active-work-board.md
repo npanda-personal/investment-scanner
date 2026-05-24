@@ -62,6 +62,34 @@ Teams ready to pick up new tasks:
 - Team 06: standby for the next Strategy/Signal/Backtesting implementation after Ready promotion.
 - Team 07: standby for the next Today Review implementation after Ready promotion.
 
+## Latest Team 00 Routing Update - MD-05 Priority And TSC-02A Prep
+
+Date: 2026-05-24
+
+Completed:
+
+- Team 02 drafted `CF-W1-MD-05` from the user's stale catalog-sync report.
+- Team 03 marked `CF-W1-MD-05` as a Ready candidate with bounded Market Data Foundation file reservations and no schema/route/repository/provider/startup/backfill scope.
+- Team 03 split `CF-W1-TSC-02` into `CF-W1-TSC-02A-TREV-HEALTH`, a stacked Today Review child on accepted Team 07 branch commit `9fbc989`.
+- Team 04 prepared the `CF-W1-TSC-02A-TREV-HEALTH` QA plan and marked it ready for Team 00 evaluation.
+- Team 04 prepared the `CF-W1-MD-05` QA plan and marked it ready for Team 00 evaluation.
+- Team 00 promoted `CF-W1-MD-05` to Team 05 and `CF-W1-TSC-02A-TREV-HEALTH` to Team 07 for parallel implementation.
+
+Current state:
+
+- `CF-W1-MD-05`: Ready for Implementation / assigned to Team 05.
+- `CF-W1-TSC-02A-TREV-HEALTH`: Ready for Implementation / assigned to Team 07, stacked on `9fbc989`.
+- `CF-W1-TSC-03`: requirement draft only, behind `TSC-02A`.
+
+Teams ready to pick up new tasks:
+
+- Team 05: implement `CF-W1-MD-05`.
+- Team 07: implement `CF-W1-TSC-02A-TREV-HEALTH`.
+- Team 04: standby for QA after either implementation handoff.
+- Team 10: standby for review after QA acceptance.
+- Team 02: continue rolling direct-value discovery.
+- Team 03: ready for `TSC-03` architecture after `MD-05` and `TSC-02A` routing.
+
 ## Latest Team 00 Routing Update - BT-04 Ready Promotion
 
 Date: 2026-05-24

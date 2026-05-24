@@ -10,8 +10,131 @@ No available application-code item is currently waiting unassigned in Ready.
 
 - `CF-W1-TSC-01A-TREV` completed QA, Team 10 review, Architect Signoff, delegated PO acceptance, staged-scope verification, and scoped local branch commit `9fbc989 feat: add trusted signal candidates to today review`.
 - `CF-W1-BT-04` completed Team 06 implementation, Team 04 QA, Team 10 review, Architect Signoff, delegated PO acceptance, staged-scope verification, and scoped local Team 06 branch commit `2bd794f feat: add backtesting proof freshness labels`.
-- `CF-W1-TSC-03` is a new Team 02 requirement draft and is not Ready. It waits behind `CF-W1-TSC-02` and Team 03 architecture prep.
+- `CF-W1-MD-05` is promoted and assigned to Team 05 as the highest-priority upstream trust fix for stale catalog-sync freshness messaging.
+- `CF-W1-TSC-02A-TREV-HEALTH` is promoted and assigned to Team 07 as an independent stacked Today Review child. It must stack on Team 07 branch commit `9fbc989`, not plain `dev`.
+- `CF-W1-TSC-03` is a new Team 02 requirement draft and is not Ready. It waits behind `CF-W1-TSC-02A` and Team 03 architecture prep.
 - `CF-W1-DQ-02B` is blocked from implementation pending explicit DQE read-side/public-contract reopening; no source reservation is active.
+
+2026-05-24 Team 00 Ready promotion - `CF-W1-MD-05`:
+
+- `CF-W1-MD-05` is promoted and assigned to Team 05 as a bounded Market Data Foundation implementation slice.
+- Purpose: fix catalog sync freshness explainability so stale latest-session or stale-instrument catch-up states do not read as terminal "no new data".
+- Parallel-safety decision: safe to run in parallel with `CF-W1-TSC-02A-TREV-HEALTH` because file reservations are disjoint (`market-data-foundation` vs `today-trade-review`).
+- Branch recommendation: `codex/team05-market-data/CF-W1-MD-05`.
+- Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team05-CF-W1-MD-05`.
+- Base recommendation: current local `dev` after Team 00 promotion docs.
+- Gate evidence:
+  - Requirement: `10-requirements/CF-W1-MD-05-catalog-sync-latest-session-freshness-requirement.md`
+  - Architecture review: `03-architecture/CF-W1-MD-05-architecture-review.md`
+  - Contract: `06-contracts/CF-W1-MD-05-catalog-sync-freshness-contract.md`
+  - Work packet: `08-work-packets/CF-W1-MD-05-work-packet.md`
+  - QA plan: `04-qa/CF-W1-MD-05-qa-plan.md`
+  - Open decisions: none.
+- Allowed implementation files:
+  - `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`
+  - `backend/src/modules/market-data-foundation/market-data-foundation.types.ts`
+  - `backend/src/modules/market-data-foundation/market-data-foundation.md`
+  - `backend/tests/modules/market-data-foundation/market-data.service.test.ts`
+  - `frontend/src/features/market-data-foundation/types.ts`
+  - `frontend/src/features/market-data-foundation/components/MarketDataFoundationPage.tsx`
+  - `frontend/tests/ui/market-data-foundation.spec.ts`
+- Allowed reporting docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-05-CF-W1-MD-05-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-MD-05-developer-handoff.md`
+- Forbidden scope:
+  - Prisma schema or migrations
+  - generated files
+  - `backend/src/modules/market-data-foundation/market-data-foundation.repository.ts`
+  - `backend/src/modules/market-data-foundation/market-data-foundation.controller.ts`
+  - `backend/src/modules/market-data-foundation/market-data-foundation.router.ts`
+  - `backend/src/modules/market-data-foundation/market-data-foundation.validation.ts`
+  - `backend/src/modules/market-data-foundation/market-data-foundation.provider.ts`
+  - `backend/src/modules/market-data-foundation/market-data-foundation.scheduler.ts`
+  - `backend/src/modules/market-data-foundation/market-data-foundation.worker.ts`
+  - `backend/src/modules/market-data-foundation/market-data-foundation.queue.ts`
+  - `backend/src/modules/market-data-foundation/market-data-foundation.market-session.ts`
+  - `backend/src/modules/market-data-foundation/market-data-foundation.universe.ts`
+  - `backend/src/modules/market-data-foundation/index.ts`
+  - `frontend/src/features/market-data-foundation/api/marketDataFoundationService.ts`
+  - `frontend/src/features/market-data-foundation/components/InstrumentDetailPage.tsx`
+  - `frontend/src/features/market-data-foundation/components/MarketDataStatusPanel.tsx`
+  - `frontend/src/features/market-data-foundation/routes.tsx`
+  - `frontend/tests/ui/market-data-foundation-instrument.spec.ts`
+  - backend and frontend route registries
+  - shared backend utilities or shared frontend components
+  - package manifests
+  - provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential files
+- Required validation:
+
+```powershell
+cd backend
+npm.cmd test -- market-data.service.test.ts --runInBand
+npm.cmd run build
+```
+
+```powershell
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- market-data-foundation.spec.ts --workers=1
+```
+
+- Stop if implementation requires repository edits for unsupported exclusion counts, controller/router/route-registry changes, schema/migration/generated changes, shared UI/backend utility changes, provider/startup/backfill changes, Instrument Detail page scope expansion, or broad live-provider behavior.
+
+2026-05-24 Team 00 Ready promotion - `CF-W1-TSC-02A-TREV-HEALTH`:
+
+- `CF-W1-TSC-02A-TREV-HEALTH` is promoted and assigned to Team 07 as an independent Today Review active-signal-health implementation slice.
+- Purpose: add active signal health states backed by documented rule evidence without Trade Plan, target, R:R, or advice framing.
+- Parallel-safety decision: safe to run in parallel with `CF-W1-MD-05` because file reservations are disjoint.
+- Required base: accepted Team 07 branch commit `9fbc989 feat: add trusted signal candidates to today review`.
+- Branch recommendation: `codex/team07-portfolio-alerts/CF-W1-TSC-02A-TREV-HEALTH`.
+- Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-TSC-02A-TREV-HEALTH`.
+- Gate evidence:
+  - Requirement: `10-requirements/CF-W1-TSC-02-active-signal-health-rule-evidence-requirement.md`
+  - Architecture review: `03-architecture/CF-W1-TSC-02-architecture-review.md`
+  - Contract: `06-contracts/CF-W1-TSC-02-active-signal-health-rule-evidence-contract.md`
+  - Work packet: `08-work-packets/CF-W1-TSC-02-work-packet.md`
+  - QA plan: `04-qa/CF-W1-TSC-02A-TREV-HEALTH-qa-plan.md`
+  - Open decisions: none.
+- Allowed implementation files:
+  - `backend/src/modules/today-trade-review/today-trade-review.types.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.service.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.md`
+  - `backend/tests/modules/today-trade-review/today-trade-review.service.test.ts`
+  - `frontend/src/features/today-trade-review/types.ts`
+  - `frontend/src/features/today-trade-review/components/TodayReviewPage.tsx`
+  - `frontend/src/features/today-trade-review/components/TodayReviewCandidateDetailPage.tsx`
+  - `frontend/tests/ui/today-trade-review.spec.ts`
+- Allowed reporting docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-07-CF-W1-TSC-02A-TREV-HEALTH-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-TSC-02A-TREV-HEALTH-developer-handoff.md`
+- Forbidden scope:
+  - Today Review repository, controller, router, validation, module, or index files
+  - `frontend/src/features/today-trade-review/api/**`
+  - `frontend/src/features/today-trade-review/hooks/**`
+  - `frontend/src/features/today-trade-review/routes.tsx`
+  - backend/frontend route registries
+  - shared backend utilities or shared frontend components
+  - Prisma schema or migrations
+  - generated files
+  - package manifests
+  - upstream/downstream source/tests outside the reserved Today Review set
+  - provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential files
+- Required validation:
+
+```powershell
+git merge-base --is-ancestor 9fbc989 HEAD
+cd backend
+npm.cmd test -- today-trade-review.service.test.ts --runInBand
+npm.cmd run build
+```
+
+```powershell
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- today-trade-review.spec.ts --workers=1
+```
+
+- Stop if implementation is attempted from plain `dev`, touches files outside the reserved Today Review set, overclaims `HEALTHY` without documented rule evidence, weakens DQ hard-blocking, regresses legacy snapshots, creates list/detail inconsistency, or introduces target/R:R/Trade Plan/advice language.
 
 2026-05-24 Team 00 Ready promotion - `CF-W1-BT-04`:
 

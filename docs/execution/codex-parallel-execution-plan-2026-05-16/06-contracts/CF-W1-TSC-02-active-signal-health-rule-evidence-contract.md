@@ -6,39 +6,84 @@ Owner: Team 03 - Solution Architect Factory
 
 ## Status
 
-Draft architecture contract. Not Ready for Implementation.
+Split-child contract. Parent is not Ready for Implementation.
 
-This contract is prepared as a follow-on to `CF-W1-TSC-01A-TREV`; it must not be promoted until Today Review has accepted source-proven Trusted Signal Candidate adoption.
+This contract applies to the bounded child:
+
+- `CF-W1-TSC-02A-TREV-HEALTH`
 
 ## Purpose
 
-Define an additive active-signal health projection for Trusted Signal Candidates so Today Review can explain whether a candidate is still active, healthy, weakening, warning, exit-triggered, invalidated, expired, or blocked.
+Define one additive Today Review-owned active-signal health projection for accepted Trusted Signal Candidates.
 
-The projection is research-support only. It must not become a Trade Plan workflow, target-price workflow, R:R workflow, direct-action workflow, broker workflow, or automated trade instruction.
+The projection must help the user see whether a candidate is still active, healthy, weakening, risk-warning, exit-triggered, invalidated, expired, or blocked, with visible rule/version/evidence dates and explicit missing-evidence reasons.
+
+This remains research-support only. It must not become a Trade Plan workflow, target-price workflow, reward/risk workflow, direct-action workflow, broker workflow, or automated trade instruction.
+
+## Required Base
+
+The child must stack on accepted `CF-W1-TSC-01A-TREV` commit `9fbc989`, which already carries accepted Trusted Signal Candidate adoption and the accepted Signal Generation bridge dependency `40c00f1`.
+
+Do not implement this child directly against plain `dev`.
 
 ## Scope
 
-Bounded first child:
+### In scope
 
-- Today Review read-path health projection
-- Today Review candidate row and detail rendering only
-- no new persistence
-- no route changes
-- no shared UI
-- no upstream source changes
+- Today Review candidate-row health projection
+- Today Review candidate-detail health projection
+- additive Today Review backend/frontend types
+- additive health mapping in Today Review service
+- focused Today Review service and UI smoke coverage
 
-Out of scope:
+### Out of scope
 
-- new active monitor page
+- new persistence
+- repository/controller/router/validation/index edits
+- route changes
+- route-registry edits
+- shared backend utilities
+- shared frontend UI
+- schema or migrations
+- package or generated-file changes
+- upstream module source changes
+- new page or new monitor route
 - durable health history
-- Prisma/schema/migration work
-- route registry work
-- Signal Generation, Data Quality, Strategy, Signal Quality, Market Data, Backtesting, Trade Plan, Alerts, Portfolio, Watchlist, Copilot, or Research Hub source changes
-- provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credentials
+- provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential work
+- `CF-W1-TSC-03` supporting DQ/calibration/backtesting evidence chain
 
-## Additive Health Fields
+## Allowed Files
 
-The first child should add fields equivalent to:
+- `backend/src/modules/today-trade-review/today-trade-review.types.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.service.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.md`
+- `backend/tests/modules/today-trade-review/today-trade-review.service.test.ts`
+- `frontend/src/features/today-trade-review/types.ts`
+- `frontend/src/features/today-trade-review/components/TodayReviewPage.tsx`
+- `frontend/src/features/today-trade-review/components/TodayReviewCandidateDetailPage.tsx`
+- `frontend/tests/ui/today-trade-review.spec.ts`
+
+## Forbidden Files
+
+- `backend/src/modules/today-trade-review/today-trade-review.repository.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.controller.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.router.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.validation.ts`
+- `backend/src/modules/today-trade-review/index.ts`
+- `frontend/src/features/today-trade-review/api/**`
+- `frontend/src/features/today-trade-review/hooks/**`
+- `frontend/src/features/today-trade-review/routes.tsx`
+- backend and frontend route registries
+- shared backend utilities
+- shared frontend components
+- package manifests
+- generated files
+- Prisma schema or migrations
+- upstream/downstream source or tests outside the allowed file set
+
+## Additive Health Semantics
+
+The child should add semantics equivalent to:
 
 ```ts
 type TrustedSignalHealthState =
@@ -73,83 +118,83 @@ interface TrustedSignalHealthProjection {
 }
 ```
 
-Exact names may differ, but the semantics must remain additive and backward-compatible.
+Exact field names may differ. The semantics must remain additive and backward-compatible.
 
 ## Evidence Inputs
 
-Allowed first-slice inputs:
+Allowed evidence inputs:
 
-- accepted `TSC-01A-TREV` Trusted Signal Candidate snapshots;
-- source-proven Signal Generation trigger evidence stored or projected through `sourceSignalSnapshot`;
-- existing Data Quality snapshot fields and accepted DQ residual summary fields when present;
-- accepted strategy/rule/version metadata already in Today Review candidate snapshots;
-- accepted exit or invalidation evidence only when source-proven and rule-backed.
+- accepted Trusted Signal Candidate snapshots from `CF-W1-TSC-01A-TREV`
+- Signal Generation source-proven entry trigger evidence already carried through Today Review
+- Data Quality snapshot readiness and evidence dates
+- strategy/rule/version evidence already carried through Today Review snapshots
+- Strategy Decision rule-based current-state evidence already available during Today Review projection
 
-Forbidden evidence inputs:
+Not allowed as health proof:
 
-- arbitrary target prices;
-- synthetic profit targets;
-- R:R or reward/risk ratios;
-- Trade Plan target or stop geometry;
-- price movement alone;
-- direct buy/sell wording;
-- newly inferred rule evidence not owned by the source module.
+- arbitrary target prices
+- synthetic profit targets
+- reward/risk ratios
+- Trade Plan target or stop geometry
+- price movement alone
+- advice-like language
+- new heuristic evidence invented outside the existing source modules
 
 ## State Rules
 
 - `BLOCKED`
-  - Data Quality is blocked, missing, unsupported, stale-hard-blocked, scope-mismatched, or not trusted for the candidate; or
-  - required source-proven entry evidence from `TSC-01A` is missing.
+  - required trusted entry evidence is missing; or
+  - Data Quality is blocked, missing, unsupported, or stale-hard-blocked; or
+  - current proof basis required for a trusted health state is missing.
 - `ACTIVE`
-  - accepted entry evidence exists, but no rule-backed stronger health, weakening, risk, exit, invalidation, expiry, or block is proven.
+  - trusted entry evidence exists, but no stronger current rule-backed health state is proven.
 - `HEALTHY`
-  - documented rule/version evidence proves the candidate remains valid.
+  - current rule/version evidence proves the candidate remains valid.
 - `WEAKENING`
-  - documented rule/version evidence proves weakening.
+  - current rule/version evidence proves weakening.
 - `RISK_WARNING`
-  - documented risk, DQ, or accepted module-owned warning evidence proves a warning.
+  - current warning evidence proves risk without meeting exit or invalidation proof.
 - `EXIT_TRIGGERED`
-  - documented exit rule evidence proves an exit trigger.
+  - documented exit-rule evidence proves exit.
 - `INVALIDATED`
-  - documented invalidation rule evidence proves invalidation.
+  - documented invalidation-rule evidence proves invalidation.
 - `EXPIRED`
-  - documented expiry rule evidence proves expiry.
+  - documented expiry-rule evidence proves expiry.
 
-Missing proof must produce `ACTIVE` with missing-evidence reasons or `BLOCKED` if the missing evidence is a hard requirement. Do not invent `HEALTHY`, `WEAKENING`, `RISK_WARNING`, `EXIT_TRIGGERED`, `INVALIDATED`, or `EXPIRED`.
-
-## Display Rules
-
-- Candidate list and detail surfaces must show the same health state and summary for the same candidate.
-- Missing rule evidence must be visible.
-- Data Quality blockers must be visible and must prevent trusted health.
-- Exit and invalidation labels must remain missing or unsupported unless documented rule evidence proves them.
-- Touched surfaces must avoid target-price, profit-target, R:R, reward/risk, buy/sell, guarantee, and direct-action wording.
+Missing proof must never be promoted into a stronger state. It must fall back to `ACTIVE` or `BLOCKED` with explicit missing-evidence reasons.
 
 ## Compatibility Rules
 
-- Existing Today Review candidate fields remain valid.
-- Existing snapshots remain readable.
-- Older candidates without health evidence should render as conservative `ACTIVE` or `BLOCKED` with missing-evidence reasons, not crash.
-- No persisted columns are required in the first child.
-- No route response must become breaking; fields are additive.
+- Existing Today Review routes remain unchanged.
+- Existing Today Review persisted rows remain readable.
+- Older rows that lack new health evidence must render conservatively and not fail.
+- No new persisted columns are required.
+- No response shape should become breaking; new fields are additive only.
 
 ## Stop Conditions
 
-Stop and split the child if truthful behavior requires:
+Stop and split again if truthful implementation requires:
 
-- Prisma/schema/migration changes;
-- Today Review repository/controller/router/validation/module/index edits;
-- backend or frontend route registry edits;
+- schema, migration, or generated-file changes;
+- repository/controller/router/validation/index edits;
+- route or route-registry edits;
 - shared UI or shared backend utility edits;
-- upstream module source edits;
-- package or generated-file changes;
+- upstream source changes;
+- package changes;
 - provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential work;
-- target/R:R/Trade Plan source-of-truth semantics.
+- `CF-W1-TSC-03` support evidence;
+- target/R:R/Trade Plan semantics as health evidence.
 
 ## One-Writer Rule
 
-This contract reserves one future writer across the Today Review backend/frontend file set after `CF-W1-TSC-01A-TREV` is accepted. No parallel Today Review writer is allowed.
+One writer only across the full Today Review backend/frontend reservation.
+
+Do not run this child in parallel with any other Today Review source packet.
 
 ## Readiness Note
 
-As of 2026-05-24, the contract is bounded but blocked from Ready. Required next gates are accepted `CF-W1-TSC-01A-TREV`, Team 04 QA planning for `CF-W1-TSC-02`, and Team 00 stacked Ready evaluation.
+As of 2026-05-24:
+
+- parent `CF-W1-TSC-02` is not Ready;
+- child `CF-W1-TSC-02A-TREV-HEALTH` is the only honest Ready-candidate path;
+- Team 04 QA planning and Team 00 stacked promotion are still required before implementation.
