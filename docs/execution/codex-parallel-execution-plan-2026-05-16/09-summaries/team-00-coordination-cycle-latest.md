@@ -2,6 +2,34 @@
 
 Date: 2026-05-20
 
+## Latest Runtime Checkpoint - TREV Commit, BT-04 Review, Rolling Queue
+
+Date: 2026-05-24
+
+Completed:
+
+- `CF-W1-TSC-01A-TREV` cleared QA, Team 10 review, Architect Signoff, delegated PO acceptance, scoped staging verification, and local Team 07 branch commit `9fbc989 feat: add trusted signal candidates to today review`.
+- `CF-W1-BT-04` cleared Team 04 QA, Team 10 review, Architect Signoff, delegated PO acceptance, staged-scope verification, and scoped local Team 06 branch commit `2bd794f feat: add backtesting proof freshness labels`.
+- Team 02 drafted `CF-W1-TSC-03` for Today Review supporting trust evidence after DQ, calibration, and backtesting trust slices.
+- Team 03 blocked `CF-W1-DQ-02B` from implementation because the residual `DQ-02` value requires an explicit DQE persisted read-side/public-contract packet.
+
+Active agents:
+
+| Team | Agent | Work Item | Status |
+| --- | --- | --- | --- |
+| Team 03 | `019e5ad9-4124-70a0-9855-1cbae2881271` | `CF-W1-BT-04` Architect Signoff | accepted and closed |
+
+Teams ready to pick up new tasks:
+
+- Team 03: prepare `CF-W1-TSC-02`.
+- Team 04: standby for next QA plan or verification handoff.
+- Team 10: standby for review after future QA acceptance.
+- Team 02: continue rolling direct-value requirement discovery.
+- Team 06: standby for next Strategy/Signal/Backtesting Ready slice.
+- Team 07: standby for next Today Review Ready slice.
+
+Product Owner action required: no.
+
 ## Latest Runtime Checkpoint - BT-04 Promotion And TREV Rework
 
 Date: 2026-05-24

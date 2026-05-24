@@ -6,6 +6,13 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+2026-05-24 Team 00 status update:
+
+- `CF-W1-TSC-01A-TREV` completed QA, Team 10 review, Architect Signoff, delegated PO acceptance, staged-scope verification, and scoped local branch commit `9fbc989 feat: add trusted signal candidates to today review`.
+- `CF-W1-BT-04` completed Team 06 implementation, Team 04 QA, Team 10 review, Architect Signoff, delegated PO acceptance, staged-scope verification, and scoped local Team 06 branch commit `2bd794f feat: add backtesting proof freshness labels`.
+- `CF-W1-TSC-03` is a new Team 02 requirement draft and is not Ready. It waits behind `CF-W1-TSC-02` and Team 03 architecture prep.
+- `CF-W1-DQ-02B` is blocked from implementation pending explicit DQE read-side/public-contract reopening; no source reservation is active.
+
 2026-05-24 Team 00 Ready promotion - `CF-W1-BT-04`:
 
 - `CF-W1-BT-04` is promoted and assigned to Team 06 as an independent Backtesting Strategy Lab implementation slice.

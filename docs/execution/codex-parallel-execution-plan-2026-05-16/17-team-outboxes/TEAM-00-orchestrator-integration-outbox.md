@@ -1,5 +1,39 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - TREV Commit / BT-04 Signoff / Rolling Prep
+
+Date: 2026-05-24
+
+Status:
+
+- Branch: `dev`.
+- Open decisions: 0.
+- Product Owner action required: no.
+- Push performed: no.
+
+Completed:
+
+- `CF-W1-TSC-01A-TREV` passed QA, Team 10 review, Architect Signoff, delegated Product Owner acceptance, scoped staging verification, and local Team 07 branch commit `9fbc989 feat: add trusted signal candidates to today review`.
+- `CF-W1-BT-04` passed Team 04 QA, Team 10 review, Architect Signoff, delegated PO acceptance, staged-scope verification, and scoped local Team 06 branch commit `2bd794f feat: add backtesting proof freshness labels`.
+- Team 02 drafted `CF-W1-TSC-03` as the next Today Review supporting-trust evidence requirement after `CF-W1-TSC-02`.
+- Team 03 blocked `CF-W1-DQ-02B` from implementation because the residual work needs an explicit DQE persisted read-side/public-contract packet.
+
+Routing:
+
+- `CF-W1-BT-04`: accepted and branch-committed at `2bd794f`.
+- `CF-W1-TSC-02`: next architecture-prep candidate.
+- `CF-W1-TSC-03`: requirement draft only; not Ready.
+- `CF-W1-DQ-02B`: blocked from source implementation until Team 00/Architect explicitly reopen the DQE read-side/public-contract scope.
+
+Teams ready to pick up new tasks:
+
+- Team 03: prepare `CF-W1-TSC-02`.
+- Team 04: standby for QA planning/verification after the next Team 03 packet or implementation handoff.
+- Team 10: standby for review after future QA acceptance.
+- Team 02: continue rolling direct-value requirement discovery.
+- Team 06: standby for the next Strategy/Signal/Backtesting Ready slice.
+- Team 07: standby for the next Today Review Ready slice.
+
 ## Latest Runtime Checkpoint - BT-04 Ready Promotion
 
 Date: 2026-05-24

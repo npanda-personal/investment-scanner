@@ -10,10 +10,12 @@
 | Parallel write conflict | High | Medium | Orchestrator | same file requested by multiple teams | file reservations and one-writer rule | block conflicting work |
 | Dirty worktree implementation risk | High | Low | Orchestrator | git status shows uncommitted source changes | no implementation until resolved | run `git status --short` before implementation |
 | Data correctness risk | High | High | Market Data + DQE | trust/readiness counters fail | revalidate data chain first | Sprint 1 candidate |
+| DQE read-side currentness overclaim risk | High | Medium | Team 00 + Team 03 + Team 05 | residual `DQ-02` work tries to expose currentness without persisted/public read-path contract | keep `DQ-02B` blocked until a DQE read-side/public-contract packet is explicitly opened | do not promote `DQ-02B` as a no-schema service-only child |
 | False trigger risk | High | Medium | Signal Generation + QA | trigger lacks rule/DQ/audit fields | contract-first signal gate | audit trigger contract |
 | Trusted candidate entry-price evidence gap | High | High | Team 00 + Team 03 + Team 06 | `CF-W1-TSC-01` requires rule-triggered entry price but Today Review lacks it and Signal Trigger marks `trigger_price` unavailable | keep TSC implementation out of Ready; prepare upstream Signal Trigger entry-price evidence packet | route `CF-W1-SIG-TRIGGER-ENTRY-01` requirement/architecture/QA prep |
 | Signal quality risk | High | Medium | Signal Quality Lab | no outcome proof | forward validation plan | contract inventory |
 | Overfit/backtest risk | High | Medium | Backtesting + Architect | metrics without DQ/source proof | require DQ and assumption docs | inspect backtest contract |
+| Backtesting proof comparison window risk | Medium | Low | Team 06 + Team 03 + Team 10 | very old saved-run detail falls outside existing `listRuns()` comparison window | record as non-blocking limitation for `BT-04`; defer repository widening unless separately approved | keep `BT-04` read-path additive and avoid repository scope creep |
 | Free data limitation risk | High | High | Market Data + PO | provider gaps or paid requirement | PO/Architect source policy | block paid providers |
 | Local resource/memory risk | Medium | Medium | Orchestrator | memory >=95% | avoid heavy runs | check before heavy work |
 | UX confusion risk | Medium | Medium | UX Agent | PO/QA cannot explain workflow | UX-before-UI | require UX plan |
@@ -62,6 +64,7 @@
 ## Current Blockers
 
 - Market Data durable readiness evidence is incomplete for full contract compliance.
+- `CF-W1-DQ-02B` is blocked from implementation because Team 03 found the residual `DQ-02` value requires an explicit DQE persisted read-side/public-contract packet after accepted `DQ-02A`; no honest second no-schema service-local child exists.
 - Current Market Data natural-key behavior is symbol/date-centric and narrower than the active contract target.
 - `signal-generation-engine` run-path default/fail-closed behavior is accepted in bounded `CF-W2-SIG-01A`, and trusted list read-path filtering is committed in `CF-W1-SIG-01B` as `a5bc49a`.
 - `latestForInstrument()` is gated by committed `CF-W1-SIG-LATEST-01` as `e0a6788`.

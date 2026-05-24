@@ -4,7 +4,9 @@ Date: 2026-05-18
 
 | ID | Blocked item | Upstream dependency |
 | --- | --- | --- |
-| CF-W1-TSC-01 | Trusted Signal Candidate Workflow on `/today-review` | Parent remains routed through split child `CF-W1-TSC-01A`. `CF-W1-TSC-01A-SIG` is accepted and committed; `CF-W1-TSC-01A-TREV` is promoted as the downstream adoption child. |
+| CF-W1-TSC-01 | Trusted Signal Candidate Workflow on `/today-review` | Parent remains routed through split children. `CF-W1-TSC-01A-SIG` is accepted and committed; `CF-W1-TSC-01A-TREV` is accepted and locally committed on Team 07 branch `9fbc989`; follow-on children remain separate. |
+| CF-W1-TSC-03 | Today Review supporting trust evidence | New requirement draft; accepted `CF-W1-BT-04` base exists as `2bd794f`, but this item still waits for `CF-W1-TSC-02` sequencing and Team 03 architecture prep before any Ready evaluation. |
+| CF-W1-DQ-02B | DQE currentness public/read-path exposure | Team 03 found this blocked until Team 00 opens an explicit DQE persisted read-side/public-contract packet; no source implementation is authorized now. |
 | CF-W1-BT-01 | Backtesting DQ fail-closed behavior | DQ fail-closed policy and signal/strategy trust policy |
 | CF-W1-TP-01 | Trade Plan DQ hard blockers and no-target migration | Backend-only child contract, Team 03 reservation matrix, Team 06 inspection, and child QA plan are prepared as `CF-W1-TP-01B`; still needs Team 00 Ready promotion |
 | CF-W1-L3-ALERT-01 | Alert readiness consumer tests | Child architecture contract, Team 03 reservation matrix, exact backend file reservations, and child QA plan are prepared; still needs Team 00 Ready promotion |

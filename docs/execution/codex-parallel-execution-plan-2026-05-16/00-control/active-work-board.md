@@ -34,6 +34,34 @@ No historical active work items have been migrated as active.
 - Rejected / Rework
 - Deferred
 
+## Latest Team 00 Routing Update - TREV Commit And BT-04 Signoff
+
+Date: 2026-05-24
+
+Completed:
+
+- `CF-W1-TSC-01A-TREV` passed Team 04 QA, Team 10 review, Team 03 Architect Signoff, delegated Product Owner acceptance, staged-scope verification, and scoped local branch commit `9fbc989 feat: add trusted signal candidates to today review`.
+- `CF-W1-BT-04` passed Team 04 QA, Team 10 review, Team 03 Architect Signoff, delegated Product Owner acceptance, staged-scope verification, and scoped local Team 06 branch commit `2bd794f feat: add backtesting proof freshness labels`.
+- Team 02 drafted `CF-W1-TSC-03` as the next Today Review supporting-trust evidence requirement behind `CF-W1-TSC-02`.
+- Team 03 evaluated `CF-W1-DQ-02B` and blocked it from implementation because the residual value requires an explicit DQE persisted read-side/public-contract packet, not another no-schema service-local child.
+
+Current state:
+
+- `CF-W1-TSC-01A-TREV`: Committed on Team 07 branch `codex/team07-portfolio-alerts/CF-W1-TSC-01A-today-review-trigger-evidence` at `9fbc989`.
+- `CF-W1-BT-04`: Committed on Team 06 branch `codex/team06-strategy-signal/CF-W1-BT-04` at `2bd794f`.
+- `CF-W1-TSC-02`: next active-signal-health architecture-prep candidate.
+- `CF-W1-TSC-03`: new requirement draft; queue behind `TSC-02`, not Ready.
+- `CF-W1-DQ-02B`: Blocked from implementation pending Team 00/Architect reopening of DQE read-side/public-contract scope.
+
+Teams ready to pick up new tasks:
+
+- Team 03: prepare `CF-W1-TSC-02`.
+- Team 04: standby for QA planning/verification after the next Team 03 packet or implementation handoff.
+- Team 10: standby for review after future QA acceptance.
+- Team 02: continue rolling Product Owner requirement discovery focused on market data, data quality, signals, calibration, backtesting, and Today Review trust.
+- Team 06: standby for the next Strategy/Signal/Backtesting implementation after Ready promotion.
+- Team 07: standby for the next Today Review implementation after Ready promotion.
+
 ## Latest Team 00 Routing Update - BT-04 Ready Promotion
 
 Date: 2026-05-24
