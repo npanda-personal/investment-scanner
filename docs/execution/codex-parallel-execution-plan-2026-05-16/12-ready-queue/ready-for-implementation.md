@@ -6,10 +6,57 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+2026-05-24 Team 00 Ready promotion - `CF-W1-TSC-01A-SIG`:
+
+- `CF-W1-TSC-01A-SIG` is promoted and assigned to Team 06 as the first executable child of the Trusted Signal Candidate adoption path.
+- Purpose: add optional strategy-aware read options to `SignalGenerationEngineService.latestForInstrument` so downstream Today Review can request source-proven trigger evidence for the Strategy Decision strategy.
+- Sequencing: Team 06 bridge must complete QA, review, Architect Signoff, delegated PO acceptance, and scoped commit before Team 07 Today Review adoption (`CF-W1-TSC-01A-TREV`) starts.
+- Branch recommendation: `codex/team06-strategy-signal/CF-W1-TSC-01A-signal-latest-strategy-context`
+- Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-TSC-01A-SIG`
+- Gate evidence:
+  - Requirement: `10-requirements/CF-W1-TSC-01A-today-review-trusted-signal-candidate-adoption-requirement.md`
+  - Architecture review: `03-architecture/CF-W1-TSC-01A-architecture-review.md`
+  - Contract: `06-contracts/CF-W1-TSC-01A-trigger-evidence-adoption-contract.md`
+  - Work packet: `08-work-packets/CF-W1-TSC-01A-work-packet.md`
+  - QA plan: `04-qa/CF-W1-TSC-01A-qa-plan.md`
+  - Open decisions: none.
+- Allowed implementation files:
+  - `backend/src/modules/signal-generation-engine/signal-generation-engine.service.ts`
+  - `backend/src/modules/signal-generation-engine/signal-generation-engine.types.ts`
+  - `backend/src/modules/signal-generation-engine/signal-generation-engine.md`
+  - `backend/tests/modules/signal-generation-engine/signal-generation-engine.service.test.ts`
+  - `backend/tests/modules/signal-generation-engine/signal-generation-engine.trigger-contract.test.ts`
+- Allowed reporting docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-CF-W1-TSC-01A-SIG-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-TSC-01A-SIG-developer-handoff.md`
+- Forbidden scope:
+  - Prisma schema or migrations
+  - generated files
+  - Signal Generation repository, controller, router, validation, module, or index files
+  - Today Review source/tests
+  - route registries
+  - shared backend utilities
+  - shared frontend components
+  - package manifests
+  - frontend files
+  - Strategy Framework, Strategy Decision, Data Quality, Market Data, Trade Plan, Portfolio, Watchlist, Alerts, Copilot, or Research Hub source/tests
+  - provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential files
+- Required validation:
+
+```powershell
+cd backend
+npm.cmd test -- signal-generation-engine.service.test.ts signal-generation-engine.trigger-contract.test.ts --runInBand
+npm.cmd run build
+```
+
+- Stop if implementation needs route/controller/repository/schema/shared/package/generated/frontend/provider scope, creates durable trigger persistence, changes existing default route behavior, or emits `SOURCE_PROVEN` trigger evidence without exact strategy/rule/source proof.
+
+`CF-W1-TSC-01A-TREV` remains blocked until this bridge is accepted.
+
 2026-05-24 Team 00 Trusted Signal Candidate dependency update:
 
 - `CF-W1-SIG-TRIGGER-ENTRY-01` was implemented as a bounded Signal Generation compatibility-evidence child after Product Owner, Architect, and QA agent review confirmed the module-local path.
-- Current state: accepted through QA, Code Review, Architect Signoff, and delegated PO acceptance; scoped local commit pending.
+- Current state: accepted through QA, Code Review, Architect Signoff, delegated PO acceptance, and scoped local commit `649e645 feat: add signal trigger entry price evidence`.
 - Validation passed: `cd backend && npm.cmd test -- signal-generation-engine.trigger-contract.test.ts signal-generation-engine.service.test.ts signal-generation-dq-enforcement.invariants.test.ts --runInBand`; `cd backend && npm.cmd run build`.
 - This does not move `CF-W1-TSC-01` into Ready yet. A downstream Today Review/TSC adoption child still needs accepted trigger-evidence dependency, architecture contract, QA plan, exact file reservations, and Team 00 promotion.
 

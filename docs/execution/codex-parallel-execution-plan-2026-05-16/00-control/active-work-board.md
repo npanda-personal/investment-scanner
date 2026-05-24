@@ -67,6 +67,43 @@ Teams ready to pick up new tasks:
 - Team 02: rolling Product Owner / requirements audit remains ready for the next direct investor/trader-value item.
 - Team 03: rolling Architecture Factory should prepare the next TSC downstream adoption child after signoff.
 
+## Latest Team 00 Routing Update - TSC-01A Split Promotion
+
+Date: 2026-05-24
+
+`CF-W1-TSC-01A` is split into sequential executable children.
+
+Routing:
+
+- `CF-W1-TSC-01A-SIG`: promoted to Team 06 as the first executable child.
+- `CF-W1-TSC-01A-TREV`: remains blocked until the Team 06 bridge is accepted, committed, and available as the implementation base.
+
+Evidence:
+
+- Team 02 drafted the child requirement and committed docs checkpoint `b7fdd29 docs: draft today review trusted candidate adoption`.
+- Team 03 prepared architecture/work-packet evidence and recommends split sequential workers.
+- Team 04 prepared the QA plan and confirmed `CF-W1-TSC-01A-SIG` is ready for Team 00 Ready evaluation.
+- Team 00 added the explicit child contract and Ready handoff.
+- Open decisions: 0.
+- Product Owner action required: no.
+
+Allowed Team 06 scope:
+
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.service.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.types.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.md`
+- `backend/tests/modules/signal-generation-engine/signal-generation-engine.service.test.ts`
+- `backend/tests/modules/signal-generation-engine/signal-generation-engine.trigger-contract.test.ts`
+
+Teams ready to pick up new tasks:
+
+- Team 06: implement `CF-W1-TSC-01A-SIG` in the dedicated worktree.
+- Team 04: QA Verification after Team 06 developer handoff.
+- Team 10: Code Review after QA acceptance.
+- Team 03: Architect Signoff after Team 10 acceptance.
+- Team 02: next rolling PO/requirements item is `CF-W1-DQ-03`.
+- Team 03: rolling architecture prep may continue on `CF-W1-DQ-03` while Team 06 works.
+
 ## Current Operating Model: Multi-Team Parallel Execution
 
 The active execution plan now uses persistent Codex teams, not a single sequential Orchestrator wave.

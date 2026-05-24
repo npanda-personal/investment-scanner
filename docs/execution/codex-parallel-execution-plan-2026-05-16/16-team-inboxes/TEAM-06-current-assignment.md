@@ -2,6 +2,85 @@
 
 Date: 2026-05-20
 
+## Latest Assignment Override - 2026-05-24 TSC Signal Bridge
+
+Team 00 promotes `CF-W1-TSC-01A-SIG` as the first executable Trusted Signal Candidate child.
+
+Work item:
+
+- `CF-W1-TSC-01A-SIG` - Signal Generation strategy-aware latest-signal trigger-evidence bridge.
+
+Branch / worktree:
+
+- Branch: `codex/team06-strategy-signal/CF-W1-TSC-01A-signal-latest-strategy-context`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W1-TSC-01A-SIG`
+
+Evidence to use:
+
+- Requirement: `10-requirements/CF-W1-TSC-01A-today-review-trusted-signal-candidate-adoption-requirement.md`
+- Architecture review: `03-architecture/CF-W1-TSC-01A-architecture-review.md`
+- Contract: `06-contracts/CF-W1-TSC-01A-trigger-evidence-adoption-contract.md`
+- Work packet: `08-work-packets/CF-W1-TSC-01A-work-packet.md`
+- QA plan: `04-qa/CF-W1-TSC-01A-qa-plan.md`
+- Ready handoff: `12-ready-queue/ready-for-implementation.md`
+
+Allowed files:
+
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.service.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.types.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.md`
+- `backend/tests/modules/signal-generation-engine/signal-generation-engine.service.test.ts`
+- `backend/tests/modules/signal-generation-engine/signal-generation-engine.trigger-contract.test.ts`
+
+Allowed reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-CF-W1-TSC-01A-SIG-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-TSC-01A-SIG-developer-handoff.md`
+
+Required behavior:
+
+- Add optional strategy-aware read options to `SignalGenerationEngineService.latestForInstrument`.
+- Preserve existing `latestForInstrument(instrumentId)` behavior for controllers and current callers.
+- Reuse existing `enrichSignals(..., options)` strategy-aware enrichment.
+- Pass safe existing run options only when fallback generation is needed.
+- Keep `SOURCE_PROVEN` trigger evidence strict to exact strategy/rule/source proof.
+- Do not add route, controller, repository, schema, generated, provider/live, startup/backfill, durable trigger persistence, or frontend behavior.
+
+Forbidden files:
+
+- Prisma schema or migrations
+- generated files
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.repository.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.controller.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.router.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.validation.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.module.ts`
+- `backend/src/modules/signal-generation-engine/index.ts`
+- route registries
+- shared backend utilities
+- shared frontend components
+- package manifests
+- frontend files
+- Today Review files
+- Strategy Framework, Strategy Decision, Data Quality, Market Data, Trade Plan, Portfolio, Watchlist, Alerts, Copilot, or Research Hub source/tests
+- provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential files
+
+Required validation:
+
+```powershell
+cd backend
+npm.cmd test -- signal-generation-engine.service.test.ts signal-generation-engine.trigger-contract.test.ts --runInBand
+npm.cmd run build
+```
+
+Expected handoff:
+
+- Update `17-team-outboxes/TEAM-06-CF-W1-TSC-01A-SIG-outbox.md`.
+- Create/update `18-integration-queue/CF-W1-TSC-01A-SIG-developer-handoff.md`.
+- Record exact branch/worktree, changed files, inspected files, behavior changed, tests run, skipped checks, forbidden files confirmed untouched, risks, blockers, and next gate: Team 04 QA Verification.
+
+Stop and return to Team 00 if implementation needs any forbidden file, changes route behavior, introduces target/R:R/advice semantics, or cannot keep source-proven trigger evidence fail-closed.
+
 ## Latest Assignment Override - 2026-05-24 Gate Closure And Standby
 
 `CF-W1-STRAT-04` and `CF-W1-SQLAB-03` are complete through QA, Team 10 review, Architect Signoff, delegated PO acceptance, and scoped local implementation-branch commits.

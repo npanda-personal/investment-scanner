@@ -2,6 +2,34 @@
 
 Date: 2026-05-20
 
+## Latest Runtime Checkpoint - TSC-01A Ready Promotion
+
+Date: 2026-05-24
+
+Completed:
+
+- Team 02 created and committed the `CF-W1-TSC-01A` requirement path as `b7fdd29 docs: draft today review trusted candidate adoption`.
+- Team 03 created the split architecture review and work packet.
+- Team 04 created the split QA plan.
+- Team 00 added the explicit trigger-evidence adoption contract.
+- Team 00 promoted `CF-W1-TSC-01A-SIG` as the first executable child.
+
+Routing:
+
+- `CF-W1-TSC-01A-SIG`: Team 06 owns the Signal Generation bridge.
+- `CF-W1-TSC-01A-TREV`: blocked until Team 06 bridge acceptance.
+- Open decisions: 0.
+- Product Owner action required: no.
+
+Teams ready to pick up new tasks:
+
+- Team 06: implement `CF-W1-TSC-01A-SIG`.
+- Team 04: QA Verification after Team 06 handoff.
+- Team 10: Code Review after QA acceptance.
+- Team 03: Architect Signoff after review acceptance.
+- Team 02: rolling requirements can continue with `CF-W1-DQ-03`.
+- Team 03: rolling architecture can prepare `CF-W1-DQ-03`.
+
 ## Latest Runtime Checkpoint - SIG Trigger Entry Evidence
 
 Date: 2026-05-24

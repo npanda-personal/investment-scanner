@@ -1,5 +1,33 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - TSC-01A Signal Bridge Promotion
+
+Date: 2026-05-24
+
+Status:
+
+- Branch: `dev`.
+- Open decisions: 0.
+- Product Owner action required: no.
+- Team 02 committed requirement docs checkpoint `b7fdd29 docs: draft today review trusted candidate adoption`.
+
+Completed:
+
+- Team 03 determined `CF-W1-TSC-01A` must split into Team 06 Signal Generation bridge first and Team 07 Today Review adoption second.
+- Team 04 completed the split QA plan.
+- Team 00 added the explicit `CF-W1-TSC-01A` adoption contract.
+- Team 00 promoted only `CF-W1-TSC-01A-SIG` to Ready.
+- `CF-W1-TSC-01A-TREV` remains blocked until the Team 06 bridge is accepted.
+
+Teams ready to pick up new tasks:
+
+- Team 06: `CF-W1-TSC-01A-SIG` implementation.
+- Team 04: QA Verification after Team 06 developer handoff.
+- Team 10: Code Review after Team 04 accepts QA.
+- Team 03: Architect Signoff after Team 10 acceptance.
+- Team 02: rolling PO/requirements next item `CF-W1-DQ-03`.
+- Team 03: rolling architecture prep for `CF-W1-DQ-03`.
+
 ## Latest Runtime Checkpoint - SIG Trigger Entry Evidence Implementation
 
 Date: 2026-05-24
