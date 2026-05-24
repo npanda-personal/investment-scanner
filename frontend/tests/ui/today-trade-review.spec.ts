@@ -456,19 +456,19 @@ test.describe('Today Trade Review UI', () => {
     await expect(page.getByRole('link', { name: 'ALPHA.NS' })).toBeVisible();
     await expect(page.getByText('Daily: READY').first()).toBeVisible();
     await expect(page.getByText('Automation: BLOCKED').first()).toBeVisible();
-    await expect(page.getByText('PHASE0_AUTOMATION_NOT_AUTHORIZED').first()).toBeVisible();
+    await expect(page.getByTitle('Automation: BLOCKED - PHASE0_AUTOMATION_NOT_AUTHORIZED').first()).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Long Review (1)' })).toBeVisible();
     await page.getByRole('tab', { name: /Watch Only/ }).click();
     await expect(page.getByText('UNPROVEN.NS')).toBeVisible();
     await expect(page.getByRole('cell', { name: 'Unproven', exact: true })).toBeVisible();
     await expect(page.getByText('Daily: Missing').first()).toBeVisible();
-    await expect(page.getByText('Conservative display-only downgrade: missing DQ tier context').first()).toBeVisible();
+    await expect(page.getByTitle('28 (from 35) - Conservative display-only downgrade: missing DQ tier context').first()).toBeVisible();
     await expect(page.getByText('Data Quality use-case tier context is missing; confidence view is conservatively downgraded.').first()).toBeVisible();
     await page.getByRole('tab', { name: /Blocked/ }).click();
     await expect(page.getByText('BLOCKED.NS')).toBeVisible();
     await expect(page.getByText('Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.').first()).toBeVisible();
     await expect(page.getByText('Daily: BLOCKED').first()).toBeVisible();
-    await expect(page.getByText('DAILY_REVIEW_BLOCKED_BY_HISTORY').first()).toBeVisible();
+    await expect(page.getByTitle('Daily: BLOCKED - DAILY_REVIEW_BLOCKED_BY_HISTORY').first()).toBeVisible();
 
     await page.reload();
     await expect(page.getByRole('heading', { name: "Today's Trade Review" })).toBeVisible();
@@ -479,6 +479,78 @@ test.describe('Today Trade Review UI', () => {
     const body = await page.locator('body').innerText();
     expect(body).not.toMatch(/buy now|sell now|guaranteed|place order|execute order|live trade|financial advice|execution/i);
     expect(body).not.toContain('Raw signal count');
+  });
+
+  test('candidate table supports filtering, sorting, pagination, and hover-only full cell text', async ({ page }) => {
+    const longRows = [
+      { symbol: 'ZETA.NS', companyName: 'Zeta Industries', rank: 1, grade: 'B', confidenceScore: 78, dq: 'GOOD' },
+      { symbol: 'OMEGA.NS', companyName: 'Omega Capital Services', rank: 2, grade: 'A', confidenceScore: 91, dq: 'READY' },
+      { symbol: 'BETA.NS', companyName: 'Beta Manufacturing', rank: 3, grade: 'C', confidenceScore: 61, dq: 'LIMITED' },
+      { symbol: 'DELTA.NS', companyName: 'Delta Energy', rank: 4, grade: 'B', confidenceScore: 72, dq: 'GOOD' },
+      { symbol: 'KAPPA.NS', companyName: 'Kappa Retail', rank: 5, grade: 'A', confidenceScore: 86, dq: 'READY' },
+      { symbol: 'ALPHA.NS', companyName: 'Alpha Ltd', rank: 6, grade: 'A', confidenceScore: 88, dq: 'GOOD' },
+      { symbol: 'SIGMA.NS', companyName: 'Sigma Tools', rank: 7, grade: 'D', confidenceScore: 44, dq: 'WATCH' },
+    ].map((row, index) => ({
+      ...candidate,
+      id: `candidate-table-${index + 1}`,
+      instrumentId: `stock-table-${index + 1}`,
+      symbol: row.symbol,
+      companyName: row.companyName,
+      rank: row.rank,
+      grade: row.grade,
+      confidenceScore: row.confidenceScore,
+      reasonSummary: `${row.symbol} has a long clipped research-support reason that should stay on one table line and remain available from the cell hover title.`,
+      dataQualitySnapshot: {
+        ...candidate.dataQualitySnapshot,
+        instrumentId: `stock-table-${index + 1}`,
+        symbol: row.symbol,
+        companyName: row.companyName,
+        coverageStatus: row.dq,
+      },
+    }));
+    const tableResponse = {
+      ...completedResponse,
+      run: {
+        ...completedResponse.run,
+        candidateCounts: { LONG_REVIEW: longRows.length },
+        candidates: longRows,
+      },
+      groups: {
+        ...completedResponse.groups,
+        longReview: longRows,
+        blocked: [],
+        unproven: [],
+      },
+    };
+    await page.route('**/api/v1/today-review/latest**', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(tableResponse) });
+    });
+
+    await visitAuthenticated(page, '/today-review');
+
+    await expect(page.getByLabel('Search rows')).toBeVisible();
+    await expect(page.getByText('Hover any clipped cell to read the full value.')).toBeVisible();
+    await expect(page.getByTitle(/long clipped research-support reason/).first()).toBeVisible();
+
+    await page.getByLabel('Search rows').fill('OMEGA');
+    await expect(page.getByText('Showing 1-1 of 1 filtered candidates.')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'OMEGA.NS' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'ZETA.NS' })).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Clear table filters' }).click();
+    await expect(page.getByText('Showing 1-7 of 7 filtered candidates.')).toBeVisible();
+
+    await page.getByLabel('Rows per page:').click();
+    await page.getByRole('option', { name: '5', exact: true }).click();
+    await expect(page.getByText('Showing 1-5 of 7 filtered candidates.')).toBeVisible();
+    await page.getByRole('button', { name: 'Go to next page' }).click();
+    await expect(page.getByText('Showing 6-7 of 7 filtered candidates.')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Symbol' }).click();
+    await expect(page.getByRole('link', { name: 'ZETA.NS' })).toBeVisible();
+
+    const body = await page.locator('body').innerText();
+    expect(body).not.toMatch(/R:R|reward\/risk|target \/ reward|buy now|sell now|guaranteed|financial advice/i);
   });
 
   test('candidate detail shows plan, invalidation, context, data quality, and proof panels', async ({ page }) => {

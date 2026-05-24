@@ -1,4 +1,6 @@
+import ClearIcon from '@mui/icons-material/Clear';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import SearchIcon from '@mui/icons-material/Search';
 import {
   Alert,
   Box,
@@ -7,8 +9,14 @@ import {
   CardContent,
   Chip,
   CircularProgress,
+  FormControl,
   Grid,
+  IconButton,
+  InputAdornment,
+  InputLabel,
   Link,
+  MenuItem,
+  Select,
   Stack,
   Tab,
   Table,
@@ -16,11 +24,16 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
+  TableSortLabel,
   Tabs,
+  TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
-import { useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { useTodayReview } from '../hooks/useTodayReview';
@@ -349,101 +362,563 @@ function SummaryCard({ label, value, tone }: { label: string; value: number; ton
   );
 }
 
+type SortDirection = 'asc' | 'desc';
+type SortKey =
+  | 'rank'
+  | 'symbol'
+  | 'state'
+  | 'setup'
+  | 'entry'
+  | 'exit'
+  | 'confidence'
+  | 'grade'
+  | 'dailyReview'
+  | 'automation'
+  | 'dataFreshness'
+  | 'dataQuality'
+  | 'proof'
+  | 'market'
+  | 'sector'
+  | 'reason'
+  | 'blocker';
+
+interface CandidateColumn {
+  id: SortKey;
+  label: string;
+  width: number;
+  align?: 'left' | 'right' | 'center';
+  value: (candidate: TodayReviewCandidate) => string | number;
+  render: (candidate: TodayReviewCandidate) => ReactNode;
+}
+
 function CandidateTable({ candidates }: { candidates: TodayReviewCandidate[] }) {
+  const [query, setQuery] = useState('');
+  const [gradeFilter, setGradeFilter] = useState('ALL');
+  const [readinessFilter, setReadinessFilter] = useState('ALL');
+  const [dataQualityFilter, setDataQualityFilter] = useState('ALL');
+  const [sortBy, setSortBy] = useState<SortKey>('rank');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const candidateKey = useMemo(() => candidates.map((candidate) => candidate.id).join('|'), [candidates]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [candidateKey]);
+
+  const filterOptions = useMemo(() => {
+    const grades = Array.from(new Set(candidates.map((candidate) => candidate.grade))).sort();
+    const dataQuality = Array.from(new Set(candidates.map((candidate) => dataQualityLabel(candidate)))).sort();
+    return { grades, dataQuality };
+  }, [candidates]);
+
+  const filteredCandidates = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return candidates.filter((candidate) => {
+      const context = tierContextForCandidate(candidate);
+      const matchesQuery = !normalizedQuery || searchableCandidateText(candidate).includes(normalizedQuery);
+      const matchesGrade = gradeFilter === 'ALL' || candidate.grade === gradeFilter;
+      const matchesReadiness = readinessFilter === 'ALL' || context.dailyReview.status === readinessFilter;
+      const matchesDataQuality = dataQualityFilter === 'ALL' || dataQualityLabel(candidate) === dataQualityFilter;
+      return matchesQuery && matchesGrade && matchesReadiness && matchesDataQuality;
+    });
+  }, [candidates, dataQualityFilter, gradeFilter, query, readinessFilter]);
+
+  const columns = useMemo<CandidateColumn[]>(() => [
+    {
+      id: 'rank',
+      label: 'Rank',
+      width: 72,
+      align: 'right',
+      value: (candidate) => candidate.rank,
+      render: (candidate) => <EllipsisCell fullText={String(candidate.rank)} align="right" strong />,
+    },
+    {
+      id: 'symbol',
+      label: 'Symbol',
+      width: 150,
+      value: (candidate) => `${candidate.symbol} ${candidate.companyName || ''}`,
+      render: (candidate) => (
+        <Tooltip title={`${candidate.symbol} - ${candidate.companyName || 'Company unavailable'}`} arrow enterDelay={350}>
+          <Link
+            component={RouterLink}
+            to={`/today-review/candidates/${candidate.id}`}
+            fontWeight={700}
+            title={`${candidate.symbol} - ${candidate.companyName || 'Company unavailable'}`}
+            sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+          >
+            {candidate.symbol}
+          </Link>
+        </Tooltip>
+      ),
+    },
+    {
+      id: 'state',
+      label: 'State',
+      width: 160,
+      value: (candidate) => stateLabel(candidate.state),
+      render: (candidate) => <EllipsisCell fullText={stateLabel(candidate.state)} />,
+    },
+    {
+      id: 'setup',
+      label: 'Setup',
+      width: 170,
+      value: (candidate) => candidate.setupType || candidate.strategyCode,
+      render: (candidate) => <EllipsisCell fullText={candidate.setupType || candidate.strategyCode} />,
+    },
+    {
+      id: 'entry',
+      label: 'Entry evidence',
+      width: 190,
+      value: (candidate) => formatEntry(candidate.tradePlanSnapshot as any),
+      render: (candidate) => <EllipsisCell fullText={formatEntry(candidate.tradePlanSnapshot as any)} />,
+    },
+    {
+      id: 'exit',
+      label: 'Exit / invalidation',
+      width: 240,
+      value: (candidate) => formatStop(candidate.tradePlanSnapshot as any, candidate),
+      render: (candidate) => <EllipsisCell fullText={formatStop(candidate.tradePlanSnapshot as any, candidate)} />,
+    },
+    {
+      id: 'confidence',
+      label: 'Confidence',
+      width: 140,
+      align: 'right',
+      value: (candidate) => Number(candidate.confidenceScore || 0),
+      render: (candidate) => {
+        const confidence = confidenceDisplay(candidate);
+        return <EllipsisCell fullText={confidence.note ? `${confidence.label} - ${confidence.note}` : confidence.label} align="right" strong />;
+      },
+    },
+    {
+      id: 'grade',
+      label: 'Grade',
+      width: 104,
+      value: (candidate) => gradeSortValue(candidate.grade),
+      render: (candidate) => <Chip label={candidate.grade} size="small" color={gradeColor(candidate.grade) as any} sx={chipNoWrapSx} />,
+    },
+    {
+      id: 'dailyReview',
+      label: 'Daily tier',
+      width: 150,
+      value: (candidate) => tierContextForCandidate(candidate).dailyReview.status,
+      render: (candidate) => {
+        const tier = tierContextForCandidate(candidate).dailyReview;
+        return <TierChip tier={tier} />;
+      },
+    },
+    {
+      id: 'automation',
+      label: 'Automation',
+      width: 150,
+      value: (candidate) => tierContextForCandidate(candidate).automation.status,
+      render: (candidate) => {
+        const tier = tierContextForCandidate(candidate).automation;
+        return <TierChip tier={tier} />;
+      },
+    },
+    {
+      id: 'dataFreshness',
+      label: 'Data through',
+      width: 140,
+      value: (candidate) => latestDataDate(candidate),
+      render: (candidate) => <EllipsisCell fullText={formatDate(latestDataDate(candidate))} />,
+    },
+    {
+      id: 'dataQuality',
+      label: 'DQ',
+      width: 150,
+      value: dataQualityLabel,
+      render: (candidate) => <EllipsisCell fullText={dataQualityLabel(candidate)} />,
+    },
+    {
+      id: 'proof',
+      label: 'Proof',
+      width: 130,
+      value: proofLabel,
+      render: (candidate) => <EllipsisCell fullText={proofLabel(candidate)} />,
+    },
+    {
+      id: 'market',
+      label: 'Regime',
+      width: 140,
+      value: marketLabel,
+      render: (candidate) => <EllipsisCell fullText={marketLabel(candidate)} />,
+    },
+    {
+      id: 'sector',
+      label: 'Sector',
+      width: 180,
+      value: sectorAlignment,
+      render: (candidate) => <EllipsisCell fullText={sectorAlignment(candidate)} />,
+    },
+    {
+      id: 'reason',
+      label: 'Reason',
+      width: 320,
+      value: (candidate) => candidate.reasonSummary,
+      render: (candidate) => <EllipsisCell fullText={candidate.reasonSummary} />,
+    },
+    {
+      id: 'blocker',
+      label: 'Blocker',
+      width: 300,
+      value: (candidate) => blockerLabel(candidate),
+      render: (candidate) => <EllipsisCell fullText={blockerLabel(candidate)} />,
+    },
+  ], []);
+
+  const sortedCandidates = useMemo(() => {
+    const column = columns.find((item) => item.id === sortBy) || columns[0];
+    return [...filteredCandidates].sort((a, b) => compareValues(column.value(a), column.value(b), sortDirection));
+  }, [columns, filteredCandidates, sortBy, sortDirection]);
+
+  const pagedCandidates = useMemo(() => {
+    const start = page * pageSize;
+    return sortedCandidates.slice(start, start + pageSize);
+  }, [page, pageSize, sortedCandidates]);
+
+  useEffect(() => {
+    const maxPage = Math.max(0, Math.ceil(filteredCandidates.length / pageSize) - 1);
+    if (page > maxPage) setPage(maxPage);
+  }, [filteredCandidates.length, page, pageSize]);
+
+  const hasFilters = Boolean(query || gradeFilter !== 'ALL' || readinessFilter !== 'ALL' || dataQualityFilter !== 'ALL');
+
+  const handleSort = (columnId: SortKey) => {
+    setPage(0);
+    if (sortBy === columnId) {
+      setSortDirection((current) => current === 'asc' ? 'desc' : 'asc');
+      return;
+    }
+    setSortBy(columnId);
+    setSortDirection(columnId === 'rank' ? 'asc' : 'desc');
+  };
+
+  const clearFilters = () => {
+    setQuery('');
+    setGradeFilter('ALL');
+    setReadinessFilter('ALL');
+    setDataQualityFilter('ALL');
+    setPage(0);
+  };
+
   return (
-    <TableContainer>
-      <Table size="small" aria-label="Today review candidates">
-        <TableHead>
-          <TableRow>
-            <TableCell>Rank</TableCell>
-            <TableCell>Symbol</TableCell>
-            <TableCell>Direction</TableCell>
-            <TableCell>Setup</TableCell>
-            <TableCell>Entry zone or trigger</TableCell>
-            <TableCell>Stop / invalidation</TableCell>
-            <TableCell>Target / reward</TableCell>
-            <TableCell>Reward/risk</TableCell>
-            <TableCell>Confidence</TableCell>
-            <TableCell>Grade</TableCell>
-            <TableCell>Daily review tier</TableCell>
-            <TableCell>Automation tier</TableCell>
-            <TableCell>Data freshness</TableCell>
-            <TableCell>Data quality</TableCell>
-            <TableCell>Proof rating</TableCell>
-            <TableCell>Market/regime</TableCell>
-            <TableCell>Sector alignment</TableCell>
-            <TableCell>Reason</TableCell>
-            <TableCell>Blocker</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {candidates.map((candidate) => {
-            const plan = candidate.tradePlanSnapshot as any;
-            const dq = candidate.dataQualitySnapshot as TodayReviewCandidateDataQualitySnapshot | null;
-            const proof = candidate.strategyProofSnapshot as any;
-            const market = candidate.marketContextSnapshot as any;
-            const context = tierContextForCandidate(candidate);
-            const confidence = confidenceDisplay(candidate);
-            return (
-              <TableRow key={candidate.id} hover>
-                <TableCell>{candidate.rank}</TableCell>
-                <TableCell>
-                  <Link component={RouterLink} to={`/today-review/candidates/${candidate.id}`} fontWeight={700}>
-                    {candidate.symbol}
-                  </Link>
-                  <Typography variant="caption" color="text.secondary" display="block">{candidate.companyName || 'Company unavailable'}</Typography>
+    <Stack spacing={1.5}>
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', md: 'minmax(260px, 1.2fr) repeat(3, minmax(150px, 0.55fr)) auto' },
+          gap: 1.25,
+          alignItems: 'center',
+        }}
+      >
+        <TextField
+          label="Search rows"
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setPage(0);
+          }}
+          size="small"
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon fontSize="small" />
+              </InputAdornment>
+            ),
+          }}
+        />
+        <FormControl size="small">
+          <InputLabel id="today-review-grade-filter-label">Grade</InputLabel>
+          <Select
+            labelId="today-review-grade-filter-label"
+            value={gradeFilter}
+            label="Grade"
+            onChange={(event) => {
+              setGradeFilter(event.target.value);
+              setPage(0);
+            }}
+          >
+            <MenuItem value="ALL">All grades</MenuItem>
+            {filterOptions.grades.map((grade) => <MenuItem key={grade} value={grade}>{grade}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <FormControl size="small">
+          <InputLabel id="today-review-readiness-filter-label">Daily tier</InputLabel>
+          <Select
+            labelId="today-review-readiness-filter-label"
+            value={readinessFilter}
+            label="Daily tier"
+            onChange={(event) => {
+              setReadinessFilter(event.target.value);
+              setPage(0);
+            }}
+          >
+            <MenuItem value="ALL">All daily tiers</MenuItem>
+            <MenuItem value="READY">READY</MenuItem>
+            <MenuItem value="LIMITED">LIMITED</MenuItem>
+            <MenuItem value="BLOCKED">BLOCKED</MenuItem>
+            <MenuItem value="MISSING">MISSING</MenuItem>
+          </Select>
+        </FormControl>
+        <FormControl size="small">
+          <InputLabel id="today-review-dq-filter-label">Data quality</InputLabel>
+          <Select
+            labelId="today-review-dq-filter-label"
+            value={dataQualityFilter}
+            label="Data quality"
+            onChange={(event) => {
+              setDataQualityFilter(event.target.value);
+              setPage(0);
+            }}
+          >
+            <MenuItem value="ALL">All DQ states</MenuItem>
+            {filterOptions.dataQuality.map((status) => <MenuItem key={status} value={status}>{status}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <Tooltip title="Clear table filters" arrow>
+          <span>
+            <IconButton
+              aria-label="Clear table filters"
+              onClick={clearFilters}
+              disabled={!hasFilters}
+              size="small"
+              sx={{ justifySelf: { xs: 'start', md: 'end' } }}
+            >
+              <ClearIcon fontSize="small" />
+            </IconButton>
+          </span>
+        </Tooltip>
+      </Box>
+
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
+        <Typography variant="caption" color="text.secondary">
+          Showing {filteredCandidates.length === 0 ? 0 : page * pageSize + 1}-{Math.min((page + 1) * pageSize, filteredCandidates.length)} of {filteredCandidates.length} filtered candidates.
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          Hover any clipped cell to read the full value.
+        </Typography>
+      </Stack>
+
+      <TableContainer
+        sx={{
+          border: '1px solid',
+          borderColor: 'divider',
+          borderRadius: 1,
+          maxHeight: 620,
+          overflowX: 'auto',
+          '& .MuiTableCell-root': {
+            whiteSpace: 'nowrap',
+          },
+        }}
+      >
+        <Table
+          stickyHeader
+          size="small"
+          aria-label="Today review candidates"
+          sx={{
+            tableLayout: 'fixed',
+            minWidth: 2860,
+            '& .MuiTableCell-head': {
+              bgcolor: 'background.paper',
+              borderBottom: '1px solid',
+              borderColor: 'divider',
+              color: 'text.secondary',
+              fontSize: 12,
+              fontWeight: 700,
+              lineHeight: 1.2,
+              py: 1,
+            },
+            '& .MuiTableCell-body': {
+              fontSize: 13,
+              py: 0.85,
+              verticalAlign: 'middle',
+            },
+            '& .MuiTableBody-root .MuiTableRow-root:nth-of-type(even)': {
+              bgcolor: 'action.hover',
+            },
+          }}
+        >
+          <TableHead>
+            <TableRow>
+              {columns.map((column) => (
+                <TableCell key={column.id} align={column.align} sx={{ width: column.width }}>
+                  <TableSortLabel
+                    active={sortBy === column.id}
+                    direction={sortBy === column.id ? sortDirection : 'asc'}
+                    onClick={() => handleSort(column.id)}
+                  >
+                    {column.label}
+                  </TableSortLabel>
                 </TableCell>
-                <TableCell>{stateLabel(candidate.state)}</TableCell>
-                <TableCell>{candidate.setupType || candidate.strategyCode}</TableCell>
-                <TableCell>{formatEntry(plan)}</TableCell>
-                <TableCell>{formatStop(plan, candidate)}</TableCell>
-                <TableCell>{formatTarget(plan)}</TableCell>
-                <TableCell>{formatRatio(plan?.rewardRiskRatio)}</TableCell>
-                <TableCell>
-                  <Typography fontWeight={600}>{confidence.label}</Typography>
-                  {confidence.note && <Typography variant="caption" color="warning.main">{confidence.note}</Typography>}
+              ))}
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {pagedCandidates.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} sx={{ py: 4, textAlign: 'center' }}>
+                  <Typography color="text.secondary">No candidates match the current table filters.</Typography>
                 </TableCell>
-                <TableCell><Chip label={candidate.grade} size="small" color={gradeColor(candidate.grade) as any} /></TableCell>
-                <TableCell>
-                  <Chip
-                    size="small"
-                    label={context.dailyReview.label}
-                    color={tierColor(context.dailyReview.status)}
-                    variant={context.dailyReview.status === 'READY' ? 'outlined' : 'filled'}
-                  />
-                  {context.dailyReview.reason && (
-                    <Typography variant="caption" color="text.secondary" display="block">
-                      {context.dailyReview.reason}
-                    </Typography>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <Chip
-                    size="small"
-                    label={context.automation.label}
-                    color={tierColor(context.automation.status)}
-                    variant={context.automation.status === 'BLOCKED' ? 'filled' : 'outlined'}
-                  />
-                  {context.automation.reason && (
-                    <Typography variant="caption" color={context.automation.status === 'BLOCKED' ? 'text.secondary' : 'warning.main'} display="block">
-                      {context.automation.reason}
-                    </Typography>
-                  )}
-                </TableCell>
-                <TableCell>{formatDate(plan?.marketDataSnapshot?.latestStoredTradingDate || plan?.latestPriceTimestamp)}</TableCell>
-                <TableCell>{dq?.coverageStatus || dq?.signalReadinessStatus || 'Missing'}</TableCell>
-                <TableCell>{proof?.strategyRating?.ratingGrade || plan?.strategyRating || 'Unproven'}</TableCell>
-                <TableCell>{market?.regime?.regime || 'Unknown'}</TableCell>
-                <TableCell>{sectorAlignment(candidate)}</TableCell>
-                <TableCell>{candidate.reasonSummary}</TableCell>
-                <TableCell>{context.blocker || candidate.blockers[0] || '-'}</TableCell>
               </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </TableContainer>
+            ) : pagedCandidates.map((candidate) => (
+              <TableRow key={candidate.id} hover>
+                {columns.map((column) => (
+                  <TableCell key={column.id} align={column.align}>{column.render(candidate)}</TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      <TablePagination
+        component="div"
+        count={filteredCandidates.length}
+        page={page}
+        rowsPerPage={pageSize}
+        rowsPerPageOptions={[5, 10, 25, 50]}
+        onPageChange={(_event, nextPage) => setPage(nextPage)}
+        onRowsPerPageChange={(event) => {
+          setPageSize(Number(event.target.value));
+          setPage(0);
+        }}
+        sx={{
+          border: '1px solid',
+          borderColor: 'divider',
+          borderRadius: 1,
+          '.MuiTablePagination-toolbar': {
+            minHeight: 44,
+          },
+        }}
+      />
+    </Stack>
   );
+}
+
+const chipNoWrapSx = {
+  maxWidth: '100%',
+  '& .MuiChip-label': {
+    display: 'block',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+};
+
+function EllipsisCell({
+  fullText,
+  children,
+  align,
+  strong = false,
+}: {
+  fullText: string;
+  children?: ReactNode;
+  align?: 'left' | 'right' | 'center';
+  strong?: boolean;
+}) {
+  const text = fullText || '-';
+  return (
+    <Tooltip title={text !== '-' ? text : ''} arrow enterDelay={350}>
+      <Typography
+        title={text}
+        component="span"
+        sx={{
+          display: 'block',
+          maxWidth: '100%',
+          overflow: 'hidden',
+          textAlign: align,
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          fontWeight: strong ? 700 : 400,
+        }}
+      >
+        {children ?? text}
+      </Typography>
+    </Tooltip>
+  );
+}
+
+function TierChip({ tier }: { tier: TierCellContext }) {
+  const title = tier.reason ? `${tier.label} - ${tier.reason}` : tier.label;
+  return (
+    <Tooltip title={title} arrow enterDelay={350}>
+      <Chip
+        title={title}
+        size="small"
+        label={tier.label}
+        color={tierColor(tier.status)}
+        variant={tier.status === 'READY' ? 'outlined' : 'filled'}
+        sx={chipNoWrapSx}
+      />
+    </Tooltip>
+  );
+}
+
+function searchableCandidateText(candidate: TodayReviewCandidate) {
+  const context = tierContextForCandidate(candidate);
+  const plan = candidate.tradePlanSnapshot as any;
+  return [
+    candidate.symbol,
+    candidate.companyName,
+    candidate.state,
+    stateLabel(candidate.state),
+    candidate.setupType,
+    candidate.strategyCode,
+    candidate.strategyVersion,
+    candidate.grade,
+    candidate.reasonSummary,
+    candidate.blockers.join(' '),
+    candidate.watchReasons.join(' '),
+    formatEntry(plan),
+    formatStop(plan, candidate),
+    context.dailyReview.label,
+    context.dailyReview.reason,
+    context.automation.label,
+    context.automation.reason,
+    dataQualityLabel(candidate),
+    proofLabel(candidate),
+    marketLabel(candidate),
+    sectorAlignment(candidate),
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+
+function compareValues(a: string | number, b: string | number, direction: SortDirection) {
+  const modifier = direction === 'asc' ? 1 : -1;
+  if (typeof a === 'number' && typeof b === 'number') return (a - b) * modifier;
+  return String(a ?? '').localeCompare(String(b ?? ''), undefined, { numeric: true, sensitivity: 'base' }) * modifier;
+}
+
+function gradeSortValue(grade: string) {
+  const order: Record<string, number> = { A: 1, B: 2, C: 3, D: 4, UNPROVEN: 5 };
+  return order[grade] ?? 99;
+}
+
+function latestDataDate(candidate: TodayReviewCandidate) {
+  const plan = candidate.tradePlanSnapshot as any;
+  return plan?.marketDataSnapshot?.latestStoredTradingDate || plan?.latestPriceTimestamp || '';
+}
+
+function dataQualityLabel(candidate: TodayReviewCandidate) {
+  const dq = candidate.dataQualitySnapshot as TodayReviewCandidateDataQualitySnapshot | null;
+  return dq?.coverageStatus || dq?.signalReadinessStatus || 'Missing';
+}
+
+function proofLabel(candidate: TodayReviewCandidate) {
+  const plan = candidate.tradePlanSnapshot as any;
+  const proof = candidate.strategyProofSnapshot as any;
+  return proof?.strategyRating?.ratingGrade || plan?.strategyRating || 'Unproven';
+}
+
+function marketLabel(candidate: TodayReviewCandidate) {
+  const market = candidate.marketContextSnapshot as any;
+  return market?.regime?.regime || 'Unknown';
+}
+
+function blockerLabel(candidate: TodayReviewCandidate) {
+  return tierContextForCandidate(candidate).blocker || candidate.blockers[0] || '-';
 }
 
 type TierStatus = 'READY' | 'LIMITED' | 'BLOCKED' | 'MISSING';
@@ -567,15 +1042,6 @@ function formatStop(plan: any, candidate?: TodayReviewCandidate) {
   if (candidate?.blockers?.[0]) return candidate.blockers[0];
   if (!plan?.stopLoss) return 'Unavailable';
   return `${formatCurrency(Number(plan.stopLoss.price))}; ${plan.invalidationRules?.[0] || 'Invalidation unavailable'}`;
-}
-
-function formatTarget(plan: any) {
-  if (!plan?.target) return 'Unavailable';
-  return formatCurrency(Number(plan.target.price));
-}
-
-function formatRatio(value?: number) {
-  return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : 'Unavailable';
 }
 
 function gradeColor(grade: string) {
