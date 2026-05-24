@@ -17,25 +17,25 @@ Current status:
 Gate movement:
 
 - `CF-W2-SIG-01A` completed QA, Team 10 review, Architect Signoff, delegated PO acceptance, staged-scope verification, and local Team 06 branch commit `24f938b docs: accept signal dq fail-closed validation`.
-- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` was rejected by Team 04 QA and returned to Team 07 rework in `C:\work\repo\investment-scanner-worktrees\t7-tsc03a`, stacked on accepted commit `34c9993`.
-- TSC-03A rework target: keep backtesting proof-currentness `MISSING` unless explicit module-owned proof exists, and remove calibration UI fallback from confidence-like legacy fields when the explicit support block is missing.
+- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` was rejected by Team 04 QA, reworked by Team 07, and accepted by Team 04 QA rerun in `C:\work\repo\investment-scanner-worktrees\t7-tsc03a`, stacked on accepted commit `34c9993`.
+- TSC-03A Team 10 review is active; Architect Signoff is next if review accepts.
 - `CF-W1-SIG-LATEST-01` is already accepted from 2026-05-17; Team 00 corrected the Top 10 queues so it is no longer routed as fresh work.
 - `CF-W2-TSC-04` stays planning-only until the active Today Review writer set is free.
 - `CF-W2-BT-05` completed Team 03 architecture prep and Team 04 QA planning, then Team 00 promoted it to Team 06 as a bounded backend-only stacked Backtesting implementation slice.
-- Team 04 QA rejected the first BT-05 handoff on compile blocker `TS2367`; Team 06 rework is active and must keep invalidation evidence missing/unsupported unless explicit proof exists.
+- Team 04 QA rejected the first BT-05 handoff on compile blocker `TS2367`; Team 06 fixed it and Team 04 QA accepted the rerun.
+- Team 10 then rejected BT-05 because incomplete runs could look like supported operational/simulation exit evidence with zero counts. Team 06 completed the bounded fix, and Team 04 QA rerun is active.
 - `CF-W2-TSC-05` was added by Team 02 as a planning-only no-target ranking / eligibility reframe requirement.
 
 Active agents:
 
-- Team 07 rework agent `019e5bae-5f24-7143-8e1a-c033d0a46130`: `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` bounded QA fixes.
-- Team 06 rework agent `019e5bb6-bb61-7243-bd55-625c2c02f857`: `CF-W2-BT-05` compile-blocker fix.
+- Team 10 review agent `019e5bc4-1292-72b0-8f49-180dc0b34450`: `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`.
+- Team 04 QA rerun agent `019e5be8-252a-75d2-b1f3-fbc3a2aa66bc`: `CF-W2-BT-05`.
 
 Teams ready to pick up new tasks:
 
-- Team 06: complete `CF-W2-BT-05` compile-blocker rework in the dedicated stacked Backtesting worktree.
-- Team 04: QA rerun after Team 07 rework handoff.
-- Team 04: QA rerun after Team 06 `BT-05` rework handoff.
-- Team 10: review after QA acceptance.
+- Team 10: review `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`.
+- Team 04: QA rerun `CF-W2-BT-05`.
+- Team 10: re-review `CF-W2-BT-05` after Team 04 accepts the rerun.
 - Team 03: Architect Signoff after Team 10 acceptance; otherwise prepare next Today Review no-target packet after file release.
 - Team 02: rolling direct investor/trader-value discovery, reading root `AGENTS.md` first.
 

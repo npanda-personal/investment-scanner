@@ -64,18 +64,17 @@ Current state:
 - `CF-W1-MD-05`: Committed on implementation branch; no push.
 - `CF-W1-TSC-02A-TREV-HEALTH`: Committed on implementation branch; no push.
 - `CF-W2-SIG-01A`: Committed on Team 06 branch; no push.
-- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`: Rejected / Rework after Team 04 QA found two trust-evidence overclaim paths; Team 07 rework is active in the same dedicated stacked worktree.
-- `CF-W2-BT-05`: Rejected / Rework after Team 04 QA found a TypeScript compile blocker (`TS2367`) in the new rule-evidence projection; Team 06 rework is active in the same stacked backtesting worktree.
+- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`: Team 04 QA accepted after bounded Team 07 rework; Team 10 review is active in the same dedicated stacked worktree.
+- `CF-W2-BT-05`: Team 06 completed the incomplete-run evidence rework after Team 10 rejection; Team 04 QA rerun is active in the same stacked backtesting worktree.
 - Open decisions: 0.
 - Product Owner action required: no.
 
 Teams ready to pick up new tasks:
 
-- Team 07: continue `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` implementation now.
-- Team 06: complete bounded `CF-W2-BT-05` compile-blocker rework in the dedicated stacked Backtesting worktree.
-- Team 04: QA rerun after Team 07 `TSC-03A` rework handoff.
-- Team 04: QA rerun after Team 06 `BT-05` rework handoff.
-- Team 10: review after QA acceptance.
+- Team 10: review `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` after Team 04 QA acceptance.
+- Team 04: QA rerun `CF-W2-BT-05` after Team 06 incomplete-run evidence rework.
+- Team 10: re-review `CF-W2-BT-05` after Team 04 accepts the rerun.
+- Team 03: Architect Signoff after Team 10 acceptance.
 - Team 03: architecture prep for `CF-W2-TSC-05` after Today Review files are free, or Architect Signoff after Team 10 acceptance.
 - Team 02: continue rolling requirements discovery focused on direct investor/trader value.
 
