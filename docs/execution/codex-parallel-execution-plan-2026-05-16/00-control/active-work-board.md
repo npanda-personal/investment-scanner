@@ -34,6 +34,33 @@ No historical active work items have been migrated as active.
 - Rejected / Rework
 - Deferred
 
+## Latest Team 00 Routing Update - MD-05 Rework And TSC-02A Resource Gate
+
+Date: 2026-05-24
+
+Current state:
+
+- `CF-W1-MD-05`: Rejected / Rework after required Market Data Playwright smoke rerun failed 5 of 10 tests. Team 05 completed bounded rework in `C:\work\repo\investment-scanner-worktrees\team05-CF-W1-MD-05`; validation is waiting for memory below 90% before rerun.
+- `CF-W1-TSC-02A-TREV-HEALTH`: Implementation complete in `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-TSC-02A-TREV-HEALTH`, but developer validation is resource-gated. Not QA-ready yet.
+- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`: Next legitimate no-schema Today Review candidate after `TSC-02A`; blocked by active Today Review writer sequencing.
+- `CF-W1-SQLAB-02B`: Architecture and contract prepared as storage-consent-gated; not Ready.
+- Open decisions: 0.
+- Product Owner action required: no.
+
+Gate correction:
+
+- Prior MD-05 QA/review/architecture acceptance evidence remains historical but cannot be used for final acceptance after the failed Playwright smoke and subsequent rework.
+- MD-05 must rerun Playwright, then Team 04 QA, Team 10 review, Architect Signoff, delegated PO acceptance, and scoped staging before any local commit.
+
+Teams ready to pick up new tasks:
+
+- Team 05: standby for MD-05 rework follow-up if the next smoke rerun fails.
+- Team 04: ready for MD-05 QA rerun after deterministic validation.
+- Team 10: ready for MD-05 re-review after QA acceptance.
+- Team 03: ready for MD-05 re-signoff after Team 10 acceptance; otherwise no new TSC-03A source work until Today Review writer releases.
+- Team 07: ready to run `TSC-02A` developer validation when memory drops below 90%.
+- Team 02: no new fresh requirement drafting needed now; confirmed `TSC-03A` is the next bounded no-schema candidate.
+
 ## Latest Team 00 Routing Update - TREV Commit And BT-04 Signoff
 
 Date: 2026-05-24

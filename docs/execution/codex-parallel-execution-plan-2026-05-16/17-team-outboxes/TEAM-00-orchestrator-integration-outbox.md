@@ -1,5 +1,42 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - MD-05 Rework / Resource Gate
+
+Date: 2026-05-24
+
+Status:
+
+- Branch: `dev`.
+- Main worktree: clean after docs checkpoints.
+- Open decisions: 0.
+- Product Owner action required: no.
+- Push performed: no.
+
+Current gate state:
+
+- `CF-W1-MD-05` is back in `Rejected / Rework` after Team 00 reran the required `market-data-foundation.spec.ts` Playwright smoke when memory dropped below 90%.
+- The rerun failed 5 of 10 tests. The original `ACCEPT_WITH_RESOURCE_GAP`, Team 10 `ACCEPT`, and Architect `ACCEPT` are no longer sufficient for final acceptance because the resource gap resolved into real UI-smoke failures.
+- Team 05 completed bounded rework in `C:\work\repo\investment-scanner-worktrees\team05-CF-W1-MD-05`.
+- Rework root cause: UI tests did not mock `GET /api/v1/market-data/prices/backfill-active-run`, allowing local active backfill state to disable `Sync Catalog`; `Data Through` was also too late in the wide catalog table for reliable smoke visibility.
+- Rework changed only `MarketDataFoundationPage.tsx`, `market-data-foundation.spec.ts`, and MD-05 reporting docs.
+- Rework validation is still blocked by memory at roughly 94% used. Do not commit MD-05 until Playwright rerun passes, then Team 04 QA, Team 10 review, Architect Signoff, delegated PO acceptance, and scoped staging all rerun or explicitly reaffirm after the rework.
+
+Parallel state:
+
+- `CF-W1-TSC-02A-TREV-HEALTH` implementation is complete in `C:\work\repo\investment-scanner-worktrees\team07-CF-W1-TSC-02A-TREV-HEALTH`, but executable developer validation was skipped because memory stayed above 90%. It is not QA-ready yet.
+- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` remains the next legitimate no-schema Today Review candidate, but it is blocked by the active `TSC-02A` Today Review writer set.
+- `CF-W1-SQLAB-02B` architecture is prepared and committed in active docs as storage-consent-gated; it is not Ready.
+- Team 02 fresh-gap audit confirmed no new requirement should be invented while `TSC-03A` is already the next bounded candidate.
+
+Teams ready to pick up new tasks:
+
+- Team 05: standby for further MD-05 rework only if the next Playwright rerun still fails.
+- Team 04: ready for MD-05 QA rerun after Playwright passes or after Team 00 records a deterministic validation result.
+- Team 10: ready for MD-05 re-review after Team 04 accepts the rework.
+- Team 03: ready for MD-05 re-signoff after Team 10 accepts; otherwise parked.
+- Team 07: must run `TSC-02A` developer validation once memory is below 90%.
+- Team 02: no new drafting needed right now; next real candidate is already `TSC-03A`.
+
 ## Latest Runtime Checkpoint - MD-05 Priority / TSC-02A Prep
 
 Date: 2026-05-24

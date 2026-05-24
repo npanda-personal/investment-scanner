@@ -1,6 +1,40 @@
 # Team 00 Coordination Cycle Latest
 
-Date: 2026-05-20
+Date: 2026-05-24
+
+## Latest Runtime Checkpoint - MD-05 Rework / TSC-02A Resource Gate
+
+Date: 2026-05-24
+
+Current status:
+
+- Branch: `dev`.
+- Main worktree: clean after active-docs checkpoints.
+- Open decisions: 0.
+- Product Owner action required: no.
+- Push performed: no.
+
+Gate movement:
+
+- `CF-W1-MD-05` implementation, QA, review, and architecture initially progressed, but Team 00 reran the required Market Data Playwright smoke after the memory gate cleared.
+- That smoke failed 5 of 10 tests, so MD-05 is back in `Rejected / Rework`; no delegated PO acceptance, commit, or push is authorized.
+- Team 05 completed bounded rework in the same worktree. Root cause was unmocked active price-backfill state disabling `Sync Catalog` and wide-table `Data Through` placement making row freshness copy unreliable in smoke.
+- Rework validation remains blocked by current memory around 94%; rerun the single market-data Playwright smoke when memory falls below 90%.
+- `CF-W1-TSC-02A-TREV-HEALTH` implementation is complete but executable validation is also resource-gated; it is not QA-ready.
+- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` remains queued behind the Today Review writer set.
+
+Active agents:
+
+None after closing completed Team 05/02/03/04/10/03 agents. New heavy validation agents should wait until memory is below 90%.
+
+Teams ready to pick up new tasks:
+
+- Team 05: standby for more MD-05 rework if Playwright still fails.
+- Team 04: ready for MD-05 QA rerun after Playwright passes.
+- Team 10: ready for MD-05 re-review after Team 04 accepts.
+- Team 03: ready for MD-05 re-signoff after Team 10 accepts.
+- Team 07: ready to run `TSC-02A` developer validation when memory is below 90%.
+- Team 02: no new drafting needed; latest audit confirmed `TSC-03A` is the next bounded no-schema candidate.
 
 ## Latest Runtime Checkpoint - TREV Commit, BT-04 Review, Rolling Queue
 
