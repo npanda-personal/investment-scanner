@@ -20,14 +20,15 @@ Current gate state:
 - `CF-W1-SIG-LATEST-01` was reconciled as already accepted from 2026-05-17 and removed from fresh-candidate routing.
 - `CF-W2-TSC-04` remains planning-only and cannot implement until the Today Review writer set is free.
 - `CF-W2-BT-05` completed Team 03 architecture prep and Team 04 QA planning; Team 00 promoted it to Team 06 in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-BT-05`.
+- Team 04 QA rejected the first BT-05 handoff on a compile blocker: `invalidationStatus` was narrowed to `UNSUPPORTED | MISSING` and then compared with `SUPPORTED`. Team 06 rework is active and must preserve the rule that invalidation evidence remains missing/unsupported unless explicit proof exists.
 - `CF-W2-TSC-05` was added as planning-only follow-up for no-target ranking / eligibility semantics.
 
 Teams ready to pick up new tasks:
 
 - Team 07: complete bounded `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` rework now.
-- Team 06: implement `CF-W2-BT-05` now in the dedicated stacked Backtesting worktree.
+- Team 06: complete bounded `CF-W2-BT-05` compile-blocker rework now in the dedicated stacked Backtesting worktree.
 - Team 04: QA rerun after Team 07 rework handoff.
-- Team 04: QA verification after Team 06 `BT-05` handoff.
+- Team 04: QA rerun after Team 06 `BT-05` rework handoff.
 - Team 10: review after QA acceptance.
 - Team 03: Architect Signoff after review acceptance; otherwise prepare `CF-W2-TSC-05` after Today Review writer release.
 - Team 02: rolling direct investor/trader-value discovery, reading root `AGENTS.md` first.

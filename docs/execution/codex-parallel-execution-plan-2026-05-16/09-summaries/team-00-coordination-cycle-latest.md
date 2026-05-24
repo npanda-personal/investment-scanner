@@ -22,18 +22,19 @@ Gate movement:
 - `CF-W1-SIG-LATEST-01` is already accepted from 2026-05-17; Team 00 corrected the Top 10 queues so it is no longer routed as fresh work.
 - `CF-W2-TSC-04` stays planning-only until the active Today Review writer set is free.
 - `CF-W2-BT-05` completed Team 03 architecture prep and Team 04 QA planning, then Team 00 promoted it to Team 06 as a bounded backend-only stacked Backtesting implementation slice.
+- Team 04 QA rejected the first BT-05 handoff on compile blocker `TS2367`; Team 06 rework is active and must keep invalidation evidence missing/unsupported unless explicit proof exists.
 - `CF-W2-TSC-05` was added by Team 02 as a planning-only no-target ranking / eligibility reframe requirement.
 
 Active agents:
 
 - Team 07 rework agent `019e5bae-5f24-7143-8e1a-c033d0a46130`: `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` bounded QA fixes.
-- Team 06 implementation agent `019e5baa-669e-7621-8809-06fc9d392ed0`: `CF-W2-BT-05`.
+- Team 06 rework agent `019e5bb6-bb61-7243-bd55-625c2c02f857`: `CF-W2-BT-05` compile-blocker fix.
 
 Teams ready to pick up new tasks:
 
-- Team 06: implement `CF-W2-BT-05` in the dedicated stacked Backtesting worktree.
+- Team 06: complete `CF-W2-BT-05` compile-blocker rework in the dedicated stacked Backtesting worktree.
 - Team 04: QA rerun after Team 07 rework handoff.
-- Team 04: QA verification after Team 06 `BT-05` handoff.
+- Team 04: QA rerun after Team 06 `BT-05` rework handoff.
 - Team 10: review after QA acceptance.
 - Team 03: Architect Signoff after Team 10 acceptance; otherwise prepare next Today Review no-target packet after file release.
 - Team 02: rolling direct investor/trader-value discovery, reading root `AGENTS.md` first.
