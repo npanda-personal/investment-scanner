@@ -240,6 +240,27 @@ Date: 2026-05-20
 - Team 03: pick up Architect Signoff after Team 10 acceptance.
 - Team 02: pick up rolling requirements discovery when Team 00 frees a slot.
 
+## Runtime Queue Snapshot
+
+Date: 2026-05-24
+
+| Slot | Team | Agent | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | `019e59c5-8123-74e2-b027-16bcd2e7baa5` | QA verification | `CF-W1-STRAT-04` | active |
+| 2 | Team 04 - QA Factory | `019e59c5-c4e4-7881-b09c-16c0b65ecd4c` | QA verification | `CF-W1-SQLAB-03` | active |
+| 3 | Open slot | none | queued review | Team 10 review for first QA-accepted handoff | waiting |
+| 4 | Open slot | none | queued signoff | Team 03 Architect Signoff after Team 10 acceptance | waiting |
+| 5 | Open slot | none | queued source inspection | Team 00 `CF-W1-TSC-01A` Ready evaluation | waiting for current gates |
+| 6 | Open slot | none | queued docs | Team 02/03 refinement if TSC source inspection finds a gap | waiting |
+
+Teams ready to pick up new tasks:
+
+- Team 04: active `STRAT-04` QA verification.
+- Team 04: active `SQLAB-03` QA verification.
+- Team 10: ready for review after QA acceptance.
+- Team 03: ready for Architect Signoff after Team 10 acceptance.
+- Team 00: source inspection and Ready evaluation for `CF-W1-TSC-01A` after current gates.
+
 ## Relaunch Update
 
 Date: 2026-05-20

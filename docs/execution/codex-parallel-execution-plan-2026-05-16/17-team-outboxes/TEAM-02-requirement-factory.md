@@ -1,8 +1,35 @@
 # TEAM-02 Requirement Factory
 
+## Team 02 Product Direction Reframe - Trusted Signal Candidates - 2026-05-24
+
+Product Owner redirected signal workflow priority away from Trade Plan, R:R, arbitrary targets, synthetic targets, and target-price framing.
+
+Files changed by Team 00 on behalf of the requirement lane:
+
+- `10-requirements/CF-W1-TSC-01-trusted-signal-candidate-workflow-requirement.md`
+- `10-requirements/CF-W1-TP-03-trade-plan-proof-snapshot-freshness-labels-for-generated-plans-requirement.md`
+- `10-requirements/top-10-ready-candidates.md`
+- `10-requirements/next-top-10-candidates.md`
+- `10-requirements/refinement-queue.md`
+- `10-requirements/requirements-backlog.md`
+
+Requirement changes:
+
+- Added `CF-W1-TSC-01` as the new top product-direction requirement.
+- Anchored the first slice on `/today-review`.
+- Defined candidate groups: `Highly Trusted`, `Trusted but Needs Review`, `Watch Only`, and `Blocked`.
+- Defined health states: `Active`, `Healthy`, `Weakening`, `Risk Warning`, `Exit Triggered`, `Invalidated`, `Expired`, and `Blocked`.
+- Marked `CF-W1-TP-03` paused/stale as framed. Do not execute Trade Plan proof-snapshot freshness work unless it is reframed into Trusted Signal Candidate health with no R:R, arbitrary targets, synthetic targets, or Trade Plan-first UX.
+
+Next recommended Ready-promotion candidate:
+
+- `CF-W1-TSC-01A` after Team 00 source inspection, exact file reservations, and sequencing against accepted `CF-W1-L3-TREV-02` branch commit `f1de1d5`.
+
+---
+
 Date: 2026-05-20
 
-Status: Requirement refinement pass completed for the Team 01 follow-up audit. Root `AGENTS.md` was read first and used as the governing product constitution. This remains a docs-only routing view. Team 00 still owns Ready movement, exact file reservations, and one-writer sequencing.
+Status: Requirement refinement pass completed for the Team 01 follow-up audit and the backtesting proof-basis refresh. Root `AGENTS.md` was read first and used as the governing product constitution. This remains a docs-only routing view. Team 00 still owns Ready movement, exact file reservations, and one-writer sequencing.
 
 ## Current Pass
 
@@ -35,6 +62,17 @@ Product Owner action:
 
 - No immediate Product Owner decision is required for the draft requirement records.
 - Product Owner approval is required later if either item leaves additive module-local scope.
+
+## 2026-05-20 Additional Audit: Backtesting Proof-Basis Refresh
+
+Team 02 also reviewed the latest backtesting trust evidence after the Team 01 follow-up draft pass.
+
+Result:
+
+- `audit-backtesting-proof-basis-2026-05-20.md` confirms `CF-W1-BT-03` remains parked and should not re-enter fresh discovery.
+- That audit reinforces `CF-W1-BT-04` as the fresh backtesting follow-on because the queue still needs a compact current-proof label on saved runs.
+- No new backtesting requirement ID was created in this pass.
+- The current top five remain unchanged.
 
 ## 2026-05-20 Additional Audit: Stock Research Workbench Scope Behavior
 

@@ -340,6 +340,15 @@ Old work items in `docs/codex-agent-team-plan/` may be used only as evidence or 
 | CF-W1-STRAT-04 | Strategy trust/readiness implementation | Team 06 | Active implementation | Dedicated Team 06 worktree | Team 04 QA is queued after handoff. |
 | CF-W1-SQLAB-03 | Signal Quality Lab implementation | Team 06 | Active implementation | Dedicated Team 06 worktree | Team 04 QA is queued after handoff. |
 
+## Team 00 Checkpoint - 2026-05-24 Trusted Signal Candidate Goal
+
+| ID | Work Item | Owner | State | Scope | Notes |
+|---|---|---|---|---|---|
+| CF-W1-TSC-01 | Trusted Signal Candidate Workflow | Teams 02, 03, 04, 00 | Requirement / Architecture / QA Path Drafted | Active execution docs | `/today-review` is the preferred first surface. No app-code implementation is Ready yet. |
+| CF-W1-TP-03 | Trade Plan proof snapshot freshness | Team 00 | Paused / Stale As Framed | Active execution docs | Product Owner rejected Trade Plan/R:R/target-first direction. Do not execute unless reframed into Trusted Signal Candidate health without targets/R:R. |
+| CF-W1-STRAT-04 | Strategy evidence freshness | Team 04 | QA Verification | Team 06 STRAT-04 worktree | Team 04 QA verification relaunched as `019e59c5-8123-74e2-b027-16bcd2e7baa5`. |
+| CF-W1-SQLAB-03 | Signal Quality review-loop actionability | Team 04 | QA Verification | Team 06 SQLAB-03 worktree | Team 04 QA verification relaunched as `019e59c5-c4e4-7881-b09c-16c0b65ecd4c`. |
+
 ## Autonomous Orchestrator Setup
 
 | ID | Work Item | Owner | State | Scope | Notes |

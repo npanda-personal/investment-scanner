@@ -1,8 +1,8 @@
 # Requirements Backlog
 
-Date: 2026-05-20
+Date: 2026-05-24
 
-Status: Team 00 corrected after RH-03 acceptance, the `7bad648` catalog-freshness hotfix, and branch-evidence verification. Product Owner priority remains direct investor/trader value first: market-data freshness/provenance, data-quality readiness, signals/triggers, strategy/rules, trade-plan research support, backtesting, calibration, market/historical context, and research explainability.
+Status: Team 00 updated after Product Owner redirected the workflow toward Trusted Signal Candidates and away from Trade Plan, R:R, arbitrary targets, and target-price framing. Product Owner priority remains direct investor/trader value first: market-data freshness/provenance, data-quality readiness, signals/triggers, strategy/rules, trusted candidate health, backtesting, calibration, market/historical context, and research explainability.
 
 Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-02A` are accepted parked branch commits, not fresh backlog-front items.
 
@@ -10,12 +10,13 @@ Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-
 
 | ID | Why it matters now | Next gate |
 | --- | --- | --- |
+| `CF-W1-TSC-01` | `/today-review` should become the Trusted Signal Candidate workflow: high-trust counts, rule-triggered entry price, reason summary, health, and rule-based exit/invalidation without R:R or targets. | Team 00 source inspection and Ready evaluation for a bounded `TSC-01A` child after QA plan/file reservations are confirmed. |
 | `CF-W1-HCTX-03` | Historical context needs age and provenance warnings so nearest snapshots do not read like same-day evidence. | Team 03 architecture contract and QA planning. |
 | `CF-W1-DQ-03` | Downstream trust consumers need a compact residual reason summary instead of raw DQ arrays. | Team 03 architecture contract and QA planning. |
 | `CF-W1-MCTX-02` | Market Context needs an explicit persisted-versus-generated freshness basis label. | Team 03 architecture contract and QA planning. |
 | `CF-W1-STRAT-04` | Strategy evidence needs freshness and stale-summary labels so compact summaries do not overclaim recency. | Team 03 architecture contract and QA planning. |
 | `CF-W1-SQLAB-03` | Signal Quality Lab needs review-loop actionability for noisy and limited outcomes. | Team 03 architecture contract and QA planning. |
-| `CF-W1-TP-03` | Trade Plan generated plans need proof snapshot freshness labels so older plan snapshots do not read like current proof. | Team 03 architecture contract and QA planning; keep first child additive and no-schema. |
+| `CF-W1-TP-03` | Paused/stale as framed; Trade Plan proof snapshot freshness does not match the new Trusted Signal Candidate direction. | Do not execute unless reframed into signal health with no R:R, targets, or Trade Plan-first UX. |
 | `CF-W1-BT-04` | Backtesting saved runs need freshness/current-proof labels so older simulations do not read like latest proof. | Team 03 architecture contract and QA planning; keep first child additive and no-schema. |
 | `CF-W1-DQ-02` residual parent | `DQ-02A` currentness evidence is accepted, but read-side/public-contract residual scope remains split-required. | Team 03 should identify a bounded no-schema follow-up or keep the parent blocked. |
 | `CF-W1-L3-DQ-01A` | Passive Lane 3 readiness display still needs truthful contract semantics. | Keep contract-only unless Team 03/04 define a bounded child. |
@@ -25,16 +26,22 @@ Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-
 
 | Rank | ID | State | Why now |
 | --- | --- | --- | --- |
-| 1 | `CF-W1-HCTX-03` | Draft | Fresh nearest-snapshot age and provenance warnings are the clearest historical-context trust gap. |
-| 2 | `CF-W1-DQ-03` | Draft | Residual reason summary is the cleanest downstream trust gap on top of current DQ outputs. |
-| 3 | `CF-W1-MCTX-02` | Draft | Persisted-versus-generated freshness basis labels are needed on the Market Context review surface. |
-| 4 | `CF-W1-STRAT-04` | Draft | Strategy evidence freshness and stale-summary labels keep compact summaries honest. |
-| 5 | `CF-W1-SQLAB-03` | Draft | Review-loop actionability is the next useful Signal Quality trust surface. |
-| 6 | `CF-W1-TP-03` | Draft | Trade Plan proof snapshots need explicit current/stale labeling on generated plans. |
-| 7 | `CF-W1-BT-04` | Draft | Backtesting saved runs need explicit freshness/current-proof labeling. |
+| 1 | `CF-W1-TSC-01` | Draft | Trusted Signal Candidates are now the primary workflow direction for daily signal review. |
+| 2 | `CF-W1-HCTX-03` | Accepted branch commit | Fresh nearest-snapshot age and provenance warnings are accepted and parked as `f6034c6`. |
+| 3 | `CF-W1-DQ-03` | Draft | Residual reason summary is the cleanest downstream trust gap on top of current DQ outputs. |
+| 4 | `CF-W1-MCTX-02` | Accepted branch commit | Persisted-versus-generated freshness basis labels are accepted and parked as `0c802c2`. |
+| 5 | `CF-W1-STRAT-04` | Implementation gate active | Strategy evidence freshness and stale-summary labels keep compact summaries honest. |
+| 6 | `CF-W1-SQLAB-03` | Implementation gate active | Review-loop actionability is the next useful Signal Quality trust surface. |
+| 7 | `CF-W1-BT-04` | Architecture prepared | Backtesting saved runs need explicit freshness/current-proof labeling. |
 | 8 | `CF-W1-DQ-02` residual parent | Split-required | Remaining read-side/public-contract scope after accepted `DQ-02A`. |
 | 9 | `CF-W1-L3-DQ-01A` | Contract-only | Lane 3 passive readiness DTOs still matter, but not as the next fresh implementation pull. |
 | 10 | `CF-W1-MD-02A` | Proposal-only | Market-data evidence storage remains gated. |
+
+## Rolling Audit Notes
+
+- The 2026-05-20 `audit-backtesting-proof-basis-2026-05-20.md` confirms `CF-W1-BT-03` stays parked and does not become a fresh Team 02 discovery item.
+- That same audit reinforces `CF-W1-BT-04` as the next backtesting trust slice because the queue still needs a compact current-proof label on saved runs.
+- No new evidence from the backtesting refresh outranks the current top five.
 
 ## Active Or Parked Exclusions
 

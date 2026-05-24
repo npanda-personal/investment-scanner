@@ -1,6 +1,140 @@
 # Team 03 Architecture Factory Outbox
 
+## Team 03 Architecture Reframe - Trusted Signal Candidates - 2026-05-24
+
+Product Owner redirected signal workflow priority away from Trade Plan, R:R, arbitrary targets, synthetic targets, and target-price framing.
+
+Files changed by Team 00 on behalf of the architecture lane:
+
+- `03-architecture/CF-W1-TSC-01-architecture-review.md`
+- `06-contracts/CF-W1-TSC-01-trusted-signal-candidate-contract.md`
+- `08-work-packets/CF-W1-TSC-01-work-packet.md`
+- `04-qa/CF-W1-TSC-01-qa-plan.md`
+- `03-architecture/CF-W1-TP-03-architecture-review.md`
+- `06-contracts/CF-W1-TP-03-trade-plan-proof-snapshot-freshness-contract.md`
+- `08-work-packets/CF-W1-TP-03-work-packet.md`
+
+Architecture decision:
+
+- Prepare `CF-W1-TSC-01` as a Today Review-first, read-path/additive workflow.
+- Do not create a disconnected new page for the first slice.
+- Avoid `trade-plan-risk-engine` source changes in the first child unless a later approved child explicitly reframes that module away from target/R:R semantics.
+- `CF-W1-TP-03` is paused/stale as framed and is no longer architecture-ready for implementation.
+
+Next recommended architecture gate:
+
+- Team 00 should inspect current Today Review source/tests and decide whether `CF-W1-TSC-01A` stacks on accepted `CF-W1-L3-TREV-02` branch commit `f1de1d5` or waits for branch integration.
+
+---
+
 Date: 2026-05-17
+
+## Team 03 Rolling Architecture Prep - TP-03 / BT-04 And DQ-02 Residual Check - 2026-05-20
+
+Assignment: continue rolling architecture preparation for the highest-value unassigned investor/trader work after checking whether any live Architect Signoff was still waiting in the active integration queue, without touching application code/tests, Prisma, package manifests, route registries, shared utilities/UI, generated files, requirements, QA plans, ready queue, or historical planning folders.
+
+Queue result before prep:
+
+- No live Team 03 Architect Signoff was still waiting in the active integration flow at this pass.
+- Latest Team 00 runtime evidence already shows accepted branch commits for:
+  - `CF-W1-HCTX-03` -> `f6034c6`
+  - `CF-W1-L3-TREV-02` -> `f1de1d5`
+  - `CF-W1-MCTX-02` -> `0c802c2`
+  - `CF-W1-SQLAB-02A` -> `abac241`
+- `CF-W1-STRAT-04` and `CF-W1-SQLAB-03` are already in active Team 06 implementation and were excluded from fresh architecture prep.
+- `CF-W1-DQ-03` already has Team 03 architecture, Team 04 QA planning, and remains the highest unassigned already-prepared direct-value packet.
+
+Updated:
+
+- `03-architecture/CF-W1-TP-03-architecture-review.md`
+- `06-contracts/CF-W1-TP-03-trade-plan-proof-snapshot-freshness-contract.md`
+- `08-work-packets/CF-W1-TP-03-work-packet.md`
+- `03-architecture/CF-W1-BT-04-architecture-review.md`
+- `06-contracts/CF-W1-BT-04-backtesting-run-current-proof-freshness-contract.md`
+- `08-work-packets/CF-W1-BT-04-work-packet.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Read-only evidence inspected:
+
+- root `AGENTS.md`
+- latest Team 00 runtime / active board routing notes
+- `10-requirements/top-10-ready-candidates.md`
+- `10-requirements/next-top-10-candidates.md`
+- `10-requirements/CF-W1-TP-03-trade-plan-proof-snapshot-freshness-labels-for-generated-plans-requirement.md`
+- `10-requirements/CF-W1-BT-04-backtesting-run-freshness-and-current-proof-labels-requirement.md`
+- `10-requirements/CF-W1-DQ-02-dq-currentness-evidence-requirement.md`
+- adjacent Team 03 architecture/work-packet patterns for `TP-01A`, `TP-02`, `BT-03`, and `DQ-02`
+- current `trade-plan-risk-engine` backend/frontend source and focused tests
+- current `backtesting-strategy-lab` backend/frontend source and focused tests
+- current `DQ-02` residual-parent architecture review
+- git branch containment for accepted parked commits:
+  - Trade Plan: `309a853`, `1222daf`
+  - Backtesting: `8f984b1`
+
+Architecture verdict by item:
+
+1. `CF-W1-DQ-03`
+   - verdict: already prepared earlier in this execution folder
+   - state now: highest unassigned direct-value packet already holding Team 03 architecture plus Team 04 QA planning
+   - no new Team 03 docs were needed in this pass
+
+2. `CF-W1-TP-03`
+   - verdict: `ARCHITECTURE-READY-CANDIDATE`
+   - direct-value boundary: backend-only is technically possible but not honest enough for the user-visible trust gap; the smallest useful packet is module-owned backend plus feature-local Trade Plan list/detail UI
+   - module owners:
+     - backend `trade-plan-risk-engine`
+     - frontend `trade-plan-risk-engine`
+   - exact future writer set:
+     - `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.service.ts`
+     - `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.types.ts`
+     - `backend/src/modules/trade-plan-risk-engine/trade-plan-risk-engine.md`
+     - `backend/tests/modules/trade-plan-risk-engine/trade-plan-risk-engine.service.test.ts`
+     - `backend/tests/trade-plan-risk-engine.paper-readiness.test.ts`
+     - `frontend/src/features/trade-plan-risk-engine/types.ts`
+     - `frontend/src/features/trade-plan-risk-engine/components/TradePlanTable.tsx`
+     - `frontend/src/features/trade-plan-risk-engine/components/TradePlanDetail.tsx`
+     - `frontend/tests/ui/trade-plan-risk-engine.spec.ts`
+   - hard dependency: stack on accepted `CF-W1-TP-01A` commit `309a853`, which already contains accepted `CF-W1-TP-02` commit `1222daf`
+   - stop/split trigger: any repository, route, shared UI, generated, Prisma, or upstream-module source requirement
+
+3. `CF-W1-BT-04`
+   - verdict: `ARCHITECTURE-READY-CANDIDATE`
+   - direct-value boundary: backend-only is technically possible but not honest enough for the saved-run trust gap; the smallest useful packet is module-owned backend plus feature-local saved-run/detail UI
+   - module owners:
+     - backend `backtesting-strategy-lab`
+     - frontend `backtesting-strategy-lab`
+   - exact future writer set:
+     - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.ts`
+     - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.types.ts`
+     - `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+     - `backend/tests/modules/backtesting-strategy-lab/backtesting-strategy-lab.service.test.ts`
+     - `frontend/src/features/backtesting-strategy-lab/types.ts`
+     - `frontend/src/features/backtesting-strategy-lab/components/BacktestingStrategyLabPage.tsx`
+     - `frontend/tests/ui/backtesting-strategy-lab.spec.ts`
+   - hard dependency: stack on accepted `CF-W1-BT-03` commit `8f984b1`
+   - stop/split trigger: any repository, route, shared UI, generated, Prisma, or new validation-engine requirement
+
+4. `CF-W1-DQ-02` residual parent
+   - verdict: `BLOCKED`
+   - reason: the remaining value is read-side/public-contract consistency on persisted DQE list/summary/diagnostics surfaces; there is no honest new no-schema/no-route/no-repository child after accepted `CF-W1-DQ-02A`
+   - Team 03 recommendation: keep the residual parent blocked until Team 00 explicitly opens a DQE repository/read-side consent packet stacked on accepted `c2d6753`
+
+Shared-file and one-writer implications:
+
+- `TP-03` and `BT-04` do not open shared route-registry, shared UI, shared utility, package, or generated-file writer scope.
+- Both are still single-writer packets because each one overlaps its module's accepted parked branch exactly.
+- Team 00 must keep them out of plain `dev` and out of parallel writer passes:
+  - `TP-03` cannot run in parallel with any other `trade-plan-risk-engine` source packet
+  - `BT-04` cannot run in parallel with any other `backtesting-strategy-lab` source packet
+
+Recommended Team 00 routing after this pass:
+
+1. keep `CF-W1-DQ-03` as the top already-prepared unassigned direct-value packet
+2. send Team 04 QA planning next for `CF-W1-TP-03`
+3. send Team 04 QA planning after that for `CF-W1-BT-04`
+4. keep `CF-W1-DQ-02` residual parent blocked until an explicit DQE read-side consent packet is opened
+
+No tests, builds, Prisma commands, services, providers, UI checks, commits, or pushes were run.
 
 ## Team 03 STRAT-04 + SQLAB-03 Fresh Architecture Readiness Prep - 2026-05-20
 

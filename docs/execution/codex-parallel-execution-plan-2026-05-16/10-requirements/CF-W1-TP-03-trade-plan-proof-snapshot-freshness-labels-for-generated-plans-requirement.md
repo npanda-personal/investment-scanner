@@ -2,9 +2,15 @@
 
 Date: 2026-05-20
 
+Update: 2026-05-24
+
 ## Status
 
-Audit-derived requirement draft. Refinement-only. Not Ready for Implementation.
+Paused / stale as framed. Not Ready for Implementation.
+
+Product Owner redirected the workflow away from Trade Plan, R:R, arbitrary targets, synthetic targets, and target-price framing. Do not execute this requirement as a Trade Plan proof-snapshot freshness implementation.
+
+This requirement may be revisited only if it is reframed as Trusted Signal Candidate health/evidence support with no Trade Plan-first UX, no R:R, and no arbitrary target semantics.
 
 ## Product Value
 

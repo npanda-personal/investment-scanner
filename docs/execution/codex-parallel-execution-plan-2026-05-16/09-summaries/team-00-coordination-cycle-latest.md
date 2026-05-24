@@ -157,6 +157,30 @@ Next coordination actions:
 
 Product Owner action required: no.
 
+## Trusted Signal Candidate Goal Execution
+
+Date: 2026-05-24
+
+- Product Owner goal set: evolve the app away from Trade Plan, R:R, arbitrary targets, synthetic targets, and target-price framing.
+- New requirement path: `CF-W1-TSC-01 - Trusted Signal Candidate Workflow`.
+- First-slice preference: `/today-review` as the primary daily workflow surface.
+- Candidate groups: `Highly Trusted`, `Trusted but Needs Review`, `Watch Only`, `Blocked`.
+- Signal health states: `Active`, `Healthy`, `Weakening`, `Risk Warning`, `Exit Triggered`, `Invalidated`, `Expired`, `Blocked`.
+- `CF-W1-TP-03` is paused/stale as framed and must not be implemented as Trade Plan proof-snapshot freshness.
+- Team 04 QA verification relaunched:
+  - `CF-W1-STRAT-04`: `019e59c5-8123-74e2-b027-16bcd2e7baa5`
+  - `CF-W1-SQLAB-03`: `019e59c5-c4e4-7881-b09c-16c0b65ecd4c`
+
+Teams ready to pick up new tasks:
+
+- Team 04: active `STRAT-04` QA verification.
+- Team 04: active `SQLAB-03` QA verification.
+- Team 10: review after QA acceptance.
+- Team 03: Architect Signoff after Team 10 acceptance.
+- Team 00: inspect source and evaluate `CF-W1-TSC-01A` Ready status after current gates.
+
+Product Owner action required: no.
+
 ## Rolling Lane Relaunch
 
 Date: 2026-05-20
