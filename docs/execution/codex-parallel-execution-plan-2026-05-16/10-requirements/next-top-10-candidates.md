@@ -6,22 +6,24 @@ Status: Team 02 rolling PO refresh after source/docs audit. Product priority is 
 
 Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-02A` are already accepted and locally committed parked branches. They must not be presented as fresh implementation pulls.
 
-Team 02 audit update: `CF-W1-MD-05` and `CF-W1-TSC-02A-TREV-HEALTH` remain active and must not be reassigned as fresh pulls. Source/docs inspection also found residual Today Review target/reward and Trade Plan-style language plus a Backtesting take-profit simulation/evidence ambiguity; those are captured as new planning-only requirements `CF-W2-TSC-04` and `CF-W2-BT-05`.
+Team 02 audit update: `CF-W1-MD-05`, `CF-W1-TSC-02A-TREV-HEALTH`, and `CF-W2-SIG-01A` have moved through implementation/validation gates and must not be reassigned as fresh pulls. Source/docs inspection also found residual Today Review target/reward and Trade Plan-style language plus a Backtesting take-profit simulation/evidence ambiguity; those are captured as new planning-only requirements `CF-W2-TSC-04` and `CF-W2-BT-05`.
+
+Team 00 correction: `CF-W1-SIG-LATEST-01` is not a current candidate. It was accepted under standing delegation on 2026-05-17 and is documented in `09-summaries/CF-W1-SIG-LATEST-01-summary.md`, `09-summaries/CF-W1-SIG-LATEST-01-po-acceptance-packet.md`, and gate evidence under `03-architecture/`, `04-qa/`, and `13-implementation-evidence/`.
 
 ## Current Priority Order
 
 | Rank | ID | Current state | Why it matters now | Next Team 00 action |
 | --- | --- | --- | --- | --- |
-| 1 | `CF-W1-MD-05` | Promoted / assigned | Catalog sync freshness ambiguity directly undermines trust in all downstream signals, backtests, and Today Review. It is a bounded no-schema fix for session freshness and skip-reason explainability. | Team 05 implementation in dedicated worktree; do not reassign. |
-| 2 | `CF-W1-TSC-02A-TREV-HEALTH` | Promoted / assigned | Today Review active-signal health is the next downstream workflow after candidate adoption, but it must stack on Team 07 commit `9fbc989`. | Team 07 implementation in dedicated stacked worktree; do not reassign. |
-| 3 | `CF-W1-TSC-03` | Requirement draft | After DQ, calibration, and backtesting trust slices, the user needs one Today Review supporting-evidence chain showing DQ, calibration readiness, and backtesting proof currentness without a new score or target framing. | Route to Team 03 architecture prep after `TSC-02A`; keep out of Ready. |
-| 4 | `CF-W2-SIG-01A` | Requirement-ready evidence flow | Signal generation runs should fail closed on missing/unavailable DQ by default before downstream candidates trust generated output. | Team 00 should evaluate Ready promotion after active gates clear; Team 03/04 can refresh evidence if needed. |
-| 5 | `CF-W1-SIG-LATEST-01` | Requirement-ready evidence flow | Instrument detail/latest-signal reads must not expose legacy or auto-generated trusted-looking signals without DQ readiness evidence. | Team 00 should evaluate after `CF-W2-SIG-01A` or combine only if file reservations stay isolated. |
-| 6 | `CF-W2-TSC-04` | New planning-only requirement | Today Review source/docs still expose target/reward and Trade Plan-style language that conflicts with the trusted signal candidate direction. | Route to Team 03/04 for a bounded no-target Today Review language/UX contract after `TSC-02A`. |
-| 7 | `CF-W2-BT-05` | New planning-only requirement | Backtesting exit evidence must separate documented rule exits/invalidation from optional take-profit simulation assumptions before supporting candidate health. | Route to Team 03 after signal DQ gates; keep planning-only. |
-| 8 | `CF-W1-DQ-02` residual parent | Blocked by architecture consent boundary | Team 03 found no honest second no-schema child after accepted `DQ-02A`; the residual value requires an explicit DQE persisted read-side/public-contract packet. | Keep blocked from implementation until Team 00 opens a DQE read-side/public-contract packet. |
-| 9 | `CF-W1-MD-02A` | Consent-gated proposal | Durable market-data evidence storage remains high-value upstream trust work, but it is still docs-only until schema consent opens. | Keep proposal-only; use only for Team 03 / Team 04 packet prep when consent is intentionally opened. |
-| 10 | `CF-W1-SQLAB-02B` | Consent-gated proposal | Durable Signal Quality learning memory would strengthen research continuity and calibration review after current trust slices. | Keep proposal-only unless Team 00 deliberately opens storage consent. |
+| 1 | `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` | Implementation in progress | Today Review needs a compact supporting-evidence chain showing DQ, calibration readiness, and backtesting proof currentness without a new score or target framing. | Team 07 active in `C:\work\repo\investment-scanner-worktrees\t7-tsc03a`; no parallel Today Review writer. |
+| 2 | `CF-W2-TSC-04` | Planning-only requirement | Today Review source/docs still expose target/reward and Trade Plan-style language that conflicts with the trusted signal candidate direction. | Hold implementation until `TSC-03A` releases Today Review files; Team 03/04 may prepare docs-only bounded contract/QA. |
+| 3 | `CF-W2-BT-05` | Planning-only requirement | Backtesting exit evidence must separate documented rule exits/invalidation from optional take-profit simulation assumptions before supporting candidate health. | Route to Team 03 architecture prep now; writer set is disjoint from active Today Review work. |
+| 4 | `CF-W1-DQ-02` residual parent | Blocked by architecture consent boundary | Team 03 found no honest second no-schema child after accepted `DQ-02A`; the residual value requires an explicit DQE persisted read-side/public-contract packet. | Keep blocked from implementation until Team 00 opens a DQE read-side/public-contract packet. |
+| 5 | `CF-W1-MD-02A` | Consent-gated proposal | Durable market-data evidence storage remains high-value upstream trust work, but it is still docs-only until schema consent opens. | Keep proposal-only; use only for Team 03 / Team 04 packet prep when consent is intentionally opened. |
+| 6 | `CF-W1-SQLAB-02B` | Consent-gated proposal | Durable Signal Quality learning memory would strengthen research continuity and calibration review after current trust slices. | Keep proposal-only unless Team 00 deliberately opens storage consent. |
+| 7 | `OPEN-PO-DISCOVERY-01` | Rolling PO discovery | The queue needs more direct investor/trader-value candidates beyond the active Today Review and Backtesting planning items. | Team 02 should audit Market Data, DQ, Signal Generation, Backtesting, Calibration, and Today Review for fresh value. |
+| 8 | `OPEN-ARCH-PREP-01` | Rolling architecture prep | Architect capacity should stay active when no signoff packet is waiting. | Team 03 should prepare the next non-overlapping direct-value contract or signoff packet. |
+| 9 | `CF-W2-SIG-01A` | Accepted / local branch commit | Signal generation run-path DQ fail-closed behavior has passed gates and was locally committed on Team 06 branch as `24f938b`. | Do not reassign; merge/release only under the active release policy. |
+| 10 | `CF-W1-SIG-LATEST-01` | Accepted / historical gate evidence | Latest instrument DQ gate was accepted on 2026-05-17. | Do not reassign or treat as fresh Ready work. |
 
 ## Dispatch Notes
 
@@ -34,7 +36,8 @@ Team 02 audit update: `CF-W1-MD-05` and `CF-W1-TSC-02A-TREV-HEALTH` remain activ
 - `CF-W1-TP-03` is paused/stale as framed because Product Owner rejected Trade Plan-first, R:R, and arbitrary target workflow direction. Do not execute it unless reframed into Trusted Signal Candidate health without targets/R:R.
 - `CF-W1-BT-04` is no longer an unassigned requirement-ready item; it is accepted and locally committed on the Team 06 branch as `2bd794f`.
 - `CF-W1-TSC-03` is a new Team 02 draft and should be the next Today Review supporting-trust architecture-prep candidate after `TSC-02A`.
-- `CF-W2-SIG-01A` and `CF-W1-SIG-LATEST-01` are the next signal-side DQ enforcement candidates. They should not bypass Team 00 Ready promotion, but they now outrank admin, notification, and Copilot convenience work.
+- `CF-W2-SIG-01A` has completed validation and local evidence commit `24f938b`; do not reopen it unless new source evidence proves a regression.
+- `CF-W1-SIG-LATEST-01` is already accepted from 2026-05-17; do not route it as fresh implementation.
 - `CF-W2-TSC-04` and `CF-W2-BT-05` are new planning-only requirements from the 2026-05-24 rolling PO audit.
 - The 2026-05-20 backtesting proof-basis audit keeps `CF-W1-BT-03` parked and reinforces `CF-W1-BT-04` as the fresh backtesting current-proof slice.
 - `CF-W1-RH-03` is accepted and locally committed as `5bd176b`; do not treat it as a fresh Team 02 pull.

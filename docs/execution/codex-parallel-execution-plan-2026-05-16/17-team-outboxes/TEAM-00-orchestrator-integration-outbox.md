@@ -1,5 +1,35 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - SIG-01A Closed / TSC-03A Active
+
+Date: 2026-05-24
+
+Status:
+
+- Branch: `dev`.
+- Main worktree: active execution docs only after queue correction; no application source edits by Team 00.
+- Open decisions: 0.
+- Product Owner action required: no.
+- Push performed: no.
+
+Current gate state:
+
+- `CF-W2-SIG-01A` is accepted through QA, Team 10 review, Architect Signoff, delegated PO acceptance, staged-scope verification, and local Team 06 branch commit `24f938b docs: accept signal dq fail-closed validation`.
+- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` is active with Team 07 in `C:\work\repo\investment-scanner-worktrees\t7-tsc03a`, stacked on accepted `34c9993`.
+- `CF-W1-SIG-LATEST-01` was reconciled as already accepted from 2026-05-17 and removed from fresh-candidate routing.
+- `CF-W2-TSC-04` remains planning-only and cannot implement until the Today Review writer set is free.
+- `CF-W2-BT-05` is the next safe non-overlapping architecture-prep item.
+
+Teams ready to pick up new tasks:
+
+- Team 07: continue `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` implementation now.
+- Team 04: QA verification after Team 07 developer handoff.
+- Team 10: review after QA acceptance.
+- Team 03: architecture prep for `CF-W2-BT-05` while no signoff packet is waiting.
+- Team 02: rolling direct investor/trader-value discovery, reading root `AGENTS.md` first.
+
+---
+
 ## Latest Runtime Checkpoint - MD-05 Rework / Resource Gate
 
 Date: 2026-05-24

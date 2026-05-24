@@ -129,8 +129,16 @@ rg -n "R:R|reward/risk|profit target|price target|target price|target / reward|b
 - `CF-W1-BT-04` completed Team 06 implementation, Team 04 QA, Team 10 review, Architect Signoff, delegated PO acceptance, staged-scope verification, and scoped local Team 06 branch commit `2bd794f feat: add backtesting proof freshness labels`.
 - `CF-W1-MD-05` completed all gates and is committed on Team 05 branch as `93c29e2 feat: add catalog sync freshness explainability`.
 - `CF-W1-TSC-02A-TREV-HEALTH` completed all gates and is committed on Team 07 branch as `34c9993 feat: add today review active signal health`.
+- `CF-W2-SIG-01A` completed all gates and is committed on Team 06 branch as `24f938b docs: accept signal dq fail-closed validation`.
 - `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` is promoted and assigned to Team 07, stacked on accepted `34c9993`.
 - `CF-W1-DQ-02B` is blocked from implementation pending explicit DQE read-side/public-contract reopening; no source reservation is active.
+
+2026-05-24 Team 00 queue correction:
+
+- `CF-W1-SIG-LATEST-01` is already accepted from 2026-05-17 and must not be treated as a current Ready candidate.
+- No unassigned application-code item is waiting in Ready.
+- `CF-W2-TSC-04` is planning-only and must not start until active Today Review writer `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` releases the shared file set.
+- `CF-W2-BT-05` is eligible for Team 03 architecture prep, not implementation.
 
 2026-05-24 Team 00 Ready promotion - `CF-W1-MD-05`:
 

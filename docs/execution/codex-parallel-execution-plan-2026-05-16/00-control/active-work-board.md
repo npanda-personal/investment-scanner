@@ -34,7 +34,7 @@ No historical active work items have been migrated as active.
 - Rejected / Rework
 - Deferred
 
-## Latest Team 00 Routing Update - MD-05 / TSC-02A Closure And SIG-01A Promotion
+## Latest Team 00 Routing Update - SIG-01A Closure And TSC-03A Active Implementation
 
 Date: 2026-05-24
 
@@ -42,37 +42,37 @@ Completed branch commits:
 
 - `CF-W1-MD-05`: accepted through QA, Team 10 review, Architect Signoff, delegated PO acceptance, staged-scope verification, and committed on `codex/team05-market-data/CF-W1-MD-05` as `93c29e2 feat: add catalog sync freshness explainability`.
 - `CF-W1-TSC-02A-TREV-HEALTH`: accepted through QA, Team 10 review, Architect Signoff, delegated PO acceptance, staged-scope verification, and committed on `codex/team07-portfolio-alerts/CF-W1-TSC-02A-TREV-HEALTH` as `34c9993 feat: add today review active signal health`.
+- `CF-W2-SIG-01A`: accepted through QA, Team 10 review, Architect Signoff, delegated PO acceptance, staged-scope verification, and committed on `codex/team06-strategy-signal/CF-W2-SIG-01A` as `24f938b docs: accept signal dq fail-closed validation`.
 
-Current Ready promotion:
+Current implementation:
 
-- `CF-W2-SIG-01A`: promoted to Team 06 for bounded Signal Generation run-path Data Quality fail-closed implementation/validation.
-- Routing note: current `dev` already appears to contain prior run-path DQ enforcement behavior. Team 06 must inspect current source first, implement only proved gaps inside the exact reservation, and otherwise produce a no-app-change developer handoff with focused validation evidence.
-- Branch recommendation: `codex/team06-strategy-signal/CF-W2-SIG-01A`.
-- Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SIG-01A`.
-- Base recommendation: current `dev` at Team 00 docs checkpoint.
 - `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`: promoted to Team 07 for bounded Today Review supporting-trust evidence implementation.
 - Branch recommendation: `codex/team07-portfolio-alerts/CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`.
 - Worktree: `C:\work\repo\investment-scanner-worktrees\t7-tsc03a` (shortened from the recommended name because Windows path length blocked checkout of long requirement filenames).
 - Required base: accepted `CF-W1-TSC-02A-TREV-HEALTH` commit `34c9993 feat: add today review active signal health`.
 - Base decision: use explicit unavailable/missing states for absent `DQ-03`, `CAL-01A`, or `BT-04` fields instead of recreating upstream logic.
 
+Current rolling prep:
+
+- `CF-W2-TSC-04`: planning-only Today Review no-target language cleanup; implementation blocked until `TSC-03A` releases Today Review files.
+- `CF-W2-BT-05`: planning-only Backtesting rule exit/invalidation evidence; safe for Team 03 architecture prep because it is disjoint from active Today Review work.
+- `CF-W1-SIG-LATEST-01`: already accepted from 2026-05-17; not a fresh candidate.
+
 Current state:
 
 - `CF-W1-MD-05`: Committed on implementation branch; no push.
 - `CF-W1-TSC-02A-TREV-HEALTH`: Committed on implementation branch; no push.
-- `CF-W2-SIG-01A`: Ready for Team 06 implementation/validation in a dedicated worktree.
-- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`: Ready for Team 07 implementation in a dedicated stacked worktree.
+- `CF-W2-SIG-01A`: Committed on Team 06 branch; no push.
+- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`: Implementation in progress with Team 07 in a dedicated stacked worktree.
 - Open decisions: 0.
 - Product Owner action required: no.
 
 Teams ready to pick up new tasks:
 
-- Team 06: `CF-W2-SIG-01A` implementation/validation now.
-- Team 07: `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` implementation now.
-- Team 04: QA verification after Team 06 handoff.
+- Team 07: continue `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` implementation now.
 - Team 04: QA verification after Team 07 handoff.
 - Team 10: review after QA acceptance.
-- Team 03: Architect Signoff after Team 10 acceptance; otherwise architecture prep for the next direct-value item.
+- Team 03: architecture prep for `CF-W2-BT-05` while no signoff packet is waiting.
 - Team 02: continue rolling requirements discovery focused on direct investor/trader value.
 
 ## Latest Team 00 Routing Update - MD-05 Rework And TSC-02A Resource Gate
