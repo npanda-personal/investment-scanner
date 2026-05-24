@@ -221,6 +221,15 @@
 - Admin, settings, auth/subscription, notifications, and alert convenience work are lowest priority unless they block correctness, privacy, user-data safety, or an already accepted branch gate.
 - The next safe docs-only handoff is `CF-W1-BT-02` architecture/contract refresh, followed by historical context, market context, calibration, signal-quality learning, Strategy Framework provenance, DQ currentness, Trade Plan readiness, and Market Data durable-readiness ADR prep.
 
+## Team 00 SIG-01A Ready Promotion Risk Decisions - 2026-05-24
+
+- `CF-W2-SIG-01A` is promoted only as a backend-only Signal Generation run-path Data Quality fail-closed implementation/validation slice.
+- Current `dev` appears to already contain prior run-path DQ enforcement behavior; Team 06 must inspect first and avoid app-code churn when focused validation proves the current behavior already satisfies the requirement.
+- Allowed files are limited to Signal Generation service, validation, and focused Signal Generation service/validation/DQ invariant tests.
+- Data Quality Engine, Market Data, Signal Generation types/repository/controller/router/module/index, Prisma/schema/migrations, route registries, frontend, shared utilities/UI, package manifests, generated files, provider/live/startup/backfill, paid/cloud, broker, telemetry, and credential scope remain blocked.
+- Explicit `useDataQualityFilter: false` must remain a legacy/research bypass and must not be described as trusted DQ enforcement.
+- Any target-price, synthetic target, `R:R`, Trade Plan-first, buy/sell, guarantee, or financial-advice wording is a QA/review reject.
+
 ## Team 00 HCTX Ready Promotion Risk Decisions - 2026-05-18
 
 - `CF-W1-HCTX-01` is promoted only as a backend-only `historical-context-snapshots` lookup-explainability slice.

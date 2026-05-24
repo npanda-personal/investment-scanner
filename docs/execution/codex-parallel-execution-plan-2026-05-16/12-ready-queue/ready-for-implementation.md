@@ -6,12 +6,65 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+2026-05-24 Team 00 Ready promotion - `CF-W2-SIG-01A`:
+
+- `CF-W2-SIG-01A` is promoted and assigned to Team 06 as a bounded Signal Generation run-path Data Quality fail-closed implementation/validation slice.
+- Purpose: ensure Signal Generation run requests default to DQ filtering and fail closed when DQ evidence is missing or DQ filtering is unavailable.
+- Routing note: current `dev` already appears to contain prior run-path DQ enforcement behavior. Team 06 must inspect current source first, implement only proved gaps inside the exact reservation, and otherwise produce a no-app-change developer handoff with focused validation evidence.
+- Parallel-safety decision: safe to run after `CF-W1-MD-05` and `CF-W1-TSC-02A` branch commits because the Signal Generation writer set is disjoint from Market Data and Today Review.
+- Branch recommendation: `codex/team06-strategy-signal/CF-W2-SIG-01A`.
+- Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SIG-01A`.
+- Base recommendation: current `dev` at Team 00 docs checkpoint.
+- Gate evidence:
+  - Requirement: `10-requirements/CF-W2-SIG-01A-signal-generation-run-path-dq-fail-closed-requirement.md`
+  - Architecture review: `03-architecture/CF-W2-SIG-01A-architecture-review.md`
+  - Contract: `06-contracts/CF-W2-SIG-01A-signal-generation-run-path-dq-fail-closed-contract.md`
+  - Work packet: `08-work-packets/CF-W2-SIG-01A-work-packet.md`
+  - QA plan: `04-qa/CF-W2-SIG-01A-qa-plan.md`
+  - Open decisions: none.
+- Allowed implementation files:
+  - `backend/src/modules/signal-generation-engine/signal-generation-engine.service.ts`
+  - `backend/src/modules/signal-generation-engine/signal-generation-engine.validation.ts`
+  - `backend/tests/modules/signal-generation-engine/signal-generation-engine.service.test.ts`
+  - `backend/tests/modules/signal-generation-engine/signal-generation-engine.validation.test.ts`
+  - `backend/tests/modules/signal-generation-engine/signal-generation-dq-enforcement.invariants.test.ts`
+- Allowed reporting docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-CF-W2-SIG-01A-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W2-SIG-01A-developer-handoff.md`
+- Forbidden scope:
+  - Data Quality Engine source/tests
+  - Market Data source/tests
+  - Signal Generation types/repository/controller/router/module/index files unless Team 00 reopens the reservation
+  - Prisma schema or migrations
+  - backend or frontend route registries
+  - shared backend utilities or shared frontend components
+  - package manifests
+  - generated/common fixtures
+  - all frontend files
+  - provider/live-data, Angel One, broker, paid service, startup/backfill, telemetry, credential, or UI files
+  - target price, synthetic target, R:R, Trade Plan-first, buy/sell, guarantee, or financial-advice wording
+- Required validation:
+
+```powershell
+cd backend
+npm.cmd test -- signal-generation-engine.service.test.ts signal-generation-engine.validation.test.ts signal-generation-dq-enforcement.invariants.test.ts --runInBand
+npm.cmd run build
+```
+
+- Required language guard:
+
+```powershell
+rg -n "targetPrice|profitTarget|priceTarget|rewardRiskRatio|R:R|buy now|sell now|guaranteed|financial advice" backend/src/modules/signal-generation-engine backend/tests/modules/signal-generation-engine
+```
+
+- Stop if implementation requires any forbidden file, a new Data Quality Engine public contract, response type changes, route/schema/shared/package/frontend/provider/live/startup/backfill changes, or if another active writer owns a reserved Signal Generation file.
+
 2026-05-24 Team 00 status update:
 
 - `CF-W1-TSC-01A-TREV` completed QA, Team 10 review, Architect Signoff, delegated PO acceptance, staged-scope verification, and scoped local branch commit `9fbc989 feat: add trusted signal candidates to today review`.
 - `CF-W1-BT-04` completed Team 06 implementation, Team 04 QA, Team 10 review, Architect Signoff, delegated PO acceptance, staged-scope verification, and scoped local Team 06 branch commit `2bd794f feat: add backtesting proof freshness labels`.
-- `CF-W1-MD-05` is promoted and assigned to Team 05 as the highest-priority upstream trust fix for stale catalog-sync freshness messaging.
-- `CF-W1-TSC-02A-TREV-HEALTH` is promoted and assigned to Team 07 as an independent stacked Today Review child. It must stack on Team 07 branch commit `9fbc989`, not plain `dev`.
+- `CF-W1-MD-05` completed all gates and is committed on Team 05 branch as `93c29e2 feat: add catalog sync freshness explainability`.
+- `CF-W1-TSC-02A-TREV-HEALTH` completed all gates and is committed on Team 07 branch as `34c9993 feat: add today review active signal health`.
 - `CF-W1-TSC-03` is a new Team 02 requirement draft and is not Ready. It waits behind `CF-W1-TSC-02A` and Team 03 architecture prep.
 - `CF-W1-DQ-02B` is blocked from implementation pending explicit DQE read-side/public-contract reopening; no source reservation is active.
 

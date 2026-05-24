@@ -730,6 +730,14 @@ Product Owner action required: no.
 | 5 | Open slot | none | pending | Team 00 `CF-W1-CAL-01A` Ready evaluation and sequencing against `CF-W1-CAL-01` | waiting |
 | 6 | Open slot | none | pending | Team 04 `CF-W1-RH-01` QA verification after Team 08 handoff | waiting |
 
+## Latest Routing - 2026-05-24
+
+- `CF-W1-MD-05`: committed on Team 05 branch as `93c29e2 feat: add catalog sync freshness explainability`; no push.
+- `CF-W1-TSC-02A-TREV-HEALTH`: committed on Team 07 branch as `34c9993 feat: add today review active signal health`; no push.
+- `CF-W2-SIG-01A`: promoted to Team 06 implementation/validation in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SIG-01A`.
+- Open decisions: zero.
+- Product Owner action required: no.
+
 ## Routing
 
 - `CF-W1-SIG-02`: complete through all gates and locally committed. Do not push; keep parked for later clean integration.

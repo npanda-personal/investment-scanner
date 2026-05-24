@@ -34,6 +34,40 @@ No historical active work items have been migrated as active.
 - Rejected / Rework
 - Deferred
 
+## Latest Team 00 Routing Update - MD-05 / TSC-02A Closure And SIG-01A Promotion
+
+Date: 2026-05-24
+
+Completed branch commits:
+
+- `CF-W1-MD-05`: accepted through QA, Team 10 review, Architect Signoff, delegated PO acceptance, staged-scope verification, and committed on `codex/team05-market-data/CF-W1-MD-05` as `93c29e2 feat: add catalog sync freshness explainability`.
+- `CF-W1-TSC-02A-TREV-HEALTH`: accepted through QA, Team 10 review, Architect Signoff, delegated PO acceptance, staged-scope verification, and committed on `codex/team07-portfolio-alerts/CF-W1-TSC-02A-TREV-HEALTH` as `34c9993 feat: add today review active signal health`.
+
+Current Ready promotion:
+
+- `CF-W2-SIG-01A`: promoted to Team 06 for bounded Signal Generation run-path Data Quality fail-closed implementation/validation.
+- Routing note: current `dev` already appears to contain prior run-path DQ enforcement behavior. Team 06 must inspect current source first, implement only proved gaps inside the exact reservation, and otherwise produce a no-app-change developer handoff with focused validation evidence.
+- Branch recommendation: `codex/team06-strategy-signal/CF-W2-SIG-01A`.
+- Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SIG-01A`.
+- Base recommendation: current `dev` at Team 00 docs checkpoint.
+
+Current state:
+
+- `CF-W1-MD-05`: Committed on implementation branch; no push.
+- `CF-W1-TSC-02A-TREV-HEALTH`: Committed on implementation branch; no push.
+- `CF-W2-SIG-01A`: Ready for Team 06 implementation/validation in a dedicated worktree.
+- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`: next Today Review candidate after TSC-02A, now eligible for Team 00 Ready evaluation once SIG-01A dispatch is stable.
+- Open decisions: 0.
+- Product Owner action required: no.
+
+Teams ready to pick up new tasks:
+
+- Team 06: `CF-W2-SIG-01A` implementation/validation now.
+- Team 04: QA verification after Team 06 handoff.
+- Team 10: review after QA acceptance.
+- Team 03: Architect Signoff after Team 10 acceptance; otherwise architecture prep for the next direct-value item.
+- Team 02: continue rolling requirements discovery focused on direct investor/trader value.
+
 ## Latest Team 00 Routing Update - MD-05 Rework And TSC-02A Resource Gate
 
 Date: 2026-05-24

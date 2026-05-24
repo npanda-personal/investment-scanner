@@ -2,6 +2,94 @@
 
 Date: 2026-05-20
 
+## Latest Assignment Override - 2026-05-24 SIG-01A
+
+Team 00 promotes `CF-W2-SIG-01A` as a bounded Signal Generation implementation/validation item.
+
+Work item:
+
+- `CF-W2-SIG-01A` - Signal Generation run-path Data Quality fail-closed behavior.
+
+Branch / worktree:
+
+- Branch: `codex/team06-strategy-signal/CF-W2-SIG-01A`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SIG-01A`
+- Base: current local `dev` at Team 00 docs checkpoint.
+
+Routing note:
+
+- Current `dev` already appears to contain prior run-path DQ enforcement behavior. Inspect current source first.
+- If current behavior fully satisfies the requirement, do not churn app code; produce the developer handoff with focused validation evidence.
+- If gaps exist, fix only inside the allowed reservation below.
+
+Evidence to use:
+
+- Requirement: `10-requirements/CF-W2-SIG-01A-signal-generation-run-path-dq-fail-closed-requirement.md`
+- Architecture review: `03-architecture/CF-W2-SIG-01A-architecture-review.md`
+- Contract: `06-contracts/CF-W2-SIG-01A-signal-generation-run-path-dq-fail-closed-contract.md`
+- Work packet: `08-work-packets/CF-W2-SIG-01A-work-packet.md`
+- QA plan: `04-qa/CF-W2-SIG-01A-qa-plan.md`
+- Ready handoff: `12-ready-queue/ready-for-implementation.md`
+
+Allowed files:
+
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.service.ts`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.validation.ts`
+- `backend/tests/modules/signal-generation-engine/signal-generation-engine.service.test.ts`
+- `backend/tests/modules/signal-generation-engine/signal-generation-engine.validation.test.ts`
+- `backend/tests/modules/signal-generation-engine/signal-generation-dq-enforcement.invariants.test.ts`
+
+Allowed reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-CF-W2-SIG-01A-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W2-SIG-01A-developer-handoff.md`
+
+Required behavior:
+
+- Omitted `useDataQualityFilter` defaults to `true`.
+- Explicit `useDataQualityFilter: false` remains preserved as legacy/research bypass and is not claimed as trusted DQ enforcement.
+- Missing DQ behavior defaults to `SKIP`.
+- Strict DQ-filtered runs pass only DQ-ready instruments to generation.
+- DQ filter exceptions fail closed with zero generated signals and zero attempted generation.
+- DQ-excluded and missing-evaluation instruments count as skipped/excluded by DQ, not generation failures.
+- Eligible generated signals preserve DQ eligibility evidence where current DTO behavior supports it.
+- No target-price, R:R, synthetic target, direct advice, guaranteed-outcome, or Trade Plan-first wording is introduced.
+
+Forbidden files:
+
+- Data Quality Engine source/tests
+- Market Data source/tests
+- Signal Generation types/repository/controller/router/module/index files unless Team 00 reopens the reservation
+- Prisma schema or migrations
+- generated files
+- backend or frontend route registries
+- all frontend files
+- shared backend utilities or shared frontend components
+- package manifests
+- provider/live-data, Angel One, broker, paid service, startup/backfill, telemetry, credential, or UI files
+
+Required validation:
+
+```powershell
+cd backend
+npm.cmd test -- signal-generation-engine.service.test.ts signal-generation-engine.validation.test.ts signal-generation-dq-enforcement.invariants.test.ts --runInBand
+npm.cmd run build
+```
+
+Required language guard:
+
+```powershell
+rg -n "targetPrice|profitTarget|priceTarget|rewardRiskRatio|R:R|buy now|sell now|guaranteed|financial advice" backend/src/modules/signal-generation-engine backend/tests/modules/signal-generation-engine
+```
+
+Expected handoff:
+
+- Update `17-team-outboxes/TEAM-06-CF-W2-SIG-01A-outbox.md`.
+- Create/update `18-integration-queue/CF-W2-SIG-01A-developer-handoff.md`.
+- Record exact branch/worktree, base commit, changed files, inspected files, behavior changed, tests run, skipped checks, forbidden files confirmed untouched, risks, blockers, and next gate: Team 04 QA Verification.
+
+Stop and return to Team 00 if implementation needs any forbidden file, response type changes, a new Data Quality Engine public contract, route/schema/shared/package/frontend/provider/live/startup/backfill changes, or target/R:R/advice semantics.
+
 ## Latest Assignment Override - 2026-05-24 BT-04
 
 Team 00 promotes `CF-W1-BT-04` as an independent Team 06 implementation item while Team 07 continues `CF-W1-TSC-01A-TREV` rework.

@@ -530,6 +530,35 @@ Product Owner action required: no.
 
 ---
 
+# Runtime Checkpoint - MD-05 / TSC-02A Closure And SIG-01A Dispatch
+
+Date: 2026-05-24
+
+## Completed Gates
+
+- `CF-W1-MD-05` accepted and locally committed on `codex/team05-market-data/CF-W1-MD-05` as `93c29e2 feat: add catalog sync freshness explainability`.
+- `CF-W1-TSC-02A-TREV-HEALTH` accepted and locally committed on `codex/team07-portfolio-alerts/CF-W1-TSC-02A-TREV-HEALTH` as `34c9993 feat: add today review active signal health`.
+- No push performed.
+
+## New Ready Dispatch
+
+- `CF-W2-SIG-01A` promoted to Team 06 for bounded Signal Generation run-path DQ fail-closed implementation/validation.
+- Branch: `codex/team06-strategy-signal/CF-W2-SIG-01A`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SIG-01A`.
+- Current-source note: prior DQ enforcement behavior appears present on `dev`; Team 06 must inspect first and implement only proved gaps inside the reservation.
+
+## Teams Ready To Pick Up New Tasks
+
+- Team 06: `CF-W2-SIG-01A` implementation/validation now.
+- Team 04: QA verification after Team 06 handoff.
+- Team 10: review after QA acceptance.
+- Team 03: Architect Signoff after Team 10 acceptance, or rolling architecture prep if no signoff is ready.
+- Team 02: rolling direct investor/trader-value requirement discovery.
+
+Product Owner action required: no.
+
+---
+
 # Team 00 Trusted Signal Candidate Goal Execution Checkpoint
 
 Date: 2026-05-24
