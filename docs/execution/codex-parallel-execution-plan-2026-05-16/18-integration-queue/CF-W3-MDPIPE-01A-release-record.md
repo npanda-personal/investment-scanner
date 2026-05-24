@@ -4,7 +4,7 @@ Date: 2026-05-25
 
 Work item: `CF-W3-MDPIPE-01A-MDF-OFFICIAL-EOD`
 
-State: Accepted; scoped local commit pending.
+State: Accepted and locally committed.
 
 ## Files Changed
 
@@ -69,4 +69,4 @@ Reverting the scoped commit restores the scheduled Market Data path to per-symbo
 
 ## Commit
 
-Local commit SHA: pending until scoped staging and commit complete.
+Local implementation commit SHA: `b0c1ab7 feat: add official eod bulk market data sync`.

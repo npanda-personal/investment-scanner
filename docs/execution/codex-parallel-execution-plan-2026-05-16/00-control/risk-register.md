@@ -69,7 +69,7 @@
 ## Current Blockers
 
 - `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` and `CF-W2-BT-05` are no longer active blockers; both completed QA, review, Architect Signoff, delegated PO acceptance, and scoped local branch commits on 2026-05-24.
-- `CF-W3-MDPIPE-01A-MDF-OFFICIAL-EOD` is no longer blocked: Team 05 rework, Team 04 QA rerun, Team 10 re-review, Architect re-signoff, and delegated PO acceptance all completed on 2026-05-25; scoped local commit is pending.
+- `CF-W3-MDPIPE-01A-MDF-OFFICIAL-EOD` is no longer blocked: Team 05 rework, Team 04 QA rerun, Team 10 re-review, Architect re-signoff, delegated PO acceptance, and scoped local implementation commit `b0c1ab7` all completed on 2026-05-25.
 - Market Data durable readiness evidence is incomplete for full contract compliance.
 - `CF-W1-DQ-02B` is blocked from implementation because Team 03 found the residual `DQ-02` value requires an explicit DQE persisted read-side/public-contract packet after accepted `DQ-02A`; no honest second no-schema service-local child exists.
 - Current Market Data natural-key behavior is symbol/date-centric and narrower than the active contract target.

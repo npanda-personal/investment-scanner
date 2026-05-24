@@ -63,14 +63,13 @@ Ready promotion:
 - Team 10 re-review accepted the rework.
 - Team 03 Architect re-signoff accepted the rework.
 - Team 00 delegated PO acceptance is recorded.
-- Scoped local commit is pending.
+- Scoped local commit completed: `b0c1ab7 feat: add official eod bulk market data sync`.
 - Scope is Market Data Foundation latest EOD bulk path only; no downstream orchestration in this slice.
 - Open decisions: 0.
 - Product Owner action required: no for Slice 1.
 
 Teams ready to pick up new tasks:
 
-- Team 00: scoped staging and local commit for `CF-W3-MDPIPE-01A`.
 - Team 02: prepare next direct investor/trader-value requirement slice after commit.
 - Team 03: prepare next architecture packet after commit, prioritizing Market Data pipeline ledger / DQ stage only if the true consent gates are opened.
 

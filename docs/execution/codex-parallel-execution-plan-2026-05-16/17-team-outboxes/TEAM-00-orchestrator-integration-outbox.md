@@ -21,7 +21,7 @@ Completed in this checkpoint:
 
 Current implementation:
 
-- `CF-W3-MDPIPE-01A-MDF-OFFICIAL-EOD`: Team 05 implementation complete; Team 04 QA accepted; Team 10 review rejected for bounded rework; Team 05 rework complete; Team 04 QA rerun accepted; Team 10 re-review accepted; Team 03 Architect re-signoff accepted; delegated PO acceptance recorded.
+- `CF-W3-MDPIPE-01A-MDF-OFFICIAL-EOD`: Team 05 implementation complete; Team 04 QA accepted; Team 10 review rejected for bounded rework; Team 05 rework complete; Team 04 QA rerun accepted; Team 10 re-review accepted; Team 03 Architect re-signoff accepted; delegated PO acceptance recorded; scoped local commit `b0c1ab7 feat: add official eod bulk market data sync` completed.
 - Scope: Market Data Foundation service/repository/types/docs/tests only.
 - Forbidden: Prisma/schema, route registry, shared utility/UI, package/generated, frontend, downstream modules, provider credentials, live provider runs, startup/backfill expansion, durable pipeline ledger.
 - Rework assignment: Team 05 worker `019e5c2e-69b9-7621-8170-f3d14594d916` completed and closed.
@@ -38,13 +38,12 @@ Validation:
 
 Teams ready to pick up new tasks:
 
-- Team 00: scoped staging and local commit now.
 - Team 02: rolling investor/trader-value requirements after Market Data hot path is stabilized.
 - Team 03: next architecture packet after commit, with durable pipeline ledger / DQ stage requiring explicit gate handling.
 
 Next action:
 
-- Stage the accepted `CF-W3-MDPIPE-01A` scope exactly, verify staged files, and create one local commit. Do not push.
+- Resume next planning/architecture work. Do not push.
 
 ---
 

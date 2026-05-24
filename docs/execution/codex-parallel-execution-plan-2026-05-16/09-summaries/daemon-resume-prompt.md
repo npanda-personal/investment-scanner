@@ -69,7 +69,7 @@ Current status:
 - Open decisions: none.
 - Product Owner action required: no.
 - Ready queue: no unassigned Ready implementation item is waiting.
-- `CF-W3-MDPIPE-01A-MDF-OFFICIAL-EOD` is accepted through Team 05 implementation/rework, Team 04 QA rerun, Team 10 re-review, Team 03 Architect re-signoff, and Team 00 delegated PO acceptance; scoped local commit is pending.
+- `CF-W3-MDPIPE-01A-MDF-OFFICIAL-EOD` is accepted through Team 05 implementation/rework, Team 04 QA rerun, Team 10 re-review, Team 03 Architect re-signoff, Team 00 delegated PO acceptance, and scoped local implementation commit `b0c1ab7 feat: add official eod bulk market data sync`.
 - Team 03 Architect and read-only explorer completed the pipeline redesign/audit and were closed.
 - First slice scope is Market Data Foundation official NSE EOD bulk latest-candle ingestion only.
 - The Team 10 cross-exchange rejection was resolved: BSE / `.BO` / non-NSE / ambiguous tasks skip official NSE matching and fall back to provider ingestion.

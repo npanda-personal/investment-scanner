@@ -9,7 +9,7 @@ No available application-code item is currently waiting unassigned in Ready.
 2026-05-25 Team 00 Ready promotion - `CF-W3-MDPIPE-01A-MDF-OFFICIAL-EOD`:
 
 - `CF-W3-MDPIPE-01A-MDF-OFFICIAL-EOD` is promoted and assigned to Team 05 as the first bounded Market Data Foundation implementation slice for the incremental data-load redesign.
-- Current gate state: accepted through Team 04 QA rerun, Team 10 re-review, Team 03 Architect re-signoff, and Team 00 delegated PO acceptance; scoped local commit pending.
+- Current gate state: accepted through Team 04 QA rerun, Team 10 re-review, Team 03 Architect re-signoff, Team 00 delegated PO acceptance, and scoped local commit `b0c1ab7 feat: add official eod bulk market data sync`.
 - Purpose: replace the current broad-universe latest-candle dependence on per-symbol provider calls with one official NSE EOD bulk-file attempt for scheduled `IN/STOCK` latest-candle catch-up.
 - Parallel-safety decision: no other active writer owns Market Data Foundation files in this shared workspace; Team 00 has assigned one Team 05 worker for this reservation.
 - Branch/worktree: shared `dev` workspace for this hot-path fix, with one writer and strict staged-scope checks before any commit.

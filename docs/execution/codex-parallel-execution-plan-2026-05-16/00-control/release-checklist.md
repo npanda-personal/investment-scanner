@@ -45,7 +45,7 @@ No requirement is released until Product Owner acceptance and release evidence a
 
 Date: 2026-05-25
 
-Status: Accepted; scoped local commit pending.
+Status: Accepted and locally committed as `b0c1ab7 feat: add official eod bulk market data sync`.
 
 Evidence:
 
