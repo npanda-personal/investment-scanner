@@ -4,7 +4,7 @@ Date: 2026-05-24
 
 Owner: Team 02 - Product / Requirement Factory
 
-Status: Requirement Draft - Blocked From Implementation By Missing Rule-Triggered Entry Price Evidence
+Status: Parent Requirement Draft - First Child Identified; Not Ready For Implementation
 
 ## Product Goal
 
@@ -96,13 +96,23 @@ If the first implementation requires persistence, route registry changes, shared
 
 Read-only source inspection found that current Today Review can support identity, state, grade, confidence score, rank, strategy proof snapshot, Data Quality snapshot, run/trust status, signal/calibration/smart-money snapshots, and market context snapshot.
 
-However, the Product Owner requires high-trust candidates to include a source-proven rule-triggered entry price. Current source does not prove that field:
+However, the Product Owner requires high-trust candidates to include a source-proven rule-triggered entry price. At the time of this original source mapping, Today Review did not prove that field:
 
 - Today Review has entry zones/reference prices, not a rule-triggered entry price.
-- Current Signal Trigger contract marks `trigger_price` unavailable.
+- Signal Trigger contract compatibility output marked `trigger_price` unavailable.
 - Trigger timestamp and rule IDs are also not source-proven in Today Review snapshots.
 
-Therefore a `Highly Trusted` candidate must remain blocked or absent until rule-triggered entry price evidence is available. Do not invent an entry price from target zones, reference prices, Trade Plan geometry, or R:R fields.
+Therefore a `Highly Trusted` candidate had to remain blocked or absent until rule-triggered entry price evidence was available. Do not invent an entry price from target zones, reference prices, Trade Plan geometry, or R:R fields.
+
+## Source Mapping Update - 2026-05-24
+
+`CF-W1-SIG-TRIGGER-ENTRY-01` is now accepted and locally committed as `649e645 feat: add signal trigger entry price evidence`.
+
+That closes the upstream Signal Generation evidence gap, but it does not by itself approve Today Review classification changes. The first downstream child can now be reframed as:
+
+`CF-W1-TSC-01A - Today Review trusted signal candidate adoption`
+
+This child should adopt source-proven trigger evidence into `/today-review`, classify candidates conservatively, and keep missing evidence visible. It remains Not Ready for Implementation until Team 03 architecture, Team 04 QA planning, exact file reservations, current source inspection, and Team 00 Ready promotion are complete.
 
 ## Acceptance Criteria
 
@@ -126,8 +136,8 @@ Therefore a `Highly Trusted` candidate must remain blocked or absent until rule-
 
 ## Next Gate
 
-Team 00 should keep `CF-W1-TSC-01` out of Ready until rule-triggered entry price evidence is source-proven or a Product Owner/Architect decision explicitly accepts a zero-highly-trusted first slice.
+Team 00 should keep the parent `CF-W1-TSC-01` out of direct implementation and route the first implementation path through `CF-W1-TSC-01A`.
 
-The likely upstream dependency is the existing Signal Trigger evidence line, including `CF-W1-SIG-TRIGGER-02` or a future child that can provide trusted `trigger_price`, trigger timestamp, and rule provenance without schema/route/shared scope drift unless separately approved.
+The upstream Signal Generation evidence dependency is now satisfied by `CF-W1-SIG-TRIGGER-ENTRY-01`, but Today Review still needs an architecture-approved adoption path before any `Highly Trusted` classification can ship.
 
 Team 00 must not promote implementation until requirement, architecture, QA, file reservations, current source inspection, no-conflict checks, and source-proven trigger price evidence pass.

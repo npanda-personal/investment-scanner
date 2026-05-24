@@ -1,5 +1,67 @@
 # TEAM-02 Requirement Factory
 
+## Team 02 Rolling PO Requirement Report - TSC-01A - 2026-05-24
+
+Root `AGENTS.md` intake completed. Product direction remains: direct investor/trader value first, no Trade Plan-first framing, no R:R, no arbitrary targets, no direct financial advice, and `/today-review` is the preferred daily signal-review cockpit.
+
+### Result For Team 00
+
+`CF-W1-TSC-01` can be reframed into a first bounded child now that `CF-W1-SIG-TRIGGER-ENTRY-01` is accepted and locally committed as `649e645 feat: add signal trigger entry price evidence`.
+
+Team 02 created:
+
+`CF-W1-TSC-01A - Today Review Trusted Signal Candidate Adoption`
+
+Status: requirement drafted; ready for Team 03 architecture/file-reservation prep and Team 04 QA planning; not Ready for implementation.
+
+### Proposed Child Acceptance Criteria
+
+- `/today-review` remains the primary workflow surface.
+- Today Review exposes counts for `Highly Trusted`, `Trusted but Needs Review`, `Watch Only`, and `Blocked`.
+- `Highly Trusted` requires trusted Data Quality plus `trigger_price_evidence.status === SOURCE_PROVEN`.
+- Entry price must be the source-proven rule trigger price, not an entry zone, reference price, target, R:R-derived value, or Trade Plan field.
+- Strategy/rule/version, trigger timestamp, and reason summary are shown only where source-proven.
+- Missing trigger evidence, blocked DQ, unsupported scope, or stale hard blockers downgrade or block the candidate with visible reasons.
+- Exit and invalidation labels require documented rule evidence; otherwise show missing or unsupported evidence.
+- Today Review table filtering, sorting, pagination, and non-wrapping row behavior must not regress.
+- No surface may show R:R, arbitrary targets, synthetic profit targets, direct buy/sell wording, or Trade Plan-first labels.
+
+### Product-Language Constraints
+
+Use: trusted candidate, entry trigger, trigger price, reason summary, evidence, trust state, health state, blocked, needs review, watch only, data quality missing, manual review required, exit rule, invalidation rule.
+
+Avoid: buy, sell, must act, guaranteed, profit target, price target, R:R, recommendation quality, advice-like wording, and Trade Plan as the primary label.
+
+### Updated Top 10 By Investor/Trader Value
+
+1. `CF-W1-TSC-01A` - Today Review Trusted Signal Candidate adoption.
+2. `CF-W1-DQ-03` - Data Quality residual reason summary for downstream trust consumers.
+3. `CF-W1-BT-04` - Backtesting saved-run freshness/current-proof labels.
+4. `CF-W1-DQ-02` residual parent - no-schema read-side/public-contract follow-up if Team 03 can split one.
+5. `CF-W1-L3-DQ-01A` - passive Lane 3 readiness DTO contract refresh.
+6. `CF-W1-MD-02A` - market-data companion evidence storage proposal, consent-gated.
+7. `CF-W1-SQLAB-02B` - durable Signal Quality learning memory proposal, consent-gated.
+8. `CF-W1-STRAT-02B` - durable strategy revision history proposal, consent-gated.
+9. `CF-W1-UX-02` - Copilot-only trust UX.
+10. `CF-W1-UX-05` - Copilot-only product-language cleanup after UX-02.
+
+Admin, settings, notifications, subscription expansion, and alert convenience remain low priority unless they become correctness, privacy, or evidence-quality blockers.
+
+### Files Changed In This Pass
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-TSC-01A-today-review-trusted-signal-candidate-adoption-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-TSC-01-trusted-signal-candidate-workflow-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SIG-TRIGGER-ENTRY-01-rule-trigger-entry-price-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-TSC-01-trusted-signal-candidate-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-TSC-01-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+No item was moved to Ready by Team 02.
+
 ## Team 02 Product Direction Reframe - Trusted Signal Candidates - 2026-05-24
 
 Product Owner redirected signal workflow priority away from Trade Plan, R:R, arbitrary targets, synthetic targets, and target-price framing.

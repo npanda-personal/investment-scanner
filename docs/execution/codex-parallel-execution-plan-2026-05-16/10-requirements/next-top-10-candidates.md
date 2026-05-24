@@ -10,23 +10,23 @@ Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-
 
 | Rank | ID | Current state | Why it matters now | Next Team 00 action |
 | --- | --- | --- | --- | --- |
-| 1 | `CF-W1-TSC-01` | Requirement/architecture/QA path drafted, implementation blocked | Trusted Signal Candidates should replace Trade Plan/R:R/target-first review framing and use `/today-review` as the daily cockpit. | Do not promote until rule-triggered entry price evidence is source-proven or PO/Architect accept a zero-highly-trusted first slice. |
-| 2 | `CF-W1-SIG-TRIGGER-ENTRY-01` | Draft requirement / architecture pending | It is the direct upstream evidence dependency for TSC high-trust classification. | Assign Team 02/03/04 docs-only prep. |
-| 3 | `CF-W1-DQ-03` | Draft requirement | Downstream trust consumers need a compact residual reason summary instead of raw DQ arrays. | Team 03 architecture contract and QA planning after TSC dependency prep starts. |
-| 4 | `CF-W1-BT-04` | Architecture prepared | Backtesting needs saved-run freshness/current-proof labels so older saved simulations do not read like current proof. | Team 04 QA planning later; do not outrank TSC dependency work. |
-| 5 | `CF-W1-DQ-02` residual parent | Needs Team 03 follow-up split | `DQ-02A` currentness evidence is accepted, but the parent still has read-side/public-contract residual scope. | Team 03 should identify whether a no-schema `DQ-02B` child exists or keep the parent blocked. |
-| 6 | `CF-W1-L3-DQ-01A` | Contract-only child | Passive readiness display remains a Lane 3 trust contract gap, but not the next app-code pull. | Keep as contract refresh unless Team 03/04 produce a bounded child. |
-| 7 | `CF-W1-MD-02A` | Consent-gated schema proposal | Durable market-data evidence storage remains valuable but schema/generated/repository scope is gated. | Keep proposal-only unless a true consent packet is opened. |
-| 8 | `CF-W1-SQLAB-02B` | Consent-gated storage proposal | Durable Signal Quality learning memory is useful but not ahead of trigger evidence. | Keep proposal-only unless storage consent opens. |
-| 9 | `CF-W1-STRAT-02B` | Consent-gated storage proposal | Durable strategy revision history is useful but schema/generated/repository-gated. | Keep proposal-only unless consent opens. |
-| 10 | `CF-W1-UX-02` | Copilot-only trust UX pending | Valuable downstream trust surface, but behind core signal evidence. | Keep Copilot-only and wait behind TSC dependency prep. |
+| 1 | `CF-W1-TSC-01A` | Requirement drafted; architecture/QA prep needed | Today Review should adopt source-proven trigger evidence into Trusted Signal Candidate groups, counts, reasons, and conservative health. | Assign Team 03 architecture/file-reservation prep and Team 04 QA planning; do not implement until Team 00 promotes Ready. |
+| 2 | `CF-W1-DQ-03` | Draft requirement | Downstream trust consumers need a compact residual reason summary instead of raw DQ arrays. | Team 03 architecture contract and QA planning after TSC adoption prep starts. |
+| 3 | `CF-W1-BT-04` | Architecture prepared | Backtesting needs saved-run freshness/current-proof labels so older saved simulations do not read like current proof. | Team 04 QA planning later; keep first child additive and no-schema. |
+| 4 | `CF-W1-DQ-02` residual parent | Needs Team 03 follow-up split | `DQ-02A` currentness evidence is accepted, but the parent still has read-side/public-contract residual scope. | Team 03 should identify whether a no-schema `DQ-02B` child exists or keep the parent blocked. |
+| 5 | `CF-W1-L3-DQ-01A` | Contract-only child | Passive readiness display remains a Lane 3 trust contract gap, but not the next app-code pull. | Keep as contract refresh unless Team 03/04 produce a bounded child. |
+| 6 | `CF-W1-MD-02A` | Consent-gated schema proposal | Durable market-data evidence storage remains valuable but schema/generated/repository scope is gated. | Keep proposal-only unless a true consent packet is opened. |
+| 7 | `CF-W1-SQLAB-02B` | Consent-gated storage proposal | Durable Signal Quality learning memory remains useful after current read/review trust slices. | Keep proposal-only unless storage consent opens. |
+| 8 | `CF-W1-STRAT-02B` | Consent-gated storage proposal | Durable strategy revision history is useful but schema/generated/repository-gated. | Keep proposal-only unless consent opens. |
+| 9 | `CF-W1-UX-02` | Copilot-only trust UX pending | Valuable downstream trust surface, but behind core signal evidence. | Keep Copilot-only and wait behind TSC adoption prep. |
+| 10 | `CF-W1-UX-05` | Copilot-only product-language cleanup | Product-language cleanup matters, but shared status/UI changes remain out of scope. | Fold into or follow `CF-W1-UX-02`; do not touch shared UI yet. |
 
 ## Dispatch Notes
 
 - `CF-W1-HCTX-03`, `CF-W1-MCTX-02`, `CF-W1-STRAT-04`, and `CF-W1-SQLAB-03` are accepted parked branch commits, not fresh pulls.
 - `CF-W1-DQ-03` remains a fresh draft requirement behind the Trusted Signal Candidate entry-price dependency.
-- `CF-W1-TSC-01` source mapping found that Today Review lacks source-proven rule-triggered entry price and current Signal Trigger contracts mark `trigger_price` unavailable.
-- `CF-W1-SIG-TRIGGER-ENTRY-01` is the next Team 02/03/04 prep child to close that upstream evidence gap before any TSC implementation promotion.
+- `CF-W1-SIG-TRIGGER-ENTRY-01` is accepted and locally committed as `649e645`; it is no longer a fresh prep item.
+- `CF-W1-TSC-01A` is now the first downstream child: adopt source-proven trigger evidence into Today Review with conservative candidate grouping and health language.
 - `CF-W1-TP-03` is paused/stale as framed because Product Owner rejected Trade Plan-first, R:R, and arbitrary target workflow direction. Do not execute it unless reframed into Trusted Signal Candidate health without targets/R:R.
 - `CF-W1-BT-04` remains a later refinement-only draft behind Trusted Signal Candidate work.
 - The 2026-05-20 backtesting proof-basis audit keeps `CF-W1-BT-03` parked and reinforces `CF-W1-BT-04` as the fresh backtesting current-proof slice.

@@ -4,7 +4,7 @@ Date: 2026-05-24
 
 Owner: Team 02 - Product / Requirement Factory
 
-Status: Accepted - Pending Scoped Local Commit
+Status: Accepted - Local Commit Created (`649e645`)
 
 ## Product Goal
 
@@ -66,4 +66,4 @@ Validation:
 - `cd backend && npm.cmd test -- signal-generation-engine.trigger-contract.test.ts signal-generation-engine.service.test.ts signal-generation-dq-enforcement.invariants.test.ts --runInBand`
 - `cd backend && npm.cmd run build`
 
-This implementation passed QA Verification, Code Review, Architect Signoff, and delegated PO acceptance. Team 00 must keep `CF-W1-TSC-01A` out of Ready until the scoped local commit is created and a downstream Today Review/Trusted Signal Candidate child is promoted with exact file reservations.
+This implementation passed QA Verification, Code Review, Architect Signoff, delegated PO acceptance, and scoped local commit as `649e645 feat: add signal trigger entry price evidence`. Team 00 must keep downstream Today Review / Trusted Signal Candidate adoption out of Ready until a bounded child is promoted with exact file reservations.

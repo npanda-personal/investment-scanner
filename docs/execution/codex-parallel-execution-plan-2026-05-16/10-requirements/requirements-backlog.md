@@ -10,8 +10,9 @@ Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-
 
 | ID | Why it matters now | Next gate |
 | --- | --- | --- |
-| `CF-W1-TSC-01` | `/today-review` should become the Trusted Signal Candidate workflow: high-trust counts, rule-triggered entry price, reason summary, health, and rule-based exit/invalidation without R:R or targets. | Blocked from implementation until rule-triggered entry price evidence is source-proven or PO/Architect accept a zero-highly-trusted first slice. |
-| `CF-W1-SIG-TRIGGER-ENTRY-01` | Signal Trigger needs source-proven rule-triggered entry price, trigger timestamp, and rule provenance before Today Review can classify any candidate as `Highly Trusted`. | Team 02 requirement refinement, Team 03 architecture/file-reservation prep, and Team 04 QA planning. |
+| `CF-W1-TSC-01A` | `/today-review` should adopt source-proven Signal Generation trigger evidence into Trusted Signal Candidate groups, counts, reasons, and conservative health. | Team 03 architecture/file-reservation prep and Team 04 QA planning; implementation only after Team 00 Ready promotion. |
+| `CF-W1-TSC-01` | Parent workflow path for Trusted Signal Candidates without R:R, arbitrary targets, synthetic targets, or Trade Plan-first framing. | Route implementation through `CF-W1-TSC-01A`; keep parent out of direct implementation. |
+| `CF-W1-SIG-TRIGGER-ENTRY-01` | Signal Generation now exposes source-proven trigger evidence for downstream adoption. | Accepted and locally committed as `649e645`; keep out of fresh Team 02 pulls. |
 | `CF-W1-HCTX-03` | Historical context needs age and provenance warnings so nearest snapshots do not read like same-day evidence. | Accepted and locally committed as `f6034c6`; wait for clean integration sequencing. |
 | `CF-W1-DQ-03` | Downstream trust consumers need a compact residual reason summary instead of raw DQ arrays. | Team 03 architecture contract and QA planning. |
 | `CF-W1-MCTX-02` | Market Context needs an explicit persisted-versus-generated freshness basis label. | Accepted and locally committed as `0c802c2`; wait for clean integration sequencing. |
@@ -27,16 +28,16 @@ Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-
 
 | Rank | ID | State | Why now |
 | --- | --- | --- | --- |
-| 1 | `CF-W1-TSC-01` | Draft / blocked by trigger price evidence | Trusted Signal Candidates are now the primary workflow direction for daily signal review. |
-| 2 | `CF-W1-SIG-TRIGGER-ENTRY-01` | Draft requirement / architecture pending | It is the direct upstream dependency for TSC high-trust classification. |
-| 3 | `CF-W1-DQ-03` | Draft | Residual reason summary is the cleanest downstream trust gap on top of current DQ outputs. |
-| 4 | `CF-W1-BT-04` | Architecture prepared | Backtesting saved runs need explicit freshness/current-proof labeling. |
-| 5 | `CF-W1-DQ-02` residual parent | Split-required | Remaining read-side/public-contract scope after accepted `DQ-02A`. |
-| 6 | `CF-W1-L3-DQ-01A` | Contract-only | Lane 3 passive readiness DTOs still matter, but not as the next fresh implementation pull. |
-| 7 | `CF-W1-MD-02A` | Proposal-only | Market-data evidence storage remains gated. |
-| 8 | `CF-W1-SQLAB-02B` | Proposal-only | Durable Signal Quality learning memory remains useful but storage-gated. |
-| 9 | `CF-W1-STRAT-02B` | Proposal-only | Durable strategy revision history remains useful but schema/generated/repository-gated. |
-| 10 | `CF-W1-UX-02` | Copilot-only trust UX pending | Useful downstream trust work, but behind core signal evidence. |
+| 1 | `CF-W1-TSC-01A` | Requirement drafted / architecture next | Today Review adoption is the next direct Trusted Signal Candidate step after accepted trigger evidence. |
+| 2 | `CF-W1-DQ-03` | Draft | Residual reason summary is the cleanest downstream trust gap on top of current DQ outputs. |
+| 3 | `CF-W1-BT-04` | Architecture prepared | Backtesting saved runs need explicit freshness/current-proof labeling. |
+| 4 | `CF-W1-DQ-02` residual parent | Split-required | Remaining read-side/public-contract scope after accepted `DQ-02A`. |
+| 5 | `CF-W1-L3-DQ-01A` | Contract-only | Lane 3 passive readiness DTOs still matter, but not as the next fresh implementation pull. |
+| 6 | `CF-W1-MD-02A` | Proposal-only | Market-data evidence storage remains gated. |
+| 7 | `CF-W1-SQLAB-02B` | Proposal-only | Durable Signal Quality learning memory remains useful but storage-gated. |
+| 8 | `CF-W1-STRAT-02B` | Proposal-only | Durable strategy revision history remains useful but schema/generated/repository-gated. |
+| 9 | `CF-W1-UX-02` | Copilot-only trust UX pending | Useful downstream trust work, but behind core signal evidence. |
+| 10 | `CF-W1-UX-05` | Copilot-only language cleanup | Useful wording cleanup after Copilot trust scope is settled; shared UI remains out of scope. |
 
 ## Rolling Audit Notes
 
@@ -83,7 +84,7 @@ These are already promoted, active, accepted, parked, or otherwise in the live R
 
 These can move toward architecture/QA next without creating duplicate application-code work:
 
-1. `CF-W1-SIG-TRIGGER-ENTRY-01` as the next upstream Signal Trigger entry-price evidence child
+1. `CF-W1-TSC-01A` as the Today Review Trusted Signal Candidate adoption child
 2. `CF-W1-DQ-03` as the next bounded downstream DQ residual-summary child
 3. `CF-W1-BT-04` as the next bounded Backtesting current-proof labeling child
 4. `CF-W1-DQ-02` residual parent split for a possible bounded follow-up after accepted `DQ-02A`

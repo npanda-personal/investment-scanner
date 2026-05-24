@@ -4,7 +4,7 @@ Date: 2026-05-24
 
 Owner: Team 00 - Orchestrator / Integration
 
-Status: Work Packet Draft - Blocked From Implementation By Missing Trigger Price Evidence
+Status: Work Packet Draft - First Child Ready For Architecture And QA Prep
 
 ## Objective
 
@@ -14,7 +14,7 @@ Prepare a bounded first implementation slice that evolves `/today-review` toward
 
 Preferred first child:
 
-`CF-W1-TSC-01A - Today Review trusted candidate grouping and health display`
+`CF-W1-TSC-01A - Today Review trusted signal candidate adoption`
 
 Expected behavior:
 
@@ -59,12 +59,12 @@ Candidate source/test files:
 
 ## Readiness Gaps Before Implementation
 
-- Current Today Review source does not prove rule-triggered entry price.
-- Current Signal Trigger contract marks `trigger_price` unavailable.
-- Team 00 must not promote a `HIGHLY_TRUSTED` candidate workflow until trigger price evidence is source-proven or a Product Owner/Architect decision accepts zero highly trusted candidates in the first slice.
+- `CF-W1-SIG-TRIGGER-ENTRY-01` is accepted and locally committed as `649e645`, so the upstream Signal Generation trigger-evidence gap is no longer the blocker.
+- Today Review still needs an architecture-approved adoption path for source-proven trigger evidence before it can classify `HIGHLY_TRUSTED` candidates.
+- Team 00 must not promote a `HIGHLY_TRUSTED` candidate workflow until Team 03 confirms the Today Review adoption path and exact file reservations.
 - Team 00 must sequence against accepted `CF-W1-L3-TREV-02` branch commit `f1de1d5`.
 - Team 00 must decide whether this child stacks on `CF-W1-L3-TREV-02` or waits for branch integration.
 
 ## Next Gate
 
-Team 00 should route the upstream Signal Trigger entry-price evidence gap before promoting this work packet.
+Team 00 should route `CF-W1-TSC-01A` to Team 03 architecture/file-reservation prep and Team 04 QA planning. Implementation remains blocked until those gates pass and Team 00 promotes the child to Ready.

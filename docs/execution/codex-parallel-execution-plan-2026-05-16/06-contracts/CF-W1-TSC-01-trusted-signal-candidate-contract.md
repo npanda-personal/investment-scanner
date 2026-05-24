@@ -4,7 +4,7 @@ Date: 2026-05-24
 
 Owner: Team 03 - Architecture Factory
 
-Status: Draft Contract - Blocked From Implementation By Missing Trigger Price Evidence
+Status: Draft Contract - Downstream Adoption Child Needed
 
 ## Purpose
 
@@ -58,7 +58,7 @@ For `HIGHLY_TRUSTED`, the display model must include:
 
 If any required field is missing, the candidate must be downgraded or blocked with a visible reason.
 
-Current source note: as of 2026-05-24, rule-triggered entry price is not source-proven in Today Review, and the current Signal Trigger contract marks `trigger_price` unavailable. Therefore no candidate may be classified as `HIGHLY_TRUSTED` until that evidence exists.
+Current source note: `CF-W1-SIG-TRIGGER-ENTRY-01` is accepted and locally committed as `649e645`, so Signal Generation can now expose source-proven trigger-price evidence. Today Review still needs a bounded downstream adoption child before any candidate may be classified as `HIGHLY_TRUSTED`.
 
 ## Exit / Invalidation Contract
 
