@@ -235,4 +235,60 @@ describe('MarketDataFoundationScheduler', () => {
       candleSyncStatus: 'MISSING_LATEST_COMPLETED',
     });
   });
+
+  it('triggers scheduled data quality stage only for normal scheduled runs with non-empty changed set', async () => {
+    const service = {
+      activePriceBackfillRun: jest.fn().mockReturnValue(null),
+      latestStoredCandleInfo: jest.fn().mockResolvedValue({
+        latestTradingDate: null,
+        finalConfirmed: false,
+        syncState: null,
+        tradingDate: '2026-05-05',
+      }),
+      syncScheduledRegion: jest.fn().mockResolvedValue({
+        region: 'IN',
+        assetType: 'STOCK',
+        tradingDate: '2026-05-05',
+        dataThroughDate: '2026-05-05',
+        sourceFingerprint: 'scheduled-region:abc123',
+        changedInstrumentIds: ['stock-1'],
+        changedInstrumentCount: 1,
+        dqStageEligible: true,
+        rowsInserted: 1,
+        rowsUpdated: 0,
+        rowsNoOp: 0,
+      }),
+    };
+    const pipelineOrchestration = {
+      runScheduledDataQualityStage: jest.fn().mockResolvedValue({ status: 'COMPLETED' }),
+    };
+    const scheduler = new MarketDataFoundationScheduler(service as any, {
+      enabled: true,
+      intervalMinutes: 15,
+      regions: ['IN'],
+      assetType: 'STOCK',
+      batchSize: 25,
+      syncDuringMarketHours: false,
+      postCloseSyncWindowMinutes: 120,
+      finalizationGraceMinutes: 15,
+      skipWeekends: true,
+    }, pipelineOrchestration as any);
+
+    const scheduledResult = await scheduler.runOnce(new Date('2026-05-05T10:30:00.000Z'));
+    await scheduler.runOnce(new Date('2026-05-05T10:31:00.000Z'), { triggerType: 'startup' });
+
+    expect(pipelineOrchestration.runScheduledDataQualityStage).toHaveBeenCalledTimes(1);
+    expect(pipelineOrchestration.runScheduledDataQualityStage).toHaveBeenCalledWith(expect.objectContaining({
+      region: 'IN',
+      assetType: 'STOCK',
+      triggerType: 'scheduled',
+      changedInstrumentIds: ['stock-1'],
+      dataThroughDate: '2026-05-05',
+      sourceFingerprint: 'scheduled-region:abc123',
+    }));
+    expect(scheduledResult[0]).toMatchObject({
+      skipped: false,
+      scheduledDataQuality: { status: 'COMPLETED' },
+    });
+  });
 });

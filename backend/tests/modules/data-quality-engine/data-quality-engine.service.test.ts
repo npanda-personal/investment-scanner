@@ -30,6 +30,9 @@ function service(overrides: Record<string, any> = {}) {
   const marketDataService = {
     listInstruments: jest.fn().mockResolvedValue({ instruments: [instrument()], pagination: { total: 2 } }),
     getInstrument: jest.fn().mockResolvedValue(instrument()),
+    getInstrumentsByIds: jest.fn().mockResolvedValue([instrument()]),
+    listRecentPriceWindowsByInstrumentIds: jest.fn().mockResolvedValue(new Map([['stock-1', prices(260)]])),
+    storedFundamentalsByInstrumentIds: jest.fn().mockResolvedValue(new Map([['stock-1', { records: [{ eps: 1 }] }]])),
     listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: prices(260) }),
     latestPriceByInstrumentId: jest.fn().mockResolvedValue({ latest: prices(1)[0] }),
     fundamentalsByInstrumentId: jest.fn().mockResolvedValue({ records: [{ eps: 1 }] }),
@@ -286,5 +289,47 @@ describe('data quality engine service', () => {
       status: 'BLOCKED',
       reasons: ['PHASE0_AUTOMATION_NOT_AUTHORIZED'],
     });
+  });
+
+  it('evaluates scheduled stage using explicit instrument ids and DB-only market data reads', async () => {
+    const setup = service({
+      marketDataService: {
+        getInstrumentsByIds: jest.fn().mockResolvedValue([
+          instrument({ id: 'stock-1', symbol: 'AAPL', region: 'IN', asset_type: 'STOCK' }),
+          instrument({ id: 'stock-2', symbol: 'MSFT', region: 'IN', asset_type: 'STOCK' }),
+        ]),
+        listRecentPriceWindowsByInstrumentIds: jest.fn().mockResolvedValue(new Map([
+          ['stock-1', prices(260)],
+          ['stock-2', prices(200)],
+        ])),
+        storedFundamentalsByInstrumentIds: jest.fn().mockResolvedValue(new Map([
+          ['stock-1', { records: [{ eps: 1 }] }],
+          ['stock-2', { records: [{ eps: 2 }] }],
+        ])),
+        storedCorporateActionsByInstrumentId: jest.fn()
+          .mockResolvedValueOnce({ actions: [{ action_type: 'dividend' }] })
+          .mockResolvedValueOnce({ actions: [] }),
+      },
+    });
+
+    const result = await setup.instance.evaluateScheduledStage({
+      instrumentIds: ['stock-2', 'stock-1', 'stock-2'],
+      region: 'IN',
+      assetType: 'STOCK',
+      batchSize: 25,
+    });
+
+    expect(result).toMatchObject({
+      totalCount: 2,
+      processedCount: 2,
+      evaluatedCount: 2,
+      failedCount: 0,
+      skippedCount: 0,
+    });
+    expect(setup.marketDataService.getInstrumentsByIds).toHaveBeenCalledWith(['stock-2', 'stock-1']);
+    expect(setup.marketDataService.listRecentPriceWindowsByInstrumentIds).toHaveBeenCalledWith(['stock-2', 'stock-1'], 300, { region: 'IN', assetType: 'STOCK' });
+    expect(setup.marketDataService.storedFundamentalsByInstrumentIds).toHaveBeenCalledWith(['stock-2', 'stock-1'], { region: 'IN', assetType: 'STOCK' });
+    expect(setup.marketDataService.storedCorporateActionsByInstrumentId).toHaveBeenCalledTimes(2);
+    expect(setup.repository.upsertEvaluation).toHaveBeenCalledTimes(2);
   });
 });

@@ -6,6 +6,42 @@ Team: TEAM-10 - Review / Release
 
 State: `CF-W1-NOTIF-02` preaccepted by code review with QA blocker; release acceptance blocked pending focused runtime verification.
 
+## 2026-05-25 `CF-W3-MDPIPE-01C` Review / Release Gate
+
+Review target: `CF-W3-MDPIPE-01C`
+
+Review decision: `ACCEPT`
+
+### Findings
+
+No blocking findings.
+
+Acceptance notes:
+
+- The scheduled Data Quality child stays inside the reserved backend modules/tests/docs only. Team 10 found no 01C application-file drift into `backend/src/server.ts`, route registries, Prisma/schema/migrations, package/generated files, shared utilities, downstream fanout modules, or frontend source.
+- Changed-set gating, startup exclusion, DB-only adapter behavior, and ledger duplicate/lease handling all match the approved 01C contract on source review.
+- Team 04 QA already recorded passing focused backend tests and build coverage for the scheduled stage plus the B4 manual-command regression set, and Team 10 found no source evidence of B4 behavior drift.
+- Parallel frontend B6 changes are present in the workspace and were explicitly excluded from this gate.
+
+### Evidence
+
+- Code review record: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W3-MDPIPE-01C-code-review.md`
+- Developer handoff: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W3-MDPIPE-01C-developer-handoff.md`
+- QA verification: `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W3-MDPIPE-01C-qa-verification.md`
+
+### Validation
+
+- Team 10 performed bounded source/static review only: scoped diff audit, scoped `git diff --check`, scoped merge-marker scan, and line review of the backend source/tests/docs in the approved 01C slice.
+- Team 04 already recorded:
+  - `cd backend && npm.cmd test -- market-data.scheduler.test.ts market-data.service.test.ts pipeline-orchestration.service.test.ts data-quality-engine.service.test.ts --runInBand` -> pass
+  - `cd backend && npm.cmd run build` -> pass
+  - `cd backend && npm.cmd test -- pipeline-orchestration.validation.test.ts pipeline-orchestration.controller.test.ts pipeline-orchestration.routes.test.ts pipeline-orchestration.service.test.ts --runInBand` -> pass
+- No Team 10 memory gate was needed because no heavy commands were started in this pass.
+
+### Next Gate
+
+Route to Team 03 Architect signoff, then Product Owner acceptance.
+
 ## 2026-05-25 `CF-W3-MDPIPE-01B6` Re-review / Release Gate
 
 Review target: `CF-W3-MDPIPE-01B6`

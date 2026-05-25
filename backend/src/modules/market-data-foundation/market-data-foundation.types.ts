@@ -180,6 +180,11 @@ export interface ScheduledRegionSyncSummary {
   region: string;
   assetType: string;
   tradingDate: string;
+  dataThroughDate?: string | null;
+  sourceFingerprint?: string | null;
+  changedInstrumentIds?: string[];
+  changedInstrumentCount?: number;
+  dqStageEligible?: boolean;
   instrumentsProcessed: number;
   rowsReceived: number;
   rowsInserted: number;

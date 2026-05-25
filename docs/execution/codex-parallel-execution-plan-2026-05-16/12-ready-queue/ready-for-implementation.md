@@ -9,7 +9,7 @@ No available application-code item is currently waiting unassigned in Ready.
 2026-05-25 Team 00 Ready promotion - `CF-W3-MDPIPE-01C-DQ-SCHEDULED-STAGE`:
 
 - `CF-W3-MDPIPE-01C` is promoted and assigned to Team 05.
-- Current gate state: Ready for backend-only implementation.
+- Current gate state: Accepted through implementation, QA verification, Code Review, Architect Signoff, and delegated Product Owner acceptance. Scoped local commit is in progress.
 - Purpose: automatically trigger a ledgered Data Quality stage from the existing Market Data scheduler using only the changed instrument set from the current scheduled Market Data pass.
 - Branch recommendation: `codex/w3-mdpipe-01c-data-quality-scheduled-stage`.
 - Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team05-CF-W3-MDPIPE-01C`.

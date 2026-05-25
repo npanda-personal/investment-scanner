@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { DataQualityEngineService } from '../data-quality-engine';
 import { PipelineOrchestrationRepository } from './pipeline-orchestration.repository';
 import type {
@@ -24,6 +25,8 @@ import type {
   PipelineStatusRunDto,
   PipelineStatusSnapshot,
   PipelineStatusStageDto,
+  ScheduledDataQualityStageRequest,
+  ScheduledDataQualityStageResponse,
 } from './pipeline-orchestration.types';
 
 const LEDGER_VERSION = 'pipeline-ledger-v1';
@@ -31,6 +34,7 @@ const ACTIVE_STATUSES = new Set(['PENDING', 'RUNNING']);
 const TERMINAL_STATUSES = new Set(['COMPLETED', 'PARTIAL', 'FAILED', 'SKIPPED', 'BLOCKED']);
 const DEFAULT_LEASE_MS = 600_000;
 const PROCESS_LOCAL_ID = `${process.pid}-${Math.random().toString(16).slice(2, 10)}`;
+const DQ_SCHEDULED_STAGE_VERSION = 'scheduled-dq-v1';
 
 type PipelineCommandPolicy = PipelineCommandCatalogItem & {
   stageOrder: number;
@@ -402,6 +406,346 @@ export class PipelineOrchestrationService {
       });
 
       return this.responseFromStage(request, policy, serverIdempotencyKey, failedStage, stageLease, 'FAILED');
+    }
+  }
+
+  async runScheduledDataQualityStage(
+    request: ScheduledDataQualityStageRequest,
+    now = new Date()
+  ): Promise<ScheduledDataQualityStageResponse> {
+    const normalizedScope = this.normalizeScope({
+      region: request.region,
+      assetType: request.assetType,
+      timeframe: request.timeframe,
+    });
+    const changedInstrumentIds = [...new Set(request.changedInstrumentIds.map((id) => String(id || '').trim()).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b));
+    const normalizedBatchSize = this.normalizeScheduledBatchSize(request.batchSize, changedInstrumentIds.length);
+    if (changedInstrumentIds.length === 0) {
+      return this.scheduledSkippedResponse(request, normalizedScope, normalizedBatchSize);
+    }
+
+    const changedInstrumentFingerprint = this.hashValues(changedInstrumentIds);
+    const stageIdempotencyKey = this.scheduledDataQualityStageIdempotencyKey({
+      region: normalizedScope.region,
+      assetType: normalizedScope.assetType,
+      timeframe: normalizedScope.timeframe,
+      dataThroughDate: request.dataThroughDate,
+      sourceFingerprint: request.sourceFingerprint,
+      changedInstrumentFingerprint,
+    });
+    const runIdempotencyKey = `${stageIdempotencyKey}:run`;
+    const inputFingerprint = [
+      'scheduled-dq',
+      request.dataThroughDate,
+      request.sourceFingerprint,
+      changedInstrumentFingerprint,
+      DQ_SCHEDULED_STAGE_VERSION,
+    ].join(':');
+    const leaseOwner = `scheduled-dq:${PROCESS_LOCAL_ID}`;
+
+    let stageLease = await this.leaseStage({
+      idempotencyKey: stageIdempotencyKey,
+      leaseOwner,
+      leaseMs: DEFAULT_LEASE_MS,
+      now,
+      allowTerminalRetry: false,
+    });
+
+    if (stageLease.reason === 'STAGE_TERMINAL') {
+      return this.scheduledResponseFromLease('DUPLICATE_TERMINAL', request, normalizedScope, stageLease, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
+    }
+    if (stageLease.reason === 'LEASE_HELD') {
+      return this.scheduledResponseFromLease('LEASE_HELD', request, normalizedScope, stageLease, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
+    }
+
+    if (stageLease.reason === 'STAGE_NOT_FOUND') {
+      const run = await this.createRun({
+        pipelineKey: request.pipelineKey,
+        triggerType: request.triggerType,
+        status: 'RUNNING',
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        timeframe: normalizedScope.timeframe,
+        dataThroughDate: new Date(`${request.dataThroughDate}T00:00:00.000Z`),
+        sourceFingerprint: request.sourceFingerprint,
+        changedInstrumentCount: changedInstrumentIds.length,
+        totalCount: changedInstrumentIds.length,
+        processedCount: 0,
+        succeededCount: 0,
+        partialCount: 0,
+        failedCount: 0,
+        skippedCount: 0,
+        unchangedCount: 0,
+        idempotencyKey: runIdempotencyKey,
+        startedAt: now,
+        metadata: {
+          sourceStage: 'MARKET_DATA',
+          dataThroughDate: request.dataThroughDate,
+          sourceFingerprint: request.sourceFingerprint,
+          changedInstrumentCount: changedInstrumentIds.length,
+          changedInstrumentIdsSample: changedInstrumentIds.slice(0, 25),
+          changedInstrumentFingerprint,
+          dqStageVersion: DQ_SCHEDULED_STAGE_VERSION,
+          schedulerRunStartedAt: request.schedulerRunStartedAt,
+        },
+      });
+
+      await this.createStage({
+        pipelineRunId: run.id,
+        stageKey: 'DATA_QUALITY',
+        stageOrder: 2,
+        status: 'PENDING',
+        idempotencyKey: stageIdempotencyKey,
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        timeframe: normalizedScope.timeframe,
+        dataThroughDate: new Date(`${request.dataThroughDate}T00:00:00.000Z`),
+        inputFingerprint,
+        changedInstrumentCount: changedInstrumentIds.length,
+        batchSize: normalizedBatchSize,
+        offset: 0,
+        nextOffset: 0,
+        hasMore: false,
+        totalCount: changedInstrumentIds.length,
+        processedCount: 0,
+        succeededCount: 0,
+        partialCount: 0,
+        failedCount: 0,
+        skippedCount: 0,
+        unchangedCount: 0,
+        metadata: {
+          sourceStage: 'MARKET_DATA',
+          dataThroughDate: request.dataThroughDate,
+          sourceFingerprint: request.sourceFingerprint,
+          changedInstrumentCount: changedInstrumentIds.length,
+          changedInstrumentFingerprint,
+          dqStageVersion: DQ_SCHEDULED_STAGE_VERSION,
+          schedulerRunStartedAt: request.schedulerRunStartedAt,
+        },
+      });
+
+      stageLease = await this.leaseStage({
+        idempotencyKey: stageIdempotencyKey,
+        leaseOwner,
+        leaseMs: DEFAULT_LEASE_MS,
+        now,
+        allowTerminalRetry: false,
+      });
+      if (stageLease.reason === 'STAGE_TERMINAL') {
+        return this.scheduledResponseFromLease('DUPLICATE_TERMINAL', request, normalizedScope, stageLease, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
+      }
+      if (stageLease.reason === 'LEASE_HELD') {
+        return this.scheduledResponseFromLease('LEASE_HELD', request, normalizedScope, stageLease, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
+      }
+    }
+
+    if (!stageLease.acquired || !stageLease.stage) {
+      return {
+        status: 'FAILED',
+        pipelineRunId: stageLease.stage?.pipelineRunId || null,
+        stageRunId: stageLease.stage?.id || null,
+        stageKey: 'DATA_QUALITY',
+        scope: {
+          region: normalizedScope.region,
+          assetType: normalizedScope.assetType,
+          timeframe: normalizedScope.timeframe,
+          pipelineKey: request.pipelineKey,
+        },
+        triggerType: 'scheduled',
+        dataThroughDate: request.dataThroughDate,
+        inputFingerprint,
+        outputFingerprint: null,
+        batch: {
+          totalInstrumentCount: changedInstrumentIds.length,
+          processedCount: 0,
+          batchSize: normalizedBatchSize,
+          nextOffset: null,
+          hasMore: false,
+        },
+        counts: {
+          totalCount: changedInstrumentIds.length,
+          processedCount: 0,
+          succeededCount: 0,
+          partialCount: 0,
+          failedCount: 1,
+          skippedCount: 0,
+          unchangedCount: 0,
+        },
+        warnings: [],
+        errors: [`Unable to acquire scheduled stage lease: ${stageLease.reason}`],
+        startedAt: null,
+        completedAt: null,
+      };
+    }
+
+    const leasedStage = stageLease.stage;
+    const startedAt = now;
+    await this.recordStageProgress({
+      idempotencyKey: stageIdempotencyKey,
+      status: 'RUNNING',
+      totalCount: changedInstrumentIds.length,
+      processedCount: 0,
+      succeededCount: 0,
+      partialCount: 0,
+      failedCount: 0,
+      skippedCount: 0,
+      unchangedCount: 0,
+      nextOffset: 0,
+      hasMore: false,
+      metadata: {
+        sourceStage: 'MARKET_DATA',
+        dataThroughDate: request.dataThroughDate,
+        sourceFingerprint: request.sourceFingerprint,
+        changedInstrumentCount: changedInstrumentIds.length,
+        changedInstrumentFingerprint,
+        dqStageVersion: DQ_SCHEDULED_STAGE_VERSION,
+        schedulerRunStartedAt: request.schedulerRunStartedAt,
+        adapter: 'DataQualityEngineService.evaluateScheduledStage',
+      },
+      now: startedAt,
+    });
+
+    try {
+      const adapterResult = await this.dataQualityService.evaluateScheduledStage({
+        instrumentIds: changedInstrumentIds,
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        batchSize: normalizedBatchSize,
+      });
+      const completedAt = new Date();
+      const durationMs = Math.max(0, completedAt.getTime() - startedAt.getTime());
+      const status = this.mapScheduledDataQualityStatus({
+        totalCount: adapterResult.totalCount,
+        evaluatedCount: adapterResult.evaluatedCount,
+        failedCount: adapterResult.failedCount,
+        skippedCount: adapterResult.skippedCount,
+      });
+      const outputFingerprint = this.hashValues([
+        stageIdempotencyKey,
+        status,
+        String(adapterResult.totalCount),
+        String(adapterResult.evaluatedCount),
+        String(adapterResult.failedCount),
+        String(adapterResult.skippedCount),
+      ]);
+
+      const completedStage = await this.completeStage({
+        idempotencyKey: stageIdempotencyKey,
+        status,
+        totalCount: adapterResult.totalCount,
+        processedCount: adapterResult.processedCount,
+        succeededCount: adapterResult.evaluatedCount,
+        partialCount: status === 'PARTIAL' ? Math.max(1, adapterResult.failedCount + adapterResult.skippedCount) : 0,
+        failedCount: adapterResult.failedCount,
+        skippedCount: adapterResult.skippedCount,
+        unchangedCount: 0,
+        nextOffset: null,
+        hasMore: false,
+        outputFingerprint,
+        warnings: adapterResult.warnings,
+        errors: [],
+        completedAt,
+        durationMs,
+        metadata: {
+          sourceStage: 'MARKET_DATA',
+          dataThroughDate: request.dataThroughDate,
+          sourceFingerprint: request.sourceFingerprint,
+          changedInstrumentCount: changedInstrumentIds.length,
+          changedInstrumentFingerprint,
+          dqStageVersion: DQ_SCHEDULED_STAGE_VERSION,
+          schedulerRunStartedAt: request.schedulerRunStartedAt,
+          adapter: 'DataQualityEngineService.evaluateScheduledStage',
+        },
+      });
+
+      await this.completeRun({
+        idempotencyKey: runIdempotencyKey,
+        status,
+        totalCount: adapterResult.totalCount,
+        processedCount: adapterResult.processedCount,
+        succeededCount: adapterResult.evaluatedCount,
+        partialCount: completedStage.partialCount,
+        failedCount: adapterResult.failedCount,
+        skippedCount: adapterResult.skippedCount,
+        unchangedCount: 0,
+        warnings: adapterResult.warnings,
+        errors: [],
+        completedAt,
+        durationMs,
+        metadata: {
+          sourceStage: 'MARKET_DATA',
+          dataThroughDate: request.dataThroughDate,
+          sourceFingerprint: request.sourceFingerprint,
+          changedInstrumentCount: changedInstrumentIds.length,
+          changedInstrumentFingerprint,
+          dqStageVersion: DQ_SCHEDULED_STAGE_VERSION,
+          schedulerRunStartedAt: request.schedulerRunStartedAt,
+          adapter: 'DataQualityEngineService.evaluateScheduledStage',
+        },
+      });
+
+      return this.scheduledResponseFromStage(status, request, normalizedScope, completedStage, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Scheduled Data Quality stage failed';
+      const completedAt = new Date();
+      const durationMs = Math.max(0, completedAt.getTime() - startedAt.getTime());
+      const failedStage = await this.completeStage({
+        idempotencyKey: stageIdempotencyKey,
+        status: 'FAILED',
+        totalCount: changedInstrumentIds.length,
+        processedCount: leasedStage.processedCount,
+        succeededCount: leasedStage.succeededCount,
+        partialCount: leasedStage.partialCount,
+        failedCount: Math.max(1, leasedStage.failedCount),
+        skippedCount: leasedStage.skippedCount,
+        unchangedCount: leasedStage.unchangedCount,
+        nextOffset: null,
+        hasMore: false,
+        outputFingerprint: null,
+        warnings: leasedStage.warnings,
+        errors: [...leasedStage.errors, errorMessage],
+        completedAt,
+        durationMs,
+        metadata: {
+          sourceStage: 'MARKET_DATA',
+          dataThroughDate: request.dataThroughDate,
+          sourceFingerprint: request.sourceFingerprint,
+          changedInstrumentCount: changedInstrumentIds.length,
+          changedInstrumentFingerprint,
+          dqStageVersion: DQ_SCHEDULED_STAGE_VERSION,
+          schedulerRunStartedAt: request.schedulerRunStartedAt,
+          adapter: 'DataQualityEngineService.evaluateScheduledStage',
+          error: errorMessage,
+        },
+      });
+      await this.completeRun({
+        idempotencyKey: runIdempotencyKey,
+        status: 'FAILED',
+        totalCount: failedStage.totalCount,
+        processedCount: failedStage.processedCount,
+        succeededCount: failedStage.succeededCount,
+        partialCount: failedStage.partialCount,
+        failedCount: failedStage.failedCount,
+        skippedCount: failedStage.skippedCount,
+        unchangedCount: failedStage.unchangedCount,
+        warnings: failedStage.warnings,
+        errors: failedStage.errors,
+        completedAt,
+        durationMs,
+        metadata: {
+          sourceStage: 'MARKET_DATA',
+          dataThroughDate: request.dataThroughDate,
+          sourceFingerprint: request.sourceFingerprint,
+          changedInstrumentCount: changedInstrumentIds.length,
+          changedInstrumentFingerprint,
+          dqStageVersion: DQ_SCHEDULED_STAGE_VERSION,
+          schedulerRunStartedAt: request.schedulerRunStartedAt,
+          adapter: 'DataQualityEngineService.evaluateScheduledStage',
+          error: errorMessage,
+        },
+      });
+      return this.scheduledResponseFromStage('FAILED', request, normalizedScope, failedStage, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
     }
   }
 
@@ -780,6 +1124,187 @@ export class PipelineOrchestrationService {
       && stage.leaseOwner === leaseOwner
       && stage.attemptCount > 1
     );
+  }
+
+  private scheduledDataQualityStageIdempotencyKey(input: {
+    region: string;
+    assetType: string;
+    timeframe: string;
+    dataThroughDate: string;
+    sourceFingerprint: string;
+    changedInstrumentFingerprint: string;
+  }): string {
+    return [
+      LEDGER_VERSION,
+      'scheduled-dq',
+      this.keyPart(input.region),
+      this.keyPart(input.assetType),
+      this.keyPart(input.timeframe),
+      this.keyPart(input.dataThroughDate),
+      this.keyPart(input.sourceFingerprint),
+      this.keyPart(input.changedInstrumentFingerprint),
+      this.keyPart(DQ_SCHEDULED_STAGE_VERSION),
+    ].join(':');
+  }
+
+  private hashValues(values: string[]): string {
+    const payload = values.join('|');
+    return createHash('sha256').update(payload).digest('hex').slice(0, 16);
+  }
+
+  private normalizeScheduledBatchSize(batchSize: number, changedInstrumentCount: number): number {
+    const normalized = Math.max(1, Math.min(Math.floor(Number(batchSize) || 25), 100));
+    return Math.max(1, Math.min(normalized, changedInstrumentCount));
+  }
+
+  private mapScheduledDataQualityStatus(input: {
+    totalCount: number;
+    evaluatedCount: number;
+    failedCount: number;
+    skippedCount: number;
+  }): 'COMPLETED' | 'PARTIAL' | 'FAILED' | 'SKIPPED' {
+    if (input.totalCount === 0) return 'SKIPPED';
+    if (input.failedCount > 0 && input.evaluatedCount === 0) return 'FAILED';
+    if (input.failedCount > 0 || input.skippedCount > 0) return 'PARTIAL';
+    return 'COMPLETED';
+  }
+
+  private scheduledSkippedResponse(
+    request: ScheduledDataQualityStageRequest,
+    normalizedScope: ReturnType<PipelineOrchestrationService['normalizeScope']>,
+    batchSize: number
+  ): ScheduledDataQualityStageResponse {
+    return {
+      status: 'SKIPPED',
+      pipelineRunId: null,
+      stageRunId: null,
+      stageKey: 'DATA_QUALITY',
+      scope: {
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        timeframe: normalizedScope.timeframe,
+        pipelineKey: request.pipelineKey,
+      },
+      triggerType: 'scheduled',
+      dataThroughDate: request.dataThroughDate,
+      inputFingerprint: 'scheduled-dq:empty-changed-set',
+      outputFingerprint: null,
+      batch: {
+        totalInstrumentCount: 0,
+        processedCount: 0,
+        batchSize,
+        nextOffset: null,
+        hasMore: false,
+      },
+      counts: {
+        totalCount: 0,
+        processedCount: 0,
+        succeededCount: 0,
+        partialCount: 0,
+        failedCount: 0,
+        skippedCount: 0,
+        unchangedCount: 0,
+      },
+      warnings: ['No changed instruments supplied for scheduled Data Quality stage.'],
+      errors: [],
+      startedAt: null,
+      completedAt: null,
+    };
+  }
+
+  private scheduledResponseFromLease(
+    status: 'DUPLICATE_TERMINAL' | 'LEASE_HELD',
+    request: ScheduledDataQualityStageRequest,
+    normalizedScope: ReturnType<PipelineOrchestrationService['normalizeScope']>,
+    leaseResult: PipelineStageLeaseResult,
+    inputFingerprint: string,
+    batchSize: number,
+    changedInstrumentCount: number
+  ): ScheduledDataQualityStageResponse {
+    const stage = leaseResult.stage;
+    return {
+      status,
+      pipelineRunId: stage?.pipelineRunId || null,
+      stageRunId: stage?.id || null,
+      stageKey: 'DATA_QUALITY',
+      scope: {
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        timeframe: normalizedScope.timeframe,
+        pipelineKey: request.pipelineKey,
+      },
+      triggerType: 'scheduled',
+      dataThroughDate: request.dataThroughDate,
+      inputFingerprint: stage?.inputFingerprint || inputFingerprint,
+      outputFingerprint: stage?.outputFingerprint || null,
+      batch: {
+        totalInstrumentCount: changedInstrumentCount,
+        processedCount: stage?.processedCount || 0,
+        batchSize: stage?.batchSize ?? batchSize,
+        nextOffset: stage?.nextOffset ?? null,
+        hasMore: stage?.hasMore ?? false,
+      },
+      counts: {
+        totalCount: stage?.totalCount ?? changedInstrumentCount,
+        processedCount: stage?.processedCount ?? 0,
+        succeededCount: stage?.succeededCount ?? 0,
+        partialCount: stage?.partialCount ?? 0,
+        failedCount: stage?.failedCount ?? 0,
+        skippedCount: stage?.skippedCount ?? 0,
+        unchangedCount: stage?.unchangedCount ?? 0,
+      },
+      warnings: stage?.warnings ?? [],
+      errors: stage?.errors ?? [],
+      startedAt: stage?.startedAt ?? null,
+      completedAt: stage?.completedAt ?? null,
+    };
+  }
+
+  private scheduledResponseFromStage(
+    status: ScheduledDataQualityStageResponse['status'],
+    request: ScheduledDataQualityStageRequest,
+    normalizedScope: ReturnType<PipelineOrchestrationService['normalizeScope']>,
+    stage: PipelineStageRunRecord,
+    inputFingerprint: string,
+    batchSize: number,
+    changedInstrumentCount: number
+  ): ScheduledDataQualityStageResponse {
+    return {
+      status,
+      pipelineRunId: stage.pipelineRunId,
+      stageRunId: stage.id,
+      stageKey: 'DATA_QUALITY',
+      scope: {
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        timeframe: normalizedScope.timeframe,
+        pipelineKey: request.pipelineKey,
+      },
+      triggerType: 'scheduled',
+      dataThroughDate: request.dataThroughDate,
+      inputFingerprint: stage.inputFingerprint || inputFingerprint,
+      outputFingerprint: stage.outputFingerprint || null,
+      batch: {
+        totalInstrumentCount: changedInstrumentCount,
+        processedCount: stage.processedCount,
+        batchSize: stage.batchSize ?? batchSize,
+        nextOffset: stage.nextOffset,
+        hasMore: stage.hasMore,
+      },
+      counts: {
+        totalCount: stage.totalCount,
+        processedCount: stage.processedCount,
+        succeededCount: stage.succeededCount,
+        partialCount: stage.partialCount,
+        failedCount: stage.failedCount,
+        skippedCount: stage.skippedCount,
+        unchangedCount: stage.unchangedCount,
+      },
+      warnings: stage.warnings,
+      errors: stage.errors,
+      startedAt: stage.startedAt,
+      completedAt: stage.completedAt,
+    };
   }
 }
 

@@ -125,6 +125,20 @@ The frontend owns user-triggered orchestration across batches and shows progress
 
 The backend remains bounded at a maximum `batchSize` of 100. The frontend overlaps independent offsets after the first batch discovers `totalCount`, then refreshes the visible table and summary after completion.
 
+## Scheduled Stage Adapter (01C)
+
+The module now exposes a scheduler-only adapter:
+
+- `DataQualityEngineService.evaluateScheduledStage({ instrumentIds, region, assetType, batchSize })`
+
+Adapter contract:
+
+- consumes explicit changed instrument ids only;
+- performs DB-only reads through Market Data Foundation public batch methods (`getInstrumentsByIds`, `listRecentPriceWindowsByInstrumentIds`, `storedFundamentalsByInstrumentIds`) plus bounded per-instrument stored corporate-actions reads;
+- does not call provider/live HTTP flows;
+- persists one latest evaluation per changed instrument via existing upsert behavior;
+- preserves existing readiness/tier semantics including `automation = BLOCKED` with `PHASE0_AUTOMATION_NOT_AUTHORIZED`.
+
 ## Frontend UX
 
 `DataQualityEnginePage` follows the shared UX guidance:

@@ -2144,6 +2144,58 @@ Parallel-safety note:
 
 No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run.
 
+## Team 03 Architect Signoff - CF-W3-MDPIPE-01C Data Quality Scheduled Stage - 2026-05-25
+
+Assignment: perform architect signoff for `CF-W3-MDPIPE-01C` after Team 04 QA `ACCEPT` and Team 10 code review `ACCEPT`, limited to the scheduled Data Quality stage backend slice and allowed architecture documentation outputs only.
+
+Files inspected:
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W3-MDPIPE-01C-data-quality-scheduled-stage-architecture.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W3-MDPIPE-01C-data-quality-scheduled-stage-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W3-MDPIPE-01C-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W3-MDPIPE-01C-developer-handoff.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W3-MDPIPE-01C-qa-verification.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W3-MDPIPE-01C-code-review.md`
+- `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.scheduler.ts`
+- `backend/src/modules/market-data-foundation/market-data-foundation.types.ts`
+- `backend/src/modules/pipeline-orchestration/pipeline-orchestration.service.ts`
+- `backend/src/modules/pipeline-orchestration/pipeline-orchestration.types.ts`
+- `backend/src/modules/pipeline-orchestration/index.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.service.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
+- `backend/src/modules/data-quality-engine/index.ts`
+- `backend/tests/modules/market-data-foundation/market-data.scheduler.test.ts`
+- `backend/tests/modules/market-data-foundation/market-data.service.test.ts`
+- `backend/tests/modules/pipeline-orchestration/pipeline-orchestration.service.test.ts`
+- `backend/tests/modules/data-quality-engine/data-quality-engine.service.test.ts`
+
+Files written:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W3-MDPIPE-01C-architect-signoff.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Verdict:
+
+- `ACCEPT`
+
+Architecture evidence summary:
+
+- scheduled DQ fanout is limited to `MarketDataFoundationScheduler.runOnce()` scheduled passes only;
+- startup paths explicitly use `triggerType: 'startup'` and do not fan out into DQ in this child;
+- changed-set evidence is derived only from inserted/updated Market Data rows in the current pass;
+- empty changed sets stay empty and hard-skip rather than widening into region-wide DQ;
+- the scheduled adapter remains DB-only through stored Market Data reads and preserves the automation block;
+- pipeline ledger idempotency, duplicate-terminal replay, and lease-held behavior match the approved contract;
+- no forbidden route/server/schema/frontend/package/shared-utility/downstream scope was introduced in the reviewed slice.
+
+Next gate:
+
+- Team 00 delegated Product Owner acceptance and scoped commit.
+
+No tests, builds, Prisma commands, services, providers, UI checks, Playwright runs, commits, or pushes were run by Team 03 in this signoff pass.
+
 ## Team 03 DQ-01A Passive Contract Prep - 2026-05-20
 
 Assignment: prepare architecture readiness for `CF-W1-L3-DQ-01A` as the next Lane 3 passive-readiness contract after accepted `PORT-01B` and ahead of `DQ-01B` / `INTEL-02`, without editing application code, tests, Team 02 requirement docs, Team 04 QA docs, `WATCH-01` docs, or the other Team 03 `INTEL-02` packet.

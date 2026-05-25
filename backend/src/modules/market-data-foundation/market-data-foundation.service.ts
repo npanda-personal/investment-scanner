@@ -3610,16 +3610,21 @@ export class MarketDataFoundationService {
       region,
       assetType,
       tradingDate,
+      dataThroughDate: targetTradingDate,
       instrumentsProcessed: 0,
       rowsReceived: 0,
       rowsInserted: 0,
       rowsUpdated: 0,
       rowsSkipped: 0,
       rowsNoOp: 0,
+      changedInstrumentIds: [],
+      changedInstrumentCount: 0,
+      dqStageEligible: false,
       warningCount: 0,
       warnings: [],
       errors: [],
     };
+    const changedInstrumentIds = new Set<string>();
 
     await this.repository.upsertSyncState({ region, assetType, tradingDate, status: 'PENDING', summary, lastCheckedAt: now });
 
@@ -3633,6 +3638,9 @@ export class MarketDataFoundationService {
     for (const taskId of officialBulk.matchedTaskIds) {
       const taskSummary = officialBulk.summaryByTaskId.get(taskId);
       if (!taskSummary) continue;
+      if ((taskSummary.rowsInserted || 0) > 0 || (taskSummary.rowsUpdated || 0) > 0) {
+        changedInstrumentIds.add(taskId);
+      }
       summary.instrumentsProcessed += 1;
       summary.rowsReceived += taskSummary.rowsReceived || 0;
       summary.rowsInserted += taskSummary.rowsInserted || 0;
@@ -3665,10 +3673,26 @@ export class MarketDataFoundationService {
         summary.rowsNoOp += result.rowsNoOp ?? 0;
         summary.warningCount += result.warningCount;
         summary.warnings.push(...(result.warnings || []));
+        if (result.rowsInserted > 0 || result.rowsUpdated > 0) {
+          changedInstrumentIds.add(task.id);
+        }
       } catch (error) {
         summary.errors.push(`${task.symbol}: ${error instanceof Error ? error.message : 'unknown error'}`);
       }
     }
+    const sortedChangedInstrumentIds = [...changedInstrumentIds].sort((a, b) => a.localeCompare(b));
+    summary.changedInstrumentIds = sortedChangedInstrumentIds;
+    summary.changedInstrumentCount = sortedChangedInstrumentIds.length;
+    summary.dqStageEligible = sortedChangedInstrumentIds.length > 0;
+    summary.sourceFingerprint = summary.officialEodBulk?.sourceFingerprint
+      || this.scheduledRegionSourceFingerprint({
+        region,
+        assetType,
+        dataThroughDate: targetTradingDate,
+        rowsInserted: summary.rowsInserted,
+        rowsUpdated: summary.rowsUpdated,
+        changedInstrumentIds: sortedChangedInstrumentIds,
+      });
 
     const latestTradingDate = await this.repository.latestStoredTradingDateForRegion(region, assetType);
     const decisionAfterRun = shouldRunMarketDataSync(region, now, {
@@ -9388,6 +9412,18 @@ export class MarketDataFoundationService {
       region,
       assetType,
       tradingDate,
+      dataThroughDate: tradingDate,
+      sourceFingerprint: this.scheduledRegionSourceFingerprint({
+        region,
+        assetType,
+        dataThroughDate: tradingDate,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        changedInstrumentIds: [],
+      }),
+      changedInstrumentIds: [],
+      changedInstrumentCount: 0,
+      dqStageEligible: false,
       instrumentsProcessed: 0,
       rowsReceived: 0,
       rowsInserted: 0,
@@ -9405,6 +9441,25 @@ export class MarketDataFoundationService {
       warnings: [message],
       errors: [],
     };
+  }
+
+  private scheduledRegionSourceFingerprint(input: {
+    region: string;
+    assetType: string;
+    dataThroughDate: string;
+    rowsInserted: number;
+    rowsUpdated: number;
+    changedInstrumentIds: string[];
+  }): string {
+    const payload = [
+      input.region,
+      input.assetType,
+      input.dataThroughDate,
+      String(input.rowsInserted),
+      String(input.rowsUpdated),
+      input.changedInstrumentIds.join(','),
+    ].join('|');
+    return `scheduled-region:${createHash('sha256').update(payload).digest('hex').slice(0, 16)}`;
   }
 
   private skipMessage(scopeType: 'CATALOG' | 'INSTRUMENT', reason: MarketDataSyncSkipReason): string {

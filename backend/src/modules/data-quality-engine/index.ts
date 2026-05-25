@@ -13,6 +13,8 @@ export type {
   DataQualityFilterResult,
   DataQualityQuery,
   DataQualityStatus,
+  DataQualityScheduledEvaluateRequest,
+  DataQualityScheduledEvaluateResponse,
   DataQualitySummary,
   LiquidityStatus,
   PriceForQuality,

@@ -95,10 +95,15 @@ Gate status:
 - `CF-W3-MDPIPE-01B6` Team 08 review-reject rework is complete.
 - Team 04 reran B6 QA and accepted the compact Data Quality indicator.
 - Team 10 re-reviewed and accepted B6.
-- B6 next gate is Team 03 Architect Signoff.
+- Team 03 signed off B6.
+- Team 00 accepted B6 under standing Product Owner delegation.
+- B6 scoped local commit is in progress.
 - `CF-W3-MDPIPE-01C` Team 05 backend implementation is complete and developer-validated.
 - Team 04 verified and accepted 01C.
-- 01C next gate is Team 10 review.
+- Team 10 reviewed and accepted 01C.
+- Team 03 signed off 01C.
+- Team 00 accepted 01C under standing Product Owner delegation.
+- 01C scoped local commit is in progress.
 
 Parallel routing:
 
@@ -107,10 +112,9 @@ Parallel routing:
 
 Teams ready to pick up new tasks:
 
-- Team 03: `CF-W3-MDPIPE-01B6` Architect Signoff.
-- Team 10: `CF-W3-MDPIPE-01C` Code Review.
-- Team 03: 01C Architect Signoff after Team 10 acceptance.
-- Team 00: delegated Product Owner acceptance and scoped commit after signoff.
+- Team 00: complete 01C staged-scope verification and local commit.
+- Team 00: complete B6 staged-scope verification and local commit.
+- Team 04: `CF-W3-MDPIPE-01B5` QA planning is complete; Team 00 may evaluate B5 Ready promotion after 01C commit clears.
 
 ## Latest Team 00 Routing Update - Pipeline Command API Accepted
 

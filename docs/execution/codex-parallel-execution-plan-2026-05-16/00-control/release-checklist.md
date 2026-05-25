@@ -73,7 +73,7 @@ Skipped:
 
 Date: 2026-05-25
 
-Status: Accepted under standing delegation. Scoped local commit is in progress.
+Status: Accepted and locally committed as `fb57cb0 feat: add data quality pipeline status strip`.
 
 Evidence:
 
@@ -102,3 +102,38 @@ Release notes:
 - `/pipeline-ops` remains the Bulk Pipeline Dashboard for Monitoring and OPS.
 - `/data-quality` now shows only a compact read-only status strip.
 - B5 control removal remains a separate blocked slice.
+
+## CF-W3-MDPIPE-01C - Scheduled Data Quality Stage
+
+Date: 2026-05-25
+
+Status: Accepted under standing delegation. Scoped local commit is in progress.
+
+Evidence:
+
+- Requirement: `10-requirements/CF-W3-MDPIPE-01-incremental-market-data-pipeline-requirement.md`
+- Architecture: `03-architecture/CF-W3-MDPIPE-01C-data-quality-scheduled-stage-architecture.md`
+- Contract: `06-contracts/CF-W3-MDPIPE-01C-data-quality-scheduled-stage-contract.md`
+- Work packet: `08-work-packets/CF-W3-MDPIPE-01C-work-packet.md`
+- QA verification: `04-qa/CF-W3-MDPIPE-01C-qa-verification.md`
+- Code review: `18-integration-queue/CF-W3-MDPIPE-01C-code-review.md`
+- Architect signoff: `03-architecture/CF-W3-MDPIPE-01C-architect-signoff.md`
+- PO acceptance: `09-summaries/CF-W3-MDPIPE-01C-po-acceptance-packet.md`
+
+Validation:
+
+- Focused backend scheduled-stage tests passed: 4 suites / 181 tests.
+- Backend build passed.
+- Pipeline Orchestration regression tests passed: 4 suites / 26 tests.
+
+Skipped:
+
+- Frontend/browser checks, because this is a backend-only scheduled-stage slice.
+- Provider/live execution, because this slice is DB-only and provider-free.
+- Startup fanout and downstream fanout, because both remain out of scope.
+
+Release notes:
+
+- Scheduled Market Data can now trigger a ledgered Data Quality stage only for changed instruments from the current scheduled pass.
+- Empty changed sets do not widen into full-scope Data Quality.
+- Existing manual Pipeline Ops Data Quality command behavior is preserved.

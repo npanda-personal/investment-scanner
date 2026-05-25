@@ -445,6 +445,16 @@ For scheduled `IN/STOCK` runs, the service first attempts one official NSE secur
 
 The scheduler avoids overlapping runs with an in-process lock. Each region is evaluated independently, so `IN,US` will only run the region whose market window is useful at that moment.
 
+For each scheduled region run, the internal summary now includes additive changed-set evidence for downstream scheduled Data Quality orchestration:
+
+- `dataThroughDate`
+- `sourceFingerprint`
+- `changedInstrumentIds` (sorted, unique)
+- `changedInstrumentCount`
+- `dqStageEligible`
+
+In `01C`, scheduled Data Quality fanout is allowed only from normal scheduled runs and only when `dqStageEligible=true` with a non-empty changed set. Startup-triggered Market Data runs do not fan out into scheduled Data Quality in this slice.
+
 ### Sync Freshness Gate
 
 The module distinguishes two different outcomes:

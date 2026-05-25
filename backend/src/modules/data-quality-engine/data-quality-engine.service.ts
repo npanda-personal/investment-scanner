@@ -9,6 +9,8 @@ import type {
   DataQualityFilterResult,
   DataQualityListResponse,
   DataQualityQuery,
+  DataQualityScheduledEvaluateRequest,
+  DataQualityScheduledEvaluateResponse,
   DataQualityTierEvidence,
   DataQualityUseCaseTiers,
   LiquidityStatus,
@@ -150,6 +152,80 @@ export class DataQualityEngineService {
       evaluatedCount,
       skippedCount: Math.max(0, processedCount - evaluatedCount - failedCount),
       failedCount,
+      warnings,
+      durationMs: Date.now() - started,
+    };
+  }
+
+  async evaluateScheduledStage(request: DataQualityScheduledEvaluateRequest): Promise<DataQualityScheduledEvaluateResponse> {
+    const started = Date.now();
+    const normalizedIds = [...new Set((request.instrumentIds || []).map((id) => String(id || '').trim()).filter(Boolean))];
+    const region = String(request.region || '').trim().toUpperCase();
+    const assetType = String(request.assetType || '').trim().toUpperCase();
+    if (normalizedIds.length === 0) {
+      return {
+        processedCount: 0,
+        totalCount: 0,
+        evaluatedCount: 0,
+        failedCount: 0,
+        skippedCount: 0,
+        warnings: [],
+        durationMs: Date.now() - started,
+      };
+    }
+
+    const [instruments, priceWindowsByInstrumentId, fundamentalsByInstrumentId] = await Promise.all([
+      this.marketDataService.getInstrumentsByIds(normalizedIds),
+      this.marketDataService.listRecentPriceWindowsByInstrumentIds(normalizedIds, 300, { region, assetType }),
+      this.marketDataService.storedFundamentalsByInstrumentIds(normalizedIds, { region, assetType }),
+    ]);
+
+    const instrumentById = new Map(
+      instruments
+        .filter((instrument: any) => this.matchesScheduledScope(instrument, region, assetType))
+        .map((instrument: any) => [String(instrument.id), instrument])
+    );
+
+    let evaluatedCount = 0;
+    let failedCount = 0;
+    let skippedCount = 0;
+    const warnings: string[] = [];
+    const concurrency = Math.max(1, Math.min(this.positiveNumber(request.batchSize, 25), MAX_EVALUATION_CONCURRENCY));
+
+    await this.eachWithConcurrency(normalizedIds, concurrency, async (instrumentId) => {
+      const instrument = instrumentById.get(instrumentId);
+      if (!instrument) {
+        skippedCount += 1;
+        warnings.push(`${instrumentId}: instrument missing or out of scope`);
+        return;
+      }
+
+      try {
+        const [actionsResponse, latestSignal] = await Promise.all([
+          this.marketDataService.storedCorporateActionsByInstrumentId(instrumentId, { region, assetType }).catch(() => ({ actions: [] })),
+          this.signalService?.signalHistory({ instrumentId, limit: 1 }).catch(() => []) ?? Promise.resolve([]),
+        ]);
+        const priceWindow = priceWindowsByInstrumentId.get(instrumentId) || [];
+        const prices = this.normalizePrices(priceWindow);
+        const latestPrice = prices[0] || null;
+        const fundamentalsResponse = fundamentalsByInstrumentId.get(instrumentId) || { records: [] };
+        const fundamentals = fundamentalsResponse.records || [];
+        const actions = actionsResponse?.actions || [];
+        const evaluated = this.evaluateInstrument(instrument, prices, latestPrice, fundamentals, actions, latestSignal.length > 0);
+        await this.repository.upsertEvaluation(evaluated);
+        evaluatedCount += 1;
+      } catch (error: any) {
+        failedCount += 1;
+        warnings.push(`${instrument.symbol || instrumentId}: ${error?.message || 'evaluation failed'}`);
+      }
+    });
+
+    return {
+      processedCount: normalizedIds.length,
+      totalCount: normalizedIds.length,
+      evaluatedCount,
+      failedCount,
+      skippedCount,
       warnings,
       durationMs: Date.now() - started,
     };
@@ -566,5 +642,14 @@ export class DataQualityEngineService {
     if (text.includes('Fundamentals')) fixes.add('Sync or add fundamentals.');
     if (text.includes('Volume')) fixes.add('Refresh price history with volume data.');
     return [...fixes];
+  }
+
+  private matchesScheduledScope(instrument: any, region: string, assetType: string): boolean {
+    const instrumentRegion = this.optionalText(instrument?.region)?.toUpperCase();
+    const instrumentAssetType = this.optionalText(instrument?.asset_type ?? instrument?.assetType)?.toUpperCase();
+    if (instrumentRegion && instrumentRegion !== region) return false;
+    if (!instrumentAssetType) return assetType === 'STOCK';
+    if (assetType === 'STOCK') return instrumentAssetType === 'STOCK' || instrumentAssetType === 'EQUITY';
+    return instrumentAssetType === assetType;
   }
 }

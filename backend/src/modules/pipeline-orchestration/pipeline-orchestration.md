@@ -118,3 +118,22 @@ Downstream stages should use this ledger to stay incremental:
 - write counts and warnings so screens can show last run status without recomputing large datasets.
 
 The ledger is the prerequisite for wiring automatic Data Quality and downstream stages safely.
+
+## Scheduled Data Quality Stage (01C)
+
+This slice adds a ledgered scheduled `DATA_QUALITY` stage adapter entrypoint:
+
+- caller: `MarketDataFoundationScheduler.runOnce()` only;
+- trigger type: `scheduled`;
+- scope: `region + assetType + timeframe(1d) + pipelineKey(market-intelligence)`;
+- input set: explicit changed instrument ids from the same scheduled Market Data pass;
+- idempotency key: deterministic key over scope, data-through date, source fingerprint, changed-set fingerprint, and stage version;
+- lease behavior: terminal duplicate returns `DUPLICATE_TERMINAL`, active lease returns `LEASE_HELD`, and no duplicate execution is allowed;
+- execution: DB-only Data Quality adapter over explicit instrument ids;
+- completion: stage/run terminal counts and progress persisted with lease cleared on completion/failure.
+
+Out of scope in this slice:
+
+- startup fanout into scheduled Data Quality;
+- command/API-triggered scheduled stage execution;
+- downstream fanout beyond `DATA_QUALITY`.

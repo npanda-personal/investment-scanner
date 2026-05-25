@@ -44,5 +44,8 @@ export type {
   PipelineStatusSnapshot,
   PipelineStatusStageDto,
   PipelineStatusStageGroupDto,
+  ScheduledDataQualityStageRequest,
+  ScheduledDataQualityStageResponse,
+  ScheduledDataQualityStageStatus,
   PipelineTriggerType,
 } from './pipeline-orchestration.types';

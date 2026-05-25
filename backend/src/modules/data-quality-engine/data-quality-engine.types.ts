@@ -126,6 +126,23 @@ export interface DataQualityEvaluateResponse {
   durationMs: number;
 }
 
+export interface DataQualityScheduledEvaluateRequest {
+  instrumentIds: string[];
+  region: string;
+  assetType: string;
+  batchSize: number;
+}
+
+export interface DataQualityScheduledEvaluateResponse {
+  processedCount: number;
+  totalCount: number;
+  evaluatedCount: number;
+  failedCount: number;
+  skippedCount: number;
+  warnings: string[];
+  durationMs: number;
+}
+
 export interface DataQualityFilterOptions {
   minSignalReadinessScore?: number;
   allowedReadinessStatuses?: SignalReadinessStatus[];

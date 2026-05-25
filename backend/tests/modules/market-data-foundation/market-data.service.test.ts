@@ -1682,7 +1682,16 @@ describe('MarketDataFoundationService syncV1', () => {
       now: new Date('2026-05-05T10:30:00.000Z'),
     });
 
-    expect(summary).toMatchObject({ rowsNoOp: 1, rowsInserted: 0, rowsUpdated: 0 });
+    expect(summary).toMatchObject({
+      rowsNoOp: 1,
+      rowsInserted: 0,
+      rowsUpdated: 0,
+      dataThroughDate: '2026-05-05',
+      changedInstrumentIds: [],
+      changedInstrumentCount: 0,
+      dqStageEligible: false,
+    });
+    expect(summary.sourceFingerprint).toEqual(expect.any(String));
     expect(service.ingestSymbol).toHaveBeenCalledWith(
       'AAPL',
       undefined,
@@ -1700,6 +1709,73 @@ describe('MarketDataFoundationService syncV1', () => {
       tradingDate: '2026-05-05',
       status: 'FINAL_CONFIRMED',
     }));
+  });
+
+  it('adds changed-set evidence only for instruments with inserted or updated rows', async () => {
+    const previousFlag = process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED;
+    process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED = 'false';
+    const tasks = [
+      {
+        id: 'stock-1',
+        symbol: 'CHANGED.NS',
+        providerSymbol: 'CHANGED.NS',
+        sourceSymbol: 'CHANGED',
+        displaySymbol: 'CHANGED',
+        lastSuccessfulDataLoadTimestamp: null,
+      },
+      {
+        id: 'stock-2',
+        symbol: 'UNCHANGED.NS',
+        providerSymbol: 'UNCHANGED.NS',
+        sourceSymbol: 'UNCHANGED',
+        displaySymbol: 'UNCHANGED',
+        lastSuccessfulDataLoadTimestamp: null,
+      },
+    ];
+    const repository = {
+      listActiveStockSyncTasks: jest.fn().mockResolvedValue(tasks),
+      upsertSyncState: jest.fn().mockResolvedValue({}),
+      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue('2026-05-05'),
+      getSyncState: jest.fn().mockResolvedValue(null),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+    jest.spyOn(service, 'ingestSymbol')
+      .mockResolvedValueOnce({
+        rowsReceived: 1,
+        rowsInserted: 1,
+        rowsUpdated: 0,
+        rowsSkipped: 0,
+        rowsNoOp: 0,
+        warningCount: 0,
+        warnings: [],
+      })
+      .mockResolvedValueOnce({
+        rowsReceived: 1,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsSkipped: 0,
+        rowsNoOp: 1,
+        warningCount: 0,
+        warnings: [],
+      });
+
+    try {
+      const summary = await service.syncScheduledRegion('IN', {
+        assetType: 'STOCK',
+        batchSize: 2,
+        now: new Date('2026-05-05T10:30:00.000Z'),
+      });
+
+      expect(summary).toMatchObject({
+        changedInstrumentIds: ['stock-1'],
+        changedInstrumentCount: 1,
+        dqStageEligible: true,
+      });
+      expect(summary.sourceFingerprint).toEqual(expect.any(String));
+    } finally {
+      if (previousFlag === undefined) delete process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED;
+      else process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED = previousFlag;
+    }
   });
 
   it('uses per-symbol stored candle basis for scheduled stale catch-up', async () => {
