@@ -6,6 +6,73 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+2026-05-25 Team 00 Ready promotion - `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME`:
+
+- `CF-W2-TSC-05A` is promoted and assigned to Team 07.
+- Current gate state: Ready for Implementation after Team 03 architecture, Team 04 QA planning, accepted `CF-W2-TSC-04A` base commit `68f0a19`, exact file reservations, and open-decision check.
+- Purpose: remove target/reward, reward/risk, paper-review/paper-readiness, target quality/method, and trade-plan geometry from Today Review trusted candidate rank/state/promotion/eligibility/score/reason/explainability semantics.
+- Branch: `codex/team07-portfolio-alerts/CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team07-CF-W2-TSC-05A`.
+- Required base: accepted `CF-W2-TSC-04A` commit `68f0a19 feat: clean today review candidate language`.
+- Base verification: `git merge-base --is-ancestor 68f0a19 HEAD` returned `BASE_OK`.
+- Gate evidence:
+  - Requirement: `10-requirements/CF-W2-TSC-05-today-review-no-target-ranking-and-eligibility-reframe-requirement.md`
+  - Architecture review: `03-architecture/CF-W2-TSC-05-architecture-review.md`
+  - Contract: `06-contracts/CF-W2-TSC-05-today-review-no-target-ranking-eligibility-contract.md`
+  - Work packet: `08-work-packets/CF-W2-TSC-05-work-packet.md`
+  - QA plan: `04-qa/CF-W2-TSC-05A-today-review-ranking-eligibility-qa-plan.md`
+  - Ready promotion: `13-implementation-evidence/CF-W2-TSC-05A-ready-promotion.md`
+  - Open decisions: none.
+- Allowed implementation files:
+  - `backend/src/modules/today-trade-review/today-trade-review.types.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.service.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.md`
+  - `backend/tests/modules/today-trade-review/today-trade-review.service.test.ts`
+  - `frontend/src/features/today-trade-review/types.ts`
+  - `frontend/src/features/today-trade-review/components/TodayReviewPage.tsx`
+  - `frontend/src/features/today-trade-review/components/TodayReviewCandidateDetailPage.tsx`
+  - `frontend/tests/ui/today-trade-review.spec.ts`
+- Allowed reporting docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-07-CF-W2-TSC-05A-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W2-TSC-05A-developer-handoff.md`
+- Forbidden scope:
+  - Today Review repository/controller/router/validation/module/index files
+  - `frontend/src/features/today-trade-review/api/**`
+  - `frontend/src/features/today-trade-review/hooks/**`
+  - `frontend/src/features/today-trade-review/routes.tsx`
+  - backend/frontend route registries
+  - Prisma schema, migrations, generated files
+  - package manifests
+  - shared backend utilities or shared frontend components
+  - upstream/downstream module source/tests outside the reserved Today Review file set
+  - `backend/src/modules/trade-plan-risk-engine/**`
+  - `backend/src/modules/strategy-decision-engine/**`
+  - `backend/src/modules/signal-generation-engine/**`
+  - `backend/src/modules/data-quality-engine/**`
+  - `backend/src/modules/signal-calibration-engine/**`
+  - `backend/src/modules/backtesting-strategy-lab/**`
+  - `frontend/src/features/data-quality-engine/**`
+  - `frontend/src/features/pipeline-ops/**`
+  - provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credentials
+- Required validation:
+
+```powershell
+git merge-base --is-ancestor 68f0a19 HEAD
+cd backend
+npm.cmd test -- today-trade-review.service.test.ts --runInBand
+npm.cmd run build
+```
+
+```powershell
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- today-trade-review.spec.ts --workers=1
+```
+
+```powershell
+rg -n "R:R|reward/risk|target / reward|target/reward|modeled reward|paper review|paper-readiness|trade-plan geometry|Trade-plan proof-chain|ready for paper review|buy now|sell now|must buy|must sell|financial advice" backend/src/modules/today-trade-review backend/tests/modules/today-trade-review frontend/src/features/today-trade-review frontend/tests/ui/today-trade-review.spec.ts
+```
+
 2026-05-25 Team 00 Ready promotion - `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE`:
 
 - `CF-W2-TSC-04A` is promoted and assigned to Team 07.

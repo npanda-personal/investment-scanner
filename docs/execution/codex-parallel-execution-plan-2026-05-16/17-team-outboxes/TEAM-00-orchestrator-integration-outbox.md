@@ -1,5 +1,37 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - TSC-05A Promoted / DQ Residual Routed
+
+Date: 2026-05-25
+
+Status:
+
+- Branch: `dev`.
+- Open decisions: 0.
+- Product Owner action required: no.
+- Push performed: no.
+- TSC-05A worktree: `C:\work\repo\investment-scanner-worktrees\team07-CF-W2-TSC-05A`.
+- TSC-05A branch: `codex/team07-portfolio-alerts/CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY`.
+- Required base: `68f0a19 feat: clean today review candidate language`.
+
+Gate movement:
+
+- Team 04 accepted `CF-W2-TSC-05A` QA planning against accepted base `68f0a19`.
+- Team 00 verified the TSC-05A worktree is clean and `git merge-base --is-ancestor 68f0a19 HEAD` passes.
+- Team 00 promoted `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` to Team 07.
+- Team 02 resolved the DQ residual direction as read-time reconstruction, not durable schema by default.
+- Team 00 routed `CF-W1-DQ-02` residual to Team 03 for docs-only read-side/public-contract architecture prep.
+
+Teams ready to pick up new tasks:
+
+- Team 07: implement `CF-W2-TSC-05A` in the dedicated stacked worktree.
+- Team 03: prepare `CF-W1-DQ-02` read-side/public-contract architecture packet.
+- Team 04: QA Verification after Team 07 handoff.
+- Team 10: Code Review after Team 04 acceptance.
+- Team 02: rolling direct-value backlog after current dispatch.
+
+---
+
 ## Latest Runtime Checkpoint - TSC-04A Accepted And TSC-05A Re-Anchor
 
 Date: 2026-05-25

@@ -1,5 +1,88 @@
 # TEAM-02 Requirement Factory
 
+## Team 02 CF-W1-DQ-02 Residual Product Decision - 2026-05-25
+
+Root `AGENTS.md` was read first. Team 02 stayed docs-only, wrote only inside the allowed requirement files plus this outbox, and did not touch application code, tests, manifests, Prisma/schema, route registries, shared UI, Team 00 control docs, or historical execution docs.
+
+### Work Item
+
+Resolve the product/requirements side of the residual `CF-W1-DQ-02` blocker after Team 03 reported there is no honest bounded no-schema child left after accepted `CF-W1-DQ-02A` commit `c2d6753`.
+
+### Files Inspected
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-DQ-02-dq-currentness-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-DQ-02-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-DQ-02B-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-DQ-02-dq-currentness-evidence-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-DQ-02B-dq-currentness-public-read-path-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/blocked-by-upstream-dependency.md`
+- `backend/src/modules/data-quality-engine/data-quality-engine.service.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.repository.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-DQ-02-residual-read-side-currentness-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+### Required Decision Output
+
+Decision: define a read-time reconstruction requirement for the residual `CF-W1-DQ-02` gap.
+
+Rejected alternatives:
+
+- defer entirely: rejected because investor/trader trust still needs one truthful DQ currentness story across summary/list/diagnostics/latest-read paths;
+- require durable persisted currentness now: rejected because Product value does not yet justify schema/storage work when the immediate need is present-time cross-surface truth rather than replayable historical currentness history.
+
+### Product Reason And User Value
+
+- Selective truth across DQ surfaces is worse than a visible blocker; it causes users to distrust both the list and the detail view.
+- Accepted `CF-W1-DQ-02A` already solved evaluator-local currentness. The remaining gap is public/read-side consistency.
+- Read-time reconstruction is the narrowest honest next product slice because it can unify currentness semantics across persisted DQ read paths without implying that the product already stores durable currentness history.
+- Durable persisted fields remain a possible later need, but only if the product later needs replayable historical currentness dates/reason codes or architecture proves truthful read-time reconstruction is insufficient.
+
+### Queue / Routing Result
+
+- Kept `CF-W2-TSC-05A` ahead of DQ residual work. This decision must not stop unrelated Today Review sequencing.
+- Replaced the vague `DQ-02` residual-parent queue wording with an explicit read-side reconstruction requirement.
+- Marked the residual as consent-gated and not Ready.
+- Recorded that Team 00, Team 02, and Architect can proceed without human Product Owner escalation for the next packet choice.
+
+### Assumptions
+
+- The current investor/trader need is latest truthful currentness across current DQ read paths, not durable historical replay.
+- Team 03's read-side/public-contract assessment is still current and accurate.
+
+### Risks And Blockers
+
+- Implementation is still blocked until Team 00 opens the explicit DQE read-side/public-contract packet.
+- Architecture may still discover that truthful or performant reconstruction requires durable fields; if so, the work must stop and reopen under separate schema consent.
+- `blocked-by-upstream-dependency.md` still references `CF-W1-DQ-02B`; Team 02 did not edit that file because it was outside the allowed write scope for this pass.
+
+### Shared-File Requests
+
+- None in this Team 02 pass.
+
+### Tests Run / Skipped
+
+- Tests run: none
+- Tests skipped: all
+- Reason: docs-only requirement decision pass
+
+### Next Gate
+
+- Team 00 should keep `CF-W2-TSC-05A` moving first.
+- After `TSC-05A` sequencing is underway, Team 00 can open the explicit DQE read-side/public-contract packet for Team 03 architecture prep.
+- Human Product Owner approval is not required for that next requirement-definition step unless the work widens into durable schema/storage consent.
+
 ## Team 02 Rolling PO Requirement Refresh - TSC-04A QA / TSC-05A Stacked Follow-On - 2026-05-25
 
 Root `AGENTS.md` was read first. Team 02 stayed docs-only, wrote only inside the reserved requirement folder and this outbox, and did not touch application code, tests, manifests, Prisma, shared files, Team 00 control docs, or historical docs.

@@ -2,6 +2,40 @@
 
 Date: 2026-05-24
 
+## Latest Runtime Checkpoint - TSC-05A Promoted / DQ Residual Routed
+
+Date: 2026-05-25
+
+Current status:
+
+- Branch: `dev`.
+- Open decisions: 0.
+- Product Owner action required: no.
+- Push performed: no.
+- Main workspace dirty scope: active execution docs only during this checkpoint.
+
+Gate movement:
+
+- `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` is Ready and assigned to Team 07.
+- Team 07 worktree: `C:\work\repo\investment-scanner-worktrees\team07-CF-W2-TSC-05A`.
+- Team 07 branch: `codex/team07-portfolio-alerts/CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY`.
+- Required base: accepted `CF-W2-TSC-04A` commit `68f0a19`.
+- Base verification passed in the TSC-05A worktree.
+- Team 02 created `CF-W1-DQ-02-residual-read-side-currentness-requirement.md` and selected read-time reconstruction as the DQ residual product path.
+- Team 03 is assigned docs-only architecture prep for the DQ residual read-side/public-contract packet.
+
+Teams ready to pick up new tasks:
+
+- Team 07: implement TSC-05A now.
+- Team 03: prepare DQ residual architecture now.
+- Team 04: QA Verification after Team 07 handoff.
+- Team 10: Code Review after Team 04 acceptance.
+- Team 02: continue rolling direct investor/trader-value discovery when next slot opens.
+
+Product Owner action required: no.
+
+---
+
 ## Latest Runtime Checkpoint - TSC-04A Accepted And TSC-05A Re-Anchor
 
 Date: 2026-05-25

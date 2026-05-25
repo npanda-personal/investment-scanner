@@ -34,6 +34,41 @@ No historical active work items have been migrated as active.
 - Rejected / Rework
 - Deferred
 
+## Latest Team 00 Routing Update - TSC-05A Promoted And DQ Residual Routed
+
+Date: 2026-05-25
+
+Gate status:
+
+- `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` is promoted to Team 07 as the next stacked Today Review implementation slice.
+- Branch: `codex/team07-portfolio-alerts/CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team07-CF-W2-TSC-05A`.
+- Required base: accepted `CF-W2-TSC-04A` commit `68f0a19 feat: clean today review candidate language`.
+- Base verification passed: `git merge-base --is-ancestor 68f0a19 HEAD`.
+- Team 04 QA plan is accepted in `04-qa/CF-W2-TSC-05A-today-review-ranking-eligibility-qa-plan.md`.
+- No open Product Owner decisions exist.
+
+Implementation boundary:
+
+- Team 07 may edit only the reserved Today Review service/types/doc/test and feature-local list/detail/spec files named in the Ready promotion.
+- Team 07 must remove target/R:R, paper-readiness, target quality/method, and trade-plan geometry from trusted candidate rank/state/promotion/eligibility/score/reason/explainability semantics.
+- Team 07 must preserve DQ hard gating, active signal health, supporting evidence, documented invalidation/risk context, and missing-evidence honesty.
+- Team 07 must stop if upstream Trade Plan, Strategy Decision, Signal Generation, DQE, schema, route, shared utility/UI, package, generated, provider/live, startup/backfill, or broad UI scope is needed.
+
+Parallel routing:
+
+- Team 03 owns docs-only architecture prep for the residual `CF-W1-DQ-02` read-side/public-contract reconstruction packet using Team 02's new requirement.
+- Team 04 stands by for TSC-05A QA verification after Team 07 handoff, and only prepares DQ QA after Team 03 confirms the exact packet.
+- Team 10 stands by for TSC-05A review after Team 04 acceptance.
+
+Teams ready to pick up new tasks:
+
+- Team 07: implement `CF-W2-TSC-05A` in the dedicated stacked worktree.
+- Team 03: prepare `CF-W1-DQ-02` read-side/public-contract architecture packet.
+- Team 04: QA Verification after Team 07 TSC-05A handoff.
+- Team 10: Code Review after Team 04 acceptance.
+- Team 02: continue rolling direct investor/trader-value requirements when a slot is open.
+
 ## Latest Team 00 Routing Update - TSC-04A Accepted And TSC-05A Re-Anchor
 
 Date: 2026-05-25

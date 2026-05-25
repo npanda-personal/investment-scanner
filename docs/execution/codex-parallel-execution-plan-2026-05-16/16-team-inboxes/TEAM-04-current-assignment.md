@@ -2,6 +2,25 @@
 
 Date: 2026-05-20
 
+## Latest Assignment Override - 2026-05-25 TSC-05A QA Standby
+
+Stand by for QA Verification on `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` after Team 07 submits a developer handoff from the stacked Today Review worktree.
+
+Team 04 has already accepted the planning artifact:
+
+- `04-qa/CF-W2-TSC-05A-today-review-ranking-eligibility-qa-plan.md`
+
+Expected worktree:
+
+- `C:\work\repo\investment-scanner-worktrees\team07-CF-W2-TSC-05A`
+- Required base check: `git merge-base --is-ancestor 68f0a19 HEAD`
+
+Do not run QA before a Team 07 handoff exists. When the handoff exists, verify the reserved Today Review file set, no upstream/schema/route/shared/package drift, backend focused tests/build, frontend build, worktree-targeted Today Review Playwright smoke, phrase scans, and compatibility-only raw-key review from the accepted QA plan.
+
+Secondary standby:
+
+- After Team 03 completes the `CF-W1-DQ-02` read-side/public-contract architecture packet, prepare the DQ QA plan only if Team 00 routes it. Do not infer Ready from the requirement alone.
+
 ## Latest Assignment Override - 2026-05-24 Trusted Signal Candidate Dependency
 
 Prepare docs-only QA planning for `CF-W1-SIG-TRIGGER-ENTRY-01` after Team 02/03 refine the requirement and architecture packet.

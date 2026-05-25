@@ -11,7 +11,7 @@ Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-
 | Rank | ID | Why it stays next | Team 00 routing note |
 | --- | --- | --- | --- |
 | 1 | `CF-W2-TSC-05` | Today Review ranking and eligibility still need a no-target reframe after accepted `TSC-04A` visible language cleanup. | Re-anchor `TSC-05A` to accepted `TSC-04A` commit `68f0a19`, then route Team 04 QA planning / Team 00 Ready evaluation. |
-| 2 | `CF-W1-DQ-02` residual parent | `DQ-02A` is complete, but the parent still has read-side/public-contract scope that may need a bounded no-schema child. | Route Team 03 to confirm or reject a bounded residual child after `TSC-05A` sequencing is underway. |
+| 2 | `CF-W1-DQ-02` residual read-side requirement | `DQ-02A` is complete, and Team 03 confirmed no honest no-schema child remains. Team 02 resolved the residual product choice as read-time reconstruction for DQE read paths, not durable storage by default. | Keep behind `TSC-05A`, then open an explicit DQE read-side/public-contract packet for Team 03 architecture prep. Do not imply Ready. If architecture proves durable storage is required, reopen under separate schema consent. |
 | 3 | `CF-W1-MD-02A` | Durable market-data evidence storage still has clear investor value, but it is consent-gated. | Blocked by schema/storage consent until Team 00 opens the durable evidence packet. |
 | 4 | `CF-W1-SQLAB-02B` | Durable Signal Quality learning memory remains useful after the current read/review trust slices. | Blocked by storage consent until Team 00 opens the durable memory packet. |
 | 5 | `CF-W1-STRAT-02B` | Durable strategy revision history still matters for explainability and review trust. | Blocked by schema/migration/generated/repository consent until Team 00 opens the revision-history packet. |
@@ -27,6 +27,7 @@ Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-
 - Team 03 has already defined `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME`; it should now be re-anchored to accepted `TSC-04A` commit `68f0a19`.
 - `CF-W1-TSC-02A-TREV-HEALTH` is accepted and locally committed as `34c9993`; Team 03 found no fresh executable `CF-W1-TSC-02` child remains under the current parent.
 - `CF-W1-DQ-02A` is accepted and locally committed as `c2d6753`; only the `DQ-02` residual parent stays in this stack behind active TSC/DQ work.
+- `CF-W1-DQ-02` residual product direction is now defined in `10-requirements/CF-W1-DQ-02-residual-read-side-currentness-requirement.md`; Team 00 no longer needs human Product Owner escalation to choose between read-time reconstruction and durable storage for the next packet.
 - `CF-W1-SQLAB-01` is accepted and locally committed as `1a41d95`; `CF-W1-SQLAB-02A` is promoted and assigned, so the next Signal Quality storage child remains `CF-W1-SQLAB-02B`.
 - `CF-W3-MDPIPE-01B5`, `CF-W3-MDPIPE-01B6`, and `CF-W3-MDPIPE-01C` stay in the pipeline lane and do not create a new Team 02 requirement gap in this pass.
 - `CF-W1-TP-03` remains paused/stale as framed. Do not revive Trade Plan proof freshness work unless it is fully reframed into Trusted Signal Candidate health with no targets or R:R leakage.
@@ -61,7 +62,7 @@ Reason: active, accepted, parked, blocked behind an accepted base, or already as
 ## Teams Ready For New Prep
 
 - Team 04: prepare `CF-W2-TSC-05A` QA planning against accepted `TSC-04A` commit `68f0a19`.
-- Team 03: ready for `CF-W1-DQ-02` residual architecture clarification after `TSC-05A` QA planning starts.
+- Team 03: ready for `CF-W1-DQ-02` residual read-side architecture prep after `TSC-05A` QA planning starts.
 - Team 02: keep rolling discovery active and keep the direct-value queue clean.
 - Team 07: standby for stacked `TSC-05A` after Team 00 Ready promotion.
 - Team 10: standby for the next QA-accepted handoff.

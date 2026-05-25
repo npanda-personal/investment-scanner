@@ -6,6 +6,108 @@ Team: TEAM-07 - Portfolio / Watchlist / Alerts
 
 Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automation-prompts/AUTO-07-portfolio-watchlist-alerts.md`
 
+## Latest Assignment Override - 2026-05-25 TSC-05A
+
+Team 00 promotes `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` as a bounded Today Review semantic cleanup slice stacked on accepted `CF-W2-TSC-04A`.
+
+You are not alone in the codebase. Other teams may be updating active execution docs and unrelated worktrees. Do not revert or overwrite edits made by others.
+
+Work item:
+
+- `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` - remove target/R:R and paper-readiness semantics from Today Review trusted candidate rank, state, promotion, eligibility, score, reason, and explainability logic.
+
+Branch / worktree:
+
+- Branch: `codex/team07-portfolio-alerts/CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team07-CF-W2-TSC-05A`
+- Required base: accepted `CF-W2-TSC-04A` commit `68f0a19 feat: clean today review candidate language`
+- Required preflight: `git merge-base --is-ancestor 68f0a19 HEAD`
+
+Evidence to use:
+
+- Requirement: `10-requirements/CF-W2-TSC-05-today-review-no-target-ranking-and-eligibility-reframe-requirement.md`
+- Architecture review: `03-architecture/CF-W2-TSC-05-architecture-review.md`
+- Contract: `06-contracts/CF-W2-TSC-05-today-review-no-target-ranking-eligibility-contract.md`
+- Work packet: `08-work-packets/CF-W2-TSC-05-work-packet.md`
+- QA plan: `04-qa/CF-W2-TSC-05A-today-review-ranking-eligibility-qa-plan.md`
+- Ready promotion: `13-implementation-evidence/CF-W2-TSC-05A-ready-promotion.md`
+- Ready handoff: `12-ready-queue/ready-for-implementation.md`
+
+Allowed files:
+
+- `backend/src/modules/today-trade-review/today-trade-review.types.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.service.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.md`
+- `backend/tests/modules/today-trade-review/today-trade-review.service.test.ts`
+- `frontend/src/features/today-trade-review/types.ts`
+- `frontend/src/features/today-trade-review/components/TodayReviewPage.tsx`
+- `frontend/src/features/today-trade-review/components/TodayReviewCandidateDetailPage.tsx`
+- `frontend/tests/ui/today-trade-review.spec.ts`
+
+Allowed reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-07-CF-W2-TSC-05A-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W2-TSC-05A-developer-handoff.md`
+
+Required behavior:
+
+- Remove target/reward, reward/risk, target quality/method, paper-review/paper-readiness, and trade-plan geometry from trusted candidate rank/state/promotion/eligibility/score/reason/explainability semantics.
+- Lite candidates must not rely on synthetic `2R` or `3R` target math for trusted rank or eligibility.
+- Compatibility fields such as target-shaped prices, reward ratios, target quality/method, `paperReadinessStatus`, or `TRADE_PLAN_PROOF_CHAIN` may remain readable only if compatibility-only and not trusted evidence.
+- Preserve DQ hard gating, active signal health, supporting evidence, documented invalidation/risk context, and missing-evidence honesty.
+- Keep Today Review compact and read-only for pipeline status; do not add page-local rerun, bulk refresh, or Pipeline Ops controls.
+- Keep wording research-support oriented and avoid direct buy/sell, guarantee, target-price, financial-advice, or Trade Plan-first framing.
+
+Forbidden files:
+
+- Today Review repository/controller/router/validation/module/index files
+- `frontend/src/features/today-trade-review/api/**`
+- `frontend/src/features/today-trade-review/hooks/**`
+- `frontend/src/features/today-trade-review/routes.tsx`
+- backend/frontend route registries
+- Prisma schema, migrations, generated files
+- package manifests
+- shared backend utilities or shared frontend components
+- upstream/downstream module source/tests outside the reserved Today Review file set
+- `backend/src/modules/trade-plan-risk-engine/**`
+- `backend/src/modules/strategy-decision-engine/**`
+- `backend/src/modules/signal-generation-engine/**`
+- `backend/src/modules/data-quality-engine/**`
+- `backend/src/modules/signal-calibration-engine/**`
+- `backend/src/modules/backtesting-strategy-lab/**`
+- `frontend/src/features/data-quality-engine/**`
+- `frontend/src/features/pipeline-ops/**`
+- provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential files
+
+Focused validation:
+
+```powershell
+git merge-base --is-ancestor 68f0a19 HEAD
+cd backend
+npm.cmd test -- today-trade-review.service.test.ts --runInBand
+npm.cmd run build
+```
+
+```powershell
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- today-trade-review.spec.ts --workers=1
+```
+
+The UI smoke must run against a dedicated frontend server started from the Team 07 `TSC-05A` worktree. Do not accept a stale default `127.0.0.1:5173` run as evidence.
+
+```powershell
+rg -n "R:R|reward/risk|target / reward|target/reward|modeled reward|paper review|paper-readiness|trade-plan geometry|Trade-plan proof-chain|ready for paper review|buy now|sell now|must buy|must sell|financial advice" backend/src/modules/today-trade-review backend/tests/modules/today-trade-review frontend/src/features/today-trade-review frontend/tests/ui/today-trade-review.spec.ts
+```
+
+Expected handoff:
+
+- Update `17-team-outboxes/TEAM-07-CF-W2-TSC-05A-outbox.md`.
+- Create/update `18-integration-queue/CF-W2-TSC-05A-developer-handoff.md`.
+- Record exact branch/worktree, base verification, changed files, inspected files, behavior changed, tests run, skipped checks, compatibility-only raw keys that remain, forbidden files confirmed untouched, risks, blockers, and next gate: Team 04 QA Verification.
+
+Stop and return to Team 00 if implementation needs any forbidden file, upstream semantic changes, route/schema/shared/package/provider/startup scope, or cannot separate rule-backed invalidation/risk from target-shaped compatibility semantics inside the reserved file set.
+
 ## Latest Assignment Override - 2026-05-25 TSC-04A
 
 Team 00 promotes `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE` as a bounded Today Review no-target candidate-language cleanup slice.

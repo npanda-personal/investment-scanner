@@ -6,6 +6,58 @@ Team: TEAM-03 - Architecture Factory
 
 Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automation-prompts/AUTO-03-architecture-factory.md`
 
+## Latest Assignment Override - 2026-05-25 DQ Residual Read-Side Packet
+
+Prepare docs-only architecture readiness for the residual `CF-W1-DQ-02` read-side/public-contract reconstruction packet.
+
+This assignment follows Team 02's product decision in `10-requirements/CF-W1-DQ-02-residual-read-side-currentness-requirement.md`: use read-time reconstruction as the default path, not durable persisted currentness fields. Do not open implementation or mark the item Ready unless the architecture, QA handoff, and exact file reservations are complete.
+
+Goal:
+
+- Define the smallest bounded DQE read-side/public-contract packet that gives `summary`, `list`, `diagnostics`, and latest-evaluation helper reads one truthful currentness story.
+- Prefer read-time reconstruction from authoritative current evidence and existing module-owned inputs.
+- Stop and report a true consent blocker only if truthful or performant reconstruction requires Prisma/schema/migration/generated changes, route registry changes, shared helpers, provider/live behavior, startup/backfill behavior, package changes, or broad frontend/UI work.
+- Keep `CF-W2-TSC-05A` as the active implementation priority; this is parallel architecture prep only.
+
+Allowed writes:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-DQ-02-read-side-currentness-architecture.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-DQ-02-read-side-currentness-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-DQ-02-read-side-currentness-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Read-only source inspection:
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-DQ-02-residual-read-side-currentness-requirement.md`
+- existing `CF-W1-DQ-02` requirement/architecture/contract/work-packet docs
+- `backend/src/modules/data-quality-engine/data-quality-engine.repository.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.service.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
+- `backend/src/modules/data-quality-engine/data-quality-engine.md`
+- focused DQE tests read-only as needed
+- Market Data Foundation docs/source read-only only to confirm current evidence ownership
+
+Forbidden writes:
+
+- application source or tests
+- Prisma schema or migrations
+- route registries
+- shared backend utilities
+- shared UI
+- package manifests
+- generated files
+- provider/live/startup/backfill files
+- frontend files
+
+Required output:
+
+- Architecture recommendation: `Ready candidate after QA`, `split required`, or `consent blocker`.
+- Exact allowed/forbidden file reservation if a bounded read-time reconstruction child is viable.
+- Explicit stop condition if durable persisted currentness or schema/storage becomes required.
+- QA handoff notes for cross-surface consistency, stale/current/session-unavailable/provider-gap cases, and fail-closed behavior.
+
 ## Latest Assignment Override - 2026-05-24 Trusted Signal Candidate Dependency
 
 Prepare docs-only architecture readiness for `CF-W1-SIG-TRIGGER-ENTRY-01`.

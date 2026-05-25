@@ -2,18 +2,18 @@
 
 Date: 2026-05-25
 
-Status: Team 00 routing correction after Team 03 confirmed `CF-W1-TSC-02` has no fresh executable child. `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE` is implemented in the Team 07 worktree, accepted by Team 04 QA and Team 10 review, and is now in Team 03 Architect Signoff. Team 03 has already prepared `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME`, but it remains intentionally blocked until accepted `TSC-04A` base evidence is recorded. Current main still contains pre-`TSC-04A` Today Review target/R:R and Trade Plan-first behavior, so `TSC-05A` must not start from current main. This file is a docs-only candidate view. Team 00 still owns Ready movement, exact file reservations, and one-writer sequencing.
+Status: Team 00 routing correction after Team 03 confirmed `CF-W1-TSC-02` has no fresh executable child and Team 02 resolved the `CF-W1-DQ-02` residual product choice. `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE` is accepted on Team 07 branch commit `68f0a19`, and Team 03 has already prepared `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` as the next stacked Today Review follow-on. `CF-W1-DQ-02A` remains accepted as `c2d6753`; the remaining DQ gap is now a consent-gated read-side/public-contract reconstruction requirement rather than a no-schema child or a forced schema packet. This file is a docs-only candidate view. Team 00 still owns Ready movement, exact file reservations, and one-writer sequencing.
 
 Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-02A` are accepted and locally committed parked branches, not fresh implementation pulls.
 
 ## Current Priority Order
 
-After the active `TSC-04A` signoff gate, the remaining unassigned investor/trader-value stack should start with the stacked `TSC-05A` follow-on, then the DQ residual/public-contract trust gap rather than admin or convenience work.
+After accepted `TSC-04A`, Team 00 promoted the stacked `TSC-05A` follow-on to Team 07. The remaining unassigned investor/trader-value prep stack starts with the DQ residual/public-contract trust gap rather than admin or convenience work.
 
 | Rank | ID | Current state | Why it matters now | Next Team 00 action |
 | --- | --- | --- | --- | --- |
-| 1 | `CF-W2-TSC-05` | Planning-only parent with stacked child defined | Copy cleanup alone is not enough if Today Review ranking and eligibility still use target-shaped geometry and reward/risk thresholds. | After accepted `TSC-04A` evidence is recorded, re-anchor `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` to that base and only then route QA planning / Ready evaluation. |
-| 2 | `CF-W1-DQ-02` residual parent | Blocked by architecture consent boundary | Team 03 found the residual read-side/public-contract scope still needs a bounded no-schema follow-up after accepted `DQ-02A`. | Route Team 03 to confirm or reject a bounded DQE read-side/public-contract child after `TSC-04A` signoff pressure clears. |
+| 1 | `CF-W2-TSC-05` | Active Team 07 Ready handoff as `CF-W2-TSC-05A` | Copy cleanup alone is not enough if Today Review ranking and eligibility still use target-shaped geometry and reward/risk thresholds. | Team 07 owns implementation in `C:\work\repo\investment-scanner-worktrees\team07-CF-W2-TSC-05A` on base `68f0a19`; Team 04 QA follows the developer handoff. |
+| 2 | `CF-W1-DQ-02` residual read-side requirement | Consent-gated requirement-defined residual | Team 03 confirmed no honest no-schema child remains. Team 02 chose read-time reconstruction so DQ currentness can stay truthful across summary/list/diagnostics/latest-read paths without opening schema work by default. | Team 03 owns docs-only architecture prep for an explicit DQE read-side/public-contract packet. Stop and split only if architecture proves durable storage is actually required. |
 | 3 | `CF-W1-MD-02A` | Consent-gated proposal | Durable market-data evidence storage remains high-value upstream trust work. | Keep proposal-only until Team 00 intentionally opens the evidence packet. |
 | 4 | `CF-W1-SQLAB-02B` | Consent-gated proposal | Durable Signal Quality learning memory would strengthen research continuity and calibration review after the current trust slices. | Keep proposal-only until Team 00 intentionally opens the learning-memory packet. |
 | 5 | `CF-W1-STRAT-02B` | Consent-gated proposal | Durable strategy revision history would preserve exact rule/version provenance for review and backtesting trust. | Keep proposal-only until Team 00 intentionally opens the revision-history packet. |
@@ -26,7 +26,8 @@ After the active `TSC-04A` signoff gate, the remaining unassigned investor/trade
 ## Dispatch Notes
 
 - `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE` is implemented in the Team 07 worktree, accepted by Team 04 QA and Team 10 review, and in active Team 03 Architect Signoff. Do not treat `CF-W2-TSC-04` or `TSC-04A` as a fresh Team 02 routing item while that gate is open.
-- `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` is already architected by Team 03 and stays intentionally blocked behind accepted `TSC-04A` base evidence.
+- `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` is promoted and assigned to Team 07; do not treat it as unassigned backlog.
+- `CF-W1-DQ-02` residual direction is now recorded in `10-requirements/CF-W1-DQ-02-residual-read-side-currentness-requirement.md`; do not send it back for generic split discovery.
 - `CF-W1-TSC-02A-TREV-HEALTH` is accepted and locally committed as `34c9993`; Team 03 found no fresh executable `CF-W1-TSC-02` child remains under the current parent.
 - `CF-W3-MDPIPE-01B5`, `CF-W3-MDPIPE-01B6`, and `CF-W3-MDPIPE-01C` stay in the pipeline lane. Do not open a duplicate Team 02 requirement unless a new investor-facing trust gap remains after those slices land.
 - `CF-W1-TSC-02A-TREV-HEALTH`, `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`, `CF-W2-SIG-01A`, `CF-W2-BT-05`, and `CF-W1-BT-04` have already moved through implementation and/or validation gates and must not be re-ranked as fresh Team 02 pulls.

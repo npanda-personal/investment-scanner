@@ -244,3 +244,83 @@ rg -n "R:R|reward/risk|target / reward|target/reward|modeled reward|paper review
 ## Next Gate
 
 - Team 10 code review, then architect signoff, then Product Owner acceptance.
+
+## Work Item
+
+`CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` - QA planning for Today Review no-target ranking and eligibility reframe on accepted `TSC-04A` base.
+
+## State / Mode
+
+- State: QA plan prepared
+- Mode: Docs-only planning, no application source or test files changed
+- Planning verdict: ACCEPTED FOR PLANNING
+
+## Files Inspected
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-TSC-05-today-review-no-target-ranking-and-eligibility-reframe-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W2-TSC-05-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W2-TSC-05-today-review-no-target-ranking-eligibility-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W2-TSC-05-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/ready-for-implementation.md`
+- accepted Team 07 worktree `C:\work\repo\investment-scanner-worktrees\team07-CF-W2-TSC-04A` at `68f0a19`
+- `backend/src/modules/today-trade-review/today-trade-review.service.ts`
+- `backend/src/modules/today-trade-review/today-trade-review.md`
+- `backend/tests/modules/today-trade-review/today-trade-review.service.test.ts`
+- `frontend/src/features/today-trade-review/components/TodayReviewPage.tsx`
+- `frontend/src/features/today-trade-review/components/TodayReviewCandidateDetailPage.tsx`
+- `frontend/tests/ui/today-trade-review.spec.ts`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-outbox.md`
+
+## Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W2-TSC-05A-today-review-ranking-eligibility-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-outbox.md`
+
+## Planning Outcome
+
+- Team 03 architecture packet is plannable on the accepted Team 07 `68f0a19` base.
+- QA plan is scoped to Today Review only and explicitly tied to a stacked Team 07 implementation worktree.
+- The plan now includes semantic regression scenarios proving trusted rank/state/promotion no longer depend on target/R:R/paper-readiness/trade-plan geometry.
+- No source verification was executed in this pass.
+
+## Readiness Blockers
+
+- Team 00 must record the actual `CF-W2-TSC-05A` stacked Team 07 implementation worktree path and confirm it descends from `68f0a19`.
+- Team 07 implementation handoff must stay inside the reserved Today Review file set.
+- QA must reject any handoff that expands into upstream modules, route/shared/schema/package/generated-file scope, or that cannot separate documented invalidation/risk blockers from target-shaped compatibility semantics.
+- UI smoke must run against the dedicated stacked Team 07 frontend server, not a stale default `127.0.0.1:5173` session.
+
+## Recommended Validation
+
+```powershell
+$team07Worktree = 'C:\work\repo\investment-scanner-worktrees\team07-CF-W2-TSC-05A'
+git -C $team07Worktree merge-base --is-ancestor 68f0a19 HEAD
+Get-Counter '\Memory\% Committed Bytes In Use'
+```
+
+```powershell
+Set-Location "$team07Worktree\backend"
+npm.cmd test -- today-trade-review.service.test.ts --runInBand
+npm.cmd run build
+```
+
+```powershell
+Set-Location "$team07Worktree\frontend"
+npm.cmd run build
+```
+
+```powershell
+Set-Location "$team07Worktree\frontend"
+$env:PLAYWRIGHT_BASE_URL = 'http://127.0.0.1:4173'
+npm.cmd run test:ui -- today-trade-review.spec.ts --workers=1
+```
+
+```powershell
+Set-Location $team07Worktree
+rg -n "\"(R:R|reward/risk|target / reward|target/reward|modeled reward|paper review|paper-readiness|trade-plan geometry|Trade-plan proof-chain|ready for paper review|buy now|sell now|must buy|must sell|financial advice)\"" backend/src/modules/today-trade-review backend/tests/modules/today-trade-review frontend/src/features/today-trade-review frontend/tests/ui/today-trade-review.spec.ts
+```
+
+## Next Gate
+
+- Team 00 can evaluate `CF-W2-TSC-05A` for Ready on the accepted `68f0a19` base, then Team 07 implementation handoff, then Team 04 execution against the reserved Today Review scope.
