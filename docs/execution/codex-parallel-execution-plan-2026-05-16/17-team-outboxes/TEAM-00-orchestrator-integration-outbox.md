@@ -1,5 +1,37 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - DQ QA Planning Launched
+
+Date: 2026-05-25
+
+Status:
+
+- Branch: `dev`.
+- Open decisions: 0.
+- Product Owner action required: no.
+- Push performed: no.
+- Latest local docs commit: `8d3fa43 docs: correct stale requirement queue recommendations`.
+- Active Team 07 agent: `019e5eb8-0d85-7213-b1ce-672513fcda1d`.
+- Active Team 04 agent: `019e5ec3-2a5b-7840-9d29-65c43a855e19`.
+
+Gate movement:
+
+- Team 02 completed rolling requirements and Team 00 corrected stale fresh-candidate recommendations for already accepted `CF-W1-BT-04` and `CF-W1-SMI-01`.
+- Team 03 completed `CF-W1-DQ-02-RS1` read-side/public-contract architecture and was closed.
+- Team 03 verdict: `Ready candidate after QA`.
+- Team 04 is now preparing docs-only QA planning for `CF-W1-DQ-02-RS1`.
+- `CF-W2-TSC-05A` remains active with Team 07 in the dedicated stacked worktree.
+
+Teams ready to pick up new tasks:
+
+- Team 07: continue `CF-W2-TSC-05A` implementation.
+- Team 04: complete `CF-W1-DQ-02-RS1` QA planning; then verify `CF-W2-TSC-05A` when Team 07 handoff exists.
+- Team 10: Code Review after Team 04 acceptance.
+- Team 03: Architect Signoff after review acceptance; otherwise next architecture packet when routed.
+- Team 01/02: fresh direct investor/trader-value audit/requirements pass if no review/signoff gate is waiting.
+
+---
+
 ## Latest Runtime Checkpoint - TSC-05A Promoted / DQ Residual Routed
 
 Date: 2026-05-25

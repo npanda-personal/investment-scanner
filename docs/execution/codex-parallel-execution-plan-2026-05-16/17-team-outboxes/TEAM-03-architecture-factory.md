@@ -1,5 +1,115 @@
 # Team 03 Architecture Factory Outbox
 
+## Team 03 CF-W1-DQ-02 Read-Side Currentness Readiness Prep - 2026-05-25
+
+Assignment: prepare docs-only architecture readiness for the residual `CF-W1-DQ-02` read-side/public-contract reconstruction packet, using the new residual requirement and current DQE / Market Data read-only evidence only, without touching application code/tests, package manifests, generated files, route registries, shared utilities, shared UI, frontend files, providers, services, Prisma, builds, or runtime processes.
+
+Updated:
+
+- `03-architecture/CF-W1-DQ-02-read-side-currentness-architecture.md`
+- `06-contracts/CF-W1-DQ-02-read-side-currentness-contract.md`
+- `08-work-packets/CF-W1-DQ-02-read-side-currentness-work-packet.md`
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Files inspected:
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-DQ-02-residual-read-side-currentness-requirement.md`
+- existing residual DQ docs:
+  - `03-architecture/CF-W1-DQ-02-architecture-review.md`
+  - `03-architecture/CF-W1-DQ-02B-architecture-review.md`
+  - `06-contracts/CF-W1-DQ-02-dq-currentness-evidence-contract.md`
+  - `06-contracts/CF-W1-DQ-02B-dq-currentness-public-read-path-contract.md`
+  - `08-work-packets/CF-W1-DQ-02-work-packet.md`
+  - `08-work-packets/CF-W1-DQ-02B-work-packet.md`
+  - `17-team-outboxes/TEAM-03-CF-W1-DQ-02B-architecture-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/blocked-by-upstream-dependency.md`
+- current DQE source/tests:
+  - `backend/src/modules/data-quality-engine/data-quality-engine.repository.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.service.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.controller.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.router.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.md`
+  - `backend/tests/modules/data-quality-engine/data-quality-engine.repository.test.ts`
+  - `backend/tests/modules/data-quality-engine/data-quality-engine.service.test.ts`
+  - `backend/tests/modules/data-quality-engine/data-quality-engine.routes.test.ts`
+  - `backend/tests/modules/data-quality-engine/data-quality-engine.invariants.test.ts`
+- Market Data read-only ownership evidence:
+  - `backend/src/modules/market-data-foundation/index.ts`
+  - `backend/src/modules/market-data-foundation/market-data-foundation.market-session.ts`
+  - `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`
+  - `backend/src/modules/market-data-foundation/market-data-foundation.types.ts`
+  - `backend/src/modules/market-data-foundation/market-data-foundation.md`
+
+Verdict:
+
+- `Ready candidate after QA`
+
+Architecture result:
+
+- Residual `CF-W1-DQ-02` can reopen as one bounded DQE read-side/public-contract child.
+- Durable schema/storage is not required by the current audit.
+- Smallest honest child stays inside:
+  - `backend/src/modules/data-quality-engine/data-quality-engine.repository.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.service.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.md`
+  - `backend/tests/modules/data-quality-engine/data-quality-engine.repository.test.ts`
+  - `backend/tests/modules/data-quality-engine/data-quality-engine.service.test.ts`
+  - `backend/tests/modules/data-quality-engine/data-quality-engine.invariants.test.ts`
+- One writer must own the full DQE child; do not split repository and service across multiple implementers.
+- Team 07 `CF-W2-TSC-05A` work is in a separate worktree and has no file overlap.
+
+Required QA handoff notes:
+
+- verify one truthful currentness story across `summary`, `list`, `diagnostics`, and latest-evaluation helper reads;
+- cover:
+  - current completed session
+  - finalization pending
+  - stale missed completed session
+  - missing latest price
+  - session evidence unavailable
+  - provider-gap blocked
+  - contradictory evidence
+  - fail-closed propagation
+- summary counts must derive from the same reconstructed basis as row/detail/latest-helper reads.
+
+Testing decision:
+
+- focused DQE repository/service/invariants tests are sufficient for the first child;
+- controller/route response tests are not required because controller behavior is thin pass-through and no route or validation widening is authorized.
+
+Forbidden scope:
+
+- DQE controller/router/validation/module/index
+- backend/frontend route registries
+- Prisma/schema/migrations
+- generated files
+- package manifests
+- shared backend utilities
+- all `market-data-foundation` source/docs/tests
+- provider/scheduler/worker/queue/startup/backfill files
+- all frontend source/tests and shared UI
+
+Stop rule:
+
+- if implementation proves truthful reconstruction requires Market Data writers, route widening, or durable stored currentness fields, Team 00 must create a Decision Packet instead of widening this child silently.
+
+Validation:
+
+- Tests run: none
+- Builds run: none
+- UI checks run: none
+- Live local data checks run: none
+- Reason: docs-only architecture readiness pass
+
+Next gate:
+
+- Team 04 QA planning for `CF-W1-DQ-02` read-side currentness reconstruction, then Team 00 Ready promotion if QA accepts the bounded packet.
+
 ## Team 03 CF-W1-DQ-02 Residual Read-Side Recheck - 2026-05-25
 
 Assignment: clarify whether residual parent `CF-W1-DQ-02` has a bounded no-schema read-side/public-contract child after accepted `CF-W1-DQ-02A` commit `c2d6753`, using current docs/source evidence only and without touching application code/tests, queues, requirements, QA docs, route registries, Prisma/schema, generated files, or historical execution docs.

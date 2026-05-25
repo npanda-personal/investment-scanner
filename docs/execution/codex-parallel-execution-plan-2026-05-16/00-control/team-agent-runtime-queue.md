@@ -4,6 +4,43 @@ Date: 2026-05-25
 
 Owner: Team 00 - Master Orchestrator / Integration
 
+## Latest Active Snapshot - TSC-05A Implementation And DQ QA Planning
+
+Date: 2026-05-25
+
+Current active agents:
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 07 - Portfolio / Watchlist / Alerts | `019e5eb8-0d85-7213-b1ce-672513fcda1d` | `gpt-5.3-codex`, high | implementation | `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` in `C:\work\repo\investment-scanner-worktrees\team07-CF-W2-TSC-05A` | active |
+| 2 | Team 04 - QA Factory | `019e5ec3-2a5b-7840-9d29-65c43a855e19` | `gpt-5.4`, high | QA planning | `CF-W1-DQ-02-RS1` read-side currentness reconstruction | active |
+| 3 | Open slot | none | pending | QA verification | Team 04 `CF-W2-TSC-05A` after Team 07 developer handoff | queued |
+| 4 | Open slot | none | pending | Code Review / Signoff | Team 10 then Team 03 after next QA ACCEPT | queued |
+| 5 | Open slot | none | pending | Audit / Requirements | fresh direct-value audit after active TSC/DQ gates | queued |
+| 6 | Open slot | none | pending | Implementation | next independent Ready item after Team 00 promotion | queued |
+
+Recently closed:
+
+- Team 02 `019e5eb9-bac5-7b02-94ae-865f5fb2f697`: rolling requirement pass completed; Team 00 corrected stale `BT-04` / `SMI-01` recommendations and committed `8d3fa43 docs: correct stale requirement queue recommendations`.
+- Team 03 `019e5eb8-7507-7943-9520-2dc34deb6d03`: DQ residual architecture completed and closed. Verdict: `Ready candidate after QA`.
+
+Current routing:
+
+- `CF-W2-TSC-05A` remains assigned to Team 07 on branch `codex/team07-portfolio-alerts/CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY`, required base `68f0a19`.
+- `CF-W1-DQ-02-RS1` is not Ready yet. Team 03 prepared the architecture/contract/work packet; Team 04 now owns docs-only QA planning.
+- No implementation is authorized for `CF-W1-DQ-02-RS1` until Team 04 accepts the QA plan and Team 00 records a Ready promotion with exact DQE file reservations.
+- No open Product Owner decisions exist.
+
+Teams ready to pick up new tasks:
+
+- Team 07: active on `CF-W2-TSC-05A` implementation.
+- Team 04: active on `CF-W1-DQ-02-RS1` QA planning; ready for `CF-W2-TSC-05A` QA verification after Team 07 handoff.
+- Team 10: ready for the next QA-accepted review handoff.
+- Team 03: ready for Architect Signoff after review acceptance; otherwise can take the next architecture packet after active QA gates clear.
+- Team 01/02: ready for a fresh direct investor/trader-value audit/requirement cycle if no review/signoff gate is waiting.
+
+---
+
 ## Latest Active Snapshot - TSC-05A Implementation And DQ Architecture
 
 Date: 2026-05-25

@@ -2,6 +2,52 @@
 
 Date: 2026-05-20
 
+## Latest Assignment Override - 2026-05-25 DQ-02 Read-Side Currentness QA Planning
+
+Prepare docs-only QA planning for `CF-W1-DQ-02-RS1` Data Quality Engine read-side/public-contract currentness reconstruction.
+
+Team 03 verdict: `Ready candidate after QA`.
+
+This is QA planning only. Do not implement application code. Do not run tests, builds, services, providers, Prisma commands, UI smoke, or live data. Do not move the item to Ready.
+
+Source inputs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-DQ-02-residual-read-side-currentness-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-DQ-02-read-side-currentness-architecture.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-DQ-02-read-side-currentness-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-DQ-02-read-side-currentness-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Allowed writes:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-DQ-02-read-side-currentness-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-CF-W1-DQ-02-read-side-currentness-qa-outbox.md`
+
+Required QA coverage:
+
+- one truthful currentness story across `summary`, `list`, `diagnostics`, `getLatestEvaluationForInstrument`, and `getEvaluationsForInstruments`;
+- current completed session;
+- current finalization pending;
+- stale missed completed session;
+- missing latest price;
+- session evidence unavailable;
+- provider-gap blocked;
+- contradictory evidence;
+- fail-closed propagation;
+- summary counts derived from the same reconstructed per-row basis as row/detail/latest-helper reads;
+- no controller/router/route-registry/schema/generated/package/shared-utility/Market Data/frontend/provider/startup/backfill scope.
+
+Required focused validation commands to recommend, not run:
+
+- `npm.cmd test -- data-quality-engine.repository.test.ts data-quality-engine.service.test.ts data-quality-engine.invariants.test.ts --runInBand`
+- `npm.cmd run build`
+
+Output:
+
+- Create the QA plan and item-specific outbox.
+- State whether the packet is QA-plan ready for Team 00 Ready evaluation.
+- List exact reject conditions and any remaining blocker.
+
 ## Latest Assignment Override - 2026-05-25 TSC-05A QA Standby
 
 Stand by for QA Verification on `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` after Team 07 submits a developer handoff from the stacked Today Review worktree.

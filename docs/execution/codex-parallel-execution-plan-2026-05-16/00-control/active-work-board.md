@@ -34,6 +34,45 @@ No historical active work items have been migrated as active.
 - Rejected / Rework
 - Deferred
 
+## Latest Team 00 Routing Update - DQ QA Planning Launched
+
+Date: 2026-05-25
+
+Gate status:
+
+- Team 03 completed `CF-W1-DQ-02-RS1` read-side/public-contract currentness architecture and was closed.
+- Team 03 verdict: `Ready candidate after QA`.
+- Team 04 QA planning is active as agent `019e5ec3-2a5b-7840-9d29-65c43a855e19`.
+- Team 02 rolling requirement correction was committed as `8d3fa43 docs: correct stale requirement queue recommendations`.
+- No open Product Owner decisions exist.
+
+DQ packet boundary:
+
+- Allowed future implementation files after Ready promotion only:
+  - `backend/src/modules/data-quality-engine/data-quality-engine.repository.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.service.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.md`
+  - `backend/tests/modules/data-quality-engine/data-quality-engine.repository.test.ts`
+  - `backend/tests/modules/data-quality-engine/data-quality-engine.service.test.ts`
+  - `backend/tests/modules/data-quality-engine/data-quality-engine.invariants.test.ts`
+- Forbidden without separate decision: DQE controller/router/validation/module/index, route registries, Prisma/schema/migrations, generated files, package manifests, shared utilities, Market Data source/docs/tests, frontend files, provider/live/startup/backfill scope.
+- No DQ implementation is authorized until Team 04 accepts the QA plan and Team 00 records Ready promotion.
+
+Parallel routing:
+
+- Team 07 remains active on `CF-W2-TSC-05A` in the dedicated stacked Today Review worktree.
+- Team 04 owns `CF-W1-DQ-02-RS1` QA planning now and remains standby for `CF-W2-TSC-05A` QA verification after Team 07 handoff.
+- Team 10 stands by for the next QA-accepted review handoff.
+
+Teams ready to pick up new tasks:
+
+- Team 07: continue `CF-W2-TSC-05A` implementation.
+- Team 04: complete `CF-W1-DQ-02-RS1` QA plan; then verify `CF-W2-TSC-05A` when handoff arrives.
+- Team 10: Code Review after Team 04 acceptance.
+- Team 03: Architect Signoff after review acceptance; otherwise next architecture packet when Team 00 routes it.
+- Team 01/02: fresh direct investor/trader-value audit/requirements pass if no signoff/review gate is waiting.
+
 ## Latest Team 00 Routing Update - TSC-05A Promoted And DQ Residual Routed
 
 Date: 2026-05-25

@@ -4,6 +4,29 @@ Date: 2026-05-17
 
 Prepared by Team 03 Architecture Factory and refreshed after `CF-W1-L3-AUTH-02` commit `503bcd9`, `CF-W1-SIG-TRIGGER-01` commit `6ab3999`, and checkpoint protocol fix commit `f75808f`.
 
+## Team 03 Next Dispatch - DQ Residual Read-Side Currentness - 2026-05-25
+
+Prepared:
+
+- `03-architecture/CF-W1-DQ-02-read-side-currentness-architecture.md`
+- `06-contracts/CF-W1-DQ-02-read-side-currentness-contract.md`
+- `08-work-packets/CF-W1-DQ-02-read-side-currentness-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Result:
+
+- `CF-W1-DQ-02` residual read-side/public-contract reconstruction is now a `Ready candidate after QA`.
+- Smallest bounded child stays inside DQE repository/service/types/doc/tests only.
+- Durable schema/storage is not required by current architecture evidence.
+- Route registry, schema, shared utility, package/generated, Market Data source, provider/startup/backfill, and frontend scope remain forbidden.
+- Service/repository focused tests are sufficient; controller/route response tests are not required for this child because controller behavior is thin pass-through and no route change is authorized.
+- Required QA focus is cross-surface consistency for current completed session, finalization pending, stale missed completed session, missing latest price, session evidence unavailable, provider-gap blocked, contradictory evidence, and fail-closed propagation.
+- If implementation later proves truthful reconstruction requires Market Data writers, route widening, or durable storage, Team 00 must open a Decision Packet instead of widening this child silently.
+
 ## Team 03 Next Dispatch - TSC Entry-Price Dependency - 2026-05-24
 
 Next architecture prep item:
