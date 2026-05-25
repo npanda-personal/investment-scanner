@@ -1,6 +1,42 @@
 # Team 00 Coordination Cycle Latest
 
-Date: 2026-05-24
+Date: 2026-05-25
+
+## Latest Runtime Checkpoint - CAL Ready Promotion, TSC QA, DQ Rework
+
+Date: 2026-05-25
+
+Current status:
+
+- Branch: `dev`.
+- Open decisions: 0.
+- Product Owner action required: no.
+- Push performed: no.
+- Team 02 research/actionability evidence-date agent `019e5eda-8856-76c3-aacf-73bff2909bb4` completed and was closed.
+- Active Team 04 TSC QA re-verification agent: `019e5edd-f986-7ed0-8aee-39e3cc4296cd`.
+- Team 05 DQ rework agent `019e5ede-7235-7052-ace9-ca5853b2a26a` completed and was closed.
+- Active Team 04 DQ QA re-verification agent: `019e5ee4-e09c-7261-9c4c-cec6b0d8b9c0`.
+
+Gate movement:
+
+- `CF-W1-RH-01A` was created as a bounded Research Hub actionability evidence-date requirement; it remains not Ready and dependency-gated behind `CF-W2-CAL-02A`.
+- `CF-W2-CAL-02A` now has requirement, architecture, contract, work packet, QA plan, exact file reservations, and no open decisions.
+- Team 00 promoted `CF-W2-CAL-02A` to Team 06 as the next independent Signal Calibration implementation slice.
+- Team 07 completed `CF-W2-TSC-05A` rework and Team 04 QA re-verification is active.
+- Team 04 rejected `CF-W1-DQ-02-RS1`; Team 05 rework removed the unbounded summary path and Team 04 DQ QA re-verification is active.
+
+Teams ready to pick up new tasks:
+
+- Team 04: active on `CF-W2-TSC-05A` QA re-verification.
+- Team 04: active on `CF-W1-DQ-02-RS1` QA re-verification.
+- Team 06: ready for `CF-W2-CAL-02A` implementation after docs checkpoint/worktree creation.
+- Team 10: Code Review after Team 04 acceptance.
+- Team 03: Architect Signoff after Team 10 acceptance, or `CF-W1-RH-01A` architecture when assigned.
+- Team 02: ready for the next rolling investor/trader-value requirement pass.
+
+Product Owner action required: no.
+
+---
 
 ## Latest Runtime Checkpoint - CAL Architecture And DQ QA Verification
 

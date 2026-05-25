@@ -6,6 +6,67 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+2026-05-25 Team 00 Ready promotion - `CF-W2-CAL-02A`:
+
+- `CF-W2-CAL-02A` is promoted and assigned to Team 06.
+- Current gate state: Ready for Implementation after Team 02 requirement/product direction, Team 03 architecture/contract/work packet, Team 04 QA plan, exact file reservations, and open-decision check.
+- Purpose: add truthful scoped evidence-basis projection to Signal Calibration list/compare/page-summary surfaces without schema, route, repository, Signal Quality, package, generated, provider, startup, or broad UI scope.
+- Branch: `codex/team06-strategy-signal/CF-W2-CAL-02A`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-CAL-02A`.
+- Required base: Team 00 docs checkpoint commit containing `13-implementation-evidence/CF-W2-CAL-02A-ready-promotion.md`.
+- Gate evidence:
+  - Requirement: `10-requirements/CF-W2-CAL-02-signal-calibration-evidence-freshness-and-scope-basis-requirement.md`
+  - Architecture review: `03-architecture/CF-W2-CAL-02-architecture-review.md`
+  - Contract: `06-contracts/CF-W2-CAL-02-signal-calibration-evidence-basis-contract.md`
+  - Work packet: `08-work-packets/CF-W2-CAL-02-work-packet.md`
+  - QA plan: `04-qa/CF-W2-CAL-02-qa-plan.md`
+  - Ready promotion: `13-implementation-evidence/CF-W2-CAL-02A-ready-promotion.md`
+  - Team 03 outbox: `17-team-outboxes/TEAM-03-architecture-factory.md`
+  - Team 04 QA outbox: `17-team-outboxes/TEAM-04-CF-W2-CAL-02-qa-outbox.md`
+  - Open decisions: none.
+- Allowed implementation files:
+  - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.service.ts`
+  - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.types.ts`
+  - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md`
+  - `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.service.test.ts`
+  - `frontend/src/features/signal-calibration-engine/types.ts`
+  - `frontend/src/features/signal-calibration-engine/api/signalCalibrationEngineService.ts`
+  - `frontend/src/features/signal-calibration-engine/hooks/useSignalCalibrationEngine.ts`
+  - `frontend/src/features/signal-calibration-engine/components/SignalCalibrationEnginePage.tsx`
+  - `frontend/tests/ui/signal-calibration-engine.spec.ts`
+  - optional only if explicit HTTP payload assertions are added: `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.routes.test.ts`
+- Allowed reporting docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-CF-W2-CAL-02A-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W2-CAL-02A-developer-handoff.md`
+- Forbidden scope:
+  - calibration repository/controller/router/validation/module/index files
+  - backend/frontend route registries
+  - all Signal Quality source/tests
+  - all Data Quality and Market Data source/tests
+  - Prisma schema, migrations, generated files, or durable stored evidence-basis fields
+  - package manifests and lockfiles
+  - shared backend utilities and shared frontend components
+  - `frontend/src/features/signal-calibration-engine/routes.tsx`
+  - `frontend/src/features/signal-calibration-engine/index.ts`
+  - `frontend/src/app/routes.tsx`
+  - provider, live, scheduler, worker, queue, startup, or backfill files
+  - `backend/src/server.ts`, `backend/.env.example`, `.gitignore`, root `AGENTS.md`, `docs/AGENTS.md`, and `docs/codex-agent-team-plan/**`
+- Required validation:
+
+```powershell
+cd backend
+npm.cmd test -- signal-calibration-engine.service.test.ts --runInBand
+npm.cmd run build
+```
+
+```powershell
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- signal-calibration-engine.spec.ts --workers=1
+```
+
+Stop and return to Team 00 if implementation requires repository/controller/router/validation/module/index edits, route widening, Signal Quality source/test edits, schema/storage, generated/package/shared scope, provider/live/startup/backfill behavior, or target/R:R/advice semantics.
+
 2026-05-25 Team 00 Ready promotion - `CF-W1-DQ-02-RS1`:
 
 - `CF-W1-DQ-02-RS1` is promoted and assigned to Team 05.

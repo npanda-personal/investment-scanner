@@ -2,6 +2,116 @@
 
 Date: 2026-05-20
 
+## Latest Assignment Override - 2026-05-25 CAL-02A
+
+Team 00 promotes `CF-W2-CAL-02A` as a bounded Signal Calibration implementation item.
+
+Work item:
+
+- `CF-W2-CAL-02A` - Signal Calibration scoped evidence-basis projection.
+
+Branch / worktree:
+
+- Branch: `codex/team06-strategy-signal/CF-W2-CAL-02A`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-CAL-02A`
+- Required base: Team 00 docs checkpoint commit containing `13-implementation-evidence/CF-W2-CAL-02A-ready-promotion.md`
+
+Evidence to use:
+
+- Requirement: `10-requirements/CF-W2-CAL-02-signal-calibration-evidence-freshness-and-scope-basis-requirement.md`
+- Architecture review: `03-architecture/CF-W2-CAL-02-architecture-review.md`
+- Contract: `06-contracts/CF-W2-CAL-02-signal-calibration-evidence-basis-contract.md`
+- Work packet: `08-work-packets/CF-W2-CAL-02-work-packet.md`
+- QA plan: `04-qa/CF-W2-CAL-02-qa-plan.md`
+- Ready promotion: `13-implementation-evidence/CF-W2-CAL-02A-ready-promotion.md`
+- Ready handoff: `12-ready-queue/ready-for-implementation.md`
+
+Allowed implementation files:
+
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.service.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.types.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md`
+- `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.service.test.ts`
+- `frontend/src/features/signal-calibration-engine/types.ts`
+- `frontend/src/features/signal-calibration-engine/api/signalCalibrationEngineService.ts`
+- `frontend/src/features/signal-calibration-engine/hooks/useSignalCalibrationEngine.ts`
+- `frontend/src/features/signal-calibration-engine/components/SignalCalibrationEnginePage.tsx`
+- `frontend/tests/ui/signal-calibration-engine.spec.ts`
+
+Optional only if explicit HTTP payload assertions are added:
+
+- `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.routes.test.ts`
+
+Allowed reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-CF-W2-CAL-02A-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W2-CAL-02A-developer-handoff.md`
+
+Required behavior:
+
+- Add an additive scoped page summary using selected `region`, `assetType`, and `horizon`.
+- Keep row `generatedAt` as calibration generation time, separate from evidence-through timing.
+- Project evidence-basis fields from existing public Signal Quality summary inputs only.
+- Distinguish measured, horizon-limited, and missing Signal Quality evidence basis.
+- Expose `nextEvaluableDate` when horizon-limited maturity is pending.
+- Fail closed when Signal Quality evidence is missing.
+- Stop using first-row readiness/influence/warning/blocker proxies for page-level summary behavior.
+- Preserve compare/list parity for row evidence-basis fields.
+- Preserve existing calibration score math, evidence thresholds, accepted DQ semantics, and row compatibility.
+- Keep language research-support oriented; do not introduce target-price, profit-target, reward/risk, `R:R`, direct advice, guaranteed-outcome, or Trade Plan-first wording.
+
+Forbidden files:
+
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.repository.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.controller.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.router.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.validation.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.module.ts`
+- `backend/src/modules/signal-calibration-engine/index.ts`
+- `backend/src/api/routes.ts`
+- all `backend/src/modules/signal-quality-lab/**`
+- all `backend/tests/modules/signal-quality-lab/**`
+- all `backend/src/modules/data-quality-engine/**`
+- all `backend/src/modules/market-data-foundation/**`
+- Prisma schema or migrations
+- generated files
+- package manifests and lockfiles
+- shared backend utilities
+- shared frontend components
+- `frontend/src/features/signal-calibration-engine/routes.tsx`
+- `frontend/src/features/signal-calibration-engine/index.ts`
+- `frontend/src/app/routes.tsx`
+- provider/live/scheduler/worker/queue/startup/backfill files
+- `backend/src/server.ts`, `backend/.env.example`, `.gitignore`, root `AGENTS.md`, `docs/AGENTS.md`, and `docs/codex-agent-team-plan/**`
+
+Required validation:
+
+```powershell
+cd backend
+npm.cmd test -- signal-calibration-engine.service.test.ts --runInBand
+npm.cmd run build
+```
+
+```powershell
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- signal-calibration-engine.spec.ts --workers=1
+```
+
+Required language guard:
+
+```powershell
+rg -n "target price|price target|profit target|reward/risk|R:R|buy now|sell now|must buy|must sell|guaranteed|financial advice|automated trade instruction|trade plan" backend/src/modules/signal-calibration-engine backend/tests/modules/signal-calibration-engine frontend/src/features/signal-calibration-engine frontend/tests/ui/signal-calibration-engine.spec.ts
+```
+
+Expected handoff:
+
+- Update `17-team-outboxes/TEAM-06-CF-W2-CAL-02A-outbox.md`.
+- Create `18-integration-queue/CF-W2-CAL-02A-developer-handoff.md`.
+- Record exact branch/worktree, base commit, changed files, inspected files, behavior changed, tests run, skipped checks, forbidden files confirmed untouched, risks, blockers, and next gate: Team 04 QA Verification.
+
+Stop and return to Team 00 if implementation needs repository, controller, router, validation, module, index, route, Signal Quality, Data Quality, Market Data, Prisma/schema, shared utility/UI, package, generated, provider/live, startup/backfill, target/R:R/profit-target, Trade Plan-first, or advice scope.
+
 ## Latest Assignment Override - 2026-05-24 BT-05
 
 Team 00 promotes `CF-W2-BT-05` as a bounded Backtesting Strategy Lab implementation item.

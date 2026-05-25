@@ -34,6 +34,42 @@ No historical active work items have been migrated as active.
 - Rejected / Rework
 - Deferred
 
+## Latest Team 00 Routing Update - CAL Ready Promotion, TSC QA, DQ Rework
+
+Date: 2026-05-25
+
+Gate status:
+
+- Team 02 completed `CF-W1-RH-01A` Research Hub actionability evidence-date requirement refinement; it remains docs-only and not Ready.
+- Team 04 completed `CF-W2-CAL-02A` QA planning with verdict `QA-plan ready`.
+- Team 00 promoted `CF-W2-CAL-02A` to Team 06 as the next independent Signal Calibration implementation slice.
+- Team 07 completed bounded `CF-W2-TSC-05A` QA-rejection rework; Team 04 QA re-verification is active as agent `019e5edd-f986-7ed0-8aee-39e3cc4296cd`.
+- Team 04 rejected `CF-W1-DQ-02-RS1`; Team 05 completed DQ rework as agent `019e5ede-7235-7052-ace9-ca5853b2a26a`, and Team 04 DQ QA re-verification is active as agent `019e5ee4-e09c-7261-9c4c-cec6b0d8b9c0`.
+- No open Product Owner decisions exist.
+
+CAL implementation boundary:
+
+- Branch: `codex/team06-strategy-signal/CF-W2-CAL-02A`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-CAL-02A`.
+- Allowed files are only Signal Calibration service/types/doc/service test, feature-local types/api/hook/page/spec, optional routes test only if explicit HTTP payload assertions are added, and Team 06 handoff/outbox docs.
+- Forbidden: calibration repository/controller/router/validation/module/index, route registries, Signal Quality source/tests, DQ/Market Data source/tests, Prisma/schema/migrations, generated files, package manifests, shared utilities/UI, feature route/index, app routes, provider/live/scheduler/worker/queue/startup/backfill, `backend/src/server.ts`, `backend/.env.example`, `.gitignore`, root `AGENTS.md`, `docs/AGENTS.md`, and `docs/codex-agent-team-plan/**`.
+
+Parallel routing:
+
+- Team 04 verifies `CF-W2-TSC-05A`; Team 10 follows if QA accepts.
+- Team 04 re-verifies `CF-W1-DQ-02-RS1` after Team 05 rework.
+- Team 06 implements `CF-W2-CAL-02A` after docs checkpoint/worktree creation.
+- Team 03 signs off after Team 10 acceptance, or prepares `CF-W1-RH-01A` architecture after active higher-priority gates are moving.
+
+Teams ready to pick up new tasks:
+
+- Team 04: active on `CF-W2-TSC-05A` QA re-verification.
+- Team 04: active on `CF-W1-DQ-02-RS1` QA re-verification.
+- Team 06: ready for `CF-W2-CAL-02A` implementation in a dedicated worktree.
+- Team 10: ready for the next QA-accepted code review.
+- Team 03: ready for Architect Signoff after Team 10 acceptance, or `CF-W1-RH-01A` architecture when Team 00 assigns it.
+- Team 02: ready for the next rolling investor/trader-value requirement pass.
+
 ## Latest Team 00 Routing Update - TSC QA And DQ Ready Promotion
 
 Date: 2026-05-25

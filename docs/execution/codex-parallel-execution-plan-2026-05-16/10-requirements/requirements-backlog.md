@@ -15,6 +15,7 @@ Team 02 rolling update: `CF-W2-TSC-05A` is active with Team 07 and `CF-W1-DQ-02-
 | `CF-W2-TSC-05A` | Today Review ranking/eligibility reframe is active with Team 07. | Do not duplicate as fresh Team 02 discovery; wait for Team 07 handoff and downstream gates. |
 | `CF-W1-DQ-02-RS1` | DQ residual read-side currentness packet is in active QA planning with Team 04. | Keep out of fresh Team 02 discovery until Team 04 completes QA planning and Team 00 routes the next gate. |
 | `CF-W2-CAL-02` | Calibration needs a truthful scoped evidence-through date and scoped page-level evidence basis. | New requirement draft; route Team 03 architecture next if Team 00 wants the next independent direct-value packet. |
+| `CF-W1-RH-01A` | Research Hub actionability already exposes per-dimension `evidenceDate`, but those dates are not wired, which weakens reviewability on the overview. | New child requirement draft; keep behind `CF-W2-CAL-02` and route only as a bounded no-storage follow-on. |
 | `CF-W1-SIG-TRIGGER-ENTRY-01` | Signal Generation now exposes source-proven trigger evidence for downstream adoption. | Accepted and locally committed as `649e645`; keep out of fresh Team 02 pulls. |
 | `CF-W1-HCTX-03` | Historical context needs age and provenance warnings so nearest snapshots do not read like same-day evidence. | Accepted and locally committed as `f6034c6`; wait for clean integration sequencing. |
 | `CF-W1-DQ-03` | Downstream trust consumers need a compact residual reason summary instead of raw DQ arrays. | Accepted / routed elsewhere; do not duplicate as fresh Team 02 discovery. |
@@ -36,16 +37,17 @@ Team 02 rolling update: `CF-W2-TSC-05A` is active with Team 07 and `CF-W1-DQ-02-
 | 2 | `CF-W1-MD-02A` | Proposal-only | Market-data evidence storage remains the next strongest upstream provenance gap, but stays consent-gated. |
 | 3 | `CF-W1-SQLAB-02B` | Proposal-only | Durable Signal Quality learning memory remains useful but storage-gated. |
 | 4 | `CF-W1-STRAT-02B` | Proposal-only | Durable strategy revision history remains useful but schema/generated/repository-gated. |
-| 5 | `CF-W1-L3-DQ-01A` | Contract-only | Lane 3 passive readiness DTOs still matter, but not as the next fresh implementation pull. |
-| 6 | `CF-W1-TSC-02` | New requirement draft | Trusted candidates need ongoing rule-based health state evidence, but it remains behind Team 07's active Today Review scope. |
-| 7 | `CF-W1-TSC-03` residual/supporting-evidence path | Parent requirement | Supporting Today Review evidence still matters, but it depends on the active Today Review writer family clearing first. |
-| 8 | `CF-W1-UX-01` | Open parent | Research Workbench trust gaps remain behind upstream trust/evidence work. |
-| 9 | `CF-W1-UX-02` | Copilot-only trust UX pending | Useful downstream trust work, but behind core signal/data/backtest evidence. |
-| 10 | `CF-W1-UX-05` | Copilot-only language cleanup | Useful wording cleanup after Copilot trust scope is settled; shared UI remains out of scope. |
+| 5 | `CF-W1-RH-01A` | New child requirement draft | Research Hub actionability tiles should surface truthful per-dimension evidence dates where the basis already exists, and explicit null plus reason where it does not. |
+| 6 | `CF-W1-L3-DQ-01A` | Contract-only | Lane 3 passive readiness DTOs still matter, but not as the next fresh implementation pull. |
+| 7 | `CF-W1-TSC-02` | New requirement draft | Trusted candidates need ongoing rule-based health state evidence, but it remains behind Team 07's active Today Review scope. |
+| 8 | `CF-W1-TSC-03` residual/supporting-evidence path | Parent requirement | Supporting Today Review evidence still matters, but it depends on the active Today Review writer family clearing first. |
+| 9 | `CF-W1-UX-01` | Open parent | Research Workbench trust gaps remain behind upstream trust/evidence work. |
+| 10 | `CF-W1-UX-02` | Copilot-only trust UX pending | Useful downstream trust work, but behind core signal/data/backtest evidence. |
 
 ## Rolling Audit Notes
 
 - Fresh audit result: `CF-W2-CAL-02` is the first independent non-consent-gated candidate after active/accepted exclusions were reconciled.
+- Team 01's follow-up evidence supports a smaller no-storage Research Hub child, `CF-W1-RH-01A`, but it stays behind `CF-W2-CAL-02` and behind the three higher-value durable-proof proposals.
 - `CF-W2-CAL-02` is not a duplicate of accepted `CF-W1-CAL-01A`; it focuses on scoped evidence freshness and page-level evidence-basis truth, not the DQ readiness gate already accepted.
 - The storage proposals remain valuable, but they stay honestly consent-gated and behind the new calibration trust slice.
 
@@ -94,12 +96,12 @@ These can move toward architecture/QA next without creating duplicate applicatio
 2. `CF-W1-MD-02A` as a consent-gated companion evidence packet
 3. `CF-W1-SQLAB-02B` as a consent-gated durable Signal Quality memory packet
 4. `CF-W1-STRAT-02B` as a consent-gated durable strategy revision history packet
-5. `CF-W1-L3-DQ-01A` as a contract-only child if Team 00 wants the passive Lane 3 display slice refreshed
-6. `CF-W1-TSC-02` as a new active signal health requirement draft after Team 07 clears Today Review files
-7. `CF-W1-TSC-03` residual/supporting-evidence follow-on after Today Review dependencies settle
-8. `CF-W1-UX-01` as the Workbench trust-evidence parent behind the core trust stack
-9. `CF-W1-UX-02` as a Copilot-only trust UX packet behind core signal evidence
-10. `CF-W1-UX-05` as Copilot-only product-language cleanup behind `CF-W1-UX-02`
+5. `CF-W1-RH-01A` as the bounded Research Hub evidence-date child after `CF-W2-CAL-02`
+6. `CF-W1-L3-DQ-01A` as a contract-only child if Team 00 wants the passive Lane 3 display slice refreshed
+7. `CF-W1-TSC-02` as a new active signal health requirement draft after Team 07 clears Today Review files
+8. `CF-W1-TSC-03` residual/supporting-evidence follow-on after Today Review dependencies settle
+9. `CF-W1-UX-01` as the Workbench trust-evidence parent behind the core trust stack
+10. `CF-W1-UX-02` as a Copilot-only trust UX packet behind core signal evidence
 
 ## Sequencing Candidates For Team 00
 

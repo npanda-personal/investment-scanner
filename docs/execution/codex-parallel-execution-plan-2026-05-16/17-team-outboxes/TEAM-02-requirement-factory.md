@@ -1,5 +1,101 @@
 # TEAM-02 Requirement Factory
 
+## Team 02 Research Hub Evidence-Date Refinement Pass - 2026-05-25
+
+Root `AGENTS.md` was read first. Team 02 stayed docs-only, wrote only inside the allowed `10-requirements/**` folder plus this outbox, and did not touch application source/tests, Team 04 QA-planning files, Team 07 Today Review files, Prisma/schema, route registries, shared UI, package manifests, or the decision inbox.
+
+### Work Item
+
+Consume Team 01's direct-value audit and determine whether the smaller non-storage Research Hub actionability evidence-date gap is real enough to become a bounded requirement.
+
+### Files Inspected
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/16-team-inboxes/TEAM-02-current-assignment.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/TEAM-01-direct-value-gap-audit-2026-05-25.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/99-decision-inbox/open-decisions.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-RH-01-research-hub-actionability-evidence-wiring-requirement.md`
+- `backend/src/modules/research-hub/research-hub.service.ts`
+- `backend/src/modules/research-hub/research-hub.types.ts`
+- `backend/src/modules/research-hub/research-hub.md`
+- `frontend/src/features/research-hub/api/researchHubApi.ts`
+- `frontend/src/features/research-hub/components/ResearchOverviewPage.tsx`
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-RH-01A-research-hub-actionability-evidence-date-wiring-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+### Requirement Created / Refined
+
+- Created `CF-W1-RH-01A - Research Hub Actionability Evidence-Date Wiring Requirement`.
+
+Why this is viable:
+
+- the backend and frontend contracts already contain `evidenceDate`;
+- the current Research Hub service never populates that field;
+- the gap is additive and bounded to honest date wiring, not a new storage/history project;
+- it does not reopen `CF-W2-CAL-02`, Today Review writer-family work, DQ residual work, or Trade Plan-first wording.
+
+Why it stays behind other items:
+
+- `CF-W2-CAL-02` still comes first because calibration needs the underlying evidence-through basis defined before Research Hub can claim a calibration evidence date;
+- `CF-W1-MD-02A`, `CF-W1-SQLAB-02B`, and `CF-W1-STRAT-02B` remain higher-value durable-proof proposals, but still consent-gated and not Ready.
+
+### Queue Delta
+
+Updated ranking result:
+
+1. `CF-W2-CAL-02`
+2. `CF-W1-MD-02A` (consent-gated)
+3. `CF-W1-SQLAB-02B` (consent-gated)
+4. `CF-W1-STRAT-02B` (consent-gated)
+5. `CF-W1-RH-01A`
+6. `CF-W1-L3-DQ-01A`
+
+No item was moved to Ready.
+
+### Recommended Next Team 03 Handoff
+
+- Keep Team 03 on `CF-W2-CAL-02` first.
+- After that packet is defined, `CF-W1-RH-01A` is the recommended bounded no-storage follow-on for Team 03:
+  - confirm which actionability dimensions already have a truthful public date basis;
+  - keep calibration date wiring dependency-gated on `CF-W2-CAL-02`;
+  - fail closed with `evidenceDate: null` where the basis is not yet public or not yet stable.
+
+### Blockers / Risks
+
+- `CF-W1-RH-01A` must not invent per-dimension dates from `generatedAt` or another overview-level timestamp.
+- Calibration evidence date remains dependency-gated on `CF-W2-CAL-02`.
+- The three durable-proof proposals remain consent-gated and proposal-only.
+- Team 07 Today Review work and Team 04 DQ/CAL QA planning stay out of this requirement.
+
+### Teams Ready To Pick Up New Tasks
+
+- Team 03: yes, for `CF-W1-RH-01A` only after `CF-W2-CAL-02` architecture work is handled or sequenced.
+- Team 02: yes, for another thin docs-only discovery pass after Team 00 routes the next packet.
+- Team 04: not for this new item yet; current CAL/DQ QA planning remains active and should not be duplicated.
+
+### Tests Run / Skipped
+
+- Tests run: none
+- Tests skipped: all
+- Reason: docs-only requirement refinement pass
+
+### Constraint Result
+
+- No application code changed.
+- No tests/builds/services/providers/Prisma/UI smoke were run.
+- No commit or push was performed.
+
 ## Team 02 Fresh Direct-Value Requirement Discovery Pass - 2026-05-25
 
 Root `AGENTS.md` was read first. Team 02 stayed docs-only, wrote only inside the allowed `10-requirements/**` folder plus this outbox, and did not touch application source/tests, architecture/contract/QA docs, route registries, Prisma/schema, package manifests, Team 07 Today Review files, or Team 04 QA-planning files.

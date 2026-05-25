@@ -4,7 +4,7 @@ Date: 2026-05-25
 
 Owner: Team 00 - Master Orchestrator / Integration
 
-## Latest Active Snapshot - TSC QA, DQ Implementation, Rolling Requirements
+## Latest Active Snapshot - CAL Ready Promotion, TSC QA, DQ Rework
 
 Date: 2026-05-25
 
@@ -12,16 +12,20 @@ Current active agents:
 
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Team 07 - Portfolio / Watchlist / Alerts | `019e5ed4-6f08-7433-b86d-d71ee7cf464a` | `gpt-5.3-codex`, high | rework | `CF-W2-TSC-05A` QA rejection fixes in Team 07 worktree | active |
-| 2 | Team 04 - QA Factory | `019e5eda-3213-7813-8145-b437a9424a40` | `gpt-5.4`, high | QA planning | `CF-W2-CAL-02A` calibration evidence basis | active |
-| 3 | Team 04 - QA Factory | `019e5ed8-5cea-7cf3-8e74-ef91fe2607d9` | `gpt-5.4`, high | QA verification | `CF-W1-DQ-02-RS1` in Team 05 worktree | active |
-| 4 | Team 02 - Requirement Factory | `019e5eda-8856-76c3-aacf-73bff2909bb4` | `gpt-5.4`, medium | requirements | research/actionability evidence-date follow-up | active |
-| 4 | Team 02 - Requirement Factory | pending spawn | `gpt-5.4`, medium | requirements | research/actionability evidence-date follow-up | queued |
-| 5 | Open slot | none | pending | Architect Signoff | Team 03 after Team 10 ACCEPT | queued |
-| 6 | Open slot | none | pending | QA verification | Team 04 after Team 05 DQ handoff | queued |
+| 1 | Team 04 - QA Factory | `019e5edd-f986-7ed0-8aee-39e3cc4296cd` | `gpt-5.4`, high | QA re-verification | `CF-W2-TSC-05A` after Team 07 rework in Team 07 worktree | active |
+| 2 | Team 04 - QA Factory | `019e5ee4-e09c-7261-9c4c-cec6b0d8b9c0` | `gpt-5.4`, high | QA re-verification | `CF-W1-DQ-02-RS1` after Team 05 rework in Team 05 worktree | active |
+| 3 | Open slot | pending spawn | `gpt-5.3-codex`, high | implementation | `CF-W2-CAL-02A` Signal Calibration evidence-basis projection | queued after docs checkpoint/worktree creation |
+| 4 | Open slot | none | pending | QA verification | Team 04 after Team 06 CAL handoff | queued |
+| 5 | Open slot | none | pending | Code Review | Team 10 after next Team 04 ACCEPT | queued |
+| 6 | Open slot | none | pending | Architect Signoff | Team 03 after Team 10 ACCEPT | queued |
 
 Recently closed:
 
+- Team 02 `019e5eda-8856-76c3-aacf-73bff2909bb4`: completed `CF-W1-RH-01A` Research Hub evidence-date requirement refinement; closed.
+- Team 05 `019e5ede-7235-7052-ace9-ca5853b2a26a`: completed `CF-W1-DQ-02-RS1` QA-rejection rework; closed.
+- Team 04 `019e5eda-3213-7813-8145-b437a9424a40`: completed `CF-W2-CAL-02A` QA planning; verdict `QA-plan ready`.
+- Team 04 `019e5ed8-5cea-7cf3-8e74-ef91fe2607d9`: rejected `CF-W1-DQ-02-RS1` for unbounded summary currentness reconstruction and missing repository coverage; closed.
+- Team 07 `019e5ed4-6f08-7433-b86d-d71ee7cf464a`: completed bounded `CF-W2-TSC-05A` QA-rejection rework; next gate is Team 04 QA re-verification.
 - Team 07 `019e5eb8-0d85-7213-b1ce-672513fcda1d`: completed `CF-W2-TSC-05A` implementation; next gate is Team 04 QA verification.
 - Team 04 `019e5ec3-2a5b-7840-9d29-65c43a855e19`: completed `CF-W1-DQ-02-RS1` QA planning; verdict `QA-plan ready`.
 - Team 02 `019e5ec5-c53c-7f02-8b9c-9476b46e7082`: completed fresh direct-value discovery; created `CF-W2-CAL-02`.
@@ -32,21 +36,20 @@ Recently closed:
 
 Current routing:
 
-- `CF-W2-TSC-05A` is back with Team 07 for bounded QA-rejection rework in the Team 07 worktree.
-- `CF-W1-DQ-02-RS1` is in Team 04 QA verification in branch `codex/team05-market-data/CF-W1-DQ-02-RS1`.
-- `CF-W2-CAL-02A` QA planning is active with Team 04.
-- Team 02 is active on the research/actionability evidence-date follow-up from Team 01's audit.
+- `CF-W2-TSC-05A` is in Team 04 QA re-verification after Team 07 rework.
+- `CF-W1-DQ-02-RS1` is in Team 04 QA re-verification after Team 05 rework.
+- `CF-W2-CAL-02A` has requirement, architecture, contract, work packet, QA plan, exact reservations, and no open decisions; Team 00 is promoting it to Team 06 as the next independent Signal Calibration implementation slice.
+- `CF-W1-RH-01A` is a new bounded Research Hub evidence-date requirement and remains behind `CF-W2-CAL-02A` plus higher-value durable-proof consent-gated proposals.
 - No open Product Owner decisions exist.
 
 Teams ready to pick up new tasks:
 
-- Team 07: active on `CF-W2-TSC-05A` rework after QA rejection.
-- Team 04: ready for `CF-W2-TSC-05A` QA re-verification after Team 07 rework handoff.
-- Team 04: active on `CF-W1-DQ-02-RS1` QA verification.
+- Team 04: active on `CF-W2-TSC-05A` QA re-verification.
+- Team 04: active on `CF-W1-DQ-02-RS1` QA re-verification.
+- Team 06: ready to implement `CF-W2-CAL-02A` after Team 00 docs checkpoint and worktree creation.
 - Team 10: ready for the next QA-accepted code review.
-- Team 04: active on `CF-W2-CAL-02A` QA planning.
-- Team 02: active on research/actionability evidence-date requirement refinement.
-- Team 03: ready for Architect Signoff after review acceptance.
+- Team 03: ready for Architect Signoff after Team 10 acceptance, or `CF-W1-RH-01A` architecture after `CF-W2-CAL-02A` is moving.
+- Team 02: ready for the next rolling investor/trader-value requirement pass.
 
 ---
 
