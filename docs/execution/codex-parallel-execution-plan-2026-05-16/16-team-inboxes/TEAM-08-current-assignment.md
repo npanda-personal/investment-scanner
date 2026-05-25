@@ -6,11 +6,17 @@ Team: TEAM-08 - UX / Research / Copilot
 
 Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automation-prompts/AUTO-08-ux-research-copilot.md`
 
-## Assignment
+## Assignment - Review-Reject Rework
 
-Pull `CF-W3-MDPIPE-01B6` as the active Team 08 implementation item.
+Pull `CF-W3-MDPIPE-01B6` back as the active Team 08 review-reject rework item.
 
 This is a frontend-only compact backend pipeline progress indicator for the Data Quality page. It is an overlap slice: do not remove existing Data Quality page controls yet.
+
+Product direction reminder:
+
+- `/pipeline-ops` is the full Bulk Pipeline Dashboard for Monitoring and OPS.
+- Individual feature pages should show only compact backend pipeline progress/status, plus a route to `/pipeline-ops` for details and approved manual controls.
+- The Data Quality page must not become a second bulk-ops dashboard in this slice.
 
 Branch/worktree:
 
@@ -26,6 +32,7 @@ Branch/worktree:
 - QA plan: `04-qa/CF-W3-MDPIPE-01B5-01B6-control-migration-progress-indicators-qa-plan.md`
 - Ready promotion: `13-implementation-evidence/CF-W3-MDPIPE-01B6-ready-promotion.md`
 - Dependency closure: `CF-W3-MDPIPE-01B4` committed as `8d45ddc feat: add pipeline command api`
+- Team 10 rejection: `18-integration-queue/CF-W3-MDPIPE-01B6-code-review.md`
 
 ## Allowed Writes
 
@@ -63,6 +70,11 @@ Branch/worktree:
 - Keep `Evaluate Scope`.
 - Keep the local `BatchProgressBar`.
 - Do not post to Data Quality evaluation, Pipeline Ops command execution, provider/live, scheduler, or downstream execution paths from the indicator.
+- Fix the Team 10 rejection:
+  - `NO_RUN_EVIDENCE` may appear only after a successful loaded pipeline snapshot has no `DATA_QUALITY` stage row.
+  - Initial loading must not claim no-run evidence.
+  - Pipeline status fetch errors must render as an inline unavailable/error state, not as no-run evidence.
+  - Add focused UI coverage for the rejected loading/error path.
 
 ## Required Validation
 

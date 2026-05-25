@@ -34,6 +34,33 @@ No historical active work items have been migrated as active.
 - Rejected / Rework
 - Deferred
 
+## Latest Team 00 Routing Update - B6 Compact Indicator Review Rework
+
+Date: 2026-05-25
+
+Current state:
+
+- `CF-W3-MDPIPE-01B6` is rejected by Team 10 and routed back to Team 08 for bounded frontend-only rework.
+- The release blocker is limited to the Data Quality compact indicator fallback state: `NO_RUN_EVIDENCE` must only appear after a successful loaded pipeline snapshot has no `DATA_QUALITY` stage row.
+- Initial loading and pipeline-status fetch errors must not be displayed as no-run evidence.
+- `/pipeline-ops` remains the full Bulk Pipeline Dashboard for Monitoring and OPS. Feature pages should keep compact read-only progress/status strips and route the user to `/pipeline-ops` for details and approved manual controls.
+- `CF-W3-MDPIPE-01C` remains active with Team 05 in a disjoint backend-only write scope.
+
+Next gates:
+
+1. Team 08 completes the compact-indicator review-reject rework.
+2. Team 04 reruns focused QA for `pipeline-ops.spec.ts` and `data-quality-engine.spec.ts`.
+3. Team 10 re-reviews after QA acceptance.
+4. Team 03 signs off after Team 10 acceptance.
+
+Teams ready to pick up new tasks:
+
+- Team 08: `CF-W3-MDPIPE-01B6` bounded rework.
+- Team 05: continue active `CF-W3-MDPIPE-01C` backend scheduled Data Quality stage.
+- Team 04: QA rerun after Team 08 rework or Team 05 handoff.
+- Team 10: re-review after Team 04 acceptance.
+- Team 03: Architect Signoff after Team 10 acceptance.
+
 ## Latest Team 00 Routing Update - Pipeline Command API Accepted
 
 Date: 2026-05-25

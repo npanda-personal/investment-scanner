@@ -6,6 +6,33 @@ Team: TEAM-10 - Review / Release
 
 State: `CF-W1-NOTIF-02` preaccepted by code review with QA blocker; release acceptance blocked pending focused runtime verification.
 
+## 2026-05-25 `CF-W3-MDPIPE-01B6` Review / Release Gate
+
+Review target: `CF-W3-MDPIPE-01B6`
+
+Review decision: `REJECT`
+
+### Findings
+
+- `P1`: `frontend/src/features/data-quality-engine/components/DataQualityPipelineStatusStrip.tsx:53-57` maps any `null` stage to `NO_RUN_EVIDENCE`, so the strip shows no-run copy during the initial `usePipelineStatus()` load and after fetch errors, not only after a successful snapshot with no `DATA_QUALITY` row. That conflicts with `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W3-MDPIPE-01B6-compact-progress-indicator-contract.md:87-103`.
+- `P2`: `frontend/tests/ui/data-quality-engine.spec.ts:5-113` covers running, terminal, and loaded no-stage states plus the no-POST assertion, but it does not cover the initial-loading or hook-error path, so the rejected fallback behavior is not protected by regression coverage.
+
+### Evidence
+
+- Code review record: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W3-MDPIPE-01B6-code-review.md`
+- Developer handoff: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W3-MDPIPE-01B6-developer-handoff.md`
+- QA verification: `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W3-MDPIPE-01B6-qa-verification.md`
+
+### Validation
+
+- `Get-Counter '\Memory\% Committed Bytes In Use'` -> `51.4%`
+- `cd frontend && npm.cmd run build` -> pass
+- `cd frontend && npm.cmd run test:ui -- pipeline-ops.spec.ts data-quality-engine.spec.ts --workers=1` -> pass after escalated rerun for the known Playwright `EPERM` artifact cleanup issue
+
+### Next Gate
+
+Return to Team 08 for a feature-local strip fix and focused UI coverage update, then Team 04 QA rerun, then Team 10 re-review.
+
 ## 2026-05-25 `CF-W3-MDPIPE-01B4` Review / Release Gate
 
 Review target: `CF-W3-MDPIPE-01B4-PIPELINE-COMMAND-API`
