@@ -2,6 +2,24 @@
 
 Date: 2026-05-25
 
+## Runtime Update - 2026-05-26
+
+User-reported issue: scheduled Signal Calibration appeared stopped at 83% after Raw Signals.
+
+Resolution in progress:
+
+- Root cause class: terminal `PARTIAL` rows could show less than 100% when skipped or missing-upstream-evidence rows were recorded separately from adapter `processedCount`.
+- Signal Calibration now counts missing raw-signal inputs as skipped completed outcomes and records `completedCount` in stage/run metadata.
+- Calibration `PARTIAL` with successful persisted output now fans out to scheduled Market Context instead of stopping the downstream chain.
+- The same completed-outcome accounting has been applied to scheduled Data Quality, Raw Signals, Signal Calibration, and the generic downstream scheduled-stage path used by Market Context, Smart Money, Context Snapshots, Signal Quality, Strategy Decision, Research Projection, and Today Review.
+- Pipeline Ops progress display now uses terminal outcome counts for completed terminal rows, so previously terminal partial rows do not look actively stuck when all rows have resolved to success/fail/skip outcomes.
+
+Boundaries:
+
+- No schema, route registry, package, provider/live, broker, cloud, or paid-service changes.
+- No Trade Plan/R:R/target-price behavior added.
+- Existing terminal calibration rows will render correctly in the dashboard, but already-completed terminal rows do not retroactively launch missing downstream stages; the next scheduled/replayed run will fan out with the new rules.
+
 ## Latest Runtime Update - Pipeline Automation First
 
 User direction: finish pipeline automation before returning to backlog work.

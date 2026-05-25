@@ -671,30 +671,49 @@ export class PipelineOrchestrationService {
       });
       const completedAt = new Date();
       const durationMs = Math.max(0, completedAt.getTime() - startedAt.getTime());
+      const totalCount = adapterResult.totalCount;
+      const adapterProcessedCount = adapterResult.processedCount;
+      const succeededCount = adapterResult.evaluatedCount;
+      const failedCount = adapterResult.failedCount;
+      const skippedCount = adapterResult.skippedCount;
+      const completedCount = Math.min(totalCount, Math.max(adapterProcessedCount, succeededCount + failedCount + skippedCount));
       const status = this.mapScheduledDataQualityStatus({
-        totalCount: adapterResult.totalCount,
-        evaluatedCount: adapterResult.evaluatedCount,
-        failedCount: adapterResult.failedCount,
-        skippedCount: adapterResult.skippedCount,
+        totalCount,
+        evaluatedCount: succeededCount,
+        failedCount,
+        skippedCount,
       });
       const outputFingerprint = this.hashValues([
         stageIdempotencyKey,
         status,
-        String(adapterResult.totalCount),
-        String(adapterResult.evaluatedCount),
-        String(adapterResult.failedCount),
-        String(adapterResult.skippedCount),
+        String(totalCount),
+        String(completedCount),
+        String(succeededCount),
+        String(failedCount),
+        String(skippedCount),
       ]);
+      const metadata = {
+        sourceStage: 'MARKET_DATA',
+        dataThroughDate: request.dataThroughDate,
+        sourceFingerprint: request.sourceFingerprint,
+        changedInstrumentCount: changedInstrumentIds.length,
+        changedInstrumentFingerprint,
+        dqStageVersion: DQ_SCHEDULED_STAGE_VERSION,
+        schedulerRunStartedAt: request.schedulerRunStartedAt,
+        adapter: 'DataQualityEngineService.evaluateScheduledStage',
+        adapterProcessedCount,
+        completedCount,
+      };
 
       const completedStage = await this.completeStage({
         idempotencyKey: stageIdempotencyKey,
         status,
-        totalCount: adapterResult.totalCount,
-        processedCount: adapterResult.processedCount,
-        succeededCount: adapterResult.evaluatedCount,
-        partialCount: status === 'PARTIAL' ? Math.max(1, adapterResult.failedCount + adapterResult.skippedCount) : 0,
-        failedCount: adapterResult.failedCount,
-        skippedCount: adapterResult.skippedCount,
+        totalCount,
+        processedCount: completedCount,
+        succeededCount,
+        partialCount: status === 'PARTIAL' ? Math.max(1, failedCount + skippedCount) : 0,
+        failedCount,
+        skippedCount,
         unchangedCount: 0,
         nextOffset: null,
         hasMore: false,
@@ -703,42 +722,24 @@ export class PipelineOrchestrationService {
         errors: [],
         completedAt,
         durationMs,
-        metadata: {
-          sourceStage: 'MARKET_DATA',
-          dataThroughDate: request.dataThroughDate,
-          sourceFingerprint: request.sourceFingerprint,
-          changedInstrumentCount: changedInstrumentIds.length,
-          changedInstrumentFingerprint,
-          dqStageVersion: DQ_SCHEDULED_STAGE_VERSION,
-          schedulerRunStartedAt: request.schedulerRunStartedAt,
-          adapter: 'DataQualityEngineService.evaluateScheduledStage',
-        },
+        metadata,
       });
 
       await this.completeRun({
         idempotencyKey: runIdempotencyKey,
         status,
-        totalCount: adapterResult.totalCount,
-        processedCount: adapterResult.processedCount,
-        succeededCount: adapterResult.evaluatedCount,
+        totalCount,
+        processedCount: completedCount,
+        succeededCount,
         partialCount: completedStage.partialCount,
-        failedCount: adapterResult.failedCount,
-        skippedCount: adapterResult.skippedCount,
+        failedCount,
+        skippedCount,
         unchangedCount: 0,
         warnings: adapterResult.warnings,
         errors: [],
         completedAt,
         durationMs,
-        metadata: {
-          sourceStage: 'MARKET_DATA',
-          dataThroughDate: request.dataThroughDate,
-          sourceFingerprint: request.sourceFingerprint,
-          changedInstrumentCount: changedInstrumentIds.length,
-          changedInstrumentFingerprint,
-          dqStageVersion: DQ_SCHEDULED_STAGE_VERSION,
-          schedulerRunStartedAt: request.schedulerRunStartedAt,
-          adapter: 'DataQualityEngineService.evaluateScheduledStage',
-        },
+        metadata,
       });
 
       const response = this.scheduledResponseFromStage(status, request, normalizedScope, completedStage, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
@@ -1017,8 +1018,9 @@ export class PipelineOrchestrationService {
       const succeededCount = generatedCount + updatedCount + noOpCount;
       const failedCount = adapterResult.failedCount ?? adapterResult.errors.length;
       const skippedCount = adapterResult.skippedCount ?? adapterResult.skipped ?? 0;
-      const processedCount = adapterResult.processedCount ?? changedInstrumentIds.length;
+      const adapterProcessedCount = adapterResult.processedCount ?? changedInstrumentIds.length;
       const totalCount = adapterResult.totalCount ?? changedInstrumentIds.length;
+      const completedCount = Math.min(totalCount, Math.max(adapterProcessedCount, succeededCount + failedCount + skippedCount));
       const status = this.mapScheduledRawSignalsStatus({
         totalCount,
         succeededCount,
@@ -1029,7 +1031,7 @@ export class PipelineOrchestrationService {
         stageIdempotencyKey,
         status,
         String(totalCount),
-        String(processedCount),
+        String(completedCount),
         String(succeededCount),
         String(failedCount),
         String(skippedCount),
@@ -1045,6 +1047,8 @@ export class PipelineOrchestrationService {
         rawSignalsStageVersion: RAW_SIGNALS_SCHEDULED_STAGE_VERSION,
         schedulerRunStartedAt: request.schedulerRunStartedAt,
         adapter: 'SignalGenerationEngineService.run',
+        adapterProcessedCount,
+        completedCount,
         generatedCount,
         updatedCount,
         noOpCount,
@@ -1056,7 +1060,7 @@ export class PipelineOrchestrationService {
         idempotencyKey: stageIdempotencyKey,
         status,
         totalCount,
-        processedCount,
+        processedCount: completedCount,
         succeededCount,
         partialCount: status === 'PARTIAL' ? Math.max(1, failedCount + skippedCount) : 0,
         failedCount,
@@ -1076,7 +1080,7 @@ export class PipelineOrchestrationService {
         idempotencyKey: runIdempotencyKey,
         status,
         totalCount,
-        processedCount,
+        processedCount: completedCount,
         succeededCount,
         partialCount: completedStage.partialCount,
         failedCount,
@@ -1357,13 +1361,16 @@ export class PipelineOrchestrationService {
       const succeededCount = adapterResult.generated ?? adapterResult.results.length;
       const failedCount = adapterResult.failedCount ?? adapterResult.errors.length;
       const unchangedCount = adapterResult.passthroughCount ?? 0;
-      const processedCount = adapterResult.processedCount ?? changedInstrumentIds.length;
+      const adapterProcessedCount = adapterResult.processedCount ?? changedInstrumentIds.length;
       const totalCount = adapterResult.totalCount ?? changedInstrumentIds.length;
-      const missingInputSkipped = Math.max(0, totalCount - processedCount);
-      const skippedCount = (adapterResult.skippedCount ?? adapterResult.skipped ?? 0) + (adapterResult.outOfScopeSkipped ?? 0) + missingInputSkipped;
+      const adapterSkippedCount = adapterResult.skippedCount ?? adapterResult.skipped ?? 0;
+      const outOfScopeSkipped = adapterResult.outOfScopeSkipped ?? 0;
+      const missingInputSkipped = Math.max(0, totalCount - adapterProcessedCount - adapterSkippedCount);
+      const skippedCount = adapterSkippedCount + outOfScopeSkipped + missingInputSkipped;
+      const completedCount = Math.min(totalCount, Math.max(adapterProcessedCount, succeededCount + failedCount + skippedCount));
       const status = this.mapScheduledSignalCalibrationStatus({
         totalCount,
-        processedCount,
+        processedCount: completedCount,
         succeededCount,
         failedCount,
         skippedCount,
@@ -1372,7 +1379,7 @@ export class PipelineOrchestrationService {
         stageIdempotencyKey,
         status,
         String(totalCount),
-        String(processedCount),
+        String(completedCount),
         String(succeededCount),
         String(failedCount),
         String(skippedCount),
@@ -1388,6 +1395,9 @@ export class PipelineOrchestrationService {
         signalCalibrationStageVersion: SIGNAL_CALIBRATION_SCHEDULED_STAGE_VERSION,
         schedulerRunStartedAt: request.schedulerRunStartedAt,
         adapter: 'SignalCalibrationEngineService.run',
+        adapterProcessedCount,
+        completedCount,
+        missingInputSkipped,
         calibratedCount: adapterResult.calibratedCount ?? 0,
         passthroughCount: adapterResult.passthroughCount ?? 0,
         selectedHorizon: adapterResult.selectedHorizon ?? null,
@@ -1399,7 +1409,7 @@ export class PipelineOrchestrationService {
         idempotencyKey: stageIdempotencyKey,
         status,
         totalCount,
-        processedCount,
+        processedCount: completedCount,
         succeededCount,
         partialCount: status === 'PARTIAL' ? Math.max(1, failedCount + skippedCount) : 0,
         failedCount,
@@ -1419,7 +1429,7 @@ export class PipelineOrchestrationService {
         idempotencyKey: runIdempotencyKey,
         status,
         totalCount,
-        processedCount,
+        processedCount: completedCount,
         succeededCount,
         partialCount: completedStage.partialCount,
         failedCount,
@@ -1433,7 +1443,7 @@ export class PipelineOrchestrationService {
       });
 
       const response = this.scheduledSignalCalibrationResponseFromStage(status, request, normalizedScope, completedStage, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
-      if (status === 'COMPLETED') {
+      if (status === 'COMPLETED' || (status === 'PARTIAL' && completedStage.succeededCount > 0)) {
         response.downstream = await this.runScheduledMarketContextStage({
           region: normalizedScope.region,
           assetType: normalizedScope.assetType,
@@ -2597,14 +2607,15 @@ export class PipelineOrchestrationService {
       const completedAt = new Date();
       const durationMs = Math.max(0, completedAt.getTime() - startedAt.getTime());
       const totalCount = adapterResult.totalCount;
-      const processedCount = adapterResult.processedCount;
+      const adapterProcessedCount = adapterResult.processedCount;
       const succeededCount = adapterResult.succeededCount;
       const failedCount = adapterResult.failedCount;
       const skippedCount = adapterResult.skippedCount;
       const unchangedCount = adapterResult.unchangedCount ?? 0;
+      const completedCount = Math.min(totalCount, Math.max(adapterProcessedCount, succeededCount + failedCount + skippedCount));
       const status = this.mapScheduledPipelineStatus({
         totalCount,
-        processedCount,
+        processedCount: completedCount,
         succeededCount,
         failedCount,
         skippedCount,
@@ -2613,7 +2624,7 @@ export class PipelineOrchestrationService {
         stageIdempotencyKey,
         status,
         String(totalCount),
-        String(processedCount),
+        String(completedCount),
         String(succeededCount),
         String(failedCount),
         String(skippedCount),
@@ -2622,12 +2633,14 @@ export class PipelineOrchestrationService {
       const metadata = {
         ...baseMetadata,
         ...(adapterResult.metadata || {}),
+        adapterProcessedCount,
+        completedCount,
       };
       const completedStage = await this.completeStage({
         idempotencyKey: stageIdempotencyKey,
         status,
         totalCount,
-        processedCount,
+        processedCount: completedCount,
         succeededCount,
         partialCount: status === 'PARTIAL' ? Math.max(1, failedCount + skippedCount) : 0,
         failedCount,
@@ -2646,7 +2659,7 @@ export class PipelineOrchestrationService {
         idempotencyKey: runIdempotencyKey,
         status,
         totalCount,
-        processedCount,
+        processedCount: completedCount,
         succeededCount,
         partialCount: completedStage.partialCount,
         failedCount,

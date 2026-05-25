@@ -946,6 +946,24 @@ describe('PipelineOrchestrationService', () => {
       evaluateScheduledStage,
       evaluate: jest.fn(),
     } as any, { run: signalRun } as any, { run: signalCalibrationRun } as any);
+    jest.spyOn(service, 'runScheduledMarketContextStage').mockResolvedValue({
+      status: 'COMPLETED',
+      pipelineRunId: 'run-market-context-after-calibration',
+      stageRunId: 'stage-market-context-after-calibration',
+      stageKey: 'MARKET_CONTEXT',
+      scope: { region: 'IN', assetType: 'STOCK', timeframe: '1d', pipelineKey: 'market-intelligence' },
+      triggerType: 'scheduled',
+      dataThroughDate: '2026-05-25',
+      inputFingerprint: 'market-context-input',
+      outputFingerprint: 'market-context-output',
+      batch: { totalInstrumentCount: 2, processedCount: 1, batchSize: 2, nextOffset: null, hasMore: false },
+      counts: { totalCount: 1, processedCount: 1, succeededCount: 1, partialCount: 0, failedCount: 0, skippedCount: 0, unchangedCount: 0 },
+      warnings: [],
+      errors: [],
+      startedAt: '2026-05-25T03:00:03.000Z',
+      completedAt: '2026-05-25T03:00:04.000Z',
+      downstream: null,
+    });
 
     const response = await service.runScheduledDataQualityStage({
       region: 'IN',
@@ -966,6 +984,7 @@ describe('PipelineOrchestrationService', () => {
     expect(response.downstreamRawSignals?.stageKey).toBe('RAW_SIGNALS');
     expect(response.downstreamRawSignals?.downstreamSignalCalibration?.status).toBe('COMPLETED');
     expect(response.downstreamRawSignals?.downstreamSignalCalibration?.stageKey).toBe('SIGNAL_CALIBRATION');
+    expect(response.downstreamRawSignals?.downstreamSignalCalibration?.downstream?.stageKey).toBe('MARKET_CONTEXT');
     expect(response.batch.totalInstrumentCount).toBe(2);
     expect(response.counts.processedCount).toBe(2);
     expect(evaluateScheduledStage).toHaveBeenCalledWith({
@@ -1375,7 +1394,7 @@ describe('PipelineOrchestrationService', () => {
     const completedCalibrationStage = {
       ...calibrationStage,
       status: 'PARTIAL',
-      processedCount: 1,
+      processedCount: 2,
       succeededCount: 1,
       partialCount: 1,
       skippedCount: 1,
@@ -1449,6 +1468,24 @@ describe('PipelineOrchestrationService', () => {
       calibrationReadiness: { status: 'USABLE' },
     });
     const service = new PipelineOrchestrationService(repository as any, {} as any, { run: signalRun } as any, { run: calibrationAdapterRun } as any);
+    jest.spyOn(service, 'runScheduledMarketContextStage').mockResolvedValue({
+      status: 'COMPLETED',
+      pipelineRunId: 'run-market-context-after-calibration',
+      stageRunId: 'stage-market-context-after-calibration',
+      stageKey: 'MARKET_CONTEXT',
+      scope: { region: 'IN', assetType: 'STOCK', timeframe: '1d', pipelineKey: 'market-intelligence' },
+      triggerType: 'scheduled',
+      dataThroughDate: '2026-05-25',
+      inputFingerprint: 'market-context-input',
+      outputFingerprint: 'market-context-output',
+      batch: { totalInstrumentCount: 2, processedCount: 1, batchSize: 2, nextOffset: null, hasMore: false },
+      counts: { totalCount: 1, processedCount: 1, succeededCount: 1, partialCount: 0, failedCount: 0, skippedCount: 0, unchangedCount: 0 },
+      warnings: [],
+      errors: [],
+      startedAt: '2026-05-25T03:00:03.000Z',
+      completedAt: '2026-05-25T03:00:04.000Z',
+      downstream: null,
+    });
 
     const response = await service.runScheduledRawSignalsStage({
       region: 'IN',
@@ -1467,6 +1504,8 @@ describe('PipelineOrchestrationService', () => {
     expect(response.status).toBe('PARTIAL');
     expect(response.downstreamSignalCalibration?.stageKey).toBe('SIGNAL_CALIBRATION');
     expect(response.downstreamSignalCalibration?.status).toBe('PARTIAL');
+    expect(response.downstreamSignalCalibration?.counts.processedCount).toBe(2);
+    expect(response.downstreamSignalCalibration?.downstream?.stageKey).toBe('MARKET_CONTEXT');
     expect(calibrationAdapterRun).toHaveBeenCalledWith(expect.objectContaining({
       instrumentIds: ['stock-1', 'stock-2'],
       region: 'IN',
@@ -1478,6 +1517,11 @@ describe('PipelineOrchestrationService', () => {
     expect(repository.upsertStage).toHaveBeenNthCalledWith(2, expect.objectContaining({
       stageKey: 'SIGNAL_CALIBRATION',
       stageOrder: 4,
+    }));
+    expect(repository.completeStage).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      processedCount: 2,
+      skippedCount: 1,
+      status: 'PARTIAL',
     }));
   });
 

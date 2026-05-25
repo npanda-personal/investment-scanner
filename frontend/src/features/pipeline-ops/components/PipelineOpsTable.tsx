@@ -222,12 +222,16 @@ export function PipelineOpsTable({
 }
 
 function ProgressCell({ stage }: { stage: PipelineStatusStage | null }) {
-  const percent = stage && stage.totalCount > 0 ? Math.min(100, Math.round((stage.processedCount / stage.totalCount) * 100)) : 0;
+  const isTerminal = Boolean(stage?.completedAt) || ['COMPLETED', 'PARTIAL', 'FAILED', 'SKIPPED', 'BLOCKED', 'CANCELED'].includes(String(stage?.status || '').toUpperCase());
+  const completedCount = stage && isTerminal
+    ? Math.min(stage.totalCount, Math.max(stage.processedCount, stage.succeededCount + stage.failedCount + stage.skippedCount))
+    : stage?.processedCount ?? 0;
+  const percent = stage && stage.totalCount > 0 ? Math.min(100, Math.round((completedCount / stage.totalCount) * 100)) : 0;
   return (
     <Stack spacing={0.5}>
       <Stack direction="row" justifyContent="space-between" spacing={1}>
         <Typography variant="caption" color="text.secondary">
-          {stage ? `${stage.processedCount} / ${stage.totalCount || 'unknown'}` : 'No run evidence'}
+          {stage ? `${completedCount} / ${stage.totalCount || 'unknown'}` : 'No run evidence'}
         </Typography>
         <Typography variant="caption" color="text.secondary">{stage && stage.totalCount > 0 ? `${percent}%` : 'N/A'}</Typography>
       </Stack>

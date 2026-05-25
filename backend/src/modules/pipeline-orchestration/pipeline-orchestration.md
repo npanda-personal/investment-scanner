@@ -56,6 +56,8 @@ Screen-local progress bars must not be the source of truth. Bulk operations shou
 
 This lets a user leave Market Data, Data Quality, Signal, Backtesting, Research, or Today Review screens and still see the active or latest pipeline progress when returning.
 
+Terminal stage progress is outcome-based. For `COMPLETED`, `PARTIAL`, `FAILED`, `SKIPPED`, `BLOCKED`, or `CANCELED` rows, skipped and failed rows are counted as completed outcomes for progress display and ledger `processedCount` where the adapter reports them separately. This prevents a finished partial stage from appearing stuck below 100% when the remaining rows were intentionally skipped or blocked by missing upstream evidence.
+
 ## Read-Only Status API
 
 `GET /api/v1/pipeline/status`
@@ -170,6 +172,8 @@ Rules:
 - Raw Signals states with no successful persisted output (`FAILED`, `SKIPPED`, `LEASE_HELD`, `DUPLICATE_TERMINAL`, and zero-success `PARTIAL`) do not fan out into calibration;
 - idempotency key: deterministic key over scope, data-through date, upstream Raw Signals output fingerprint, changed-set fingerprint, and Signal Calibration stage version;
 - manual Pipeline Ops `SIGNAL_CALIBRATION_REFRESH_SCOPE` remains deferred; this change does not make calibration refresh a manual command;
+- terminal calibration progress counts missing raw-signal inputs as skipped outcomes, so a partial calibration run with all inputs resolved does not remain visually stuck below 100%;
+- calibration `PARTIAL` with successful persisted output continues to scheduled Market Context; zero-success partial/failed/skipped calibration still stops the affected downstream branch;
 - no route changes, frontend changes, schema changes, package changes, provider/live calls, startup/backfill changes, or downstream fanout beyond Signal Calibration are introduced by this stage.
 
 This stage lets Pipeline Ops show calibration progress after scheduled Raw Signals while keeping the first automated chain DB-only and incremental.

@@ -156,6 +156,45 @@ test.describe('Pipeline Ops UI', () => {
                 updatedAt: '2026-05-25T09:30:30.000Z',
               } : null,
             },
+            {
+              stageKey: 'SIGNAL_CALIBRATION',
+              stageOrder: 4,
+              activeStage: null,
+              lastStage: {
+                id: 'stage-calibration-partial',
+                pipelineRunId: 'run-calibration-partial',
+                stageKey: 'SIGNAL_CALIBRATION',
+                stageOrder: 4,
+                status: 'PARTIAL',
+                dataThroughDate: '2026-05-23T00:00:00.000Z',
+                changedInstrumentCount: 6,
+                batchSize: 25,
+                offset: 0,
+                nextOffset: null,
+                hasMore: false,
+                totalCount: 6,
+                processedCount: 5,
+                succeededCount: 5,
+                partialCount: 1,
+                failedCount: 0,
+                skippedCount: 1,
+                unchangedCount: 0,
+                attemptCount: 1,
+                cacheKey: 'calibration:IN:STOCK:2026-05-23',
+                cacheStatus: 'MISS',
+                cacheExpiresAt: null,
+                inputFingerprint: 'raw:2026-05-23',
+                outputFingerprint: 'calibration:partial',
+                leaseOwner: null,
+                leaseExpiresAt: null,
+                startedAt: '2026-05-25T09:25:00.000Z',
+                completedAt: '2026-05-25T09:30:30.000Z',
+                durationMs: 30000,
+                warnings: ['One instrument had no raw signal row.'],
+                errors: [],
+                updatedAt: '2026-05-25T09:30:30.000Z',
+              },
+            },
           ],
         },
       });
@@ -238,6 +277,9 @@ test.describe('Pipeline Ops UI', () => {
     await expect(table.getByText('Data Quality')).toBeVisible();
     await expect(table.getByText('Readiness evaluation')).toBeVisible();
     await expect(table.getByText('Market Data')).toBeVisible();
+    const calibrationRow = table.locator('tr', { hasText: 'Signal Calibration' }).first();
+    await expect(calibrationRow.getByText('6 / 6')).toBeVisible();
+    await expect(calibrationRow.getByText('100%')).toBeVisible();
 
     const marketDataRow = table.locator('tr', { hasText: 'Market Data' }).first();
     await expect(marketDataRow.getByRole('button', { name: 'Trigger' })).toBeDisabled();
