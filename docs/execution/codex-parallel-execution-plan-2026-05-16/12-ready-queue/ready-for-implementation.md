@@ -6,6 +6,42 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+2026-05-25 Team 00 Ready promotion - `CF-W3-MDPIPE-01B6-DQ-COMPACT-PIPELINE-INDICATOR`:
+
+- `CF-W3-MDPIPE-01B6` is promoted and assigned to Team 08.
+- Current gate state: Ready for frontend-only Data Quality implementation.
+- Purpose: add a compact durable backend pipeline progress indicator on `/data-quality` while leaving full bulk operation controls centralized in the Bulk Pipeline Dashboard for Monitoring and OPS.
+- Branch recommendation: `codex/w3-mdpipe-01b6-dq-compact-indicator`.
+- Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team08-CF-W3-MDPIPE-01B6`.
+- Gate evidence:
+  - Requirement: `10-requirements/CF-W3-MDPIPE-01B3-bulk-pipeline-ops-dashboard-requirement.md`
+  - Architecture: `03-architecture/CF-W3-MDPIPE-01B5-01B6-control-migration-progress-indicators-architecture.md`
+  - Contract: `06-contracts/CF-W3-MDPIPE-01B6-compact-progress-indicator-contract.md`
+  - Work packet: `08-work-packets/CF-W3-MDPIPE-01B6-first-compact-indicator-work-packet.md`
+  - QA plan: `04-qa/CF-W3-MDPIPE-01B5-01B6-control-migration-progress-indicators-qa-plan.md`
+  - Ready promotion: `13-implementation-evidence/CF-W3-MDPIPE-01B6-ready-promotion.md`
+  - Dependency: `CF-W3-MDPIPE-01B4` accepted and committed as `8d45ddc`.
+  - Open decisions: none.
+- Allowed implementation files:
+  - `frontend/src/features/data-quality-engine/components/DataQualityEnginePage.tsx`
+  - `frontend/src/features/data-quality-engine/components/DataQualityPipelineStatusStrip.tsx` (new)
+  - `frontend/tests/ui/data-quality-engine.spec.ts`
+  - active execution docs listed in the Team 08 inbox
+- Forbidden scope:
+  - all backend source/tests
+  - `frontend/src/features/pipeline-ops/**`
+  - frontend app route/navigation files
+  - shared UI/hooks/theme/context files
+  - all other feature pages and tests
+  - Prisma, migrations, generated files, package manifests, provider/live, scheduler/startup, root `AGENTS.md`, `docs/AGENTS.md`, and `docs/codex-agent-team-plan/**`
+- Required validation:
+
+```powershell
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- pipeline-ops.spec.ts data-quality-engine.spec.ts --workers=1
+```
+
 2026-05-25 Team 00 Ready promotion - `CF-W3-MDPIPE-01B4-PIPELINE-COMMAND-API`:
 
 - `CF-W3-MDPIPE-01B4` is promoted as the first bounded Pipeline Ops command slice.

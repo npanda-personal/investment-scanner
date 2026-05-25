@@ -1,6 +1,6 @@
 # TEAM-08 Current Assignment
 
-Date: 2026-05-18
+Date: 2026-05-25
 
 Team: TEAM-08 - UX / Research / Copilot
 
@@ -8,77 +8,76 @@ Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automat
 
 ## Assignment
 
-Pull `CF-W1-UX-01A` as the active Team 08 implementation item.
+Pull `CF-W3-MDPIPE-01B6` as the active Team 08 implementation item.
 
-This is a narrowed frontend-only Stock Research Workbench trust-framing child. The full parent `CF-W1-UX-01` remains blocked for later backend trust evidence. Do not widen this slice.
+This is a frontend-only compact backend pipeline progress indicator for the Data Quality page. It is an overlap slice: do not remove existing Data Quality page controls yet.
 
 Branch/worktree:
 
-- Branch: `codex/team08-ux-research/CF-W1-UX-01A`
-- Worktree: `../investment-scanner-worktrees/team08-CF-W1-UX-01A`
+- Branch recommendation: `codex/w3-mdpipe-01b6-dq-compact-indicator`
+- Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team08-CF-W3-MDPIPE-01B6`
 
-Gate evidence:
+## Gate Evidence
 
-- Requirement: `10-requirements/CF-W1-UX-01-stock-research-workbench-trust-surfaces-requirement.md`
-- Architecture review: `03-architecture/CF-W1-UX-01-architecture-review.md`
-- Contract: `06-contracts/CF-W1-UX-01-stock-research-workbench-trust-surfaces-contract.md`
-- Work packet: `08-work-packets/CF-W1-UX-01-work-packet.md`
-- QA plan: `04-qa/CF-W1-UX-01-qa-plan.md`
-- Source mapping: `09-summaries/CF-W1-UX-01-ux-source-mapping.md`
+- Requirement: `10-requirements/CF-W3-MDPIPE-01B3-bulk-pipeline-ops-dashboard-requirement.md`
+- Architecture: `03-architecture/CF-W3-MDPIPE-01B5-01B6-control-migration-progress-indicators-architecture.md`
+- Contract: `06-contracts/CF-W3-MDPIPE-01B6-compact-progress-indicator-contract.md`
+- Work packet: `08-work-packets/CF-W3-MDPIPE-01B6-first-compact-indicator-work-packet.md`
+- QA plan: `04-qa/CF-W3-MDPIPE-01B5-01B6-control-migration-progress-indicators-qa-plan.md`
+- Ready promotion: `13-implementation-evidence/CF-W3-MDPIPE-01B6-ready-promotion.md`
+- Dependency closure: `CF-W3-MDPIPE-01B4` committed as `8d45ddc feat: add pipeline command api`
 
-## Scope
+## Allowed Writes
 
-Allowed writes:
-
-- `frontend/src/features/stock-research-workbench/components/StockResearchWorkbenchPage.tsx`
-- `frontend/src/features/stock-research-workbench/types.ts`
-- `frontend/tests/ui/stock-research-workbench.spec.ts`
+- `frontend/src/features/data-quality-engine/components/DataQualityEnginePage.tsx`
+- `frontend/src/features/data-quality-engine/components/DataQualityPipelineStatusStrip.tsx` (new)
+- `frontend/tests/ui/data-quality-engine.spec.ts`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-08-outbox.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-UX-01A-developer-handoff.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W3-MDPIPE-01B6-developer-handoff.md`
 
-Forbidden:
+## Forbidden Writes
 
-- backend source/tests
-- `frontend/src/features/stock-research-workbench/api/stockResearchWorkbenchService.ts`
-- `frontend/src/features/signal-generation-engine/**`
-- `frontend/src/features/strategy-decision-engine/**`
-- shared UI
-- navigation or route files
-- package manifests
-- Prisma/schema/migrations
-- generated files
-- providers, startup/backfill, live-provider, broker, paid/cloud, telemetry, or automation flows
+- all backend source and backend tests
+- `frontend/src/features/pipeline-ops/**`
+- `frontend/src/app/routes.tsx`
+- `frontend/src/app/navigationMetadata.tsx`
+- `frontend/src/shared/components/**`
+- `frontend/src/shared/hooks/**`
+- `frontend/src/shared/theme/**`
+- `frontend/src/contexts/MarketScopeContext.tsx`
+- all other frontend feature pages and tests
+- Prisma schema, migrations, generated files
+- package manifests and lockfiles
+- provider/live call paths
+- scheduler/startup behavior
+- root `AGENTS.md`
+- `docs/AGENTS.md`
+- `docs/codex-agent-team-plan/**`
 
-Required behavior:
+## Required Behavior
 
-- derive page trust framing only from existing Workbench response fields plus current requested market scope;
-- show scope as requested/unverified only;
-- keep `COMPLETE` as limited research context, not trusted or ready;
-- show warnings for `PARTIAL` / `DELAYED`;
-- show blocked context and suppress downstream widgets for `MISSING` / `ERROR`;
-- do not edit Signal or Strategy widget internals;
-- avoid `Trusted`, `Ready`, `Verified scope`, `Data quality passed`, `Eligible signal`, `Eligible decision`, `Reliable`, `Safe to trade`, buy/sell/advice-like wording, or target/profit language.
+- Add a feature-local compact read-only pipeline status strip below the Data Quality `PageHeader`.
+- Consume `usePipelineStatus(scope.region, scope.assetType)` from the existing Pipeline Ops feature export.
+- Resolve only the `DATA_QUALITY` stage.
+- Show current scope, stage status, processed/total progress, latest relevant timestamps, warning/error counts, and a deep link to `/pipeline-ops`.
+- Keep `Evaluate Scope`.
+- Keep the local `BatchProgressBar`.
+- Do not post to Data Quality evaluation, Pipeline Ops command execution, provider/live, scheduler, or downstream execution paths from the indicator.
 
-Required validation:
+## Required Validation
 
 ```powershell
 cd frontend
 npm.cmd run build
-npm.cmd run test:ui -- stock-research-workbench.spec.ts --workers=1
+npm.cmd run test:ui -- pipeline-ops.spec.ts data-quality-engine.spec.ts --workers=1
 ```
 
-Stop and return to Team 00 if backend/API/widget/shared/route/package/generated work is needed.
+## Stop Conditions
 
-## Branch / Worktree
-
-Use the dedicated implementation worktree for this item. Do not implement in shared `dev`.
-
-## Blockers
-
-No UX Decision Inbox item remains open. `CF-W1-UX-01A` is Ready only as the narrowed frontend-only child above.
+Stop and return to Team 00 if this requires shared UI, route/navigation, backend, package, generated, provider/live, scheduler/startup, another feature page, or command execution from `/data-quality`.
 
 ## Expected Outbox
 
 Update `17-team-outboxes/TEAM-08-outbox.md`.
 
-Also write `18-integration-queue/CF-W1-UX-01A-developer-handoff.md` after implementation and validation.
+Write `18-integration-queue/CF-W3-MDPIPE-01B6-developer-handoff.md` after implementation and validation.

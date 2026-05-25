@@ -68,6 +68,33 @@ Teams ready to pick up new tasks:
 - Team 05: standby for `CF-W3-MDPIPE-01C` after Team 03 stage architecture and QA plan.
 - Team 02: continue rolling investor/trader-value requirements with direct signal/data/backtest priority.
 
+## Latest Team 00 Routing Update - B6 Compact Indicator Promotion
+
+Date: 2026-05-25
+
+Ready promotion:
+
+- `CF-W3-MDPIPE-01B6` is promoted to Team 08 as a Data Quality-only compact progress indicator.
+- This is frontend-only and read-only.
+- The indicator must consume durable pipeline status from `GET /api/v1/pipeline/status` through the existing `usePipelineStatus()` hook.
+- The page-local `Evaluate Scope` button and local `BatchProgressBar` remain in place during this overlap slice.
+- No feature-page bulk-control removal is approved by this promotion.
+
+Allowed first-slice files:
+
+- `frontend/src/features/data-quality-engine/components/DataQualityEnginePage.tsx`
+- `frontend/src/features/data-quality-engine/components/DataQualityPipelineStatusStrip.tsx`
+- `frontend/tests/ui/data-quality-engine.spec.ts`
+
+Teams ready to pick up new tasks:
+
+- Team 08: implement `CF-W3-MDPIPE-01B6`.
+- Team 04: QA Verification after Team 08 handoff.
+- Team 10: Code Review after Team 04 acceptance.
+- Team 03: Architect Signoff after Team 10 acceptance.
+- Team 03: parallel architecture prep for `CF-W3-MDPIPE-01C` only if no file conflict appears.
+- Team 02: rolling investor/trader-value requirements discovery.
+
 ## Latest Team 00 Routing Update - Pipeline Ledger Foundation
 
 Date: 2026-05-25
