@@ -1,8 +1,40 @@
 # Team Agent Runtime Queue
 
-Date: 2026-05-20
+Date: 2026-05-25
 
 Owner: Team 00 - Master Orchestrator / Integration
+
+## Latest Active Snapshot - Pipeline Ops Rolling Gates
+
+Date: 2026-05-25
+
+Current active agents:
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 03 - Architecture Factory | `019e5ddb-0cf0-7a53-b5aa-bedbeb0bf30d` | `gpt-5.5`, xhigh | architecture / contract / work packet | `CF-W3-MDPIPE-01B4` command API and manual-trigger safety matrix | active |
+| 2 | Team 08 - UX / Research | `019e5ddb-2125-78d1-92b2-e9e917a52145` | `gpt-5.4`, high | UX planning | `CF-W3-MDPIPE-01B5/01B6` control migration and compact indicators | active |
+| 3 | Team 04 - QA Factory | `019e5ddb-3564-7122-b1fa-a009353c5868` | `gpt-5.4-mini`, high | QA planning | command API, control migration, compact indicators | active |
+| 4 | Open slot | none | pending | implementation | next bounded pipeline slice after Team 03/04 gates | waiting |
+| 5 | Open slot | none | pending | review | Team 10 review after next QA-accepted handoff | waiting |
+| 6 | Open slot | none | pending | requirements | Team 02 rolling direct investor/trader-value discovery | ready |
+
+Teams ready to pick up new tasks:
+
+- Team 03: active on `CF-W3-MDPIPE-01B4` command API architecture.
+- Team 08: active on compact progress indicator and page-control migration UX.
+- Team 04: active on command/control/progress QA plans.
+- Team 02: ready for rolling Product Owner / requirements discovery if the pipeline queue thins.
+- Team 05: standby for `CF-W3-MDPIPE-01C` Data Quality scheduled stage after status/command contracts stabilize.
+- Team 10: ready for review after the next QA acceptance.
+
+Queued next:
+
+1. Team 00 consumes Team 03/08/04 outputs.
+2. Team 00 promotes only one bounded implementation slice if architecture, QA, file reservations, and open-decision gates pass.
+3. If command API is not Ready, keep manual triggers disabled and proceed with compact progress indicators only when file reservations are disjoint.
+
+---
 
 ## Latest Active Snapshot - Dirty Docs Checkpoint And Gate Closures
 
