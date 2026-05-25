@@ -4,6 +4,40 @@ Date: 2026-05-25
 
 Owner: Team 00 - Master Orchestrator / Integration
 
+## Latest Active Snapshot - TSC-05A Implementation And DQ Architecture
+
+Date: 2026-05-25
+
+Current active agents:
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 07 - Portfolio / Watchlist / Alerts | `019e5eb8-0d85-7213-b1ce-672513fcda1d` | `gpt-5.3-codex`, high | implementation | `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` in `C:\work\repo\investment-scanner-worktrees\team07-CF-W2-TSC-05A` | active |
+| 2 | Team 03 - Architecture Factory | `019e5eb8-7507-7943-9520-2dc34deb6d03` | `gpt-5.4`, high | architecture prep | `CF-W1-DQ-02` residual read-side/public-contract reconstruction packet | active |
+| 3 | Open slot | none | pending | QA verification | Team 04 `CF-W2-TSC-05A` after Team 07 handoff | queued |
+| 4 | Open slot | none | pending | Code Review | Team 10 `CF-W2-TSC-05A` after Team 04 ACCEPT | queued |
+| 5 | Open slot | none | pending | Architect Signoff | Team 03 signoff after Team 10 ACCEPT | queued |
+| 6 | Open slot | none | pending | Requirements | Team 02 next rolling direct-value pass after current dispatch | queued |
+
+Current routing:
+
+- Main `dev` docs checkpoint committed as `188084b docs: promote tsc 05a and route dq residual`.
+- `CF-W2-TSC-05A` is assigned to Team 07 on branch `codex/team07-portfolio-alerts/CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY`, required base `68f0a19`.
+- Team 00 verified the TSC-05A worktree is clean and base check passes.
+- Team 00 created backend/frontend `node_modules` junctions in the TSC-05A worktree so the worker can validate without installing packages.
+- Team 02 selected read-time reconstruction for the DQ residual; Team 03 now owns docs-only architecture prep.
+- No open Product Owner decisions exist.
+
+Teams ready to pick up new tasks:
+
+- Team 07: active on `CF-W2-TSC-05A` implementation.
+- Team 03: active on DQ residual architecture.
+- Team 04: ready for TSC-05A QA after developer handoff.
+- Team 10: ready for TSC-05A review after QA acceptance.
+- Team 02: ready for rolling direct investor/trader-value discovery when a slot opens.
+
+---
+
 ## Latest Active Snapshot - Pipeline Ops Rolling Gates
 
 Date: 2026-05-25
