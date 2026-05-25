@@ -1,30 +1,30 @@
 # Requirements Backlog
 
-Date: 2026-05-24
+Date: 2026-05-25
 
-Status: Team 00 updated after Product Owner redirected the workflow toward Trusted Signal Candidates and away from Trade Plan, R:R, arbitrary targets, and target-price framing. Product Owner priority remains direct investor/trader value first: market-data freshness/provenance, data-quality readiness, signals/triggers, strategy/rules, trusted candidate health, backtesting, calibration, market/historical context, and research explainability.
+Status: Team 02 refreshed the backlog after a fresh direct-value audit. Product Owner priority remains direct investor/trader value first: market-data freshness/provenance, data-quality readiness, signals/triggers, strategy/rules, trusted candidate health, backtesting, calibration, market/historical context, and research explainability.
 
 Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-02A` are accepted parked branch commits, not fresh backlog-front items.
 
-Team 02 rolling update: `CF-W1-TSC-01A-SIG` is active with Team 06 and `CF-W1-DQ-03` is active with Team 05. Backlog-front discovery now excludes those active pulls and adds `CF-W1-TSC-02` as the next trusted-candidate health requirement draft.
+Team 02 rolling update: `CF-W2-TSC-05A` is active with Team 07 and `CF-W1-DQ-02-RS1` QA planning is active with Team 04. Backlog-front discovery now excludes those active pulls and adds `CF-W2-CAL-02` as the next independent non-consent-gated calibration trust requirement draft.
 
 ## Current Cycle Requirement Focus
 
 | ID | Why it matters now | Next gate |
 | --- | --- | --- |
-| `CF-W1-TSC-01A-SIG` | Signal Generation bridge for source-proven trigger evidence is active with Team 06. | Do not duplicate as fresh Team 02 discovery; wait for implementation acceptance. |
-| `CF-W1-TSC-01A-TREV` | `/today-review` should adopt accepted trigger evidence into Trusted Signal Candidate groups, counts, reasons, and conservative health. | Team 00 promotion only after Team 06 acceptance and Team 03/04 Today Review reservations pass. |
-| `CF-W1-TSC-01` | Parent workflow path for Trusted Signal Candidates without R:R, arbitrary targets, synthetic targets, or Trade Plan-first framing. | Route implementation through `CF-W1-TSC-01A`; keep parent out of direct implementation. |
+| `CF-W2-TSC-05A` | Today Review ranking/eligibility reframe is active with Team 07. | Do not duplicate as fresh Team 02 discovery; wait for Team 07 handoff and downstream gates. |
+| `CF-W1-DQ-02-RS1` | DQ residual read-side currentness packet is in active QA planning with Team 04. | Keep out of fresh Team 02 discovery until Team 04 completes QA planning and Team 00 routes the next gate. |
+| `CF-W2-CAL-02` | Calibration needs a truthful scoped evidence-through date and scoped page-level evidence basis. | New requirement draft; route Team 03 architecture next if Team 00 wants the next independent direct-value packet. |
 | `CF-W1-SIG-TRIGGER-ENTRY-01` | Signal Generation now exposes source-proven trigger evidence for downstream adoption. | Accepted and locally committed as `649e645`; keep out of fresh Team 02 pulls. |
 | `CF-W1-HCTX-03` | Historical context needs age and provenance warnings so nearest snapshots do not read like same-day evidence. | Accepted and locally committed as `f6034c6`; wait for clean integration sequencing. |
-| `CF-W1-DQ-03` | Downstream trust consumers need a compact residual reason summary instead of raw DQ arrays. | Active with Team 05; do not duplicate as fresh Team 02 discovery. |
+| `CF-W1-DQ-03` | Downstream trust consumers need a compact residual reason summary instead of raw DQ arrays. | Accepted / routed elsewhere; do not duplicate as fresh Team 02 discovery. |
 | `CF-W1-MCTX-02` | Market Context needs an explicit persisted-versus-generated freshness basis label. | Accepted and locally committed as `0c802c2`; wait for clean integration sequencing. |
 | `CF-W1-STRAT-04` | Strategy evidence needs freshness and stale-summary labels so compact summaries do not overclaim recency. | Accepted and locally committed as `8b3498e`; wait for clean integration sequencing. |
 | `CF-W1-SQLAB-03` | Signal Quality Lab needs review-loop actionability for noisy and limited outcomes. | Accepted and locally committed as `5db98f2`; wait for clean integration sequencing. |
-| `CF-W1-TSC-02` | Active candidates need rule-based health tracking after entry until exit, invalidation, expiry, or blockage. | New requirement draft; Team 03 architecture/refinement only after active TSC-01A/DQ-03 gates settle. |
+| `CF-W1-TSC-02` | Active candidates need rule-based health tracking after entry until exit, invalidation, expiry, or blockage. | New requirement draft; Team 03 architecture/refinement only after the active Today Review writer family clears. |
 | `CF-W1-TP-03` | Paused/stale as framed; Trade Plan proof snapshot freshness does not match the new Trusted Signal Candidate direction. | Do not execute unless reframed into signal health with no R:R, targets, or Trade Plan-first UX. |
-| `CF-W1-BT-04` | Backtesting saved runs need freshness/current-proof labels so older simulations do not read like latest proof. | Team 03 architecture contract and QA planning; keep first child additive and no-schema. |
-| `CF-W1-DQ-02` residual parent | `DQ-02A` currentness evidence is accepted, but read-side/public-contract residual scope remains split-required. | Team 03 should identify a bounded no-schema follow-up or keep the parent blocked. |
+| `CF-W1-BT-04` | Backtesting saved runs need freshness/current-proof labels so older simulations do not read like latest proof. | Accepted and locally committed; keep excluded from fresh routing. |
+| `CF-W1-DQ-02` residual parent | `DQ-02A` currentness evidence is accepted, and `RS1` is in active QA planning. | Keep parent blocked from new discovery until the active packet clears. |
 | `CF-W1-L3-DQ-01A` | Passive Lane 3 readiness display still needs truthful contract semantics. | Keep contract-only unless Team 03/04 define a bounded child. |
 | `CF-W1-MD-02A` | Market-data evidence storage is useful, but schema / generated / repository consent is required. | Consent-gated proposal only. |
 
@@ -32,22 +32,22 @@ Team 02 rolling update: `CF-W1-TSC-01A-SIG` is active with Team 06 and `CF-W1-DQ
 
 | Rank | ID | State | Why now |
 | --- | --- | --- | --- |
-| 1 | `CF-W1-TSC-01A-TREV` | Dependent follow-on | Today Review adoption is the next direct Trusted Signal Candidate step after Team 06 bridge acceptance. |
-| 2 | `CF-W1-BT-04` | Architecture prepared | Backtesting saved runs need explicit freshness/current-proof labeling. |
-| 3 | `CF-W1-TSC-02` | New requirement draft | Trusted candidates need ongoing rule-based health state evidence. |
-| 4 | `CF-W1-DQ-02` residual parent | Split-required | Remaining read-side/public-contract scope after accepted `DQ-02A`. |
+| 1 | `CF-W2-CAL-02` | New requirement draft | Calibration needs a truthful scoped evidence-through date and page-level evidence basis so calibrated trust does not overclaim freshness or scope. |
+| 2 | `CF-W1-MD-02A` | Proposal-only | Market-data evidence storage remains the next strongest upstream provenance gap, but stays consent-gated. |
+| 3 | `CF-W1-SQLAB-02B` | Proposal-only | Durable Signal Quality learning memory remains useful but storage-gated. |
+| 4 | `CF-W1-STRAT-02B` | Proposal-only | Durable strategy revision history remains useful but schema/generated/repository-gated. |
 | 5 | `CF-W1-L3-DQ-01A` | Contract-only | Lane 3 passive readiness DTOs still matter, but not as the next fresh implementation pull. |
-| 6 | `CF-W1-MD-02A` | Proposal-only | Market-data evidence storage remains gated. |
-| 7 | `CF-W1-SQLAB-02B` | Proposal-only | Durable Signal Quality learning memory remains useful but storage-gated. |
-| 8 | `CF-W1-STRAT-02B` | Proposal-only | Durable strategy revision history remains useful but schema/generated/repository-gated. |
+| 6 | `CF-W1-TSC-02` | New requirement draft | Trusted candidates need ongoing rule-based health state evidence, but it remains behind Team 07's active Today Review scope. |
+| 7 | `CF-W1-TSC-03` residual/supporting-evidence path | Parent requirement | Supporting Today Review evidence still matters, but it depends on the active Today Review writer family clearing first. |
+| 8 | `CF-W1-UX-01` | Open parent | Research Workbench trust gaps remain behind upstream trust/evidence work. |
 | 9 | `CF-W1-UX-02` | Copilot-only trust UX pending | Useful downstream trust work, but behind core signal/data/backtest evidence. |
 | 10 | `CF-W1-UX-05` | Copilot-only language cleanup | Useful wording cleanup after Copilot trust scope is settled; shared UI remains out of scope. |
 
 ## Rolling Audit Notes
 
-- The 2026-05-20 `audit-backtesting-proof-basis-2026-05-20.md` confirms `CF-W1-BT-03` stays parked and does not become a fresh Team 02 discovery item.
-- That same audit reinforces `CF-W1-BT-04` as the next backtesting trust slice because the queue still needs a compact current-proof label on saved runs.
-- No new evidence from the backtesting refresh outranks the current Trusted Signal Candidate entry-price dependency.
+- Fresh audit result: `CF-W2-CAL-02` is the first independent non-consent-gated candidate after active/accepted exclusions were reconciled.
+- `CF-W2-CAL-02` is not a duplicate of accepted `CF-W1-CAL-01A`; it focuses on scoped evidence freshness and page-level evidence-basis truth, not the DQ readiness gate already accepted.
+- The storage proposals remain valuable, but they stay honestly consent-gated and behind the new calibration trust slice.
 
 ## Active Or Parked Exclusions
 
@@ -61,6 +61,8 @@ Keep these out of fresh Team 02 discovery:
 - `CF-W1-L3-AUTH-03`
 - `CF-W1-BT-03`
 - `CF-W1-CAL-01A`
+- `CF-W2-TSC-05A`
+- `CF-W1-DQ-02-RS1`
 - `CF-W1-TP-01A`
 - `CF-W1-DQ-02A`
 - `CF-W1-SQLAB-01`
@@ -88,14 +90,14 @@ These are already promoted, active, accepted, parked, or otherwise in the live R
 
 These can move toward architecture/QA next without creating duplicate application-code work:
 
-1. `CF-W1-TSC-01A` as the Today Review Trusted Signal Candidate adoption child
-2. `CF-W1-BT-04` as the next bounded Backtesting current-proof labeling child
-3. `CF-W1-TSC-02` as a new active signal health requirement draft
-4. `CF-W1-DQ-02` residual parent split for a possible bounded follow-up after accepted `DQ-02A`
+1. `CF-W2-CAL-02` as the next bounded calibration evidence-basis packet
+2. `CF-W1-MD-02A` as a consent-gated companion evidence packet
+3. `CF-W1-SQLAB-02B` as a consent-gated durable Signal Quality memory packet
+4. `CF-W1-STRAT-02B` as a consent-gated durable strategy revision history packet
 5. `CF-W1-L3-DQ-01A` as a contract-only child if Team 00 wants the passive Lane 3 display slice refreshed
-6. `CF-W1-MD-02A` as a consent-gated companion evidence packet
-7. `CF-W1-SQLAB-02B` as a consent-gated durable Signal Quality memory packet
-8. `CF-W1-STRAT-02B` as a consent-gated durable strategy revision history packet
+6. `CF-W1-TSC-02` as a new active signal health requirement draft after Team 07 clears Today Review files
+7. `CF-W1-TSC-03` residual/supporting-evidence follow-on after Today Review dependencies settle
+8. `CF-W1-UX-01` as the Workbench trust-evidence parent behind the core trust stack
 9. `CF-W1-UX-02` as a Copilot-only trust UX packet behind core signal evidence
 10. `CF-W1-UX-05` as Copilot-only product-language cleanup behind `CF-W1-UX-02`
 

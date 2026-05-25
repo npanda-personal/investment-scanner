@@ -44,6 +44,8 @@ Gate status:
 - Team 04 QA Verification for `CF-W2-TSC-05A` is active as agent `019e5ec7-3ce8-7e72-bffa-92dbbb4e0a34`.
 - Team 04 completed `CF-W1-DQ-02-RS1` QA planning and was closed.
 - Team 00 promoted `CF-W1-DQ-02-RS1` to Team 05 as a bounded seven-file DQE implementation child.
+- Team 05 implementation is active as agent `019e5ecb-b61d-7773-9dc6-1246a1a558fe`.
+- Team 02 completed fresh direct-value discovery and created `CF-W2-CAL-02` as the next architecture target.
 - No open Product Owner decisions exist.
 
 DQ implementation boundary:
@@ -56,16 +58,16 @@ DQ implementation boundary:
 Parallel routing:
 
 - Team 04 verifies `CF-W2-TSC-05A`; Team 10 follows if QA accepts.
-- Team 05 may implement `CF-W1-DQ-02-RS1` after Team 00 creates the worktree.
-- Team 02 remains active on fresh direct investor/trader-value discovery.
+- Team 05 implements `CF-W1-DQ-02-RS1` in the dedicated DQE worktree.
+- Team 03 is queued for docs-only `CF-W2-CAL-02` architecture prep.
 
 Teams ready to pick up new tasks:
 
 - Team 04: active on `CF-W2-TSC-05A` QA verification.
-- Team 05: ready to implement `CF-W1-DQ-02-RS1` after worktree creation.
+- Team 05: active on `CF-W1-DQ-02-RS1` implementation.
 - Team 10: Code Review after Team 04 acceptance.
-- Team 03: Architect Signoff after Team 10 acceptance.
-- Team 02: active rolling requirements discovery.
+- Team 03: `CF-W2-CAL-02` architecture prep now; Architect Signoff after Team 10 acceptance if a review handoff arrives.
+- Team 01/02: next thin-backlog discovery after `CAL-02` architecture routing.
 
 ## Latest Team 00 Routing Update - DQ QA Planning Launched
 

@@ -11,8 +11,8 @@ Status:
 - Product Owner action required: no.
 - Push performed: no.
 - Active Team 04 QA verification agent: `019e5ec7-3ce8-7e72-bffa-92dbbb4e0a34`.
-- Active Team 02 rolling requirements agent: `019e5ec5-c53c-7f02-8b9c-9476b46e7082`.
-- Team 05 DQ-RS1 implementation: queued pending worktree creation.
+- Team 02 rolling requirements agent `019e5ec5-c53c-7f02-8b9c-9476b46e7082` completed and was closed.
+- Active Team 05 DQ-RS1 implementation agent: `019e5ecb-b61d-7773-9dc6-1246a1a558fe`.
 
 Gate movement:
 
@@ -21,14 +21,16 @@ Gate movement:
 - Team 04 completed `CF-W1-DQ-02-RS1` QA planning with `QA-plan ready`.
 - Team 00 promoted `CF-W1-DQ-02-RS1` to Team 05 for bounded implementation.
 - Old Team 05 `CF-W3-MDPIPE-01C` inbox content is stale; `01C` is already accepted and committed as `da66fa4`.
+- Team 02 created fresh requirement `CF-W2-CAL-02` for Signal Calibration evidence freshness and scope basis.
+- Team 03 is assigned next docs-only architecture prep for `CF-W2-CAL-02`.
 
 Teams ready to pick up new tasks:
 
 - Team 04: active on `CF-W2-TSC-05A` QA verification.
-- Team 05: implement `CF-W1-DQ-02-RS1` after Team 00 creates the worktree.
+- Team 05: active on `CF-W1-DQ-02-RS1` implementation.
 - Team 10: Code Review after Team 04 acceptance.
-- Team 03: Architect Signoff after Team 10 acceptance.
-- Team 02: active fresh direct-value requirement discovery.
+- Team 03: `CF-W2-CAL-02` architecture prep now; Architect Signoff after Team 10 acceptance if a review handoff arrives.
+- Team 01/02: next thin-backlog discovery after `CAL-02` architecture routing.
 
 ---
 

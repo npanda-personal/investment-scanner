@@ -6,6 +6,57 @@ Team: TEAM-03 - Architecture Factory
 
 Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automation-prompts/AUTO-03-architecture-factory.md`
 
+## Latest Assignment Override - 2026-05-25 CAL-02 Calibration Evidence Basis
+
+Prepare docs-only architecture readiness for `CF-W2-CAL-02` Signal Calibration evidence freshness and scope basis.
+
+This follows Team 02's fresh direct-value requirement discovery. Do not implement application code. Do not move the item to Ready. Determine whether the first child can stay additive and bounded without schema, route registry, shared UI, package/generated, provider/live, startup/backfill, or broad UI scope.
+
+Goal:
+
+- Define the smallest bounded Signal Calibration child that exposes truthful scoped evidence basis for selected `region`, `assetType`, and `horizon`.
+- Prefer reuse of existing Signal Quality public outputs such as generated time, latest measurable price date, next evaluable date, and horizon availability.
+- Distinguish calibration row generation time from evidence-through time.
+- Replace frontend first-row proxy / unscoped health overclaiming with a truthful scoped aggregate contract if feasible.
+- Stop and report a consent blocker only if honest implementation requires schema/storage, route registry, shared UI, package/generated, provider/live, startup/backfill, or broad UI scope.
+
+Allowed writes:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W2-CAL-02-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W2-CAL-02-signal-calibration-evidence-basis-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W2-CAL-02-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Read-only inputs:
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-CAL-02-signal-calibration-evidence-freshness-and-scope-basis-requirement.md`
+- `backend/src/modules/signal-calibration-engine/**`
+- `backend/tests/modules/signal-calibration-engine/**`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.types.ts`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.service.ts`
+- `frontend/src/features/signal-calibration-engine/**`
+
+Forbidden writes:
+
+- application source or tests
+- Prisma schema or migrations
+- route registries
+- shared backend utilities
+- shared UI
+- package manifests
+- generated files
+- provider/live/startup/backfill files
+- Today Review, DQ, Market Data, Signal Quality, Backtesting, Pipeline Ops, or other module source/tests
+
+Required output:
+
+- Architecture recommendation: `Ready candidate after QA`, `split required`, or `consent blocker`.
+- Exact allowed/forbidden file reservation if a bounded additive child is viable.
+- QA handoff notes for scoped health, evidence-through date, horizon-limited evidence, missing Signal Quality evidence, mixed-row page states, and frontend no-first-row-proxy behavior.
+- Stop condition if schema/storage, route widening, shared UI, or broader cross-module implementation is required.
+
 ## Latest Assignment Override - 2026-05-25 DQ Residual Read-Side Packet
 
 Prepare docs-only architecture readiness for the residual `CF-W1-DQ-02` read-side/public-contract reconstruction packet.

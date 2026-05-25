@@ -1,5 +1,148 @@
 # TEAM-02 Requirement Factory
 
+## Team 02 Fresh Direct-Value Requirement Discovery Pass - 2026-05-25
+
+Root `AGENTS.md` was read first. Team 02 stayed docs-only, wrote only inside the allowed `10-requirements/**` folder plus this outbox, and did not touch application source/tests, architecture/contract/QA docs, route registries, Prisma/schema, package manifests, Team 07 Today Review files, or Team 04 QA-planning files.
+
+### Work Item
+
+Run a fresh direct investor/trader-value requirement discovery pass after the accepted backtesting/smart-money/strategy/signal slices, while excluding:
+
+- active `CF-W2-TSC-05A` with Team 07;
+- active `CF-W1-DQ-02-RS1` QA planning with Team 04;
+- accepted/committed slices already listed in the assignment;
+- Trade Plan-first, target-price, synthetic-target, and advice-like requirement framing.
+
+### Files Inspected
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/active-work-board.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/team-agent-runtime-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/99-decision-inbox/open-decisions.md`
+- `backend/src/modules/market-data-foundation/market-data-foundation.md`
+- `backend/src/modules/data-quality-engine/data-quality-engine.md`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.md`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.md`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.types.ts`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.service.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.types.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.service.ts`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+- `backend/src/modules/market-context-intelligence/market-context-intelligence.md`
+- `backend/src/modules/today-trade-review/today-trade-review.md`
+- `frontend/src/features/today-trade-review/components/TodayReviewPage.tsx`
+- `frontend/src/features/pipeline-ops/components/PipelineOpsPage.tsx`
+- `frontend/src/features/pipeline-ops/components/PipelineOpsTable.tsx`
+- `frontend/src/features/pipeline-ops/components/PipelineStatusStrip.tsx`
+- `frontend/src/features/pipeline-ops/types.ts`
+- `frontend/src/features/signal-calibration-engine/components/SignalCalibrationEnginePage.tsx`
+- `frontend/src/features/signal-calibration-engine/hooks/useSignalCalibrationEngine.ts`
+- `frontend/src/features/signal-calibration-engine/api/signalCalibrationEngineService.ts`
+- `frontend/src/features/signal-calibration-engine/types.ts`
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-CAL-02-signal-calibration-evidence-freshness-and-scope-basis-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+### Requirement Created
+
+- `CF-W2-CAL-02 - Signal Calibration Evidence Freshness And Scope Basis Requirement`
+
+Reason:
+
+- Calibration already exposes readiness/sample-state language, but it does not tell the user what measurable evidence date or scoped aggregate basis those judgments come from.
+- Signal Quality already owns the upstream timing facts (`generatedAt`, `latestAvailablePriceDate`, `nextEvaluableDate`, horizon availability), so this is a real bounded trust follow-on rather than a new engine proposal.
+- The current calibration page falls back to unscoped `/health` plus first-row proxy summaries, which is not a truthful page-level trust basis.
+
+### Queue / Ranking Result
+
+Updated highest-value unassigned stack:
+
+1. `CF-W2-CAL-02`
+2. `CF-W1-MD-02A` (consent-gated)
+3. `CF-W1-SQLAB-02B` (consent-gated)
+4. `CF-W1-STRAT-02B` (consent-gated)
+5. `CF-W1-L3-DQ-01A`
+
+Why `CF-W2-CAL-02` moved above the others:
+
+- It is independent of Team 07 and Team 04 active write scopes.
+- It is non-consent-gated.
+- It fixes a current direct user trust problem in a core investor/trader evidence surface.
+- It does not reopen accepted `CF-W1-CAL-01A`; it is a fresh residual on evidence-basis truth, not DQ hard-gating.
+
+### Consent-Gated / Architecture-Next / Avoid Lists
+
+Consent-gated and keep proposal-only:
+
+- `CF-W1-MD-02A`
+- `CF-W1-SQLAB-02B`
+- `CF-W1-STRAT-02B`
+
+Architecture next:
+
+- `CF-W2-CAL-02`
+
+Hold until active writer family clears:
+
+- `CF-W1-TSC-02`
+- `CF-W1-TSC-03`
+
+Avoid as stale / accepted / already active:
+
+- `CF-W2-TSC-05A`
+- `CF-W1-DQ-02-RS1`
+- `CF-W1-BT-04`
+- `CF-W1-SMI-01`
+- accepted MDPIPE slices
+- accepted/committed items listed in the assignment exclusion set
+
+### Blockers / Risks
+
+- No independent non-consent-gated direct-value gap was found in Today Review because Team 07 owns that writer family now.
+- No DQ residual follow-on should be reopened while Team 04 owns `CF-W1-DQ-02-RS1` QA planning.
+- `CF-W2-CAL-02` will need Team 03 to confirm whether the first bounded child can stay additive across calibration-owned backend/frontend files without widening into shared UI or route work.
+
+### Recommended Next Architecture Target
+
+- `CF-W2-CAL-02`
+
+Reason:
+
+- highest unblocked direct user value;
+- bounded cross-surface trust fix;
+- no schema/storage consent needed;
+- no collision with the active Today Review and DQ packets.
+
+### Teams Ready To Pick Up New Tasks
+
+- Team 03: next architecture packet should be `CF-W2-CAL-02` after current signoff/review obligations allow.
+- Team 01/02: can continue thin-backlog discovery after `CF-W2-CAL-02` is routed.
+- Team 10: remains ready for the next QA-accepted review handoff from the active lanes.
+
+### Tests Run / Skipped
+
+- Tests run: none
+- Tests skipped: all
+- Reason: docs-only requirement pass
+
+### Constraint Result
+
+- No application code changed.
+- No tests/builds/services/providers/Prisma/UI smoke were run.
+- No item was moved to Ready.
+- No commit or push was performed.
+
 ## Team 02 Rolling Direct-Value Requirement Pass - 2026-05-25
 
 Root `AGENTS.md` was read first. Team 02 stayed docs-only, wrote only inside the allowed `10-requirements/**` folder plus this outbox, and did not touch application source/tests, architecture/contract/QA docs, the Ready queue, route registries, Prisma/schema, package manifests, or shared UI/utilities.
