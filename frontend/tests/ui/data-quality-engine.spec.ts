@@ -17,8 +17,11 @@ test.describe('Data Quality Engine UI', () => {
     await expect(indicator.getByText('Errors: 2')).toBeVisible();
     await expect(indicator.getByRole('link', { name: 'View Pipeline Ops details' })).toHaveAttribute('href', '/pipeline-ops');
 
-    await expect(page.getByRole('button', { name: 'Evaluate Scope' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Evaluate Scope' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Refresh' })).toBeVisible();
+    await expect(page.getByText('Evaluating data quality for')).toHaveCount(0);
+    await expect(page.getByText('Data quality evaluation complete for')).toHaveCount(0);
+    await expect(page.getByText('Run Evaluate Scope to populate diagnostics.')).toHaveCount(0);
     await expect(page.getByText('Coverage').first()).toBeVisible();
     await expect(page.getByText('Signal Readiness').first()).toBeVisible();
     await expect(page.getByText('Daily Review').first()).toBeVisible();
@@ -35,6 +38,7 @@ test.describe('Data Quality Engine UI', () => {
     await expect(drawer.getByText('Use-case Readiness')).toBeVisible();
     await expect(drawer.getByText('Tier Blockers (blocker-first)')).toBeVisible();
     await expect(drawer.getByText('Automation remains policy-blocked in Phase 0 and is not broker-authorized.')).toBeVisible();
+    await expect(drawer.getByRole('button', { name: 'Evaluate Scope' })).toHaveCount(0);
 
     const blockerText = await drawer.innerText();
     const signalIndex = blockerText.indexOf('Signal: Signal readiness is not ready.');
@@ -47,43 +51,31 @@ test.describe('Data Quality Engine UI', () => {
     expect(automationIndex).toBeGreaterThan(calibrationIndex);
   });
 
-  test('evaluate scope sends scoped bounded batch request without running the real evaluation', async ({ page }) => {
-    let evaluatePayload: any = null;
+  test('does not expose local evaluate controls or emit local evaluate posts when refreshing', async ({ page }) => {
+    let evaluatePostCount = 0;
+    let commandPostCount = 0;
     await mockDataQualityResponses(page);
     await mockReviewReadiness(page);
     await mockPipelineStatus(page, 'terminal');
     await page.route('**/api/v1/data-quality/evaluate', async (route) => {
-      evaluatePayload = route.request().postDataJSON();
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          processedCount: 1,
-          totalCount: 1,
-          batchSize: evaluatePayload.batchSize,
-          offset: evaluatePayload.offset,
-          nextOffset: null,
-          hasMore: false,
-          evaluatedCount: 1,
-          skippedCount: 0,
-          failedCount: 0,
-          warnings: [],
-          durationMs: 1,
-        }),
-      });
+      evaluatePostCount += 1;
+      await route.abort();
+    });
+    await page.route('**/api/v1/pipeline/commands', async (route) => {
+      commandPostCount += 1;
+      await route.abort();
     });
 
     await visitModule(page, '/data-quality', 'Data Quality Engine');
     await expect(page.getByTestId('data-quality-pipeline-status-strip').locator('.MuiChip-label', { hasText: 'COMPLETED' })).toBeVisible();
-    await page.getByRole('button', { name: 'Evaluate Scope' }).click();
+    await expect(page.getByRole('button', { name: 'Evaluate Scope' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Refresh' }).click();
+    await page.getByText('INFY').first().click();
+    const drawer = page.locator('.MuiDrawer-paperAnchorRight');
+    await expect(drawer.getByRole('button', { name: 'Evaluate Scope' })).toHaveCount(0);
 
-    await expect.poll(() => evaluatePayload).toMatchObject({
-      batchSize: 100,
-      offset: 0,
-      region: 'IN',
-      assetType: 'STOCK',
-    });
-    await expect(page.getByText('Evaluation complete. Processed 1 instruments across 1 batches.')).toBeVisible();
+    expect(evaluatePostCount).toBe(0);
+    expect(commandPostCount).toBe(0);
   });
 
   test('shows no-run evidence and does not post any commands while rendering indicator', async ({ page }) => {

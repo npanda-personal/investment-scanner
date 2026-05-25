@@ -2,6 +2,39 @@
 
 Date: 2026-05-18
 
+## 2026-05-25 - CF-W3-MDPIPE-01B5 Data Quality Local Control Removal
+
+State: implementation complete for Team 08 reservation; ready for Team 04 QA and Team 10 review.
+
+Completed work:
+
+- Removed page-local `Evaluate Scope` header action from `/data-quality`.
+- Removed drawer-local `Evaluate Scope` action from Data Quality diagnostics drawer.
+- Removed local `BatchProgressBar` surface from `/data-quality`.
+- Preserved accepted B6 compact read-only `DataQualityPipelineStatusStrip` placement and behavior.
+- Preserved local Refresh, diagnostics loading, filters, quality views, table, and drawer detail behavior.
+- Replaced stale empty-state local-control copy with Pipeline Ops aligned copy (`Use Pipeline Ops to run scope evaluation and refresh this page.`).
+- Updated Playwright assertions to verify no local evaluate actions remain and no local evaluate/command POSTs are emitted from `/data-quality`.
+
+Files changed (reserved set only):
+
+- `frontend/src/features/data-quality-engine/components/DataQualityEnginePage.tsx`
+- `frontend/tests/ui/data-quality-engine.spec.ts`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-08-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W3-MDPIPE-01B5-developer-handoff.md` (new)
+
+Validation run:
+
+- Memory gate before heavy commands: `Get-Counter '\Memory\% Committed Bytes In Use'` -> `53.5940729206414%`.
+- `cd frontend && npm.cmd run build` -> pass (pre-existing Vite chunk-size warning only).
+- `cd frontend && npm.cmd run test:ui -- pipeline-ops.spec.ts data-quality-engine.spec.ts --workers=1`
+  - first run failed with known Playwright artifact cleanup error: `EPERM` unlink `frontend/test-results/.last-run.json`
+  - rerun outside sandbox restrictions passed (`6/6`)
+
+Next gate:
+
+- Team 04 QA verification -> Team 10 code review -> Architect signoff -> Product Owner acceptance.
+
 ## 2026-05-25 - CF-W3-MDPIPE-01B6 Reject Rework (Loading/Error/No-Run State Fix)
 
 State: review-reject rework complete for Team 08 reservation; ready for Team 04 QA rerun.

@@ -4,7 +4,6 @@ import {
   Box,
   Button,
   Chip,
-  CircularProgress,
   Divider,
   Drawer,
   IconButton,
@@ -21,10 +20,9 @@ import {
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SearchIcon from '@mui/icons-material/Search';
-import SyncIcon from '@mui/icons-material/Sync';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import { Link } from 'react-router-dom';
-import { evaluateDataQuality, fetchDataQualityDiagnostics } from '../api/dataQualityEngineService';
+import { fetchDataQualityDiagnostics } from '../api/dataQualityEngineService';
 import { useDataQualityEngine } from '../hooks';
 import type {
   CoverageStatus,
@@ -36,9 +34,7 @@ import type {
   SignalReadinessStatus,
 } from '../types';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
-import { BatchProgressBar, DataTable, FilterBar, PageHeader, StatusBadge, type DataTableColumn, type SortDirection } from '@/shared/components';
-import { useBatchRunner } from '@/shared/hooks';
-import { data_quality_engine_batch_request_workers_count, data_quality_engine_batch_size } from '../config';
+import { DataTable, FilterBar, PageHeader, StatusBadge, type DataTableColumn, type SortDirection } from '@/shared/components';
 import { DataQualityPipelineStatusStrip } from './DataQualityPipelineStatusStrip';
 
 type QualityView = 'all' | 'ready' | 'blocked' | 'coverage' | 'liquidity' | 'backtest';
@@ -158,7 +154,6 @@ const TierStatusChip: React.FC<{ status: DataQualityUseCaseTierStatus }> = ({ st
 
 const DataQualityEnginePage: React.FC = () => {
   const { scope } = useMarketScope();
-  const batchRunner = useBatchRunner();
   const [search, setSearch] = useState('');
   const [coverageStatus, setCoverageStatus] = useState<CoverageStatus | ''>('');
   const [readinessStatus, setReadinessStatus] = useState<SignalReadinessStatus | ''>('');
@@ -169,7 +164,6 @@ const DataQualityEnginePage: React.FC = () => {
   const [eligibleForBacktesting, setEligibleForBacktesting] = useState('');
   const [qualityView, setQualityView] = useState<QualityView>('all');
   const [selected, setSelected] = useState<DataQualityEvaluation | null>(null);
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
@@ -237,33 +231,6 @@ const DataQualityEnginePage: React.FC = () => {
     setPage(0);
   };
 
-  const runEvaluation = async () => {
-    if (batchRunner.running) return;
-    setFormError(null);
-    setActionMessage(null);
-    batchRunner.reset();
-    try {
-      const completedRun = await batchRunner.run({
-        batchSize: data_quality_engine_batch_size,
-        parallelism: data_quality_engine_batch_request_workers_count,
-        runBatch: ({ offset, batchSize }) => evaluateDataQuality({
-          batchSize,
-          offset,
-          region: scope.region,
-          assetType: scope.assetType,
-        }),
-      });
-      const finalState = completedRun?.aggregate;
-      setActionMessage(
-        `Evaluation complete. Processed ${finalState?.processedCount ?? 0} instruments across ${finalState?.batchCount ?? 0} batches. ` +
-        `Evaluated ${finalState?.evaluatedCount ?? 0}, skipped ${finalState?.skippedCount ?? 0}, failed ${finalState?.failedCount ?? 0}.`
-      );
-      await reload();
-    } catch (err: any) {
-      setFormError(err.response?.data?.error || err.message || 'Data quality evaluation failed');
-    }
-  };
-
   const loadDiagnostics = async (instrumentId: string) => {
     setFormError(null);
     try {
@@ -327,18 +294,8 @@ const DataQualityEnginePage: React.FC = () => {
       <PageHeader
         title="Data Quality Engine"
         subtitle="Coverage, readiness, and liquidity checks for downstream research modules."
-        primaryAction={
-          <Button
-            variant="contained"
-            onClick={runEvaluation}
-            disabled={batchRunner.running}
-            startIcon={batchRunner.running ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
-          >
-            {batchRunner.running ? 'Evaluating...' : 'Evaluate Scope'}
-          </Button>
-        }
         secondaryActions={
-          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={() => void reload()} disabled={loading || batchRunner.running}>
+          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={() => void reload()} disabled={loading}>
             Refresh
           </Button>
         }
@@ -354,21 +311,6 @@ const DataQualityEnginePage: React.FC = () => {
       </Paper>
 
       {(error || formError) && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setFormError(null)}>{error || formError}</Alert>}
-      <BatchProgressBar
-        running={batchRunner.running}
-        complete={batchRunner.complete}
-        label={`${batchRunner.complete ? 'Data quality evaluation complete for' : 'Evaluating data quality for'} ${scope.region} / ${scope.assetType}`}
-        processedCount={batchRunner.processedCount}
-        totalCount={batchRunner.totalCount}
-        batchCount={batchRunner.batchCount}
-        estimatedBatchTotal={batchRunner.totalCount ? Math.ceil(batchRunner.totalCount / data_quality_engine_batch_size) : undefined}
-        evaluatedCount={batchRunner.evaluatedCount}
-        skippedCount={batchRunner.skippedCount}
-        failedCount={batchRunner.failedCount}
-        warningsCount={batchRunner.warnings.length}
-        error={batchRunner.error}
-      />
-      {actionMessage && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setActionMessage(null)}>{actionMessage}</Alert>}
 
       {summary && (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 2, mb: 2 }}>
@@ -475,7 +417,7 @@ const DataQualityEnginePage: React.FC = () => {
         rows={items}
         getRowId={(item) => item.instrumentId}
         loading={loading}
-        emptyMessage={activeFilters.length > 0 ? `No evaluations match ${activeFilters.join(', ')}.` : 'No data quality evaluations found. Run Evaluate Scope to populate diagnostics.'}
+        emptyMessage={activeFilters.length > 0 ? `No evaluations match ${activeFilters.join(', ')}.` : 'No data quality evaluations found. Use Pipeline Ops to run scope evaluation and refresh this page.'}
         page={page}
         pageSize={pageSize}
         totalCount={total}
@@ -587,7 +529,6 @@ const DataQualityEnginePage: React.FC = () => {
             <Divider />
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
               <Button variant="outlined" component={Link} to={selected.researchUrl}>Open Research</Button>
-              <Button variant="contained" onClick={() => void runEvaluation()} disabled={batchRunner.running}>Evaluate Scope</Button>
             </Stack>
           </Stack>
         )}
