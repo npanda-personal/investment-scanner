@@ -12,30 +12,30 @@ Current active agents:
 
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Open slot | none | pending | implementation | `CF-W3-MDPIPE-01B6` Data Quality compact progress indicator | ready after B4 commit |
+| 1 | Team 08 - UX / Research / Copilot | `019e5e23-34c0-70e3-bda1-a1f037359bcd` | `gpt-5.3-codex`, high | implementation | `CF-W3-MDPIPE-01B6` Data Quality compact progress indicator | active |
 | 2 | Open slot | none | pending | QA verification | Team 04 for `CF-W3-MDPIPE-01B6` after handoff | waiting |
 | 3 | Open slot | none | pending | review/signoff | Team 10 then Team 03 after QA acceptance | waiting |
-| 4 | Open slot | none | pending | architecture | `CF-W3-MDPIPE-01C` ledgered Data Quality scheduled stage | ready for prep |
+| 4 | Team 03 - Architecture Factory | `019e5e23-84c2-7980-9b6b-98c655c5e0d1` | `gpt-5.4`, high | architecture | `CF-W3-MDPIPE-01C` ledgered Data Quality scheduled stage | active |
 | 5 | Open slot | none | pending | requirements | Team 02 rolling investor/trader-value queue | ready |
 | 6 | Open slot | none | pending | review | Team 10 review after next QA-accepted handoff | waiting |
 
 Teams ready to pick up new tasks:
 
-- Team 08: ready for `CF-W3-MDPIPE-01B6` Data Quality compact indicator after B4 commit.
+- Team 08: active on `CF-W3-MDPIPE-01B6` Data Quality compact indicator.
 - Team 04: ready for `CF-W3-MDPIPE-01B6` QA after Team 08 handoff.
 - Team 10: ready for Code Review after Team 04 acceptance.
-- Team 03: ready for Architect Signoff after Team 10 acceptance, or architecture prep for `CF-W3-MDPIPE-01C`.
+- Team 03: active on architecture prep for `CF-W3-MDPIPE-01C`; later ready for B6 Architect Signoff after Team 10 acceptance.
 - Team 05: standby for `CF-W3-MDPIPE-01C` Data Quality scheduled stage after status/command contracts stabilize.
 - Team 02: completed rolling requirements refresh; next top candidates are `CF-W2-TSC-04`, `CF-W2-TSC-05`, and `CF-W1-TSC-02`.
 
 Queued next:
 
-1. Team 00 commits accepted `CF-W3-MDPIPE-01B4` after scoped staging.
-2. Team 08 implements `CF-W3-MDPIPE-01B6` compact progress indicator on the first Data Quality surface.
-3. Team 04 verifies `CF-W3-MDPIPE-01B6` after handoff.
-4. Team 10 reviews after QA acceptance.
-5. Team 03 signs off after Team 10 acceptance.
-6. Team 03/05 prepare `CF-W3-MDPIPE-01C` ledgered Data Quality scheduled stage after B6 is queued.
+1. Team 08 implements `CF-W3-MDPIPE-01B6` compact progress indicator on the first Data Quality surface.
+2. Team 04 verifies `CF-W3-MDPIPE-01B6` after handoff.
+3. Team 10 reviews after QA acceptance.
+4. Team 03 signs off after Team 10 acceptance.
+5. Team 03 prepares `CF-W3-MDPIPE-01C` ledgered Data Quality scheduled stage architecture in parallel.
+6. Team 05 stands by for `CF-W3-MDPIPE-01C` only after Team 03/04 gates promote it.
 
 Completed agents:
 
