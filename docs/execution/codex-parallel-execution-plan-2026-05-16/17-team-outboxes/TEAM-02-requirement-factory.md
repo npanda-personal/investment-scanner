@@ -1,5 +1,87 @@
 # TEAM-02 Requirement Factory
 
+## Team 02 Rolling Direct-Value Requirement Pass - 2026-05-25
+
+Root `AGENTS.md` was read first. Team 02 stayed docs-only, wrote only inside the allowed `10-requirements/**` folder plus this outbox, and did not touch application source/tests, architecture/contract/QA docs, the Ready queue, route registries, Prisma/schema, package manifests, or shared UI/utilities.
+
+### Work Item
+
+Refresh the top candidate queue after `CF-W2-TSC-05A` promotion to Team 07 and `CF-W1-DQ-02` residual read-side routing to Team 03, then identify the next independent direct investor/trader-value candidates without duplicating active write scopes.
+
+### Files Inspected
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/ready-for-implementation.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/active-work-board.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-BT-04-backtesting-run-freshness-and-current-proof-labels-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SMI-01-smart-money-evidence-freshness-partial-trust-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-TSC-03-today-review-supporting-trust-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-DQ-01A-lane-3-passive-readiness-dto-contract-requirement.md`
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+### What Changed
+
+- Removed active `CF-W2-TSC-05A` and active `CF-W1-DQ-02` residual work from the unassigned ranking.
+- Re-ranked the queue around the next independent direct-value candidates that do not collide with Team 07 Today Review writes or Team 03 DQ residual writes.
+- Elevated `CF-W1-BT-04` as the next recommended Team 03 architecture target after the active DQ residual packet.
+- Kept `CF-W1-MD-02A`, `CF-W1-SQLAB-02B`, and `CF-W1-STRAT-02B` visible but explicitly consent-gated.
+- Added `CF-W1-SMI-01` back into the near-front stack as the best non-consent-gated requirement draft behind `BT-04`.
+
+### What Did Not Change
+
+- No new requirement doc was created. Existing drafted requirements already cover the next value slices cleanly.
+- No item was moved to Ready. Team 00 still owns Ready promotion.
+- `CF-W1-TSC-02` remains a valid direct-value requirement, but it stays behind the active Today Review writer family and was not reopened as an independent next packet.
+- `CF-W1-DQ-02` residual direction did not change; it remains read-side/public-contract reconstruction, not a forced durable-schema packet.
+
+### Next 5 Unassigned Candidates
+
+1. `CF-W1-BT-04`
+2. `CF-W1-MD-02A`
+3. `CF-W1-SQLAB-02B`
+4. `CF-W1-STRAT-02B`
+5. `CF-W1-SMI-01`
+
+### Blockers / Risks
+
+- `CF-W1-MD-02A`, `CF-W1-SQLAB-02B`, and `CF-W1-STRAT-02B` remain blocked by explicit schema/storage/generated/repository consent gates.
+- `CF-W1-TSC-02` and `CF-W1-TSC-03` should not be routed while Team 07 owns the active Today Review writer set.
+- Team 03 is already occupied with the `CF-W1-DQ-02` residual packet and should not receive duplicate DQ-adjacent work in parallel.
+
+### Team 00 Correction
+
+Team 00 reconciled this Team 02 recommendation against gate evidence after the agent returned.
+
+Correction:
+
+- `CF-W1-BT-04` is already accepted and locally committed on Team 06 branch commit `2bd794f feat: add backtesting proof freshness labels`.
+- `CF-W1-SMI-01` is already accepted and locally committed on Team 06 branch commit `aee7c49 feat: add smart money evidence trust metadata`.
+- Neither item should be routed as fresh architecture or implementation work.
+- The next unassigned direct-value pool is mostly consent-gated durable-storage/provenance work (`MD-02A`, `SQLAB-02B`, `STRAT-02B`) plus lower-priority trust UX/contract residuals.
+- If no active signoff or handoff is waiting, Team 00 should run a fresh Team 01/02 audit for market-data, signals, calibration, backtesting, and Today Review to find the next non-stale user-value gap.
+
+### Tests Run / Skipped
+
+- Tests run: none
+- Tests skipped: all
+- Reason: docs-only requirement pass
+
+### Constraint Result
+
+- No application code or tests changed.
+- No commit or push was performed.
+- No accepted item was reopened.
+
 ## Team 02 CF-W1-DQ-02 Residual Product Decision - 2026-05-25
 
 Root `AGENTS.md` was read first. Team 02 stayed docs-only, wrote only inside the allowed requirement files plus this outbox, and did not touch application code, tests, manifests, Prisma/schema, route registries, shared UI, Team 00 control docs, or historical execution docs.

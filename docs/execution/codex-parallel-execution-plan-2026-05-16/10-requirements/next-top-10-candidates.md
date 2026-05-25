@@ -2,48 +2,42 @@
 
 Date: 2026-05-25
 
-Status: Team 00 routing correction after Team 03 confirmed `CF-W1-TSC-02` has no fresh executable child and Team 02 resolved the `CF-W1-DQ-02` residual product choice. `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE` is accepted on Team 07 branch commit `68f0a19`, and Team 03 has already prepared `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` as the next stacked Today Review follow-on. `CF-W1-DQ-02A` remains accepted as `c2d6753`; the remaining DQ gap is now a consent-gated read-side/public-contract reconstruction requirement rather than a no-schema child or a forced schema packet. This file is a docs-only candidate view. Team 00 still owns Ready movement, exact file reservations, and one-writer sequencing.
+Status: Team 00 corrected this queue after reconciling accepted branch evidence. `CF-W2-TSC-05A` is active with Team 07 and `CF-W1-DQ-02` residual routing is active with Team 03 architecture. This file is a docs-only planning view. Team 00 still owns Ready movement, file reservations, and one-writer sequencing.
 
-Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-02A` are accepted and locally committed parked branches, not fresh implementation pulls.
+## Routing Guardrails
+
+- Do not treat `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` as unassigned backlog; it is active with Team 07.
+- Do not duplicate `CF-W1-DQ-02` residual read-side/public-contract work while Team 03 architecture owns that packet.
+- Do not reopen accepted MDPIPE slices as new Team 02 discovery. Remaining pipeline value should surface only if a real investor-facing trust gap survives the accepted dashboard/status direction.
+- Keep admin/settings/auth/subscription/notifications convenience behind direct data/signal/research value unless correctness, privacy, or user-data safety is blocked.
 
 ## Current Priority Order
 
-After accepted `TSC-04A`, Team 00 promoted the stacked `TSC-05A` follow-on to Team 07. The remaining unassigned investor/trader-value prep stack starts with the DQ residual/public-contract trust gap rather than admin or convenience work.
-
 | Rank | ID | Current state | Why it matters now | Next Team 00 action |
 | --- | --- | --- | --- | --- |
-| 1 | `CF-W2-TSC-05` | Active Team 07 Ready handoff as `CF-W2-TSC-05A` | Copy cleanup alone is not enough if Today Review ranking and eligibility still use target-shaped geometry and reward/risk thresholds. | Team 07 owns implementation in `C:\work\repo\investment-scanner-worktrees\team07-CF-W2-TSC-05A` on base `68f0a19`; Team 04 QA follows the developer handoff. |
-| 2 | `CF-W1-DQ-02` residual read-side requirement | Consent-gated requirement-defined residual | Team 03 confirmed no honest no-schema child remains. Team 02 chose read-time reconstruction so DQ currentness can stay truthful across summary/list/diagnostics/latest-read paths without opening schema work by default. | Team 03 owns docs-only architecture prep for an explicit DQE read-side/public-contract packet. Stop and split only if architecture proves durable storage is actually required. |
-| 3 | `CF-W1-MD-02A` | Consent-gated proposal | Durable market-data evidence storage remains high-value upstream trust work. | Keep proposal-only until Team 00 intentionally opens the evidence packet. |
-| 4 | `CF-W1-SQLAB-02B` | Consent-gated proposal | Durable Signal Quality learning memory would strengthen research continuity and calibration review after the current trust slices. | Keep proposal-only until Team 00 intentionally opens the learning-memory packet. |
-| 5 | `CF-W1-STRAT-02B` | Consent-gated proposal | Durable strategy revision history would preserve exact rule/version provenance for review and backtesting trust. | Keep proposal-only until Team 00 intentionally opens the revision-history packet. |
-| 6 | `CF-W1-L3-DQ-01A` | Contract-only | Lane 3 passive readiness semantics still need a stable truthful DTO contract. | Keep contract-only until Team 03/04 define a bounded child that does not collide with active Lane 3 work or shared UI rules. |
-| 7 | `CF-W1-UX-01` residual parent | Open parent behind accepted `UX-01A` child | Workbench still lacks verified scope, latest trusted data date, blocker provenance, and downstream eligibility proof. | Keep behind the upstream trust stack; do not reopen accepted `UX-01A` framing scope. |
-| 8 | `CF-W1-UX-02` | Downstream trust UX | Copilot trust UX still matters once the core signal/data/backtest stack is stronger. | Keep behind direct investor/trader value unless a trust blocker appears. |
-| 9 | `CF-W1-UX-05` | Copy-cleanup follow-on | Product-language cleanup can reduce advice-like wording after trust UX scope is clear. | Fold into or follow `CF-W1-UX-02`, and do not reserve shared UI yet. |
-| 10 | `CF-W1-TSC-02` residual | Historical first child `CF-W1-TSC-02A-TREV-HEALTH` is already accepted as `34c9993`; only a new residual health child could create fresh value. | Do not route now. Team 02 must define a new residual child after `TSC-04A` / `TSC-05A` if a real health gap remains. |
+| 1 | `CF-W1-MD-02A` | Consent-gated proposal accepted by docs-only QA | Durable market-data evidence remains the strongest upstream provenance gap still outside active routing. | Keep proposal-only until Team 00 intentionally opens the schema/storage packet. |
+| 2 | `CF-W1-SQLAB-02B` | Consent-gated proposal accepted by docs-only QA | Durable Signal Quality learning memory would preserve post-event measured evidence across sessions. | Keep proposal-only until Team 00 intentionally opens the storage packet. |
+| 3 | `CF-W1-STRAT-02B` | Consent-gated proposal accepted by docs-only QA | Durable strategy revision history would preserve exact strategy/rule/version provenance for trust and review. | Keep proposal-only until Team 00 intentionally opens the schema/generated/repository packet. |
+| 4 | `CF-W1-L3-DQ-01A` | Contract-only | Passive Lane 3 readiness semantics still need a truthful DTO contract, but remain behind direct signal/data/backtest trust work. | Keep contract-only until a bounded child can be reserved without shared-file collision. |
+| 5 | `CF-W1-TSC-02` | Requirement draft with accepted first child history | Active candidate health remains direct user value, but it shares the Today Review writer family currently reserved by Team 07. | Hold until `TSC-05A` clears the active Today Review file set. |
+| 6 | `CF-W1-TSC-03` residual/supporting-evidence path | Parent with prior promoted child | Candidate supporting trust evidence still matters, but it depends on Today Review plus accepted supporting slices such as `BT-04`. | Hold until Today Review files are free and supporting dependencies are stable. |
+| 7 | `CF-W1-UX-01` residual parent | Open parent | Research Workbench trust gaps remain, but they are still behind upstream trust/evidence work. | Keep behind the core direct-value stack. |
+| 8 | `CF-W1-UX-02` | Downstream trust UX | Copilot trust UX remains useful later, once core evidence surfaces are stronger. | Keep behind direct investor/trader value unless a new trust blocker appears. |
+| 9 | `CF-W1-UX-05` | Downstream copy cleanup | Product-language cleanup can reduce advice-like wording after trust UX scope is clear. | Fold into or follow `UX-02`; no shared UI reservation yet. |
+| 10 | New PO audit | Not yet drafted | The non-gated direct-value queue is thin after accepted backtesting, smart-money, strategy, signal, and research slices. | Team 01/02 should audit market-data, signal, calibration, backtesting, and Today Review modules for fresh user-value gaps. |
 
 ## Dispatch Notes
 
-- `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE` is implemented in the Team 07 worktree, accepted by Team 04 QA and Team 10 review, and in active Team 03 Architect Signoff. Do not treat `CF-W2-TSC-04` or `TSC-04A` as a fresh Team 02 routing item while that gate is open.
-- `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` is promoted and assigned to Team 07; do not treat it as unassigned backlog.
-- `CF-W1-DQ-02` residual direction is now recorded in `10-requirements/CF-W1-DQ-02-residual-read-side-currentness-requirement.md`; do not send it back for generic split discovery.
-- `CF-W1-TSC-02A-TREV-HEALTH` is accepted and locally committed as `34c9993`; Team 03 found no fresh executable `CF-W1-TSC-02` child remains under the current parent.
-- `CF-W3-MDPIPE-01B5`, `CF-W3-MDPIPE-01B6`, and `CF-W3-MDPIPE-01C` stay in the pipeline lane. Do not open a duplicate Team 02 requirement unless a new investor-facing trust gap remains after those slices land.
-- `CF-W1-TSC-02A-TREV-HEALTH`, `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`, `CF-W2-SIG-01A`, `CF-W2-BT-05`, and `CF-W1-BT-04` have already moved through implementation and/or validation gates and must not be re-ranked as fresh Team 02 pulls.
-- `CF-W1-MD-05`, `CF-W1-RH-03`, `CF-W1-RH-02A`, `CF-W1-SIG-LATEST-01`, `CF-W1-SIG-TRIGGER-ENTRY-01`, `CF-W1-SQLAB-03`, `CF-W1-SQLAB-01`, `CF-W1-STRAT-04`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-02A` are accepted, committed, parked, or otherwise closed for fresh discovery.
-- `CF-W1-TP-03` is paused/stale as framed because Product Owner rejected Trade Plan-first, R:R, and arbitrary target workflow direction. Do not route it unless it is fully reframed into Trusted Signal Candidate health without targets/R:R.
+- `CF-W2-TSC-05A` stays active with Team 07 and must not be re-ranked as unassigned.
+- `CF-W1-DQ-02` residual stays active with Team 03 architecture and must not be duplicated.
+- Team 00 correction: `CF-W1-BT-04` is already accepted and locally committed on branch commit `2bd794f`; do not route it as a fresh Team 03 architecture target.
+- Team 00 correction: `CF-W1-SMI-01` is already accepted and locally committed on branch commit `aee7c49`; do not route it as a fresh Team 03 architecture target.
+- `CF-W1-MD-02A`, `CF-W1-SQLAB-02B`, and `CF-W1-STRAT-02B` remain valuable, but all three are honest consent-gated proposals, not Ready-adjacent slices.
+- No non-consent-gated independent direct-value implementation-prep item clearly outranks the active TSC/DQ work right now; use a PO/audit cycle to find the next real user-value gap.
+- `CF-W1-TSC-02` and `CF-W1-TSC-03` remain intentionally de-prioritized for this pass because Team 07 already owns the active Today Review writer family.
 
-## Priority Rule
+## Team 02 Result
 
-Direct investor/trader value stays first:
-
-1. market-data freshness and provenance,
-2. data-quality readiness,
-3. explainable signals/triggers and Today Review trusted-candidate workflow,
-4. active signal health and rule-based exit/invalidation,
-5. backtesting and calibration trust,
-6. pipeline reliability and visible freshness/progress honesty,
-7. research explainability and reviewability.
-
-Admin, auth, subscription, notifications, and alert convenience stay behind that stack unless they block correctness, privacy, or user-data safety.
+- No new requirement doc was created in this pass.
+- No item was moved to Ready.
+- The queue now reflects the next 3-5 unassigned candidates without mislabeling active or routed work as fresh backlog.
