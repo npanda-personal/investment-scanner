@@ -12,8 +12,8 @@ Current active agents:
 
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Open slot | none | pending | next backlog | B5 Ready evaluation or TSC-04 prep after 01C commit | ready |
-| 2 | Open slot | none | pending | delegated PO / commit | Team 00 for `CF-W3-MDPIPE-01C` | in progress |
+| 1 | Open slot | none | pending | implementation | Team 08 for `CF-W3-MDPIPE-01B5` | ready |
+| 2 | Open slot | none | pending | QA verification | Team 04 for `CF-W3-MDPIPE-01B5` after handoff | waiting |
 | 3 | Open slot | none | pending | rolling requirements | Team 02 next direct-value audit cycle | ready |
 | 4 | Open slot | none | pending | architecture/signoff | B5 blocked until B6 acceptance; Team 03 signoff after next review acceptance | waiting |
 | 5 | Open slot | none | pending | review | Team 10 for B6 after Team 04 QA rerun | waiting |
@@ -30,7 +30,8 @@ Teams ready to pick up new tasks:
 - Team 00: accepted B6 under standing Product Owner delegation; local commit `fb57cb0 feat: add data quality pipeline status strip` completed.
 - Team 10: accepted 01C review; closed.
 - Team 03: accepted 01C Architect Signoff; closed.
-- Team 00: accepted 01C under standing Product Owner delegation; scoped commit in progress.
+- Team 00: accepted 01C under standing Product Owner delegation; local commit `da66fa4 feat: add scheduled data quality stage` completed.
+- Team 08: ready to pick up `CF-W3-MDPIPE-01B5` Data Quality control removal.
 - Team 03: completed architecture prep for `CF-W3-MDPIPE-01C`; later ready for B6 Architect Signoff after Team 10 acceptance.
 - Team 02: completed rolling direct-value and Pipeline Ops priority refresh; no new item outranks `CF-W2-TSC-04`, `CF-W2-TSC-05`, or `CF-W1-TSC-02`.
 - Team 02: completed read-mostly rolling PO audit with no file changes and no priority reorder.

@@ -6,45 +6,45 @@ Team: TEAM-08 - UX / Research / Copilot
 
 Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automation-prompts/AUTO-08-ux-research-copilot.md`
 
-## Assignment - Review-Reject Rework
+## Assignment
 
-Pull `CF-W3-MDPIPE-01B6` back as the active Team 08 review-reject rework item.
+Pull `CF-W3-MDPIPE-01B5` as the active Team 08 implementation item.
 
-This is a frontend-only compact backend pipeline progress indicator for the Data Quality page. It is an overlap slice: do not remove existing Data Quality page controls yet.
+This is the Data Quality first child for page-local bulk-control removal after the accepted compact B6 pipeline status strip.
 
-Product direction reminder:
+Product direction:
 
-- `/pipeline-ops` is the full Bulk Pipeline Dashboard for Monitoring and OPS.
-- Individual feature pages should show only compact backend pipeline progress/status, plus a route to `/pipeline-ops` for details and approved manual controls.
-- The Data Quality page must not become a second bulk-ops dashboard in this slice.
+- `/pipeline-ops` is the Bulk Pipeline Dashboard for Monitoring and OPS.
+- `/data-quality` should show compact backend pipeline progress/status and domain diagnostics only.
+- Manual Data Quality execution must live only in `/pipeline-ops`.
 
 Branch/worktree:
 
-- Branch recommendation: `codex/w3-mdpipe-01b6-dq-compact-indicator`
-- Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team08-CF-W3-MDPIPE-01B6`
+- Branch recommendation: `codex/w3-mdpipe-01b5-dq-control-removal`
+- Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team08-CF-W3-MDPIPE-01B5`
 
 ## Gate Evidence
 
 - Requirement: `10-requirements/CF-W3-MDPIPE-01B3-bulk-pipeline-ops-dashboard-requirement.md`
-- Architecture: `03-architecture/CF-W3-MDPIPE-01B5-01B6-control-migration-progress-indicators-architecture.md`
-- Contract: `06-contracts/CF-W3-MDPIPE-01B6-compact-progress-indicator-contract.md`
-- Work packet: `08-work-packets/CF-W3-MDPIPE-01B6-first-compact-indicator-work-packet.md`
-- QA plan: `04-qa/CF-W3-MDPIPE-01B5-01B6-control-migration-progress-indicators-qa-plan.md`
-- Ready promotion: `13-implementation-evidence/CF-W3-MDPIPE-01B6-ready-promotion.md`
+- UX plan: `05-ux/CF-W3-MDPIPE-01B5-01B6-pipeline-ops-control-migration-ux.md`
+- Architecture: `03-architecture/CF-W3-MDPIPE-01B5-data-quality-first-child-control-removal-architecture.md`
+- Contract: `06-contracts/CF-W3-MDPIPE-01B5-data-quality-page-control-removal-contract.md`
+- Work packet: `08-work-packets/CF-W3-MDPIPE-01B5-data-quality-first-child-work-packet.md`
+- QA plan: `04-qa/CF-W3-MDPIPE-01B5-data-quality-control-removal-qa-plan.md`
+- Ready promotion: `13-implementation-evidence/CF-W3-MDPIPE-01B5-ready-promotion.md`
 - Dependency closure: `CF-W3-MDPIPE-01B4` committed as `8d45ddc feat: add pipeline command api`
-- Team 10 rejection: `18-integration-queue/CF-W3-MDPIPE-01B6-code-review.md`
+- Dependency closure: `CF-W3-MDPIPE-01B6` committed as `fb57cb0 feat: add data quality pipeline status strip`
 
 ## Allowed Writes
 
 - `frontend/src/features/data-quality-engine/components/DataQualityEnginePage.tsx`
-- `frontend/src/features/data-quality-engine/components/DataQualityPipelineStatusStrip.tsx` (new)
 - `frontend/tests/ui/data-quality-engine.spec.ts`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-08-outbox.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W3-MDPIPE-01B6-developer-handoff.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W3-MDPIPE-01B5-developer-handoff.md`
 
 ## Forbidden Writes
 
-- all backend source and backend tests
+- `frontend/src/features/data-quality-engine/components/DataQualityPipelineStatusStrip.tsx`
 - `frontend/src/features/pipeline-ops/**`
 - `frontend/src/app/routes.tsx`
 - `frontend/src/app/navigationMetadata.tsx`
@@ -52,7 +52,8 @@ Branch/worktree:
 - `frontend/src/shared/hooks/**`
 - `frontend/src/shared/theme/**`
 - `frontend/src/contexts/MarketScopeContext.tsx`
-- all other frontend feature pages and tests
+- all other frontend feature pages and UI specs
+- all backend source and backend tests
 - Prisma schema, migrations, generated files
 - package manifests and lockfiles
 - provider/live call paths
@@ -63,18 +64,14 @@ Branch/worktree:
 
 ## Required Behavior
 
-- Add a feature-local compact read-only pipeline status strip below the Data Quality `PageHeader`.
-- Consume `usePipelineStatus(scope.region, scope.assetType)` from the existing Pipeline Ops feature export.
-- Resolve only the `DATA_QUALITY` stage.
-- Show current scope, stage status, processed/total progress, latest relevant timestamps, warning/error counts, and a deep link to `/pipeline-ops`.
-- Keep `Evaluate Scope`.
-- Keep the local `BatchProgressBar`.
-- Do not post to Data Quality evaluation, Pipeline Ops command execution, provider/live, scheduler, or downstream execution paths from the indicator.
-- Fix the Team 10 rejection:
-  - `NO_RUN_EVIDENCE` may appear only after a successful loaded pipeline snapshot has no `DATA_QUALITY` stage row.
-  - Initial loading must not claim no-run evidence.
-  - Pipeline status fetch errors must render as an inline unavailable/error state, not as no-run evidence.
-  - Add focused UI coverage for the rejected loading/error path.
+- Remove the page-local Data Quality `Evaluate Scope` header action.
+- Remove the drawer-local Data Quality `Evaluate Scope` action.
+- Remove the local `BatchProgressBar`.
+- Preserve the accepted compact B6 pipeline status strip directly below the page header.
+- Preserve local `Refresh`, diagnostics, filters, views, table, and drawer detail behavior.
+- Replace stale local-control copy with `/pipeline-ops`-aligned wording where needed.
+- Do not add a disabled local trigger shell or future-launcher affordance on `/data-quality`.
+- Do not post to Data Quality evaluation, Pipeline Ops command execution, provider/live, scheduler, or downstream execution paths from `/data-quality` render or refresh.
 
 ## Required Validation
 
@@ -86,10 +83,10 @@ npm.cmd run test:ui -- pipeline-ops.spec.ts data-quality-engine.spec.ts --worker
 
 ## Stop Conditions
 
-Stop and return to Team 00 if this requires shared UI, route/navigation, backend, package, generated, provider/live, scheduler/startup, another feature page, or command execution from `/data-quality`.
+Stop and return to Team 00 if this requires edits to the compact strip component, Pipeline Ops source, shared UI, route/navigation, backend, package, generated files, provider/live, scheduler/startup, another feature page, or command execution from `/data-quality`.
 
 ## Expected Outbox
 
 Update `17-team-outboxes/TEAM-08-outbox.md`.
 
-Write `18-integration-queue/CF-W3-MDPIPE-01B6-developer-handoff.md` after implementation and validation.
+Write `18-integration-queue/CF-W3-MDPIPE-01B5-developer-handoff.md` after implementation and validation.

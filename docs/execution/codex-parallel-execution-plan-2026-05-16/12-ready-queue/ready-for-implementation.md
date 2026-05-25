@@ -6,10 +6,48 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+2026-05-25 Team 00 Ready promotion - `CF-W3-MDPIPE-01B5-DQ-CONTROL-REMOVAL`:
+
+- `CF-W3-MDPIPE-01B5` is promoted and assigned to Team 08.
+- Current gate state: Ready for frontend-only Data Quality page control removal.
+- Purpose: remove page-local Data Quality bulk controls now that `/pipeline-ops` owns the approved Data Quality manual command and `/data-quality` has the accepted compact pipeline status strip.
+- Branch recommendation: `codex/w3-mdpipe-01b5-dq-control-removal`.
+- Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team08-CF-W3-MDPIPE-01B5`.
+- Gate evidence:
+  - Requirement: `10-requirements/CF-W3-MDPIPE-01B3-bulk-pipeline-ops-dashboard-requirement.md`
+  - UX plan: `05-ux/CF-W3-MDPIPE-01B5-01B6-pipeline-ops-control-migration-ux.md`
+  - Architecture: `03-architecture/CF-W3-MDPIPE-01B5-data-quality-first-child-control-removal-architecture.md`
+  - Contract: `06-contracts/CF-W3-MDPIPE-01B5-data-quality-page-control-removal-contract.md`
+  - Work packet: `08-work-packets/CF-W3-MDPIPE-01B5-data-quality-first-child-work-packet.md`
+  - QA plan: `04-qa/CF-W3-MDPIPE-01B5-data-quality-control-removal-qa-plan.md`
+  - Ready promotion: `13-implementation-evidence/CF-W3-MDPIPE-01B5-ready-promotion.md`
+  - Dependency: `CF-W3-MDPIPE-01B4` accepted and committed as `8d45ddc`.
+  - Dependency: `CF-W3-MDPIPE-01B6` accepted and committed as `fb57cb0`.
+  - Open decisions: none.
+- Allowed implementation files:
+  - `frontend/src/features/data-quality-engine/components/DataQualityEnginePage.tsx`
+  - `frontend/tests/ui/data-quality-engine.spec.ts`
+  - active execution docs listed in the Team 08 inbox
+- Forbidden scope:
+  - `frontend/src/features/data-quality-engine/components/DataQualityPipelineStatusStrip.tsx`
+  - `frontend/src/features/pipeline-ops/**`
+  - frontend app route/navigation files
+  - shared UI/hooks/theme/context files
+  - all other frontend feature pages and tests
+  - all backend files/tests
+  - Prisma, migrations, generated files, package manifests, provider/live, scheduler/startup, root `AGENTS.md`, `docs/AGENTS.md`, and `docs/codex-agent-team-plan/**`
+- Required validation:
+
+```powershell
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- pipeline-ops.spec.ts data-quality-engine.spec.ts --workers=1
+```
+
 2026-05-25 Team 00 Ready promotion - `CF-W3-MDPIPE-01C-DQ-SCHEDULED-STAGE`:
 
 - `CF-W3-MDPIPE-01C` is promoted and assigned to Team 05.
-- Current gate state: Accepted through implementation, QA verification, Code Review, Architect Signoff, and delegated Product Owner acceptance. Scoped local commit is in progress.
+- Current gate state: Accepted through implementation, QA verification, Code Review, Architect Signoff, delegated Product Owner acceptance, and scoped local commit `da66fa4 feat: add scheduled data quality stage`.
 - Purpose: automatically trigger a ledgered Data Quality stage from the existing Market Data scheduler using only the changed instrument set from the current scheduled Market Data pass.
 - Branch recommendation: `codex/w3-mdpipe-01c-data-quality-scheduled-stage`.
 - Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team05-CF-W3-MDPIPE-01C`.
@@ -63,7 +101,7 @@ npm.cmd run build
 2026-05-25 Team 00 Ready promotion - `CF-W3-MDPIPE-01B6-DQ-COMPACT-PIPELINE-INDICATOR`:
 
 - `CF-W3-MDPIPE-01B6` is promoted and assigned to Team 08.
-- Current gate state: Accepted through implementation, QA rerun, Code Review, Architect Signoff, and delegated Product Owner acceptance. Scoped local commit is in progress.
+- Current gate state: Accepted through implementation, QA rerun, Code Review, Architect Signoff, delegated Product Owner acceptance, and scoped local commit `fb57cb0 feat: add data quality pipeline status strip`.
 - Purpose: add a compact durable backend pipeline progress indicator on `/data-quality` while leaving full bulk operation controls centralized in the Bulk Pipeline Dashboard for Monitoring and OPS.
 - Branch recommendation: `codex/w3-mdpipe-01b6-dq-compact-indicator`.
 - Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team08-CF-W3-MDPIPE-01B6`.

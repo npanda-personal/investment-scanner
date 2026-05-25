@@ -107,7 +107,7 @@ Release notes:
 
 Date: 2026-05-25
 
-Status: Accepted under standing delegation. Scoped local commit is in progress.
+Status: Accepted and locally committed as `da66fa4 feat: add scheduled data quality stage`.
 
 Evidence:
 

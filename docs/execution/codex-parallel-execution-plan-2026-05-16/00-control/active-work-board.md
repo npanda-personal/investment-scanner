@@ -116,6 +116,35 @@ Teams ready to pick up new tasks:
 - Team 00: complete B6 staged-scope verification and local commit.
 - Team 04: `CF-W3-MDPIPE-01B5` QA planning is complete; Team 00 may evaluate B5 Ready promotion after 01C commit clears.
 
+## Latest Team 00 Routing Update - B5 Data Quality Control Removal Promotion
+
+Date: 2026-05-25
+
+Ready promotion:
+
+- `CF-W3-MDPIPE-01B5` is promoted to Team 08 as a Data Quality-only frontend control-removal slice.
+- B5 may remove `/data-quality` page-local bulk controls now that `/pipeline-ops` owns the approved `DATA_QUALITY_EVALUATE_SCOPE` manual command and B6 is committed.
+- This is one page only and must not widen into Signals, Calibration, Market Data, Today Review, Context Snapshots, or any other feature page.
+- The accepted B6 compact strip remains unchanged and owned by its existing component.
+
+Allowed first-slice files:
+
+- `frontend/src/features/data-quality-engine/components/DataQualityEnginePage.tsx`
+- `frontend/tests/ui/data-quality-engine.spec.ts`
+
+Forbidden:
+
+- `frontend/src/features/data-quality-engine/components/DataQualityPipelineStatusStrip.tsx`
+- `frontend/src/features/pipeline-ops/**`
+- shared UI, route/navigation, backend, package, Prisma/schema/generated, provider/live, scheduler/startup, and all other pages.
+
+Teams ready to pick up new tasks:
+
+- Team 08: implement `CF-W3-MDPIPE-01B5`.
+- Team 04: QA Verification after Team 08 handoff.
+- Team 10: Code Review after Team 04 acceptance.
+- Team 03: Architect Signoff after Team 10 acceptance.
+
 ## Latest Team 00 Routing Update - Pipeline Command API Accepted
 
 Date: 2026-05-25

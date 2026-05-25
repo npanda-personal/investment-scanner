@@ -6,7 +6,7 @@ Owner: Team 00 - Delegated Product Owner Acceptance
 
 Status: ACCEPTED UNDER STANDING DELEGATION
 
-Commit: scoped local commit to be created after exact staged-scope verification.
+Commit: `fb57cb0 feat: add data quality pipeline status strip`
 
 ## Product Intent
 

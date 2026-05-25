@@ -5,6 +5,54 @@ Team: TEAM-04 - QA Factory
 
 ## Work Item
 
+`CF-W3-MDPIPE-01B5` - QA planning for Data Quality page control removal after accepted B6.
+
+## State / Mode
+
+- State: QA plan prepared
+- Mode: Docs-only planning, no application source or test files changed
+
+## Files Inspected
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W3-MDPIPE-01B5-data-quality-first-child-control-removal-architecture.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W3-MDPIPE-01B5-data-quality-page-control-removal-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W3-MDPIPE-01B5-data-quality-first-child-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/09-summaries/CF-W3-MDPIPE-01B6-po-acceptance-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W3-MDPIPE-01B5-01B6-control-migration-progress-indicators-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W3-MDPIPE-01B4-command-api-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W3-MDPIPE-01B6-qa-verification.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-outbox.md`
+
+## Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W3-MDPIPE-01B5-data-quality-control-removal-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-outbox.md`
+
+## Readiness Blockers
+
+- B5 implementation is not yet handed off in the reserved `/data-quality` file set.
+- QA execution is blocked until Team 00 confirms the post-B5 source handoff.
+- This planning pass does not promote Ready.
+
+## Recommended Validation
+
+```powershell
+cd frontend
+npm.cmd run build
+```
+
+```powershell
+cd frontend
+npm.cmd run test:ui -- pipeline-ops.spec.ts data-quality-engine.spec.ts --workers=1
+```
+
+## Next Gate
+
+- Team 00 implementation handoff for `CF-W3-MDPIPE-01B5`, then QA execution against the reserved `/data-quality` scope.
+
+## Work Item
+
 `CF-W3-MDPIPE-01C` - QA verification for the scheduled Data Quality stage after Market Data.
 
 ## State / Mode
