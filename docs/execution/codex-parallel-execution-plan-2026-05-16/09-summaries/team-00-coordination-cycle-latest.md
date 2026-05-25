@@ -15,7 +15,7 @@ Current status:
 - Latest local checkpoint commits:
   - `e15c7e9 docs: checkpoint tsc qa sequencing`
   - `c7f3f70 docs: refresh direct value backlog routing`
-- Active spawned agents: none at this checkpoint.
+- Active spawned agents: Team 04 QA planning for `CF-W2-TSC-05A`; Team 03 architecture clarification for `CF-W1-DQ-02` residual.
 
 Gate movement:
 
@@ -27,8 +27,8 @@ Gate movement:
 
 Teams ready to pick up new tasks:
 
-- Team 04: ready for `CF-W2-TSC-05A` QA planning against accepted base commit `68f0a19`.
-- Team 03: ready for `CF-W1-DQ-02` residual architecture clarification.
+- Team 04: active on `CF-W2-TSC-05A` QA planning against accepted base commit `68f0a19`.
+- Team 03: active on `CF-W1-DQ-02` residual architecture clarification.
 - Team 07: standby for stacked `CF-W2-TSC-05A` after Team 00 Ready promotion.
 - Team 02: queued for the next rolling direct-value pass.
 - Team 10: standby for the next QA-accepted handoff.

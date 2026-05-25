@@ -16,8 +16,8 @@ Current active agents:
 
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Open slot | none | pending | QA planning | `CF-W2-TSC-05A` against accepted `TSC-04A` commit `68f0a19` | ready |
-| 2 | Open slot | none | pending | architecture prep | `CF-W1-DQ-02` residual read-side/public-contract child check | ready |
+| 1 | Team 04 - QA Factory | `019e5ea9-05db-74b2-bd82-2c4aecc23bec` | `gpt-5.4`, high | QA planning | `CF-W2-TSC-05A` against accepted `TSC-04A` commit `68f0a19` | active |
+| 2 | Team 03 - Architecture Factory | `019e5ea9-5ec6-7da0-ad31-d5f937564dbc` | `gpt-5.4`, high | architecture prep | `CF-W1-DQ-02` residual read-side/public-contract child check | active |
 | 3 | Open slot | none | pending | implementation | Team 07 stacked `CF-W2-TSC-05A` after QA plan and Ready promotion | queued |
 | 4 | Open slot | none | pending | Code Review | next QA-accepted handoff | queued |
 | 5 | Open slot | none | pending | Implementation/Rework | Team 07 if `TSC-04A` QA/review rejects, otherwise `TSC-05A` after Ready promotion | queued |
@@ -36,8 +36,8 @@ Current routing:
 
 Teams ready to pick up new tasks:
 
-- Team 04: ready for `CF-W2-TSC-05A` QA planning against commit `68f0a19`.
-- Team 03: ready for `CF-W1-DQ-02` residual architecture clarification.
+- Team 04: active on `CF-W2-TSC-05A` QA planning against commit `68f0a19`.
+- Team 03: active on `CF-W1-DQ-02` residual architecture clarification.
 - Team 07: standby for stacked `CF-W2-TSC-05A` after Ready promotion.
 - Team 02: queued for the next rolling direct-value requirement pass after current architecture output.
 - Team 10: standby for the next QA-accepted handoff.

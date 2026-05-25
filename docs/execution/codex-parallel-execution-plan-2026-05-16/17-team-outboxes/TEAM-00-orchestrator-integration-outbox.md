@@ -22,8 +22,8 @@ Current gate:
 
 Teams ready to pick up new tasks:
 
-- Team 04: prepare `CF-W2-TSC-05A` QA plan against accepted base commit `68f0a19`.
-- Team 03: prepare `CF-W1-DQ-02` residual architecture clarification.
+- Team 04: active on `CF-W2-TSC-05A` QA plan against accepted base commit `68f0a19`.
+- Team 03: active on `CF-W1-DQ-02` residual architecture clarification.
 - Team 07: standby for stacked `CF-W2-TSC-05A` after Team 00 Ready promotion.
 - Team 02: queued for next rolling requirements priority pass.
 - Team 10: standby for the next QA-accepted handoff.
