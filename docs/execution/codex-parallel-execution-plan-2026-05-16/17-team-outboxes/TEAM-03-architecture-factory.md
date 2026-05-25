@@ -1,5 +1,44 @@
 # Team 03 Architecture Factory Outbox
 
+## Team 03 CF-W3-MDPIPE-01B6 Architect Signoff - 2026-05-25
+
+Assignment: perform Architect Signoff for `CF-W3-MDPIPE-01B6` after Team 04 QA ACCEPT and Team 10 review ACCEPT, using only the allowed signoff docs and without modifying application source/tests or touching Team 10 parallel backend `01C` work.
+
+Updated:
+
+- `03-architecture/CF-W3-MDPIPE-01B6-architect-signoff.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Read-only evidence inspected:
+
+- root `AGENTS.md`
+- `03-architecture/CF-W3-MDPIPE-01B5-01B6-control-migration-progress-indicators-architecture.md`
+- `06-contracts/CF-W3-MDPIPE-01B6-compact-progress-indicator-contract.md`
+- `08-work-packets/CF-W3-MDPIPE-01B6-first-compact-indicator-work-packet.md`
+- `18-integration-queue/CF-W3-MDPIPE-01B6-developer-handoff.md`
+- `04-qa/CF-W3-MDPIPE-01B6-qa-verification.md`
+- `18-integration-queue/CF-W3-MDPIPE-01B6-code-review.md`
+- `frontend/src/features/data-quality-engine/components/DataQualityEnginePage.tsx`
+- `frontend/src/features/data-quality-engine/components/DataQualityPipelineStatusStrip.tsx`
+- `frontend/tests/ui/data-quality-engine.spec.ts`
+- supporting `pipeline-ops` status hook/export/page files and route/navigation read-only evidence
+
+Architecture verdict:
+
+- `CF-W3-MDPIPE-01B6` is ACCEPTED for Architect Signoff.
+- The implementation remains feature-local and read-only on `/data-quality`, using the existing `usePipelineStatus()` hook and a `/pipeline-ops` deep link only.
+- Loading, error, loaded no-run, running, and terminal states are architecturally separated correctly; `NO_RUN_EVIDENCE` only means a loaded snapshot with no `DATA_QUALITY` stage row.
+- `/pipeline-ops` remains the Bulk Pipeline Monitoring and OPS dashboard; the Data Quality page remains a compact status surface and still keeps its local `Evaluate Scope` control and `BatchProgressBar`.
+- No route, navigation, shared UI, package, backend, Prisma, generated, provider/live, startup/scheduler, or `pipeline-ops` feature changes were introduced by this slice.
+- `CF-W3-MDPIPE-01B5` remains blocked until Team 00 opens the separate removal/release path with the correct writer reservation.
+
+Validation:
+
+- Team 03 did not rerun builds, tests, services, or UI checks.
+- Team 03 relied on Team 04 QA ACCEPT and Team 10 review ACCEPT, then performed bounded source and workspace-scope inspection.
+
+No commits or pushes were performed.
+
 ## Team 03 CF-W3-MDPIPE-01B5 Data Quality First Child Path - 2026-05-25
 
 Assignment: prepare the next architecture path for `CF-W3-MDPIPE-01B5` page-control migration and Bulk Pipeline Monitoring & Ops dashboard centralization, using only the allowed execution docs and without modifying application code/tests, ready queues, active board, Team 05/08 outboxes, or `B6` / `01C` implementation docs.

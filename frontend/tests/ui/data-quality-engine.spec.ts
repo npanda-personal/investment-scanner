@@ -5,7 +5,17 @@ test.describe('Data Quality Engine UI', () => {
   test('shows tier visibility and blocker-first diagnostics', async ({ page }) => {
     await mockDataQualityResponses(page);
     await mockReviewReadiness(page);
+    await mockPipelineStatus(page, 'running');
     await visitModule(page, '/data-quality', 'Data Quality Engine');
+
+    const indicator = page.getByTestId('data-quality-pipeline-status-strip');
+    await expect(indicator.getByText('Data Quality')).toBeVisible();
+    await expect(indicator.getByText('IN / STOCK')).toBeVisible();
+    await expect(indicator.getByText('RUNNING')).toBeVisible();
+    await expect(indicator.getByText('Progress: 20 / 80 (25%)')).toBeVisible();
+    await expect(indicator.getByText('Warnings: 1')).toBeVisible();
+    await expect(indicator.getByText('Errors: 2')).toBeVisible();
+    await expect(indicator.getByRole('link', { name: 'View Pipeline Ops details' })).toHaveAttribute('href', '/pipeline-ops');
 
     await expect(page.getByRole('button', { name: 'Evaluate Scope' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Refresh' })).toBeVisible();
@@ -41,6 +51,7 @@ test.describe('Data Quality Engine UI', () => {
     let evaluatePayload: any = null;
     await mockDataQualityResponses(page);
     await mockReviewReadiness(page);
+    await mockPipelineStatus(page, 'terminal');
     await page.route('**/api/v1/data-quality/evaluate', async (route) => {
       evaluatePayload = route.request().postDataJSON();
       await route.fulfill({
@@ -63,6 +74,7 @@ test.describe('Data Quality Engine UI', () => {
     });
 
     await visitModule(page, '/data-quality', 'Data Quality Engine');
+    await expect(page.getByTestId('data-quality-pipeline-status-strip').locator('.MuiChip-label', { hasText: 'COMPLETED' })).toBeVisible();
     await page.getByRole('button', { name: 'Evaluate Scope' }).click();
 
     await expect.poll(() => evaluatePayload).toMatchObject({
@@ -73,7 +85,206 @@ test.describe('Data Quality Engine UI', () => {
     });
     await expect(page.getByText('Evaluation complete. Processed 1 instruments across 1 batches.')).toBeVisible();
   });
+
+  test('shows no-run evidence and does not post any commands while rendering indicator', async ({ page }) => {
+    let evaluatePostCount = 0;
+    let commandPostCount = 0;
+
+    await mockDataQualityResponses(page);
+    await mockReviewReadiness(page);
+    await mockPipelineStatus(page, 'none');
+    await page.route('**/api/v1/data-quality/evaluate', async (route) => {
+      evaluatePostCount += 1;
+      await route.abort();
+    });
+    await page.route('**/api/v1/pipeline/commands', async (route) => {
+      commandPostCount += 1;
+      await route.abort();
+    });
+
+    await visitModule(page, '/data-quality', 'Data Quality Engine');
+
+    const indicator = page.getByTestId('data-quality-pipeline-status-strip');
+    await expect(indicator.getByText('NO_RUN_EVIDENCE')).toBeVisible();
+    await expect(indicator.getByText('No run evidence is available yet for the current scope.')).toBeVisible();
+    await expect(indicator.locator('.MuiLinearProgress-determinate')).toBeVisible();
+    await expect(indicator.locator('.MuiLinearProgress-indeterminate')).toHaveCount(0);
+    await expect(indicator.getByRole('link', { name: 'View Pipeline Ops details' })).toHaveAttribute('href', '/pipeline-ops');
+    expect(evaluatePostCount).toBe(0);
+    expect(commandPostCount).toBe(0);
+  });
+
+  test('does not claim no-run evidence while pipeline status is still loading', async ({ page }) => {
+    await mockDataQualityResponses(page);
+    await mockReviewReadiness(page);
+    await mockPipelineStatus(page, 'running', { delayMs: 1_500 });
+
+    await visitModule(page, '/data-quality', 'Data Quality Engine');
+
+    const indicator = page.getByTestId('data-quality-pipeline-status-strip');
+    await expect(indicator.getByText('Progress: Loading pipeline snapshot...')).toBeVisible();
+    await expect(indicator.getByText('NO_RUN_EVIDENCE')).toHaveCount(0);
+    await expect(indicator.getByText('No run evidence is available yet for the current scope.')).toHaveCount(0);
+    await expect(indicator.getByText('RUNNING')).toBeVisible();
+  });
+
+  test('shows inline unavailable state when pipeline status fetch fails', async ({ page }) => {
+    await mockDataQualityResponses(page);
+    await mockReviewReadiness(page);
+    await mockPipelineStatus(page, 'error');
+
+    await visitModule(page, '/data-quality', 'Data Quality Engine');
+
+    const indicator = page.getByTestId('data-quality-pipeline-status-strip');
+    await expect(indicator.getByText(/Pipeline status unavailable:/)).toBeVisible();
+    await expect(indicator.getByText('NO_RUN_EVIDENCE')).toHaveCount(0);
+    await expect(indicator.getByText('No run evidence is available yet for the current scope.')).toHaveCount(0);
+  });
 });
+
+type PipelineStatusMode = 'running' | 'terminal' | 'none' | 'error';
+
+async function mockPipelineStatus(page: any, mode: PipelineStatusMode, options?: { delayMs?: number }) {
+  await page.route('**/api/v1/pipeline/status**', async (route: any) => {
+    if (options?.delayMs) {
+      await new Promise((resolve) => setTimeout(resolve, options.delayMs));
+    }
+
+    if (mode === 'error') {
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Pipeline status unavailable for current scope' }),
+      });
+      return;
+    }
+
+    const runningStage = {
+      id: 'stage-data-quality-running',
+      pipelineRunId: 'run-data-quality-running',
+      stageKey: 'DATA_QUALITY',
+      stageOrder: 2,
+      status: 'RUNNING',
+      dataThroughDate: '2026-05-24T00:00:00.000Z',
+      changedInstrumentCount: 20,
+      batchSize: 25,
+      offset: 0,
+      nextOffset: 25,
+      hasMore: true,
+      totalCount: 80,
+      processedCount: 20,
+      succeededCount: 18,
+      partialCount: 1,
+      failedCount: 1,
+      skippedCount: 0,
+      unchangedCount: 0,
+      attemptCount: 1,
+      cacheKey: null,
+      cacheStatus: 'MISS',
+      cacheExpiresAt: null,
+      inputFingerprint: null,
+      outputFingerprint: null,
+      leaseOwner: 'worker-1',
+      leaseExpiresAt: '2026-05-25T09:15:00.000Z',
+      startedAt: '2026-05-25T09:00:00.000Z',
+      completedAt: null,
+      durationMs: null,
+      warnings: ['batch timeout warning'],
+      errors: ['row failed', 'dependency stale'],
+      updatedAt: '2026-05-25T09:05:00.000Z',
+    };
+
+    const terminalStage = {
+      ...runningStage,
+      id: 'stage-data-quality-complete',
+      pipelineRunId: 'run-data-quality-complete',
+      status: 'COMPLETED',
+      hasMore: false,
+      processedCount: 80,
+      succeededCount: 79,
+      partialCount: 1,
+      failedCount: 0,
+      warnings: [],
+      errors: [],
+      completedAt: '2026-05-25T09:20:00.000Z',
+      durationMs: 1_200_000,
+      updatedAt: '2026-05-25T09:20:00.000Z',
+    };
+
+    const payloadByMode: Record<Exclude<PipelineStatusMode, 'error'>, any> = {
+      running: {
+        scope: { region: 'IN', assetType: 'STOCK', timeframe: '1d', pipelineKey: 'market-intelligence' },
+        generatedAt: '2026-05-25T09:05:00.000Z',
+        activeRun: {
+          id: 'run-data-quality-running',
+          status: 'RUNNING',
+          triggerType: 'manual',
+          dataThroughDate: '2026-05-24T00:00:00.000Z',
+          changedInstrumentCount: 20,
+          totalCount: 80,
+          processedCount: 20,
+          succeededCount: 18,
+          partialCount: 1,
+          failedCount: 1,
+          skippedCount: 0,
+          unchangedCount: 0,
+          sourceFingerprint: null,
+          startedAt: '2026-05-25T09:00:00.000Z',
+          completedAt: null,
+          durationMs: null,
+          warnings: ['batch timeout warning'],
+          errors: ['row failed'],
+          updatedAt: '2026-05-25T09:05:00.000Z',
+        },
+        lastRun: null,
+        stages: [{ stageKey: 'DATA_QUALITY', stageOrder: 2, activeStage: runningStage, lastStage: null }],
+      },
+      terminal: {
+        scope: { region: 'IN', assetType: 'STOCK', timeframe: '1d', pipelineKey: 'market-intelligence' },
+        generatedAt: '2026-05-25T09:20:30.000Z',
+        activeRun: null,
+        lastRun: {
+          id: 'run-data-quality-complete',
+          status: 'COMPLETED',
+          triggerType: 'manual',
+          dataThroughDate: '2026-05-24T00:00:00.000Z',
+          changedInstrumentCount: 80,
+          totalCount: 80,
+          processedCount: 80,
+          succeededCount: 79,
+          partialCount: 1,
+          failedCount: 0,
+          skippedCount: 0,
+          unchangedCount: 0,
+          sourceFingerprint: null,
+          startedAt: '2026-05-25T09:00:00.000Z',
+          completedAt: '2026-05-25T09:20:00.000Z',
+          durationMs: 1_200_000,
+          warnings: [],
+          errors: [],
+          updatedAt: '2026-05-25T09:20:00.000Z',
+        },
+        stages: [{ stageKey: 'DATA_QUALITY', stageOrder: 2, activeStage: null, lastStage: terminalStage }],
+      },
+      none: {
+        scope: { region: 'IN', assetType: 'STOCK', timeframe: '1d', pipelineKey: 'market-intelligence' },
+        generatedAt: '2026-05-25T09:30:00.000Z',
+        activeRun: null,
+        lastRun: null,
+        stages: [
+          {
+            stageKey: 'MARKET_DATA',
+            stageOrder: 1,
+            activeStage: null,
+            lastStage: { ...terminalStage, stageKey: 'MARKET_DATA' },
+          },
+        ],
+      },
+    };
+
+    await route.fulfill({ json: payloadByMode[mode] });
+  });
+}
 
 async function mockDataQualityResponses(page: any) {
   await page.route('**/api/v1/data-quality/summary**', async (route: any) => {

@@ -63,7 +63,7 @@ npm.cmd run build
 2026-05-25 Team 00 Ready promotion - `CF-W3-MDPIPE-01B6-DQ-COMPACT-PIPELINE-INDICATOR`:
 
 - `CF-W3-MDPIPE-01B6` is promoted and assigned to Team 08.
-- Current gate state: Ready for frontend-only Data Quality implementation.
+- Current gate state: Accepted through implementation, QA rerun, Code Review, Architect Signoff, and delegated Product Owner acceptance. Scoped local commit is in progress.
 - Purpose: add a compact durable backend pipeline progress indicator on `/data-quality` while leaving full bulk operation controls centralized in the Bulk Pipeline Dashboard for Monitoring and OPS.
 - Branch recommendation: `codex/w3-mdpipe-01b6-dq-compact-indicator`.
 - Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team08-CF-W3-MDPIPE-01B6`.

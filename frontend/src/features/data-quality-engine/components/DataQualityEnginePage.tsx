@@ -39,6 +39,7 @@ import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { BatchProgressBar, DataTable, FilterBar, PageHeader, StatusBadge, type DataTableColumn, type SortDirection } from '@/shared/components';
 import { useBatchRunner } from '@/shared/hooks';
 import { data_quality_engine_batch_request_workers_count, data_quality_engine_batch_size } from '../config';
+import { DataQualityPipelineStatusStrip } from './DataQualityPipelineStatusStrip';
 
 type QualityView = 'all' | 'ready' | 'blocked' | 'coverage' | 'liquidity' | 'backtest';
 type QualityTierKey = 'dailyReview' | 'signal' | 'backtest' | 'calibration' | 'automation';
@@ -342,6 +343,8 @@ const DataQualityEnginePage: React.FC = () => {
           </Button>
         }
       />
+
+      <DataQualityPipelineStatusStrip region={scope.region} assetType={scope.assetType} />
 
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: 'anywhere' }}>

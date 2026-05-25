@@ -68,3 +68,37 @@ Skipped:
 - Live provider/public-download execution.
 - Frontend checks.
 - Downstream module checks.
+
+## CF-W3-MDPIPE-01B6 - Data Quality Compact Pipeline Indicator
+
+Date: 2026-05-25
+
+Status: Accepted under standing delegation. Scoped local commit is in progress.
+
+Evidence:
+
+- Requirement: `10-requirements/CF-W3-MDPIPE-01B3-bulk-pipeline-ops-dashboard-requirement.md`
+- Architecture: `03-architecture/CF-W3-MDPIPE-01B5-01B6-control-migration-progress-indicators-architecture.md`
+- Contract: `06-contracts/CF-W3-MDPIPE-01B6-compact-progress-indicator-contract.md`
+- Work packet: `08-work-packets/CF-W3-MDPIPE-01B6-first-compact-indicator-work-packet.md`
+- QA verification: `04-qa/CF-W3-MDPIPE-01B6-qa-verification.md`
+- Code review: `18-integration-queue/CF-W3-MDPIPE-01B6-code-review.md`
+- Architect signoff: `03-architecture/CF-W3-MDPIPE-01B6-architect-signoff.md`
+- PO acceptance: `09-summaries/CF-W3-MDPIPE-01B6-po-acceptance-packet.md`
+
+Validation:
+
+- Frontend build passed.
+- Focused UI smoke passed: `pipeline-ops.spec.ts data-quality-engine.spec.ts --workers=1`.
+- Initial Playwright run hit the known local artifact cleanup `EPERM`; rerun passed.
+
+Skipped:
+
+- Backend tests, because this is a frontend-only compact indicator.
+- Live provider, scheduler, and downstream processing checks, because this slice is read-only UI status display.
+
+Release notes:
+
+- `/pipeline-ops` remains the Bulk Pipeline Dashboard for Monitoring and OPS.
+- `/data-quality` now shows only a compact read-only status strip.
+- B5 control removal remains a separate blocked slice.
