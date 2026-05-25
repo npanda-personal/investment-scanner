@@ -1,5 +1,91 @@
 # Team 03 Architecture Factory Outbox
 
+## Team 03 CF-W3-MDPIPE-01B4 Architect Signoff - 2026-05-25
+
+Assignment: perform Architect Signoff for `CF-W3-MDPIPE-01B4-PIPELINE-COMMAND-API` after Team 04 QA ACCEPT and Team 10 review ACCEPT, using the active execution folder as authority and without modifying application code.
+
+Updated:
+
+- `03-architecture/CF-W3-MDPIPE-01B4-architect-signoff.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Read-only evidence inspected:
+
+- root `AGENTS.md`
+- `03-architecture/CF-W3-MDPIPE-01B4-pipeline-command-api-architecture.md`
+- `06-contracts/CF-W3-MDPIPE-01B4-pipeline-command-api-contract.md`
+- `08-work-packets/CF-W3-MDPIPE-01B4-work-packet.md`
+- `04-qa/CF-W3-MDPIPE-01B4-qa-verification.md`
+- `18-integration-queue/CF-W3-MDPIPE-01B4-code-review.md`
+- `18-integration-queue/CF-W3-MDPIPE-01B4-developer-handoff.md`
+- changed `pipeline-orchestration` source/tests
+- changed `pipeline-ops` source/UI smoke test
+- supporting current durable ledger repository lease behavior
+- Data Quality public export
+- active B5/B6 architecture, contract, and work-packet docs
+
+Architecture verdict:
+
+- `CF-W3-MDPIPE-01B4` is ACCEPTED for Architect Signoff.
+- The command API stays inside the existing pipeline router and does not require route-registry edits.
+- Only `DATA_QUALITY_EVALUATE_SCOPE` is enabled; all other command rows remain blocked or deferred.
+- Execution remains one batch per request with no drain-all, scheduler fanout, provider/live call, or downstream stage execution.
+- Data Quality boundary uses the public service export and does not edit Data Quality Engine source.
+- Ledger/idempotency/lease behavior fits the current durable ledger model; the duplicate-running rework is acceptable for this bounded slice.
+- `CF-W3-MDPIPE-01B5` remains blocked and `CF-W3-MDPIPE-01B6` remains separate.
+
+Validation:
+
+- Team 03 did not rerun builds, tests, services, or UI checks.
+- Team 03 relied on Team 04 QA ACCEPT and Team 10 review ACCEPT, then performed read-only architecture diff inspection.
+
+No commits or pushes were performed.
+
+---
+
+## Team 03 CF-W3-MDPIPE-01B5 / CF-W3-MDPIPE-01B6 Readiness Split - 2026-05-25
+
+Assignment: prepare architecture/work-packet readiness for `CF-W3-MDPIPE-01B5` and `CF-W3-MDPIPE-01B6` after the Pipeline Ops dashboard and pending command API, under the active execution folder only and without modifying application code/tests, Prisma, route registries, package manifests, generated files, `docs/AGENTS.md`, or `docs/codex-agent-team-plan/**`.
+
+Updated:
+
+- `03-architecture/CF-W3-MDPIPE-01B5-01B6-control-migration-progress-indicators-architecture.md`
+- `06-contracts/CF-W3-MDPIPE-01B6-compact-progress-indicator-contract.md`
+- `08-work-packets/CF-W3-MDPIPE-01B6-first-compact-indicator-work-packet.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Read-only evidence inspected:
+
+- root `AGENTS.md`
+- `00-control/active-work-board.md`
+- `03-architecture/shared-file-control.md`
+- `04-qa/CF-W3-MDPIPE-01B5-01B6-control-migration-progress-indicators-qa-plan.md`
+- `05-ux/CF-W3-MDPIPE-01B5-01B6-pipeline-ops-control-migration-ux.md`
+- `06-contracts/CF-W3-MDPIPE-01B4-pipeline-command-api-contract.md`
+- current `pipeline-ops` frontend feature
+- current `data-quality-engine` page and UI smoke
+- `01-governance/dirty-worktree-inventory.md`
+
+Architecture verdict:
+
+- `CF-W3-MDPIPE-01B6` is the first safe implementation candidate, narrowed to a Data Quality-only compact read-only indicator on `/data-quality`.
+- `CF-W3-MDPIPE-01B5` remains blocked until `CF-W3-MDPIPE-01B4` is accepted; feature-page bulk controls cannot be removed yet.
+- Shared UI is forbidden in the first `B6` slice.
+- Market Data was intentionally excluded from the first slice because its feature files are already dirty and the page still owns broader local-only tools.
+
+Key guardrails:
+
+- no backend changes
+- no `pipeline-ops` source edits
+- no shared UI extraction
+- no page-local control removal in `B6`
+- no multi-page rollout in the first pass
+- validation must cover frontend build plus `pipeline-ops` and `data-quality-engine` Playwright smoke
+
+No tests, builds, services, UI runs, commits, or pushes were run.
+
+---
+
 ## Team 03 CF-W3-MDPIPE-01B4 Pipeline Command API Gate - 2026-05-25
 
 Assignment: prepare architecture, command contract, and bounded work packet for `CF-W3-MDPIPE-01B4` under the active execution folder only, without modifying application code/tests, Prisma, route registries, package manifests, generated files, `docs/AGENTS.md`, or `docs/codex-agent-team-plan/**`.

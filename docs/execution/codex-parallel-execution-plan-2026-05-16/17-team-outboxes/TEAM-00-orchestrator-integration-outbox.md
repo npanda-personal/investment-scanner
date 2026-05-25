@@ -1,5 +1,43 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - Pipeline Command API Accepted
+
+Date: 2026-05-25
+
+Status:
+
+- Branch: `dev`.
+- Open decisions: 0.
+- Product Owner action required: no.
+- Push performed: no.
+- Scoped commit: pending Team 00 staged-scope verification.
+
+Accepted:
+
+- `CF-W3-MDPIPE-01B4` Pipeline Command API and Bulk Pipeline Dashboard manual-trigger enablement.
+- The new UI surface is the Bulk Pipeline Dashboard for Monitoring and OPS.
+- `DATA_QUALITY_EVALUATE_SCOPE` is the only enabled manual command.
+- All other catalog commands remain disabled/deferred/forbidden.
+- Individual feature pages remain scheduled for compact progress indicators only; page-local bulk-control migration remains a separate slice.
+
+Gate evidence:
+
+- Team 04 QA rerun: ACCEPT.
+- Team 10 Code Review: ACCEPT.
+- Team 03 Architect Signoff: ACCEPT.
+- Team 00 delegated PO acceptance: ACCEPT.
+
+Teams ready to pick up new tasks:
+
+- Team 08: `CF-W3-MDPIPE-01B6` compact Data Quality progress indicator after B4 commit.
+- Team 04: QA Verification for B6 after Team 08 handoff.
+- Team 10: Code Review after QA acceptance.
+- Team 03: Architect Signoff after review acceptance, or architecture prep for `CF-W3-MDPIPE-01C`.
+- Team 05: standby for `CF-W3-MDPIPE-01C` ledgered Data Quality scheduled stage after architecture/QA gates.
+- Team 02: rolling investor/trader-value requirements discovery.
+
+---
+
 ## Latest Runtime Checkpoint - Pipeline Ops Dashboard
 
 Date: 2026-05-25

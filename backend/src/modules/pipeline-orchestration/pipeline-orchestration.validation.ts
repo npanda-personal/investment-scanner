@@ -1,8 +1,34 @@
-import type { PipelineStatusQuery } from './pipeline-orchestration.types';
+import type {
+  PipelineCommandCatalogQuery,
+  PipelineCommandKey,
+  PipelineCommandRequest,
+  PipelineStatusQuery,
+} from './pipeline-orchestration.types';
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
 const MAX_STAGE_KEYS = 25;
+const DEFAULT_BATCH_SIZE = 25;
+const MAX_BATCH_SIZE = 100;
+const SUPPORTED_COMMAND_KEYS: PipelineCommandKey[] = [
+  'DATA_QUALITY_EVALUATE_SCOPE',
+  'MARKET_DATA_INCREMENTAL_EOD_LOAD',
+  'MARKET_DATA_PRICE_BACKFILL',
+  'MARKET_DATA_CATALOG_SYNC',
+  'RAW_SIGNALS_GENERATE_SCOPE',
+  'SIGNAL_CALIBRATION_REFRESH_SCOPE',
+  'SIGNAL_QUALITY_DIAGNOSTICS_REFRESH',
+  'CONTEXT_SNAPSHOTS_GENERATE_SCOPE',
+  'MARKET_CONTEXT_REFRESH_REGION',
+  'SMART_MONEY_REFRESH_SCOPE',
+  'STRATEGY_DECISION_EVALUATE_SCOPE',
+  'BACKTEST_PROOF_REFRESH',
+  'RESEARCH_PROJECTION_REFRESH',
+  'TODAY_REVIEW_PUBLISH',
+  'PIPELINE_RUN_ALL',
+  'PIPELINE_DRAIN_ALL_BATCHES',
+  'PIPELINE_CANCEL_ACTIVE',
+];
 
 export function parsePipelineStatusQuery(query: Record<string, unknown>): PipelineStatusQuery {
   const stageKeys = parseStageKeys(query.stageKeys);
@@ -14,6 +40,39 @@ export function parsePipelineStatusQuery(query: Record<string, unknown>): Pipeli
     limit: parseLimit(query.limit),
     ...(stageKeys.length ? { stageKeys } : {}),
   };
+}
+
+export function parsePipelineCommandCatalogQuery(query: Record<string, unknown>): PipelineCommandCatalogQuery {
+  return {
+    region: normalizeText(first(query.region), 'IN').toUpperCase(),
+    assetType: normalizeText(first(query.assetType), 'STOCK').toUpperCase(),
+    timeframe: normalizeText(first(query.timeframe), '1d').toLowerCase(),
+    pipelineKey: normalizeText(first(query.pipelineKey), 'market-intelligence'),
+  };
+}
+
+export function parsePipelineCommandRequest(input: Record<string, unknown>): PipelineCommandRequest {
+  return {
+    commandKey: parseCommandKey(input.commandKey),
+    region: normalizeText(first(input.region), 'IN').toUpperCase(),
+    assetType: normalizeText(first(input.assetType), 'STOCK').toUpperCase(),
+    timeframe: normalizeText(first(input.timeframe), '1d').toLowerCase(),
+    pipelineKey: normalizeText(first(input.pipelineKey), 'market-intelligence'),
+    runMode: parseRunMode(first(input.runMode)),
+    batchSize: parseBatchSize(first(input.batchSize)),
+    offset: parseOffset(first(input.offset)),
+    idempotencyKey: String(first(input.idempotencyKey) ?? '').trim(),
+    reason: parseOptionalText(first(input.reason)),
+    force: parseForceFlag(first(input.force)),
+  };
+}
+
+export function isPipelineCommandKey(value: string): value is PipelineCommandKey {
+  return SUPPORTED_COMMAND_KEYS.includes(value as PipelineCommandKey);
+}
+
+function first(value: unknown): unknown {
+  return Array.isArray(value) ? value[0] : value;
 }
 
 function normalizeText(value: unknown, fallback: string): string {
@@ -37,4 +96,45 @@ function parseStageKeys(value: unknown): string[] {
   const keys = parts.map((part) => String(part).trim()).filter(Boolean);
   if (keys.length > MAX_STAGE_KEYS) throw new Error(`stageKeys must include ${MAX_STAGE_KEYS} or fewer values`);
   return [...new Set(keys)];
+}
+
+function parseCommandKey(value: unknown): PipelineCommandKey {
+  const key = String(value ?? '').trim().toUpperCase();
+  if (!isPipelineCommandKey(key)) throw new Error('commandKey is required and must be a supported command');
+  return key;
+}
+
+function parseRunMode(value: unknown): 'single_batch' {
+  if (String(value ?? '').trim() !== 'single_batch') throw new Error('runMode must be single_batch');
+  return 'single_batch';
+}
+
+function parseBatchSize(value: unknown): number {
+  if (value === undefined || value === null || value === '') return DEFAULT_BATCH_SIZE;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > MAX_BATCH_SIZE) {
+    throw new Error(`batchSize must be an integer between 1 and ${MAX_BATCH_SIZE}`);
+  }
+  return parsed;
+}
+
+function parseOffset(value: unknown): number {
+  if (value === undefined || value === null || value === '') return 0;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) throw new Error('offset must be a non-negative integer');
+  return parsed;
+}
+
+function parseOptionalText(value: unknown): string | undefined {
+  const text = String(value ?? '').trim();
+  return text.length > 0 ? text : undefined;
+}
+
+function parseForceFlag(value: unknown): false {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  if (normalized === 'true' || normalized === '1' || normalized === 'yes') {
+    throw new Error('force=true is not allowed for manual commands');
+  }
+  if (value === true) throw new Error('force=true is not allowed for manual commands');
+  return false;
 }

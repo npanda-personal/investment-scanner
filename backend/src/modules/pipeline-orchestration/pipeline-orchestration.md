@@ -72,6 +72,37 @@ Default query:
 
 The endpoint must not call providers, run downstream stages, acquire leases, trigger scheduler work, or mutate ledger rows.
 
+## Manual Command API (Bounded Slice)
+
+First safe command slice adds:
+
+- `GET /api/v1/pipeline/commands/catalog`
+- `POST /api/v1/pipeline/commands`
+
+Safety contract for this slice:
+
+- only `DATA_QUALITY_EVALUATE_SCOPE` is executable;
+- all other command rows are `DEFERRED` or `FORBIDDEN` with explicit reasons;
+- command requests must use `runMode=single_batch`;
+- `batchSize` must be `1..100` and `offset` must be non-negative;
+- `force=true` is rejected;
+- executable commands require a client `idempotencyKey`;
+- same idempotency key must not invoke the adapter twice;
+- stage lease is acquired before adapter execution and conflict returns `409`;
+- stage and run rows are persisted with `triggerType=manual`;
+- terminal stage completion/failure clears lease fields.
+
+First executable adapter path:
+
+- `DataQualityEngineService.evaluate({ region, assetType, batchSize, offset })`
+
+Out of scope:
+
+- scheduler fanout;
+- provider/live ingestion from Pipeline Ops;
+- downstream stage fanout;
+- bulk drain or full pipeline run.
+
 Ops UI direction:
 
 - A later Bulk Pipeline Dashboard should own bulk operation monitoring and manual trigger controls.

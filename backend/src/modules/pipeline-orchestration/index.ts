@@ -6,9 +6,24 @@ export {
   pipelineOrchestrationRouter,
   default as defaultPipelineOrchestrationRouter,
 } from './pipeline-orchestration.router';
-export { PipelineOrchestrationService } from './pipeline-orchestration.service';
-export { parsePipelineStatusQuery } from './pipeline-orchestration.validation';
+export { PipelineCommandError, PipelineOrchestrationService } from './pipeline-orchestration.service';
+export {
+  isPipelineCommandKey,
+  parsePipelineCommandCatalogQuery,
+  parsePipelineCommandRequest,
+  parsePipelineStatusQuery,
+} from './pipeline-orchestration.validation';
 export type {
+  PipelineCommandAvailability,
+  PipelineCommandCatalogItem,
+  PipelineCommandCatalogQuery,
+  PipelineCommandCatalogResponse,
+  PipelineCommandExecutionContext,
+  PipelineCommandKey,
+  PipelineCommandRequest,
+  PipelineCommandResponse,
+  PipelineCommandResultStatus,
+  PipelineCommandRunMode,
   PipelineCacheStatus,
   PipelineCounters,
   PipelineLatestStageQuery,

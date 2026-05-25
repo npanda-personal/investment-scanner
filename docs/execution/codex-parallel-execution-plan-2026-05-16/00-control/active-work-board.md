@@ -34,6 +34,40 @@ No historical active work items have been migrated as active.
 - Rejected / Rework
 - Deferred
 
+## Latest Team 00 Routing Update - Pipeline Command API Accepted
+
+Date: 2026-05-25
+
+Implementation status:
+
+- `CF-W3-MDPIPE-01B4` is accepted through Team 05 implementation/rework, Team 04 QA rerun, Team 10 Code Review, Team 03 Architect Signoff, and Team 00 delegated Product Owner acceptance.
+- The Bulk Pipeline Dashboard is the Monitoring and OPS surface for durable pipeline progress and approved manual operation controls.
+- `DATA_QUALITY_EVALUATE_SCOPE` is the only enabled manual command.
+- All other command catalog entries remain disabled, deferred, or forbidden until separately approved.
+- Existing feature-page bulk controls remain until a separate page-control migration slice can remove or replace them without stranding ad hoc operation access.
+
+Validation:
+
+- `npm.cmd test -- pipeline-orchestration.validation.test.ts pipeline-orchestration.service.test.ts pipeline-orchestration.controller.test.ts pipeline-orchestration.routes.test.ts --runInBand`: passed.
+- `npm.cmd run build`: passed from `backend`.
+- `npm.cmd run build`: passed from `frontend`.
+- `npm.cmd run test:ui -- pipeline-ops.spec.ts --workers=1`: passed.
+
+Next slices:
+
+1. `CF-W3-MDPIPE-01B6` compact per-screen backend pipeline progress indicators, starting with Data Quality.
+2. `CF-W3-MDPIPE-01B5` phased migration/removal of feature-page bulk controls after dashboard command coverage is safe.
+3. `CF-W3-MDPIPE-01C` ledgered Data Quality scheduled stage.
+
+Teams ready to pick up new tasks:
+
+- Team 08: implement `CF-W3-MDPIPE-01B6` Data Quality compact progress indicator after the B4 scoped commit.
+- Team 04: QA Verification after Team 08 handoff.
+- Team 10: Code Review after Team 04 acceptance.
+- Team 03: Architect Signoff after Team 10 acceptance, or architecture prep for `CF-W3-MDPIPE-01C`.
+- Team 05: standby for `CF-W3-MDPIPE-01C` after Team 03 stage architecture and QA plan.
+- Team 02: continue rolling investor/trader-value requirements with direct signal/data/backtest priority.
+
 ## Latest Team 00 Routing Update - Pipeline Ledger Foundation
 
 Date: 2026-05-25

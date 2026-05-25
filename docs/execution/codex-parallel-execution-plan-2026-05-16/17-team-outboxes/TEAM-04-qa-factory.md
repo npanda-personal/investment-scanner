@@ -4,6 +4,127 @@ Date: 2026-05-24
 
 Mode: docs-only QA planning for bounded Ready-evaluation packets.
 
+## 2026-05-25 `CF-W3-MDPIPE-01B4` QA Re-verification
+
+- Team: `TEAM-04` - QA Re-verification
+- Mode: executable QA rerun after Team 05 blocker fix
+- Work item: `CF-W3-MDPIPE-01B4-PIPELINE-COMMAND-API`
+- State/mode: re-verification complete
+- Owner: Team 04 QA Re-verification
+- Lane/module:
+  - Lane 1
+  - `pipeline-orchestration`
+  - `pipeline-ops`
+- Files changed:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W3-MDPIPE-01B4-qa-verification.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - root `AGENTS.md`
+  - active B4 QA plan, contract, work packet, prior QA reject, implementation evidence, Team 05 outbox, and developer handoff
+  - `backend/src/modules/pipeline-orchestration/pipeline-orchestration.service.ts`
+  - `backend/tests/modules/pipeline-orchestration/pipeline-orchestration.service.test.ts`
+  - `backend/tests/modules/pipeline-orchestration/pipeline-orchestration.validation.test.ts`
+  - `backend/tests/modules/pipeline-orchestration/pipeline-orchestration.controller.test.ts`
+  - `backend/tests/modules/pipeline-orchestration/pipeline-orchestration.routes.test.ts`
+  - `frontend/tests/ui/pipeline-ops.spec.ts`
+- Behavior changed:
+  - none; QA evidence only
+- Docs changed:
+  - updated B4 QA verification with rerun evidence and final verdict
+  - updated Team 04 outbox
+- Contracts changed:
+  - none
+- Tests run:
+  - `cd backend && npm.cmd test -- pipeline-orchestration.validation.test.ts pipeline-orchestration.service.test.ts pipeline-orchestration.controller.test.ts pipeline-orchestration.routes.test.ts --runInBand` (pass, 4 suites / 23 tests)
+  - `cd backend && npm.cmd run build` (pass)
+  - `cd frontend && npm.cmd run build` (pass)
+  - `cd frontend && npm.cmd run test:ui -- pipeline-ops.spec.ts --workers=1` (pass after escalated artifact access and temporary local frontend dev server start)
+- Tests skipped:
+  - none from the requested validation set
+- Assumptions:
+  - Team 05 rework is the intended B4 candidate for review routing
+  - the bounded `pipeline-ops` smoke remains sufficient for this slice
+- Risks:
+  - Playwright still needs elevated local artifact access and a temporary frontend dev server in this environment
+  - frontend build still emits the pre-existing chunk-size warning
+- Blockers:
+  - none remaining for Team 04 QA on `CF-W3-MDPIPE-01B4`
+- Shared-file requests:
+  - none
+- QA verdict:
+  - `CF-W3-MDPIPE-01B4`: `ACCEPT`
+- Next gate:
+  - Team 10 review, Architect signoff, and Team 00 routing
+- Evidence notes:
+  - same-owner duplicate-running idempotency blocker resolved
+  - focused regression exists and passed
+  - scope remains inside the reserved B4 file set
+
+## 2026-05-25 `CF-W3-MDPIPE-01B4` QA Verification
+
+- Team: `TEAM-04` - QA Verification
+- Mode: executable QA verification after Team 05 developer handoff
+- Work item: `CF-W3-MDPIPE-01B4-PIPELINE-COMMAND-API`
+- State/mode: verification complete
+- Owner: Team 04 QA Verification
+- Lane/module:
+  - Lane 1
+  - `pipeline-orchestration`
+  - `pipeline-ops`
+- Files changed:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W3-MDPIPE-01B4-qa-verification.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - root `AGENTS.md`
+  - active B4 requirement, architecture, contract, work-packet, QA plan, implementation evidence, Team 05 outbox, and developer handoff
+  - `backend/src/modules/pipeline-orchestration/pipeline-orchestration.controller.ts`
+  - `backend/src/modules/pipeline-orchestration/pipeline-orchestration.repository.ts`
+  - `backend/src/modules/pipeline-orchestration/pipeline-orchestration.router.ts`
+  - `backend/src/modules/pipeline-orchestration/pipeline-orchestration.service.ts`
+  - `backend/src/modules/pipeline-orchestration/pipeline-orchestration.types.ts`
+  - `backend/src/modules/pipeline-orchestration/pipeline-orchestration.validation.ts`
+  - `backend/tests/modules/pipeline-orchestration/pipeline-orchestration.controller.test.ts`
+  - `backend/tests/modules/pipeline-orchestration/pipeline-orchestration.routes.test.ts`
+  - `backend/tests/modules/pipeline-orchestration/pipeline-orchestration.service.test.ts`
+  - `backend/tests/modules/pipeline-orchestration/pipeline-orchestration.validation.test.ts`
+  - `frontend/src/features/pipeline-ops/api/pipelineOpsService.ts`
+  - `frontend/src/features/pipeline-ops/components/PipelineOpsPage.tsx`
+  - `frontend/src/features/pipeline-ops/components/PipelineOpsTable.tsx`
+  - `frontend/src/features/pipeline-ops/hooks/usePipelineStatus.ts`
+  - `frontend/src/features/pipeline-ops/types.ts`
+  - `frontend/tests/ui/pipeline-ops.spec.ts`
+- Behavior changed:
+  - none; QA evidence only
+- Docs changed:
+  - added B4 QA verification evidence
+  - updated Team 04 outbox
+- Contracts changed:
+  - none
+- Tests run:
+  - `cd backend && npm.cmd test -- pipeline-orchestration.validation.test.ts pipeline-orchestration.service.test.ts pipeline-orchestration.controller.test.ts pipeline-orchestration.routes.test.ts --runInBand` (pass)
+  - `cd backend && npm.cmd run build` (pass)
+  - `cd frontend && npm.cmd run build` (pass)
+  - `cd frontend && npm.cmd run test:ui -- pipeline-ops.spec.ts --workers=1` (pass after rerun with escalated artifact access and temporary local dev server)
+- Tests skipped:
+  - none from the requested validation set
+- Assumptions:
+  - Team 05 handoff represents the intended B4 implementation candidate
+  - current UI smoke remains sufficient for the bounded `pipeline-ops` click and refresh path
+- Risks:
+  - release-blocking duplicate-running same-idempotency path in the command service
+  - current backend tests miss same-owner active-lease duplicate coverage
+- Blockers:
+  - `REJECT`: same idempotency key while stage is still `RUNNING` can reacquire its own lease and execute `DataQualityEngineService.evaluate(...)` again
+  - repository evidence: `backend/src/modules/pipeline-orchestration/pipeline-orchestration.repository.ts:170-180`
+  - service evidence: `backend/src/modules/pipeline-orchestration/pipeline-orchestration.service.ts:188-275`
+  - coverage gap: `backend/tests/modules/pipeline-orchestration/pipeline-orchestration.service.test.ts:314-520`
+- Shared-file requests:
+  - none
+- QA verdict:
+  - `CF-W3-MDPIPE-01B4`: `REJECT`
+- Next gate:
+  - return to Team 05 for a command idempotency/lease fix and focused same-owner running-duplicate test coverage, then reroute to Team 04 for re-verification
+
 ## 2026-05-25 `CF-W3-MDPIPE-01B4` / `CF-W3-MDPIPE-01B5-01B6` QA Planning
 
 - Team: `TEAM-04` - QA Factory

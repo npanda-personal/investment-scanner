@@ -6,6 +6,37 @@ Team: TEAM-10 - Review / Release
 
 State: `CF-W1-NOTIF-02` preaccepted by code review with QA blocker; release acceptance blocked pending focused runtime verification.
 
+## 2026-05-25 `CF-W3-MDPIPE-01B4` Review / Release Gate
+
+Review target: `CF-W3-MDPIPE-01B4-PIPELINE-COMMAND-API`
+
+Review decision: `ACCEPT`
+
+Architect Signoff may proceed.
+
+### Findings
+
+No blocking findings.
+
+Acceptance notes:
+
+- B4 stayed inside the reserved application file scope. The reviewed diff is limited to `backend/src/modules/pipeline-orchestration/**`, focused `backend/tests/modules/pipeline-orchestration/**`, `frontend/src/features/pipeline-ops/**`, `frontend/tests/ui/pipeline-ops.spec.ts`, and the expected bounded execution docs. No forbidden application-file edits were found in route registries, Prisma/schema, `data-quality-engine`, `market-data-foundation`, shared UI, package manifests, or provider/scheduler paths.
+- The backend safety matrix is correct: `DATA_QUALITY_EVALUATE_SCOPE` is the only `ENABLED` command, while every other command remains `DEFERRED` or `FORBIDDEN` with explicit reasons.
+- The command execution path remains single-batch, DQ-only, and local. It validates `runMode=single_batch`, `batchSize` `1..100`, non-negative `offset`, and `idempotencyKey`, acquires a stage lease before the adapter call, invokes only `DataQualityEngineService.evaluate(...)`, and does not add provider/live, scheduler, or downstream fanout behavior.
+- The QA blocker rework is valid. Same-idempotency duplicate submit while the stage is already `RUNNING` under the same owner family now returns `409 / LEASE_HELD` and does not execute the adapter again.
+- Frontend behavior matches the contract. Status polling stays GET-only, the dashboard fetches catalog separately, only the Data Quality row becomes triggerable, each click generates a fresh `crypto.randomUUID()`, the trigger posts once per click, and status refresh happens after the command response.
+- Focused backend tests, focused Playwright coverage, and Team 04 re-verification are sufficient for this bounded slice. Product language and local/free constraints remain within policy.
+
+### Evidence
+
+- Code review record: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W3-MDPIPE-01B4-code-review.md`
+- Developer handoff: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W3-MDPIPE-01B4-developer-handoff.md`
+- QA verification: `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W3-MDPIPE-01B4-qa-verification.md`
+
+### Next Gate
+
+Route to Team 03 Architect Signoff.
+
 ## 2026-05-18 `CF-W1-UX-01A` Review / Release Gate
 
 Team 10 reviewed the Team 08 developer handoff in branch `codex/team08-ux-research/CF-W1-UX-01A` at worktree `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-UX-01A`.

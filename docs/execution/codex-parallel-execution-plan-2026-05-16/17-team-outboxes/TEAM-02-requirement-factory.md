@@ -1,5 +1,87 @@
 # TEAM-02 Requirement Factory
 
+## Team 02 Rolling PO Discovery - Pipeline Command API Excluded - 2026-05-25
+
+Root `AGENTS.md` intake completed first. Workspace was clean at the start of this pass. Team 02 stayed docs-only and wrote only inside the reserved requirement files.
+
+### Current PO Priority Applied
+
+- Highest user value for investor/trader comes before admin/settings/notifications.
+- Priority remains: market data trust, data quality trust, signal quality and backtesting trust, calibration trust, trusted candidate workflow, and Today Review.
+- Team 05's `CF-W3-MDPIPE-01B4` pipeline command API work is active and intentionally excluded from Team 02 discovery.
+- No Trade Plan-first framing, no R:R framing, and no arbitrary target-price framing.
+
+### Queue Refresh Result
+
+Refreshed the direct investor/trader-value stack after excluding the active pipeline lane and already accepted items:
+
+1. `CF-W2-TSC-04`
+2. `CF-W2-TSC-05`
+3. `CF-W1-TSC-02`
+4. `CF-W1-DQ-02` residual parent
+5. `CF-W1-MD-02A`
+6. `CF-W1-SQLAB-02B`
+7. `CF-W1-STRAT-02B`
+8. `CF-W1-L3-DQ-01A`
+9. `CF-W1-UX-02`
+10. `CF-W1-UX-05`
+
+### Requirement Refinement Result
+
+Refined the queue to keep the accepted and committed slices out of the front:
+
+- `CF-W1-BT-04` is no longer a fresh backtesting candidate.
+- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` is no longer a fresh Today Review pull.
+- `CF-W2-BT-05` is no longer a fresh backtesting pull.
+- `CF-W1-MD-05` is no longer a fresh market-data pull.
+
+### Queue Re-Sort Result
+
+Active items excluded from fresh discovery:
+
+- `CF-W1-TSC-01A-SIG` is active with Team 06.
+- `CF-W1-DQ-03` is active with Team 05.
+- `CF-W3-MDPIPE-01B4` is active with Team 05.
+
+Next unassigned queue after active pulls:
+
+1. `CF-W2-TSC-04`
+2. `CF-W2-TSC-05`
+3. `CF-W1-TSC-02`
+4. `CF-W1-DQ-02` residual parent
+5. `CF-W1-MD-02A`
+6. `CF-W1-SQLAB-02B`
+7. `CF-W1-STRAT-02B`
+8. `CF-W1-L3-DQ-01A`
+9. `CF-W1-UX-02`
+10. `CF-W1-UX-05`
+
+### Team 00 / Team 03 Handoff Recommendation
+
+Recommended next Team 00 routing:
+
+1. Send `CF-W2-TSC-04` to Team 03/04 as the next bounded Today Review cleanup slice.
+2. Queue `CF-W2-TSC-05` immediately behind it as the ranking/eligibility reframe slice.
+3. Keep `CF-W1-TSC-02` next as the active candidate-health gap once Today Review cleanup sequencing clears.
+4. Keep `CF-W1-DQ-02` as the next residual upstream review only after Team 03 confirms there is a bounded no-schema child to write.
+
+Reason:
+
+- `TSC-04` and `TSC-05` are the next direct Today Review trust fixes after the accepted supporting-evidence work.
+- `TSC-02` is the next direct active-signal-health gap once Today Review cleanup is out of the way.
+- `DQ-02` still matters, but only after the residual split question is resolved.
+
+### Files Changed In This Pass
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+### Ready Result
+
+No item was moved to Ready by Team 02.
+
 ## Team 02 Rolling Queue Refresh - 2026-05-24
 
 Root `AGENTS.md` intake completed first. Workspace was clean at the start of this pass. Team 02 stayed docs-only and wrote only inside the reserved requirement files.

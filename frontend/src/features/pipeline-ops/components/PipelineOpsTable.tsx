@@ -23,7 +23,14 @@ import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { Link as RouterLink } from 'react-router-dom';
 import { StatusBadge } from '@/shared/components';
-import type { PipelineStatusSnapshot, PipelineStatusStage, PipelineStatusStageGroup } from '../types';
+import type {
+  PipelineCommandCatalogItem,
+  PipelineCommandCatalogResponse,
+  PipelineCommandKey,
+  PipelineStatusSnapshot,
+  PipelineStatusStage,
+  PipelineStatusStageGroup,
+} from '../types';
 import { formatDateTime } from './PipelineStatusStrip';
 
 type OperationDefinition = {
@@ -54,21 +61,38 @@ type PipelineOpsRow = OperationDefinition & PipelineStatusStageGroup;
 type PipelineOpsTableProps = {
   snapshot: PipelineStatusSnapshot | null;
   activeOnly: boolean;
+  catalog: PipelineCommandCatalogResponse | null;
+  catalogLoading: boolean;
+  commandPendingKey: PipelineCommandKey | null;
+  onTriggerCommand: (commandKey: PipelineCommandKey) => Promise<void>;
 };
 
 const ACTIVE_STATUSES = new Set(['PENDING', 'RUNNING']);
 
-export function PipelineOpsTable({ snapshot, activeOnly }: PipelineOpsTableProps) {
+export function PipelineOpsTable({
+  snapshot,
+  activeOnly,
+  catalog,
+  catalogLoading,
+  commandPendingKey,
+  onTriggerCommand,
+}: PipelineOpsTableProps) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   const rows = useMemo(() => {
     const stageMap = new Map((snapshot?.stages || []).map((stage) => [stage.stageKey, stage]));
+    const commandMap = new Map<string, PipelineCommandCatalogItem>();
+    for (const command of catalog?.commands || []) {
+      if (!commandMap.has(command.stageKey)) commandMap.set(command.stageKey, command);
+      if (command.commandKey === 'DATA_QUALITY_EVALUATE_SCOPE') commandMap.set(command.stageKey, command);
+    }
     const catalogRows = OPERATION_CATALOG.map((operation) => ({
       ...operation,
       ...(stageMap.get(operation.stageKey) || {
         activeStage: null,
         lastStage: null,
       }),
+      command: commandMap.get(operation.stageKey) || null,
     }));
     const unknownRows = (snapshot?.stages || [])
       .filter((stage) => !OPERATION_CATALOG.some((operation) => operation.stageKey === stage.stageKey))
@@ -80,10 +104,12 @@ export function PipelineOpsTable({ snapshot, activeOnly }: PipelineOpsTableProps
         sourcePath: '/pipeline-ops',
         activeStage: stage.activeStage,
         lastStage: stage.lastStage,
+        command: commandMap.get(stage.stageKey) || null,
       }));
-    const allRows: PipelineOpsRow[] = [...catalogRows, ...unknownRows].sort((a, b) => a.stageOrder - b.stageOrder || a.stageKey.localeCompare(b.stageKey));
+    const allRows: Array<PipelineOpsRow & { command: PipelineCommandCatalogItem | null }> = [...catalogRows, ...unknownRows]
+      .sort((a, b) => a.stageOrder - b.stageOrder || a.stageKey.localeCompare(b.stageKey));
     return activeOnly ? allRows.filter((row) => row.activeStage && ACTIVE_STATUSES.has(row.activeStage.status)) : allRows;
-  }, [activeOnly, snapshot]);
+  }, [activeOnly, catalog?.commands, snapshot]);
 
   const toggleRow = (stageKey: string) => {
     setExpandedRows((current) => {
@@ -120,6 +146,12 @@ export function PipelineOpsTable({ snapshot, activeOnly }: PipelineOpsTableProps
           {rows.map((row) => {
             const stage = row.activeStage || row.lastStage;
             const isExpanded = expandedRows.has(row.stageKey);
+            const command = row.command;
+            const commandEnabled = command?.availability === 'ENABLED';
+            const commandDisabledReason = command
+              ? (command.availability === 'ENABLED' ? null : command.disabledReason || `${command.commandKey} is not available for manual execution.`)
+              : (catalogLoading ? 'Loading command policy...' : 'No command contract is mapped to this pipeline row.');
+            const triggerLabel = commandPendingKey === command?.commandKey ? 'Running...' : 'Trigger';
             return (
               <Fragment key={row.stageKey}>
                 <TableRow hover>
@@ -159,10 +191,15 @@ export function PipelineOpsTable({ snapshot, activeOnly }: PipelineOpsTableProps
                     </Stack>
                   </TableCell>
                   <TableCell>
-                    <Tooltip title="Pending approved command contract">
+                    <Tooltip title={commandDisabledReason || `Run ${command?.operationName || row.operationName}`}>
                       <span>
-                        <Button size="small" variant="outlined" disabled>
-                          Trigger
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          disabled={!commandEnabled || commandPendingKey !== null}
+                          onClick={() => command?.commandKey && void onTriggerCommand(command.commandKey)}
+                        >
+                          {triggerLabel}
                         </Button>
                       </span>
                     </Tooltip>

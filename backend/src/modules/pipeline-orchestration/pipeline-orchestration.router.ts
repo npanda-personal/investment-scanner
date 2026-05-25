@@ -4,6 +4,8 @@ import { PipelineOrchestrationController } from './pipeline-orchestration.contro
 export function createPipelineOrchestrationRouter(controller = new PipelineOrchestrationController()) {
   const router = Router();
   router.get('/pipeline/status', controller.status);
+  router.get('/pipeline/commands/catalog', controller.commandCatalog);
+  router.post('/pipeline/commands', controller.executeCommand);
   return router;
 }
 

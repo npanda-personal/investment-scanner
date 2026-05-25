@@ -12,33 +12,42 @@ Current active agents:
 
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Open slot | none | pending | implementation | Team 05 `CF-W3-MDPIPE-01B4` after docs checkpoint | ready |
-| 2 | Open slot | none | pending | QA verification | Team 04 after Team 05 handoff | waiting |
+| 1 | Open slot | none | pending | implementation | `CF-W3-MDPIPE-01B6` Data Quality compact progress indicator | ready after B4 commit |
+| 2 | Open slot | none | pending | QA verification | Team 04 for `CF-W3-MDPIPE-01B6` after handoff | waiting |
 | 3 | Open slot | none | pending | review/signoff | Team 10 then Team 03 after QA acceptance | waiting |
-| 4 | Open slot | none | pending | implementation | next bounded pipeline slice after command API | waiting |
-| 5 | Open slot | none | pending | review | Team 10 review after next QA-accepted handoff | waiting |
-| 6 | Open slot | none | pending | requirements | Team 02 rolling direct investor/trader-value discovery | ready |
+| 4 | Open slot | none | pending | architecture | `CF-W3-MDPIPE-01C` ledgered Data Quality scheduled stage | ready for prep |
+| 5 | Open slot | none | pending | requirements | Team 02 rolling investor/trader-value queue | ready |
+| 6 | Open slot | none | pending | review | Team 10 review after next QA-accepted handoff | waiting |
 
 Teams ready to pick up new tasks:
 
-- Team 05: ready for `CF-W3-MDPIPE-01B4` command API implementation after docs checkpoint.
-- Team 04: ready for QA verification after Team 05 handoff.
+- Team 08: ready for `CF-W3-MDPIPE-01B6` Data Quality compact indicator after B4 commit.
+- Team 04: ready for `CF-W3-MDPIPE-01B6` QA after Team 08 handoff.
 - Team 10: ready for Code Review after Team 04 acceptance.
-- Team 03: ready for Architect Signoff after Team 10 acceptance.
-- Team 02: ready for rolling Product Owner / requirements discovery if the pipeline queue thins.
+- Team 03: ready for Architect Signoff after Team 10 acceptance, or architecture prep for `CF-W3-MDPIPE-01C`.
 - Team 05: standby for `CF-W3-MDPIPE-01C` Data Quality scheduled stage after status/command contracts stabilize.
-- Team 08: standby for compact indicator follow-up after command API stabilizes.
+- Team 02: completed rolling requirements refresh; next top candidates are `CF-W2-TSC-04`, `CF-W2-TSC-05`, and `CF-W1-TSC-02`.
 
 Queued next:
 
-1. Team 00 commits docs-only gates for `CF-W3-MDPIPE-01B4`, `01B5`, and `01B6`.
-2. Team 00 launches Team 05 for `CF-W3-MDPIPE-01B4`.
-3. Team 05 implements only `DATA_QUALITY_EVALUATE_SCOPE`.
-4. Team 04/10/03 run QA, review, and signoff after the developer handoff.
+1. Team 00 commits accepted `CF-W3-MDPIPE-01B4` after scoped staging.
+2. Team 08 implements `CF-W3-MDPIPE-01B6` compact progress indicator on the first Data Quality surface.
+3. Team 04 verifies `CF-W3-MDPIPE-01B6` after handoff.
+4. Team 10 reviews after QA acceptance.
+5. Team 03 signs off after Team 10 acceptance.
+6. Team 03/05 prepare `CF-W3-MDPIPE-01C` ledgered Data Quality scheduled stage after B6 is queued.
 
 Completed agents:
 
 - Team 03 `019e5ddb-0cf0-7a53-b5aa-bedbeb0bf30d`: completed B4 architecture, contract, and work packet; closed.
+- Team 05 `019e5de9-86ce-77a1-9607-24daefbcd838`: completed first B4 implementation; closed after Team 04 QA rejection.
+- Team 04 `019e5dfb-b64b-7b22-9aa6-0fa3c07bbfad`: rejected B4 on same-idempotency active-running duplicate execution; closed.
+- Team 05 `019e5e02-5cd8-7273-a28c-19692d2349bf`: completed duplicate-running idempotency rework; closed.
+- Team 04 `019e5e05-e51f-...`: accepted B4 QA rerun; closed.
+- Team 10 `019e5e0d-a220-...`: accepted B4 Code Review; closed.
+- Team 03 `019e5e12-db47-...`: accepted B4 Architect Signoff; closed.
+- Team 03 `019e5dea-040d-7f12-9122-5f879ec4e9d4`: completed B5/B6 architecture; B6 ready-candidate, B5 blocked; closed.
+- Team 02 `019e5dea-2124-7233-b175-247e53e4203d`: completed rolling requirements refresh; closed.
 - Team 08 `019e5ddb-2125-78d1-92b2-e9e917a52145`: completed B5/B6 UX plan; closed.
 - Team 04 `019e5ddb-3564-7122-b1fa-a009353c5868`: completed B4/B5/B6 QA plans; closed.
 
