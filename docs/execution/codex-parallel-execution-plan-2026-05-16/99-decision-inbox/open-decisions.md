@@ -4,11 +4,15 @@ Date: 2026-05-18
 
 ## Current Open Decisions
 
-No open decisions.
+Open decisions: 1.
 
-Product Owner action not required.
+Product Owner action required for the affected workstream only.
 
-Daemon should continue autonomous work.
+Daemon should continue unrelated autonomous work.
+
+| Decision ID | Summary | Affected Workstream | Decision Packet | Current Routing |
+| --- | --- | --- | --- | --- |
+| DECISION-20260525-dq-rs1-currentness-summary-parity | Choose whether to reduce `CF-W1-DQ-02-RS1` to bounded row/detail currentness only or preserve full summary/helper parity and create an upstream bulk/durable evidence slice first. | `CF-W1-DQ-02-RS1` only | `DECISION-20260525-dq-rs1-currentness-summary-parity.md` | Stop Team 05 RS1 rework and do not rerun QA on the current packet until resolved. |
 
 ## Resolved This Cycle
 

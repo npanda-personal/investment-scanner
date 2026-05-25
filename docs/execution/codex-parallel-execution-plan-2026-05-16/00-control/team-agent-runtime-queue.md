@@ -4,7 +4,7 @@ Date: 2026-05-25
 
 Owner: Team 00 - Master Orchestrator / Integration
 
-## Latest Active Snapshot - CAL Implementation, TSC Scope Addendum, DQ Rework
+## Latest Active Snapshot - CAL And TSC Remediation, DQ Decision Blocker
 
 Date: 2026-05-25
 
@@ -12,15 +12,23 @@ Current active agents:
 
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Team 06 - Strategy / Signal / Risk | `019e5ee9-07e1-7af1-95a4-ff756bf3c2a2` | `gpt-5.3-codex`, high | implementation | `CF-W2-CAL-02A` Signal Calibration evidence-basis projection | active |
-| 2 | Team 07 - Portfolio / Watchlist / Alerts | `019e5eed-c91f-7a40-bbf9-6087d54a10d7` | `gpt-5.3-codex`, high | rework | `CF-W2-TSC-05A` repository persisted-read fix after addendum | active |
-| 3 | Team 04 - QA Factory | `019e5eef-bb81-7d92-ac87-ba4277fd9c3b` | `gpt-5.4`, high | QA re-verification | `CF-W1-DQ-02-RS1` after Team 05 aggregate-summary rework | active |
-| 4 | Team 02 - Requirement Factory | `019e5eec-7aae-72e0-96f5-41a61b3518a4` | `gpt-5.4`, medium | rolling requirements | direct investor/trader-value backlog discovery and priority hygiene | active |
-| 5 | Open slot | none | pending | Code Review | Team 10 after next Team 04 ACCEPT | queued |
-| 6 | Open slot | none | pending | Architect Signoff | Team 03 after Team 10 ACCEPT | queued |
+| 1 | Team 06 - Strategy / Signal / Risk | `019e5f05-2f3e-7632-b8ab-275f1c4e933d` | `gpt-5.3-codex`, high | remediation | `CF-W2-CAL-02A` code-review fixes | active |
+| 2 | Team 07 - Portfolio / Watchlist / Alerts | `019e5f0b-9afc-70c3-bea5-7350e45985b7` | `gpt-5.3-codex`, high | remediation | `CF-W2-TSC-05A` compatibility-only riskContext scoring fix | active |
+| 3 | Open slot | none | pending | QA verification | Team 04 after Team 06 CAL remediation handoff | queued |
+| 4 | Open slot | none | pending | QA verification | Team 04 after Team 07 TSC remediation handoff | queued |
+| 5 | Open slot | none | paused | Decision Blocker | `CF-W1-DQ-02-RS1` blocked by open Decision Packet | paused |
+| 6 | Open slot | none | paused | Factory pause | no new backlog execution until current open items are closed and break report is sent | paused |
 
 Recently closed:
 
+- Team 10 `019e5eff-bbaa-7952-b065-c9b19cea6c8c`: rejected `CF-W2-CAL-02A` for stale page summary on fetch failure and compare/list evidence-basis parity risk; closed.
+- Team 04 `019e5efa-8c15-7d51-ba20-1629059d58f6`: accepted `CF-W2-TSC-05A` QA after repository persisted-read rework; closed.
+- Team 10 `019e5f04-ae4f-7fe2-b5a4-8f87f64e1129`: rejected `CF-W2-TSC-05A` because compatibility-only snapshot presence still awarded `riskContext`; closed.
+- Team 04 `019e5ef5-9072-7fd1-9377-b14326abd796`: accepted `CF-W2-CAL-02A` QA; UI smoke remains an environment blocker/risk; closed.
+- Team 07 `019e5eed-c91f-7a40-bbf9-6087d54a10d7`: completed `CF-W2-TSC-05A` repository persisted-read rework; closed.
+- Team 10 `019e5ef3-d1bf-7142-a4d8-9a8cc9b80974`: rejected `CF-W1-DQ-02-RS1`; closed.
+- Team 03 `019e5efb-719d-7ca1-80a3-14274e90da20`: confirmed `CF-W1-DQ-02-RS1` has no bounded DQE-only rework under current packet; Decision Packet opened; closed.
+- Team 02 `019e5eec-7aae-72e0-96f5-41a61b3518a4`: completed priority hygiene; closed.
 - Team 03 `019e5ee9-68c2-73d2-96be-22a78f7cf608`: completed `CF-W2-TSC-05A` repository scope addendum; verdict routine module-local scope correction, no Product Owner blocker; closed.
 - Team 05 `019e5ee9-e6a5-7831-953e-31cf73fc0ea8`: completed `CF-W1-DQ-02-RS1` aggregate-summary rework; summary now uses bounded DB-side counts and `findFirst`; closed.
 - Team 04 `019e5edd-f986-7ed0-8aee-39e3cc4296cd`: rejected `CF-W2-TSC-05A` after finding repository persisted-read legacy explainability leakage; closed.
@@ -40,21 +48,22 @@ Recently closed:
 
 Current routing:
 
-- `CF-W2-TSC-05A` repository persisted-read scope correction is approved by Team 03; Team 07 rework is active in the Team 07 worktree.
-- `CF-W1-DQ-02-RS1` is in Team 04 QA re-verification after Team 05 replaced repository summary full-row loading with bounded aggregate query behavior.
-- `CF-W2-CAL-02A` is active with Team 06 in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-CAL-02A`.
+- `CF-W2-TSC-05A` is back with Team 07 for a bounded review-reject remediation: compatibility-only snapshot presence must not award trusted `riskContext`.
+- `CF-W1-DQ-02-RS1` is blocked by `99-decision-inbox/DECISION-20260525-dq-rs1-currentness-summary-parity.md`; no further Team 05/04/10 loop until resolved.
+- `CF-W2-CAL-02A` is back with Team 06 for bounded review-reject remediation: clear/fail-close stale page summary on fetch failure and align compare/list evidence-basis behavior.
 - `CF-W1-RH-01A` is a new bounded Research Hub evidence-date requirement and remains behind `CF-W2-CAL-02A` plus higher-value durable-proof consent-gated proposals.
-- Team 02 rolling requirement discovery is active to keep direct investor/trader-value backlog depth moving while implementation/review gates run.
-- No open Product Owner decisions exist.
+- Team 02 rolling requirement discovery completed priority hygiene; no new backlog execution will start until the requested break report is sent.
+- Open Product Owner decisions: 1, affecting only `CF-W1-DQ-02-RS1`.
 
 Teams ready to pick up new tasks:
 
-- Team 06: active on `CF-W2-CAL-02A` implementation.
-- Team 07: active on `CF-W2-TSC-05A` repository persisted-read rework after addendum.
-- Team 04: active on `CF-W1-DQ-02-RS1` QA re-verification; ready for CAL QA after Team 06 handoff and TSC QA after Team 07 rework.
-- Team 10: ready for the next QA-accepted code review.
-- Team 03: ready for Architect Signoff after Team 10 acceptance once the addendum task completes.
-- Team 02: active on the next rolling investor/trader-value requirement pass.
+- Team 06: active on `CF-W2-CAL-02A` remediation.
+- Team 07: active on `CF-W2-TSC-05A` remediation.
+- Team 04: queued for CAL and TSC QA re-verification after remediation handoffs.
+- Team 10: queued for code review after QA acceptance.
+- Team 03: queued for Architect Signoff after Team 10 acceptance.
+- Team 05: blocked on `CF-W1-DQ-02-RS1` until the Decision Packet is resolved.
+- Team 02: paused after priority hygiene per Product Owner break request.
 
 ---
 
