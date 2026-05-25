@@ -34,6 +34,41 @@ No historical active work items have been migrated as active.
 - Rejected / Rework
 - Deferred
 
+## Latest Team 00 Routing Update - Pipeline Automation First
+
+Date: 2026-05-25
+
+User direction:
+
+- Pause backlog execution and finish the pipeline automation path first.
+
+Current gate status:
+
+- Market Data price-backfill progress visibility is implemented as a narrow ledger bridge to `MARKET_DATA`.
+- Scheduled Data Quality remains wired after scheduled Market Data using the changed instrument set.
+- Scheduled Raw Signals is now wired after scheduled Data Quality only when DQ returns `COMPLETED`.
+- Raw Signals uses explicit upstream changed instrument ids and does not run region-wide pagination for the scheduled path.
+- Scheduled Signal Calibration is now wired after Raw Signals only when Raw Signals returns `COMPLETED`.
+- Signal Calibration uses explicit upstream changed instrument ids and latest persisted raw-signal rows only; missing rows are counted as skipped evidence.
+- `RAW_SIGNALS_GENERATE_SCOPE` and `SIGNAL_CALIBRATION_REFRESH_SCOPE` remain manual-command `DEFERRED`; this is scheduler automation only.
+
+Validation:
+
+- `npm.cmd test -- pipeline-orchestration.service.test.ts signal-generation-engine.service.test.ts signal-generation-dq-enforcement.invariants.test.ts --runInBand` passed.
+- `npm.cmd test -- pipeline-orchestration.service.test.ts signal-calibration-engine.service.test.ts --runInBand` passed.
+- `npm.cmd test -- market-data.scheduler.test.ts data-quality-engine.service.test.ts pipeline-orchestration.validation.test.ts pipeline-orchestration.controller.test.ts pipeline-orchestration.routes.test.ts --runInBand` passed.
+- `npm.cmd test -- pipeline-orchestration.service.test.ts market-data.scheduler.test.ts market-data.service.test.ts market-data.routes.test.ts data-quality-engine.service.test.ts signal-generation-engine.service.test.ts --runInBand` passed.
+- `npm.cmd test -- pipeline-orchestration.service.test.ts market-data.scheduler.test.ts market-data.service.test.ts market-data.routes.test.ts data-quality-engine.service.test.ts signal-generation-engine.service.test.ts signal-calibration-engine.service.test.ts --runInBand` passed.
+- `npm.cmd run build` passed.
+- `git diff --check` passed with normal LF/CRLF warnings only.
+
+Next pipeline-only routing:
+
+- Team 00 should finish validation for the scheduled `DATA_QUALITY -> RAW_SIGNALS -> SIGNAL_CALIBRATION` backend chain and commit the scoped pipeline automation checkpoint.
+- Team 03 should prepare the next bounded scheduled-stage adapter contract for context snapshots or market context.
+- Team 04 should prepare QA for the next pipeline fanout before implementation.
+- Team 00 should not resume non-pipeline backlog until this pipeline automation checkpoint is committed or explicitly paused.
+
 ## Latest Team 00 Routing Update - Pause After Current Open Items
 
 Date: 2026-05-25

@@ -125,10 +125,19 @@ export class SignalCalibrationEngineService {
     const generatedAt = new Date().toISOString();
     const errors: string[] = [];
     const warnings: string[] = [];
+    const explicitInstrumentIds = request.instrumentIds
+      ? [...new Set(request.instrumentIds.map((id) => String(id || '').trim()).filter(Boolean))]
+      : [];
     const totalCount = await this.resolveTotalCount(request);
-    const batchSize = request.instrumentId || request.symbol ? 1 : this.clampInt(request.batchSize ?? request.limit, 25, 1, 100);
-    const offset = request.instrumentId || request.symbol ? 0 : this.clampInt(request.offset, 0, 0, Number.MAX_SAFE_INTEGER);
+    const batchSize = request.instrumentId || request.symbol
+      ? 1
+      : explicitInstrumentIds.length || this.clampInt(request.batchSize ?? request.limit, 25, 1, 100);
+    const offset = request.instrumentId || request.symbol || explicitInstrumentIds.length ? 0 : this.clampInt(request.offset, 0, 0, Number.MAX_SAFE_INTEGER);
     const signals = await this.resolveSignals({ ...request, batchSize, offset });
+    const resolvedExplicitIds = new Set(signals.map((signal) => String(signal.instrument_id || '').trim()).filter(Boolean));
+    const missingExplicitSignalCount = explicitInstrumentIds.length
+      ? Math.max(0, explicitInstrumentIds.length - resolvedExplicitIds.size)
+      : 0;
     const results: SignalCalibrationResultDto[] = [];
     
     let outOfScopeSkipped = 0;
@@ -176,9 +185,13 @@ export class SignalCalibrationEngineService {
     }
     
     const processedCount = signals.length;
-    const nextOffset = offset + processedCount;
+    const nextOffset = explicitInstrumentIds.length ? totalCount : offset + processedCount;
+    const hasMore = explicitInstrumentIds.length ? false : nextOffset < totalCount;
     const passthroughCount = results.filter((result) => !result.calibrationApplied).length;
-    const skipped = Math.max(0, signals.length - results.length - errors.length);
+    if (missingExplicitSignalCount > 0) {
+      warnings.push(`${missingExplicitSignalCount} requested instruments did not have persisted raw signals for calibration.`);
+    }
+    const skipped = Math.max(0, signals.length - results.length - errors.length) + missingExplicitSignalCount;
     const runEvidence = this.runEvidenceFromSummary(horizon, globalSummary, results);
     const runReadiness = this.aggregateReadiness(results, horizon, runEvidence, Boolean(globalSummary));
     return {
@@ -191,8 +204,8 @@ export class SignalCalibrationEngineService {
       totalCount,
       batchSize,
       offset,
-      nextOffset: nextOffset < totalCount ? nextOffset : null,
-      hasMore: nextOffset < totalCount,
+      nextOffset: hasMore ? nextOffset : null,
+      hasMore,
       selectedHorizon: horizon,
       calibrationEvidence: runEvidence,
       calibrationReadiness: runReadiness,
@@ -877,6 +890,14 @@ export class SignalCalibrationEngineService {
       const signal = await this.signalService.latestForInstrument(request.instrumentId);
       return signal ? [signal] : [];
     }
+    if (request.instrumentIds?.length) {
+      const uniqueIds = [...new Set(request.instrumentIds.map((id) => String(id || '').trim()).filter(Boolean))];
+      const signalServiceAny = this.signalService as any;
+      if (typeof signalServiceAny.latestPersistedForInstruments === 'function') {
+        return signalServiceAny.latestPersistedForInstruments(uniqueIds);
+      }
+      return [];
+    }
     if (request.symbol) {
       const run = await this.signalService.run({ symbol: request.symbol, limit: 1 });
       return run.results;
@@ -894,6 +915,9 @@ export class SignalCalibrationEngineService {
 
   private async resolveTotalCount(request: CalibrationRunRequest): Promise<number> {
     if (request.instrumentId || request.symbol) return 1;
+    if (request.instrumentIds?.length) {
+      return new Set(request.instrumentIds.map((id) => String(id || '').trim()).filter(Boolean)).size;
+    }
     return this.signalService.latestSignalUniverseCount({
       direction: request.direction,
       sector: request.sector,

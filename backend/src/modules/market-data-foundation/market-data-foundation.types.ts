@@ -1614,6 +1614,7 @@ export interface PriceBackfillRunError {
 export interface PriceBackfillRunRequest extends MarketDataRepairRequest {
   maxBatches?: number;
   maxBatchesPerAction?: number;
+  triggerType?: 'startup' | 'backfill' | 'manual' | 'scheduled';
 }
 
 export interface PriceBackfillRunStatusResponse {

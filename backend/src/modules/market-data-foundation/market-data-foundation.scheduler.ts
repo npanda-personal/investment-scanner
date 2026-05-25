@@ -342,6 +342,7 @@ export async function startMarketDataStartupPriceBackfill(env = process.env) {
     batchSize: parseNumber(env.MARKET_DATA_STARTUP_PRICE_BACKFILL_BATCH_SIZE, 20),
     workerConcurrency: parseNumber(env.MARKET_DATA_STARTUP_PRICE_BACKFILL_WORKER_CONCURRENCY, 2),
     maxBatches: parseNumber(env.MARKET_DATA_STARTUP_PRICE_BACKFILL_MAX_BATCHES, 100),
+    triggerType: 'startup',
     force: false,
     fullReload: false,
   });

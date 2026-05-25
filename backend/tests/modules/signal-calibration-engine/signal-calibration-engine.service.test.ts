@@ -350,6 +350,82 @@ describe('signal calibration engine service', () => {
     expect(result.calibrationReadiness).toMatchObject({ status: 'USABLE', downstreamInfluence: 'NORMAL' });
   });
 
+  it('runs explicit instrument calibration from persisted raw signals only', async () => {
+    const latestPersistedForInstruments = jest.fn().mockResolvedValue([
+      rawSignal({ instrument_id: 'stock-1' }),
+      rawSignal({ instrument_id: 'stock-2', symbol: 'MSFT' }),
+    ]);
+    const latestSignalUniverse = jest.fn();
+    const latestSignalUniverseCount = jest.fn();
+    const signalRun = jest.fn();
+    const latestForInstrument = jest.fn();
+    const setup = service({
+      signalService: {
+        latestPersistedForInstruments,
+        latestSignalUniverse,
+        latestSignalUniverseCount,
+        run: signalRun,
+        latestForInstrument,
+      },
+    });
+
+    const result = await setup.instance.run({
+      instrumentIds: ['stock-2', 'stock-1', 'stock-2'],
+      batchSize: 25,
+      offset: 10,
+      region: 'IN',
+      assetType: 'STOCK',
+    });
+
+    expect(latestPersistedForInstruments).toHaveBeenCalledWith(['stock-2', 'stock-1']);
+    expect(latestSignalUniverse).not.toHaveBeenCalled();
+    expect(latestSignalUniverseCount).not.toHaveBeenCalled();
+    expect(signalRun).not.toHaveBeenCalled();
+    expect(latestForInstrument).not.toHaveBeenCalled();
+    expect(setup.repository.create).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({
+      processedCount: 2,
+      totalCount: 2,
+      batchSize: 2,
+      offset: 0,
+      nextOffset: null,
+      hasMore: false,
+      skippedCount: 0,
+      failedCount: 0,
+    });
+  });
+
+  it('counts requested explicit instruments without persisted raw signals as skipped', async () => {
+    const setup = service({
+      signalService: {
+        latestPersistedForInstruments: jest.fn().mockResolvedValue([
+          rawSignal({ instrument_id: 'stock-1' }),
+        ]),
+        latestSignalUniverse: jest.fn(),
+        latestSignalUniverseCount: jest.fn(),
+        run: jest.fn(),
+        latestForInstrument: jest.fn(),
+      },
+    });
+
+    const result = await setup.instance.run({
+      instrumentIds: ['stock-1', 'stock-2', 'stock-2'],
+      region: 'IN',
+      assetType: 'STOCK',
+    });
+
+    expect(setup.repository.create).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      generated: 1,
+      processedCount: 1,
+      totalCount: 2,
+      skippedCount: 1,
+      failedCount: 0,
+      hasMore: false,
+    });
+    expect(result.warnings.join(' ')).toContain('1 requested instruments did not have persisted raw signals');
+  });
+
   it('attaches conservative readiness to existing persisted rows without stored evidence', async () => {
     const setup = service({
       repository: {

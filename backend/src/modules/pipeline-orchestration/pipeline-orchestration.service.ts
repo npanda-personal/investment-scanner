@@ -1,5 +1,7 @@
 import { createHash } from 'crypto';
 import { DataQualityEngineService } from '../data-quality-engine';
+import { SignalGenerationEngineService } from '../signal-generation-engine';
+import { SignalCalibrationEngineService } from '../signal-calibration-engine';
 import { PipelineOrchestrationRepository } from './pipeline-orchestration.repository';
 import type {
   PipelineCommandAvailability,
@@ -11,6 +13,7 @@ import type {
   PipelineCommandRequest,
   PipelineCommandResponse,
   PipelineLatestStageQuery,
+  MarketDataStageSnapshotRequest,
   PipelineRunCompleteInput,
   PipelineRunCreateInput,
   PipelineRunRecord,
@@ -21,12 +24,17 @@ import type {
   PipelineStageLeaseResult,
   PipelineStageProgressInput,
   PipelineStageRunRecord,
+  PipelineStageStatus,
   PipelineStatusQuery,
   PipelineStatusRunDto,
   PipelineStatusSnapshot,
   PipelineStatusStageDto,
   ScheduledDataQualityStageRequest,
   ScheduledDataQualityStageResponse,
+  ScheduledRawSignalsStageRequest,
+  ScheduledRawSignalsStageResponse,
+  ScheduledSignalCalibrationStageRequest,
+  ScheduledSignalCalibrationStageResponse,
 } from './pipeline-orchestration.types';
 
 const LEDGER_VERSION = 'pipeline-ledger-v1';
@@ -35,6 +43,8 @@ const TERMINAL_STATUSES = new Set(['COMPLETED', 'PARTIAL', 'FAILED', 'SKIPPED', 
 const DEFAULT_LEASE_MS = 600_000;
 const PROCESS_LOCAL_ID = `${process.pid}-${Math.random().toString(16).slice(2, 10)}`;
 const DQ_SCHEDULED_STAGE_VERSION = 'scheduled-dq-v1';
+const RAW_SIGNALS_SCHEDULED_STAGE_VERSION = 'scheduled-raw-signals-v1';
+const SIGNAL_CALIBRATION_SCHEDULED_STAGE_VERSION = 'scheduled-signal-calibration-v1';
 
 type PipelineCommandPolicy = PipelineCommandCatalogItem & {
   stageOrder: number;
@@ -75,7 +85,9 @@ export class PipelineCommandError extends Error {
 export class PipelineOrchestrationService {
   constructor(
     private readonly repository = new PipelineOrchestrationRepository(),
-    private readonly dataQualityService = new DataQualityEngineService()
+    private readonly dataQualityService = new DataQualityEngineService(),
+    private readonly signalGenerationService = new SignalGenerationEngineService(),
+    private readonly signalCalibrationService = new SignalCalibrationEngineService()
   ) {}
 
   createRun(input: PipelineRunCreateInput): Promise<PipelineRunRecord> {
@@ -685,7 +697,31 @@ export class PipelineOrchestrationService {
         },
       });
 
-      return this.scheduledResponseFromStage(status, request, normalizedScope, completedStage, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
+      const response = this.scheduledResponseFromStage(status, request, normalizedScope, completedStage, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
+      if (status === 'COMPLETED') {
+        response.downstreamRawSignals = await this.runScheduledRawSignalsStage({
+          region: normalizedScope.region,
+          assetType: normalizedScope.assetType,
+          timeframe: '1d',
+          pipelineKey: request.pipelineKey,
+          triggerType: 'scheduled',
+          dataThroughDate: request.dataThroughDate,
+          sourceFingerprint: outputFingerprint,
+          changedInstrumentIds,
+          batchSize: normalizedBatchSize,
+          schedulerRunStartedAt: request.schedulerRunStartedAt,
+          upstreamStageRunId: completedStage.id,
+        }).catch((error) => {
+          console.error('[PipelineOrchestration] scheduled Raw Signals stage failed after Data Quality', {
+            region: normalizedScope.region,
+            assetType: normalizedScope.assetType,
+            dataThroughDate: request.dataThroughDate,
+            error: error instanceof Error ? error.message : 'unknown error',
+          });
+          return null;
+        });
+      }
+      return response;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Scheduled Data Quality stage failed';
       const completedAt = new Date();
@@ -747,6 +783,832 @@ export class PipelineOrchestrationService {
       });
       return this.scheduledResponseFromStage('FAILED', request, normalizedScope, failedStage, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
     }
+  }
+
+  async runScheduledRawSignalsStage(
+    request: ScheduledRawSignalsStageRequest,
+    now = new Date()
+  ): Promise<ScheduledRawSignalsStageResponse> {
+    const normalizedScope = this.normalizeScope({
+      region: request.region,
+      assetType: request.assetType,
+      timeframe: request.timeframe,
+    });
+    const changedInstrumentIds = [...new Set(request.changedInstrumentIds.map((id) => String(id || '').trim()).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b));
+    const normalizedBatchSize = this.normalizeScheduledBatchSize(request.batchSize, changedInstrumentIds.length);
+    if (changedInstrumentIds.length === 0) {
+      return this.scheduledRawSignalsSkippedResponse(request, normalizedScope, normalizedBatchSize);
+    }
+
+    const changedInstrumentFingerprint = this.hashValues(changedInstrumentIds);
+    const stageIdempotencyKey = this.scheduledRawSignalsStageIdempotencyKey({
+      region: normalizedScope.region,
+      assetType: normalizedScope.assetType,
+      timeframe: normalizedScope.timeframe,
+      dataThroughDate: request.dataThroughDate,
+      sourceFingerprint: request.sourceFingerprint,
+      changedInstrumentFingerprint,
+    });
+    const runIdempotencyKey = `${stageIdempotencyKey}:run`;
+    const inputFingerprint = [
+      'scheduled-raw-signals',
+      request.dataThroughDate,
+      request.sourceFingerprint,
+      changedInstrumentFingerprint,
+      RAW_SIGNALS_SCHEDULED_STAGE_VERSION,
+    ].join(':');
+    const leaseOwner = `scheduled-raw-signals:${PROCESS_LOCAL_ID}`;
+
+    let stageLease = await this.leaseStage({
+      idempotencyKey: stageIdempotencyKey,
+      leaseOwner,
+      leaseMs: DEFAULT_LEASE_MS,
+      now,
+      allowTerminalRetry: false,
+    });
+
+    if (stageLease.reason === 'STAGE_TERMINAL') {
+      return this.scheduledRawSignalsResponseFromLease('DUPLICATE_TERMINAL', request, normalizedScope, stageLease, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
+    }
+    if (stageLease.reason === 'LEASE_HELD') {
+      return this.scheduledRawSignalsResponseFromLease('LEASE_HELD', request, normalizedScope, stageLease, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
+    }
+
+    if (stageLease.reason === 'STAGE_NOT_FOUND') {
+      const run = await this.createRun({
+        pipelineKey: request.pipelineKey,
+        triggerType: request.triggerType,
+        status: 'RUNNING',
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        timeframe: normalizedScope.timeframe,
+        dataThroughDate: new Date(`${request.dataThroughDate}T00:00:00.000Z`),
+        sourceFingerprint: request.sourceFingerprint,
+        changedInstrumentCount: changedInstrumentIds.length,
+        totalCount: changedInstrumentIds.length,
+        processedCount: 0,
+        succeededCount: 0,
+        partialCount: 0,
+        failedCount: 0,
+        skippedCount: 0,
+        unchangedCount: 0,
+        idempotencyKey: runIdempotencyKey,
+        startedAt: now,
+        metadata: {
+          sourceStage: 'DATA_QUALITY',
+          upstreamStageRunId: request.upstreamStageRunId ?? null,
+          dataThroughDate: request.dataThroughDate,
+          sourceFingerprint: request.sourceFingerprint,
+          changedInstrumentCount: changedInstrumentIds.length,
+          changedInstrumentIdsSample: changedInstrumentIds.slice(0, 25),
+          changedInstrumentFingerprint,
+          rawSignalsStageVersion: RAW_SIGNALS_SCHEDULED_STAGE_VERSION,
+          schedulerRunStartedAt: request.schedulerRunStartedAt,
+        },
+      });
+
+      await this.createStage({
+        pipelineRunId: run.id,
+        stageKey: 'RAW_SIGNALS',
+        stageOrder: 3,
+        status: 'PENDING',
+        idempotencyKey: stageIdempotencyKey,
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        timeframe: normalizedScope.timeframe,
+        dataThroughDate: new Date(`${request.dataThroughDate}T00:00:00.000Z`),
+        inputFingerprint,
+        changedInstrumentCount: changedInstrumentIds.length,
+        batchSize: normalizedBatchSize,
+        offset: 0,
+        nextOffset: 0,
+        hasMore: false,
+        totalCount: changedInstrumentIds.length,
+        processedCount: 0,
+        succeededCount: 0,
+        partialCount: 0,
+        failedCount: 0,
+        skippedCount: 0,
+        unchangedCount: 0,
+        metadata: {
+          sourceStage: 'DATA_QUALITY',
+          upstreamStageRunId: request.upstreamStageRunId ?? null,
+          dataThroughDate: request.dataThroughDate,
+          sourceFingerprint: request.sourceFingerprint,
+          changedInstrumentCount: changedInstrumentIds.length,
+          changedInstrumentFingerprint,
+          rawSignalsStageVersion: RAW_SIGNALS_SCHEDULED_STAGE_VERSION,
+          schedulerRunStartedAt: request.schedulerRunStartedAt,
+        },
+      });
+
+      stageLease = await this.leaseStage({
+        idempotencyKey: stageIdempotencyKey,
+        leaseOwner,
+        leaseMs: DEFAULT_LEASE_MS,
+        now,
+        allowTerminalRetry: false,
+      });
+      if (stageLease.reason === 'STAGE_TERMINAL') {
+        return this.scheduledRawSignalsResponseFromLease('DUPLICATE_TERMINAL', request, normalizedScope, stageLease, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
+      }
+      if (stageLease.reason === 'LEASE_HELD') {
+        return this.scheduledRawSignalsResponseFromLease('LEASE_HELD', request, normalizedScope, stageLease, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
+      }
+    }
+
+    if (!stageLease.acquired || !stageLease.stage) {
+      return this.scheduledRawSignalsFailureResponse(request, normalizedScope, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length, `Unable to acquire scheduled Raw Signals stage lease: ${stageLease.reason}`);
+    }
+
+    const leasedStage = stageLease.stage;
+    const startedAt = now;
+    await this.recordStageProgress({
+      idempotencyKey: stageIdempotencyKey,
+      status: 'RUNNING',
+      totalCount: changedInstrumentIds.length,
+      processedCount: 0,
+      succeededCount: 0,
+      partialCount: 0,
+      failedCount: 0,
+      skippedCount: 0,
+      unchangedCount: 0,
+      nextOffset: 0,
+      hasMore: false,
+      metadata: {
+        sourceStage: 'DATA_QUALITY',
+        upstreamStageRunId: request.upstreamStageRunId ?? null,
+        dataThroughDate: request.dataThroughDate,
+        sourceFingerprint: request.sourceFingerprint,
+        changedInstrumentCount: changedInstrumentIds.length,
+        changedInstrumentFingerprint,
+        rawSignalsStageVersion: RAW_SIGNALS_SCHEDULED_STAGE_VERSION,
+        schedulerRunStartedAt: request.schedulerRunStartedAt,
+        adapter: 'SignalGenerationEngineService.run',
+      },
+      now: startedAt,
+    });
+
+    try {
+      const adapterResult = await this.signalGenerationService.run({
+        instrumentIds: changedInstrumentIds,
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        batchSize: normalizedBatchSize,
+        offset: 0,
+        requestedByUserId: 'system',
+        useDataQualityFilter: true,
+        missingQualityBehavior: 'SKIP',
+        skipUnusable: true,
+        includeLimited: false,
+        providerThrottleMs: 0,
+        researchContextMode: 'LIGHTWEIGHT',
+      });
+      const completedAt = new Date();
+      const durationMs = Math.max(0, completedAt.getTime() - startedAt.getTime());
+      const generatedCount = adapterResult.generatedCount ?? adapterResult.generated ?? 0;
+      const updatedCount = adapterResult.updatedCount ?? 0;
+      const noOpCount = adapterResult.noOpCount ?? 0;
+      const succeededCount = generatedCount + updatedCount + noOpCount;
+      const failedCount = adapterResult.failedCount ?? adapterResult.errors.length;
+      const skippedCount = adapterResult.skippedCount ?? adapterResult.skipped ?? 0;
+      const processedCount = adapterResult.processedCount ?? changedInstrumentIds.length;
+      const totalCount = adapterResult.totalCount ?? changedInstrumentIds.length;
+      const status = this.mapScheduledRawSignalsStatus({
+        totalCount,
+        succeededCount,
+        failedCount,
+        skippedCount,
+      });
+      const outputFingerprint = this.hashValues([
+        stageIdempotencyKey,
+        status,
+        String(totalCount),
+        String(processedCount),
+        String(succeededCount),
+        String(failedCount),
+        String(skippedCount),
+        String(noOpCount),
+      ]);
+      const metadata = {
+        sourceStage: 'DATA_QUALITY',
+        upstreamStageRunId: request.upstreamStageRunId ?? null,
+        dataThroughDate: request.dataThroughDate,
+        sourceFingerprint: request.sourceFingerprint,
+        changedInstrumentCount: changedInstrumentIds.length,
+        changedInstrumentFingerprint,
+        rawSignalsStageVersion: RAW_SIGNALS_SCHEDULED_STAGE_VERSION,
+        schedulerRunStartedAt: request.schedulerRunStartedAt,
+        adapter: 'SignalGenerationEngineService.run',
+        generatedCount,
+        updatedCount,
+        noOpCount,
+        excludedByDataQuality: adapterResult.dataQuality?.excludedByDataQuality ?? 0,
+        missingQualityEvaluationCount: adapterResult.dataQuality?.missingQualityEvaluationCount ?? 0,
+      };
+
+      const completedStage = await this.completeStage({
+        idempotencyKey: stageIdempotencyKey,
+        status,
+        totalCount,
+        processedCount,
+        succeededCount,
+        partialCount: status === 'PARTIAL' ? Math.max(1, failedCount + skippedCount) : 0,
+        failedCount,
+        skippedCount,
+        unchangedCount: noOpCount,
+        nextOffset: null,
+        hasMore: false,
+        outputFingerprint,
+        warnings: adapterResult.warnings,
+        errors: adapterResult.errors,
+        completedAt,
+        durationMs,
+        metadata,
+      });
+
+      await this.completeRun({
+        idempotencyKey: runIdempotencyKey,
+        status,
+        totalCount,
+        processedCount,
+        succeededCount,
+        partialCount: completedStage.partialCount,
+        failedCount,
+        skippedCount,
+        unchangedCount: noOpCount,
+        warnings: adapterResult.warnings,
+        errors: adapterResult.errors,
+        completedAt,
+        durationMs,
+        metadata,
+      });
+
+      const response = this.scheduledRawSignalsResponseFromStage(status, request, normalizedScope, completedStage, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
+      if (status === 'COMPLETED') {
+        response.downstreamSignalCalibration = await this.runScheduledSignalCalibrationStage({
+          region: normalizedScope.region,
+          assetType: normalizedScope.assetType,
+          timeframe: '1d',
+          pipelineKey: request.pipelineKey,
+          triggerType: 'scheduled',
+          dataThroughDate: request.dataThroughDate,
+          sourceFingerprint: outputFingerprint,
+          changedInstrumentIds,
+          batchSize: normalizedBatchSize,
+          schedulerRunStartedAt: request.schedulerRunStartedAt,
+          upstreamStageRunId: completedStage.id,
+        }).catch((error) => {
+          console.error('[PipelineOrchestration] scheduled Signal Calibration stage failed after Raw Signals', {
+            region: normalizedScope.region,
+            assetType: normalizedScope.assetType,
+            dataThroughDate: request.dataThroughDate,
+            error: error instanceof Error ? error.message : 'unknown error',
+          });
+          return null;
+        });
+      }
+      return response;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Scheduled Raw Signals stage failed';
+      const completedAt = new Date();
+      const durationMs = Math.max(0, completedAt.getTime() - startedAt.getTime());
+      const failedStage = await this.completeStage({
+        idempotencyKey: stageIdempotencyKey,
+        status: 'FAILED',
+        totalCount: changedInstrumentIds.length,
+        processedCount: leasedStage.processedCount,
+        succeededCount: leasedStage.succeededCount,
+        partialCount: leasedStage.partialCount,
+        failedCount: Math.max(1, leasedStage.failedCount),
+        skippedCount: leasedStage.skippedCount,
+        unchangedCount: leasedStage.unchangedCount,
+        nextOffset: null,
+        hasMore: false,
+        outputFingerprint: null,
+        warnings: leasedStage.warnings,
+        errors: [...leasedStage.errors, errorMessage],
+        completedAt,
+        durationMs,
+        metadata: {
+          sourceStage: 'DATA_QUALITY',
+          upstreamStageRunId: request.upstreamStageRunId ?? null,
+          dataThroughDate: request.dataThroughDate,
+          sourceFingerprint: request.sourceFingerprint,
+          changedInstrumentCount: changedInstrumentIds.length,
+          changedInstrumentFingerprint,
+          rawSignalsStageVersion: RAW_SIGNALS_SCHEDULED_STAGE_VERSION,
+          schedulerRunStartedAt: request.schedulerRunStartedAt,
+          adapter: 'SignalGenerationEngineService.run',
+          error: errorMessage,
+        },
+      });
+      await this.completeRun({
+        idempotencyKey: runIdempotencyKey,
+        status: 'FAILED',
+        totalCount: failedStage.totalCount,
+        processedCount: failedStage.processedCount,
+        succeededCount: failedStage.succeededCount,
+        partialCount: failedStage.partialCount,
+        failedCount: failedStage.failedCount,
+        skippedCount: failedStage.skippedCount,
+        unchangedCount: failedStage.unchangedCount,
+        warnings: failedStage.warnings,
+        errors: failedStage.errors,
+        completedAt,
+        durationMs,
+        metadata: {
+          sourceStage: 'DATA_QUALITY',
+          upstreamStageRunId: request.upstreamStageRunId ?? null,
+          dataThroughDate: request.dataThroughDate,
+          sourceFingerprint: request.sourceFingerprint,
+          changedInstrumentCount: changedInstrumentIds.length,
+          changedInstrumentFingerprint,
+          rawSignalsStageVersion: RAW_SIGNALS_SCHEDULED_STAGE_VERSION,
+          schedulerRunStartedAt: request.schedulerRunStartedAt,
+          adapter: 'SignalGenerationEngineService.run',
+          error: errorMessage,
+        },
+      });
+      return this.scheduledRawSignalsResponseFromStage('FAILED', request, normalizedScope, failedStage, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
+    }
+  }
+
+  async runScheduledSignalCalibrationStage(
+    request: ScheduledSignalCalibrationStageRequest,
+    now = new Date()
+  ): Promise<ScheduledSignalCalibrationStageResponse> {
+    const normalizedScope = this.normalizeScope({
+      region: request.region,
+      assetType: request.assetType,
+      timeframe: request.timeframe,
+    });
+    const changedInstrumentIds = [...new Set(request.changedInstrumentIds.map((id) => String(id || '').trim()).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b));
+    const normalizedBatchSize = this.normalizeScheduledBatchSize(request.batchSize, changedInstrumentIds.length);
+    if (changedInstrumentIds.length === 0) {
+      return this.scheduledSignalCalibrationSkippedResponse(request, normalizedScope, normalizedBatchSize);
+    }
+
+    const changedInstrumentFingerprint = this.hashValues(changedInstrumentIds);
+    const stageIdempotencyKey = this.scheduledSignalCalibrationStageIdempotencyKey({
+      region: normalizedScope.region,
+      assetType: normalizedScope.assetType,
+      timeframe: normalizedScope.timeframe,
+      dataThroughDate: request.dataThroughDate,
+      sourceFingerprint: request.sourceFingerprint,
+      changedInstrumentFingerprint,
+    });
+    const runIdempotencyKey = `${stageIdempotencyKey}:run`;
+    const inputFingerprint = [
+      'scheduled-signal-calibration',
+      request.dataThroughDate,
+      request.sourceFingerprint,
+      changedInstrumentFingerprint,
+      SIGNAL_CALIBRATION_SCHEDULED_STAGE_VERSION,
+    ].join(':');
+    const leaseOwner = `scheduled-signal-calibration:${PROCESS_LOCAL_ID}`;
+
+    let stageLease = await this.leaseStage({
+      idempotencyKey: stageIdempotencyKey,
+      leaseOwner,
+      leaseMs: DEFAULT_LEASE_MS,
+      now,
+      allowTerminalRetry: false,
+    });
+
+    if (stageLease.reason === 'STAGE_TERMINAL') {
+      return this.scheduledSignalCalibrationResponseFromLease('DUPLICATE_TERMINAL', request, normalizedScope, stageLease, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
+    }
+    if (stageLease.reason === 'LEASE_HELD') {
+      return this.scheduledSignalCalibrationResponseFromLease('LEASE_HELD', request, normalizedScope, stageLease, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
+    }
+
+    if (stageLease.reason === 'STAGE_NOT_FOUND') {
+      const run = await this.createRun({
+        pipelineKey: request.pipelineKey,
+        triggerType: request.triggerType,
+        status: 'RUNNING',
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        timeframe: normalizedScope.timeframe,
+        dataThroughDate: new Date(`${request.dataThroughDate}T00:00:00.000Z`),
+        sourceFingerprint: request.sourceFingerprint,
+        changedInstrumentCount: changedInstrumentIds.length,
+        totalCount: changedInstrumentIds.length,
+        processedCount: 0,
+        succeededCount: 0,
+        partialCount: 0,
+        failedCount: 0,
+        skippedCount: 0,
+        unchangedCount: 0,
+        idempotencyKey: runIdempotencyKey,
+        startedAt: now,
+        metadata: {
+          sourceStage: 'RAW_SIGNALS',
+          upstreamStageRunId: request.upstreamStageRunId ?? null,
+          dataThroughDate: request.dataThroughDate,
+          sourceFingerprint: request.sourceFingerprint,
+          changedInstrumentCount: changedInstrumentIds.length,
+          changedInstrumentIdsSample: changedInstrumentIds.slice(0, 25),
+          changedInstrumentFingerprint,
+          signalCalibrationStageVersion: SIGNAL_CALIBRATION_SCHEDULED_STAGE_VERSION,
+          schedulerRunStartedAt: request.schedulerRunStartedAt,
+        },
+      });
+
+      await this.createStage({
+        pipelineRunId: run.id,
+        stageKey: 'SIGNAL_CALIBRATION',
+        stageOrder: 4,
+        status: 'PENDING',
+        idempotencyKey: stageIdempotencyKey,
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        timeframe: normalizedScope.timeframe,
+        dataThroughDate: new Date(`${request.dataThroughDate}T00:00:00.000Z`),
+        inputFingerprint,
+        changedInstrumentCount: changedInstrumentIds.length,
+        batchSize: normalizedBatchSize,
+        offset: 0,
+        nextOffset: 0,
+        hasMore: false,
+        totalCount: changedInstrumentIds.length,
+        processedCount: 0,
+        succeededCount: 0,
+        partialCount: 0,
+        failedCount: 0,
+        skippedCount: 0,
+        unchangedCount: 0,
+        metadata: {
+          sourceStage: 'RAW_SIGNALS',
+          upstreamStageRunId: request.upstreamStageRunId ?? null,
+          dataThroughDate: request.dataThroughDate,
+          sourceFingerprint: request.sourceFingerprint,
+          changedInstrumentCount: changedInstrumentIds.length,
+          changedInstrumentFingerprint,
+          signalCalibrationStageVersion: SIGNAL_CALIBRATION_SCHEDULED_STAGE_VERSION,
+          schedulerRunStartedAt: request.schedulerRunStartedAt,
+        },
+      });
+
+      stageLease = await this.leaseStage({
+        idempotencyKey: stageIdempotencyKey,
+        leaseOwner,
+        leaseMs: DEFAULT_LEASE_MS,
+        now,
+        allowTerminalRetry: false,
+      });
+      if (stageLease.reason === 'STAGE_TERMINAL') {
+        return this.scheduledSignalCalibrationResponseFromLease('DUPLICATE_TERMINAL', request, normalizedScope, stageLease, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
+      }
+      if (stageLease.reason === 'LEASE_HELD') {
+        return this.scheduledSignalCalibrationResponseFromLease('LEASE_HELD', request, normalizedScope, stageLease, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
+      }
+    }
+
+    if (!stageLease.acquired || !stageLease.stage) {
+      return this.scheduledSignalCalibrationFailureResponse(request, normalizedScope, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length, `Unable to acquire scheduled Signal Calibration stage lease: ${stageLease.reason}`);
+    }
+
+    const leasedStage = stageLease.stage;
+    const startedAt = now;
+    await this.recordStageProgress({
+      idempotencyKey: stageIdempotencyKey,
+      status: 'RUNNING',
+      totalCount: changedInstrumentIds.length,
+      processedCount: 0,
+      succeededCount: 0,
+      partialCount: 0,
+      failedCount: 0,
+      skippedCount: 0,
+      unchangedCount: 0,
+      nextOffset: 0,
+      hasMore: false,
+      metadata: {
+        sourceStage: 'RAW_SIGNALS',
+        upstreamStageRunId: request.upstreamStageRunId ?? null,
+        dataThroughDate: request.dataThroughDate,
+        sourceFingerprint: request.sourceFingerprint,
+        changedInstrumentCount: changedInstrumentIds.length,
+        changedInstrumentFingerprint,
+        signalCalibrationStageVersion: SIGNAL_CALIBRATION_SCHEDULED_STAGE_VERSION,
+        schedulerRunStartedAt: request.schedulerRunStartedAt,
+        adapter: 'SignalCalibrationEngineService.run',
+      },
+      now: startedAt,
+    });
+
+    try {
+      const adapterResult = await this.signalCalibrationService.run({
+        instrumentIds: changedInstrumentIds,
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        batchSize: normalizedBatchSize,
+        offset: 0,
+      });
+      const completedAt = new Date();
+      const durationMs = Math.max(0, completedAt.getTime() - startedAt.getTime());
+      const succeededCount = adapterResult.generated ?? adapterResult.results.length;
+      const failedCount = adapterResult.failedCount ?? adapterResult.errors.length;
+      const unchangedCount = adapterResult.passthroughCount ?? 0;
+      const processedCount = adapterResult.processedCount ?? changedInstrumentIds.length;
+      const totalCount = adapterResult.totalCount ?? changedInstrumentIds.length;
+      const missingInputSkipped = Math.max(0, totalCount - processedCount);
+      const skippedCount = (adapterResult.skippedCount ?? adapterResult.skipped ?? 0) + (adapterResult.outOfScopeSkipped ?? 0) + missingInputSkipped;
+      const status = this.mapScheduledSignalCalibrationStatus({
+        totalCount,
+        processedCount,
+        succeededCount,
+        failedCount,
+        skippedCount,
+      });
+      const outputFingerprint = this.hashValues([
+        stageIdempotencyKey,
+        status,
+        String(totalCount),
+        String(processedCount),
+        String(succeededCount),
+        String(failedCount),
+        String(skippedCount),
+        String(unchangedCount),
+      ]);
+      const metadata = {
+        sourceStage: 'RAW_SIGNALS',
+        upstreamStageRunId: request.upstreamStageRunId ?? null,
+        dataThroughDate: request.dataThroughDate,
+        sourceFingerprint: request.sourceFingerprint,
+        changedInstrumentCount: changedInstrumentIds.length,
+        changedInstrumentFingerprint,
+        signalCalibrationStageVersion: SIGNAL_CALIBRATION_SCHEDULED_STAGE_VERSION,
+        schedulerRunStartedAt: request.schedulerRunStartedAt,
+        adapter: 'SignalCalibrationEngineService.run',
+        calibratedCount: adapterResult.calibratedCount ?? 0,
+        passthroughCount: adapterResult.passthroughCount ?? 0,
+        selectedHorizon: adapterResult.selectedHorizon ?? null,
+        evidenceStatus: adapterResult.calibrationEvidence?.evidenceStatus ?? null,
+        readinessStatus: adapterResult.calibrationReadiness?.status ?? null,
+      };
+
+      const completedStage = await this.completeStage({
+        idempotencyKey: stageIdempotencyKey,
+        status,
+        totalCount,
+        processedCount,
+        succeededCount,
+        partialCount: status === 'PARTIAL' ? Math.max(1, failedCount + skippedCount) : 0,
+        failedCount,
+        skippedCount,
+        unchangedCount,
+        nextOffset: null,
+        hasMore: false,
+        outputFingerprint,
+        warnings: adapterResult.warnings,
+        errors: adapterResult.errors,
+        completedAt,
+        durationMs,
+        metadata,
+      });
+
+      await this.completeRun({
+        idempotencyKey: runIdempotencyKey,
+        status,
+        totalCount,
+        processedCount,
+        succeededCount,
+        partialCount: completedStage.partialCount,
+        failedCount,
+        skippedCount,
+        unchangedCount,
+        warnings: adapterResult.warnings,
+        errors: adapterResult.errors,
+        completedAt,
+        durationMs,
+        metadata,
+      });
+
+      return this.scheduledSignalCalibrationResponseFromStage(status, request, normalizedScope, completedStage, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Scheduled Signal Calibration stage failed';
+      const completedAt = new Date();
+      const durationMs = Math.max(0, completedAt.getTime() - startedAt.getTime());
+      const failedStage = await this.completeStage({
+        idempotencyKey: stageIdempotencyKey,
+        status: 'FAILED',
+        totalCount: changedInstrumentIds.length,
+        processedCount: leasedStage.processedCount,
+        succeededCount: leasedStage.succeededCount,
+        partialCount: leasedStage.partialCount,
+        failedCount: Math.max(1, leasedStage.failedCount),
+        skippedCount: leasedStage.skippedCount,
+        unchangedCount: leasedStage.unchangedCount,
+        nextOffset: null,
+        hasMore: false,
+        outputFingerprint: null,
+        warnings: leasedStage.warnings,
+        errors: [...leasedStage.errors, errorMessage],
+        completedAt,
+        durationMs,
+        metadata: {
+          sourceStage: 'RAW_SIGNALS',
+          upstreamStageRunId: request.upstreamStageRunId ?? null,
+          dataThroughDate: request.dataThroughDate,
+          sourceFingerprint: request.sourceFingerprint,
+          changedInstrumentCount: changedInstrumentIds.length,
+          changedInstrumentFingerprint,
+          signalCalibrationStageVersion: SIGNAL_CALIBRATION_SCHEDULED_STAGE_VERSION,
+          schedulerRunStartedAt: request.schedulerRunStartedAt,
+          adapter: 'SignalCalibrationEngineService.run',
+          error: errorMessage,
+        },
+      });
+      await this.completeRun({
+        idempotencyKey: runIdempotencyKey,
+        status: 'FAILED',
+        totalCount: failedStage.totalCount,
+        processedCount: failedStage.processedCount,
+        succeededCount: failedStage.succeededCount,
+        partialCount: failedStage.partialCount,
+        failedCount: failedStage.failedCount,
+        skippedCount: failedStage.skippedCount,
+        unchangedCount: failedStage.unchangedCount,
+        warnings: failedStage.warnings,
+        errors: failedStage.errors,
+        completedAt,
+        durationMs,
+        metadata: {
+          sourceStage: 'RAW_SIGNALS',
+          upstreamStageRunId: request.upstreamStageRunId ?? null,
+          dataThroughDate: request.dataThroughDate,
+          sourceFingerprint: request.sourceFingerprint,
+          changedInstrumentCount: changedInstrumentIds.length,
+          changedInstrumentFingerprint,
+          signalCalibrationStageVersion: SIGNAL_CALIBRATION_SCHEDULED_STAGE_VERSION,
+          schedulerRunStartedAt: request.schedulerRunStartedAt,
+          adapter: 'SignalCalibrationEngineService.run',
+          error: errorMessage,
+        },
+      });
+      return this.scheduledSignalCalibrationResponseFromStage('FAILED', request, normalizedScope, failedStage, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
+    }
+  }
+
+  async recordMarketDataStageSnapshot(
+    request: MarketDataStageSnapshotRequest,
+    now = new Date()
+  ): Promise<PipelineStageRunRecord> {
+    const normalizedScope = this.normalizeScope({
+      region: request.region,
+      assetType: request.assetType,
+      timeframe: request.timeframe,
+      dataThroughDate: this.parseOptionalDate(request.dataThroughDate),
+    });
+    const runId = request.runId.trim();
+    if (!runId) throw new Error('runId is required for Market Data pipeline stage snapshots');
+
+    const status = this.mapExternalPipelineStatus(request.status);
+    const terminal = TERMINAL_STATUSES.has(status);
+    const stageIdempotencyKey = [
+      LEDGER_VERSION,
+      'market-data',
+      this.keyPart(request.operation),
+      this.keyPart(normalizedScope.region),
+      this.keyPart(normalizedScope.assetType),
+      this.keyPart(normalizedScope.timeframe),
+      this.keyPart(runId),
+    ].join(':');
+    const runIdempotencyKey = `${stageIdempotencyKey}:run`;
+    const warnings = this.toStringArray(request.warnings);
+    const errors = this.toStringArray(request.errors);
+    const startedAt = this.parseOptionalDate(request.startedAt) || now;
+    const completedAt = this.parseOptionalDate(request.completedAt) || (terminal ? now : null);
+    const succeededCount = request.succeededCount ?? Math.max(0, request.processedCount - request.failedCount - request.skippedCount);
+    const unchangedCount = request.unchangedCount ?? 0;
+    const metadata = {
+      operation: request.operation,
+      sourceRunId: runId,
+      sourceModule: 'market-data-foundation',
+      ...(request.metadata || {}),
+    };
+
+    const run = await this.createRun({
+      pipelineKey: request.pipelineKey,
+      triggerType: request.triggerType,
+      status: terminal ? 'RUNNING' : status,
+      region: normalizedScope.region,
+      assetType: normalizedScope.assetType,
+      timeframe: normalizedScope.timeframe,
+      dataThroughDate: normalizedScope.dataThroughDate ?? null,
+      sourceFingerprint: `market-data:${request.operation}:${runId}`,
+      totalCount: request.totalCount,
+      processedCount: request.processedCount,
+      succeededCount,
+      failedCount: request.failedCount,
+      skippedCount: request.skippedCount,
+      unchangedCount,
+      warnings,
+      errors,
+      idempotencyKey: runIdempotencyKey,
+      startedAt,
+      metadata,
+    });
+
+    await this.createStage({
+      pipelineRunId: run.id,
+      stageKey: 'MARKET_DATA',
+      stageOrder: 1,
+      status: terminal ? 'RUNNING' : status,
+      idempotencyKey: stageIdempotencyKey,
+      region: normalizedScope.region,
+      assetType: normalizedScope.assetType,
+      timeframe: normalizedScope.timeframe,
+      dataThroughDate: normalizedScope.dataThroughDate ?? null,
+      inputFingerprint: `market-data:${request.operation}:${runId}`,
+      changedInstrumentCount: request.processedCount,
+      batchSize: request.batchSize ?? null,
+      offset: 0,
+      nextOffset: request.nextOffset ?? null,
+      hasMore: request.hasMore,
+      totalCount: request.totalCount,
+      processedCount: request.processedCount,
+      succeededCount,
+      failedCount: request.failedCount,
+      skippedCount: request.skippedCount,
+      unchangedCount,
+      cacheStatus: 'BYPASS',
+      warnings,
+      errors,
+      metadata,
+    });
+
+    if (!terminal) {
+      return this.recordStageProgress({
+        idempotencyKey: stageIdempotencyKey,
+        status,
+        totalCount: request.totalCount,
+        processedCount: request.processedCount,
+        succeededCount,
+        failedCount: request.failedCount,
+        skippedCount: request.skippedCount,
+        unchangedCount,
+        nextOffset: request.nextOffset ?? null,
+        hasMore: request.hasMore,
+        warnings,
+        errors,
+        metadata,
+        now,
+      });
+    }
+
+    const outputFingerprint = this.hashValues([
+      stageIdempotencyKey,
+      status,
+      String(request.totalCount),
+      String(request.processedCount),
+      String(succeededCount),
+      String(request.failedCount),
+      String(request.skippedCount),
+      String(unchangedCount),
+    ]);
+    const durationMs = completedAt ? Math.max(0, completedAt.getTime() - startedAt.getTime()) : null;
+    const completedStage = await this.completeStage({
+      idempotencyKey: stageIdempotencyKey,
+      status,
+      outputFingerprint,
+      totalCount: request.totalCount,
+      processedCount: request.processedCount,
+      succeededCount,
+      partialCount: status === 'PARTIAL' ? Math.max(1, request.failedCount) : 0,
+      failedCount: request.failedCount,
+      skippedCount: request.skippedCount,
+      unchangedCount,
+      nextOffset: request.nextOffset ?? null,
+      hasMore: request.hasMore,
+      cacheStatus: 'BYPASS',
+      completedAt: completedAt ?? undefined,
+      durationMs,
+      warnings,
+      errors,
+      metadata,
+    });
+    await this.completeRun({
+      idempotencyKey: runIdempotencyKey,
+      status,
+      totalCount: request.totalCount,
+      processedCount: request.processedCount,
+      succeededCount,
+      partialCount: completedStage.partialCount,
+      failedCount: request.failedCount,
+      skippedCount: request.skippedCount,
+      unchangedCount,
+      completedAt: completedAt ?? undefined,
+      durationMs,
+      warnings,
+      errors,
+      metadata,
+    });
+    return completedStage;
   }
 
   runIdempotencyKey(input: PipelineRunCreateInput): string {
@@ -1117,6 +1979,25 @@ export class PipelineOrchestrationService {
     return Array.isArray(value) ? value.map((entry) => String(entry)) : [];
   }
 
+  private parseOptionalDate(value: string | Date | null | undefined): Date | null {
+    if (!value) return null;
+    if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+    const normalized = /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00.000Z` : value;
+    const parsed = new Date(normalized);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  private mapExternalPipelineStatus(status: MarketDataStageSnapshotRequest['status']): PipelineStageStatus {
+    if (status === 'CANCELED') return 'PARTIAL';
+    if (status === 'PENDING') return 'PENDING';
+    if (status === 'RUNNING') return 'RUNNING';
+    if (status === 'COMPLETED') return 'COMPLETED';
+    if (status === 'FAILED') return 'FAILED';
+    if (status === 'SKIPPED') return 'SKIPPED';
+    if (status === 'BLOCKED') return 'BLOCKED';
+    return 'PARTIAL';
+  }
+
   private isInFlightDuplicateStage(stage: PipelineStageRunRecord, leaseOwner: string): boolean {
     return (
       stage.status === 'RUNNING'
@@ -1147,6 +2028,48 @@ export class PipelineOrchestrationService {
     ].join(':');
   }
 
+  private scheduledRawSignalsStageIdempotencyKey(input: {
+    region: string;
+    assetType: string;
+    timeframe: string;
+    dataThroughDate: string;
+    sourceFingerprint: string;
+    changedInstrumentFingerprint: string;
+  }): string {
+    return [
+      LEDGER_VERSION,
+      'scheduled-raw-signals',
+      this.keyPart(input.region),
+      this.keyPart(input.assetType),
+      this.keyPart(input.timeframe),
+      this.keyPart(input.dataThroughDate),
+      this.keyPart(input.sourceFingerprint),
+      this.keyPart(input.changedInstrumentFingerprint),
+      this.keyPart(RAW_SIGNALS_SCHEDULED_STAGE_VERSION),
+    ].join(':');
+  }
+
+  private scheduledSignalCalibrationStageIdempotencyKey(input: {
+    region: string;
+    assetType: string;
+    timeframe: string;
+    dataThroughDate: string;
+    sourceFingerprint: string;
+    changedInstrumentFingerprint: string;
+  }): string {
+    return [
+      LEDGER_VERSION,
+      'scheduled-signal-calibration',
+      this.keyPart(input.region),
+      this.keyPart(input.assetType),
+      this.keyPart(input.timeframe),
+      this.keyPart(input.dataThroughDate),
+      this.keyPart(input.sourceFingerprint),
+      this.keyPart(input.changedInstrumentFingerprint),
+      this.keyPart(SIGNAL_CALIBRATION_SCHEDULED_STAGE_VERSION),
+    ].join(':');
+  }
+
   private hashValues(values: string[]): string {
     const payload = values.join('|');
     return createHash('sha256').update(payload).digest('hex').slice(0, 16);
@@ -1166,6 +2089,33 @@ export class PipelineOrchestrationService {
     if (input.totalCount === 0) return 'SKIPPED';
     if (input.failedCount > 0 && input.evaluatedCount === 0) return 'FAILED';
     if (input.failedCount > 0 || input.skippedCount > 0) return 'PARTIAL';
+    return 'COMPLETED';
+  }
+
+  private mapScheduledRawSignalsStatus(input: {
+    totalCount: number;
+    succeededCount: number;
+    failedCount: number;
+    skippedCount: number;
+  }): 'COMPLETED' | 'PARTIAL' | 'FAILED' | 'SKIPPED' {
+    if (input.totalCount === 0) return 'SKIPPED';
+    if (input.failedCount > 0 && input.succeededCount === 0) return 'FAILED';
+    if (input.succeededCount === 0 && input.skippedCount > 0) return 'SKIPPED';
+    if (input.failedCount > 0 || input.skippedCount > 0) return 'PARTIAL';
+    return 'COMPLETED';
+  }
+
+  private mapScheduledSignalCalibrationStatus(input: {
+    totalCount: number;
+    processedCount: number;
+    succeededCount: number;
+    failedCount: number;
+    skippedCount: number;
+  }): 'COMPLETED' | 'PARTIAL' | 'FAILED' | 'SKIPPED' {
+    if (input.totalCount === 0) return 'SKIPPED';
+    if (input.failedCount > 0 && input.succeededCount === 0) return 'FAILED';
+    if (input.succeededCount === 0 && (input.skippedCount > 0 || input.processedCount === 0)) return 'SKIPPED';
+    if (input.failedCount > 0 || input.skippedCount > 0 || input.processedCount < input.totalCount) return 'PARTIAL';
     return 'COMPLETED';
   }
 
@@ -1274,6 +2224,374 @@ export class PipelineOrchestrationService {
       pipelineRunId: stage.pipelineRunId,
       stageRunId: stage.id,
       stageKey: 'DATA_QUALITY',
+      scope: {
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        timeframe: normalizedScope.timeframe,
+        pipelineKey: request.pipelineKey,
+      },
+      triggerType: 'scheduled',
+      dataThroughDate: request.dataThroughDate,
+      inputFingerprint: stage.inputFingerprint || inputFingerprint,
+      outputFingerprint: stage.outputFingerprint || null,
+      batch: {
+        totalInstrumentCount: changedInstrumentCount,
+        processedCount: stage.processedCount,
+        batchSize: stage.batchSize ?? batchSize,
+        nextOffset: stage.nextOffset,
+        hasMore: stage.hasMore,
+      },
+      counts: {
+        totalCount: stage.totalCount,
+        processedCount: stage.processedCount,
+        succeededCount: stage.succeededCount,
+        partialCount: stage.partialCount,
+        failedCount: stage.failedCount,
+        skippedCount: stage.skippedCount,
+        unchangedCount: stage.unchangedCount,
+      },
+      warnings: stage.warnings,
+      errors: stage.errors,
+      startedAt: stage.startedAt,
+      completedAt: stage.completedAt,
+    };
+  }
+
+  private scheduledRawSignalsSkippedResponse(
+    request: ScheduledRawSignalsStageRequest,
+    normalizedScope: ReturnType<PipelineOrchestrationService['normalizeScope']>,
+    batchSize: number
+  ): ScheduledRawSignalsStageResponse {
+    return {
+      status: 'SKIPPED',
+      pipelineRunId: null,
+      stageRunId: null,
+      stageKey: 'RAW_SIGNALS',
+      scope: {
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        timeframe: normalizedScope.timeframe,
+        pipelineKey: request.pipelineKey,
+      },
+      triggerType: 'scheduled',
+      dataThroughDate: request.dataThroughDate,
+      inputFingerprint: 'scheduled-raw-signals:empty-changed-set',
+      outputFingerprint: null,
+      batch: {
+        totalInstrumentCount: 0,
+        processedCount: 0,
+        batchSize,
+        nextOffset: null,
+        hasMore: false,
+      },
+      counts: {
+        totalCount: 0,
+        processedCount: 0,
+        succeededCount: 0,
+        partialCount: 0,
+        failedCount: 0,
+        skippedCount: 0,
+        unchangedCount: 0,
+      },
+      warnings: ['No changed instruments supplied for scheduled Raw Signals stage.'],
+      errors: [],
+      startedAt: null,
+      completedAt: null,
+    };
+  }
+
+  private scheduledRawSignalsFailureResponse(
+    request: ScheduledRawSignalsStageRequest,
+    normalizedScope: ReturnType<PipelineOrchestrationService['normalizeScope']>,
+    inputFingerprint: string,
+    batchSize: number,
+    changedInstrumentCount: number,
+    error: string
+  ): ScheduledRawSignalsStageResponse {
+    return {
+      status: 'FAILED',
+      pipelineRunId: null,
+      stageRunId: null,
+      stageKey: 'RAW_SIGNALS',
+      scope: {
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        timeframe: normalizedScope.timeframe,
+        pipelineKey: request.pipelineKey,
+      },
+      triggerType: 'scheduled',
+      dataThroughDate: request.dataThroughDate,
+      inputFingerprint,
+      outputFingerprint: null,
+      batch: {
+        totalInstrumentCount: changedInstrumentCount,
+        processedCount: 0,
+        batchSize,
+        nextOffset: null,
+        hasMore: false,
+      },
+      counts: {
+        totalCount: changedInstrumentCount,
+        processedCount: 0,
+        succeededCount: 0,
+        partialCount: 0,
+        failedCount: 1,
+        skippedCount: 0,
+        unchangedCount: 0,
+      },
+      warnings: [],
+      errors: [error],
+      startedAt: null,
+      completedAt: null,
+    };
+  }
+
+  private scheduledRawSignalsResponseFromLease(
+    status: 'DUPLICATE_TERMINAL' | 'LEASE_HELD',
+    request: ScheduledRawSignalsStageRequest,
+    normalizedScope: ReturnType<PipelineOrchestrationService['normalizeScope']>,
+    leaseResult: PipelineStageLeaseResult,
+    inputFingerprint: string,
+    batchSize: number,
+    changedInstrumentCount: number
+  ): ScheduledRawSignalsStageResponse {
+    const stage = leaseResult.stage;
+    return {
+      status,
+      pipelineRunId: stage?.pipelineRunId || null,
+      stageRunId: stage?.id || null,
+      stageKey: 'RAW_SIGNALS',
+      scope: {
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        timeframe: normalizedScope.timeframe,
+        pipelineKey: request.pipelineKey,
+      },
+      triggerType: 'scheduled',
+      dataThroughDate: request.dataThroughDate,
+      inputFingerprint: stage?.inputFingerprint || inputFingerprint,
+      outputFingerprint: stage?.outputFingerprint || null,
+      batch: {
+        totalInstrumentCount: changedInstrumentCount,
+        processedCount: stage?.processedCount || 0,
+        batchSize: stage?.batchSize ?? batchSize,
+        nextOffset: stage?.nextOffset ?? null,
+        hasMore: stage?.hasMore ?? false,
+      },
+      counts: {
+        totalCount: stage?.totalCount ?? changedInstrumentCount,
+        processedCount: stage?.processedCount ?? 0,
+        succeededCount: stage?.succeededCount ?? 0,
+        partialCount: stage?.partialCount ?? 0,
+        failedCount: stage?.failedCount ?? 0,
+        skippedCount: stage?.skippedCount ?? 0,
+        unchangedCount: stage?.unchangedCount ?? 0,
+      },
+      warnings: stage?.warnings ?? [],
+      errors: stage?.errors ?? [],
+      startedAt: stage?.startedAt ?? null,
+      completedAt: stage?.completedAt ?? null,
+    };
+  }
+
+  private scheduledRawSignalsResponseFromStage(
+    status: ScheduledRawSignalsStageResponse['status'],
+    request: ScheduledRawSignalsStageRequest,
+    normalizedScope: ReturnType<PipelineOrchestrationService['normalizeScope']>,
+    stage: PipelineStageRunRecord,
+    inputFingerprint: string,
+    batchSize: number,
+    changedInstrumentCount: number
+  ): ScheduledRawSignalsStageResponse {
+    return {
+      status,
+      pipelineRunId: stage.pipelineRunId,
+      stageRunId: stage.id,
+      stageKey: 'RAW_SIGNALS',
+      scope: {
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        timeframe: normalizedScope.timeframe,
+        pipelineKey: request.pipelineKey,
+      },
+      triggerType: 'scheduled',
+      dataThroughDate: request.dataThroughDate,
+      inputFingerprint: stage.inputFingerprint || inputFingerprint,
+      outputFingerprint: stage.outputFingerprint || null,
+      batch: {
+        totalInstrumentCount: changedInstrumentCount,
+        processedCount: stage.processedCount,
+        batchSize: stage.batchSize ?? batchSize,
+        nextOffset: stage.nextOffset,
+        hasMore: stage.hasMore,
+      },
+      counts: {
+        totalCount: stage.totalCount,
+        processedCount: stage.processedCount,
+        succeededCount: stage.succeededCount,
+        partialCount: stage.partialCount,
+        failedCount: stage.failedCount,
+        skippedCount: stage.skippedCount,
+        unchangedCount: stage.unchangedCount,
+      },
+      warnings: stage.warnings,
+      errors: stage.errors,
+      startedAt: stage.startedAt,
+      completedAt: stage.completedAt,
+    };
+  }
+
+  private scheduledSignalCalibrationSkippedResponse(
+    request: ScheduledSignalCalibrationStageRequest,
+    normalizedScope: ReturnType<PipelineOrchestrationService['normalizeScope']>,
+    batchSize: number
+  ): ScheduledSignalCalibrationStageResponse {
+    return {
+      status: 'SKIPPED',
+      pipelineRunId: null,
+      stageRunId: null,
+      stageKey: 'SIGNAL_CALIBRATION',
+      scope: {
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        timeframe: normalizedScope.timeframe,
+        pipelineKey: request.pipelineKey,
+      },
+      triggerType: 'scheduled',
+      dataThroughDate: request.dataThroughDate,
+      inputFingerprint: 'scheduled-signal-calibration:empty-changed-set',
+      outputFingerprint: null,
+      batch: {
+        totalInstrumentCount: 0,
+        processedCount: 0,
+        batchSize,
+        nextOffset: null,
+        hasMore: false,
+      },
+      counts: {
+        totalCount: 0,
+        processedCount: 0,
+        succeededCount: 0,
+        partialCount: 0,
+        failedCount: 0,
+        skippedCount: 0,
+        unchangedCount: 0,
+      },
+      warnings: ['No changed instruments supplied for scheduled Signal Calibration stage.'],
+      errors: [],
+      startedAt: null,
+      completedAt: null,
+    };
+  }
+
+  private scheduledSignalCalibrationFailureResponse(
+    request: ScheduledSignalCalibrationStageRequest,
+    normalizedScope: ReturnType<PipelineOrchestrationService['normalizeScope']>,
+    inputFingerprint: string,
+    batchSize: number,
+    changedInstrumentCount: number,
+    error: string
+  ): ScheduledSignalCalibrationStageResponse {
+    return {
+      status: 'FAILED',
+      pipelineRunId: null,
+      stageRunId: null,
+      stageKey: 'SIGNAL_CALIBRATION',
+      scope: {
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        timeframe: normalizedScope.timeframe,
+        pipelineKey: request.pipelineKey,
+      },
+      triggerType: 'scheduled',
+      dataThroughDate: request.dataThroughDate,
+      inputFingerprint,
+      outputFingerprint: null,
+      batch: {
+        totalInstrumentCount: changedInstrumentCount,
+        processedCount: 0,
+        batchSize,
+        nextOffset: null,
+        hasMore: false,
+      },
+      counts: {
+        totalCount: changedInstrumentCount,
+        processedCount: 0,
+        succeededCount: 0,
+        partialCount: 0,
+        failedCount: 1,
+        skippedCount: 0,
+        unchangedCount: 0,
+      },
+      warnings: [],
+      errors: [error],
+      startedAt: null,
+      completedAt: null,
+    };
+  }
+
+  private scheduledSignalCalibrationResponseFromLease(
+    status: 'DUPLICATE_TERMINAL' | 'LEASE_HELD',
+    request: ScheduledSignalCalibrationStageRequest,
+    normalizedScope: ReturnType<PipelineOrchestrationService['normalizeScope']>,
+    leaseResult: PipelineStageLeaseResult,
+    inputFingerprint: string,
+    batchSize: number,
+    changedInstrumentCount: number
+  ): ScheduledSignalCalibrationStageResponse {
+    const stage = leaseResult.stage;
+    return {
+      status,
+      pipelineRunId: stage?.pipelineRunId || null,
+      stageRunId: stage?.id || null,
+      stageKey: 'SIGNAL_CALIBRATION',
+      scope: {
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        timeframe: normalizedScope.timeframe,
+        pipelineKey: request.pipelineKey,
+      },
+      triggerType: 'scheduled',
+      dataThroughDate: request.dataThroughDate,
+      inputFingerprint: stage?.inputFingerprint || inputFingerprint,
+      outputFingerprint: stage?.outputFingerprint || null,
+      batch: {
+        totalInstrumentCount: changedInstrumentCount,
+        processedCount: stage?.processedCount || 0,
+        batchSize: stage?.batchSize ?? batchSize,
+        nextOffset: stage?.nextOffset ?? null,
+        hasMore: stage?.hasMore ?? false,
+      },
+      counts: {
+        totalCount: stage?.totalCount ?? changedInstrumentCount,
+        processedCount: stage?.processedCount ?? 0,
+        succeededCount: stage?.succeededCount ?? 0,
+        partialCount: stage?.partialCount ?? 0,
+        failedCount: stage?.failedCount ?? 0,
+        skippedCount: stage?.skippedCount ?? 0,
+        unchangedCount: stage?.unchangedCount ?? 0,
+      },
+      warnings: stage?.warnings ?? [],
+      errors: stage?.errors ?? [],
+      startedAt: stage?.startedAt ?? null,
+      completedAt: stage?.completedAt ?? null,
+    };
+  }
+
+  private scheduledSignalCalibrationResponseFromStage(
+    status: ScheduledSignalCalibrationStageResponse['status'],
+    request: ScheduledSignalCalibrationStageRequest,
+    normalizedScope: ReturnType<PipelineOrchestrationService['normalizeScope']>,
+    stage: PipelineStageRunRecord,
+    inputFingerprint: string,
+    batchSize: number,
+    changedInstrumentCount: number
+  ): ScheduledSignalCalibrationStageResponse {
+    return {
+      status,
+      pipelineRunId: stage.pipelineRunId,
+      stageRunId: stage.id,
+      stageKey: 'SIGNAL_CALIBRATION',
       scope: {
         region: normalizedScope.region,
         assetType: normalizedScope.assetType,

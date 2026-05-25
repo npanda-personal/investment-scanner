@@ -752,6 +752,65 @@ describe('SignalGenerationEngineService', () => {
     expect(result.directionCountsGenerated).toEqual({ BULLISH: 1, NEUTRAL: 1, BEARISH: 0 });
   });
 
+  it('runs an explicit instrument-id batch without region-wide pagination', async () => {
+    const marketDataService = {
+      listInstruments: jest.fn(),
+    };
+    const service = new SignalGenerationEngineService(runAuditRepository() as any, marketDataService as any, {} as any);
+    jest.spyOn(service, 'generateForInstrument').mockImplementation(async (instrumentId) => ({
+      instrument_id: instrumentId,
+      symbol: instrumentId.toUpperCase(),
+      company_name: null,
+      sector: null,
+      country: 'IN',
+      currentPrice: null,
+      previousClose: null,
+      dailyChange: null,
+      dailyChangePercent: null,
+      currency: null,
+      priceTimestamp: null,
+      score: 75,
+      direction: 'BULLISH',
+      confidence: 'LOW',
+      triggered_signals: [],
+      negative_signals: [],
+      explanation: 'Bullish because rule evidence is present.',
+      generated_at: new Date().toISOString(),
+      source: 'signal-generation-engine',
+      data_status: 'COMPLETE',
+    } as any));
+
+    const result = await service.run({
+      instrumentIds: ['stock-2', 'stock-1', 'stock-2'],
+      region: 'IN',
+      assetType: 'STOCK',
+      useDataQualityFilter: false,
+      providerThrottleMs: 0,
+    });
+
+    expect(marketDataService.listInstruments).not.toHaveBeenCalled();
+    expect(service.generateForInstrument).toHaveBeenCalledTimes(2);
+    expect(service.generateForInstrument).toHaveBeenNthCalledWith(1, 'stock-2', expect.objectContaining({
+      region: 'IN',
+      assetType: 'STOCK',
+    }));
+    expect(service.generateForInstrument).toHaveBeenNthCalledWith(2, 'stock-1', expect.objectContaining({
+      region: 'IN',
+      assetType: 'STOCK',
+    }));
+    expect(result).toMatchObject({
+      processedCount: 2,
+      totalCount: 2,
+      batchSize: 2,
+      offset: 0,
+      nextOffset: null,
+      hasMore: false,
+      generatedCount: 2,
+      skippedCount: 0,
+      failedCount: 0,
+    });
+  });
+
   it('uses batch-loaded market context and shared strategy ratings for signal runs', async () => {
     const repository = {
       createSignalResult: jest.fn(async (result) => ({ ...result, id: `${result.instrument_id}-signal` })),

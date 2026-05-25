@@ -220,6 +220,7 @@ export interface PaginatedSignalResponse {
 
 export interface SignalRunRequest {
   instrumentId?: string;
+  instrumentIds?: string[];
   symbol?: string;
   researchContextMode?: 'FULL' | 'LIGHTWEIGHT';
   limit?: number;

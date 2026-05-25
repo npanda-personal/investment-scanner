@@ -455,6 +455,13 @@ For each scheduled region run, the internal summary now includes additive change
 
 In `01C`, scheduled Data Quality fanout is allowed only from normal scheduled runs and only when `dqStageEligible=true` with a non-empty changed set. Startup-triggered Market Data runs do not fan out into scheduled Data Quality in this slice.
 
+Price backfill visibility:
+
+- startup price backfill remains owned by Market Data Foundation and continues to use the existing module-local run state;
+- each price-backfill run mirrors its current progress into the Pipeline Orchestration ledger as stage `MARKET_DATA`;
+- Pipeline Ops can therefore show active/terminal Market Data progress after navigation or refresh;
+- this mirror does not make Pipeline Ops a Market Data command launcher and does not change provider/backfill execution behavior.
+
 ### Sync Freshness Gate
 
 The module distinguishes two different outcomes:

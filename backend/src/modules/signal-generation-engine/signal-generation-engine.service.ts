@@ -107,6 +107,12 @@ export class SignalGenerationEngineService {
     return generated ? this.enrichSignal(generated) : null;
   }
 
+  async latestPersistedForInstruments(instrumentIds: string[]): Promise<SignalResultDto[]> {
+    const uniqueIds = [...new Set(instrumentIds.map((id) => String(id || '').trim()).filter(Boolean))];
+    const results = await Promise.all(uniqueIds.map((instrumentId) => this.repository.latestForInstrument(instrumentId).catch(() => null)));
+    return results.filter((result): result is SignalResultDto => Boolean(result && this.isTrustedReadSignal(result)));
+  }
+
   async run(request: SignalRunRequest): Promise<SignalRunResponse> {
     const startedAt = Date.now();
     const generatedAt = new Date().toISOString();
@@ -115,8 +121,14 @@ export class SignalGenerationEngineService {
     const rulesetVersion = request.rulesetVersion || modelVersion;
     const errors: string[] = [];
     const warnings: string[] = [];
-    const batchSize = request.instrumentId || request.symbol ? 1 : this.clampInt(request.batchSize ?? request.limit, signal_generation_engine_batch_size, 1, signal_generation_engine_batch_size);
-    const offset = request.instrumentId || request.symbol ? 0 : this.clampInt(request.offset, 0, 0, Number.MAX_SAFE_INTEGER);
+    const explicitInstrumentIds = request.instrumentIds
+      ? [...new Set(request.instrumentIds.map((id) => String(id || '').trim()).filter(Boolean))]
+      : [];
+    const explicitInstrumentScope = Boolean(request.instrumentId || request.symbol || explicitInstrumentIds.length);
+    const batchSize = request.instrumentId || request.symbol
+      ? 1
+      : explicitInstrumentIds.length || this.clampInt(request.batchSize ?? request.limit, signal_generation_engine_batch_size, 1, signal_generation_engine_batch_size);
+    const offset = explicitInstrumentScope ? 0 : this.clampInt(request.offset, 0, 0, Number.MAX_SAFE_INTEGER);
     const maxConcurrency = request.instrumentId || request.symbol
       ? 1
       : this.clampInt(request.maxConcurrency ?? process.env.SIGNAL_GENERATION_ENGINE_WORKERS_COUNT, signal_generation_engine_workers_count, 1, signal_generation_engine_max_workers_count);
@@ -1129,6 +1141,10 @@ export class SignalGenerationEngineService {
 
   private async resolveRunUniverse(request: SignalRunRequest, batchSize: number, offset: number): Promise<{ instrumentIds: string[]; totalCount: number }> {
     if (request.instrumentId) return { instrumentIds: [request.instrumentId], totalCount: 1 };
+    if (request.instrumentIds?.length) {
+      const instrumentIds = [...new Set(request.instrumentIds.map((id) => String(id || '').trim()).filter(Boolean))];
+      return { instrumentIds, totalCount: instrumentIds.length };
+    }
     if (request.symbol) {
       const instruments = await this.marketDataService.listInstruments({ search: request.symbol, pageSize: 25, region: request.region, assetType: request.assetType });
       const match = instruments.instruments.find((instrument: any) => instrument.symbol === request.symbol);

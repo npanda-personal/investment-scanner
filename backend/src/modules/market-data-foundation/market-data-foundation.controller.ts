@@ -621,6 +621,7 @@ export class MarketDataFoundationController {
         batchSize: this.numberParam(req, 'batchSize') ?? this.numberParam(req, 'limit'),
         workerConcurrency: this.numberParam(req, 'workerConcurrency'),
         maxBatches: this.numberParam(req, 'maxBatches'),
+        triggerType: 'manual',
         force: this.parseOptionalBoolean(req.query.force ?? req.body?.force),
         fullReload: this.parseOptionalBoolean(req.query.fullReload ?? req.body?.fullReload),
       }));

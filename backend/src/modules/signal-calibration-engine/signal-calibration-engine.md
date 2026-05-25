@@ -38,6 +38,8 @@ Batch request:
 
 Batch mode processes the latest raw signal for each instrument in the requested window. It does not load or calibrate the entire universe in one request.
 
+Pipeline automation can call the service with explicit `instrumentIds`. That path is for scheduled downstream processing after Raw Signals and uses only latest persisted raw signal rows for the requested instruments. It does not generate raw signals, invoke provider/live paths, or paginate the full region. Duplicate requested ids are deduped before processing; requested ids without a persisted raw signal are counted in `skippedCount` with a warning instead of being reported as clean success.
+
 Response fields include the previous compatibility fields plus progress metadata:
 
 - `generated`

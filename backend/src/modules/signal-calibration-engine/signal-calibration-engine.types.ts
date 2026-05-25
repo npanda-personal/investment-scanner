@@ -92,6 +92,7 @@ export interface SignalCalibrationResultDto {
 
 export interface CalibrationRunRequest {
   instrumentId?: string;
+  instrumentIds?: string[];
   symbol?: string;
   limit?: number;
   batchSize?: number;

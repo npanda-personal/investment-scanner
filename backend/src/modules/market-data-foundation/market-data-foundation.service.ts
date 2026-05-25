@@ -137,6 +137,7 @@ type PriceBackfillRunRecord = PriceBackfillRunStatusResponse & {
   cancelRequested: boolean;
   force: boolean;
   fullReload: boolean;
+  triggerType: 'startup' | 'backfill' | 'manual' | 'scheduled';
   processedStockIds: Set<string>;
 };
 
@@ -438,6 +439,36 @@ type OfficialNseEodBulkSyncResult = {
   summaryByTaskId: Map<string, SyncSummary>;
 };
 
+type MarketDataPipelineRecorder = {
+  recordMarketDataStageSnapshot(input: {
+    region: string;
+    assetType: string;
+    timeframe: '1d';
+    pipelineKey: 'market-intelligence';
+    triggerType: 'startup' | 'backfill' | 'scheduled' | 'manual';
+    operation: 'PRICE_BACKFILL';
+    runId: string;
+    status: PriceBackfillRunStatusResponse['status'];
+    dataThroughDate?: string | null;
+    totalCount: number;
+    processedCount: number;
+    succeededCount: number;
+    failedCount: number;
+    skippedCount: number;
+    unchangedCount: number;
+    batchSize: number;
+    nextOffset: number | null;
+    hasMore: boolean;
+    startedAt: string;
+    completedAt: string | null;
+    warnings: string[];
+    errors: string[];
+    metadata: Record<string, unknown>;
+  }): Promise<unknown>;
+};
+
+type MarketDataPipelineSnapshotInput = Parameters<MarketDataPipelineRecorder['recordMarketDataStageSnapshot']>[0];
+
 export class MarketDataFoundationService {
   private static lastIngestionAt = 0;
   private static ingestionThrottleChain: Promise<void> = Promise.resolve();
@@ -445,6 +476,7 @@ export class MarketDataFoundationService {
   private static activeCatalogSyncRuns = new Map<string, string>();
   private static priceBackfillRuns = new Map<string, PriceBackfillRunRecord>();
   private static activePriceBackfillRuns = new Map<string, string>();
+  private static priceBackfillPipelineSnapshotChains = new Map<string, Promise<void>>();
   private readonly manualSyncCooldownMinutes = this.readPositiveNumber(
     process.env.MARKET_DATA_MANUAL_SYNC_COOLDOWN_MINUTES,
     15
@@ -458,7 +490,8 @@ export class MarketDataFoundationService {
   constructor(
     private readonly repository = new MarketDataFoundationRepository(),
     private readonly marketDataProvider = new YahooFinanceIngestionService(),
-    private readonly angelOneMarketDataProvider = new AngelOneMarketDataProvider()
+    private readonly angelOneMarketDataProvider = new AngelOneMarketDataProvider(),
+    private readonly pipelineRecorder?: MarketDataPipelineRecorder
   ) {}
 
   list(options: PaginationOptions) {
@@ -2722,6 +2755,7 @@ export class MarketDataFoundationService {
       cancelRequested: false,
       force: request.force === true || request.fullReload === true,
       fullReload: request.fullReload === true,
+      triggerType: request.triggerType ?? 'backfill',
       processedStockIds: new Set<string>(),
     };
 
@@ -2729,6 +2763,7 @@ export class MarketDataFoundationService {
     MarketDataFoundationService.priceBackfillRuns.set(runId, run);
     MarketDataFoundationService.activePriceBackfillRuns.set(activeKey, runId);
     this.prunePriceBackfillRuns();
+    this.enqueuePriceBackfillPipelineSnapshot(run);
 
     setTimeout(() => {
       void this.processPriceBackfillRun(runId);
@@ -5083,6 +5118,7 @@ export class MarketDataFoundationService {
 
   private touchPriceBackfillRun(run: PriceBackfillRunRecord): void {
     run.updatedAt = new Date().toISOString();
+    this.enqueuePriceBackfillPipelineSnapshot(run);
   }
 
   private completePriceBackfillRun(run: PriceBackfillRunRecord): void {
@@ -5092,6 +5128,85 @@ export class MarketDataFoundationService {
     run.completedAt = now;
     MarketDataFoundationService.activePriceBackfillRuns.delete(run.activeKey);
     this.prunePriceBackfillRuns();
+    this.enqueuePriceBackfillPipelineSnapshot(run);
+  }
+
+  private enqueuePriceBackfillPipelineSnapshot(run: PriceBackfillRunRecord): void {
+    const snapshot = this.toPriceBackfillPipelineSnapshot(run);
+    const previous = MarketDataFoundationService.priceBackfillPipelineSnapshotChains.get(run.runId) || Promise.resolve();
+    const next = previous
+      .catch(() => undefined)
+      .then(() => this.recordPriceBackfillPipelineSnapshot(snapshot))
+      .finally(() => {
+        if (MarketDataFoundationService.priceBackfillPipelineSnapshotChains.get(run.runId) === next) {
+          MarketDataFoundationService.priceBackfillPipelineSnapshotChains.delete(run.runId);
+        }
+      });
+    MarketDataFoundationService.priceBackfillPipelineSnapshotChains.set(run.runId, next);
+  }
+
+  private toPriceBackfillPipelineSnapshot(run: PriceBackfillRunRecord): MarketDataPipelineSnapshotInput {
+    return {
+      region: run.region,
+      assetType: run.assetType,
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      triggerType: run.triggerType,
+      operation: 'PRICE_BACKFILL',
+      runId: run.runId,
+      status: run.status,
+      dataThroughDate: run.latestBatch?.targetEndDate || run.latestBatch?.latestCompletedEodDate || null,
+      totalCount: run.totalCount,
+      processedCount: run.processedCount,
+      succeededCount: Math.max(0, run.updated + run.noOp),
+      failedCount: run.failed,
+      skippedCount: run.skipped,
+      unchangedCount: run.noOp,
+      batchSize: run.batchSize,
+      nextOffset: run.hasMore ? 0 : null,
+      hasMore: run.hasMore,
+      startedAt: run.startedAt,
+      completedAt: run.completedAt,
+      warnings: [...run.warnings],
+      errors: run.recentErrors.map((entry) => entry.symbol ? `${entry.symbol}: ${entry.message}` : entry.message),
+      metadata: {
+        sourceRunId: run.runId,
+        scopeType: run.scopeType,
+        message: run.message,
+        currentBatchNumber: run.currentBatchNumber,
+        batchesPlanned: run.batchesPlanned,
+        batchesExecuted: run.batchesExecuted,
+        workerConcurrency: run.workerConcurrency,
+        providerThrottleMs: run.providerThrottleMs,
+        maxBatches: run.maxBatches,
+        percentComplete: run.percentComplete,
+        remainingCandidates: run.remainingCandidates,
+        priceRowsReceived: run.priceRowsReceived,
+        priceRowsInserted: run.priceRowsInserted,
+        priceRowsUpdated: run.priceRowsUpdated,
+        priceRowsNoOp: run.priceRowsNoOp,
+        zeroRowProviderReturns: run.zeroRowProviderReturns,
+      },
+    };
+  }
+
+  private async recordPriceBackfillPipelineSnapshot(snapshot: MarketDataPipelineSnapshotInput): Promise<void> {
+    try {
+      const recorder = this.pipelineRecorder || await this.createPipelineRecorder();
+      await recorder.recordMarketDataStageSnapshot(snapshot);
+    } catch (error) {
+      console.error('[MarketDataPipelineLedger] failed to record price-backfill snapshot', {
+        runId: snapshot.runId,
+        region: snapshot.region,
+        assetType: snapshot.assetType,
+        error: error instanceof Error ? error.message : 'unknown error',
+      });
+    }
+  }
+
+  private async createPipelineRecorder(): Promise<MarketDataPipelineRecorder> {
+    const module = await import('../pipeline-orchestration/pipeline-orchestration.service');
+    return new module.PipelineOrchestrationService();
   }
 
   private addPriceBackfillRunWarning(run: PriceBackfillRunRecord, warning: string): void {

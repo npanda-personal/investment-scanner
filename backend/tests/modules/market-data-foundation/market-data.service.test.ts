@@ -4775,6 +4775,43 @@ describe('MarketDataFoundationService syncV1', () => {
     });
   });
 
+  it('mirrors price backfill run progress into the pipeline ledger', async () => {
+    const recorder = {
+      recordMarketDataStageSnapshot: jest.fn().mockResolvedValue({}),
+    };
+    const service = new MarketDataFoundationService({} as any, {} as any, {} as any, recorder as any);
+    jest.spyOn(service, 'repairPlan').mockResolvedValue({
+      supportedPriceBackfillNeeded: 3,
+      priceBackfillNeeded: 3,
+    } as any);
+    jest.spyOn(service as any, 'processPriceBackfillRun').mockResolvedValue(undefined);
+
+    const result = await service.startPriceBackfillRun({
+      region: 'IN',
+      assetType: 'STOCK',
+      batchSize: 2,
+      workerConcurrency: 1,
+      maxBatches: 2,
+      triggerType: 'startup',
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(recorder.recordMarketDataStageSnapshot).toHaveBeenCalledWith(expect.objectContaining({
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      triggerType: 'startup',
+      operation: 'PRICE_BACKFILL',
+      runId: result.runId,
+      status: 'RUNNING',
+      totalCount: 3,
+      processedCount: 0,
+      batchSize: 2,
+      hasMore: true,
+    }));
+  });
+
   it('skips already-attempted price backfill stock ids so background runs keep draining', async () => {
     const stocks = [
       { id: 'done-id', symbol: 'DONE.NS', providerSupportStatus: 'SUPPORTED', isActive: true, isDelisted: false, providerSymbol: 'DONE.NS', sector: 'Tech', industry: 'Software', country: 'India', currency: 'INR' },
