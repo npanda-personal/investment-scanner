@@ -1,5 +1,63 @@
 # Team 03 Architecture Factory Outbox
 
+## Team 03 CF-W3-MDPIPE-01C Data Quality Scheduled Stage Prep - 2026-05-25
+
+Assignment: prepare the next architecture path for `CF-W3-MDPIPE-01C`, the ledgered Data Quality scheduled stage, after the committed ledger/status/dashboard/command API slices, using only the allowed execution docs and without modifying application code/tests, Prisma, route registries, package manifests, generated files, frontend files, `docs/AGENTS.md`, or `docs/codex-agent-team-plan/**`.
+
+Updated:
+
+- `03-architecture/CF-W3-MDPIPE-01C-data-quality-scheduled-stage-architecture.md`
+- `06-contracts/CF-W3-MDPIPE-01C-data-quality-scheduled-stage-contract.md`
+- `08-work-packets/CF-W3-MDPIPE-01C-work-packet.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Read-only evidence inspected:
+
+- root `AGENTS.md`
+- `00-control/active-work-board.md`
+- `09-summaries/daemon-cycle-latest.md`
+- `10-requirements/CF-W3-MDPIPE-01-incremental-market-data-pipeline-requirement.md`
+- `03-architecture/CF-W3-MDPIPE-01-incremental-market-data-pipeline-architecture.md`
+- `06-contracts/CF-W3-MDPIPE-01B4-pipeline-command-api-contract.md`
+- current `pipeline-orchestration` backend module
+- current `data-quality-engine` backend module
+- current `market-data-foundation` scheduler/service evidence needed to answer scheduler/startup questions
+- `backend/src/server.ts`
+- accepted commit references supplied by Team 00:
+  - `e537f9e`
+  - `10719fa`
+  - `cb45735`
+  - `8d45ddc`
+
+Architecture verdict:
+
+- `CF-W3-MDPIPE-01C` is a `Ready candidate` for Team 04 QA planning.
+- The correct first path is backend-only and uses the existing Market Data scheduler as the only trigger.
+- Scheduler hook is required for a true scheduled stage and is not a new consent blocker under the accepted parent requirement.
+- Startup fanout is not required for the first child and remains intentionally excluded.
+- The first child must stay DB-only and incremental by consuming only the changed instrument set from the current Market Data scheduler pass.
+- The first child must not reuse the B4 manual command path as the scheduler implementation.
+
+Exact future Team 05 reservation direction:
+
+- allowed files are limited to the exact `market-data-foundation`, `pipeline-orchestration`, and `data-quality-engine` service/types/doc/test files listed in the new `01C` architecture/work-packet docs;
+- frontend, server, route-registry, Prisma, package, provider, repository, shared-file, and downstream stage files remain forbidden in the first child;
+- Team 08 `B6` files remain out of scope.
+
+Required QA inputs surfaced to Team 04:
+
+- scheduled change triggers exactly one ledgered DQ stage;
+- scheduled no-op does not trigger full-scope DQ;
+- startup does not fan out into DQ in this child;
+- duplicate fingerprint and held-lease behavior remain safe;
+- status API rehydrates scheduled DQ evidence;
+- manual B4 command behavior remains unchanged;
+- no provider/live calls occur during scheduled DQ.
+
+No tests, builds, services, providers, UI checks, commits, or pushes were run.
+
+---
+
 ## Team 03 CF-W3-MDPIPE-01B4 Architect Signoff - 2026-05-25
 
 Assignment: perform Architect Signoff for `CF-W3-MDPIPE-01B4-PIPELINE-COMMAND-API` after Team 04 QA ACCEPT and Team 10 review ACCEPT, using the active execution folder as authority and without modifying application code.

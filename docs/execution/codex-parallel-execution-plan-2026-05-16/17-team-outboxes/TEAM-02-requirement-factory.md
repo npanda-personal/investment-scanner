@@ -11,6 +11,18 @@ Root `AGENTS.md` intake completed first. Workspace was clean at the start of thi
 - Team 05's `CF-W3-MDPIPE-01B4` pipeline command API work is accepted and locally committed, and `CF-W3-MDPIPE-01B6` is active Team 08 follow-up; both are intentionally excluded from Team 02 discovery.
 - No Trade Plan-first framing, no R:R framing, and no arbitrary target-price framing.
 
+### Fresh Gap Audit Result - 2026-05-25
+
+I audited the current top three planning candidates plus the adjacent trust surfaces in `today-trade-review`, `signal-generation-engine`, `signal-quality-lab`, `signal-calibration-engine`, `backtesting-strategy-lab`, and `market-context-intelligence`.
+
+Result:
+
+- No genuinely new direct investor/trader-value requirement outranks `CF-W2-TSC-04`, `CF-W2-TSC-05`, or `CF-W1-TSC-02`.
+- The Today Review source still contains the target/reward and reward/risk machinery that those two cleanup slices are meant to remove or reframe, so the current top two remain valid.
+- The active-signal-health gap is already captured by `CF-W1-TSC-02`; no separate, higher-value health requirement emerged from this pass.
+- Signal quality, calibration, backtesting, and market-context surfaces already expose explicit trust/evidence semantics, so no new draft should be created from this audit.
+- No item moves to Ready from Team 02.
+
 ### Queue Refresh Result
 
 Refreshed the direct investor/trader-value stack after excluding the active pipeline lane and already accepted items:
@@ -88,6 +100,7 @@ Reason:
 - `TSC-02` is the next direct active-signal-health gap once Today Review cleanup is out of the way.
 - `DQ-02` still matters, but only after the residual split question is resolved.
 - `CF-W3-MDPIPE-01B4` is accepted and `CF-W3-MDPIPE-01B6` is active; neither should re-enter Team 02 queueing.
+- This pass found no new requirement that should be inserted ahead of the current top three.
 
 ### Files Changed In This Pass
 

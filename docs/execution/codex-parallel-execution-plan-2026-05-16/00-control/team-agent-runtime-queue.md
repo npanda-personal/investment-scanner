@@ -15,8 +15,8 @@ Current active agents:
 | 1 | Team 08 - UX / Research / Copilot | `019e5e23-34c0-70e3-bda1-a1f037359bcd` | `gpt-5.3-codex`, high | implementation | `CF-W3-MDPIPE-01B6` Data Quality compact progress indicator | active |
 | 2 | Open slot | none | pending | QA verification | Team 04 for `CF-W3-MDPIPE-01B6` after handoff | waiting |
 | 3 | Open slot | none | pending | review/signoff | Team 10 then Team 03 after QA acceptance | waiting |
-| 4 | Team 03 - Architecture Factory | `019e5e23-84c2-7980-9b6b-98c655c5e0d1` | `gpt-5.4`, high | architecture | `CF-W3-MDPIPE-01C` ledgered Data Quality scheduled stage | active |
-| 5 | Team 02 - Product Owner / Requirement Factory | `019e5e2a-46f0-7e63-b1e6-b3b6a7c973e5` | `gpt-5.4-mini`, medium | requirements | next direct investor/trader-value discovery cycle | active |
+| 4 | Open slot | none | pending | QA planning | Team 04 for `CF-W3-MDPIPE-01C` after Team 03 architecture packet | ready |
+| 5 | Open slot | none | pending | requirements | next direct investor/trader-value discovery cycle | queued |
 | 6 | Open slot | none | pending | review | Team 10 review after next QA-accepted handoff | waiting |
 
 Teams ready to pick up new tasks:
@@ -24,9 +24,10 @@ Teams ready to pick up new tasks:
 - Team 08: active on `CF-W3-MDPIPE-01B6` Data Quality compact indicator.
 - Team 04: ready for `CF-W3-MDPIPE-01B6` QA after Team 08 handoff.
 - Team 10: ready for Code Review after Team 04 acceptance.
-- Team 03: active on architecture prep for `CF-W3-MDPIPE-01C`; later ready for B6 Architect Signoff after Team 10 acceptance.
+- Team 03: completed architecture prep for `CF-W3-MDPIPE-01C`; later ready for B6 Architect Signoff after Team 10 acceptance.
+- Team 04: ready for `CF-W3-MDPIPE-01C` QA planning.
 - Team 05: standby for `CF-W3-MDPIPE-01C` Data Quality scheduled stage after status/command contracts stabilize.
-- Team 02: active on next direct investor/trader-value requirement discovery after queue refresh.
+- Team 02: completed fresh-gap audit; no new requirement outranks `CF-W2-TSC-04`, `CF-W2-TSC-05`, or `CF-W1-TSC-02`.
 
 Queued next:
 
@@ -34,8 +35,8 @@ Queued next:
 2. Team 04 verifies `CF-W3-MDPIPE-01B6` after handoff.
 3. Team 10 reviews after QA acceptance.
 4. Team 03 signs off after Team 10 acceptance.
-5. Team 03 prepares `CF-W3-MDPIPE-01C` ledgered Data Quality scheduled stage architecture in parallel.
-6. Team 02 refreshes top investor/trader-value requirements in parallel without moving items to Ready.
+5. Team 04 prepares `CF-W3-MDPIPE-01C` QA plan.
+6. Team 02 can relaunch after current handoff pressure drops.
 
 Completed agents:
 
@@ -51,6 +52,8 @@ Completed agents:
 - Team 08 `019e5ddb-2125-78d1-92b2-e9e917a52145`: completed B5/B6 UX plan; closed.
 - Team 04 `019e5ddb-3564-7122-b1fa-a009353c5868`: completed B4/B5/B6 QA plans; closed.
 - Team 02 `019e5e24-b66c-7680-adfc-0031857ab61f`: completed rolling requirements refresh after B4 commit and B6 promotion; closed.
+- Team 03 `019e5e23-84c2-7980-9b6b-98c655c5e0d1`: completed `CF-W3-MDPIPE-01C` architecture, contract, and work packet; closed.
+- Team 02 `019e5e2a-46f0-7e63-b1e6-b3b6a7c973e5`: completed fresh-gap audit; no new requirement created; closed.
 
 ---
 
