@@ -12,8 +12,8 @@ Current active agents:
 
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Open slot | none | pending | review | Team 10 for `CF-W3-MDPIPE-01B6` after Team 04 QA ACCEPT | ready |
-| 2 | Open slot | none | pending | QA verification | Team 04 for `CF-W3-MDPIPE-01C` after Team 05 handoff | ready |
+| 1 | Open slot | none | pending | Architect Signoff | Team 03 for `CF-W3-MDPIPE-01B6` after Team 10 ACCEPT | ready |
+| 2 | Open slot | none | pending | review | Team 10 for `CF-W3-MDPIPE-01C` after Team 04 QA ACCEPT | ready |
 | 3 | Open slot | none | pending | rolling requirements | Team 02 next direct-value audit cycle | ready |
 | 4 | Open slot | none | pending | architecture/signoff | B5 blocked until B6 acceptance; Team 03 signoff after next review acceptance | waiting |
 | 5 | Open slot | none | pending | review | Team 10 for B6 after Team 04 QA rerun | waiting |
@@ -24,8 +24,10 @@ Teams ready to pick up new tasks:
 - Team 08: completed `CF-W3-MDPIPE-01B6` review-reject rework; closed.
 - Team 05: completed `CF-W3-MDPIPE-01C` Data Quality scheduled stage implementation; closed.
 - Team 04: accepted `CF-W3-MDPIPE-01B6` QA rerun after Team 08 rework; closed.
-- Team 04: ready for `CF-W3-MDPIPE-01C` QA verification after Team 05 handoff.
-- Team 10: ready for B6 or 01C review after Team 04 acceptance.
+- Team 04: accepted `CF-W3-MDPIPE-01C` QA verification after Team 05 handoff; closed.
+- Team 10: accepted `CF-W3-MDPIPE-01B6` re-review after Team 04 acceptance; closed.
+- Team 03: ready for B6 Architect Signoff.
+- Team 10: ready for 01C review.
 - Team 03: completed architecture prep for `CF-W3-MDPIPE-01C`; later ready for B6 Architect Signoff after Team 10 acceptance.
 - Team 02: completed rolling direct-value and Pipeline Ops priority refresh; no new item outranks `CF-W2-TSC-04`, `CF-W2-TSC-05`, or `CF-W1-TSC-02`.
 - Team 02: completed read-mostly rolling PO audit with no file changes and no priority reorder.
@@ -67,6 +69,8 @@ Completed agents:
 - Team 03 `019e5e42-fde6-7510-8e5c-dd97780aa368`: completed `CF-W3-MDPIPE-01B5` Data Quality-first architecture/contract/work-packet prep; closed.
 - Team 04 `019e5e46-3233-7ad2-8c5f-4924fa4161a2`: accepted `CF-W3-MDPIPE-01B6` QA rerun after Team 08 rework; closed.
 - Team 05 `019e5e36-7ca5-7543-a168-64ec7af10c38`: completed `CF-W3-MDPIPE-01C` backend implementation and validation; closed.
+- Team 04 `019e5e4c-d3fb-78c3-b9de-5c29aaf1ff50`: accepted `CF-W3-MDPIPE-01C` QA verification; closed.
+- Team 10 `019e5e4c-7b8b-7371-a9a9-dc56302245ee`: accepted `CF-W3-MDPIPE-01B6` re-review; closed.
 
 ---
 

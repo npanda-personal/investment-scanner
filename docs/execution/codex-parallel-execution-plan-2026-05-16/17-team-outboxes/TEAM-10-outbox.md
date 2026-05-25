@@ -6,6 +6,40 @@ Team: TEAM-10 - Review / Release
 
 State: `CF-W1-NOTIF-02` preaccepted by code review with QA blocker; release acceptance blocked pending focused runtime verification.
 
+## 2026-05-25 `CF-W3-MDPIPE-01B6` Re-review / Release Gate
+
+Review target: `CF-W3-MDPIPE-01B6`
+
+Review decision: `ACCEPT`
+
+### Findings
+
+No blocking findings.
+
+Acceptance notes:
+
+- `frontend/src/features/data-quality-engine/components/DataQualityPipelineStatusStrip.tsx:56-57` now limits `NO_RUN_EVIDENCE` to the loaded no-stage case only, while `:61-69` separates loading and inline unavailable states.
+- `frontend/src/features/data-quality-engine/components/DataQualityPipelineStatusStrip.tsx:70-73` makes loaded no-run determinate and keeps indeterminate progress out of the accepted no-run path.
+- `frontend/tests/ui/data-quality-engine.spec.ts:89-141` now covers the no-run, loading, and hook-error cases and preserves the no-POST assertion for indicator render.
+- The strip remains read-only and linked-only; Team 10 found no render-time POST path to Data Quality evaluate or pipeline command execution.
+- Targeted forbidden-scope status checks for `frontend/src/features/pipeline-ops`, shared UI, routes/navigation, packages, and Prisma returned clean in this pass.
+
+### Evidence
+
+- Code review record: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W3-MDPIPE-01B6-code-review.md`
+- Developer handoff: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W3-MDPIPE-01B6-developer-handoff.md`
+- QA verification: `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W3-MDPIPE-01B6-qa-verification.md`
+
+### Validation
+
+- Team 10 performed bounded source review only in this rerun.
+- Team 04 already recorded `npm.cmd run build` -> pass and `npm.cmd run test:ui -- pipeline-ops.spec.ts data-quality-engine.spec.ts --workers=1` -> pass (`6/6`) after the known Playwright artifact cleanup rerun.
+- No Team 10 memory gate was needed because no heavy commands were started in this pass.
+
+### Next Gate
+
+Route to Team 03 Architect signoff, then Product Owner acceptance.
+
 ## 2026-05-25 `CF-W3-MDPIPE-01B6` Review / Release Gate
 
 Review target: `CF-W3-MDPIPE-01B6`
