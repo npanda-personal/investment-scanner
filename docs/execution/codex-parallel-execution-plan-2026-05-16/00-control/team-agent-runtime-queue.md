@@ -12,8 +12,8 @@ Current active agents:
 
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Open slot | none | pending | Architect Signoff | Team 03 for `CF-W3-MDPIPE-01B6` after Team 10 ACCEPT | ready |
-| 2 | Open slot | none | pending | review | Team 10 for `CF-W3-MDPIPE-01C` after Team 04 QA ACCEPT | ready |
+| 1 | Team 03 - Architecture Factory | `019e5e51-6861-7ce1-93a7-59a0af06177b` | `gpt-5.4`, high | Architect Signoff | `CF-W3-MDPIPE-01B6` after Team 10 ACCEPT | active |
+| 2 | Team 10 - Review / Release | `019e5e51-c309-7c20-9c70-5fc6b48d65d9` | `gpt-5.4`, high | code review | `CF-W3-MDPIPE-01C` after Team 04 QA ACCEPT | active |
 | 3 | Open slot | none | pending | rolling requirements | Team 02 next direct-value audit cycle | ready |
 | 4 | Open slot | none | pending | architecture/signoff | B5 blocked until B6 acceptance; Team 03 signoff after next review acceptance | waiting |
 | 5 | Open slot | none | pending | review | Team 10 for B6 after Team 04 QA rerun | waiting |
@@ -26,8 +26,8 @@ Teams ready to pick up new tasks:
 - Team 04: accepted `CF-W3-MDPIPE-01B6` QA rerun after Team 08 rework; closed.
 - Team 04: accepted `CF-W3-MDPIPE-01C` QA verification after Team 05 handoff; closed.
 - Team 10: accepted `CF-W3-MDPIPE-01B6` re-review after Team 04 acceptance; closed.
-- Team 03: ready for B6 Architect Signoff.
-- Team 10: ready for 01C review.
+- Team 03: active on B6 Architect Signoff.
+- Team 10: active on 01C review.
 - Team 03: completed architecture prep for `CF-W3-MDPIPE-01C`; later ready for B6 Architect Signoff after Team 10 acceptance.
 - Team 02: completed rolling direct-value and Pipeline Ops priority refresh; no new item outranks `CF-W2-TSC-04`, `CF-W2-TSC-05`, or `CF-W1-TSC-02`.
 - Team 02: completed read-mostly rolling PO audit with no file changes and no priority reorder.
