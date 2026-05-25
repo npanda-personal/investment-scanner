@@ -13,8 +13,9 @@ Current active agents:
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Team 07 - Portfolio / Watchlist / Alerts | `019e5ed4-6f08-7433-b86d-d71ee7cf464a` | `gpt-5.3-codex`, high | rework | `CF-W2-TSC-05A` QA rejection fixes in Team 07 worktree | active |
-| 2 | Team 04 - QA Factory | pending spawn | `gpt-5.4`, high | QA planning | `CF-W2-CAL-02A` calibration evidence basis | queued |
+| 2 | Team 04 - QA Factory | `019e5eda-3213-7813-8145-b437a9424a40` | `gpt-5.4`, high | QA planning | `CF-W2-CAL-02A` calibration evidence basis | active |
 | 3 | Team 04 - QA Factory | `019e5ed8-5cea-7cf3-8e74-ef91fe2607d9` | `gpt-5.4`, high | QA verification | `CF-W1-DQ-02-RS1` in Team 05 worktree | active |
+| 4 | Team 02 - Requirement Factory | `019e5eda-8856-76c3-aacf-73bff2909bb4` | `gpt-5.4`, medium | requirements | research/actionability evidence-date follow-up | active |
 | 4 | Team 02 - Requirement Factory | pending spawn | `gpt-5.4`, medium | requirements | research/actionability evidence-date follow-up | queued |
 | 5 | Open slot | none | pending | Architect Signoff | Team 03 after Team 10 ACCEPT | queued |
 | 6 | Open slot | none | pending | QA verification | Team 04 after Team 05 DQ handoff | queued |
@@ -33,8 +34,8 @@ Current routing:
 
 - `CF-W2-TSC-05A` is back with Team 07 for bounded QA-rejection rework in the Team 07 worktree.
 - `CF-W1-DQ-02-RS1` is in Team 04 QA verification in branch `codex/team05-market-data/CF-W1-DQ-02-RS1`.
-- `CF-W2-CAL-02A` is queued for Team 04 QA planning.
-- Team 02 is queued to refine the research/actionability evidence-date follow-up from Team 01's audit.
+- `CF-W2-CAL-02A` QA planning is active with Team 04.
+- Team 02 is active on the research/actionability evidence-date follow-up from Team 01's audit.
 - No open Product Owner decisions exist.
 
 Teams ready to pick up new tasks:
@@ -43,8 +44,8 @@ Teams ready to pick up new tasks:
 - Team 04: ready for `CF-W2-TSC-05A` QA re-verification after Team 07 rework handoff.
 - Team 04: active on `CF-W1-DQ-02-RS1` QA verification.
 - Team 10: ready for the next QA-accepted code review.
-- Team 04: ready for `CF-W2-CAL-02A` QA planning.
-- Team 02: ready for research/actionability evidence-date requirement refinement.
+- Team 04: active on `CF-W2-CAL-02A` QA planning.
+- Team 02: active on research/actionability evidence-date requirement refinement.
 - Team 03: ready for Architect Signoff after review acceptance.
 
 ---
