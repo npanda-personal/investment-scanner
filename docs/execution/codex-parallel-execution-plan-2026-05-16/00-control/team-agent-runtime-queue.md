@@ -13,7 +13,7 @@ Current active agents:
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Team 04 - QA Factory | `019e5ec7-3ce8-7e72-bffa-92dbbb4e0a34` | `gpt-5.4`, high | QA verification | `CF-W2-TSC-05A` in Team 07 worktree | active |
-| 2 | Team 03 - Architecture Factory | pending spawn | `gpt-5.4`, high | architecture prep | `CF-W2-CAL-02` calibration evidence basis | queued |
+| 2 | Team 03 - Architecture Factory | `019e5ece-ed41-7b22-af81-18d3cc84bbb2` | `gpt-5.4`, high | architecture prep | `CF-W2-CAL-02` calibration evidence basis | active |
 | 3 | Team 05 - Market Data / Data Quality | `019e5ecb-b61d-7773-9dc6-1246a1a558fe` | `gpt-5.3-codex`, high | implementation | `CF-W1-DQ-02-RS1` in `C:\work\repo\investment-scanner-worktrees\team05-CF-W1-DQ-02-RS1` | active |
 | 4 | Open slot | none | pending | Code Review | Team 10 after next QA ACCEPT | queued |
 | 5 | Open slot | none | pending | Architect Signoff | Team 03 after Team 10 ACCEPT | queued |
@@ -30,7 +30,7 @@ Current routing:
 - `CF-W2-TSC-05A` is in QA verification in the Team 07 worktree.
 - `CF-W1-DQ-02-RS1` is promoted to Team 05 as a bounded seven-file DQE implementation child.
 - Team 05 implementation is active in branch `codex/team05-market-data/CF-W1-DQ-02-RS1`.
-- `CF-W2-CAL-02` is queued for Team 03 docs-only architecture prep.
+- `CF-W2-CAL-02` is active with Team 03 docs-only architecture prep.
 - No open Product Owner decisions exist.
 
 Teams ready to pick up new tasks:
@@ -38,7 +38,7 @@ Teams ready to pick up new tasks:
 - Team 04: active on `CF-W2-TSC-05A` QA verification.
 - Team 05: active on `CF-W1-DQ-02-RS1` implementation.
 - Team 10: ready for the next QA-accepted code review.
-- Team 03: `CF-W2-CAL-02` architecture prep next; Architect Signoff after review acceptance if a QA-accepted handoff appears.
+- Team 03: active on `CF-W2-CAL-02` architecture prep; Architect Signoff after review acceptance if a QA-accepted handoff appears.
 - Team 01/02: ready for the next thin-backlog discovery pass after `CAL-02` architecture routing.
 
 ---
