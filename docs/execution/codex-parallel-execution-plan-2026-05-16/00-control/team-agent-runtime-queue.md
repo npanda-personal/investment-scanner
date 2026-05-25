@@ -15,7 +15,7 @@ Current active agents:
 | 1 | Team 04 - QA Factory | `019e5ec7-3ce8-7e72-bffa-92dbbb4e0a34` | `gpt-5.4`, high | QA verification | `CF-W2-TSC-05A` in Team 07 worktree | active |
 | 2 | Team 03 - Architecture Factory | `019e5ece-ed41-7b22-af81-18d3cc84bbb2` | `gpt-5.4`, high | architecture prep | `CF-W2-CAL-02` calibration evidence basis | active |
 | 3 | Team 05 - Market Data / Data Quality | `019e5ecb-b61d-7773-9dc6-1246a1a558fe` | `gpt-5.3-codex`, high | implementation | `CF-W1-DQ-02-RS1` in `C:\work\repo\investment-scanner-worktrees\team05-CF-W1-DQ-02-RS1` | active |
-| 4 | Open slot | none | pending | Code Review | Team 10 after next QA ACCEPT | queued |
+| 4 | Team 01 - Audit Factory | `019e5ed1-b626-7121-b84a-55ed577ccb70` | `gpt-5.4`, medium | audit | next direct investor/trader-value gaps after CAL-02 | active |
 | 5 | Open slot | none | pending | Architect Signoff | Team 03 after Team 10 ACCEPT | queued |
 | 6 | Open slot | none | pending | QA verification | Team 04 after Team 05 DQ handoff | queued |
 
@@ -31,6 +31,7 @@ Current routing:
 - `CF-W1-DQ-02-RS1` is promoted to Team 05 as a bounded seven-file DQE implementation child.
 - Team 05 implementation is active in branch `codex/team05-market-data/CF-W1-DQ-02-RS1`.
 - `CF-W2-CAL-02` is active with Team 03 docs-only architecture prep.
+- Team 01 is auditing the next direct-value gaps after active TSC/DQ/CAL work.
 - No open Product Owner decisions exist.
 
 Teams ready to pick up new tasks:
@@ -39,7 +40,8 @@ Teams ready to pick up new tasks:
 - Team 05: active on `CF-W1-DQ-02-RS1` implementation.
 - Team 10: ready for the next QA-accepted code review.
 - Team 03: active on `CF-W2-CAL-02` architecture prep; Architect Signoff after review acceptance if a QA-accepted handoff appears.
-- Team 01/02: ready for the next thin-backlog discovery pass after `CAL-02` architecture routing.
+- Team 01: active on next direct-value gap audit.
+- Team 02: ready for the next requirement pass after Team 01 output.
 
 ---
 
