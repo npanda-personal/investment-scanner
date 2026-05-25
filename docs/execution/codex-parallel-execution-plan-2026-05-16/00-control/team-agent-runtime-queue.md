@@ -13,8 +13,8 @@ Current active agents:
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Team 06 - Strategy / Signal / Risk | `019e5ee9-07e1-7af1-95a4-ff756bf3c2a2` | `gpt-5.3-codex`, high | implementation | `CF-W2-CAL-02A` Signal Calibration evidence-basis projection | active |
-| 2 | Open slot | pending spawn | `gpt-5.3-codex`, high | rework | Team 07 `CF-W2-TSC-05A` repository persisted-read fix after addendum commit | queued |
-| 3 | Team 05 - Market Data / Data Quality | `019e5ee9-e6a5-7831-953e-31cf73fc0ea8` | `gpt-5.3-codex`, high | rework | `CF-W1-DQ-02-RS1` repository summary aggregate query fix | active |
+| 2 | Team 07 - Portfolio / Watchlist / Alerts | `019e5eed-c91f-7a40-bbf9-6087d54a10d7` | `gpt-5.3-codex`, high | rework | `CF-W2-TSC-05A` repository persisted-read fix after addendum | active |
+| 3 | Team 04 - QA Factory | `019e5eef-bb81-7d92-ac87-ba4277fd9c3b` | `gpt-5.4`, high | QA re-verification | `CF-W1-DQ-02-RS1` after Team 05 aggregate-summary rework | active |
 | 4 | Team 02 - Requirement Factory | `019e5eec-7aae-72e0-96f5-41a61b3518a4` | `gpt-5.4`, medium | rolling requirements | direct investor/trader-value backlog discovery and priority hygiene | active |
 | 5 | Open slot | none | pending | Code Review | Team 10 after next Team 04 ACCEPT | queued |
 | 6 | Open slot | none | pending | Architect Signoff | Team 03 after Team 10 ACCEPT | queued |
@@ -22,6 +22,7 @@ Current active agents:
 Recently closed:
 
 - Team 03 `019e5ee9-68c2-73d2-96be-22a78f7cf608`: completed `CF-W2-TSC-05A` repository scope addendum; verdict routine module-local scope correction, no Product Owner blocker; closed.
+- Team 05 `019e5ee9-e6a5-7831-953e-31cf73fc0ea8`: completed `CF-W1-DQ-02-RS1` aggregate-summary rework; summary now uses bounded DB-side counts and `findFirst`; closed.
 - Team 04 `019e5edd-f986-7ed0-8aee-39e3cc4296cd`: rejected `CF-W2-TSC-05A` after finding repository persisted-read legacy explainability leakage; closed.
 - Team 04 `019e5ee4-e09c-7261-9c4c-cec6b0d8b9c0`: rejected `CF-W1-DQ-02-RS1` because repository summary still used an unbounded full-scope `findMany`; closed.
 - Team 02 `019e5eda-8856-76c3-aacf-73bff2909bb4`: completed `CF-W1-RH-01A` Research Hub evidence-date requirement refinement; closed.
@@ -39,8 +40,8 @@ Recently closed:
 
 Current routing:
 
-- `CF-W2-TSC-05A` repository persisted-read scope correction is approved by Team 03; Team 07 rework is queued after the docs checkpoint.
-- `CF-W1-DQ-02-RS1` is rejected back to Team 05 to replace repository summary full-row loading with bounded aggregate query behavior.
+- `CF-W2-TSC-05A` repository persisted-read scope correction is approved by Team 03; Team 07 rework is active in the Team 07 worktree.
+- `CF-W1-DQ-02-RS1` is in Team 04 QA re-verification after Team 05 replaced repository summary full-row loading with bounded aggregate query behavior.
 - `CF-W2-CAL-02A` is active with Team 06 in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-CAL-02A`.
 - `CF-W1-RH-01A` is a new bounded Research Hub evidence-date requirement and remains behind `CF-W2-CAL-02A` plus higher-value durable-proof consent-gated proposals.
 - Team 02 rolling requirement discovery is active to keep direct investor/trader-value backlog depth moving while implementation/review gates run.
@@ -49,9 +50,8 @@ Current routing:
 Teams ready to pick up new tasks:
 
 - Team 06: active on `CF-W2-CAL-02A` implementation.
-- Team 07: queued for `CF-W2-TSC-05A` repository persisted-read rework after addendum checkpoint.
-- Team 05: active on `CF-W1-DQ-02-RS1` aggregate-summary rework.
-- Team 04: ready for CAL QA after Team 06 handoff; ready for DQ QA after Team 05 handoff; ready for TSC QA after Team 03 addendum and Team 07 rework.
+- Team 07: active on `CF-W2-TSC-05A` repository persisted-read rework after addendum.
+- Team 04: active on `CF-W1-DQ-02-RS1` QA re-verification; ready for CAL QA after Team 06 handoff and TSC QA after Team 07 rework.
 - Team 10: ready for the next QA-accepted code review.
 - Team 03: ready for Architect Signoff after Team 10 acceptance once the addendum task completes.
 - Team 02: active on the next rolling investor/trader-value requirement pass.
