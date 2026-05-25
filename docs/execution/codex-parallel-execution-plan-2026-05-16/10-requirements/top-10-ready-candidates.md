@@ -2,11 +2,11 @@
 
 Date: 2026-05-25
 
-Status: Team 02 rolling PO refresh after source/docs audit and the live pipeline-lane update. This file is a docs-only candidate view, not proof of implementation readiness. Team 00 owns all Ready queue movement.
+Status: Team 02 rolling PO refresh after source/docs audit, the Pipeline Ops command API commit, and the B6 compact-indicator promotion. This file is a docs-only candidate view, not proof of implementation readiness. Team 00 owns all Ready queue movement.
 
 Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-02A` are accepted and locally committed parked branches, not fresh candidates.
 
-Team 02 audit update: `CF-W1-MD-05`, `CF-W1-TSC-02A-TREV-HEALTH`, `CF-W2-SIG-01A`, `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`, `CF-W2-BT-05`, and `CF-W1-BT-04` have moved through implementation/validation gates and are not fresh Team 02 pulls. `CF-W3-MDPIPE-01B4` is active Team 05 pipeline command API work and stays out of PO discovery. Next fresh-pull value should prioritize Today Review no-target cleanup, ranking/eligibility cleanup, active candidate health, and upstream trust evidence over admin, subscription, notification, or Copilot convenience work.
+Team 02 audit update: `CF-W1-MD-05`, `CF-W1-TSC-02A-TREV-HEALTH`, `CF-W2-SIG-01A`, `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`, `CF-W2-BT-05`, and `CF-W1-BT-04` have moved through implementation/validation gates and are not fresh Team 02 pulls. `CF-W3-MDPIPE-01B4` is accepted and locally committed pipeline command API work, while `CF-W3-MDPIPE-01B6` is active Team 08 compact-indicator follow-up; both stay out of PO discovery. Next fresh-pull value should prioritize Today Review no-target cleanup, ranking/eligibility cleanup, active candidate health, and upstream trust evidence over admin, subscription, notification, or Copilot convenience work.
 
 Team 00 correction: `CF-W1-SIG-LATEST-01` is already accepted from 2026-05-17 and must not be ranked as a new Ready candidate.
 
@@ -16,16 +16,16 @@ After `TSC-03A` and `BT-05` closure, the remaining unassigned investor/trader-va
 
 | Rank | ID | Why now | Next gate |
 | --- | --- | --- | --- |
-| 1 | `CF-W2-TSC-04` | Today Review source/docs still expose target/reward and Trade Plan-style language that conflicts with the trusted signal candidate workflow. | Planning-only; Team 03/04 can prepare bounded contract/QA now that `TSC-03A` released Today Review files. |
-| 2 | `CF-W2-TSC-05` | Today Review ranking/eligibility must not continue relying on target/reward geometry after copy cleanup. | Planning-only; route to Team 03 for a bounded split before implementation. |
-| 3 | `CF-W1-TSC-02` | Active candidates still need rule-based health tracking after entry until exit, invalidation, expiry, or blockage. | Requirement-ready; Team 03 prep next when Today Review sequencing allows it. |
-| 4 | `CF-W1-DQ-02` residual parent | `DQ-02A` is complete, but the parent still has read-side/public-contract scope that may need a bounded no-schema child. | Team 03 should identify a bounded follow-up or keep the residual parent blocked. |
-| 5 | `CF-W1-MD-02A` | Durable market-data evidence storage remains high-value upstream trust work, even though it is still consent-gated. | Proposal-only until explicit schema/storage consent opens. |
-| 6 | `CF-W1-SQLAB-02B` | Durable Signal Quality learning memory would strengthen post-event review and calibration continuity. | Proposal-only until storage consent opens. |
-| 7 | `CF-W1-STRAT-02B` | Durable strategy revision history would preserve exact rule/version provenance for review and backtesting trust. | Proposal-only until schema/generated/repository consent opens. |
-| 8 | `CF-W1-L3-DQ-01A` | Passive Lane 3 readiness semantics remain a real trust-contract gap. | Contract-only unless Team 03/04 define a bounded child that does not collide with active Lane 3 work. |
-| 9 | `CF-W1-UX-02` | Copilot trust UX still matters once the core signal/data/backtest stack is stronger. | Keep behind direct investor/trader value unless a trust blocker appears. |
-| 10 | `CF-W1-UX-05` | Product-language cleanup can reduce advice-like wording after Copilot trust scope is clear. | Fold into or follow `UX-02`; do not reserve shared UI yet. |
+| 1 | `CF-W2-TSC-04` | Today Review source/docs still expose target/reward and Trade Plan-style language that conflicts with the trusted signal candidate workflow. | Fresh planning candidate; planning-only, and Team 03/04 can prepare bounded contract/QA now that `TSC-03A` released Today Review files. |
+| 2 | `CF-W2-TSC-05` | Today Review ranking/eligibility must not continue relying on target/reward geometry after copy cleanup. | Fresh planning candidate; planning-only, and route to Team 03 for a bounded split before implementation. |
+| 3 | `CF-W1-TSC-02` | Active candidates still need rule-based health tracking after entry until exit, invalidation, expiry, or blockage. | Fresh planning candidate; requirement-ready, and Team 03 prep next when Today Review sequencing allows it. |
+| 4 | `CF-W1-DQ-02` residual parent | `DQ-02A` is complete, but the parent still has read-side/public-contract scope that may need a bounded no-schema child. | Blocked by the residual read-side/public-contract split decision until Team 03 confirms a bounded follow-up. |
+| 5 | `CF-W1-MD-02A` | Durable market-data evidence storage remains high-value upstream trust work, even though it is still consent-gated. | Blocked by schema/storage consent until Team 00 explicitly opens the durable evidence packet. |
+| 6 | `CF-W1-SQLAB-02B` | Durable Signal Quality learning memory would strengthen post-event review and calibration continuity. | Blocked by storage consent until Team 00 explicitly opens the durable memory packet. |
+| 7 | `CF-W1-STRAT-02B` | Durable strategy revision history would preserve exact rule/version provenance for review and backtesting trust. | Blocked by schema/generated/repository consent until Team 00 explicitly opens the revision-history packet. |
+| 8 | `CF-W1-L3-DQ-01A` | Passive Lane 3 readiness semantics remain a real trust-contract gap. | Contract-only until Team 03/04 define a bounded child that does not collide with active Lane 3 work or shared UI rules. |
+| 9 | `CF-W1-UX-02` | Copilot trust UX still matters once the core signal/data/backtest stack is stronger. | Downstream trust UX candidate; keep behind direct investor/trader value unless a trust blocker appears. |
+| 10 | `CF-W1-UX-05` | Product-language cleanup can reduce advice-like wording after Copilot trust scope is clear. | Downstream copy-cleanup candidate; fold into or follow `UX-02`, and do not reserve shared UI yet. |
 
 ## Fresh Pull Exclusions
 
@@ -54,6 +54,8 @@ Do not treat these as the next fresh Team 02 pull:
 - `CF-W2-BT-05` is promoted and assigned to Team 06; do not treat it as fresh planning work.
 - `CF-W2-TSC-04` and `CF-W2-TSC-05` remain planning-only Today Review follow-ons.
 - `CF-W1-BT-04` is accepted and locally committed as `2bd794f`; it is no longer a fresh backtesting candidate.
+- `CF-W3-MDPIPE-01B4` is accepted and locally committed as `8d45ddc`; do not treat it as fresh Team 02 discovery.
+- `CF-W3-MDPIPE-01B6` is active Team 08 compact-indicator work; do not treat it as fresh Team 02 discovery.
 
 ## Routing Guidance
 
@@ -66,6 +68,7 @@ Do not treat these as the next fresh Team 02 pull:
 - `CF-W1-STRAT-04` and `CF-W1-SQLAB-03` gates are closed and parked as accepted branch commits; do not reopen them for fresh implementation.
 - Treat `CF-W1-DQ-02` as the next Market Data / Data Quality residual parent only after the two requirement-ready direct-value slices above are placed.
 - Keep `CF-W1-MD-02A`, `CF-W1-SQLAB-02B`, and `CF-W1-STRAT-02B` proposal-only until explicit consent opens the gated paths.
+- `CF-W3-MDPIPE-01B4` is accepted and committed; `CF-W3-MDPIPE-01B6` is active Team 08 frontend-only work. Keep both out of fresh Team 02 routing.
 
 ## Rolling Audit Note
 

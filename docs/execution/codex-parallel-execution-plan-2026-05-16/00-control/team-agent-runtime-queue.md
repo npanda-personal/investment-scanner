@@ -16,7 +16,7 @@ Current active agents:
 | 2 | Open slot | none | pending | QA verification | Team 04 for `CF-W3-MDPIPE-01B6` after handoff | waiting |
 | 3 | Open slot | none | pending | review/signoff | Team 10 then Team 03 after QA acceptance | waiting |
 | 4 | Team 03 - Architecture Factory | `019e5e23-84c2-7980-9b6b-98c655c5e0d1` | `gpt-5.4`, high | architecture | `CF-W3-MDPIPE-01C` ledgered Data Quality scheduled stage | active |
-| 5 | Team 02 - Product Owner / Requirement Factory | `019e5e24-b66c-7680-adfc-0031857ab61f` | `gpt-5.4-mini`, medium | requirements | rolling investor/trader-value queue refresh | active |
+| 5 | Open slot | none | pending | requirements | next rolling investor/trader-value discovery cycle | queued |
 | 6 | Open slot | none | pending | review | Team 10 review after next QA-accepted handoff | waiting |
 
 Teams ready to pick up new tasks:
@@ -26,7 +26,7 @@ Teams ready to pick up new tasks:
 - Team 10: ready for Code Review after Team 04 acceptance.
 - Team 03: active on architecture prep for `CF-W3-MDPIPE-01C`; later ready for B6 Architect Signoff after Team 10 acceptance.
 - Team 05: standby for `CF-W3-MDPIPE-01C` Data Quality scheduled stage after status/command contracts stabilize.
-- Team 02: active on rolling investor/trader-value queue refresh.
+- Team 02: completed rolling investor/trader-value queue refresh; next fresh planning candidates are `CF-W2-TSC-04`, `CF-W2-TSC-05`, and `CF-W1-TSC-02`.
 
 Queued next:
 
@@ -50,6 +50,7 @@ Completed agents:
 - Team 02 `019e5dea-2124-7233-b175-247e53e4203d`: completed rolling requirements refresh; closed.
 - Team 08 `019e5ddb-2125-78d1-92b2-e9e917a52145`: completed B5/B6 UX plan; closed.
 - Team 04 `019e5ddb-3564-7122-b1fa-a009353c5868`: completed B4/B5/B6 QA plans; closed.
+- Team 02 `019e5e24-b66c-7680-adfc-0031857ab61f`: completed rolling requirements refresh after B4 commit and B6 promotion; closed.
 
 ---
 

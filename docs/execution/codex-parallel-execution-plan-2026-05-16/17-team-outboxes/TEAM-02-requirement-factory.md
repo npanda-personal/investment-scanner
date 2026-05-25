@@ -1,6 +1,6 @@
 # TEAM-02 Requirement Factory
 
-## Team 02 Rolling PO Discovery - Pipeline Command API Excluded - 2026-05-25
+## Team 02 Rolling PO Discovery - Pipeline Command API Accepted, B6 Active - 2026-05-25
 
 Root `AGENTS.md` intake completed first. Workspace was clean at the start of this pass. Team 02 stayed docs-only and wrote only inside the reserved requirement files.
 
@@ -8,7 +8,7 @@ Root `AGENTS.md` intake completed first. Workspace was clean at the start of thi
 
 - Highest user value for investor/trader comes before admin/settings/notifications.
 - Priority remains: market data trust, data quality trust, signal quality and backtesting trust, calibration trust, trusted candidate workflow, and Today Review.
-- Team 05's `CF-W3-MDPIPE-01B4` pipeline command API work is active and intentionally excluded from Team 02 discovery.
+- Team 05's `CF-W3-MDPIPE-01B4` pipeline command API work is accepted and locally committed, and `CF-W3-MDPIPE-01B6` is active Team 08 follow-up; both are intentionally excluded from Team 02 discovery.
 - No Trade Plan-first framing, no R:R framing, and no arbitrary target-price framing.
 
 ### Queue Refresh Result
@@ -26,6 +26,22 @@ Refreshed the direct investor/trader-value stack after excluding the active pipe
 9. `CF-W1-UX-02`
 10. `CF-W1-UX-05`
 
+Fresh planning candidates inside that stack:
+
+- `CF-W2-TSC-04`
+- `CF-W2-TSC-05`
+- `CF-W1-TSC-02`
+
+Blocked by schema, storage, route, or shared-UI decisions:
+
+- `CF-W1-DQ-02` residual parent - blocked by the residual read-side/public-contract split.
+- `CF-W1-MD-02A` - blocked by schema/storage consent.
+- `CF-W1-SQLAB-02B` - blocked by storage consent.
+- `CF-W1-STRAT-02B` - blocked by schema/generated/repository consent.
+- `CF-W1-L3-DQ-01A` - contract-only until a bounded child avoids active Lane 3 work or shared UI rules.
+- `CF-W1-UX-02` - downstream trust UX, not a current front-runner.
+- `CF-W1-UX-05` - downstream copy cleanup, not a current front-runner.
+
 ### Requirement Refinement Result
 
 Refined the queue to keep the accepted and committed slices out of the front:
@@ -41,7 +57,8 @@ Active items excluded from fresh discovery:
 
 - `CF-W1-TSC-01A-SIG` is active with Team 06.
 - `CF-W1-DQ-03` is active with Team 05.
-- `CF-W3-MDPIPE-01B4` is active with Team 05.
+- `CF-W3-MDPIPE-01B4` is accepted and locally committed.
+- `CF-W3-MDPIPE-01B6` is active with Team 08.
 
 Next unassigned queue after active pulls:
 
@@ -70,6 +87,7 @@ Reason:
 - `TSC-04` and `TSC-05` are the next direct Today Review trust fixes after the accepted supporting-evidence work.
 - `TSC-02` is the next direct active-signal-health gap once Today Review cleanup is out of the way.
 - `DQ-02` still matters, but only after the residual split question is resolved.
+- `CF-W3-MDPIPE-01B4` is accepted and `CF-W3-MDPIPE-01B6` is active; neither should re-enter Team 02 queueing.
 
 ### Files Changed In This Pass
 
