@@ -14,10 +14,10 @@ Current active agents:
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Team 07 - Portfolio / Watchlist / Alerts | `019e5eb8-0d85-7213-b1ce-672513fcda1d` | `gpt-5.3-codex`, high | implementation | `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` in `C:\work\repo\investment-scanner-worktrees\team07-CF-W2-TSC-05A` | active |
 | 2 | Team 03 - Architecture Factory | `019e5eb8-7507-7943-9520-2dc34deb6d03` | `gpt-5.4`, high | architecture prep | `CF-W1-DQ-02` residual read-side/public-contract reconstruction packet | active |
-| 3 | Open slot | none | pending | QA verification | Team 04 `CF-W2-TSC-05A` after Team 07 handoff | queued |
-| 4 | Open slot | none | pending | Code Review | Team 10 `CF-W2-TSC-05A` after Team 04 ACCEPT | queued |
-| 5 | Open slot | none | pending | Architect Signoff | Team 03 signoff after Team 10 ACCEPT | queued |
-| 6 | Open slot | none | pending | Requirements | Team 02 next rolling direct-value pass after current dispatch | queued |
+| 3 | Team 02 - PO / Requirement Factory | `019e5eb9-bac5-7b02-94ae-865f5fb2f697` | `gpt-5.4`, medium | requirements | rolling direct investor/trader-value backlog after TSC-05A/DQ routing | active |
+| 4 | Open slot | none | pending | QA verification | Team 04 `CF-W2-TSC-05A` after Team 07 handoff | queued |
+| 5 | Open slot | none | pending | Code Review / Signoff | Team 10 then Team 03 after Team 04 ACCEPT | queued |
+| 6 | Open slot | none | pending | Implementation / QA | next independent Ready item after Team 02 / Team 03 outputs | queued |
 
 Current routing:
 
@@ -26,15 +26,16 @@ Current routing:
 - Team 00 verified the TSC-05A worktree is clean and base check passes.
 - Team 00 created backend/frontend `node_modules` junctions in the TSC-05A worktree so the worker can validate without installing packages.
 - Team 02 selected read-time reconstruction for the DQ residual; Team 03 now owns docs-only architecture prep.
+- Team 02 rolling direct-value requirements pass is active as `019e5eb9-bac5-7b02-94ae-865f5fb2f697`.
 - No open Product Owner decisions exist.
 
 Teams ready to pick up new tasks:
 
 - Team 07: active on `CF-W2-TSC-05A` implementation.
 - Team 03: active on DQ residual architecture.
+- Team 02: active on rolling direct investor/trader-value discovery after TSC-05A/DQ routing.
 - Team 04: ready for TSC-05A QA after developer handoff.
 - Team 10: ready for TSC-05A review after QA acceptance.
-- Team 02: ready for rolling direct investor/trader-value discovery when a slot opens.
 
 ---
 
