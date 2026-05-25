@@ -71,6 +71,34 @@ Teams ready to pick up new tasks:
 - Team 03: `CF-W2-CAL-02` architecture prep now; Architect Signoff after Team 10 acceptance if a review handoff arrives.
 - Team 01/02: next thin-backlog discovery after `CAL-02` architecture routing.
 
+## Latest Team 00 Routing Update - CAL Architecture And DQ QA Verification
+
+Date: 2026-05-25
+
+Gate status:
+
+- Team 03 completed `CF-W2-CAL-02` architecture, contract, and work packet.
+- Team 03 verdict: `Ready candidate after QA`; no Ready promotion yet.
+- Team 01 completed the next direct-value audit and confirmed post-`CAL-02` durable-proof candidates remain consent-gated.
+- Team 05 completed `CF-W1-DQ-02-RS1` implementation in the dedicated worktree.
+- Team 04 QA Verification for `CF-W1-DQ-02-RS1` is active as agent `019e5ed8-5cea-7cf3-8e74-ef91fe2607d9`.
+- Team 07 remains active on bounded `CF-W2-TSC-05A` QA-rejection rework.
+- No open Product Owner decisions exist.
+
+Parallel routing:
+
+- Team 04 QA planning for `CF-W2-CAL-02A` is queued.
+- Team 02 requirement refinement for the research/actionability evidence-date follow-up is queued.
+- Team 10 remains ready for the next QA-accepted review handoff.
+
+Teams ready to pick up new tasks:
+
+- Team 07: active on `CF-W2-TSC-05A` QA-rejection rework.
+- Team 04: active on `CF-W1-DQ-02-RS1` QA verification; ready for `CF-W2-CAL-02A` QA planning in a separate docs-only scope.
+- Team 10: Code Review after Team 04 acceptance.
+- Team 02: research/actionability evidence-date requirement refinement.
+- Team 03: Architect Signoff after Team 10 acceptance.
+
 ## Latest Team 00 Routing Update - DQ QA Planning Launched
 
 Date: 2026-05-25

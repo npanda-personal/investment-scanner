@@ -4,6 +4,41 @@ Date: 2026-05-17
 
 Prepared by Team 03 Architecture Factory and refreshed after `CF-W1-L3-AUTH-02` commit `503bcd9`, `CF-W1-SIG-TRIGGER-01` commit `6ab3999`, and checkpoint protocol fix commit `f75808f`.
 
+## Team 03 Next Dispatch - CAL Scoped Evidence Basis - 2026-05-25
+
+Prepared:
+
+- `03-architecture/CF-W2-CAL-02-architecture-review.md`
+- `06-contracts/CF-W2-CAL-02-signal-calibration-evidence-basis-contract.md`
+- `08-work-packets/CF-W2-CAL-02-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Result:
+
+- `CF-W2-CAL-02` is now a `Ready candidate after QA`.
+- The smallest honest child is `CF-W2-CAL-02A scoped evidence-basis projection`.
+- The packet stays additive and bounded without schema/storage, route registry, shared UI, package/generated, provider/live, startup/backfill, or broad UI scope.
+- The first child should not widen `/signals/calibration/health`; instead it should treat `/signals/calibration/top` as the scoped aggregate page-summary contract and keep module health as module-level compatibility health.
+- Exact future writer set is limited to:
+  - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.service.ts`
+  - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.types.ts`
+  - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md`
+  - `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.service.test.ts`
+  - `frontend/src/features/signal-calibration-engine/types.ts`
+  - `frontend/src/features/signal-calibration-engine/api/signalCalibrationEngineService.ts`
+  - `frontend/src/features/signal-calibration-engine/hooks/useSignalCalibrationEngine.ts`
+  - `frontend/src/features/signal-calibration-engine/components/SignalCalibrationEnginePage.tsx`
+  - `frontend/tests/ui/signal-calibration-engine.spec.ts`
+- Optional only if explicit controller payload assertions are added:
+  - `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.routes.test.ts`
+- Calibration repository/controller/router/validation/module/index, route registries, Signal Quality source/tests, Prisma/schema/migrations, generated files, package manifests, shared utilities/UI, feature route files, and provider/live/startup/backfill files remain forbidden.
+- Required QA focus is scoped summary truthfulness, evidence-through date versus row generation time, horizon-limited evidence, missing Signal Quality evidence, mixed-row page states, compare parity, and no-first-row-proxy behavior.
+- If implementation later proves that truthful scoped summary requires repository/controller/router widening or schema/storage, Team 00 must reopen the work as a split or consent-gated child instead of widening this packet silently.
+
 ## Team 03 Next Dispatch - DQ Residual Read-Side Currentness - 2026-05-25
 
 Prepared:

@@ -13,9 +13,9 @@ Current active agents:
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Team 07 - Portfolio / Watchlist / Alerts | `019e5ed4-6f08-7433-b86d-d71ee7cf464a` | `gpt-5.3-codex`, high | rework | `CF-W2-TSC-05A` QA rejection fixes in Team 07 worktree | active |
-| 2 | Team 03 - Architecture Factory | `019e5ece-ed41-7b22-af81-18d3cc84bbb2` | `gpt-5.4`, high | architecture prep | `CF-W2-CAL-02` calibration evidence basis | active |
-| 3 | Team 05 - Market Data / Data Quality | `019e5ecb-b61d-7773-9dc6-1246a1a558fe` | `gpt-5.3-codex`, high | implementation | `CF-W1-DQ-02-RS1` in `C:\work\repo\investment-scanner-worktrees\team05-CF-W1-DQ-02-RS1` | active |
-| 4 | Team 01 - Audit Factory | `019e5ed1-b626-7121-b84a-55ed577ccb70` | `gpt-5.4`, medium | audit | next direct investor/trader-value gaps after CAL-02 | active |
+| 2 | Team 04 - QA Factory | pending spawn | `gpt-5.4`, high | QA planning | `CF-W2-CAL-02A` calibration evidence basis | queued |
+| 3 | Team 04 - QA Factory | `019e5ed8-5cea-7cf3-8e74-ef91fe2607d9` | `gpt-5.4`, high | QA verification | `CF-W1-DQ-02-RS1` in Team 05 worktree | active |
+| 4 | Team 02 - Requirement Factory | pending spawn | `gpt-5.4`, medium | requirements | research/actionability evidence-date follow-up | queued |
 | 5 | Open slot | none | pending | Architect Signoff | Team 03 after Team 10 ACCEPT | queued |
 | 6 | Open slot | none | pending | QA verification | Team 04 after Team 05 DQ handoff | queued |
 
@@ -25,25 +25,27 @@ Recently closed:
 - Team 04 `019e5ec3-2a5b-7840-9d29-65c43a855e19`: completed `CF-W1-DQ-02-RS1` QA planning; verdict `QA-plan ready`.
 - Team 02 `019e5ec5-c53c-7f02-8b9c-9476b46e7082`: completed fresh direct-value discovery; created `CF-W2-CAL-02`.
 - Team 04 `019e5ec7-3ce8-7e72-bffa-92dbbb4e0a34`: rejected `CF-W2-TSC-05A` for missing worktree artifact docs and two banned fixture phrases; closed.
+- Team 03 `019e5ece-ed41-7b22-af81-18d3cc84bbb2`: completed `CF-W2-CAL-02` architecture; verdict `Ready candidate after QA`; closed.
+- Team 01 `019e5ed1-b626-7121-b84a-55ed577ccb70`: completed direct-value audit; closed.
+- Team 05 `019e5ecb-b61d-7773-9dc6-1246a1a558fe`: completed `CF-W1-DQ-02-RS1` implementation; closed.
 
 Current routing:
 
 - `CF-W2-TSC-05A` is back with Team 07 for bounded QA-rejection rework in the Team 07 worktree.
-- `CF-W1-DQ-02-RS1` is promoted to Team 05 as a bounded seven-file DQE implementation child.
-- Team 05 implementation is active in branch `codex/team05-market-data/CF-W1-DQ-02-RS1`.
-- `CF-W2-CAL-02` is active with Team 03 docs-only architecture prep.
-- Team 01 is auditing the next direct-value gaps after active TSC/DQ/CAL work.
+- `CF-W1-DQ-02-RS1` is in Team 04 QA verification in branch `codex/team05-market-data/CF-W1-DQ-02-RS1`.
+- `CF-W2-CAL-02A` is queued for Team 04 QA planning.
+- Team 02 is queued to refine the research/actionability evidence-date follow-up from Team 01's audit.
 - No open Product Owner decisions exist.
 
 Teams ready to pick up new tasks:
 
 - Team 07: active on `CF-W2-TSC-05A` rework after QA rejection.
 - Team 04: ready for `CF-W2-TSC-05A` QA re-verification after Team 07 rework handoff.
-- Team 05: active on `CF-W1-DQ-02-RS1` implementation.
+- Team 04: active on `CF-W1-DQ-02-RS1` QA verification.
 - Team 10: ready for the next QA-accepted code review.
-- Team 03: active on `CF-W2-CAL-02` architecture prep; Architect Signoff after review acceptance if a QA-accepted handoff appears.
-- Team 01: active on next direct-value gap audit.
-- Team 02: ready for the next requirement pass after Team 01 output.
+- Team 04: ready for `CF-W2-CAL-02A` QA planning.
+- Team 02: ready for research/actionability evidence-date requirement refinement.
+- Team 03: ready for Architect Signoff after review acceptance.
 
 ---
 

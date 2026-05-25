@@ -1,5 +1,113 @@
 # Team 03 Architecture Factory Outbox
 
+## Team 03 CF-W2-CAL-02 Scoped Evidence Basis Readiness Prep - 2026-05-25
+
+Assignment: prepare docs-only architecture readiness for `CF-W2-CAL-02` Signal Calibration evidence freshness and scope basis, using only the allowed execution docs plus read-only calibration/Signal Quality/frontend inspection, without touching application code/tests, route registries, Prisma/schema, generated files, shared utilities, shared UI, package manifests, providers, live/startup/backfill files, or other module source/tests.
+
+Updated:
+
+- `03-architecture/CF-W2-CAL-02-architecture-review.md`
+- `06-contracts/CF-W2-CAL-02-signal-calibration-evidence-basis-contract.md`
+- `08-work-packets/CF-W2-CAL-02-work-packet.md`
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Files inspected:
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/16-team-inboxes/TEAM-03-current-assignment.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-CAL-02-signal-calibration-evidence-freshness-and-scope-basis-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/active-work-board.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/99-decision-inbox/open-decisions.md`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.service.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.types.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.controller.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.router.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.validation.ts`
+- `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md`
+- `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.service.test.ts`
+- `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.routes.test.ts`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.types.ts`
+- `backend/src/modules/signal-quality-lab/signal-quality-lab.service.ts`
+- `frontend/src/features/signal-calibration-engine/api/signalCalibrationEngineService.ts`
+- `frontend/src/features/signal-calibration-engine/hooks/useSignalCalibrationEngine.ts`
+- `frontend/src/features/signal-calibration-engine/components/SignalCalibrationEnginePage.tsx`
+- `frontend/src/features/signal-calibration-engine/types.ts`
+- `frontend/tests/ui/signal-calibration-engine.spec.ts`
+
+Verdict:
+
+- `Ready candidate after QA`
+
+Architecture result:
+
+- The smallest honest child is `CF-W2-CAL-02A scoped evidence-basis projection`.
+- Truthful scope handling can stay additive by extending the existing `/signals/calibration/top` response instead of widening the module health route.
+- Row outputs should distinguish:
+  - calibration row generation time; and
+  - evidence-through timing from current scoped Signal Quality summary outputs.
+- The frontend page should stop using:
+  - unscoped `/signals/calibration/health`; and
+  - `items[0]` readiness/influence/warning/blocker fallback.
+- Exact future allowed files:
+  - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.service.ts`
+  - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.types.ts`
+  - `backend/src/modules/signal-calibration-engine/signal-calibration-engine.md`
+  - `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.service.test.ts`
+  - `frontend/src/features/signal-calibration-engine/types.ts`
+  - `frontend/src/features/signal-calibration-engine/api/signalCalibrationEngineService.ts`
+  - `frontend/src/features/signal-calibration-engine/hooks/useSignalCalibrationEngine.ts`
+  - `frontend/src/features/signal-calibration-engine/components/SignalCalibrationEnginePage.tsx`
+  - `frontend/tests/ui/signal-calibration-engine.spec.ts`
+- Optional only if explicit controller payload assertions are added:
+  - `backend/tests/modules/signal-calibration-engine/signal-calibration-engine.routes.test.ts`
+
+Exact forbidden scope:
+
+- calibration repository/controller/router/validation/module/index
+- backend/frontend route registries
+- all `signal-quality-lab` source/tests
+- all `data-quality-engine` source/tests
+- Prisma/schema/migrations
+- generated files
+- package manifests
+- shared backend utilities
+- shared UI
+- feature route files / app route files
+- provider/live/worker/queue/scheduler/startup/backfill files
+- Today Review, Market Data, Backtesting, Pipeline Ops, and all other module source/tests outside the reserved writer set
+
+Required QA handoff notes:
+
+- verify truthful scoped summary for selected `region`, `assetType`, and `horizon`
+- verify calibration row generation time is distinct from evidence-through date
+- verify horizon-limited evidence exposes `nextEvaluableDate`
+- verify missing Signal Quality evidence stays fail-closed and does not imply current proof
+- verify mixed row page states do not degrade to first-row readiness/influence/warning/blocker proxies
+- verify compare view and list rows use the same evidence-basis fields
+- verify the frontend no longer uses unscoped module health as the page summary source
+
+Stop rule:
+
+- if implementation proves repository/controller/router widening, schema/storage, shared UI, route registry, package/generated, or provider/live/startup/backfill changes are required, Team 00 must reopen the work as a split or consent-gated child instead of widening this packet silently
+
+Teams ready to pick up new tasks:
+
+- Team 04: QA planning for `CF-W2-CAL-02A`
+- Team 00: Ready evaluation after QA acceptance
+- Next Lane 2 implementation writer after Team 00 promotion
+- Team 10: review after QA and implementation handoff
+- Team 03: Architect Signoff after Team 10 acceptance
+
+Validation:
+
+- Tests run: none
+- Builds run: none
+- UI checks run: none
+- Live local data checks run: none
+- Reason: docs-only architecture readiness pass
+
 ## Team 03 CF-W1-DQ-02 Read-Side Currentness Readiness Prep - 2026-05-25
 
 Assignment: prepare docs-only architecture readiness for the residual `CF-W1-DQ-02` read-side/public-contract reconstruction packet, using the new residual requirement and current DQE / Market Data read-only evidence only, without touching application code/tests, package manifests, generated files, route registries, shared utilities, shared UI, frontend files, providers, services, Prisma, builds, or runtime processes.

@@ -4,6 +4,39 @@ Date: 2026-05-18
 
 Team: TEAM-02 - Requirement Factory
 
+## Latest Assignment Override - 2026-05-25 Research Evidence-Date Follow-Up
+
+Before creating or changing requirements, read root `AGENTS.md` and preserve the Product Owner direction: direct investor/trader value first, no Trade Plan/R:R/target-price framing, no financial-advice wording, and no app-code implementation from Team 02.
+
+Assignment:
+
+1. Consume Team 01's direct-value audit and refine the smaller non-storage research/actionability evidence-date wiring gap into a bounded requirement if current evidence supports it.
+2. Keep `CF-W2-CAL-02` out of fresh discovery because Team 03 architecture has completed and Team 04 QA planning is being routed.
+3. Keep `CF-W1-MD-02A`, `CF-W1-SQLAB-02B`, and `CF-W1-STRAT-02B` ranked as higher direct-value durable-proof proposals, but explicitly consent-gated and not Ready.
+4. Do not reopen active/accepted/parked items, Today Review writer-family work, `CF-W1-DQ-02-RS1`, or Trade Plan/target/R:R work.
+5. Update requirement queues only where needed; Team 00 owns Ready movement.
+
+Primary input:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/TEAM-01-direct-value-gap-audit-2026-05-25.md`
+
+Read-only source hints from Team 01:
+
+- `backend/src/modules/research-hub/research-hub.service.ts`
+- `frontend/src/features/research-hub/api/researchHubApi.ts`
+
+Allowed writes:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/**`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+Required output:
+
+- Requirement draft or explicit no-go note for the research/actionability evidence-date wiring gap.
+- Acceptance criteria must preserve research-support language and avoid advice-like, target-price, R:R, or Trade Plan-first wording.
+- Queue updates must keep consent-gated storage/history proposals honest and must not move any item to Ready.
+- Recommended next Team 03 handoff if a bounded requirement is viable.
+
 ## Latest Assignment Override - 2026-05-24 Trusted Signal Candidate Dependency
 
 Before creating or changing requirements, read root `AGENTS.md` and preserve the Product Owner direction: direct investor/trader value first, no Trade Plan/R:R/target-price framing, no financial-advice wording, and no app-code implementation from Team 02.

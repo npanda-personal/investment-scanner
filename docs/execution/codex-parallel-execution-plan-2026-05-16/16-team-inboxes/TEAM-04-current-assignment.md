@@ -2,6 +2,50 @@
 
 Date: 2026-05-20
 
+## Latest Assignment Override - 2026-05-25 CAL-02A QA Planning
+
+Prepare docs-only QA planning for `CF-W2-CAL-02A` Signal Calibration scoped evidence-basis projection.
+
+Team 03 verdict: `Ready candidate after QA`.
+
+This is QA planning only. Do not implement application code. Do not run tests, builds, services, providers, Prisma commands, UI smoke, or live data. Do not move the item to Ready.
+
+Source inputs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-CAL-02-signal-calibration-evidence-freshness-and-scope-basis-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W2-CAL-02-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W2-CAL-02-signal-calibration-evidence-basis-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W2-CAL-02-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Allowed writes:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W2-CAL-02-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-CF-W2-CAL-02-qa-outbox.md`
+
+Required QA coverage:
+
+- scoped summary uses selected `region`, `assetType`, and `horizon`;
+- row `generatedAt` remains distinct from evidence-through date;
+- horizon-limited evidence exposes `nextEvaluableDate`;
+- missing Signal Quality evidence fails closed;
+- mixed-row page states do not use first-row readiness, influence, warning, or blocker proxies;
+- compare/list parity for row evidence-basis fields;
+- page summary no longer relies on unscoped `/signals/calibration/health`;
+- no calibration repository/controller/router/validation/module/index, route registry, Signal Quality source/test, Prisma/schema/generated/package/shared utility/shared UI/provider/startup/backfill scope.
+
+Required focused validation commands to recommend, not run:
+
+- `npm.cmd test -- signal-calibration-engine.service.test.ts --runInBand`
+- `npm.cmd run build`
+- `npm.cmd run test:ui -- signal-calibration-engine.spec.ts --workers=1`
+
+Output:
+
+- Create the QA plan and item-specific outbox.
+- State whether the packet is QA-plan ready for Team 00 Ready evaluation.
+- List exact reject conditions and any remaining blocker.
+
 ## Latest Assignment Override - 2026-05-25 DQ-02 Read-Side Currentness QA Planning
 
 Prepare docs-only QA planning for `CF-W1-DQ-02-RS1` Data Quality Engine read-side/public-contract currentness reconstruction.

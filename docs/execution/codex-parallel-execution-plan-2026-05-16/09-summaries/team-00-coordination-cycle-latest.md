@@ -2,6 +2,38 @@
 
 Date: 2026-05-24
 
+## Latest Runtime Checkpoint - CAL Architecture And DQ QA Verification
+
+Date: 2026-05-25
+
+Current status:
+
+- Branch: `dev`.
+- Open decisions: 0.
+- Product Owner action required: no.
+- Push performed: no.
+- Active Team 07 rework agent: `019e5ed4-6f08-7433-b86d-d71ee7cf464a`.
+- Active Team 04 DQ QA verification agent: `019e5ed8-5cea-7cf3-8e74-ef91fe2607d9`.
+
+Gate movement:
+
+- Team 03 completed `CF-W2-CAL-02` architecture with verdict `Ready candidate after QA`.
+- Team 01 completed next direct-value audit; post-`CAL-02` durable-proof candidates remain consent-gated.
+- Team 05 completed `CF-W1-DQ-02-RS1` implementation; Team 04 QA verification is active in the Team 05 worktree.
+- Team 07 remains active on bounded `CF-W2-TSC-05A` QA-rejection rework.
+
+Teams ready to pick up new tasks:
+
+- Team 07: active on `CF-W2-TSC-05A` QA-rejection rework.
+- Team 04: active on `CF-W1-DQ-02-RS1` QA verification; ready for `CF-W2-CAL-02A` QA planning in a separate docs-only scope.
+- Team 10: Code Review after Team 04 acceptance.
+- Team 02: research/actionability evidence-date requirement refinement.
+- Team 03: Architect Signoff after Team 10 acceptance.
+
+Product Owner action required: no.
+
+---
+
 ## Latest Runtime Checkpoint - TSC QA And DQ Ready Promotion
 
 Date: 2026-05-25
