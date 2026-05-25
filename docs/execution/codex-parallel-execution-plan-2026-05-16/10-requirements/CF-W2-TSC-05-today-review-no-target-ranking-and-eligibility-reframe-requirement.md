@@ -30,9 +30,11 @@ Trusted candidate ranking should prioritize:
 - data-quality readiness and currentness;
 - current signal health or blockage;
 - supporting backtesting/calibration/status evidence already approved for reuse;
-- reason summary and missing-evidence honesty.
+- reason summary and missing-evidence honesty;
+- compact read-only freshness or in-progress status when a candidate is waiting on downstream publication or refresh evidence.
 
 Target/reward, synthetic target levels, reward/risk thresholds, and trade-plan-first geometry must not decide whether a candidate appears trusted or how it is ranked in the trusted workflow.
+If stale or pending-refresh state affects eligibility, the workflow may only show compact read-only status on Today Review. Manual reruns and bulk controls stay in `Pipeline Ops`.
 
 ## Acceptance Criteria
 
@@ -40,6 +42,7 @@ Target/reward, synthetic target levels, reward/risk thresholds, and trade-plan-f
 - If legacy trade-plan compatibility data is present, it is either excluded from trusted candidate ranking logic or explicitly marked compatibility-only where architecture approves.
 - Lite candidate logic does not synthesize trusted-looking target evidence from fixed 2R/3R geometry.
 - Candidate detail and grouped list continue to show entry evidence, invalidation/risk context, blockers, DQ readiness, supporting trust evidence, and missing-evidence explanations.
+- Any stale or in-progress refresh state shown on Today Review remains compact and read-only. Ranking cleanup must not introduce page-local bulk refresh, rerun, or manual pipeline controls.
 - The requirement stays additive and bounded to Today Review source/tests/docs unless Team 03 explicitly proves an upstream dependency must be split first.
 - No Prisma/schema, route registry, shared UI, package manifest, generated type, provider/live, startup/backfill, broker, paid service, or broad Trade Plan rewrite is included.
 
@@ -50,6 +53,7 @@ Target/reward, synthetic target levels, reward/risk thresholds, and trade-plan-f
 - No new persistence model for candidate snapshots.
 - No schema migration.
 - No route changes.
+- No Pipeline Ops command button, bulk refresh control, or page-local manual trigger control on Today Review.
 - No direct buy/sell advice.
 - No attempt to solve Today Review language cleanup, ranking cleanup, and downstream consumer adoption in one unbounded pass unless Team 03 explicitly re-slices it.
 
@@ -57,6 +61,7 @@ Target/reward, synthetic target levels, reward/risk thresholds, and trade-plan-f
 
 - `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` should finish first so Today Review reserved files are released.
 - `CF-W2-TSC-04` remains the earlier language-cleanup companion; this requirement addresses ranking/promotion semantics, not just copy.
+- `CF-W3-MDPIPE-01B3` direction remains in force: individual screens may show compact status only, while `/pipeline-ops` owns monitoring and manual trigger controls.
 - Team 03 should confirm whether this can remain a Today Review-only read-path change or needs a narrower child split between Lite candidate generation and persisted candidate presentation.
 
 ## Likely Module Ownership

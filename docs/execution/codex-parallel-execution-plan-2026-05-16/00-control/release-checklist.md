@@ -137,3 +137,39 @@ Release notes:
 - Scheduled Market Data can now trigger a ledgered Data Quality stage only for changed instruments from the current scheduled pass.
 - Empty changed sets do not widen into full-scope Data Quality.
 - Existing manual Pipeline Ops Data Quality command behavior is preserved.
+
+## CF-W3-MDPIPE-01B5 - Data Quality Local Control Removal
+
+Date: 2026-05-25
+
+Status: Accepted and locally committed as `3f850d1 feat: remove data quality local evaluate controls`.
+
+Evidence:
+
+- Requirement: `10-requirements/CF-W3-MDPIPE-01B3-bulk-pipeline-ops-dashboard-requirement.md`
+- Architecture: `03-architecture/CF-W3-MDPIPE-01B5-data-quality-first-child-control-removal-architecture.md`
+- Contract: `06-contracts/CF-W3-MDPIPE-01B5-data-quality-page-control-removal-contract.md`
+- Work packet: `08-work-packets/CF-W3-MDPIPE-01B5-data-quality-first-child-work-packet.md`
+- QA verification: `04-qa/CF-W3-MDPIPE-01B5-qa-verification.md`
+- Code review: `13-implementation-evidence/CF-W3-MDPIPE-01B5-code-review.md`
+- Architect signoff: `03-architecture/CF-W3-MDPIPE-01B5-architect-signoff.md`
+- PO acceptance: `09-summaries/CF-W3-MDPIPE-01B5-po-acceptance-packet.md`
+- Developer handoff: `18-integration-queue/CF-W3-MDPIPE-01B5-developer-handoff.md`
+
+Validation:
+
+- Frontend build passed.
+- Focused UI smoke passed: `pipeline-ops.spec.ts data-quality-engine.spec.ts --workers=1`.
+- Initial Playwright run hit the known local artifact cleanup `EPERM`; rerun passed.
+
+Skipped:
+
+- Backend tests, because this is a frontend-only Data Quality page-control slice.
+- Live provider, scheduler, startup/backfill, and downstream processing checks, because this slice removes UI-local controls only.
+
+Release notes:
+
+- `/data-quality` no longer exposes page-local or drawer-local `Evaluate Scope` controls.
+- `/data-quality` no longer renders the local batch progress surface.
+- `/data-quality` keeps the compact read-only Data Quality pipeline status strip.
+- `/pipeline-ops` remains the sole manual Data Quality bulk command surface.

@@ -69,6 +69,7 @@ The first health child should focus on:
 - documented exit or invalidation rule status when available;
 - documented weakening or risk-warning reason when available;
 - compact health reason summary and missing-evidence reasons;
+- compact read-only stale or in-progress freshness status when health cannot yet be refreshed from current trusted evidence;
 - backwards-compatible read-path outputs for Today Review or a later active-candidate monitor;
 - no target price, arbitrary profit target, R:R, synthetic reward range, or direct buy/sell wording.
 
@@ -76,6 +77,7 @@ The first health child should focus on:
 
 - `Exit Triggered` and `Invalidated` require documented exit or invalidation rule proof.
 - `Healthy`, `Weakening`, and `Risk Warning` require a visible rule/version or evidence basis.
+- Surfaces using this projection may show compact read-only waiting, stale, or refresh-pending status, but they must not add page-local bulk refresh or manual pipeline controls. Manual remediation stays in `Pipeline Ops`.
 - Missing, blocked, stale-hard-blocked, or unsupported Data Quality cannot produce `Healthy`.
 - If evidence is partial or unsupported, the candidate should remain `Active` with a review reason or fall to `Blocked`; do not fabricate certainty.
 - The first child must not derive health only from price movement, Trade Plan compatibility fields, stop geometry, or target-shaped calculations.

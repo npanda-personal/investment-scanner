@@ -2,11 +2,11 @@
 
 Date: 2026-05-25
 
-Status: Team 02 rolling PO refresh after source/docs audit, the Pipeline Ops command API commit, and the B6 compact-indicator promotion. This file is a docs-only candidate view, not proof of implementation readiness. Team 00 still owns Ready movement, exact file reservations, and one-writer sequencing.
+Status: Team 02 rolling PO refresh after source/docs audit, active Team 00 and Team 03 prep on `CF-W2-TSC-04`, active Team 00 and Team 08 gating on `CF-W3-MDPIPE-01B5`, and the B6 compact-indicator follow-up. This file is a docs-only candidate view, not proof of implementation readiness. Team 00 still owns Ready movement, exact file reservations, and one-writer sequencing.
 
 Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-02A` are accepted and locally committed parked branches, not fresh implementation pulls.
 
-Team 02 audit update: `CF-W1-MD-05`, `CF-W1-TSC-02A-TREV-HEALTH`, `CF-W2-SIG-01A`, `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`, `CF-W2-BT-05`, and `CF-W1-BT-04` have moved through implementation/validation gates and must not be reassigned as fresh pulls. `CF-W3-MDPIPE-01B4` is accepted and locally committed pipeline command API work, while `CF-W3-MDPIPE-01B6` is active Team 08 compact-indicator follow-up; both stay out of PO discovery. Fresh-pull value should stay on Today Review cleanup, active candidate health, DQ residual truth, and durable trust evidence.
+Team 02 audit update: `CF-W1-MD-05` is promoted and assigned to Team 05, while `CF-W1-TSC-02A-TREV-HEALTH`, `CF-W2-SIG-01A`, `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`, `CF-W2-BT-05`, and `CF-W1-BT-04` have moved through implementation/validation gates. None of those items should be reassigned as fresh Team 02 pulls. `CF-W3-MDPIPE-01B3` and `CF-W3-MDPIPE-01B4` already establish the Pipeline Ops split: `/pipeline-ops` owns monitoring and manual triggers, while individual screens may show only compact read-only freshness/progress state. Active `CF-W3-MDPIPE-01B5` and `CF-W3-MDPIPE-01B6` remain in the pipeline lane and stay out of PO discovery. Fresh-pull value should stay on Today Review cleanup, active candidate health, DQ residual truth, and durable trust evidence.
 
 Team 00 correction: `CF-W1-SIG-LATEST-01` is not a current candidate. It was accepted under standing delegation on 2026-05-17 and is documented in `09-summaries/CF-W1-SIG-LATEST-01-summary.md`, `09-summaries/CF-W1-SIG-LATEST-01-po-acceptance-packet.md`, and gate evidence under `03-architecture/`, `04-qa/`, and `13-implementation-evidence/`.
 
@@ -33,15 +33,16 @@ After `TSC-03A` and `BT-05` closure, the remaining unassigned investor/trader-va
 - `CF-W1-TSC-01A-TREV` is accepted and locally committed on its Team 07 branch as `9fbc989`; do not re-rank it as an unassigned Team 02 candidate.
 - `CF-W1-TSC-01A-SIG` is accepted and locally committed upstream; `CF-W1-DQ-03` is active with Team 05. Do not duplicate either as fresh Team 02 work.
 - `CF-W1-SIG-TRIGGER-ENTRY-01` is accepted and locally committed as `649e645`; it is no longer a fresh prep item.
-- `CF-W1-MD-05` is now the top upstream trust candidate and should be evaluated before downstream Today Review work once Team 04 QA plan exists.
-- `CF-W1-TSC-02A-TREV-HEALTH` has Team 03 architecture and Team 04 QA planning, but remains out of Ready until Team 00 promotes the stacked Team 07 worktree.
+- `CF-W1-MD-05` is promoted and assigned to Team 05; keep it out of fresh Team 02 pulls.
+- `CF-W1-TSC-02A-TREV-HEALTH` is already accepted and committed as `34c9993`; keep it out of fresh Team 02 pulls.
 - `CF-W1-TP-03` is paused/stale as framed because Product Owner rejected Trade Plan-first, R:R, and arbitrary target workflow direction. Do not execute it unless reframed into Trusted Signal Candidate health without targets/R:R.
 - `CF-W1-BT-04` is no longer an unassigned requirement-ready item; it is accepted and locally committed on the Team 06 branch as `2bd794f`.
-- `CF-W1-TSC-03` is a new Team 02 draft and should be the next Today Review supporting-trust architecture-prep candidate after `TSC-02A`.
+- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` has already moved through implementation and validation; do not reopen the parent as a fresh Team 02 pull unless Team 00 intentionally opens a new child.
 - `CF-W2-SIG-01A` has completed validation and local evidence commit `24f938b`; do not reopen it unless new source evidence proves a regression.
 - `CF-W1-SIG-LATEST-01` is already accepted from 2026-05-17; do not route it as fresh implementation.
 - `CF-W2-BT-05` is promoted and assigned to Team 06; do not route it as fresh planning work.
 - `CF-W2-TSC-04` and `CF-W2-TSC-05` remain planning-only Today Review follow-ons until the active Today Review writer set is free.
+- `CF-W2-TSC-04` is already in active Team 00 and Team 03 prep; keep it as the top planning slice, but do not let parallel Today Review follow-ons collide with the same writer set.
 - The 2026-05-20 backtesting proof-basis audit keeps `CF-W1-BT-03` parked, and `CF-W1-BT-04` has now moved through implementation and validation.
 - `CF-W1-RH-03` is accepted and locally committed as `5bd176b`; do not treat it as a fresh Team 02 pull.
 - `CF-W3-MDPIPE-01B4` is accepted and locally committed as `8d45ddc`; do not treat it as a fresh Team 02 pull.
@@ -62,7 +63,7 @@ After `TSC-03A` and `BT-05` closure, the remaining unassigned investor/trader-va
 - `CF-W1-RH-01`, `CF-W1-MD-01`, `CF-W1-MD-04`, `CF-W1-HCTX-02`, `CF-W1-MD-03`, `CF-W1-MCTX-01`, `CF-W1-TP-02`, `CF-W1-SIG-02`, `CF-W1-STRAT-03`, `CF-W1-L3-WATCH-01`, `CF-W1-BT-02`, and `CF-W1-CAL-01` are accepted, committed, parked, or otherwise already in the live gate path and stay out of fresh Team 02 discovery.
 - `CF-W1-TP-03` must stay separate from active/accepted `TP-01A`, `TP-01B`, and `TP-02`.
 - `CF-W1-BT-04` must stay separate from accepted `BT-03` and must not be widened into advanced validation work.
-- `CF-W3-MDPIPE-01B4` and `CF-W3-MDPIPE-01B6` are outside Team 02 discovery; keep them in the pipeline lane.
+- `CF-W3-MDPIPE-01B5` and `CF-W3-MDPIPE-01B6` stay in the pipeline lane. Do not open a separate Team 02 requirement unless a user-facing trust gap remains after the compact-indicator and page-control migration slices land.
 
 ## Priority Rule
 

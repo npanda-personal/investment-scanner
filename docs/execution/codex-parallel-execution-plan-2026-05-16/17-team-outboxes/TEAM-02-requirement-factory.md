@@ -1,5 +1,75 @@
 # TEAM-02 Requirement Factory
 
+## Team 02 Rolling PO Requirement Audit - Today Review / Pipeline Ops Alignment - 2026-05-25
+
+Root `AGENTS.md` was read first. Team 02 stayed docs-only, wrote only inside the reserved requirement folder and this outbox, and did not touch application code, tests, manifests, Prisma, shared files, or Team 00 control docs.
+
+### Files Inspected
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-TSC-04-today-review-no-target-candidate-language-cleanup-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-TSC-05-today-review-no-target-ranking-and-eligibility-reframe-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-TSC-02-active-signal-health-rule-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-TSC-03-today-review-supporting-trust-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MD-05-catalog-sync-latest-session-freshness-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-TREV-01-today-review-publication-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-TREV-02-today-review-candidate-snapshot-provenance-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-DQ-02-dq-currentness-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W3-MDPIPE-01-incremental-market-data-pipeline-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W3-MDPIPE-01B1-durable-pipeline-ledger-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W3-MDPIPE-01B2-pipeline-status-api-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W3-MDPIPE-01B3-bulk-pipeline-ops-dashboard-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W3-MDPIPE-01B4-command-api-manual-trigger-safety-requirement.md`
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-TSC-04-today-review-no-target-candidate-language-cleanup-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-TSC-05-today-review-no-target-ranking-and-eligibility-reframe-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-TSC-02-active-signal-health-rule-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+### Ranking Decision
+
+- No new requirement outranks the existing direct investor/trader stack.
+- Top three remain unchanged:
+  1. `CF-W2-TSC-04`
+  2. `CF-W2-TSC-05`
+  3. `CF-W1-TSC-02`
+- The ranking stayed intact because the latest Pipeline Ops direction is already covered by the MDPIPE lane. It does not create a separate higher-priority Team 02 discovery item.
+- The candidate docs were stale in their notes, not in their top-three ordering. Stale `MD-05` and `TSC-03` dispatch language was normalized so the written guidance matches the actual active gate state.
+
+### New / Updated Requirements
+
+- No new requirement ID was created in this pass.
+- Updated `CF-W2-TSC-04` to state that Today Review may show compact read-only stale or in-progress freshness/status context, but it must not gain page-local manual pipeline or bulk refresh controls.
+- Updated `CF-W2-TSC-05` to keep the same no-target ranking/eligibility scope while explicitly preserving the Pipeline Ops split: compact read-only status is allowed, local rerun controls are not.
+- Updated `CF-W1-TSC-02` so future active-candidate health surfaces may expose compact read-only stale or refresh-pending status, but manual remediation stays in `Pipeline Ops`.
+- Updated the two top-10 queue docs to reflect:
+  - active Team 00 and Team 03 prep on `CF-W2-TSC-04`,
+  - active Team 00 and Team 08 gating on `CF-W3-MDPIPE-01B5`,
+  - the settled `/pipeline-ops` vs. compact feature-page status split,
+  - `CF-W1-MD-05` and `CF-W1-TSC-03A` no longer being described as fresh Team 02 pulls.
+
+### Blockers
+
+- Team 00 and Team 03 are already using the Today Review planning lane for `CF-W2-TSC-04`; Team 02 must avoid widening that slice or creating a competing Today Review child on the same writer set.
+- Team 00 and Team 08 own the live `CF-W3-MDPIPE-01B5` and `CF-W3-MDPIPE-01B6` pipeline lane follow-ons.
+- Team 02 has no authority to move any item to Ready.
+- No separate Team 02 requirement should be opened for Pipeline Ops unless a remaining investor-facing trust gap persists after the current compact-indicator and page-control migration slices land.
+
+### Recommended Next Team 00 Action
+
+- Continue `CF-W2-TSC-04` architecture and QA prep with Team 03 and Team 04.
+- Keep `CF-W2-TSC-05` queued directly behind `CF-W2-TSC-04`, but do not open it on the same Today Review writer set until the first packet clears.
+- Keep `CF-W1-TSC-02` as the next active-candidate-health requirement after the two Today Review cleanup slices.
+- Keep `CF-W3-MDPIPE-01B5` and `CF-W3-MDPIPE-01B6` in the pipeline lane. Do not route them back through Team 02 discovery.
+- Do not move any item to Ready from this Team 02 pass.
+
 ## Team 02 Rolling PO Discovery - Pipeline Ops Coverage Check - 2026-05-25
 
 Root `AGENTS.md` and the current requirement queue were re-read for a docs-only priority refresh. Team 02 kept the pass bounded to requirements discovery and did not touch application code, ready queues, or other team outboxes.

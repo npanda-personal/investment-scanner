@@ -57,4 +57,4 @@ No route registry, shared UI, backend source/test, Prisma/schema, generated file
 
 ## Commit Status
 
-Pending Team 00 scoped staging and local commit.
+Scoped local commit completed: `3f850d1 feat: remove data quality local evaluate controls`.

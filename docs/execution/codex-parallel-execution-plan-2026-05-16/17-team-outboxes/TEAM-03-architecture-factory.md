@@ -1,5 +1,105 @@
 # Team 03 Architecture Factory Outbox
 
+## Team 03 CF-W3-MDPIPE-01B5 Architect Signoff - 2026-05-25
+
+Assignment: perform Architect Signoff for `CF-W3-MDPIPE-01B5` after Team 04 QA ACCEPT and Team 10 review ACCEPT, using only the allowed signoff docs and without modifying application source/tests or touching unrelated Team 00 / Team 07 work.
+
+Updated:
+
+- `03-architecture/CF-W3-MDPIPE-01B5-architect-signoff.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Read-only evidence inspected:
+
+- root `AGENTS.md`
+- `18-integration-queue/CF-W3-MDPIPE-01B5-developer-handoff.md`
+- `04-qa/CF-W3-MDPIPE-01B5-qa-verification.md`
+- `13-implementation-evidence/CF-W3-MDPIPE-01B5-code-review.md`
+- `06-contracts/CF-W3-MDPIPE-01B5-data-quality-page-control-removal-contract.md`
+- `03-architecture/CF-W3-MDPIPE-01B5-data-quality-first-child-control-removal-architecture.md`
+- `frontend/src/features/data-quality-engine/components/DataQualityEnginePage.tsx`
+- `frontend/tests/ui/data-quality-engine.spec.ts`
+- supporting read-only `DataQualityPipelineStatusStrip.tsx`, `pipeline-ops.spec.ts`, and workspace `git status` / `git diff` evidence
+
+Architecture verdict:
+
+- `CF-W3-MDPIPE-01B5` is ACCEPTED for Architect Signoff.
+- The implementation stays inside the approved B5 child boundary: Data Quality page only, with page-local bulk controls removed and the accepted compact read-only strip preserved.
+- Manual scoped execution remains centralized on `/pipeline-ops`; `/data-quality` emits no local bulk POST path and keeps only diagnostics/readiness behavior plus local `Refresh`.
+- No B6 strip-component drift, Pipeline Ops feature drift, shared UI drift, route/navigation drift, backend/package/schema/generated drift, or provider/live/scheduler/startup widening was observed.
+- The reserved writer set was respected: current dirty application scope for this child remains exactly `DataQualityEnginePage.tsx` plus `data-quality-engine.spec.ts`.
+- Team 04 QA ACCEPT and Team 10 review ACCEPT provide sufficient evidence for delegated Product Owner acceptance on this narrow child.
+
+Validation:
+
+- Team 03 did not rerun builds, tests, services, or UI checks.
+- Team 03 relied on Team 04 QA ACCEPT and Team 10 review ACCEPT, then performed bounded source, spec, and workspace-scope inspection.
+
+No commits or pushes were performed.
+
+## Team 03 CF-W2-TSC-04 Today Review No-Target Candidate Language Prep - 2026-05-25
+
+Assignment: prepare docs-only architecture for the next Today Review investor/trader-value follow-up, `CF-W2-TSC-04`, without modifying application code/tests, ready queues, active board, Team 08 docs, Data Quality docs, or Pipeline Ops files.
+
+Updated:
+
+- `03-architecture/CF-W2-TSC-04-architecture-review.md`
+- `06-contracts/CF-W2-TSC-04-today-review-no-target-candidate-language-cleanup-contract.md`
+- `08-work-packets/CF-W2-TSC-04-work-packet.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Read-only evidence inspected:
+
+- root `AGENTS.md`
+- `10-requirements/CF-W2-TSC-04-today-review-no-target-candidate-language-cleanup-requirement.md`
+- `10-requirements/CF-W2-TSC-05-today-review-no-target-ranking-and-eligibility-reframe-requirement.md`
+- `10-requirements/next-top-10-candidates.md`
+- `10-requirements/top-10-ready-candidates.md`
+- accepted Today Review prep docs for `TSC-01A`, `TSC-02`, and `TSC-03`
+- current Today Review backend/frontend source, module doc, focused tests, and UI smoke spec
+
+Architecture verdict:
+
+- `CF-W2-TSC-04` should not move as one unsplit parent packet.
+- The smallest honest executable child is `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE`.
+- Source inspection proved this is not frontend-copy-only: current Today Review service still emits target/reward, reward/risk, paper-review, and Trade Plan-first reason language, so a bounded no-schema Today Review read-path mapping layer is required.
+- The child remains Today Review-only and no-schema, with exact writer reservation limited to the existing Today Review service/types/doc/test and page/detail/spec files.
+- Ranking, promotion, confidence, Lite target generation, and reward/risk threshold cleanup remain explicitly out of scope and belong to `CF-W2-TSC-05`.
+- Required implementation base is accepted `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` commit `09bbf9b`.
+- The child can be Ready after Team 04 writes the QA plan and Team 00 records the bounded Ready promotion.
+
+Exact future reservation direction:
+
+- allowed writer set:
+  - `backend/src/modules/today-trade-review/today-trade-review.types.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.service.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.md`
+  - `backend/tests/modules/today-trade-review/today-trade-review.service.test.ts`
+  - `frontend/src/features/today-trade-review/types.ts`
+  - `frontend/src/features/today-trade-review/components/TodayReviewPage.tsx`
+  - `frontend/src/features/today-trade-review/components/TodayReviewCandidateDetailPage.tsx`
+  - `frontend/tests/ui/today-trade-review.spec.ts`
+- forbidden scope includes:
+  - Today Review repository/controller/router/validation/index files
+  - Today Review api/hooks/routes files
+  - backend/frontend route registries
+  - shared UI / shared backend utilities
+  - Prisma/schema/migrations/generated
+  - package manifests
+  - upstream modules including Trade Plan, Signal Generation, Strategy Decision, DQ, Calibration, and Backtesting
+  - `frontend/src/features/data-quality-engine/**`
+  - `frontend/src/features/pipeline-ops/**`
+
+Required QA handoff focus for Team 04:
+
+- verify touched Today Review surfaces remove visible target/reward, reward/risk, modeled reward, paper-review, trade-plan geometry, and Trade-plan proof-chain language;
+- verify trusted entry wording uses source-proven trigger evidence when present and explicit unavailable/missing evidence when absent;
+- verify any remaining Trade Plan compatibility context is labeled compatibility-only or hidden from trusted candidate framing;
+- verify supporting evidence and active-health semantics from accepted `09bbf9b` stay intact;
+- verify no ranking, grouping, promotion, or confidence behavior changes in this slice.
+
+No tests, builds, services, UI runs, commits, or pushes were run.
+
 ## Team 03 CF-W3-MDPIPE-01B6 Architect Signoff - 2026-05-25
 
 Assignment: perform Architect Signoff for `CF-W3-MDPIPE-01B6` after Team 04 QA ACCEPT and Team 10 review ACCEPT, using only the allowed signoff docs and without modifying application source/tests or touching Team 10 parallel backend `01C` work.

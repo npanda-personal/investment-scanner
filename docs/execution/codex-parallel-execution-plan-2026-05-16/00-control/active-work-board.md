@@ -145,6 +145,30 @@ Teams ready to pick up new tasks:
 - Team 10: Code Review after Team 04 acceptance.
 - Team 03: Architect Signoff after Team 10 acceptance.
 
+## Latest Team 00 Routing Update - B5 Review Accepted And TSC-04A Promotion
+
+Date: 2026-05-25
+
+Gate status:
+
+- `CF-W3-MDPIPE-01B5` Team 08 implementation completed in the reserved Data Quality page scope.
+- Team 04 QA accepted B5 after frontend build and focused `pipeline-ops.spec.ts data-quality-engine.spec.ts` UI coverage passed on rerun after the known Playwright artifact cleanup issue.
+- Team 10 code review accepted B5 with no blocking defects.
+- Team 03 Architect Signoff accepted B5.
+- Team 00 accepted B5 under standing Product Owner delegation.
+- Scoped local commit completed: `3f850d1 feat: remove data quality local evaluate controls`.
+- Team 03 architecture prep split `CF-W2-TSC-04` into the bounded child `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE`.
+- Team 04 accepted the `CF-W2-TSC-04A` QA plan.
+- Team 00 promoted `CF-W2-TSC-04A` to Team 07 in dedicated worktree `C:\work\repo\investment-scanner-worktrees\team07-CF-W2-TSC-04A` on branch `codex/team07-portfolio-alerts/CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE`.
+
+Teams ready to pick up new tasks:
+
+- Team 03: complete B5 Architect Signoff.
+- Team 07: implement `CF-W2-TSC-04A` in the dedicated Today Review worktree.
+- Team 04: QA Verification after Team 07 TSC-04A handoff.
+- Team 10: Code Review after the next Team 04 acceptance.
+- Team 03: Architect Signoff after the next Team 10 acceptance.
+
 ## Latest Team 00 Routing Update - Pipeline Command API Accepted
 
 Date: 2026-05-25

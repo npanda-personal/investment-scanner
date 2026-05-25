@@ -12,12 +12,12 @@ Current active agents:
 
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Open slot | none | pending | implementation | Team 08 for `CF-W3-MDPIPE-01B5` | ready |
-| 2 | Open slot | none | pending | QA verification | Team 04 for `CF-W3-MDPIPE-01B5` after handoff | waiting |
-| 3 | Open slot | none | pending | rolling requirements | Team 02 next direct-value audit cycle | ready |
-| 4 | Open slot | none | pending | architecture/signoff | B5 blocked until B6 acceptance; Team 03 signoff after next review acceptance | waiting |
-| 5 | Open slot | none | pending | review | Team 10 for B6 after Team 04 QA rerun | waiting |
-| 6 | Open slot | none | pending | review | Team 10 review after next QA-accepted handoff | waiting |
+| 1 | Team 08 - UX / Research / Copilot | `019e5e61-f6a7-7420-9e69-bc9337dc139f` | `gpt-5.3-codex`, high | implementation | `CF-W3-MDPIPE-01B5` Data Quality control removal | completed; closed |
+| 2 | Team 04 - QA Factory | `019e5e68-5a76-72d3-9f21-bd0cf7f3f36c` | `gpt-5.4`, medium | QA verification | `CF-W3-MDPIPE-01B5` after Team 08 handoff | accepted; closed |
+| 3 | Team 02 - PO / Requirement Factory | `019e5e65-6bfb-7d11-b99b-33eeea41e54e` | `gpt-5.4`, high | rolling requirements | investor/trader-value backlog refresh after Pipeline Ops direction | completed; closed |
+| 4 | Team 03 - Architecture Factory | `019e5e62-87a0-7181-b0f4-7394fa9ea451` | `gpt-5.4`, high | architecture prep | `CF-W2-TSC-04` Today Review no-target candidate-language cleanup | completed; closed |
+| 5 | Team 03 - Architect Signoff | `019e5e70-477c-7872-82fc-a31a2231107b` | `gpt-5.4`, high | signoff | `CF-W3-MDPIPE-01B5` after Team 10 ACCEPT | active |
+| 6 | Team 07 - Portfolio / Watchlist / Alerts | `019e5e70-ce2e-7262-b253-110cc4d986ca` | `gpt-5.3-codex`, high | implementation | `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE` | active |
 
 Teams ready to pick up new tasks:
 
@@ -31,7 +31,17 @@ Teams ready to pick up new tasks:
 - Team 10: accepted 01C review; closed.
 - Team 03: accepted 01C Architect Signoff; closed.
 - Team 00: accepted 01C under standing Product Owner delegation; local commit `da66fa4 feat: add scheduled data quality stage` completed.
-- Team 08: ready to pick up `CF-W3-MDPIPE-01B5` Data Quality control removal.
+- Team 08: active on `CF-W3-MDPIPE-01B5` Data Quality control removal.
+- Team 08: completed `CF-W3-MDPIPE-01B5` Data Quality control removal; closed after handoff.
+- Team 04: accepted `CF-W3-MDPIPE-01B5` QA verification; closed.
+- Team 10: accepted `CF-W3-MDPIPE-01B5` code review; closed.
+- Team 03: accepted `CF-W3-MDPIPE-01B5` Architect Signoff; closed.
+- Team 00: accepted `CF-W3-MDPIPE-01B5` under standing Product Owner delegation and committed `3f850d1 feat: remove data quality local evaluate controls`.
+- Team 02: completed rolling direct investor/trader-value backlog refresh; priority remains `CF-W2-TSC-04`, `CF-W2-TSC-05`, `CF-W1-TSC-02`.
+- Team 03: completed `CF-W2-TSC-04` architecture prep; proposed `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE`.
+- Team 04: accepted `CF-W2-TSC-04A` QA planning; closed.
+- Team 00: promoted `CF-W2-TSC-04A` to Team 07 in dedicated worktree `C:\work\repo\investment-scanner-worktrees\team07-CF-W2-TSC-04A`.
+- Team 07: active on `CF-W2-TSC-04A` implementation.
 - Team 03: completed architecture prep for `CF-W3-MDPIPE-01C`; later ready for B6 Architect Signoff after Team 10 acceptance.
 - Team 02: completed rolling direct-value and Pipeline Ops priority refresh; no new item outranks `CF-W2-TSC-04`, `CF-W2-TSC-05`, or `CF-W1-TSC-02`.
 - Team 02: completed read-mostly rolling PO audit with no file changes and no priority reorder.
@@ -46,6 +56,7 @@ Queued next:
 4. Team 03 signs off B6 after Team 10 acceptance.
 5. Team 04 verifies `CF-W3-MDPIPE-01C` after Team 05 handoff.
 6. Team 00 consumes Team 02 / Team 03 docs-only outputs when they finish.
+7. Team 04 plans `CF-W2-TSC-04` QA if Team 03 returns a bounded architecture packet.
 
 Completed agents:
 

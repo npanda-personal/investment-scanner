@@ -6,10 +6,76 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+2026-05-25 Team 00 Ready promotion - `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE`:
+
+- `CF-W2-TSC-04A` is promoted and assigned to Team 07.
+- Current gate state: Ready for bounded Today Review implementation.
+- Purpose: remove target/reward, reward/risk, paper-review, and Trade Plan-first wording from touched Today Review trusted-candidate list/detail/doc/spec surfaces without changing ranking, grouping, promotion, confidence, eligibility, reward/risk thresholds, or Lite target generation.
+- Branch: `codex/team07-portfolio-alerts/CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team07-CF-W2-TSC-04A`.
+- Required base: accepted `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` commit `09bbf9b`.
+- Gate evidence:
+  - Requirement: `10-requirements/CF-W2-TSC-04-today-review-no-target-candidate-language-cleanup-requirement.md`
+  - Architecture review: `03-architecture/CF-W2-TSC-04-architecture-review.md`
+  - Contract: `06-contracts/CF-W2-TSC-04-today-review-no-target-candidate-language-cleanup-contract.md`
+  - Work packet: `08-work-packets/CF-W2-TSC-04-work-packet.md`
+  - QA plan: `04-qa/CF-W2-TSC-04A-today-review-no-target-candidate-language-qa-plan.md`
+  - Ready promotion: `13-implementation-evidence/CF-W2-TSC-04A-ready-promotion.md`
+  - Open decisions: none.
+- Allowed implementation files:
+  - `backend/src/modules/today-trade-review/today-trade-review.types.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.service.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.md`
+  - `backend/tests/modules/today-trade-review/today-trade-review.service.test.ts`
+  - `frontend/src/features/today-trade-review/types.ts`
+  - `frontend/src/features/today-trade-review/components/TodayReviewPage.tsx`
+  - `frontend/src/features/today-trade-review/components/TodayReviewCandidateDetailPage.tsx`
+  - `frontend/tests/ui/today-trade-review.spec.ts`
+- Allowed reporting docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-07-CF-W2-TSC-04A-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W2-TSC-04A-developer-handoff.md`
+- Forbidden scope:
+  - Today Review repository/controller/router/validation/module/index files
+  - backend/frontend route registries
+  - `frontend/src/features/today-trade-review/api/**`
+  - `frontend/src/features/today-trade-review/hooks/**`
+  - `frontend/src/features/today-trade-review/routes.tsx`
+  - Prisma schema, migrations, generated files
+  - package manifests
+  - shared backend utilities or shared frontend components
+  - upstream/downstream module source/tests outside the reserved Today Review file set
+  - `backend/src/modules/trade-plan-risk-engine/**`
+  - `backend/src/modules/strategy-decision-engine/**`
+  - `backend/src/modules/signal-generation-engine/**`
+  - `backend/src/modules/data-quality-engine/**`
+  - `backend/src/modules/signal-calibration-engine/**`
+  - `backend/src/modules/backtesting-strategy-lab/**`
+  - `frontend/src/features/data-quality-engine/**`
+  - `frontend/src/features/pipeline-ops/**`
+  - provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credentials
+- Required validation:
+
+```powershell
+git merge-base --is-ancestor 09bbf9b HEAD
+cd backend
+npm.cmd test -- today-trade-review.service.test.ts --runInBand
+npm.cmd run build
+```
+
+```powershell
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- today-trade-review.spec.ts --workers=1
+```
+
+```powershell
+rg -n "R:R|reward/risk|target / reward|target/reward|modeled reward|paper review|trade-plan geometry|Trade-plan proof-chain|profit target|buy now|sell now|must buy|must sell|financial advice" backend/src/modules/today-trade-review backend/tests/modules/today-trade-review frontend/src/features/today-trade-review frontend/tests/ui/today-trade-review.spec.ts
+```
+
 2026-05-25 Team 00 Ready promotion - `CF-W3-MDPIPE-01B5-DQ-CONTROL-REMOVAL`:
 
 - `CF-W3-MDPIPE-01B5` is promoted and assigned to Team 08.
-- Current gate state: Ready for frontend-only Data Quality page control removal.
+- Current gate state: Accepted through implementation, QA verification, Code Review, Architect Signoff, delegated Product Owner acceptance, and scoped local commit `3f850d1 feat: remove data quality local evaluate controls`.
 - Purpose: remove page-local Data Quality bulk controls now that `/pipeline-ops` owns the approved Data Quality manual command and `/data-quality` has the accepted compact pipeline status strip.
 - Branch recommendation: `codex/w3-mdpipe-01b5-dq-control-removal`.
 - Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team08-CF-W3-MDPIPE-01B5`.
@@ -21,6 +87,11 @@ No available application-code item is currently waiting unassigned in Ready.
   - Work packet: `08-work-packets/CF-W3-MDPIPE-01B5-data-quality-first-child-work-packet.md`
   - QA plan: `04-qa/CF-W3-MDPIPE-01B5-data-quality-control-removal-qa-plan.md`
   - Ready promotion: `13-implementation-evidence/CF-W3-MDPIPE-01B5-ready-promotion.md`
+  - Developer handoff: `18-integration-queue/CF-W3-MDPIPE-01B5-developer-handoff.md`
+  - QA verification: `04-qa/CF-W3-MDPIPE-01B5-qa-verification.md`
+  - Code review: `13-implementation-evidence/CF-W3-MDPIPE-01B5-code-review.md`
+  - Architect signoff: `03-architecture/CF-W3-MDPIPE-01B5-architect-signoff.md`
+  - PO acceptance packet: `09-summaries/CF-W3-MDPIPE-01B5-po-acceptance-packet.md`
   - Dependency: `CF-W3-MDPIPE-01B4` accepted and committed as `8d45ddc`.
   - Dependency: `CF-W3-MDPIPE-01B6` accepted and committed as `fb57cb0`.
   - Open decisions: none.

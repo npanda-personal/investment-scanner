@@ -21,9 +21,11 @@ Reframe Today Review candidate list/detail language so trusted user-facing surfa
 - strategy/rule/version evidence;
 - data-quality readiness;
 - signal health, risk warning, exit-triggered, invalidated, expired, or blocked status;
-- reason summary and missing-evidence explanations.
+- reason summary and missing-evidence explanations;
+- compact read-only freshness or progress status when the candidate view is waiting on downstream refresh or publication evidence.
 
 Target/reward, R:R, synthetic profit target, and Trade Plan-first labels must not appear as trusted candidate evidence.
+Today Review may explain stale or in-progress trust state, but manual bulk refresh or pipeline-trigger controls stay in `Pipeline Ops`.
 
 ## Acceptance Criteria
 
@@ -31,6 +33,7 @@ Target/reward, R:R, synthetic profit target, and Trade Plan-first labels must no
 - Entry price copy means rule-triggered entry price, source-proven trigger price, or unavailable/missing evidence. It must not be inferred from target, reward/risk, stop geometry, or Trade Plan compatibility fields.
 - If current persisted candidate snapshots contain target-shaped compatibility fields, the UI either hides them from trusted candidate framing or labels them compatibility-only/historical where architecture approves.
 - Candidate detail keeps blockers, warnings, DQ readiness, strategy proof, calibration/backtesting evidence, and reason summaries visible.
+- If Today Review needs to explain stale, in-progress, or waiting-on-refresh status, it does so with compact read-only status only. It must not add page-local manual trigger, bulk refresh, or pipeline control affordances.
 - Existing route paths remain unchanged.
 - No Prisma/schema, route registry, shared UI, package manifest, generated type, provider/live, startup/backfill, broker, paid service, or broad Research Hub rewrite is included.
 
@@ -40,6 +43,7 @@ Target/reward, R:R, synthetic profit target, and Trade Plan-first labels must no
 - No new trigger persistence table.
 - No new signal scoring model.
 - No schema migration.
+- No Pipeline Ops command button, bulk refresh control, or page-local manual trigger control on Today Review.
 - No shared status-badge or shared table component changes.
 - No direct buy/sell advice or execution workflow.
 

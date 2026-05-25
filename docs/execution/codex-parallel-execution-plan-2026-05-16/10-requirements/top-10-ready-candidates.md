@@ -2,11 +2,11 @@
 
 Date: 2026-05-25
 
-Status: Team 02 rolling PO refresh after source/docs audit, the Pipeline Ops command API commit, and the B6 compact-indicator promotion. This file is a docs-only candidate view, not proof of implementation readiness. Team 00 owns all Ready queue movement.
+Status: Team 02 rolling PO refresh after source/docs audit, active Team 00 and Team 03 prep on `CF-W2-TSC-04`, active Team 00 and Team 08 gating on `CF-W3-MDPIPE-01B5`, and the B6 compact-indicator follow-up. This file is a docs-only candidate view, not proof of implementation readiness. Team 00 owns all Ready queue movement.
 
 Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-02A` are accepted and locally committed parked branches, not fresh candidates.
 
-Team 02 audit update: `CF-W1-MD-05`, `CF-W1-TSC-02A-TREV-HEALTH`, `CF-W2-SIG-01A`, `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`, `CF-W2-BT-05`, and `CF-W1-BT-04` have moved through implementation/validation gates and are not fresh Team 02 pulls. `CF-W3-MDPIPE-01B4` is accepted and locally committed pipeline command API work, while `CF-W3-MDPIPE-01B6` is active Team 08 compact-indicator follow-up; both stay out of PO discovery. Next fresh-pull value should prioritize Today Review no-target cleanup, ranking/eligibility cleanup, active candidate health, and upstream trust evidence over admin, subscription, notification, or Copilot convenience work.
+Team 02 audit update: `CF-W1-MD-05` is promoted and assigned to Team 05, while `CF-W1-TSC-02A-TREV-HEALTH`, `CF-W2-SIG-01A`, `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE`, `CF-W2-BT-05`, and `CF-W1-BT-04` have moved through implementation/validation gates and are not fresh Team 02 pulls. `CF-W3-MDPIPE-01B3` and `CF-W3-MDPIPE-01B4` already establish the Pipeline Ops split: `/pipeline-ops` owns monitoring and manual triggers, while individual screens may show only compact read-only freshness/progress state. Active `CF-W3-MDPIPE-01B5` and `CF-W3-MDPIPE-01B6` stay out of PO discovery. Next fresh-pull value should prioritize Today Review no-target cleanup, ranking/eligibility cleanup, active candidate health, and upstream trust evidence over admin, subscription, notification, or Copilot convenience work.
 
 Team 00 correction: `CF-W1-SIG-LATEST-01` is already accepted from 2026-05-17 and must not be ranked as a new Ready candidate.
 
@@ -64,11 +64,12 @@ Do not treat these as the next fresh Team 02 pull:
 - Do not execute `CF-W1-TP-03` as framed; pause and reframe only if needed for Trusted Signal Candidate health.
 - `CF-W1-MD-05` is promoted and assigned to Team 05; do not pull it as fresh Team 02 work.
 - `CF-W1-TSC-02A-TREV-HEALTH` is promoted and assigned to Team 07; do not pull it as fresh Team 02 work.
-- Use `CF-W1-TSC-03` as the next Today Review supporting-trust architecture-prep candidate after `TSC-02A` and `BT-05` closure.
+- `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` has already moved through implementation and validation; do not reopen the parent as a fresh Team 02 pull unless Team 00 intentionally opens a new child.
+- `CF-W2-TSC-04` is already in active Team 00 and Team 03 prep; keep it as the top planning slice, but do not open `CF-W2-TSC-05` on the same Today Review writer set until the first packet clears.
 - `CF-W1-STRAT-04` and `CF-W1-SQLAB-03` gates are closed and parked as accepted branch commits; do not reopen them for fresh implementation.
 - Treat `CF-W1-DQ-02` as the next Market Data / Data Quality residual parent only after the two requirement-ready direct-value slices above are placed.
 - Keep `CF-W1-MD-02A`, `CF-W1-SQLAB-02B`, and `CF-W1-STRAT-02B` proposal-only until explicit consent opens the gated paths.
-- `CF-W3-MDPIPE-01B4` is accepted and committed; `CF-W3-MDPIPE-01B6` is active Team 08 frontend-only work. Keep both out of fresh Team 02 routing.
+- `CF-W3-MDPIPE-01B5` and `CF-W3-MDPIPE-01B6` stay in the pipeline lane. Do not open a separate Team 02 requirement unless a user-facing trust gap remains after the compact-indicator and page-control migration slices land.
 
 ## Rolling Audit Note
 
