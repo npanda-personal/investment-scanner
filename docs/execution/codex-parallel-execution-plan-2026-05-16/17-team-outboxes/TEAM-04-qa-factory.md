@@ -4,6 +4,66 @@ Date: 2026-05-24
 
 Mode: docs-only QA planning for bounded Ready-evaluation packets.
 
+## 2026-05-25 `CF-W3-MDPIPE-01B6` QA Verification
+
+- Team: `TEAM-04` - QA Factory
+- Mode: executable QA verification
+- Work item: `CF-W3-MDPIPE-01B6` - Data Quality compact pipeline indicator
+- State/mode: verification complete
+- Owner: Team 04 QA Factory
+- Lane/module:
+  - Lane 3
+  - `data-quality-engine`
+  - `pipeline-ops` read-only consumption only
+- Files changed:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W3-MDPIPE-01B6-qa-verification.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - `AGENTS.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W3-MDPIPE-01B6-developer-handoff.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/13-implementation-evidence/CF-W3-MDPIPE-01B6-ready-promotion.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W3-MDPIPE-01B6-compact-progress-indicator-contract.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W3-MDPIPE-01B6-first-compact-indicator-work-packet.md`
+  - `frontend/src/features/data-quality-engine/components/DataQualityEnginePage.tsx`
+  - `frontend/src/features/data-quality-engine/components/DataQualityPipelineStatusStrip.tsx`
+  - `frontend/tests/ui/data-quality-engine.spec.ts`
+  - `frontend/src/features/pipeline-ops/index.ts`
+  - `frontend/src/features/pipeline-ops/hooks/usePipelineStatus.ts`
+  - `frontend/src/features/pipeline-ops/types.ts`
+  - `frontend/src/features/pipeline-ops/components/PipelineStatusStrip.tsx`
+  - `frontend/src/app/routes.tsx`
+- Behavior changed:
+  - none; QA evidence only
+- Docs changed:
+  - added `04-qa/CF-W3-MDPIPE-01B6-qa-verification.md`
+  - updated this Team 04 outbox
+- Contracts changed:
+  - none
+- Tests run:
+  - `cd frontend && npm.cmd run build` (pass)
+  - `cd frontend && npm.cmd run test:ui -- pipeline-ops.spec.ts data-quality-engine.spec.ts --workers=1` (pass, 4/4)
+- Tests skipped:
+  - none from the requested validation set
+- Skipped-test reason:
+  - n/a
+- Assumptions:
+  - `DATA_QUALITY` remains the canonical stage key for `/data-quality`
+  - `usePipelineStatus()` remains read-only and stable
+- Risks:
+  - timestamp formatting is locale dependent
+  - the frontend build still emits the pre-existing chunk-size warning
+- Blockers:
+  - none remaining for Team 04 QA on `CF-W3-MDPIPE-01B6`
+- Shared-file requests:
+  - none
+- QA verdict:
+  - `CF-W3-MDPIPE-01B6`: `ACCEPT`
+- Next gate:
+  - Code review / lead validation, then architect signoff, then Product Owner acceptance
+- Evidence notes:
+  - focused UI spec covers running, terminal, and no-run evidence, the `/pipeline-ops` deep link, retained `Evaluate Scope`, retained local `BatchProgressBar`, and no command/evaluation POSTs during indicator render
+  - `git diff` inspection showed no edits to route registries, `pipeline-ops` source, backend source, Prisma, or package manifests
+
 ## 2026-05-25 `CF-W3-MDPIPE-01C` QA Planning
 
 - Team: `TEAM-04` - QA Factory
