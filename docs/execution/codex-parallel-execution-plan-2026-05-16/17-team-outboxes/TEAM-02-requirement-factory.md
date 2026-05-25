@@ -1,5 +1,68 @@
 # TEAM-02 Requirement Factory
 
+## Team 02 Rolling PO Requirement Refresh - TSC-04A QA / TSC-05A Stacked Follow-On - 2026-05-25
+
+Root `AGENTS.md` was read first. Team 02 stayed docs-only, wrote only inside the reserved requirement folder and this outbox, and did not touch application code, tests, manifests, Prisma, shared files, Team 00 control docs, or historical docs.
+
+### Files Inspected
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-TSC-04-today-review-no-target-candidate-language-cleanup-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-TSC-05-today-review-no-target-ranking-and-eligibility-reframe-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-TSC-02-active-signal-health-rule-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/13-implementation-evidence/CF-W2-TSC-04A-ready-promotion.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-00-orchestrator-integration-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-architecture-factory.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-outbox.md`
+- `backend/src/modules/today-trade-review/today-trade-review.md`
+- `backend/src/modules/today-trade-review/today-trade-review.service.ts`
+- `frontend/src/features/today-trade-review/components/TodayReviewPage.tsx`
+- `frontend/src/features/today-trade-review/components/TodayReviewCandidateDetailPage.tsx`
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+### Reconciliation Result
+
+- Reconciled the stale queue assumption that `CF-W2-TSC-04` is still a generic fresh planning item.
+- Current authoritative state is narrower:
+  - `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE` is implemented in the Team 07 worktree and is under active Team 04 QA verification.
+  - `CF-W2-TSC-04` parent remains in-flight until QA, review, signoff, and Product Owner acceptance resolve.
+  - `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` is already prepared by Team 03 but remains blocked behind accepted `TSC-04A` base evidence.
+- Reconciled source/docs evidence that current main still exposes pre-`TSC-04A` Today Review target/R:R and Trade Plan-first semantics, so `TSC-05A` must not start from current main.
+- Kept `CF-W1-TP-03` paused/stale as framed.
+- Did not create a new requirement ID; no genuinely higher-value gap outranked the current queue once `TSC-04A` active state was accounted for.
+
+### Next 3 Team 00 Routing Recommendation After TSC-04A Clears Gates
+
+1. `CF-W2-TSC-05` via stacked child `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME`
+   - Re-anchor to the accepted `TSC-04A` branch/commit or merged base first.
+   - Keep it Today Review-only and reject any widening into upstream Trade Plan or Strategy Decision rewrites.
+2. `CF-W1-TSC-02`
+   - Route Team 03 architecture prep for the next active-signal-health requirement once the Today Review no-target pair is sequenced.
+3. `CF-W1-DQ-02` residual parent
+   - Only if Team 03 confirms a bounded no-schema read-side/public-contract child; otherwise keep blocked and do not fake readiness.
+
+### Teams Ready To Pick Up New Requirement / Architecture / QA Prep
+
+- Team 02: rolling requirement hygiene and next-gap discovery.
+- Team 03: ready to re-anchor `CF-W2-TSC-05A` after accepted `TSC-04A` base evidence; otherwise next architecture prep for `CF-W1-TSC-02`.
+- Team 04: active on `TSC-04A` QA verification; ready for `TSC-05A` QA planning after accepted base evidence exists.
+- Team 10: ready for `TSC-04A` code review after Team 04 acceptance.
+- Team 07: ready for bounded `TSC-04A` rework if QA/review rejects it; otherwise standby for stacked `TSC-05A`.
+
+### Constraint Result
+
+- No item was moved to Ready.
+- No commit or push was performed.
+
 ## Team 02 Rolling PO Requirement Audit - Today Review / Pipeline Ops Alignment - 2026-05-25
 
 Root `AGENTS.md` was read first. Team 02 stayed docs-only, wrote only inside the reserved requirement folder and this outbox, and did not touch application code, tests, manifests, Prisma, shared files, or Team 00 control docs.
