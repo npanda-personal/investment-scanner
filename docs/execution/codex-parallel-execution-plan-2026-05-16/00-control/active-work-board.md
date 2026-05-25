@@ -34,6 +34,33 @@ No historical active work items have been migrated as active.
 - Rejected / Rework
 - Deferred
 
+## Latest Team 00 Routing Update - Pause After Current Open Items
+
+Date: 2026-05-25
+
+Gate status:
+
+- `CF-W2-TSC-05A` is accepted through Team 07 implementation/rework, Team 04 QA, Team 10 Code Review, Team 03 Architect Signoff, delegated Product Owner acceptance, and local branch commit `1bb16d8 feat: reframe today review ranking eligibility`.
+- `CF-W2-CAL-02A` is accepted through Team 06 implementation/rework, Team 04 QA, Team 10 Code Review, Team 03 Architect Signoff, delegated Product Owner acceptance, and local branch commit `1be7d1a feat: add calibration evidence basis`.
+- `CF-W1-DQ-02-RS1` is stopped behind open Decision Packet `99-decision-inbox/DECISION-20260525-dq-rs1-currentness-summary-parity.md`.
+- No active subagents remain.
+- No push performed.
+
+Pause routing:
+
+- Do not continue `CF-W1-DQ-02-RS1` until the decision chooses reduced RS1 scope or a full-parity upstream bulk/durable evidence path.
+- Do not start new backlog work until the Product Owner resumes after this pause.
+- Next non-consent architecture candidate after resume: `CF-W1-RH-01A`.
+- Consent-gated top items remain `CF-W1-MD-02A`, `CF-W1-SQLAB-02B`, and `CF-W1-STRAT-02B`.
+
+Teams ready to pick up new tasks after resume:
+
+- Team 03: `CF-W1-RH-01A` architecture, or decision-driven DQ path after Product Owner resolves the DQ packet.
+- Team 02: rolling investor/trader-value requirements.
+- Team 04: QA planning/verification for the next promoted packet.
+- Team 05: blocked for DQ-RS1 until decision resolution; otherwise available for bounded Market Data/DQ work.
+- Team 06 / Team 07 / Team 10: available for the next promoted implementation or review handoff.
+
 ## Latest Team 00 Routing Update - CAL Ready Promotion, TSC QA, DQ Rework
 
 Date: 2026-05-25

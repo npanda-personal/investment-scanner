@@ -1,5 +1,43 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - Pause After Current Open Items
+
+Date: 2026-05-25
+
+Status:
+
+- Branch: `dev`.
+- Main workspace status at checkpoint: clean before this docs update.
+- Active subagents: none.
+- Open decisions: 1, affecting only `CF-W1-DQ-02-RS1`.
+- Product Owner action required: yes for the DQ decision only.
+- Push performed: no.
+
+Closed this cycle:
+
+- `CF-W2-TSC-05A`: accepted and locally committed on Team 07 branch as `1bb16d8 feat: reframe today review ranking eligibility`.
+- `CF-W2-CAL-02A`: accepted and locally committed on Team 06 branch as `1be7d1a feat: add calibration evidence basis`.
+
+Blocked:
+
+- `CF-W1-DQ-02-RS1`: Team 10 rejected; Team 03 confirmed no bounded DQE-only rework can satisfy the current contract. Decision Packet opened at `99-decision-inbox/DECISION-20260525-dq-rs1-currentness-summary-parity.md`.
+
+Next priority after pause:
+
+- Resolve DQ decision packet.
+- If not resolving DQ immediately, route `CF-W1-RH-01A` to Team 03 as the next non-consent architecture item.
+- Keep consent-gated durable proof items (`CF-W1-MD-02A`, `CF-W1-SQLAB-02B`, `CF-W1-STRAT-02B`) out of implementation until approved.
+
+Teams ready to pick up new tasks after resume:
+
+- Team 03: `CF-W1-RH-01A` architecture or DQ decision-driven design.
+- Team 02: rolling requirement discovery.
+- Team 04: QA planning/verification.
+- Team 05: DQ/Market Data only after DQ decision or a separate bounded packet.
+- Team 06 / Team 07 / Team 10: next implementation/review handoff.
+
+---
+
 ## Latest Runtime Checkpoint - CAL Ready Promotion, TSC QA, DQ Rework
 
 Date: 2026-05-25

@@ -4,7 +4,7 @@ Date: 2026-05-25
 
 Owner: Team 00 - Master Orchestrator / Integration
 
-## Latest Active Snapshot - CAL And TSC Remediation, DQ Decision Blocker
+## Latest Active Snapshot - Pause Checkpoint After Current Open Items
 
 Date: 2026-05-25
 
@@ -12,15 +12,22 @@ Current active agents:
 
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Team 06 - Strategy / Signal / Risk | `019e5f05-2f3e-7632-b8ab-275f1c4e933d` | `gpt-5.3-codex`, high | remediation | `CF-W2-CAL-02A` code-review fixes | active |
-| 2 | Team 07 - Portfolio / Watchlist / Alerts | `019e5f0b-9afc-70c3-bea5-7350e45985b7` | `gpt-5.3-codex`, high | remediation | `CF-W2-TSC-05A` compatibility-only riskContext scoring fix | active |
-| 3 | Open slot | none | pending | QA verification | Team 04 after Team 06 CAL remediation handoff | queued |
-| 4 | Open slot | none | pending | QA verification | Team 04 after Team 07 TSC remediation handoff | queued |
-| 5 | Open slot | none | paused | Decision Blocker | `CF-W1-DQ-02-RS1` blocked by open Decision Packet | paused |
-| 6 | Open slot | none | paused | Factory pause | no new backlog execution until current open items are closed and break report is sent | paused |
+| 1 | Open slot | none | paused | Accepted / committed | `CF-W2-TSC-05A` committed locally as `1bb16d8` on Team 07 branch | closed |
+| 2 | Open slot | none | paused | Accepted / committed | `CF-W2-CAL-02A` committed locally as `1be7d1a` on Team 06 branch | closed |
+| 3 | Open slot | none | paused | Decision Blocker | `CF-W1-DQ-02-RS1` blocked by open Decision Packet | paused |
+| 4 | Open slot | none | paused | Factory pause | no new backlog execution until Product Owner resumes | paused |
+| 5 | Open slot | none | paused | Next architecture | `CF-W1-RH-01A` is next non-consent architecture candidate after resume | queued |
+| 6 | Open slot | none | paused | Next requirements | Team 02 rolling requirement pass after resume | queued |
 
 Recently closed:
 
+- Team 03 `019e5f1f-c2c5-7190-9d1d-4e62169a3ef1`: accepted `CF-W2-CAL-02A` Architect Signoff; closed.
+- Team 10 `019e5f1b-8357-74f3-b6e5-415daf737062`: accepted `CF-W2-CAL-02A` Code Review after remediation; closed.
+- Team 04 `019e5f13-45d6-7b42-a421-e4cac12aee73`: accepted `CF-W2-CAL-02A` QA after remediation; closed.
+- Team 07 `019e5f0b-9afc-70c3-bea5-7350e45985b7`: completed `CF-W2-TSC-05A` review-reject remediation; closed.
+- Team 04 `019e5f11-31cf-7b30-9b96-ac7d667537ac`: accepted `CF-W2-TSC-05A` QA after remediation; closed.
+- Team 10 `019e5f14-c0ae-7b81-8077-3f6451596da4`: accepted `CF-W2-TSC-05A` Code Review after remediation; closed.
+- Team 03 `019e5f18-a002-74c3-af78-374f9cb34c70`: accepted `CF-W2-TSC-05A` Architect Signoff; closed.
 - Team 10 `019e5eff-bbaa-7952-b065-c9b19cea6c8c`: rejected `CF-W2-CAL-02A` for stale page summary on fetch failure and compare/list evidence-basis parity risk; closed.
 - Team 04 `019e5efa-8c15-7d51-ba20-1629059d58f6`: accepted `CF-W2-TSC-05A` QA after repository persisted-read rework; closed.
 - Team 10 `019e5f04-ae4f-7fe2-b5a4-8f87f64e1129`: rejected `CF-W2-TSC-05A` because compatibility-only snapshot presence still awarded `riskContext`; closed.
@@ -48,22 +55,21 @@ Recently closed:
 
 Current routing:
 
-- `CF-W2-TSC-05A` is back with Team 07 for a bounded review-reject remediation: compatibility-only snapshot presence must not award trusted `riskContext`.
+- `CF-W2-TSC-05A` is accepted through QA, Code Review, Architect Signoff, delegated PO acceptance, and local branch commit `1bb16d8 feat: reframe today review ranking eligibility`.
 - `CF-W1-DQ-02-RS1` is blocked by `99-decision-inbox/DECISION-20260525-dq-rs1-currentness-summary-parity.md`; no further Team 05/04/10 loop until resolved.
-- `CF-W2-CAL-02A` is back with Team 06 for bounded review-reject remediation: clear/fail-close stale page summary on fetch failure and align compare/list evidence-basis behavior.
+- `CF-W2-CAL-02A` is accepted through QA, Code Review, Architect Signoff, delegated PO acceptance, and local branch commit `1be7d1a feat: add calibration evidence basis`.
 - `CF-W1-RH-01A` is a new bounded Research Hub evidence-date requirement and remains behind `CF-W2-CAL-02A` plus higher-value durable-proof consent-gated proposals.
 - Team 02 rolling requirement discovery completed priority hygiene; no new backlog execution will start until the requested break report is sent.
 - Open Product Owner decisions: 1, affecting only `CF-W1-DQ-02-RS1`.
 
 Teams ready to pick up new tasks:
 
-- Team 06: active on `CF-W2-CAL-02A` remediation.
-- Team 07: active on `CF-W2-TSC-05A` remediation.
-- Team 04: queued for CAL and TSC QA re-verification after remediation handoffs.
-- Team 10: queued for code review after QA acceptance.
-- Team 03: queued for Architect Signoff after Team 10 acceptance.
+- Team 03: next non-consent architecture candidate is `CF-W1-RH-01A` after Product Owner resumes.
+- Team 02: ready for another rolling investor/trader-value requirement pass after Product Owner resumes.
+- Team 04: ready for QA planning/verification after the next routed packet.
+- Team 10: ready for the next QA-accepted review.
 - Team 05: blocked on `CF-W1-DQ-02-RS1` until the Decision Packet is resolved.
-- Team 02: paused after priority hygiene per Product Owner break request.
+- Team 06 / Team 07: no active assignment after accepted TSC/CAL commits.
 
 ---
 

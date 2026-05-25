@@ -2,6 +2,43 @@
 
 Date: 2026-05-25
 
+## Latest Runtime Checkpoint - Pause After Current Open Items
+
+Date: 2026-05-25
+
+Current status:
+
+- Branch: `dev`.
+- Active subagents: none.
+- Open decisions: 1, affecting only `CF-W1-DQ-02-RS1`.
+- Product Owner action required: yes, only for `DECISION-20260525-dq-rs1-currentness-summary-parity`.
+- Push performed: no.
+
+Completed and locally committed:
+
+- `CF-W2-TSC-05A`: Team 07 branch `codex/team07-portfolio-alerts/CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY`, commit `1bb16d8 feat: reframe today review ranking eligibility`.
+- `CF-W2-CAL-02A`: Team 06 branch `codex/team06-strategy-signal/CF-W2-CAL-02A`, commit `1be7d1a feat: add calibration evidence basis`.
+
+Blocked:
+
+- `CF-W1-DQ-02-RS1`: stopped after Team 10 rejection and Team 03 architecture correction. Decision Packet: `99-decision-inbox/DECISION-20260525-dq-rs1-currentness-summary-parity.md`.
+
+Next priority after Product Owner resumes:
+
+- Resolve the DQ decision packet.
+- Otherwise route `CF-W1-RH-01A` to Team 03 as the next non-consent architecture packet.
+- Keep `CF-W1-MD-02A`, `CF-W1-SQLAB-02B`, and `CF-W1-STRAT-02B` as higher-value but consent-gated durable-proof proposals.
+
+Teams ready to pick up new tasks after resume:
+
+- Team 03: `CF-W1-RH-01A` architecture or DQ decision-driven design.
+- Team 02: rolling investor/trader-value requirements.
+- Team 04: QA planning/verification for the next promoted packet.
+- Team 05: DQ/Market Data after decision or bounded packet.
+- Team 06 / Team 07 / Team 10: next implementation/review handoff.
+
+---
+
 ## Latest Runtime Checkpoint - CAL Ready Promotion, TSC QA, DQ Rework
 
 Date: 2026-05-25
