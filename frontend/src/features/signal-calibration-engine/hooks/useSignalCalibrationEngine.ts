@@ -22,7 +22,7 @@ export function useSignalCalibrationEngine() {
     limit: 25,
     offset: 0,
     hasMore: false,
-    sortBy: 'generatedAt',
+    sortBy: 'calibratedScore',
     sortDirection: 'desc'
   });
   
@@ -52,17 +52,18 @@ export function useSignalCalibrationEngine() {
     setLoading(true);
     setError(null);
     try {
+      const nextFilters = params.filters !== undefined ? params.filters : filters;
+      const nextSearch = params.search !== undefined ? params.search : search;
       const result = await fetchTopCalibratedSignals({
         region,
         assetType,
         horizon: params.horizon || horizon,
-        search: params.search || search || undefined,
+        search: nextSearch || undefined,
         limit: params.limit || data.limit,
         offset: params.offset ?? data.offset,
         sortBy: params.sortBy || data.sortBy,
         sortDirection: params.sortDirection || data.sortDirection,
-        ...filters,
-        ...params.filters
+        ...nextFilters
       });
       setData(result);
     } catch (err: any) {
@@ -95,6 +96,11 @@ export function useSignalCalibrationEngine() {
     setFilters(newFilters);
     fetchTableData({ filters: newFilters, offset: 0 });
   };
+  const resetFilters = () => {
+    setSearch('');
+    setFilters({});
+    fetchTableData({ search: '', filters: {}, offset: 0 });
+  };
   const changeHorizon = (nextHorizon: string) => {
     setHorizon(nextHorizon);
     fetchTableData({ horizon: nextHorizon, offset: 0 });
@@ -111,6 +117,7 @@ export function useSignalCalibrationEngine() {
     setSorting,
     applySearch,
     applyFilters,
+    resetFilters,
     changeHorizon,
     search,
     filters,

@@ -66,6 +66,27 @@ const calibratedRow = {
 };
 
 async function mockCalibrationApi(page: Page) {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('investment_scanner_auth_token', 'playwright-signal-calibration-token');
+  });
+  await page.route('**/api/v1/auth/me', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 'playwright-signal-calibration-user',
+        email: 'codex.test@example.com',
+        name: 'Codex Test',
+        createdAt: '2026-05-25T00:00:00.000Z',
+        updatedAt: '2026-05-25T00:00:00.000Z',
+        lastLoginAt: '2026-05-25T00:00:00.000Z',
+      }),
+    });
+  });
+  await page.route('**/api/v1/auth/logout', async (route: Route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true }) });
+  });
+
   await page.route('**/api/v1/signals/calibration/model', async (route: Route) => {
     await route.fulfill({
       status: 200,
@@ -100,16 +121,18 @@ async function mockCalibrationApi(page: Page) {
     const url = new URL(route.request().url());
     expect(url.searchParams.get('region')).toBe('IN');
     expect(url.searchParams.get('assetType')).toBe('STOCK');
+    expect(url.searchParams.get('sortBy')).toBe('calibratedScore');
+    expect(url.searchParams.get('sortDirection')).toBe('desc');
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
         items: [calibratedRow],
         totalCount: 1,
-        limit: 25,
-        offset: 0,
+        limit: Number(url.searchParams.get('limit') || 25),
+        offset: Number(url.searchParams.get('offset') || 0),
         hasMore: false,
-        sortBy: 'generatedAt',
+        sortBy: 'calibratedScore',
         sortDirection: 'desc',
       }),
     });
@@ -151,21 +174,26 @@ test.describe('Signal Calibration Engine UI', () => {
     await visitModule(page, '/signals/calibration', 'Signal Calibration Engine');
 
     await expect(page.getByText('Calibration uses historical evidence and context snapshots for research support only.')).toBeVisible();
-    await expect(page.getByText('Calibration Sample Warning')).toBeVisible();
-    await expect(page.getByText('Group sample is below calibration threshold.')).toBeVisible();
+    await expect(page.getByText('Calibration Evidence Warnings')).toBeVisible();
+    await expect(page.getByText('1 visible rows have warnings or data gaps. Use filters or CSV export for row-level evidence.')).toBeVisible();
     await expect(page.getByText('Readiness', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('Downstream Influence', { exact: true })).toBeVisible();
+    await expect(page.getByText('Normal Influence on Page', { exact: true })).toBeVisible();
     await expect(page.getByText('Limited Evidence on Page', { exact: true })).toBeVisible();
-    expect(await page.getByRole('columnheader', { name: 'Raw' }).count()).toBeGreaterThan(0);
     expect(await page.getByRole('columnheader', { name: 'Calibrated' }).count()).toBeGreaterThan(0);
     expect(await page.getByRole('columnheader', { name: 'Evidence' }).count()).toBeGreaterThan(0);
     expect(await page.getByRole('columnheader', { name: 'Readiness' }).count()).toBeGreaterThan(0);
     expect(await page.getByRole('columnheader', { name: 'Influence' }).count()).toBeGreaterThan(0);
     await expect(page.getByText('RELIANCE.NS')).toBeVisible();
-    await expect(page.getByText('LOW_SAMPLE')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'LIMITED' }).first()).toBeVisible();
-    await expect(page.getByText('CALIBRATED_SCORE')).toBeVisible();
+    await expect(page.getByText('Low Sample')).toBeVisible();
+    await expect(page.getByText('Limited').nth(1)).toBeVisible();
     await expect(page.getByText('110 / 18')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Export CSV' })).toBeVisible();
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export CSV' }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toContain('signal-calibration-in-stock');
+    await expect(page.getByText('Exported 1 latest-per-stock calibration rows for IN / STOCK as an Excel-compatible CSV.')).toBeVisible();
 
     await page.getByRole('button', { name: 'Run Calibration' }).click();
     await expect(page.getByText('Calibration complete for IN / STOCK.')).toBeVisible();

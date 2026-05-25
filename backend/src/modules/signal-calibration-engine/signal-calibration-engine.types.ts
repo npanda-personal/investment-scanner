@@ -125,6 +125,7 @@ export interface CalibrationQuery {
   minCalibratedScore?: number;
   minAbsDelta?: number;
   hasDataGaps?: boolean;
+  calibrationModelVersion?: string;
 }
 
 export interface PaginatedCalibrationResponse {

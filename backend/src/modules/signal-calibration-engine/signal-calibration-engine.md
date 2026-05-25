@@ -216,7 +216,7 @@ Frontend route:
 
 - `/signals/calibration`
 
-The dashboard shows the current scope (`IN / STOCK`, `US / STOCK`, etc.), selected horizon, sample warning banner, summary cards, and a full DataTable with pagination and server-side sorting/filtering. The compare selector uses the shared scoped instrument search, so it defaults to the selected global region and asset type.
+The dashboard shows the current scope (`IN / STOCK`, `US / STOCK`, etc.), selected horizon, sample warning banner, summary cards, and a full DataTable with pagination and server-side sorting/filtering. The table defaults to calibrated score descending and lists one current calibration row per instrument, using the latest persisted calibration for each stock so historical calibration rows do not duplicate symbols in the main view. The table also provides an Excel-compatible CSV export for the current scope, filters, and sort. The compare selector uses the shared scoped instrument search, so it defaults to the selected global region and asset type.
 
 The UI explicitly states that calibration is historical measurement support for research support only. A prominent warning banner appears if sample data is sparse.
 
@@ -239,6 +239,7 @@ Downstream strategy triage modules that need fast, bounded reads should use the 
 - Full calibration runs are manual and batch-based; the UI uses the shared batch runner with module-owned `signal_calibration_engine_batch_size = 100` and `signal_calibration_engine_batch_request_workers_count = 4`, keeps the run button disabled, and shows determinate progress until all batches finish.
 - Batch progress keeps applied calibrations, passthrough raw-score preservations, skipped records, out-of-scope skips, failures, and warnings as separate counters.
 - Batch runs load Signal Quality grouping metrics once per batch and reuse them across signals. Per-instrument lookups are still used for historical context snapshots and latest Data Quality Engine evaluation.
+- Persisted list rows without stored per-row group evidence use current Signal Quality summary evidence as a compatibility fallback instead of forcing `INSUFFICIENT_SAMPLE`; truly missing summary evidence or zero evaluated horizon samples still blocks calibration confidence.
 - Raw-vs-calibrated comparison is fetched only after a user selects one instrument from the searchable selector.
 
 ## Known Limitations

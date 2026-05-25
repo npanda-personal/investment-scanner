@@ -78,7 +78,7 @@ export class SignalCalibrationEngineService {
   ) {}
 
   async latestForInstrument(instrumentId: string): Promise<SignalCalibrationResultDto | null> {
-    const existing = await this.repository.latestForInstrument(instrumentId);
+    const existing = await this.repository.latestForInstrument(instrumentId, MODEL_VERSION);
     if (existing) {
       const summary = await this.qualityService.summary({ horizon: DEFAULT_HORIZON, limit: 1, minSampleSize: 0 }).catch(() => null);
       return this.withEvidenceFromSummary(existing, DEFAULT_HORIZON, summary);
@@ -88,14 +88,14 @@ export class SignalCalibrationEngineService {
   }
 
   async latestPersistedForInstrument(instrumentId: string): Promise<SignalCalibrationResultDto | null> {
-    const existing = await this.repository.latestForInstrument(instrumentId);
+    const existing = await this.repository.latestForInstrument(instrumentId, MODEL_VERSION);
     return existing ? this.withEvidenceFromSummary(existing, DEFAULT_HORIZON, null) : null;
   }
 
   async latestPersistedForInstruments(instrumentIds: string[]): Promise<SignalCalibrationResultDto[]> {
     const repositoryAny = this.repository as any;
     const existing = typeof repositoryAny.latestForInstruments === 'function'
-      ? await repositoryAny.latestForInstruments(instrumentIds).catch(() => [])
+      ? await repositoryAny.latestForInstruments(instrumentIds, MODEL_VERSION).catch(() => [])
       : [];
     return (existing as SignalCalibrationResultDto[]).map((item) => this.withEvidenceFromSummary(item, DEFAULT_HORIZON, null));
   }
@@ -220,7 +220,7 @@ export class SignalCalibrationEngineService {
   }
 
   async top(query: CalibrationQuery): Promise<PaginatedCalibrationResponse> {
-    const page = await this.repository.top(query);
+    const page = await this.repository.top({ ...query, calibrationModelVersion: MODEL_VERSION });
     const horizon = this.parseHorizon(query.horizon);
     const summary = await this.qualityService.summary({
       horizon,
@@ -371,6 +371,11 @@ export class SignalCalibrationEngineService {
       if ((metric.winRate ?? 0) >= 0.58 && (metric.averageForwardReturn ?? 0) > 0) add({ type: 'SIGNAL_TYPE', label: `${item.code} has favorable historical quality.`, delta: 4, evidence: metric }, metric.sampleSize);
       if ((metric.winRate ?? 1) <= 0.45 || (metric.averageForwardReturn ?? 0) < 0) add({ type: 'SIGNAL_TYPE', label: `${item.code} has weak historical quality.`, delta: -5, evidence: metric }, metric.sampleSize);
     }
+    groupEvaluatedSamples = Math.max(
+      groupEvaluatedSamples,
+      context.scoreBucketMetric?.sampleSize ?? 0,
+      context.sectorMetric?.sampleSize ?? 0
+    );
 
     const sourceEvidenceStatus = this.finalEvidenceStatus(evidenceStatus, groupEvaluatedSamples);
     const sourceConfidenceTier = this.confidenceTier(overallEvaluatedSamples, groupEvaluatedSamples, evaluatedForHorizon, sourceEvidenceStatus);
@@ -600,7 +605,7 @@ export class SignalCalibrationEngineService {
     const groupEvaluatedSamples = Math.max(
       0,
       ...[...item.boosts, ...item.penalties].map((adjustment) => Number((adjustment.evidence as any)?.sampleSize || 0))
-    );
+    ) || overallEvaluatedSamples;
     const confidence = this.sampleConfidence(overallEvaluatedSamples, groupEvaluatedSamples, evaluatedForHorizon);
     const evidenceStatus = this.finalEvidenceStatus(this.evidenceStatusForSamples(overallEvaluatedSamples, evaluatedForHorizon, Boolean(summary)), groupEvaluatedSamples);
     const warnings = summary ? this.sampleWarnings(horizon, overallEvaluatedSamples, groupEvaluatedSamples, evaluatedForHorizon) : ['Signal Quality diagnostics unavailable for this scope.'];
@@ -847,16 +852,18 @@ export class SignalCalibrationEngineService {
   }
 
   private sampleConfidence(overall: number, group: number, evaluatedForHorizon: number): CalibrationConfidenceLevel {
-    if (evaluatedForHorizon === 0 || overall < MIN_OVERALL_SAMPLES || group < MIN_GROUP_SAMPLES) return 'INSUFFICIENT_SAMPLE';
-    if (overall >= THRESHOLDS.HIGH.overall && group >= THRESHOLDS.HIGH.group) return 'HIGH';
-    if (overall >= THRESHOLDS.MEDIUM.overall && group >= THRESHOLDS.MEDIUM.group) return 'MEDIUM';
+    if (evaluatedForHorizon === 0 || overall < MIN_OVERALL_SAMPLES) return 'INSUFFICIENT_SAMPLE';
+    if (group > 0 && group < MIN_GROUP_SAMPLES) return 'INSUFFICIENT_SAMPLE';
+    if (overall >= THRESHOLDS.HIGH.overall && (group === 0 || group >= THRESHOLDS.HIGH.group)) return 'HIGH';
+    if (overall >= THRESHOLDS.MEDIUM.overall && (group === 0 || group >= THRESHOLDS.MEDIUM.group)) return 'MEDIUM';
     return 'LOW';
   }
 
   private confidenceTier(overall: number, group: number, evaluatedForHorizon: number, evidenceStatus: CalibrationEvidenceStatus): CalibrationConfidenceLevel {
     if (evidenceStatus === 'MISSING' || evidenceStatus === 'INSUFFICIENT' || evaluatedForHorizon === 0 || overall < MIN_OVERALL_SAMPLES) return 'INSUFFICIENT_SAMPLE';
-    if (overall >= THRESHOLDS.HIGH.overall && group >= THRESHOLDS.HIGH.group) return 'HIGH';
-    if (overall >= THRESHOLDS.MEDIUM.overall && group >= THRESHOLDS.MEDIUM.group) return 'MEDIUM';
+    if (group > 0 && group < MIN_GROUP_SAMPLES) return 'INSUFFICIENT_SAMPLE';
+    if (overall >= THRESHOLDS.HIGH.overall && (group === 0 || group >= THRESHOLDS.HIGH.group)) return 'HIGH';
+    if (overall >= THRESHOLDS.MEDIUM.overall && (group === 0 || group >= THRESHOLDS.MEDIUM.group)) return 'MEDIUM';
     return 'LOW';
   }
 
@@ -874,7 +881,7 @@ export class SignalCalibrationEngineService {
 
   private sampleWarnings(horizon: QualityHorizon, overall: number, group: number, evaluatedForHorizon: number): string[] {
     if (evaluatedForHorizon === 0) return [`Calibration is limited for ${horizon} because 0 signals have enough future price data. Scores are not aggressively adjusted.`];
-    if (overall < MIN_OVERALL_SAMPLES || group < MIN_GROUP_SAMPLES) {
+    if (overall < MIN_OVERALL_SAMPLES || (group > 0 && group < MIN_GROUP_SAMPLES)) {
       return [`${horizon} has ${overall} evaluated samples, below the recommended ${MIN_OVERALL_SAMPLES} overall / ${MIN_GROUP_SAMPLES} per group minimum. Calibration confidence is low.`];
     }
     if (overall < THRESHOLDS.MEDIUM.overall) return [`${horizon} sample evidence is limited; score adjustments are capped conservatively.`];

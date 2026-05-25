@@ -42,20 +42,20 @@ export class SignalCalibrationEngineRepository {
     return { ...result, ...this.toDto(saved), ...this.evidenceFields(result) };
   }
 
-  async latestForInstrument(instrumentId: string): Promise<SignalCalibrationResultDto | null> {
+  async latestForInstrument(instrumentId: string, calibrationModelVersion?: string): Promise<SignalCalibrationResultDto | null> {
     const result = await this.db.signalCalibrationResult.findFirst({
-      where: { instrumentId },
-      orderBy: { generatedAt: 'desc' },
+      where: { instrumentId, calibrationModelVersion },
+      orderBy: [{ generatedAt: 'desc' }, { updatedAt: 'desc' }, { id: 'asc' }],
     });
     return result ? this.toDto(result) : null;
   }
 
-  async latestForInstruments(instrumentIds: string[]): Promise<SignalCalibrationResultDto[]> {
+  async latestForInstruments(instrumentIds: string[], calibrationModelVersion?: string): Promise<SignalCalibrationResultDto[]> {
     const uniqueIds = [...new Set(instrumentIds.filter(Boolean))];
     if (uniqueIds.length === 0) return [];
     const rows = await this.db.signalCalibrationResult.findMany({
-      where: { instrumentId: { in: uniqueIds } },
-      orderBy: [{ instrumentId: 'asc' }, { generatedAt: 'desc' }],
+      where: { instrumentId: { in: uniqueIds }, calibrationModelVersion },
+      orderBy: [{ instrumentId: 'asc' }, { generatedAt: 'desc' }, { updatedAt: 'desc' }, { id: 'asc' }],
       distinct: ['instrumentId'],
     });
     return rows.map((row) => this.toDto(row));
@@ -63,68 +63,43 @@ export class SignalCalibrationEngineRepository {
 
   async top(query: CalibrationQuery): Promise<PaginatedCalibrationResponse> {
     const where: Prisma.SignalCalibrationResultWhereInput = {
-      calibratedDirection: query.direction,
-      rawConfidence: query.confidence,
-      rawScore: query.minRawScore !== undefined ? { gte: query.minRawScore } : undefined,
-      calibratedScore: query.minCalibratedScore !== undefined || query.minScore !== undefined
-        ? { gte: query.minCalibratedScore ?? query.minScore }
-        : undefined,
-      sector: query.sector ? { equals: query.sector, mode: 'insensitive' } : undefined,
-      country: query.country ? { equals: query.country, mode: 'insensitive' } : undefined,
-      calibratedConfidence: this.confidenceFilter(query),
-      dataGaps: query.hasDataGaps === undefined ? undefined : query.hasDataGaps ? { not: [] as any } : { equals: [] as any },
+      calibrationModelVersion: query.calibrationModelVersion,
     };
-    if (query.minAbsDelta !== undefined) {
-      where.OR = [
-        { scoreDelta: { gte: query.minAbsDelta } },
-        { scoreDelta: { lte: -query.minAbsDelta } },
-      ];
-    }
-
-    if (query.search) {
-      where.AND = [
-        ...this.asAndArray(where.AND),
-        {
-          OR: [
-        { symbol: { contains: query.search, mode: 'insensitive' } },
-        { companyName: { contains: query.search, mode: 'insensitive' } },
-          ],
-        },
-      ];
-    }
 
     const stockWhere = this.stockWhere(query.region, query.assetType);
     if (Object.keys(stockWhere).length > 0) {
       where.instrumentId = { in: await this.instrumentIdsInScope(stockWhere) };
     }
 
-    const orderBy: Prisma.SignalCalibrationResultOrderByWithRelationInput = {};
-    if (query.sortBy === 'symbol') orderBy.symbol = query.sortDirection;
-    else if (query.sortBy === 'rawScore') orderBy.rawScore = query.sortDirection;
-    else if (query.sortBy === 'calibratedScore') orderBy.calibratedScore = query.sortDirection;
-    else if (query.sortBy === 'scoreDelta' || query.sortBy === 'delta') orderBy.scoreDelta = query.sortDirection;
-    else orderBy.generatedAt = query.sortDirection || 'desc';
+    if (query.search) {
+      where.OR = [
+        { symbol: { contains: query.search, mode: 'insensitive' } },
+        { companyName: { contains: query.search, mode: 'insensitive' } },
+      ];
+    }
 
     const limit = query.limit || 25;
     const offset = query.offset || 0;
 
-    const [totalCount, rows] = await Promise.all([
-      this.db.signalCalibrationResult.count({ where }),
-      this.db.signalCalibrationResult.findMany({
-        where,
-        orderBy: [orderBy, { id: 'asc' }],
-        take: limit,
-        skip: offset,
-      }),
-    ]);
+    const rows = await this.db.signalCalibrationResult.findMany({
+      where,
+      orderBy: [{ generatedAt: 'desc' }, { updatedAt: 'desc' }, { id: 'asc' }],
+      distinct: ['instrumentId'],
+    });
 
-    const items = await this.attachMarketMetadata(rows.map((row) => this.toDto(row)));
+    const latestRows = this.latestRowPerInstrument(rows);
+    const filtered = latestRows
+      .map((row) => this.toDto(row))
+      .filter((item) => this.matchesQuery(item, query))
+      .sort((a, b) => this.compareForSort(a, b, query));
+    const totalCount = filtered.length;
+    const items = await this.attachMarketMetadata(filtered.slice(offset, offset + limit));
     return {
       items,
       totalCount,
       limit,
       offset,
-      hasMore: offset + rows.length < totalCount,
+      hasMore: offset + limit < totalCount,
       sortBy: query.sortBy || 'generatedAt',
       sortDirection: query.sortDirection || 'desc',
     };
@@ -198,10 +173,47 @@ export class SignalCalibrationEngineRepository {
 
   private confidenceFilter(query: CalibrationQuery): string | Prisma.StringFilter | undefined {
     if (query.calibrationConfidence) return query.calibrationConfidence;
-    if (query.evidenceStatus === 'INSUFFICIENT') return 'INSUFFICIENT_SAMPLE';
-    if (query.evidenceStatus === 'LOW_SAMPLE') return 'LOW';
-    if (query.evidenceStatus === 'SUFFICIENT') return { in: ['MEDIUM', 'HIGH'] };
     return undefined;
+  }
+
+  private latestRowPerInstrument(rows: any[]): any[] {
+    const seen = new Set<string>();
+    const latestRows: any[] = [];
+    for (const row of rows) {
+      const instrumentId = String(row.instrumentId || '').trim();
+      if (!instrumentId || seen.has(instrumentId)) continue;
+      seen.add(instrumentId);
+      latestRows.push(row);
+    }
+    return latestRows;
+  }
+
+  private matchesQuery(item: SignalCalibrationResultDto, query: CalibrationQuery): boolean {
+    if (query.direction && item.calibratedDirection !== query.direction) return false;
+    if (query.confidence && item.rawConfidence !== query.confidence) return false;
+    if (query.minRawScore !== undefined && item.rawScore < query.minRawScore) return false;
+    const minCalibratedScore = query.minCalibratedScore ?? query.minScore;
+    if (minCalibratedScore !== undefined && item.calibratedScore < minCalibratedScore) return false;
+    if (query.minAbsDelta !== undefined && Math.abs(item.scoreDelta) < query.minAbsDelta) return false;
+    if (query.sector && String(item.sector || '').toLowerCase() !== query.sector.toLowerCase()) return false;
+    if (query.country && String(item.country || '').toLowerCase() !== query.country.toLowerCase()) return false;
+    if (query.hasDataGaps !== undefined && (item.dataGaps.length > 0) !== query.hasDataGaps) return false;
+    const confidenceFilter = this.confidenceFilter(query);
+    if (typeof confidenceFilter === 'string' && item.calibratedConfidence !== confidenceFilter) return false;
+    if (typeof confidenceFilter === 'object' && 'in' in confidenceFilter && Array.isArray(confidenceFilter.in) && !confidenceFilter.in.includes(item.calibratedConfidence)) return false;
+    return true;
+  }
+
+  private compareForSort(a: SignalCalibrationResultDto, b: SignalCalibrationResultDto, query: CalibrationQuery): number {
+    const direction = query.sortDirection === 'asc' ? 1 : -1;
+    let comparison = 0;
+    if (query.sortBy === 'symbol') comparison = a.symbol.localeCompare(b.symbol);
+    else if (query.sortBy === 'rawScore') comparison = a.rawScore - b.rawScore;
+    else if (query.sortBy === 'scoreDelta' || query.sortBy === 'delta') comparison = a.scoreDelta - b.scoreDelta;
+    else if (query.sortBy === 'generatedAt' || query.sortBy === 'calibratedAt') comparison = new Date(a.generatedAt).getTime() - new Date(b.generatedAt).getTime();
+    else comparison = a.calibratedScore - b.calibratedScore;
+    if (comparison !== 0) return comparison * direction;
+    return a.symbol.localeCompare(b.symbol) || a.instrumentId.localeCompare(b.instrumentId) || String(a.id || '').localeCompare(String(b.id || ''));
   }
 
   private async attachMarketMetadata(items: SignalCalibrationResultDto[]): Promise<SignalCalibrationResultDto[]> {
@@ -241,8 +253,4 @@ export class SignalCalibrationEngineRepository {
     };
   }
 
-  private asAndArray(value: Prisma.SignalCalibrationResultWhereInput['AND']): Prisma.SignalCalibrationResultWhereInput[] {
-    if (!value) return [];
-    return Array.isArray(value) ? value : [value];
-  }
 }

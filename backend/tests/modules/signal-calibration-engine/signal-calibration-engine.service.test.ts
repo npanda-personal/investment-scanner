@@ -453,6 +453,48 @@ describe('signal calibration engine service', () => {
     expect(latest?.calibratedConfidence).toBe('INSUFFICIENT_SAMPLE');
   });
 
+  it('does not downgrade persisted table rows to insufficient sample when current summary evidence is sufficient', async () => {
+    const persisted = {
+      ...service().instance.calibrate(rawSignal(), context()),
+      calibrationEvidence: null,
+      calibrationReadiness: null,
+      calibratedConfidence: 'HIGH' as const,
+      boosts: [],
+      penalties: [],
+      groupEvaluatedSamples: undefined,
+    };
+    const setup = service({
+      repository: {
+        top: jest.fn().mockResolvedValue({
+          items: [persisted],
+          totalCount: 1,
+          limit: 25,
+          offset: 0,
+          hasMore: false,
+          sortBy: 'calibratedScore',
+          sortDirection: 'desc',
+        }),
+      },
+      qualityService: {
+        summary: jest.fn().mockResolvedValue({
+          dataStatus: 'COMPLETE',
+          evaluationDiagnostics: { evaluatedSignals: 220 },
+          horizonAvailability: { '20D': { eligible: 220, evaluated: 220, insufficientFuturePrice: 0 } },
+        }),
+      },
+    });
+
+    const page = await setup.instance.top({ region: 'IN', assetType: 'STOCK', limit: 25, offset: 0, sortBy: 'calibratedScore', sortDirection: 'desc' });
+
+    expect(page.items[0].calibratedConfidence).toBe('HIGH');
+    expect(page.items[0].confidenceTier).toBe('HIGH');
+    expect(page.items[0].calibrationReadiness).toMatchObject({
+      status: 'USABLE',
+      downstreamInfluence: 'NORMAL',
+      authoritativeScore: 'CALIBRATED_SCORE',
+    });
+  });
+
   it('loads Signal Quality grouping metrics once per batch instead of once per signal', async () => {
     const setup = service({
       signalService: {
