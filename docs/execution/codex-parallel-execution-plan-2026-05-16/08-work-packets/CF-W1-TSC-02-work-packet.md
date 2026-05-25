@@ -1,6 +1,6 @@
 # CF-W1-TSC-02 Work Packet
 
-Date: 2026-05-24
+Date: 2026-05-25
 
 ## Work Item
 
@@ -8,46 +8,52 @@ Parent requirement:
 
 - `CF-W1-TSC-02 - Active Signal Health rule-backed exit/invalidation evidence`
 
-Bounded first child:
+Historical first child:
 
 - `CF-W1-TSC-02A-TREV-HEALTH`
 
 ## State
 
-Split required.
+Blocked. Do not promote to Ready.
 
-The parent stays out of Ready. One bounded first child is feasible and should be the only promotable implementation packet.
+The original smallest honest first child already ran to acceptance and local commit `34c9993 feat: add today review active signal health`.
+
+There is no fresh implementation packet to open under parent `CF-W1-TSC-02` from the current workspace state.
 
 ## Owner / Lane / Module
 
-- Architecture owner: Team 03 - Solution Architect Factory
-- Future implementation owner: Team 07 - Portfolio / Watchlist / Alerts / Today Review
+- Architecture owner: Team 03 - Architecture Factory
+- Historical implementation owner: Team 07 - Portfolio / Watchlist / Alerts / Today Review
 - Lane: Lane 3 with Lane 2 evidence inputs
 - Backend module: `today-trade-review`
 - Frontend feature: `today-trade-review`
 
-## Required Base
+## Historical Base And Outcome
 
-- accepted `CF-W1-TSC-01A-TREV` local commit `9fbc989`
-- accepted Signal Generation bridge commit `40c00f1` through that base
+- historical required base: accepted `CF-W1-TSC-01A-TREV` commit `9fbc989`
+- historical accepted child outcome: `34c9993 feat: add today review active signal health`
 
-Do not start from plain `dev`.
+That historical child is already complete. Do not treat its base or its work packet as a new assignment request.
 
 ## Smallest Honest First Child
 
-Add one Today Review-owned health projection for Trusted Signal Candidates that:
+Historical first child:
 
-- preserves accepted Trusted Signal Candidate grouping from `CF-W1-TSC-01A-TREV`;
-- adds active-signal health state plus evidence status;
-- shows strategy/rule/version basis, evidence date, summary, and missing-evidence reasons;
-- uses current rule-backed evidence only;
-- hard-blocks trusted health when Data Quality is missing, blocked, or unsupported;
-- does not introduce new persistence, routes, or pages;
-- does not include `CF-W1-TSC-03` supporting trust evidence.
+- `CF-W1-TSC-02A-TREV-HEALTH`
 
-## Exact File Reservations
+Current fresh-child result:
 
-### Allowed implementation files
+- none
+
+If Product still wants more active-signal-health scope after the current Today Review no-target sequence, Team 02 must define a new residual child instead of reusing this packet.
+
+## Exact Future File Reservations
+
+### Current reservation decision
+
+No new application file reservation is granted under parent `CF-W1-TSC-02` now.
+
+### Provisional future Today Review-local writer set if a new residual child is explicitly opened later
 
 - `backend/src/modules/today-trade-review/today-trade-review.types.ts`
 - `backend/src/modules/today-trade-review/today-trade-review.service.ts`
@@ -57,6 +63,8 @@ Add one Today Review-owned health projection for Trusted Signal Candidates that:
 - `frontend/src/features/today-trade-review/components/TodayReviewPage.tsx`
 - `frontend/src/features/today-trade-review/components/TodayReviewCandidateDetailPage.tsx`
 - `frontend/tests/ui/today-trade-review.spec.ts`
+
+These files are currently unavailable because the same writer set is occupied by active `CF-W2-TSC-04A` and stacked `CF-W2-TSC-05A`.
 
 ### Forbidden files
 
@@ -78,96 +86,73 @@ Add one Today Review-owned health projection for Trusted Signal Candidates that:
 - Signal Generation, Strategy Decision, Data Quality, Market Data, Backtesting, Trade Plan, Portfolio, Watchlist, Alerts, Copilot, Research Hub, Market Context, and Historical Context source/tests
 - provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential files
 
-## Required Behavior
+## Sequencing Relative To Current Today Review Stack
 
-The first child must:
-
-- reserve only these health states: `ACTIVE`, `HEALTHY`, `WEAKENING`, `RISK_WARNING`, `EXIT_TRIGGERED`, `INVALIDATED`, `EXPIRED`, `BLOCKED`
-- keep state derivation conservative and rule-backed
-- preserve existing Today Review route contracts
-- expose evidence date or explicit missing-evidence reason
-- keep list/detail state and summary consistent for the same candidate
-- preserve backward compatibility for older candidate rows that do not yet carry new health fields
-- avoid target price, synthetic target, reward/risk, Trade Plan-first, direct buy/sell, and advice-like wording
+1. `CF-W1-TSC-02A-TREV-HEALTH` is already the accepted upstream health slice.
+2. `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE` currently holds the Today Review writer set in Team 07 and Team 04 QA.
+3. `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` is already prepared and stacked immediately behind accepted `TSC-04A` evidence.
+4. Do not start a reopened `CF-W1-TSC-02` packet before, between, or parallel to those two Today Review no-target packets.
+5. If Team 00 later wants more active-signal-health work, it must first decide whether `TSC-05A` runs or is explicitly deferred on the same writer set.
 
 ## Dependencies
 
-### Hard dependencies
+### Already satisfied
 
-- accepted `CF-W1-TSC-01A-TREV` base commit `9fbc989`
-- Team 04 `CF-W1-TSC-02` QA plan
-- Team 00 stacked Ready promotion
+- historical `CF-W1-TSC-01A-TREV` base
+- historical Team 04 `CF-W1-TSC-02A-TREV-HEALTH` QA plan
+- historical Team 00 Ready promotion and Team 07 implementation of `TSC-02A`
 
-### Optional dependency
+### Current blockers
 
-- `CF-W1-DQ-03` if residual summary fields are already present on the chosen base
-
-### Explicitly not part of this child
-
-- `CF-W1-TSC-03`
-- `CF-W1-BT-04`
-- new active-monitor page
-- durable health history
+- active `CF-W2-TSC-04A` Today Review writer ownership
+- stacked `CF-W2-TSC-05A` on the same writer set
+- no new residual active-signal-health child requirement
 
 ## Branch / Worktree Recommendation
 
-- Branch: `codex/team07-portfolio-alerts/CF-W1-TSC-02A-active-signal-health`
-- Worktree: `../investment-scanner-worktrees/team07-CF-W1-TSC-02A`
-- Base: accepted `CF-W1-TSC-01A-TREV` commit `9fbc989`
+None now.
 
-Reason:
+Do not open a new branch/worktree for parent `CF-W1-TSC-02` from current main.
 
-- same writer set as accepted TSC-01A Today Review work;
-- current `dev` is not the correct trust-language or evidence baseline;
-- one-writer discipline is required across the full Today Review reservation.
+If a new residual child is later approved, Team 00 must provide:
 
-## QA Handoff Needed
+- the exact accepted post-`TSC-04A` or post-`TSC-05A` base commit;
+- a fresh single-writer reservation;
+- a new child-specific branch/worktree assignment.
 
-Team 04 should prepare focused verification for:
+## QA Handoff Recommendation
 
-- `ACTIVE`
-- `HEALTHY`
-- `WEAKENING`
-- `RISK_WARNING`
-- `EXIT_TRIGGERED`
-- `INVALIDATED`
-- `EXPIRED`
-- `BLOCKED`
-- missing-rule-evidence downgrade
-- hard-blocked Data Quality
-- legacy snapshot compatibility
-- no target/R:R/Trade Plan/advice leakage
-- list/detail consistency
+No new Team 04 QA handoff is recommended on parent `CF-W1-TSC-02` now.
 
-Suggested validation after future implementation:
+Use the prior `CF-W1-TSC-02A-TREV-HEALTH` QA plan only as historical reference.
 
-```powershell
-cd backend
-npm.cmd test -- today-trade-review.service.test.ts --runInBand
-npm.cmd run build
-```
+If a new residual child is later opened, Team 04 should:
 
-```powershell
-cd frontend
-npm.cmd run build
-npm.cmd run test:ui -- today-trade-review.spec.ts --workers=1
-```
+- verify against the accepted post-no-target Today Review base;
+- confirm accepted health-state semantics still hold;
+- confirm no target, reward/risk, paper-review, or Trade Plan-first leakage on touched surfaces;
+- reject any widening into upstream modules, shared files, schema, routes, or generated types.
 
 ## Stop Conditions
 
-Stop and return to Team 00 / Architect if implementation requires:
+Stop and return to Team 00 / Team 02 / Architect if someone attempts to use this packet to:
 
-- schema, migration, or generated-file changes;
-- repository/controller/router/validation/index edits;
-- route or route-registry changes;
-- shared UI or shared backend utility changes;
-- upstream source edits;
-- package changes;
-- provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential work;
-- TSC-03 support evidence;
-- target/R:R/Trade Plan semantics as health proof.
+- reopen `CF-W1-TSC-02A-TREV-HEALTH` as if it were not already complete;
+- promote the parent to Ready;
+- reserve the active Today Review writer set during `TSC-04A` / `TSC-05A`;
+- invent a new child without a new requirement packet;
+- widen into forbidden upstream/shared/schema/route/package scope.
+
+## Next Gate
+
+No immediate implementation gate.
+
+The next honest gate is:
+
+- Team 02 residual requirement definition only if a post-`TSC-04A` / post-`TSC-05A` health gap still exists.
 
 ## Ready Recommendation
 
-- Parent `CF-W1-TSC-02`: not Ready
-- Child `CF-W1-TSC-02A-TREV-HEALTH`: Ready candidate after Team 04 QA planning and Team 00 promotion on stacked base `9fbc989`
+- Parent `CF-W1-TSC-02`: blocked
+- Fresh Ready-candidate child under current parent: none
+- Historical first child `CF-W1-TSC-02A-TREV-HEALTH`: already accepted and committed

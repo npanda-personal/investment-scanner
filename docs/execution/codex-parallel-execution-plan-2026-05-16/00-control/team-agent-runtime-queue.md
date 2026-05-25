@@ -8,7 +8,7 @@ Owner: Team 00 - Master Orchestrator / Integration
 
 Date: 2026-05-25
 
-## Latest Active Snapshot - TSC-04A QA And Rolling Backlog
+## Latest Active Snapshot - TSC-04A Accepted And TSC-05A Re-Anchor
 
 Date: 2026-05-25
 
@@ -16,28 +16,31 @@ Current active agents:
 
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Team 10 - Review / Release | `019e5e93-889e-7b33-b23b-4c56668876a7` | `gpt-5.4`, high | Code Review | `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE` after Team 04 QA ACCEPT | active |
-| 2 | Team 03 - Architecture Factory | `019e5e97-941b-7863-a774-2b7349ed6c2f` | `gpt-5.4`, high | architecture prep | `CF-W1-TSC-02` active signal health | active |
-| 3 | Open slot | none | pending | Architect Signoff | `CF-W2-TSC-04A` after Team 10 acceptance | queued |
-| 4 | Open slot | none | pending | QA planning | `CF-W2-TSC-05A` after accepted TSC-04A base evidence | queued |
+| 1 | Open slot | none | pending | QA planning | `CF-W2-TSC-05A` against accepted `TSC-04A` commit `68f0a19` | ready |
+| 2 | Open slot | none | pending | architecture prep | `CF-W1-DQ-02` residual read-side/public-contract child check | ready |
+| 3 | Open slot | none | pending | implementation | Team 07 stacked `CF-W2-TSC-05A` after QA plan and Ready promotion | queued |
+| 4 | Open slot | none | pending | Code Review | next QA-accepted handoff | queued |
 | 5 | Open slot | none | pending | Implementation/Rework | Team 07 if `TSC-04A` QA/review rejects, otherwise `TSC-05A` after Ready promotion | queued |
 | 6 | Open slot | none | pending | Requirements | Team 02 next rolling direct-value pass after architecture output | queued |
 
 Current routing:
 
-- Team 07 completed `CF-W2-TSC-04A` implementation in `C:\work\repo\investment-scanner-worktrees\team07-CF-W2-TSC-04A`.
-- Team 00 replayed developer validation and confirmed the worktree-targeted Today Review Playwright smoke must use the worktree build/server, not stale default `127.0.0.1:5173`.
+- Team 07 completed and committed `CF-W2-TSC-04A` on branch `codex/team07-portfolio-alerts/CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE` as `68f0a19 feat: clean today review candidate language`.
 - Team 04 accepted `CF-W2-TSC-04A` QA verification.
-- Team 03 completed `CF-W2-TSC-05A` architecture sequencing; it is blocked behind accepted `TSC-04A` base evidence and must not start in parallel on the same Today Review files.
+- Team 10 accepted `CF-W2-TSC-04A` Code Review.
+- Team 03 accepted `CF-W2-TSC-04A` Architect Signoff.
+- Team 00 accepted `CF-W2-TSC-04A` under standing Product Owner delegation.
+- Team 03 completed `CF-W2-TSC-05A` architecture sequencing; it should now stack on accepted `TSC-04A` commit `68f0a19`.
+- Team 03 confirmed parent `CF-W1-TSC-02` has no fresh executable child.
 - Team 02 completed the direct-value backlog refresh and Team 00 committed it as `c7f3f70 docs: refresh direct value backlog routing`.
 
 Teams ready to pick up new tasks:
 
-- Team 10: active on `CF-W2-TSC-04A` Code Review.
-- Team 03: active on `CF-W1-TSC-02` architecture prep; queued for `CF-W2-TSC-04A` Architect Signoff after Team 10 acceptance.
-- Team 04: queued for `CF-W2-TSC-05A` QA planning after accepted `TSC-04A` base evidence.
+- Team 04: ready for `CF-W2-TSC-05A` QA planning against commit `68f0a19`.
+- Team 03: ready for `CF-W1-DQ-02` residual architecture clarification.
+- Team 07: standby for stacked `CF-W2-TSC-05A` after Ready promotion.
 - Team 02: queued for the next rolling direct-value requirement pass after current architecture output.
-- Team 07: standby for bounded `TSC-04A` rework or, after acceptance and Team 00 Ready promotion, stacked `TSC-05A`.
+- Team 10: standby for the next QA-accepted handoff.
 
 ---
 

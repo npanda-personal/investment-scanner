@@ -1,34 +1,45 @@
 # CF-W1-TSC-02 Active Signal Health Rule Evidence Contract
 
-Date: 2026-05-24
+Date: 2026-05-25
 
-Owner: Team 03 - Solution Architect Factory
+Owner: Team 03 - Architecture Factory
 
 ## Status
 
-Split-child contract. Parent is not Ready for Implementation.
+Blocked archival contract. Not a current Ready-promotion packet.
 
-This contract applies to the bounded child:
+This contract documents the historical bounded first child:
 
 - `CF-W1-TSC-02A-TREV-HEALTH`
 
+That child is already accepted and locally committed as `34c9993 feat: add today review active signal health`.
+
+Do not reuse this contract as proof that `CF-W1-TSC-02` is a fresh Ready-candidate now.
+
 ## Purpose
 
-Define one additive Today Review-owned active-signal health projection for accepted Trusted Signal Candidates.
+Record the bounded contract that was used for the first honest active-signal-health child in Today Review, and freeze the file-reservation boundary so later teams do not reopen it accidentally while the current Today Review no-target sequence is active.
 
-The projection must help the user see whether a candidate is still active, healthy, weakening, risk-warning, exit-triggered, invalidated, expired, or blocked, with visible rule/version/evidence dates and explicit missing-evidence reasons.
+## Historical First Child
 
-This remains research-support only. It must not become a Trade Plan workflow, target-price workflow, reward/risk workflow, direct-action workflow, broker workflow, or automated trade instruction.
+- Child: `CF-W1-TSC-02A-TREV-HEALTH`
+- Historical base: accepted `CF-W1-TSC-01A-TREV` commit `9fbc989`
+- Historical accepted outcome: local commit `34c9993 feat: add today review active signal health`
 
-## Required Base
+This contract is now historical traceability. It is not permission to start a new `CF-W1-TSC-02` implementation pass.
 
-The child must stack on accepted `CF-W1-TSC-01A-TREV` commit `9fbc989`, which already carries accepted Trusted Signal Candidate adoption and the accepted Signal Generation bridge dependency `40c00f1`.
+## Current Reopen Rule
 
-Do not implement this child directly against plain `dev`.
+If Product wants more active-signal-health scope after the current Today Review no-target stack:
 
-## Scope
+1. Team 02 must define a new residual child requirement.
+2. Team 03 must issue a new architecture/contract/work-packet set.
+3. The new child must stack on the accepted post-`CF-W2-TSC-04A` or post-`CF-W2-TSC-05A` base that Team 00 records.
+4. Do not reopen this historical contract unchanged.
 
-### In scope
+## Historical Scope
+
+### In scope for the consumed first child
 
 - Today Review candidate-row health projection
 - Today Review candidate-detail health projection
@@ -50,9 +61,13 @@ Do not implement this child directly against plain `dev`.
 - new page or new monitor route
 - durable health history
 - provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential work
-- `CF-W1-TSC-03` supporting DQ/calibration/backtesting evidence chain
+- later supporting-trust evidence slices
 
-## Allowed Files
+## Provisional Future Allowed Files
+
+No new implementation reservation is active under this contract now.
+
+If Team 00 later opens a new residual health child, the only plausible Today Review-local writer set remains:
 
 - `backend/src/modules/today-trade-review/today-trade-review.types.ts`
 - `backend/src/modules/today-trade-review/today-trade-review.service.ts`
@@ -62,6 +77,8 @@ Do not implement this child directly against plain `dev`.
 - `frontend/src/features/today-trade-review/components/TodayReviewPage.tsx`
 - `frontend/src/features/today-trade-review/components/TodayReviewCandidateDetailPage.tsx`
 - `frontend/tests/ui/today-trade-review.spec.ts`
+
+These files are currently collision-blocked by active `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE` and stacked `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME`.
 
 ## Forbidden Files
 
@@ -79,122 +96,52 @@ Do not implement this child directly against plain `dev`.
 - package manifests
 - generated files
 - Prisma schema or migrations
-- upstream/downstream source or tests outside the allowed file set
+- `backend/src/modules/trade-plan-risk-engine/**`
+- `backend/src/modules/strategy-decision-engine/**`
+- `backend/src/modules/signal-generation-engine/**`
+- `backend/src/modules/data-quality-engine/**`
+- `backend/src/modules/signal-calibration-engine/**`
+- `backend/src/modules/backtesting-strategy-lab/**`
+- `frontend/src/features/data-quality-engine/**`
+- `frontend/src/features/pipeline-ops/**`
+- all source/tests outside the Today Review-local writer set
 
-## Additive Health Semantics
+## Historical Semantics Preserved For Reference
 
-The child should add semantics equivalent to:
+The consumed first child defined one additive health projection with these states only:
 
-```ts
-type TrustedSignalHealthState =
-  | 'ACTIVE'
-  | 'HEALTHY'
-  | 'WEAKENING'
-  | 'RISK_WARNING'
-  | 'EXIT_TRIGGERED'
-  | 'INVALIDATED'
-  | 'EXPIRED'
-  | 'BLOCKED';
-
-type TrustedSignalHealthEvidenceStatus =
-  | 'SOURCE_PROVEN'
-  | 'PARTIAL'
-  | 'MISSING_RULE_EVIDENCE'
-  | 'UNSUPPORTED'
-  | 'DATA_QUALITY_BLOCKED';
-
-interface TrustedSignalHealthProjection {
-  state: TrustedSignalHealthState;
-  evidenceStatus: TrustedSignalHealthEvidenceStatus;
-  summary: string;
-  reasonCodes: string[];
-  evidenceDate: string | null;
-  sourceModule: string;
-  strategyCode: string | null;
-  strategyVersion: string | null;
-  ruleId: string | null;
-  ruleVersion: string | null;
-  missingEvidenceReasons: string[];
-}
-```
-
-Exact field names may differ. The semantics must remain additive and backward-compatible.
-
-## Evidence Inputs
-
-Allowed evidence inputs:
-
-- accepted Trusted Signal Candidate snapshots from `CF-W1-TSC-01A-TREV`
-- Signal Generation source-proven entry trigger evidence already carried through Today Review
-- Data Quality snapshot readiness and evidence dates
-- strategy/rule/version evidence already carried through Today Review snapshots
-- Strategy Decision rule-based current-state evidence already available during Today Review projection
-
-Not allowed as health proof:
-
-- arbitrary target prices
-- synthetic profit targets
-- reward/risk ratios
-- Trade Plan target or stop geometry
-- price movement alone
-- advice-like language
-- new heuristic evidence invented outside the existing source modules
-
-## State Rules
-
-- `BLOCKED`
-  - required trusted entry evidence is missing; or
-  - Data Quality is blocked, missing, unsupported, or stale-hard-blocked; or
-  - current proof basis required for a trusted health state is missing.
 - `ACTIVE`
-  - trusted entry evidence exists, but no stronger current rule-backed health state is proven.
 - `HEALTHY`
-  - current rule/version evidence proves the candidate remains valid.
 - `WEAKENING`
-  - current rule/version evidence proves weakening.
 - `RISK_WARNING`
-  - current warning evidence proves risk without meeting exit or invalidation proof.
 - `EXIT_TRIGGERED`
-  - documented exit-rule evidence proves exit.
 - `INVALIDATED`
-  - documented invalidation-rule evidence proves invalidation.
 - `EXPIRED`
-  - documented expiry-rule evidence proves expiry.
+- `BLOCKED`
 
-Missing proof must never be promoted into a stronger state. It must fall back to `ACTIVE` or `BLOCKED` with explicit missing-evidence reasons.
+Guardrails:
 
-## Compatibility Rules
+- stronger states required current rule/version evidence;
+- missing proof could not silently promote a candidate;
+- blocked or missing Data Quality could not produce a trusted healthy state;
+- target prices, synthetic profit targets, reward/risk ratios, Trade Plan geometry, and price movement alone were not valid health proof.
 
-- Existing Today Review routes remain unchanged.
-- Existing Today Review persisted rows remain readable.
-- Older rows that lack new health evidence must render conservatively and not fail.
-- No new persisted columns are required.
-- No response shape should become breaking; new fields are additive only.
+These semantics remain the accepted reference point. A future residual child must preserve them unless Product Owner direction and a new architecture packet say otherwise.
 
-## Stop Conditions
+## Sequencing Note
 
-Stop and split again if truthful implementation requires:
+Do not start any new `CF-W1-TSC-02` implementation pass:
 
-- schema, migration, or generated-file changes;
-- repository/controller/router/validation/index edits;
-- route or route-registry edits;
-- shared UI or shared backend utility edits;
-- upstream source changes;
-- package changes;
-- provider/live-data, startup/backfill, paid/cloud, broker, telemetry, or credential work;
-- `CF-W1-TSC-03` support evidence;
-- target/R:R/Trade Plan semantics as health evidence.
-
-## One-Writer Rule
-
-One writer only across the full Today Review backend/frontend reservation.
-
-Do not run this child in parallel with any other Today Review source packet.
+- in parallel with `CF-W2-TSC-04A`;
+- ahead of stacked `CF-W2-TSC-05A`;
+- from current main;
+- by reusing this historical contract as if the first child were still pending.
 
 ## Readiness Note
 
-As of 2026-05-24:
+As of 2026-05-25:
 
-- parent `CF-W1-TSC-02` is not Ready;
-- child `CF-W1-TSC-02A-TREV-HEALTH` is the only honest Ready-candidate path;
-- Team 04 QA planning and Team 00 stacked promotion are still required before implementation.
+- parent `CF-W1-TSC-02` is blocked;
+- historical child `CF-W1-TSC-02A-TREV-HEALTH` is already complete;
+- no fresh residual child contract exists yet;
+- the current Today Review writer set is occupied by `TSC-04A` and reserved next for `TSC-05A`.

@@ -34,33 +34,30 @@ No historical active work items have been migrated as active.
 - Rejected / Rework
 - Deferred
 
-## Latest Team 00 Routing Update - TSC-04A QA And TSC-05A Sequencing
+## Latest Team 00 Routing Update - TSC-04A Accepted And TSC-05A Re-Anchor
 
 Date: 2026-05-25
 
 Gate status:
 
-- `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE` Team 07 implementation is complete in the dedicated worktree `C:\work\repo\investment-scanner-worktrees\team07-CF-W2-TSC-04A`.
-- Team 00 developer-validation replay passed for the focused backend Today Review test, backend build, frontend build, and worktree-targeted Today Review Playwright smoke; default `127.0.0.1:5173` smoke output is not accepted evidence because it can point at a stale main-workspace server.
-- Team 04 QA Verification accepted `CF-W2-TSC-04A` using the worktree build/server.
-- Team 10 Code Review is active for `CF-W2-TSC-04A`.
-- Team 03 prepared `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` as the smallest future semantic cleanup child, but it is explicitly not Ready until `TSC-04A` is accepted and Team 00 records the exact base commit.
-- Team 03 Architecture Factory is active on docs-only `CF-W1-TSC-02` active signal health prep while the `TSC-04A` review gate runs.
+- `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE` is accepted through Team 07 implementation, Team 04 QA Verification, Team 10 Code Review, Team 03 Architect Signoff, delegated Product Owner acceptance, and scoped local Team 07 branch commit `68f0a19 feat: clean today review candidate language`.
+- Validated evidence includes focused backend Today Review test, backend build, frontend build, and worktree-targeted Today Review Playwright smoke; default `127.0.0.1:5173` smoke output is not accepted evidence because it can point at a stale main-workspace server.
+- Team 03 confirmed parent `CF-W1-TSC-02` has no fresh executable child because `CF-W1-TSC-02A-TREV-HEALTH` is already accepted as `34c9993`.
+- Team 03 prepared `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME`; it can now be re-anchored to accepted `TSC-04A` commit `68f0a19`.
 - No open Product Owner decisions exist.
 
 Sequencing:
 
-- Do not start `CF-W2-TSC-05A` in parallel with `TSC-04A`; both reserve the same Today Review writer set.
-- Keep `TSC-05A` stacked on the accepted future `TSC-04A` branch/commit, not current `dev`.
-- Team 02 is active on a rolling direct-value top-10 refresh while the QA gate runs.
+- Do not start `CF-W2-TSC-05A` from current `dev`; stack it on accepted `TSC-04A` commit `68f0a19`.
+- Do not reopen parent `CF-W1-TSC-02` unless Team 02 creates a new residual health requirement after the no-target pair lands.
 
 Teams ready to pick up new tasks:
 
-- Team 10: complete `CF-W2-TSC-04A` Code Review.
-- Team 03: complete docs-only `CF-W1-TSC-02` architecture prep, then Architect Signoff after Team 10 acceptance.
-- Team 04: standby for QA planning after `TSC-05A` re-anchor or QA verification after any `TSC-04A` review rework.
+- Team 04: prepare `CF-W2-TSC-05A` QA plan against accepted base commit `68f0a19`.
+- Team 03: prepare `CF-W1-DQ-02` residual architecture clarification once the TSC-05A QA plan is underway.
+- Team 07: standby for stacked `CF-W2-TSC-05A` implementation after Team 00 Ready promotion.
 - Team 02: continue rolling investor/trader-value requirements and priority hygiene.
-- Team 07: standby for bounded rework if Team 04 or Team 10 rejects `TSC-04A`.
+- Team 10: standby for the next QA-accepted handoff.
 
 ## Latest Team 00 Routing Update - B6 Compact Indicator Review Rework
 

@@ -1,6 +1,6 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
-## Latest Runtime Checkpoint - TSC-04A QA And TSC-05A Sequencing
+## Latest Runtime Checkpoint - TSC-04A Accepted And TSC-05A Re-Anchor
 
 Date: 2026-05-25
 
@@ -10,25 +10,23 @@ Status:
 - Open decisions: 0.
 - Product Owner action required: no.
 - Push performed: no.
-- Main dirty scope: active execution docs plus isolated Team 07 worktree implementation under QA.
+- Team 07 branch commit: `68f0a19 feat: clean today review candidate language`.
 
 Current gate:
 
-- `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE` Team 07 implementation is complete in `C:\work\repo\investment-scanner-worktrees\team07-CF-W2-TSC-04A`.
+- `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE` is accepted through implementation, QA, review, Architect Signoff, delegated PO acceptance, and scoped local Team 07 branch commit `68f0a19`.
 - Team 00 replayed developer validation and confirmed the valid UI smoke evidence is the worktree-built frontend server, not default `127.0.0.1:5173`.
-- Team 04 QA Verification accepted `TSC-04A`; agent `019e5e8c-905b-78e3-862d-7f8c54de2d2c` is closed.
-- Team 10 Code Review is active as agent `019e5e93-889e-7b33-b23b-4c56668876a7`.
-- Team 02 rolling direct-value backlog refresh is complete and committed as `c7f3f70 docs: refresh direct value backlog routing`; agent `019e5e8d-d858-7a51-8e0f-7f8bae43c466` is closed.
-- Team 03 docs-only `CF-W1-TSC-02` architecture prep is active as agent `019e5e97-941b-7863-a774-2b7349ed6c2f`.
-- Team 03 prepared `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME`; it remains blocked behind accepted `TSC-04A` base evidence.
+- Team 02 rolling direct-value backlog refresh is complete and committed as `c7f3f70 docs: refresh direct value backlog routing`.
+- Team 03 prepared `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME`; it should now be re-anchored to accepted `TSC-04A` commit `68f0a19`.
+- Team 03 confirmed `CF-W1-TSC-02` has no fresh executable child because `CF-W1-TSC-02A-TREV-HEALTH` is already accepted as `34c9993`.
 
 Teams ready to pick up new tasks:
 
-- Team 10: complete `CF-W2-TSC-04A` Code Review.
-- Team 03: complete `CF-W1-TSC-02` architecture prep; then Architect Signoff after Team 10 acceptance.
-- Team 04: queued for `TSC-05A` QA planning after accepted `TSC-04A` base evidence.
+- Team 04: prepare `CF-W2-TSC-05A` QA plan against accepted base commit `68f0a19`.
+- Team 03: prepare `CF-W1-DQ-02` residual architecture clarification.
+- Team 07: standby for stacked `CF-W2-TSC-05A` after Team 00 Ready promotion.
 - Team 02: queued for next rolling requirements priority pass.
-- Team 07: bounded rework if QA/review rejects `TSC-04A`; otherwise standby for stacked `TSC-05A` after Ready promotion.
+- Team 10: standby for the next QA-accepted handoff.
 
 ---
 

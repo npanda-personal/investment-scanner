@@ -2,7 +2,7 @@
 
 Date: 2026-05-24
 
-## Latest Runtime Checkpoint - TSC-04A QA And TSC-05A Sequencing
+## Latest Runtime Checkpoint - TSC-04A Accepted And TSC-05A Re-Anchor
 
 Date: 2026-05-25
 
@@ -15,25 +15,23 @@ Current status:
 - Latest local checkpoint commits:
   - `e15c7e9 docs: checkpoint tsc qa sequencing`
   - `c7f3f70 docs: refresh direct value backlog routing`
-- Active spawned agents: Team 10 review for `CF-W2-TSC-04A`; Team 03 architecture prep for `CF-W1-TSC-02`.
+- Active spawned agents: none at this checkpoint.
 
 Gate movement:
 
-- Team 07 completed `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE` in the dedicated worktree `C:\work\repo\investment-scanner-worktrees\team07-CF-W2-TSC-04A`.
+- `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE` is accepted through Team 07 implementation, Team 04 QA Verification, Team 10 Code Review, Team 03 Architect Signoff, delegated Product Owner acceptance, and local Team 07 branch commit `68f0a19 feat: clean today review candidate language`.
 - Team 00 replayed developer validation: focused backend Today Review test passed, backend build passed, frontend build passed, and worktree-targeted Today Review Playwright smoke passed against a built worktree server. The stale default-port Playwright run is not accepted as evidence.
-- Team 04 QA Verification accepted `CF-W2-TSC-04A`.
-- Team 10 Code Review is active for `CF-W2-TSC-04A`.
-- Team 03 prepared `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` as a stacked future child, but it remains blocked until `TSC-04A` is accepted and Team 00 records the exact base commit.
-- Team 02 completed the rolling direct-value backlog refresh; next order after `TSC-04A` is `TSC-05A`, then `TSC-02`, then `DQ-02` residual only if Team 03 proves a bounded no-schema child.
-- Team 03 Architecture Factory is active on docs-only `CF-W1-TSC-02` prep while review runs.
+- Team 03 prepared `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME`; it should now be re-anchored to accepted `TSC-04A` commit `68f0a19`.
+- Team 02 completed the rolling direct-value backlog refresh.
+- Team 03 confirmed `CF-W1-TSC-02` has no fresh executable child because `CF-W1-TSC-02A-TREV-HEALTH` is already accepted as `34c9993`.
 
 Teams ready to pick up new tasks:
 
-- Team 10: active `CF-W2-TSC-04A` Code Review.
-- Team 03: active `CF-W1-TSC-02` architecture prep; then Architect Signoff after Team 10 acceptance.
-- Team 04: queued for `TSC-05A` QA planning after accepted `TSC-04A` base evidence.
+- Team 04: ready for `CF-W2-TSC-05A` QA planning against accepted base commit `68f0a19`.
+- Team 03: ready for `CF-W1-DQ-02` residual architecture clarification.
+- Team 07: standby for stacked `CF-W2-TSC-05A` after Team 00 Ready promotion.
 - Team 02: queued for the next rolling direct-value pass.
-- Team 07: standby for rework if QA/review rejects `TSC-04A`.
+- Team 10: standby for the next QA-accepted handoff.
 
 Product Owner action required: no.
 

@@ -1,5 +1,66 @@
 # Team 03 Architecture Factory Outbox
 
+## Team 03 CF-W1-TSC-02 Active Signal Health Readiness Refresh - 2026-05-25
+
+Assignment: refresh docs-only architecture/file-reservation readiness for `CF-W1-TSC-02` using root `AGENTS.md` and the current Today Review execution stack as authority, without touching application code/tests, ready queues, active board, QA docs, requirements docs, decision queues, or any Team 07 worktree files.
+
+Updated:
+
+- `03-architecture/CF-W1-TSC-02-architecture-review.md`
+- `06-contracts/CF-W1-TSC-02-active-signal-health-rule-evidence-contract.md`
+- `08-work-packets/CF-W1-TSC-02-work-packet.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Read-only evidence inspected:
+
+- root `AGENTS.md`
+- `10-requirements/CF-W1-TSC-02-active-signal-health-rule-evidence-requirement.md`
+- `10-requirements/top-10-ready-candidates.md`
+- `10-requirements/next-top-10-candidates.md`
+- `03-architecture/CF-W2-TSC-05-architecture-review.md`
+- `06-contracts/CF-W2-TSC-05-today-review-no-target-ranking-eligibility-contract.md`
+- `00-control/active-work-board.md`
+- `16-team-inboxes/TEAM-07-current-assignment.md`
+- existing `CF-W1-TSC-02`, `CF-W1-TSC-03`, `CF-W2-TSC-04`, and `CF-W2-TSC-05` architecture/contract/work-packet docs
+- current main-workspace Today Review module doc, service, types, focused test, page, detail page, and UI smoke spec
+
+Architecture verdict:
+
+- `CF-W1-TSC-02` is blocked, not Ready, and not a fresh Ready-candidate.
+- The smallest honest first child remains `CF-W1-TSC-02A-TREV-HEALTH`, but that child is already accepted and locally committed as `34c9993 feat: add today review active signal health`.
+- Older `CF-W1-TSC-02` docs were stale because they still described `TSC-02A` as pending QA planning / Ready promotion.
+- No fresh child is defined under the parent from the current workspace state; any future residual health work requires a new Team 02 requirement child and a new Team 03 packet.
+- Current main is also not an acceptable residual-health base because Today Review still carries pre-`TSC-04A` target/reward, reward/risk, paper-review, and Trade Plan-first semantics.
+
+Sequencing and collision result:
+
+- Team 07 / Team 04 currently own the Today Review writer set for `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE`.
+- `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` is already prepared and stacked immediately behind accepted `TSC-04A` evidence on the same writer set.
+- Therefore no fresh `CF-W1-TSC-02` child may be promoted before, between, or parallel to `TSC-04A` and `TSC-05A`.
+
+Exact future reservation direction:
+
+- no new reservation is granted under parent `CF-W1-TSC-02` now;
+- if Team 00 later opens a new residual active-signal-health child, the only plausible module-local writer set remains:
+  - `backend/src/modules/today-trade-review/today-trade-review.types.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.service.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.md`
+  - `backend/tests/modules/today-trade-review/today-trade-review.service.test.ts`
+  - `frontend/src/features/today-trade-review/types.ts`
+  - `frontend/src/features/today-trade-review/components/TodayReviewPage.tsx`
+  - `frontend/src/features/today-trade-review/components/TodayReviewCandidateDetailPage.tsx`
+  - `frontend/tests/ui/today-trade-review.spec.ts`
+- those files are currently collision-blocked by active `TSC-04A` and stacked `TSC-05A`;
+- forbidden scope stays unchanged: Today Review repository/controller/router/validation/index, api/hooks/routes, route registries, shared UI/shared backend utilities, package manifests, generated files, Prisma/schema/migrations, upstream modules, and all other app source/tests outside the Today Review-local writer set.
+
+Recommended Team 04 QA handoff direction:
+
+- no immediate Team 04 QA planning on parent `CF-W1-TSC-02`;
+- retain `CF-W1-TSC-02A-TREV-HEALTH` QA artifacts as historical evidence only;
+- if a new residual health child is later opened, QA must plan against the accepted post-`TSC-04A` or post-`TSC-05A` base, verify no regression to accepted health states, and reject any target/R:R/paper-review/Trade Plan-first leakage or scope widening.
+
+No tests, builds, services, UI runs, commits, or pushes were run.
+
 ## Team 03 CF-W2-TSC-05 Today Review Ranking / Eligibility Sequencing - 2026-05-25
 
 Assignment: prepare docs-only architecture sequencing for `CF-W2-TSC-05` using root `AGENTS.md` and the active execution folder as authority, without modifying application code/tests, Team 07 worktree files, QA docs, ready queues, active board, runtime queues, or shared/runtime source.

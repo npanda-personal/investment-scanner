@@ -9,7 +9,7 @@ No available application-code item is currently waiting unassigned in Ready.
 2026-05-25 Team 00 Ready promotion - `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE`:
 
 - `CF-W2-TSC-04A` is promoted and assigned to Team 07.
-- Current gate state: Team 07 implementation complete; Team 04 QA Verification active.
+- Current gate state: Accepted through implementation, QA Verification, Code Review, Architect Signoff, delegated Product Owner acceptance, and scoped local branch commit `68f0a19 feat: clean today review candidate language`.
 - Purpose: remove target/reward, reward/risk, paper-review, and Trade Plan-first wording from touched Today Review trusted-candidate list/detail/doc/spec surfaces without changing ranking, grouping, promotion, confidence, eligibility, reward/risk thresholds, or Lite target generation.
 - Branch: `codex/team07-portfolio-alerts/CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE`.
 - Worktree: `C:\work\repo\investment-scanner-worktrees\team07-CF-W2-TSC-04A`.

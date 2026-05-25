@@ -2,31 +2,30 @@
 
 Date: 2026-05-25
 
-Status: Team 02 updated after reconciling the active `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE` QA gate with the current Today Review source/docs state. Team 07 implementation is complete in the dedicated worktree, Team 04 QA verification is active, and Team 03 has already prepared the stacked `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` follow-on. `TSC-05A` remains blocked until Team 00 records accepted `TSC-04A` branch/commit evidence. Current main still contains pre-`TSC-04A` target/R:R and Trade Plan-first Today Review semantics, so no new follow-on should be routed from current main. This queue is refinement-only. Team 00 still owns Ready movement.
+Status: Team 00 routing correction after Team 03 confirmed `CF-W1-TSC-02` has no fresh executable child. Team 07 implementation for `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE` is accepted through QA, Team 10 review, Architect Signoff, delegated PO acceptance, and local branch commit `68f0a19 feat: clean today review candidate language`. Team 03 has already prepared the stacked `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` follow-on, which can now be re-anchored to accepted `TSC-04A` commit `68f0a19` for QA planning / Ready evaluation. This queue is refinement-only. Team 00 still owns Ready movement.
 
 Team 00 override: `CF-W1-BT-03`, `CF-W1-CAL-01A`, `CF-W1-TP-01A`, and `CF-W1-DQ-02A` are accepted parked branch commits, not fresh refinement-front items.
 
-## Current Refinement Stack Behind The Active TSC-04A Gate
+## Current Refinement Stack Behind Accepted TSC-04A
 
 | Rank | ID | Why it stays next | Team 00 routing note |
 | --- | --- | --- | --- |
-| 1 | `CF-W2-TSC-05` | Today Review ranking and eligibility still need a no-target reframe after `TSC-04A` clears visible language cleanup. | Keep blocked / stacked until accepted `TSC-04A` base evidence is recorded; then re-anchor `TSC-05A` to that base before QA planning or Ready evaluation. |
-| 2 | `CF-W1-TSC-02` | Trusted candidates still need rule-based health tracking after entry until exit, invalidation, expiry, or blockage. | Requirement-ready; Team 03 architecture prep is the next direct requirement/architecture packet after the Today Review no-target pair unless an isolated writer-safe path appears sooner. |
-| 3 | `CF-W1-DQ-02` residual parent | `DQ-02A` is complete, but the parent still has read-side/public-contract scope that may need a bounded no-schema child. | Blocked by the residual read-side/public-contract split decision until Team 03 confirms a bounded follow-up. |
-| 4 | `CF-W1-MD-02A` | Durable market-data evidence storage still has clear investor value, but it is consent-gated. | Blocked by schema/storage consent until Team 00 opens the durable evidence packet. |
-| 5 | `CF-W1-SQLAB-02B` | Durable Signal Quality learning memory remains useful after the current read/review trust slices. | Blocked by storage consent until Team 00 opens the durable memory packet. |
-| 6 | `CF-W1-STRAT-02B` | Durable strategy revision history still matters for explainability and review trust. | Blocked by schema/migration/generated/repository consent until Team 00 opens the revision-history packet. |
-| 7 | `CF-W1-L3-DQ-01A` | Passive readiness display semantics remain a real Lane 3 trust contract gap. | Contract-only until Team 03/04 define a bounded child that does not collide with active Lane 3 work or shared UI rules. |
-| 8 | `CF-W1-UX-01` residual parent | Workbench still lacks verified scope, trusted-date, blocker provenance, and downstream eligibility proof behind the accepted `UX-01A` framing child. | Keep behind upstream trust packets; do not reopen accepted `UX-01A`. |
-| 9 | `CF-W1-UX-02` | Copilot trust UX still matters, but it remains downstream of the core data and strategy trust stack. | Downstream trust UX candidate; keep behind direct investor/trader value unless a trust blocker appears. |
-| 10 | `CF-W1-UX-05` | Copilot-only product language cleanup can reduce advice-like wording after trust UX scope is clear. | Downstream copy-cleanup candidate; fold into or follow `CF-W1-UX-02`, and do not reserve shared UI yet. |
+| 1 | `CF-W2-TSC-05` | Today Review ranking and eligibility still need a no-target reframe after accepted `TSC-04A` visible language cleanup. | Re-anchor `TSC-05A` to accepted `TSC-04A` commit `68f0a19`, then route Team 04 QA planning / Team 00 Ready evaluation. |
+| 2 | `CF-W1-DQ-02` residual parent | `DQ-02A` is complete, but the parent still has read-side/public-contract scope that may need a bounded no-schema child. | Route Team 03 to confirm or reject a bounded residual child after `TSC-05A` sequencing is underway. |
+| 3 | `CF-W1-MD-02A` | Durable market-data evidence storage still has clear investor value, but it is consent-gated. | Blocked by schema/storage consent until Team 00 opens the durable evidence packet. |
+| 4 | `CF-W1-SQLAB-02B` | Durable Signal Quality learning memory remains useful after the current read/review trust slices. | Blocked by storage consent until Team 00 opens the durable memory packet. |
+| 5 | `CF-W1-STRAT-02B` | Durable strategy revision history still matters for explainability and review trust. | Blocked by schema/migration/generated/repository consent until Team 00 opens the revision-history packet. |
+| 6 | `CF-W1-L3-DQ-01A` | Passive readiness display semantics remain a real Lane 3 trust contract gap. | Contract-only until Team 03/04 define a bounded child that does not collide with active Lane 3 work or shared UI rules. |
+| 7 | `CF-W1-UX-01` residual parent | Workbench still lacks verified scope, trusted-date, blocker provenance, and downstream eligibility proof behind the accepted `UX-01A` framing child. | Keep behind upstream trust packets; do not reopen accepted `UX-01A`. |
+| 8 | `CF-W1-UX-02` | Copilot trust UX still matters, but it remains downstream of the core data and strategy trust stack. | Downstream trust UX candidate; keep behind direct investor/trader value unless a trust blocker appears. |
+| 9 | `CF-W1-UX-05` | Copilot-only product language cleanup can reduce advice-like wording after trust UX scope is clear. | Downstream copy-cleanup candidate; fold into or follow `CF-W1-UX-02`, and do not reserve shared UI yet. |
+| 10 | `CF-W1-TSC-02` residual | Historical first child `CF-W1-TSC-02A-TREV-HEALTH` is already accepted as `34c9993`; only a new residual health child could create fresh value. | Do not route now. Team 02 must define a new residual child after `TSC-04A` / `TSC-05A` if a real health gap remains. |
 
 ## Audit-Backed Notes
 
-- Team 00 runtime checkpoint records `CF-W2-TSC-04A` as implemented in the Team 07 worktree and under active Team 04 QA verification. That makes `CF-W2-TSC-04` an in-flight parent, not a fresh refinement-front planning item.
-- Team 03 has already defined `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` and explicitly blocked it behind accepted `TSC-04A` base evidence.
-- Current main still contains pre-`TSC-04A` Today Review target/R:R and Trade Plan-first language in the module doc, service, and Today Review page/detail surfaces, so `TSC-05A` must not start from current main.
-- `CF-W1-TSC-02` remains the next active signal health gap after the Today Review no-target cleanup pair.
+- Team 00 accepted and committed `CF-W2-TSC-04A` on Team 07 branch commit `68f0a19`; `CF-W2-TSC-04` is no longer a fresh refinement-front planning item.
+- Team 03 has already defined `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME`; it should now be re-anchored to accepted `TSC-04A` commit `68f0a19`.
+- `CF-W1-TSC-02A-TREV-HEALTH` is accepted and locally committed as `34c9993`; Team 03 found no fresh executable `CF-W1-TSC-02` child remains under the current parent.
 - `CF-W1-DQ-02A` is accepted and locally committed as `c2d6753`; only the `DQ-02` residual parent stays in this stack behind active TSC/DQ work.
 - `CF-W1-SQLAB-01` is accepted and locally committed as `1a41d95`; `CF-W1-SQLAB-02A` is promoted and assigned, so the next Signal Quality storage child remains `CF-W1-SQLAB-02B`.
 - `CF-W3-MDPIPE-01B5`, `CF-W3-MDPIPE-01B6`, and `CF-W3-MDPIPE-01C` stay in the pipeline lane and do not create a new Team 02 requirement gap in this pass.
@@ -61,12 +60,12 @@ Reason: active, accepted, parked, blocked behind an accepted base, or already as
 
 ## Teams Ready For New Prep
 
-- Team 02: keep rolling discovery active and keep the direct-value queue clean while `TSC-04A` finishes QA/review/signoff.
-- Team 03: ready to re-anchor `CF-W2-TSC-05A` after Team 00 records accepted `TSC-04A` base evidence; otherwise ready to prep `CF-W1-TSC-02` next when Team 00 releases the Today Review writer set.
-- Team 04: active on `CF-W2-TSC-04A` QA verification; ready to prepare `CF-W2-TSC-05A` QA planning once the accepted base is available.
-- Team 10: ready for `CF-W2-TSC-04A` code review after Team 04 acceptance.
-- Team 07: ready for bounded `TSC-04A` rework if QA/review rejects it; otherwise standby for stacked `TSC-05A` after Team 00 re-promotes from the accepted base.
-- Team 00: keep `CF-W2-TSC-05A` blocked behind accepted `TSC-04A`; do not reopen `CF-W2-TSC-04` parent or move anything to Ready from this file.
+- Team 04: prepare `CF-W2-TSC-05A` QA planning against accepted `TSC-04A` commit `68f0a19`.
+- Team 03: ready for `CF-W1-DQ-02` residual architecture clarification after `TSC-05A` QA planning starts.
+- Team 02: keep rolling discovery active and keep the direct-value queue clean.
+- Team 07: standby for stacked `TSC-05A` after Team 00 Ready promotion.
+- Team 10: standby for the next QA-accepted handoff.
+- Team 00: re-anchor `CF-W2-TSC-05A` to commit `68f0a19`; do not reopen `CF-W2-TSC-04` or parent `CF-W1-TSC-02`.
 
 ## Team 02 Constraint Reminder
 
