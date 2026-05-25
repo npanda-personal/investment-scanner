@@ -883,7 +883,7 @@ export interface MarketDataRepairRequest {
   providerValidationQueue?: ProviderValidationQueue;
   force?: boolean;
   fullReload?: boolean;
-  policy?: 'AUTO_DEEP_FOR_SHALLOW' | 'FORCE_DEEP';
+  policy?: 'INCREMENTAL_LATEST_ONLY' | 'AUTO_DEEP_FOR_SHALLOW' | 'FORCE_DEEP';
   workerConcurrency?: number;
   csvText?: string;
   catalogSource?: CatalogSource | string;

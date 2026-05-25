@@ -4775,6 +4775,58 @@ describe('MarketDataFoundationService syncV1', () => {
     });
   });
 
+  it('keeps startup incremental-latest backfill from deep-loading history-current gaps', async () => {
+    const latestCompleted = latestCompletedTradingDateForRegion('IN') || '2026-05-25';
+    const staleDate = new Date(`${latestCompleted}T00:00:00.000Z`);
+    staleDate.setUTCDate(staleDate.getUTCDate() - 1);
+    const staleLatest = staleDate.toISOString().slice(0, 10);
+    const stocks = [
+      { id: 'deep-only-id', symbol: 'DEEPONLY.NS', providerSupportStatus: 'SUPPORTED', isActive: true, isDelisted: false, providerSymbol: 'DEEPONLY.NS', sector: 'Tech', industry: 'Software', country: 'India', currency: 'INR' },
+      { id: 'stale-id', symbol: 'STALE.NS', providerSupportStatus: 'SUPPORTED', isActive: true, isDelisted: false, providerSymbol: 'STALE.NS', sector: 'Tech', industry: 'Software', country: 'India', currency: 'INR' },
+    ];
+    const repository = {
+      listStocksForUniverseHealth: jest.fn()
+        .mockResolvedValueOnce(stocks)
+        .mockResolvedValueOnce([stocks[0]]),
+      priceReadinessStatsForSymbols: jest.fn()
+        .mockResolvedValueOnce(new Map([
+          ['DEEPONLY.NS', { priceHistoryBars: 120, firstPriceDate: null, latestPriceDate: latestCompleted, latestVolume: 100, latestAdjustedClose: 100, latestClose: 100 }],
+          ['STALE.NS', { priceHistoryBars: 4000, firstPriceDate: '2010-01-01', latestPriceDate: staleLatest, latestVolume: 100, latestAdjustedClose: 100, latestClose: 100 }],
+        ]))
+        .mockResolvedValueOnce(new Map([
+          ['DEEPONLY.NS', { priceHistoryBars: 120, firstPriceDate: null, latestPriceDate: latestCompleted, latestVolume: 100, latestAdjustedClose: 100, latestClose: 100 }],
+        ])),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+    jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
+      rowsReceived: 1,
+      rowsInserted: 0,
+      rowsUpdated: 1,
+      rowsSkipped: 0,
+      rowsNoOp: 0,
+      warningCount: 0,
+      warnings: [],
+    });
+
+    const result = await service.backfillPrices({
+      region: 'IN',
+      assetType: 'STOCK',
+      batchSize: 10,
+      policy: 'INCREMENTAL_LATEST_ONLY',
+    });
+
+    expect(service.ingestSymbol).toHaveBeenCalledTimes(1);
+    expect((service.ingestSymbol as jest.Mock).mock.calls[0][0]).toBe('STALE.NS');
+    expect(result).toMatchObject({
+      processedCount: 1,
+      incrementalCaughtUp: 1,
+      deepReloaded: 0,
+      processedStockIds: ['stale-id'],
+      remainingCandidates: 0,
+      hasMore: false,
+    });
+  });
+
   it('mirrors price backfill run progress into the pipeline ledger', async () => {
     const recorder = {
       recordMarketDataStageSnapshot: jest.fn().mockResolvedValue({}),
@@ -4807,6 +4859,7 @@ describe('MarketDataFoundationService syncV1', () => {
       status: 'RUNNING',
       totalCount: 3,
       processedCount: 0,
+      changedInstrumentIds: [],
       batchSize: 2,
       hasMore: true,
     }));

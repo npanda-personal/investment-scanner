@@ -16,6 +16,9 @@ Current implementation state:
 - Scheduled `SIGNAL_CALIBRATION` uses explicit changed instrument ids and latest persisted raw-signal rows only; missing raw rows are counted as skipped evidence.
 - Scheduled `SIGNAL_CALIBRATION` now continues through ledgered downstream research stages: `MARKET_CONTEXT`, `SMART_MONEY`, `CONTEXT_SNAPSHOTS`, `SIGNAL_QUALITY`, `STRATEGY_DECISION`, `RESEARCH_PROJECTION`, and `TODAY_REVIEW`.
 - Explicit changed instrument ids are preserved for stages that can run instrument-scoped work. Context Snapshots and Today Review avoid provider/legacy generation fallback in the scheduled path.
+- Terminal Market Data price-backfill snapshots now carry processed instrument ids into the ledger and fan out to scheduled Data Quality, then the existing DB-only downstream chain can continue.
+- Startup price backfill now uses incremental-latest-only policy; it no longer launches a broad historical/deep repair queue when latest EOD is already current.
+- The 15-minute latest-candle scheduler no longer waits behind active background price backfill, so primary Market Data freshness checks can continue while deep repair runs separately.
 - Manual Pipeline Ops commands remain unchanged: `DATA_QUALITY_EVALUATE_SCOPE` is still the only executable command; `RAW_SIGNALS_GENERATE_SCOPE` and `SIGNAL_CALIBRATION_REFRESH_SCOPE` remain deferred.
 
 Boundaries preserved:
@@ -36,6 +39,7 @@ npm.cmd test -- market-data.scheduler.test.ts data-quality-engine.service.test.t
 npm.cmd test -- pipeline-orchestration.service.test.ts market-data.scheduler.test.ts market-data.service.test.ts market-data.routes.test.ts data-quality-engine.service.test.ts signal-generation-engine.service.test.ts --runInBand
 npm.cmd test -- pipeline-orchestration.service.test.ts market-data.scheduler.test.ts market-data.service.test.ts market-data.routes.test.ts data-quality-engine.service.test.ts signal-generation-engine.service.test.ts signal-calibration-engine.service.test.ts --runInBand
 npm.cmd test -- pipeline-orchestration.service.test.ts market-data.scheduler.test.ts market-data.service.test.ts market-data.routes.test.ts data-quality-engine.service.test.ts signal-generation-engine.service.test.ts signal-calibration-engine.service.test.ts smart-money-intelligence.service.test.ts historical-context-snapshots.service.test.ts strategy-decision-engine.service.test.ts today-trade-review.service.test.ts signal-quality-lab.service.test.ts --runInBand
+npm.cmd test -- market-data.scheduler.test.ts market-data.service.test.ts pipeline-orchestration.service.test.ts --runInBand
 npm.cmd run build
 git diff --check
 ```

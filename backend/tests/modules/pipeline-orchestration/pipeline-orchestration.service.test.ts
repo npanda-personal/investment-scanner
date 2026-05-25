@@ -1934,4 +1934,133 @@ describe('PipelineOrchestrationService', () => {
       durationMs: 300000,
     }));
   });
+
+  it('fans out terminal Market Data price-backfill snapshots into scheduled Data Quality for changed instruments', async () => {
+    const run = {
+      id: 'run-md-terminal',
+      pipelineKey: 'market-intelligence',
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      triggerType: 'startup',
+      status: 'RUNNING',
+      idempotencyKey: 'run-md-key',
+      dataThroughDate: '2026-05-25T00:00:00.000Z',
+      sourceFingerprint: 'market-data:PRICE_BACKFILL:price-backfill-3',
+      changedInstrumentCount: 0,
+      totalCount: 20,
+      processedCount: 20,
+      succeededCount: 20,
+      partialCount: 0,
+      failedCount: 0,
+      skippedCount: 0,
+      unchangedCount: 5,
+      warnings: [],
+      errors: [],
+      metadata: null,
+      startedAt: '2026-05-25T03:00:00.000Z',
+      completedAt: null,
+      durationMs: null,
+      createdAt: '2026-05-25T03:00:00.000Z',
+      updatedAt: '2026-05-25T03:01:00.000Z',
+    };
+    const completedStage = {
+      id: 'stage-md-terminal',
+      pipelineRunId: 'run-md-terminal',
+      stageKey: 'MARKET_DATA',
+      stageOrder: 1,
+      status: 'COMPLETED',
+      idempotencyKey: 'stage-md-terminal-key',
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      dataThroughDate: '2026-05-25T00:00:00.000Z',
+      inputFingerprint: 'market-data:PRICE_BACKFILL:price-backfill-3',
+      outputFingerprint: 'market-data-output',
+      changedInstrumentCount: 2,
+      batchSize: 20,
+      offset: 0,
+      nextOffset: null,
+      hasMore: false,
+      totalCount: 20,
+      processedCount: 20,
+      succeededCount: 20,
+      partialCount: 0,
+      failedCount: 0,
+      skippedCount: 0,
+      unchangedCount: 5,
+      attemptCount: 1,
+      cacheKey: null,
+      cacheStatus: 'BYPASS',
+      cacheExpiresAt: null,
+      leaseOwner: null,
+      leaseExpiresAt: null,
+      startedAt: '2026-05-25T03:00:00.000Z',
+      completedAt: '2026-05-25T03:05:00.000Z',
+      durationMs: 300000,
+      warnings: [],
+      errors: [],
+      metadata: null,
+      createdAt: '2026-05-25T03:00:00.000Z',
+      updatedAt: '2026-05-25T03:05:00.000Z',
+    };
+    const repository = {
+      upsertRun: jest.fn().mockResolvedValue(run),
+      completeRun: jest.fn().mockResolvedValue({ ...run, status: 'COMPLETED' }),
+      upsertStage: jest.fn().mockResolvedValue({ ...completedStage, status: 'RUNNING' }),
+      acquireStageLease: jest.fn(),
+      completeStage: jest.fn().mockResolvedValue(completedStage),
+      recordStageProgress: jest.fn(),
+      latestStages: jest.fn(),
+    };
+    const service = new PipelineOrchestrationService(repository as any, {} as any);
+    const runScheduledDataQualityStage = jest
+      .spyOn(service, 'runScheduledDataQualityStage')
+      .mockResolvedValue({ status: 'COMPLETED' } as any);
+
+    await service.recordMarketDataStageSnapshot({
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      triggerType: 'startup',
+      operation: 'PRICE_BACKFILL',
+      runId: 'price-backfill-3',
+      status: 'COMPLETED',
+      dataThroughDate: '2026-05-25T00:00:00.000Z',
+      totalCount: 20,
+      processedCount: 20,
+      succeededCount: 20,
+      failedCount: 0,
+      skippedCount: 0,
+      unchangedCount: 5,
+      changedInstrumentIds: ['stock-2', 'stock-1', 'stock-1'],
+      batchSize: 20,
+      nextOffset: null,
+      hasMore: false,
+      startedAt: '2026-05-25T03:00:00.000Z',
+      completedAt: '2026-05-25T03:05:00.000Z',
+      warnings: [],
+      errors: [],
+      metadata: { message: 'Price backfill completed.' },
+    });
+
+    expect(repository.upsertRun).toHaveBeenCalledWith(expect.objectContaining({
+      changedInstrumentCount: 2,
+    }));
+    expect(repository.upsertStage).toHaveBeenCalledWith(expect.objectContaining({
+      changedInstrumentCount: 2,
+    }));
+    expect(runScheduledDataQualityStage).toHaveBeenCalledWith(expect.objectContaining({
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      triggerType: 'scheduled',
+      dataThroughDate: '2026-05-25',
+      changedInstrumentIds: ['stock-1', 'stock-2'],
+      batchSize: 2,
+      schedulerRunStartedAt: '2026-05-25T03:00:00.000Z',
+    }));
+  });
 });

@@ -141,11 +141,28 @@ describe('MarketDataFoundationScheduler', () => {
     expect(service.syncScheduledRegion).toHaveBeenCalledTimes(1);
   });
 
-  it('skips latest-candle sync while a price backfill background run is active', async () => {
+  it('keeps incremental latest-candle sync eligible while a price backfill background run is active', async () => {
     const service = {
       activePriceBackfillRun: jest.fn().mockReturnValue({ runId: 'price-backfill-1', status: 'RUNNING' }),
-      latestStoredCandleInfo: jest.fn(),
-      syncScheduledRegion: jest.fn(),
+      latestStoredCandleInfo: jest.fn().mockResolvedValue({
+        latestTradingDate: null,
+        finalConfirmed: false,
+        syncState: null,
+        tradingDate: '2026-05-05',
+      }),
+      syncScheduledRegion: jest.fn().mockResolvedValue({
+        region: 'IN',
+        assetType: 'STOCK',
+        tradingDate: '2026-05-05',
+        dataThroughDate: '2026-05-05',
+        sourceFingerprint: 'scheduled-region:abc123',
+        changedInstrumentIds: [],
+        changedInstrumentCount: 0,
+        dqStageEligible: false,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsNoOp: 0,
+      }),
     };
     const scheduler = new MarketDataFoundationScheduler(service as any, {
       enabled: true,
@@ -162,12 +179,11 @@ describe('MarketDataFoundationScheduler', () => {
     const result = await scheduler.runOnce(new Date('2026-05-05T10:30:00.000Z'));
 
     expect(result[0]).toMatchObject({
-      skipped: true,
-      reasonCode: 'PRICE_BACKFILL_RUNNING',
-      priceBackfillRunId: 'price-backfill-1',
+      skipped: false,
+      activePriceBackfillRunId: 'price-backfill-1',
     });
-    expect(service.latestStoredCandleInfo).not.toHaveBeenCalled();
-    expect(service.syncScheduledRegion).not.toHaveBeenCalled();
+    expect(service.latestStoredCandleInfo).toHaveBeenCalledTimes(1);
+    expect(service.syncScheduledRegion).toHaveBeenCalledTimes(1);
   });
 
   it('status shows whether the latest completed candle is stored', async () => {

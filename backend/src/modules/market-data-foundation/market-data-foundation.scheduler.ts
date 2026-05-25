@@ -84,27 +84,11 @@ export class MarketDataFoundationScheduler {
     try {
       const results = [];
       for (const region of this.config.regions) {
+        const latest = await this.service.latestStoredCandleInfo(region, this.config.assetType, now);
         const activePriceBackfill = this.service.activePriceBackfillRun({
           region,
           assetType: this.config.assetType,
         });
-        if (activePriceBackfill) {
-          this.nextSuggestedRunAt = new Date(now.getTime() + Math.max(1, this.config.intervalMinutes) * 60_000).toISOString();
-          console.log('[MarketDataScheduler] skipping scheduled latest-candle sync while price backfill is active', {
-            region,
-            assetType: this.config.assetType,
-            priceBackfillRunId: activePriceBackfill.runId,
-          });
-          results.push({
-            region,
-            skipped: true,
-            reasonCode: 'PRICE_BACKFILL_RUNNING',
-            priceBackfillRunId: activePriceBackfill.runId,
-          });
-          continue;
-        }
-
-        const latest = await this.service.latestStoredCandleInfo(region, this.config.assetType, now);
         const decision = shouldRunMarketDataSync(region, now, {
           latestTradingDate: latest.latestTradingDate,
           finalConfirmed: latest.finalConfirmed,
@@ -125,11 +109,19 @@ export class MarketDataFoundationScheduler {
           missingLatestCompleted,
           latestCompletedTradingDate,
           latestStoredTradingDate: latest.latestTradingDate,
+          activePriceBackfillRunId: activePriceBackfill?.runId,
         });
 
         if (!decision.shouldRun && !missingLatestCompleted) {
-          results.push({ region, skipped: true, decision });
+          results.push({ region, skipped: true, decision, activePriceBackfillRunId: activePriceBackfill?.runId });
           continue;
+        }
+        if (activePriceBackfill) {
+          console.log('[MarketDataScheduler] running incremental latest-candle sync while price backfill continues in background', {
+            region,
+            assetType: this.config.assetType,
+            priceBackfillRunId: activePriceBackfill.runId,
+          });
         }
 
         const summary = await this.service.syncScheduledRegion(region, {
@@ -163,7 +155,7 @@ export class MarketDataFoundationScheduler {
             });
           }
         }
-        results.push({ region, skipped: false, decision, summary, scheduledDataQuality });
+        results.push({ region, skipped: false, decision, summary, scheduledDataQuality, activePriceBackfillRunId: activePriceBackfill?.runId });
       }
       return results;
     } finally {
@@ -345,6 +337,7 @@ export async function startMarketDataStartupPriceBackfill(env = process.env) {
     triggerType: 'startup',
     force: false,
     fullReload: false,
+    policy: 'INCREMENTAL_LATEST_ONLY',
   });
   console.log('[MarketDataStartupBackfill] price backfill background run', {
     runId: result.runId,

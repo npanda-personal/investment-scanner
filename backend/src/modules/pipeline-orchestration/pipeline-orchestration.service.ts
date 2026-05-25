@@ -1844,6 +1844,8 @@ export class PipelineOrchestrationService {
     const runIdempotencyKey = `${stageIdempotencyKey}:run`;
     const warnings = this.toStringArray(request.warnings);
     const errors = this.toStringArray(request.errors);
+    const changedInstrumentIds = this.normalizeInstrumentIds(request.changedInstrumentIds);
+    const changedInstrumentCount = changedInstrumentIds.length > 0 ? changedInstrumentIds.length : request.processedCount;
     const startedAt = this.parseOptionalDate(request.startedAt) || now;
     const completedAt = this.parseOptionalDate(request.completedAt) || (terminal ? now : null);
     const succeededCount = request.succeededCount ?? Math.max(0, request.processedCount - request.failedCount - request.skippedCount);
@@ -1864,6 +1866,7 @@ export class PipelineOrchestrationService {
       timeframe: normalizedScope.timeframe,
       dataThroughDate: normalizedScope.dataThroughDate ?? null,
       sourceFingerprint: `market-data:${request.operation}:${runId}`,
+      changedInstrumentCount,
       totalCount: request.totalCount,
       processedCount: request.processedCount,
       succeededCount,
@@ -1888,7 +1891,7 @@ export class PipelineOrchestrationService {
       timeframe: normalizedScope.timeframe,
       dataThroughDate: normalizedScope.dataThroughDate ?? null,
       inputFingerprint: `market-data:${request.operation}:${runId}`,
-      changedInstrumentCount: request.processedCount,
+      changedInstrumentCount,
       batchSize: request.batchSize ?? null,
       offset: 0,
       nextOffset: request.nextOffset ?? null,
@@ -1970,6 +1973,14 @@ export class PipelineOrchestrationService {
       warnings,
       errors,
       metadata,
+    });
+    await this.runDownstreamDataQualityForMarketDataSnapshot({
+      request,
+      normalizedScope,
+      completedStage,
+      outputFingerprint,
+      changedInstrumentIds,
+      normalizedBatchSize: this.normalizeScheduledBatchSize(request.batchSize ?? 25, changedInstrumentIds.length),
     });
     return completedStage;
   }
@@ -2330,6 +2341,70 @@ export class PipelineOrchestrationService {
       limit: '100',
     });
     return `/api/v1/pipeline/status?${query.toString()}`;
+  }
+
+  private normalizeInstrumentIds(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+    return [...new Set(value.map((entry) => String(entry || '').trim()).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b));
+  }
+
+  private async runDownstreamDataQualityForMarketDataSnapshot(input: {
+    request: MarketDataStageSnapshotRequest;
+    normalizedScope: { region: string; assetType: string; timeframe: string; dataThroughDate?: Date | null };
+    completedStage: PipelineStageRunRecord;
+    outputFingerprint: string;
+    changedInstrumentIds: string[];
+    normalizedBatchSize: number;
+  }): Promise<void> {
+    const { request, normalizedScope, completedStage, outputFingerprint, changedInstrumentIds, normalizedBatchSize } = input;
+    if (!this.shouldRunDownstreamDataQualityForMarketDataSnapshot(request, changedInstrumentIds)) return;
+
+    const dataThroughDate = this.snapshotDataThroughDateKey(request.dataThroughDate, normalizedScope.dataThroughDate);
+    if (!dataThroughDate) {
+      console.warn('[PipelineOrchestration] Market Data snapshot skipped downstream Data Quality: missing dataThroughDate', {
+        operation: request.operation,
+        runId: request.runId,
+        stageRunId: completedStage.id,
+      });
+      return;
+    }
+
+    await this.runScheduledDataQualityStage({
+      region: normalizedScope.region,
+      assetType: normalizedScope.assetType,
+      timeframe: '1d',
+      pipelineKey: request.pipelineKey,
+      triggerType: 'scheduled',
+      dataThroughDate,
+      sourceFingerprint: outputFingerprint || completedStage.outputFingerprint || `market-data:${request.operation}:${request.runId}`,
+      changedInstrumentIds,
+      batchSize: normalizedBatchSize,
+      schedulerRunStartedAt: (this.parseOptionalDate(request.startedAt) || new Date()).toISOString(),
+    }).catch((error) => {
+      console.error('[PipelineOrchestration] downstream Data Quality stage failed after Market Data snapshot', {
+        operation: request.operation,
+        runId: request.runId,
+        stageRunId: completedStage.id,
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        error: error instanceof Error ? error.message : 'unknown error',
+      });
+    });
+  }
+
+  private shouldRunDownstreamDataQualityForMarketDataSnapshot(
+    request: MarketDataStageSnapshotRequest,
+    changedInstrumentIds: string[]
+  ): boolean {
+    if (changedInstrumentIds.length === 0) return false;
+    if (request.operation === 'CATALOG_SYNC') return false;
+    return request.status === 'COMPLETED' || request.status === 'PARTIAL';
+  }
+
+  private snapshotDataThroughDateKey(value: string | null | undefined, fallback: Date | null | undefined): string | null {
+    const parsed = this.parseOptionalDate(value) || fallback || null;
+    return parsed ? parsed.toISOString().slice(0, 10) : null;
   }
 
   private mapDataQualityStatus(totalCount: number, failedCount: number): 'COMPLETED' | 'PARTIAL' | 'SKIPPED' {

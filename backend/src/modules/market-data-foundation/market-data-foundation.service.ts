@@ -456,6 +456,7 @@ type MarketDataPipelineRecorder = {
     failedCount: number;
     skippedCount: number;
     unchangedCount: number;
+    changedInstrumentIds?: string[];
     batchSize: number;
     nextOffset: number | null;
     hasMore: boolean;
@@ -2586,7 +2587,12 @@ export class MarketDataFoundationService {
     const providerThrottleMs = this.priceBackfillProviderThrottleMs();
     const excludeStockIds = new Set((request.excludeStockIds || []).filter(Boolean));
     const includeRetryableBlocked = request.force === true || request.fullReload === true;
-    const candidates = await this.priceBackfillCandidates(scope, excludeStockIds, { includeRetryableBlocked });
+    const latestCompletedDate = latestCompletedTradingDateForRegion(scope.region);
+    const candidates = this.filterPriceBackfillCandidatesForPolicy(
+      await this.priceBackfillCandidates(scope, excludeStockIds, { includeRetryableBlocked }),
+      request.policy,
+      latestCompletedDate
+    );
     const page = candidates.slice(0, batch.batchSize);
     const summary = this.emptyRepairSummary(scope, batch, candidates.length, true);
     summary.workerConcurrency = workerConcurrency;
@@ -2601,7 +2607,6 @@ export class MarketDataFoundationService {
     summary.historyCoverageFallbackRequired = 0;
     summary.sampleCoverageResults = [];
     summary.processedStockIds = [];
-    const latestCompletedDate = latestCompletedTradingDateForRegion(scope.region);
     summary.latestCompletedEodDate = latestCompletedDate;
 
     if (!latestCompletedDate) {
@@ -2682,7 +2687,11 @@ export class MarketDataFoundationService {
     });
 
     const attemptedStockIds = new Set([...excludeStockIds, ...(summary.processedStockIds || [])]);
-    const remainingCandidates = await this.priceBackfillCandidates(scope, attemptedStockIds, { includeRetryableBlocked });
+    const remainingCandidates = this.filterPriceBackfillCandidatesForPolicy(
+      await this.priceBackfillCandidates(scope, attemptedStockIds, { includeRetryableBlocked }),
+      request.policy,
+      latestCompletedDate
+    );
     summary.remainingCandidates = remainingCandidates.length;
     summary.hasMore = remainingCandidates.length > 0;
     summary.nextOffset = summary.hasMore ? 0 : null;
@@ -2711,8 +2720,7 @@ export class MarketDataFoundationService {
 
     const now = new Date();
     const clamped = this.normalizePriceBackfillRunRequest(request);
-    const repairPlan = await this.repairPlan(scope);
-    const totalCount = repairPlan.supportedPriceBackfillNeeded ?? repairPlan.priceBackfillNeeded ?? 0;
+    const totalCount = await this.countPriceBackfillRunCandidates(scope, request);
     const runId = this.createPriceBackfillRunId(now);
     const run: PriceBackfillRunRecord = {
       success: true,
@@ -5162,6 +5170,7 @@ export class MarketDataFoundationService {
       failedCount: run.failed,
       skippedCount: run.skipped,
       unchangedCount: run.noOp,
+      changedInstrumentIds: [...run.processedStockIds],
       batchSize: run.batchSize,
       nextOffset: run.hasMore ? 0 : null,
       hasMore: run.hasMore,
@@ -8358,6 +8367,33 @@ export class MarketDataFoundationService {
         if (leftPriority !== rightPriority) return leftPriority - rightPriority;
         return String(left.stock.symbol).localeCompare(String(right.stock.symbol));
       });
+  }
+
+  private async countPriceBackfillRunCandidates(
+    scope: { region: string; assetType: string },
+    request: PriceBackfillRunRequest
+  ): Promise<number> {
+    if (request.policy === 'INCREMENTAL_LATEST_ONLY') {
+      const latestCompletedDate = latestCompletedTradingDateForRegion(scope.region);
+      const candidates = await this.priceBackfillCandidates(scope);
+      return this.filterPriceBackfillCandidatesForPolicy(candidates, request.policy, latestCompletedDate).length;
+    }
+
+    const repairPlan = await this.repairPlan(scope);
+    return repairPlan.supportedPriceBackfillNeeded ?? repairPlan.priceBackfillNeeded ?? 0;
+  }
+
+  private filterPriceBackfillCandidatesForPolicy(
+    candidates: PriceBackfillCandidate[],
+    policy: MarketDataRepairRequest['policy'],
+    latestCompletedDate: string | null
+  ): PriceBackfillCandidate[] {
+    if (policy !== 'INCREMENTAL_LATEST_ONLY') return candidates;
+    if (!latestCompletedDate) return [];
+    return candidates.filter((candidate) => Boolean(
+      candidate.readiness.latestPriceDate
+      && candidate.readiness.latestPriceDate < latestCompletedDate
+    ));
   }
 
   private async repairStatesByStockId(

@@ -641,6 +641,7 @@ export interface MarketDataStageSnapshotRequest {
   failedCount: number;
   skippedCount: number;
   unchangedCount?: number;
+  changedInstrumentIds?: string[];
   batchSize?: number | null;
   nextOffset?: number | null;
   hasMore: boolean;
