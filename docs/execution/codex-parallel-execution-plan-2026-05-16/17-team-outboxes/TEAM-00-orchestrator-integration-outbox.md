@@ -10,14 +10,16 @@ Status:
 - Open decisions: 0.
 - Product Owner action required: no.
 - Push performed: no.
-- Active Team 04 QA verification agent: `019e5ec7-3ce8-7e72-bffa-92dbbb4e0a34`.
+- Team 04 QA verification agent `019e5ec7-3ce8-7e72-bffa-92dbbb4e0a34` rejected `CF-W2-TSC-05A` and was closed.
+- Active Team 07 rework agent: `019e5ed4-6f08-7433-b86d-d71ee7cf464a`.
 - Team 02 rolling requirements agent `019e5ec5-c53c-7f02-8b9c-9476b46e7082` completed and was closed.
 - Active Team 05 DQ-RS1 implementation agent: `019e5ecb-b61d-7773-9dc6-1246a1a558fe`.
 
 Gate movement:
 
 - Team 07 completed `CF-W2-TSC-05A` implementation and developer validation.
-- Team 04 QA Verification for `CF-W2-TSC-05A` is active in the Team 07 worktree.
+- Team 04 QA rejected `CF-W2-TSC-05A` for missing worktree copies of the QA plan / Ready promotion and two banned `Modeled reward range.` fixture phrases.
+- Team 07 rework is active with an exact fix scope.
 - Team 04 completed `CF-W1-DQ-02-RS1` QA planning with `QA-plan ready`.
 - Team 00 promoted `CF-W1-DQ-02-RS1` to Team 05 for bounded implementation.
 - Old Team 05 `CF-W3-MDPIPE-01C` inbox content is stale; `01C` is already accepted and committed as `da66fa4`.
@@ -26,7 +28,8 @@ Gate movement:
 
 Teams ready to pick up new tasks:
 
-- Team 04: active on `CF-W2-TSC-05A` QA verification.
+- Team 07: active on `CF-W2-TSC-05A` QA-rejection rework.
+- Team 04: ready for `CF-W2-TSC-05A` QA re-verification after Team 07 handoff.
 - Team 05: active on `CF-W1-DQ-02-RS1` implementation.
 - Team 10: Code Review after Team 04 acceptance.
 - Team 03: `CF-W2-CAL-02` architecture prep now; Architect Signoff after Team 10 acceptance if a review handoff arrives.

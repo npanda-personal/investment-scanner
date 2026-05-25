@@ -41,7 +41,8 @@ Date: 2026-05-25
 Gate status:
 
 - Team 07 completed `CF-W2-TSC-05A` implementation and developer validation in the stacked Today Review worktree.
-- Team 04 QA Verification for `CF-W2-TSC-05A` is active as agent `019e5ec7-3ce8-7e72-bffa-92dbbb4e0a34`.
+- Team 04 QA Verification rejected `CF-W2-TSC-05A` for bounded handoff/test-fixture issues, not runtime behavior or forbidden-file drift.
+- Team 07 rework is active as agent `019e5ed4-6f08-7433-b86d-d71ee7cf464a`.
 - Team 04 completed `CF-W1-DQ-02-RS1` QA planning and was closed.
 - Team 00 promoted `CF-W1-DQ-02-RS1` to Team 05 as a bounded seven-file DQE implementation child.
 - Team 05 implementation is active as agent `019e5ecb-b61d-7773-9dc6-1246a1a558fe`.
@@ -63,7 +64,8 @@ Parallel routing:
 
 Teams ready to pick up new tasks:
 
-- Team 04: active on `CF-W2-TSC-05A` QA verification.
+- Team 07: active on `CF-W2-TSC-05A` QA-rejection rework.
+- Team 04: ready for `CF-W2-TSC-05A` QA re-verification after Team 07 handoff.
 - Team 05: active on `CF-W1-DQ-02-RS1` implementation.
 - Team 10: Code Review after Team 04 acceptance.
 - Team 03: `CF-W2-CAL-02` architecture prep now; Architect Signoff after Team 10 acceptance if a review handoff arrives.

@@ -12,7 +12,7 @@ Current active agents:
 
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Team 04 - QA Factory | `019e5ec7-3ce8-7e72-bffa-92dbbb4e0a34` | `gpt-5.4`, high | QA verification | `CF-W2-TSC-05A` in Team 07 worktree | active |
+| 1 | Team 07 - Portfolio / Watchlist / Alerts | `019e5ed4-6f08-7433-b86d-d71ee7cf464a` | `gpt-5.3-codex`, high | rework | `CF-W2-TSC-05A` QA rejection fixes in Team 07 worktree | active |
 | 2 | Team 03 - Architecture Factory | `019e5ece-ed41-7b22-af81-18d3cc84bbb2` | `gpt-5.4`, high | architecture prep | `CF-W2-CAL-02` calibration evidence basis | active |
 | 3 | Team 05 - Market Data / Data Quality | `019e5ecb-b61d-7773-9dc6-1246a1a558fe` | `gpt-5.3-codex`, high | implementation | `CF-W1-DQ-02-RS1` in `C:\work\repo\investment-scanner-worktrees\team05-CF-W1-DQ-02-RS1` | active |
 | 4 | Team 01 - Audit Factory | `019e5ed1-b626-7121-b84a-55ed577ccb70` | `gpt-5.4`, medium | audit | next direct investor/trader-value gaps after CAL-02 | active |
@@ -24,10 +24,11 @@ Recently closed:
 - Team 07 `019e5eb8-0d85-7213-b1ce-672513fcda1d`: completed `CF-W2-TSC-05A` implementation; next gate is Team 04 QA verification.
 - Team 04 `019e5ec3-2a5b-7840-9d29-65c43a855e19`: completed `CF-W1-DQ-02-RS1` QA planning; verdict `QA-plan ready`.
 - Team 02 `019e5ec5-c53c-7f02-8b9c-9476b46e7082`: completed fresh direct-value discovery; created `CF-W2-CAL-02`.
+- Team 04 `019e5ec7-3ce8-7e72-bffa-92dbbb4e0a34`: rejected `CF-W2-TSC-05A` for missing worktree artifact docs and two banned fixture phrases; closed.
 
 Current routing:
 
-- `CF-W2-TSC-05A` is in QA verification in the Team 07 worktree.
+- `CF-W2-TSC-05A` is back with Team 07 for bounded QA-rejection rework in the Team 07 worktree.
 - `CF-W1-DQ-02-RS1` is promoted to Team 05 as a bounded seven-file DQE implementation child.
 - Team 05 implementation is active in branch `codex/team05-market-data/CF-W1-DQ-02-RS1`.
 - `CF-W2-CAL-02` is active with Team 03 docs-only architecture prep.
@@ -36,7 +37,8 @@ Current routing:
 
 Teams ready to pick up new tasks:
 
-- Team 04: active on `CF-W2-TSC-05A` QA verification.
+- Team 07: active on `CF-W2-TSC-05A` rework after QA rejection.
+- Team 04: ready for `CF-W2-TSC-05A` QA re-verification after Team 07 rework handoff.
 - Team 05: active on `CF-W1-DQ-02-RS1` implementation.
 - Team 10: ready for the next QA-accepted code review.
 - Team 03: active on `CF-W2-CAL-02` architecture prep; Architect Signoff after review acceptance if a QA-accepted handoff appears.
