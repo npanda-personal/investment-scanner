@@ -157,17 +157,17 @@ This stage lets Pipeline Ops show Raw Signals progress after scheduled DQ withou
 
 ## Scheduled Signal Calibration Stage
 
-The scheduler path now continues from terminal scheduled `RAW_SIGNALS` success into a ledgered `SIGNAL_CALIBRATION` stage.
+The scheduler path now continues from terminal scheduled `RAW_SIGNALS` success, or partial success with persisted raw-signal output, into a ledgered `SIGNAL_CALIBRATION` stage.
 
 Rules:
 
-- caller: `PipelineOrchestrationService.runScheduledRawSignalsStage()` after scheduled Raw Signals completes with `COMPLETED`;
+- caller: `PipelineOrchestrationService.runScheduledRawSignalsStage()` after scheduled Raw Signals completes with `COMPLETED`, or `PARTIAL` with at least one successful generated/updated/no-op raw-signal output;
 - trigger type: `scheduled`;
 - input set: the same sorted, unique changed instrument ids from the current scheduled Market Data pass;
 - adapter: `SignalCalibrationEngineService.run()` with explicit `instrumentIds`, scope, `batchSize`, and `offset=0`;
 - calibration reads latest persisted raw signals only for the explicit instruments; it does not generate raw signals, paginate the full region, or call providers;
 - missing persisted raw signal rows are counted as skipped evidence, so the stage cannot report clean success for unresolved inputs;
-- non-completed Raw Signals states (`PARTIAL`, `FAILED`, `SKIPPED`, `LEASE_HELD`, `DUPLICATE_TERMINAL`) do not fan out into calibration;
+- Raw Signals states with no successful persisted output (`FAILED`, `SKIPPED`, `LEASE_HELD`, `DUPLICATE_TERMINAL`, and zero-success `PARTIAL`) do not fan out into calibration;
 - idempotency key: deterministic key over scope, data-through date, upstream Raw Signals output fingerprint, changed-set fingerprint, and Signal Calibration stage version;
 - manual Pipeline Ops `SIGNAL_CALIBRATION_REFRESH_SCOPE` remains deferred; this change does not make calibration refresh a manual command;
 - no route changes, frontend changes, schema changes, package changes, provider/live calls, startup/backfill changes, or downstream fanout beyond Signal Calibration are introduced by this stage.

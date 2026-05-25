@@ -1090,7 +1090,7 @@ export class PipelineOrchestrationService {
       });
 
       const response = this.scheduledRawSignalsResponseFromStage(status, request, normalizedScope, completedStage, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
-      if (status === 'COMPLETED') {
+      if (status === 'COMPLETED' || (status === 'PARTIAL' && completedStage.succeededCount > 0)) {
         response.downstreamSignalCalibration = await this.runScheduledSignalCalibrationStage({
           region: normalizedScope.region,
           assetType: normalizedScope.assetType,

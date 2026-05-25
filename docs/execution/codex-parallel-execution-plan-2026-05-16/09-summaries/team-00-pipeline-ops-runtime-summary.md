@@ -12,8 +12,9 @@ Current implementation state:
 - Scheduled Market Data -> scheduled Data Quality remains the first downstream fanout path.
 - Scheduled Data Quality now fans out to a ledgered `RAW_SIGNALS` stage only when scheduled DQ completes with `COMPLETED`.
 - Scheduled `RAW_SIGNALS` uses explicit changed instrument ids from the upstream scheduler pass and does not run a region-wide signal scan.
-- Scheduled `RAW_SIGNALS` now fans out to a ledgered `SIGNAL_CALIBRATION` stage only when Raw Signals completes with `COMPLETED`.
+- Scheduled `RAW_SIGNALS` now fans out to a ledgered `SIGNAL_CALIBRATION` stage when Raw Signals completes with `COMPLETED`, or `PARTIAL` with successful persisted output.
 - Scheduled `SIGNAL_CALIBRATION` uses explicit changed instrument ids and latest persisted raw-signal rows only; missing raw rows are counted as skipped evidence.
+- Raw Signals `PARTIAL` runs with at least one successful persisted output now fan out to Signal Calibration; fully skipped/failed Raw Signals still stop the chain.
 - Scheduled `SIGNAL_CALIBRATION` now continues through ledgered downstream research stages: `MARKET_CONTEXT`, `SMART_MONEY`, `CONTEXT_SNAPSHOTS`, `SIGNAL_QUALITY`, `STRATEGY_DECISION`, `RESEARCH_PROJECTION`, and `TODAY_REVIEW`.
 - Explicit changed instrument ids are preserved for stages that can run instrument-scoped work. Context Snapshots and Today Review avoid provider/legacy generation fallback in the scheduled path.
 - Terminal Market Data price-backfill snapshots now carry processed instrument ids into the ledger and fan out to scheduled Data Quality, then the existing DB-only downstream chain can continue.
