@@ -86,6 +86,30 @@ Teams ready to pick up new tasks:
 - Team 03: Architect Signoff for B6 after Team 10 acceptance.
 - Team 04: B5 QA planning only after B6 acceptance and Team 00 Ready evaluation.
 
+## Latest Team 00 Routing Update - B6 QA Accepted And 01C Handoff Ready
+
+Date: 2026-05-25
+
+Gate status:
+
+- `CF-W3-MDPIPE-01B6` Team 08 review-reject rework is complete.
+- Team 04 reran B6 QA and accepted the compact Data Quality indicator.
+- B6 next gate is Team 10 re-review.
+- `CF-W3-MDPIPE-01C` Team 05 backend implementation is complete and developer-validated.
+- 01C next gate is Team 04 QA verification.
+
+Parallel routing:
+
+- B6 re-review and 01C QA can run in parallel because B6 writes only Data Quality frontend/evidence docs and 01C writes backend Market Data / Pipeline Orchestration / Data Quality evidence docs.
+- B5 remains blocked until B6 is accepted and committed or otherwise releases the Data Quality page writer set.
+
+Teams ready to pick up new tasks:
+
+- Team 10: `CF-W3-MDPIPE-01B6` re-review.
+- Team 04: `CF-W3-MDPIPE-01C` QA verification.
+- Team 03: B6 Architect Signoff after Team 10 acceptance.
+- Team 10: 01C review after Team 04 acceptance.
+
 ## Latest Team 00 Routing Update - Pipeline Command API Accepted
 
 Date: 2026-05-25

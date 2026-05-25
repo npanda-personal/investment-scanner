@@ -12,8 +12,8 @@ Current active agents:
 
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Team 04 - QA Factory | `019e5e46-3233-7ad2-8c5f-4924fa4161a2` | `gpt-5.4-mini`, medium | QA rerun | `CF-W3-MDPIPE-01B6` compact Data Quality indicator | active |
-| 2 | Team 05 - Market Data / Data Quality | `019e5e36-7ca5-7543-a168-64ec7af10c38` | `gpt-5.3-codex`, high | implementation | `CF-W3-MDPIPE-01C` Data Quality scheduled stage | active |
+| 1 | Open slot | none | pending | review | Team 10 for `CF-W3-MDPIPE-01B6` after Team 04 QA ACCEPT | ready |
+| 2 | Open slot | none | pending | QA verification | Team 04 for `CF-W3-MDPIPE-01C` after Team 05 handoff | ready |
 | 3 | Open slot | none | pending | rolling requirements | Team 02 next direct-value audit cycle | ready |
 | 4 | Open slot | none | pending | architecture/signoff | B5 blocked until B6 acceptance; Team 03 signoff after next review acceptance | waiting |
 | 5 | Open slot | none | pending | review | Team 10 for B6 after Team 04 QA rerun | waiting |
@@ -22,8 +22,8 @@ Current active agents:
 Teams ready to pick up new tasks:
 
 - Team 08: completed `CF-W3-MDPIPE-01B6` review-reject rework; closed.
-- Team 05: active on `CF-W3-MDPIPE-01C` Data Quality scheduled stage implementation.
-- Team 04: active on `CF-W3-MDPIPE-01B6` QA rerun after Team 08 rework.
+- Team 05: completed `CF-W3-MDPIPE-01C` Data Quality scheduled stage implementation; closed.
+- Team 04: accepted `CF-W3-MDPIPE-01B6` QA rerun after Team 08 rework; closed.
 - Team 04: ready for `CF-W3-MDPIPE-01C` QA verification after Team 05 handoff.
 - Team 10: ready for B6 or 01C review after Team 04 acceptance.
 - Team 03: completed architecture prep for `CF-W3-MDPIPE-01C`; later ready for B6 Architect Signoff after Team 10 acceptance.
@@ -65,6 +65,8 @@ Completed agents:
 - Team 08 `019e5e3f-191a-7f50-8cb0-01c41806b771`: completed `CF-W3-MDPIPE-01B6` review-reject rework and validation; closed.
 - Team 02 `019e5e44-fec0-7460-886c-3c3f0d16a31a`: completed read-mostly direct-value gap audit; no files changed; no priority reorder; closed.
 - Team 03 `019e5e42-fde6-7510-8e5c-dd97780aa368`: completed `CF-W3-MDPIPE-01B5` Data Quality-first architecture/contract/work-packet prep; closed.
+- Team 04 `019e5e46-3233-7ad2-8c5f-4924fa4161a2`: accepted `CF-W3-MDPIPE-01B6` QA rerun after Team 08 rework; closed.
+- Team 05 `019e5e36-7ca5-7543-a168-64ec7af10c38`: completed `CF-W3-MDPIPE-01C` backend implementation and validation; closed.
 
 ---
 

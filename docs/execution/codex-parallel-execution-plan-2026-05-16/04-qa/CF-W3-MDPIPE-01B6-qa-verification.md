@@ -6,7 +6,7 @@ Team: TEAM-04 - QA Factory
 
 Work item: `CF-W3-MDPIPE-01B6` - Data Quality compact pipeline indicator
 
-State/mode: executable QA verification complete
+State/mode: QA rerun complete after Team 08 review-reject rework
 
 Owner: Team 04 QA Factory
 
@@ -19,15 +19,16 @@ Lane/module: Lane 3 frontend surface, `frontend/src/features/data-quality-engine
 ## Files Changed
 
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W3-MDPIPE-01B6-qa-verification.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-outbox.md`
 
 ## Files Inspected
 
 - `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W3-MDPIPE-01B6-code-review.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W3-MDPIPE-01B6-developer-handoff.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/13-implementation-evidence/CF-W3-MDPIPE-01B6-ready-promotion.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W3-MDPIPE-01B5-01B6-control-migration-progress-indicators-qa-plan.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W3-MDPIPE-01B6-compact-progress-indicator-contract.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W3-MDPIPE-01B6-first-compact-indicator-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-08-outbox.md`
 - `frontend/src/features/data-quality-engine/components/DataQualityEnginePage.tsx`
 - `frontend/src/features/data-quality-engine/components/DataQualityPipelineStatusStrip.tsx`
 - `frontend/tests/ui/data-quality-engine.spec.ts`
@@ -39,20 +40,20 @@ Lane/module: Lane 3 frontend surface, `frontend/src/features/data-quality-engine
 
 ## Behavior Verified
 
-- Compact indicator renders directly below the Data Quality page header.
-- Indicator resolves only `DATA_QUALITY`.
-- Indicator shows running, terminal, and no-run evidence states.
-- Indicator exposes the `/pipeline-ops` deep link.
-- `Evaluate Scope` remains present.
-- Local `BatchProgressBar` remains present.
-- Render path does not emit `POST /api/v1/data-quality/evaluate` or `POST /api/v1/pipeline/commands`.
-- No route registry, backend, shared UI, or package drift was introduced by this slice.
+- `NO_RUN_EVIDENCE` appears only after a successful loaded snapshot with no `DATA_QUALITY` stage row.
+- Initial loading does not claim no-run evidence.
+- Pipeline status fetch errors render an inline unavailable/error state and do not claim no-run evidence.
+- Loaded no-run state does not show an indeterminate progress bar.
+- The indicator remains read-only and did not POST to Data Quality evaluate or pipeline command execution during render.
+- `/pipeline-ops` remains the Monitoring & OPS detail/manual control page; Data Quality remains compact status only.
 
 ## Validation
 
-- `cd frontend && npm.cmd run build` -> pass.
-- `cd frontend && npm.cmd run test:ui -- pipeline-ops.spec.ts data-quality-engine.spec.ts --workers=1` -> pass, 4/4.
-- Playwright first failed in the sandbox with `EPERM` unlink on `frontend/test-results/.last-run.json`; rerun with elevated artifact access passed.
+- `Get-Counter '\\Memory\\% Committed Bytes In Use'` -> `51.8006622911898%`.
+- `npm.cmd run build` in `frontend` -> pass.
+- `npm.cmd run test:ui -- pipeline-ops.spec.ts data-quality-engine.spec.ts --workers=1` in `frontend`:
+  - first attempt failed with known sandbox artifact cleanup issue: `EPERM: operation not permitted, unlink 'C:\\work\\repo\\investment-scanner\\frontend\\test-results\\.last-run.json'`
+  - rerun with elevated artifact access passed: `6/6`
 
 ## Tests Skipped
 
@@ -83,4 +84,5 @@ Lane/module: Lane 3 frontend surface, `frontend/src/features/data-quality-engine
 ## Evidence Notes
 
 - The focused UI spec validates the running, terminal, and no-run evidence cases, plus the `/pipeline-ops` link and the absence of command/evaluation POSTs during indicator render.
-- `git diff` inspection showed no edits to `frontend/src/app/routes.tsx`, `frontend/src/features/pipeline-ops/**`, or other shared/package/backend scope.
+- Team 08 outbox and developer handoff reflect the reject-rework fix before this rerun.
+- `git status` showed unrelated dirty work in other modules; no application source was modified by Team 04 during this QA pass.

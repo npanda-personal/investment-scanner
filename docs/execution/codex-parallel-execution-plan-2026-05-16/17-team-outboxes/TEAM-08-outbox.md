@@ -2,6 +2,72 @@
 
 Date: 2026-05-18
 
+## 2026-05-25 - CF-W3-MDPIPE-01B6 Reject Rework (Loading/Error/No-Run State Fix)
+
+State: review-reject rework complete for Team 08 reservation; ready for Team 04 QA rerun.
+
+Completed work:
+
+- Updated `DataQualityPipelineStatusStrip` state handling so `NO_RUN_EVIDENCE` appears only after successful snapshot load with no `DATA_QUALITY` stage group.
+- Prevented initial loading from claiming no-run evidence; strip now shows loading progress text during first status fetch.
+- Ensured pipeline status fetch errors render inline unavailable/error state instead of no-run evidence.
+- Removed indeterminate progress rendering for loaded no-run state.
+- Preserved compact, read-only strip behavior and `/pipeline-ops` deep link.
+- Added focused Playwright coverage for loading and error paths to prevent regression.
+
+Files changed (reserved set only):
+
+- `frontend/src/features/data-quality-engine/components/DataQualityPipelineStatusStrip.tsx`
+- `frontend/tests/ui/data-quality-engine.spec.ts`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-08-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W3-MDPIPE-01B6-developer-handoff.md`
+
+Validation run:
+
+- `cd frontend && npm.cmd run build` -> pass
+- `cd frontend && npm.cmd run test:ui -- pipeline-ops.spec.ts data-quality-engine.spec.ts --workers=1`
+  - first run failed with known Playwright artifact cleanup `EPERM` unlink on `frontend/test-results/.last-run.json`
+  - rerun with elevated artifact access passed (`6/6`)
+
+Next gate:
+
+- Team 04 QA rerun -> Team 10 re-review.
+
+## 2026-05-25 - CF-W3-MDPIPE-01B6 Data Quality Compact Pipeline Indicator
+
+State: implementation complete for Team 08 reservation; ready for integration review.
+
+Completed work:
+
+- Added feature-local compact read-only pipeline status strip on `Data Quality Engine` page below `PageHeader`.
+- Wired strip to `usePipelineStatus(scope.region, scope.assetType)` from Pipeline Ops export and resolved only `DATA_QUALITY` stage (`activeStage ?? lastStage`).
+- Preserved existing page-local `Evaluate Scope` control and local `BatchProgressBar` behavior.
+- Added UI smoke assertions for running, terminal, and no-run indicator states; deep link to `/pipeline-ops`; and zero indicator-triggered bulk POST behavior.
+
+Files changed (reserved set only):
+
+- `frontend/src/features/data-quality-engine/components/DataQualityEnginePage.tsx`
+- `frontend/src/features/data-quality-engine/components/DataQualityPipelineStatusStrip.tsx` (new)
+- `frontend/tests/ui/data-quality-engine.spec.ts`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-08-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W3-MDPIPE-01B6-developer-handoff.md` (new)
+
+Validation run:
+
+- `cd frontend && npm.cmd run build` -> pass
+- `cd frontend && npm.cmd run test:ui -- pipeline-ops.spec.ts data-quality-engine.spec.ts --workers=1` -> pass (ran with escalation after sandbox `EPERM` on `test-results/.last-run.json`)
+
+Constraints check:
+
+- No backend edits.
+- No `pipeline-ops` feature edits.
+- No shared UI, route, navigation, scope-context, Prisma, package, or generated-file edits.
+- Indicator path is read-only and does not invoke `POST /api/v1/data-quality/evaluate` or `POST /api/v1/pipeline/commands` during render.
+
+Next gate:
+
+- Team 00 integration queue intake, then QA/Code Review/Architect signoff for `CF-W3-MDPIPE-01B6`.
+
 ## 2026-05-25 - CF-W3-MDPIPE-01B5 / CF-W3-MDPIPE-01B6 Pipeline Ops Control Migration UX
 
 State: docs-only UX planning complete; feature-page control removal still blocked on `CF-W3-MDPIPE-01B4`.

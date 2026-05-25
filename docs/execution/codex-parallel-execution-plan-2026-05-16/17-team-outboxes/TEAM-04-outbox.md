@@ -6,6 +6,56 @@ Team: TEAM-04 - QA Factory
 
 State: Docs-only QA planning completed for `CF-W1-TSC-01A`
 
+## 2026-05-25 - CF-W3-MDPIPE-01B6 QA Rerun
+
+State: executable QA rerun complete after Team 08 review-reject rework.
+
+Work item:
+
+- `CF-W3-MDPIPE-01B6` - Data Quality compact pipeline indicator
+
+Verdict:
+
+- `ACCEPT`
+
+Files changed:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W3-MDPIPE-01B6-qa-verification.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-outbox.md`
+
+Files inspected:
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W3-MDPIPE-01B6-code-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W3-MDPIPE-01B6-developer-handoff.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W3-MDPIPE-01B5-01B6-control-migration-progress-indicators-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W3-MDPIPE-01B6-compact-progress-indicator-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-08-outbox.md`
+- `frontend/src/features/data-quality-engine/components/DataQualityEnginePage.tsx`
+- `frontend/src/features/data-quality-engine/components/DataQualityPipelineStatusStrip.tsx`
+- `frontend/tests/ui/data-quality-engine.spec.ts`
+
+Validation run:
+
+- `Get-Counter '\\Memory\\% Committed Bytes In Use'` -> `51.8006622911898%`
+- `cd frontend && npm.cmd run build` -> pass
+- `cd frontend && npm.cmd run test:ui -- pipeline-ops.spec.ts data-quality-engine.spec.ts --workers=1`
+  - first attempt failed with sandbox artifact cleanup `EPERM` on `frontend/test-results/.last-run.json`
+  - rerun with elevated artifact access passed (`6/6`)
+
+Behavior verified:
+
+- `NO_RUN_EVIDENCE` only appears after a successful loaded snapshot with no `DATA_QUALITY` stage row.
+- Initial loading does not claim no-run evidence.
+- Fetch errors render inline unavailable/error state and do not claim no-run evidence.
+- Loaded no-run state does not show an indeterminate progress bar.
+- The strip remains read-only and does not POST to Data Quality evaluate or pipeline commands during render.
+- `/pipeline-ops` remains the Monitoring & OPS detail/manual control page.
+
+Next gate:
+
+- Team 10 re-review, then Architect signoff, then Product Owner acceptance.
+
 ## Assignment
 
 Create a focused QA plan for `CF-W1-TSC-01A` using Team 03's split architecture:
