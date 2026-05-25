@@ -4827,15 +4827,147 @@ describe('MarketDataFoundationService syncV1', () => {
     });
   });
 
+  it('uses one official NSE EOD bulk file for incremental latest price backfill before provider fallback', async () => {
+    const previousFlag = process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED;
+    const previousFetch = global.fetch;
+    process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED = 'true';
+    const latestCompleted = latestCompletedTradingDateForRegion('IN') || '2026-05-25';
+    const [year, month, day] = latestCompleted.split('-');
+    const staleDate = new Date(`${latestCompleted}T00:00:00.000Z`);
+    staleDate.setUTCDate(staleDate.getUTCDate() - 1);
+    const staleLatest = staleDate.toISOString().slice(0, 10);
+    const csvText = [
+      'SYMBOL,SERIES,DATE1,OPEN_PRICE,HIGH_PRICE,LOW_PRICE,CLOSE_PRICE,TTL_TRD_QNTY',
+      `RELIANCE,EQ,${day}-${month}-${year},100,110,95,108,1000`,
+    ].join('\n');
+    const payload = Buffer.from(csvText);
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: (name: string) => (name.toLowerCase() === 'content-length' ? String(payload.length) : null) },
+      arrayBuffer: async () => payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.byteLength),
+    }) as any;
+
+    const repository = {
+      listStocksForUniverseHealth: jest.fn()
+        .mockResolvedValueOnce([
+          {
+            id: 'reliance-id',
+            symbol: 'RELIANCE',
+            providerSymbol: 'RELIANCE.NS',
+            sourceSymbol: 'RELIANCE',
+            displaySymbol: 'RELIANCE',
+            exchange: 'NSE',
+            providerSupportStatus: 'SUPPORTED',
+            isActive: true,
+            isDelisted: false,
+            sector: 'Energy',
+            industry: 'Oil & Gas',
+            country: 'India',
+            currency: 'INR',
+          },
+        ])
+        .mockResolvedValueOnce([]),
+      priceReadinessStatsForSymbols: jest.fn()
+        .mockResolvedValueOnce(new Map([
+          ['RELIANCE', { priceHistoryBars: 4000, firstPriceDate: '2010-01-01', latestPriceDate: staleLatest, latestVolume: 100, latestAdjustedClose: 100, latestClose: 100 }],
+        ]))
+        .mockResolvedValueOnce(new Map()),
+      updateStockLoadTimestampBySymbol: jest.fn().mockResolvedValue({}),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+    const storeHistorical = jest.spyOn(service, 'storeHistorical').mockResolvedValue({
+      rowsReceived: 1,
+      rowsInserted: 0,
+      rowsUpdated: 1,
+      rowsSkipped: 0,
+      rowsNoOp: 0,
+      warningCount: 0,
+      warnings: [],
+    });
+    const ingestSymbol = jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
+      rowsReceived: 1,
+      rowsInserted: 0,
+      rowsUpdated: 1,
+      rowsSkipped: 0,
+      rowsNoOp: 0,
+      warningCount: 0,
+      warnings: [],
+    });
+
+    try {
+      const result = await service.backfillPrices({
+        region: 'IN',
+        assetType: 'STOCK',
+        batchSize: 10,
+        policy: 'INCREMENTAL_LATEST_ONLY',
+      });
+
+      expect(storeHistorical).toHaveBeenCalledWith([
+        expect.objectContaining({
+          symbol: 'RELIANCE',
+          source: 'NSE_SECURITY_BHAVDATA',
+          date: new Date(`${latestCompleted}T00:00:00.000Z`),
+        }),
+      ]);
+      expect(repository.updateStockLoadTimestampBySymbol).toHaveBeenCalledWith('RELIANCE');
+      expect(ingestSymbol).not.toHaveBeenCalled();
+      expect(result).toMatchObject({
+        processedCount: 1,
+        updated: 1,
+        priceRowsUpdated: 1,
+        processedStockIds: ['reliance-id'],
+        remainingCandidates: 0,
+        hasMore: false,
+        officialEodBulk: {
+          attempted: true,
+          sourceName: 'NSE_SECURITY_BHAVDATA',
+          matchedInstruments: 1,
+        },
+      });
+    } finally {
+      if (previousFlag === undefined) delete process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED;
+      else process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED = previousFlag;
+      global.fetch = previousFetch;
+    }
+  });
+
   it('mirrors price backfill run progress into the pipeline ledger', async () => {
+    const stocks = ['AAA.NS', 'BBB.NS', 'CCC.NS'].map((symbol, index) => ({
+      id: `stock-${index + 1}`,
+      symbol,
+      providerSupportStatus: 'SUPPORTED',
+      isActive: true,
+      isDelisted: false,
+      providerSymbol: symbol,
+      sector: 'Tech',
+      industry: 'Software',
+      marketCap: 100000000,
+      country: 'India',
+      currency: 'INR',
+      isin: `INE000A0100${index}`,
+      ipoDate: new Date('2020-01-01T00:00:00.000Z'),
+      assetType: 'STOCK',
+    }));
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue(stocks),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map(stocks.map((stock) => [
+        stock.symbol,
+        {
+          priceHistoryBars: 300,
+          firstPriceDate: '2020-01-01',
+          latestPriceDate: '2026-05-01',
+          latestVolume: 1000,
+          latestAdjustedClose: 100,
+          latestClose: 100,
+        },
+      ]))),
+      listBlockedPriceBackfillStockIds: jest.fn().mockResolvedValue([]),
+    };
     const recorder = {
       recordMarketDataStageSnapshot: jest.fn().mockResolvedValue({}),
     };
-    const service = new MarketDataFoundationService({} as any, {} as any, {} as any, recorder as any);
-    jest.spyOn(service, 'repairPlan').mockResolvedValue({
-      supportedPriceBackfillNeeded: 3,
-      priceBackfillNeeded: 3,
-    } as any);
+    const service = new MarketDataFoundationService(repository as any, {} as any, {} as any, recorder as any);
     jest.spyOn(service as any, 'processPriceBackfillRun').mockResolvedValue(undefined);
 
     const result = await service.startPriceBackfillRun({

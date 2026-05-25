@@ -603,6 +603,7 @@ export class MarketDataFoundationController {
         batchSize: this.numberParam(req, 'batchSize') ?? this.numberParam(req, 'limit'),
         offset: this.numberParam(req, 'offset'),
         workerConcurrency: this.numberParam(req, 'workerConcurrency'),
+        policy: this.parsePriceBackfillPolicy(req.query.policy ?? req.body?.policy),
         force: this.parseOptionalBoolean(req.query.force ?? req.body?.force),
         fullReload: this.parseOptionalBoolean(req.query.fullReload ?? req.body?.fullReload),
       }));
@@ -622,6 +623,7 @@ export class MarketDataFoundationController {
         workerConcurrency: this.numberParam(req, 'workerConcurrency'),
         maxBatches: this.numberParam(req, 'maxBatches'),
         triggerType: 'manual',
+        policy: this.parsePriceBackfillPolicy(req.query.policy ?? req.body?.policy),
         force: this.parseOptionalBoolean(req.query.force ?? req.body?.force),
         fullReload: this.parseOptionalBoolean(req.query.fullReload ?? req.body?.fullReload),
       }));
@@ -858,6 +860,16 @@ export class MarketDataFoundationController {
   private parseRepairRunActions(value: unknown): any[] | undefined {
     if (Array.isArray(value)) return value;
     if (typeof value === 'string') return value.split(',').map((item) => item.trim()).filter(Boolean);
+    return undefined;
+  }
+
+  private parsePriceBackfillPolicy(value: unknown): 'INCREMENTAL_LATEST_ONLY' | 'AUTO_DEEP_FOR_SHALLOW' | 'FORCE_DEEP' | undefined {
+    const policy = Array.isArray(value) ? value[0] : value;
+    if (typeof policy !== 'string') return undefined;
+    const normalized = policy.trim().toUpperCase();
+    if (normalized === 'INCREMENTAL_LATEST_ONLY' || normalized === 'AUTO_DEEP_FOR_SHALLOW' || normalized === 'FORCE_DEEP') {
+      return normalized;
+    }
     return undefined;
   }
 

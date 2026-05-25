@@ -1163,6 +1163,7 @@ export interface MarketDataRepairSummary {
   priceRowsInserted?: number;
   priceRowsUpdated?: number;
   priceRowsNoOp?: number;
+  officialEodBulk?: OfficialEodBulkSyncEvidence | null;
   zeroRowProviderReturns?: number;
   deepReloaded?: number;
   incrementalCaughtUp?: number;

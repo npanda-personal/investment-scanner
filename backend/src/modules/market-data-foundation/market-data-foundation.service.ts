@@ -137,6 +137,7 @@ type PriceBackfillRunRecord = PriceBackfillRunStatusResponse & {
   cancelRequested: boolean;
   force: boolean;
   fullReload: boolean;
+  policy: MarketDataRepairRequest['policy'];
   triggerType: 'startup' | 'backfill' | 'manual' | 'scheduled';
   processedStockIds: Set<string>;
 };
@@ -1618,7 +1619,7 @@ export class MarketDataFoundationService {
     const startedAt = new Date();
     const scope = this.repairScope(request);
     const batchSize = Math.min(Math.max(Number(request.batchSize ?? request.limit) || 50, 1), 100);
-    const maxBatchesPerAction = Math.min(Math.max(Number(request.maxBatchesPerAction) || 20, 1), 100);
+    const maxBatchesPerAction = Math.min(Math.max(Number(request.maxBatchesPerAction) || 5, 1), 100);
     const drainMode = request.mode === 'DRAIN_UNTIL_BLOCKED';
     const actions = this.normalizeRepairRunActions(request.actions, request.mode, request.csvText);
     const beforeSnapshot = await this.tryUniverseComputationSnapshot(scope);
@@ -2601,6 +2602,7 @@ export class MarketDataFoundationService {
     summary.priceRowsInserted = 0;
     summary.priceRowsUpdated = 0;
     summary.priceRowsNoOp = 0;
+    summary.officialEodBulk = null;
     summary.zeroRowProviderReturns = 0;
     summary.deepReloaded = 0;
     summary.incrementalCaughtUp = 0;
@@ -2619,8 +2621,15 @@ export class MarketDataFoundationService {
 
     const safeEndDate = this.endOfTradingDateUtc(latestCompletedDate);
     summary.targetEndDate = safeEndDate.toISOString();
+    const providerPage = await this.applyOfficialEodBulkForIncrementalPriceBackfill({
+      policy: request.policy,
+      scope,
+      targetTradingDate: latestCompletedDate,
+      page,
+      summary,
+    });
 
-    await this.eachWithConcurrency(page, workerConcurrency, async (candidate) => {
+    await this.eachWithConcurrency(providerPage, workerConcurrency, async (candidate) => {
       const { stock, mode, startDate } = this.priceBackfillFetchPlan(candidate, latestCompletedDate, request);
       summary.processedCount += 1;
       if (stock.id) summary.processedStockIds!.push(stock.id);
@@ -2720,7 +2729,8 @@ export class MarketDataFoundationService {
 
     const now = new Date();
     const clamped = this.normalizePriceBackfillRunRequest(request);
-    const totalCount = await this.countPriceBackfillRunCandidates(scope, request);
+    const policy = request.policy || (request.fullReload ? 'FORCE_DEEP' : 'INCREMENTAL_LATEST_ONLY');
+    const totalCount = await this.countPriceBackfillRunCandidates(scope, { ...request, policy });
     const runId = this.createPriceBackfillRunId(now);
     const run: PriceBackfillRunRecord = {
       success: true,
@@ -2763,6 +2773,7 @@ export class MarketDataFoundationService {
       cancelRequested: false,
       force: request.force === true || request.fullReload === true,
       fullReload: request.fullReload === true,
+      policy,
       triggerType: request.triggerType ?? 'backfill',
       processedStockIds: new Set<string>(),
     };
@@ -4998,6 +5009,7 @@ export class MarketDataFoundationService {
           workerConcurrency: run.workerConcurrency,
           force: run.force,
           fullReload: run.fullReload,
+          policy: run.policy,
           excludeStockIds: Array.from(run.processedStockIds),
         });
         run.batchesExecuted += 1;
@@ -5092,7 +5104,7 @@ export class MarketDataFoundationService {
     );
     const maxBatches = this.clampCatalogSyncNumber(
       request.maxBatches ?? request.maxBatchesPerAction,
-      100,
+      5,
       1,
       500,
       'maxBatches',
@@ -7507,6 +7519,7 @@ export class MarketDataFoundationService {
       ...base,
       force: request.force === true || request.fullReload === true,
       fullReload: request.fullReload,
+      policy: request.policy || (request.fullReload ? 'FORCE_DEEP' : 'INCREMENTAL_LATEST_ONLY'),
     });
   }
 
@@ -8381,6 +8394,79 @@ export class MarketDataFoundationService {
 
     const repairPlan = await this.repairPlan(scope);
     return repairPlan.supportedPriceBackfillNeeded ?? repairPlan.priceBackfillNeeded ?? 0;
+  }
+
+  private async applyOfficialEodBulkForIncrementalPriceBackfill(input: {
+    policy: MarketDataRepairRequest['policy'];
+    scope: { region: string; assetType: string };
+    targetTradingDate: string;
+    page: PriceBackfillCandidate[];
+    summary: MarketDataRepairSummary;
+  }): Promise<PriceBackfillCandidate[]> {
+    if (input.policy !== 'INCREMENTAL_LATEST_ONLY' || input.page.length === 0) return input.page;
+
+    const tasks = input.page.map((candidate) => this.priceBackfillCandidateTask(candidate));
+    const officialBulk = await this.tryOfficialNseEodBulkLatestCandle({
+      region: input.scope.region,
+      assetType: input.scope.assetType,
+      targetTradingDate: input.targetTradingDate,
+      tasks,
+    });
+    input.summary.officialEodBulk = officialBulk.evidence;
+    if (officialBulk.evidence.sourceFingerprint) {
+      input.summary.sourceFingerprint = officialBulk.evidence.sourceFingerprint;
+    }
+    for (const warning of officialBulk.evidence.warnings || []) {
+      input.summary.warnings.push(warning);
+    }
+    if (officialBulk.evidence.fallbackReason && !['OFFICIAL_EOD_DISABLED', 'OFFICIAL_EOD_NO_TASKS'].includes(officialBulk.evidence.fallbackReason)) {
+      input.summary.warnings.push(`Official NSE EOD bulk fallback: ${officialBulk.evidence.fallbackReason}`);
+    }
+
+    if (officialBulk.matchedTaskIds.size === 0) return input.page;
+
+    const byId = new Map(input.page.map((candidate) => [String(candidate.stock.id), candidate]));
+    for (const taskId of officialBulk.matchedTaskIds) {
+      const candidate = byId.get(taskId);
+      const taskSummary = officialBulk.summaryByTaskId.get(taskId);
+      if (!candidate || !taskSummary) continue;
+
+      input.summary.processedCount += 1;
+      input.summary.processedStockIds!.push(taskId);
+      input.summary.priceRowsReceived = (input.summary.priceRowsReceived || 0) + (taskSummary.rowsReceived || 0);
+      input.summary.priceRowsInserted = (input.summary.priceRowsInserted || 0) + (taskSummary.rowsInserted || 0);
+      input.summary.priceRowsUpdated = (input.summary.priceRowsUpdated || 0) + (taskSummary.rowsUpdated || 0);
+      input.summary.priceRowsNoOp = (input.summary.priceRowsNoOp || 0) + (taskSummary.rowsNoOp || 0);
+      if ((taskSummary.rowsInserted || 0) > 0 || (taskSummary.rowsUpdated || 0) > 0) {
+        input.summary.updated += 1;
+      } else if ((taskSummary.rowsNoOp || 0) > 0) {
+        input.summary.noOp = (input.summary.noOp || 0) + 1;
+      } else {
+        input.summary.skipped += 1;
+      }
+      if ((taskSummary.warningCount || 0) > 0) {
+        input.summary.warnings.push(...(taskSummary.warnings || []));
+      }
+      this.addPriceBackfillCoverageSample(input.summary, candidate, null);
+    }
+
+    return input.page.filter((candidate) => !officialBulk.matchedTaskIds.has(String(candidate.stock.id)));
+  }
+
+  private priceBackfillCandidateTask(candidate: PriceBackfillCandidate): StockSyncTask {
+    const stock = candidate.stock;
+    return {
+      id: String(stock.id),
+      symbol: String(stock.symbol),
+      exchange: stock.exchange ?? null,
+      providerSymbol: stock.providerSymbol ?? null,
+      sourceSymbol: stock.sourceSymbol ?? null,
+      displaySymbol: stock.displaySymbol ?? null,
+      lastSuccessfulDataLoadTimestamp: stock.lastSuccessfulDataLoadTimestamp ?? null,
+      latestStoredTimestamp: candidate.readiness.latestPriceDate
+        ? new Date(`${candidate.readiness.latestPriceDate}T00:00:00.000Z`)
+        : null,
+    };
   }
 
   private filterPriceBackfillCandidatesForPolicy(

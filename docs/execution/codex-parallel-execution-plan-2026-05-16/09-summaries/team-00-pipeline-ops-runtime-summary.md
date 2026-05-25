@@ -19,12 +19,15 @@ Current implementation state:
 - Terminal Market Data price-backfill snapshots now carry processed instrument ids into the ledger and fan out to scheduled Data Quality, then the existing DB-only downstream chain can continue.
 - Startup price backfill now uses incremental-latest-only policy; it no longer launches a broad historical/deep repair queue when latest EOD is already current.
 - The 15-minute latest-candle scheduler no longer waits behind active background price backfill, so primary Market Data freshness checks can continue while deep repair runs separately.
+- Backfill performance hardening now keeps startup/background/UI price runs bounded: startup defaults to five latest-only batches, the Market Data UI starts price maintenance with `INCREMENTAL_LATEST_ONLY`, three batches, and one worker, and operational repair passes latest-only policy into its price step.
+- Latest-only `IN/STOCK` price backfill now attempts the official NSE daily EOD bulk file first and falls back only unmatched instruments to per-symbol provider calls.
+- Background price-backfill runs now carry the selected policy into each worker batch, so the queue count and actual execution no longer drift into historical/deep repair unexpectedly.
 - Manual Pipeline Ops commands remain unchanged: `DATA_QUALITY_EVALUATE_SCOPE` is still the only executable command; `RAW_SIGNALS_GENERATE_SCOPE` and `SIGNAL_CALIBRATION_REFRESH_SCOPE` remain deferred.
 
 Boundaries preserved:
 
 - No Prisma/schema/migration/generated changes.
-- No route registry, controller, router, validation, frontend, package, provider/live, broker, cloud, or telemetry changes.
+- Controller/frontend changes are bounded to Market Data price-backfill request policy/defaults and visible official-bulk evidence; no route registry, router, validation, package, provider/live, broker, cloud, or telemetry changes.
 - No backtesting proof, legacy plan/risk generation, provider/live, or broad manual command fanout in this slice.
 - No target price, R:R, reward/risk, direct advice, or Trade Plan-first language added.
 
@@ -40,6 +43,8 @@ npm.cmd test -- pipeline-orchestration.service.test.ts market-data.scheduler.tes
 npm.cmd test -- pipeline-orchestration.service.test.ts market-data.scheduler.test.ts market-data.service.test.ts market-data.routes.test.ts data-quality-engine.service.test.ts signal-generation-engine.service.test.ts signal-calibration-engine.service.test.ts --runInBand
 npm.cmd test -- pipeline-orchestration.service.test.ts market-data.scheduler.test.ts market-data.service.test.ts market-data.routes.test.ts data-quality-engine.service.test.ts signal-generation-engine.service.test.ts signal-calibration-engine.service.test.ts smart-money-intelligence.service.test.ts historical-context-snapshots.service.test.ts strategy-decision-engine.service.test.ts today-trade-review.service.test.ts signal-quality-lab.service.test.ts --runInBand
 npm.cmd test -- market-data.scheduler.test.ts market-data.service.test.ts pipeline-orchestration.service.test.ts --runInBand
+npm.cmd test -- market-data.service.test.ts --runInBand
+npm.cmd test -- market-data.routes.test.ts market-data.scheduler.test.ts pipeline-orchestration.service.test.ts --runInBand
 npm.cmd run build
 git diff --check
 ```

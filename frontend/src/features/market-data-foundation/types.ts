@@ -493,6 +493,7 @@ export interface MarketDataRepairRequest {
   providerValidationQueue?: 'UNKNOWN_FIRST' | 'RETRY_FAILED';
   force?: boolean;
   fullReload?: boolean;
+  policy?: 'INCREMENTAL_LATEST_ONLY' | 'AUTO_DEEP_FOR_SHALLOW' | 'FORCE_DEEP';
   csvText?: string;
   catalogSource?: string;
   importMode?: 'MANUAL_CSV' | 'CONFIGURED_URL';
@@ -687,6 +688,7 @@ export interface MarketDataRepairSummary {
   priceRowsInserted?: number;
   priceRowsUpdated?: number;
   priceRowsNoOp?: number;
+  officialEodBulk?: OfficialEodBulkSyncEvidence | null;
   zeroRowProviderReturns?: number;
   deepReloaded?: number;
   incrementalCaughtUp?: number;
@@ -717,6 +719,24 @@ export interface MarketDataRepairSummary {
   unmatchedCatalogRows?: number;
   sourceFingerprint?: string;
   sourceIdentity?: MarketDataRepairSourceIdentity;
+}
+
+export interface OfficialEodBulkSyncEvidence {
+  enabled: boolean;
+  attempted: boolean;
+  sourceName: string | null;
+  sourceUrl: string | null;
+  sourceFileName: string | null;
+  targetTradingDate: string | null;
+  sourceFingerprint: string | null;
+  rowsRead: number;
+  rowsParsed: number;
+  matchedInstruments: number;
+  rowsInserted: number;
+  rowsUpdated: number;
+  rowsNoOp: number;
+  fallbackReason?: string | null;
+  warnings: string[];
 }
 
 export interface MarketDataRepairRunActionResult {

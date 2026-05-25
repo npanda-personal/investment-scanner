@@ -342,8 +342,9 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
         const run = await startMarketDataPriceBackfillRun({
           ...request,
           batchSize: 20,
-          maxBatches: 100,
-          workerConcurrency: 2,
+          maxBatches: 3,
+          workerConcurrency: 1,
+          policy: 'INCREMENTAL_LATEST_ONLY',
           force: false,
         });
         setPriceBackfillRun(run);
@@ -382,8 +383,9 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
         region,
         assetType,
         batchSize: REPAIR_BATCH_SIZE,
-        maxBatchesPerAction: drain ? 50 : 20,
+        maxBatchesPerAction: drain ? 10 : 5,
         workerConcurrency: 4,
+        policy: 'INCREMENTAL_LATEST_ONLY',
         dryRun,
         mode: drain ? 'DRAIN_UNTIL_BLOCKED' : undefined,
         actions: drain ? undefined : [
@@ -1352,6 +1354,11 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
                   hasNumber(repairSummary.remainingCandidates)) && (
                   <Typography variant="caption">
                     Zero-row provider returns {formatCount(repairSummary.zeroRowProviderReturns)}; deep reloaded {formatCount(repairSummary.deepReloaded)}; incremental caught up {formatCount(repairSummary.incrementalCaughtUp)}; remaining candidates {formatCount(repairSummary.remainingCandidates)}.
+                  </Typography>
+                )}
+                {repairSummary.officialEodBulk?.attempted && (
+                  <Typography variant="caption">
+                    Official EOD bulk matched {formatCount(repairSummary.officialEodBulk.matchedInstruments)} instruments; inserted {formatCount(repairSummary.officialEodBulk.rowsInserted)}, updated {formatCount(repairSummary.officialEodBulk.rowsUpdated)}, no-op {formatCount(repairSummary.officialEodBulk.rowsNoOp)}.
                   </Typography>
                 )}
                 {(repairSummary.latestCompletedEodDate || repairSummary.targetEndDate) && (

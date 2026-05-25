@@ -196,6 +196,7 @@ describe('market data controller', () => {
       body: {
         batchSize: 25,
         fullReload: false,
+        policy: 'INCREMENTAL_LATEST_ONLY',
       },
       originalUrl: '/api/v1/market-data/prices/backfill',
     } as any;
@@ -212,6 +213,7 @@ describe('market data controller', () => {
       batchSize: 25,
       workerConcurrency: 3,
       fullReload: false,
+      policy: 'INCREMENTAL_LATEST_ONLY',
     }));
     expect(res.json).toHaveBeenCalledWith({ processedCount: 3 });
   });
@@ -231,6 +233,7 @@ describe('market data controller', () => {
         workerConcurrency: 2,
         maxBatches: 100,
         force: false,
+        policy: 'INCREMENTAL_LATEST_ONLY',
       },
       originalUrl: '/api/v1/market-data/prices/backfill-runs',
     } as any;
@@ -248,6 +251,7 @@ describe('market data controller', () => {
       workerConcurrency: 2,
       maxBatches: 100,
       force: false,
+      policy: 'INCREMENTAL_LATEST_ONLY',
     }));
     expect(res.status).toHaveBeenCalledWith(202);
     expect(res.json).toHaveBeenCalledWith({ runId: 'price-backfill-1', status: 'RUNNING' });
