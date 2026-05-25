@@ -12,8 +12,10 @@ Latest checkpoint before resume:
 - `CF-W3-MDPIPE-01B1-DURABLE-PIPELINE-LEDGER-FOUNDATION` is implemented and developer-validated; scoped commit is the next checkpoint if not already present in git log.
 - `01B1` validation passed: `npx.cmd prisma generate`, `npm.cmd test -- pipeline-orchestration --runInBand`, and `npm.cmd run build`.
 - `01B1` intentionally did not wire route/status API, frontend progress cards, scheduler fanout, DQ execution, provider/live calls, or server startup/backfill changes.
-- Next sequence: `01B2` read-only pipeline status API, `01B3` per-screen last-run/active-progress UI display, then `01C` ledgered Data Quality scheduled stage.
+- `CF-W3-MDPIPE-01B2` read-only pipeline status API is implemented and developer-validated if commit `feat: add read-only pipeline status api` appears in git log.
+- Next sequence: `01B3` Ops-style Bulk Pipeline Dashboard plus compact per-screen progress indicators, then `01C` ledgered Data Quality scheduled stage.
 - Progress visibility requirement: bulk operation progress must be durable and rehydratable after navigation using `PipelineStageRun` status/counts/offsets/lease fields.
+- Updated UI direction: remove full bulk-op controls from respective feature pages over time; centralize monitoring/manual trigger controls in the Bulk Pipeline Dashboard. Feature pages show compact backend-pipeline progress only.
 
 ```text
 You are Team 00 - Master Orchestrator / Integration.

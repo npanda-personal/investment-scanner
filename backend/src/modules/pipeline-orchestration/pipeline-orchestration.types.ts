@@ -179,6 +179,95 @@ export interface PipelineLatestStageQuery {
   region?: string;
   assetType?: string;
   timeframe?: string;
+  pipelineKey?: string;
   stageKeys?: string[];
   limit?: number;
+}
+
+export interface PipelineStatusQuery {
+  region: string;
+  assetType: string;
+  timeframe: string;
+  pipelineKey: string;
+  stageKeys?: string[];
+  limit: number;
+}
+
+export type PipelineStatusRunDto = Pick<
+  PipelineRunRecord,
+  | 'id'
+  | 'status'
+  | 'triggerType'
+  | 'dataThroughDate'
+  | 'changedInstrumentCount'
+  | 'totalCount'
+  | 'processedCount'
+  | 'succeededCount'
+  | 'partialCount'
+  | 'failedCount'
+  | 'skippedCount'
+  | 'unchangedCount'
+  | 'sourceFingerprint'
+  | 'startedAt'
+  | 'completedAt'
+  | 'durationMs'
+  | 'warnings'
+  | 'errors'
+  | 'updatedAt'
+>;
+
+export type PipelineStatusStageDto = Pick<
+  PipelineStageRunRecord,
+  | 'id'
+  | 'pipelineRunId'
+  | 'stageKey'
+  | 'stageOrder'
+  | 'status'
+  | 'dataThroughDate'
+  | 'changedInstrumentCount'
+  | 'batchSize'
+  | 'offset'
+  | 'nextOffset'
+  | 'hasMore'
+  | 'totalCount'
+  | 'processedCount'
+  | 'succeededCount'
+  | 'partialCount'
+  | 'failedCount'
+  | 'skippedCount'
+  | 'unchangedCount'
+  | 'attemptCount'
+  | 'cacheKey'
+  | 'cacheStatus'
+  | 'cacheExpiresAt'
+  | 'inputFingerprint'
+  | 'outputFingerprint'
+  | 'leaseOwner'
+  | 'leaseExpiresAt'
+  | 'startedAt'
+  | 'completedAt'
+  | 'durationMs'
+  | 'warnings'
+  | 'errors'
+  | 'updatedAt'
+>;
+
+export interface PipelineStatusStageGroupDto {
+  stageKey: string;
+  stageOrder: number;
+  activeStage: PipelineStatusStageDto | null;
+  lastStage: PipelineStatusStageDto | null;
+}
+
+export interface PipelineStatusSnapshot {
+  scope: {
+    region: string;
+    assetType: string;
+    timeframe: string;
+    pipelineKey: string;
+  };
+  generatedAt: string;
+  activeRun: PipelineStatusRunDto | null;
+  lastRun: PipelineStatusRunDto | null;
+  stages: PipelineStatusStageGroupDto[];
 }

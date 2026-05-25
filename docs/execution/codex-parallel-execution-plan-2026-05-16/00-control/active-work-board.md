@@ -62,8 +62,8 @@ Validation:
 
 Next slices:
 
-1. `CF-W3-MDPIPE-01B2` read-only pipeline status API.
-2. `CF-W3-MDPIPE-01B3` per-screen last-run and active-progress UI display that survives navigation.
+1. `CF-W3-MDPIPE-01B2` read-only pipeline status API - implemented and developer-validated.
+2. `CF-W3-MDPIPE-01B3` Ops-style Bulk Pipeline Dashboard plus compact per-screen backend progress indicators.
 3. `CF-W3-MDPIPE-01C` Data Quality scheduled stage using the durable ledger.
 4. `CF-W3-MDPIPE-01D` DB-only downstream fanout, one stage family at a time.
 
@@ -74,6 +74,36 @@ Teams ready to pick up new tasks:
 - Team 05: Data Quality stage implementation only after `01B2`/stage contract promotion.
 - Team 08: UI mapping for per-screen pipeline status cards after status API contract is accepted.
 - Team 10: review `CF-W3-MDPIPE-01B1` after scoped commit.
+
+## Latest Team 00 Routing Update - Pipeline Status API
+
+Date: 2026-05-25
+
+Implementation status:
+
+- `CF-W3-MDPIPE-01B2` implemented as backend-only read API.
+- Added `GET /api/v1/pipeline/status`.
+- Added controller, router, validation, service status snapshot, bounded repository read paths, and tests.
+- No UI, manual trigger endpoint, scheduler fanout, downstream execution, provider/live call, schema change, or startup/backfill change was included.
+
+Validation:
+
+- `npm.cmd test -- pipeline-orchestration --runInBand`: passed, 5 suites / 17 tests.
+- `npm.cmd run build`: passed.
+
+Updated Product Owner direction:
+
+- Bulk operation controls should move to a dedicated Ops-style Bulk Pipeline Dashboard.
+- Respective feature pages should show only compact backend pipeline progress indicators.
+- The dashboard should show module name, op name, status, progress, and manual trigger provision where safe and separately approved.
+
+Teams ready to pick up new tasks:
+
+- Team 03: architecture for `CF-W3-MDPIPE-01B3` Bulk Pipeline Ops Dashboard and safe manual trigger command model.
+- Team 08: UX for the Ops dashboard and compact per-screen progress indicators.
+- Team 04: QA plan for dashboard navigation rehydration, status polling, and no-provider status rendering.
+- Team 05: prepare `CF-W3-MDPIPE-01C` DQ stage after dashboard/status contracts.
+- Team 10: review `01B2` after scoped commit.
 
 ## Latest Team 00 Routing Update - Market Data Pipeline Redesign
 

@@ -6,6 +6,37 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+2026-05-25 Team 00 implementation - `CF-W3-MDPIPE-01B2-PIPELINE-STATUS-API`:
+
+- `CF-W3-MDPIPE-01B2` was promoted and implemented as the read-only pipeline status API after Team 03 architecture acceptance and Team 04 QA planning.
+- Current gate state: developer validation passed; scoped commit pending.
+- Purpose: expose active/latest pipeline run and stage progress from durable ledger rows so UI can rehydrate progress after navigation without triggering providers or recomputation.
+- Gate evidence:
+  - Requirement: `10-requirements/CF-W3-MDPIPE-01B2-pipeline-status-api-requirement.md`
+  - Architecture: `03-architecture/CF-W3-MDPIPE-01B2-pipeline-status-api-architecture.md`
+  - QA plan/evidence: `04-qa/CF-W3-MDPIPE-01B2-pipeline-status-api-qa-plan.md`
+  - Implementation evidence: `13-implementation-evidence/CF-W3-MDPIPE-01B2-implementation-evidence.md`
+- Allowed implementation files used:
+  - `backend/src/api/routes.ts`
+  - `backend/src/modules/pipeline-orchestration/**`
+  - `backend/tests/modules/pipeline-orchestration/**`
+  - active execution docs
+- Forbidden scope preserved:
+  - no Prisma schema/migration
+  - no `backend/src/server.ts`
+  - no Market Data scheduler edits
+  - no downstream module source/tests
+  - no frontend files
+  - no package manifests
+  - no provider/live, startup/backfill, or fanout changes
+- Validation passed:
+
+```powershell
+cd backend
+npm.cmd test -- pipeline-orchestration --runInBand
+npm.cmd run build
+```
+
 2026-05-25 Team 00 implementation - `CF-W3-MDPIPE-01B1-DURABLE-PIPELINE-LEDGER-FOUNDATION`:
 
 - `CF-W3-MDPIPE-01B1` was promoted and implemented as the durable pipeline ledger foundation after Product Owner direction and Team 03 architecture acceptance.

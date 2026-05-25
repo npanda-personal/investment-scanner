@@ -15,9 +15,8 @@ Current slice:
 - Idempotency keys use pipeline/stage, region, asset type, timeframe, data-through date, and source/input fingerprint.
 - Cache fields (`cacheKey`, `cacheStatus`, `cacheExpiresAt`, `inputFingerprint`, `outputFingerprint`) let later DB-backed stages avoid recomputing unchanged work.
 
-Out of scope for this slice:
+Out of scope for the ledger foundation slice:
 
-- route/API registration,
 - scheduler fanout,
 - startup or backfill behavior changes,
 - downstream module execution,
@@ -56,6 +55,27 @@ Screen-local progress bars must not be the source of truth. Bulk operations shou
 - `leaseExpiresAt`
 
 This lets a user leave Market Data, Data Quality, Signal, Backtesting, Research, or Today Review screens and still see the active or latest pipeline progress when returning.
+
+## Read-Only Status API
+
+`GET /api/v1/pipeline/status`
+
+The status API is read-only. It reads local ledger rows and returns active plus latest terminal run/stage progress for the requested scope.
+
+Default query:
+
+- `region=IN`
+- `assetType=STOCK`
+- `timeframe=1d`
+- `pipelineKey=market-intelligence`
+- `limit=25`
+
+The endpoint must not call providers, run downstream stages, acquire leases, trigger scheduler work, or mutate ledger rows.
+
+Ops UI direction:
+
+- A later Bulk Pipeline Dashboard should own bulk operation monitoring and manual trigger controls.
+- Individual feature screens should show compact backend-pipeline progress only, sourced from this API.
 
 ## Performance Contract
 

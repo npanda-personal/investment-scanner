@@ -324,4 +324,45 @@ describe('PipelineOrchestrationRepository', () => {
       leaseOwner: 'worker-1',
     });
   });
+
+  it('uses bounded read-only queries for pipeline status', async () => {
+    const db = {
+      pipelineRun: {
+        findFirst: jest.fn()
+          .mockResolvedValueOnce(runRecord)
+          .mockResolvedValueOnce({ ...runRecord, status: 'COMPLETED', completedAt: now }),
+      },
+      pipelineStageRun: {
+        findMany: jest.fn().mockResolvedValue([stageRecord]),
+      },
+    };
+    const repository = new PipelineOrchestrationRepository(db as any);
+    const query = { region: 'IN', assetType: 'STOCK', timeframe: '1d', pipelineKey: 'market-intelligence', limit: 25 };
+
+    await repository.findActiveRun(query);
+    await repository.findLastRun(query);
+    await repository.latestStages(query);
+
+    expect(db.pipelineRun.findFirst).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      where: expect.objectContaining({
+        pipelineKey: 'market-intelligence',
+        scopeRegion: 'IN',
+        scopeAssetType: 'STOCK',
+        status: { in: ['PENDING', 'RUNNING'] },
+      }),
+    }));
+    expect(db.pipelineRun.findFirst).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      where: expect.objectContaining({
+        status: { in: ['COMPLETED', 'PARTIAL', 'FAILED', 'SKIPPED', 'BLOCKED'] },
+      }),
+    }));
+    expect(db.pipelineStageRun.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        pipelineRun: { pipelineKey: 'market-intelligence' },
+        scopeRegion: 'IN',
+        scopeAssetType: 'STOCK',
+      }),
+      take: 25,
+    }));
+  });
 });

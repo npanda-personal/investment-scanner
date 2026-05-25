@@ -11,9 +11,15 @@ import type {
   PipelineStageLeaseResult,
   PipelineStageProgressInput,
   PipelineStageRunRecord,
+  PipelineStatusQuery,
+  PipelineStatusRunDto,
+  PipelineStatusSnapshot,
+  PipelineStatusStageDto,
 } from './pipeline-orchestration.types';
 
 const LEDGER_VERSION = 'pipeline-ledger-v1';
+const ACTIVE_STATUSES = new Set(['PENDING', 'RUNNING']);
+const TERMINAL_STATUSES = new Set(['COMPLETED', 'PARTIAL', 'FAILED', 'SKIPPED', 'BLOCKED']);
 
 export class PipelineOrchestrationService {
   constructor(private readonly repository = new PipelineOrchestrationRepository()) {}
@@ -56,6 +62,26 @@ export class PipelineOrchestrationService {
 
   latestStages(query: PipelineLatestStageQuery): Promise<PipelineStageRunRecord[]> {
     return this.repository.latestStages(query);
+  }
+
+  async status(query: PipelineStatusQuery, now = new Date()): Promise<PipelineStatusSnapshot> {
+    const [activeRun, lastRun, stages] = await Promise.all([
+      this.repository.findActiveRun(query),
+      this.repository.findLastRun(query),
+      this.repository.latestStages(query),
+    ]);
+    return {
+      scope: {
+        region: query.region,
+        assetType: query.assetType,
+        timeframe: query.timeframe,
+        pipelineKey: query.pipelineKey,
+      },
+      generatedAt: now.toISOString(),
+      activeRun: activeRun ? this.toRunStatus(activeRun) : null,
+      lastRun: lastRun ? this.toRunStatus(lastRun) : null,
+      stages: this.groupStages(stages),
+    };
   }
 
   runIdempotencyKey(input: PipelineRunCreateInput): string {
@@ -106,5 +132,88 @@ export class PipelineOrchestrationService {
 
   private keyPart(value: string): string {
     return value.trim().replace(/\s+/g, '-').toLowerCase();
+  }
+
+  private groupStages(stages: PipelineStageRunRecord[]) {
+    const groups = new Map<string, {
+      stageKey: string;
+      stageOrder: number;
+      activeStage: PipelineStatusStageDto | null;
+      lastStage: PipelineStatusStageDto | null;
+    }>();
+    for (const stage of stages) {
+      const current = groups.get(stage.stageKey) || {
+        stageKey: stage.stageKey,
+        stageOrder: stage.stageOrder,
+        activeStage: null,
+        lastStage: null,
+      };
+      current.stageOrder = Math.min(current.stageOrder, stage.stageOrder);
+      if (!current.activeStage && ACTIVE_STATUSES.has(stage.status)) current.activeStage = this.toStageStatus(stage);
+      if (!current.lastStage && TERMINAL_STATUSES.has(stage.status)) current.lastStage = this.toStageStatus(stage);
+      groups.set(stage.stageKey, current);
+    }
+    return [...groups.values()].sort((a, b) => a.stageOrder - b.stageOrder || a.stageKey.localeCompare(b.stageKey));
+  }
+
+  private toRunStatus(run: PipelineRunRecord): PipelineStatusRunDto {
+    return {
+      id: run.id,
+      status: run.status,
+      triggerType: run.triggerType,
+      dataThroughDate: run.dataThroughDate,
+      changedInstrumentCount: run.changedInstrumentCount,
+      totalCount: run.totalCount,
+      processedCount: run.processedCount,
+      succeededCount: run.succeededCount,
+      partialCount: run.partialCount,
+      failedCount: run.failedCount,
+      skippedCount: run.skippedCount,
+      unchangedCount: run.unchangedCount,
+      sourceFingerprint: run.sourceFingerprint,
+      startedAt: run.startedAt,
+      completedAt: run.completedAt,
+      durationMs: run.durationMs,
+      warnings: run.warnings,
+      errors: run.errors,
+      updatedAt: run.updatedAt,
+    };
+  }
+
+  private toStageStatus(stage: PipelineStageRunRecord): PipelineStatusStageDto {
+    return {
+      id: stage.id,
+      pipelineRunId: stage.pipelineRunId,
+      stageKey: stage.stageKey,
+      stageOrder: stage.stageOrder,
+      status: stage.status,
+      dataThroughDate: stage.dataThroughDate,
+      changedInstrumentCount: stage.changedInstrumentCount,
+      batchSize: stage.batchSize,
+      offset: stage.offset,
+      nextOffset: stage.nextOffset,
+      hasMore: stage.hasMore,
+      totalCount: stage.totalCount,
+      processedCount: stage.processedCount,
+      succeededCount: stage.succeededCount,
+      partialCount: stage.partialCount,
+      failedCount: stage.failedCount,
+      skippedCount: stage.skippedCount,
+      unchangedCount: stage.unchangedCount,
+      attemptCount: stage.attemptCount,
+      cacheKey: stage.cacheKey,
+      cacheStatus: stage.cacheStatus,
+      cacheExpiresAt: stage.cacheExpiresAt,
+      inputFingerprint: stage.inputFingerprint,
+      outputFingerprint: stage.outputFingerprint,
+      leaseOwner: stage.leaseOwner,
+      leaseExpiresAt: stage.leaseExpiresAt,
+      startedAt: stage.startedAt,
+      completedAt: stage.completedAt,
+      durationMs: stage.durationMs,
+      warnings: stage.warnings,
+      errors: stage.errors,
+      updatedAt: stage.updatedAt,
+    };
   }
 }

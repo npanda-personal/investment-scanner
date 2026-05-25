@@ -4295,6 +4295,44 @@ Date: 2026-05-18
 - Team 03: `CF-W1-BT-01A` Architect Signoff after Team 10 accepts.
 
 Product Owner action required: no.
+# Runtime Checkpoint - Pipeline Status API
+
+Date: 2026-05-25
+
+Team 00 consumed Team 03 architecture and Team 04 QA planning for `CF-W3-MDPIPE-01B2`.
+
+Branch: `dev`.
+
+Implemented:
+
+- `GET /api/v1/pipeline/status`.
+- Pipeline controller/router/validation.
+- Status snapshot service composition.
+- Bounded active/latest run and stage read paths.
+- Tests for route registration, query parsing, controller behavior, status grouping, and bounded repository reads.
+
+Validation:
+
+- `npm.cmd test -- pipeline-orchestration --runInBand`: passed, 5 suites / 17 tests.
+- `npm.cmd run build`: passed.
+
+Updated Product Owner direction:
+
+- Create a dedicated Ops-style Bulk Pipeline Dashboard for bulk op monitoring and manual trigger controls.
+- Respective feature pages should only show compact backend pipeline progress indicators.
+
+Teams ready to pick up new tasks:
+
+- Team 03: architecture `CF-W3-MDPIPE-01B3` dashboard/manual trigger command model.
+- Team 08: UX for the Bulk Pipeline Dashboard and feature-page compact status indicators.
+- Team 04: QA for dashboard navigation rehydration and polling.
+- Team 05: `CF-W3-MDPIPE-01C` DQ scheduled stage prep after dashboard/status contracts.
+- Team 10: review `01B2` after scoped commit.
+
+Product Owner action required: no current open decision; manual trigger commands, frontend route/shared UI, and scheduler fanout remain separately gated.
+
+---
+
 # Runtime Checkpoint - Pipeline Ledger Foundation
 
 Date: 2026-05-25

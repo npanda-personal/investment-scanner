@@ -25,7 +25,7 @@ Status: `CF-W3-MDPIPE-01B1-DURABLE-PIPELINE-LEDGER-FOUNDATION` implemented and d
 After scoped commit, continue with:
 
 1. `CF-W3-MDPIPE-01B2` read-only pipeline status API.
-2. `CF-W3-MDPIPE-01B3` per-screen last-run and active-progress UI display.
+2. `CF-W3-MDPIPE-01B3` Ops-style Bulk Pipeline Dashboard plus compact per-screen backend progress indicators.
 3. `CF-W3-MDPIPE-01C` ledgered Data Quality scheduled stage.
 
 Do not wire scheduler fanout until status API, progress visibility, and DQ stage QA are ready.

@@ -14,6 +14,8 @@ import type {
 } from './pipeline-orchestration.types';
 
 const TERMINAL_STAGE_STATUSES = ['COMPLETED', 'PARTIAL', 'FAILED', 'SKIPPED', 'BLOCKED'];
+const ACTIVE_STATUSES = ['PENDING', 'RUNNING'];
+const TERMINAL_RUN_STATUSES = ['COMPLETED', 'PARTIAL', 'FAILED', 'SKIPPED', 'BLOCKED'];
 
 export class PipelineOrchestrationRepository {
   constructor(private readonly db = prisma) {}
@@ -247,12 +249,41 @@ export class PipelineOrchestrationRepository {
         scopeRegion: query.region,
         scopeAssetType: query.assetType,
         timeframe: query.timeframe,
+        pipelineRun: query.pipelineKey ? { pipelineKey: query.pipelineKey } : undefined,
         stageKey: query.stageKeys?.length ? { in: query.stageKeys } : undefined,
       },
       orderBy: [{ startedAt: 'desc' }, { updatedAt: 'desc' }],
       take: query.limit ?? 25,
     });
     return rows.map((row: unknown) => this.toStageRecord(row));
+  }
+
+  async findActiveRun(query: Required<Pick<PipelineLatestStageQuery, 'region' | 'assetType' | 'timeframe' | 'pipelineKey'>>): Promise<PipelineRunRecord | null> {
+    const row = await this.db.pipelineRun.findFirst({
+      where: {
+        pipelineKey: query.pipelineKey,
+        scopeRegion: query.region,
+        scopeAssetType: query.assetType,
+        timeframe: query.timeframe,
+        status: { in: ACTIVE_STATUSES },
+      },
+      orderBy: [{ startedAt: 'desc' }, { updatedAt: 'desc' }],
+    });
+    return row ? this.toRunRecord(row) : null;
+  }
+
+  async findLastRun(query: Required<Pick<PipelineLatestStageQuery, 'region' | 'assetType' | 'timeframe' | 'pipelineKey'>>): Promise<PipelineRunRecord | null> {
+    const row = await this.db.pipelineRun.findFirst({
+      where: {
+        pipelineKey: query.pipelineKey,
+        scopeRegion: query.region,
+        scopeAssetType: query.assetType,
+        timeframe: query.timeframe,
+        status: { in: TERMINAL_RUN_STATUSES },
+      },
+      orderBy: [{ completedAt: 'desc' }, { updatedAt: 'desc' }],
+    });
+    return row ? this.toRunRecord(row) : null;
   }
 
   private toRunRecord(record: any): PipelineRunRecord {
