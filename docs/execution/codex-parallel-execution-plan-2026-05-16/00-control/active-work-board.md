@@ -40,7 +40,7 @@ Date: 2026-05-25
 
 Implementation status:
 
-- `CF-W3-MDPIPE-01B4` is accepted through Team 05 implementation/rework, Team 04 QA rerun, Team 10 Code Review, Team 03 Architect Signoff, and Team 00 delegated Product Owner acceptance.
+- `CF-W3-MDPIPE-01B4` is accepted through Team 05 implementation/rework, Team 04 QA rerun, Team 10 Code Review, Team 03 Architect Signoff, Team 00 delegated Product Owner acceptance, and scoped local commit `8d45ddc feat: add pipeline command api`.
 - The Bulk Pipeline Dashboard is the Monitoring and OPS surface for durable pipeline progress and approved manual operation controls.
 - `DATA_QUALITY_EVALUATE_SCOPE` is the only enabled manual command.
 - All other command catalog entries remain disabled, deferred, or forbidden until separately approved.

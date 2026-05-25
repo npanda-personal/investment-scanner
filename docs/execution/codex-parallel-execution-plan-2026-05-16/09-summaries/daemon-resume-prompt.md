@@ -14,7 +14,7 @@ Latest checkpoint before resume:
 - `01B1` intentionally did not wire route/status API, frontend progress cards, scheduler fanout, DQ execution, provider/live calls, or server startup/backfill changes.
 - `CF-W3-MDPIPE-01B2` read-only pipeline status API is implemented and developer-validated if commit `feat: add read-only pipeline status api` appears in git log.
 - `CF-W3-MDPIPE-01B3-S1` Bulk Pipeline Monitoring and Ops dashboard is implemented and developer-validated if commit `feat: add pipeline ops dashboard` appears in git log.
-- `CF-W3-MDPIPE-01B4` Pipeline Command API is accepted through QA, Code Review, Architect Signoff, and delegated PO acceptance; scoped commit is the next checkpoint if not already present in git log.
+- `CF-W3-MDPIPE-01B4` Pipeline Command API is accepted through QA, Code Review, Architect Signoff, delegated PO acceptance, and committed on `dev` as `8d45ddc feat: add pipeline command api`.
 - Next sequence: `01B6` compact per-screen progress indicators, `01B5` page-local bulk-control migration, then `01C` ledgered Data Quality scheduled stage.
 - Progress visibility requirement: bulk operation progress must be durable and rehydratable after navigation using `PipelineStageRun` status/counts/offsets/lease fields.
 - Updated UI direction: create the new page as a Bulk Pipeline Dashboard for Monitoring and OPS; remove full bulk-op controls from respective feature pages over time; centralize monitoring/manual trigger controls in the Bulk Pipeline Dashboard. Feature pages show compact backend-pipeline progress only.
@@ -81,7 +81,7 @@ Read:
 Current status:
 - Open decisions: none.
 - Product Owner action required: no.
-- Ready queue: no unassigned Ready implementation item is waiting until the accepted B4 command API commit is complete and Team 00 promotes B6.
+- Ready queue: no unassigned Ready implementation item is waiting until Team 00 promotes B6.
 - `CF-W3-MDPIPE-01A-MDF-OFFICIAL-EOD` is accepted through Team 05 implementation/rework, Team 04 QA rerun, Team 10 re-review, Team 03 Architect re-signoff, Team 00 delegated PO acceptance, and scoped local implementation commit `b0c1ab7 feat: add official eod bulk market data sync`.
 - Team 03 Architect and read-only explorer completed the pipeline redesign/audit and were closed.
 - First slice scope is Market Data Foundation official NSE EOD bulk latest-candle ingestion only.
@@ -104,20 +104,14 @@ Current status:
 - `CF-W3-MDPIPE-01B1` durable pipeline ledger is committed on `dev` as `e537f9e feat: add durable pipeline ledger foundation`.
 - `CF-W3-MDPIPE-01B2` read-only pipeline status API is committed on `dev` as `10719fa feat: add read-only pipeline status api`.
 - `CF-W3-MDPIPE-01B3-S1` Bulk Pipeline Dashboard is committed on `dev` as `cb45735 feat: add pipeline ops dashboard`.
-- `CF-W3-MDPIPE-01B4` command API is accepted through Team 05 rework, Team 04 QA rerun, Team 10 Code Review, Team 03 Architect Signoff, and Team 00 delegated PO acceptance. The next checkpoint is scoped commit if not already present in git log.
+- `CF-W3-MDPIPE-01B4` command API is accepted through Team 05 rework, Team 04 QA rerun, Team 10 Code Review, Team 03 Architect Signoff, Team 00 delegated PO acceptance, and scoped local commit `8d45ddc feat: add pipeline command api`.
 - Bulk Pipeline Dashboard is the Monitoring and OPS surface for module name, op name, status, progress, and approved manual triggers. Feature pages should show compact progress only.
 
 Next autonomous actions:
-1. Verify changed files match the `CF-W3-MDPIPE-01B4` reservation and active execution docs.
-2. Run final scoped checks if resource-safe:
-   - `git diff --check`
-   - backend focused pipeline command tests if not already rerun in this session
-   - frontend `pipeline-ops.spec.ts` only if UI wording changed after the last smoke
-3. Create a scoped local commit for accepted B4 if staged scope is exact.
-4. Promote `CF-W3-MDPIPE-01B6` compact Data Quality progress indicator to Team 08.
-5. Queue Team 04 QA, Team 10 review, and Team 03 signoff for B6.
-6. Start Team 03 architecture prep for `CF-W3-MDPIPE-01C` ledgered Data Quality scheduled stage when a slot is free.
-7. Continue Team 02 rolling requirements discovery with direct investor/trader-value priority.
+1. Promote `CF-W3-MDPIPE-01B6` compact Data Quality progress indicator to Team 08 if gates remain clean.
+2. Queue Team 04 QA, Team 10 review, and Team 03 signoff for B6.
+3. Start Team 03 architecture prep for `CF-W3-MDPIPE-01C` ledgered Data Quality scheduled stage when a slot is free.
+4. Continue Team 02 rolling requirements discovery with direct investor/trader-value priority.
 
 Stop only for:
 - true consent blockers,

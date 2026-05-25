@@ -20,7 +20,7 @@ Date: 2026-05-25
 - `CF-W3-MDPIPE-01B1-DURABLE-PIPELINE-LEDGER-FOUNDATION` implemented and committed on `dev` as `e537f9e feat: add durable pipeline ledger foundation`.
 - `CF-W3-MDPIPE-01B2-PIPELINE-STATUS-API` implemented and committed on `dev` as `10719fa feat: add read-only pipeline status api`.
 - `CF-W3-MDPIPE-01B3-S1-PIPELINE-OPS-DASHBOARD` implemented and committed on `dev` as `cb45735 feat: add pipeline ops dashboard`.
-- `CF-W3-MDPIPE-01B4-PIPELINE-COMMAND-API` implemented, QA accepted after rework, Code Review accepted, Architect Signoff accepted, and delegated PO acceptance recorded; scoped commit is pending.
+- `CF-W3-MDPIPE-01B4-PIPELINE-COMMAND-API` implemented, QA accepted after rework, Code Review accepted, Architect Signoff accepted, delegated PO acceptance recorded, and committed on `dev` as `8d45ddc feat: add pipeline command api`.
 
 ## Current Implementation Checkpoint
 
@@ -44,9 +44,9 @@ Validation:
 
 ## Queue Pressure
 
-- Ready queue depth: 0 available unassigned application-code items after the accepted command API commit completes.
+- Ready queue depth: 0 available unassigned application-code items; B6 compact indicator is the next Ready-promotion candidate.
 - Refinement queue depth: active; next items are compact progress indicators, page-control migration, and ledgered Data Quality stage.
-- Integration queue depth: command API scoped commit pending; prior ledger/status/dashboard commits are complete.
+- Integration queue depth: command API scoped commit complete; prior ledger/status/dashboard commits are complete.
 - Open decisions: 0.
 - Product Owner action required: no.
 
@@ -61,7 +61,7 @@ Validation:
 
 | Team | State | Current assignment | Next relaunch condition |
 | --- | --- | --- | --- |
-| Team 00 | coordinating | Commit accepted command API, then promote the next bounded pipeline slice | Continue rolling scheduler unless a true blocker appears. |
+| Team 00 | coordinating | Promote the next bounded pipeline slice | Continue rolling scheduler unless a true blocker appears. |
 | Team 02 | ready | Rolling Product Owner / requirements discovery focused on investor/trader value | Relaunch when the pipeline queue thins. |
 | Team 03 | ready | Architect Signoff done for B4; next architecture prep is `CF-W3-MDPIPE-01C` | Start after B4 commit or if Team 00 asks for stage prep. |
 | Team 04 | ready | QA for B6 compact indicator, then command-control migration | Start after Team 08 B6 handoff. |
@@ -74,12 +74,12 @@ Validation:
 
 ## Next Assignments
 
-1. Team 00: commit accepted `CF-W3-MDPIPE-01B4` if staged scope is exact.
-2. Team 08: implement `CF-W3-MDPIPE-01B6` compact Data Quality progress indicator.
+1. Team 00: promote `CF-W3-MDPIPE-01B6` compact Data Quality progress indicator if gates remain clean.
+2. Team 08: implement `CF-W3-MDPIPE-01B6`.
 3. Team 04: verify B6 after Team 08 handoff.
 4. Team 10 and Team 03: review/signoff B6 after QA acceptance.
 5. Team 03 and Team 05: prepare `CF-W3-MDPIPE-01C` ledgered Data Quality scheduled stage after command/status contracts stabilize.
 
 ## Stop State
 
-Runtime checkpoint only. Product Owner action is not required. Autonomous work should continue through B4 commit, B6 compact progress indicator, and `01C` Data Quality stage architecture before broad downstream fanout.
+Runtime checkpoint only. Product Owner action is not required. Autonomous work should continue through B6 compact progress indicator and `01C` Data Quality stage architecture before broad downstream fanout.

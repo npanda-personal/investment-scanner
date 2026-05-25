@@ -10,7 +10,7 @@ Status:
 - Open decisions: 0.
 - Product Owner action required: no.
 - Push performed: no.
-- Scoped commit: pending Team 00 staged-scope verification.
+- Scoped commit: `8d45ddc feat: add pipeline command api`.
 
 Accepted:
 

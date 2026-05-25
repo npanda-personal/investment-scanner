@@ -9,7 +9,7 @@ No available application-code item is currently waiting unassigned in Ready.
 2026-05-25 Team 00 Ready promotion - `CF-W3-MDPIPE-01B4-PIPELINE-COMMAND-API`:
 
 - `CF-W3-MDPIPE-01B4` is promoted as the first bounded Pipeline Ops command slice.
-- Current gate state: accepted through implementation, QA rerun, Code Review, Architect Signoff, and delegated Product Owner acceptance; scoped commit pending.
+- Current gate state: accepted through implementation, QA rerun, Code Review, Architect Signoff, delegated Product Owner acceptance, and scoped local commit `8d45ddc feat: add pipeline command api`.
 - Purpose: enable only `DATA_QUALITY_EVALUATE_SCOPE` from Pipeline Ops while keeping all other commands disabled/deferred/forbidden.
 - Branch recommendation: `codex/w3-mdpipe-01b4-pipeline-command-api`.
 - Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team05-CF-W3-MDPIPE-01B4`.

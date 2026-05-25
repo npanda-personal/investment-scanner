@@ -6,6 +6,8 @@ Owner: Team 00 - Delegated Product Owner Acceptance
 
 Status: ACCEPTED UNDER STANDING DELEGATION
 
+Commit: `8d45ddc feat: add pipeline command api`
+
 ## Product Intent
 
 Enable the first safe manual operation from the Bulk Pipeline Dashboard for Monitoring and OPS without expanding provider access, scheduler fanout, or downstream orchestration.
