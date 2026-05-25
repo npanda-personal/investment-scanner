@@ -16,16 +16,18 @@ Current gate:
 
 - `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE` Team 07 implementation is complete in `C:\work\repo\investment-scanner-worktrees\team07-CF-W2-TSC-04A`.
 - Team 00 replayed developer validation and confirmed the valid UI smoke evidence is the worktree-built frontend server, not default `127.0.0.1:5173`.
-- Team 04 QA Verification is active as agent `019e5e8c-905b-78e3-862d-7f8c54de2d2c`.
-- Team 02 rolling direct-value backlog refresh is active as agent `019e5e8d-d858-7a51-8e0f-7f8bae43c466`.
+- Team 04 QA Verification accepted `TSC-04A`; agent `019e5e8c-905b-78e3-862d-7f8c54de2d2c` is closed.
+- Team 10 Code Review is active as agent `019e5e93-889e-7b33-b23b-4c56668876a7`.
+- Team 02 rolling direct-value backlog refresh is complete and committed as `c7f3f70 docs: refresh direct value backlog routing`; agent `019e5e8d-d858-7a51-8e0f-7f8bae43c466` is closed.
+- Team 03 docs-only `CF-W1-TSC-02` architecture prep is active as agent `019e5e97-941b-7863-a774-2b7349ed6c2f`.
 - Team 03 prepared `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME`; it remains blocked behind accepted `TSC-04A` base evidence.
 
 Teams ready to pick up new tasks:
 
-- Team 04: complete `CF-W2-TSC-04A` QA Verification.
-- Team 10: Code Review after Team 04 acceptance.
-- Team 03: Architect Signoff after Team 10 acceptance; otherwise next non-overlapping architecture packet after Team 02 refresh.
-- Team 02: rolling requirements priority hygiene.
+- Team 10: complete `CF-W2-TSC-04A` Code Review.
+- Team 03: complete `CF-W1-TSC-02` architecture prep; then Architect Signoff after Team 10 acceptance.
+- Team 04: queued for `TSC-05A` QA planning after accepted `TSC-04A` base evidence.
+- Team 02: queued for next rolling requirements priority pass.
 - Team 07: bounded rework if QA/review rejects `TSC-04A`; otherwise standby for stacked `TSC-05A` after Ready promotion.
 
 ---

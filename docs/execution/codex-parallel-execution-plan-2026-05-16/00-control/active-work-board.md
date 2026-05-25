@@ -42,8 +42,10 @@ Gate status:
 
 - `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE` Team 07 implementation is complete in the dedicated worktree `C:\work\repo\investment-scanner-worktrees\team07-CF-W2-TSC-04A`.
 - Team 00 developer-validation replay passed for the focused backend Today Review test, backend build, frontend build, and worktree-targeted Today Review Playwright smoke; default `127.0.0.1:5173` smoke output is not accepted evidence because it can point at a stale main-workspace server.
-- Team 04 QA Verification is active for `CF-W2-TSC-04A` using the worktree build/server.
+- Team 04 QA Verification accepted `CF-W2-TSC-04A` using the worktree build/server.
+- Team 10 Code Review is active for `CF-W2-TSC-04A`.
 - Team 03 prepared `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` as the smallest future semantic cleanup child, but it is explicitly not Ready until `TSC-04A` is accepted and Team 00 records the exact base commit.
+- Team 03 Architecture Factory is active on docs-only `CF-W1-TSC-02` active signal health prep while the `TSC-04A` review gate runs.
 - No open Product Owner decisions exist.
 
 Sequencing:
@@ -54,9 +56,9 @@ Sequencing:
 
 Teams ready to pick up new tasks:
 
-- Team 04: complete `CF-W2-TSC-04A` QA Verification.
-- Team 10: Code Review after Team 04 acceptance.
-- Team 03: Architect Signoff after Team 10 acceptance; otherwise prepare the next non-overlapping direct-value architecture packet after Team 02 refresh.
+- Team 10: complete `CF-W2-TSC-04A` Code Review.
+- Team 03: complete docs-only `CF-W1-TSC-02` architecture prep, then Architect Signoff after Team 10 acceptance.
+- Team 04: standby for QA planning after `TSC-05A` re-anchor or QA verification after any `TSC-04A` review rework.
 - Team 02: continue rolling investor/trader-value requirements and priority hygiene.
 - Team 07: standby for bounded rework if Team 04 or Team 10 rejects `TSC-04A`.
 

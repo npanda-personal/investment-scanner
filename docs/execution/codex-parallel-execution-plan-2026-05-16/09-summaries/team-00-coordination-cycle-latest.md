@@ -12,22 +12,27 @@ Current status:
 - Open decisions: 0.
 - Product Owner action required: no.
 - Push performed: no.
-- Main workspace dirty scope: active execution docs only.
-- Active spawned agents: Team 04 QA for `CF-W2-TSC-04A`; Team 02 rolling requirements refresh.
+- Latest local checkpoint commits:
+  - `e15c7e9 docs: checkpoint tsc qa sequencing`
+  - `c7f3f70 docs: refresh direct value backlog routing`
+- Active spawned agents: Team 10 review for `CF-W2-TSC-04A`; Team 03 architecture prep for `CF-W1-TSC-02`.
 
 Gate movement:
 
 - Team 07 completed `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE` in the dedicated worktree `C:\work\repo\investment-scanner-worktrees\team07-CF-W2-TSC-04A`.
 - Team 00 replayed developer validation: focused backend Today Review test passed, backend build passed, frontend build passed, and worktree-targeted Today Review Playwright smoke passed against a built worktree server. The stale default-port Playwright run is not accepted as evidence.
-- Team 04 QA Verification is active for `CF-W2-TSC-04A`.
+- Team 04 QA Verification accepted `CF-W2-TSC-04A`.
+- Team 10 Code Review is active for `CF-W2-TSC-04A`.
 - Team 03 prepared `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` as a stacked future child, but it remains blocked until `TSC-04A` is accepted and Team 00 records the exact base commit.
+- Team 02 completed the rolling direct-value backlog refresh; next order after `TSC-04A` is `TSC-05A`, then `TSC-02`, then `DQ-02` residual only if Team 03 proves a bounded no-schema child.
+- Team 03 Architecture Factory is active on docs-only `CF-W1-TSC-02` prep while review runs.
 
 Teams ready to pick up new tasks:
 
-- Team 04: active `CF-W2-TSC-04A` QA Verification.
-- Team 10: review after Team 04 acceptance.
-- Team 03: Architect Signoff after Team 10 acceptance; otherwise next non-overlapping architecture prep after Team 02 refresh.
-- Team 02: active rolling direct investor/trader-value backlog refresh.
+- Team 10: active `CF-W2-TSC-04A` Code Review.
+- Team 03: active `CF-W1-TSC-02` architecture prep; then Architect Signoff after Team 10 acceptance.
+- Team 04: queued for `TSC-05A` QA planning after accepted `TSC-04A` base evidence.
+- Team 02: queued for the next rolling direct-value pass.
 - Team 07: standby for rework if QA/review rejects `TSC-04A`.
 
 Product Owner action required: no.
