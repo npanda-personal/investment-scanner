@@ -61,6 +61,31 @@ Teams ready to pick up new tasks:
 - Team 10: re-review after Team 04 acceptance.
 - Team 03: Architect Signoff after Team 10 acceptance.
 
+## Latest Team 00 Routing Update - B5 Data Quality Control Migration Architecture
+
+Date: 2026-05-25
+
+Architecture status:
+
+- Team 03 prepared the `CF-W3-MDPIPE-01B5` Data Quality-first page-control migration packet.
+- B5 should run one page at a time, not as a multi-page migration.
+- The first safe child is `/data-quality` only, because it now has an approved equivalent manual command path through `/pipeline-ops`.
+- `/pipeline-ops` remains the Bulk Pipeline Dashboard for Monitoring and OPS.
+- Feature pages should keep compact status/progress indicators and should not become full bulk-operation dashboards.
+
+Blocked / not Ready:
+
+- B5 implementation remains blocked until B6 is accepted and releases the Data Quality page writer set.
+- Team 00 must perform a separate Ready promotion before any B5 code work.
+- No route, shared UI, package, backend, or pipeline-ops feature changes are approved by this architecture prep alone.
+
+Teams ready to pick up new tasks:
+
+- Team 04: QA rerun for B6 is active.
+- Team 10: B6 re-review after Team 04 acceptance.
+- Team 03: Architect Signoff for B6 after Team 10 acceptance.
+- Team 04: B5 QA planning only after B6 acceptance and Team 00 Ready evaluation.
+
 ## Latest Team 00 Routing Update - Pipeline Command API Accepted
 
 Date: 2026-05-25

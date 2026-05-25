@@ -1,5 +1,63 @@
 # Team 03 Architecture Factory Outbox
 
+## Team 03 CF-W3-MDPIPE-01B5 Data Quality First Child Path - 2026-05-25
+
+Assignment: prepare the next architecture path for `CF-W3-MDPIPE-01B5` page-control migration and Bulk Pipeline Monitoring & Ops dashboard centralization, using only the allowed execution docs and without modifying application code/tests, ready queues, active board, Team 05/08 outboxes, or `B6` / `01C` implementation docs.
+
+Updated:
+
+- `03-architecture/CF-W3-MDPIPE-01B5-data-quality-first-child-control-removal-architecture.md`
+- `06-contracts/CF-W3-MDPIPE-01B5-data-quality-page-control-removal-contract.md`
+- `08-work-packets/CF-W3-MDPIPE-01B5-data-quality-first-child-work-packet.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Read-only evidence inspected:
+
+- root `AGENTS.md`
+- `09-summaries/team-00-pipeline-ops-runtime-summary.md`
+- `05-ux/CF-W3-MDPIPE-01B5-01B6-pipeline-ops-control-migration-ux.md`
+- `10-requirements/CF-W3-MDPIPE-01B3-bulk-pipeline-ops-dashboard-requirement.md`
+- `10-requirements/CF-W3-MDPIPE-01B4-command-api-manual-trigger-safety-requirement.md`
+- `06-contracts/CF-W3-MDPIPE-01B4-pipeline-command-api-contract.md`
+- `06-contracts/CF-W3-MDPIPE-01B6-compact-progress-indicator-contract.md`
+- `03-architecture/CF-W3-MDPIPE-01B5-01B6-control-migration-progress-indicators-architecture.md`
+- `04-qa/CF-W3-MDPIPE-01B5-01B6-control-migration-progress-indicators-qa-plan.md`
+- `18-integration-queue/CF-W3-MDPIPE-01B6-code-review.md`
+- current `frontend/src/features/data-quality-engine/components/DataQualityEnginePage.tsx`
+- current `frontend/src/features/data-quality-engine/components/DataQualityPipelineStatusStrip.tsx`
+- current `frontend/tests/ui/data-quality-engine.spec.ts`
+
+Architecture verdict:
+
+- `CF-W3-MDPIPE-01B5` should move one page at a time, not as a multi-page removal pass.
+- The first safe child after `CF-W3-MDPIPE-01B6` acceptance is Data Quality only: `/data-quality` -> `DATA_QUALITY`.
+- The child stays blocked while Team 08 reworks `B6`, because the same Data Quality page files remain under active rework and the accepted compact-strip behavior is still the dependency.
+- `/pipeline-ops` remains the Bulk Pipeline Monitoring and Ops home; feature pages remain compact status surfaces only after migration.
+
+Exact future reservation direction:
+
+- allowed writer set is narrowed to:
+  - `frontend/src/features/data-quality-engine/components/DataQualityEnginePage.tsx`
+  - `frontend/tests/ui/data-quality-engine.spec.ts`
+- forbidden scope explicitly includes:
+  - `frontend/src/features/data-quality-engine/components/DataQualityPipelineStatusStrip.tsx`
+  - `frontend/src/features/pipeline-ops/**`
+  - route registries
+  - shared UI / shared hooks
+  - package manifests / lockfiles
+  - backend files
+  - all non-Data-Quality feature pages
+
+Required QA handoff focus:
+
+- verify all local `Evaluate Scope` entry points are gone from `/data-quality`;
+- verify the local `BatchProgressBar` is gone;
+- verify the accepted compact strip still handles loading, error, loaded no-run, active, and terminal states correctly;
+- verify `/pipeline-ops` remains the only manual command home for `DATA_QUALITY_EVALUATE_SCOPE`;
+- verify `/data-quality` emits no bulk POST path after migration.
+
+No tests, builds, services, UI runs, commits, or pushes were run.
+
 ## Team 03 CF-W3-MDPIPE-01C Data Quality Scheduled Stage Prep - 2026-05-25
 
 Assignment: prepare the next architecture path for `CF-W3-MDPIPE-01C`, the ledgered Data Quality scheduled stage, after the committed ledger/status/dashboard/command API slices, using only the allowed execution docs and without modifying application code/tests, Prisma, route registries, package manifests, generated files, frontend files, `docs/AGENTS.md`, or `docs/codex-agent-team-plan/**`.

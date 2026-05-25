@@ -12,23 +12,25 @@ Current active agents:
 
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Team 08 - UX / Research / Copilot | `019e5e3f-191a-7f50-8cb0-01c41806b771` | `gpt-5.3-codex`, high | review-reject rework | `CF-W3-MDPIPE-01B6` compact Data Quality indicator | active |
+| 1 | Team 04 - QA Factory | `019e5e46-3233-7ad2-8c5f-4924fa4161a2` | `gpt-5.4-mini`, medium | QA rerun | `CF-W3-MDPIPE-01B6` compact Data Quality indicator | active |
 | 2 | Team 05 - Market Data / Data Quality | `019e5e36-7ca5-7543-a168-64ec7af10c38` | `gpt-5.3-codex`, high | implementation | `CF-W3-MDPIPE-01C` Data Quality scheduled stage | active |
 | 3 | Open slot | none | pending | rolling requirements | Team 02 next direct-value audit cycle | ready |
-| 4 | Team 03 - Architecture Factory | `019e5e42-fde6-7510-8e5c-dd97780aa368` | `gpt-5.4`, high | architecture prep | `CF-W3-MDPIPE-01B5` page-control migration | active |
-| 5 | Open slot | none | pending | QA rerun | Team 04 for B6 after Team 08 rework | waiting |
+| 4 | Open slot | none | pending | architecture/signoff | B5 blocked until B6 acceptance; Team 03 signoff after next review acceptance | waiting |
+| 5 | Open slot | none | pending | review | Team 10 for B6 after Team 04 QA rerun | waiting |
 | 6 | Open slot | none | pending | review | Team 10 review after next QA-accepted handoff | waiting |
 
 Teams ready to pick up new tasks:
 
-- Team 08: ready for `CF-W3-MDPIPE-01B6` review-reject rework. Fix loading/error/no-run state separation and UI coverage.
+- Team 08: completed `CF-W3-MDPIPE-01B6` review-reject rework; closed.
 - Team 05: active on `CF-W3-MDPIPE-01C` Data Quality scheduled stage implementation.
-- Team 04: ready for `CF-W3-MDPIPE-01B6` QA rerun after Team 08 rework.
+- Team 04: active on `CF-W3-MDPIPE-01B6` QA rerun after Team 08 rework.
 - Team 04: ready for `CF-W3-MDPIPE-01C` QA verification after Team 05 handoff.
 - Team 10: ready for B6 or 01C review after Team 04 acceptance.
 - Team 03: completed architecture prep for `CF-W3-MDPIPE-01C`; later ready for B6 Architect Signoff after Team 10 acceptance.
 - Team 02: completed rolling direct-value and Pipeline Ops priority refresh; no new item outranks `CF-W2-TSC-04`, `CF-W2-TSC-05`, or `CF-W1-TSC-02`.
+- Team 02: completed read-mostly rolling PO audit with no file changes and no priority reorder.
 - Team 03: active on `CF-W3-MDPIPE-01B5` architecture prep for page-control migration.
+- Team 03: completed `CF-W3-MDPIPE-01B5` Data Quality-first architecture packet; implementation remains blocked until B6 acceptance releases the Data Quality page writer set.
 
 Queued next:
 
@@ -60,6 +62,9 @@ Completed agents:
 - Team 04 `019e5e31-1235-7683-8acc-6a10ed32fb31`: accepted `CF-W3-MDPIPE-01B6` QA verification; closed.
 - Team 10 `019e5e36-080f-7403-a830-35811c9c3b1a`: rejected `CF-W3-MDPIPE-01B6` for no-run/loading/error state conflation; closed.
 - Team 02 `019e5e42-9642-7582-a4be-00c6b213e972`: completed rolling direct-value and Pipeline Ops priority refresh; no queue reorder; closed.
+- Team 08 `019e5e3f-191a-7f50-8cb0-01c41806b771`: completed `CF-W3-MDPIPE-01B6` review-reject rework and validation; closed.
+- Team 02 `019e5e44-fec0-7460-886c-3c3f0d16a31a`: completed read-mostly direct-value gap audit; no files changed; no priority reorder; closed.
+- Team 03 `019e5e42-fde6-7510-8e5c-dd97780aa368`: completed `CF-W3-MDPIPE-01B5` Data Quality-first architecture/contract/work-packet prep; closed.
 
 ---
 
