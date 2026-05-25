@@ -1,5 +1,94 @@
 # TEAM-02 Requirement Factory
 
+## Team 02 Rolling Priority Hygiene Pass - 2026-05-25
+
+Root `AGENTS.md` was read first. Team 02 stayed docs-only, wrote only inside the allowed `10-requirements/**` folder plus this outbox, and did not touch application source/tests, Team 03 architecture docs, Team 04 QA docs, Team 05 implementation files, Prisma/schema, route registries, package manifests, or the decision inbox.
+
+### Work Item
+
+Reconcile the requirement queues against the live runtime queue so Team 02 does not keep ranking already-active work as if it were fresh unassigned backlog.
+
+### Files Inspected
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/team-agent-runtime-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-CAL-02-signal-calibration-evidence-freshness-and-scope-basis-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-RH-01A-research-hub-actionability-evidence-date-wiring-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/TEAM-01-direct-value-gap-audit-2026-05-25.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/99-decision-inbox/open-decisions.md`
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-CAL-02-signal-calibration-evidence-freshness-and-scope-basis-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+### What Changed
+
+- Marked `CF-W2-CAL-02` as reserved through active child `CF-W2-CAL-02A` rather than keeping it at the top of the unassigned queue.
+- Updated queue headers and guardrails to match the live reserved lanes:
+  - Team 06 active on `CF-W2-CAL-02A`
+  - Team 03 active on `CF-W2-TSC-05A` addendum
+  - Team 05 active on `CF-W1-DQ-02-RS1` rework
+- Re-ranked the next honest unassigned stack to:
+  1. `CF-W1-MD-02A`
+  2. `CF-W1-SQLAB-02B`
+  3. `CF-W1-STRAT-02B`
+  4. `CF-W1-RH-01A`
+  5. `CF-W1-L3-DQ-01A`
+
+### Product Routing Result
+
+- No new requirement ID was created in this pass.
+- No item was moved to Ready.
+- `CF-W1-RH-01A` is now the first non-storage, non-Today-Review, non-DQ-rework follow-on once the active calibration child clears.
+- The three durable-proof proposals stay above `CF-W1-RH-01A` in investor/trader value, but they remain consent-gated and proposal-only.
+
+### Recommended Next Team 03 Architecture Intake
+
+Default next non-consent path after current active lanes:
+
+- `CF-W1-RH-01A` after `CF-W2-CAL-02A` closes and after Team 03 clears the active `CF-W2-TSC-05A` addendum.
+
+Conditional consent-opened paths:
+
+- `CF-W1-MD-02A` if Team 00 intentionally opens storage/schema scope.
+- `CF-W1-SQLAB-02B` if Team 00 intentionally opens storage scope.
+- `CF-W1-STRAT-02B` if Team 00 intentionally opens schema/generated/repository scope.
+
+### Consent Gates
+
+- `CF-W1-MD-02A`: storage/schema companion evidence scope.
+- `CF-W1-SQLAB-02B`: durable storage scope for measured outcome memory.
+- `CF-W1-STRAT-02B`: schema/generated/repository scope for durable strategy revision history.
+
+### Teams Ready To Pick Up New Tasks
+
+- Team 03: not for a fresh packet immediately; currently reserved on `CF-W2-TSC-05A` addendum. Next non-consent intake should be `CF-W1-RH-01A` after active CAL/TSC gates clear.
+- Team 04: queued for active-lane QA only; no fresh Team 02 packet should be routed there now.
+- Team 06: active on `CF-W2-CAL-02A`.
+- Team 10: ready for the next QA-accepted active-lane review handoff.
+- Team 02: ready for another thin docs-only pass after Team 00 consumes this hygiene update.
+
+### Tests Run / Skipped
+
+- Tests run: none
+- Tests skipped: all
+- Reason: docs-only priority hygiene pass
+
+### Constraint Result
+
+- No application code changed.
+- No tests/builds/services/providers/Prisma/UI smoke were run.
+- No commit or push was performed.
+
 ## Team 02 Research Hub Evidence-Date Refinement Pass - 2026-05-25
 
 Root `AGENTS.md` was read first. Team 02 stayed docs-only, wrote only inside the allowed `10-requirements/**` folder plus this outbox, and did not touch application source/tests, Team 04 QA-planning files, Team 07 Today Review files, Prisma/schema, route registries, shared UI, package manifests, or the decision inbox.

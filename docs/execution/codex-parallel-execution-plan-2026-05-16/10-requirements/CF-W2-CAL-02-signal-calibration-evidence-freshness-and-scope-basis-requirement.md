@@ -4,7 +4,7 @@ Date: 2026-05-25
 
 ## Status
 
-Fresh audit-derived requirement draft. Not Ready for Implementation.
+Parent requirement remains active in the delivery pipeline through bounded child `CF-W2-CAL-02A`, which is currently active with Team 06. The parent is not a fresh unassigned packet and is not Ready for independent implementation routing.
 
 ## Product Value
 
@@ -29,7 +29,7 @@ The next slice should make the evidence basis explicit so a user can answer:
 
 - Keep accepted `CF-W1-CAL-01A` excluded. This requirement is a fresh follow-on about evidence basis visibility, not another DQ gate rewrite.
 - Reuse Signal Quality Lab public outputs; do not duplicate outcome maturity logic inside calibration.
-- Stay separate from Team 07 Today Review work and Team 04 `CF-W1-DQ-02-RS1` QA planning.
+- Stay separate from Team 07 Today Review work and Team 05 `CF-W1-DQ-02-RS1` rework.
 
 ## Bounded Requirement
 
@@ -61,4 +61,4 @@ The first child slice should focus on:
 
 ## Next Gate
 
-Team 03 architecture prep for a bounded Signal Calibration scoped evidence-basis child, then Team 04 QA planning after architecture confirms the additive contract and file reservations.
+Bounded child `CF-W2-CAL-02A` is already the active execution slice. No duplicate architecture or implementation packet should be opened from this parent until Team 06, Team 04, Team 10, and Team 03 clear the current child through the normal gates.
