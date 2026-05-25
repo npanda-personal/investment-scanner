@@ -1027,6 +1027,89 @@ model TodayReviewCandidate {
   @@map("today_review_candidates")
 }
 
+model PipelineRun {
+  id                     String             @id @default(cuid())
+  pipelineKey            String
+  scopeRegion            String
+  scopeAssetType         String
+  timeframe              String             @default("1d")
+  triggerType            String
+  status                 String
+  idempotencyKey         String             @unique
+  dataThroughDate        DateTime?
+  sourceFingerprint      String?
+  changedInstrumentCount Int                @default(0)
+  totalCount             Int                @default(0)
+  processedCount         Int                @default(0)
+  succeededCount         Int                @default(0)
+  partialCount           Int                @default(0)
+  failedCount            Int                @default(0)
+  skippedCount           Int                @default(0)
+  unchangedCount         Int                @default(0)
+  warnings               Json
+  errors                 Json
+  metadata               Json?
+  startedAt              DateTime           @default(now())
+  completedAt            DateTime?
+  durationMs             Int?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  stages                 PipelineStageRun[]
+
+  @@index([pipelineKey, scopeRegion, scopeAssetType, timeframe, dataThroughDate])
+  @@index([scopeRegion, scopeAssetType, startedAt])
+  @@index([status, startedAt])
+  @@map("pipeline_runs")
+}
+
+model PipelineStageRun {
+  id                     String      @id @default(cuid())
+  pipelineRunId          String
+  pipelineRun            PipelineRun @relation(fields: [pipelineRunId], references: [id], onDelete: Cascade)
+  stageKey               String
+  stageOrder             Int
+  status                 String
+  idempotencyKey         String      @unique
+  scopeRegion            String
+  scopeAssetType         String
+  timeframe              String      @default("1d")
+  dataThroughDate        DateTime?
+  inputFingerprint       String?
+  outputFingerprint      String?
+  changedInstrumentCount Int         @default(0)
+  batchSize              Int?
+  offset                 Int?
+  nextOffset             Int?
+  hasMore                Boolean     @default(false)
+  totalCount             Int         @default(0)
+  processedCount         Int         @default(0)
+  succeededCount         Int         @default(0)
+  partialCount           Int         @default(0)
+  failedCount            Int         @default(0)
+  skippedCount           Int         @default(0)
+  unchangedCount         Int         @default(0)
+  attemptCount           Int         @default(0)
+  cacheKey               String?
+  cacheStatus            String      @default("UNKNOWN")
+  cacheExpiresAt         DateTime?
+  leaseOwner             String?
+  leaseExpiresAt         DateTime?
+  startedAt              DateTime?
+  completedAt            DateTime?
+  durationMs             Int?
+  warnings               Json
+  errors                 Json
+  metadata               Json?
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
+
+  @@unique([pipelineRunId, stageKey])
+  @@index([pipelineRunId, stageOrder])
+  @@index([stageKey, scopeRegion, scopeAssetType, timeframe, dataThroughDate])
+  @@index([stageKey, status, leaseExpiresAt])
+  @@map("pipeline_stage_runs")
+}
+
 
 
 

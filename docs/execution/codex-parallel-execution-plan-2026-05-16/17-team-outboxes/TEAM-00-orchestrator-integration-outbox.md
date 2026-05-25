@@ -4295,3 +4295,44 @@ Date: 2026-05-18
 - Team 03: `CF-W1-BT-01A` Architect Signoff after Team 10 accepts.
 
 Product Owner action required: no.
+# Runtime Checkpoint - Pipeline Ledger Foundation
+
+Date: 2026-05-25
+
+Team 00 consumed Team 03 architecture direction and implemented `CF-W3-MDPIPE-01B1-DURABLE-PIPELINE-LEDGER-FOUNDATION`.
+
+Branch: `dev`.
+
+Implemented:
+
+- Durable `PipelineRun` / `PipelineStageRun` Prisma models and migration.
+- New backend `pipeline-orchestration` module.
+- Idempotency keys, stage leases, mid-run progress persistence, cache/fingerprint metadata, and latest-stage lookup.
+- Focused tests for run/stage upsert, lease behavior, stage completion, and progress persistence.
+
+Validation:
+
+- `npx.cmd prisma generate`: passed after stopping stale local Node processes that locked the Prisma generated-client DLL.
+- `npm.cmd test -- pipeline-orchestration --runInBand`: passed.
+- `npm.cmd run build`: passed.
+
+Not included:
+
+- no route/status API,
+- no UI status/progress cards,
+- no scheduler fanout,
+- no Data Quality or downstream pipeline execution,
+- no live provider calls,
+- no server startup/backfill change.
+
+Teams ready to pick up new tasks:
+
+- Team 03: `CF-W3-MDPIPE-01B2` status API architecture and `01B3` UI progress contract.
+- Team 04: QA plan for status API, progress rehydration after navigation, and DQ stage batching.
+- Team 05: DQ scheduled stage only after status/stage contracts are promoted.
+- Team 08: per-screen UI status mapping after API contract.
+- Team 10: review ledger foundation after scoped commit.
+
+Product Owner action required: no current open decision; route/UI/fanout slices remain separately gated.
+
+---

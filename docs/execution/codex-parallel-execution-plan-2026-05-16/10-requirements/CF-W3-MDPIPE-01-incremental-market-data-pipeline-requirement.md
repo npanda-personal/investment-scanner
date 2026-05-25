@@ -86,8 +86,10 @@ Market Data Foundation should use one official NSE EOD bulk file for latest comp
 
 ## Later Slices
 
-- Durable `PipelineRun` and `PipelineStageRun` ledger with DB-backed leases.
-- Data Quality post-market-data stage.
+- `CF-W3-MDPIPE-01B1`: durable `PipelineRun` and `PipelineStageRun` ledger with DB-backed leases, progress persistence, and cache/fingerprint metadata.
+- `CF-W3-MDPIPE-01B2`: read-only pipeline status API.
+- `CF-W3-MDPIPE-01B3`: per-screen last-run and active-progress UI display that survives navigation.
+- `CF-W3-MDPIPE-01C`: Data Quality post-market-data stage.
 - Raw signals, calibration, historical context, market context, smart money, and strategy stage wiring.
 - Today Review and Research Command Center persisted freshness projections.
 - Screen-by-screen performance passes.

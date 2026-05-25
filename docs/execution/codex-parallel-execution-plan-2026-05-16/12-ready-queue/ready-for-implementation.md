@@ -6,6 +6,40 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+2026-05-25 Team 00 implementation - `CF-W3-MDPIPE-01B1-DURABLE-PIPELINE-LEDGER-FOUNDATION`:
+
+- `CF-W3-MDPIPE-01B1` was promoted and implemented as the durable pipeline ledger foundation after Product Owner direction and Team 03 architecture acceptance.
+- Current gate state: developer validation passed; scoped commit pending.
+- Purpose: persist pipeline run/stage status, mid-run progress, leases, idempotency keys, cache metadata, and fingerprints so automated pipelines and UI progress can survive navigation and later run incrementally.
+- Gate evidence:
+  - Requirement: `10-requirements/CF-W3-MDPIPE-01B1-durable-pipeline-ledger-requirement.md`
+  - Architecture: `03-architecture/CF-W3-MDPIPE-01B1-durable-pipeline-ledger-architecture.md`
+  - QA plan/evidence: `04-qa/CF-W3-MDPIPE-01B1-durable-pipeline-ledger-qa-plan.md`
+  - Implementation evidence: `13-implementation-evidence/CF-W3-MDPIPE-01B1-implementation-evidence.md`
+  - Handoff: `18-integration-queue/CF-W3-MDPIPE-01B1-developer-handoff.md`
+- Allowed implementation files used:
+  - `backend/prisma/schema.prisma`
+  - `backend/prisma/migrations/202605250001_pipeline_orchestration_ledger/migration.sql`
+  - `backend/src/modules/pipeline-orchestration/**`
+  - `backend/tests/modules/pipeline-orchestration/**`
+  - active execution docs
+- Forbidden scope preserved:
+  - no `backend/src/server.ts`
+  - no `backend/src/api/routes.ts`
+  - no Market Data scheduler edits
+  - no downstream module source/tests
+  - no frontend files
+  - no package manifests
+  - no provider/live, startup/backfill, or broad fanout changes
+- Validation passed:
+
+```powershell
+cd backend
+npx.cmd prisma generate
+npm.cmd test -- pipeline-orchestration --runInBand
+npm.cmd run build
+```
+
 2026-05-25 Team 00 Ready promotion - `CF-W3-MDPIPE-01A-MDF-OFFICIAL-EOD`:
 
 - `CF-W3-MDPIPE-01A-MDF-OFFICIAL-EOD` is promoted and assigned to Team 05 as the first bounded Market Data Foundation implementation slice for the incremental data-load redesign.

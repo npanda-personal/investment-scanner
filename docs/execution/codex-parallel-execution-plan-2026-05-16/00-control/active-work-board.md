@@ -34,6 +34,47 @@ No historical active work items have been migrated as active.
 - Rejected / Rework
 - Deferred
 
+## Latest Team 00 Routing Update - Pipeline Ledger Foundation
+
+Date: 2026-05-25
+
+Current goal:
+
+- Make automated Market Data and downstream intelligence pipelines durable, incremental, visible after navigation, and safe for later DB-only high-performance fanout.
+
+Architect result:
+
+- Team 03 accepted a durable-ledger-first direction.
+- Team 03 rejected a no-schema DQ-only scheduler shortcut because it would be non-durable, repeat offset-zero work, misuse Market Data sync state, or silently expand scheduler/startup behavior.
+
+Implementation status:
+
+- `CF-W3-MDPIPE-01B1-DURABLE-PIPELINE-LEDGER-FOUNDATION` implemented by Team 00 as the prerequisite slice.
+- Added Prisma-backed `PipelineRun` and `PipelineStageRun` ledger models, migration, and new `pipeline-orchestration` backend module.
+- Added idempotency keys, stage leases, mid-run progress persistence, warning/error evidence, cache keys, cache status, input/output fingerprints, and bounded batch offset fields.
+- No scheduler fanout, route registry, frontend UI, downstream execution, provider/live call, or server startup/backfill change was included.
+
+Validation:
+
+- `npx.cmd prisma generate`: passed after stopping stale local Node processes that locked the Prisma generated-client DLL.
+- `npm.cmd test -- pipeline-orchestration --runInBand`: passed, 2 suites / 9 tests.
+- `npm.cmd run build`: passed.
+
+Next slices:
+
+1. `CF-W3-MDPIPE-01B2` read-only pipeline status API.
+2. `CF-W3-MDPIPE-01B3` per-screen last-run and active-progress UI display that survives navigation.
+3. `CF-W3-MDPIPE-01C` Data Quality scheduled stage using the durable ledger.
+4. `CF-W3-MDPIPE-01D` DB-only downstream fanout, one stage family at a time.
+
+Teams ready to pick up new tasks:
+
+- Team 03: architecture packet for `CF-W3-MDPIPE-01B2` status API and `01B3` UI progress rehydration.
+- Team 04: QA plan for status API, navigation-resilient progress display, and DQ stage batching.
+- Team 05: Data Quality stage implementation only after `01B2`/stage contract promotion.
+- Team 08: UI mapping for per-screen pipeline status cards after status API contract is accepted.
+- Team 10: review `CF-W3-MDPIPE-01B1` after scoped commit.
+
 ## Latest Team 00 Routing Update - Market Data Pipeline Redesign
 
 Date: 2026-05-25

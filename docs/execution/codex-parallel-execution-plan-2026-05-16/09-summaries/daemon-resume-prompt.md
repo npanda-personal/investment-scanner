@@ -4,7 +4,16 @@ Date: 2026-05-25
 
 Path: `docs/execution/codex-parallel-execution-plan-2026-05-16/09-summaries/daemon-resume-prompt.md`
 
-This file exists and was updated after Team 00 accepted `CF-W3-MDPIPE-01A-MDF-OFFICIAL-EOD` for the Market Data pipeline redesign.
+This file exists and was updated after Team 00 implemented `CF-W3-MDPIPE-01B1-DURABLE-PIPELINE-LEDGER-FOUNDATION` for the Market Data pipeline redesign.
+
+Latest checkpoint before resume:
+
+- `CF-W3-MDPIPE-01A-MDF-OFFICIAL-EOD` committed on `dev` as `b0c1ab7`.
+- `CF-W3-MDPIPE-01B1-DURABLE-PIPELINE-LEDGER-FOUNDATION` is implemented and developer-validated; scoped commit is the next checkpoint if not already present in git log.
+- `01B1` validation passed: `npx.cmd prisma generate`, `npm.cmd test -- pipeline-orchestration --runInBand`, and `npm.cmd run build`.
+- `01B1` intentionally did not wire route/status API, frontend progress cards, scheduler fanout, DQ execution, provider/live calls, or server startup/backfill changes.
+- Next sequence: `01B2` read-only pipeline status API, `01B3` per-screen last-run/active-progress UI display, then `01C` ledgered Data Quality scheduled stage.
+- Progress visibility requirement: bulk operation progress must be durable and rehydratable after navigation using `PipelineStageRun` status/counts/offsets/lease fields.
 
 ```text
 You are Team 00 - Master Orchestrator / Integration.

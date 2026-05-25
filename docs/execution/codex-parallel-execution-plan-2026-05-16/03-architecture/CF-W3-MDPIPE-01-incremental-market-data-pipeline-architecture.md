@@ -121,7 +121,7 @@ A durable pipeline ledger should add:
 - stage leases
 - idempotency keys by scope, stage, data-through date, and model/rule version
 
-That later slice requires explicit schema/migration approval.
+`CF-W3-MDPIPE-01B1` implements that ledger foundation after Product Owner direction to proceed with the architect-approved redesign. Route/status APIs, scheduler fanout, downstream execution, and UI progress cards remain separate slices.
 
 ## Architect Decision
 
