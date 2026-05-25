@@ -1,5 +1,47 @@
 # Team 03 Architecture Factory Outbox
 
+## Team 03 CF-W3-MDPIPE-01B4 Pipeline Command API Gate - 2026-05-25
+
+Assignment: prepare architecture, command contract, and bounded work packet for `CF-W3-MDPIPE-01B4` under the active execution folder only, without modifying application code/tests, Prisma, route registries, package manifests, generated files, `docs/AGENTS.md`, or `docs/codex-agent-team-plan/**`.
+
+Updated:
+
+- `03-architecture/CF-W3-MDPIPE-01B4-pipeline-command-api-architecture.md`
+- `06-contracts/CF-W3-MDPIPE-01B4-pipeline-command-api-contract.md`
+- `08-work-packets/CF-W3-MDPIPE-01B4-work-packet.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Read-only evidence inspected:
+
+- root `AGENTS.md`
+- prior MDPIPE architecture and requirement docs for `01B1`, `01B2`, and `01B3-S1`
+- current `pipeline-orchestration` backend module
+- current `pipeline-ops` frontend feature
+- current route registry registration state
+- current batch/manual trigger surfaces across Market Data, Data Quality, Signal Generation, Signal Calibration, Signal Quality, Smart Money, Strategy Decision, Historical Context, Market Context, Backtesting, and Today Review
+- `99-decision-inbox/open-decisions.md`
+- git evidence for commits `e537f9e`, `10719fa`, and `cb45735`
+
+Architecture verdict:
+
+- `CF-W3-MDPIPE-01B4` is an Architecture Ready candidate for Team 04 QA planning and Team 00 Ready evaluation.
+- First implementation slice enables only `DATA_QUALITY_EVALUATE_SCOPE` as a one-batch manual command through `pipeline-orchestration`.
+- All other command buttons remain blocked/deferred by a backend catalog until separate adapter-specific gates.
+- No Product Owner consent blocker was found because the slice is local-first, free, no-schema, no-package, no-provider, no-scheduler, no-route-registry, upstream-only, and does not remove existing feature-page bulk controls.
+
+Key guardrails:
+
+- no broad downstream execution;
+- no market-data provider/live calls from UI status rendering or command catalog;
+- no scheduler/startup/backfill fanout;
+- no removal of existing feature-page bulk controls;
+- no Prisma, package, generated, route-registry, shared UI, or downstream module source changes;
+- no investment-recommendation, broker, paid/cloud, telemetry, or external analytics behavior.
+
+No tests, builds, services, providers, UI checks, commits, or pushes were run.
+
+---
+
 ## Team 03 Rolling Architecture Prep - BT-04 / TSC-02 - 2026-05-24
 
 Assignment: keep architecture moving on independent high-value items while Team 07 and Team 04 handle `CF-W1-TSC-01A-TREV`, using only reserved docs under the active execution folder and no application-code changes.

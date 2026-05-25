@@ -6,6 +6,65 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+2026-05-25 Team 00 Ready promotion - `CF-W3-MDPIPE-01B4-PIPELINE-COMMAND-API`:
+
+- `CF-W3-MDPIPE-01B4` is promoted as the first bounded Pipeline Ops command slice.
+- Current gate state: Ready for Team 05 implementation.
+- Purpose: enable only `DATA_QUALITY_EVALUATE_SCOPE` from Pipeline Ops while keeping all other commands disabled/deferred/forbidden.
+- Branch recommendation: `codex/w3-mdpipe-01b4-pipeline-command-api`.
+- Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team05-CF-W3-MDPIPE-01B4`.
+- Gate evidence:
+  - Requirement: `10-requirements/CF-W3-MDPIPE-01B4-command-api-manual-trigger-safety-requirement.md`
+  - Architecture: `03-architecture/CF-W3-MDPIPE-01B4-pipeline-command-api-architecture.md`
+  - Contract: `06-contracts/CF-W3-MDPIPE-01B4-pipeline-command-api-contract.md`
+  - Work packet: `08-work-packets/CF-W3-MDPIPE-01B4-work-packet.md`
+  - QA plan: `04-qa/CF-W3-MDPIPE-01B4-command-api-qa-plan.md`
+  - Open decisions: none.
+- Allowed implementation files:
+  - `backend/src/modules/pipeline-orchestration/pipeline-orchestration.types.ts`
+  - `backend/src/modules/pipeline-orchestration/pipeline-orchestration.validation.ts`
+  - `backend/src/modules/pipeline-orchestration/pipeline-orchestration.service.ts`
+  - `backend/src/modules/pipeline-orchestration/pipeline-orchestration.controller.ts`
+  - `backend/src/modules/pipeline-orchestration/pipeline-orchestration.router.ts`
+  - `backend/src/modules/pipeline-orchestration/pipeline-orchestration.module.ts` only if dependency injection is required
+  - `backend/src/modules/pipeline-orchestration/index.ts` only if public command exports are required
+  - `backend/src/modules/pipeline-orchestration/pipeline-orchestration.md`
+  - `backend/tests/modules/pipeline-orchestration/pipeline-orchestration.validation.test.ts`
+  - `backend/tests/modules/pipeline-orchestration/pipeline-orchestration.service.test.ts`
+  - `backend/tests/modules/pipeline-orchestration/pipeline-orchestration.controller.test.ts`
+  - `backend/tests/modules/pipeline-orchestration/pipeline-orchestration.routes.test.ts`
+  - `frontend/src/features/pipeline-ops/types.ts`
+  - `frontend/src/features/pipeline-ops/api/pipelineOpsService.ts`
+  - `frontend/src/features/pipeline-ops/hooks/usePipelineStatus.ts` only if command-trigger refresh requires it
+  - `frontend/src/features/pipeline-ops/components/PipelineOpsPage.tsx`
+  - `frontend/src/features/pipeline-ops/components/PipelineOpsTable.tsx`
+  - `frontend/tests/ui/pipeline-ops.spec.ts`
+- Forbidden scope:
+  - `backend/src/api/routes.ts`
+  - `backend/src/server.ts`
+  - Prisma schema, migrations, generated files, package manifests, lockfiles
+  - Market Data and Data Quality source/tests
+  - all downstream module source/tests outside `pipeline-orchestration`
+  - frontend app route/navigation files
+  - existing feature pages outside `pipeline-ops`
+  - shared frontend components and shared backend utilities
+  - auth/subscription source
+  - scheduler/startup/backfill files
+  - provider/live data behavior, cloud, telemetry, broker, credentials
+- Required validation:
+
+```powershell
+cd backend
+npm.cmd test -- pipeline-orchestration.validation.test.ts pipeline-orchestration.service.test.ts pipeline-orchestration.controller.test.ts pipeline-orchestration.routes.test.ts --runInBand
+npm.cmd run build
+```
+
+```powershell
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- pipeline-ops.spec.ts --workers=1
+```
+
 2026-05-25 Team 00 implementation - `CF-W3-MDPIPE-01B3-S1-PIPELINE-OPS-DASHBOARD`:
 
 - `CF-W3-MDPIPE-01B3-S1` was promoted and implemented as the first frontend-only Bulk Pipeline Monitoring and Ops dashboard after Team 03 architecture and Team 08 UX mapping.

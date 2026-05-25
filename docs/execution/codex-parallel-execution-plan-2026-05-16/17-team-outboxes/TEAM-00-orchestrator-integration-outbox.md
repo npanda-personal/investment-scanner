@@ -42,6 +42,40 @@ Product Owner action required: no.
 
 ---
 
+## Runtime Checkpoint - Pipeline Command API Ready Promotion
+
+Date: 2026-05-25
+
+Status:
+
+- Branch: `dev`.
+- Open decisions: 0.
+- Product Owner action required: no.
+- Push performed: no.
+
+Consumed outputs:
+
+- Team 03 completed `CF-W3-MDPIPE-01B4` architecture, contract, and work packet.
+- Team 04 completed B4 command API QA planning and B5/B6 control-migration QA planning.
+- Team 08 completed B5/B6 compact indicator and control-migration UX planning.
+
+Ready promotion:
+
+- `CF-W3-MDPIPE-01B4` is promoted to Team 05 implementation.
+- Only `DATA_QUALITY_EVALUATE_SCOPE` is enabled in the first command slice.
+- All other commands remain disabled/deferred/forbidden.
+- Existing feature-page bulk controls remain untouched.
+
+Teams ready to pick up new tasks:
+
+- Team 05: implement `CF-W3-MDPIPE-01B4`.
+- Team 04: QA Verification after Team 05 handoff.
+- Team 10: Code Review after Team 04 acceptance.
+- Team 03: Architect Signoff after Team 10 acceptance.
+- Team 02: rolling requirements discovery if pipeline queue thins.
+
+---
+
 ## Latest Runtime Checkpoint - Market Data Pipeline Redesign Started
 
 Date: 2026-05-25

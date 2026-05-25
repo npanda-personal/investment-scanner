@@ -2,6 +2,36 @@
 
 Date: 2026-05-18
 
+## 2026-05-25 - CF-W3-MDPIPE-01B5 / CF-W3-MDPIPE-01B6 Pipeline Ops Control Migration UX
+
+State: docs-only UX planning complete; feature-page control removal still blocked on `CF-W3-MDPIPE-01B4`.
+
+Completed work:
+
+- Audited the current `cb45735 feat: add pipeline ops dashboard` slice, active execution docs, the pipeline status UI contract, and current page-local bulk-control surfaces.
+- Created `05-ux/CF-W3-MDPIPE-01B5-01B6-pipeline-ops-control-migration-ux.md`.
+- Mapped the confirmed bulk-control pages, catalog-linked indicator pages, compact-strip placement, state handling, rehydration expectations, manual-trigger visibility rules, migration phases, accessibility notes, and explicit non-goals.
+
+Key UX conclusions:
+
+- `/pipeline-ops` is the Monitoring and Ops home; feature pages should keep only compact read-only progress/status strips.
+- Do not remove local bulk controls until the approved command API exists.
+- Do not migrate non-pipeline tools by accident: keep per-instrument sync, lookup tools, import/backfill/repair tools, trade-plan generation, and ad hoc backtest execution out of this B5/B6 slice unless later architecture explicitly adds them.
+
+Files changed:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/05-ux/CF-W3-MDPIPE-01B5-01B6-pipeline-ops-control-migration-ux.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-08-outbox.md`
+
+Tests run:
+
+- None. Docs-only planning pass.
+
+Current blockers:
+
+- `CF-W3-MDPIPE-01B4` command API and approved operation matrix are required before page-local bulk controls can be removed.
+- Some catalog-linked pages are indicator targets only in this pass because their local control surfaces were not confirmed or their existing actions are not yet proven pipeline commands.
+
 ## Heartbeat
 
 | Field | Value |

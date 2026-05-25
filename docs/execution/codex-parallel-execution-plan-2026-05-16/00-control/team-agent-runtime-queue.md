@@ -12,27 +12,35 @@ Current active agents:
 
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Team 03 - Architecture Factory | `019e5ddb-0cf0-7a53-b5aa-bedbeb0bf30d` | `gpt-5.5`, xhigh | architecture / contract / work packet | `CF-W3-MDPIPE-01B4` command API and manual-trigger safety matrix | active |
-| 2 | Team 08 - UX / Research | `019e5ddb-2125-78d1-92b2-e9e917a52145` | `gpt-5.4`, high | UX planning | `CF-W3-MDPIPE-01B5/01B6` control migration and compact indicators | active |
-| 3 | Team 04 - QA Factory | `019e5ddb-3564-7122-b1fa-a009353c5868` | `gpt-5.4-mini`, high | QA planning | command API, control migration, compact indicators | active |
-| 4 | Open slot | none | pending | implementation | next bounded pipeline slice after Team 03/04 gates | waiting |
+| 1 | Open slot | none | pending | implementation | Team 05 `CF-W3-MDPIPE-01B4` after docs checkpoint | ready |
+| 2 | Open slot | none | pending | QA verification | Team 04 after Team 05 handoff | waiting |
+| 3 | Open slot | none | pending | review/signoff | Team 10 then Team 03 after QA acceptance | waiting |
+| 4 | Open slot | none | pending | implementation | next bounded pipeline slice after command API | waiting |
 | 5 | Open slot | none | pending | review | Team 10 review after next QA-accepted handoff | waiting |
 | 6 | Open slot | none | pending | requirements | Team 02 rolling direct investor/trader-value discovery | ready |
 
 Teams ready to pick up new tasks:
 
-- Team 03: active on `CF-W3-MDPIPE-01B4` command API architecture.
-- Team 08: active on compact progress indicator and page-control migration UX.
-- Team 04: active on command/control/progress QA plans.
+- Team 05: ready for `CF-W3-MDPIPE-01B4` command API implementation after docs checkpoint.
+- Team 04: ready for QA verification after Team 05 handoff.
+- Team 10: ready for Code Review after Team 04 acceptance.
+- Team 03: ready for Architect Signoff after Team 10 acceptance.
 - Team 02: ready for rolling Product Owner / requirements discovery if the pipeline queue thins.
 - Team 05: standby for `CF-W3-MDPIPE-01C` Data Quality scheduled stage after status/command contracts stabilize.
-- Team 10: ready for review after the next QA acceptance.
+- Team 08: standby for compact indicator follow-up after command API stabilizes.
 
 Queued next:
 
-1. Team 00 consumes Team 03/08/04 outputs.
-2. Team 00 promotes only one bounded implementation slice if architecture, QA, file reservations, and open-decision gates pass.
-3. If command API is not Ready, keep manual triggers disabled and proceed with compact progress indicators only when file reservations are disjoint.
+1. Team 00 commits docs-only gates for `CF-W3-MDPIPE-01B4`, `01B5`, and `01B6`.
+2. Team 00 launches Team 05 for `CF-W3-MDPIPE-01B4`.
+3. Team 05 implements only `DATA_QUALITY_EVALUATE_SCOPE`.
+4. Team 04/10/03 run QA, review, and signoff after the developer handoff.
+
+Completed agents:
+
+- Team 03 `019e5ddb-0cf0-7a53-b5aa-bedbeb0bf30d`: completed B4 architecture, contract, and work packet; closed.
+- Team 08 `019e5ddb-2125-78d1-92b2-e9e917a52145`: completed B5/B6 UX plan; closed.
+- Team 04 `019e5ddb-3564-7122-b1fa-a009353c5868`: completed B4/B5/B6 QA plans; closed.
 
 ---
 

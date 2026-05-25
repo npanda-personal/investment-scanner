@@ -849,3 +849,100 @@ Write:
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-MCTX-01-developer-handoff.md`
 
 Do not commit. Team 00 handles QA, review, Architect Signoff, delegated PO acceptance, scoped local commit, and later integration.
+# Team 05 Current Assignment - CF-W3-MDPIPE-01B4
+
+Date: 2026-05-25
+
+Team: Team 05 - Market Data / Data Quality
+
+Status: Ready for bounded implementation.
+
+## Assignment
+
+Implement `CF-W3-MDPIPE-01B4-PIPELINE-COMMAND-API` as the first safe Pipeline Ops manual command slice.
+
+Enabled command:
+
+```text
+DATA_QUALITY_EVALUATE_SCOPE
+```
+
+All other commands must remain disabled, deferred, or forbidden by backend catalog policy.
+
+Branch/worktree recommendation:
+
+- Branch: `codex/w3-mdpipe-01b4-pipeline-command-api`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team05-CF-W3-MDPIPE-01B4`
+
+## Read Before Coding
+
+- `AGENTS.md`
+- `10-requirements/CF-W3-MDPIPE-01B4-command-api-manual-trigger-safety-requirement.md`
+- `03-architecture/CF-W3-MDPIPE-01B4-pipeline-command-api-architecture.md`
+- `06-contracts/CF-W3-MDPIPE-01B4-pipeline-command-api-contract.md`
+- `08-work-packets/CF-W3-MDPIPE-01B4-work-packet.md`
+- `04-qa/CF-W3-MDPIPE-01B4-command-api-qa-plan.md`
+
+## Allowed Files
+
+- `backend/src/modules/pipeline-orchestration/pipeline-orchestration.types.ts`
+- `backend/src/modules/pipeline-orchestration/pipeline-orchestration.validation.ts`
+- `backend/src/modules/pipeline-orchestration/pipeline-orchestration.service.ts`
+- `backend/src/modules/pipeline-orchestration/pipeline-orchestration.controller.ts`
+- `backend/src/modules/pipeline-orchestration/pipeline-orchestration.router.ts`
+- `backend/src/modules/pipeline-orchestration/pipeline-orchestration.module.ts` only if dependency injection is required
+- `backend/src/modules/pipeline-orchestration/index.ts` only if public command exports are required
+- `backend/src/modules/pipeline-orchestration/pipeline-orchestration.md`
+- `backend/tests/modules/pipeline-orchestration/pipeline-orchestration.validation.test.ts`
+- `backend/tests/modules/pipeline-orchestration/pipeline-orchestration.service.test.ts`
+- `backend/tests/modules/pipeline-orchestration/pipeline-orchestration.controller.test.ts`
+- `backend/tests/modules/pipeline-orchestration/pipeline-orchestration.routes.test.ts`
+- `frontend/src/features/pipeline-ops/types.ts`
+- `frontend/src/features/pipeline-ops/api/pipelineOpsService.ts`
+- `frontend/src/features/pipeline-ops/hooks/usePipelineStatus.ts` only if command-trigger refresh requires it
+- `frontend/src/features/pipeline-ops/components/PipelineOpsPage.tsx`
+- `frontend/src/features/pipeline-ops/components/PipelineOpsTable.tsx`
+- `frontend/tests/ui/pipeline-ops.spec.ts`
+- active execution implementation evidence and Team 05 outbox
+
+## Forbidden Files
+
+- `backend/src/api/routes.ts`
+- `backend/src/server.ts`
+- `backend/prisma/schema.prisma`
+- `backend/prisma/migrations/**`
+- generated files
+- package manifests and lockfiles
+- `backend/src/modules/market-data-foundation/**`
+- `backend/tests/modules/market-data-foundation/**`
+- `backend/src/modules/data-quality-engine/**`
+- `backend/tests/modules/data-quality-engine/**`
+- all downstream module source/tests outside `pipeline-orchestration`
+- `frontend/src/app/routes.tsx`
+- `frontend/src/app/navigationMetadata.tsx`
+- existing feature pages outside `frontend/src/features/pipeline-ops/**`
+- shared frontend components
+- shared backend utilities
+- auth/subscription source
+- scheduler/startup/backfill files
+- provider/live data behavior
+- Docker/cloud/telemetry/broker files
+- root `AGENTS.md`
+- `docs/AGENTS.md`
+- `docs/codex-agent-team-plan/**`
+
+## Required Validation
+
+```powershell
+cd backend
+npm.cmd test -- pipeline-orchestration.validation.test.ts pipeline-orchestration.service.test.ts pipeline-orchestration.controller.test.ts pipeline-orchestration.routes.test.ts --runInBand
+npm.cmd run build
+```
+
+```powershell
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- pipeline-ops.spec.ts --workers=1
+```
+
+Stop and return to Team 00 if any forbidden file or broader command/scheduler/provider/downstream scope is required.

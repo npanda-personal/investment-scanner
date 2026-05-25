@@ -4,6 +4,91 @@ Date: 2026-05-24
 
 Mode: docs-only QA planning for bounded Ready-evaluation packets.
 
+## 2026-05-25 `CF-W3-MDPIPE-01B4` / `CF-W3-MDPIPE-01B5-01B6` QA Planning
+
+- Team: `TEAM-04` - QA Factory
+- Mode: docs-only QA packet preparation
+- Work items:
+  - `CF-W3-MDPIPE-01B4` - command API / manual-trigger safety matrix
+  - `CF-W3-MDPIPE-01B5` - page-local bulk-control migration
+  - `CF-W3-MDPIPE-01B6` - compact per-screen pipeline progress indicators
+- State/mode: QA planning only; no executable validation
+- Owner: Team 04 QA Factory
+- Lane/module:
+  - `pipeline-orchestration`
+  - pipeline UI surfaces across the affected feature pages
+- Files changed:
+  - `04-qa/CF-W3-MDPIPE-01B4-command-api-qa-plan.md`
+  - `04-qa/CF-W3-MDPIPE-01B5-01B6-control-migration-progress-indicators-qa-plan.md`
+  - `17-team-outboxes/TEAM-04-qa-factory.md`
+- Files inspected:
+  - `AGENTS.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/README.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/active-work-board.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/team-agent-runtime-queue.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/09-summaries/team-00-pipeline-ledger-latest.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/09-summaries/daemon-cycle-latest.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W3-MDPIPE-01B3-bulk-pipeline-ops-dashboard-requirement.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W3-MDPIPE-01B3-S1-pipeline-ops-dashboard-architecture.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W3-MDPIPE-01B2-pipeline-status-api-architecture.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W3-MDPIPE-01B3-S1-pipeline-ops-dashboard-qa-plan.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W3-MDPIPE-01B2-pipeline-status-api-qa-plan.md`
+  - `backend/src/modules/pipeline-orchestration/pipeline-orchestration.md`
+  - `backend/src/modules/pipeline-orchestration/pipeline-orchestration.service.ts`
+  - `backend/src/modules/pipeline-orchestration/pipeline-orchestration.controller.ts`
+  - `backend/src/modules/pipeline-orchestration/pipeline-orchestration.validation.ts`
+  - `frontend/src/features/pipeline-ops/components/PipelineOpsPage.tsx`
+  - `frontend/src/features/pipeline-ops/components/PipelineOpsTable.tsx`
+  - `frontend/src/features/pipeline-ops/components/PipelineStatusStrip.tsx`
+  - `frontend/src/features/pipeline-ops/hooks/usePipelineStatus.ts`
+  - `frontend/src/features/pipeline-ops/api/pipelineOpsService.ts`
+  - `frontend/tests/ui/pipeline-ops.spec.ts`
+  - `frontend/tests/ui/market-data-foundation.spec.ts`
+  - `frontend/tests/ui/data-quality-engine.spec.ts`
+  - `frontend/tests/ui/signal-generation-engine.spec.ts`
+  - `frontend/tests/ui/signal-quality-lab.spec.ts`
+  - `frontend/tests/ui/strategy-framework.spec.ts`
+  - `frontend/tests/ui/strategy-decision-engine.spec.ts`
+  - `frontend/tests/ui/backtesting-strategy-lab.spec.ts`
+  - `frontend/tests/ui/smart-money-intelligence.spec.ts`
+  - `frontend/tests/ui/today-trade-review.spec.ts`
+- Behavior changed:
+  - none; docs-only QA planning
+- Docs changed:
+  - prepared `04-qa/CF-W3-MDPIPE-01B4-command-api-qa-plan.md`
+  - prepared `04-qa/CF-W3-MDPIPE-01B5-01B6-control-migration-progress-indicators-qa-plan.md`
+  - refreshed this Team 04 outbox with the readiness verdict and Team 00 next gate
+- Contracts changed:
+  - none
+- Tests run:
+  - none
+- Tests skipped:
+  - all executable validation was skipped because this is a planning pass with no implementation handoff
+- Skipped-test reason:
+  - docs-only planning; both children are still pending the architecture/work-packet gate
+- Assumptions:
+  - `CF-W3-MDPIPE-01B4` remains a bounded command API and manual-trigger safety slice only
+  - `CF-W3-MDPIPE-01B5` and `CF-W3-MDPIPE-01B6` stay on the feature-page surfaces already tracked by Team 00 and Team 08
+  - page-local bulk control migration will not widen into schema, provider/live, or shared-component work
+- Risks:
+  - implementers may widen into route registries, package manifests, generated files, or cross-module ownership
+  - the command API may be over-permitted unless the safety matrix and lease semantics stay explicit
+  - compact progress indicators may regress into a bulk-control clone instead of a compact read-only status affordance
+- Blockers:
+  - no Team 04 planning blocker remains
+  - executable QA remains blocked until the matching architecture/work-packet set exists and Team 00 promotes the exact reservations
+- Shared-file requests:
+  - none from Team 04
+- QA readiness verdict:
+  - `CF-W3-MDPIPE-01B4`: `READY-CANDIDATE / PENDING-ARCHITECTURE-AND-WORK-PACKET`
+  - `CF-W3-MDPIPE-01B5`: `READY-CANDIDATE / PENDING-ARCHITECTURE-AND-WORK-PACKET`
+  - `CF-W3-MDPIPE-01B6`: `READY-CANDIDATE / PENDING-ARCHITECTURE-AND-WORK-PACKET`
+- Recommendation for Team 00:
+  - keep `CF-W3-MDPIPE-01B4` isolated until the command matrix, idempotency, and lease contract are explicit
+  - keep `CF-W3-MDPIPE-01B5` and `CF-W3-MDPIPE-01B6` together only if the feature-page reservation stays exact and Team 00 confirms the compact indicator model before implementation
+- Next gate:
+  - Team 03 and Team 08 architecture/work-packet completion for the command API and feature-page migration slices
+
 ## 2026-05-24 `CF-W1-BT-04` QA Planning
 
 - Team: `TEAM-04` - QA Factory

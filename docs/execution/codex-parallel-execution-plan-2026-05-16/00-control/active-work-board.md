@@ -137,6 +137,33 @@ Teams ready to pick up new tasks:
 - Team 05: Data Quality scheduled stage prep after command/status contracts remain stable.
 - Team 10: review the `01B3-S1` dashboard slice after scoped commit.
 
+## Latest Team 00 Routing Update - Pipeline Command API
+
+Date: 2026-05-25
+
+Ready promotion:
+
+- `CF-W3-MDPIPE-01B4` is promoted as the first bounded command API implementation slice.
+- Only `DATA_QUALITY_EVALUATE_SCOPE` may be enabled.
+- The command runs one Data Quality batch per request and records durable pipeline run/stage evidence.
+- All other command buttons remain disabled/deferred/forbidden by backend catalog policy.
+- Existing feature-page bulk controls remain untouched until a later migration slice.
+
+Teams:
+
+- Team 03 completed architecture, contract, and work packet.
+- Team 04 completed command API QA planning.
+- Team 08 completed control-migration / compact-indicator UX planning.
+- Team 05 owns the bounded implementation handoff.
+
+Teams ready to pick up new tasks:
+
+- Team 05: implement `CF-W3-MDPIPE-01B4` inside the exact Pipeline Orchestration / Pipeline Ops reservation.
+- Team 04: QA Verification after Team 05 handoff.
+- Team 10: Code Review after Team 04 acceptance.
+- Team 03: Architect Signoff after Team 10 acceptance.
+- Team 08: standby for compact indicator follow-up after command slice stabilizes.
+
 ## Latest Team 00 Routing Update - Market Data Pipeline Redesign
 
 Date: 2026-05-25
