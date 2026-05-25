@@ -194,10 +194,14 @@ Rules:
 
 - each stage writes its own `PipelineRun` and `PipelineStageRun` rows with deterministic idempotency keys, leases, counts, warnings, errors, input fingerprints, and output fingerprints;
 - each stage receives the same explicit changed instrument ids from the upstream scheduled Market Data pass when the adapter supports instrument-scoped work;
-- `SMART_MONEY` uses explicit instrument ids and local price/volume data only;
-- `CONTEXT_SNAPSHOTS` uses explicit instrument ids, latest persisted Market Context, and latest persisted Smart Money snapshots in the scheduled path, avoiding provider fallback work;
-- `SIGNAL_QUALITY` refreshes bounded diagnostics from persisted raw signals and local price history;
-- `STRATEGY_DECISION` evaluates explicit instrument ids and consumes persisted calibration, data quality, smart-money, market context, and local price windows;
+- scheduled downstream stages are incremental changed-set refreshes, while manual module buttons may intentionally drain a larger or full scoped universe;
+- changed-set stages must drain all supplied changed instrument ids across internal pages before reporting terminal status;
+- instrument progress counts (`totalCount`, `processedCount`, `succeededCount`, `failedCount`, `skippedCount`) describe changed instruments, not generated records;
+- generated output counts, such as smart-money range snapshots, context snapshot records, strategy decisions, and Today Review candidate counts, are written to metadata so Pipeline Ops does not imply full-universe parity or fake 100% progress;
+- `SMART_MONEY` uses explicit instrument ids and local price/volume data only, draining the changed set across batches;
+- `CONTEXT_SNAPSHOTS` uses explicit instrument ids, latest persisted Market Context, and latest persisted Smart Money snapshots in the scheduled path, avoiding provider fallback work and draining the changed set across batches;
+- `SIGNAL_QUALITY` refreshes bounded diagnostics for supplied changed instruments using persisted raw signals and local price history;
+- `STRATEGY_DECISION` evaluates all explicit changed instrument ids and consumes persisted calibration, data quality, smart-money, market context, and local price windows;
 - `RESEARCH_PROJECTION` runs the Research Hub overview as a projection/evidence stage;
 - `TODAY_REVIEW` publishes the daily review with compatibility risk-snapshot generation disabled for the scheduled path;
 - non-completed upstream states stop only the affected downstream branch unless the stage explicitly allows partial evidence to continue;

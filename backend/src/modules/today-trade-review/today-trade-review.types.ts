@@ -285,13 +285,16 @@ export interface TodayReviewUpstreamServices {
   };
   signalService: {
     latestForInstrument(instrumentId: string): Promise<SignalResultDto | null>;
+    latestPersistedForInstruments?(instrumentIds: string[]): Promise<SignalResultDto[]>;
     latestSignalUniverse(query: any): Promise<SignalResultDto[]>;
   };
   calibrationService: {
     latestPersistedForInstrument(instrumentId: string): Promise<SignalCalibrationResultDto | null>;
+    latestPersistedForInstruments?(instrumentIds: string[]): Promise<SignalCalibrationResultDto[]>;
   };
   smartMoneyService: {
     latestPersistedStock(instrumentId: string, range?: '1M' | '3M' | '6M'): Promise<SmartMoneyStockSummary | null>;
+    latestPersistedStocks?(instrumentIds: string[], range?: '1M' | '3M' | '6M'): Promise<SmartMoneyStockSummary[]>;
   };
 }
 

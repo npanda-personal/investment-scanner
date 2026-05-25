@@ -531,6 +531,13 @@ test.describe('Today Trade Review UI', () => {
     await expect(page.getByLabel('Search rows')).toBeVisible();
     await expect(page.getByText('Hover any clipped cell to read the full value.')).toBeVisible();
     await expect(page.getByTitle(/long clipped research-support reason/).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Export CSV' })).toBeVisible();
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export CSV' }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toContain('today-review-current-table');
+    await expect(page.getByText('Exported 7 Today Review rows as an Excel-compatible CSV.')).toBeVisible();
 
     await page.getByLabel('Search rows').fill('OMEGA');
     await expect(page.getByText('Showing 1-1 of 1 filtered candidates.')).toBeVisible();

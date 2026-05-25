@@ -481,11 +481,26 @@ export class TodayTradeReviewService {
       ...entryDecisions.map((decision) => ({ decision, sourceKind: 'ENTRY' as const })),
       ...exitDecisions.map((decision) => ({ decision, sourceKind: 'EXIT' as const })),
     ]);
-    const instrumentIds = decisions.map(({ decision }) => decision.instrumentId!).filter(Boolean);
-    const dataQualityByInstrument = new Map(
-      (await this.safe(() => this.services.dataQualityService.getEvaluationsForInstruments(instrumentIds), 'Data quality snapshots are unavailable.', warnings) || [])
-        .map((evaluation) => [evaluation.instrumentId, evaluation])
-    );
+    const instrumentIds = [...new Set(decisions.map(({ decision }) => decision.instrumentId!).filter(Boolean))];
+    const hasBulkRawSignals = typeof this.services.signalService.latestPersistedForInstruments === 'function';
+    const hasBulkCalibration = typeof this.services.calibrationService.latestPersistedForInstruments === 'function';
+    const hasBulkSmartMoney = typeof this.services.smartMoneyService.latestPersistedStocks === 'function';
+    const [dataQualityRows, rawSignalRows, calibrationRows, smartMoneyRows] = await Promise.all([
+      this.safe(() => this.services.dataQualityService.getEvaluationsForInstruments(instrumentIds), 'Data quality snapshots are unavailable.', warnings),
+      hasBulkRawSignals
+        ? this.safe(() => this.services.signalService.latestPersistedForInstruments!(instrumentIds), 'Raw signal snapshots are unavailable.', warnings)
+        : Promise.resolve(null),
+      hasBulkCalibration
+        ? this.safe(() => this.services.calibrationService.latestPersistedForInstruments!(instrumentIds), 'Calibration snapshots are unavailable.', warnings)
+        : Promise.resolve(null),
+      hasBulkSmartMoney
+        ? this.safe(() => this.services.smartMoneyService.latestPersistedStocks!(instrumentIds, '3M'), 'Smart-money snapshots are unavailable.', warnings)
+        : Promise.resolve(null),
+    ]);
+    const dataQualityByInstrument = new Map((dataQualityRows || []).map((evaluation) => [evaluation.instrumentId, evaluation]));
+    const rawSignalByInstrument = new Map((rawSignalRows || []).map((signal) => [signal.instrument_id, signal]));
+    const calibrationByInstrument = new Map((calibrationRows || []).map((calibration) => [calibration.instrumentId, calibration]));
+    const smartMoneyByInstrument = new Map((smartMoneyRows || []).map((summary) => [summary.instrumentId, summary]));
 
     const result: TodayReviewCandidateSource[] = [];
     for (const item of decisions) {
@@ -494,9 +509,15 @@ export class TodayTradeReviewService {
         item.sourceKind === 'ENTRY'
           ? this.loadTradePlan(item.decision, scope, warnings, skipTradePlanGeneration)
           : Promise.resolve(null),
-        this.safe(() => this.services.signalService.latestForInstrument(instrumentId), `${item.decision.symbol} raw signal support is unavailable.`, warnings),
-        this.safe(() => this.services.calibrationService.latestPersistedForInstrument(instrumentId), `${item.decision.symbol} calibration support is unavailable.`, warnings),
-        this.safe(() => this.services.smartMoneyService.latestPersistedStock(instrumentId, '3M'), `${item.decision.symbol} smart-money support is unavailable.`, warnings),
+        hasBulkRawSignals
+          ? Promise.resolve(rawSignalByInstrument.get(instrumentId) || null)
+          : this.safe(() => this.services.signalService.latestForInstrument(instrumentId), `${item.decision.symbol} raw signal support is unavailable.`, warnings),
+        hasBulkCalibration
+          ? Promise.resolve(calibrationByInstrument.get(instrumentId) || null)
+          : this.safe(() => this.services.calibrationService.latestPersistedForInstrument(instrumentId), `${item.decision.symbol} calibration support is unavailable.`, warnings),
+        hasBulkSmartMoney
+          ? Promise.resolve(smartMoneyByInstrument.get(instrumentId) || null)
+          : this.safe(() => this.services.smartMoneyService.latestPersistedStock(instrumentId, '3M'), `${item.decision.symbol} smart-money support is unavailable.`, warnings),
       ]);
       result.push({
         decision: item.decision,

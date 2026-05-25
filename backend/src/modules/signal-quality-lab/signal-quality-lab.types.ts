@@ -39,6 +39,7 @@ export interface QualityRecalculateRequest {
   region?: string;
   assetType?: string;
   modelVersion?: string;
+  instrumentIds?: string[];
   from?: string;
   to?: string;
 }

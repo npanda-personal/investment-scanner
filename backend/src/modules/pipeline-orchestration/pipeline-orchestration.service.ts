@@ -54,13 +54,13 @@ const PROCESS_LOCAL_ID = `${process.pid}-${Math.random().toString(16).slice(2, 1
 const DQ_SCHEDULED_STAGE_VERSION = 'scheduled-dq-v1';
 const RAW_SIGNALS_SCHEDULED_STAGE_VERSION = 'scheduled-raw-signals-v1';
 const SIGNAL_CALIBRATION_SCHEDULED_STAGE_VERSION = 'scheduled-signal-calibration-v1';
-const MARKET_CONTEXT_SCHEDULED_STAGE_VERSION = 'scheduled-market-context-v1';
-const SMART_MONEY_SCHEDULED_STAGE_VERSION = 'scheduled-smart-money-v1';
-const CONTEXT_SNAPSHOTS_SCHEDULED_STAGE_VERSION = 'scheduled-context-snapshots-v1';
-const SIGNAL_QUALITY_SCHEDULED_STAGE_VERSION = 'scheduled-signal-quality-v1';
-const STRATEGY_DECISION_SCHEDULED_STAGE_VERSION = 'scheduled-strategy-decision-v1';
-const RESEARCH_PROJECTION_SCHEDULED_STAGE_VERSION = 'scheduled-research-projection-v1';
-const TODAY_REVIEW_SCHEDULED_STAGE_VERSION = 'scheduled-today-review-v1';
+const MARKET_CONTEXT_SCHEDULED_STAGE_VERSION = 'scheduled-market-context-v2';
+const SMART_MONEY_SCHEDULED_STAGE_VERSION = 'scheduled-smart-money-v2';
+const CONTEXT_SNAPSHOTS_SCHEDULED_STAGE_VERSION = 'scheduled-context-snapshots-v2';
+const SIGNAL_QUALITY_SCHEDULED_STAGE_VERSION = 'scheduled-signal-quality-v2';
+const STRATEGY_DECISION_SCHEDULED_STAGE_VERSION = 'scheduled-strategy-decision-v2';
+const RESEARCH_PROJECTION_SCHEDULED_STAGE_VERSION = 'scheduled-research-projection-v2';
+const TODAY_REVIEW_SCHEDULED_STAGE_VERSION = 'scheduled-today-review-v2';
 
 type ScheduledAdapterResult = {
   totalCount: number;
@@ -71,6 +71,8 @@ type ScheduledAdapterResult = {
   unchangedCount?: number;
   warnings?: string[];
   errors?: string[];
+  nextOffset?: number | null;
+  hasMore?: boolean;
   metadata?: Record<string, unknown>;
 };
 
@@ -1574,25 +1576,57 @@ export class PipelineOrchestrationService {
       sourceStage: 'MARKET_CONTEXT',
       adapter: 'SmartMoneyIntelligenceService.run',
     }, async ({ normalizedScope, changedInstrumentIds, normalizedBatchSize }) => {
-      const result = await this.smartMoneyService.run(normalizedBatchSize, {
-        region: normalizedScope.region,
-        assetType: normalizedScope.assetType,
-        offset: 0,
-        instrumentIds: changedInstrumentIds,
-      });
+      const aggregate = {
+        totalCount: changedInstrumentIds.length,
+        processedCount: 0,
+        generatedCount: 0,
+        failedCount: 0,
+        skippedCount: 0,
+        warnings: [] as string[],
+        errors: [] as string[],
+        byRange: {} as Record<string, { generated: number; skipped: number }>,
+        pages: 0,
+      };
+      let offset = 0;
+      while (offset < aggregate.totalCount) {
+        const result = await this.smartMoneyService.run(normalizedBatchSize, {
+          region: normalizedScope.region,
+          assetType: normalizedScope.assetType,
+          offset,
+          instrumentIds: changedInstrumentIds,
+        });
+        aggregate.totalCount = result.totalCount;
+        aggregate.processedCount += result.processedCount;
+        aggregate.generatedCount += result.generatedCount;
+        aggregate.failedCount += result.failedCount;
+        aggregate.skippedCount += result.skippedCount;
+        aggregate.warnings.push(...(result.warnings || []));
+        aggregate.errors.push(...(result.errors || []));
+        for (const [range, counts] of Object.entries(result.byRange || {})) {
+          const current = aggregate.byRange[range] || { generated: 0, skipped: 0 };
+          aggregate.byRange[range] = {
+            generated: current.generated + Number(counts.generated || 0),
+            skipped: current.skipped + Number(counts.skipped || 0),
+          };
+        }
+        aggregate.pages += 1;
+        if (!result.hasMore || result.processedCount <= 0 || result.nextOffset === null || result.nextOffset === undefined) break;
+        offset = result.nextOffset;
+      }
       return {
-        totalCount: result.totalCount,
-        processedCount: result.processedCount,
-        succeededCount: result.generatedCount,
-        failedCount: result.failedCount,
-        skippedCount: result.skippedCount,
+        totalCount: aggregate.totalCount,
+        processedCount: Math.min(aggregate.totalCount, aggregate.processedCount),
+        succeededCount: Math.max(0, Math.min(aggregate.totalCount, aggregate.processedCount) - aggregate.failedCount),
+        failedCount: aggregate.failedCount,
+        skippedCount: 0,
         unchangedCount: 0,
-        warnings: result.warnings,
-        errors: result.errors,
+        warnings: aggregate.warnings,
+        errors: aggregate.errors,
         metadata: {
-          byRange: result.byRange,
-          generatedCount: result.generatedCount,
-          skippedCount: result.skippedCount,
+          adapterPages: aggregate.pages,
+          byRange: aggregate.byRange,
+          generatedRecordCount: aggregate.generatedCount,
+          skippedRecordCount: aggregate.skippedCount,
         },
       };
     }, now);
@@ -1616,28 +1650,56 @@ export class PipelineOrchestrationService {
       sourceStage: 'SMART_MONEY',
       adapter: 'HistoricalContextSnapshotsService.generate',
     }, async ({ normalizedScope, changedInstrumentIds, normalizedBatchSize }) => {
-      const result = await this.historicalContextService.generate(
-        new Date(`${request.dataThroughDate}T00:00:00.000Z`),
-        normalizedBatchSize,
-        {
-          region: normalizedScope.region,
-          assetType: normalizedScope.assetType,
-          instrumentIds: changedInstrumentIds,
+      const aggregate = {
+        market: { inserted: 0, updated: 0, skipped: 0 },
+        sectors: { inserted: 0, updated: 0, skipped: 0 },
+        countries: { inserted: 0, updated: 0, skipped: 0 },
+        smartMoney: { inserted: 0, updated: 0, skipped: 0 },
+        dataQuality: { inserted: 0, updated: 0, skipped: 0 },
+        warnings: [] as string[],
+        pages: 0,
+        processedCount: 0,
+        snapshotDate: null as string | null,
+      };
+      for (let offset = 0; offset < changedInstrumentIds.length; offset += normalizedBatchSize) {
+        const chunkIds = changedInstrumentIds.slice(offset, offset + normalizedBatchSize);
+        if (chunkIds.length === 0) break;
+        const result = await this.historicalContextService.generate(
+          new Date(`${request.dataThroughDate}T00:00:00.000Z`),
+          chunkIds.length,
+          {
+            region: normalizedScope.region,
+            assetType: normalizedScope.assetType,
+            instrumentIds: chunkIds,
+          }
+        );
+        for (const key of ['market', 'sectors', 'countries', 'smartMoney', 'dataQuality'] as const) {
+          aggregate[key].inserted += result[key].inserted;
+          aggregate[key].updated += result[key].updated;
+          aggregate[key].skipped += result[key].skipped;
         }
-      );
+        aggregate.warnings.push(...result.warnings);
+        aggregate.snapshotDate = result.snapshotDate;
+        aggregate.pages += 1;
+        aggregate.processedCount += chunkIds.length;
+      }
+      const result = aggregate;
       const inserted = result.market.inserted + result.sectors.inserted + result.countries.inserted + result.smartMoney.inserted + result.dataQuality.inserted;
       const updated = result.market.updated + result.sectors.updated + result.countries.updated + result.smartMoney.updated + result.dataQuality.updated;
       const skipped = result.market.skipped + result.sectors.skipped + result.countries.skipped + result.smartMoney.skipped + result.dataQuality.skipped;
       return {
         totalCount: changedInstrumentIds.length,
-        processedCount: Math.min(changedInstrumentIds.length, normalizedBatchSize),
-        succeededCount: inserted + updated,
+        processedCount: Math.min(changedInstrumentIds.length, result.processedCount),
+        succeededCount: Math.min(changedInstrumentIds.length, result.processedCount),
         failedCount: 0,
-        skippedCount: skipped,
+        skippedCount: 0,
         unchangedCount: updated,
         warnings: result.warnings,
         errors: [],
         metadata: {
+          adapterPages: result.pages,
+          persistedRecordCount: inserted + updated,
+          skippedRecordCount: skipped,
           snapshotDate: result.snapshotDate,
           market: result.market,
           sectors: result.sectors,
@@ -1666,30 +1728,72 @@ export class PipelineOrchestrationService {
       stageVersion: SIGNAL_QUALITY_SCHEDULED_STAGE_VERSION,
       sourceStage: 'CONTEXT_SNAPSHOTS',
       adapter: 'SignalQualityLabService.recalculate',
-    }, async ({ normalizedScope, normalizedBatchSize }) => {
-      const result = await this.signalQualityService.recalculate({
-        batchSize: normalizedBatchSize,
-        offset: 0,
-        horizon: '20D',
-        region: normalizedScope.region,
-        assetType: normalizedScope.assetType,
-      });
+    }, async ({ normalizedScope, changedInstrumentIds, normalizedBatchSize }) => {
+      const aggregate = {
+        totalCount: changedInstrumentIds.length,
+        processedCount: 0,
+        skippedCount: 0,
+        failedCount: 0,
+        warnings: [] as string[],
+        selectedHorizon: '20D',
+        evidenceUsability: 'UNAVAILABLE' as string,
+        matureSignalsInBatch: 0,
+        notYetMatureInBatch: 0,
+        evaluatedCount: 0,
+        unevaluatedCount: 0,
+        missingPriceHistoryCount: 0,
+        outcomesPersisted: false,
+        message: '',
+        pages: 0,
+      };
+      let offset = 0;
+      while (offset < aggregate.totalCount) {
+        const result = await this.signalQualityService.recalculate({
+          batchSize: normalizedBatchSize,
+          offset,
+          horizon: '20D',
+          region: normalizedScope.region,
+          assetType: normalizedScope.assetType,
+          instrumentIds: changedInstrumentIds,
+        });
+        aggregate.totalCount = result.totalCount;
+        aggregate.processedCount += result.processedCount;
+        aggregate.skippedCount += result.skippedCount;
+        aggregate.failedCount += result.failedCount;
+        aggregate.warnings.push(...result.warnings);
+        aggregate.selectedHorizon = result.selectedHorizon;
+        aggregate.evidenceUsability = result.evidenceUsability;
+        aggregate.matureSignalsInBatch += result.matureSignalsInBatch;
+        aggregate.notYetMatureInBatch += result.notYetMatureInBatch;
+        aggregate.evaluatedCount += result.evaluatedCount;
+        aggregate.unevaluatedCount += result.unevaluatedCount;
+        aggregate.missingPriceHistoryCount += result.missingPriceHistoryCount;
+        aggregate.outcomesPersisted = aggregate.outcomesPersisted || result.outcomesPersisted;
+        aggregate.message = result.message;
+        aggregate.pages += 1;
+        if (!result.hasMore || result.processedCount <= 0 || result.nextOffset === null || result.nextOffset === undefined) break;
+        offset = result.nextOffset;
+      }
       return {
-        totalCount: result.totalCount,
-        processedCount: result.processedCount,
-        succeededCount: result.evaluatedCount,
-        failedCount: result.failedCount,
-        skippedCount: result.skippedCount + result.unevaluatedCount + result.missingPriceHistoryCount,
+        totalCount: aggregate.totalCount,
+        processedCount: Math.min(aggregate.totalCount, aggregate.processedCount),
+        succeededCount: Math.max(0, Math.min(aggregate.totalCount, aggregate.processedCount) - aggregate.failedCount - aggregate.skippedCount),
+        failedCount: aggregate.failedCount,
+        skippedCount: aggregate.skippedCount,
         unchangedCount: 0,
-        warnings: result.warnings,
+        warnings: aggregate.warnings,
         errors: [],
         metadata: {
-          selectedHorizon: result.selectedHorizon,
-          evidenceUsability: result.evidenceUsability,
-          matureSignalsInBatch: result.matureSignalsInBatch,
-          notYetMatureInBatch: result.notYetMatureInBatch,
-          outcomesPersisted: result.outcomesPersisted,
-          message: result.message,
+          adapterPages: aggregate.pages,
+          selectedHorizon: aggregate.selectedHorizon,
+          evidenceUsability: aggregate.evidenceUsability,
+          matureSignalsInBatch: aggregate.matureSignalsInBatch,
+          notYetMatureInBatch: aggregate.notYetMatureInBatch,
+          evaluatedCount: aggregate.evaluatedCount,
+          unevaluatedCount: aggregate.unevaluatedCount,
+          missingPriceHistoryCount: aggregate.missingPriceHistoryCount,
+          outcomesPersisted: aggregate.outcomesPersisted,
+          message: aggregate.message,
         },
       };
     }, now);
@@ -1713,26 +1817,53 @@ export class PipelineOrchestrationService {
       sourceStage: 'SIGNAL_QUALITY',
       adapter: 'StrategyDecisionEngineService.evaluate',
     }, async ({ normalizedScope, changedInstrumentIds, normalizedBatchSize }) => {
-      const result = await this.strategyDecisionService.evaluate({
-        strategy: 'ALL',
-        instrumentIds: changedInstrumentIds,
-        region: normalizedScope.region,
-        assetType: normalizedScope.assetType,
-        batchSize: normalizedBatchSize,
-        offset: 0,
-      });
+      const aggregate = {
+        totalCount: changedInstrumentIds.length,
+        processedCount: 0,
+        generatedCount: 0,
+        failedCount: 0,
+        skippedCount: 0,
+        warnings: [] as string[],
+        resultsLength: 0,
+        pages: 0,
+      };
+      let offset = 0;
+      let hasMore = false;
+      while (offset < aggregate.totalCount) {
+        const result = await this.strategyDecisionService.evaluate({
+          strategy: 'ALL',
+          instrumentIds: changedInstrumentIds,
+          region: normalizedScope.region,
+          assetType: normalizedScope.assetType,
+          batchSize: normalizedBatchSize,
+          offset,
+        });
+        aggregate.totalCount = result.totalCount;
+        aggregate.processedCount += result.processedCount;
+        aggregate.generatedCount += result.generatedCount;
+        aggregate.failedCount += result.failedCount;
+        aggregate.skippedCount += result.skippedCount;
+        aggregate.warnings.push(...(result.warnings || []));
+        aggregate.resultsLength += result.results.length;
+        aggregate.pages += 1;
+        hasMore = result.hasMore;
+        if (!result.hasMore || result.processedCount <= 0 || result.nextOffset === null || result.nextOffset === undefined) break;
+        offset = result.nextOffset;
+      }
       return {
-        totalCount: result.totalCount,
-        processedCount: result.processedCount,
-        succeededCount: result.generatedCount,
-        failedCount: result.failedCount,
-        skippedCount: result.skippedCount,
+        totalCount: aggregate.totalCount,
+        processedCount: Math.min(aggregate.totalCount, aggregate.processedCount),
+        succeededCount: Math.max(0, Math.min(aggregate.totalCount, aggregate.processedCount) - aggregate.failedCount - aggregate.skippedCount),
+        failedCount: aggregate.failedCount,
+        skippedCount: aggregate.skippedCount,
         unchangedCount: 0,
-        warnings: result.warnings,
+        warnings: aggregate.warnings,
         errors: [],
         metadata: {
-          resultCount: result.results.length,
-          hasMore: result.hasMore,
+          adapterPages: aggregate.pages,
+          persistedDecisionCount: aggregate.generatedCount,
+          resultCount: aggregate.resultsLength,
+          hasMore,
         },
       };
     }, now);
@@ -2612,7 +2743,9 @@ export class PipelineOrchestrationService {
       const failedCount = adapterResult.failedCount;
       const skippedCount = adapterResult.skippedCount;
       const unchangedCount = adapterResult.unchangedCount ?? 0;
-      const completedCount = Math.min(totalCount, Math.max(adapterProcessedCount, succeededCount + failedCount + skippedCount));
+      const completedCount = Math.min(totalCount, Math.max(0, adapterProcessedCount));
+      const hasMore = adapterResult.hasMore ?? completedCount < totalCount;
+      const nextOffset = hasMore ? adapterResult.nextOffset ?? completedCount : null;
       const status = this.mapScheduledPipelineStatus({
         totalCount,
         processedCount: completedCount,
@@ -2635,6 +2768,8 @@ export class PipelineOrchestrationService {
         ...(adapterResult.metadata || {}),
         adapterProcessedCount,
         completedCount,
+        hasMore,
+        nextOffset,
       };
       const completedStage = await this.completeStage({
         idempotencyKey: stageIdempotencyKey,
@@ -2646,8 +2781,8 @@ export class PipelineOrchestrationService {
         failedCount,
         skippedCount,
         unchangedCount,
-        nextOffset: null,
-        hasMore: false,
+        nextOffset,
+        hasMore,
         outputFingerprint,
         warnings: adapterResult.warnings || [],
         errors: adapterResult.errors || [],
@@ -2875,6 +3010,7 @@ export class PipelineOrchestrationService {
   }): 'COMPLETED' | 'PARTIAL' | 'FAILED' | 'SKIPPED' {
     if (input.totalCount === 0) return 'SKIPPED';
     if (input.failedCount > 0 && input.succeededCount === 0) return 'FAILED';
+    if (input.processedCount < input.totalCount) return 'PARTIAL';
     if (input.succeededCount === 0 && (input.skippedCount > 0 || input.processedCount === 0)) return 'SKIPPED';
     if (input.failedCount > 0 || input.skippedCount > 0 || input.processedCount < input.totalCount) return 'PARTIAL';
     return 'COMPLETED';

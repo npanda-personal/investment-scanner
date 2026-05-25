@@ -1793,6 +1793,325 @@ describe('PipelineOrchestrationService', () => {
     }));
   });
 
+  it('drains all changed-instrument Smart Money batches and keeps record counts in metadata', async () => {
+    let leasedStage: any;
+    const repository = {
+      upsertRun: jest.fn().mockResolvedValue({
+        id: 'run-smart-money',
+        pipelineKey: 'market-intelligence',
+        region: 'IN',
+        assetType: 'STOCK',
+        timeframe: '1d',
+        triggerType: 'scheduled',
+        status: 'RUNNING',
+        idempotencyKey: 'run-smart-money-key',
+        dataThroughDate: '2026-05-25T00:00:00.000Z',
+        sourceFingerprint: 'market-context-output',
+        changedInstrumentCount: 3,
+        totalCount: 3,
+        processedCount: 0,
+        succeededCount: 0,
+        partialCount: 0,
+        failedCount: 0,
+        skippedCount: 0,
+        unchangedCount: 0,
+        warnings: [],
+        errors: [],
+        metadata: null,
+        startedAt: '2026-05-25T03:00:00.000Z',
+        completedAt: null,
+        durationMs: null,
+        createdAt: '2026-05-25T03:00:00.000Z',
+        updatedAt: '2026-05-25T03:00:00.000Z',
+      }),
+      completeRun: jest.fn().mockImplementation(async (input) => ({ ...leasedStage, ...input, status: input.status })),
+      upsertStage: jest.fn().mockImplementation(async () => {
+        leasedStage = {
+          id: 'stage-smart-money',
+          pipelineRunId: 'run-smart-money',
+          stageKey: 'SMART_MONEY',
+          stageOrder: 8,
+          status: 'PENDING',
+          idempotencyKey: 'stage-smart-money-key',
+          region: 'IN',
+          assetType: 'STOCK',
+          timeframe: '1d',
+          dataThroughDate: '2026-05-25T00:00:00.000Z',
+          inputFingerprint: 'smart-money-input',
+          outputFingerprint: null,
+          changedInstrumentCount: 3,
+          batchSize: 2,
+          offset: 0,
+          nextOffset: 0,
+          hasMore: false,
+          totalCount: 3,
+          processedCount: 0,
+          succeededCount: 0,
+          partialCount: 0,
+          failedCount: 0,
+          skippedCount: 0,
+          unchangedCount: 0,
+          attemptCount: 1,
+          cacheKey: null,
+          cacheStatus: 'UNKNOWN',
+          cacheExpiresAt: null,
+          leaseOwner: 'scheduled-smart-money:test',
+          leaseExpiresAt: '2026-05-25T03:10:00.000Z',
+          startedAt: '2026-05-25T03:00:01.000Z',
+          completedAt: null,
+          durationMs: null,
+          warnings: [],
+          errors: [],
+          metadata: null,
+          createdAt: '2026-05-25T03:00:00.000Z',
+          updatedAt: '2026-05-25T03:00:01.000Z',
+        };
+        return leasedStage;
+      }),
+      acquireStageLease: jest.fn()
+        .mockResolvedValueOnce({ acquired: false, reason: 'STAGE_NOT_FOUND', stage: null })
+        .mockImplementation(async () => ({ acquired: true, reason: 'ACQUIRED', stage: { ...leasedStage, status: 'RUNNING' } })),
+      completeStage: jest.fn().mockImplementation(async (input) => ({
+        ...leasedStage,
+        ...input,
+        id: 'stage-smart-money',
+        pipelineRunId: 'run-smart-money',
+        stageKey: 'SMART_MONEY',
+        stageOrder: 8,
+      })),
+      recordStageProgress: jest.fn().mockImplementation(async (input) => ({ ...leasedStage, ...input, status: input.status })),
+      latestStages: jest.fn(),
+    };
+    const smartRun = jest.fn()
+      .mockResolvedValueOnce({
+        totalCount: 3,
+        processedCount: 2,
+        generatedCount: 6,
+        failedCount: 0,
+        skippedCount: 0,
+        warnings: [],
+        errors: [],
+        byRange: { '1M': { generated: 2, skipped: 0 }, '3M': { generated: 2, skipped: 0 }, '6M': { generated: 2, skipped: 0 } },
+        hasMore: true,
+        nextOffset: 2,
+      })
+      .mockResolvedValueOnce({
+        totalCount: 3,
+        processedCount: 1,
+        generatedCount: 3,
+        failedCount: 0,
+        skippedCount: 0,
+        warnings: [],
+        errors: [],
+        byRange: { '1M': { generated: 1, skipped: 0 }, '3M': { generated: 1, skipped: 0 }, '6M': { generated: 1, skipped: 0 } },
+        hasMore: false,
+        nextOffset: null,
+      });
+    const service = new PipelineOrchestrationService(
+      repository as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      { run: smartRun } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+    jest.spyOn(service, 'runScheduledContextSnapshotsStage').mockResolvedValue(null as any);
+
+    const response = await service.runScheduledSmartMoneyStage({
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      triggerType: 'scheduled',
+      dataThroughDate: '2026-05-25',
+      sourceFingerprint: 'market-context-output',
+      changedInstrumentIds: ['stock-1', 'stock-2', 'stock-3'],
+      batchSize: 2,
+      schedulerRunStartedAt: '2026-05-25T03:00:00.000Z',
+      upstreamStageRunId: 'stage-market-context',
+    }, new Date('2026-05-25T03:00:00.000Z'));
+
+    expect(response.status).toBe('COMPLETED');
+    expect(smartRun).toHaveBeenCalledTimes(2);
+    expect(smartRun).toHaveBeenNthCalledWith(1, 2, expect.objectContaining({ offset: 0, instrumentIds: ['stock-1', 'stock-2', 'stock-3'] }));
+    expect(smartRun).toHaveBeenNthCalledWith(2, 2, expect.objectContaining({ offset: 2, instrumentIds: ['stock-1', 'stock-2', 'stock-3'] }));
+    expect(repository.completeStage).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'COMPLETED',
+      totalCount: 3,
+      processedCount: 3,
+      succeededCount: 3,
+      skippedCount: 0,
+      metadata: expect.objectContaining({
+        adapterPages: 2,
+        generatedRecordCount: 9,
+        skippedRecordCount: 0,
+      }),
+    }));
+  });
+
+  it('drains all changed-instrument Strategy Decision batches and records decision output separately', async () => {
+    let leasedStage: any;
+    const repository = {
+      upsertRun: jest.fn().mockResolvedValue({
+        id: 'run-strategy-decision',
+        pipelineKey: 'market-intelligence',
+        region: 'IN',
+        assetType: 'STOCK',
+        timeframe: '1d',
+        triggerType: 'scheduled',
+        status: 'RUNNING',
+        idempotencyKey: 'run-strategy-decision-key',
+        dataThroughDate: '2026-05-25T00:00:00.000Z',
+        sourceFingerprint: 'signal-quality-output',
+        changedInstrumentCount: 3,
+        totalCount: 3,
+        processedCount: 0,
+        succeededCount: 0,
+        partialCount: 0,
+        failedCount: 0,
+        skippedCount: 0,
+        unchangedCount: 0,
+        warnings: [],
+        errors: [],
+        metadata: null,
+        startedAt: '2026-05-25T03:00:00.000Z',
+        completedAt: null,
+        durationMs: null,
+        createdAt: '2026-05-25T03:00:00.000Z',
+        updatedAt: '2026-05-25T03:00:00.000Z',
+      }),
+      completeRun: jest.fn().mockImplementation(async (input) => ({ ...leasedStage, ...input, status: input.status })),
+      upsertStage: jest.fn().mockImplementation(async () => {
+        leasedStage = {
+          id: 'stage-strategy-decision',
+          pipelineRunId: 'run-strategy-decision',
+          stageKey: 'STRATEGY_DECISION',
+          stageOrder: 9,
+          status: 'PENDING',
+          idempotencyKey: 'stage-strategy-decision-key',
+          region: 'IN',
+          assetType: 'STOCK',
+          timeframe: '1d',
+          dataThroughDate: '2026-05-25T00:00:00.000Z',
+          inputFingerprint: 'strategy-decision-input',
+          outputFingerprint: null,
+          changedInstrumentCount: 3,
+          batchSize: 2,
+          offset: 0,
+          nextOffset: 0,
+          hasMore: false,
+          totalCount: 3,
+          processedCount: 0,
+          succeededCount: 0,
+          partialCount: 0,
+          failedCount: 0,
+          skippedCount: 0,
+          unchangedCount: 0,
+          attemptCount: 1,
+          cacheKey: null,
+          cacheStatus: 'UNKNOWN',
+          cacheExpiresAt: null,
+          leaseOwner: 'scheduled-strategy-decision:test',
+          leaseExpiresAt: '2026-05-25T03:10:00.000Z',
+          startedAt: '2026-05-25T03:00:01.000Z',
+          completedAt: null,
+          durationMs: null,
+          warnings: [],
+          errors: [],
+          metadata: null,
+          createdAt: '2026-05-25T03:00:00.000Z',
+          updatedAt: '2026-05-25T03:00:01.000Z',
+        };
+        return leasedStage;
+      }),
+      acquireStageLease: jest.fn()
+        .mockResolvedValueOnce({ acquired: false, reason: 'STAGE_NOT_FOUND', stage: null })
+        .mockImplementation(async () => ({ acquired: true, reason: 'ACQUIRED', stage: { ...leasedStage, status: 'RUNNING' } })),
+      completeStage: jest.fn().mockImplementation(async (input) => ({
+        ...leasedStage,
+        ...input,
+        id: 'stage-strategy-decision',
+        pipelineRunId: 'run-strategy-decision',
+        stageKey: 'STRATEGY_DECISION',
+        stageOrder: 9,
+      })),
+      recordStageProgress: jest.fn().mockImplementation(async (input) => ({ ...leasedStage, ...input, status: input.status })),
+      latestStages: jest.fn(),
+    };
+    const evaluate = jest.fn()
+      .mockResolvedValueOnce({
+        totalCount: 3,
+        processedCount: 2,
+        generatedCount: 100,
+        failedCount: 0,
+        skippedCount: 0,
+        warnings: [],
+        results: new Array(100).fill(null).map((_, index) => ({ id: `decision-a-${index}` })),
+        hasMore: true,
+        nextOffset: 2,
+      })
+      .mockResolvedValueOnce({
+        totalCount: 3,
+        processedCount: 1,
+        generatedCount: 50,
+        failedCount: 0,
+        skippedCount: 0,
+        warnings: [],
+        results: new Array(50).fill(null).map((_, index) => ({ id: `decision-b-${index}` })),
+        hasMore: false,
+        nextOffset: null,
+      });
+    const service = new PipelineOrchestrationService(
+      repository as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      { evaluate } as any,
+      {} as any,
+      {} as any
+    );
+    jest.spyOn(service, 'runScheduledResearchProjectionStage').mockResolvedValue(null as any);
+
+    const response = await service.runScheduledStrategyDecisionStage({
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      triggerType: 'scheduled',
+      dataThroughDate: '2026-05-25',
+      sourceFingerprint: 'signal-quality-output',
+      changedInstrumentIds: ['stock-1', 'stock-2', 'stock-3'],
+      batchSize: 2,
+      schedulerRunStartedAt: '2026-05-25T03:00:00.000Z',
+      upstreamStageRunId: 'stage-signal-quality',
+    }, new Date('2026-05-25T03:00:00.000Z'));
+
+    expect(response.status).toBe('COMPLETED');
+    expect(evaluate).toHaveBeenCalledTimes(2);
+    expect(evaluate).toHaveBeenNthCalledWith(1, expect.objectContaining({ offset: 0, batchSize: 2, instrumentIds: ['stock-1', 'stock-2', 'stock-3'] }));
+    expect(evaluate).toHaveBeenNthCalledWith(2, expect.objectContaining({ offset: 2, batchSize: 2, instrumentIds: ['stock-1', 'stock-2', 'stock-3'] }));
+    expect(repository.completeStage).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'COMPLETED',
+      totalCount: 3,
+      processedCount: 3,
+      succeededCount: 3,
+      metadata: expect.objectContaining({
+        adapterPages: 2,
+        persistedDecisionCount: 150,
+        resultCount: 150,
+      }),
+    }));
+  });
+
   it('returns scheduled duplicate terminal without executing adapter', async () => {
     const terminalStage = {
       id: 'stage-terminal',

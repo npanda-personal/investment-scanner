@@ -202,25 +202,35 @@ export class SignalQualityLabService {
     const started = Date.now();
     const batchSize = this.clampInt(input.batchSize, 25, 1, 100);
     const offset = this.clampInt(input.offset, 0, 0, Number.MAX_SAFE_INTEGER);
-    const [totalCount, signals] = await Promise.all([
-      this.signalService.signalHistoryCount({
-        from: input.from,
-        to: input.to,
-        region: input.region,
-        assetType: input.assetType,
-        modelVersion: input.modelVersion,
-      }),
-      this.signalService.signalHistory({
-        limit: batchSize,
-        offset,
-        from: input.from,
-        to: input.to,
-        region: input.region,
-        assetType: input.assetType,
-        modelVersion: input.modelVersion,
-      }),
-    ]);
-    const processedCount = signals.length;
+    const explicitInstrumentIds = [...new Set((input.instrumentIds || []).map((id) => String(id || '').trim()).filter(Boolean))];
+    const explicitBatchIds = explicitInstrumentIds.slice(offset, offset + batchSize);
+    const [totalCount, signals] = explicitInstrumentIds.length > 0
+      ? [
+        explicitInstrumentIds.length,
+        typeof (this.signalService as any).latestPersistedForInstruments === 'function'
+          ? await (this.signalService as any).latestPersistedForInstruments(explicitBatchIds).catch(() => [])
+          : [],
+      ]
+      : await Promise.all([
+        this.signalService.signalHistoryCount({
+          from: input.from,
+          to: input.to,
+          region: input.region,
+          assetType: input.assetType,
+          modelVersion: input.modelVersion,
+        }),
+        this.signalService.signalHistory({
+          limit: batchSize,
+          offset,
+          from: input.from,
+          to: input.to,
+          region: input.region,
+          assetType: input.assetType,
+          modelVersion: input.modelVersion,
+        }),
+      ]);
+    const processedCount = explicitInstrumentIds.length > 0 ? explicitBatchIds.length : signals.length;
+    const missingPersistedSignalCount = explicitInstrumentIds.length > 0 ? Math.max(0, explicitBatchIds.length - signals.length) : 0;
     const selectedHorizon: QualityHorizon = input.horizon || '20D';
     const outcomes = await this.outcomesForSignals(signals, {
       horizon: selectedHorizon,
@@ -247,10 +257,10 @@ export class SignalQualityLabService {
       evidenceUsability,
       inserted: 0,
       updated: 0,
-      skipped: 0,
+      skipped: missingPersistedSignalCount,
       insertedCount: 0,
       updatedCount: 0,
-      skippedCount: 0,
+      skippedCount: missingPersistedSignalCount,
       failedCount: 0,
       matureSignalsInBatch: evaluatedInBatch,
       evaluatedInBatch,
@@ -264,7 +274,9 @@ export class SignalQualityLabService {
       missingPriceHistoryCount: missingPriceHistoryInBatch,
       outcomesPersisted: false,
       message: 'Outcomes are calculated on demand; recalculation refreshed diagnostics only.',
-      warnings: [],
+      warnings: missingPersistedSignalCount > 0
+        ? [`${missingPersistedSignalCount} requested instruments did not have persisted trusted raw signals for signal-quality diagnostics.`]
+        : [],
       durationMs: Date.now() - started,
     };
   }

@@ -330,6 +330,104 @@ describe('TodayTradeReviewService', () => {
     expect(second.run?.candidateCounts.LONG_REVIEW).toBe(1);
   });
 
+  it('uses persisted bulk evidence for candidate enrichment when available', async () => {
+    const latestForInstrument = jest.fn().mockRejectedValue(new Error('should not generate on demand'));
+    const latestPersistedForInstruments = jest.fn().mockResolvedValue([{
+      instrument_id: 'stock-1',
+      symbol: 'ALPHA.NS',
+      company_name: 'Alpha Ltd',
+      sector: 'Financial Services',
+      country: 'India',
+      currentPrice: 100,
+      previousClose: 99,
+      dailyChange: 1,
+      dailyChangePercent: 1,
+      currency: 'INR',
+      priceTimestamp: fixedNow.toISOString(),
+      score: 77,
+      direction: 'BULLISH',
+      confidence: 'HIGH',
+      triggered_signals: [],
+      negative_signals: [],
+      explanation: 'Persisted support.',
+      generated_at: fixedNow.toISOString(),
+      source: 'test',
+      data_status: 'COMPLETE',
+    }]);
+    const latestPersistedCalibration = jest.fn().mockResolvedValue([{
+      signalResultId: 'signal-1',
+      instrumentId: 'stock-1',
+      symbol: 'ALPHA.NS',
+      companyName: 'Alpha Ltd',
+      sector: 'Financial Services',
+      country: 'India',
+      rawScore: 77,
+      calibratedScore: 80,
+      scoreDelta: 3,
+      rawDirection: 'BULLISH',
+      calibratedDirection: 'BULLISH',
+      rawConfidence: 'HIGH',
+      calibratedConfidence: 'HIGH',
+      boosts: [],
+      penalties: [],
+      calibrationReasons: [],
+      dataGaps: [],
+      calibrationModelVersion: 'cal-v1',
+      rawSignalModelVersion: 'sig-v1',
+      generatedAt: fixedNow.toISOString(),
+      dataStatus: 'COMPLETE',
+      researchUrl: '/research/stocks/stock-1',
+    }]);
+    const latestPersistedSmartMoney = jest.fn().mockResolvedValue([{
+      instrumentId: 'stock-1',
+      symbol: 'ALPHA.NS',
+      companyName: 'Alpha Ltd',
+      sector: 'Financial Services',
+      smartMoneyScore: 70,
+      status: 'ACCUMULATION',
+      confidence: 'MEDIUM',
+      explanation: 'Persisted smart money.',
+      updatedAt: fixedNow.toISOString(),
+      dataStatus: 'COMPLETE',
+      source: 'test',
+      range: '3M',
+      latestClose: 100,
+      latestVolume: 1000000,
+      averageVolume20: 900000,
+      dailyChangePercent: 1,
+      signals: [],
+      insiderOwnership: { insiderBuyCount: null, insiderSellCount: null, netInsiderActivity: null, institutionalOwnershipPercent: null, ownershipDataStatus: 'MISSING', source: 'test', explanation: 'Missing.' },
+      researchUrl: '/research/stocks/stock-1',
+    }]);
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      signalService: {
+        latestForInstrument,
+        latestPersistedForInstruments,
+        latestSignalUniverse: jest.fn().mockResolvedValue([]),
+      },
+      calibrationService: {
+        latestPersistedForInstrument: jest.fn().mockRejectedValue(new Error('single calibration lookup should not run')),
+        latestPersistedForInstruments: latestPersistedCalibration,
+      },
+      smartMoneyService: {
+        latestPersistedStock: jest.fn().mockRejectedValue(new Error('single smart-money lookup should not run')),
+        latestPersistedStocks: latestPersistedSmartMoney,
+      },
+    }), () => fixedNow);
+
+    const result = await service.run({ skipTradePlanGeneration: true });
+
+    expect(result.groups.longReview[0]?.sourceSignalSnapshot).toEqual(expect.objectContaining({
+      rawSignal: expect.objectContaining({ score: 77, supportOnly: true }),
+      calibration: expect.objectContaining({ calibratedScore: 80 }),
+      smartMoney: expect.objectContaining({ status: 'ACCUMULATION', supportOnly: true }),
+    }));
+    expect(latestPersistedForInstruments).toHaveBeenCalledWith(['stock-1']);
+    expect(latestPersistedCalibration).toHaveBeenCalledWith(['stock-1']);
+    expect(latestPersistedSmartMoney).toHaveBeenCalledWith(['stock-1'], '3M');
+    expect(latestForInstrument).not.toHaveBeenCalled();
+  });
+
   it('does not promote raw signals without Strategy Decision candidates', async () => {
     const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
       strategyDecisionService: {

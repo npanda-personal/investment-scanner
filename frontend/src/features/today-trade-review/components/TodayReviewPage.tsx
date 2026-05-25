@@ -1,4 +1,5 @@
 import ClearIcon from '@mui/icons-material/Clear';
+import DownloadIcon from '@mui/icons-material/Download';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SearchIcon from '@mui/icons-material/Search';
 import {
@@ -391,6 +392,58 @@ interface CandidateColumn {
   render: (candidate: TodayReviewCandidate) => ReactNode;
 }
 
+const todayReviewExportColumns: Array<{ label: string; value: (candidate: TodayReviewCandidate) => string | number | null | undefined }> = [
+  { label: 'Rank', value: (candidate) => candidate.rank },
+  { label: 'Symbol', value: (candidate) => candidate.symbol },
+  { label: 'Company', value: (candidate) => candidate.companyName },
+  { label: 'State', value: (candidate) => stateLabel(candidate.state) },
+  { label: 'Setup', value: (candidate) => candidate.setupType || candidate.strategyCode },
+  { label: 'Entry Evidence', value: (candidate) => formatEntry(candidate.tradePlanSnapshot as any) },
+  { label: 'Exit / Invalidation', value: (candidate) => formatStop(candidate.tradePlanSnapshot as any, candidate) },
+  { label: 'Confidence', value: (candidate) => confidenceDisplay(candidate).label },
+  { label: 'Confidence Note', value: (candidate) => confidenceDisplay(candidate).note },
+  { label: 'Grade', value: (candidate) => candidate.grade },
+  { label: 'Daily Review Tier', value: (candidate) => tierContextForCandidate(candidate).dailyReview.status },
+  { label: 'Daily Review Reason', value: (candidate) => tierContextForCandidate(candidate).dailyReview.reason },
+  { label: 'Automation Tier', value: (candidate) => tierContextForCandidate(candidate).automation.status },
+  { label: 'Automation Reason', value: (candidate) => tierContextForCandidate(candidate).automation.reason },
+  { label: 'Data Through', value: (candidate) => latestDataDate(candidate) },
+  { label: 'Data Quality', value: dataQualityLabel },
+  { label: 'Proof', value: proofLabel },
+  { label: 'Market Regime', value: marketLabel },
+  { label: 'Sector', value: sectorAlignment },
+  { label: 'Reason Summary', value: (candidate) => candidate.reasonSummary },
+  { label: 'Blocker', value: blockerLabel },
+  { label: 'Watch Reasons', value: (candidate) => candidate.watchReasons.join('; ') },
+  { label: 'Blockers', value: (candidate) => candidate.blockers.join('; ') },
+  { label: 'Strategy Code', value: (candidate) => candidate.strategyCode },
+  { label: 'Strategy Version', value: (candidate) => candidate.strategyVersion },
+  { label: 'Candidate URL', value: (candidate) => `/today-review/candidates/${candidate.id}` },
+  { label: 'Created At', value: (candidate) => candidate.createdAt },
+  { label: 'Updated At', value: (candidate) => candidate.updatedAt },
+];
+
+function csvCell(value: string | number | null | undefined): string {
+  const text = typeof value === 'number' ? String(value) : String(value ?? '').replace(/^[=+@-]/, "'$&");
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function downloadTodayReviewCsv(rows: TodayReviewCandidate[], tabLabel: string) {
+  const header = todayReviewExportColumns.map((column) => csvCell(column.label)).join(',');
+  const body = rows.map((candidate) => todayReviewExportColumns.map((column) => csvCell(column.value(candidate))).join(',')).join('\r\n');
+  const csv = `\uFEFF${header}\r\n${body}`;
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  const tabSlug = tabLabel.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'candidates';
+  link.href = url;
+  link.download = `today-review-${tabSlug}-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 function CandidateTable({ candidates }: { candidates: TodayReviewCandidate[] }) {
   const [query, setQuery] = useState('');
   const [gradeFilter, setGradeFilter] = useState('ALL');
@@ -400,6 +453,7 @@ function CandidateTable({ candidates }: { candidates: TodayReviewCandidate[] }) 
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
   const candidateKey = useMemo(() => candidates.map((candidate) => candidate.id).join('|'), [candidates]);
 
   useEffect(() => {
@@ -602,14 +656,21 @@ function CandidateTable({ candidates }: { candidates: TodayReviewCandidate[] }) 
     setReadinessFilter('ALL');
     setDataQualityFilter('ALL');
     setPage(0);
+    setActionMessage(null);
+  };
+
+  const exportTable = () => {
+    downloadTodayReviewCsv(sortedCandidates, 'current-table');
+    setActionMessage(`Exported ${sortedCandidates.length} Today Review rows as an Excel-compatible CSV.`);
   };
 
   return (
     <Stack spacing={1.5}>
+      {actionMessage && <Alert severity="success">{actionMessage}</Alert>}
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: 'minmax(260px, 1.2fr) repeat(3, minmax(150px, 0.55fr)) auto' },
+          gridTemplateColumns: { xs: '1fr', md: 'minmax(260px, 1.2fr) repeat(3, minmax(150px, 0.55fr)) auto auto' },
           gap: 1.25,
           alignItems: 'center',
         }}
@@ -691,6 +752,15 @@ function CandidateTable({ candidates }: { candidates: TodayReviewCandidate[] }) 
             </IconButton>
           </span>
         </Tooltip>
+        <Button
+          variant="outlined"
+          startIcon={<DownloadIcon />}
+          onClick={exportTable}
+          disabled={sortedCandidates.length === 0}
+          sx={{ justifySelf: { xs: 'start', md: 'end' }, whiteSpace: 'nowrap' }}
+        >
+          Export CSV
+        </Button>
       </Box>
 
       <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
