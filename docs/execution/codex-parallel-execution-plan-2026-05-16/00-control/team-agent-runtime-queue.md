@@ -4,6 +4,43 @@ Date: 2026-05-25
 
 Owner: Team 00 - Master Orchestrator / Integration
 
+## Latest Active Snapshot - TSC QA, DQ Implementation, Rolling Requirements
+
+Date: 2026-05-25
+
+Current active agents:
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | `019e5ec7-3ce8-7e72-bffa-92dbbb4e0a34` | `gpt-5.4`, high | QA verification | `CF-W2-TSC-05A` in Team 07 worktree | active |
+| 2 | Team 02 - PO / Requirement Factory | `019e5ec5-c53c-7f02-8b9c-9476b46e7082` | `gpt-5.4`, medium | requirements | fresh direct investor/trader-value discovery | active |
+| 3 | Team 05 - Market Data / Data Quality | pending spawn | `gpt-5.3-codex`, high | implementation | `CF-W1-DQ-02-RS1` in `C:\work\repo\investment-scanner-worktrees\team05-CF-W1-DQ-02-RS1` | queued |
+| 4 | Open slot | none | pending | Code Review | Team 10 after next QA ACCEPT | queued |
+| 5 | Open slot | none | pending | Architect Signoff | Team 03 after Team 10 ACCEPT | queued |
+| 6 | Open slot | none | pending | QA verification | Team 04 after Team 05 DQ handoff | queued |
+
+Recently closed:
+
+- Team 07 `019e5eb8-0d85-7213-b1ce-672513fcda1d`: completed `CF-W2-TSC-05A` implementation; next gate is Team 04 QA verification.
+- Team 04 `019e5ec3-2a5b-7840-9d29-65c43a855e19`: completed `CF-W1-DQ-02-RS1` QA planning; verdict `QA-plan ready`.
+
+Current routing:
+
+- `CF-W2-TSC-05A` is in QA verification in the Team 07 worktree.
+- `CF-W1-DQ-02-RS1` is promoted to Team 05 as a bounded seven-file DQE implementation child.
+- Team 05 worktree/branch must be created before spawning implementation.
+- No open Product Owner decisions exist.
+
+Teams ready to pick up new tasks:
+
+- Team 04: active on `CF-W2-TSC-05A` QA verification.
+- Team 05: ready to implement `CF-W1-DQ-02-RS1` after Team 00 creates the worktree.
+- Team 10: ready for the next QA-accepted code review.
+- Team 03: ready for Architect Signoff after review acceptance.
+- Team 02: active on fresh direct investor/trader-value requirement discovery.
+
+---
+
 ## Latest Active Snapshot - TSC-05A Implementation And DQ QA Planning
 
 Date: 2026-05-25

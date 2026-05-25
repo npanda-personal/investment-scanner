@@ -1,5 +1,37 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - TSC QA And DQ Ready Promotion
+
+Date: 2026-05-25
+
+Status:
+
+- Branch: `dev`.
+- Open decisions: 0.
+- Product Owner action required: no.
+- Push performed: no.
+- Active Team 04 QA verification agent: `019e5ec7-3ce8-7e72-bffa-92dbbb4e0a34`.
+- Active Team 02 rolling requirements agent: `019e5ec5-c53c-7f02-8b9c-9476b46e7082`.
+- Team 05 DQ-RS1 implementation: queued pending worktree creation.
+
+Gate movement:
+
+- Team 07 completed `CF-W2-TSC-05A` implementation and developer validation.
+- Team 04 QA Verification for `CF-W2-TSC-05A` is active in the Team 07 worktree.
+- Team 04 completed `CF-W1-DQ-02-RS1` QA planning with `QA-plan ready`.
+- Team 00 promoted `CF-W1-DQ-02-RS1` to Team 05 for bounded implementation.
+- Old Team 05 `CF-W3-MDPIPE-01C` inbox content is stale; `01C` is already accepted and committed as `da66fa4`.
+
+Teams ready to pick up new tasks:
+
+- Team 04: active on `CF-W2-TSC-05A` QA verification.
+- Team 05: implement `CF-W1-DQ-02-RS1` after Team 00 creates the worktree.
+- Team 10: Code Review after Team 04 acceptance.
+- Team 03: Architect Signoff after Team 10 acceptance.
+- Team 02: active fresh direct-value requirement discovery.
+
+---
+
 ## Latest Runtime Checkpoint - DQ QA Planning Launched
 
 Date: 2026-05-25

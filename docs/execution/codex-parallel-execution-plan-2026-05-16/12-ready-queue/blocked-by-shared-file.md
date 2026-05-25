@@ -5,7 +5,7 @@ Date: 2026-05-18
 | ID | Shared/high-risk file or boundary | Why blocked |
 | --- | --- | --- |
 | CF-W1-MD-02 | Prisma schema / OHLC storage model | Option B ADR direction is approved, but durable evidence implementation may need schema/natural-key changes and remains blocked until a separate implementation slice is approved. |
-| CF-W1-DQ-02-RS1 | DQE read-side/public currentness contract | Team 03 prepared a bounded no-schema read-time reconstruction packet inside DQE repository/service/types/docs/tests only. Implementation remains blocked until Team 04 accepts the QA plan and Team 00 records Ready promotion. Controller/router, route registry, Prisma/schema, Market Data writers, shared utilities, frontend, provider/startup/backfill, packages, and generated files remain forbidden unless separately approved. |
+| CF-W1-DQ-02-RS1 | DQE read-side/public currentness contract | No longer blocked for the exact seven-file DQE writer set promoted to Team 05. Controller/router, route registry, Prisma/schema, Market Data writers, shared utilities, frontend, provider/startup/backfill, packages, and generated files remain forbidden unless separately approved. |
 | CF-W1-STRAT-02 | Prisma `StrategyDefinition` uniqueness | Version-keyed definitions likely require schema/storage decision. |
 | CF-W1-TP-01 | Trade Plan target geometry / frontend display model | Full migration may require Trade Plan source, API semantics, and UI contract decisions. |
 | CF-W1-UX-05 | `frontend/src/shared/**` | Option A resolved the first slice as Copilot-only; shared `StatusBadge` language/color mapping remains future and requires separate shared UI reservation. |

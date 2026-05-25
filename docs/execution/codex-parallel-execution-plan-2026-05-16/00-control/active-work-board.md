@@ -34,6 +34,39 @@ No historical active work items have been migrated as active.
 - Rejected / Rework
 - Deferred
 
+## Latest Team 00 Routing Update - TSC QA And DQ Ready Promotion
+
+Date: 2026-05-25
+
+Gate status:
+
+- Team 07 completed `CF-W2-TSC-05A` implementation and developer validation in the stacked Today Review worktree.
+- Team 04 QA Verification for `CF-W2-TSC-05A` is active as agent `019e5ec7-3ce8-7e72-bffa-92dbbb4e0a34`.
+- Team 04 completed `CF-W1-DQ-02-RS1` QA planning and was closed.
+- Team 00 promoted `CF-W1-DQ-02-RS1` to Team 05 as a bounded seven-file DQE implementation child.
+- No open Product Owner decisions exist.
+
+DQ implementation boundary:
+
+- Branch: `codex/team05-market-data/CF-W1-DQ-02-RS1`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team05-CF-W1-DQ-02-RS1`.
+- Allowed files are only DQE repository/service/types/doc and repository/service/invariants tests listed in the Ready promotion.
+- Forbidden: DQE controller/router/validation/module/index, route registries, Market Data source/docs/tests, Prisma/schema/migrations, generated files, package manifests, shared utilities, provider/startup/backfill, frontend/shared UI, `backend/src/server.ts`, `backend/.env.example`, `.gitignore`, root `AGENTS.md`, `docs/AGENTS.md`, and `docs/codex-agent-team-plan/**`.
+
+Parallel routing:
+
+- Team 04 verifies `CF-W2-TSC-05A`; Team 10 follows if QA accepts.
+- Team 05 may implement `CF-W1-DQ-02-RS1` after Team 00 creates the worktree.
+- Team 02 remains active on fresh direct investor/trader-value discovery.
+
+Teams ready to pick up new tasks:
+
+- Team 04: active on `CF-W2-TSC-05A` QA verification.
+- Team 05: ready to implement `CF-W1-DQ-02-RS1` after worktree creation.
+- Team 10: Code Review after Team 04 acceptance.
+- Team 03: Architect Signoff after Team 10 acceptance.
+- Team 02: active rolling requirements discovery.
+
 ## Latest Team 00 Routing Update - DQ QA Planning Launched
 
 Date: 2026-05-25

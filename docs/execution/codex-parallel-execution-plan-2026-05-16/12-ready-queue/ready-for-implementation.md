@@ -6,6 +6,54 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+2026-05-25 Team 00 Ready promotion - `CF-W1-DQ-02-RS1`:
+
+- `CF-W1-DQ-02-RS1` is promoted and assigned to Team 05.
+- Current gate state: Ready for Implementation after Team 02 requirement/product direction, Team 03 architecture/contract/work packet, Team 04 QA plan, exact file reservations, and open-decision check.
+- Purpose: reconstruct one truthful Data Quality currentness story across DQE read surfaces without schema, route, Market Data, frontend, provider, or startup scope.
+- Branch: `codex/team05-market-data/CF-W1-DQ-02-RS1`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team05-CF-W1-DQ-02-RS1`.
+- Gate evidence:
+  - Requirement: `10-requirements/CF-W1-DQ-02-residual-read-side-currentness-requirement.md`
+  - Architecture review: `03-architecture/CF-W1-DQ-02-read-side-currentness-architecture.md`
+  - Contract: `06-contracts/CF-W1-DQ-02-read-side-currentness-contract.md`
+  - Work packet: `08-work-packets/CF-W1-DQ-02-read-side-currentness-work-packet.md`
+  - QA plan: `04-qa/CF-W1-DQ-02-read-side-currentness-qa-plan.md`
+  - Ready promotion: `13-implementation-evidence/CF-W1-DQ-02-RS1-ready-promotion.md`
+  - Team 03 outbox: `17-team-outboxes/TEAM-03-architecture-factory.md`
+  - Team 04 QA outbox: `17-team-outboxes/TEAM-04-CF-W1-DQ-02-read-side-currentness-qa-outbox.md`
+  - Open decisions: none.
+- Allowed implementation files:
+  - `backend/src/modules/data-quality-engine/data-quality-engine.repository.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.service.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.md`
+  - `backend/tests/modules/data-quality-engine/data-quality-engine.repository.test.ts`
+  - `backend/tests/modules/data-quality-engine/data-quality-engine.service.test.ts`
+  - `backend/tests/modules/data-quality-engine/data-quality-engine.invariants.test.ts`
+- Allowed reporting docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-05-CF-W1-DQ-02-RS1-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-DQ-02-RS1-developer-handoff.md`
+- Forbidden scope:
+  - DQE controller/router/validation/module/index
+  - backend/frontend route registries
+  - all `backend/src/modules/market-data-foundation/**`
+  - Prisma schema, migrations, generated files, and durable stored currentness fields
+  - package manifests and lockfiles
+  - shared backend utilities
+  - provider, scheduler, worker, queue, startup, or backfill files
+  - all frontend source/tests and shared UI
+  - `backend/src/server.ts`, `backend/.env.example`, `.gitignore`, root `AGENTS.md`, `docs/AGENTS.md`, and `docs/codex-agent-team-plan/**`
+- Required validation:
+
+```powershell
+cd backend
+npm.cmd test -- data-quality-engine.repository.test.ts data-quality-engine.service.test.ts data-quality-engine.invariants.test.ts --runInBand
+npm.cmd run build
+```
+
+Stop and return to Team 00 if implementation requires Market Data source edits, DQE controller/router/route widening, Prisma/schema/migration/generated/package/shared-utility/frontend/provider/startup/backfill scope, or durable stored currentness fields.
+
 2026-05-25 Team 00 Ready promotion - `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME`:
 
 - `CF-W2-TSC-05A` is promoted and assigned to Team 07.
