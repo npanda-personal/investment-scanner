@@ -50,23 +50,27 @@ Current gate status:
 - Raw Signals uses explicit upstream changed instrument ids and does not run region-wide pagination for the scheduled path.
 - Scheduled Signal Calibration is now wired after Raw Signals only when Raw Signals returns `COMPLETED`.
 - Signal Calibration uses explicit upstream changed instrument ids and latest persisted raw-signal rows only; missing rows are counted as skipped evidence.
+- The scheduled chain now continues through `MARKET_CONTEXT`, `SMART_MONEY`, `CONTEXT_SNAPSHOTS`, `SIGNAL_QUALITY`, `STRATEGY_DECISION`, `RESEARCH_PROJECTION`, and `TODAY_REVIEW`.
+- Instrument-scoped downstream stages preserve explicit changed ids; scheduled Context Snapshots and Today Review avoid provider/legacy generation fallback.
 - `RAW_SIGNALS_GENERATE_SCOPE` and `SIGNAL_CALIBRATION_REFRESH_SCOPE` remain manual-command `DEFERRED`; this is scheduler automation only.
 
 Validation:
 
 - `npm.cmd test -- pipeline-orchestration.service.test.ts signal-generation-engine.service.test.ts signal-generation-dq-enforcement.invariants.test.ts --runInBand` passed.
 - `npm.cmd test -- pipeline-orchestration.service.test.ts signal-calibration-engine.service.test.ts --runInBand` passed.
+- `npm.cmd test -- pipeline-orchestration.service.test.ts smart-money-intelligence.service.test.ts historical-context-snapshots.service.test.ts strategy-decision-engine.service.test.ts today-trade-review.service.test.ts signal-quality-lab.service.test.ts --runInBand` passed.
 - `npm.cmd test -- market-data.scheduler.test.ts data-quality-engine.service.test.ts pipeline-orchestration.validation.test.ts pipeline-orchestration.controller.test.ts pipeline-orchestration.routes.test.ts --runInBand` passed.
 - `npm.cmd test -- pipeline-orchestration.service.test.ts market-data.scheduler.test.ts market-data.service.test.ts market-data.routes.test.ts data-quality-engine.service.test.ts signal-generation-engine.service.test.ts --runInBand` passed.
 - `npm.cmd test -- pipeline-orchestration.service.test.ts market-data.scheduler.test.ts market-data.service.test.ts market-data.routes.test.ts data-quality-engine.service.test.ts signal-generation-engine.service.test.ts signal-calibration-engine.service.test.ts --runInBand` passed.
+- `npm.cmd test -- pipeline-orchestration.service.test.ts market-data.scheduler.test.ts market-data.service.test.ts market-data.routes.test.ts data-quality-engine.service.test.ts signal-generation-engine.service.test.ts signal-calibration-engine.service.test.ts smart-money-intelligence.service.test.ts historical-context-snapshots.service.test.ts strategy-decision-engine.service.test.ts today-trade-review.service.test.ts signal-quality-lab.service.test.ts --runInBand` passed: 12 suites, 333 tests.
 - `npm.cmd run build` passed.
 - `git diff --check` passed with normal LF/CRLF warnings only.
 
 Next pipeline-only routing:
 
-- Team 00 should finish validation for the scheduled `DATA_QUALITY -> RAW_SIGNALS -> SIGNAL_CALIBRATION` backend chain and commit the scoped pipeline automation checkpoint.
-- Team 03 should prepare the next bounded scheduled-stage adapter contract for context snapshots or market context.
-- Team 04 should prepare QA for the next pipeline fanout before implementation.
+- Team 00 should finish final regression/build validation for the full scheduled backend chain and commit the scoped pipeline automation checkpoint.
+- Team 03 should prepare the next bounded backtesting-proof automation contract only after this checkpoint is stable.
+- Team 04 should prepare QA for any future backtest-proof or manual-command fanout before implementation.
 - Team 00 should not resume non-pipeline backlog until this pipeline automation checkpoint is committed or explicitly paused.
 
 ## Latest Team 00 Routing Update - Pause After Current Open Items

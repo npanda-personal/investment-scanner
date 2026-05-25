@@ -1102,6 +1102,10 @@ export class StrategyDecisionEngineService {
     offset: number
   ): Promise<{ instrumentIds: string[]; totalCount: number; rawSignalsByInstrumentId: Map<string, SignalResultDto> }> {
     if (request.instrumentId) return { instrumentIds: [request.instrumentId], totalCount: 1, rawSignalsByInstrumentId: new Map() };
+    if (request.instrumentIds?.length) {
+      const ids = [...new Set(request.instrumentIds.map((id) => String(id || '').trim()).filter(Boolean))];
+      return { instrumentIds: ids.slice(offset, offset + batchSize), totalCount: ids.length, rawSignalsByInstrumentId: new Map() };
+    }
     if (request.symbol) {
       const res = await this.marketDataService.listInstruments({
         search: request.symbol,

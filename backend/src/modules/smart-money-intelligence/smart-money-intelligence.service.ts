@@ -13,6 +13,7 @@ import type {
   SectorSmartMoneyStatus,
   SmartMoneyDataStatus,
   SmartMoneyRunResponse,
+  SmartMoneyRunQuery,
 } from './smart-money-intelligence.types';
 
 interface InstrumentLike {
@@ -49,16 +50,24 @@ export class SmartMoneyIntelligenceService {
     };
   }
 
-  async run(batchSize: number = 100, query: { region?: string; assetType?: string; offset?: number } = {}): Promise<SmartMoneyRunResponse> {
+  async run(batchSize: number = 100, query: SmartMoneyRunQuery = {}): Promise<SmartMoneyRunResponse> {
     const startedAt = Date.now();
     const offset = Math.max(0, Math.floor(Number(query.offset) || 0));
     const pageSize = Math.min(100, Math.max(1, Math.floor(Number(batchSize) || 100)));
     const page = Math.floor(offset / pageSize) + 1;
     const region = query.region || SMART_MONEY_DEFAULT_REGION;
     const assetType = query.assetType || SMART_MONEY_DEFAULT_ASSET_TYPE;
-    const response = await this.marketDataService.listInstruments({ page, pageSize, region, assetType });
-    const instruments = response.instruments || [];
-    const totalCount = Number(response.pagination?.total ?? instruments.length);
+    const explicitIds = [...new Set((query.instrumentIds || []).map((id) => String(id || '').trim()).filter(Boolean))];
+    const explicitBatchIds = explicitIds.slice(offset, offset + pageSize);
+    const response = explicitIds.length
+      ? null
+      : await this.marketDataService.listInstruments({ page, pageSize, region, assetType });
+    const instruments = explicitIds.length
+      ? await this.marketDataService.getInstrumentsByIds(explicitBatchIds)
+      : response?.instruments || [];
+    const totalCount = explicitIds.length
+      ? explicitIds.length
+      : Number(response?.pagination?.total ?? instruments.length);
 
     let generated = 0;
     let skipped = 0;
@@ -68,6 +77,12 @@ export class SmartMoneyIntelligenceService {
       '3M': { generated: 0, skipped: 0 },
       '6M': { generated: 0, skipped: 0 },
     };
+    const requestedCount = explicitIds.length ? explicitBatchIds.length : instruments.length;
+    const missingInstrumentSkipped = explicitIds.length ? Math.max(0, requestedCount - instruments.length) : 0;
+    if (missingInstrumentSkipped > 0) {
+      skipped += missingInstrumentSkipped;
+      for (const range of SMART_MONEY_REFRESH_RANGES) byRange[range].skipped += missingInstrumentSkipped;
+    }
 
     await Promise.all(instruments.map(async (instrument: any) => {
       try {
@@ -92,8 +107,8 @@ export class SmartMoneyIntelligenceService {
       }
     }));
 
-    const processedCount = instruments.length;
-    const nextOffset = offset + processedCount < totalCount ? offset + processedCount : null;
+    const processedCount = requestedCount;
+    const nextOffset = offset + requestedCount < totalCount ? offset + requestedCount : null;
 
     return {
       generated,

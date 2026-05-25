@@ -124,6 +124,7 @@ export interface StrategyDecisionDto {
 export interface StrategyEvaluateRequest {
   strategy: StrategyName | 'ALL';
   instrumentId?: string;
+  instrumentIds?: string[];
   symbol?: string;
   portfolioId?: string;
   watchlistId?: string;

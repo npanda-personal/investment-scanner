@@ -54,5 +54,8 @@ export type {
   ScheduledSignalCalibrationStageRequest,
   ScheduledSignalCalibrationStageResponse,
   ScheduledSignalCalibrationStageStatus,
+  ScheduledPipelineStageRequest,
+  ScheduledPipelineStageResponse,
+  ScheduledPipelineStageStatus,
   PipelineTriggerType,
 } from './pipeline-orchestration.types';

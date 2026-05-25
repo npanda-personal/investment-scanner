@@ -212,6 +212,42 @@ describe('SmartMoneyIntelligenceService', () => {
     expect(repository.saveSnapshot).toHaveBeenCalledTimes(6);
   });
 
+  it('refreshes explicit instrument ids without region-wide pagination', async () => {
+    const repository = {
+      saveSnapshot: jest.fn(async () => undefined),
+    };
+    const marketDataService = {
+      getInstrumentsByIds: jest.fn(async () => [
+        { ...instrument, id: 'stock-2', symbol: 'BBB' },
+        { ...instrument, id: 'stock-1', symbol: 'AAA' },
+      ]),
+      listInstruments: jest.fn(),
+      listPricesByInstrumentId: jest.fn(async () => ({ prices: priceRows(181) })),
+    };
+    const service = new SmartMoneyIntelligenceService(repository as any, marketDataService as any, {} as any);
+
+    const result = await service.run(25, {
+      region: 'IN',
+      assetType: 'STOCK',
+      instrumentIds: ['stock-2', 'stock-1', 'stock-2'],
+    });
+
+    expect(marketDataService.getInstrumentsByIds).toHaveBeenCalledWith(['stock-2', 'stock-1']);
+    expect(marketDataService.listInstruments).not.toHaveBeenCalled();
+    expect(marketDataService.listPricesByInstrumentId).toHaveBeenCalledTimes(2);
+    expect(repository.saveSnapshot).toHaveBeenCalledTimes(6);
+    expect(result).toMatchObject({
+      processedCount: 2,
+      totalCount: 2,
+      batchSize: 25,
+      offset: 0,
+      nextOffset: null,
+      hasMore: false,
+      generatedCount: 6,
+      failedCount: 0,
+    });
+  });
+
   it('uses the selected range window as scoring evidence instead of cloning the latest 20-day result', () => {
     const service = new SmartMoneyIntelligenceService({} as any, {} as any);
     const allBars = mixedRegimeBars();

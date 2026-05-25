@@ -14,9 +14,10 @@ export class HistoricalContextSnapshotsService {
     private readonly marketDataService = new MarketDataFoundationService()
   ) {}
 
-  async generate(snapshotDate = normalizeSnapshotDate(), limit = 50, scope: { region?: string; assetType?: string } = {}): Promise<SnapshotGenerateSummary> {
+  async generate(snapshotDate = normalizeSnapshotDate(), limit = 50, scope: { region?: string; assetType?: string; instrumentIds?: string[] } = {}): Promise<SnapshotGenerateSummary> {
     const region = (scope.region || 'IN').toUpperCase();
     const assetType = (scope.assetType || 'STOCK').toUpperCase();
+    const explicitInstrumentIds = [...new Set((scope.instrumentIds || []).map((id) => String(id || '').trim()).filter(Boolean))];
     const warnings: string[] = [];
     const market = this.repository.emptyCount();
     const sectors = this.repository.emptyCount();
@@ -24,7 +25,14 @@ export class HistoricalContextSnapshotsService {
     const smartMoney = this.repository.emptyCount();
     const dataQuality = this.repository.emptyCount();
 
-    const summary = await this.safe(() => this.marketContextService.summary({ region }), 'market context summary failed', warnings);
+    const marketContextAny = this.marketContextService as any;
+    const summary = await this.safe<any>(
+      () => explicitInstrumentIds.length > 0 && typeof marketContextAny.latestPersistedSummary === 'function'
+        ? marketContextAny.latestPersistedSummary(region)
+        : this.marketContextService.summary({ region }),
+      'market context summary failed',
+      warnings
+    );
     if (summary) {
       this.bump(market, await this.repository.upsertMarket({
         snapshotDate,
@@ -82,10 +90,19 @@ export class HistoricalContextSnapshotsService {
       market.skipped += 1;
     }
 
-    const instruments = await this.safe(() => this.marketDataService.listInstruments({ page: 1, pageSize: limit, region, assetType }), 'instrument list failed', warnings);
-    for (const instrument of instruments?.instruments || []) {
+    const instruments = explicitInstrumentIds.length > 0
+      ? await this.safe<any[]>(() => this.marketDataService.getInstrumentsByIds(explicitInstrumentIds.slice(0, Math.max(1, limit))), 'instrument list failed', warnings)
+      : (await this.safe(() => this.marketDataService.listInstruments({ page: 1, pageSize: limit, region, assetType }), 'instrument list failed', warnings))?.instruments || [];
+    const smartMoneyAny = this.smartMoneyService as any;
+    for (const instrument of instruments || []) {
       const [smart, prices, latest, fundamentals] = await Promise.all([
-        this.safe(() => this.smartMoneyService.stock(instrument.id), `${instrument.symbol} smart-money failed`, warnings),
+        this.safe<any>(
+          () => explicitInstrumentIds.length > 0 && typeof smartMoneyAny.latestPersistedStock === 'function'
+            ? smartMoneyAny.latestPersistedStock(instrument.id, '3M')
+            : this.smartMoneyService.stock(instrument.id),
+          `${instrument.symbol} smart-money failed`,
+          warnings
+        ),
         this.safe(() => this.marketDataService.listPricesByInstrumentId(instrument.id, 500, undefined, undefined, { region, assetType }), `${instrument.symbol} prices failed`, warnings),
         this.safe(() => this.marketDataService.latestPriceByInstrumentId(instrument.id, { region, assetType }), `${instrument.symbol} latest price failed`, warnings),
         this.safe(() => this.marketDataService.fundamentalsByInstrumentId(instrument.id, { region, assetType }), `${instrument.symbol} fundamentals failed`, warnings),

@@ -1,7 +1,14 @@
 import { createHash } from 'crypto';
 import { DataQualityEngineService } from '../data-quality-engine';
+import { HistoricalContextSnapshotsService } from '../historical-context-snapshots';
+import { MarketContextIntelligenceService } from '../market-context-intelligence';
+import { ResearchHubService } from '../research-hub';
 import { SignalGenerationEngineService } from '../signal-generation-engine';
 import { SignalCalibrationEngineService } from '../signal-calibration-engine';
+import { SignalQualityLabService } from '../signal-quality-lab';
+import { SmartMoneyIntelligenceService } from '../smart-money-intelligence';
+import { StrategyDecisionEngineService } from '../strategy-decision-engine';
+import { TodayTradeReviewService } from '../today-trade-review';
 import { PipelineOrchestrationRepository } from './pipeline-orchestration.repository';
 import type {
   PipelineCommandAvailability,
@@ -35,6 +42,8 @@ import type {
   ScheduledRawSignalsStageResponse,
   ScheduledSignalCalibrationStageRequest,
   ScheduledSignalCalibrationStageResponse,
+  ScheduledPipelineStageRequest,
+  ScheduledPipelineStageResponse,
 } from './pipeline-orchestration.types';
 
 const LEDGER_VERSION = 'pipeline-ledger-v1';
@@ -45,6 +54,34 @@ const PROCESS_LOCAL_ID = `${process.pid}-${Math.random().toString(16).slice(2, 1
 const DQ_SCHEDULED_STAGE_VERSION = 'scheduled-dq-v1';
 const RAW_SIGNALS_SCHEDULED_STAGE_VERSION = 'scheduled-raw-signals-v1';
 const SIGNAL_CALIBRATION_SCHEDULED_STAGE_VERSION = 'scheduled-signal-calibration-v1';
+const MARKET_CONTEXT_SCHEDULED_STAGE_VERSION = 'scheduled-market-context-v1';
+const SMART_MONEY_SCHEDULED_STAGE_VERSION = 'scheduled-smart-money-v1';
+const CONTEXT_SNAPSHOTS_SCHEDULED_STAGE_VERSION = 'scheduled-context-snapshots-v1';
+const SIGNAL_QUALITY_SCHEDULED_STAGE_VERSION = 'scheduled-signal-quality-v1';
+const STRATEGY_DECISION_SCHEDULED_STAGE_VERSION = 'scheduled-strategy-decision-v1';
+const RESEARCH_PROJECTION_SCHEDULED_STAGE_VERSION = 'scheduled-research-projection-v1';
+const TODAY_REVIEW_SCHEDULED_STAGE_VERSION = 'scheduled-today-review-v1';
+
+type ScheduledAdapterResult = {
+  totalCount: number;
+  processedCount: number;
+  succeededCount: number;
+  failedCount: number;
+  skippedCount: number;
+  unchangedCount?: number;
+  warnings?: string[];
+  errors?: string[];
+  metadata?: Record<string, unknown>;
+};
+
+type ScheduledStageDefinition = {
+  stageKey: string;
+  stageOrder: number;
+  stageSlug: string;
+  stageVersion: string;
+  sourceStage: string;
+  adapter: string;
+};
 
 type PipelineCommandPolicy = PipelineCommandCatalogItem & {
   stageOrder: number;
@@ -55,16 +92,16 @@ const PIPELINE_COMMAND_POLICIES: PipelineCommandPolicy[] = [
   commandPolicy('MARKET_DATA_PRICE_BACKFILL', 'MARKET_DATA', 1, 'Market Data', 'Price backfill', 'FORBIDDEN', 'Price backfill remains feature-owned until a separate gate approves command migration.'),
   commandPolicy('MARKET_DATA_CATALOG_SYNC', 'MARKET_DATA', 1, 'Market Data', 'Catalog sync', 'FORBIDDEN', 'Catalog sync remains feature-owned until a separate gate approves command migration.'),
   commandPolicy('DATA_QUALITY_EVALUATE_SCOPE', 'DATA_QUALITY', 2, 'Data Quality', 'Readiness evaluation', 'ENABLED', null),
-  commandPolicy('RAW_SIGNALS_GENERATE_SCOPE', 'RAW_SIGNALS', 3, 'Signals', 'Raw signal generation', 'DEFERRED', 'Requires a separate adapter contract after Data Quality command safety is proven.'),
-  commandPolicy('SIGNAL_CALIBRATION_REFRESH_SCOPE', 'SIGNAL_CALIBRATION', 4, 'Signal Calibration', 'Calibration refresh', 'DEFERRED', 'Requires adapter-specific QA and contract approval.'),
-  commandPolicy('CONTEXT_SNAPSHOTS_GENERATE_SCOPE', 'CONTEXT_SNAPSHOTS', 5, 'Context Snapshots', 'Historical context snapshot generation', 'DEFERRED', 'Requires snapshot-date and source-freshness contract approval.'),
-  commandPolicy('MARKET_CONTEXT_REFRESH_REGION', 'MARKET_CONTEXT', 6, 'Market Context', 'Market context refresh', 'DEFERRED', 'Requires region/scope count mapping contract approval.'),
-  commandPolicy('SIGNAL_QUALITY_DIAGNOSTICS_REFRESH', 'SIGNAL_QUALITY', 7, 'Signal Quality', 'Signal quality diagnostics refresh', 'DEFERRED', 'Requires diagnostics-cost and historical-price bounds contract approval.'),
-  commandPolicy('SMART_MONEY_REFRESH_SCOPE', 'SMART_MONEY', 8, 'Smart Money', 'Smart money refresh', 'DEFERRED', 'Requires adapter-specific local price bounds and count mapping contract.'),
-  commandPolicy('STRATEGY_DECISION_EVALUATE_SCOPE', 'STRATEGY_DECISION', 9, 'Strategy', 'Strategy decision refresh', 'DEFERRED', 'Requires downstream gating contract approval.'),
+  commandPolicy('RAW_SIGNALS_GENERATE_SCOPE', 'RAW_SIGNALS', 3, 'Signals', 'Raw signal generation', 'DEFERRED', 'Manual command is deferred; scheduler-only explicit-instrument automation is active.'),
+  commandPolicy('SIGNAL_CALIBRATION_REFRESH_SCOPE', 'SIGNAL_CALIBRATION', 4, 'Signal Calibration', 'Calibration refresh', 'DEFERRED', 'Manual command is deferred; scheduler-only persisted-signal automation is active.'),
+  commandPolicy('CONTEXT_SNAPSHOTS_GENERATE_SCOPE', 'CONTEXT_SNAPSHOTS', 5, 'Context Snapshots', 'Historical context snapshot generation', 'DEFERRED', 'Manual command is deferred; scheduler-only persisted-context automation is active.'),
+  commandPolicy('MARKET_CONTEXT_REFRESH_REGION', 'MARKET_CONTEXT', 6, 'Market Context', 'Market context refresh', 'DEFERRED', 'Manual command is deferred; scheduler-only market-context automation is active.'),
+  commandPolicy('SIGNAL_QUALITY_DIAGNOSTICS_REFRESH', 'SIGNAL_QUALITY', 7, 'Signal Quality', 'Signal quality diagnostics refresh', 'DEFERRED', 'Manual command is deferred; scheduler-only diagnostics refresh is active.'),
+  commandPolicy('SMART_MONEY_REFRESH_SCOPE', 'SMART_MONEY', 8, 'Smart Money', 'Smart money refresh', 'DEFERRED', 'Manual command is deferred; scheduler-only explicit-instrument automation is active.'),
+  commandPolicy('STRATEGY_DECISION_EVALUATE_SCOPE', 'STRATEGY_DECISION', 9, 'Strategy', 'Strategy decision refresh', 'DEFERRED', 'Manual command is deferred; scheduler-only explicit-instrument evaluation is active.'),
   commandPolicy('BACKTEST_PROOF_REFRESH', 'BACKTEST_PROOF', 10, 'Backtests', 'Backtest proof refresh', 'FORBIDDEN', 'Backtesting proof execution is out of scope for this first command slice.'),
-  commandPolicy('RESEARCH_PROJECTION_REFRESH', 'RESEARCH_PROJECTION', 11, 'Research', 'Research projection refresh', 'FORBIDDEN', 'No approved write command contract exists for research projection refresh.'),
-  commandPolicy('TODAY_REVIEW_PUBLISH', 'TODAY_REVIEW', 12, 'Today Review', 'Today review publish', 'FORBIDDEN', 'Publication workflow requires a separate Product and architecture gate.'),
+  commandPolicy('RESEARCH_PROJECTION_REFRESH', 'RESEARCH_PROJECTION', 11, 'Research', 'Research projection refresh', 'FORBIDDEN', 'Manual command remains forbidden; scheduler-only research projection automation is active.'),
+  commandPolicy('TODAY_REVIEW_PUBLISH', 'TODAY_REVIEW', 12, 'Today Review', 'Today review publish', 'FORBIDDEN', 'Manual command remains forbidden; scheduler-only publication is active with compatibility generation disabled.'),
   commandPolicy('PIPELINE_RUN_ALL', 'PIPELINE', 13, 'Pipeline', 'Run all stages', 'FORBIDDEN', 'Broad pipeline fanout is out of scope.'),
   commandPolicy('PIPELINE_DRAIN_ALL_BATCHES', 'PIPELINE', 13, 'Pipeline', 'Drain all batches', 'FORBIDDEN', 'First slice allows one batch per request only.'),
   commandPolicy('PIPELINE_CANCEL_ACTIVE', 'PIPELINE', 13, 'Pipeline', 'Cancel active run', 'FORBIDDEN', 'No background worker cancellation contract exists for this slice.'),
@@ -87,7 +124,14 @@ export class PipelineOrchestrationService {
     private readonly repository = new PipelineOrchestrationRepository(),
     private readonly dataQualityService = new DataQualityEngineService(),
     private readonly signalGenerationService = new SignalGenerationEngineService(),
-    private readonly signalCalibrationService = new SignalCalibrationEngineService()
+    private readonly signalCalibrationService = new SignalCalibrationEngineService(),
+    private readonly marketContextService = new MarketContextIntelligenceService(),
+    private readonly smartMoneyService = new SmartMoneyIntelligenceService(),
+    private readonly historicalContextService = new HistoricalContextSnapshotsService(),
+    private readonly signalQualityService = new SignalQualityLabService(),
+    private readonly strategyDecisionService = new StrategyDecisionEngineService(),
+    private readonly researchHubService = new ResearchHubService(),
+    private readonly todayReviewService = new TodayTradeReviewService()
   ) {}
 
   createRun(input: PipelineRunCreateInput): Promise<PipelineRunRecord> {
@@ -1388,7 +1432,31 @@ export class PipelineOrchestrationService {
         metadata,
       });
 
-      return this.scheduledSignalCalibrationResponseFromStage(status, request, normalizedScope, completedStage, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
+      const response = this.scheduledSignalCalibrationResponseFromStage(status, request, normalizedScope, completedStage, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
+      if (status === 'COMPLETED') {
+        response.downstream = await this.runScheduledMarketContextStage({
+          region: normalizedScope.region,
+          assetType: normalizedScope.assetType,
+          timeframe: '1d',
+          pipelineKey: request.pipelineKey,
+          triggerType: 'scheduled',
+          dataThroughDate: request.dataThroughDate,
+          sourceFingerprint: outputFingerprint,
+          changedInstrumentIds,
+          batchSize: normalizedBatchSize,
+          schedulerRunStartedAt: request.schedulerRunStartedAt,
+          upstreamStageRunId: completedStage.id,
+        }).catch((error) => {
+          console.error('[PipelineOrchestration] scheduled Market Context stage failed after Signal Calibration', {
+            region: normalizedScope.region,
+            assetType: normalizedScope.assetType,
+            dataThroughDate: request.dataThroughDate,
+            error: error instanceof Error ? error.message : 'unknown error',
+          });
+          return null;
+        });
+      }
+      return response;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Scheduled Signal Calibration stage failed';
       const completedAt = new Date();
@@ -1452,6 +1520,301 @@ export class PipelineOrchestrationService {
       });
       return this.scheduledSignalCalibrationResponseFromStage('FAILED', request, normalizedScope, failedStage, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
     }
+  }
+
+  async runScheduledMarketContextStage(request: ScheduledPipelineStageRequest, now = new Date()): Promise<ScheduledPipelineStageResponse> {
+    const response = await this.runScheduledPipelineStage(request, {
+      stageKey: 'MARKET_CONTEXT',
+      stageOrder: 6,
+      stageSlug: 'scheduled-market-context',
+      stageVersion: MARKET_CONTEXT_SCHEDULED_STAGE_VERSION,
+      sourceStage: 'SIGNAL_CALIBRATION',
+      adapter: 'MarketContextIntelligenceService.run',
+    }, async ({ normalizedScope }) => {
+      const result = await this.marketContextService.run(normalizedScope.region);
+      const succeeded = result?.status === 'success';
+      return {
+        totalCount: 1,
+        processedCount: 1,
+        succeededCount: succeeded ? 1 : 0,
+        failedCount: succeeded ? 0 : 1,
+        skippedCount: 0,
+        unchangedCount: 0,
+        errors: succeeded ? [] : ['Market Context refresh did not report success.'],
+        metadata: { adapterStatus: result?.status ?? null },
+      };
+    }, now);
+
+    if (response.status === 'COMPLETED') {
+      response.downstream = await this.runScheduledSmartMoneyStage({
+        ...request,
+        sourceFingerprint: response.outputFingerprint || request.sourceFingerprint,
+        upstreamStageRunId: response.stageRunId,
+      }).catch((error) => this.logScheduledDownstreamFailure('Smart Money', response.stageKey, request, error));
+    }
+    return response;
+  }
+
+  async runScheduledSmartMoneyStage(request: ScheduledPipelineStageRequest, now = new Date()): Promise<ScheduledPipelineStageResponse> {
+    const response = await this.runScheduledPipelineStage(request, {
+      stageKey: 'SMART_MONEY',
+      stageOrder: 8,
+      stageSlug: 'scheduled-smart-money',
+      stageVersion: SMART_MONEY_SCHEDULED_STAGE_VERSION,
+      sourceStage: 'MARKET_CONTEXT',
+      adapter: 'SmartMoneyIntelligenceService.run',
+    }, async ({ normalizedScope, changedInstrumentIds, normalizedBatchSize }) => {
+      const result = await this.smartMoneyService.run(normalizedBatchSize, {
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        offset: 0,
+        instrumentIds: changedInstrumentIds,
+      });
+      return {
+        totalCount: result.totalCount,
+        processedCount: result.processedCount,
+        succeededCount: result.generatedCount,
+        failedCount: result.failedCount,
+        skippedCount: result.skippedCount,
+        unchangedCount: 0,
+        warnings: result.warnings,
+        errors: result.errors,
+        metadata: {
+          byRange: result.byRange,
+          generatedCount: result.generatedCount,
+          skippedCount: result.skippedCount,
+        },
+      };
+    }, now);
+
+    if (response.status === 'COMPLETED' || response.status === 'PARTIAL') {
+      response.downstream = await this.runScheduledContextSnapshotsStage({
+        ...request,
+        sourceFingerprint: response.outputFingerprint || request.sourceFingerprint,
+        upstreamStageRunId: response.stageRunId,
+      }).catch((error) => this.logScheduledDownstreamFailure('Context Snapshots', response.stageKey, request, error));
+    }
+    return response;
+  }
+
+  async runScheduledContextSnapshotsStage(request: ScheduledPipelineStageRequest, now = new Date()): Promise<ScheduledPipelineStageResponse> {
+    const response = await this.runScheduledPipelineStage(request, {
+      stageKey: 'CONTEXT_SNAPSHOTS',
+      stageOrder: 5,
+      stageSlug: 'scheduled-context-snapshots',
+      stageVersion: CONTEXT_SNAPSHOTS_SCHEDULED_STAGE_VERSION,
+      sourceStage: 'SMART_MONEY',
+      adapter: 'HistoricalContextSnapshotsService.generate',
+    }, async ({ normalizedScope, changedInstrumentIds, normalizedBatchSize }) => {
+      const result = await this.historicalContextService.generate(
+        new Date(`${request.dataThroughDate}T00:00:00.000Z`),
+        normalizedBatchSize,
+        {
+          region: normalizedScope.region,
+          assetType: normalizedScope.assetType,
+          instrumentIds: changedInstrumentIds,
+        }
+      );
+      const inserted = result.market.inserted + result.sectors.inserted + result.countries.inserted + result.smartMoney.inserted + result.dataQuality.inserted;
+      const updated = result.market.updated + result.sectors.updated + result.countries.updated + result.smartMoney.updated + result.dataQuality.updated;
+      const skipped = result.market.skipped + result.sectors.skipped + result.countries.skipped + result.smartMoney.skipped + result.dataQuality.skipped;
+      return {
+        totalCount: changedInstrumentIds.length,
+        processedCount: Math.min(changedInstrumentIds.length, normalizedBatchSize),
+        succeededCount: inserted + updated,
+        failedCount: 0,
+        skippedCount: skipped,
+        unchangedCount: updated,
+        warnings: result.warnings,
+        errors: [],
+        metadata: {
+          snapshotDate: result.snapshotDate,
+          market: result.market,
+          sectors: result.sectors,
+          countries: result.countries,
+          smartMoney: result.smartMoney,
+          dataQuality: result.dataQuality,
+        },
+      };
+    }, now);
+
+    if (response.status === 'COMPLETED' || response.status === 'PARTIAL') {
+      response.downstream = await this.runScheduledSignalQualityStage({
+        ...request,
+        sourceFingerprint: response.outputFingerprint || request.sourceFingerprint,
+        upstreamStageRunId: response.stageRunId,
+      }).catch((error) => this.logScheduledDownstreamFailure('Signal Quality', response.stageKey, request, error));
+    }
+    return response;
+  }
+
+  async runScheduledSignalQualityStage(request: ScheduledPipelineStageRequest, now = new Date()): Promise<ScheduledPipelineStageResponse> {
+    const response = await this.runScheduledPipelineStage(request, {
+      stageKey: 'SIGNAL_QUALITY',
+      stageOrder: 7,
+      stageSlug: 'scheduled-signal-quality',
+      stageVersion: SIGNAL_QUALITY_SCHEDULED_STAGE_VERSION,
+      sourceStage: 'CONTEXT_SNAPSHOTS',
+      adapter: 'SignalQualityLabService.recalculate',
+    }, async ({ normalizedScope, normalizedBatchSize }) => {
+      const result = await this.signalQualityService.recalculate({
+        batchSize: normalizedBatchSize,
+        offset: 0,
+        horizon: '20D',
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+      });
+      return {
+        totalCount: result.totalCount,
+        processedCount: result.processedCount,
+        succeededCount: result.evaluatedCount,
+        failedCount: result.failedCount,
+        skippedCount: result.skippedCount + result.unevaluatedCount + result.missingPriceHistoryCount,
+        unchangedCount: 0,
+        warnings: result.warnings,
+        errors: [],
+        metadata: {
+          selectedHorizon: result.selectedHorizon,
+          evidenceUsability: result.evidenceUsability,
+          matureSignalsInBatch: result.matureSignalsInBatch,
+          notYetMatureInBatch: result.notYetMatureInBatch,
+          outcomesPersisted: result.outcomesPersisted,
+          message: result.message,
+        },
+      };
+    }, now);
+
+    if (response.status === 'COMPLETED' || response.status === 'PARTIAL' || response.status === 'SKIPPED') {
+      response.downstream = await this.runScheduledStrategyDecisionStage({
+        ...request,
+        sourceFingerprint: response.outputFingerprint || request.sourceFingerprint,
+        upstreamStageRunId: response.stageRunId,
+      }).catch((error) => this.logScheduledDownstreamFailure('Strategy Decision', response.stageKey, request, error));
+    }
+    return response;
+  }
+
+  async runScheduledStrategyDecisionStage(request: ScheduledPipelineStageRequest, now = new Date()): Promise<ScheduledPipelineStageResponse> {
+    const response = await this.runScheduledPipelineStage(request, {
+      stageKey: 'STRATEGY_DECISION',
+      stageOrder: 9,
+      stageSlug: 'scheduled-strategy-decision',
+      stageVersion: STRATEGY_DECISION_SCHEDULED_STAGE_VERSION,
+      sourceStage: 'SIGNAL_QUALITY',
+      adapter: 'StrategyDecisionEngineService.evaluate',
+    }, async ({ normalizedScope, changedInstrumentIds, normalizedBatchSize }) => {
+      const result = await this.strategyDecisionService.evaluate({
+        strategy: 'ALL',
+        instrumentIds: changedInstrumentIds,
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        batchSize: normalizedBatchSize,
+        offset: 0,
+      });
+      return {
+        totalCount: result.totalCount,
+        processedCount: result.processedCount,
+        succeededCount: result.generatedCount,
+        failedCount: result.failedCount,
+        skippedCount: result.skippedCount,
+        unchangedCount: 0,
+        warnings: result.warnings,
+        errors: [],
+        metadata: {
+          resultCount: result.results.length,
+          hasMore: result.hasMore,
+        },
+      };
+    }, now);
+
+    if (response.status === 'COMPLETED' || response.status === 'PARTIAL' || response.status === 'SKIPPED') {
+      response.downstream = await this.runScheduledResearchProjectionStage({
+        ...request,
+        sourceFingerprint: response.outputFingerprint || request.sourceFingerprint,
+        upstreamStageRunId: response.stageRunId,
+      }).catch((error) => this.logScheduledDownstreamFailure('Research Projection', response.stageKey, request, error));
+    }
+    return response;
+  }
+
+  async runScheduledResearchProjectionStage(request: ScheduledPipelineStageRequest, now = new Date()): Promise<ScheduledPipelineStageResponse> {
+    const response = await this.runScheduledPipelineStage(request, {
+      stageKey: 'RESEARCH_PROJECTION',
+      stageOrder: 11,
+      stageSlug: 'scheduled-research-projection',
+      stageVersion: RESEARCH_PROJECTION_SCHEDULED_STAGE_VERSION,
+      sourceStage: 'STRATEGY_DECISION',
+      adapter: 'ResearchHubService.overview',
+    }, async ({ normalizedScope }) => {
+      const result = await this.researchHubService.overview({
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+      });
+      return {
+        totalCount: 1,
+        processedCount: 1,
+        succeededCount: 1,
+        failedCount: 0,
+        skippedCount: result.dataGaps.length > 0 ? 1 : 0,
+        unchangedCount: 0,
+        warnings: result.dataGaps,
+        errors: [],
+        metadata: {
+          generatedAt: result.generatedAt,
+          marketGate: result.marketReadiness.marketGate,
+          marketCondition: result.marketReadiness.marketCondition,
+          reviewCandidates: result.researchPriorities.tradeCandidates.length,
+          watchCandidates: result.researchPriorities.watchCandidates.length,
+          avoidCandidates: result.researchPriorities.avoidCandidates.length,
+        },
+      };
+    }, now);
+
+    if (response.status === 'COMPLETED' || response.status === 'PARTIAL') {
+      response.downstream = await this.runScheduledTodayReviewStage({
+        ...request,
+        sourceFingerprint: response.outputFingerprint || request.sourceFingerprint,
+        upstreamStageRunId: response.stageRunId,
+      }).catch((error) => this.logScheduledDownstreamFailure('Today Review', response.stageKey, request, error));
+    }
+    return response;
+  }
+
+  async runScheduledTodayReviewStage(request: ScheduledPipelineStageRequest, now = new Date()): Promise<ScheduledPipelineStageResponse> {
+    return this.runScheduledPipelineStage(request, {
+      stageKey: 'TODAY_REVIEW',
+      stageOrder: 12,
+      stageSlug: 'scheduled-today-review',
+      stageVersion: TODAY_REVIEW_SCHEDULED_STAGE_VERSION,
+      sourceStage: 'RESEARCH_PROJECTION',
+      adapter: 'TodayTradeReviewService.run',
+    }, async ({ normalizedScope }) => {
+      const result = await this.todayReviewService.run({
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        skipTradePlanGeneration: true,
+      });
+      const candidateCounts = result.run?.candidateCounts || {};
+      const totalCandidates = Object.values(candidateCounts).reduce((sum, value) => sum + Number(value || 0), 0);
+      return {
+        totalCount: 1,
+        processedCount: 1,
+        succeededCount: result.run?.status === 'FAILED' ? 0 : 1,
+        failedCount: result.run?.status === 'FAILED' ? 1 : 0,
+        skippedCount: result.run?.status === 'PARTIAL' ? 1 : 0,
+        unchangedCount: 0,
+        warnings: result.run?.warnings || [],
+        errors: result.run?.status === 'FAILED' ? result.run.warnings || ['Today Review publication failed.'] : [],
+        metadata: {
+          todayReviewRunId: result.run?.id || null,
+          runStatus: result.run?.status || null,
+          trustStatus: result.run?.trustStatus || null,
+          dataThroughDate: result.run?.dataThroughDate || null,
+          totalCandidates,
+          candidateCounts,
+        },
+      };
+    }, now);
   }
 
   async recordMarketDataStageSnapshot(
@@ -2007,6 +2370,292 @@ export class PipelineOrchestrationService {
     );
   }
 
+  private async runScheduledPipelineStage(
+    request: ScheduledPipelineStageRequest,
+    definition: ScheduledStageDefinition,
+    adapter: (context: {
+      normalizedScope: ReturnType<PipelineOrchestrationService['normalizeScope']>;
+      changedInstrumentIds: string[];
+      normalizedBatchSize: number;
+    }) => Promise<ScheduledAdapterResult>,
+    now: Date
+  ): Promise<ScheduledPipelineStageResponse> {
+    const normalizedScope = this.normalizeScope({
+      region: request.region,
+      assetType: request.assetType,
+      timeframe: request.timeframe,
+    });
+    const changedInstrumentIds = [...new Set(request.changedInstrumentIds.map((id) => String(id || '').trim()).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b));
+    const normalizedBatchSize = this.normalizeScheduledBatchSize(request.batchSize, changedInstrumentIds.length);
+    if (changedInstrumentIds.length === 0) {
+      return this.scheduledPipelineSkippedResponse(definition, request, normalizedScope, normalizedBatchSize);
+    }
+
+    const changedInstrumentFingerprint = this.hashValues(changedInstrumentIds);
+    const stageIdempotencyKey = this.scheduledPipelineStageIdempotencyKey(definition, {
+      region: normalizedScope.region,
+      assetType: normalizedScope.assetType,
+      timeframe: normalizedScope.timeframe,
+      dataThroughDate: request.dataThroughDate,
+      sourceFingerprint: request.sourceFingerprint,
+      changedInstrumentFingerprint,
+    });
+    const runIdempotencyKey = `${stageIdempotencyKey}:run`;
+    const inputFingerprint = [
+      definition.stageSlug,
+      request.dataThroughDate,
+      request.sourceFingerprint,
+      changedInstrumentFingerprint,
+      definition.stageVersion,
+    ].join(':');
+    const leaseOwner = `${definition.stageSlug}:${PROCESS_LOCAL_ID}`;
+
+    let stageLease = await this.leaseStage({
+      idempotencyKey: stageIdempotencyKey,
+      leaseOwner,
+      leaseMs: DEFAULT_LEASE_MS,
+      now,
+      allowTerminalRetry: false,
+    });
+
+    if (stageLease.reason === 'STAGE_TERMINAL') {
+      return this.scheduledPipelineResponseFromLease('DUPLICATE_TERMINAL', definition, request, normalizedScope, stageLease, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
+    }
+    if (stageLease.reason === 'LEASE_HELD') {
+      return this.scheduledPipelineResponseFromLease('LEASE_HELD', definition, request, normalizedScope, stageLease, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
+    }
+
+    if (stageLease.reason === 'STAGE_NOT_FOUND') {
+      const baseMetadata = this.scheduledPipelineMetadata(definition, request, changedInstrumentIds, changedInstrumentFingerprint);
+      const run = await this.createRun({
+        pipelineKey: request.pipelineKey,
+        triggerType: request.triggerType,
+        status: 'RUNNING',
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        timeframe: normalizedScope.timeframe,
+        dataThroughDate: new Date(`${request.dataThroughDate}T00:00:00.000Z`),
+        sourceFingerprint: request.sourceFingerprint,
+        changedInstrumentCount: changedInstrumentIds.length,
+        totalCount: changedInstrumentIds.length,
+        processedCount: 0,
+        succeededCount: 0,
+        partialCount: 0,
+        failedCount: 0,
+        skippedCount: 0,
+        unchangedCount: 0,
+        idempotencyKey: runIdempotencyKey,
+        startedAt: now,
+        metadata: baseMetadata,
+      });
+
+      await this.createStage({
+        pipelineRunId: run.id,
+        stageKey: definition.stageKey,
+        stageOrder: definition.stageOrder,
+        status: 'PENDING',
+        idempotencyKey: stageIdempotencyKey,
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        timeframe: normalizedScope.timeframe,
+        dataThroughDate: new Date(`${request.dataThroughDate}T00:00:00.000Z`),
+        inputFingerprint,
+        changedInstrumentCount: changedInstrumentIds.length,
+        batchSize: normalizedBatchSize,
+        offset: 0,
+        nextOffset: 0,
+        hasMore: false,
+        totalCount: changedInstrumentIds.length,
+        processedCount: 0,
+        succeededCount: 0,
+        partialCount: 0,
+        failedCount: 0,
+        skippedCount: 0,
+        unchangedCount: 0,
+        metadata: baseMetadata,
+      });
+
+      stageLease = await this.leaseStage({
+        idempotencyKey: stageIdempotencyKey,
+        leaseOwner,
+        leaseMs: DEFAULT_LEASE_MS,
+        now,
+        allowTerminalRetry: false,
+      });
+      if (stageLease.reason === 'STAGE_TERMINAL') {
+        return this.scheduledPipelineResponseFromLease('DUPLICATE_TERMINAL', definition, request, normalizedScope, stageLease, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
+      }
+      if (stageLease.reason === 'LEASE_HELD') {
+        return this.scheduledPipelineResponseFromLease('LEASE_HELD', definition, request, normalizedScope, stageLease, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
+      }
+    }
+
+    if (!stageLease.acquired || !stageLease.stage) {
+      return this.scheduledPipelineFailureResponse(definition, request, normalizedScope, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length, `Unable to acquire scheduled ${definition.stageKey} stage lease: ${stageLease.reason}`);
+    }
+
+    const leasedStage = stageLease.stage;
+    const startedAt = now;
+    const baseMetadata = {
+      ...this.scheduledPipelineMetadata(definition, request, changedInstrumentIds, changedInstrumentFingerprint),
+      adapter: definition.adapter,
+    };
+    await this.recordStageProgress({
+      idempotencyKey: stageIdempotencyKey,
+      status: 'RUNNING',
+      totalCount: changedInstrumentIds.length,
+      processedCount: 0,
+      succeededCount: 0,
+      partialCount: 0,
+      failedCount: 0,
+      skippedCount: 0,
+      unchangedCount: 0,
+      nextOffset: 0,
+      hasMore: false,
+      metadata: baseMetadata,
+      now: startedAt,
+    });
+
+    try {
+      const adapterResult = await adapter({ normalizedScope, changedInstrumentIds, normalizedBatchSize });
+      const completedAt = new Date();
+      const durationMs = Math.max(0, completedAt.getTime() - startedAt.getTime());
+      const totalCount = adapterResult.totalCount;
+      const processedCount = adapterResult.processedCount;
+      const succeededCount = adapterResult.succeededCount;
+      const failedCount = adapterResult.failedCount;
+      const skippedCount = adapterResult.skippedCount;
+      const unchangedCount = adapterResult.unchangedCount ?? 0;
+      const status = this.mapScheduledPipelineStatus({
+        totalCount,
+        processedCount,
+        succeededCount,
+        failedCount,
+        skippedCount,
+      });
+      const outputFingerprint = this.hashValues([
+        stageIdempotencyKey,
+        status,
+        String(totalCount),
+        String(processedCount),
+        String(succeededCount),
+        String(failedCount),
+        String(skippedCount),
+        String(unchangedCount),
+      ]);
+      const metadata = {
+        ...baseMetadata,
+        ...(adapterResult.metadata || {}),
+      };
+      const completedStage = await this.completeStage({
+        idempotencyKey: stageIdempotencyKey,
+        status,
+        totalCount,
+        processedCount,
+        succeededCount,
+        partialCount: status === 'PARTIAL' ? Math.max(1, failedCount + skippedCount) : 0,
+        failedCount,
+        skippedCount,
+        unchangedCount,
+        nextOffset: null,
+        hasMore: false,
+        outputFingerprint,
+        warnings: adapterResult.warnings || [],
+        errors: adapterResult.errors || [],
+        completedAt,
+        durationMs,
+        metadata,
+      });
+      await this.completeRun({
+        idempotencyKey: runIdempotencyKey,
+        status,
+        totalCount,
+        processedCount,
+        succeededCount,
+        partialCount: completedStage.partialCount,
+        failedCount,
+        skippedCount,
+        unchangedCount,
+        warnings: adapterResult.warnings || [],
+        errors: adapterResult.errors || [],
+        completedAt,
+        durationMs,
+        metadata,
+      });
+      return this.scheduledPipelineResponseFromStage(status, definition, request, normalizedScope, completedStage, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : `Scheduled ${definition.stageKey} stage failed`;
+      const completedAt = new Date();
+      const durationMs = Math.max(0, completedAt.getTime() - startedAt.getTime());
+      const failedStage = await this.completeStage({
+        idempotencyKey: stageIdempotencyKey,
+        status: 'FAILED',
+        totalCount: changedInstrumentIds.length,
+        processedCount: leasedStage.processedCount,
+        succeededCount: leasedStage.succeededCount,
+        partialCount: leasedStage.partialCount,
+        failedCount: Math.max(1, leasedStage.failedCount),
+        skippedCount: leasedStage.skippedCount,
+        unchangedCount: leasedStage.unchangedCount,
+        nextOffset: null,
+        hasMore: false,
+        outputFingerprint: null,
+        warnings: leasedStage.warnings,
+        errors: [...leasedStage.errors, errorMessage],
+        completedAt,
+        durationMs,
+        metadata: { ...baseMetadata, error: errorMessage },
+      });
+      await this.completeRun({
+        idempotencyKey: runIdempotencyKey,
+        status: 'FAILED',
+        totalCount: failedStage.totalCount,
+        processedCount: failedStage.processedCount,
+        succeededCount: failedStage.succeededCount,
+        partialCount: failedStage.partialCount,
+        failedCount: failedStage.failedCount,
+        skippedCount: failedStage.skippedCount,
+        unchangedCount: failedStage.unchangedCount,
+        warnings: failedStage.warnings,
+        errors: failedStage.errors,
+        completedAt,
+        durationMs,
+        metadata: { ...baseMetadata, error: errorMessage },
+      });
+      return this.scheduledPipelineResponseFromStage('FAILED', definition, request, normalizedScope, failedStage, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
+    }
+  }
+
+  private scheduledPipelineMetadata(
+    definition: ScheduledStageDefinition,
+    request: ScheduledPipelineStageRequest,
+    changedInstrumentIds: string[],
+    changedInstrumentFingerprint: string
+  ) {
+    return {
+      sourceStage: definition.sourceStage,
+      upstreamStageRunId: request.upstreamStageRunId ?? null,
+      dataThroughDate: request.dataThroughDate,
+      sourceFingerprint: request.sourceFingerprint,
+      changedInstrumentCount: changedInstrumentIds.length,
+      changedInstrumentIdsSample: changedInstrumentIds.slice(0, 25),
+      changedInstrumentFingerprint,
+      stageVersion: definition.stageVersion,
+      schedulerRunStartedAt: request.schedulerRunStartedAt,
+    };
+  }
+
+  private logScheduledDownstreamFailure(stageName: string, sourceStage: string, request: ScheduledPipelineStageRequest, error: unknown): null {
+    console.error(`[PipelineOrchestration] scheduled ${stageName} stage failed after ${sourceStage}`, {
+      region: request.region,
+      assetType: request.assetType,
+      dataThroughDate: request.dataThroughDate,
+      error: error instanceof Error ? error.message : 'unknown error',
+    });
+    return null;
+  }
+
   private scheduledDataQualityStageIdempotencyKey(input: {
     region: string;
     assetType: string;
@@ -2070,6 +2719,30 @@ export class PipelineOrchestrationService {
     ].join(':');
   }
 
+  private scheduledPipelineStageIdempotencyKey(
+    definition: ScheduledStageDefinition,
+    input: {
+      region: string;
+      assetType: string;
+      timeframe: string;
+      dataThroughDate: string;
+      sourceFingerprint: string;
+      changedInstrumentFingerprint: string;
+    }
+  ): string {
+    return [
+      LEDGER_VERSION,
+      definition.stageSlug,
+      this.keyPart(input.region),
+      this.keyPart(input.assetType),
+      this.keyPart(input.timeframe),
+      this.keyPart(input.dataThroughDate),
+      this.keyPart(input.sourceFingerprint),
+      this.keyPart(input.changedInstrumentFingerprint),
+      this.keyPart(definition.stageVersion),
+    ].join(':');
+  }
+
   private hashValues(values: string[]): string {
     const payload = values.join('|');
     return createHash('sha256').update(payload).digest('hex').slice(0, 16);
@@ -2106,6 +2779,20 @@ export class PipelineOrchestrationService {
   }
 
   private mapScheduledSignalCalibrationStatus(input: {
+    totalCount: number;
+    processedCount: number;
+    succeededCount: number;
+    failedCount: number;
+    skippedCount: number;
+  }): 'COMPLETED' | 'PARTIAL' | 'FAILED' | 'SKIPPED' {
+    if (input.totalCount === 0) return 'SKIPPED';
+    if (input.failedCount > 0 && input.succeededCount === 0) return 'FAILED';
+    if (input.succeededCount === 0 && (input.skippedCount > 0 || input.processedCount === 0)) return 'SKIPPED';
+    if (input.failedCount > 0 || input.skippedCount > 0 || input.processedCount < input.totalCount) return 'PARTIAL';
+    return 'COMPLETED';
+  }
+
+  private mapScheduledPipelineStatus(input: {
     totalCount: number;
     processedCount: number;
     succeededCount: number;
@@ -2408,6 +3095,194 @@ export class PipelineOrchestrationService {
       pipelineRunId: stage.pipelineRunId,
       stageRunId: stage.id,
       stageKey: 'RAW_SIGNALS',
+      scope: {
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        timeframe: normalizedScope.timeframe,
+        pipelineKey: request.pipelineKey,
+      },
+      triggerType: 'scheduled',
+      dataThroughDate: request.dataThroughDate,
+      inputFingerprint: stage.inputFingerprint || inputFingerprint,
+      outputFingerprint: stage.outputFingerprint || null,
+      batch: {
+        totalInstrumentCount: changedInstrumentCount,
+        processedCount: stage.processedCount,
+        batchSize: stage.batchSize ?? batchSize,
+        nextOffset: stage.nextOffset,
+        hasMore: stage.hasMore,
+      },
+      counts: {
+        totalCount: stage.totalCount,
+        processedCount: stage.processedCount,
+        succeededCount: stage.succeededCount,
+        partialCount: stage.partialCount,
+        failedCount: stage.failedCount,
+        skippedCount: stage.skippedCount,
+        unchangedCount: stage.unchangedCount,
+      },
+      warnings: stage.warnings,
+      errors: stage.errors,
+      startedAt: stage.startedAt,
+      completedAt: stage.completedAt,
+    };
+  }
+
+  private scheduledPipelineSkippedResponse(
+    definition: ScheduledStageDefinition,
+    request: ScheduledPipelineStageRequest,
+    normalizedScope: ReturnType<PipelineOrchestrationService['normalizeScope']>,
+    batchSize: number
+  ): ScheduledPipelineStageResponse {
+    return {
+      status: 'SKIPPED',
+      pipelineRunId: null,
+      stageRunId: null,
+      stageKey: definition.stageKey,
+      scope: {
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        timeframe: normalizedScope.timeframe,
+        pipelineKey: request.pipelineKey,
+      },
+      triggerType: 'scheduled',
+      dataThroughDate: request.dataThroughDate,
+      inputFingerprint: `${definition.stageSlug}:empty-changed-set`,
+      outputFingerprint: null,
+      batch: {
+        totalInstrumentCount: 0,
+        processedCount: 0,
+        batchSize,
+        nextOffset: null,
+        hasMore: false,
+      },
+      counts: {
+        totalCount: 0,
+        processedCount: 0,
+        succeededCount: 0,
+        partialCount: 0,
+        failedCount: 0,
+        skippedCount: 0,
+        unchangedCount: 0,
+      },
+      warnings: [`No changed instruments supplied for scheduled ${definition.stageKey} stage.`],
+      errors: [],
+      startedAt: null,
+      completedAt: null,
+    };
+  }
+
+  private scheduledPipelineFailureResponse(
+    definition: ScheduledStageDefinition,
+    request: ScheduledPipelineStageRequest,
+    normalizedScope: ReturnType<PipelineOrchestrationService['normalizeScope']>,
+    inputFingerprint: string,
+    batchSize: number,
+    changedInstrumentCount: number,
+    error: string
+  ): ScheduledPipelineStageResponse {
+    return {
+      status: 'FAILED',
+      pipelineRunId: null,
+      stageRunId: null,
+      stageKey: definition.stageKey,
+      scope: {
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        timeframe: normalizedScope.timeframe,
+        pipelineKey: request.pipelineKey,
+      },
+      triggerType: 'scheduled',
+      dataThroughDate: request.dataThroughDate,
+      inputFingerprint,
+      outputFingerprint: null,
+      batch: {
+        totalInstrumentCount: changedInstrumentCount,
+        processedCount: 0,
+        batchSize,
+        nextOffset: null,
+        hasMore: false,
+      },
+      counts: {
+        totalCount: changedInstrumentCount,
+        processedCount: 0,
+        succeededCount: 0,
+        partialCount: 0,
+        failedCount: 1,
+        skippedCount: 0,
+        unchangedCount: 0,
+      },
+      warnings: [],
+      errors: [error],
+      startedAt: null,
+      completedAt: null,
+    };
+  }
+
+  private scheduledPipelineResponseFromLease(
+    status: 'DUPLICATE_TERMINAL' | 'LEASE_HELD',
+    definition: ScheduledStageDefinition,
+    request: ScheduledPipelineStageRequest,
+    normalizedScope: ReturnType<PipelineOrchestrationService['normalizeScope']>,
+    leaseResult: PipelineStageLeaseResult,
+    inputFingerprint: string,
+    batchSize: number,
+    changedInstrumentCount: number
+  ): ScheduledPipelineStageResponse {
+    const stage = leaseResult.stage;
+    return {
+      status,
+      pipelineRunId: stage?.pipelineRunId || null,
+      stageRunId: stage?.id || null,
+      stageKey: definition.stageKey,
+      scope: {
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        timeframe: normalizedScope.timeframe,
+        pipelineKey: request.pipelineKey,
+      },
+      triggerType: 'scheduled',
+      dataThroughDate: request.dataThroughDate,
+      inputFingerprint: stage?.inputFingerprint || inputFingerprint,
+      outputFingerprint: stage?.outputFingerprint || null,
+      batch: {
+        totalInstrumentCount: changedInstrumentCount,
+        processedCount: stage?.processedCount || 0,
+        batchSize: stage?.batchSize ?? batchSize,
+        nextOffset: stage?.nextOffset ?? null,
+        hasMore: stage?.hasMore ?? false,
+      },
+      counts: {
+        totalCount: stage?.totalCount ?? changedInstrumentCount,
+        processedCount: stage?.processedCount ?? 0,
+        succeededCount: stage?.succeededCount ?? 0,
+        partialCount: stage?.partialCount ?? 0,
+        failedCount: stage?.failedCount ?? 0,
+        skippedCount: stage?.skippedCount ?? 0,
+        unchangedCount: stage?.unchangedCount ?? 0,
+      },
+      warnings: stage?.warnings ?? [],
+      errors: stage?.errors ?? [],
+      startedAt: stage?.startedAt ?? null,
+      completedAt: stage?.completedAt ?? null,
+    };
+  }
+
+  private scheduledPipelineResponseFromStage(
+    status: ScheduledPipelineStageResponse['status'],
+    definition: ScheduledStageDefinition,
+    request: ScheduledPipelineStageRequest,
+    normalizedScope: ReturnType<PipelineOrchestrationService['normalizeScope']>,
+    stage: PipelineStageRunRecord,
+    inputFingerprint: string,
+    batchSize: number,
+    changedInstrumentCount: number
+  ): ScheduledPipelineStageResponse {
+    return {
+      status,
+      pipelineRunId: stage.pipelineRunId,
+      stageRunId: stage.id,
+      stageKey: definition.stageKey,
       scope: {
         region: normalizedScope.region,
         assetType: normalizedScope.assetType,

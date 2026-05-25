@@ -14,13 +14,15 @@ Current implementation state:
 - Scheduled `RAW_SIGNALS` uses explicit changed instrument ids from the upstream scheduler pass and does not run a region-wide signal scan.
 - Scheduled `RAW_SIGNALS` now fans out to a ledgered `SIGNAL_CALIBRATION` stage only when Raw Signals completes with `COMPLETED`.
 - Scheduled `SIGNAL_CALIBRATION` uses explicit changed instrument ids and latest persisted raw-signal rows only; missing raw rows are counted as skipped evidence.
+- Scheduled `SIGNAL_CALIBRATION` now continues through ledgered downstream research stages: `MARKET_CONTEXT`, `SMART_MONEY`, `CONTEXT_SNAPSHOTS`, `SIGNAL_QUALITY`, `STRATEGY_DECISION`, `RESEARCH_PROJECTION`, and `TODAY_REVIEW`.
+- Explicit changed instrument ids are preserved for stages that can run instrument-scoped work. Context Snapshots and Today Review avoid provider/legacy generation fallback in the scheduled path.
 - Manual Pipeline Ops commands remain unchanged: `DATA_QUALITY_EVALUATE_SCOPE` is still the only executable command; `RAW_SIGNALS_GENERATE_SCOPE` and `SIGNAL_CALIBRATION_REFRESH_SCOPE` remain deferred.
 
 Boundaries preserved:
 
 - No Prisma/schema/migration/generated changes.
 - No route registry, controller, router, validation, frontend, package, provider/live, broker, cloud, or telemetry changes.
-- No Signal Quality, Strategy Decision, Backtesting, Trade Plan, Research, or Today Review fanout in this slice.
+- No backtesting proof, legacy plan/risk generation, provider/live, or broad manual command fanout in this slice.
 - No target price, R:R, reward/risk, direct advice, or Trade Plan-first language added.
 
 Validation completed:
@@ -29,17 +31,19 @@ Validation completed:
 cd backend
 npm.cmd test -- pipeline-orchestration.service.test.ts signal-generation-engine.service.test.ts signal-generation-dq-enforcement.invariants.test.ts --runInBand
 npm.cmd test -- pipeline-orchestration.service.test.ts signal-calibration-engine.service.test.ts --runInBand
+npm.cmd test -- pipeline-orchestration.service.test.ts smart-money-intelligence.service.test.ts historical-context-snapshots.service.test.ts strategy-decision-engine.service.test.ts today-trade-review.service.test.ts signal-quality-lab.service.test.ts --runInBand
 npm.cmd test -- market-data.scheduler.test.ts data-quality-engine.service.test.ts pipeline-orchestration.validation.test.ts pipeline-orchestration.controller.test.ts pipeline-orchestration.routes.test.ts --runInBand
 npm.cmd test -- pipeline-orchestration.service.test.ts market-data.scheduler.test.ts market-data.service.test.ts market-data.routes.test.ts data-quality-engine.service.test.ts signal-generation-engine.service.test.ts --runInBand
 npm.cmd test -- pipeline-orchestration.service.test.ts market-data.scheduler.test.ts market-data.service.test.ts market-data.routes.test.ts data-quality-engine.service.test.ts signal-generation-engine.service.test.ts signal-calibration-engine.service.test.ts --runInBand
+npm.cmd test -- pipeline-orchestration.service.test.ts market-data.scheduler.test.ts market-data.service.test.ts market-data.routes.test.ts data-quality-engine.service.test.ts signal-generation-engine.service.test.ts signal-calibration-engine.service.test.ts smart-money-intelligence.service.test.ts historical-context-snapshots.service.test.ts strategy-decision-engine.service.test.ts today-trade-review.service.test.ts signal-quality-lab.service.test.ts --runInBand
 npm.cmd run build
 git diff --check
 ```
 
 Next pipeline automation priority:
 
-1. Finish validation for the scheduled `DATA_QUALITY -> RAW_SIGNALS -> SIGNAL_CALIBRATION` chain and commit the scoped pipeline automation changes.
-2. Then continue one stage at a time: context snapshots, market context/sector rotation, signal quality, smart money, strategy decisions, bounded backtest proof, Research projection, Today Review projection.
+1. Finish validation for the scheduled `DATA_QUALITY -> RAW_SIGNALS -> SIGNAL_CALIBRATION -> MARKET_CONTEXT -> SMART_MONEY -> CONTEXT_SNAPSHOTS -> SIGNAL_QUALITY -> STRATEGY_DECISION -> RESEARCH_PROJECTION -> TODAY_REVIEW` chain and commit the scoped pipeline automation changes.
+2. Keep backtesting proof as the next separate contract because it needs bounded strategy/timeframe/universe rules before 15-minute automation.
 3. Do not wire Trade Plan/R:R/target-shaped stages; reframe any compatibility path into Trusted Signal Candidate health only.
 
 ## Current Direction

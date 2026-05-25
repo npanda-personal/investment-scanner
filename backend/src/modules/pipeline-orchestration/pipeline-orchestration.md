@@ -175,6 +175,33 @@ Rules:
 
 This stage lets Pipeline Ops show calibration progress after scheduled Raw Signals while keeping the first automated chain DB-only and incremental.
 
+## Scheduled Downstream Research Chain
+
+After scheduled `SIGNAL_CALIBRATION` completes, the scheduler-only chain now continues through the research-support stages that can run from local persisted data:
+
+1. `MARKET_CONTEXT`
+2. `SMART_MONEY`
+3. `CONTEXT_SNAPSHOTS`
+4. `SIGNAL_QUALITY`
+5. `STRATEGY_DECISION`
+6. `RESEARCH_PROJECTION`
+7. `TODAY_REVIEW`
+
+Rules:
+
+- each stage writes its own `PipelineRun` and `PipelineStageRun` rows with deterministic idempotency keys, leases, counts, warnings, errors, input fingerprints, and output fingerprints;
+- each stage receives the same explicit changed instrument ids from the upstream scheduled Market Data pass when the adapter supports instrument-scoped work;
+- `SMART_MONEY` uses explicit instrument ids and local price/volume data only;
+- `CONTEXT_SNAPSHOTS` uses explicit instrument ids, latest persisted Market Context, and latest persisted Smart Money snapshots in the scheduled path, avoiding provider fallback work;
+- `SIGNAL_QUALITY` refreshes bounded diagnostics from persisted raw signals and local price history;
+- `STRATEGY_DECISION` evaluates explicit instrument ids and consumes persisted calibration, data quality, smart-money, market context, and local price windows;
+- `RESEARCH_PROJECTION` runs the Research Hub overview as a projection/evidence stage;
+- `TODAY_REVIEW` publishes the daily review with compatibility risk-snapshot generation disabled for the scheduled path;
+- non-completed upstream states stop only the affected downstream branch unless the stage explicitly allows partial evidence to continue;
+- manual commands for these stages remain `DEFERRED` or `FORBIDDEN` until separate command contracts approve safe user-triggered execution.
+
+Backtesting proof and legacy risk/plan generation are not scheduled in this chain. Backtesting needs a separate bounded strategy/timeframe/universe contract before it can run automatically, and legacy risk/plan generation conflicts with the current Trusted Signal Candidate direction unless reframed into signal health evidence.
+
 ## Market Data Stage Visibility
 
 The Pipeline Ops dashboard reads `PipelineRun` and `PipelineStageRun`; Market Data workflows that only update module-local run state are not visible there unless they mirror progress into the ledger.

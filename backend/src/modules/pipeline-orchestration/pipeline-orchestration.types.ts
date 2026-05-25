@@ -562,6 +562,67 @@ export interface ScheduledSignalCalibrationStageResponse {
   errors: string[];
   startedAt: string | null;
   completedAt: string | null;
+  downstream?: ScheduledPipelineStageResponse | null;
+}
+
+export type ScheduledPipelineStageStatus =
+  | 'COMPLETED'
+  | 'PARTIAL'
+  | 'FAILED'
+  | 'SKIPPED'
+  | 'DUPLICATE_TERMINAL'
+  | 'LEASE_HELD';
+
+export interface ScheduledPipelineStageRequest {
+  region: string;
+  assetType: string;
+  timeframe: '1d';
+  pipelineKey: 'market-intelligence';
+  triggerType: 'scheduled';
+  dataThroughDate: string;
+  sourceFingerprint: string;
+  changedInstrumentIds: string[];
+  batchSize: number;
+  schedulerRunStartedAt: string;
+  upstreamStageRunId?: string | null;
+}
+
+export interface ScheduledPipelineStageResponse {
+  status: ScheduledPipelineStageStatus;
+  pipelineRunId: string | null;
+  stageRunId: string | null;
+  stageKey: string;
+  scope: {
+    region: string;
+    assetType: string;
+    timeframe: string;
+    pipelineKey: string;
+  };
+  triggerType: 'scheduled';
+  dataThroughDate: string;
+  inputFingerprint: string;
+  outputFingerprint: string | null;
+  batch: {
+    totalInstrumentCount: number;
+    processedCount: number;
+    batchSize: number;
+    nextOffset: number | null;
+    hasMore: boolean;
+  };
+  counts: {
+    totalCount: number;
+    processedCount: number;
+    succeededCount: number;
+    partialCount: number;
+    failedCount: number;
+    skippedCount: number;
+    unchangedCount: number;
+  };
+  warnings: string[];
+  errors: string[];
+  startedAt: string | null;
+  completedAt: string | null;
+  downstream?: ScheduledPipelineStageResponse | null;
 }
 
 export interface MarketDataStageSnapshotRequest {

@@ -68,6 +68,8 @@ The endpoint refreshes all supported ranges (`1M`, `3M`, `6M`) for only the curr
 
 The frontend owns full-scope orchestration. It keeps calling the backend with `nextOffset` until `hasMore=false`, keeps the refresh button disabled while running, and shows progress plus a final generated/skipped/failed summary. The regular Playwright suite stubs the POST and asserts this orchestration; real full refreshes remain manual browser checks because they are database-heavy.
 
+Scheduled pipeline automation can also call `SmartMoneyIntelligenceService.run()` with explicit `instrumentIds`. That path avoids region-wide pagination, uses local persisted market data only, uses missing ownership placeholders rather than provider calls, writes persisted daily snapshots for each supported range, and counts missing explicit instruments as skipped evidence instead of clean success.
+
 ## Sector Aggregation
 Sector summaries are calculated per region to provide accurate localized tailwinds and distribution warnings.
 

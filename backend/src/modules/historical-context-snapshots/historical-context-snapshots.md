@@ -58,6 +58,8 @@ Repeated snapshot generation uses upsert behavior and returns inserted/updated/s
 - returns inserted/updated/skipped counts and warnings
 - skips sector rows whose sector metadata is `Unknown`, blank, `N/A`, `NA`, or null-equivalent. These rows increment skipped-sector count and return a metadata-gap warning; they are not persisted as ranked leadership/weakness evidence.
 
+Scheduled pipeline automation may call the service with explicit `instrumentIds`. That path uses latest persisted Market Context and latest persisted Smart Money snapshots instead of generating missing upstream context on demand. Missing upstream rows are recorded as skipped/gap evidence, keeping the scheduled chain DB-only and avoiding provider fallback behavior.
+
 Partial failures are captured as warnings instead of failing the full batch.
 
 ## Sector Metadata Policy

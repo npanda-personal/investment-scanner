@@ -103,7 +103,7 @@ export class TodayTradeReviewService {
       sourceSnapshot.scanFunnel = liteResult.scanFunnel;
       const candidateSources = sources.reviewUniverse?.mode === 'NO_REVIEW'
         ? []
-        : await this.buildCandidateSources(sources.entryDecisions, sources.exitDecisions, sources, scope, warnings);
+        : await this.buildCandidateSources(sources.entryDecisions, sources.exitDecisions, sources, scope, warnings, Boolean(request.skipTradePlanGeneration));
       const strategyCandidates = candidateSources.map((candidateSource) => this.mapCandidate(candidateSource));
       const candidates = this.rankCandidates(this.mergeCandidates([...liteResult.candidates, ...strategyCandidates]));
       const candidateCounts = this.countCandidates(candidates);
@@ -474,7 +474,8 @@ export class TodayTradeReviewService {
       marketGate: Record<string, unknown> | null;
     },
     scope: { region: string; assetType: string },
-    warnings: string[]
+    warnings: string[],
+    skipTradePlanGeneration = false
   ): Promise<TodayReviewCandidateSource[]> {
     const decisions = this.dedupeDecisions([
       ...entryDecisions.map((decision) => ({ decision, sourceKind: 'ENTRY' as const })),
@@ -491,7 +492,7 @@ export class TodayTradeReviewService {
       const instrumentId = item.decision.instrumentId!;
       const [tradePlan, rawSignal, calibration, smartMoney] = await Promise.all([
         item.sourceKind === 'ENTRY'
-          ? this.loadTradePlan(item.decision, scope, warnings)
+          ? this.loadTradePlan(item.decision, scope, warnings, skipTradePlanGeneration)
           : Promise.resolve(null),
         this.safe(() => this.services.signalService.latestForInstrument(instrumentId), `${item.decision.symbol} raw signal support is unavailable.`, warnings),
         this.safe(() => this.services.calibrationService.latestPersistedForInstrument(instrumentId), `${item.decision.symbol} calibration support is unavailable.`, warnings),
@@ -512,7 +513,7 @@ export class TodayTradeReviewService {
     return result;
   }
 
-  private async loadTradePlan(decision: StrategyDecisionDto, scope: { region: string; assetType: string }, warnings: string[]) {
+  private async loadTradePlan(decision: StrategyDecisionDto, scope: { region: string; assetType: string }, warnings: string[], skipGeneration = false) {
     if (!decision.instrumentId || !decision.symbol) return null;
     const latest = await this.safe(
       () => this.services.tradePlanService.latestForInstrument(decision.instrumentId!, decision.strategy, undefined, scope),
@@ -520,6 +521,10 @@ export class TodayTradeReviewService {
       warnings
     );
     if (latest) return latest;
+    if (skipGeneration) {
+      warnings.push(`${decision.symbol} persisted legacy risk snapshot is unavailable; scheduler publication skipped compatibility snapshot generation.`);
+      return null;
+    }
     return this.safe(
       () => this.services.tradePlanService.generatePlan({
         instrumentId: decision.instrumentId!,

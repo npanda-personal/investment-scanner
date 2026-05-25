@@ -38,6 +38,7 @@ export type TodayReviewReasonSeverity = 'INFO' | 'WATCH' | 'BLOCKER';
 export interface TodayReviewRunRequest {
   region?: string;
   assetType?: string;
+  skipTradePlanGeneration?: boolean;
 }
 
 export interface TodayReviewQuery {

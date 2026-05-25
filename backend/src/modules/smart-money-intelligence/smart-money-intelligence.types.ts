@@ -105,3 +105,10 @@ export interface SmartMoneyRunResponse {
     assetType: string;
   };
 }
+
+export interface SmartMoneyRunQuery {
+  region?: string;
+  assetType?: string;
+  offset?: number;
+  instrumentIds?: string[];
+}

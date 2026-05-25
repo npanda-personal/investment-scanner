@@ -15,6 +15,7 @@ The `marketGate` endpoint accepts a `region` parameter. This ensures the "OPEN/C
 - `GET /api/v1/strategy/candidates`: Supports `region` and `assetType` query parameters.
 - `POST /api/v1/strategy/evaluate`: Respects the provided `region` for universe resolution and market gate checks.
 - Evaluation is batch-oriented. Callers should use `batchSize` plus `offset`; the backend evaluates only the requested page, returns `nextOffset`, and uses bounded worker-style concurrency inside the request.
+- Scheduled pipeline automation may pass explicit `instrumentIds`; that path avoids region-wide latest-signal pagination and evaluates only the changed instrument set.
 - Candidate and funnel reads default to the latest scoped `generatedDate` so current dashboards do not mix old daily decisions with the latest evaluation state. Historical rows remain available only when callers explicitly use `includeHistory=true`.
 - Funnel diagnostics return the full scoped, latest-date, proof-safe decision count separately from the bounded latest-row sample used for status and skip-reason diagnostics. Legacy non-framework-backed rows are excluded unless `includeLegacy=true` is explicitly supplied. Downstream modules that need actionable candidate totals should use the candidate query count, not infer eligibility from the bounded diagnostics sample.
 
