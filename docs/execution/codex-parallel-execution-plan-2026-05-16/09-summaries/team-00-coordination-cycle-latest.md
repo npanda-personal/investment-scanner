@@ -38,6 +38,39 @@ Product Owner action required: no.
 
 ---
 
+## Runtime Continuation Note - Active Parallel Agents
+
+Date: 2026-05-25
+
+Current active agents:
+
+- Team 06 `019e5ee9-07e1-7af1-95a4-ff756bf3c2a2`: implementing `CF-W2-CAL-02A` in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-CAL-02A`.
+- Team 03 `019e5ee9-68c2-73d2-96be-22a78f7cf608`: preparing a `CF-W2-TSC-05A` repository persisted-read scope addendum after Team 04 QA rejection.
+- Team 05 `019e5ee9-e6a5-7831-953e-31cf73fc0ea8`: reworking `CF-W1-DQ-02-RS1` repository summary to avoid full-scope row loading.
+
+Recently closed:
+
+- Team 04 `019e5edd-f986-7ed0-8aee-39e3cc4296cd`: rejected `CF-W2-TSC-05A` because persisted Today Review reads can rebuild legacy trade-plan explainability through repository hydration.
+- Team 04 `019e5ee4-e09c-7261-9c4c-cec6b0d8b9c0`: rejected `CF-W1-DQ-02-RS1` because repository summary still used full-scope `findMany`.
+
+Next gates:
+
+- Team 07 rework for TSC starts only after Team 03 confirms repository inclusion as module-local scope correction.
+- Team 04 DQ re-verification starts after Team 05 aggregate-summary handoff.
+- Team 04 CAL QA starts after Team 06 handoff.
+- Team 10 reviews the next QA-accepted item.
+
+Teams ready to pick up new tasks:
+
+- Team 06: active on CAL implementation.
+- Team 03: active on TSC scope addendum.
+- Team 05: active on DQ rework.
+- Team 04: ready for the next QA handoff.
+- Team 10: ready for the next QA-accepted review.
+- Team 02: ready for rolling investor/trader-value requirements when a slot opens.
+
+---
+
 ## Latest Runtime Checkpoint - CAL Architecture And DQ QA Verification
 
 Date: 2026-05-25
