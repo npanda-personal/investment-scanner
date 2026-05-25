@@ -1,5 +1,38 @@
 # TEAM-02 Requirement Factory
 
+## Team 02 Rolling PO Discovery - Pipeline Ops Coverage Check - 2026-05-25
+
+Root `AGENTS.md` and the current requirement queue were re-read for a docs-only priority refresh. Team 02 kept the pass bounded to requirements discovery and did not touch application code, ready queues, or other team outboxes.
+
+### Current PO Priority Recheck
+
+- Investor/trader trust value still leads: market-data freshness, data-quality readiness, explainable signals, backtesting/calibration trust, and Trusted Signal Candidate / Today Review.
+- Admin, auth, subscription, and convenience surfaces remain lower priority unless they block correctness, privacy, or trust.
+- The new `/pipeline-ops` direction is already covered by the existing `CF-W3-MDPIPE-01B1` through `CF-W3-MDPIPE-01B4` pipeline stack and the current Team 00 runtime guidance.
+- Downstream DB-only performance concerns are already captured in the pipeline risk/register and `CF-W3-MDPIPE-01D` follow-on path; no fresh Team 02 candidate was discovered for that lane.
+
+### Fresh Gap Audit Result - 2026-05-25
+
+- No new direct investor/trader-value requirement outranks `CF-W2-TSC-04`, `CF-W2-TSC-05`, or `CF-W1-TSC-02`.
+- The Today Review cleanup pair still addresses the active target/reward and ranking/eligibility language gap.
+- The active-signal-health gap is still fully represented by `CF-W1-TSC-02`.
+- Pipeline Ops monitoring and OPS detail remain a pipeline-lane track, not a new Team 02 requirement discovery.
+- No item moves to Ready from Team 02.
+
+### Queue Result
+
+No priority change. The current top three remain:
+
+1. `CF-W2-TSC-04`
+2. `CF-W2-TSC-05`
+3. `CF-W1-TSC-02`
+
+### Team 00 Routing Recommendation
+
+- Keep `CF-W2-TSC-04` and `CF-W2-TSC-05` as the next Team 03/04 Today Review cleanup send.
+- Keep `CF-W1-TSC-02` behind them as the next active-candidate-health requirement draft.
+- Keep pipeline-ops monitoring, command safety, and DB-only fanout in the pipeline lane; do not re-route them through Team 02 discovery.
+
 ## Team 02 Rolling PO Discovery - Pipeline Command API Accepted, B6 Active - 2026-05-25
 
 Root `AGENTS.md` intake completed first. Workspace was clean at the start of this pass. Team 02 stayed docs-only and wrote only inside the reserved requirement files.
