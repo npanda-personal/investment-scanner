@@ -1,5 +1,47 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - Pipeline Ops Dashboard
+
+Date: 2026-05-25
+
+Status:
+
+- Branch: `dev`.
+- Open decisions: 0.
+- Product Owner action required: no.
+- Push performed: no.
+
+Implemented:
+
+- `CF-W3-MDPIPE-01B3-S1` as the first frontend-only Bulk Pipeline Monitoring and Ops dashboard.
+- New `/pipeline-ops` route and Foundation navigation item.
+- Read-only `GET /api/v1/pipeline/status` client and polling hook.
+- Scope strip plus operations table for module/op/status/progress/timing/counts/warnings/errors.
+- Disabled manual trigger provision with explicit pending command-contract tooltip.
+
+Validation:
+
+- `cd frontend && npm.cmd run build`: passed.
+- `cd frontend && npm.cmd run test:ui -- pipeline-ops.spec.ts --workers=1`: passed, 1 test.
+
+Deferred:
+
+- Existing feature-page bulk controls remain until a safe command API exists.
+- Compact feature-page progress indicators remain a separate slice.
+- No backend command endpoint, provider/live call, scheduler fanout, or downstream execution was included.
+
+Teams ready to pick up new tasks:
+
+- Team 03: architecture for `CF-W3-MDPIPE-01B4` command API and manual-trigger safety matrix.
+- Team 08: UX mapping for compact progress indicators and control migration.
+- Team 04: QA for command safety, progress rehydration, and page-control migration.
+- Team 05: Data Quality scheduled stage after command/status contracts stay stable.
+- Team 10: review the dashboard slice after scoped commit.
+
+Product Owner action required: no.
+
+---
+
 ## Latest Runtime Checkpoint - Market Data Pipeline Redesign Started
 
 Date: 2026-05-25

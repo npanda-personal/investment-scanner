@@ -15,6 +15,7 @@ import MarkEmailReadIcon from '@mui/icons-material/MarkEmailRead';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import TuneIcon from '@mui/icons-material/Tune';
+import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing';
 
 export type NavItem = {
   path: string;
@@ -48,6 +49,7 @@ export const navGroups: NavGroup[] = [
         matchPrefixes: ['/market-data-foundation/', '/stocks/'],
         aliases: ['/stocks'],
       },
+      { path: '/pipeline-ops', label: 'Pipeline Ops', icon: <PrecisionManufacturingIcon /> },
       { path: '/data-quality', label: 'Data Quality', icon: <FactCheckIcon /> },
       { path: '/context-snapshots', label: 'Context Snapshots', icon: <CalendarMonthIcon /> },
     ],

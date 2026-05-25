@@ -4,13 +4,13 @@ Date: 2026-05-25
 
 Owner: Team 00 / Team 08 / Team 03 / Team 04
 
-Status: Requirement captured. Not Ready for implementation until UX, architecture, QA, and route/frontend reservations are accepted.
+Status: First read-only dashboard slice implemented as `CF-W3-MDPIPE-01B3-S1`. Command controls and feature-page control migration remain future bounded slices.
 
 ## Product Direction
 
 Bulk operation controls should not be scattered across individual feature pages.
 
-Create a dedicated Ops-style Bulk Pipeline Dashboard for monitoring and operations.
+Create a dedicated Bulk Pipeline Dashboard for Monitoring and Ops.
 
 ## User Value
 
@@ -38,3 +38,21 @@ Individual screens should only show a compact progress/status indicator so the u
 - No provider/live call from UI status rendering.
 - No broad shared UI component unless Team 00 reserves it.
 - No route/navigation change without explicit frontend route reservation.
+
+## First Slice Result
+
+`CF-W3-MDPIPE-01B3-S1` adds `/pipeline-ops` as the central Monitoring and Ops dashboard for durable pipeline status.
+
+Included:
+
+- `Pipeline Ops` navigation under Foundation.
+- Scope-aware read-only status loading from `GET /api/v1/pipeline/status`.
+- Auto-refreshing progress table for the pipeline stage catalog.
+- Module/op/status/progress/last-run/counts/evidence columns.
+- Disabled manual trigger provision with explicit pending-command-contract tooltip.
+
+Deferred:
+
+- safe command API for manual triggers,
+- removal of page-local bulk controls,
+- compact progress indicators on individual feature screens.

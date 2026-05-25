@@ -23,6 +23,7 @@ import { researchHubRoutes } from '@/features/research-hub';
 import { strategyFrameworkRoutes } from '@/features/strategy-framework';
 import { tradePlanRiskEngineRoutes } from '@/features/trade-plan-risk-engine';
 import { todayTradeReviewRoutes } from '@/features/today-trade-review';
+import { pipelineOpsRoutes } from '@/features/pipeline-ops';
 
 export const appRoutes: RouteObject[] = [
   ...publicAuthIdentityRoutes,
@@ -39,6 +40,7 @@ export const appRoutes: RouteObject[] = [
           ...researchHubRoutes,
           ...tradePlanRiskEngineRoutes,
           ...marketDataFoundationRoutes,
+          ...pipelineOpsRoutes,
           ...stockResearchWorkbenchRoutes,
           ...signalGenerationEngineRoutes,
           ...signalQualityLabRoutes,

@@ -105,6 +105,38 @@ Teams ready to pick up new tasks:
 - Team 05: prepare `CF-W3-MDPIPE-01C` DQ stage after dashboard/status contracts.
 - Team 10: review `01B2` after scoped commit.
 
+## Latest Team 00 Routing Update - Pipeline Ops Dashboard
+
+Date: 2026-05-25
+
+Implementation status:
+
+- `CF-W3-MDPIPE-01B3-S1` implemented as the first frontend-only Bulk Pipeline Monitoring and Ops dashboard slice.
+- Added `/pipeline-ops` under Foundation navigation.
+- Added a read-only pipeline status client, polling hook, scope/status strip, operations table, and disabled manual trigger provision pending a command API.
+- The dashboard shows module, operation, status, progress, last-run timing, data-through date, success/partial/fail/skip counts, warnings/errors, and expandable evidence details.
+- Existing feature-page bulk controls were not removed in this slice because the safe manual command API is not implemented yet.
+
+Validation:
+
+- `npm.cmd run build`: passed from `frontend`.
+- `npm.cmd run test:ui -- pipeline-ops.spec.ts --workers=1`: passed, 1 test.
+
+Next slices:
+
+1. `CF-W3-MDPIPE-01B4` pipeline command API and manual-trigger safety matrix.
+2. `CF-W3-MDPIPE-01B5` phased migration/removal of page-local bulk controls after command API is available.
+3. `CF-W3-MDPIPE-01B6` compact per-screen progress indicators for the feature pages.
+4. `CF-W3-MDPIPE-01C` ledgered Data Quality scheduled stage.
+
+Teams ready to pick up new tasks:
+
+- Team 03: architecture for `CF-W3-MDPIPE-01B4` command API and manual-trigger permissions/idempotency.
+- Team 08: UX mapping for compact feature-page progress strips and Ops dashboard command states.
+- Team 04: QA plan for command safety, progress rehydration, no provider calls from UI, and page-control migration.
+- Team 05: Data Quality scheduled stage prep after command/status contracts remain stable.
+- Team 10: review the `01B3-S1` dashboard slice after scoped commit.
+
 ## Latest Team 00 Routing Update - Market Data Pipeline Redesign
 
 Date: 2026-05-25
