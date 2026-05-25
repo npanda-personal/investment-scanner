@@ -13,7 +13,7 @@ Current active agents:
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Team 04 - QA Factory | `019e5e31-1235-7683-8acc-6a10ed32fb31` | `gpt-5.4-mini`, medium | QA verification | `CF-W3-MDPIPE-01B6` Data Quality compact indicator | active |
-| 2 | Open slot | none | pending | implementation | Team 05 for `CF-W3-MDPIPE-01C` after Team 00 Ready promotion | ready candidate |
+| 2 | Open slot | none | pending | implementation | Team 05 for `CF-W3-MDPIPE-01C` after Team 00 Ready promotion | ready |
 | 3 | Open slot | none | pending | review/signoff | Team 10 then Team 03 after QA acceptance | waiting |
 | 4 | Open slot | none | pending | QA planning | Team 04 for `CF-W3-MDPIPE-01C` after Team 03 architecture packet | ready |
 | 5 | Open slot | none | pending | requirements | next direct investor/trader-value discovery cycle | queued |
@@ -26,7 +26,7 @@ Teams ready to pick up new tasks:
 - Team 10: ready for Code Review after Team 04 acceptance.
 - Team 03: completed architecture prep for `CF-W3-MDPIPE-01C`; later ready for B6 Architect Signoff after Team 10 acceptance.
 - Team 04: `CF-W3-MDPIPE-01C` QA plan complete; no QA-planning writer conflict remains.
-- Team 05: standby for `CF-W3-MDPIPE-01C` Data Quality scheduled stage after status/command contracts stabilize.
+- Team 05: ready for `CF-W3-MDPIPE-01C` Data Quality scheduled stage implementation.
 - Team 02: completed fresh-gap audit; no new requirement outranks `CF-W2-TSC-04`, `CF-W2-TSC-05`, or `CF-W1-TSC-02`.
 
 Queued next:
@@ -35,7 +35,7 @@ Queued next:
 2. Team 10 reviews B6 after Team 04 acceptance.
 3. Team 10 reviews after QA acceptance.
 4. Team 03 signs off after Team 10 acceptance.
-5. Team 00 evaluates `CF-W3-MDPIPE-01C` for Team 05 Ready promotion.
+5. Team 05 implements `CF-W3-MDPIPE-01C` after Team 00 handoff commit.
 6. Team 02 can relaunch after current handoff pressure drops.
 
 Completed agents:

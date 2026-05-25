@@ -6,6 +6,60 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready.
 
+2026-05-25 Team 00 Ready promotion - `CF-W3-MDPIPE-01C-DQ-SCHEDULED-STAGE`:
+
+- `CF-W3-MDPIPE-01C` is promoted and assigned to Team 05.
+- Current gate state: Ready for backend-only implementation.
+- Purpose: automatically trigger a ledgered Data Quality stage from the existing Market Data scheduler using only the changed instrument set from the current scheduled Market Data pass.
+- Branch recommendation: `codex/w3-mdpipe-01c-data-quality-scheduled-stage`.
+- Worktree recommendation: `C:\work\repo\investment-scanner-worktrees\team05-CF-W3-MDPIPE-01C`.
+- Gate evidence:
+  - Requirement: `10-requirements/CF-W3-MDPIPE-01-incremental-market-data-pipeline-requirement.md`
+  - Architecture: `03-architecture/CF-W3-MDPIPE-01C-data-quality-scheduled-stage-architecture.md`
+  - Contract: `06-contracts/CF-W3-MDPIPE-01C-data-quality-scheduled-stage-contract.md`
+  - Work packet: `08-work-packets/CF-W3-MDPIPE-01C-work-packet.md`
+  - QA plan: `04-qa/CF-W3-MDPIPE-01C-data-quality-scheduled-stage-qa-plan.md`
+  - Ready promotion: `13-implementation-evidence/CF-W3-MDPIPE-01C-ready-promotion.md`
+  - Open decisions: none.
+- Allowed implementation files:
+  - `backend/src/modules/market-data-foundation/market-data-foundation.service.ts`
+  - `backend/src/modules/market-data-foundation/market-data-foundation.scheduler.ts`
+  - `backend/src/modules/market-data-foundation/market-data-foundation.types.ts`
+  - `backend/src/modules/market-data-foundation/market-data-foundation.md`
+  - `backend/src/modules/pipeline-orchestration/pipeline-orchestration.types.ts`
+  - `backend/src/modules/pipeline-orchestration/pipeline-orchestration.service.ts`
+  - `backend/src/modules/pipeline-orchestration/pipeline-orchestration.md`
+  - `backend/src/modules/pipeline-orchestration/index.ts` only if scheduled-stage exports are required
+  - `backend/src/modules/data-quality-engine/data-quality-engine.types.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.service.ts`
+  - `backend/src/modules/data-quality-engine/data-quality-engine.md`
+  - `backend/src/modules/data-quality-engine/index.ts` only if scheduled-stage exports are required
+  - `backend/tests/modules/market-data-foundation/market-data.scheduler.test.ts`
+  - `backend/tests/modules/market-data-foundation/market-data.service.test.ts`
+  - `backend/tests/modules/pipeline-orchestration/pipeline-orchestration.service.test.ts`
+  - `backend/tests/modules/data-quality-engine/data-quality-engine.service.test.ts`
+  - active execution docs listed in the Team 05 inbox
+- Forbidden scope:
+  - `backend/src/server.ts`
+  - route registries
+  - Prisma/schema/migrations/generated files
+  - package manifests and lockfiles
+  - all frontend files/tests
+  - provider/live calls
+  - startup DQ fanout
+  - full-universe DQ rescans from empty changed sets
+  - downstream module fanout
+  - shared backend utilities or shared UI
+- Required validation:
+
+```powershell
+cd backend
+npm.cmd test -- market-data.scheduler.test.ts market-data.service.test.ts pipeline-orchestration.service.test.ts data-quality-engine.service.test.ts --runInBand
+npm.cmd run build
+npm.cmd test -- pipeline-orchestration.validation.test.ts pipeline-orchestration.controller.test.ts pipeline-orchestration.routes.test.ts pipeline-orchestration.service.test.ts --runInBand
+npm.cmd run build
+```
+
 2026-05-25 Team 00 Ready promotion - `CF-W3-MDPIPE-01B6-DQ-COMPACT-PIPELINE-INDICATOR`:
 
 - `CF-W3-MDPIPE-01B6` is promoted and assigned to Team 08.

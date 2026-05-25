@@ -95,6 +95,32 @@ Teams ready to pick up new tasks:
 - Team 03: parallel architecture prep for `CF-W3-MDPIPE-01C` only if no file conflict appears.
 - Team 02: rolling investor/trader-value requirements discovery.
 
+## Latest Team 00 Routing Update - 01C Scheduled Data Quality Promotion
+
+Date: 2026-05-25
+
+Ready promotion:
+
+- `CF-W3-MDPIPE-01C` is promoted to Team 05 as a backend-only scheduled Data Quality stage.
+- The first child uses the existing Market Data scheduler path and changed-set evidence only.
+- The first child must not add startup fanout, route changes, schema changes, frontend changes, provider/live calls, full-universe rescans from empty changed sets, or downstream fanout.
+- `backend/src/server.ts` remains forbidden.
+- `CF-W3-MDPIPE-01B6` remains a separate Team 08/Team 04 frontend QA path and does not share files with 01C.
+
+Allowed implementation family:
+
+- Market Data Foundation service/scheduler/types/docs and focused tests
+- Pipeline Orchestration service/types/docs and focused tests
+- Data Quality Engine service/types/docs and focused tests
+
+Teams ready to pick up new tasks:
+
+- Team 05: implement `CF-W3-MDPIPE-01C`.
+- Team 04: QA Verification after Team 05 handoff.
+- Team 10: Code Review after Team 04 acceptance.
+- Team 03: Architect Signoff after Team 10 acceptance.
+- Team 04: continues B6 QA independently.
+
 ## Latest Team 00 Routing Update - Pipeline Ledger Foundation
 
 Date: 2026-05-25
