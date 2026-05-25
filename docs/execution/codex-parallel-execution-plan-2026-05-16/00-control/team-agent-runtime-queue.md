@@ -12,7 +12,7 @@ Current active agents:
 
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Open slot | none | pending | QA verification | Team 04 for `CF-W3-MDPIPE-01B6` after handoff | ready |
+| 1 | Team 04 - QA Factory | `019e5e31-1235-7683-8acc-6a10ed32fb31` | `gpt-5.4-mini`, medium | QA verification | `CF-W3-MDPIPE-01B6` Data Quality compact indicator | active |
 | 2 | Open slot | none | pending | implementation | Team 05 for `CF-W3-MDPIPE-01C` after Team 00 Ready promotion | ready candidate |
 | 3 | Open slot | none | pending | review/signoff | Team 10 then Team 03 after QA acceptance | waiting |
 | 4 | Open slot | none | pending | QA planning | Team 04 for `CF-W3-MDPIPE-01C` after Team 03 architecture packet | ready |
@@ -22,7 +22,7 @@ Current active agents:
 Teams ready to pick up new tasks:
 
 - Team 08: completed `CF-W3-MDPIPE-01B6` implementation handoff; closed.
-- Team 04: completed `CF-W3-MDPIPE-01C` QA planning; ready for `CF-W3-MDPIPE-01B6` QA verification.
+- Team 04: active on `CF-W3-MDPIPE-01B6` QA verification.
 - Team 10: ready for Code Review after Team 04 acceptance.
 - Team 03: completed architecture prep for `CF-W3-MDPIPE-01C`; later ready for B6 Architect Signoff after Team 10 acceptance.
 - Team 04: `CF-W3-MDPIPE-01C` QA plan complete; no QA-planning writer conflict remains.
