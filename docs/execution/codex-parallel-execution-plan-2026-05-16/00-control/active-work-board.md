@@ -34,6 +34,32 @@ No historical active work items have been migrated as active.
 - Rejected / Rework
 - Deferred
 
+## Latest Team 00 Routing Update - TSC-04A QA And TSC-05A Sequencing
+
+Date: 2026-05-25
+
+Gate status:
+
+- `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE` Team 07 implementation is complete in the dedicated worktree `C:\work\repo\investment-scanner-worktrees\team07-CF-W2-TSC-04A`.
+- Team 00 developer-validation replay passed for the focused backend Today Review test, backend build, frontend build, and worktree-targeted Today Review Playwright smoke; default `127.0.0.1:5173` smoke output is not accepted evidence because it can point at a stale main-workspace server.
+- Team 04 QA Verification is active for `CF-W2-TSC-04A` using the worktree build/server.
+- Team 03 prepared `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` as the smallest future semantic cleanup child, but it is explicitly not Ready until `TSC-04A` is accepted and Team 00 records the exact base commit.
+- No open Product Owner decisions exist.
+
+Sequencing:
+
+- Do not start `CF-W2-TSC-05A` in parallel with `TSC-04A`; both reserve the same Today Review writer set.
+- Keep `TSC-05A` stacked on the accepted future `TSC-04A` branch/commit, not current `dev`.
+- Team 02 is active on a rolling direct-value top-10 refresh while the QA gate runs.
+
+Teams ready to pick up new tasks:
+
+- Team 04: complete `CF-W2-TSC-04A` QA Verification.
+- Team 10: Code Review after Team 04 acceptance.
+- Team 03: Architect Signoff after Team 10 acceptance; otherwise prepare the next non-overlapping direct-value architecture packet after Team 02 refresh.
+- Team 02: continue rolling investor/trader-value requirements and priority hygiene.
+- Team 07: standby for bounded rework if Team 04 or Team 10 rejects `TSC-04A`.
+
 ## Latest Team 00 Routing Update - B6 Compact Indicator Review Rework
 
 Date: 2026-05-25

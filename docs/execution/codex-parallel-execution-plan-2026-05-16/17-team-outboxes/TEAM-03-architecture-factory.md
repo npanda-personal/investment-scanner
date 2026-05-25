@@ -1,5 +1,75 @@
 # Team 03 Architecture Factory Outbox
 
+## Team 03 CF-W2-TSC-05 Today Review Ranking / Eligibility Sequencing - 2026-05-25
+
+Assignment: prepare docs-only architecture sequencing for `CF-W2-TSC-05` using root `AGENTS.md` and the active execution folder as authority, without modifying application code/tests, Team 07 worktree files, QA docs, ready queues, active board, runtime queues, or shared/runtime source.
+
+Updated:
+
+- `03-architecture/CF-W2-TSC-05-architecture-review.md`
+- `06-contracts/CF-W2-TSC-05-today-review-no-target-ranking-eligibility-contract.md`
+- `08-work-packets/CF-W2-TSC-05-work-packet.md`
+- `17-team-outboxes/TEAM-03-architecture-factory.md`
+
+Read-only evidence inspected:
+
+- root `AGENTS.md`
+- `10-requirements/CF-W2-TSC-05-today-review-no-target-ranking-and-eligibility-reframe-requirement.md`
+- `10-requirements/CF-W2-TSC-04-today-review-no-target-candidate-language-cleanup-requirement.md`
+- `03-architecture/CF-W2-TSC-04-architecture-review.md`
+- `06-contracts/CF-W2-TSC-04-today-review-no-target-candidate-language-cleanup-contract.md`
+- `04-qa/CF-W2-TSC-04A-today-review-no-target-candidate-language-qa-plan.md`
+- `13-implementation-evidence/CF-W2-TSC-04A-ready-promotion.md`
+- current main-workspace Today Review module doc, service, types, focused tests, page, detail page, and UI smoke spec
+
+Architecture verdict:
+
+- `CF-W2-TSC-05` now has a smallest honest future child: `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME`.
+- The item is explicitly not Ready. It is sequenced behind accepted `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE`.
+- Current main still contains pre-`TSC-04A` target/R:R strings and Trade Plan-first trusted-surface behavior, so `CF-W2-TSC-05A` must stack on the accepted future `TSC-04A` branch/commit once Team 00 records it.
+- Current Today Review source proves the target/R:R semantic dependence is mostly Today Review-local: Lite scoring, Lite synthetic targets, candidate state, watch reasons, trade-plan scoring, reason summaries, explainability ranking components, and UI/spec trust messaging all still read or surface target-shaped compatibility data.
+- Team 03 did not prove an immediate upstream rewrite is required. The first future child can remain Today Review-only if it filters compatibility-only trade-plan semantics on the Today Review side.
+- Stop boundary is explicit: if Team 07 cannot separate documented invalidation/risk blockers from target/paper-review blockers using current Today Review-visible fields, Team 00 must open a separate upstream blocker packet instead of widening `CF-W2-TSC-05A`.
+
+Exact future reservation direction:
+
+- allowed writer set:
+  - `backend/src/modules/today-trade-review/today-trade-review.types.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.service.ts`
+  - `backend/src/modules/today-trade-review/today-trade-review.md`
+  - `backend/tests/modules/today-trade-review/today-trade-review.service.test.ts`
+  - `frontend/src/features/today-trade-review/types.ts`
+  - `frontend/src/features/today-trade-review/components/TodayReviewPage.tsx`
+  - `frontend/src/features/today-trade-review/components/TodayReviewCandidateDetailPage.tsx`
+  - `frontend/tests/ui/today-trade-review.spec.ts`
+- forbidden scope includes:
+  - Today Review repository/controller/router/validation/index files
+  - Today Review api/hooks/routes files
+  - backend/frontend route registries
+  - shared UI / shared backend utilities
+  - Prisma/schema/migrations/generated
+  - package manifests
+  - upstream modules including Trade Plan, Strategy Decision, Signal Generation, DQ, Calibration, and Backtesting
+  - `frontend/src/features/data-quality-engine/**`
+  - `frontend/src/features/pipeline-ops/**`
+
+Recommended Team 04 QA handoff direction:
+
+- do not plan execution from current main;
+- wait for Team 00 to provide the accepted `CF-W2-TSC-04A` base commit;
+- then verify that target/reward, reward/risk, synthetic target math, and paper-review thresholds no longer determine candidate rank or eligibility;
+- preserve rule-based invalidation/risk blockers, DQ readiness, signal health, supporting evidence, and missing-evidence honesty;
+- reject the handoff if the implementation needs upstream Trade Plan or Strategy Decision edits.
+
+Recommended next Team 00 action:
+
+1. Keep `CF-W2-TSC-05` out of Ready.
+2. Wait for Team 07 acceptance and exact commit/merge evidence for `CF-W2-TSC-04A`.
+3. Re-anchor `CF-W2-TSC-05A` to that accepted base.
+4. Route `CF-W2-TSC-05A` to Team 04 for QA planning only after the base is available.
+
+No tests, builds, services, UI runs, commits, or pushes were run.
+
 ## Team 03 CF-W3-MDPIPE-01B5 Architect Signoff - 2026-05-25
 
 Assignment: perform Architect Signoff for `CF-W3-MDPIPE-01B5` after Team 04 QA ACCEPT and Team 10 review ACCEPT, using only the allowed signoff docs and without modifying application source/tests or touching unrelated Team 00 / Team 07 work.

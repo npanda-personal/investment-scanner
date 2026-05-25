@@ -8,6 +8,37 @@ Owner: Team 00 - Master Orchestrator / Integration
 
 Date: 2026-05-25
 
+## Latest Active Snapshot - TSC-04A QA And Rolling Backlog
+
+Date: 2026-05-25
+
+Current active agents:
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | `019e5e8c-905b-78e3-862d-7f8c54de2d2c` | `gpt-5.3-codex`, high | QA verification | `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE` | active |
+| 2 | Team 02 - PO / Requirement Factory | `019e5e8d-d858-7a51-8e0f-7f8bae43c466` | `gpt-5.4`, high | rolling requirements | direct investor/trader-value top-10 refresh | active |
+| 3 | Open slot | none | pending | Code Review | `CF-W2-TSC-04A` after Team 04 acceptance | queued |
+| 4 | Open slot | none | pending | Architect Signoff | `CF-W2-TSC-04A` after Team 10 acceptance | queued |
+| 5 | Open slot | none | pending | Implementation/Rework | Team 07 if `TSC-04A` QA/review rejects, otherwise `TSC-05A` after Ready promotion | queued |
+| 6 | Open slot | none | pending | Architecture/QA prep | next non-overlapping direct-value item after Team 02 refresh | queued |
+
+Current routing:
+
+- Team 07 completed `CF-W2-TSC-04A` implementation in `C:\work\repo\investment-scanner-worktrees\team07-CF-W2-TSC-04A`.
+- Team 00 replayed developer validation and confirmed the worktree-targeted Today Review Playwright smoke must use the worktree build/server, not stale default `127.0.0.1:5173`.
+- Team 03 completed `CF-W2-TSC-05A` architecture sequencing; it is blocked behind accepted `TSC-04A` base evidence and must not start in parallel on the same Today Review files.
+
+Teams ready to pick up new tasks:
+
+- Team 04: active on `CF-W2-TSC-04A` QA Verification.
+- Team 10: queued for `CF-W2-TSC-04A` Code Review after Team 04 acceptance.
+- Team 03: queued for `CF-W2-TSC-04A` Architect Signoff after Team 10 acceptance.
+- Team 02: active on rolling direct-value requirements and backlog hygiene.
+- Team 07: standby for bounded `TSC-04A` rework or, after acceptance and Team 00 Ready promotion, stacked `TSC-05A`.
+
+---
+
 Current active agents:
 
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |

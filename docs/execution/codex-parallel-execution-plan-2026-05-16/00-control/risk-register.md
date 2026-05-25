@@ -21,6 +21,7 @@
 | MD-05 UI smoke regression risk | High | Medium | Team 05 + Team 04 + Team 00 | required `market-data-foundation.spec.ts` fails after MD-05 changes or resource-gated validation later reveals real UI issues | keep MD-05 in Rejected/Rework until Playwright passes and QA/review/signoff rerun | rerun single MD-05 Playwright smoke below 90% memory, then route QA rerun |
 | False trigger risk | High | Medium | Signal Generation + QA | trigger lacks rule/DQ/audit fields | contract-first signal gate | audit trigger contract |
 | Trusted candidate entry-price evidence gap | High | High | Team 00 + Team 03 + Team 06 | `CF-W1-TSC-01` requires rule-triggered entry price but Today Review lacks it and Signal Trigger marks `trigger_price` unavailable | keep TSC implementation out of Ready; prepare upstream Signal Trigger entry-price evidence packet | route `CF-W1-SIG-TRIGGER-ENTRY-01` requirement/architecture/QA prep |
+| Today Review stacked-writer sequencing risk | High | Medium | Team 00 + Team 03 + Team 07 | `CF-W2-TSC-05A` tries to edit Today Review ranking/eligibility before accepted `CF-W2-TSC-04A` base lands | keep `TSC-05A` blocked behind accepted `TSC-04A` commit and one-writer release | route QA/review/signoff for `TSC-04A` first |
 | Signal quality risk | High | Medium | Signal Quality Lab | no outcome proof | forward validation plan | contract inventory |
 | Overfit/backtest risk | High | Medium | Backtesting + Architect | metrics without DQ/source proof | require DQ and assumption docs | inspect backtest contract |
 | Backtesting proof comparison window risk | Medium | Low | Team 06 + Team 03 + Team 10 | very old saved-run detail falls outside existing `listRuns()` comparison window | record as non-blocking limitation for `BT-04`; defer repository widening unless separately approved | keep `BT-04` read-path additive and avoid repository scope creep |
@@ -73,6 +74,7 @@
 
 - `CF-W1-TSC-03A-TREV-SUPPORTING-EVIDENCE` and `CF-W2-BT-05` are no longer active blockers; both completed QA, review, Architect Signoff, delegated PO acceptance, and scoped local branch commits on 2026-05-24.
 - `CF-W3-MDPIPE-01A-MDF-OFFICIAL-EOD` is no longer blocked: Team 05 rework, Team 04 QA rerun, Team 10 re-review, Architect re-signoff, delegated PO acceptance, and scoped local implementation commit `b0c1ab7` all completed on 2026-05-25.
+- `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` is blocked from implementation until `CF-W2-TSC-04A` is accepted and Team 00 records the exact base commit; it reserves the same Today Review writer set.
 - Market Data durable readiness evidence is incomplete for full contract compliance.
 - `CF-W1-DQ-02B` is blocked from implementation because Team 03 found the residual `DQ-02` value requires an explicit DQE persisted read-side/public-contract packet after accepted `DQ-02A`; no honest second no-schema service-local child exists.
 - Current Market Data natural-key behavior is symbol/date-centric and narrower than the active contract target.

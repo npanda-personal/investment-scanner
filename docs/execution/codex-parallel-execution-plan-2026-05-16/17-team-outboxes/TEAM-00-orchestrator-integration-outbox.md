@@ -1,5 +1,35 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - TSC-04A QA And TSC-05A Sequencing
+
+Date: 2026-05-25
+
+Status:
+
+- Branch: `dev`.
+- Open decisions: 0.
+- Product Owner action required: no.
+- Push performed: no.
+- Main dirty scope: active execution docs plus isolated Team 07 worktree implementation under QA.
+
+Current gate:
+
+- `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE` Team 07 implementation is complete in `C:\work\repo\investment-scanner-worktrees\team07-CF-W2-TSC-04A`.
+- Team 00 replayed developer validation and confirmed the valid UI smoke evidence is the worktree-built frontend server, not default `127.0.0.1:5173`.
+- Team 04 QA Verification is active as agent `019e5e8c-905b-78e3-862d-7f8c54de2d2c`.
+- Team 02 rolling direct-value backlog refresh is active as agent `019e5e8d-d858-7a51-8e0f-7f8bae43c466`.
+- Team 03 prepared `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME`; it remains blocked behind accepted `TSC-04A` base evidence.
+
+Teams ready to pick up new tasks:
+
+- Team 04: complete `CF-W2-TSC-04A` QA Verification.
+- Team 10: Code Review after Team 04 acceptance.
+- Team 03: Architect Signoff after Team 10 acceptance; otherwise next non-overlapping architecture packet after Team 02 refresh.
+- Team 02: rolling requirements priority hygiene.
+- Team 07: bounded rework if QA/review rejects `TSC-04A`; otherwise standby for stacked `TSC-05A` after Ready promotion.
+
+---
+
 ## Latest Runtime Checkpoint - Pipeline Command API Accepted
 
 Date: 2026-05-25

@@ -2,6 +2,38 @@
 
 Date: 2026-05-24
 
+## Latest Runtime Checkpoint - TSC-04A QA And TSC-05A Sequencing
+
+Date: 2026-05-25
+
+Current status:
+
+- Branch: `dev`.
+- Open decisions: 0.
+- Product Owner action required: no.
+- Push performed: no.
+- Main workspace dirty scope: active execution docs only.
+- Active spawned agents: Team 04 QA for `CF-W2-TSC-04A`; Team 02 rolling requirements refresh.
+
+Gate movement:
+
+- Team 07 completed `CF-W2-TSC-04A-TREV-CANDIDATE-LANGUAGE` in the dedicated worktree `C:\work\repo\investment-scanner-worktrees\team07-CF-W2-TSC-04A`.
+- Team 00 replayed developer validation: focused backend Today Review test passed, backend build passed, frontend build passed, and worktree-targeted Today Review Playwright smoke passed against a built worktree server. The stale default-port Playwright run is not accepted as evidence.
+- Team 04 QA Verification is active for `CF-W2-TSC-04A`.
+- Team 03 prepared `CF-W2-TSC-05A-TREV-RANKING-ELIGIBILITY-REFRAME` as a stacked future child, but it remains blocked until `TSC-04A` is accepted and Team 00 records the exact base commit.
+
+Teams ready to pick up new tasks:
+
+- Team 04: active `CF-W2-TSC-04A` QA Verification.
+- Team 10: review after Team 04 acceptance.
+- Team 03: Architect Signoff after Team 10 acceptance; otherwise next non-overlapping architecture prep after Team 02 refresh.
+- Team 02: active rolling direct investor/trader-value backlog refresh.
+- Team 07: standby for rework if QA/review rejects `TSC-04A`.
+
+Product Owner action required: no.
+
+---
+
 ## Latest Runtime Checkpoint - Open Items Closed And Stop
 
 Date: 2026-05-24
