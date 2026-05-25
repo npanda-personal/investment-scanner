@@ -63,8 +63,13 @@ function service(overrides: Record<string, any> = {}) {
     bySector: jest.fn().mockResolvedValue([{ group: 'Technology', winRate: 0.61, averageForwardReturn: 0.02, sampleSize: 50 }]),
     noisy: jest.fn().mockResolvedValue([]),
     summary: jest.fn().mockResolvedValue({
+      generatedAt: '2026-05-10T09:30:00.000Z',
       dataStatus: 'PARTIAL',
-      evaluationDiagnostics: { evaluatedSignals: 220 },
+      evaluationDiagnostics: {
+        evaluatedSignals: 220,
+        latestAvailablePriceDate: '2026-05-10',
+        nextEvaluableDate: null,
+      },
       horizonAvailability: {
         '1D': { eligible: 220, evaluated: 220, insufficientFuturePrice: 0 },
         '5D': { eligible: 220, evaluated: 220, insufficientFuturePrice: 0 },
@@ -179,6 +184,188 @@ describe('signal calibration engine service', () => {
     expect(comparison?.rawSignal.symbol).toBe('AAPL');
     expect(comparison?.calibratedSignal.symbol).toBe('AAPL');
     expect(setup.qualityService.summary).toHaveBeenCalledWith(expect.objectContaining({ horizon: '20D' }));
+    expect(comparison?.calibratedSignal.calibrationEvidence?.evidenceBasis).toMatchObject({
+      status: 'MEASURED',
+      signalQualityGeneratedAt: '2026-05-10T09:30:00.000Z',
+      latestMeasurablePriceDate: '2026-05-10',
+    });
+  });
+
+  it('projects scoped page summary and measured evidence basis from scoped top summary', async () => {
+    const setup = service({
+      repository: {
+        top: jest.fn().mockResolvedValue({
+          items: [{
+            ...service().instance.calibrate(rawSignal(), context()),
+            calibrationEvidence: null,
+            calibrationReadiness: null,
+          }],
+          totalCount: 1,
+          limit: 25,
+          offset: 0,
+          hasMore: false,
+          sortBy: 'generatedAt',
+          sortDirection: 'desc',
+        }),
+      },
+      qualityService: {
+        summary: jest.fn().mockResolvedValue({
+          generatedAt: '2026-05-20T10:00:00.000Z',
+          dataStatus: 'PARTIAL',
+          evaluationDiagnostics: {
+            evaluatedSignals: 220,
+            latestAvailablePriceDate: '2026-05-20',
+            nextEvaluableDate: null,
+          },
+          horizonAvailability: {
+            '20D': { eligible: 220, evaluated: 220, insufficientFuturePrice: 0 },
+          },
+        }),
+      },
+    });
+
+    const page = await setup.instance.top({ limit: 25, region: 'IN', assetType: 'STOCK', horizon: '20D' });
+    expect(page.pageSummary).toBeDefined();
+    expect(page.pageSummary!.scope).toEqual({ region: 'IN', assetType: 'STOCK', horizon: '20D' });
+    expect(page.pageSummary!.calibrationEvidence.evidenceBasis).toMatchObject({
+      status: 'MEASURED',
+      signalQualityGeneratedAt: '2026-05-20T10:00:00.000Z',
+      latestMeasurablePriceDate: '2026-05-20',
+      nextEvaluableDate: null,
+    });
+    expect(page.items[0].calibrationEvidence?.evidenceBasis).toMatchObject({
+      status: 'MEASURED',
+      latestMeasurablePriceDate: '2026-05-20',
+    });
+  });
+
+  it('uses the same summary scope query shape for compare and top under the same scope and horizon', async () => {
+    const summary = jest.fn().mockResolvedValue({
+      generatedAt: '2026-05-20T10:00:00.000Z',
+      dataStatus: 'PARTIAL',
+      evaluationDiagnostics: {
+        evaluatedSignals: 220,
+        latestAvailablePriceDate: '2026-05-20',
+        nextEvaluableDate: null,
+      },
+      horizonAvailability: {
+        '20D': { eligible: 220, evaluated: 220, insufficientFuturePrice: 0 },
+      },
+    });
+    const setup = service({
+      signalService: {
+        latestForInstrument: jest.fn().mockResolvedValue(rawSignal({ sector: 'Technology', country: 'US' })),
+      },
+      repository: {
+        top: jest.fn().mockResolvedValue({
+          items: [{
+            ...service().instance.calibrate(rawSignal(), context()),
+            calibrationEvidence: null,
+            calibrationReadiness: null,
+          }],
+          totalCount: 1,
+          limit: 25,
+          offset: 0,
+          hasMore: false,
+          sortBy: 'generatedAt',
+          sortDirection: 'desc',
+        }),
+      },
+      qualityService: {
+        summary,
+      },
+    });
+
+    await setup.instance.compare('stock-1', 'US', 'STOCK', '20D');
+    await setup.instance.top({ limit: 25, region: 'US', assetType: 'STOCK', horizon: '20D' });
+
+    expect(summary).toHaveBeenCalledTimes(2);
+    expect(summary.mock.calls[0][0]).toEqual({
+      horizon: '20D',
+      limit: 1,
+      minSampleSize: 0,
+      region: 'US',
+      assetType: 'STOCK',
+      sector: undefined,
+      country: undefined,
+    });
+    expect(summary.mock.calls[1][0]).toEqual(summary.mock.calls[0][0]);
+  });
+
+  it('marks horizon-limited evidence basis and exposes next evaluable date', async () => {
+    const setup = service({
+      repository: {
+        top: jest.fn().mockResolvedValue({
+          items: [{
+            ...service().instance.calibrate(rawSignal(), context()),
+            calibrationEvidence: null,
+            calibrationReadiness: null,
+          }],
+          totalCount: 1,
+          limit: 25,
+          offset: 0,
+          hasMore: false,
+          sortBy: 'generatedAt',
+          sortDirection: 'desc',
+        }),
+      },
+      qualityService: {
+        summary: jest.fn().mockResolvedValue({
+          generatedAt: '2026-05-20T10:00:00.000Z',
+          dataStatus: 'PARTIAL',
+          evaluationDiagnostics: {
+            evaluatedSignals: 90,
+            latestAvailablePriceDate: '2026-05-20',
+            nextEvaluableDate: '2026-06-10',
+          },
+          horizonAvailability: {
+            '20D': { eligible: 150, evaluated: 90, insufficientFuturePrice: 60 },
+          },
+        }),
+      },
+    });
+
+    const page = await setup.instance.top({ limit: 25, region: 'US', assetType: 'STOCK', horizon: '20D' });
+    expect(page.pageSummary).toBeDefined();
+    expect(page.pageSummary!.calibrationEvidence.evidenceBasis).toMatchObject({
+      status: 'HORIZON_LIMITED',
+      latestMeasurablePriceDate: '2026-05-20',
+      nextEvaluableDate: '2026-06-10',
+    });
+    expect(page.items[0].calibrationEvidence?.evidenceBasis).toMatchObject({
+      status: 'HORIZON_LIMITED',
+      nextEvaluableDate: '2026-06-10',
+    });
+  });
+
+  it('fails closed with missing Signal Quality evidence basis when scoped summary is unavailable', async () => {
+    const setup = service({
+      repository: {
+        top: jest.fn().mockResolvedValue({
+          items: [{
+            ...service().instance.calibrate(rawSignal(), context()),
+            calibrationEvidence: null,
+            calibrationReadiness: null,
+          }],
+          totalCount: 1,
+          limit: 25,
+          offset: 0,
+          hasMore: false,
+          sortBy: 'generatedAt',
+          sortDirection: 'desc',
+        }),
+      },
+      qualityService: {
+        summary: jest.fn().mockRejectedValue(new Error('summary missing')),
+      },
+    });
+
+    const page = await setup.instance.top({ limit: 25, region: 'IN', assetType: 'STOCK', horizon: '20D' });
+    expect(page.pageSummary).toBeDefined();
+    expect(page.pageSummary!.calibrationEvidence.evidenceBasis.status).toBe('MISSING_SIGNAL_QUALITY_EVIDENCE');
+    expect(page.pageSummary!.calibrationReadiness.status).toBe('UNAVAILABLE');
+    expect(page.items[0].calibrationReadiness?.status).toBe('UNAVAILABLE');
+    expect(page.items[0].calibrationEvidence?.evidenceBasis.status).toBe('MISSING_SIGNAL_QUALITY_EVIDENCE');
   });
 
   it('returns model and health metadata', async () => {

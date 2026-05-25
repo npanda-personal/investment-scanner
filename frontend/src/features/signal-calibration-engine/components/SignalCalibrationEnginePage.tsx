@@ -107,11 +107,11 @@ function downloadCalibrationCsv(rows: SignalCalibrationResult[], scopeLabel: str
 const SignalCalibrationEnginePage: React.FC = () => {
   const { scope } = useMarketScope();
   const { region, assetType } = scope;
-  const { 
-    data, model, health, loading, error, reload, 
+  const {
+    data, model, loading, error, reload,
     setPagination, setSorting, applySearch, applyFilters, resetFilters, changeHorizon, search, filters, horizon,
   } = useSignalCalibrationEngine();
-  
+
   const [selectedInstrument, setSelectedInstrument] = useState<V1Instrument | null>(null);
   const [runLimit, setRunLimit] = useState(String(signal_calibration_engine_batch_size));
   const [comparison, setComparison] = useState<CalibrationComparison | null>(null);
@@ -122,6 +122,7 @@ const SignalCalibrationEnginePage: React.FC = () => {
 
   const summary = useMemo(() => {
     const items = data.items || [];
+    const pageSummary = data.pageSummary;
     const upgraded = items.filter((item) => item.scoreDelta > 0).length;
     const downgraded = items.filter((item) => item.scoreDelta < 0).length;
     const avgDelta = items.length ? items.reduce((sum, item) => sum + item.scoreDelta, 0) / items.length : 0;
@@ -132,7 +133,7 @@ const SignalCalibrationEnginePage: React.FC = () => {
     const warningRows = items.filter((item) => (item.warningsCount ?? 0) > 0 || item.dataGaps.length > 0 || (item.calibrationEvidence?.evidenceWarnings.length ?? 0) > 0).length;
     const blockerRows = items.filter((item) => (item.calibrationReadiness?.blockers.length ?? 0) > 0).length;
     return {
-      calibrated: health?.calibratedSignals ?? data.totalCount,
+      calibrated: pageSummary?.totalScopedRows ?? data.totalCount,
       upgraded,
       downgraded,
       avgDelta: avgDelta.toFixed(1),
@@ -146,8 +147,13 @@ const SignalCalibrationEnginePage: React.FC = () => {
       normalInfluence,
       warningRows,
       blockerRows,
+      pageReadiness: pageSummary?.calibrationReadiness?.status || 'UNAVAILABLE',
+      pageInfluence: pageSummary?.calibrationReadiness?.downstreamInfluence || 'NONE',
+      evidenceBasis: pageSummary?.calibrationEvidence?.evidenceBasis,
+      evidenceWarnings: pageSummary?.calibrationEvidence?.evidenceWarnings || [],
+      readinessBlockers: pageSummary?.calibrationReadiness?.blockers || [],
     };
-  }, [health, data]);
+  }, [data]);
 
   const run = async () => {
     setFormError(null);
@@ -226,7 +232,14 @@ const SignalCalibrationEnginePage: React.FC = () => {
     { id: 'evidenceStatus', label: 'Evidence', render: (row) => <Chip size="small" variant="outlined" label={labelize(row.evidenceStatus || 'UNKNOWN')} color={row.evidenceStatus === 'SUFFICIENT' ? 'success' : row.evidenceStatus === 'LOW_SAMPLE' ? 'warning' : 'error'} /> },
     { id: 'overallEvaluatedSamples', label: 'Samples', render: (row) => `${row.overallEvaluatedSamples ?? 0} / ${row.groupEvaluatedSamples ?? 0}` },
     { id: 'dataGaps', label: 'Data Gaps', render: (row) => row.dataGaps.length },
-    { id: 'generatedAt', label: 'Calibrated', sortable: true, render: (row) => new Date(row.generatedAt).toLocaleDateString() },
+    { id: 'generatedAt', label: 'Calibrated At', sortable: true, render: (row) => new Date(row.generatedAt).toLocaleDateString() },
+    {
+      id: 'evidenceThrough',
+      label: 'Evidence Through',
+      render: (row) => row.calibrationEvidence?.evidenceBasis?.latestMeasurablePriceDate
+        ? new Date(row.calibrationEvidence.evidenceBasis.latestMeasurablePriceDate).toLocaleDateString()
+        : '-',
+    },
     { id: 'actions', label: 'Actions', align: 'right', render: (row) => (
       <Tooltip title="Open Research" arrow>
         <IconButton size="small" component={Link} to={row.researchUrl}>
@@ -239,6 +252,8 @@ const SignalCalibrationEnginePage: React.FC = () => {
   if (loading && !model && data.items.length === 0) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>;
 
   const scopeLabel = `${region === 'GLOBAL' ? 'Global' : region} / ${assetType || 'ALL'}`;
+  const evidenceThroughDate = summary.evidenceBasis?.latestMeasurablePriceDate;
+  const nextEvaluableDate = summary.evidenceBasis?.nextEvaluableDate;
 
   return (
     <Box sx={{ p: 3, maxWidth: 1500, mx: 'auto' }}>
@@ -260,13 +275,25 @@ const SignalCalibrationEnginePage: React.FC = () => {
         }
       />
 
+      {summary.evidenceWarnings.length > 0 && (
+        <Alert severity="warning" sx={{ mb: 3 }}>
+          <Typography variant="subtitle2" fontWeight={700}>Calibration Sample Warning</Typography>
+          {summary.evidenceWarnings.map((w, i) => <Typography key={i} variant="body2">{w}</Typography>)}
+        </Alert>
+      )}
       {summary.warningRows > 0 && (
         <Alert severity="warning" sx={{ mb: 3 }}>
           <Typography variant="subtitle2" fontWeight={700}>Calibration Evidence Warnings</Typography>
           <Typography variant="body2">{summary.warningRows} visible rows have warnings or data gaps. Use filters or CSV export for row-level evidence.</Typography>
         </Alert>
       )}
-      {summary.blockerRows > 0 && (
+      {summary.readinessBlockers.length > 0 && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          <Typography variant="subtitle2" fontWeight={700}>Calibration Readiness Blocked</Typography>
+          {summary.readinessBlockers.map((w, i) => <Typography key={i} variant="body2">{w}</Typography>)}
+        </Alert>
+      )}
+      {summary.blockerRows > 0 && summary.readinessBlockers.length === 0 && (
         <Alert severity="error" sx={{ mb: 3 }}>
           <Typography variant="subtitle2" fontWeight={700}>Calibration Readiness Blocked</Typography>
           <Typography variant="body2">{summary.blockerRows} visible rows have blockers and should not influence downstream trusted workflows.</Typography>
@@ -295,6 +322,11 @@ const SignalCalibrationEnginePage: React.FC = () => {
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(6, 1fr)' }, gap: 2, mb: 3 }}>
         <MetricCard label="Selected Horizon" value={horizon} />
+        <MetricCard label="Readiness" value={summary.pageReadiness} tone={readinessTone(summary.pageReadiness)} />
+        <MetricCard label="Downstream Influence" value={summary.pageInfluence} tone={summary.pageInfluence === 'NONE' ? 'error' : summary.pageInfluence === 'LIMITED' ? 'warning' : 'success'} />
+        <MetricCard label="Evidence Basis" value={summary.evidenceBasis?.status || 'MISSING_SIGNAL_QUALITY_EVIDENCE'} tone={summary.evidenceBasis?.status === 'MEASURED' ? 'success' : summary.evidenceBasis?.status === 'HORIZON_LIMITED' ? 'warning' : 'error'} />
+        <MetricCard label="Evidence Through" value={evidenceThroughDate ? new Date(evidenceThroughDate).toLocaleDateString() : '-'} />
+        <MetricCard label="Next Evaluable Date" value={nextEvaluableDate ? new Date(nextEvaluableDate).toLocaleDateString() : '-'} />
         <MetricCard label="Usable on Page" value={summary.usable} tone={summary.usable > 0 ? 'success' : undefined} />
         <MetricCard label="Normal Influence on Page" value={summary.normalInfluence} tone={summary.normalInfluence > 0 ? 'success' : undefined} />
         <MetricCard label="Calibrated Signals" value={summary.calibrated} />
@@ -383,6 +415,15 @@ const SignalCalibrationEnginePage: React.FC = () => {
                 <Typography variant="subtitle1" fontWeight={700}>Calibrated Signal</Typography>
                 <Typography>{comparison.calibratedSignal.calibratedScore} ({delta(comparison.calibratedSignal.scoreDelta)}) / {comparison.calibratedSignal.calibratedDirection} / <ConfidenceChip value={comparison.calibratedSignal.calibratedConfidence} /></Typography>
                 <Typography variant="body2" sx={{ mt: 1 }}><strong>Evidence Status:</strong> {comparison.calibratedSignal.evidenceStatus} ({comparison.calibratedSignal.overallEvaluatedSamples} samples)</Typography>
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  <strong>Evidence Basis:</strong> {comparison.calibratedSignal.calibrationEvidence?.evidenceBasis?.status || 'MISSING_SIGNAL_QUALITY_EVIDENCE'}
+                  {comparison.calibratedSignal.calibrationEvidence?.evidenceBasis?.latestMeasurablePriceDate
+                    ? ` / Through ${new Date(comparison.calibratedSignal.calibrationEvidence.evidenceBasis.latestMeasurablePriceDate).toLocaleDateString()}`
+                    : ''}
+                  {comparison.calibratedSignal.calibrationEvidence?.evidenceBasis?.nextEvaluableDate
+                    ? ` / Next evaluable ${new Date(comparison.calibratedSignal.calibrationEvidence.evidenceBasis.nextEvaluableDate).toLocaleDateString()}`
+                    : ''}
+                </Typography>
                 <Typography variant="body2" sx={{ mt: 1 }}><strong>Readiness:</strong> {comparison.calibratedSignal.calibrationReadiness?.status || 'UNAVAILABLE'} / {comparison.calibratedSignal.calibrationReadiness?.downstreamInfluence || 'NONE'} / {comparison.calibratedSignal.calibrationReadiness?.authoritativeScore || 'RAW_SCORE'}</Typography>
                 <Typography variant="body2" sx={{ mt: 1 }}><strong>Boosts:</strong> {comparison.calibratedSignal.boosts.map((item) => item.label).join('; ') || 'None'}</Typography>
                 <Typography variant="body2"><strong>Penalties:</strong> {comparison.calibratedSignal.penalties.map((item) => item.label).join('; ') || 'None'}</Typography>

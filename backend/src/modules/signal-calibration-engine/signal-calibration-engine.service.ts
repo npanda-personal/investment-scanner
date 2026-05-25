@@ -14,8 +14,10 @@ import type {
   CalibrationRunRequest,
   CalibrationRunResponse,
   CalibrationEvidenceStatus,
+  CalibrationEvidenceBasis,
   CalibrationConfidenceLevel,
   CalibrationEvidence,
+  CalibrationPageSummary,
   CalibrationReadiness,
   SignalCalibrationResultDto,
   SignalLikeForCalibration,
@@ -104,7 +106,11 @@ export class SignalCalibrationEngineService {
     const raw = await this.signalService.latestForInstrument(instrumentId);
     if (!raw) return null;
     const horizon = this.parseHorizon(horizonInput);
-    const summary = await this.qualityService.summary({ horizon, limit: 1, minSampleSize: 0, region, assetType, sector: raw.sector || undefined, country: raw.country || undefined }).catch(() => null);
+    const summary = await this.qualityService.summary(this.signalQualitySummaryQuery({
+      horizon,
+      region,
+      assetType,
+    })).catch(() => null);
     const stock = await this.repository.instrumentInScope(instrumentId, region, assetType);
     if (!stock && region && region !== 'GLOBAL') {
       return null;
@@ -222,18 +228,18 @@ export class SignalCalibrationEngineService {
   async top(query: CalibrationQuery): Promise<PaginatedCalibrationResponse> {
     const page = await this.repository.top({ ...query, calibrationModelVersion: MODEL_VERSION });
     const horizon = this.parseHorizon(query.horizon);
-    const summary = await this.qualityService.summary({
+    const summary = await this.qualityService.summary(this.signalQualitySummaryQuery({
       horizon,
-      limit: 1,
-      minSampleSize: 0,
       region: query.region,
       assetType: query.assetType,
       sector: query.sector,
       country: query.country,
-    }).catch(() => null);
+    })).catch(() => null);
+    const items = page.items.map((item) => this.withEvidenceFromSummary(item, horizon, summary));
     return {
       ...page,
-      items: page.items.map((item) => this.withEvidenceFromSummary(item, horizon, summary)),
+      items,
+      pageSummary: this.pageSummary(query, horizon, summary, items, page.totalCount),
     };
   }
 
@@ -404,6 +410,11 @@ export class SignalCalibrationEngineService {
 
     const calibrationApplied = boosts.length > 0 || penalties.length > 0;
     const sampleSizePenaltyApplied = confidenceTier === 'INSUFFICIENT_SAMPLE' || confidenceTier === 'LOW';
+    const evidenceBasis = this.calibrationEvidenceBasis(context.horizon, {
+      generatedAt: context.signalQualityGeneratedAt ?? null,
+      evaluationDiagnostics: context.evaluationDiagnostics || null,
+      horizonAvailability: context.horizonAvailability || null,
+    });
     const calibrationEvidence = this.calibrationEvidence({
       horizon: context.horizon,
       overallEvaluatedSamples,
@@ -413,6 +424,7 @@ export class SignalCalibrationEngineService {
       evidenceStatus: finalEvidenceStatus,
       evidenceReasons: reasons,
       evidenceWarnings,
+      evidenceBasis,
     });
     const calibrationReadiness = this.calibrationReadiness({
       evidenceStatus: finalEvidenceStatus,
@@ -517,6 +529,7 @@ export class SignalCalibrationEngineService {
       dataGaps: lookup?.gaps?.length ? [...lookup.gaps] : lookup ? [] : ['Historical context lookup unavailable.'],
       horizonAvailability: globalSummary?.horizonAvailability || null,
       evaluationDiagnostics: globalSummary?.evaluationDiagnostics || null,
+      signalQualityGeneratedAt: globalSummary?.generatedAt || null,
       horizon,
     };
   }
@@ -599,7 +612,7 @@ export class SignalCalibrationEngineService {
   }
 
   private withEvidenceFromSummary(item: SignalCalibrationResultDto, horizon: QualityHorizon, summary: any): SignalCalibrationResultDto {
-    if (item.calibrationEvidence && item.calibrationReadiness) return item;
+    if (item.calibrationEvidence?.evidenceBasis && item.calibrationReadiness) return item;
     const overallEvaluatedSamples = summary?.evaluationDiagnostics?.evaluatedSignals ?? 0;
     const evaluatedForHorizon = summary?.horizonAvailability?.[horizon]?.evaluated ?? overallEvaluatedSamples;
     const groupEvaluatedSamples = Math.max(
@@ -610,6 +623,7 @@ export class SignalCalibrationEngineService {
     const evidenceStatus = this.finalEvidenceStatus(this.evidenceStatusForSamples(overallEvaluatedSamples, evaluatedForHorizon, Boolean(summary)), groupEvaluatedSamples);
     const warnings = summary ? this.sampleWarnings(horizon, overallEvaluatedSamples, groupEvaluatedSamples, evaluatedForHorizon) : ['Signal Quality diagnostics unavailable for this scope.'];
     const calibrationApplied = evidenceStatus === 'SUFFICIENT' || evidenceStatus === 'LOW_SAMPLE' ? item.scoreDelta !== 0 : false;
+    const evidenceBasis = this.calibrationEvidenceBasis(horizon, summary);
     const calibrationEvidence = this.calibrationEvidence({
       horizon,
       overallEvaluatedSamples,
@@ -619,6 +633,7 @@ export class SignalCalibrationEngineService {
       evidenceStatus,
       evidenceReasons: item.calibrationReasons,
       evidenceWarnings: warnings,
+      evidenceBasis,
     });
     const calibrationReadiness = this.calibrationReadiness({
       evidenceStatus,
@@ -659,6 +674,7 @@ export class SignalCalibrationEngineService {
     evidenceStatus: CalibrationEvidenceStatus;
     evidenceReasons: string[];
     evidenceWarnings: string[];
+    evidenceBasis: CalibrationEvidenceBasis;
   }): CalibrationEvidence {
     return {
       horizon: input.horizon,
@@ -674,6 +690,7 @@ export class SignalCalibrationEngineService {
       evidenceReasons: input.evidenceReasons,
       evidenceWarnings: input.evidenceWarnings,
       warnings: input.evidenceWarnings,
+      evidenceBasis: input.evidenceBasis,
     };
   }
 
@@ -694,6 +711,13 @@ export class SignalCalibrationEngineService {
       evidenceStatus: input.evidenceStatus,
       evidenceReasons: [input.reason],
       evidenceWarnings: [input.reason],
+      evidenceBasis: {
+        status: 'MISSING_SIGNAL_QUALITY_EVIDENCE',
+        signalQualityGeneratedAt: null,
+        latestMeasurablePriceDate: null,
+        nextEvaluableDate: null,
+        reasonSummary: input.reason,
+      },
     });
   }
 
@@ -770,8 +794,6 @@ export class SignalCalibrationEngineService {
   }
 
   private runEvidenceFromSummary(horizon: QualityHorizon, summary: any, results: SignalCalibrationResultDto[]): CalibrationEvidence | null {
-    const firstEvidence = results.find((result) => result.calibrationEvidence)?.calibrationEvidence;
-    if (firstEvidence) return firstEvidence;
     if (!summary) {
       return this.calibrationEvidence({
         horizon,
@@ -782,6 +804,7 @@ export class SignalCalibrationEngineService {
         evidenceStatus: 'MISSING',
         evidenceReasons: [],
         evidenceWarnings: ['Signal Quality diagnostics unavailable for this scope.'],
+        evidenceBasis: this.calibrationEvidenceBasis(horizon, null),
       });
     }
     const overallEvaluatedSamples = summary.evaluationDiagnostics?.evaluatedSignals ?? 0;
@@ -795,7 +818,70 @@ export class SignalCalibrationEngineService {
       evidenceStatus: this.evidenceStatusForSamples(overallEvaluatedSamples, evaluatedForHorizon, true),
       evidenceReasons: [],
       evidenceWarnings: this.sampleWarnings(horizon, overallEvaluatedSamples, Math.max(0, ...results.map((result) => result.groupEvaluatedSamples ?? 0)), evaluatedForHorizon),
+      evidenceBasis: this.calibrationEvidenceBasis(horizon, summary),
     });
+  }
+
+  private pageSummary(
+    query: CalibrationQuery,
+    horizon: QualityHorizon,
+    summary: any,
+    items: SignalCalibrationResultDto[],
+    totalScopedRows: number
+  ): CalibrationPageSummary {
+    const calibrationEvidence = this.runEvidenceFromSummary(horizon, summary, items) || this.healthCalibrationEvidence({
+      dataStatus: 'MISSING',
+      evidenceStatus: 'MISSING',
+      reason: 'Signal Quality diagnostics unavailable for this scope.',
+    });
+    const calibrationReadiness = this.aggregateReadiness(items, horizon, calibrationEvidence, Boolean(summary));
+    return {
+      scope: {
+        region: query.region || 'GLOBAL',
+        assetType: query.assetType || 'ALL',
+        horizon,
+      },
+      itemsOnPage: items.length,
+      totalScopedRows,
+      calibrationEvidence,
+      calibrationReadiness,
+    };
+  }
+
+  private calibrationEvidenceBasis(horizon: QualityHorizon | string, summary: any): CalibrationEvidenceBasis {
+    const latestMeasurablePriceDate = summary?.evaluationDiagnostics?.latestAvailablePriceDate ?? null;
+    const nextEvaluableDate = summary?.evaluationDiagnostics?.nextEvaluableDate ?? null;
+    const signalQualityGeneratedAt = summary?.generatedAt ?? null;
+    const horizonAvailability = summary?.horizonAvailability?.[horizon];
+    if (!summary || !latestMeasurablePriceDate) {
+      return {
+        status: 'MISSING_SIGNAL_QUALITY_EVIDENCE',
+        signalQualityGeneratedAt,
+        latestMeasurablePriceDate,
+        nextEvaluableDate,
+        reasonSummary: `Signal Quality evidence basis is missing for ${horizon}.`,
+      };
+    }
+
+    const hasHorizonLimit = Number(horizonAvailability?.insufficientFuturePrice ?? 0) > 0
+      || (Number(horizonAvailability?.eligible ?? 0) > Number(horizonAvailability?.evaluated ?? 0) && Boolean(nextEvaluableDate));
+    if (hasHorizonLimit) {
+      return {
+        status: 'HORIZON_LIMITED',
+        signalQualityGeneratedAt,
+        latestMeasurablePriceDate,
+        nextEvaluableDate,
+        reasonSummary: `Selected horizon ${horizon} is still maturing; evidence currently measures outcomes through ${latestMeasurablePriceDate}.`,
+      };
+    }
+
+    return {
+      status: 'MEASURED',
+      signalQualityGeneratedAt,
+      latestMeasurablePriceDate,
+      nextEvaluableDate,
+      reasonSummary: `Measured evidence for ${horizon} is available through ${latestMeasurablePriceDate}.`,
+    };
   }
 
   private aggregateReadiness(results: SignalCalibrationResultDto[], horizon: QualityHorizon, evidence: CalibrationEvidence | null, hasSummary: boolean): CalibrationReadiness {
@@ -890,6 +976,24 @@ export class SignalCalibrationEngineService {
 
   private parseHorizon(value: unknown): QualityHorizon {
     return SUPPORTED_HORIZONS.includes(value as QualityHorizon) ? value as QualityHorizon : DEFAULT_HORIZON;
+  }
+
+  private signalQualitySummaryQuery(input: {
+    horizon: QualityHorizon;
+    region?: string;
+    assetType?: string;
+    sector?: string;
+    country?: string;
+  }) {
+    return {
+      horizon: input.horizon,
+      limit: 1,
+      minSampleSize: 0,
+      region: input.region,
+      assetType: input.assetType,
+      sector: input.sector,
+      country: input.country,
+    };
   }
 
   private async resolveSignals(request: CalibrationRunRequest): Promise<SignalResultDto[]> {

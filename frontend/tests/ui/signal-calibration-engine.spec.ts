@@ -49,6 +49,13 @@ const calibratedRow = {
     evidenceReasons: ['Overall evidence is available.'],
     evidenceWarnings: ['Group sample is below calibration threshold.'],
     warnings: ['Group sample is below calibration threshold.'],
+    evidenceBasis: {
+      status: 'HORIZON_LIMITED',
+      signalQualityGeneratedAt: '2026-05-10T09:30:00.000Z',
+      latestMeasurablePriceDate: '2026-05-09',
+      nextEvaluableDate: '2026-05-27',
+      reasonSummary: 'Selected horizon 20D is still maturing; evidence currently measures outcomes through 2026-05-09.',
+    },
   },
   calibrationReadiness: {
     status: 'LIMITED',
@@ -87,6 +94,7 @@ async function mockCalibrationApi(page: Page) {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true }) });
   });
 
+  let healthRequested = false;
   await page.route('**/api/v1/signals/calibration/model', async (route: Route) => {
     await route.fulfill({
       status: 200,
@@ -110,6 +118,7 @@ async function mockCalibrationApi(page: Page) {
   });
 
   await page.route('**/api/v1/signals/calibration/health', async (route: Route) => {
+    healthRequested = true;
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -123,25 +132,82 @@ async function mockCalibrationApi(page: Page) {
     expect(url.searchParams.get('assetType')).toBe('STOCK');
     expect(url.searchParams.get('sortBy')).toBe('calibratedScore');
     expect(url.searchParams.get('sortDirection')).toBe('desc');
+    expect(url.searchParams.get('horizon')).toBe('20D');
+    const leadingRow = {
+      ...calibratedRow,
+      id: 'cal-2',
+      symbol: 'INFY.NS',
+      calibratedConfidence: 'HIGH',
+      evidenceStatus: 'SUFFICIENT',
+      scoreDelta: 4,
+      calibrationEvidence: {
+        ...calibratedRow.calibrationEvidence,
+        evidenceStatus: 'SUFFICIENT',
+        evidenceWarnings: [],
+        warnings: [],
+        evidenceBasis: {
+          status: 'MEASURED',
+          signalQualityGeneratedAt: '2026-05-10T09:30:00.000Z',
+          latestMeasurablePriceDate: '2026-05-10',
+          nextEvaluableDate: null,
+          reasonSummary: 'Measured evidence for 20D is available through 2026-05-10.',
+        },
+      },
+      calibrationReadiness: {
+        ...calibratedRow.calibrationReadiness,
+        status: 'USABLE',
+        confidenceTier: 'HIGH',
+        downstreamInfluence: 'NORMAL',
+      },
+    };
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        items: [calibratedRow],
-        totalCount: 1,
+        items: [leadingRow, calibratedRow],
+        totalCount: 2,
         limit: Number(url.searchParams.get('limit') || 25),
         offset: Number(url.searchParams.get('offset') || 0),
         hasMore: false,
         sortBy: 'calibratedScore',
         sortDirection: 'desc',
+        pageSummary: {
+          scope: { region: 'IN', assetType: 'STOCK', horizon: '20D' },
+          itemsOnPage: 2,
+          totalScopedRows: 2,
+          calibrationEvidence: {
+            ...calibratedRow.calibrationEvidence,
+            evidenceStatus: 'MISSING',
+            evidenceWarnings: ['Signal Quality diagnostics unavailable for this scope.'],
+            warnings: ['Signal Quality diagnostics unavailable for this scope.'],
+            evidenceBasis: {
+              status: 'MISSING_SIGNAL_QUALITY_EVIDENCE',
+              signalQualityGeneratedAt: null,
+              latestMeasurablePriceDate: null,
+              nextEvaluableDate: null,
+              reasonSummary: 'Signal Quality evidence basis is missing for 20D.',
+            },
+          },
+          calibrationReadiness: {
+            ...calibratedRow.calibrationReadiness,
+            status: 'UNAVAILABLE',
+            confidenceTier: 'INSUFFICIENT_SAMPLE',
+            downstreamInfluence: 'NONE',
+            authoritativeScore: 'RAW_SCORE',
+            blockers: ['Signal Quality evidence is missing.'],
+          },
+        },
       }),
     });
   });
+  return {
+    wasHealthRequested: () => healthRequested,
+  };
 }
 
 test.describe('Signal Calibration Engine UI', () => {
   test('shows calibrated evidence fields and scoped batch run payload', async ({ page }) => {
-    await mockCalibrationApi(page);
+    const api = await mockCalibrationApi(page);
     let runPayload: any = null;
     await page.route('**/api/v1/signals/calibration/run', async (route: Route) => {
       runPayload = route.request().postDataJSON();
@@ -174,16 +240,27 @@ test.describe('Signal Calibration Engine UI', () => {
     await visitModule(page, '/signals/calibration', 'Signal Calibration Engine');
 
     await expect(page.getByText('Calibration uses historical evidence and context snapshots for research support only.')).toBeVisible();
+    await expect(page.getByText('Calibration Sample Warning')).toBeVisible();
+    await expect(page.getByText('Signal Quality diagnostics unavailable for this scope.')).toBeVisible();
     await expect(page.getByText('Calibration Evidence Warnings')).toBeVisible();
     await expect(page.getByText('1 visible rows have warnings or data gaps. Use filters or CSV export for row-level evidence.')).toBeVisible();
+    await expect(page.getByText('Calibration Readiness Blocked')).toBeVisible();
+    await expect(page.getByText('Signal Quality evidence is missing.')).toBeVisible();
     await expect(page.getByText('Readiness', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Downstream Influence', { exact: true })).toBeVisible();
+    await expect(page.getByText('Evidence Basis', { exact: true })).toBeVisible();
     await expect(page.getByText('Normal Influence on Page', { exact: true })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Evidence Through' })).toBeVisible();
+    await expect(page.getByText('MISSING_SIGNAL_QUALITY_EVIDENCE')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'UNAVAILABLE' }).first()).toBeVisible();
     await expect(page.getByText('Limited Evidence on Page', { exact: true })).toBeVisible();
     expect(await page.getByRole('columnheader', { name: 'Calibrated' }).count()).toBeGreaterThan(0);
     expect(await page.getByRole('columnheader', { name: 'Evidence' }).count()).toBeGreaterThan(0);
+    expect(await page.getByRole('columnheader', { name: 'Evidence Through' }).count()).toBeGreaterThan(0);
     expect(await page.getByRole('columnheader', { name: 'Readiness' }).count()).toBeGreaterThan(0);
     expect(await page.getByRole('columnheader', { name: 'Influence' }).count()).toBeGreaterThan(0);
     await expect(page.getByText('RELIANCE.NS')).toBeVisible();
+    await expect(page.getByText('INFY.NS')).toBeVisible();
     await expect(page.getByText('Low Sample')).toBeVisible();
     await expect(page.getByText('Limited').nth(1)).toBeVisible();
     await expect(page.getByText('110 / 18')).toBeVisible();
@@ -193,7 +270,9 @@ test.describe('Signal Calibration Engine UI', () => {
     await page.getByRole('button', { name: 'Export CSV' }).click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toContain('signal-calibration-in-stock');
-    await expect(page.getByText('Exported 1 latest-per-stock calibration rows for IN / STOCK as an Excel-compatible CSV.')).toBeVisible();
+    await expect(page.getByText('Exported 2 latest-per-stock calibration rows for IN / STOCK as an Excel-compatible CSV.')).toBeVisible();
+    expect(await page.getByRole('cell', { name: 'CALIBRATED_SCORE' }).count()).toBeGreaterThan(0);
+    expect(await page.getByRole('cell', { name: '110 / 18' }).count()).toBeGreaterThan(0);
 
     await page.getByRole('button', { name: 'Run Calibration' }).click();
     await expect(page.getByText('Calibration complete for IN / STOCK.')).toBeVisible();
@@ -204,5 +283,108 @@ test.describe('Signal Calibration Engine UI', () => {
       offset: 0,
     });
     expect(runPayload.batchSize).toBeLessThanOrEqual(100);
+    expect(api.wasHealthRequested()).toBe(false);
+  });
+
+  test('fail-closes page summary after a scoped /top request fails following a successful load', async ({ page }) => {
+    await page.route('**/api/v1/signals/calibration/model', async (route: Route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          calibrationModelVersion: 'signal-calibration-v2',
+          qualityMetricWindow: '20D',
+          supportedHorizons: ['1D', '5D', '10D', '20D', '60D'],
+          defaultHorizon: '20D',
+          minSampleSize: 50,
+          minOverallSamples: 50,
+          minGroupSamples: 20,
+          perAdjustmentDeltaCap: 10,
+          totalDeltaCap: 25,
+          rules: [],
+          sampleSafetyRules: [],
+          calibrationReadinessRules: [],
+          fallbackBehavior: 'Preserve raw score when evidence is insufficient.',
+        }),
+      });
+    });
+    await page.route('**/api/v1/signals/calibration/health', async (route: Route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ calibratedSignals: 1, latestGeneratedAt: '2026-05-10T00:00:00.000Z' }),
+      });
+    });
+
+    await page.route('**/api/v1/signals/calibration/top**', async (route: Route) => {
+      const url = new URL(route.request().url());
+      if (url.searchParams.get('horizon') !== '10D') {
+        const row = {
+          ...calibratedRow,
+          evidenceStatus: 'SUFFICIENT',
+          calibrationEvidence: {
+            ...calibratedRow.calibrationEvidence,
+            evidenceStatus: 'SUFFICIENT',
+            evidenceWarnings: [],
+            warnings: [],
+            evidenceBasis: {
+              status: 'MEASURED',
+              signalQualityGeneratedAt: '2026-05-10T09:30:00.000Z',
+              latestMeasurablePriceDate: '2026-05-10',
+              nextEvaluableDate: null,
+              reasonSummary: 'Measured evidence for 20D is available through 2026-05-10.',
+            },
+          },
+          calibrationReadiness: {
+            ...calibratedRow.calibrationReadiness,
+            status: 'USABLE',
+            confidenceTier: 'HIGH',
+            downstreamInfluence: 'NORMAL',
+            blockers: [],
+          },
+        };
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            items: [row],
+            totalCount: 1,
+            limit: 25,
+            offset: 0,
+            hasMore: false,
+            sortBy: 'generatedAt',
+            sortDirection: 'desc',
+            pageSummary: {
+              scope: { region: 'IN', assetType: 'STOCK', horizon: '20D' },
+              itemsOnPage: 1,
+              totalScopedRows: 1,
+              calibrationEvidence: row.calibrationEvidence,
+              calibrationReadiness: row.calibrationReadiness,
+            },
+          }),
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Scoped top failed' }),
+      });
+    });
+
+    await visitModule(page, '/signals/calibration', 'Signal Calibration Engine');
+
+    await expect(page.getByText('MEASURED')).toBeVisible();
+    await expect(page.getByText('RELIANCE.NS')).toBeVisible();
+
+    await page.getByRole('combobox', { name: /Horizon/i }).click();
+    await page.getByRole('option', { name: '10D' }).click();
+
+    await expect(page.getByText('Scoped top failed')).toBeVisible();
+    await expect(page.getByText('MISSING_SIGNAL_QUALITY_EVIDENCE')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'UNAVAILABLE' }).first()).toBeVisible();
+    await expect(page.getByText('Signal Quality diagnostics unavailable for this scope.')).toBeVisible();
+    await expect(page.getByText('RELIANCE.NS')).not.toBeVisible();
   });
 });

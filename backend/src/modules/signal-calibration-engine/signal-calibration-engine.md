@@ -70,7 +70,11 @@ Individual instrument failures are counted in `failedCount` and returned in `war
 
 The `/signals/calibration/top`, `/signals/calibration/run`, and `/signals/calibration/compare/:instrumentId` endpoints respect Global Market Scope (`region` and `assetType`). The backend filters calibration rows through `Stock` metadata using the shared market-scope helper, so `region=IN&assetType=STOCK` excludes US/EU rows when their stock metadata is out of scope. Scoped single-instrument compare/run requests do not persist calibration for instruments outside the requested scope; they return a not-found/skip result instead.
 
-The `/signals/calibration/top` endpoint returns a `PaginatedCalibrationResponse` with `items`, `totalCount`, `limit`, `offset`, `hasMore`, `sortBy`, and `sortDirection`.
+Compare and list now source Signal Quality summary evidence through the same visible scope basis (`region`, `assetType`, `horizon`, plus explicit list filters only when supplied on `/top`). Compare no longer injects hidden instrument `sector`/`country` filters, so evidence-basis timing stays aligned across compare/list for the same selected scope and horizon.
+
+The `/signals/calibration/top` endpoint returns a `PaginatedCalibrationResponse` with `items`, `totalCount`, `limit`, `offset`, `hasMore`, `sortBy`, `sortDirection`, and additive scoped `pageSummary` metadata.
+
+`pageSummary` is scoped to the selected `region`, `assetType`, and `horizon`. It includes page-level calibration evidence/readiness derived from the scoped response and Signal Quality summary inputs, so frontend summary cards do not infer page state from `items[0]` or unscoped module health.
 
 Supported query params include `region`, `assetType`, `limit`, `offset`, `sortBy`, `sortDirection`, `direction`, `confidence`, `calibrationConfidence`, `evidenceStatus`, `minRawScore`, `minCalibratedScore`, `minAbsDelta`, `hasDataGaps`, `search`, and `horizon`. `limit` is clamped to 100. Sorting supports `symbol`, `rawScore`, `calibratedScore`, `scoreDelta`, and `generatedAt`.
 
@@ -118,6 +122,16 @@ The calibration UI clearly displays:
 - Adjustment cap and whether sample-size fallback/passthrough was used
 
 Response DTOs add `calibrationEvidence`, `calibrationConfidence`, `calibrationApplied`, `adjustmentCapApplied`, `sampleSizePenaltyApplied`, `overallEvaluatedSamples`, `groupEvaluatedSamples`, `evidenceStatus`, and `warningsCount`.
+
+Each `calibrationEvidence` object now includes additive `evidenceBasis` fields sourced from Signal Quality summary outputs:
+
+- `status`: `MEASURED`, `HORIZON_LIMITED`, or `MISSING_SIGNAL_QUALITY_EVIDENCE`
+- `signalQualityGeneratedAt`
+- `latestMeasurablePriceDate`
+- `nextEvaluableDate`
+- `reasonSummary`
+
+`generatedAt` on calibration rows remains the calibration generation timestamp; evidence-through timing is carried separately in `calibrationEvidence.evidenceBasis.latestMeasurablePriceDate`.
 
 Source-module readiness guardrails are additive and are not persisted in this slice. Calibration-owned responses also expose:
 

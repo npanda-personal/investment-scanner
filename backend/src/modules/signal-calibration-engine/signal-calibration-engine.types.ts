@@ -5,6 +5,7 @@ export type CalibrationDataStatus = 'COMPLETE' | 'PARTIAL' | 'MISSING' | 'ERROR'
 export type CalibrationAdjustmentType = 'SIGNAL_TYPE' | 'SCORE_BUCKET' | 'REGIME' | 'SECTOR' | 'SMART_MONEY' | 'DATA_QUALITY' | 'NOISE';
 export type CalibrationConfidenceLevel = SignalConfidence | 'INSUFFICIENT_SAMPLE';
 export type CalibrationEvidenceStatus = 'SUFFICIENT' | 'LOW_SAMPLE' | 'INSUFFICIENT' | 'MISSING';
+export type CalibrationEvidenceBasisStatus = 'MEASURED' | 'HORIZON_LIMITED' | 'MISSING_SIGNAL_QUALITY_EVIDENCE';
 export type CalibrationReadinessStatus = 'USABLE' | 'LIMITED' | 'UNAVAILABLE';
 export type CalibrationDownstreamInfluence = 'NORMAL' | 'LIMITED' | 'NONE';
 export type CalibrationAuthoritativeScore = 'CALIBRATED_SCORE' | 'RAW_SCORE' | 'NO_SCORE';
@@ -30,6 +31,15 @@ export interface CalibrationEvidence {
   evidenceReasons: string[];
   evidenceWarnings: string[];
   warnings: string[];
+  evidenceBasis: CalibrationEvidenceBasis;
+}
+
+export interface CalibrationEvidenceBasis {
+  status: CalibrationEvidenceBasisStatus;
+  signalQualityGeneratedAt: string | null;
+  latestMeasurablePriceDate: string | null;
+  nextEvaluableDate: string | null;
+  reasonSummary: string;
 }
 
 export interface CalibrationReadiness {
@@ -136,6 +146,19 @@ export interface PaginatedCalibrationResponse {
   hasMore: boolean;
   sortBy: string;
   sortDirection: 'asc' | 'desc';
+  pageSummary?: CalibrationPageSummary;
+}
+
+export interface CalibrationPageSummary {
+  scope: {
+    region: string;
+    assetType: string;
+    horizon: string;
+  };
+  itemsOnPage: number;
+  totalScopedRows: number;
+  calibrationEvidence: CalibrationEvidence;
+  calibrationReadiness: CalibrationReadiness;
 }
 
 export interface CalibrationRunResponse {
@@ -220,6 +243,7 @@ export interface CalibrationContext {
   dataGaps: string[];
   horizonAvailability?: Record<string, { eligible: number; evaluated: number; insufficientFuturePrice: number }> | null;
   evaluationDiagnostics?: any | null;
+  signalQualityGeneratedAt?: string | null;
   horizon: string;
 }
 

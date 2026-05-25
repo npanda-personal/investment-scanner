@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { fetchCalibrationHealth, fetchCalibrationModel, fetchTopCalibratedSignals } from '../api/signalCalibrationEngineService';
-import type { CalibrationModelInfo, PaginatedCalibrationResponse } from '../types';
+import { fetchCalibrationModel, fetchTopCalibratedSignals } from '../api/signalCalibrationEngineService';
+import type { CalibrationModelInfo, CalibrationPageSummary, PaginatedCalibrationResponse } from '../types';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 
 export interface CalibrationFilters {
@@ -11,6 +11,44 @@ export interface CalibrationFilters {
   minAbsDelta?: number;
   hasDataGaps?: boolean;
 }
+
+const failClosedPageSummary = (region: string | undefined, assetType: string | undefined, horizon: string): CalibrationPageSummary => ({
+  scope: { region: region || 'GLOBAL', assetType: assetType || 'ALL', horizon },
+  itemsOnPage: 0,
+  totalScopedRows: 0,
+  calibrationEvidence: {
+    horizon,
+    overallEvaluatedSamples: 0,
+    groupEvaluatedSamples: 0,
+    minimumOverallSamples: 50,
+    minimumGroupSamples: 20,
+    requiredOverallSamples: 50,
+    requiredGroupSamples: 20,
+    horizonAvailability: {},
+    dataStatus: 'MISSING',
+    evidenceStatus: 'MISSING',
+    evidenceReasons: [],
+    evidenceWarnings: ['Signal Quality diagnostics unavailable for this scope.'],
+    warnings: ['Signal Quality diagnostics unavailable for this scope.'],
+    evidenceBasis: {
+      status: 'MISSING_SIGNAL_QUALITY_EVIDENCE' as const,
+      signalQualityGeneratedAt: null,
+      latestMeasurablePriceDate: null,
+      nextEvaluableDate: null,
+      reasonSummary: `Signal Quality evidence basis is missing for ${horizon}.`,
+    },
+  },
+  calibrationReadiness: {
+    status: 'UNAVAILABLE' as const,
+    confidenceTier: 'INSUFFICIENT_SAMPLE' as const,
+    calibrationApplied: false,
+    adjustmentCapApplied: 0,
+    downstreamInfluence: 'NONE' as const,
+    authoritativeScore: 'NO_SCORE' as const,
+    reasons: [`No calibrated results were produced for ${horizon}.`],
+    blockers: [`No calibrated results were produced for ${horizon}.`],
+  },
+});
 
 export function useSignalCalibrationEngine() {
   const { scope } = useMarketScope();
@@ -23,11 +61,11 @@ export function useSignalCalibrationEngine() {
     offset: 0,
     hasMore: false,
     sortBy: 'calibratedScore',
-    sortDirection: 'desc'
+    sortDirection: 'desc',
+    pageSummary: failClosedPageSummary(region, assetType, '20D'),
   });
   
   const [model, setModel] = useState<CalibrationModelInfo | null>(null);
-  const [health, setHealth] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,29 +73,26 @@ export function useSignalCalibrationEngine() {
   const [filters, setFilters] = useState<CalibrationFilters>({});
   const [horizon, setHorizon] = useState('20D');
   
-  const loadModelAndHealth = useCallback(async () => {
+  const loadModel = useCallback(async () => {
     try {
-      const [nextModel, nextHealth] = await Promise.all([
-        fetchCalibrationModel(),
-        fetchCalibrationHealth(),
-      ]);
+      const nextModel = await fetchCalibrationModel();
       setModel(nextModel);
-      setHealth(nextHealth);
     } catch (err: any) {
-      console.error('Failed to load calibration model or health', err);
+      console.error('Failed to load calibration model', err);
     }
   }, []);
 
   const fetchTableData = useCallback(async (params: Record<string, any>) => {
     setLoading(true);
     setError(null);
+    const selectedHorizon = params.horizon || horizon;
     try {
       const nextFilters = params.filters !== undefined ? params.filters : filters;
       const nextSearch = params.search !== undefined ? params.search : search;
       const result = await fetchTopCalibratedSignals({
         region,
         assetType,
-        horizon: params.horizon || horizon,
+        horizon: selectedHorizon,
         search: nextSearch || undefined,
         limit: params.limit || data.limit,
         offset: params.offset ?? data.offset,
@@ -68,20 +103,26 @@ export function useSignalCalibrationEngine() {
       setData(result);
     } catch (err: any) {
       setError(err.response?.data?.error || err.message || 'Failed to load signal calibration');
-      setData((prev) => ({ ...prev, items: [], totalCount: 0 }));
+      setData((prev) => ({
+        ...prev,
+        items: [],
+        totalCount: 0,
+        hasMore: false,
+        pageSummary: failClosedPageSummary(region, assetType, selectedHorizon),
+      }));
     } finally {
       setLoading(false);
     }
   }, [region, assetType, horizon, search, data.limit, data.offset, data.sortBy, data.sortDirection, filters]);
 
   const reload = useCallback(() => {
-    loadModelAndHealth();
+    loadModel();
     return fetchTableData({});
-  }, [loadModelAndHealth, fetchTableData]);
+  }, [loadModel, fetchTableData]);
 
   // Refetch when scope changes, reset pagination
   useEffect(() => {
-    loadModelAndHealth();
+    loadModel();
     fetchTableData({ offset: 0 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [region, assetType]);
@@ -109,7 +150,6 @@ export function useSignalCalibrationEngine() {
   return { 
     data, 
     model, 
-    health, 
     loading, 
     error, 
     reload,
