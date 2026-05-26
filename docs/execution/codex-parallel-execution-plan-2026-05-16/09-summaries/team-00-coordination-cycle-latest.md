@@ -23,28 +23,30 @@ Completed / routed:
 - Team 00 created the UX-01B worktree, merged current `dev`, linked backend/frontend dependencies, and launched Team 08 worker `019e6443-4d5b-7c83-a93c-f0699146d06f`.
 - Team 08 launch `019e6443-4d5b-7c83-a93c-f0699146d06f` failed before work began due to prompt-policy filtering; Team 00 closed it and relaunched Team 08 as `019e6446-6e31-7f42-88f0-374ed9c48747`.
 - SPL-02 QA accepted; Team 10 review rejected for stale scope-transition totals and missing explicit loading/error-state UI proof.
-- Team 00 closed Team 10, launched Team 06 bounded SPL-02 rework as `019e644a-7cb0-7131-b159-3ba11ccf29c1`, consumed the completed rework, closed Team 06, and launched Team 04 QA rerun as `019e6455-ae39-7c80-8543-673608a99f20`.
+- Team 00 closed Team 10, launched Team 06 bounded SPL-02 rework as `019e644a-7cb0-7131-b159-3ba11ccf29c1`, consumed the completed rework, closed Team 06, launched Team 04 QA rerun as `019e6455-ae39-7c80-8543-673608a99f20`, consumed QA acceptance, closed Team 04, and launched Team 10 rereview as `019e645c-bf6c-7272-b3c0-ab6df9916cb7`.
+- Team 08 completed UX-01B implementation; Team 00 closed Team 08 and launched Team 04 QA Verification as `019e645d-3a98-7cd3-9365-40a2867efd27`.
 
 Active / queued:
 
-- Team 04 `019e6455-ae39-7c80-8543-673608a99f20`: active on SPL-02 QA rerun.
-- Team 08 `019e6446-6e31-7f42-88f0-374ed9c48747`: active on UX-01B implementation.
+- Team 10 `019e645c-bf6c-7272-b3c0-ab6df9916cb7`: active on SPL-02 rereview.
+- Team 04 `019e645d-3a98-7cd3-9365-40a2867efd27`: active on UX-01B QA Verification.
 - Team 02 `019e645a-5323-7842-9783-c76f310fd7a0`: active on rolling investor/trader-value requirements discovery.
 - Team 10: queued for SPL-02 Code Review after QA acceptance.
 - Team 03: queued for SPL-02 Architect Signoff after Team 10 acceptance.
 
 Teams ready to pick up new tasks:
 
-- Team 04: SPL-02 QA rerun now.
-- Team 08: UX-01B implementation active.
+- Team 10: SPL-02 rereview now.
+- Team 04: UX-01B QA Verification now.
 - Team 02: rolling investor/trader-value requirements discovery active.
-- Team 10: SPL-02 rereview after QA rerun accepts.
+- Team 03: SPL-02 Architect Signoff after Team 10 acceptance.
+- Team 10: UX-01B review after Team 04 acceptance.
 - Team 03: SPL-02 signoff after Team 10 accepts, or rolling architecture prep if no signoff is waiting.
 - Team 02: rolling investor/trader-value requirements discovery.
 
 Next action:
 
-- Continue monitoring Team 04 SPL-02 QA rerun and Team 08 UX-01B implementation. Route Team 10 rereview immediately after QA rerun acceptance.
+- Continue monitoring Team 10 SPL-02 rereview, Team 04 UX-01B QA, and Team 02 requirements. Route the next accepted gate immediately.
 
 ---
 

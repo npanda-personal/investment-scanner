@@ -22,10 +22,10 @@ Current active agents:
 
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Team 04 - QA Factory | `019e6455-ae39-7c80-8543-673608a99f20` | `gpt-5.4`, high | QA rerun | `CF-W2-SPL-02` in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02` | active |
-| 2 | Team 08 - UX / Research / Copilot | `019e6446-6e31-7f42-88f0-374ed9c48747` | `gpt-5.3-codex`, high | implementation | `CF-W1-UX-01B` in `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-UX-01B` | active |
+| 1 | Team 10 - Review / Release | `019e645c-bf6c-7272-b3c0-ab6df9916cb7` | `gpt-5.4`, high | rereview | `CF-W2-SPL-02` in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02` | active |
+| 2 | Team 04 - QA Factory | `019e645d-3a98-7cd3-9365-40a2867efd27` | `gpt-5.4`, high | QA Verification | `CF-W1-UX-01B` in `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-UX-01B` | active |
 | 3 | Team 02 - PO / Requirement Factory | `019e645a-5323-7842-9783-c76f310fd7a0` | `gpt-5.4`, medium | requirements | rolling direct investor/trader-value requirements | active |
-| 4 | Open slot | none | pending | Code Review | Team 10 `CF-W2-SPL-02` rereview after Team 04 ACCEPT | queued |
+| 4 | Open slot | none | pending | Code Review | Team 10 `CF-W1-UX-01B` review after Team 04 ACCEPT | queued |
 | 5 | Open slot | none | pending | QA Verification | Team 04 `CF-W1-UX-01B` after Team 08 handoff | queued |
 | 6 | Open slot | none | pending | Review / Signoff | Team 10 rereview and Team 03 signoff after SPL-02 QA rerun accepts | queued |
 
@@ -35,15 +35,18 @@ Current routing:
 - Team 04 accepted SPL-02 QA with backend tests/build, frontend build, worktree-targeted UI smoke, language guard, scope confirmation, and diff hygiene.
 - Team 10 rejected release readiness; rework is limited to `frontend/src/features/signal-position-ledger/hooks/useSignalPositionLedgerActiveRows.ts`, `SignalPositionLedgerPage.tsx`, `SignalPositionSummaryStrip.tsx`, `frontend/tests/ui/signal-position-ledger.spec.ts`, and assigned evidence docs.
 - Team 06 completed the bounded SPL-02 rework with frontend build, UI smoke, language guard, and diff hygiene evidence.
+- Team 04 accepted the SPL-02 QA rerun and Team 10 rereview is active.
+- Team 08 completed UX-01B implementation and Team 04 QA Verification is active.
 - `CF-W1-UX-01B` is active and independent from SPL-02 because it excludes route/navigation/shared files and stays inside Stock Research Workbench module/feature ownership.
 - Open decisions remain scoped to `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
 
 Teams ready to pick up new tasks:
 
-- Team 04: active on SPL-02 QA rerun.
-- Team 08: active on UX-01B implementation.
+- Team 10: active on SPL-02 rereview.
+- Team 04: active on UX-01B QA Verification.
 - Team 02: active on rolling investor/trader-value requirements discovery.
-- Team 10: ready for SPL-02 rereview after QA rerun acceptance.
+- Team 03: ready for SPL-02 Architect Signoff after Team 10 acceptance.
+- Team 10: ready for UX-01B review after Team 04 QA acceptance.
 - Team 03: ready for SPL-02 signoff after Team 10 acceptance.
 - Team 02: ready for rolling investor/trader-value requirements discovery.
 

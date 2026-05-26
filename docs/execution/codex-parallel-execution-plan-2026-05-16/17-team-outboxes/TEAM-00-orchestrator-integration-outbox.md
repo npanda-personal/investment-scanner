@@ -19,7 +19,10 @@ Gate movement:
 - Team 04 QA Verification accepted.
 - Team 10 Code Review rejected SPL-02 for stale scope-transition totals and missing explicit loading/error-state UI proof; Team 00 closed Team 10.
 - Team 06 bounded review-reject rework completed and Team 00 closed Team 06.
-- Team 04 QA rerun is active as `019e6455-ae39-7c80-8543-673608a99f20`.
+- Team 04 QA rerun accepted and Team 00 closed Team 04.
+- Team 10 rereview is active as `019e645c-bf6c-7272-b3c0-ab6df9916cb7`.
+- Team 08 completed UX-01B implementation and Team 00 closed Team 08.
+- Team 04 UX-01B QA Verification is active as `019e645d-3a98-7cd3-9365-40a2867efd27`.
 - Team 04 completed `CF-W1-UX-01B` QA planning and returned `QA-PLAN READY`.
 - Team 00 promoted `CF-W1-UX-01B` to Team 08 for bounded implementation.
 - Team 00 created `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-UX-01B`, merged current `dev`, linked backend/frontend dependency folders, closed failed pre-work launch `019e6443-4d5b-7c83-a93c-f0699146d06f`, and relaunched Team 08 worker `019e6446-6e31-7f42-88f0-374ed9c48747`.
@@ -34,16 +37,17 @@ UX-01B implementation assignment:
 
 Teams ready to pick up new tasks:
 
-- Team 04: SPL-02 QA rerun now.
-- Team 08: UX-01B implementation active.
+- Team 10: SPL-02 rereview now.
+- Team 04: UX-01B QA Verification now.
 - Team 02: rolling investor/trader-value requirements discovery active.
-- Team 10: SPL-02 rereview after QA rerun acceptance.
+- Team 03: SPL-02 Architect Signoff after Team 10 accepts.
+- Team 10: UX-01B review after Team 04 accepts.
 - Team 03: SPL-02 Architect Signoff after Team 10 accepts, or rolling architecture prep if no signoff is waiting.
 - Team 02: rolling investor/trader-value requirements discovery.
 
 Next action:
 
-- Monitor Team 04 SPL-02 QA rerun and Team 08 UX-01B implementation. If SPL-02 QA rerun accepts first, route Team 10 rereview immediately. Do not push.
+- Monitor Team 10 SPL-02 rereview, Team 04 UX-01B QA, and Team 02 requirements. Route the next accepted gate immediately. Do not push.
 
 ## Latest Runtime Checkpoint - SPL-02 Promoted
 

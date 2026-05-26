@@ -45,15 +45,15 @@ Current state:
 - Team 06 implementation worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02`.
 - Team 04 QA accepted SPL-02.
 - Team 10 review rejected SPL-02 for stale scope-transition totals and missing explicit loading/error-state UI proof.
-- Team 06 rework completed; Team 04 QA rerun is active as `019e6455-ae39-7c80-8543-673608a99f20`.
+- Team 06 rework completed; Team 04 QA rerun accepted; Team 10 rereview is active as `019e645c-bf6c-7272-b3c0-ab6df9916cb7`.
 - `CF-W1-UX-01B` Stock Research Workbench trust-evidence contract is promoted and active with Team 08 as the next independent user-facing implementation slice.
-- Team 08 UX-01B agent: `019e6446-6e31-7f42-88f0-374ed9c48747`; prior launch `019e6443-4d5b-7c83-a93c-f0699146d06f` failed before work began and is closed.
+- Team 08 UX-01B implementation completed; Team 04 QA Verification is active as `019e645d-3a98-7cd3-9365-40a2867efd27`.
+- Prior Team 08 launch `019e6443-4d5b-7c83-a93c-f0699146d06f` failed before work began and is closed.
 - Open decisions remain 2 and block only `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
 
 SPL-02 next gates:
 
-- Team 04: QA rerun now.
-- Team 10: Code Review rerun after Team 04 accepts.
+- Team 10: Code Review rerun now.
 - Team 03: Architect Signoff after Team 10 accepts.
 - Team 00: delegated PO acceptance and scoped local commit if all gates pass.
 
@@ -68,9 +68,9 @@ UX-01B implementation routing:
 
 Teams ready to pick up new tasks:
 
-- Team 04: active on SPL-02 QA rerun.
-- Team 08: active on `CF-W1-UX-01B` implementation.
-- Team 10: ready for SPL-02 rereview after QA rerun acceptance.
+- Team 10: active on SPL-02 rereview.
+- Team 04: active on `CF-W1-UX-01B` QA Verification.
+- Team 10: ready for UX-01B review after QA acceptance.
 - Team 03: ready for SPL-02 Architect Signoff after Code Review acceptance, or rolling architecture if no signoff is waiting.
 - Team 02: ready for rolling investor/trader-value requirements discovery.
 - Team 06: SPL-02 implementation complete; no new Team 06 item should start until SPL-02 moves past QA or Team 00 assigns another non-overlapping branch.
