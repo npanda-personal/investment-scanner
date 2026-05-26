@@ -42,7 +42,8 @@ Current state:
 
 - `CF-W2-SPL-02` Team 10 rereview returned `ACCEPT`.
 - Team 10 rereview evidence is recorded at `18-integration-queue/CF-W2-SPL-02-code-review.md`.
-- `CF-W2-SPL-02` is now in Team 03 Architect Signoff.
+- `CF-W2-SPL-02` Team 03 Architect Signoff returned `ACCEPT`.
+- `CF-W2-SPL-02` is accepted under standing delegation and is in scoped local commit verification.
 - Team 04 accepted `CF-W1-UX-01B` QA Verification.
 - `CF-W1-UX-01B` is now in Team 10 Code Review as `019e646a-98d9-7422-bcd8-419fe2abf191`.
 - Team 02 completed its rolling investor/trader-value requirement pass and created `CF-W2-DOV-02` plus `CF-W2-SPL-03`.
@@ -52,13 +53,12 @@ Current state:
 
 SPL-02 next gates:
 
-- Team 03: Architect Signoff now.
-- Team 00: delegated PO acceptance after Architect Signoff accepts.
-- Team 00: scoped local commit from the Team 06 worktree only after all gates pass.
+- Team 00: scoped local commit from the Team 06 worktree after staged-scope verification passes.
+- Team 00: record commit SHA and leave push disabled.
 
 Teams ready to pick up new tasks:
 
-- Team 03: `CF-W2-SPL-02` Architect Signoff now.
+- Team 00: `CF-W2-SPL-02` scoped commit verification now.
 - Team 03: `CF-W2-DOV-02` architecture readiness in parallel if agent capacity permits and file reservations stay isolated.
 - Team 10: active on `CF-W1-UX-01B` Code Review.
 - Team 04: ready for the next QA plan or verification assignment after one of the active implementation/review gates produces a handoff.

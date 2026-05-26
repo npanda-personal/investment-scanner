@@ -4,6 +4,44 @@ Date: 2026-05-17
 
 Prepared by Team 03 Architecture Factory and refreshed after `CF-W1-L3-AUTH-02` commit `503bcd9`, `CF-W1-SIG-TRIGGER-01` commit `6ab3999`, and checkpoint protocol fix commit `f75808f`.
 
+## Team 03 Next Dispatch - DOV Calibration Evidence Summary - 2026-05-26
+
+Prepared:
+
+- `03-architecture/CF-W2-DOV-02-architecture-review.md`
+- `06-contracts/CF-W2-DOV-02-daily-overview-calibration-evidence-summary-contract.md`
+- `08-work-packets/CF-W2-DOV-02-work-packet.md`
+
+Updated:
+
+- `03-architecture/next-contracts-to-prepare.md`
+- `17-team-outboxes/TEAM-03-CF-W2-DOV-02-architecture-outbox.md`
+
+Result:
+
+- `CF-W2-DOV-02` is `split required`.
+- This is not a consent blocker. The bounded child remains a frontend-only Daily Overview consumer slice.
+- The split is dependency/base gating:
+  - the currently inspected shared base still shows the old `HomePage.tsx` launcher;
+  - `frontend/src/features/daily-overview-dashboard/**` is absent on the inspected base;
+  - the inspected calibration frontend types/UI still use module health and do not yet expose accepted `CF-W2-CAL-02A` evidence-basis fields.
+- The smallest honest child is one `Calibration Evidence-Through Summary` section inside the accepted `daily-overview-dashboard` feature that:
+  - sits below primary candidate-review content;
+  - consumes only calibration-owned scoped page-summary truth from accepted `CF-W2-CAL-02A`;
+  - avoids `signals/calibration/health`, `items[0]`, warning-row proxies, and non-calibration fallbacks.
+- Exact future writer set, once Team 00 selects a base that already includes accepted `CF-W2-DOV-01` and accepted `CF-W2-CAL-02A`, is limited to:
+  - `frontend/src/features/daily-overview-dashboard/types.ts`
+  - `frontend/src/features/daily-overview-dashboard/api/dailyOverviewDashboardApi.ts`
+  - `frontend/src/features/daily-overview-dashboard/hooks/useDailyOverviewDashboard.ts`
+  - `frontend/src/features/daily-overview-dashboard/components/DailyOverviewDashboardPage.tsx`
+  - `frontend/src/features/daily-overview-dashboard/components/CalibrationEvidenceSummaryPanel.tsx`
+  - `frontend/tests/ui/daily-overview-dashboard.spec.ts`
+- Optional only if the accepted parent currently uses a local placeholder component for this section:
+  - `frontend/src/features/daily-overview-dashboard/components/ComingSoonPanel.tsx`
+- `HomePage.tsx`, calibration feature source/tests, all backend files, routes, shared UI, package/generated, Prisma/schema, and provider/live/startup/backfill files remain forbidden.
+- Required QA focus is scope/horizon label correctness, evidence-through date versus row generation time, waiting/unavailable truthfulness, no first-row proxy, no module-health fallback, and dependency-missing placeholder honesty.
+- Team 00 should not promote this child directly from the current shared base. The next gate is QA planning plus dependency-base verification first.
+
 ## Team 03 Next Dispatch - CAL Scoped Evidence Basis - 2026-05-25
 
 Prepared:

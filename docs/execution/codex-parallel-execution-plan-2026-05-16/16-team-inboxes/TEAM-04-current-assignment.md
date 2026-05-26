@@ -2,6 +2,54 @@
 
 Date: 2026-05-20
 
+## Latest Assignment Override - 2026-05-26 DOV-02 QA Planning
+
+Prepare docs-only QA planning for `CF-W2-DOV-02` Daily Overview calibration evidence-through summary.
+
+Team 03 architecture result: `split required`, not a consent blocker. Do not move the item to Ready. Do not run tests, builds, services, providers, Prisma commands, UI smoke, or live data. Do not implement application code.
+
+Important dependency note:
+
+- Implementation is allowed only on a base that already includes accepted `CF-W2-DOV-01` commit `a371e2f` and accepted `CF-W2-CAL-02A` commit `1be7d1a`.
+- The current plain `dev` base is not sufficient for implementation because it may not contain `daily-overview-dashboard/**` or accepted CAL-02A evidence-basis fields.
+
+Source inputs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-DOV-02-daily-overview-calibration-evidence-through-summary-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W2-DOV-02-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W2-DOV-02-daily-overview-calibration-evidence-summary-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W2-DOV-02-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-CF-W2-DOV-02-architecture-outbox.md`
+
+Allowed writes:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W2-DOV-02-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-CF-W2-DOV-02-qa-plan-outbox.md`
+
+Required QA coverage:
+
+- summary consumes only accepted CAL-02A scoped page-summary truth;
+- no use of `/signals/calibration/health`, first row proxies, or module-health fallback;
+- scope and horizon labels remain explicit;
+- evidence-through basis is separate from row generation time;
+- unavailable/waiting states are visible and truthful;
+- missing accepted CAL-02A evidence fails closed instead of inventing data;
+- panel placement stays below primary Daily Overview candidate-review content;
+- no `HomePage.tsx`, backend, route registry, shared UI/hooks, Signal Calibration source/test, schema/storage, package/generated, provider/live/startup/backfill scope;
+- no advice, target, reward/risk, broker/execution, or Trade Plan-first language.
+
+Required focused validation commands to recommend, not run:
+
+- `cd frontend && npm.cmd run build`
+- `cd frontend && npm.cmd run test:ui -- daily-overview-dashboard.spec.ts --workers=1`
+- focused language guard over `frontend/src/features/daily-overview-dashboard` and `frontend/tests/ui/daily-overview-dashboard.spec.ts`
+
+Output:
+
+- Create the QA plan and item-specific outbox.
+- State `QA-plan ready after dependency-base verification`, not Ready for implementation.
+- List exact reject conditions and dependency-base checks for Team 00.
+
 ## Latest Assignment Override - 2026-05-26 SPL-02 QA Rerun Standby
 
 Stand by for QA rerun on `CF-W2-SPL-02` after Team 06 completes bounded Code Review rejection rework.

@@ -18,19 +18,21 @@ Completed in the recent window:
 - Team 06 completed `CF-W2-SPL-02` implementation and code-review rework.
 - Team 04 accepted `CF-W2-SPL-02` QA rerun.
 - Team 10 accepted `CF-W2-SPL-02` rereview.
+- Team 03 accepted `CF-W2-SPL-02` Architect Signoff.
+- Team 00 created delegated PO acceptance packet for `CF-W2-SPL-02`.
 - Team 08 completed `CF-W1-UX-01B` implementation and handed it to Team 04.
 - Team 04 accepted `CF-W1-UX-01B` QA Verification.
 - Team 02 completed rolling investor/trader-value requirement discovery and added `CF-W2-DOV-02` plus `CF-W2-SPL-03`.
 
 Active / queued:
 
-- Team 03 `019e6467-db53-7fb0-b138-c88833ddc6f4`: active on SPL-02 Architect Signoff.
+- Team 00: SPL-02 scoped local commit verification.
 - Team 03 `019e6468-4976-77a0-9e5e-214c7d8a1053`: active on DOV-02 architecture readiness.
 - Team 10 `019e646a-98d9-7422-bcd8-419fe2abf191`: active on UX-01B Code Review.
 
 Teams ready to pick up new tasks:
 
-- Team 03: active on SPL-02 Architect Signoff.
+- Team 00: SPL-02 scoped commit verification now.
 - Team 03: active on DOV-02 architecture readiness.
 - Team 10: active on UX-01B Code Review.
 - Team 04: ready for next QA handoff.
@@ -38,7 +40,7 @@ Teams ready to pick up new tasks:
 
 Next action:
 
-- Monitor active Team 03 workers and Team 10 UX-01B review, then route the next accepted gate immediately.
+- Verify and commit accepted SPL-02 scope locally, then continue monitoring active Team 03 DOV-02 architecture and Team 10 UX-01B review.
 
 ## Latest Runtime Checkpoint - SPL-02 QA Active, UX-01B Ready
 

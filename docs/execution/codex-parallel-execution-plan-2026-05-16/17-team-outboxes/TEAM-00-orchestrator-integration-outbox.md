@@ -16,7 +16,9 @@ Gate movement:
 
 - Team 10 rereview accepted `CF-W2-SPL-02` after Team 06 rework and Team 04 QA rerun.
 - Team 00 recorded the Team 10 acceptance evidence at `18-integration-queue/CF-W2-SPL-02-code-review.md`.
-- Team 03 Architect Signoff is now the next gate for `CF-W2-SPL-02`.
+- Team 03 Architect Signoff accepted `CF-W2-SPL-02`.
+- Team 00 created delegated PO acceptance packet `09-summaries/CF-W2-SPL-02-po-acceptance-packet.md`.
+- `CF-W2-SPL-02` is now in scoped local commit verification in the Team 06 worktree.
 - Team 04 UX-01B QA Verification returned `ACCEPT`; Team 00 closed `019e645d-3a98-7cd3-9365-40a2867efd27`.
 - Team 10 UX-01B Code Review is active as `019e646a-98d9-7422-bcd8-419fe2abf191`.
 - Team 02 completed rolling requirement discovery and added `CF-W2-DOV-02` plus `CF-W2-SPL-03`.
@@ -25,7 +27,7 @@ Gate movement:
 
 Teams ready to pick up new tasks:
 
-- Team 03: SPL-02 Architect Signoff active as `019e6467-db53-7fb0-b138-c88833ddc6f4`.
+- Team 00: SPL-02 scoped commit verification now.
 - Team 03: DOV-02 architecture readiness active as `019e6468-4976-77a0-9e5e-214c7d8a1053`.
 - Team 10: UX-01B Code Review active as `019e646a-98d9-7422-bcd8-419fe2abf191`.
 - Team 04: ready for the next QA handoff.
@@ -34,7 +36,7 @@ Teams ready to pick up new tasks:
 
 Next action:
 
-- Monitor Team 03 SPL-02 Architect Signoff, Team 03 DOV-02 architecture readiness, and Team 10 UX-01B Code Review. Do not push.
+- Verify and commit the accepted SPL-02 worktree scope locally, then continue monitoring Team 03 DOV-02 architecture readiness and Team 10 UX-01B Code Review. Do not push.
 
 ## Latest Runtime Checkpoint - SPL-02 QA Routed, UX-01B Ready
 

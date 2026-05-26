@@ -6,6 +6,12 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready. The newly promoted items below are assigned immediately to their owning teams and should run in separate worktrees.
 
+2026-05-26 Team 00 gate update:
+
+- `CF-W2-SPL-02` is accepted under standing delegation after Team 04 QA rerun, Team 10 rereview, and Team 03 Architect Signoff. It is in scoped local commit verification on branch `codex/team06-strategy-signal/CF-W2-SPL-02`; no push is authorized.
+- `CF-W1-UX-01B` was rejected by Team 10 Code Review for synthetic frontend `trust_evidence` fallback. It is returned to Team 08 for bounded frontend-only rework, then Team 04 QA rerun and Team 10 rereview.
+- `CF-W2-DOV-02` is not Ready. Team 03 returned `split required`; Team 04 QA planning and Team 00 dependency-base verification are next.
+
 2026-05-26 Team 00 Ready promotion - `CF-W1-UX-01B`:
 
 - `CF-W1-UX-01B` is promoted and assigned to Team 08 as the Stock Research Workbench trust-evidence contract child after accepted Workbench trust framing `CF-W1-UX-01A`.

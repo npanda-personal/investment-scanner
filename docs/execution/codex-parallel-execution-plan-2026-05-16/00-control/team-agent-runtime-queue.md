@@ -4,35 +4,35 @@ Date: 2026-05-25
 
 Owner: Team 00 - Master Orchestrator / Integration
 
-## Latest Active Snapshot - SPL-02 Signoff Routed, UX-01B QA Active
+## Latest Active Snapshot - SPL-02 Accepted, UX-01B Rework Active, DOV-02 QA Planning Queued
 
 Date: 2026-05-26
 
 Update:
 
-- Team 10 accepted `CF-W2-SPL-02` rereview and Team 00 recorded the code-review evidence in the active integration queue.
-- Team 03 Architect Signoff for `CF-W2-SPL-02` is now the highest-priority queued agent.
-- Team 02 completed rolling investor/trader-value requirements and Team 00 recorded `CF-W2-DOV-02` as the next non-consent architecture candidate.
-- Team 04 accepted `CF-W1-UX-01B` QA Verification and Team 00 launched Team 10 Code Review.
+- Team 03 Architect Signoff accepted `CF-W2-SPL-02`; Team 00 created delegated PO acceptance and is verifying scoped local commit.
+- Team 03 architecture completed `CF-W2-DOV-02` with `split required`, not a consent blocker; Team 04 QA planning is queued.
+- Team 10 rejected `CF-W1-UX-01B` for synthetic frontend `trust_evidence` fallback; Team 08 bounded rework is active.
 
 Current active / queued agents:
 
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Team 10 - Review / Release | `019e646a-98d9-7422-bcd8-419fe2abf191` | `gpt-5.4`, high | Code Review | `CF-W1-UX-01B` in `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-UX-01B` | active |
-| 2 | Team 03 - Architecture Factory | `019e6467-db53-7fb0-b138-c88833ddc6f4` | `gpt-5.4`, high | Architect Signoff | `CF-W2-SPL-02` in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02` | active |
-| 3 | Team 03 - Architecture Factory | `019e6468-4976-77a0-9e5e-214c7d8a1053` | `gpt-5.4`, high | architecture readiness | `CF-W2-DOV-02` Daily Overview calibration evidence summary | active |
-| 4 | Team 03 - Architecture Factory | pending | `gpt-5.4`, high | Architect Signoff | `CF-W1-UX-01B` after Team 10 ACCEPT | queued |
-| 5 | Team 08 - UX / Research / Copilot | none | pending | rework | `CF-W1-UX-01B` only if Team 04 rejects | queued |
-| 6 | Team 06 - Strategy / Signal / Risk | none | pending | rework | `CF-W2-SPL-02` only if Team 03 rejects | queued |
+| 1 | Team 08 - UX / Research / Copilot | `019e6470-2027-7141-affc-9eac83ee17e0` | `gpt-5.4`, high | Code Review rejection rework | `CF-W1-UX-01B` in `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-UX-01B` | active |
+| 2 | Team 00 - Orchestrator | local | n/a | scoped commit verification | `CF-W2-SPL-02` in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02` | active |
+| 3 | Team 04 - QA Factory | pending | `gpt-5.4`, high | QA planning | `CF-W2-DOV-02` Daily Overview calibration evidence summary | queued |
+| 4 | Team 04 - QA Factory | pending | `gpt-5.4`, high | QA rerun | `CF-W1-UX-01B` after Team 08 rework handoff | queued |
+| 5 | Team 10 - Review / Release | pending | `gpt-5.4`, high | rereview | `CF-W1-UX-01B` after Team 04 ACCEPT | queued |
+| 6 | Team 03 - Architecture Factory | pending | `gpt-5.4`, high | Architect Signoff | `CF-W1-UX-01B` after Team 10 ACCEPT | queued |
 
 Teams ready to pick up new tasks:
 
-- Team 03: active on `CF-W2-SPL-02` Architect Signoff as `019e6467-db53-7fb0-b138-c88833ddc6f4`.
-- Team 03: active on `CF-W2-DOV-02` architecture readiness as `019e6468-4976-77a0-9e5e-214c7d8a1053`.
-- Team 10: active on UX-01B review as `019e646a-98d9-7422-bcd8-419fe2abf191`.
-- Team 04: ready for the next QA plan or verification assignment.
-- Team 02: another rolling requirement pass after signoff/architecture pressure clears.
+- Team 08: active on UX-01B bounded rework.
+- Team 04: ready for DOV-02 QA planning now.
+- Team 04: queued for UX-01B QA rerun after Team 08 handoff.
+- Team 10: queued for UX-01B rereview after QA acceptance.
+- Team 03: queued for UX-01B Architect Signoff after Team 10 acceptance.
+- Team 02: ready for another rolling requirement pass after commit/routing pressure clears.
 
 ## Latest Active Snapshot - SPL-02 QA Rerun And UX-01B Implementation
 
