@@ -9,28 +9,29 @@ Latest live checkpoint:
 - Branch: `dev`.
 - Open decisions: 2, scoped only to `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
 - Product Owner action required: yes only for those affected workstreams; no for active DOV/SPL/RH routine gates.
-- `CF-W2-DOV-01` is Ready and assigned to Team 08 as a frontend-only Daily Overview dashboard child.
+- `CF-W2-DOV-01` prior Ready promotion is superseded by Product Owner feedback and refreshed Team 02/Team 08 docs. It must go through Team 03 architecture/source-map refresh and Team 04 QA refresh before any implementation resumes.
 - `CF-W2-DOV-01` branch/worktree: `codex/team08-ux-research/CF-W2-DOV-01`, `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-01`.
 - `CF-W2-DOV-01` allowed scope: `frontend/src/app/HomePage.tsx`, new `frontend/src/features/daily-overview-dashboard/**`, and `frontend/tests/ui/daily-overview-dashboard.spec.ts`.
-- `CF-W2-DOV-01` current gate: paused after Product Owner UX feedback. The current implementation reads as an admin/developer monitoring dashboard, not an investor/trader daily overview. Do not advance DOV until Team 08/Team 02 reframe the product/UX around investor/trader daily decisions.
+- `CF-W2-DOV-01` current gate: requirement and UX reframed around investor/trader daily decisions; next gate is Team 03 architecture/source-map refresh.
 - `CF-W2-SPL-01B` is Ready and assigned to Team 06 as a backend-only active-row read-model child.
 - `CF-W2-SPL-01B` branch/worktree: `codex/team06-strategy-signal/CF-W2-SPL-01B`, `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-01B`.
 - `CF-W2-SPL-01B` allowed scope: new `backend/src/modules/signal-position-ledger/**` and `backend/tests/modules/signal-position-ledger/**`.
 - `CF-W2-SPL-01B` current gate: accepted through QA rerun, Code Review rerun, Architect Signoff, delegated PO acceptance, and locally committed on the Team 06 branch as `ca31d79 feat: add signal position ledger read model`.
-- `CF-W1-RH-01A` is now Ready for a separate Research Hub evidence-date implementation once the Team 00 docs checkpoint containing `13-implementation-evidence/CF-W1-RH-01A-ready-promotion.md` exists.
+- `CF-W1-RH-01A` is accepted and locally committed on the Team 08 branch as `30460aa feat: add research hub evidence dates`.
 - `CF-W1-RH-01A` branch/worktree: `codex/team08-research/CF-W1-RH-01A`, `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-RH-01A`.
 - `CF-W1-RH-01A` allowed scope: `backend/src/modules/research-hub/research-hub.service.ts`, `backend/src/modules/research-hub/research-hub.md`, `backend/tests/modules/research-hub/research-hub.service.test.ts`, `frontend/src/features/research-hub/components/ResearchOverviewPage.tsx`, and `frontend/tests/ui/research-hub.spec.ts`.
-- `CF-W1-RH-01A` current gate: Team 08 implementation complete; Team 04 QA Verification active as `019e639b-4277-7191-b579-f89023b629b0`.
+- `CF-W1-RH-01A` current gate: parked as accepted local branch commit until integration sequencing is opened.
 - `CF-W1-MD-02A` current gate: proposal-only; Team 03 opened `DECISION-20260526-md-02b-schema-generated-consent`; no Prisma/schema/generated/source implementation may start until resolved.
 - Team 02 requirement lane refined `CF-W1-RH-01A` and updated priority queues; DOV/SPL are routed work, not fresh discovery.
 - Active implementation agents at checkpoint:
   - Team 08 `019e63b3-3be9-7470-ba5f-b3fc1d1ce261`: `CF-W2-DOV-01` paused UX reframe analysis after Product Owner feedback.
   - Team 04 `019e63b5-d35a-72a0-8a4d-770ce1986dc4`: `CF-W1-RH-01A` QA rerun.
 - Next gates:
-  1. consume Team 08 DOV UX reframe and route DOV back to requirement/UX/architecture/QA before more implementation;
-  2. consume Team 04 RH QA rerun and route Team 10 Code Review if accepted;
+  1. route Team 03 DOV architecture/source-map refresh from the investor/trader-first requirement and UX;
+  2. route Team 04 DOV QA refresh after Team 03;
   3. keep SPL parked as accepted branch commit `ca31d79` until a later integration pass;
-  4. keep Team 02 rolling on the next direct investor/trader-value requirement when a slot is free.
+  4. keep RH parked as accepted branch commit `30460aa` until integration sequencing is opened;
+  5. keep Team 02 rolling on the next direct investor/trader-value requirement when a slot is free.
 
 This file exists and was updated after Team 00 accepted `CF-W3-MDPIPE-01B4-PIPELINE-COMMAND-API` for the Market Data pipeline redesign.
 

@@ -4,7 +4,7 @@ Date: 2026-05-26
 
 Owner: Team 08 - UX / Research / Copilot
 
-State: Docs-only UX planning complete. Ready for Team 00 intake and Team 03 architecture follow-on. Not ready for implementation approval yet.
+State: Docs-only investor/trader-first UX reframe complete. Ready for Team 00 intake and Team 03 architecture follow-on. Not ready for implementation approval yet.
 
 ## Work item
 
@@ -15,28 +15,32 @@ State: Docs-only UX planning complete. Ready for Team 00 intake and Team 03 arch
 
 ## Completed work summary
 
-- Audited the current `/` page and the main nearby summary surfaces named by the requirement.
-- Authored the Daily Overview UX plan in the active execution folder.
-- Mapped dashboard sections into:
-  - current-data sections that can reuse existing truths
-  - explicit `Coming soon` placeholders that must not be faked
-- Defined interaction model, section ordering, empty/error/loading states, trust-display rules, layout guidance, implementation slice guidance, and forbidden wording/UI claims.
+- Re-audited the current DOV requirement, architecture note, and prior Team 08 UX handoff after Product Owner reframe.
+- Replaced the prior admin-leaning UX plan with an investor/trader-first dashboard plan.
+- Defined the first viewport around:
+  - `Market Pulse`
+  - `High-Priority Review Candidates`
+  - `Market Movers`
+  - `Institutional Flow`
+  - `Watch And Blocked`
+  - compact `Evidence Caveats`
+- Locked `Market Movers` to `Coming soon - Market Movers` for slice 1 unless architecture finds a truthful stored-data source.
+- Locked `Institutional Flow` to `Coming soon - FII/DII Activity` for slice 1 unless architecture finds a truthful local source.
+- Moved admin/diagnostic surfaces to compact caveats and supporting navigation instead of first-viewport identity.
+- Updated acceptance criteria, QA scenarios, copy rules, and architecture questions for the new layout direction.
 
 ## Files changed
 
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/05-ux/CF-W2-DOV-01-daily-overview-dashboard-ux-plan.md` (new)
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-08-CF-W2-DOV-01-ux-outbox.md` (new)
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/05-ux/CF-W2-DOV-01-daily-overview-dashboard-ux-plan.md` (replaced / reframed)
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-08-CF-W2-DOV-01-ux-outbox.md` (updated)
 
 ## Files inspected
 
 - `AGENTS.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-DOV-01-daily-overview-interactive-market-dashboard-requirement.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
-- `frontend/src/app/HomePage.tsx`
-- `frontend/src/features/today-trade-review/components/TodayReviewPage.tsx`
-- `frontend/src/features/research-hub/components/ResearchOverviewPage.tsx`
-- `frontend/src/features/pipeline-ops/components/PipelineOpsPage.tsx`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/05-ux/CF-W3-MDPIPE-01B5-01B6-pipeline-ops-control-migration-ux.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W2-DOV-01-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/05-ux/CF-W2-DOV-01-daily-overview-dashboard-ux-plan.md` (prior version)
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W2-DOV-01-work-packet.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-08-outbox.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/README.md`
 
@@ -47,8 +51,8 @@ State: Docs-only UX planning complete. Ready for Team 00 intake and Team 03 arch
 
 ## Docs changed
 
-- Added the new UX plan for `CF-W2-DOV-01`.
-- Added this dedicated Team 08 handoff outbox for Team 00 / Team 03 / Team 04 consumption.
+- Replaced the old DOV UX plan with the investor/trader-first reframe.
+- Updated this dedicated Team 08 handoff outbox for Team 00 / Team 03 / Team 04 consumption.
 
 ## Contracts changed
 
@@ -65,27 +69,33 @@ State: Docs-only UX planning complete. Ready for Team 00 intake and Team 03 arch
 
 ## Assumptions
 
-- The requirement's listed summary surfaces remain the authoritative current truth sources unless Team 03 finds a contract gap during architecture mapping.
+- Today Review and Research Hub remain the primary truthful source for review candidates in slice 1.
+- No truthful market-wide movers source exists on the current base unless Team 03 finds one during architecture refresh.
+- No truthful local FII/DII source exists on the current base unless Team 03 finds one during architecture refresh.
 - The dashboard should inherit existing market scope behavior instead of introducing a second scope system.
 - The Product Owner still wants `/` to become a working dashboard, not a launch-card page.
 
 ## Key UX conclusions
 
-- The first viewport should be dominated by scope, freshness/trust context, and daily pulse, not navigation cards.
-- Daily Pulse must be the anchor section because it best answers whether the user can meaningfully review the current scope.
-- Candidate, market-environment, evidence-health, and data/pipeline sections should reuse existing module truths rather than inventing a new dashboard score.
-- Follow-through and outcome sections are valuable, but current truth is not mature enough; they should remain `Coming soon`.
+- The first viewport should read like a daily market briefing, not an operations console.
+- `Market Pulse` and `High-Priority Review Candidates` are the first-viewport anchors.
+- `Market Movers` and `Institutional Flow` should still be present in the first viewport, but as explicit `Coming soon` placeholders in slice 1.
+- `Watch And Blocked` belongs in the main overview because it prevents false confidence.
+- `Evidence Caveats` must stay compact and secondary.
+- Admin/diagnostic content should move below the main briefing slices or into supporting navigation.
 
 ## Risks
 
+- Architecture may find that the current `Market Pulse` sources do not support a clean investor-facing headline without overclaiming asset-type precision.
 - Architecture may find route-load fanout too expensive if the dashboard pulls too many independent read models directly from the frontend.
-- Some summaries referenced by the requirement may exist conceptually but not yet as stable public DTOs for a compact dashboard.
-- Cross-module disagreement handling needs architectural care so the dashboard surfaces mixed evidence honestly without duplicating decision logic.
+- Some summaries referenced by the reframe may exist conceptually but not yet as stable public DTOs for a compact dashboard.
+- Cross-module disagreement handling still needs architectural care so the dashboard surfaces mixed evidence honestly without duplicating decision logic.
 
 ## Blockers
 
-- Team 03 architecture mapping is still required before implementation can be scoped safely.
+- Team 03 architecture mapping is still required before implementation can be scoped safely against the new first-viewport layout.
 - Public dashboard composition may need a bounded adapter if current frontend API fanout is too heavy.
+- `Market Movers` and `Institutional Flow` must stay placeholder-only unless architecture proves a truthful current source.
 - Any section without stable public truth must stay placeholder-only until the owning module exposes it safely.
 
 ## Shared-file requests
@@ -100,7 +110,7 @@ State: Docs-only UX planning complete. Ready for Team 00 intake and Team 03 arch
 
 Reason:
 
-- The UX plan is specific enough for architecture and QA planning, but the requirement itself still says Team 03 architecture prep is required first.
+- The UX plan is specific enough for architecture and QA planning, but Team 03 still needs to confirm whether the new first-viewport composition is source-safe and whether any current source can truthfully graduate `Market Movers` or `Institutional Flow` from placeholder state.
 
 ## Next gate
 
@@ -110,6 +120,6 @@ Reason:
 
 ## Evidence notes
 
-- Current `frontend/src/app/HomePage.tsx` is still a launch-card surface and does not satisfy the requirement intent.
-- `TodayReviewPage.tsx` and `ResearchOverviewPage.tsx` already expose strong summary patterns that can anchor the dashboard UX.
-- `PipelineOpsPage.tsx` confirms that data/pipeline trust should remain visible as a separate evidence lane rather than being buried inside candidate summaries.
+- The prior Team 08 plan still led with a pulse/trust-first structure that was too close to an admin-style dashboard.
+- The requirement and Team 03 architecture note now both point to an investor/trader-first reframe.
+- Current source truth still supports candidates and caveats better than market-wide movers or FII/DII.

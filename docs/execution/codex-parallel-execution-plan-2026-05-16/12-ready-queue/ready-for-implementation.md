@@ -8,10 +8,10 @@ No available application-code item is currently waiting unassigned in Ready. The
 
 2026-05-26 gate update:
 
-- `CF-W2-DOV-01` remains assigned to Team 08 and is in QA-rejection rework; it is not ready for Code Review until Team 04 rerun accepts.
-- `CF-W2-DOV-01` is now paused from implementation acceptance after Product Owner feedback that the dashboard reads like an admin/developer monitoring dashboard. It must return to requirement/UX/architecture/QA refresh before implementation resumes.
-- `CF-W2-SPL-01B` remains assigned to Team 06 and is in Code Review rejection rework; it is not ready for Architect Signoff until Team 04 rerun and Team 10 re-review accept.
-- `CF-W1-RH-01A` remains assigned to Team 08 and is currently in Team 04 QA Verification.
+- `CF-W2-DOV-01` is paused from implementation and prior Ready promotion is superseded by Product Owner feedback. Team 02 and Team 08 refreshed requirement/UX around an investor/trader daily briefing; Team 03 architecture refresh and Team 04 QA refresh are required before a new implementation pass.
+- `CF-W2-SPL-01B` is no longer in rework. It is accepted through QA rerun, Code Review rerun, Architect Signoff, delegated PO acceptance, and local Team 06 branch commit `ca31d79 feat: add signal position ledger read model`.
+- `CF-W2-SPL-01B` remains parked as a backend-only active-row read-model foundation. No route registry, frontend UI, closed-history, or durable lifecycle follow-up is Ready.
+- `CF-W1-RH-01A` is accepted through QA rerun, Code Review, Architect Signoff, delegated PO acceptance, and local Team 08 branch commit `30460aa feat: add research hub evidence dates`.
 - `CF-W1-MD-02A` is proposal-only and not Ready for Implementation because `DECISION-20260526-md-02b-schema-generated-consent` is open.
 
 2026-05-26 Team 00 Ready promotion - `CF-W1-RH-01A`:

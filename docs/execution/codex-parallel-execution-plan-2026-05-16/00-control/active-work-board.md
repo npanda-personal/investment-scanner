@@ -34,6 +34,39 @@ No historical active work items have been migrated as active.
 - Rejected / Rework
 - Deferred
 
+## Latest Team 00 Routing Update - DOV Reframe, SPL Parked, RH Accepted
+
+Date: 2026-05-26
+
+Current state:
+
+- `CF-W2-DOV-01` remains high priority, but the prior admin/developer-style dashboard direction is superseded. Team 02 refreshed the requirement and Team 08 refreshed the UX plan around an investor/trader daily briefing.
+- `CF-W2-DOV-01` must not resume implementation until Team 03 refreshes architecture/source mapping and Team 04 refreshes QA against the new product/UX framing.
+- `CF-W2-DOV-01` slice 1 should center Today Review / Research Hub evidence for high-priority bullish, bearish, exit-risk, watch, and blocked candidates. Market-wide gainers/losers and FII/DII activity remain `Coming soon` placeholders unless architecture finds a truthful local source.
+- `CF-W2-SPL-01B` Signal Position Ledger active-row backend read model is accepted through QA rerun, Code Review rerun, Architect Signoff, delegated PO acceptance, staged-scope verification, and local Team 06 branch commit `ca31d79 feat: add signal position ledger read model`.
+- `CF-W2-SPL-01B` is parked as a backend-only foundation. It is not a surfaced open/closed positions page and it is not route-registry integrated yet.
+- `CF-W1-RH-01A` Research Hub evidence-date wiring is accepted through QA rerun, Code Review, Architect Signoff, delegated PO acceptance, staged-scope verification, and local Team 08 branch commit `30460aa feat: add research hub evidence dates`.
+- Open decisions remain 2 and block only `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
+
+Next gates:
+
+- Team 03: refresh `CF-W2-DOV-01` architecture/source map using the new investor/trader UX and requirement.
+- Team 04: refresh `CF-W2-DOV-01` QA plan after Team 03 architecture refresh.
+- Team 08: implement the refreshed DOV slice only after Team 00 records a new Ready promotion.
+- Team 06: standby for a later Signal Position Ledger route/UI or closed-history child; no new SPL implementation is Ready now.
+- Team 00: keep `CF-W2-SPL-01B` and `CF-W1-RH-01A` parked as accepted local branch commits until integration sequencing is opened.
+
+Teams ready to pick up new tasks:
+
+- Team 03: `CF-W2-DOV-01` architecture refresh now.
+- Team 04: DOV QA refresh after Team 03.
+- Team 08: DOV implementation after refreshed Ready promotion only.
+- Team 06: SPL follow-up standby, not active until a new child is promoted.
+- Team 10: standby for next QA-accepted handoff.
+- Team 02: ready for rolling investor/trader-value discovery when no signoff/architecture gate is waiting.
+
+---
+
 ## Latest Team 00 Routing Update - Implementation Gates In Flight
 
 Date: 2026-05-26

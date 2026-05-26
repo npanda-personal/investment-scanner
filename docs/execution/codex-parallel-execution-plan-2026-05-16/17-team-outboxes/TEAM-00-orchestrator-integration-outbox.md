@@ -1,5 +1,47 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - DOV Reframe Routed, SPL And RH Accepted
+
+Date: 2026-05-26
+
+Status:
+
+- Branch: `dev`.
+- Main workspace status before this checkpoint: active execution docs only.
+- Open decisions: 2, affecting only `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
+- Product Owner action required: yes only for those affected workstreams.
+- Push performed: no.
+
+Gate movement:
+
+- Team 02 refreshed `CF-W2-DOV-01` requirement framing after Product Owner feedback.
+- Team 08 refreshed `CF-W2-DOV-01` UX around an investor/trader daily briefing, not an admin/developer monitoring console.
+- `CF-W2-DOV-01` remains blocked from implementation until Team 03 architecture/source-map refresh and Team 04 QA refresh complete.
+- `CF-W2-SPL-01B` completed the full acceptance path and is locally committed on the Team 06 branch as `ca31d79 feat: add signal position ledger read model`.
+- `CF-W1-RH-01A` completed the full acceptance path and is locally committed on the Team 08 branch as `30460aa feat: add research hub evidence dates`.
+
+SPL requirement result:
+
+- Parent requirement `CF-W2-SPL-01` exists and remains the product direction for the Signal Position Ledger module.
+- Combined child `CF-W2-SPL-01A` is superseded as split history because current source cannot truthfully prove active and closed lifecycle rows together.
+- Narrowed child `CF-W2-SPL-01B` was promoted and implemented as active-only backend read-model foundation.
+- Closed history, route exposure, and UI tabs remain future children, not part of the accepted `01B` slice.
+
+Teams ready to pick up new tasks:
+
+- Team 03: `CF-W2-DOV-01` architecture/source-map refresh now.
+- Team 04: DOV QA refresh after Team 03.
+- Team 08: DOV implementation only after refreshed Ready promotion.
+- Team 06: Signal Position Ledger follow-up standby; no active SPL child is Ready.
+- Team 10: standby for next QA-accepted handoff.
+- Team 02: rolling investor/trader-value discovery when architecture/signoff pressure clears.
+
+Next action:
+
+- Dispatch Team 03 architecture refresh for the investor/trader-first Daily Overview and keep SPL/RH parked until integration sequencing is intentionally opened.
+
+---
+
 ## Latest Runtime Checkpoint - Ready Implementation Started, Rework Routed
 
 Date: 2026-05-26

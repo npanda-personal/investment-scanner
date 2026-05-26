@@ -4,530 +4,439 @@ Date: 2026-05-26
 
 Owner: Team 08 - UX / Research / Copilot
 
-Status: Superseded / reframe required after Product Owner feedback. Not implementation approval.
+Status: Investor/trader-first reframe complete. Docs-only UX plan. Not implementation approval.
 
-## Superseding Product Owner Feedback - 2026-05-26
+## UX Verdict
 
-The prior UX plan is too close to a developer/admin monitoring dashboard. The Daily Overview must feel like an investor/trader daily briefing and opportunity workspace.
+The Daily Overview should stop behaving like a system-monitoring home page.
 
-Do not make these prior sections prominent first-viewport sections:
+The first viewport should feel like a daily investor/trader briefing:
 
-- `Data Trust and Pipeline Health`
-- `Signal and Evidence Health`
-- `Drilldown Strip`
+1. what the current market backdrop looks like,
+2. which review candidates deserve attention,
+3. which setups are watch-only or blocked,
+4. which expected market-wide signals are not available yet,
+5. and only then what evidence caveats may limit confidence.
 
-They may exist only as compact secondary caveats or supporting navigation. The first viewport must focus on market opportunity, market movement, and review candidates.
+`Data Trust and Pipeline Health`, `Signal and Evidence Health`, and `Drilldown Strip` are no longer first-viewport identity sections. They move into compact caveats and supporting navigation below the main briefing slices.
 
-The revised section direction is:
+## Product Owner Direction Applied
 
-1. `Market Pulse`
-   - current market regime, breadth, sector tone, notable caution signal
+- Prioritize market overview and review opportunities in the first viewport.
+- Keep market-wide movers as `Coming soon - Market Movers` unless a truthful stored-data source is confirmed.
+- Keep FII/DII as `Coming soon - FII/DII Activity` unless a truthful local source is confirmed.
+- Reuse Today Review and Research Hub for bullish, bearish, exit-risk, watch, blocked, and limited-evidence candidate framing.
+- Keep evidence, data-quality, and pipeline caveats compact and secondary.
+- Use research-support language only.
 
-2. `Market Movers`
-   - gainers and losers if the current database/API can prove latest movement
-   - otherwise `Coming soon - Market Movers`
+## Source Truth Map For Slice 1
 
-3. `High-Priority Review Candidates`
-   - bullish review candidates
-   - bearish / exit-risk candidates
-   - source-ranked, not dashboard-invented
+| Section | Slice 1 status | Truth basis |
+| --- | --- | --- |
+| Market Pulse | Ship now, but clearly limited | Today Review reviewability + Research Overview market-readiness + Market Context region-level backdrop |
+| High-Priority Review Candidates | Ship now | Today Review candidate groups; Research Hub priorities as supporting context |
+| Watch And Blocked | Ship now | Today Review watch-only, blocked, insufficient-data, unproven, and reason summaries |
+| Market Movers | Placeholder only | No truthful market-wide movers source confirmed on current base |
+| Institutional Flow | Placeholder only | No truthful FII/DII source confirmed on current base |
+| Evidence Caveats | Ship now as compact secondary surface | Data Quality, review-readiness, pipeline status, signal/proof caveats already surfaced elsewhere |
+| Supporting Navigation | Ship now | Today Review, Research, Market Context, Data Quality, Signals, Calibration, Smart Money, Backtests, Pipeline Ops |
 
-4. `Watch And Blocked`
-   - watch-only, limited-evidence, blocked, invalidated, or missing-DQ setups with reason summaries
+## Scope And Guardrails
 
-5. `Institutional Flow`
-   - FII/DII activity only if a reliable local source exists
-   - otherwise `Coming soon - FII/DII Activity`
+- This plan applies to the `/` Daily Overview redesign only.
+- This is a docs-only UX pass. No source, schema, route, shared UI, or package approval is implied.
+- Slice 1 must prefer honest placeholders over invented investor/trader summaries.
+- Market-wide claims must stay narrow and truthful to the active `region / assetType`.
+- Market Context must be labeled as region-level context where asset-type specificity is not proven.
 
-6. `Evidence Caveats`
-   - compact warnings: stale data, DQ blockers, pipeline failures, missing calibration/outcome evidence
-   - route to Data Quality / Pipeline Ops for details
+## Primary User Goal
 
-7. `Focused Drilldowns`
-   - secondary navigation to Today Review, Research, Market Context, Signals, Calibration, Data Quality, Smart Money, Backtests, Pipeline Ops
+When the user opens `/`, they should quickly understand whether the current market scope is reviewable, which bullish or bearish/exit-risk candidates deserve inspection, which setups are blocked or only worth watching, and what important market-wide context is still unavailable.
 
-Preferred wording:
-
-- `high-priority review candidate`
-- `bullish review`
-- `bearish / exit-risk review`
-- `market movers`
-- `watch only`
-- `blocked`
-- `limited evidence`
-- `reason summary`
-
-Avoid:
-
-- `high conviction trade`
-- `best trade`
-- `buy`
-- `sell`
-- `target`
-- `R:R`
-- `pipeline health` as a main dashboard promise
-- module-health phrasing in first viewport
-
-Downstream Team 08 must prepare a replacement UX plan before implementation resumes.
-
-### Source Availability Update - 2026-05-26
-
-Current source inspection confirms the replacement UX must use this truth map:
-
-- `Market Movers`: placeholder-only for market-wide gainers/losers in slice 1. Existing watchlist daily-change sorting can support a future user-watchlist movers subsection, but not market-wide movers.
-- `Institutional Flow`: placeholder-only for FII/DII in slice 1. Smart Money can be described only as price/volume behavior, not FII/DII flow.
-- `High-Priority Review Candidates`: ready for slice 1 from Today Review candidate groups, with Research Hub priorities as supporting context.
-- `Bearish / Exit-Risk Review`: ready for slice 1 from Today Review `shortReview` / `exitRiskReview`, with Research Hub exit candidates as supporting context.
-- `Watch And Blocked`: ready for slice 1 from Today Review watch/blocked/unproven/insufficient-data groups plus reason summaries.
-- `Market Pulse`: limited/lower-page from Market Context and Research Hub because Market Context is region-scoped, not fully asset-type-specific.
-
-The first viewport should therefore be:
-
-1. scope and daily reviewability statement,
-2. bullish / bearish / exit-risk candidate lanes,
-3. watch/blocked reason summary,
-4. clear placeholders for Market Movers and FII/DII if shown,
-5. compact evidence caveats only after the user-facing market/candidate sections.
-
-## Scope and guardrails
-
-- This plan is for the `/` route redesign only.
-- This plan does not approve backend aggregation, new routes, shared UI rewrites, Prisma changes, package changes, or new scoring logic.
-- The dashboard must reuse existing module truth where it already exists.
-- Where truth is not yet stable, the page should show a clearly tagged `Coming soon` placeholder instead of invented summary metrics.
-- Research-support wording is mandatory. No buy/sell advice, no price targets, no reward/risk framing, no implied execution workflow.
-
-## Primary user goal
-
-When the user opens `/`, they should understand the current scope, whether the scope is reviewable, what changed most recently, where candidate attention is concentrated, and which upstream trust issues need attention before deeper research.
-
-## Primary user journey
+## Primary User Journey
 
 1. Open `/`.
-2. Confirm scope, freshness, and trust posture in the first viewport.
-3. Read one clear daily pulse statement that answers whether review work is supported, limited, or blocked.
-4. Scan candidate counts, market environment, evidence health, and data/pipeline health in descending importance.
-5. Drill into the owning page for detail without losing orientation.
-6. Return to `/` as the default cross-system overview surface.
+2. Confirm the active `region / assetType` and that this is a research-support overview.
+3. Read `Market Pulse` for today's backdrop and reviewability posture.
+4. Scan `High-Priority Review Candidates` for bullish and bearish/exit-risk names that deserve review.
+5. Check `Watch And Blocked` to avoid over-reading weak or constrained setups.
+6. Notice `Coming soon` placeholders for `Market Movers` and `FII/DII Activity` instead of assuming those views already exist.
+7. Read compact `Evidence Caveats` only as needed.
+8. Drill into Today Review, Research, Market Context, Data Quality, or other owner pages for detail.
 
-## Information hierarchy
+## Information Hierarchy
 
 1. Header rail with scope, timestamp, refresh, and research-support disclaimer
-2. Daily pulse
-3. Review candidate summary
-4. Market environment and confirmation
-5. Signal and evidence health
-6. Data trust and pipeline health
-7. Drilldown strip
-8. `Coming soon` dashboard placeholders
+2. `Market Pulse`
+3. `High-Priority Review Candidates`
+4. `Market Movers` and `Institutional Flow` placeholders
+5. `Watch And Blocked`
+6. compact `Evidence Caveats`
+7. supporting drilldowns and lower-page evidence/detail surfaces
 
-## Proposed dashboard sections in priority order
+## First Viewport Layout
 
-| Priority | Section | User question answered | Source basis | Initial status |
-| --- | --- | --- | --- | --- |
-| 1 | Header rail | What scope am I looking at, and how current is this dashboard? | Current app scope plus page-level load timestamp; no invented freshness score | Current data |
-| 2 | Daily pulse | Can I trust this scope enough to review setups today, and what should I check first? | Today Review run/trust/readiness context plus Research Command Center actionability headline | Current data |
-| 3 | Review candidate summary | Where are the most relevant review candidates and blocked items right now? | Today Review grouped counts plus Research Command Center priority groups where already public | Current data |
-| 4 | Market environment and confirmation | Is the environment supportive, mixed, or cautionary, and what evidence agrees or disagrees? | Market Context summary plus Smart Money summary plus Research Command Center confirmation summary | Current data |
-| 5 | Signal and evidence health | Are raw signals, calibration evidence, and strategy proof healthy enough to treat as useful context? | Raw Signals latest summary, calibration summary, Research Command Center strategy proof summary, backtest proof where already surfaced | Current data |
-| 6 | Data trust and pipeline health | Are upstream readiness or pipeline issues undermining downstream counts? | Data Quality summary plus Pipeline Ops active/latest run context | Current data |
-| 7 | Drilldown strip | Where should I go next for deeper review? | Route shortcuts with truthful chips/counts only when already exposed | Current data |
-| 8 | Signal position follow-through | What active signal positions are still developing? | Depends on Signal Position Ledger maturity | `Coming soon` |
-| 9 | Calibration evidence-through summary | How current is calibration evidence across the active scope? | Depends on `CF-W2-CAL-02` maturity | `Coming soon` |
-| 10 | Measured outcome follow-through | Are recent signals proving reliable after forward observation? | Depends on Signal Quality / outcome read-model maturity | `Coming soon` |
+### Desktop
 
-## Section-by-section UX definition
+Use a dense 12-column dashboard layout.
 
-### 1. Header rail
+- Row 1: header rail, full width
+- Row 2:
+  - `Market Pulse` - 4 cols
+  - `High-Priority Review Candidates` - 8 cols
+- Row 3:
+  - `Market Movers` - 3 cols
+  - `Institutional Flow` - 3 cols
+  - `Watch And Blocked` - 4 cols
+  - `Evidence Caveats` - 2 cols
+
+This keeps the first viewport investor/trader-facing even when two sections are still placeholder-only.
+
+### Mobile
+
+Stack in this order:
+
+1. header rail
+2. `Market Pulse`
+3. `High-Priority Review Candidates`
+4. `Market Movers`
+5. `Institutional Flow`
+6. `Watch And Blocked`
+7. `Evidence Caveats`
+
+### First-Viewport Rules
+
+- `Market Pulse` and `High-Priority Review Candidates` must be visible without scrolling on desktop.
+- `Evidence Caveats` must stay compact and visually quieter than opportunity sections.
+- No first-viewport launch cards.
+- No first-viewport pipeline-health identity.
+- No first-viewport developer monitoring tone.
+
+## Section Definitions
+
+### 1. Header Rail
 
 Must show:
 
 - page title `Daily Overview`
-- current `region / assetType`
-- dashboard loaded/generated timestamp
-- research-support disclaimer in compact always-visible form
+- active `region / assetType`
+- latest available loaded timestamp
 - refresh action
+- compact research-support disclaimer
 
-Should also allow:
+Should also show:
 
-- one compact trust chip sourced from the daily pulse basis, not a new global score
+- one compact reviewability chip such as `Review supported`, `Review limited`, or `Review blocked`
 
-Must not include:
+Must not show:
 
-- hero marketing copy
-- large launch cards
-- promotional imagery
+- launch-card navigation grid
+- marketing hero copy
+- portfolio-performance framing
 
-### 2. Daily pulse
+### 2. Market Pulse
 
-This is the anchor section and should dominate the first viewport.
+Purpose:
+
+- give the page its investor/trader identity
+- summarize the market backdrop plus whether review work is supported today
 
 Must summarize:
 
-- Today Review run status
-- Today Review trust status
-- Research Command Center actionability or market-gate headline
-- review mode
-- trusted-universe count versus catalog count when available
-- required data-through date
-- stored/current data-through date
-- primary blocker or warning
-- one next-best drill action
+- reviewability state from Today Review / review-readiness
+- region-level regime or market-tone summary
+- breadth or participation cue where available
+- sector leadership / weakness where available
+- strongest caution signal or contradiction
+- next best review action
 
 Preferred presentation:
 
-- one lead statement
-- 4-6 supporting metrics/chips
-- one blocker/warning rail when applicable
-- one primary drilldown button
+- one lead sentence
+- 4-6 compact stat chips
+- one caution line if evidence is mixed or limited
 
-Copy model:
+Copy examples:
 
-- `Review supported`
-- `Review limited`
-- `Review blocked`
-- `Mixed evidence`
+- `Review supported with mixed sector confirmation`
+- `Review limited by incomplete market evidence`
+- `Caution: backdrop is mixed and several candidates remain blocked`
 
-Avoid:
+UX note:
 
-- `Strong buy day`
-- `Trade now`
-- `High conviction`
+The prior standalone `Daily Pulse` becomes part of `Market Pulse`. It is no longer the whole page identity by itself.
 
-### 3. Review candidate summary
+### 3. High-Priority Review Candidates
 
-Must summarize:
+Purpose:
 
-- bullish review candidate count
-- exit-risk review count
-- watch-only count
-- blocked count
-- top priority candidates or next actions only when already surfaced by Today Review or Research Command Center
+- surface the setups that deserve immediate review attention
 
-Interaction:
+Must include:
 
-- segmented control or tabs for `Bullish review`, `Exit risk`, `Watch only`, `Blocked`
-- default tab should be the most actionable trustworthy group, not necessarily the largest count
-- count-first summary cards above the tab body
-- row-level drill routes to Today Review or Research detail surfaces
+- bullish review candidates
+- bearish / exit-risk review candidates
+- reason summaries
+- source-owned ordering only
 
-Table/list behavior:
+Recommended structure:
 
-- desktop: compact sortable table or dense list
-- mobile: stacked list with one primary metric row and one reason summary row
-- default sort: strongest current review priority from the source order; do not invent a cross-module score
+- top summary chips:
+  - `Bullish review`
+  - `Bearish / exit-risk review`
+  - `Watch only`
+  - `Blocked`
+- primary split view:
+  - left lane `Bullish review`
+  - right lane `Bearish / exit-risk review`
 
-### 4. Market environment and confirmation
+Row content should prefer:
 
-Must summarize:
+- symbol
+- trigger or candidate type
+- reason summary
+- freshness or status label if truthful
+- drill action to Today Review or Research
 
-- market regime
-- breadth status
-- leading sectors
-- weak sectors
-- smart-money accumulation count
-- smart-money distribution count
-- strongest confirmation note
-- strongest contradiction note
+Must not include:
 
-UX rule:
+- target price
+- reward/risk
+- direct action language
+- synthetic cross-module ranking
 
-- explicitly show disagreement when signals, smart money, and market context do not align
-- disagreement should read as `mixed evidence` or `confirmation conflict`, not as a hidden downgrade
+### 4. Market Movers
 
-### 5. Signal and evidence health
+Slice 1 state:
 
-Must summarize:
+- `Coming soon - Market Movers`
 
-- bullish / bearish / neutral raw signal counts where available
-- latest signal generation run freshness/status
-- calibration usable / limited / unavailable state
-- calibration warning count when available
-- strategy-proof proven / unproven summary
-- missing backtest count or market-blocked count when available
+Reason:
 
-UX rule:
-
-- keep raw signals, calibration, and proof as separate evidence lanes
-- do not compress them into one confidence number
-
-### 6. Data trust and pipeline health
-
-Must summarize:
-
-- DQ ready / limited / blocked state
-- top blocker themes
-- active pipeline run or latest completed run
-- failed / blocked / warning stage counts
-- direct links to Data Quality and Pipeline Ops
-
-UX rule:
-
-- this section should visibly explain when downstream candidate counts may be misleading because upstream data is partial or blocked
-
-### 7. Drilldown strip
-
-Recommended destinations:
-
-- Today Review
-- Research Command Center
-- Market Context
-- Raw Signals
-- Signal Calibration
-- Data Quality
-- Smart Money
-- Pipeline Ops
-- Backtests
-
-Each route tile/button may show only:
-
-- one truthful count
-- one truthful status chip
-- or one freshness label
-
-If a route has no stable summary field yet, show the route without invented status text.
-
-### 8. `Coming soon` placeholders
-
-Keep these lower on the page and visually framed as future dashboard value, not missing errors.
-
-Required placeholders:
-
-1. `Coming soon - Signal Position Follow-Through`
-2. `Coming soon - Calibration Evidence-Through Summary`
-3. `Coming soon - Measured Outcome Follow-Through`
+- no truthful public market-wide movers source is confirmed on the current base
 
 Placeholder rules:
 
-- show one short statement explaining what the section will eventually summarize
-- name the dependency or missing truth basis
-- do not show dummy counts, empty charts, or fake progress
+- explain that market-wide gainers/losers are not yet backed by a safe stored-data source
+- do not substitute watchlist movers and label them as market-wide movers
+- do not show fake counts, empty heatmaps, or placeholder rows
 
-## Which sections can use current data now
+### 5. Institutional Flow
 
-### Current-data sections
+Slice 1 state:
 
-- Header rail
-- Daily pulse
-- Review candidate summary
-- Market environment and confirmation
-- Signal and evidence health
-- Data trust and pipeline health
-- Drilldown strip
+- `Coming soon - FII/DII Activity`
 
-### Proven current source mapping
+Reason:
 
-| Section | Current source evidence |
-| --- | --- |
-| Header rail | `HomePage` route context can be replaced; scope context already exists app-wide |
-| Daily pulse | `TodayReviewPage` run status, trust status, review mode, trusted universe, data-through dates, warnings; `ResearchOverviewPage` actionability headline and next action |
-| Review candidate summary | `TodayReviewPage` group counts and tab model; `ResearchOverviewPage` priority groups and next actions |
-| Market environment and confirmation | Requirement-defined current Market Context, Smart Money, and Research Command Center confirmation summaries |
-| Signal and evidence health | Requirement-defined current Raw Signals, Calibration, Research proof, and Backtesting summary surfaces |
-| Data trust and pipeline health | Requirement-defined current Data Quality summary plus `PipelineOpsPage` active/latest run context |
-| Drilldown strip | Existing page destinations already named in requirement and current app pages |
+- no truthful FII/DII source is confirmed on the current base
 
-## Which sections are `Coming soon`
+Placeholder rules:
 
-- `Signal Position Follow-Through`
-- `Calibration Evidence-Through Summary`
-- `Measured Outcome Follow-Through`
+- say this slice is waiting for a reliable local source
+- do not relabel Smart Money as FII/DII
+- do not show guessed inflow/outflow values
 
-These must remain placeholder-only until Team 03 confirms a truthful public contract for each summary.
+### 6. Watch And Blocked
 
-## Interaction model
+Purpose:
 
-### Global filters
+- help the user avoid over-reading low-quality or constrained setups
 
-- inherit current app-level `region / assetType` scope; do not add a second independent scope system on the page
-- scope changes must refetch all dashboard sections
-- if a section cannot support the active scope, show a scope-limited state rather than stale prior-scope data
+Must summarize:
 
-### Local filters and controls
+- watch-only candidates
+- blocked candidates
+- insufficient-data or limited-evidence candidates
+- invalidated / unproven setups when present
+- top blocker reasons
 
-- candidate section tabs: `Bullish review`, `Exit risk`, `Watch only`, `Blocked`
-- optional secondary toggle in candidate section: `Today Review` vs `Research priorities` if Team 03 confirms both sources can coexist without confusion
-- no freeform global search in slice 1 unless current source contracts already make it cheap and truthful
+Recommended presentation:
 
-### Sorting
+- grouped list or accordion by state
+- one compact reason-summary line per item
+- blocker reasons visible before encouraging copy
 
-- candidate tables/lists may sort by current source order, symbol, status, or freshness
-- default order should respect the source module's own priority/readiness order
-- do not introduce a synthetic dashboard rank across Today Review, Research, Signals, and Calibration
+This section belongs in the first viewport because it actively protects the user from false confidence.
+
+### 7. Evidence Caveats
+
+Purpose:
+
+- keep trust issues visible without turning the page into an admin console
+
+Must remain compact.
+
+May summarize:
+
+- DQ limited / blocked status
+- stale or missing data warnings
+- pipeline run caveat when it changes interpretation materially
+- missing calibration aggregate
+- missing measured outcome follow-through
+
+Should route to:
+
+- Data Quality
+- Pipeline Ops
+- Signals
+- Calibration
+
+Must not become:
+
+- a full diagnostic section
+- the dominant visual block on the page
+- a replacement for the user-facing overview
+
+## Secondary Below-The-Fold Areas
+
+After the first viewport, the page may expand into supporting sections such as:
+
+- deeper market context
+- signal and proof caveats
+- supporting navigation / drilldowns
+- clearly tagged future-value placeholders
+
+These are supporting surfaces, not the primary identity of the Daily Overview.
+
+## Primary Data Shown
+
+- current scope
+- market backdrop / reviewability statement
+- bullish review candidates
+- bearish / exit-risk review candidates
+- watch-only / blocked / limited-evidence candidates
+- compact missing-evidence warnings
+
+## Secondary Data Shown
+
+- timestamps
+- route shortcuts
+- deeper evidence caveats
+- region-level market context qualifiers
+- placeholder explanations for unavailable market-wide slices
+
+## Interaction Model
+
+### Filters And Scope
+
+- inherit the existing app-level `region / assetType` scope
+- do not create a second page scope system
+- all sections refetch on scope change
+- unsupported scope states must show explicit limited wording
+
+### Candidate Interaction
+
+- allow tab or segmented switching inside `High-Priority Review Candidates`
+- recommended tabs:
+  - `Bullish review`
+  - `Bearish / exit-risk`
+  - `Watch only`
+  - `Blocked`
+- default tab should be the most reviewable trustworthy group, not simply the largest count
 
 ### Drilldowns
 
-- every section needs one obvious owner route
-- row-level drilldowns should preserve current scope where route contracts already support it
-- when a section combines more than one source, its primary drill route should point to the surface that owns the dominant decision context
+- `Market Pulse` -> Today Review or Market Context depending on the dominant caveat
+- `High-Priority Review Candidates` -> Today Review / Research
+- `Watch And Blocked` -> Today Review
+- `Evidence Caveats` -> Data Quality / Pipeline Ops / Signals / Calibration
 
-### Refresh and progress indicators
+### Refresh
 
-- header-level refresh updates the whole dashboard
-- show quiet section-level loading placeholders rather than blank cards
-- refresh state may show `Refreshing dashboard` or section-level `Updating` text
-- no fake progress percentage for dashboard composition
-- if source modules expose run state, show their real run state text instead of a generic spinner only
+- one header-level refresh
+- no fake percentage progress
+- show section-local loading states when appropriate
 
-## Empty, loading, and error states
+## Empty, Loading, And Error States
 
-### Top-level loading
+### Loading
 
-- first load: skeleton rows for header metrics, daily pulse, and the first two sections
-- do not block the whole page with a centered full-screen spinner unless the route shell itself cannot load
+- show skeletons for header, `Market Pulse`, and candidate lanes
+- placeholders for `Market Movers` and `Institutional Flow` should still render immediately as `Coming soon`
 
-### Top-level error
+### Empty
 
-- show one dashboard-level error banner when the dashboard shell cannot assemble enough content to be useful
-- keep section containers visible if partial content can still render
+- no candidates: explain that no current review candidates are published for the active scope
+- no watch/blocked items: explain that no constrained setups are currently flagged
+- no market context: label `Market Pulse` as limited and keep the reviewability summary visible if available
 
-### Section empty states
+### Error / Partial
 
-- Daily pulse: explain that no Today Review snapshot or readiness summary exists yet for the active scope, then route to Today Review or Pipeline Ops
-- Candidate summary: explain that no current review candidates are published for the active scope, and show blocked/watch counts if available
-- Market environment: explain that market context evidence is unavailable or partial for the active scope
-- Signal/evidence health: explain whether missing evidence is due to no recent run, partial run, or missing proof data
-- Data/pipeline health: explain whether no current run evidence exists or whether upstream checks are incomplete
+- one section failing must not blank the full page
+- partial states must say `Limited` or `Unavailable`
+- contradictory source signals must be labeled `Mixed evidence`
 
-### Partial and mixed states
+## Trust-Building Rules
 
-- partial data must stay visibly partial
-- contradictory evidence must surface as `mixed evidence`
-- blocked data must explain the blocking reason before any encouraging counts
+- show missing market-wide slices honestly with `Coming soon`
+- warnings must appear before optimistic interpretation when evidence is limited
+- do not invent a dashboard-wide confidence number
+- do not hide cross-source disagreement
+- do not use green-positive styling to imply actionability
+- keep admin/diagnostic depth behind caveats or drilldowns
 
-## Trust and evidence display rules
+## Accessibility / Basic Usability
 
-- Every section must identify its evidence basis with source-module labels or a drill route that clearly leads to the source page.
-- Show timestamps only when a real source timestamp exists.
-- Show warnings and blockers before positive counts when trust is limited.
-- If Today Review and Research Command Center disagree, show the disagreement rather than picking one silent narrative.
-- Do not invent a dashboard-wide confidence score.
-- Do not hide partial, stale, blocked, or missing evidence behind green styling.
-- Keep candidate summaries tied to strategy/rule/version-aware sources when those fields are later exposed in drilldown details.
-- Use calm neutral styling for informative states; reserve strong error/warning treatment for true blockers or failed trust conditions.
+- section headings must be short and plain
+- chips and tabs must have clear text labels, not color-only meaning
+- compact caveat text must still remain readable on mobile
+- first-viewport content must preserve scanning order on small screens
 
-## Mobile and desktop layout guidance
+## Required Product Language
 
-### Desktop
+Prefer:
 
-- first viewport: header rail plus daily pulse plus the start of candidate summary
-- use a 12-column layout with dense panels, not card-inside-card nesting
-- recommended pattern:
-  - row 1: header rail
-  - row 2: daily pulse full width
-  - row 3: candidate summary 8 cols, market environment 4 cols
-  - row 4: signal/evidence health 8 cols, data/pipeline health 4 cols
-  - row 5: drilldown strip full width
-  - row 6: `Coming soon` placeholders full width or 3-up compact tiles
+- `Market Pulse`
+- `High-Priority Review Candidates`
+- `bullish review`
+- `bearish / exit-risk review`
+- `watch only`
+- `blocked`
+- `limited evidence`
+- `mixed evidence`
+- `reason summary`
+- `consider review`
 
-### Mobile
-
-- preserve importance order strictly
-- stack sections vertically with the daily pulse first
-- compress metrics into two-column chips or stat rows
-- candidate lists should collapse from table to stacked rows
-- drilldown strip should become a two-column button grid or stacked list
-
-### Shared layout rules
-
-- no oversized hero
-- no launch-card home screen feel
-- no decorative illustration requirements
-- section headings should be operational and compact
-
-## Implementation slice recommendation
-
-### Slice 1 - truthful interactive dashboard baseline
-
-Recommended first shippable slice:
-
-- Header rail
-- Daily pulse
-- Review candidate summary
-- Market environment and confirmation
-- Signal and evidence health
-- Data trust and pipeline health
-- Drilldown strip
-- `Coming soon` placeholders
-
-Conditions:
-
-- ship only sections that can be populated from current public truth
-- if Team 03 finds dashboard fanout/performance too heavy for route load, prefer one bounded summary adapter over duplicated frontend orchestration logic
-- if any section cannot be composed truthfully in slice 1, demote that section to `Coming soon` rather than widening scope casually
-
-### Slice 2 - density and polish, only after slice 1 truth is stable
-
-- richer section-level drill chips
-- more detailed candidate tab switching
-- improved freshness comparators where a shared truth source exists
-
-## Explicit forbidden wording
-
-Do not use:
+Avoid:
 
 - `buy`
 - `sell`
-- `buy now`
-- `sell now`
+- `target`
 - `profit target`
-- `price target`
-- `reward/risk`
 - `R:R`
-- `take profit`
-- `stop out now`
+- `best trade`
+- `high conviction trade`
 - `must buy`
 - `must sell`
-- `guaranteed`
-- `guaranteed return`
-- `high conviction trade`
-- `best trade`
-- `top trade`
-- `win rate today`
 
-Preferred wording:
+## Acceptance Criteria For Downstream Teams
 
-- `bullish review candidate`
-- `bearish trigger`
-- `exit-risk review`
-- `watch only`
-- `blocked`
-- `mixed evidence`
-- `research priority`
-- `consider review`
-- `reason summary`
-- `data quality`
-- `signal quality`
-- `strategy proof`
+- `/` reads like an investor/trader dashboard, not a monitoring console.
+- The first viewport prioritizes `Market Pulse` and `High-Priority Review Candidates`.
+- `Market Movers` is explicitly `Coming soon - Market Movers` unless a truthful source is confirmed.
+- `Institutional Flow` is explicitly `Coming soon - FII/DII Activity` unless a truthful source is confirmed.
+- `Watch And Blocked` is visible in the main overview, not buried below diagnostics.
+- `Evidence Caveats` is compact and secondary.
+- Admin/diagnostic surfaces move to secondary caveats or supporting navigation.
+- All copy remains research-support only.
 
-## Explicit forbidden UI claims
+## QA Scenarios
 
-Do not imply:
+1. First viewport shows `Market Pulse`, `High-Priority Review Candidates`, `Market Movers`, `Institutional Flow`, `Watch And Blocked`, and compact `Evidence Caveats` in the expected order.
+2. `Market Movers` renders as `Coming soon - Market Movers` with no fake rows when no truthful source is present.
+3. `Institutional Flow` renders as `Coming soon - FII/DII Activity` with no Smart Money relabeling.
+4. `High-Priority Review Candidates` shows bullish and bearish/exit-risk review lanes using source-owned ordering.
+5. `Watch And Blocked` explains why candidates are blocked or limited.
+6. `Evidence Caveats` stays compact and links outward instead of taking over the page.
+7. Mixed or contradictory evidence is visible as `Mixed evidence`.
+8. No prohibited financial-advice or target/risk-reward language appears on the page.
 
-- the dashboard is an execution screen
-- portfolio ownership is required to use the page
-- the page knows target prices
-- the page knows realized performance follow-through when that read model is not yet public
-- a synthetic global confidence score
-- a unified rank across unrelated source modules
-- complete support for scopes or asset classes not proven by current source
-- hidden freshness certainty when the timestamp basis is missing
-- that a green badge means a setup should be acted on
+## Architecture Questions Raised By This UX Reframe
 
-## Acceptance-ready UX checkpoints for downstream teams
-
-- First viewport is orientation and trust, not navigation launch cards.
-- Daily pulse answers whether the current scope is reviewable, limited, or blocked.
-- Candidate summary is interactive and routes to owning pages without inventing a new ranking model.
-- Mixed or contradictory evidence remains visible.
-- Pipeline and data trust are visible before downstream counts can be over-read.
-- `Coming soon` sections are explicit and honest.
-- Language remains research-support only.
-
-## Team 03 questions this UX plan expects architecture to answer
-
-1. Can slice 1 be composed from current public frontend APIs without excessive route-load fanout?
-2. If not, what is the smallest bounded dashboard adapter that preserves source ownership?
-3. Which current sections have stable enough summary DTOs for slice 1, and which must fall back to placeholder state?
-4. Which routes and feature exports can be reused without widening shared UI ownership?
-5. What is the safest refresh model so the dashboard stays current without implying live market streaming?
+1. Can `Market Pulse` safely combine Today Review reviewability plus region-level Market Context without implying asset-type precision that the source does not prove?
+2. Can `High-Priority Review Candidates` show bullish and bearish/exit-risk lanes from Today Review alone in slice 1, with Research Hub used only as supporting context?
+3. Should `Watch And Blocked` live off Today Review groups only, or is there another current public source that improves blocker reasons without widening scope?
+4. Is there any safe stored-data source for scoped market-wide movers on the current base, or should `Market Movers` remain placeholder-only until a later requirement?
+5. Is there any truthful local FII/DII path at all, or should `Institutional Flow` stay placeholder-only for the foreseeable slice?
+6. What is the smallest summary payload needed for compact `Evidence Caveats` so the caveat area stays secondary and does not reintroduce the old admin-style layout?

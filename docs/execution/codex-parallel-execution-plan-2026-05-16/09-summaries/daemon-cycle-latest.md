@@ -6,7 +6,7 @@ Date: 2026-05-26
 
 - Cycle id: `DAEMON-20260517`
 - Rolling iteration count: 27
-- Current mode: Team 00 coordinating Ready implementation gates; Daily Overview is paused for Product Owner UX reframe.
+- Current mode: Team 00 coordinating refreshed Daily Overview architecture; SPL/RH accepted branch commits are parked.
 - Daemon continuing: yes.
 - Main branch: `dev`.
 - Resume prompt path: `09-summaries/daemon-resume-prompt.md`.
@@ -51,7 +51,7 @@ Validation:
 
 ## Queue Pressure
 
-- Ready queue depth: 0 available unassigned application-code items; active Ready work is already assigned to Team 08 / Team 06 / Team 08.
+- Ready queue depth: 0 available unassigned application-code items; DOV requires refreshed architecture/QA before a new Ready promotion.
 - Refinement queue depth: active; next proposal-first items are `CF-W1-MD-02A`, `CF-W1-SQLAB-02B`, `CF-W1-STRAT-02B`, `CF-W1-L3-DQ-01A`, and `CF-W1-UX-01`.
 - Integration queue depth: active handoffs/review evidence exist in the three worktrees; no accepted app-code commit is ready yet.
 - Open decisions: 2.
@@ -59,9 +59,9 @@ Validation:
 
 ## Current Blockers
 
-- `CF-W2-DOV-01` is blocked from any acceptance/commit until it is reframed around investor/trader daily workflow instead of admin/pipeline health.
-- `CF-W2-SPL-01B` is no longer blocked; it is accepted and locally committed on its Team 06 branch.
-- `CF-W1-RH-01A` is blocked from Code Review until Team 04 QA accepts.
+- `CF-W2-DOV-01` is blocked from implementation until Team 03 architecture/source-map refresh and Team 04 QA refresh consume the new investor/trader requirement/UX.
+- `CF-W2-SPL-01B` is no longer blocked; it is accepted and locally committed on its Team 06 branch as `ca31d79`.
+- `CF-W1-RH-01A` is no longer blocked; it is accepted and locally committed on its Team 08 branch as `30460aa`.
 - `CF-W1-MD-02B` is blocked by the new schema/generated consent decision.
 - `CF-W1-DQ-02-RS1` remains blocked by the currentness-summary parity decision.
 - Manual trigger support is still limited to one Data Quality batch command. Market Data provider ingestion, scheduler fanout, and downstream fanout remain disabled/forbidden.
@@ -75,8 +75,8 @@ Validation:
 | --- | --- | --- | --- |
 | Team 00 | coordinating | Consume active agent outputs and route QA/review/signoff gates | Continue rolling scheduler unless a true blocker appears. |
 | Team 02 | ready | Rolling Product Owner / requirements discovery focused on investor/trader value | Relaunch when an agent slot opens and no review/signoff gate is waiting. |
-| Team 03 | ready | Architect Signoff after Team 10 acceptance | Start after RH Code Review acceptance or after DOV is reframed and re-reviewed. |
-| Team 04 | active | `CF-W1-RH-01A` QA rerun | Start DOV QA only after the UX reframe and new implementation pass. |
+| Team 03 | ready | `CF-W2-DOV-01` architecture/source-map refresh | Start now from refreshed requirement and UX. |
+| Team 04 | ready | DOV QA refresh after architecture | Start after Team 03 refresh. |
 | Team 05 | blocked/standby | `CF-W1-MD-02B` blocked by consent; DQ-RS1 blocked by decision | Wait for Product Owner decision or a separate no-schema Ready packet. |
 | Team 06 | committed | `CF-W2-SPL-01B` accepted branch commit `ca31d79` | Wait for a later integration pass. |
 | Team 07 | standby | No current Ready item | Wait for next promoted Today Review / Portfolio item. |

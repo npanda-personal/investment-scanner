@@ -9,7 +9,7 @@ Status: Team 02 refreshed this queue after reconciling the live runtime queue wi
 - Do not treat `CF-W2-CAL-02A` or parent `CF-W2-CAL-02` as unassigned backlog while the calibration child remains in the routed delivery path.
 - Do not treat historical Today Review parents `CF-W1-TSC-02` or `CF-W1-TSC-03` as fresh queue heads; their honest executable children were already prepared or consumed in earlier stacked work and are not the next Team 02 discovery packet from current `dev`.
 - Do not duplicate `CF-W1-DQ-02-RS1` while it remains an isolated DQ decision/rework stream.
-- Do not treat `CF-W2-DOV-01` as fresh Team 02 discovery while Team 08 UX, Team 03 architecture, and Team 04 scaffold outputs already exist.
+- Do not treat `CF-W2-DOV-01` as fresh Team 02 discovery while it remains a routed high-priority packet; after the 2026-05-26 Product Owner correction, its Team 08 UX and Team 03 architecture outputs must be refreshed before implementation can resume.
 - Do not treat `CF-W2-SPL-01B` as fresh Team 02 discovery while Team 03 architecture and Team 04 QA outputs already exist.
 - Do not treat `CF-W1-RH-01A` as fresh Team 02 discovery while Team 00 has already promoted it into the active Ready family.
 - Do not reopen accepted MDPIPE slices as new Team 02 discovery. Remaining pipeline value should surface only if a real investor-facing trust gap survives the accepted dashboard/status direction.
@@ -28,7 +28,7 @@ Status: Team 02 refreshed this queue after reconciling the live runtime queue wi
 ## Dispatch Notes
 
 - `CF-W2-CAL-02` remains important, but its bounded child `CF-W2-CAL-02A` is already routed and therefore stays out of the unassigned stack.
-- `CF-W2-DOV-01`, `CF-W2-SPL-01B`, and `CF-W1-RH-01A` have already moved past Team 02 requirement shaping and should stay with Team 00 / Team 03 / Team 04 / owning implementation teams for the current gate flow.
+- `CF-W2-DOV-01`, `CF-W2-SPL-01B`, and `CF-W1-RH-01A` have already moved past Team 02 fresh discovery and should stay with Team 00 / Team 03 / Team 04 / owning implementation teams for the current gate flow. `CF-W2-DOV-01` specifically remains high priority, but it is blocked from implementation until the investor/trader-first Team 08 UX and Team 03 architecture refreshes replace the superseded admin-style framing.
 - `CF-W1-MD-02A`, `CF-W1-SQLAB-02B`, and `CF-W1-STRAT-02B` remain valuable, but all three are honest consent-gated proposals rather than Ready-adjacent slices.
 - Parent `CF-W1-TSC-02` and `CF-W1-TSC-03` docs remain useful historical context, but they are not the next fresh Team 02 queue heads from current `dev`.
 - `CF-W2-SPL-01A` remains a split-history requirement, not the next intake target.

@@ -1,5 +1,43 @@
 # TEAM-02 Requirement Factory
 
+## Team 02 DOV Investor-First Requirement Correction - 2026-05-26
+
+Root `AGENTS.md` was read first. Team 02 stayed docs-only and updated only requirement-lane artifacts plus this outbox.
+
+### Work Item
+
+Refresh `CF-W2-DOV-01` after Product Owner correction so the Daily Overview reads like an investor/trader daily dashboard, not an admin/developer monitoring dashboard.
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-DOV-01-daily-overview-interactive-market-dashboard-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+### Decision
+
+- DOV remains a high-priority routed work item.
+- The first slice is now explicitly investor/trader-first:
+  - daily review board
+  - bullish / bearish / exit-risk candidates
+  - watch / blocked / insufficient-data review
+  - `Coming soon - Market Movers`
+  - `Coming soon - FII/DII Activity`
+  - lower-page market pulse
+  - compact evidence caveats and focused drilldowns
+- `Data Trust and Pipeline Health`, `Signal and Evidence Health`, and drilldown navigation are no longer acceptable as primary first-viewport sections.
+
+### Block / Verdict
+
+- `CF-W2-DOV-01` stays blocked from implementation and Ready movement until:
+  1. Team 08 publishes the replacement investor/trader-first UX plan.
+  2. Team 03 refreshes the architecture/source map against that revised UX shape.
+- Team 04 QA refresh follows only after those two docs land.
+
+### Constraint Result
+
+- No app source, tests, package manifests, route registries, Prisma/schema/migrations/generated files, shared UI, or backend/frontend source files were changed.
+
 ## Team 02 Rolling Requirement Discovery Correction - 2026-05-26
 
 Root `AGENTS.md` was read first. Team 02 stayed docs-only, wrote only inside requirement-queue docs plus this outbox, and did not touch app source/tests, Prisma/schema, route registries, shared UI, package manifests, or generated artifacts.
