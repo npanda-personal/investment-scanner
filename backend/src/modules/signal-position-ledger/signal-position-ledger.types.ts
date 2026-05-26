@@ -1,0 +1,112 @@
+import type { SignalResultDto } from '../signal-generation-engine';
+
+export type SignalPositionTriggerType = 'bullish_entry_trigger' | 'bearish_trigger';
+export type SignalPositionReturnStatus = 'CURRENT' | 'STALE' | 'UNAVAILABLE';
+export type SignalPositionHealthState = 'EXIT_TRIGGERED' | 'RISK_WARNING' | null;
+export type SignalPositionLifecycleEvidenceStatus = 'EXIT_COMPATIBILITY_ONLY' | 'UNAVAILABLE';
+export type SignalPositionTrustEvidenceStatus =
+  | 'SOURCE_PROVEN'
+  | 'SOURCE_PROVEN_PRICE_STALE'
+  | 'SOURCE_PROVEN_PRICE_UNAVAILABLE'
+  | 'SOURCE_PROVEN_DQ_LIMITED'
+  | 'SOURCE_PROVEN_DQ_UNAVAILABLE';
+
+export interface SignalPositionLedgerActiveQuery {
+  region: string;
+  assetType: string;
+  limit: number;
+  offset: number;
+}
+
+export interface SignalPositionLedgerSignalPage {
+  items: SignalResultDto[];
+  totalCount: number;
+  limit: number;
+  offset: number;
+  nextOffset: number | null;
+  hasMore: boolean;
+}
+
+export interface SignalPositionLedgerActiveCandidate {
+  signal: SignalResultDto;
+  triggerContract: SignalPositionTriggerContractReadModel;
+}
+
+export interface SignalPositionTriggerContractReadModel {
+  signal_id: string | null;
+  instrument_id: string;
+  symbol: string;
+  asset_class: string | null;
+  region: string | null;
+  strategy_id: string | null;
+  strategy_version: string | null;
+  trigger_type: string;
+  trigger_price: number | null;
+  trigger_timestamp: string | null;
+  entry_rule_id: string | null;
+  reason_summary: string;
+  data_quality_status: string | null;
+  trigger_price_evidence: {
+    status: string | null;
+  } | null;
+}
+
+export interface SignalPositionLatestPriceSnapshot {
+  date: string;
+  close: number;
+  adjustedClose: number;
+  dataStatus: string;
+  source: string | null;
+}
+
+export interface SignalPositionDataQualitySnapshot {
+  signalReadinessStatus: string | null;
+  coverageStatus: string | null;
+  liquidityStatus: string | null;
+  lastEvaluatedAt: string;
+}
+
+export interface SignalPositionExitDecisionSnapshot {
+  strategy: string;
+  decision: string;
+  generatedAt: string;
+}
+
+export interface SignalPositionLedgerActiveRow {
+  signalId: string | null;
+  instrumentId: string;
+  symbol: string;
+  companyName: string | null;
+  region: string | null;
+  assetType: string | null;
+  triggerType: SignalPositionTriggerType;
+  entryTriggerTimestamp: string;
+  entryTriggerPrice: number;
+  entryReasonSummary: string;
+  strategyId: string | null;
+  strategyVersion: string | null;
+  entryRuleId: string | null;
+  latestTrustedPriceDate: string | null;
+  latestTrustedPrice: number | null;
+  currentReturnPercent: number | null;
+  currentReturnStatus: SignalPositionReturnStatus;
+  currentDataQualityStatus: string | null;
+  healthState: SignalPositionHealthState;
+  lifecycleEvidenceStatus: SignalPositionLifecycleEvidenceStatus;
+  trustEvidenceStatus: SignalPositionTrustEvidenceStatus;
+}
+
+export interface SignalPositionLedgerActiveListResponse {
+  items: SignalPositionLedgerActiveRow[];
+  totalCount: number;
+  limit: number;
+  offset: number;
+  nextOffset: number | null;
+  hasMore: boolean;
+  scope: {
+    region: string;
+    assetType: string;
+  };
+  warnings: string[];
+}
+
