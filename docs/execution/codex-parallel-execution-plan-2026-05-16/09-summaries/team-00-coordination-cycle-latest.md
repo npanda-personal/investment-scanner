@@ -20,27 +20,31 @@ Completed in the recent window:
 - Team 10 accepted `CF-W2-SPL-02` rereview.
 - Team 03 accepted `CF-W2-SPL-02` Architect Signoff.
 - Team 00 created delegated PO acceptance packet for `CF-W2-SPL-02`.
+- Team 00 committed `CF-W2-SPL-02` locally as `31115f0 feat: add signal position ledger surface`.
 - Team 08 completed `CF-W1-UX-01B` implementation and handed it to Team 04.
 - Team 04 accepted `CF-W1-UX-01B` QA Verification.
+- Team 10 rejected `CF-W1-UX-01B` for synthetic frontend `trust_evidence` fallback.
 - Team 02 completed rolling investor/trader-value requirement discovery and added `CF-W2-DOV-02` plus `CF-W2-SPL-03`.
+- Team 03 completed `CF-W2-DOV-02` architecture with `split required`.
 
 Active / queued:
 
-- Team 00: SPL-02 scoped local commit verification.
-- Team 03 `019e6468-4976-77a0-9e5e-214c7d8a1053`: active on DOV-02 architecture readiness.
-- Team 10 `019e646a-98d9-7422-bcd8-419fe2abf191`: active on UX-01B Code Review.
+- Team 08 `019e6470-2027-7141-affc-9eac83ee17e0`: active on UX-01B bounded rework.
+- Team 04 `019e6472-cca9-7d40-85dd-fd0aa17e14f1`: active on DOV-02 QA planning.
+- Team 04: queued for UX-01B QA rerun after Team 08 handoff.
+- Team 10: queued for UX-01B rereview after Team 04 accepts.
 
 Teams ready to pick up new tasks:
 
-- Team 00: SPL-02 scoped commit verification now.
-- Team 03: active on DOV-02 architecture readiness.
-- Team 10: active on UX-01B Code Review.
-- Team 04: ready for next QA handoff.
+- Team 08: active on UX-01B bounded rework.
+- Team 04: active on DOV-02 QA planning.
+- Team 04: queued for UX-01B QA rerun after rework handoff.
+- Team 10: queued for UX-01B rereview after QA acceptance.
 - Team 02: rolling requirement discovery after current gates clear.
 
 Next action:
 
-- Verify and commit accepted SPL-02 scope locally, then continue monitoring active Team 03 DOV-02 architecture and Team 10 UX-01B review.
+- Monitor Team 08 UX-01B rework and Team 04 DOV-02 QA planning, then route QA/review gates immediately.
 
 ## Latest Runtime Checkpoint - SPL-02 QA Active, UX-01B Ready
 

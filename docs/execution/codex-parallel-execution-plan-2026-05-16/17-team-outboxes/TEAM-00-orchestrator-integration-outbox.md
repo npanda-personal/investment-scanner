@@ -18,25 +18,24 @@ Gate movement:
 - Team 00 recorded the Team 10 acceptance evidence at `18-integration-queue/CF-W2-SPL-02-code-review.md`.
 - Team 03 Architect Signoff accepted `CF-W2-SPL-02`.
 - Team 00 created delegated PO acceptance packet `09-summaries/CF-W2-SPL-02-po-acceptance-packet.md`.
-- `CF-W2-SPL-02` is now in scoped local commit verification in the Team 06 worktree.
+- `CF-W2-SPL-02` scoped local commit completed on Team 06 branch as `31115f0 feat: add signal position ledger surface`.
+- Team 10 rejected `CF-W1-UX-01B`; Team 08 bounded rework is active as `019e6470-2027-7141-affc-9eac83ee17e0`.
+- Team 03 completed `CF-W2-DOV-02` architecture with `split required`; Team 04 QA planning is active as `019e6472-cca9-7d40-85dd-fd0aa17e14f1`.
 - Team 04 UX-01B QA Verification returned `ACCEPT`; Team 00 closed `019e645d-3a98-7cd3-9365-40a2867efd27`.
-- Team 10 UX-01B Code Review is active as `019e646a-98d9-7422-bcd8-419fe2abf191`.
 - Team 02 completed rolling requirement discovery and added `CF-W2-DOV-02` plus `CF-W2-SPL-03`.
-- `CF-W2-DOV-02` is queued for docs-only Team 03 architecture readiness.
 - `CF-W2-SPL-03` remains proposal-only and not Ready.
 
 Teams ready to pick up new tasks:
 
-- Team 00: SPL-02 scoped commit verification now.
-- Team 03: DOV-02 architecture readiness active as `019e6468-4976-77a0-9e5e-214c7d8a1053`.
-- Team 10: UX-01B Code Review active as `019e646a-98d9-7422-bcd8-419fe2abf191`.
-- Team 04: ready for the next QA handoff.
-- Team 08: UX-01B rework only if Team 04 rejects.
-- Team 06: SPL-02 rework only if Team 03 rejects.
+- Team 08: UX-01B bounded rework active.
+- Team 04: DOV-02 QA planning active.
+- Team 04: ready for UX-01B QA rerun after Team 08 handoff.
+- Team 10: ready for UX-01B rereview after QA acceptance.
+- Team 06: SPL-02 complete/parked; ready for next Team 06 Ready item.
 
 Next action:
 
-- Verify and commit the accepted SPL-02 worktree scope locally, then continue monitoring Team 03 DOV-02 architecture readiness and Team 10 UX-01B Code Review. Do not push.
+- Monitor Team 08 UX-01B rework and Team 04 DOV-02 QA planning. Do not push.
 
 ## Latest Runtime Checkpoint - SPL-02 QA Routed, UX-01B Ready
 

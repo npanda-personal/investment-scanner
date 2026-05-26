@@ -43,27 +43,26 @@ Current state:
 - `CF-W2-SPL-02` Team 10 rereview returned `ACCEPT`.
 - Team 10 rereview evidence is recorded at `18-integration-queue/CF-W2-SPL-02-code-review.md`.
 - `CF-W2-SPL-02` Team 03 Architect Signoff returned `ACCEPT`.
-- `CF-W2-SPL-02` is accepted under standing delegation and is in scoped local commit verification.
+- `CF-W2-SPL-02` is accepted under standing delegation and locally committed on branch `codex/team06-strategy-signal/CF-W2-SPL-02` as `31115f0 feat: add signal position ledger surface`.
 - Team 04 accepted `CF-W1-UX-01B` QA Verification.
-- `CF-W1-UX-01B` is now in Team 10 Code Review as `019e646a-98d9-7422-bcd8-419fe2abf191`.
+- Team 10 rejected `CF-W1-UX-01B` for synthetic frontend `trust_evidence` fallback.
+- `CF-W1-UX-01B` is back in bounded Team 08 rework as `019e6470-2027-7141-affc-9eac83ee17e0`.
 - Team 02 completed its rolling investor/trader-value requirement pass and created `CF-W2-DOV-02` plus `CF-W2-SPL-03`.
-- `CF-W2-DOV-02` is queued for Team 03 architecture readiness as a non-consent Daily Overview follow-up.
+- `CF-W2-DOV-02` Team 03 architecture returned `split required`; Team 04 QA planning is active as `019e6472-cca9-7d40-85dd-fd0aa17e14f1`.
 - `CF-W2-SPL-03` remains requirement/proposal-only and is not Ready because closed-history lifecycle proof likely needs storage/lifecycle architecture.
 - Open decisions remain 2 and block only `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
 
 SPL-02 next gates:
 
-- Team 00: scoped local commit from the Team 06 worktree after staged-scope verification passes.
-- Team 00: record commit SHA and leave push disabled.
+- Team 00: no push; keep branch parked for integration sequencing.
 
 Teams ready to pick up new tasks:
 
-- Team 00: `CF-W2-SPL-02` scoped commit verification now.
-- Team 03: `CF-W2-DOV-02` architecture readiness in parallel if agent capacity permits and file reservations stay isolated.
-- Team 10: active on `CF-W1-UX-01B` Code Review.
-- Team 04: ready for the next QA plan or verification assignment after one of the active implementation/review gates produces a handoff.
-- Team 08: ready for UX-01B rework only if Team 04 rejects; otherwise wait for the next user-facing Ready slice.
-- Team 06: ready for SPL-02 rework only if Architect rejects; otherwise wait for next Team 06 Ready item.
+- Team 04: `CF-W2-DOV-02` QA planning active.
+- Team 08: active on `CF-W1-UX-01B` bounded rework.
+- Team 04: queued for `CF-W1-UX-01B` QA rerun after Team 08 handoff.
+- Team 10: queued for `CF-W1-UX-01B` rereview after QA acceptance.
+- Team 06: SPL-02 complete/parked; ready for next Team 06 Ready item.
 - Team 02: ready for another rolling requirement pass after the current architecture/signoff pressure clears.
 
 ## Latest Team 00 Routing Update - SPL-02 QA, UX-01B Ready

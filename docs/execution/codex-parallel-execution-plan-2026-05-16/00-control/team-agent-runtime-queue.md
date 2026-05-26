@@ -13,14 +13,16 @@ Update:
 - Team 03 Architect Signoff accepted `CF-W2-SPL-02`; Team 00 created delegated PO acceptance and is verifying scoped local commit.
 - Team 03 architecture completed `CF-W2-DOV-02` with `split required`, not a consent blocker; Team 04 QA planning is queued.
 - Team 10 rejected `CF-W1-UX-01B` for synthetic frontend `trust_evidence` fallback; Team 08 bounded rework is active.
+- Team 00 committed accepted `CF-W2-SPL-02` on branch `codex/team06-strategy-signal/CF-W2-SPL-02` as `31115f0 feat: add signal position ledger surface`.
+- Team 04 DOV-02 QA planning is active as `019e6472-cca9-7d40-85dd-fd0aa17e14f1`.
 
 Current active / queued agents:
 
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Team 08 - UX / Research / Copilot | `019e6470-2027-7141-affc-9eac83ee17e0` | `gpt-5.4`, high | Code Review rejection rework | `CF-W1-UX-01B` in `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-UX-01B` | active |
-| 2 | Team 00 - Orchestrator | local | n/a | scoped commit verification | `CF-W2-SPL-02` in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02` | active |
-| 3 | Team 04 - QA Factory | pending | `gpt-5.4`, high | QA planning | `CF-W2-DOV-02` Daily Overview calibration evidence summary | queued |
+| 2 | Team 04 - QA Factory | `019e6472-cca9-7d40-85dd-fd0aa17e14f1` | `gpt-5.4`, high | QA planning | `CF-W2-DOV-02` Daily Overview calibration evidence summary | active |
+| 3 | Team 00 - Orchestrator | local | n/a | parked accepted commit | `CF-W2-SPL-02` commit `31115f0` | complete |
 | 4 | Team 04 - QA Factory | pending | `gpt-5.4`, high | QA rerun | `CF-W1-UX-01B` after Team 08 rework handoff | queued |
 | 5 | Team 10 - Review / Release | pending | `gpt-5.4`, high | rereview | `CF-W1-UX-01B` after Team 04 ACCEPT | queued |
 | 6 | Team 03 - Architecture Factory | pending | `gpt-5.4`, high | Architect Signoff | `CF-W1-UX-01B` after Team 10 ACCEPT | queued |
@@ -28,7 +30,7 @@ Current active / queued agents:
 Teams ready to pick up new tasks:
 
 - Team 08: active on UX-01B bounded rework.
-- Team 04: ready for DOV-02 QA planning now.
+- Team 04: active on DOV-02 QA planning as `019e6472-cca9-7d40-85dd-fd0aa17e14f1`.
 - Team 04: queued for UX-01B QA rerun after Team 08 handoff.
 - Team 10: queued for UX-01B rereview after QA acceptance.
 - Team 03: queued for UX-01B Architect Signoff after Team 10 acceptance.
