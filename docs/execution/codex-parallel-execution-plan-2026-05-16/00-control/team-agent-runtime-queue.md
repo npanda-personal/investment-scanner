@@ -4,7 +4,7 @@ Date: 2026-05-25
 
 Owner: Team 00 - Master Orchestrator / Integration
 
-## Latest Active Snapshot - SPL-02 Review And UX-01B Implementation
+## Latest Active Snapshot - SPL-02 Review Rework And UX-01B Implementation
 
 Date: 2026-05-26
 
@@ -12,7 +12,8 @@ Update:
 
 - Team 06 completed `CF-W2-SPL-02` implementation in the dedicated worktree and Team 00 closed the Team 06 worker.
 - Team 04 QA Verification for `CF-W2-SPL-02` accepted and Team 00 closed the Team 04 worker.
-- Team 10 Code Review / Release Readiness for `CF-W2-SPL-02` is active.
+- Team 10 Code Review rejected `CF-W2-SPL-02` for stale scope-transition totals and missing explicit UI loading/error-state proof.
+- Team 00 closed Team 10 and launched Team 06 bounded rework in the same SPL-02 worktree.
 - Team 04 completed the `CF-W1-UX-01B` QA plan and Team 00 promoted UX-01B to Ready for Team 08.
 - Team 00 created the UX-01B worktree from accepted `UX-01A`, merged current `dev`, linked dependency folders, and launched Team 08.
 - First Team 08 launch `019e6443-4d5b-7c83-a93c-f0699146d06f` failed before work began due to prompt-policy filtering. Team 00 closed it and relaunched with sanitized delegation wording as `019e6446-6e31-7f42-88f0-374ed9c48747`.
@@ -21,24 +22,27 @@ Current active agents:
 
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Team 10 - Review / Release | `019e6445-1dad-76f2-8178-9b55762d6c5c` | `gpt-5.4`, high | Code Review | `CF-W2-SPL-02` in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02` | active |
+| 1 | Team 06 - Strategy / Signal / Risk | `019e644a-7cb0-7131-b159-3ba11ccf29c1` | `gpt-5.3-codex`, high | review-reject rework | `CF-W2-SPL-02` in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02` | active |
 | 2 | Team 08 - UX / Research / Copilot | `019e6446-6e31-7f42-88f0-374ed9c48747` | `gpt-5.3-codex`, high | implementation | `CF-W1-UX-01B` in `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-UX-01B` | active |
-| 3 | Open slot | none | pending | Architect Signoff | Team 03 `CF-W2-SPL-02` after Team 10 ACCEPT | queued |
+| 3 | Open slot | none | pending | QA rerun | Team 04 `CF-W2-SPL-02` after Team 06 rework handoff | queued |
 | 4 | Open slot | none | pending | Requirements | Team 02 rolling direct investor/trader-value requirements | queued |
 | 5 | Open slot | none | pending | QA Verification | Team 04 `CF-W1-UX-01B` after Team 08 handoff | queued |
-| 6 | Open slot | none | pending | Requirements / Architecture | Team 02 rolling discovery or Team 03 rolling design when no signoff is waiting | queued |
+| 6 | Open slot | none | pending | Review / Signoff | Team 10 rereview and Team 03 signoff after SPL-02 QA rerun accepts | queued |
 
 Current routing:
 
 - `CF-W2-SPL-02` changed only its reserved route/navigation, Signal Position Ledger module/feature/test, and assigned evidence docs according to the developer handoff.
 - Team 04 accepted SPL-02 QA with backend tests/build, frontend build, worktree-targeted UI smoke, language guard, scope confirmation, and diff hygiene.
+- Team 10 rejected release readiness; rework is limited to `frontend/src/features/signal-position-ledger/hooks/useSignalPositionLedgerActiveRows.ts`, `SignalPositionLedgerPage.tsx`, `SignalPositionSummaryStrip.tsx`, `frontend/tests/ui/signal-position-ledger.spec.ts`, and assigned evidence docs.
 - `CF-W1-UX-01B` is active and independent from SPL-02 because it excludes route/navigation/shared files and stays inside Stock Research Workbench module/feature ownership.
 - Open decisions remain scoped to `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
 
 Teams ready to pick up new tasks:
 
-- Team 10: active on SPL-02 Code Review.
+- Team 06: active on SPL-02 review-reject rework.
 - Team 08: active on UX-01B implementation.
+- Team 04: ready for SPL-02 QA rerun after Team 06 handoff.
+- Team 10: ready for SPL-02 rereview after QA rerun acceptance.
 - Team 03: ready for SPL-02 signoff after Team 10 acceptance.
 - Team 02: ready for rolling investor/trader-value requirements discovery.
 

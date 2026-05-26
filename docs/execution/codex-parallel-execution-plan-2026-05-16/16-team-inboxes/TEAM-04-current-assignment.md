@@ -2,6 +2,27 @@
 
 Date: 2026-05-20
 
+## Latest Assignment Override - 2026-05-26 SPL-02 QA Rerun Standby
+
+Stand by for QA rerun on `CF-W2-SPL-02` after Team 06 completes bounded Code Review rejection rework.
+
+Expected worktree:
+
+- `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02`
+
+Expected rework focus:
+
+- stale prior-scope totals/page counts must not render under a newly selected scope while the new scoped response is loading;
+- UI smoke evidence must explicitly cover active loading and active error states.
+
+Do not run QA before Team 06 updates the developer handoff. When the handoff exists, verify only the rework scope plus any unchanged prior acceptance evidence needed for release confidence.
+
+Next output after rerun:
+
+- update `18-integration-queue/CF-W2-SPL-02-qa-verification.md`;
+- update `17-team-outboxes/TEAM-04-qa-factory.md`;
+- return pass/reject and whether Team 10 rereview can proceed.
+
 ## Latest Assignment Override - 2026-05-26 SPL-02 QA Verification
 
 Run QA Verification for `CF-W2-SPL-02` in the dedicated Team 06 worktree. This supersedes older standby text for the active spawned Team 04 QA agent.

@@ -2,6 +2,66 @@
 
 Date: 2026-05-20
 
+## Latest Assignment Override - 2026-05-26 SPL-02 Review-Reject Rework
+
+Run bounded Code Review rejection rework for `CF-W2-SPL-02` in the existing Team 06 worktree.
+
+Work item:
+
+- `CF-W2-SPL-02` - Signal Position Ledger active positions surface.
+
+Branch / worktree:
+
+- Branch: `codex/team06-strategy-signal/CF-W2-SPL-02`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02`
+
+Review input:
+
+- `18-integration-queue/CF-W2-SPL-02-code-review.md`
+- `18-integration-queue/CF-W2-SPL-02-qa-verification.md`
+- `18-integration-queue/CF-W2-SPL-02-developer-handoff.md`
+
+Required fixes:
+
+- Prevent prior-scope totals or page-derived counts from rendering under a newly selected scope while the new scoped response is loading.
+- Add or strengthen UI smoke coverage for active loading and active error states.
+
+Allowed rework files:
+
+- `frontend/src/features/signal-position-ledger/hooks/useSignalPositionLedgerActiveRows.ts`
+- `frontend/src/features/signal-position-ledger/components/SignalPositionLedgerPage.tsx`
+- `frontend/src/features/signal-position-ledger/components/SignalPositionSummaryStrip.tsx`
+- `frontend/tests/ui/signal-position-ledger.spec.ts`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-CF-W2-SPL-02-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W2-SPL-02-developer-handoff.md`
+
+Forbidden rework scope:
+
+- backend source/tests/routes
+- frontend route/navigation files
+- other frontend features
+- shared UI/helpers/context
+- schema, migrations, generated files, package manifests, lockfiles
+- provider/live/startup/scheduler/worker/queue files
+- Closed History API/data/counts/mocks/close evidence/detail routes
+- product-language drift outside the approved research-support wording
+
+Required validation:
+
+```powershell
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- signal-position-ledger.spec.ts --workers=1
+```
+
+Also run the SPL-02 language guard and `git diff --check`.
+
+Expected handoff:
+
+- Update `18-integration-queue/CF-W2-SPL-02-developer-handoff.md` with a rework section.
+- Update `17-team-outboxes/TEAM-06-CF-W2-SPL-02-outbox.md`.
+- Next gate: Team 04 QA rerun with explicit loading/error-state evidence.
+
 ## Latest Assignment Override - 2026-05-26 SPL-02
 
 Team 00 promotes `CF-W2-SPL-02` as a bounded Signal Position Ledger user-facing surface implementation item.
