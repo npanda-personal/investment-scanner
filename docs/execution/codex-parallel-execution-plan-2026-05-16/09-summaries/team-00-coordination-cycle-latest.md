@@ -29,6 +29,7 @@ Active / queued:
 
 - Team 04 `019e6455-ae39-7c80-8543-673608a99f20`: active on SPL-02 QA rerun.
 - Team 08 `019e6446-6e31-7f42-88f0-374ed9c48747`: active on UX-01B implementation.
+- Team 02 `019e645a-5323-7842-9783-c76f310fd7a0`: active on rolling investor/trader-value requirements discovery.
 - Team 10: queued for SPL-02 Code Review after QA acceptance.
 - Team 03: queued for SPL-02 Architect Signoff after Team 10 acceptance.
 
@@ -36,6 +37,7 @@ Teams ready to pick up new tasks:
 
 - Team 04: SPL-02 QA rerun now.
 - Team 08: UX-01B implementation active.
+- Team 02: rolling investor/trader-value requirements discovery active.
 - Team 10: SPL-02 rereview after QA rerun accepts.
 - Team 03: SPL-02 signoff after Team 10 accepts, or rolling architecture prep if no signoff is waiting.
 - Team 02: rolling investor/trader-value requirements discovery.

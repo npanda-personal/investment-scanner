@@ -36,6 +36,7 @@ Teams ready to pick up new tasks:
 
 - Team 04: SPL-02 QA rerun now.
 - Team 08: UX-01B implementation active.
+- Team 02: rolling investor/trader-value requirements discovery active.
 - Team 10: SPL-02 rereview after QA rerun acceptance.
 - Team 03: SPL-02 Architect Signoff after Team 10 accepts, or rolling architecture prep if no signoff is waiting.
 - Team 02: rolling investor/trader-value requirements discovery.

@@ -24,8 +24,8 @@ Current active agents:
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Team 04 - QA Factory | `019e6455-ae39-7c80-8543-673608a99f20` | `gpt-5.4`, high | QA rerun | `CF-W2-SPL-02` in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02` | active |
 | 2 | Team 08 - UX / Research / Copilot | `019e6446-6e31-7f42-88f0-374ed9c48747` | `gpt-5.3-codex`, high | implementation | `CF-W1-UX-01B` in `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-UX-01B` | active |
-| 3 | Open slot | none | pending | Code Review | Team 10 `CF-W2-SPL-02` rereview after Team 04 ACCEPT | queued |
-| 4 | Open slot | none | pending | Requirements | Team 02 rolling direct investor/trader-value requirements | queued |
+| 3 | Team 02 - PO / Requirement Factory | `019e645a-5323-7842-9783-c76f310fd7a0` | `gpt-5.4`, medium | requirements | rolling direct investor/trader-value requirements | active |
+| 4 | Open slot | none | pending | Code Review | Team 10 `CF-W2-SPL-02` rereview after Team 04 ACCEPT | queued |
 | 5 | Open slot | none | pending | QA Verification | Team 04 `CF-W1-UX-01B` after Team 08 handoff | queued |
 | 6 | Open slot | none | pending | Review / Signoff | Team 10 rereview and Team 03 signoff after SPL-02 QA rerun accepts | queued |
 
@@ -42,6 +42,7 @@ Teams ready to pick up new tasks:
 
 - Team 04: active on SPL-02 QA rerun.
 - Team 08: active on UX-01B implementation.
+- Team 02: active on rolling investor/trader-value requirements discovery.
 - Team 10: ready for SPL-02 rereview after QA rerun acceptance.
 - Team 03: ready for SPL-02 signoff after Team 10 acceptance.
 - Team 02: ready for rolling investor/trader-value requirements discovery.
