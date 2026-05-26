@@ -27,6 +27,7 @@ export class SmartMoneyIntelligenceController {
   top = async (req: Request, res: Response) => this.respond(res, () =>
     this.service.top({
       limit: parseLimit(req.query.limit),
+      offset: parseOffset(req.query.offset),
       sector: parseOptionalText(req.query.sector),
       region: parseOptionalText(req.query.region),
       assetType: parseOptionalText(req.query.assetType),
@@ -37,6 +38,7 @@ export class SmartMoneyIntelligenceController {
   distribution = async (req: Request, res: Response) => this.respond(res, () =>
     this.service.distribution({
       limit: parseLimit(req.query.limit),
+      offset: parseOffset(req.query.offset),
       sector: parseOptionalText(req.query.sector),
       region: parseOptionalText(req.query.region),
       assetType: parseOptionalText(req.query.assetType),

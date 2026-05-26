@@ -13,7 +13,7 @@ Query parameters `region` and `assetType` are supported in all list and aggregat
 
 Snapshot refresh also accepts `region` and `assetType`. The frontend must call the authenticated API client, not raw unauthenticated `fetch`, so `Refresh Snapshots` genuinely invokes the backend and then reloads the visible accumulation/distribution/sector data.
 
-Refresh generation persists all supported ranges (`1M`, `3M`, and `6M`) in one run. The list endpoints are persisted-snapshot reads, so a refresh must not only calculate the default `3M` range while leaving the other visible UI ranges empty.
+Refresh generation persists all supported ranges (`1M`, `3M`, and `6M`) in one run. The list endpoints are persisted-snapshot reads from the latest available snapshot date for the selected scope/range, so a market-session snapshot remains visible after the runtime calendar rolls over. A refresh must not only calculate the default `3M` range while leaving the other visible UI ranges empty.
 
 ## API Reference
 
@@ -68,7 +68,7 @@ The endpoint refreshes all supported ranges (`1M`, `3M`, `6M`) for only the curr
 
 The frontend owns full-scope orchestration. It keeps calling the backend with `nextOffset` until `hasMore=false`, keeps the refresh button disabled while running, and shows progress plus a final generated/skipped/failed summary. The regular Playwright suite stubs the POST and asserts this orchestration; real full refreshes remain manual browser checks because they are database-heavy.
 
-Scheduled pipeline automation can also call `SmartMoneyIntelligenceService.run()` with explicit `instrumentIds`. That path avoids region-wide pagination, uses local persisted market data only, uses missing ownership placeholders rather than provider calls, writes persisted daily snapshots for each supported range, and counts missing explicit instruments as skipped evidence instead of clean success.
+Scheduled pipeline automation can also call `SmartMoneyIntelligenceService.run()` with explicit `instrumentIds`. That path avoids region-wide pagination, uses local persisted market data only, uses missing ownership placeholders rather than provider calls, writes persisted daily snapshots for each supported range, and counts missing explicit instruments as skipped evidence instead of clean success. Read APIs intentionally fall back to the latest available snapshot date rather than requiring UTC today, because automated market-session runs can complete after local midnight while still representing the latest completed trading date.
 
 ## Sector Aggregation
 Sector summaries are calculated per region to provide accurate localized tailwinds and distribution warnings.
@@ -77,7 +77,7 @@ Sector aggregation is range-specific. If the user selects `1M`, `3M`, or `6M`, t
 
 ## Downstream Reads
 
-`stock()` may calculate and persist an on-demand snapshot when today's snapshot is missing. Downstream batch triage modules that need fast, bounded reads should use the public `latestPersistedStock()` service method so missing smart-money context becomes a data gap instead of triggering price-volume calculation during their request.
+`stock()` may calculate and persist an on-demand snapshot when no persisted snapshot exists for the requested instrument/range. Downstream batch triage modules that need fast, bounded reads should use the public `latestPersistedStock()` or `latestPersistedStocks()` service methods so missing smart-money context becomes a data gap instead of triggering price-volume calculation during their request. These persisted readers return the latest stored snapshot per instrument/range, not only rows whose `snapshotDate` equals the runtime calendar date.
 
 ## Frontend
 - `SmartMoneyIntelligencePage`: Subscribes to `useMarketScope()`. Automatically refetches all candidates and sector data when the header region changes.

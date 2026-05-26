@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import { visitAuthenticated } from './support/auth';
 
 async function mockAuthenticatedUser(page: Page) {
@@ -481,7 +482,7 @@ test.describe('Today Trade Review UI', () => {
     expect(body).not.toContain('Raw signal count');
   });
 
-  test('candidate table supports filtering, sorting, pagination, and hover-only full cell text', async ({ page }) => {
+  test('candidate table supports filtering, sorting, pagination, and hover-only full cell text', async ({ page }, testInfo) => {
     const longRows = [
       { symbol: 'ZETA.NS', companyName: 'Zeta Industries', rank: 1, grade: 'B', confidenceScore: 78, dq: 'GOOD' },
       { symbol: 'OMEGA.NS', companyName: 'Omega Capital Services', rank: 2, grade: 'A', confidenceScore: 91, dq: 'READY' },
@@ -537,6 +538,13 @@ test.describe('Today Trade Review UI', () => {
     await page.getByRole('button', { name: 'Export CSV' }).click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toContain('today-review-current-table');
+    const csvPath = testInfo.outputPath(download.suggestedFilename());
+    await download.saveAs(csvPath);
+    const csv = await readFile(csvPath, 'utf8');
+    const header = csv.split(/\r?\n/)[0].replace(/^\uFEFF/, '');
+    expect(header).toBe('Rank,Symbol,Company,State,Setup,Entry Evidence,Confidence,Grade,Daily Tier,Data Through,Data Quality,Reason Summary,Blocker,Strategy Code');
+    expect(header).not.toContain('Automation Reason');
+    expect(header).not.toContain('Candidate URL');
     await expect(page.getByText('Exported 7 Today Review rows as an Excel-compatible CSV.')).toBeVisible();
 
     await page.getByLabel('Search rows').fill('OMEGA');

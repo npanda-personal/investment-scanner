@@ -7,16 +7,19 @@ export class SmartMoneyIntelligenceRepository {
   constructor(private readonly db: PrismaClient = prisma) {}
 
   async latestSnapshots(query: SmartMoneyListQuery, isDistribution: boolean = false): Promise<{ results: SmartMoneyStockSummary[], total: number }> {
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-
     const stockFilters = this.stockScopeFilters(query.region, query.assetType);
 
-    const where: any = {
+    const baseWhere: any = {
       ...(stockFilters.length > 0 ? { stock: { AND: stockFilters } } : {}),
-      snapshotDate: today,
       range: query.range,
       ...(query.sector && { sector: query.sector }),
+    };
+    const snapshotDate = await this.latestSnapshotDate(baseWhere);
+    if (!snapshotDate) return { results: [], total: 0 };
+
+    const where: any = {
+      ...baseWhere,
+      snapshotDate,
     };
 
     if (isDistribution) {
@@ -46,15 +49,12 @@ export class SmartMoneyIntelligenceRepository {
   }
 
   async latestStockSnapshot(instrumentId: string, range: SmartMoneyRange): Promise<SmartMoneyStockSummary | null> {
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-
     const row = await this.db.smartMoneyContextSnapshot.findFirst({
       where: {
-        snapshotDate: today,
         instrumentId,
         range,
-      }
+      },
+      orderBy: { snapshotDate: 'desc' },
     });
 
     if (!row) return null;
@@ -64,14 +64,23 @@ export class SmartMoneyIntelligenceRepository {
   async latestStockSnapshots(instrumentIds: string[], range: SmartMoneyRange): Promise<SmartMoneyStockSummary[]> {
     const uniqueIds = [...new Set(instrumentIds.filter(Boolean))];
     if (uniqueIds.length === 0) return [];
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
+    const latestByInstrument = await this.db.smartMoneyContextSnapshot.groupBy({
+      by: ['instrumentId'],
+      where: {
+        instrumentId: { in: uniqueIds },
+        range,
+      },
+      _max: { snapshotDate: true },
+    });
+    const latestPairs: Array<{ instrumentId: string; snapshotDate: Date }> = latestByInstrument.flatMap((item: any) => (
+      item._max?.snapshotDate ? [{ instrumentId: item.instrumentId, snapshotDate: item._max.snapshotDate }] : []
+    ));
+    if (latestPairs.length === 0) return [];
 
     const rows = await this.db.smartMoneyContextSnapshot.findMany({
       where: {
-        snapshotDate: today,
-        instrumentId: { in: uniqueIds },
         range,
+        OR: latestPairs,
       },
     });
 
@@ -79,15 +88,18 @@ export class SmartMoneyIntelligenceRepository {
   }
 
   async latestSectorSnapshots(range: SmartMoneyRange, query: Pick<SmartMoneyListQuery, 'region' | 'assetType'> = {}): Promise<SectorSmartMoneySummary[]> {
-     const today = new Date();
-     today.setUTCHours(0, 0, 0, 0);
      const stockFilters = this.stockScopeFilters(query.region, query.assetType);
+     const baseWhere: any = {
+       ...(stockFilters.length > 0 ? { stock: { AND: stockFilters } } : {}),
+       range,
+     };
+     const snapshotDate = await this.latestSnapshotDate(baseWhere);
+     if (!snapshotDate) return [];
 
      const rows = await this.db.smartMoneyContextSnapshot.findMany({
        where: {
-         ...(stockFilters.length > 0 ? { stock: { AND: stockFilters } } : {}),
-         snapshotDate: today,
-         range,
+         ...baseWhere,
+         snapshotDate,
        }
      });
 
@@ -198,6 +210,15 @@ export class SmartMoneyIntelligenceRepository {
     const assetTypeFilter = this.assetTypeFilter(assetType);
     if (assetTypeFilter) stockFilters.push(assetTypeFilter);
     return stockFilters;
+  }
+
+  private async latestSnapshotDate(where: any): Promise<Date | null> {
+    const row = await this.db.smartMoneyContextSnapshot.findFirst({
+      where,
+      orderBy: { snapshotDate: 'desc' },
+      select: { snapshotDate: true },
+    });
+    return row?.snapshotDate ?? null;
   }
 
   private mapSnapshotToSummary(row: any): SmartMoneyStockSummary {
