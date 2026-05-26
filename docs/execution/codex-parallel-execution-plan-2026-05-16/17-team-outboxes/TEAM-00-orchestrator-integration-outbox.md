@@ -16,10 +16,10 @@ Gate movement:
 
 - Team 06 completed `CF-W2-SPL-02` implementation in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02`.
 - Team 00 closed Team 06 worker `019e6423-90b8-76d0-bf3f-cc6b1ffffd70`.
-- Team 04 QA Verification is active as `019e643c-66de-7980-8b83-d772afc667e1`.
+- Team 04 QA Verification accepted; Team 10 Code Review is active as `019e6445-1dad-76f2-8178-9b55762d6c5c`.
 - Team 04 completed `CF-W1-UX-01B` QA planning and returned `QA-PLAN READY`.
 - Team 00 promoted `CF-W1-UX-01B` to Team 08 for bounded implementation.
-- Team 00 created `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-UX-01B`, merged current `dev`, linked backend/frontend dependency folders, and launched Team 08 worker `019e6443-4d5b-7c83-a93c-f0699146d06f`.
+- Team 00 created `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-UX-01B`, merged current `dev`, linked backend/frontend dependency folders, closed failed pre-work launch `019e6443-4d5b-7c83-a93c-f0699146d06f`, and relaunched Team 08 worker `019e6446-6e31-7f42-88f0-374ed9c48747`.
 
 UX-01B implementation assignment:
 
@@ -31,7 +31,7 @@ UX-01B implementation assignment:
 
 Teams ready to pick up new tasks:
 
-- Team 04: SPL-02 QA Verification now.
+- Team 10: SPL-02 Code Review now.
 - Team 08: UX-01B implementation active.
 - Team 10: SPL-02 Code Review after Team 04 accepts.
 - Team 03: SPL-02 Architect Signoff after Team 10 accepts, or rolling architecture prep if no signoff is waiting.
