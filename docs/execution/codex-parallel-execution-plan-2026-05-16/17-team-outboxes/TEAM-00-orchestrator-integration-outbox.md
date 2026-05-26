@@ -19,6 +19,7 @@ Gate movement:
 - Team 04 QA Verification is active as `019e643c-66de-7980-8b83-d772afc667e1`.
 - Team 04 completed `CF-W1-UX-01B` QA planning and returned `QA-PLAN READY`.
 - Team 00 promoted `CF-W1-UX-01B` to Team 08 for bounded implementation.
+- Team 00 created `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-UX-01B`, merged current `dev`, linked backend/frontend dependency folders, and launched Team 08 worker `019e6443-4d5b-7c83-a93c-f0699146d06f`.
 
 UX-01B implementation assignment:
 
@@ -31,14 +32,14 @@ UX-01B implementation assignment:
 Teams ready to pick up new tasks:
 
 - Team 04: SPL-02 QA Verification now.
-- Team 08: UX-01B implementation after worktree setup.
+- Team 08: UX-01B implementation active.
 - Team 10: SPL-02 Code Review after Team 04 accepts.
 - Team 03: SPL-02 Architect Signoff after Team 10 accepts, or rolling architecture prep if no signoff is waiting.
 - Team 02: rolling investor/trader-value requirements discovery.
 
 Next action:
 
-- Create the UX-01B worktree from the accepted UX-01A branch, merge current `dev`, link dependency folders if needed, and spawn Team 08. Do not push.
+- Monitor Team 04 SPL-02 QA and Team 08 UX-01B implementation. If SPL-02 QA accepts first, route Team 10 Code Review immediately. Do not push.
 
 ## Latest Runtime Checkpoint - SPL-02 Promoted
 

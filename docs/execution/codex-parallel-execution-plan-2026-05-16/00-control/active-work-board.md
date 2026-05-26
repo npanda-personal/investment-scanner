@@ -44,7 +44,8 @@ Current state:
 - Team 06 implementation branch: `codex/team06-strategy-signal/CF-W2-SPL-02`.
 - Team 06 implementation worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02`.
 - Team 04 QA agent: `019e643c-66de-7980-8b83-d772afc667e1`.
-- `CF-W1-UX-01B` Stock Research Workbench trust-evidence contract is promoted to Team 08 as the next independent user-facing implementation slice.
+- `CF-W1-UX-01B` Stock Research Workbench trust-evidence contract is promoted and active with Team 08 as the next independent user-facing implementation slice.
+- Team 08 UX-01B agent: `019e6443-4d5b-7c83-a93c-f0699146d06f`.
 - Open decisions remain 2 and block only `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
 
 SPL-02 next gates:
@@ -66,7 +67,7 @@ UX-01B implementation routing:
 Teams ready to pick up new tasks:
 
 - Team 04: active on SPL-02 QA Verification.
-- Team 08: ready for `CF-W1-UX-01B` implementation after Team 00 creates the worktree.
+- Team 08: active on `CF-W1-UX-01B` implementation.
 - Team 10: ready for SPL-02 Code Review after QA acceptance.
 - Team 03: ready for SPL-02 Architect Signoff after Code Review acceptance, or rolling architecture if no signoff is waiting.
 - Team 02: ready for rolling investor/trader-value requirements discovery.

@@ -20,25 +20,26 @@ Completed / routed:
 - Team 06 worker `019e6423-90b8-76d0-bf3f-cc6b1ffffd70` was closed after handoff.
 - `CF-W1-UX-01B` now has requirement, architecture review, contract, work packet, QA plan, exact reservations, and no affected open decision.
 - Team 00 promoted `CF-W1-UX-01B` to Ready for Team 08.
+- Team 00 created the UX-01B worktree, merged current `dev`, linked backend/frontend dependencies, and launched Team 08 worker `019e6443-4d5b-7c83-a93c-f0699146d06f`.
 
 Active / queued:
 
 - Team 04 `019e643c-66de-7980-8b83-d772afc667e1`: active on SPL-02 QA.
-- Team 08: queued for UX-01B implementation after worktree setup.
+- Team 08 `019e6443-4d5b-7c83-a93c-f0699146d06f`: active on UX-01B implementation.
 - Team 10: queued for SPL-02 Code Review after QA acceptance.
 - Team 03: queued for SPL-02 Architect Signoff after Team 10 acceptance.
 
 Teams ready to pick up new tasks:
 
 - Team 04: SPL-02 QA Verification now.
-- Team 08: UX-01B implementation after worktree setup.
+- Team 08: UX-01B implementation active.
 - Team 10: SPL-02 review after QA accepts.
 - Team 03: SPL-02 signoff after Team 10 accepts, or rolling architecture prep if no signoff is waiting.
 - Team 02: rolling investor/trader-value requirements discovery.
 
 Next action:
 
-- Create the UX-01B stacked worktree from accepted `CF-W1-UX-01A` branch, merge current `dev`, spawn Team 08, then continue monitoring Team 04 SPL-02 QA.
+- Continue monitoring Team 04 SPL-02 QA and Team 08 UX-01B implementation. Route Team 10 review immediately after the next QA-accepted handoff.
 
 ---
 
