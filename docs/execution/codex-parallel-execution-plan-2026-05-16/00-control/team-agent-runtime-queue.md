@@ -46,6 +46,27 @@ Update:
 - DOV-02 dependency integration base verified at `50bccc8`.
 - Team 08 implementation worktree created at `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-02`.
 - Team 08 implementation launched as `019e649d-550f-7b31-b6fa-40109ce27eff`.
+- Team 04 QA rejected DOV-02 for one bounded missing Playwright scenario: successful `MISSING_SIGNAL_QUALITY_EVIDENCE` page-summary response.
+- Team 08 spec-only rework launched as `019e64b8-9dde-76a2-8423-35e3d34896b5`.
+- Team 04 QA rerun accepted.
+- Team 10 Code Review accepted.
+- Team 03 Architect Signoff accepted.
+- Team 00 delegated PO accepted and committed `CF-W2-DOV-02` on branch `codex/team08-ux-research/CF-W2-DOV-02` as `ff0c52e feat: add daily overview calibration evidence summary`.
+
+Current active agents:
+
+- none.
+
+Paused:
+
+- rolling Team 02 requirements
+- rolling Team 03 architecture
+
+Teams ready to pick up new tasks:
+
+- Team 00: no active worker queued; closure report ready.
+- Team 04 / Team 10 / Team 03: standby only if the Product Owner asks for further release/integration review.
+- Team 02 / Team 03 rolling lanes remain paused by Product Owner direction.
 
 ## Latest Active Snapshot - UX-01B Signoff, STRAT-05 Architecture, Rolling PO
 

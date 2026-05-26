@@ -25,7 +25,26 @@ Active focus:
 
 Active agent:
 
-- Team 08 `019e649d-550f-7b31-b6fa-40109ce27eff`: `CF-W2-DOV-02` implementation in `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-02`.
+- Team 08 `019e64b8-9dde-76a2-8423-35e3d34896b5`: `CF-W2-DOV-02` QA-rejection spec-only rework in `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-02`.
+
+Latest gate:
+
+- Team 04 QA rejected DOV-02 only for missing successful `MISSING_SIGNAL_QUALITY_EVIDENCE` Playwright coverage. No implementation scope drift was found.
+- Team 08 completed spec-only rework.
+- Team 04 QA rerun accepted.
+- Team 10 Code Review accepted.
+- Team 03 Architect Signoff accepted.
+- Team 00 delegated PO accepted and locally committed DOV-02 as `ff0c52e feat: add daily overview calibration evidence summary`.
+
+Current active agents:
+
+- none.
+
+Closure state:
+
+- Two narrowed priority items are closed through local scoped commits:
+  - Signal Position Ledger active surface: `31115f0`.
+  - Daily Overview dashboard/evidence summary path: `a371e2f` and `ff0c52e`.
 
 Teams ready to pick up new tasks:
 

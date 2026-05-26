@@ -23,12 +23,18 @@ Completed in the recent window:
 
 In progress:
 
-- Team 08 `019e649d-550f-7b31-b6fa-40109ce27eff`: `CF-W2-DOV-02` implementation in `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-02`.
+- Team 08 `019e64b8-9dde-76a2-8423-35e3d34896b5`: `CF-W2-DOV-02` QA-rejection spec-only rework in `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-02`.
 
 Pending:
 
-- Daily Overview dependency integration base.
-- Daily Overview follow-up implementation by Team 08.
+- none for the two narrowed priority items inside this coordination cycle.
+
+Closed:
+
+- Signal Position Ledger active surface committed as `31115f0 feat: add signal position ledger surface`.
+- Daily Overview dashboard committed as `a371e2f feat: add daily overview dashboard`.
+- Daily Overview calibration evidence-through summary committed as `ff0c52e feat: add daily overview calibration evidence summary`.
+- Stock Research Workbench trust evidence closure was also completed while unwinding the active gate queue, committed as `8dbc183 feat: add workbench trust evidence contract`.
 - QA, review, Architect Signoff, delegated PO acceptance, and commit for that follow-up slice.
 
 Teams ready to pick up new tasks:
@@ -38,6 +44,10 @@ Teams ready to pick up new tasks:
 - Team 04: QA after handoff.
 - Team 10: review after QA acceptance.
 - Team 03: Architect Signoff after review acceptance.
+
+Current active agents:
+
+- none.
 
 ## Latest Runtime Checkpoint - UX-01B Signoff And STRAT-05 Architecture Active
 
