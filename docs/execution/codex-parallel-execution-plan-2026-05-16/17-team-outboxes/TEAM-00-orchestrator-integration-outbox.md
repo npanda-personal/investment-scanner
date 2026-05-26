@@ -18,7 +18,8 @@ Gate movement:
 - Team 00 closed Team 06 worker `019e6423-90b8-76d0-bf3f-cc6b1ffffd70`.
 - Team 04 QA Verification accepted.
 - Team 10 Code Review rejected SPL-02 for stale scope-transition totals and missing explicit loading/error-state UI proof; Team 00 closed Team 10.
-- Team 06 bounded review-reject rework is active as `019e644a-7cb0-7131-b159-3ba11ccf29c1`.
+- Team 06 bounded review-reject rework completed and Team 00 closed Team 06.
+- Team 04 QA rerun is active as `019e6455-ae39-7c80-8543-673608a99f20`.
 - Team 04 completed `CF-W1-UX-01B` QA planning and returned `QA-PLAN READY`.
 - Team 00 promoted `CF-W1-UX-01B` to Team 08 for bounded implementation.
 - Team 00 created `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-UX-01B`, merged current `dev`, linked backend/frontend dependency folders, closed failed pre-work launch `019e6443-4d5b-7c83-a93c-f0699146d06f`, and relaunched Team 08 worker `019e6446-6e31-7f42-88f0-374ed9c48747`.
@@ -33,16 +34,15 @@ UX-01B implementation assignment:
 
 Teams ready to pick up new tasks:
 
-- Team 06: SPL-02 review-reject rework now.
+- Team 04: SPL-02 QA rerun now.
 - Team 08: UX-01B implementation active.
-- Team 04: SPL-02 QA rerun after Team 06 handoff.
 - Team 10: SPL-02 rereview after QA rerun acceptance.
 - Team 03: SPL-02 Architect Signoff after Team 10 accepts, or rolling architecture prep if no signoff is waiting.
 - Team 02: rolling investor/trader-value requirements discovery.
 
 Next action:
 
-- Monitor Team 06 SPL-02 rework and Team 08 UX-01B implementation. If SPL-02 rework completes first, route Team 04 QA rerun immediately. Do not push.
+- Monitor Team 04 SPL-02 QA rerun and Team 08 UX-01B implementation. If SPL-02 QA rerun accepts first, route Team 10 rereview immediately. Do not push.
 
 ## Latest Runtime Checkpoint - SPL-02 Promoted
 
