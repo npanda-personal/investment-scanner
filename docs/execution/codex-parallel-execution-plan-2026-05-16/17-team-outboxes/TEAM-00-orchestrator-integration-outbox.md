@@ -1,5 +1,45 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - DOV Refreshed Ready
+
+Date: 2026-05-26
+
+Status:
+
+- Branch: `dev`.
+- Open decisions: 2, affecting only `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
+- Product Owner action required: yes only for those affected workstreams.
+- Push performed: no.
+
+Gate movement:
+
+- Team 03 refreshed `CF-W2-DOV-01` architecture/source mapping and returned `READY-CANDIDATE AFTER QA`.
+- Team 04 refreshed `CF-W2-DOV-01` QA and returned `QA-PLAN READY`.
+- Team 00 refreshed the DOV Ready promotion for bounded Team 08 frontend-only rework in the existing DOV worktree.
+
+Implementation assignment:
+
+- Team: Team 08 - UX / Research / frontend owner.
+- Branch: `codex/team08-ux-research/CF-W2-DOV-01`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-01`.
+- Scope: `frontend/src/app/HomePage.tsx`, `frontend/src/features/daily-overview-dashboard/**`, and `frontend/tests/ui/daily-overview-dashboard.spec.ts` only, plus allowed handoff/outbox docs.
+- Intent: replace the old admin-style DOV implementation with investor/trader-first first viewport sections and truthful placeholders.
+
+Teams ready to pick up new tasks:
+
+- Team 08: DOV refreshed implementation/rework now.
+- Team 04: DOV QA Verification after Team 08 handoff.
+- Team 10: Code Review after QA acceptance.
+- Team 03: Architect Signoff after Code Review acceptance.
+- Team 06: SPL follow-up standby; no active SPL child is Ready.
+- Team 02: rolling investor/trader-value discovery after DOV worker launch.
+
+Next action:
+
+- Spawn Team 08 worker for DOV refreshed rework. Do not push.
+
+---
+
 ## Latest Runtime Checkpoint - DOV Reframe Routed, SPL And RH Accepted
 
 Date: 2026-05-26

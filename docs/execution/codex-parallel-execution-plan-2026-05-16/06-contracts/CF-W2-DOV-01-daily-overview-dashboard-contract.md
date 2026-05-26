@@ -2,41 +2,40 @@
 
 Date: 2026-05-26
 
-Owner: Team 03 Architecture Factory
+Owner: Team 03 - Solution Architecture Factory
 
-## Status
+Status: `READY-CANDIDATE AFTER QA`
 
-Draft contract for the safest first slice.
-
-Architecture verdict: this can become a Ready candidate after Team 04 QA planning and Team 00 shared-file reservation.
+This is a docs-only contract refresh. It supersedes older admin-style Daily Overview contract language.
 
 ## Contract Intent
 
-Turn `/` into a real Daily Overview workspace without creating a new backend summary layer, without hiding source disagreement, and without inventing calibration, follow-through, or confidence rollups that current source truth does not support.
+Turn `/` into an investor/trader-first Daily Overview workspace using truthful existing read sources and explicit `Coming soon` placeholders for unavailable market-wide or institutional-flow evidence.
 
-The first slice is frontend-only.
+The first slice is frontend-only. The dashboard consumes source-owner truth; it must not redefine source truth, create a synthetic confidence score, or infer unavailable data.
 
 ## Ownership
 
 Frontend ownership:
 
-- new feature `daily-overview-dashboard`
-- existing app shell file `frontend/src/app/HomePage.tsx`
+- new feature: `frontend/src/features/daily-overview-dashboard`
+- shell integration: `frontend/src/app/HomePage.tsx`
 
-Upstream data ownership remains unchanged:
+Source ownership remains unchanged:
 
-- Today Review owns review-run truth
-- Research Hub owns research-priority and light cross-pillar triage truth
-- Market Context owns regime/breadth/sector truth
-- Data Quality owns readiness and blocker truth
-- Signal Generation owns latest raw-signal run truth
-- Pipeline Ops owns pipeline ledger truth
+- Today Review owns daily review runs, candidate groups, watch/blocked reasons, scan funnel, and explainability.
+- Research Hub owns research priorities, market-readiness text, strategy-proof summary, light confirmation summaries, next actions, and data gaps.
+- Market Data Foundation owns review-readiness summary.
+- Market Context owns region-level regime, breadth, and sector context.
+- Data Quality owns readiness and data-quality summary.
+- Signal Generation owns latest raw-signal run audit.
+- Pipeline Ops owns pipeline run and stage status.
 
-The dashboard consumes those truths. It must not redefine them.
+Daily Overview is a read-only presentation composition layer.
 
-## Exact Allowed Read Surfaces
+## Allowed Read Surfaces
 
-Use only these existing public frontend/API surfaces in slice 1:
+Slice 1 may use only:
 
 - `GET /api/v1/today-review/latest`
 - `GET /api/v1/research/overview`
@@ -45,280 +44,337 @@ Use only these existing public frontend/API surfaces in slice 1:
 - `GET /api/v1/data-quality/summary`
 - `GET /api/v1/signals/runs/latest`
 - `GET /api/v1/pipeline/status`
-- local scope via `useMarketScope()`
+- `useMarketScope()`
 
 Allowed feature-local wrappers:
 
-- `dailyOverviewDashboardApi.ts`
-- `useDailyOverviewDashboard.ts`
-
-Forbidden in slice 1:
-
-- new backend adapter calls
-- `POST` run/refresh commands
-- direct calibration aggregate reads from `signals/calibration/health` or `signals/calibration/top`
-- direct Smart Money fanout calls
-- direct Backtests run-list fanout calls
-- direct Signal Quality summary fanout for a home-level rollup
-
-## File Boundary
-
-Allowed future writer set:
-
-- `frontend/src/app/HomePage.tsx`
-- `frontend/src/features/daily-overview-dashboard/index.ts`
-- `frontend/src/features/daily-overview-dashboard/types.ts`
 - `frontend/src/features/daily-overview-dashboard/api/dailyOverviewDashboardApi.ts`
 - `frontend/src/features/daily-overview-dashboard/hooks/useDailyOverviewDashboard.ts`
-- `frontend/src/features/daily-overview-dashboard/components/**`
-- `frontend/tests/ui/daily-overview-dashboard.spec.ts`
 
-Forbidden:
+Forbidden read/command surfaces in slice 1:
 
-- all backend source/tests
-- `frontend/src/app/routes.tsx`
-- `frontend/src/app/navigationMetadata.tsx`
-- `frontend/src/shared/components/**`
-- package manifests
-- Prisma schema/migrations
-- generated files
-- shared hooks/utilities rewrites
-- other feature page rewrites
+- new backend `daily-overview-dashboard` API
+- POST run/refresh endpoints
+- pipeline command endpoints
+- provider/live calls
+- direct Smart Money fanout for FII/DII
+- direct Backtesting fanout for proof rollups
+- direct Signal Quality fanout for measured outcome rollups
+- direct calibration aggregate inference from `signals/calibration/health`, `signals/calibration/top`, or first rows
+- watchlist daily-change sorting relabeled as market-wide movers
 
 ## Required Load Contract
 
-### Phase A: critical load
-
-The dashboard must first load:
+Critical first-viewport load:
 
 1. Today Review latest
 2. Research Overview
-3. Review-readiness summary
+3. Market Data review-readiness summary
 
-Those three calls own the first viewport.
-
-### Phase B: deferred sections
-
-After Phase A settles, load:
+Deferred/supporting load:
 
 1. Market Context summary
 2. Data Quality summary
 3. Signal latest run
 4. Pipeline status
 
-The page must not block first render on all seven sources.
+Rules:
 
-## Required Section Contract
+- Use section-local errors and `Promise.allSettled`-style behavior.
+- Do not block placeholder-only sections on API calls.
+- Do not blank the full page when one source fails.
+- Refresh refetches reads only.
+- Do not fake a single atomic dashboard snapshot.
+
+## Section Contract
 
 ### Header Rail
 
 Must show:
 
 - `Daily Overview`
-- current `region / assetType`
-- latest loaded timestamp available from current section payloads
-- visible research-support disclaimer
+- active `region / assetType`
+- latest successfully loaded/source timestamp when available
+- compact research-support disclaimer
 - refresh action
+- reviewability chip such as `Review supported`, `Review limited`, or `Review blocked`
 
-Rules:
+Must not show:
 
-- do not invent a single dashboard snapshot timestamp
-- do not use marketing or launch-card composition
+- launch-card grid
+- marketing hero copy
+- portfolio performance framing
+- canonical backend dashboard timestamp
 
-### Daily Pulse
+### Market Pulse
 
-Primary fields must come from Today Review and review-readiness truth:
+Classification: implementable now from current truth, with limitations.
 
-- Today Review run status
-- trust status
-- review mode
-- trusted-universe count
-- catalog count where available
-- required data-through date
-- stored/current data-through date
-- top blocker or warning
-- next bounded action
+Required source basis:
 
-Allowed secondary copy:
+- Today Review run status, trust status, review mode, warnings, source snapshot, scan funnel where available
+- review-readiness review mode, trust status, user decision, trusted/catalog counts, data-through dates, blockers, and next bounded action
+- Research Overview market readiness and next actions as supporting context
+- Market Context regime, breadth, top/weak sectors as region-level supporting context
 
-- `ResearchOverview.marketReadiness.headline`
-- `ResearchOverview.nextActions`
+Required behavior:
 
-Forbidden pulse source:
-
-- `ResearchOverview.actionability.dimensions.todayReviewReadiness`
-- `ResearchOverview.actionability.dimensions.calibrationReadiness`
-- `ResearchOverview.actionability.dimensions.tradePlanReadiness`
-
-Those dimensions are not stable enough on the current base.
-
-### Review Candidate Summary
-
-Required counts:
-
-- long review
-- exit-risk review
-- watch-only
-- blocked
-
-Allowed detail rows:
-
-- Today Review top rows
-- Research Hub top research-priority rows
-
-Forbidden fields:
-
-- target
-- reward/risk
-- target price
-- trade-plan geometry
-- direct-action wording
-
-### Market Environment And Confirmation
-
-Required fields:
-
-- regime
-- breadth status
-- leading sectors
-- weak sectors
-- smart-money accumulation count
-- smart-money distribution count
-- strongest confirmations
-- strongest contradictions
-
-Required limitation rule:
-
-- if asset-type-specific market context is not proven, label the section as region-level context rather than pretending full asset-type specificity.
-
-### Signal And Evidence Health
-
-Allowed now:
-
-- raw bullish / bearish counts
-- latest raw-signal run freshness/status
-- proven / unproven / missing-backtest / blocked-by-market-gate counts
-
-Required placeholder behavior:
-
-- calibration aggregate must render as `Coming soon`
-- measured outcome follow-through must render as `Coming soon`
+- First-viewport investor/trader briefing.
+- Explicitly label mixed, limited, stale, or blocked evidence.
+- Label Market Context as region-level if asset-type-specific truth is not proven.
 
 Forbidden:
 
-- one combined evidence score
-- scope-wide calibration readiness derived from first row
-- scope-wide calibration readiness derived from unscoped module health
+- treating Research Hub placeholder-like actionability dimensions for Today Review, Calibration, or Trade Plan readiness as the pulse authority
+- dashboard-wide confidence score
+- direct advice wording
 
-### Data Trust And Pipeline Health
+### High-Priority Review Candidates
 
-Required fields:
+Classification: implementable now from current truth.
 
-- DQ summary counts
-- review-readiness trust status
-- blocker categories when available
-- next bounded repair action when available
-- active pipeline run or latest pipeline run
-- failed / blocked / warning stage visibility
+Required source basis:
 
-Rules:
+- bullish review: `TodayReviewResponse.groups.longReview`
+- bearish review: `TodayReviewResponse.groups.shortReview`
+- exit-risk review: `TodayReviewResponse.groups.exitRiskReview`
+- row reason summaries, blockers, watch reasons, strategy code/version, timestamps, and Today Review candidate detail links where available
 
-- data trust problems must remain visible even when candidate counts are non-zero
-- this section is read-only in slice 1
+Allowed supporting context:
 
-### Drilldown Strip
-
-Routes:
-
-- Today Review
-- Research Command Center
-- Market Context
-- Raw Signals
-- Signal Calibration
-- Data Quality
-- Smart Money
-- Pipeline Ops
-- Backtests
-
-Context chips:
-
-- only from already-loaded payloads
-- omitted when truthful context is not available
-
-## Required Placeholder Contract
-
-The first slice must include clearly tagged placeholders for:
-
-1. `Coming soon - Signal Position Follow-Through`
-2. `Coming soon - Calibration Evidence-Through Summary`
-3. `Coming soon - Measured Outcome Follow-Through`
-
-These placeholders are required product honesty, not optional polish.
-
-## Error And Mixed-Evidence Contract
+- `ResearchOverview.researchPriorities.tradeCandidates`
+- `ResearchOverview.researchPriorities.exitCandidates`
+- `ResearchOverview.strategyProofSummary`
 
 Rules:
 
-- section errors are local; the whole page must not fail because one source fails
-- disagreement between sources must render as `mixed evidence`, warning copy, or side-by-side tension
-- the page must not silently choose one source and hide the contradiction
-- refresh must refetch reads only
+- Today Review owns counts and source ordering.
+- Research Hub context must be visibly supporting, not overriding.
+- Use `high-priority review candidate`, `bullish review`, `bearish / exit-risk review`, and `reason summary`.
+
+Forbidden:
+
+- `buy`, `sell`, `best trade`, target, target price, profit target, reward/risk, `R:R`, direct execution copy, or synthetic ranking.
+
+### Watch And Blocked
+
+Classification: implementable now from current truth.
+
+Required source basis:
+
+- `TodayReviewResponse.groups.watchOnly`
+- `TodayReviewResponse.groups.blocked`
+- `TodayReviewResponse.groups.insufficientData`
+- `TodayReviewResponse.groups.unproven`
+- Today Review scan funnel
+- Today Review explainability exclusion summaries
+- row-level blockers and watch reasons
+
+Required behavior:
+
+- Show why setups are watch-only, blocked, insufficient-data, or unproven.
+- Keep reasons visible before any drill action.
+- Allow feature-local tabs/segments if useful.
+
+### Coming Soon - Market Movers
+
+Classification: placeholder-only now.
+
+Required placeholder text must state:
+
+- market-wide gainers/losers are not yet backed by a truthful scoped stored-data source
+- missing source basis is a scoped market-wide movers API/hook backed by stored market data
+- watchlist daily-change sorting and signal row sorting are not market-wide movers
+
+Forbidden:
+
+- fake rows, fake counts, fake freshness, provider/live calls, or relabeled watchlist/signal sorting.
+
+### Coming Soon - FII/DII Activity
+
+Classification: placeholder-only now.
+
+Required placeholder text must state:
+
+- no current route, DTO, hook, provider, or local source exposes truthful FII/DII activity
+- missing source basis is a dedicated local institutional-flow source and contract
+- Smart Money price/volume proxy summaries are not an acceptable FII/DII substitute
+
+Forbidden:
+
+- guessed inflow/outflow values, Smart Money relabeling, provider/live calls, or invented freshness.
+
+### Evidence Caveats
+
+Classification: implementable now as compact secondary support.
+
+Allowed source basis:
+
+- Data Quality summary
+- review-readiness blockers and next action
+- Pipeline status active/latest run and stage warnings/failures/blockers
+- Signal latest run status and warnings
+- Research Overview data gaps and strategy-proof notes
+
+Required behavior:
+
+- Stay compact and secondary to Market Pulse and candidate sections.
+- Link outward to owner pages for detail.
+- Use `Limited`, `Unavailable`, `Mixed evidence`, or `Blocked` language when appropriate.
+
+Forbidden:
+
+- first-viewport `Data Trust and Pipeline Health` identity section
+- first-viewport `Signal and Evidence Health` identity section
+- pipeline command controls
+- hiding trust caveats behind positive candidate counts
+
+### Supporting Navigation
+
+Classification: implementable now as secondary support.
+
+Allowed routes:
+
+- `/today-review`
+- `/research`
+- `/market-context`
+- `/signals`
+- `/signals/calibration`
+- `/data-quality`
+- `/smart-money`
+- `/pipeline-ops`
+- `/backtests`
+
+Rules:
+
+- Context chips may use only already loaded payloads.
+- Omit chips when truthful context is unavailable.
+- Do not recreate a first-viewport launcher strip.
+
+## Placeholder And Deferred Contract
+
+Placeholder-only in slice 1:
+
+- `Coming soon - Market Movers`
+- `Coming soon - FII/DII Activity`
+- `Coming soon - Signal Position Follow-Through`, only if included below primary sections
+- `Coming soon - Calibration Evidence-Through Summary`, only if included below primary sections
+- `Coming soon - Measured Outcome Follow-Through`, only if included below primary sections
+
+Deferred because it needs new storage/API/provider/route/shared scope:
+
+- scoped market-wide movers read model/API/hook
+- dedicated local FII/DII institutional-flow source/contract
+- backend `daily-overview-dashboard` adapter
+- persisted/canonical dashboard snapshot
+- dashboard-level calibration evidence-through aggregate
+- dashboard-level measured outcome follow-through aggregate
+- signal-position follow-through UI/API integration beyond already accepted backend foundations
+
+## File Boundary
+
+Allowed implementation writer set:
+
+- `frontend/src/app/HomePage.tsx`
+- `frontend/src/features/daily-overview-dashboard/index.ts`
+- `frontend/src/features/daily-overview-dashboard/types.ts`
+- `frontend/src/features/daily-overview-dashboard/api/dailyOverviewDashboardApi.ts`
+- `frontend/src/features/daily-overview-dashboard/hooks/useDailyOverviewDashboard.ts`
+- `frontend/src/features/daily-overview-dashboard/components/DailyOverviewDashboardPage.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/MarketPulsePanel.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/ReviewCandidatesPanel.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/WatchBlockedPanel.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/ComingSoonPanel.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/EvidenceCaveatsPanel.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/SupportingNavigationPanel.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/**` for additional feature-local components only
+- `frontend/tests/ui/daily-overview-dashboard.spec.ts`
+
+Forbidden:
+
+- `backend/src/**`
+- `backend/tests/**`
+- `frontend/src/app/routes.tsx`
+- `frontend/src/app/navigationMetadata.tsx`
+- `frontend/src/shared/**`
+- `frontend/src/contexts/**`
+- existing feature source outside read-only imports
+- package manifests and lockfiles
+- Prisma schema/migrations/generated files
+- provider/live-data files
+- startup/backfill/scheduler/worker/queue files
+- pipeline command execution files
+- route registries
+- root `AGENTS.md`
+- `docs/AGENTS.md`
+- `docs/codex-agent-team-plan/**`
+
+## Escalation Rule
+
+Stop and return to Team 00 if implementation requires:
+
+- backend adapter or backend route work
+- route registry edits
+- shared UI or shared hook changes
+- package changes
+- Prisma/schema/migration/generated changes
+- provider/live calls
+- startup/backfill/scheduler work
+- direct Smart Money or Backtesting fanout beyond the approved read set
+- calibration aggregation from current calibration responses
+- replacing required placeholders with inferred or fake summaries
 
 ## Product Language Contract
 
 Prefer:
 
-- review
-- candidate
-- trust
-- readiness
-- data quality
-- evidence
-- blocker
-- limited
-- mixed evidence
-- reason summary
+- `Market Pulse`
+- `High-Priority Review Candidates`
+- `bullish review`
+- `bearish / exit-risk review`
+- `watch only`
+- `blocked`
+- `limited evidence`
+- `mixed evidence`
+- `reason summary`
+- `consider review`
+- `Coming soon`
 
 Avoid:
 
-- buy
-- sell
-- target
-- reward/risk
-- action now
-- automated trade
-- guaranteed
-- confidence score as a cross-system summary
+- `buy`
+- `sell`
+- `target`
+- `target price`
+- `price target`
+- `profit target`
+- `reward/risk`
+- `R:R`
+- `best trade`
+- `must buy`
+- `must sell`
+- `guaranteed`
+- `financial advice`
+- fake confidence or fake freshness
 
-## Explicit Non-Goals
+## QA Contract
 
-- no backend `daily-overview-dashboard` module in slice 1
-- no backend route
-- no shared UI rewrite
-- no navigation rewrite
-- no portfolio or broker workflow
-- no signal-position lifecycle summary
-- no calibration evidence-through rollup
-- no measured-outcome rollup
+QA must verify:
 
-## Escalation Rule
-
-Stop and escalate to Team 00 if implementation requires any of:
-
-- backend changes
-- route-registry changes
-- shared UI changes
-- package changes
-- schema or generated-file changes
-- direct calibration aggregate logic
-- Smart Money or Backtests fanout beyond the approved read set
+- first viewport reflects the investor/trader-first section order
+- Market Movers and FII/DII placeholders are explicit and have no fake rows
+- candidate lanes use Today Review groups and source-owned ordering
+- Watch And Blocked shows truthful reasons
+- Evidence Caveats remains compact and secondary
+- source failures are section-local
+- no forbidden language appears
+- UI smoke proves either scoped data is visible or domain-specific empty/limited states explain why data is absent
 
 ## Ready Note
 
-This contract is sufficiently bounded for Team 04 QA planning.
+This contract is bounded enough for Team 04 QA refresh. Ready promotion should require:
 
-Ready promotion should require:
-
-1. Team 04 QA plan acceptance
-2. Team 00 shared-file reservation for `HomePage.tsx`
-3. explicit confirmation that placeholders remain placeholders in slice 1
+1. refreshed Team 04 QA acceptance against this contract
+2. Team 00 single-writer reservation for `frontend/src/app/HomePage.tsx`
+3. Team 00 confirmation of the frontend-only writer set
+4. explicit preservation of placeholder-only sections for unsupported truth surfaces

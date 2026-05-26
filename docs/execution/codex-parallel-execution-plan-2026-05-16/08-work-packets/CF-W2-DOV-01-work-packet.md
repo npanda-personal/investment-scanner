@@ -2,31 +2,40 @@
 
 Date: 2026-05-26
 
-## Status
+Owner: Team 03 - Solution Architecture Factory
 
-Architecture-prepared.
+Status: `READY-CANDIDATE AFTER QA`
 
-Team 00 may send this packet to Team 04 for QA planning. Do not start implementation until Team 04 QA planning is complete and Team 00 records a Ready promotion.
+Do not start or resume implementation from stale Ready text. Team 04 must refresh QA against the investor/trader-first architecture and Team 00 must re-confirm Ready promotion and file reservations.
 
 ## Requirement
 
-Replace the static launch-card `/` page with a real Daily Overview dashboard using existing public read APIs and explicit `Coming soon` placeholders for unresolved truth surfaces.
+Replace the static launch-card `/` page with an investor/trader-first Daily Overview dashboard using existing public read APIs and explicit `Coming soon` placeholders for unsupported market-wide or institutional-flow evidence.
+
+The page must prioritize:
+
+1. Header Rail
+2. Market Pulse
+3. High-Priority Review Candidates
+4. Coming Soon - Market Movers
+5. Coming Soon - FII/DII Activity
+6. Watch And Blocked
+7. compact Evidence Caveats
+8. secondary Supporting Navigation
+
+It must not read like a data pipeline, signal-health, or module-monitoring console.
 
 ## Recommended Owner
 
-Team 07 or another Team 00-designated frontend owner with Lane 3 UX-shell responsibility.
+Team 08 or Team 00-designated frontend owner with Lane 3 UX-shell responsibility.
 
 Recommended branch:
 
-- `codex/team07-lane3/CF-W2-DOV-01`
+- `codex/team08-ux-research/CF-W2-DOV-01`
 
 Recommended worktree:
 
-- `C:\work\repo\investment-scanner-worktrees\team07-CF-W2-DOV-01`
-
-Recommended base:
-
-- latest `dev` at Team 00 Ready promotion time, provided no other active writer is holding `frontend/src/app/HomePage.tsx`
+- `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-01`
 
 ## Allowed Files
 
@@ -35,12 +44,19 @@ Recommended base:
 - `frontend/src/features/daily-overview-dashboard/types.ts`
 - `frontend/src/features/daily-overview-dashboard/api/dailyOverviewDashboardApi.ts`
 - `frontend/src/features/daily-overview-dashboard/hooks/useDailyOverviewDashboard.ts`
-- `frontend/src/features/daily-overview-dashboard/components/**`
+- `frontend/src/features/daily-overview-dashboard/components/DailyOverviewDashboardPage.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/MarketPulsePanel.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/ReviewCandidatesPanel.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/WatchBlockedPanel.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/ComingSoonPanel.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/EvidenceCaveatsPanel.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/SupportingNavigationPanel.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/**` for additional feature-local components only
 - `frontend/tests/ui/daily-overview-dashboard.spec.ts`
 
-Allowed branch-local reporting docs after Ready promotion:
+Allowed reporting docs after Team 00 Ready promotion:
 
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-07-CF-W2-DOV-01-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-08-CF-W2-DOV-01-outbox.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W2-DOV-01-developer-handoff.md`
 
 ## Forbidden Files
@@ -49,14 +65,17 @@ Allowed branch-local reporting docs after Ready promotion:
 - `backend/tests/**`
 - `frontend/src/app/routes.tsx`
 - `frontend/src/app/navigationMetadata.tsx`
-- `frontend/src/shared/components/**`
+- `frontend/src/shared/**`
+- `frontend/src/contexts/**`
 - existing feature pages outside read-only imports
+- existing feature API/hook/type files outside read-only imports
 - Prisma schema or migrations
-- package manifests
 - generated files
-- shared hooks/utilities rewrites
+- package manifests and lockfiles
 - provider/live-data files
+- startup/backfill/scheduler/worker/queue files
 - pipeline command files
+- route registries
 - root `AGENTS.md`
 - `docs/AGENTS.md`
 - `docs/codex-agent-team-plan/**`
@@ -65,38 +84,153 @@ Allowed branch-local reporting docs after Ready promotion:
 
 - `/` remains the existing route and continues to resolve through `HomePage.tsx`.
 - `HomePage.tsx` becomes a thin shell that renders the new dashboard feature.
-- The dashboard loads the first viewport from:
-  - Today Review latest
-  - Research Overview
-  - review-readiness summary
-- The dashboard defers:
-  - Market Context summary
-  - Data Quality summary
-  - Signal latest run
-  - Pipeline status
-- Today Review truth owns run status, trust status, review mode, and candidate counts.
-- Research Hub truth owns research priorities, strategy-proof summary, and light signal/smart-money confirmation summary.
-- Market Context truth owns regime/breadth/sector context.
-- Data Quality truth owns DQ summary and readiness blocker framing.
-- Pipeline Ops truth owns active/latest stage state.
-- The page stays read-only.
-- Refresh refetches reads only.
-- Calibration aggregate remains `Coming soon`.
-- Signal Position Follow-Through remains `Coming soon`.
-- Measured Outcome Follow-Through remains `Coming soon`.
-- No target, reward/risk, target-price, broker, or direct-advice wording is introduced.
+- No backend adapter is added in slice 1.
+- No route registry is changed.
+- The dashboard is read-only.
+- Refresh refetches read APIs only.
+- Section failures render section-local `Limited` or `Unavailable` states.
+- The page does not fake atomic snapshot consistency across independent sources.
+
+## Required Data Sources
+
+Critical first-viewport reads:
+
+- `GET /api/v1/today-review/latest`
+- `GET /api/v1/research/overview`
+- `GET /api/v1/market-data/review-readiness-summary`
+
+Deferred/supporting reads:
+
+- `GET /api/v1/market-context/summary`
+- `GET /api/v1/data-quality/summary`
+- `GET /api/v1/signals/runs/latest`
+- `GET /api/v1/pipeline/status`
+
+Local scope:
+
+- `useMarketScope()`
+
+Do not call:
+
+- POST run/refresh endpoints
+- pipeline commands
+- provider/live endpoints
+- direct Smart Money fanout for FII/DII
+- direct Backtesting fanout
+- direct Signal Quality fanout
+- calibration aggregate endpoints for dashboard summary inference
+
+## Exact First-Slice Sections
+
+### Header Rail
+
+Implement now.
+
+Show `Daily Overview`, active scope, loaded/source timestamp if available, refresh, research-support disclaimer, and reviewability chip.
+
+### Market Pulse
+
+Implement now from current truth.
+
+Use Today Review, review-readiness, Research Overview market readiness, and limited Market Context region-level context. Explicitly label `limited`, `blocked`, or `mixed evidence` when applicable.
+
+### High-Priority Review Candidates
+
+Implement now from current truth.
+
+Use:
+
+- bullish review from Today Review `groups.longReview`
+- bearish review from Today Review `groups.shortReview`
+- exit-risk review from Today Review `groups.exitRiskReview`
+
+Research Hub priorities may be supporting context only.
+
+### Coming Soon - Market Movers
+
+Placeholder-only now.
+
+Required copy:
+
+- market-wide gainers/losers are not yet backed by a truthful scoped stored-data source
+- missing source basis is a scoped market-wide movers API/hook backed by stored market data
+- watchlist daily-change sorting and signal row sorting are not market-wide movers
+
+### Coming Soon - FII/DII Activity
+
+Placeholder-only now.
+
+Required copy:
+
+- no current route, DTO, hook, provider, or local source exposes truthful FII/DII activity
+- missing source basis is a dedicated local institutional-flow source and contract
+- Smart Money is not an acceptable FII/DII substitute
+
+### Watch And Blocked
+
+Implement now from current truth.
+
+Use Today Review `watchOnly`, `blocked`, `insufficientData`, `unproven`, scan funnel, explainability, blockers, and watch reasons.
+
+### Evidence Caveats
+
+Implement now as compact secondary support.
+
+Use Data Quality summary, review-readiness blockers, Pipeline status, Signal latest run warnings, Research Hub data gaps, and strategy-proof notes. Keep it visually quieter than Market Pulse and candidate review sections.
+
+### Supporting Navigation
+
+Implement now as secondary support.
+
+Allowed route targets:
+
+- `/today-review`
+- `/research`
+- `/market-context`
+- `/signals`
+- `/signals/calibration`
+- `/data-quality`
+- `/smart-money`
+- `/pipeline-ops`
+- `/backtests`
+
+Context chips may use only already loaded payloads.
+
+## Placeholder And Deferred Requirements
+
+Must remain placeholder-only in slice 1:
+
+- `Coming soon - Market Movers`
+- `Coming soon - FII/DII Activity`
+- `Coming soon - Signal Position Follow-Through`, if included
+- `Coming soon - Calibration Evidence-Through Summary`, if included
+- `Coming soon - Measured Outcome Follow-Through`, if included
+
+Deferred, not authorized:
+
+- new market-wide movers storage/API/hook
+- new FII/DII institutional-flow storage/API/provider path
+- backend dashboard adapter
+- canonical persisted dashboard snapshot
+- calibration evidence-through dashboard aggregate
+- measured outcome follow-through dashboard aggregate
+- Signal Position Ledger UI/API integration beyond current approved foundations
 
 ## Required UX Rules
 
-- The first viewport must show scope, trust context, and Daily Pulse, not launch cards.
-- The page must be dense and dashboard-like, not marketing-like.
-- Each section must have its own empty / limited / unavailable state.
-- Mixed-source disagreement must be shown explicitly.
-- Drilldowns must route to the owning surface.
+- First viewport must be investor/trader-first, not admin/developer-first.
+- `Market Pulse` and `High-Priority Review Candidates` are first-viewport anchors.
+- `Market Movers` and `FII/DII Activity` must be visible as honest `Coming soon` placeholders.
+- `Watch And Blocked` must be visible in the main overview.
+- `Evidence Caveats` must be compact and secondary.
+- No first-viewport launch-card strip.
+- No `Data Trust and Pipeline Health`, `Signal and Evidence Health`, or `Drilldown Strip` as first-viewport product identity sections.
+- Market Context must be described as region-level where asset-type-specific proof is unavailable.
+- No target, reward/risk, target-price, broker, direct-advice, fake confidence, fake freshness, or invented value wording.
 
 ## Validation
 
-Run:
+Required after implementation:
 
 ```text
 cd frontend
@@ -104,13 +238,23 @@ npm.cmd run build
 npm.cmd run test:ui -- daily-overview-dashboard.spec.ts --workers=1
 ```
 
-UI smoke expectations:
+Required UI smoke expectations:
 
-- `/` no longer renders the old launch-card grid
-- first viewport shows scope plus Daily Pulse
-- Today Review and Research Hub drill links work
-- blocked or empty states explain why data is absent
-- `Coming soon` placeholders render exactly where current source truth is intentionally deferred
+- `/` no longer renders the old launch-card grid.
+- First viewport shows Header Rail, Market Pulse, High-Priority Review Candidates, Market Movers placeholder, FII/DII placeholder, Watch And Blocked, and compact Evidence Caveats.
+- Bullish, bearish, and exit-risk lanes use Today Review groups.
+- Watch/blocked/insufficient/unproven states show reasons or domain-specific empty states.
+- Market Movers placeholder has no fake rows and rejects watchlist relabeling.
+- FII/DII placeholder has no guessed values and does not relabel Smart Money.
+- Evidence Caveats remains compact and links outward.
+- Section-local API failure does not blank the full dashboard.
+- Forbidden language scan passes.
+
+Suggested forbidden language scan:
+
+```text
+rg -n "buy now|sell now|must buy|must sell|target price|price target|profit target|reward/risk|R:R|guaranteed|financial advice|best trade" frontend/src/app/HomePage.tsx frontend/src/features/daily-overview-dashboard frontend/tests/ui/daily-overview-dashboard.spec.ts
+```
 
 ## Stop Conditions
 
@@ -118,24 +262,43 @@ Stop and return to Team 00 if implementation requires:
 
 - backend changes
 - route-registry changes
-- shared UI changes
+- shared UI or shared hook changes
 - package changes
-- Prisma/schema changes
-- generated-file changes
-- direct Smart Money or Backtests fanout beyond the approved read set
-- calibration aggregation from current `signals/calibration` responses
+- Prisma/schema/migration/generated changes
+- provider/live-data calls
+- startup/backfill/scheduler/worker/queue changes
+- pipeline command execution
+- direct Smart Money or Backtesting fanout beyond the approved read set
+- calibration aggregation from current calibration responses
 - replacing placeholders with inferred summaries
+- changing the app-level market scope system
 
 ## Known Limitations To Preserve
 
-- Research Hub actionability dimensions for Today Review / Calibration / Trade Plan are still unstable on the current base.
-- Market Context is region-scoped, not fully asset-type-scoped.
-- Backtesting current-proof freshness labels are not available on the current base.
-- Calibration evidence-through aggregation is not available on the current base.
-- The dashboard is section-live, not one atomic persisted snapshot.
+- Section data is live from independent owners, not a single atomic persisted dashboard snapshot.
+- Market Context is region-level from the current frontend public API.
+- Market Movers has no truthful current source.
+- FII/DII Activity has no truthful current source.
+- Calibration evidence-through, signal-position follow-through, and measured outcome follow-through are not currently truthful Daily Overview summaries.
+- Older Ready queue text may still exist and should be reconciled by Team 00 after refreshed QA.
 
-## Dependency Notes
+## Handoff Requirements
 
-- Team 04 QA planning is required before Ready promotion.
-- Team 00 must reserve `frontend/src/app/HomePage.tsx` as a shared file.
-- No Team 00 backend gate is required unless implementation tries to open a backend summary adapter.
+Developer handoff must include:
+
+- exact files changed
+- exact files inspected
+- section-to-source mapping used
+- API calls made and skipped
+- placeholders preserved
+- build and UI test results
+- forbidden language scan result
+- any skipped checks and exact reasons
+- screenshots or UI smoke evidence proving the first viewport hierarchy
+- risks and follow-up blockers
+
+## Next Gate
+
+1. Team 04 refreshes QA plan/evidence for this investor/trader-first packet.
+2. Team 00 re-confirms Ready promotion and file reservations.
+3. Team 08 or assigned frontend owner implements inside this file set only.

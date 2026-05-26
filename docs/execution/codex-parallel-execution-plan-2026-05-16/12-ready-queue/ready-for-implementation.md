@@ -6,6 +6,55 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready. The newly promoted items below are assigned immediately to their owning teams and should run in separate worktrees.
 
+2026-05-26 refreshed Ready promotion - `CF-W2-DOV-01`:
+
+- `CF-W2-DOV-01` is re-promoted as frontend-only Team 08 rework after Product Owner correction, Team 02 requirement refresh, Team 08 UX refresh, Team 03 architecture refresh, and Team 04 QA refresh.
+- Branch: `codex/team08-ux-research/CF-W2-DOV-01`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-01`.
+- Current gate state: Ready for Team 08 rework/implementation. Prior admin-style implementation and review artifacts are historical evidence only unless they comply with this refreshed packet.
+- Allowed implementation files:
+  - `frontend/src/app/HomePage.tsx`
+  - `frontend/src/features/daily-overview-dashboard/index.ts`
+  - `frontend/src/features/daily-overview-dashboard/types.ts`
+  - `frontend/src/features/daily-overview-dashboard/api/dailyOverviewDashboardApi.ts`
+  - `frontend/src/features/daily-overview-dashboard/hooks/useDailyOverviewDashboard.ts`
+  - `frontend/src/features/daily-overview-dashboard/components/**`
+  - `frontend/tests/ui/daily-overview-dashboard.spec.ts`
+- Allowed reporting docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-08-CF-W2-DOV-01-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W2-DOV-01-developer-handoff.md`
+- Forbidden scope:
+  - all backend files and backend tests
+  - backend or frontend route registries
+  - `frontend/src/app/navigationMetadata.tsx`
+  - `frontend/src/shared/**`
+  - shared hooks, theme, context, or app-level market-scope rewrites
+  - existing feature page/API/hook/type rewrites outside read-only imports
+  - Prisma schema or migrations
+  - generated files
+  - package manifests or lockfiles
+  - provider/live-data calls
+  - startup/backfill/scheduler/worker/queue files
+  - pipeline command execution
+  - direct Smart Money or Backtesting fanout beyond the approved read set
+  - calibration aggregation from current calibration responses
+  - replacing placeholders with inferred or hardcoded summaries
+- Required validation:
+
+```powershell
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- daily-overview-dashboard.spec.ts --workers=1
+```
+
+- Required language guard:
+
+```powershell
+rg -n "buy now|sell now|must buy|must sell|target price|price target|profit target|reward/risk|R:R|guaranteed|financial advice|best trade" frontend/src/app/HomePage.tsx frontend/src/features/daily-overview-dashboard frontend/tests/ui/daily-overview-dashboard.spec.ts
+```
+
+Stop and return to Team 00 if implementation requires backend changes, route-registry edits, shared UI/hooks/context, package/schema/generated files, provider/live calls, pipeline commands, startup/backfill/scheduler changes, market-wide movers/FII-DII invention, or Signal Position Ledger UI/API integration.
+
 2026-05-26 gate update:
 
 - `CF-W2-DOV-01` is paused from implementation and prior Ready promotion is superseded by Product Owner feedback. Team 02 and Team 08 refreshed requirement/UX around an investor/trader daily briefing; Team 03 architecture refresh and Team 04 QA refresh are required before a new implementation pass.

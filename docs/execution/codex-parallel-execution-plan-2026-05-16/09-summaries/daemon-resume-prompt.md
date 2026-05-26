@@ -9,10 +9,10 @@ Latest live checkpoint:
 - Branch: `dev`.
 - Open decisions: 2, scoped only to `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
 - Product Owner action required: yes only for those affected workstreams; no for active DOV/SPL/RH routine gates.
-- `CF-W2-DOV-01` prior Ready promotion is superseded by Product Owner feedback and refreshed Team 02/Team 08 docs. It must go through Team 03 architecture/source-map refresh and Team 04 QA refresh before any implementation resumes.
+- `CF-W2-DOV-01` refreshed Ready promotion is recorded after Product Owner feedback, Team 02 requirement refresh, Team 08 UX refresh, Team 03 architecture refresh, and Team 04 QA refresh. Team 08 may now rework the existing DOV worktree within the refreshed frontend-only boundary.
 - `CF-W2-DOV-01` branch/worktree: `codex/team08-ux-research/CF-W2-DOV-01`, `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-01`.
 - `CF-W2-DOV-01` allowed scope: `frontend/src/app/HomePage.tsx`, new `frontend/src/features/daily-overview-dashboard/**`, and `frontend/tests/ui/daily-overview-dashboard.spec.ts`.
-- `CF-W2-DOV-01` current gate: requirement and UX reframed around investor/trader daily decisions; next gate is Team 03 architecture/source-map refresh.
+- `CF-W2-DOV-01` current gate: refreshed Ready for Team 08 implementation/rework. After handoff, route to Team 04 QA Verification.
 - `CF-W2-SPL-01B` is Ready and assigned to Team 06 as a backend-only active-row read-model child.
 - `CF-W2-SPL-01B` branch/worktree: `codex/team06-strategy-signal/CF-W2-SPL-01B`, `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-01B`.
 - `CF-W2-SPL-01B` allowed scope: new `backend/src/modules/signal-position-ledger/**` and `backend/tests/modules/signal-position-ledger/**`.
@@ -27,8 +27,8 @@ Latest live checkpoint:
   - Team 08 `019e63b3-3be9-7470-ba5f-b3fc1d1ce261`: `CF-W2-DOV-01` paused UX reframe analysis after Product Owner feedback.
   - Team 04 `019e63b5-d35a-72a0-8a4d-770ce1986dc4`: `CF-W1-RH-01A` QA rerun.
 - Next gates:
-  1. route Team 03 DOV architecture/source-map refresh from the investor/trader-first requirement and UX;
-  2. route Team 04 DOV QA refresh after Team 03;
+  1. launch Team 08 DOV refreshed frontend-only rework in the existing DOV worktree;
+  2. route Team 04 DOV QA Verification after Team 08 handoff;
   3. keep SPL parked as accepted branch commit `ca31d79` until a later integration pass;
   4. keep RH parked as accepted branch commit `30460aa` until integration sequencing is opened;
   5. keep Team 02 rolling on the next direct investor/trader-value requirement when a slot is free.

@@ -2,340 +2,285 @@
 
 Date: 2026-05-26
 
-Owner: Team 04 QA Factory
+Owner: Team 04 - QA Factory
+
+Mode: Docs-only QA planning refresh. No application source, tests, package manifests, route registries, Prisma/schema/migrations/generated files, shared UI, backend/frontend source, or implementation worktrees were modified.
 
 ## Work Item
 
-`CF-W2-DOV-01` - Daily Overview dashboard for frontend `/`.
+`CF-W2-DOV-01` - Daily Overview investor/trader-first dashboard refresh for frontend `/`.
 
-## QA Status
+## QA Verdict
 
-`ACCEPT / READY-FOR-TEAM00-EVALUATION`
+`QA-PLAN READY`
 
-Docs-only QA planning is prepared from the requirement, architecture review, dashboard contract, work packet, UX plan, pre-architecture QA scaffold, current `HomePage.tsx`, and current frontend UI test layout. Executable QA remains blocked until Team 00 promotes one exact implementation handoff for the reserved `HomePage.tsx`, feature-local `daily-overview-dashboard` files, and one feature-owned Playwright spec only.
+Team 04 accepts the refreshed investor/trader-first requirement, UX plan, architecture review, contract, and work packet as QA-plannable for one bounded frontend-only Slice 1.
 
-No Team 04 planning blocker remains. Team 00 can evaluate this packet for Ready promotion if it preserves the exact frontend-only writer set, keeps `/` on the existing route, and does not widen into backend, route registry, shared UI, Prisma, package, or generated-file scope.
+Executable QA remains pending until Team 00 promotes one exact implementation handoff and reserves the allowed writer set. This QA plan does not approve implementation by itself.
 
-## Verdict
+## QA Position
 
-The `CF-W2-DOV-01` QA packet is ready for Team 00 Ready evaluation as one bounded frontend-only Daily Overview dashboard slice.
+The prior Daily Overview QA framing is superseded where it validated an admin/developer monitoring layout around `Daily Pulse`, `Signal and Evidence Health`, `Data Trust and Pipeline Health`, or a first-viewport drilldown strip.
 
-Remaining Team 00 readiness work after this QA plan:
+Slice 1 QA must validate that `/` reads as an investor/trader daily dashboard:
 
-- reserve `frontend/src/app/HomePage.tsx` under one writer for the implementation pass
-- copy the exact feature-local writer set from the architecture/work-packet packet into the Ready record
-- keep the packet separate from any backend adapter proposal, route-registry change, shared UI rewrite, or package/schema widening
+1. first viewport anchors on `Market Pulse` and `High-Priority Review Candidates`;
+2. candidate lanes use Today Review / Research truth without advice wording;
+3. `Market Movers` remains placeholder-only unless a truthful source exists;
+4. `FII/DII Activity` remains placeholder-only unless a truthful source exists;
+5. `Evidence Caveats` stays compact and secondary;
+6. no fake freshness, progress, confidence, market-wide, or institutional-flow claims appear;
+7. no backend, provider/live, pipeline command, route-registry, Prisma, package, generated, or shared-UI scope is introduced.
 
-## Scope
+## Contract Inputs Reviewed
 
-First-slice QA for replacing the `/` launch-card surface with a truthful Daily Overview dashboard built from existing read APIs and explicit `Coming soon` placeholders.
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-DOV-01-daily-overview-interactive-market-dashboard-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/05-ux/CF-W2-DOV-01-daily-overview-dashboard-ux-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W2-DOV-01-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W2-DOV-01-daily-overview-dashboard-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W2-DOV-01-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-CF-W2-DOV-01-architecture-outbox.md`
+- existing `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W2-DOV-01-qa-plan.md`
+- existing `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-CF-W2-DOV-01-qa-plan-outbox.md`
 
-Planned in-scope implementation surfaces, once Team 00 promotes an exact handoff:
+## Implementation Scope QA Will Accept
+
+Allowed writer set for the implementation pass:
 
 - `frontend/src/app/HomePage.tsx`
 - `frontend/src/features/daily-overview-dashboard/index.ts`
 - `frontend/src/features/daily-overview-dashboard/types.ts`
 - `frontend/src/features/daily-overview-dashboard/api/dailyOverviewDashboardApi.ts`
 - `frontend/src/features/daily-overview-dashboard/hooks/useDailyOverviewDashboard.ts`
-- `frontend/src/features/daily-overview-dashboard/components/**`
+- `frontend/src/features/daily-overview-dashboard/components/DailyOverviewDashboardPage.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/MarketPulsePanel.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/ReviewCandidatesPanel.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/WatchBlockedPanel.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/ComingSoonPanel.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/EvidenceCaveatsPanel.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/SupportingNavigationPanel.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/**` for additional feature-local components only
 - `frontend/tests/ui/daily-overview-dashboard.spec.ts`
 
-Out of scope for this child:
+Allowed reporting docs after Team 00 Ready promotion:
 
-- all `backend/src/**`
-- all `backend/tests/**`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-08-CF-W2-DOV-01-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W2-DOV-01-developer-handoff.md`
+
+Forbidden writer scope:
+
+- `backend/src/**`
+- `backend/tests/**`
 - `frontend/src/app/routes.tsx`
 - `frontend/src/app/navigationMetadata.tsx`
-- `frontend/src/shared/components/**`
-- existing feature page rewrites outside read-only imports
-- Prisma schema/migrations
-- package manifests
-- generated files
-- provider/live-data/startup/backfill/worker/queue scope
+- `frontend/src/shared/**`
+- `frontend/src/contexts/**`
+- existing feature pages outside read-only imports
+- existing feature API/hook/type files outside read-only imports
+- Prisma schema, migrations, and generated files
+- `package.json`, `package-lock.json`, and package manifests
+- provider/live-data files
+- startup, scheduler, backfill, worker, queue, and pipeline command files
+- route registries
+- root `AGENTS.md`
+- `docs/AGENTS.md`
+- `docs/codex-agent-team-plan/**`
 
-## Contract Inputs Reviewed
+QA must reject the implementation handoff if any forbidden file becomes necessary or modified.
 
-- `AGENTS.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-DOV-01-daily-overview-interactive-market-dashboard-requirement.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W2-DOV-01-architecture-review.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W2-DOV-01-daily-overview-dashboard-contract.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W2-DOV-01-work-packet.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/05-ux/CF-W2-DOV-01-daily-overview-dashboard-ux-plan.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W2-DOV-01-pre-architecture-qa-scaffold.md`
-- `frontend/src/app/HomePage.tsx`
-- `frontend/tests/ui/README.md`
-- current UI suite inventory under `frontend/tests/ui`
+## Approved Read Contract
 
-## Current Source Alignment
+Allowed Slice 1 reads:
 
-- `/` still renders a static launch-card grid from `frontend/src/app/HomePage.tsx`; the first QA assertion is therefore structural, not cosmetic.
-- Team 03 architecture and contract agree that slice 1 must stay frontend-only and use only:
-  - `GET /api/v1/today-review/latest`
-  - `GET /api/v1/research/overview`
-  - `GET /api/v1/market-data/review-readiness-summary`
-  - `GET /api/v1/market-context/summary`
-  - `GET /api/v1/data-quality/summary`
-  - `GET /api/v1/signals/runs/latest`
-  - `GET /api/v1/pipeline/status`
-  - local scope via `useMarketScope()`
-- Daily Pulse authority must come from Today Review plus review-readiness truth. Research Hub `actionability.dimensions.todayReviewReadiness`, `calibrationReadiness`, and `tradePlanReadiness` are not valid pulse authorities on the current base.
-- Market Environment can ship now, but current Market Context truth is region-scoped, not proven asset-type-specific. QA must require explicit region-level limitation wording when needed.
-- Signal and Evidence Health can show raw-signal and proof summaries now, but calibration aggregate and measured outcome rollups are not truthful current-source summaries and must remain `Coming soon`.
-- Placeholder honesty is part of correctness, not optional UX polish. The dashboard fails QA if it borrows nearby data to make deferred areas look filled.
+- `GET /api/v1/today-review/latest`
+- `GET /api/v1/research/overview`
+- `GET /api/v1/market-data/review-readiness-summary`
+- `GET /api/v1/market-context/summary`
+- `GET /api/v1/data-quality/summary`
+- `GET /api/v1/signals/runs/latest`
+- `GET /api/v1/pipeline/status`
+- `useMarketScope()`
 
-## Exact Acceptance Matrix
+Forbidden Slice 1 calls:
 
-| ID | Source basis | Exact acceptance requirement | QA proof required after implementation |
+- new backend `daily-overview-dashboard` API
+- POST run, refresh, scan, sync, import, backfill, worker, or pipeline command endpoints
+- provider/live calls
+- direct Smart Money fanout for FII/DII
+- direct Backtesting fanout
+- direct Signal Quality fanout
+- calibration aggregate inference from calibration health/top/row endpoints
+- watchlist daily-change or signal-row sorting relabeled as market-wide movers
+
+QA must intercept network activity in the Playwright smoke and fail on any unapproved call from `/`.
+
+## Acceptance Matrix
+
+| ID | Area | Required QA acceptance | Proof required after implementation |
 | --- | --- | --- | --- |
-| AC-01 | Requirement | `/` is redefined from a launch-card page into a true Daily Overview workspace dashboard. | Playwright proves `/` no longer shows the old launch-card grid as the primary surface and instead renders a dashboard header plus Daily Pulse in the first viewport. |
-| AC-02 | Requirement | The page gives one dedicated area for the most important cross-system filtered information. | UI smoke proves `/` loads and renders summaries from more than one approved source module on one page without route-hopping. |
-| AC-03 | Requirement + UX + Contract | The first viewport shows scope, freshness/trust context, disclaimer, and Daily Pulse rather than generic navigation cards. | Playwright proves visible `Daily Overview`, `region / assetType`, one loaded timestamp, research-support disclaimer, refresh action, and Daily Pulse status/headline/blocker content above drilldown-only content. |
-| AC-04 | Requirement + UX + Contract | The dashboard includes distinct sections for Daily Pulse, Review Candidate Summary, Market Environment and Confirmation, Signal and Evidence Health, Data Trust and Pipeline Health, and Drilldown Strip. | UI smoke asserts each section label or equivalent semantic header exists and owns domain-specific content or a truthful limited/blocked state. |
-| AC-05 | Requirement + Architecture + Contract | Every section uses existing truthful data or an explicit `Coming soon` placeholder. | Network assertions prove only approved reads are used. UI assertions prove deferred sections render explicit `Coming soon` copy instead of counts, charts, or inferred scores. |
-| AC-06 | Requirement + UX | Research-support wording is preserved and financial-advice, target, and reward/risk wording is absent. | Playwright text scan plus reviewer inspection reject `buy`, `sell now`, `target price`, `profit target`, `reward/risk`, `R:R`, `place order`, `broker`, and similar terms on `/`. |
-| AC-07 | Requirement | The dashboard does not require portfolio ownership, broker execution, or Trade Plan target semantics to feel complete. | Smoke proves the core dashboard renders meaningful sections without portfolio P/L, execution controls, order flow, target fields, or trade-plan geometry. |
-| AC-08 | Requirement + UX | Empty/blocked states explain why data is absent and where the user should drill next. | Per-section blocked/empty mock scenarios show domain-specific reason text plus retry or drill-next route rather than generic empty filler or zeros. |
-| AC-09 | Requirement + Work Packet | No backend, route-registry, shared UI, Prisma, package, provider/live, or startup/backfill widening is silently introduced. | Code-review gate and file-diff inspection confirm implementation stayed within the reserved frontend-only writer set. |
-| AC-10 | Requirement + Contract | Header rail must show title, `region / assetType`, latest loaded timestamp, disclaimer, and refresh action. | UI smoke asserts all five are visible and refresh triggers observable refetches instead of a cosmetic spinner only. |
-| AC-11 | Requirement + Contract + UX | Daily Pulse must answer whether the current scope is review-supported, limited, blocked, or mixed, with run status, trust status, review mode, data-through framing, top blocker/warning, and next bounded action. | Mocked scenarios prove Daily Pulse changes with Today Review and review-readiness payloads, preserves warnings, and never falls back to unstable Research Hub actionability dimensions as the authority. |
-| AC-12 | Requirement + Contract + UX | Review Candidate Summary must show long review, exit-risk review, watch-only, and blocked counts with truthful tab/segment switching and drilldowns. | Playwright proves switching groups updates visible rows without stale counts, and row drilldowns route to approved downstream surfaces only. |
-| AC-13 | Requirement + Architecture + Contract + UX | Market Environment and Confirmation must show regime, breadth, sectors, smart-money context, and confirmation/contradiction notes while preserving disagreement. | UI smoke proves mixed evidence remains visible as mixed/contradictory and non-`STOCK` limitation wording appears when asset-type-specific context is not proven. |
-| AC-14 | Requirement + Architecture + Contract + UX | Signal and Evidence Health must keep raw signals, proof, and deferred evidence lanes separate. | UI smoke proves raw-signal counts and latest run status can render now, while calibration aggregate and measured outcome remain separate `Coming soon` placeholders with no combined confidence number. |
-| AC-15 | Requirement + Contract + UX | Data Trust and Pipeline Health must show DQ summary, readiness blocker themes, next repair action, and pipeline status before users misread downstream counts. | Mocked blocker scenarios prove DQ/pipeline warnings stay visible even when candidate counts are non-zero. |
-| AC-16 | Requirement + Contract + UX | Drilldown Strip must route to Today Review, Research, Market Context, Raw Signals, Signal Calibration, Data Quality, Smart Money, Pipeline Ops, and Backtests with additive-only truthful chips. | UI smoke proves all approved routes are present and any chip/count shown is sourced from already-loaded payloads; absent truth yields no chip or explicit unavailable wording. |
-| AC-17 | Requirement + Contract + UX | `Coming soon - Signal Position Follow-Through`, `Coming soon - Calibration Evidence-Through Summary`, and `Coming soon - Measured Outcome Follow-Through` must stay honest. | UI smoke proves all three placeholders render as clearly tagged future sections with dependency/missing-truth explanations and no fake counts, charts, statuses, or percentages. |
+| AC-01 | First viewport identity | `/` must read as an investor/trader daily dashboard, not an admin, pipeline-monitor, signal-health, or launch-card surface. | Screenshot or Playwright viewport assertions show `Daily Overview`, scope, `Market Pulse`, `High-Priority Review Candidates`, `Coming soon - Market Movers`, `Coming soon - FII/DII Activity`, `Watch And Blocked`, and compact `Evidence Caveats` in the first viewport on desktop. |
+| AC-02 | Header rail | Header shows `Daily Overview`, active `region / assetType`, research-support disclaimer, refresh action, and a truthful loaded/source timestamp only when available. | UI smoke asserts all required header elements and verifies refresh triggers approved read refetches only. |
+| AC-03 | Market Pulse | `Market Pulse` uses Today Review, review-readiness, Research Overview market readiness, and limited Market Context truth; it labels `limited`, `blocked`, or `mixed evidence` when applicable. | Mocked scenarios prove reviewability changes with Today Review/review-readiness payloads and Market Context is labeled region-level where asset-type specificity is not proven. |
+| AC-04 | High-Priority Review Candidates | Bullish, bearish, and exit-risk lanes use Today Review `groups.longReview`, `groups.shortReview`, and `groups.exitRiskReview` with source-owned ordering and reason summaries. | UI smoke verifies rows/counts reconcile to mocked Today Review groups and Research Hub context appears only as supporting context, not reordering authority. |
+| AC-05 | Advice-safe candidates | Candidate copy uses research-support language such as `high-priority review candidate`, `bullish review`, `bearish / exit-risk review`, and `reason summary`. | Text scan and reviewer inspection prove no advice, execution, target, reward/risk, or synthetic ranking language is visible. |
+| AC-06 | Market Movers placeholder | `Market Movers` is placeholder-only unless a truthful scoped market-wide movers source is explicitly approved later. | UI smoke proves `Coming soon - Market Movers` renders with no rows, fake counts, fake charts, fake freshness, provider calls, or watchlist/signal relabeling. |
+| AC-07 | FII/DII placeholder | `FII/DII Activity` is placeholder-only unless a truthful local institutional-flow source is explicitly approved later. | UI smoke proves `Coming soon - FII/DII Activity` renders with no guessed inflow/outflow, no Smart Money relabeling, no fake freshness, and no provider/live calls. |
+| AC-08 | Watch And Blocked | `Watch And Blocked` shows watch-only, blocked, insufficient-data, and unproven groups with reasons before any drill action. | Mocked scenarios prove each state renders reason text or a domain-specific empty state and routes only to approved owner pages. |
+| AC-09 | Evidence Caveats | `Evidence Caveats` stays compact, visually secondary, and links outward for detail; it does not become a first-viewport `Data Trust and Pipeline Health` or `Signal and Evidence Health` console. | Desktop and mobile smoke checks verify the caveat area is smaller/quieter than `Market Pulse` and candidates and contains only concise warnings/statuses. |
+| AC-10 | No fake freshness/progress/confidence | The dashboard must not invent atomic snapshot consistency, fake generated timestamps, fake percent progress, fake confidence scores, or zero-filled placeholder values. | Mocked payload timestamp changes update visible source/loaded labels; missing timestamps render no fake date. Text scan rejects `confidence`, `% complete`, or similar invented progress unless source-owned. |
+| AC-11 | Section-local failures | One failed supporting source must not blank the full page. | Network failure scenarios prove affected sections show `Limited` or `Unavailable` while header, placeholders, and available critical sections remain visible. |
+| AC-12 | Scope behavior | The dashboard uses the app market scope and refetches when scope changes. | UI smoke changes `region / assetType` where supported and verifies approved reads refire with scope params where the source route supports them and visible content/limited state changes. |
+| AC-13 | Supporting navigation | Supporting navigation is secondary and uses only approved routes and already-loaded context chips. | UI smoke verifies links to `/today-review`, `/research`, `/market-context`, `/signals`, `/signals/calibration`, `/data-quality`, `/smart-money`, `/pipeline-ops`, and `/backtests`, with chips omitted or marked unavailable where no truth exists. |
+| AC-14 | File boundary | Implementation remains within the allowed frontend-only writer set. | Code review and `git diff --name-only` evidence show no forbidden source, test, package, Prisma, route-registry, shared UI, backend, provider, or generated-file edits. |
+| AC-15 | Placeholder honesty for optional future sections | If Signal Position Follow-Through, Calibration Evidence-Through Summary, or Measured Outcome Follow-Through appear, they must be below primary sections and placeholder-only. | UI smoke proves these optional sections, if present, are explicitly `Coming soon` with no counts, percentages, graphs, or inferred statuses. |
 
-## Required QA Assertions
+## Recommended Playwright Smoke Assertions
 
-- `/` remains the existing route and still resolves through `HomePage.tsx`.
-- `HomePage.tsx` becomes a thin shell for the dashboard, not a second static card page.
-- Phase A loads are first-viewport-critical:
-  - Today Review latest
-  - Research Overview
-  - review-readiness summary
-- Phase B loads are deferred:
-  - Market Context summary
-  - Data Quality summary
-  - latest signal run
-  - pipeline status
-- The first viewport does not block on all seven reads before rendering.
-- Daily Pulse uses Today Review plus review-readiness as the primary truth source.
-- Research Hub unstable actionability dimensions are not used as the pulse authority.
-- Market Context limitations remain visible where asset-type-specific context is not proven.
-- Calibration aggregate, Signal Position Follow-Through, and Measured Outcome Follow-Through remain placeholders in slice 1.
-- No section introduces target, reward/risk, direct-advice, broker, or execution semantics.
-
-## Playwright Smoke Expectations For `/`
-
-The dedicated smoke should live at:
+The dedicated smoke must live at:
 
 - `frontend/tests/ui/daily-overview-dashboard.spec.ts`
 
-Minimum route-level smoke expectations:
+Required assertions:
 
-- visit `/` and prove the page is the dashboard, not the legacy launch grid
-- first viewport shows:
-  - `Daily Overview`
-  - current `region / assetType`
-  - one loaded timestamp or freshness label
-  - research-support disclaimer
-  - refresh action
-  - Daily Pulse status/headline
-- Daily Pulse shows Today Review and review-readiness-backed content before lower-priority sections
-- Review Candidate Summary supports group switching without stale rows or stale counts
-- drill controls navigate to:
-  - `/today-review`
-  - `/research`
-  - `/market-context`
-  - `/signals`
-  - `/signals/calibration`
-  - `/data-quality`
-  - `/smart-money`
-  - `/pipeline-ops`
-  - `/backtests`
-- blocked/limited/empty states are domain-specific and route the user forward
-- all three `Coming soon` placeholders render exactly where truth is deferred
-- page text excludes advice/target/R:R language
+- `page.goto('/')` renders a dashboard body and does not render the old launch-card grid as the primary surface.
+- First viewport contains `Daily Overview`, active scope, research-support disclaimer, refresh action, `Market Pulse`, and `High-Priority Review Candidates`.
+- First viewport does not contain first-identity sections named `Data Trust and Pipeline Health`, `Signal and Evidence Health`, or `Drilldown Strip`.
+- First viewport visual order on desktop prioritizes `Market Pulse` and `High-Priority Review Candidates` before caveats/navigation.
+- `High-Priority Review Candidates` renders bullish review rows from `groups.longReview`, bearish review rows from `groups.shortReview`, and exit-risk rows from `groups.exitRiskReview`.
+- Candidate rows show source-owned reason summaries, strategy/version context where available, and approved drill routes only.
+- Candidate tab/segment switching does not leave stale rows or stale counts.
+- `Watch And Blocked` renders watch-only, blocked, insufficient-data, and unproven reasons or domain-specific empty states.
+- `Coming soon - Market Movers` renders with required missing-source explanation and no rows/counts/charts.
+- `Coming soon - FII/DII Activity` renders with required missing-source explanation and no guessed values or Smart Money wording presented as FII/DII.
+- `Evidence Caveats` remains compact, secondary, and links to owner pages rather than becoming the page identity.
+- Section-local API failures show `Limited` or `Unavailable` without blanking the whole page.
+- Scope change refetches approved reads and visibly changes content or limited-state wording.
+- Refresh button reissues approved reads only.
+- Network interception fails the test on any call outside the approved GET read set.
+- Page text excludes prohibited advice/target/reward-risk/execution wording.
 
-Recommended scenario set for the spec:
+Recommended scenario set:
 
-1. happy-path mixed dashboard data
-2. Today Review blocked but other sections available
-3. no review candidates for current scope
-4. Market Context limited to region-level wording
-5. DQ/pipeline blockers visible despite non-zero candidate counts
-6. placeholder-only deferred evidence sections
-7. scope change triggers refetch and visible content change
-8. refresh button reissues approved reads
+1. happy-path mixed evidence with bullish, bearish, and exit-risk candidates;
+2. Today Review blocked while Research and Market Context are available;
+3. no candidates for the active scope;
+4. Market Context present but region-level only;
+5. DQ or pipeline caveat visible while candidate counts are non-zero;
+6. Market Movers and FII/DII placeholders only;
+7. supporting source failure;
+8. scope change and refresh refetch.
 
-## Data Sourcing And No-Hardcode Checks
+## Forbidden Language Guard
 
-QA must prove the dashboard is sourced from existing APIs and not hardcoded, inferred, or faked.
-
-- Intercept all dashboard requests and assert only the approved GET routes are called.
-- Assert requests carry `region` and `assetType` where the source route supports those scope params.
-- Change market scope and prove the dashboard refetches and visibly changes section content.
-- Mutate mocked payload values between loads and prove visible timestamps, counts, warnings, and labels change accordingly.
-- Verify candidate counts reconcile to Today Review group payloads and tab bodies for the same mocked data.
-- Verify Daily Pulse blocker/warning text reconciles to Today Review or review-readiness payload content, not a local constant.
-- Verify Research Hub `marketReadiness.headline` or `nextActions` may appear only as secondary copy, never as the sole pulse authority when Today Review truth disagrees.
-- Verify smart-money counts shown in Market Environment come only from already-approved source payloads and are omitted when truthful source data is not available.
-- Verify drilldown chips/counts disappear or show unavailable states when the source does not expose those values.
-- Verify a changed timestamp in any loaded source can update the header freshness label; the label must not remain a hardcoded static string.
-- Verify refresh causes observable network activity or state transition and not only a button spinner.
-
-## Coming Soon Placeholder Honesty Checks
-
-These are hard QA gates.
-
-- `Coming soon - Signal Position Follow-Through` must not show active position counts, closed outcome counts, or synthetic performance labels.
-- `Coming soon - Calibration Evidence-Through Summary` must not derive a scope-wide calibration state from `/signals/calibration/health`, first-row calibration data, or any unrelated module health.
-- `Coming soon - Measured Outcome Follow-Through` must not borrow Signal Quality page copy to imply a stable dashboard rollup exists.
-- Each placeholder must explicitly say the summary is not yet truthful on the current source basis.
-- Each placeholder must identify the missing dependency or future requirement family in brief copy.
-- Placeholder sections must not show fake graphs, fake percentages, fake status chips, or zero-filled summary cards pretending to be live.
-
-## No Advice / No Targets / No R:R Guard
-
-Reject the packet if `/` introduces any of the following in visible copy, tooltip copy, labels, CTA text, placeholder text, mocked smoke assertions, or section headings:
+Reject if `/`, tooltips, labels, placeholder text, test mocks, or CTA copy include:
 
 - `buy now`
 - `sell now`
 - `must buy`
 - `must sell`
-- `financial advice`
-- `place order`
-- `execute order`
-- `broker`
 - `target price`
 - `price target`
 - `profit target`
 - `reward/risk`
 - `R:R`
-- `take profit`
-- `stop and target`
+- `best trade`
+- `high conviction trade`
+- `place order`
+- `execute order`
+- `broker`
 - `guaranteed`
 - `guaranteed return`
+- `financial advice`
 
-Preferred wording remains:
+The standalone words `buy` and `sell` should not appear as user-facing recommendation labels. If existing source text contains these terms, implementation must map display language to `bullish review`, `bearish review`, `exit-risk review`, or similarly safe research-support wording.
 
-- `Daily Overview`
-- `Daily Pulse`
-- `review supported`
-- `review limited`
-- `review blocked`
-- `mixed evidence`
-- `bullish trigger`
-- `bearish trigger`
-- `review candidate`
-- `watch only`
-- `blocked`
-- `data quality`
-- `reason summary`
-- `consider review`
+Suggested scan after implementation:
 
-## Focused Command Guidance
+```powershell
+rg -n "buy now|sell now|must buy|must sell|target price|price target|profit target|reward/risk|R:R|best trade|high conviction trade|place order|execute order|broker|guaranteed|guaranteed return|financial advice" frontend/src/app/HomePage.tsx frontend/src/features/daily-overview-dashboard frontend/tests/ui/daily-overview-dashboard.spec.ts
+```
 
-Commands below are guidance only. They were not run during this docs-only QA planning task.
+## Required Validation Commands After Implementation
 
-Recommended frontend build after accepted implementation and resource checks:
+Check laptop memory before build or UI smoke per root performance rules.
+
+Required frontend build:
 
 ```powershell
 cd frontend
 npm.cmd run build
 ```
 
-Focused Daily Overview UI smoke after implementation:
+Required focused UI smoke:
 
 ```powershell
 cd frontend
 npm.cmd run test:ui -- daily-overview-dashboard.spec.ts --workers=1
 ```
 
-Recommended regression cluster if the final dashboard materially reuses live patterns from source pages:
+Recommended regression cluster if Team 00 requests broader evidence:
 
 ```powershell
 cd frontend
 npm.cmd run test:ui -- daily-overview-dashboard.spec.ts today-trade-review.spec.ts research-hub.spec.ts market-context-intelligence.spec.ts data-quality-engine.spec.ts pipeline-ops.spec.ts signal-generation-engine.spec.ts --workers=1
 ```
 
-Optional expanded regression when implementation surfaces already-loaded Smart Money behavior in a user-visible way:
-
-```powershell
-cd frontend
-npm.cmd run test:ui -- daily-overview-dashboard.spec.ts today-trade-review.spec.ts research-hub.spec.ts market-context-intelligence.spec.ts data-quality-engine.spec.ts pipeline-ops.spec.ts signal-generation-engine.spec.ts smart-money-intelligence.spec.ts --workers=1
-```
+No backend build, Prisma command, migration command, or provider/live validation is required for the approved frontend-only slice. If backend scope is introduced, QA must stop and return the packet to Team 00 / Team 03.
 
 ## Exact Reject Conditions
 
-Reject the packet immediately and return it to Team 00 / Architect if implementation does any of the following:
+Reject the implementation handoff immediately if any of the following occur:
 
-- edits any file outside the exact reserved frontend-only writer set
-- edits:
-  - `backend/src/**`
-  - `backend/tests/**`
-  - `frontend/src/app/routes.tsx`
-  - `frontend/src/app/navigationMetadata.tsx`
-  - `frontend/src/shared/components/**`
-  - Prisma schema or migrations
-  - package manifests
-  - generated files
-  - provider/live/startup/backfill/worker/queue scope
-- adds a backend dashboard adapter or any new dashboard-specific backend route
-- performs `POST` run/refresh commands from `/`
-- uses unapproved API surfaces or fanout calls beyond the contract
-- treats Research Hub unstable actionability dimensions as Daily Pulse authority
-- fabricates a single global confidence score or combined evidence score
-- derives calibration aggregate truth from first-row calibration data, unscoped module health, or any source other than an approved future requirement
-- hides DQ/pipeline blockers behind success styling or non-zero candidate counts
-- removes region-level limitation wording when Market Context is not asset-type-specific
-- leaves the old launch-card page as the primary `/` body with only dashboard fragments added below it
-- introduces advice-like, target-like, reward/risk-like, or execution-like wording
+- edits outside the allowed writer set;
+- backend adapter, backend route, route-registry, shared UI, shared hook, package, Prisma/schema/migration/generated, provider/live, startup/backfill/scheduler/worker/queue, or pipeline command scope appears;
+- `/` remains primarily a launch-card page;
+- first viewport reads as a data-quality, pipeline, signal-health, or module-monitoring console;
+- Market Movers shows anything other than an honest placeholder without an approved truthful market-wide movers source;
+- FII/DII Activity shows anything other than an honest placeholder without an approved truthful institutional-flow source;
+- Smart Money is relabeled as FII/DII;
+- watchlist or signal-row sorting is relabeled as market-wide movers;
+- Research Hub actionability dimensions become the primary Market Pulse authority over Today Review / review-readiness truth;
+- fake global confidence, fake freshness, fake progress, fake generated timestamp, fake placeholder rows, or zero-filled charts are introduced;
+- advice, target, reward/risk, broker, execution, or guaranteed-return wording appears;
+- section failure blanks the full page;
+- scope/refetch behavior cannot be proven without changing shared market-scope code.
 
-These are rejection conditions for the bounded first child, not soft warnings.
+## Evidence Required From Future Developer Handoff
 
-## Stop Conditions
+- exact files changed and inspected;
+- section-to-source mapping used;
+- API calls made and explicitly skipped;
+- confirmation that Market Movers and FII/DII stayed placeholder-only;
+- confirmation that no provider/live/pipeline command triggers were added;
+- build output for `npm.cmd run build`;
+- UI smoke output for `daily-overview-dashboard.spec.ts`;
+- forbidden-language scan output;
+- screenshot or Playwright trace proving first-viewport hierarchy;
+- skipped checks with reasons;
+- known limitations and follow-up blockers.
 
-Stop QA and return the packet to Team 00 / Architect if:
+## Tests Run In This QA Planning Pass
 
-- truthful `/` behavior cannot be delivered inside the exact reserved frontend-only writer set
-- implementation requires backend changes, route-registry changes, shared UI changes, package changes, or Prisma/schema changes
-- implementation needs direct Smart Money, Backtests, Calibration, or Signal Quality fanout beyond the approved read set
-- implementation attempts to replace required placeholders with inferred summaries
-- implementation cannot prove scope refetch or refresh truth without widening into shared hooks/utilities
+- none
 
-## Evidence Required Later
+## Tests Skipped In This QA Planning Pass
 
-- exact implementation handoff limited to the reserved frontend-only writer set
-- Playwright evidence for:
-  - dashboard-first `/` rendering
-  - first viewport trust/scope/pulse content
-  - candidate group switching
-  - drilldown navigation
-  - blocked and empty state honesty
-  - region-level limitation wording
-  - placeholder-only deferred sections
-  - scope-change refetch
-  - refresh refetch
-  - no advice/no target/no R:R wording
-- frontend build output
-- focused `daily-overview-dashboard.spec.ts` output
-- expanded regression output if Team 00 requires it for promotion or signoff
-- explicit note that no forbidden scope and no hardcoded/faked summaries were introduced
+- `cd frontend; npm.cmd run build`
+- `cd frontend; npm.cmd run test:ui -- daily-overview-dashboard.spec.ts --workers=1`
 
-## Readiness Verdict For Team 00
+Skipped because this was a docs-only QA planning pass and no implementation handoff exists yet.
 
-Recommendation: `READY FOR TEAM 00 PROMOTION` as one bounded frontend-only child.
+## Blockers
 
-Current blockers to executable QA, but not to Team 00 Ready evaluation:
+No Team 04 planning blocker remains.
 
-- no implementation handoff yet exists
-- `frontend/src/app/HomePage.tsx` still needs explicit Team 00 shared-file reservation
-- no dedicated `frontend/tests/ui/daily-overview-dashboard.spec.ts` exists yet
+Executable QA blockers:
 
-Promotion blockers if Team 00 cannot hold the packet to the approved scope:
+- Team 00 has not yet promoted the refreshed packet to Ready.
+- Team 00 has not yet reserved the allowed writer set for a single implementation pass.
+- `frontend/tests/ui/daily-overview-dashboard.spec.ts` does not exist yet and must be created in the implementation pass.
 
-- any backend adapter proposal
-- any route-registry or shared UI dependency
-- any attempt to replace placeholders with inferred summaries
-- any need to widen package, Prisma, generated, or provider/live scope
+## Next Team 00 Action
+
+Re-confirm Ready only if the packet remains a frontend-only Slice 1, copy the exact allowed/forbidden file sets into the Ready record, reserve `frontend/src/app/HomePage.tsx` and the feature-local dashboard files for one writer, and instruct the implementer to preserve Market Movers and FII/DII as placeholder-only surfaces.

@@ -67,6 +67,42 @@ Teams ready to pick up new tasks:
 
 ---
 
+## Latest Team 00 Routing Update - DOV Refreshed Ready Promotion
+
+Date: 2026-05-26
+
+Gate status:
+
+- Team 02 requirement refresh completed.
+- Team 08 UX refresh completed.
+- Team 03 architecture/source-map refresh returned `READY-CANDIDATE AFTER QA`.
+- Team 04 QA refresh returned `QA-PLAN READY`.
+- Team 00 refreshed the Ready promotion for `CF-W2-DOV-01` as frontend-only rework in the existing Team 08 worktree.
+
+Implementation boundary:
+
+- Branch: `codex/team08-ux-research/CF-W2-DOV-01`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-01`.
+- Allowed files: `frontend/src/app/HomePage.tsx`, `frontend/src/features/daily-overview-dashboard/**`, and `frontend/tests/ui/daily-overview-dashboard.spec.ts`.
+- Forbidden files: all backend files/tests, route registries, `frontend/src/app/navigationMetadata.tsx`, shared UI/hooks/context, package/schema/generated files, provider/live/startup/backfill/scheduler files, pipeline command files, and existing feature rewrites outside read-only imports.
+
+Required first-slice shape:
+
+- Implement now: Header Rail, Market Pulse, High-Priority Review Candidates, Watch And Blocked, compact Evidence Caveats, secondary Supporting Navigation.
+- Placeholder-only now: Market Movers, FII/DII Activity, and optional lower-page Signal Position / Calibration / Measured Outcome follow-through placeholders.
+- Do not revive the old admin-style `Data Trust and Pipeline Health`, `Signal and Evidence Health`, or `Drilldown Strip` as first-viewport product sections.
+
+Teams ready to pick up new tasks:
+
+- Team 08: implement/refactor `CF-W2-DOV-01` now in the existing DOV worktree under the refreshed Ready packet.
+- Team 04: QA Verification after Team 08 handoff.
+- Team 10: Code Review after Team 04 acceptance.
+- Team 03: Architect Signoff after Team 10 acceptance.
+- Team 06: SPL follow-up standby; no active SPL child is Ready.
+- Team 02: rolling investor/trader-value discovery after the DOV implementation lane is launched.
+
+---
+
 ## Latest Team 00 Routing Update - Implementation Gates In Flight
 
 Date: 2026-05-26

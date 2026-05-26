@@ -14,6 +14,13 @@ Date: 2026-05-26
 - Product Owner action required: yes only for affected decision workstreams.
 - Decision inbox count: 2.
 
+Latest routing update:
+
+- `CF-W2-DOV-01` refreshed Ready promotion is recorded after Team 02/08/03/04 refresh gates.
+- Next active implementation lane is Team 08 DOV frontend-only rework in `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-01`.
+- `CF-W2-SPL-01B` remains parked as accepted branch commit `ca31d79`.
+- `CF-W1-RH-01A` remains parked as accepted branch commit `30460aa`.
+
 ## Completed Since Prior Checkpoint
 
 - Team 00 promoted and launched three independent Ready implementation lanes: `CF-W2-DOV-01`, `CF-W2-SPL-01B`, and `CF-W1-RH-01A`.

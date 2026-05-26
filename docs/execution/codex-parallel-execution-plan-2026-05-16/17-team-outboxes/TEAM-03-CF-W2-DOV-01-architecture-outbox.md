@@ -2,41 +2,25 @@
 
 Date: 2026-05-26
 
-Team: Team 03 Architecture Factory
+Team: Team 03 - Solution Architecture Factory
 
-Mode: docs-only architecture audit in main workspace
+Mode: docs-only architecture refresh in main workspace
+
+## Verdict
+
+`READY-CANDIDATE AFTER QA`
+
+Reasons:
+
+- The investor/trader-first first slice can be built from existing public read APIs with frontend-only staged composition.
+- No backend adapter, route registry, schema, package, generated-file, shared UI, provider/live, startup/backfill, or pipeline command scope is needed for slice 1.
+- Market Movers and FII/DII Activity have no truthful current source and are explicitly placeholder-only.
+- The old admin-style first-viewport sections have been demoted to compact caveats/supporting navigation.
+- Team 04 must refresh QA against the new hierarchy before Team 00 re-confirms Ready.
 
 ## Assignment
 
-Read the new Team 02 requirement for `CF-W2-DOV-01`, map each Daily Overview section to current truth sources, and decide whether the first honest slice should be frontend composition or a bounded backend summary adapter.
-
-## Files Inspected
-
-- `AGENTS.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-DOV-01-daily-overview-interactive-market-dashboard-requirement.md`
-- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
-- `frontend/src/app/HomePage.tsx`
-- `frontend/src/app/routes.tsx`
-- `frontend/src/app/navigationMetadata.tsx`
-- `frontend/src/features/today-trade-review/**`
-- `frontend/src/features/research-hub/**`
-- `frontend/src/features/market-context-intelligence/**`
-- `frontend/src/features/data-quality-engine/**`
-- `frontend/src/features/signal-generation-engine/**`
-- `frontend/src/features/signal-calibration-engine/**`
-- `frontend/src/features/smart-money-intelligence/**`
-- `frontend/src/features/backtesting-strategy-lab/**`
-- `frontend/src/features/pipeline-ops/**`
-- `backend/src/modules/today-trade-review/**`
-- `backend/src/modules/research-hub/**`
-- `backend/src/modules/market-context-intelligence/**`
-- `backend/src/modules/data-quality-engine/**`
-- `backend/src/modules/signal-generation-engine/**`
-- `backend/src/modules/signal-calibration-engine/**`
-- `backend/src/modules/smart-money-intelligence/**`
-- `backend/src/modules/backtesting-strategy-lab/**`
-- `backend/src/modules/pipeline-orchestration/**`
-- relevant execution-folder architecture, contract, QA, and accepted-slice docs for Research Hub, Market Context, Smart Money, Signal Generation, Calibration, Backtesting, and Pipeline Ops
+Refresh the `CF-W2-DOV-01` Daily Overview architecture review/source map so it matches the latest Product Owner direction and Team 08 investor/trader-first UX plan.
 
 ## Files Changed
 
@@ -45,83 +29,164 @@ Read the new Team 02 requirement for `CF-W2-DOV-01`, map each Daily Overview sec
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W2-DOV-01-work-packet.md`
 - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-CF-W2-DOV-01-architecture-outbox.md`
 
-## Result
+## Files Inspected
 
-Team 03 recommends a frontend-only first slice.
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-DOV-01-daily-overview-interactive-market-dashboard-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/05-ux/CF-W2-DOV-01-daily-overview-dashboard-ux-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W2-DOV-01-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W2-DOV-01-daily-overview-dashboard-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W2-DOV-01-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/ready-for-implementation.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-08-CF-W2-DOV-01-ux-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-CF-W2-DOV-01-architecture-outbox.md`
+- `frontend/src/app/HomePage.tsx`
+- `frontend/src/app/routes.tsx`
+- `frontend/src/contexts/MarketScopeContext.tsx`
+- `frontend/src/features/today-trade-review/types.ts`
+- `frontend/src/features/today-trade-review/hooks/useTodayReview.ts`
+- `frontend/src/features/research-hub/api/researchHubApi.ts`
+- `frontend/src/features/research-hub/hooks/useResearchOverview.ts`
+- `frontend/src/features/market-context-intelligence/api/marketContextIntelligenceService.ts`
+- `frontend/src/features/market-context-intelligence/types.ts`
+- `frontend/src/features/data-quality-engine/api/dataQualityEngineService.ts`
+- `frontend/src/features/data-quality-engine/types.ts`
+- `frontend/src/features/signal-generation-engine/api/signalGenerationEngineService.ts`
+- `frontend/src/features/signal-generation-engine/types.ts`
+- `frontend/src/features/pipeline-ops/api/pipelineOpsService.ts`
+- `frontend/src/features/pipeline-ops/types.ts`
+- `frontend/src` and `backend/src` search results for `dailyChangeDesc`, `dailyChangeAsc`, `Market Movers`, `FII`, and `DII`
 
-Do now:
-
-- keep `/` on the existing `HomePage.tsx` route shell
-- replace the launch-card body with a new `daily-overview-dashboard` feature
-- compose the dashboard from existing public read APIs
-- keep unresolved calibration and follow-through summaries as explicit `Coming soon`
-
-Do not do in slice 1:
-
-- add a backend `daily-overview-dashboard` module
-- add a backend route
-- widen route registries or shared UI
-- invent a synthetic market or confidence score
-
-## Architecture Finding
-
-### Truthful now
-
-- Daily Pulse from Today Review latest plus review-readiness summary
-- candidate counts from Today Review groups
-- research priorities and strategy-proof counts from Research Hub
-- market regime/breadth/sectors from Market Context
-- Smart Money confirmation counts from Research Hub confirmation summary
-- raw-signal counts from Research Hub confirmation summary
-- latest raw-signal run freshness from Signal Generation latest-run audit
-- DQ counts and readiness blockers from Data Quality summary plus review-readiness summary
-- pipeline health from Pipeline Ops status
-
-### Not truthful now
-
-- scope-wide calibration usable/limited/unavailable summary
-- calibration evidence-through summary
-- signal-position follow-through summary
-- measured-outcome follow-through summary
-- backtesting current-proof labels on the current repo base
-
-## Frontend vs Backend Decision
+## Architecture Decision
 
 Chosen:
 
-- frontend composition with staged loading
-
-Why:
-
-- no backend gate needed
-- one shared app-shell file plus a new feature is the smallest safe write surface
-- existing sources already provide bounded summary reads
+- frontend-only first slice
+- staged loading from existing read APIs
+- feature-local dashboard under `frontend/src/features/daily-overview-dashboard`
+- `frontend/src/app/HomePage.tsx` as the only existing app-shell writer file
 
 Deferred:
 
-- backend adapter only if measured performance later proves the staged frontend composition is too expensive
+- backend `daily-overview-dashboard` adapter
+- route registry edits
+- market-wide movers API/storage
+- FII/DII source/API/storage
+- calibration/outcome/signal-position dashboard aggregates
 
-## Ready Direction
+## Exact First-Slice Sections
 
-This item can become a `Ready candidate` after:
+Implementable now from current truth:
 
-1. Team 04 QA planning
-2. Team 00 single-writer reservation for `frontend/src/app/HomePage.tsx`
-3. Team 00 confirmation that the first slice keeps calibration and follow-through areas as placeholders
+- Header Rail
+- Market Pulse
+- High-Priority Review Candidates
+- Watch And Blocked
+- compact Evidence Caveats
+- secondary Supporting Navigation
 
-## Validation
+Placeholder-only now:
 
-No tests, builds, servers, Prisma commands, or app-code edits were run.
+- `Coming soon - Market Movers`
+- `Coming soon - FII/DII Activity`
+- `Coming soon - Signal Position Follow-Through`, only if included below primary sections
+- `Coming soon - Calibration Evidence-Through Summary`, only if included below primary sections
+- `Coming soon - Measured Outcome Follow-Through`, only if included below primary sections
 
-Validation was source and docs inspection only.
+Deferred because it needs new storage/API/provider/route/shared scope:
+
+- truthful scoped market-wide movers read model/API/hook
+- truthful local FII/DII institutional-flow source and contract
+- backend Daily Overview adapter
+- canonical persisted dashboard snapshot
+- calibration evidence-through dashboard rollup
+- measured outcome follow-through dashboard rollup
+- signal-position follow-through dashboard integration
+
+## Frontend vs Backend Decision
+
+Frontend-only remains the correct first slice.
+
+The bounded read set is:
+
+- `GET /api/v1/today-review/latest`
+- `GET /api/v1/research/overview`
+- `GET /api/v1/market-data/review-readiness-summary`
+- `GET /api/v1/market-context/summary`
+- `GET /api/v1/data-quality/summary`
+- `GET /api/v1/signals/runs/latest`
+- `GET /api/v1/pipeline/status`
+- `useMarketScope()`
+
+Backend adapter is blocked unless a later Decision Packet proves measured performance, fanout, consistency, or snapshot needs that cannot be solved inside the frontend-only contract.
+
+## File Reservations For Next Implementation Pass
+
+Allowed writer set:
+
+- `frontend/src/app/HomePage.tsx`
+- `frontend/src/features/daily-overview-dashboard/index.ts`
+- `frontend/src/features/daily-overview-dashboard/types.ts`
+- `frontend/src/features/daily-overview-dashboard/api/dailyOverviewDashboardApi.ts`
+- `frontend/src/features/daily-overview-dashboard/hooks/useDailyOverviewDashboard.ts`
+- `frontend/src/features/daily-overview-dashboard/components/DailyOverviewDashboardPage.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/MarketPulsePanel.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/ReviewCandidatesPanel.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/WatchBlockedPanel.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/ComingSoonPanel.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/EvidenceCaveatsPanel.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/SupportingNavigationPanel.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/**` for additional feature-local components only
+- `frontend/tests/ui/daily-overview-dashboard.spec.ts`
+
+Forbidden writer scope:
+
+- `backend/src/**`
+- `backend/tests/**`
+- `frontend/src/app/routes.tsx`
+- `frontend/src/app/navigationMetadata.tsx`
+- `frontend/src/shared/**`
+- `frontend/src/contexts/**`
+- existing feature source outside read-only imports
+- package manifests and lockfiles
+- Prisma schema/migrations/generated files
+- provider/live/startup/backfill/scheduler/worker/queue files
+- route registries
+- root `AGENTS.md`
+- `docs/AGENTS.md`
+- `docs/codex-agent-team-plan/**`
+
+## QA Handoff Notes
+
+Team 04 should verify:
+
+- first viewport is investor/trader-first and not admin/developer monitoring
+- Market Pulse and High-Priority Review Candidates anchor the first viewport
+- Market Movers is a `Coming soon` placeholder with no fake rows or watchlist relabeling
+- FII/DII Activity is a `Coming soon` placeholder with no Smart Money relabeling
+- Watch And Blocked uses Today Review reasons
+- Evidence Caveats remains compact and secondary
+- source failures are local to sections
+- forbidden advice/target/reward-risk/fake-confidence language is absent
+- UI smoke proves visible scoped data or domain-specific empty/limited states
+
+Required implementation validation after Ready:
+
+```text
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- daily-overview-dashboard.spec.ts --workers=1
+```
+
+No tests, builds, servers, Prisma commands, or app-code edits were run by Team 03 in this docs-only pass.
 
 ## Risks
 
-- Research Hub actionability still contains placeholder Today Review / Calibration / Trade Plan dimensions on the current base; implementers must not wire Daily Pulse to those fields.
-- Market Context public route is region-scoped, so non-stock scopes need explicit limited framing.
-- Current dashboard truth will be section-live rather than one atomic snapshot.
+- `ready-for-implementation.md` still contains prior DOV Ready promotion text; Team 00 should reconcile it after Team 04 QA refresh.
+- Market Context is region-level from the current frontend public API, so asset-type-specific wording must be caveated.
+- Multi-source reads are not atomic; the UI must not imply a single generated dashboard snapshot.
+- Placeholder-only sections must stay placeholders even if the UI would look more complete with invented values.
 
 ## Next Gate
 
-- Team 04: QA plan for the frontend-only slice
-- Team 00: Ready evaluation and shared-file reservation
+Team 04 QA refresh, then Team 00 Ready evaluation and file-reservation confirmation.
