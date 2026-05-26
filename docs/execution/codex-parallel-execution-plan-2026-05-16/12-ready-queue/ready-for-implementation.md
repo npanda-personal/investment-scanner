@@ -6,6 +6,62 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready. The newly promoted items below are assigned immediately to their owning teams and should run in separate worktrees.
 
+2026-05-26 Team 00 Ready promotion - `CF-W1-UX-01B`:
+
+- `CF-W1-UX-01B` is promoted and assigned to Team 08 as the Stock Research Workbench trust-evidence contract child after accepted Workbench trust framing `CF-W1-UX-01A`.
+- Purpose: add page-owned Workbench trust evidence for requested scope, verification state, blocker/limitation reasons, and latest page-owned evidence timestamp/basis without shared UI, route/navigation, or upstream module source changes.
+- Branch: `codex/team08-ux-research/CF-W1-UX-01B`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-UX-01B`.
+- Required base: stack from `codex/team08-ux-research/CF-W1-UX-01A` at `246d5a3 feat: add workbench trust framing`, then merge current `dev` before implementation.
+- Gate evidence:
+  - Requirement: `10-requirements/CF-W1-UX-01B-stock-research-workbench-trust-evidence-contract-requirement.md`
+  - Architecture review: `03-architecture/CF-W1-UX-01B-architecture-review.md`
+  - Contract: `06-contracts/CF-W1-UX-01B-stock-research-workbench-trust-evidence-contract.md`
+  - Work packet: `08-work-packets/CF-W1-UX-01B-work-packet.md`
+  - QA plan: `04-qa/CF-W1-UX-01B-qa-plan.md`
+  - Ready promotion: `13-implementation-evidence/CF-W1-UX-01B-ready-promotion.md`
+- Allowed implementation files:
+  - `backend/src/modules/stock-research-workbench/stock-research-workbench.controller.ts`
+  - `backend/src/modules/stock-research-workbench/stock-research-workbench.service.ts`
+  - `backend/src/modules/stock-research-workbench/stock-research-workbench.types.ts`
+  - `backend/src/modules/stock-research-workbench/stock-research-workbench.validation.ts`
+  - `backend/src/modules/stock-research-workbench/stock-research-workbench.md`
+  - `backend/tests/modules/stock-research-workbench/stock-research-workbench.service.test.ts`
+  - `backend/tests/modules/stock-research-workbench/stock-research-workbench.validation.test.ts`
+  - `backend/tests/modules/stock-research-workbench/stock-research-workbench.routes.test.ts`
+  - `frontend/src/features/stock-research-workbench/api/stockResearchWorkbenchService.ts`
+  - `frontend/src/features/stock-research-workbench/types.ts`
+  - `frontend/src/features/stock-research-workbench/components/StockResearchWorkbenchPage.tsx`
+  - `frontend/tests/ui/stock-research-workbench.spec.ts`
+- Allowed reporting docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-08-CF-W1-UX-01B-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-UX-01B-developer-handoff.md`
+- Forbidden scope:
+  - `backend/src/api/routes.ts`
+  - `frontend/src/app/routes.tsx`
+  - `frontend/src/app/navigationMetadata.tsx`
+  - `frontend/src/contexts/MarketScopeContext.tsx`
+  - Market Data, DQ, Signal, Strategy, shared frontend, schema/migration/generated/package, provider/live/startup/backfill/scheduler files
+  - downstream widget internals, route/navigation changes, shared UI, unsupported-scope fakery, advice, target, reward/risk, guarantee, or action-authorizing wording
+- Required validation:
+
+```powershell
+cd backend
+npm.cmd test -- stock-research-workbench.service.test.ts stock-research-workbench.validation.test.ts stock-research-workbench.routes.test.ts --runInBand
+npm.cmd run build
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- stock-research-workbench.spec.ts --workers=1
+```
+
+- Required language guard:
+
+```powershell
+rg -n -i "buy|sell|target|price target|profit target|reward/risk|risk:reward|R:R|safe to trade|trusted signal|eligible strategy|guaranteed|financial advice|latest trusted data date" backend/src/modules/stock-research-workbench backend/tests/modules/stock-research-workbench frontend/src/features/stock-research-workbench frontend/tests/ui/stock-research-workbench.spec.ts
+```
+
+Stop and return to Team 00 if implementation requires any forbidden file, shared UI/context, upstream module source/test changes, unsupported-scope fallback behavior, downstream widget internals, schema/generated/package/provider scope, or product-language drift.
+
 2026-05-26 Team 00 Ready promotion - `CF-W2-SPL-02`:
 
 - `CF-W2-SPL-02` is promoted and assigned to Team 06 as the next Signal Position Ledger child after accepted backend foundation `CF-W2-SPL-01B`.

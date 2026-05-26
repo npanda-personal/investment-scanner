@@ -46,3 +46,4 @@ These items are not blocked by Product Owner decisions, but they remain out of R
 - `CF-W1-UX-05`
 - `CF-W1-MD-01`
 - `CF-W2-SPL-02`
+- `CF-W1-UX-01B`

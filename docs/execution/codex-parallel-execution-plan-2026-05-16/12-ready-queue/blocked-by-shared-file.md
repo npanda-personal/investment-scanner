@@ -28,6 +28,18 @@ No other team may edit these files until SPL-02 is handed off, rejected, or Team
 
 If SPL-02 needs shared UI, shared backend utilities, schema, package/generated files, Home Page, closed-history files, or additional route/nav redesign, stop and return to Team 00.
 
+## Team 00 Shared-File Check - 2026-05-26 UX-01B
+
+`CF-W1-UX-01B` is not blocked by the active SPL-02 route/navigation reservation because its implementation files exclude:
+
+- `backend/src/api/routes.ts`
+- `frontend/src/app/routes.tsx`
+- `frontend/src/app/navigationMetadata.tsx`
+- `frontend/src/shared/**`
+- `frontend/src/contexts/MarketScopeContext.tsx`
+
+Team 08 may proceed only inside the Workbench module/feature files listed in `13-implementation-evidence/CF-W1-UX-01B-ready-promotion.md`. If UX-01B needs route/navigation, shared UI/context, upstream Market Data/DQ/Signal/Strategy source, schema, generated, package, provider, startup, scheduler, or downstream widget internals, stop and return to Team 00.
+
 ## Team 00 Routing Note - 2026-05-18
 
 Current near-ready inspection targets are expected to avoid shared/high-risk files:

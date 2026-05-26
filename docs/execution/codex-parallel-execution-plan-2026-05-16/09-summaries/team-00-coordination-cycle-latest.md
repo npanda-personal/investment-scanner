@@ -2,6 +2,46 @@
 
 Date: 2026-05-26
 
+## Latest Runtime Checkpoint - SPL-02 QA Active, UX-01B Ready
+
+Date: 2026-05-26
+
+Current status:
+
+- Branch: `dev`.
+- Main workspace status before this checkpoint: clean.
+- Open decisions: 2, scoped only to `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
+- Product Owner action required: yes only for those affected workstreams; no for SPL-02 or UX-01B.
+- Push performed: no.
+
+Completed / routed:
+
+- `CF-W2-SPL-02` implementation completed in the Team 06 worktree; Team 04 QA Verification is active.
+- Team 06 worker `019e6423-90b8-76d0-bf3f-cc6b1ffffd70` was closed after handoff.
+- `CF-W1-UX-01B` now has requirement, architecture review, contract, work packet, QA plan, exact reservations, and no affected open decision.
+- Team 00 promoted `CF-W1-UX-01B` to Ready for Team 08.
+
+Active / queued:
+
+- Team 04 `019e643c-66de-7980-8b83-d772afc667e1`: active on SPL-02 QA.
+- Team 08: queued for UX-01B implementation after worktree setup.
+- Team 10: queued for SPL-02 Code Review after QA acceptance.
+- Team 03: queued for SPL-02 Architect Signoff after Team 10 acceptance.
+
+Teams ready to pick up new tasks:
+
+- Team 04: SPL-02 QA Verification now.
+- Team 08: UX-01B implementation after worktree setup.
+- Team 10: SPL-02 review after QA accepts.
+- Team 03: SPL-02 signoff after Team 10 accepts, or rolling architecture prep if no signoff is waiting.
+- Team 02: rolling investor/trader-value requirements discovery.
+
+Next action:
+
+- Create the UX-01B stacked worktree from accepted `CF-W1-UX-01A` branch, merge current `dev`, spawn Team 08, then continue monitoring Team 04 SPL-02 QA.
+
+---
+
 ## Latest Runtime Checkpoint - DOV Accepted And SPL-02 Promoted
 
 Date: 2026-05-26

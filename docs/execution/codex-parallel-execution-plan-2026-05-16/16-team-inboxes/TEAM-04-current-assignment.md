@@ -2,6 +2,74 @@
 
 Date: 2026-05-20
 
+## Latest Assignment Override - 2026-05-26 SPL-02 QA Verification
+
+Run QA Verification for `CF-W2-SPL-02` in the dedicated Team 06 worktree. This supersedes older standby text for the active spawned Team 04 QA agent.
+
+Do not edit application source or tests. Do not install packages. Do not commit or push.
+
+Source handoff:
+
+- Requirement: `CF-W2-SPL-02`
+- Branch: `codex/team06-strategy-signal/CF-W2-SPL-02`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02`
+- Developer handoff: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W2-SPL-02-developer-handoff.md`
+- QA plan: `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W2-SPL-02-qa-plan.md`
+- Ready promotion: `docs/execution/codex-parallel-execution-plan-2026-05-16/13-implementation-evidence/CF-W2-SPL-02-ready-promotion.md`
+
+Files to verify:
+
+- `backend/src/api/routes.ts`
+- `backend/src/modules/signal-position-ledger/signal-position-ledger.service.ts`
+- `backend/src/modules/signal-position-ledger/signal-position-ledger.md`
+- `backend/tests/modules/signal-position-ledger/signal-position-ledger.service.test.ts`
+- `backend/tests/modules/signal-position-ledger/signal-position-ledger.routes.test.ts`
+- `frontend/src/features/signal-position-ledger/**`
+- `frontend/src/app/routes.tsx`
+- `frontend/src/app/navigationMetadata.tsx`
+- `frontend/tests/ui/signal-position-ledger.spec.ts`
+- assigned Team 06 outbox and developer handoff docs
+
+Forbidden scope to confirm untouched:
+
+- Prisma schema, migrations, generated files, package manifests, lockfiles
+- shared UI, shared test helpers, shared backend utilities
+- `frontend/src/app/HomePage.tsx`
+- Today Review, Trade Plan, Portfolio, Backtesting, Market Data, Data Quality, provider/live, startup/backfill, scheduler, worker, queue files
+- closed-history API, rows, counts, mocks, close date, close price, close reason, closed return, durable lifecycle storage, or row-detail routes
+- direct advice, target-price, reward/risk, broker/execution, realized P/L, or guarantee wording
+
+Required QA checks:
+
+- backend endpoint is mounted at `GET /api/v1/signals/position-ledger/active`;
+- active rows are ordered by newest entry trigger timestamp before pagination;
+- frontend protected route `/signal-position-ledger` exists;
+- navigation shows `Signal Position Ledger` under `Daily Work` after `Today Review`;
+- default tab is `Active Positions`;
+- summary labels page-local derived metrics as `This page`;
+- market-scope changes reset pagination and refetch;
+- `Closed History` is placeholder-only with no API call, rows, counts, mocks, or inferred close evidence;
+- research-support wording is preserved.
+
+Required commands:
+
+```powershell
+cd C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02\backend
+npm.cmd test -- signal-position-ledger.service.test.ts signal-position-ledger.routes.test.ts --runInBand
+npm.cmd run build
+cd C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02\frontend
+npm.cmd run build
+npm.cmd run test:ui -- signal-position-ledger.spec.ts --workers=1
+```
+
+If default Playwright port serves another worktree, use the Team 06 server at `http://127.0.0.1:5175` only after verifying it is the correct worktree, or start a clean worktree server on an available port and set `PLAYWRIGHT_BASE_URL`.
+
+Output:
+
+- Write QA evidence to `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W2-SPL-02-qa-verification.md` in the Team 06 worktree.
+- Update `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md` in the Team 06 worktree.
+- Return pass/reject decision, commands run, scope confirmation, skipped checks, risks, and whether Team 10 Code Review can proceed.
+
 ## Latest Assignment Override - 2026-05-25 CAL-02A QA Planning
 
 Prepare docs-only QA planning for `CF-W2-CAL-02A` Signal Calibration scoped evidence-basis projection.

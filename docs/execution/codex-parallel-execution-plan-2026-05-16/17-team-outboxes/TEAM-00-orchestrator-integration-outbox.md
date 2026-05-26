@@ -1,5 +1,45 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - SPL-02 QA Routed, UX-01B Ready
+
+Date: 2026-05-26
+
+Status:
+
+- Branch: `dev`.
+- Main workspace status before this checkpoint: clean.
+- Open decisions: 2, affecting only `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
+- Product Owner action required: yes only for those affected workstreams; no for SPL-02 or UX-01B.
+- Push performed: no.
+
+Gate movement:
+
+- Team 06 completed `CF-W2-SPL-02` implementation in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02`.
+- Team 00 closed Team 06 worker `019e6423-90b8-76d0-bf3f-cc6b1ffffd70`.
+- Team 04 QA Verification is active as `019e643c-66de-7980-8b83-d772afc667e1`.
+- Team 04 completed `CF-W1-UX-01B` QA planning and returned `QA-PLAN READY`.
+- Team 00 promoted `CF-W1-UX-01B` to Team 08 for bounded implementation.
+
+UX-01B implementation assignment:
+
+- Team: Team 08 - UX / Research / Copilot.
+- Branch: `codex/team08-ux-research/CF-W1-UX-01B`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-UX-01B`.
+- Required base: accepted Workbench trust-framing branch `codex/team08-ux-research/CF-W1-UX-01A` at `246d5a3`, then merge current `dev`.
+- Scope: Stock Research Workbench backend module, feature-local Workbench UI/API/types, focused backend tests, and Workbench UI smoke test only.
+
+Teams ready to pick up new tasks:
+
+- Team 04: SPL-02 QA Verification now.
+- Team 08: UX-01B implementation after worktree setup.
+- Team 10: SPL-02 Code Review after Team 04 accepts.
+- Team 03: SPL-02 Architect Signoff after Team 10 accepts, or rolling architecture prep if no signoff is waiting.
+- Team 02: rolling investor/trader-value requirements discovery.
+
+Next action:
+
+- Create the UX-01B worktree from the accepted UX-01A branch, merge current `dev`, link dependency folders if needed, and spawn Team 08. Do not push.
+
 ## Latest Runtime Checkpoint - SPL-02 Promoted
 
 Date: 2026-05-26

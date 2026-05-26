@@ -34,6 +34,44 @@ No historical active work items have been migrated as active.
 - Rejected / Rework
 - Deferred
 
+## Latest Team 00 Routing Update - SPL-02 QA, UX-01B Ready
+
+Date: 2026-05-26
+
+Current state:
+
+- `CF-W2-SPL-02` developer implementation is complete in the Team 06 worktree and is now routed to Team 04 QA Verification.
+- Team 06 implementation branch: `codex/team06-strategy-signal/CF-W2-SPL-02`.
+- Team 06 implementation worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02`.
+- Team 04 QA agent: `019e643c-66de-7980-8b83-d772afc667e1`.
+- `CF-W1-UX-01B` Stock Research Workbench trust-evidence contract is promoted to Team 08 as the next independent user-facing implementation slice.
+- Open decisions remain 2 and block only `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
+
+SPL-02 next gates:
+
+- Team 04: QA Verification now.
+- Team 10: Code Review after Team 04 accepts.
+- Team 03: Architect Signoff after Team 10 accepts.
+- Team 00: delegated PO acceptance and scoped local commit if all gates pass.
+
+UX-01B implementation routing:
+
+- Team: Team 08 - UX / Research / Copilot.
+- Branch: `codex/team08-ux-research/CF-W1-UX-01B`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-UX-01B`.
+- Required base: stack from accepted `codex/team08-ux-research/CF-W1-UX-01A` commit `246d5a3`, then merge current `dev` active docs.
+- Scope: Stock Research Workbench backend module, feature-local Workbench UI/API/types, focused backend tests, and Workbench UI smoke test only.
+- Forbidden: route/navigation files, shared UI/context, Market Data, DQ, Signal, Strategy source/tests, schema/migrations/generated/package files, provider/live/startup/backfill/scheduler files, unsupported-scope fakery, downstream widget internals, advice, target, reward/risk, guarantee, or action-authorizing wording.
+
+Teams ready to pick up new tasks:
+
+- Team 04: active on SPL-02 QA Verification.
+- Team 08: ready for `CF-W1-UX-01B` implementation after Team 00 creates the worktree.
+- Team 10: ready for SPL-02 Code Review after QA acceptance.
+- Team 03: ready for SPL-02 Architect Signoff after Code Review acceptance, or rolling architecture if no signoff is waiting.
+- Team 02: ready for rolling investor/trader-value requirements discovery.
+- Team 06: SPL-02 implementation complete; no new Team 06 item should start until SPL-02 moves past QA or Team 00 assigns another non-overlapping branch.
+
 ## Latest Team 00 Routing Update - SPL-02 Promoted After DOV Acceptance
 
 Date: 2026-05-26

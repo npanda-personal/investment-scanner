@@ -4,6 +4,43 @@ Date: 2026-05-25
 
 Owner: Team 00 - Master Orchestrator / Integration
 
+## Latest Active Snapshot - SPL-02 QA And UX-01B Ready
+
+Date: 2026-05-26
+
+Update:
+
+- Team 06 completed `CF-W2-SPL-02` implementation in the dedicated worktree and Team 00 closed the Team 06 worker.
+- Team 04 QA Verification for `CF-W2-SPL-02` is active.
+- Team 04 completed the `CF-W1-UX-01B` QA plan and Team 00 promoted UX-01B to Ready for Team 08.
+
+Current active agents:
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 04 - QA Factory | `019e643c-66de-7980-8b83-d772afc667e1` | `gpt-5.4`, high | QA Verification | `CF-W2-SPL-02` in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02` | active |
+| 2 | Open slot | none | pending | implementation | Team 08 `CF-W1-UX-01B` after worktree setup | queued |
+| 3 | Open slot | none | pending | Code Review | Team 10 `CF-W2-SPL-02` after Team 04 ACCEPT | queued |
+| 4 | Open slot | none | pending | Architect Signoff | Team 03 `CF-W2-SPL-02` after Team 10 ACCEPT | queued |
+| 5 | Open slot | none | pending | QA Verification | Team 04 `CF-W1-UX-01B` after Team 08 handoff | queued |
+| 6 | Open slot | none | pending | Requirements / Architecture | Team 02 rolling discovery or Team 03 rolling design when no signoff is waiting | queued |
+
+Current routing:
+
+- `CF-W2-SPL-02` changed only its reserved route/navigation, Signal Position Ledger module/feature/test, and assigned evidence docs according to the developer handoff.
+- `CF-W1-UX-01B` is Ready and independent from SPL-02 because it excludes route/navigation/shared files and stays inside Stock Research Workbench module/feature ownership.
+- Open decisions remain scoped to `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
+
+Teams ready to pick up new tasks:
+
+- Team 04: active on SPL-02 QA Verification.
+- Team 08: ready for UX-01B implementation after Team 00 creates the stacked worktree.
+- Team 10: ready for SPL-02 review after QA acceptance.
+- Team 03: ready for SPL-02 signoff after Team 10 acceptance.
+- Team 02: ready for rolling investor/trader-value requirements discovery.
+
+---
+
 ## Latest Active Snapshot - SPL-02 Implementation And Rolling PO
 
 Date: 2026-05-26

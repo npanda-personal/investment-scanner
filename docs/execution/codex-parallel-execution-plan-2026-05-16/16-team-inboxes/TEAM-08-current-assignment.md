@@ -6,6 +6,96 @@ Team: TEAM-08 - UX / Research / Copilot
 
 Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automation-prompts/AUTO-08-ux-research-copilot.md`
 
+## Latest Assignment Override - 2026-05-26 UX-01B
+
+Team 00 promotes `CF-W1-UX-01B` as a bounded Stock Research Workbench trust-evidence implementation item.
+
+Work item:
+
+- `CF-W1-UX-01B` - Stock Research Workbench trust evidence contract.
+
+Branch / worktree:
+
+- Branch: `codex/team08-ux-research/CF-W1-UX-01B`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-UX-01B`
+- Required base: stack from accepted Workbench trust-framing branch `codex/team08-ux-research/CF-W1-UX-01A` at `246d5a3 feat: add workbench trust framing`, then merge current `dev` before implementation.
+
+Evidence to use:
+
+- Requirement: `10-requirements/CF-W1-UX-01B-stock-research-workbench-trust-evidence-contract-requirement.md`
+- Architecture review: `03-architecture/CF-W1-UX-01B-architecture-review.md`
+- Contract: `06-contracts/CF-W1-UX-01B-stock-research-workbench-trust-evidence-contract.md`
+- Work packet: `08-work-packets/CF-W1-UX-01B-work-packet.md`
+- QA plan: `04-qa/CF-W1-UX-01B-qa-plan.md`
+- Ready promotion: `13-implementation-evidence/CF-W1-UX-01B-ready-promotion.md`
+- Ready handoff: `12-ready-queue/ready-for-implementation.md`
+
+Allowed implementation files:
+
+- `backend/src/modules/stock-research-workbench/stock-research-workbench.controller.ts`
+- `backend/src/modules/stock-research-workbench/stock-research-workbench.service.ts`
+- `backend/src/modules/stock-research-workbench/stock-research-workbench.types.ts`
+- `backend/src/modules/stock-research-workbench/stock-research-workbench.validation.ts`
+- `backend/src/modules/stock-research-workbench/stock-research-workbench.md`
+- `backend/tests/modules/stock-research-workbench/stock-research-workbench.service.test.ts`
+- `backend/tests/modules/stock-research-workbench/stock-research-workbench.validation.test.ts`
+- `backend/tests/modules/stock-research-workbench/stock-research-workbench.routes.test.ts`
+- `frontend/src/features/stock-research-workbench/api/stockResearchWorkbenchService.ts`
+- `frontend/src/features/stock-research-workbench/types.ts`
+- `frontend/src/features/stock-research-workbench/components/StockResearchWorkbenchPage.tsx`
+- `frontend/tests/ui/stock-research-workbench.spec.ts`
+
+Allowed reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-08-CF-W1-UX-01B-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-UX-01B-developer-handoff.md`
+
+Required behavior:
+
+- Add additive page-owned `trust_evidence` without removing or renaming existing Workbench response fields.
+- Send and reflect requested `region` and `assetType` from the Workbench client.
+- Show explicit scope verification states: verified match, unverified, mismatch, or unsupported.
+- Show latest page-owned evidence timestamp only with a truthful basis; otherwise keep evidence unavailable/unknown.
+- Show blocker and limitation reasons on the Workbench page.
+- Gate downstream Signal and Strategy widgets with page-owned `LIMITED` or `BLOCKED` states only.
+- Suppress blocked widgets and show a local blocked reason.
+- Preserve existing range controls, loading, error, and empty states.
+- Keep research-support language and avoid advice, target, reward/risk, guarantee, or action-authorizing wording.
+
+Forbidden files:
+
+- `backend/src/api/routes.ts`
+- `frontend/src/app/routes.tsx`
+- `frontend/src/app/navigationMetadata.tsx`
+- `frontend/src/contexts/MarketScopeContext.tsx`
+- `backend/src/modules/market-data-foundation/**`
+- `backend/src/modules/data-quality-engine/**`
+- `backend/src/modules/signal-generation-engine/**`
+- `backend/src/modules/strategy-decision-engine/**`
+- `frontend/src/features/signal-generation-engine/**`
+- `frontend/src/features/strategy-decision-engine/**`
+- `frontend/src/shared/**`
+- Prisma schema, migrations, generated files, package manifests, lockfiles, provider/live, startup/backfill, scheduler, worker, queue, paid/cloud, broker, or telemetry files
+
+Required validation:
+
+```powershell
+cd backend
+npm.cmd test -- stock-research-workbench.service.test.ts stock-research-workbench.validation.test.ts stock-research-workbench.routes.test.ts --runInBand
+npm.cmd run build
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- stock-research-workbench.spec.ts --workers=1
+```
+
+Expected handoff:
+
+- Update `17-team-outboxes/TEAM-08-CF-W1-UX-01B-outbox.md`.
+- Create `18-integration-queue/CF-W1-UX-01B-developer-handoff.md`.
+- Record exact branch/worktree, base commit, changed files, inspected files, behavior changed, tests run, skipped checks, forbidden files confirmed untouched, risks, blockers, and next gate: Team 04 QA Verification.
+
+Stop and return to Team 00 if implementation requires route/navigation edits, shared UI/context, upstream module source/test changes, unsupported-scope fallback behavior, downstream widget internals, schema/generated/package/provider scope, or product-language drift.
+
 ## Latest Assignment Override - 2026-05-26 DOV-01
 
 Team 00 promotes `CF-W2-DOV-01` as a bounded frontend-only Daily Overview dashboard implementation item.
