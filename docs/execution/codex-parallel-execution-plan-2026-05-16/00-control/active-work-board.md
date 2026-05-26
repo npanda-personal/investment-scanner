@@ -47,10 +47,12 @@ Current state:
 - Team 04 accepted `CF-W1-UX-01B` QA Verification.
 - Team 10 rejected `CF-W1-UX-01B` for synthetic frontend `trust_evidence` fallback.
 - Team 08 completed bounded `CF-W1-UX-01B` rework.
-- `CF-W1-UX-01B` is in Team 04 QA rerun as `019e6479-4c86-7fa2-a260-5b7a44fd9476`.
+- Team 04 accepted `CF-W1-UX-01B` QA rerun.
+- `CF-W1-UX-01B` is in Team 10 rereview as `019e6480-cc8c-7102-a136-7fa73f0e745a`.
 - Team 02 completed its rolling investor/trader-value requirement pass and created `CF-W2-DOV-02` plus `CF-W2-SPL-03`.
 - `CF-W2-DOV-02` Team 03 architecture returned `split required`; Team 04 QA planning completed.
 - Team 00 dependency-base verification found `a371e2f` and `1be7d1a` on separate branches with Signal Calibration dry-merge conflicts. DOV-02 now needs architecture/integration base correction before implementation.
+- Team 03 dependency-base correction returned `wait for integration sequencing`, not a consent blocker. Recommended path: create a dedicated Team 00 integration base with CAL-02A as the semantic baseline, then replay only accepted DOV-01 commit `a371e2f`.
 - `CF-W2-SPL-03` remains requirement/proposal-only and is not Ready because closed-history lifecycle proof likely needs storage/lifecycle architecture.
 - Team 02 rolling investor/trader-value requirement discovery is active as `019e647e-0d7c-7711-a2df-c4c2a566dcdc`.
 - Open decisions remain 2 and block only `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
@@ -61,7 +63,10 @@ SPL-02 next gates:
 
 Teams ready to pick up new tasks:
 
-- Team 03: active on `CF-W2-DOV-02` dependency-base correction architecture as `019e647a-e5f9-7251-a2e1-154d821de566`.
+- Team 00: ready to prepare the DOV-02 dependency integration base after current checkpoint.
+- Team 10: active on `CF-W1-UX-01B` rereview.
+- Team 03: queued for `CF-W1-UX-01B` Architect Signoff if Team 10 accepts.
+- Team 02: active on rolling investor/trader-value requirement discovery.
 - Team 04: active on `CF-W1-UX-01B` QA rerun.
 - Team 10: queued for `CF-W1-UX-01B` rereview after QA acceptance.
 - Team 03: ready for DOV-02 dependency-base correction architecture.

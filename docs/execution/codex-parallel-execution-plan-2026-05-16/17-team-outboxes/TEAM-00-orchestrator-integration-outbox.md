@@ -20,26 +20,28 @@ Gate movement:
 - Team 00 created delegated PO acceptance packet `09-summaries/CF-W2-SPL-02-po-acceptance-packet.md`.
 - `CF-W2-SPL-02` scoped local commit completed on Team 06 branch as `31115f0 feat: add signal position ledger surface`.
 - Team 10 rejected `CF-W1-UX-01B`; Team 08 bounded rework completed.
-- Team 04 UX-01B QA rerun is active as `019e6479-4c86-7fa2-a260-5b7a44fd9476`.
+- Team 04 accepted UX-01B QA rerun.
+- Team 10 UX-01B rereview is active as `019e6480-cc8c-7102-a136-7fa73f0e745a`.
 - Team 02 rolling investor/trader-value requirement discovery is active as `019e647e-0d7c-7711-a2df-c4c2a566dcdc`.
 - Team 03 completed `CF-W2-DOV-02` architecture with `split required`.
 - Team 04 completed DOV-02 QA planning with `QA-PLAN READY AFTER DEPENDENCY-BASE VERIFICATION`.
 - Team 00 dependency-base verification found DOV-01 and CAL-02A on separate branches with Signal Calibration dry-merge conflicts.
+- Team 03 dependency-base correction returned `wait for integration sequencing`; recommended dedicated Team 00 integration branch with CAL-02A semantic baseline and replay of only `a371e2f`.
 - Team 04 UX-01B QA Verification returned `ACCEPT`; Team 00 closed `019e645d-3a98-7cd3-9365-40a2867efd27`.
 - Team 02 completed rolling requirement discovery and added `CF-W2-DOV-02` plus `CF-W2-SPL-03`.
 - `CF-W2-SPL-03` remains proposal-only and not Ready.
 
 Teams ready to pick up new tasks:
 
-- Team 04: UX-01B QA rerun active.
-- Team 03: DOV-02 dependency-base correction architecture active as `019e647a-e5f9-7251-a2e1-154d821de566`.
+- Team 10: UX-01B rereview active.
+- Team 00: DOV-02 dependency integration base preparation queued.
 - Team 02: rolling requirement discovery active as `019e647e-0d7c-7711-a2df-c4c2a566dcdc`.
-- Team 10: ready for UX-01B rereview after QA acceptance.
+- Team 03: queued for UX-01B Architect Signoff if Team 10 accepts.
 - Team 06: SPL-02 complete/parked; ready for next Team 06 Ready item.
 
 Next action:
 
-- Monitor Team 04 UX-01B QA rerun and route Team 10 rereview if accepted. Do not push.
+- Monitor Team 10 UX-01B rereview and route Architect Signoff if accepted. Do not push.
 
 ## Latest Runtime Checkpoint - SPL-02 QA Routed, UX-01B Ready
 

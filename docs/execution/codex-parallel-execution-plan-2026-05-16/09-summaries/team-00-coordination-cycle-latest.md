@@ -25,30 +25,31 @@ Completed in the recent window:
 - Team 04 accepted `CF-W1-UX-01B` QA Verification.
 - Team 10 rejected `CF-W1-UX-01B` for synthetic frontend `trust_evidence` fallback.
 - Team 08 completed UX-01B bounded rework.
-- Team 04 UX-01B QA rerun is active.
+- Team 04 accepted UX-01B QA rerun.
+- Team 10 UX-01B rereview is active.
 - Team 02 completed rolling investor/trader-value requirement discovery and added `CF-W2-DOV-02` plus `CF-W2-SPL-03`.
 - Team 03 completed `CF-W2-DOV-02` architecture with `split required`.
 - Team 04 completed `CF-W2-DOV-02` QA planning with `QA-PLAN READY AFTER DEPENDENCY-BASE VERIFICATION`.
 - Team 00 dependency-base verification found DOV-01 and CAL-02A on separate branches with Signal Calibration dry-merge conflicts.
+- Team 03 completed DOV-02 dependency-base correction architecture with `wait for integration sequencing`; no Product Owner consent blocker.
 
 Active / queued:
 
-- Team 04 `019e6479-4c86-7fa2-a260-5b7a44fd9476`: active on UX-01B QA rerun.
-- Team 03 `019e647a-e5f9-7251-a2e1-154d821de566`: active on DOV-02 dependency-base correction architecture.
+- Team 10 `019e6480-cc8c-7102-a136-7fa73f0e745a`: active on UX-01B rereview.
+- Team 00: DOV-02 dependency integration base preparation queued.
 - Team 02 `019e647e-0d7c-7711-a2df-c4c2a566dcdc`: active on rolling investor/trader-value requirements.
-- Team 04: queued for UX-01B QA rerun after Team 08 handoff.
-- Team 10: queued for UX-01B rereview after Team 04 accepts.
+- Team 03: queued for UX-01B Architect Signoff if Team 10 accepts.
 
 Teams ready to pick up new tasks:
 
-- Team 04: active on UX-01B QA rerun.
-- Team 03: active on DOV-02 dependency-base correction architecture.
-- Team 10: queued for UX-01B rereview after QA acceptance.
+- Team 10: active on UX-01B rereview.
+- Team 00: ready to prepare DOV-02 dependency integration base.
+- Team 03: queued for UX-01B Architect Signoff if Team 10 accepts.
 - Team 02: active on rolling requirement discovery.
 
 Next action:
 
-- Monitor Team 04 UX-01B QA rerun, route DOV-02 dependency-base correction to Team 03, then route QA/review gates immediately.
+- Monitor Team 10 UX-01B rereview, then route Architect Signoff if accepted.
 
 ## Latest Runtime Checkpoint - SPL-02 QA Active, UX-01B Ready
 
