@@ -6,6 +6,91 @@ Team: TEAM-10 - Review / Release
 
 Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automation-prompts/AUTO-10-review-release.md`
 
+## Latest Assignment Override - 2026-05-26 UX-01B Code Review
+
+Perform Code Review / Release Readiness precheck for `CF-W1-UX-01B` after Team 04 QA Verification returned `ACCEPT`.
+
+This assignment supersedes older Team 10 queue text. Work only in the dedicated Team 08 Workbench worktree. Do not review unrelated Trade Plan, Portfolio, Calibration, Smart Money, SPL, or pipeline work in this pass.
+
+Do not edit application source or tests. Do not stage, commit, or push.
+
+## Branch / Worktree
+
+- Branch: `codex/team08-ux-research/CF-W1-UX-01B`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-UX-01B`
+- Required base: accepted Workbench trust-framing branch `codex/team08-ux-research/CF-W1-UX-01A` at `246d5a3 feat: add workbench trust framing`, with current `dev` merged.
+
+## Evidence To Review
+
+From the worktree:
+
+- Developer handoff: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-UX-01B-developer-handoff.md`
+- Team 08 outbox: `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-08-CF-W1-UX-01B-outbox.md`
+- QA verification: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-UX-01B-qa-verification.md`
+- Team 04 outbox: `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-qa-factory.md`
+
+From active docs:
+
+- Requirement: `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-UX-01B-stock-research-workbench-trust-evidence-contract-requirement.md`
+- Architecture review: `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-UX-01B-architecture-review.md`
+- Contract: `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W1-UX-01B-stock-research-workbench-trust-evidence-contract.md`
+- Work packet: `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W1-UX-01B-work-packet.md`
+- QA plan: `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W1-UX-01B-qa-plan.md`
+- Ready promotion: `docs/execution/codex-parallel-execution-plan-2026-05-16/13-implementation-evidence/CF-W1-UX-01B-ready-promotion.md`
+
+## Review Scope
+
+Review only the approved Team 08 changed files:
+
+- `backend/src/modules/stock-research-workbench/stock-research-workbench.controller.ts`
+- `backend/src/modules/stock-research-workbench/stock-research-workbench.service.ts`
+- `backend/src/modules/stock-research-workbench/stock-research-workbench.types.ts`
+- `backend/src/modules/stock-research-workbench/stock-research-workbench.validation.ts`
+- `backend/src/modules/stock-research-workbench/stock-research-workbench.md`
+- `backend/tests/modules/stock-research-workbench/stock-research-workbench.service.test.ts`
+- `backend/tests/modules/stock-research-workbench/stock-research-workbench.validation.test.ts`
+- `backend/tests/modules/stock-research-workbench/stock-research-workbench.routes.test.ts` only if changed; QA reports it was listed but not modified
+- `frontend/src/features/stock-research-workbench/api/stockResearchWorkbenchService.ts`
+- `frontend/src/features/stock-research-workbench/types.ts`
+- `frontend/src/features/stock-research-workbench/components/StockResearchWorkbenchPage.tsx`
+- `frontend/tests/ui/stock-research-workbench.spec.ts`
+
+Verify:
+
+- implementation stays within the Team 00 / Team 03 reserved file list;
+- `trust_evidence` is additive and does not remove or rename existing Workbench response fields;
+- requested `region` and `assetType` are parsed locally, sent by the client, and refetched on scope/range changes;
+- scope verification states are explicit and do not silently fall back to unsupported or mismatched scope;
+- latest evidence timestamp is shown only with a truthful page-owned basis and unavailable evidence remains `null` / `UNKNOWN`;
+- blocker and limitation reasons are visible;
+- downstream Signal/Strategy widgets stay `LIMITED` or `BLOCKED`, with blocked widgets suppressed locally;
+- no route/navigation/shared UI/shared context/upstream module/schema/generated/package/provider/startup/scheduler scope was introduced;
+- product language remains research-support and avoids direct advice, targets, guarantees, reward/risk, broker/execution, or action-authorizing wording.
+
+## Commands / Evidence
+
+Team 04 QA accepted with:
+
+- `npm.cmd test -- stock-research-workbench.service.test.ts stock-research-workbench.validation.test.ts stock-research-workbench.routes.test.ts --runInBand`: pass, 3 suites / 13 tests.
+- backend `npm.cmd run build`: pass.
+- frontend `npm.cmd run build`: pass.
+- UI smoke against dedicated worktree server `PLAYWRIGHT_BASE_URL=http://127.0.0.1:5174 npm.cmd run test:ui -- stock-research-workbench.spec.ts --workers=1`: pass, 4/4.
+- language guard: no matches.
+- `git diff --check`: pass with line-ending warnings only.
+
+Team 10 may inspect diffs and evidence. Do not run broad suites unless needed for a concrete review concern.
+
+## Allowed Writes
+
+Only in the Team 08 UX-01B worktree:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-UX-01B-code-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-10-review-release.md`
+
+## Output
+
+Return pass/reject decision, findings with file/line references, changed-file scope confirmation, whether QA evidence is sufficient, release risk, rollback note, and whether Architect Signoff can proceed.
+
 ## Assignment
 
 Perform Code Review / Release Readiness precheck for `CF-W1-TP-01B` in parallel with the `CF-W1-L3-PORT-01A` QA rerun.

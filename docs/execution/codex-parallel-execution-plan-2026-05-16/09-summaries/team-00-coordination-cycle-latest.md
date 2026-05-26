@@ -19,26 +19,26 @@ Completed in the recent window:
 - Team 04 accepted `CF-W2-SPL-02` QA rerun.
 - Team 10 accepted `CF-W2-SPL-02` rereview.
 - Team 08 completed `CF-W1-UX-01B` implementation and handed it to Team 04.
+- Team 04 accepted `CF-W1-UX-01B` QA Verification.
 - Team 02 completed rolling investor/trader-value requirement discovery and added `CF-W2-DOV-02` plus `CF-W2-SPL-03`.
 
 Active / queued:
 
-- Team 04 `019e645d-3a98-7cd3-9365-40a2867efd27`: active on UX-01B QA Verification.
-- Team 03: queued for SPL-02 Architect Signoff.
-- Team 03: queued for DOV-02 architecture readiness.
-- Team 10: queued for UX-01B review after QA acceptance.
+- Team 03 `019e6467-db53-7fb0-b138-c88833ddc6f4`: active on SPL-02 Architect Signoff.
+- Team 03 `019e6468-4976-77a0-9e5e-214c7d8a1053`: active on DOV-02 architecture readiness.
+- Team 10 `019e646a-98d9-7422-bcd8-419fe2abf191`: active on UX-01B Code Review.
 
 Teams ready to pick up new tasks:
 
-- Team 03: SPL-02 Architect Signoff now.
-- Team 03: DOV-02 architecture readiness in parallel if capacity permits.
-- Team 04: UX-01B QA Verification active.
-- Team 10: UX-01B review after QA acceptance.
+- Team 03: active on SPL-02 Architect Signoff.
+- Team 03: active on DOV-02 architecture readiness.
+- Team 10: active on UX-01B Code Review.
+- Team 04: ready for next QA handoff.
 - Team 02: rolling requirement discovery after current gates clear.
 
 Next action:
 
-- Record docs checkpoint, then launch Team 03 signoff and DOV-02 architecture workers if capacity remains.
+- Monitor active Team 03 workers and Team 10 UX-01B review, then route the next accepted gate immediately.
 
 ## Latest Runtime Checkpoint - SPL-02 QA Active, UX-01B Ready
 

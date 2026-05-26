@@ -13,25 +13,25 @@ Update:
 - Team 10 accepted `CF-W2-SPL-02` rereview and Team 00 recorded the code-review evidence in the active integration queue.
 - Team 03 Architect Signoff for `CF-W2-SPL-02` is now the highest-priority queued agent.
 - Team 02 completed rolling investor/trader-value requirements and Team 00 recorded `CF-W2-DOV-02` as the next non-consent architecture candidate.
-- Team 04 remains active on `CF-W1-UX-01B` QA Verification.
+- Team 04 accepted `CF-W1-UX-01B` QA Verification and Team 00 launched Team 10 Code Review.
 
 Current active / queued agents:
 
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Team 04 - QA Factory | `019e645d-3a98-7cd3-9365-40a2867efd27` | `gpt-5.4`, high | QA Verification | `CF-W1-UX-01B` in `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-UX-01B` | active |
-| 2 | Team 03 - Architecture Factory | pending | `gpt-5.4`, high | Architect Signoff | `CF-W2-SPL-02` in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02` | queued |
-| 3 | Team 03 - Architecture Factory | pending | `gpt-5.4`, high | architecture readiness | `CF-W2-DOV-02` Daily Overview calibration evidence summary | queued |
-| 4 | Team 10 - Review / Release | pending | `gpt-5.4`, high | Code Review | `CF-W1-UX-01B` after Team 04 ACCEPT | queued |
+| 1 | Team 10 - Review / Release | `019e646a-98d9-7422-bcd8-419fe2abf191` | `gpt-5.4`, high | Code Review | `CF-W1-UX-01B` in `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-UX-01B` | active |
+| 2 | Team 03 - Architecture Factory | `019e6467-db53-7fb0-b138-c88833ddc6f4` | `gpt-5.4`, high | Architect Signoff | `CF-W2-SPL-02` in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02` | active |
+| 3 | Team 03 - Architecture Factory | `019e6468-4976-77a0-9e5e-214c7d8a1053` | `gpt-5.4`, high | architecture readiness | `CF-W2-DOV-02` Daily Overview calibration evidence summary | active |
+| 4 | Team 03 - Architecture Factory | pending | `gpt-5.4`, high | Architect Signoff | `CF-W1-UX-01B` after Team 10 ACCEPT | queued |
 | 5 | Team 08 - UX / Research / Copilot | none | pending | rework | `CF-W1-UX-01B` only if Team 04 rejects | queued |
 | 6 | Team 06 - Strategy / Signal / Risk | none | pending | rework | `CF-W2-SPL-02` only if Team 03 rejects | queued |
 
 Teams ready to pick up new tasks:
 
-- Team 03: `CF-W2-SPL-02` Architect Signoff now.
-- Team 03: `CF-W2-DOV-02` architecture readiness in parallel if capacity permits.
-- Team 04: active on UX-01B QA.
-- Team 10: UX-01B review after QA acceptance.
+- Team 03: active on `CF-W2-SPL-02` Architect Signoff as `019e6467-db53-7fb0-b138-c88833ddc6f4`.
+- Team 03: active on `CF-W2-DOV-02` architecture readiness as `019e6468-4976-77a0-9e5e-214c7d8a1053`.
+- Team 10: active on UX-01B review as `019e646a-98d9-7422-bcd8-419fe2abf191`.
+- Team 04: ready for the next QA plan or verification assignment.
 - Team 02: another rolling requirement pass after signoff/architecture pressure clears.
 
 ## Latest Active Snapshot - SPL-02 QA Rerun And UX-01B Implementation

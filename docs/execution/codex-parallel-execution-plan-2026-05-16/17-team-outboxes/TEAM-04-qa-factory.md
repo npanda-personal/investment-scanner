@@ -4,6 +4,24 @@ Date: 2026-05-24
 
 Mode: docs-only QA planning for bounded Ready-evaluation packets.
 
+## 2026-05-26 `CF-W1-UX-01B` QA Verification
+
+- Team: `TEAM-04` - QA Factory
+- Mode: executable QA verification
+- Work item: `CF-W1-UX-01B - Stock Research Workbench trust evidence contract`
+- Verdict: `ACCEPT`
+- Evidence: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-UX-01B-qa-verification.md`
+- Tests run:
+  - `Get-Counter '\Memory\% Committed Bytes In Use'` -> `76.75%`
+  - `cd backend && npm.cmd test -- stock-research-workbench.service.test.ts stock-research-workbench.validation.test.ts stock-research-workbench.routes.test.ts --runInBand` -> pass, 3 suites / 13 tests
+  - `cd backend && npm.cmd run build` -> pass
+  - `cd frontend && npm.cmd run build` -> pass
+  - UI smoke against dedicated worktree server `http://127.0.0.1:5174` -> pass, 4/4
+  - language guard -> no matches
+  - `git diff --check` -> pass with line-ending warnings only
+- Scope result: implementation stayed inside the reserved Workbench file set; no route/nav/shared UI/shared context/upstream module/schema/generated/package/provider/scheduler edits.
+- Next gate: Team 10 review.
+
 ## 2026-05-25 `CF-W3-MDPIPE-01B6` QA Verification
 
 - Team: `TEAM-04` - QA Factory
