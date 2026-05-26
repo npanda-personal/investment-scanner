@@ -334,6 +334,82 @@ describe('SignalPositionLedgerService', () => {
     ]));
   });
 
+  it('orders active rows by newest entry trigger timestamp before pagination', async () => {
+    const oldSignal = { ...trustedSignal, id: 'signal-old', instrument_id: 'stock-old', symbol: 'OLD', company_name: 'Old Co' };
+    const newSignal = { ...trustedSignal, id: 'signal-new', instrument_id: 'stock-new', symbol: 'NEW', company_name: 'New Co' };
+    const midSignal = { ...trustedSignal, id: 'signal-mid', instrument_id: 'stock-mid', symbol: 'MID', company_name: 'Mid Co' };
+    const repository = {
+      listLatestSignals: jest.fn().mockResolvedValue({
+        items: [oldSignal, newSignal, midSignal],
+        totalCount: 3,
+        limit: 100,
+        offset: 0,
+        nextOffset: null,
+        hasMore: false,
+      }),
+      latestPriceByInstrumentId: jest.fn().mockResolvedValue({
+        date: new Date().toISOString(),
+        close: 103,
+        adjustedClose: 103,
+        dataStatus: 'COMPLETE',
+        source: 'database',
+      }),
+      latestDataQualityByInstrumentId: jest.fn().mockResolvedValue({
+        signalReadinessStatus: 'READY',
+        coverageStatus: 'GOOD',
+        liquidityStatus: 'LIQUID',
+        lastEvaluatedAt: new Date().toISOString(),
+      }),
+      latestExitDecisionByInstrumentId: jest.fn().mockResolvedValue(null),
+    };
+    const signalService = {
+      enrichSignals: jest.fn().mockResolvedValue([
+        {
+          ...oldSignal,
+          triggerContract: {
+            ...sourceProvenTrigger,
+            signal_id: 'signal-old',
+            instrument_id: 'stock-old',
+            symbol: 'OLD',
+            trigger_timestamp: '2026-05-24T00:00:00.000Z',
+          },
+        },
+        {
+          ...newSignal,
+          triggerContract: {
+            ...sourceProvenTrigger,
+            signal_id: 'signal-new',
+            instrument_id: 'stock-new',
+            symbol: 'NEW',
+            trigger_timestamp: '2026-05-26T00:00:00.000Z',
+          },
+        },
+        {
+          ...midSignal,
+          triggerContract: {
+            ...sourceProvenTrigger,
+            signal_id: 'signal-mid',
+            instrument_id: 'stock-mid',
+            symbol: 'MID',
+            trigger_timestamp: '2026-05-25T00:00:00.000Z',
+          },
+        },
+      ]),
+    };
+    const service = new SignalPositionLedgerService(repository as any, signalService as any);
+
+    const result = await service.listActiveRows({ region: 'IN', assetType: 'STOCK', limit: 1, offset: 0 });
+
+    expect(result.totalCount).toBe(3);
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toMatchObject({
+      symbol: 'NEW',
+      entryTriggerTimestamp: '2026-05-26T00:00:00.000Z',
+    });
+    expect(result.nextOffset).toBe(1);
+    expect(result.hasMore).toBe(true);
+  });
+
   it('filters across source pages and paginates only active rows', async () => {
     const signalA = { ...trustedSignal, id: 'signal-a', instrument_id: 'stock-a', symbol: 'AAA', company_name: 'AAA Co' };
     const signalB = { ...trustedSignal, id: 'signal-b', instrument_id: 'stock-b', symbol: 'BBB', company_name: 'BBB Co' };

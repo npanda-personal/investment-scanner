@@ -36,6 +36,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { path: '/', label: 'Daily Overview', icon: <DashboardIcon /> },
       { path: '/today-review', label: 'Today Review', icon: <CalendarMonthIcon />, matchPrefixes: ['/today-review/'] },
+      { path: '/signal-position-ledger', label: 'Signal Position Ledger', icon: <FactCheckIcon />, matchPrefixes: ['/signal-position-ledger/'] },
       { path: '/research', label: 'Research Command Center', icon: <DashboardIcon />, matchPrefixes: ['/research/', '/research/stocks/'] },
     ],
   },

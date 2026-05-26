@@ -26,6 +26,7 @@ import { strategyFrameworkRouter } from '../modules/strategy-framework';
 import { tradePlanRiskModule } from '../modules/trade-plan-risk-engine';
 import { todayTradeReviewRouter } from '../modules/today-trade-review';
 import { pipelineOrchestrationRouter } from '../modules/pipeline-orchestration';
+import { signalPositionLedgerRouter } from '../modules/signal-position-ledger';
 
 export interface ApiModule {
   path: string;
@@ -56,6 +57,7 @@ export const apiModules: ApiModule[] = [
   { path: '/api/v1/research', router: researchHubRouter },
   { path: '/api/v1', router: todayTradeReviewRouter },
   { path: '/api/v1', router: pipelineOrchestrationRouter },
+  { path: '/api/v1', router: signalPositionLedgerRouter },
   { path: tradePlanRiskModule.routePrefix, router: tradePlanRiskModule.router },
   { path: '/api/market-data-foundation', router: marketDataFoundationRouter },
 ];

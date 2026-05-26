@@ -2,14 +2,16 @@
 
 ## Scope
 
-`signal-position-ledger` is a backend-only, module-local read model for active signal-position rows.
+`signal-position-ledger` is a backend read model for active signal-position rows.
 
 This module currently exposes:
 
-- `GET /signals/position-ledger/health`
-- `GET /signals/position-ledger/active`
+- module-local `GET /signals/position-ledger/health`
+- module-local `GET /signals/position-ledger/active`
+- mounted `GET /api/v1/signals/position-ledger/health`
+- mounted `GET /api/v1/signals/position-ledger/active`
 
-It is intentionally not mounted in `backend/src/api/routes.ts` in this child.
+The mounted active endpoint preserves the accepted active-list DTO: `items`, `totalCount`, `limit`, `offset`, `nextOffset`, `hasMore`, `scope`, and `warnings`.
 
 ## Active Row Truth Rules
 
@@ -22,6 +24,8 @@ Rows are included only when current source evidence proves:
 - trigger type is entry-compatible (`bullish_entry_trigger` or `bearish_trigger`).
 
 Risk-only signals and incomplete trigger evidence are excluded.
+
+Active rows are ordered by newest `entryTriggerTimestamp` before pagination. Rows with the same timestamp fall back to symbol and then instrument id ordering for stable results.
 
 ## Current Return Rules
 
@@ -43,12 +47,12 @@ Current `dev` compatibility health states are intentionally limited:
 
 All other lifecycle evidence remains unavailable in this child.
 
+`Closed History` remains a frontend placeholder until durable close date, close price, and close reason proof exist.
+
 ## Non-Goals In This Child
 
-- route-registry mounting
-- frontend feature wiring
 - schema or migration changes
 - durable open/closed lifecycle storage
 - closed-history read model
-- broker/portfolio P&L or target/reward-risk semantics
+- external account, capital-allocation, or direct action framing
 

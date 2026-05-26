@@ -24,6 +24,7 @@ import { strategyFrameworkRoutes } from '@/features/strategy-framework';
 import { tradePlanRiskEngineRoutes } from '@/features/trade-plan-risk-engine';
 import { todayTradeReviewRoutes } from '@/features/today-trade-review';
 import { pipelineOpsRoutes } from '@/features/pipeline-ops';
+import { signalPositionLedgerRoutes } from '@/features/signal-position-ledger';
 
 export const appRoutes: RouteObject[] = [
   ...publicAuthIdentityRoutes,
@@ -37,6 +38,7 @@ export const appRoutes: RouteObject[] = [
         children: [
           { index: true, element: <HomePage /> },
           ...todayTradeReviewRoutes,
+          ...signalPositionLedgerRoutes,
           ...researchHubRoutes,
           ...tradePlanRiskEngineRoutes,
           ...marketDataFoundationRoutes,

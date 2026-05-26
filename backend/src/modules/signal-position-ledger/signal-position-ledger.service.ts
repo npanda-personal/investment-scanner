@@ -23,8 +23,9 @@ export class SignalPositionLedgerService {
   async listActiveRows(query: SignalPositionLedgerActiveQuery): Promise<SignalPositionLedgerActiveListResponse> {
     const warnings: string[] = [];
     const candidates = await this.collectActiveCandidates(query, warnings);
-    const totalCount = candidates.length;
-    const selected = candidates.slice(query.offset, query.offset + query.limit);
+    const orderedCandidates = this.orderActiveCandidates(candidates);
+    const totalCount = orderedCandidates.length;
+    const selected = orderedCandidates.slice(query.offset, query.offset + query.limit);
     const items = await Promise.all(selected.map((candidate) => this.toActiveRow(candidate, query)));
 
     const nextOffset = query.offset + items.length;
@@ -87,6 +88,20 @@ export class SignalPositionLedgerService {
     }
 
     return candidates;
+  }
+
+  private orderActiveCandidates(candidates: SignalPositionLedgerActiveCandidate[]): SignalPositionLedgerActiveCandidate[] {
+    return [...candidates].sort((left, right) => {
+      const rightTime = Date.parse(right.triggerContract.trigger_timestamp || '');
+      const leftTime = Date.parse(left.triggerContract.trigger_timestamp || '');
+      const timeDelta = (Number.isFinite(rightTime) ? rightTime : 0) - (Number.isFinite(leftTime) ? leftTime : 0);
+      if (timeDelta !== 0) return timeDelta;
+
+      const symbolDelta = left.signal.symbol.localeCompare(right.signal.symbol);
+      if (symbolDelta !== 0) return symbolDelta;
+
+      return left.signal.instrument_id.localeCompare(right.signal.instrument_id);
+    });
   }
 
   private async toActiveRow(candidate: SignalPositionLedgerActiveCandidate, scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>): Promise<SignalPositionLedgerActiveRow> {
