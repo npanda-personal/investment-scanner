@@ -8,16 +8,22 @@ Owner: Team 00 - Master Orchestrator / Integration
 
 Date: 2026-05-26
 
+Update:
+
+- Team 02 completed the post-SPL queue refresh and was closed.
+- Team 02 docs commit: `0498169 docs: refresh post spl requirement queue`.
+- Team 03 is now launched on `CF-W1-UX-01B` architecture prep.
+
 Current active agents:
 
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Team 06 - Strategy / Signal / Risk | `019e6423-90b8-76d0-bf3f-cc6b1ffffd70` | `gpt-5.5`, xhigh | implementation | `CF-W2-SPL-02` in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02` | active |
-| 2 | Team 02 - PO / Requirement Factory | `019e6423-f118-7783-b867-aa2760c94008` | `gpt-5.4`, high | rolling requirements | post-DOV/SPL queue refresh and next direct-value candidate discovery | active |
+| 2 | Team 03 - Architecture Factory | `019e642c-928e-7712-898b-7779cdf6d4e6` | `gpt-5.4`, high | architecture prep | `CF-W1-UX-01B` Workbench trust-evidence contract | active |
 | 3 | Open slot | none | pending | QA Verification | Team 04 `CF-W2-SPL-02` after Team 06 handoff | queued |
 | 4 | Open slot | none | pending | Code Review | Team 10 `CF-W2-SPL-02` after Team 04 ACCEPT | queued |
 | 5 | Open slot | none | pending | Architect Signoff | Team 03 `CF-W2-SPL-02` after Team 10 ACCEPT | queued |
-| 6 | Open slot | none | pending | Architecture | Team 03 next architecture assignment after Team 02 output or SPL-02 review gate | queued |
+| 6 | Open slot | none | pending | QA Planning | Team 04 `CF-W1-UX-01B` after Team 03 architecture if verdict is Ready candidate | queued |
 
 Current routing:
 
@@ -25,15 +31,16 @@ Current routing:
 - `CF-W2-SPL-01B` is accepted and locally committed on Team 06 branch as `ca31d79`.
 - `CF-W2-SPL-02` is promoted and assigned to Team 06. Team 00 reserves `backend/src/api/routes.ts`, `frontend/src/app/routes.tsx`, and `frontend/src/app/navigationMetadata.tsx` for one writer.
 - `CF-W2-SPL-02` worktree merge base is prepared with `ca31d79` as an ancestor and current `dev` active docs merged.
-- Team 02 is refreshing requirements queues so stale DOV/SPL status does not keep routing humans through old priorities.
+- Team 02 refreshed requirements queues so stale DOV/SPL status does not keep routing humans through old priorities.
+- Team 03 is preparing the next non-consent Workbench trust-evidence architecture packet in parallel with SPL-02 implementation.
 
 Teams ready to pick up new tasks:
 
 - Team 06: active on SPL-02 implementation.
-- Team 02: active on rolling requirement refresh.
+- Team 03: active on `CF-W1-UX-01B` architecture prep.
 - Team 04: ready for SPL-02 QA after Team 06 handoff.
 - Team 10: ready for SPL-02 review after QA acceptance.
-- Team 03: ready for SPL-02 signoff after review acceptance, or next architecture prep after Team 02 output.
+- Team 04: ready for `CF-W1-UX-01B` QA planning if Team 03 returns `READY-CANDIDATE AFTER QA`.
 - Team 08: standby for UX feedback or the next user-facing item.
 
 ---
