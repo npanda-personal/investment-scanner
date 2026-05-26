@@ -1,5 +1,434 @@
 # TEAM-02 Requirement Factory
 
+## Team 02 Research Hub Next-Candidate Refinement Pass - 2026-05-26
+
+Root `AGENTS.md` was read first. Team 02 stayed docs-only, wrote only inside the allowed `10-requirements/**` folder plus this outbox, and did not touch application source/tests, Team 03 architecture docs, Team 04 QA docs, the Ready queue, Prisma/schema, route registries, package manifests, shared UI, or generated artifacts.
+
+### Work Item
+
+Audit one high-value non-consent workflow that does not collide with the current `CF-W2-DOV-01` or `CF-W2-SPL-01B` gate work, then refine the next direct investor/trader-value requirement and refresh the queue if priority changed.
+
+### Files Inspected
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-RH-01A-research-hub-actionability-evidence-date-wiring-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-CF-W2-DOV-01-architecture-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-CF-W2-SPL-01B-architecture-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-CF-W2-DOV-01-pre-architecture-qa-scaffold-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-04-CF-W2-SPL-01B-qa-plan-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/active-work-board.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/team-agent-runtime-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/11-module-audits/TEAM-01-direct-value-gap-audit-2026-05-25.md`
+- `backend/src/modules/research-hub/research-hub.md`
+- `backend/src/modules/research-hub/research-hub.types.ts`
+- `backend/src/modules/research-hub/research-hub.service.ts`
+- `backend/src/modules/strategy-decision-engine/strategy-decision-engine.service.ts`
+- `frontend/src/features/research-hub/api/researchHubApi.ts`
+- `frontend/src/features/research-hub/components/ResearchOverviewPage.tsx`
+- `frontend/tests/ui/research-hub.spec.ts`
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-RH-01A-research-hub-actionability-evidence-date-wiring-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+### Requirement Result
+
+Refined:
+
+- `CF-W1-RH-01A - Research Hub Actionability Evidence-Date Wiring Requirement`
+
+Key refinement outcome:
+
+- the contract already carries `evidenceDate` on Research Hub actionability dimensions;
+- the backend service never populates those dates today;
+- the current actionability tiles also do not render the field;
+- the child now explicitly requires dimension-by-dimension truth classification instead of any shared fallback timestamp;
+- calibration remains dependency-gated on the calibration-owned evidence-basis path, not reinvented inside Research Hub.
+
+### Queue Delta
+
+Updated Team 02 queue docs so they reflect current gate reality:
+
+- `CF-W2-DOV-01` is no longer ranked as fresh Team 02 discovery because Team 08 UX plus Team 03/04 gate prep already exists.
+- `CF-W2-SPL-01B` is no longer ranked as fresh Team 02 discovery because Team 03 architecture plus Team 04 QA planning already exists.
+- `CF-W1-RH-01A` is now the next unclaimed non-consent architecture candidate.
+- The three higher-value durable-proof proposals remain ahead of it in pure product value rank, but they stay honestly consent-gated.
+
+### Team 00 Recommendation
+
+Recommended next Team 00 action:
+
+1. Keep carrying `CF-W2-DOV-01` and `CF-W2-SPL-01B` through their current Team 00 gating decisions without sending them back through Team 02.
+2. If Team 00 wants the next fresh non-consent docs-to-architecture packet, route `CF-W1-RH-01A` to Team 03 now.
+
+### Architecture-Ready Result
+
+Yes: `CF-W1-RH-01A` can now become architecture-ready as the next bounded non-storage, non-route, non-schema follow-on.
+
+It is not Ready for implementation. Team 03 still needs to prove which dimensions can truthfully surface an evidence date on the current repo base, and Team 04 should plan date-present versus date-null QA only after that architecture pass.
+
+### Tests Run / Skipped
+
+- Tests run: none
+- Tests skipped: all
+- Reason: docs-only requirement refinement pass
+
+### Constraint Result
+
+- No application code changed.
+- No tests/builds/services/providers/Prisma/UI smoke were run.
+- No commit or push was performed.
+
+## Team 02 Daily Overview Dashboard Requirement Pass - 2026-05-26
+
+Root `AGENTS.md` was read first. Team 02 stayed docs-only, wrote only inside the allowed `10-requirements/**` folder plus this outbox, and did not touch application source/tests, Team 03 architecture docs, Team 04 QA docs, the Ready queue, Prisma/schema, route registries, package manifests, shared UI, or generated artifacts.
+
+### Work Item
+
+Convert the current thin `Daily Overview` launcher into a requirement path for a real interactive market overview dashboard that summarizes the most important filtered investor/trader information across the system while keeping research-support language and explicit truth boundaries.
+
+### Files Inspected
+
+- `AGENTS.md`
+- `frontend/src/app/HomePage.tsx`
+- `frontend/src/app/routes.tsx`
+- `frontend/src/app/navigationMetadata.tsx`
+- `frontend/src/features/today-trade-review/components/TodayReviewPage.tsx`
+- `frontend/src/features/research-hub/components/ResearchOverviewPage.tsx`
+- `frontend/src/features/research-hub/api/researchHubApi.ts`
+- `frontend/src/features/market-context-intelligence/components/MarketContextPage.tsx`
+- `frontend/src/features/data-quality-engine/components/DataQualityEnginePage.tsx`
+- `frontend/src/features/signal-generation-engine/components/SignalsDashboardPage.tsx`
+- `frontend/src/features/signal-calibration-engine/components/SignalCalibrationEnginePage.tsx`
+- `frontend/src/features/smart-money-intelligence/components/SmartMoneyIntelligencePage.tsx`
+- `frontend/src/features/backtesting-strategy-lab/components/BacktestingStrategyLabPage.tsx`
+- `frontend/src/features/pipeline-ops/components/PipelineOpsPage.tsx`
+- `backend/src/modules/today-trade-review/today-trade-review.md`
+- `backend/src/modules/stock-research-workbench/stock-research-workbench.md`
+- `backend/src/modules/pipeline-orchestration/pipeline-orchestration.md`
+- `docs/module-verification-register.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-DOV-01-daily-overview-interactive-market-dashboard-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+### Requirement Result
+
+Created:
+
+- `CF-W2-DOV-01 - Daily Overview Interactive Market Dashboard`
+
+### Source Audit Result
+
+Current `Daily Overview` reality:
+
+- nav label exists for `/`
+- route `/` resolves to `HomePage`
+- `HomePage` is still only a small launch-card grid
+
+Relevant summary truth already exists across source surfaces:
+
+- Today Review run/trust/coverage/group counts
+- Research Hub actionability, next actions, priorities, proof, confirmations, what-changed
+- Market Context regime/breadth/sectors
+- Data Quality readiness/tier context
+- Raw Signals counts and latest run
+- Calibration readiness/evidence context
+- Smart Money accumulation/distribution summaries
+- Backtesting run/proof context
+- Pipeline Ops active/latest stage status
+
+### Product Decision
+
+The Daily Overview page should become a true working dashboard, not a launch page, and should summarize cross-system filtered data in this order:
+
+1. scope/freshness/trust header
+2. daily pulse and reviewability
+3. review candidate / research-priority summary
+4. market environment and confirmation
+5. signal and evidence health
+6. data trust and pipeline health
+7. drilldown strip
+8. explicit `Coming soon` placeholders where current summary truth is not yet stable
+
+### Required `Coming soon` Areas
+
+- `Signal Position Follow-Through`
+- `Calibration Evidence-Through Summary`
+- `Measured Outcome Follow-Through`
+
+These stay placeholder-only until source truth matures enough to summarize them honestly.
+
+### Queue Delta
+
+Updated Team 02 queue docs to insert `CF-W2-DOV-01` as the next high-value non-storage cross-system workflow requirement behind the three explicit storage-gated proposals.
+
+Routing intent:
+
+- `CF-W2-DOV-01` now sits ahead of `CF-W1-RH-01A` in the non-storage queue because the latest Product Owner direction makes the landing-page redesign a primary user workflow
+- no item was moved to Ready
+- Team 00 still owns promotion and sequencing
+
+### Recommended Team 03 Architecture Handoff
+
+Team 03 should evaluate:
+
+- frontend-only composition from existing public APIs versus
+- a bounded backend summary adapter that consumes only public exports from Today Review, Research Hub, Market Context, Data Quality, Raw Signals, Calibration, Smart Money, Backtesting, and Pipeline Ops
+
+Key architecture question:
+
+- what is the smallest truthful first slice that can turn `/` into a real dashboard without inventing synthetic scores or widening into unsafe shared-file churn?
+
+### Next Gate
+
+- Team 03 next gate: bounded Daily Overview dashboard architecture review, section/source mapping, and exact file-reservation guidance
+- Team 04 next gate: QA planning only after Team 03 defines the first-slice architecture/contract/work-packet path
+
+### Tests Run / Skipped
+
+- Tests run: none
+- Tests skipped: all
+- Reason: docs-only requirement refinement pass
+
+### Constraint Result
+
+- No application code changed.
+- No tests/builds/services/providers/Prisma/UI smoke were run.
+- No commit or push was performed.
+
+## Team 02 Signal Position Ledger Split Follow-Up - 2026-05-26
+
+Root `AGENTS.md` was read first. Team 02 stayed docs-only, wrote only inside the allowed `10-requirements/**` folder plus this outbox, and did not touch application source/tests, Team 03 architecture docs, Team 04 QA docs, the Ready queue, Prisma/schema, route registries, package manifests, shared UI, generated artifacts, provider/live integrations, startup/backfill paths, broker scope, portfolio scope, or Trade Plan target/R:R scope.
+
+### Work Item
+
+Consume Team 03's architecture verdict that `CF-W2-SPL-01A` is not Ready because active plus closed cannot both be truthful on current source, and create a new active-only child requirement for Signal Position Ledger while explicitly deferring closed history to a later durable lifecycle/storage child.
+
+### Files Inspected
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-SPL-01-signal-position-ledger-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-SPL-01A-signal-position-ledger-first-slice-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W2-SPL-01A-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-CF-W2-SPL-01A-architecture-outbox.md`
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-SPL-01-signal-position-ledger-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-SPL-01A-signal-position-ledger-first-slice-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-SPL-01B-signal-position-ledger-active-positions-read-model-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+### Requirement Result
+
+Created:
+
+- `CF-W2-SPL-01B - Signal Position Ledger Active Positions Read Model`
+
+Updated:
+
+- parent `CF-W2-SPL-01` to point to the active-only-first split path
+- original child `CF-W2-SPL-01A` to remain as split-history only, not the next intake target
+
+### What The New Child Requires
+
+`CF-W2-SPL-01B` is active-only and must show, using existing persisted/public evidence only:
+
+- company/symbol
+- entry trigger date and price
+- entry reason summary
+- current trusted price date
+- current return percent
+- lifecycle/health state only if provable
+- DQ/trust/evidence status
+- strategy/rule/version provenance
+
+### What The New Child Explicitly Defers
+
+Deferred to a later durable lifecycle/storage child:
+
+- closed history
+- close date / close price / close reason proof
+- closed return proof across sessions
+- any Prisma/schema/generated/repository widening needed to make closed lifecycle truth durable
+
+### Queue Delta
+
+Updated the Team 02 requirement queue docs so the live Signal Position Ledger candidate is now `CF-W2-SPL-01B`, not `CF-W2-SPL-01A`.
+
+Current routing intent:
+
+- keep `CF-W2-SPL-01B` behind `CF-W1-TSC-02` and `CF-W1-TSC-03`
+- do not treat `CF-W2-SPL-01A` as the next architecture intake
+- do not move any Signal Position Ledger item to Ready from Team 02
+
+### Product Routing Result
+
+- No item was moved to Ready.
+- No QA plan was requested yet.
+- No architecture docs were edited by Team 02.
+- The family now has an explicit truthful split path: active-only first, durable closed history later.
+
+### Next Gate
+
+- Team 03 next gate: architecture review, source-map refresh, contract draft, and bounded work-packet prep for `CF-W2-SPL-01B`.
+- Team 04 next gate: hold at pre-architecture scaffold status until Team 03 completes the narrowed `CF-W2-SPL-01B` packet; then prepare QA for `CF-W2-SPL-01B` only.
+
+### Tests Run / Skipped
+
+- Tests run: none
+- Tests skipped: all
+- Reason: docs-only requirement refinement pass
+
+### Constraint Result
+
+- No application code changed.
+- No tests/builds/services/providers/Prisma/UI smoke were run.
+- No commit or push was performed.
+
+## Team 02 Signal Position Ledger Requirement Path - 2026-05-26
+
+Root `AGENTS.md` was read first. Team 02 stayed docs-only, wrote only inside the allowed `10-requirements/**` folder plus this outbox, and did not touch application source/tests, Team 03 architecture docs, Team 04 QA docs, the Ready queue, Prisma/schema, route registries, package manifests, or shared UI.
+
+### Work Item
+
+Create a product-requirement path for a new investor/trader-value module that shows system-triggered active and closed signal positions without drifting into broker execution, Trade Plan-first wording, target/R:R framing, or direct-action language.
+
+### Files Inspected
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/active-work-board.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-TSC-01-trusted-signal-candidate-workflow-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-TSC-02-active-signal-health-rule-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-TSC-03-today-review-supporting-trust-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-TSC-02-architecture-review.md`
+- `backend/src/modules/signal-generation-engine/signal-generation-engine.md`
+- `backend/src/modules/strategy-decision-engine/strategy-decision-engine.md`
+- `backend/src/modules/today-trade-review/today-trade-review.md`
+- `backend/src/modules/backtesting-strategy-lab/backtesting-strategy-lab.md`
+- `frontend/src/features/today-trade-review/components/TodayReviewPage.tsx`
+- `frontend/src/features/today-trade-review/components/TodayReviewCandidateDetailPage.tsx`
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-SPL-01-signal-position-ledger-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-SPL-01A-signal-position-ledger-first-slice-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+### Requirement Created
+
+- `CF-W2-SPL-01 - Signal Position Ledger`
+- `CF-W2-SPL-01A - Signal Position Ledger first slice`
+
+### Safe Naming Decision
+
+Chosen module name:
+
+- `Signal Position Ledger`
+
+Rejected as the primary module name:
+
+- `Active Trades`
+- `Open Trades`
+- `Closed Trades`
+
+Reason:
+
+- the module is anchored to system-triggered research evidence, not broker execution;
+- `ledger` reinforces auditability and history;
+- `position` is acceptable only when explicitly defined as a system-tracked research state created from source-proven entry evidence and later closed by documented exit/invalidation/expiry evidence.
+
+### What Changed
+
+- Created a new standalone module path instead of overloading Today Review or Portfolio ownership.
+- Defined a parent requirement for the full active-plus-closed signal-position workflow.
+- Defined a bounded first child that keeps the initial slice read-focused and proof-safe.
+- Required active rows to have source-proven entry trigger evidence.
+- Required closed rows to have documented exit, invalidation, or expiry evidence.
+- Explicitly rejected target/R:R, broker, quantity, realized-P/L, and Trade Plan-first framing.
+- Added the new child to the Team 02 requirement queues behind `CF-W1-TSC-02` and `CF-W1-TSC-03`, ahead of lower-value UX-only follow-ons.
+
+### Queue Delta
+
+Updated queue placement:
+
+- `CF-W2-SPL-01A` is now inserted after `CF-W1-TSC-03` and before `CF-W1-UX-01` in the Team 02 top/refinement/backlog views.
+
+Reason:
+
+- this is real direct investor/trader value;
+- it is more valuable than downstream trust-copy-only work;
+- but it still depends on settled Today Review lifecycle semantics and a Team 03 architecture decision on read-model versus durable-ledger first.
+
+### Recommended Architecture Handoff
+
+Team 03 should treat `CF-W2-SPL-01A` as the next new-module architecture candidate after current Today Review no-target sequencing settles.
+
+Primary architecture questions:
+
+1. Can current persisted evidence already prove enough active and closed rows for a truthful read-model-first slice?
+2. If not, should the first implementation split into:
+   - active-only read model first, then
+   - durable closed-history ledger later?
+3. Can the new module stay isolated in:
+   - `backend/src/modules/signal-position-ledger`
+   - `frontend/src/features/signal-position-ledger`
+   without immediate shared-contract or shared-UI widening?
+4. Which missing lifecycle facts would force an explicit schema/storage consent packet?
+
+### Product Routing Result
+
+- No item was moved to Ready.
+- Team 00 still owns promotion and file reservations.
+- The new module path is requirement-only and architecture-next.
+
+### Tests Run / Skipped
+
+- Tests run: none
+- Tests skipped: all
+- Reason: docs-only requirement pass
+
+### Constraint Result
+
+- No application code changed.
+- No tests/builds/services/providers/Prisma/UI smoke were run.
+- No commit or push was performed.
+
 ## Team 02 Rolling Priority Hygiene Pass - 2026-05-25
 
 Root `AGENTS.md` was read first. Team 02 stayed docs-only, wrote only inside the allowed `10-requirements/**` folder plus this outbox, and did not touch application source/tests, Team 03 architecture docs, Team 04 QA docs, Team 05 implementation files, Prisma/schema, route registries, package manifests, or the decision inbox.

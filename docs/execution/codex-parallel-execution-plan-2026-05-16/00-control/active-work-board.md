@@ -34,6 +34,42 @@ No historical active work items have been migrated as active.
 - Rejected / Rework
 - Deferred
 
+## Latest Team 00 Routing Update - Daily Overview And Signal Position Ledger Ready
+
+Date: 2026-05-26
+
+User direction:
+
+- Redesign the Daily Overview page into one interactive market overview dashboard for investor/trader value.
+- Keep direct-value work moving in parallel where file scopes are independent.
+
+Gate status:
+
+- `CF-W2-DOV-01` is promoted to Ready as a frontend-only Team 08 child.
+- `CF-W2-SPL-01B` is promoted to Ready as a backend-only Team 06 child.
+- `CF-W2-DOV-01` and `CF-W2-SPL-01B` are independent and may run in parallel.
+- `CF-W2-DOV-01` must keep `Calibration Evidence-Through`, `Signal Position Follow-Through`, and `Measured Outcome Follow-Through` as explicit `Coming soon` placeholders.
+- `CF-W2-SPL-01B` is only a backend read-model foundation; it is not a surfaced open/closed positions page.
+- Open decisions: one unrelated `CF-W1-DQ-02-RS1` currentness-summary parity decision; it blocks only DQ-RS1.
+
+Implementation routing:
+
+- Team 08 owns `CF-W2-DOV-01` in branch `codex/team08-ux-research/CF-W2-DOV-01`, worktree `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-01`.
+- Team 06 owns `CF-W2-SPL-01B` in branch `codex/team06-strategy-signal/CF-W2-SPL-01B`, worktree `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-01B`.
+- Team 04 owns QA Verification after each developer handoff.
+- Team 10 owns Code Review after Team 04 acceptance.
+- Team 03 owns Architect Signoff after Team 10 acceptance and continues `CF-W1-RH-01A` architecture prep in parallel.
+- Team 02 continues rolling direct investor/trader-value requirement discovery.
+
+Teams ready to pick up new tasks:
+
+- Team 08: implement `CF-W2-DOV-01` after docs checkpoint/worktree setup.
+- Team 06: implement `CF-W2-SPL-01B` after docs checkpoint/worktree setup.
+- Team 04: QA Verification for whichever implementation handoff lands first.
+- Team 10: Code Review after QA acceptance.
+- Team 03: active on `CF-W1-RH-01A` architecture and later signoff gates.
+- Team 02: active on rolling requirement discovery.
+
 ## Latest Team 00 Routing Update - Pipeline Automation First
 
 Date: 2026-05-25

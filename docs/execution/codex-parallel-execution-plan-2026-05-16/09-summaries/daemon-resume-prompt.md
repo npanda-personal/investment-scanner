@@ -1,8 +1,33 @@
 # Daemon Resume Prompt
 
-Date: 2026-05-25
+Date: 2026-05-26
 
 Path: `docs/execution/codex-parallel-execution-plan-2026-05-16/09-summaries/daemon-resume-prompt.md`
+
+Latest live checkpoint:
+
+- Branch: `dev`.
+- Open decisions: 1, scoped only to `CF-W1-DQ-02-RS1`.
+- Product Owner action required: no for active DOV/SPL/RH workstreams.
+- `CF-W2-DOV-01` is Ready and assigned to Team 08 as a frontend-only Daily Overview dashboard child.
+- `CF-W2-DOV-01` branch/worktree: `codex/team08-ux-research/CF-W2-DOV-01`, `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-01`.
+- `CF-W2-DOV-01` allowed scope: `frontend/src/app/HomePage.tsx`, new `frontend/src/features/daily-overview-dashboard/**`, and `frontend/tests/ui/daily-overview-dashboard.spec.ts`.
+- `CF-W2-SPL-01B` is Ready and assigned to Team 06 as a backend-only active-row read-model child.
+- `CF-W2-SPL-01B` branch/worktree: `codex/team06-strategy-signal/CF-W2-SPL-01B`, `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-01B`.
+- `CF-W2-SPL-01B` allowed scope: new `backend/src/modules/signal-position-ledger/**` and `backend/tests/modules/signal-position-ledger/**`.
+- Team 04 is preparing `CF-W1-RH-01A` QA planning after Team 03 architecture; RH is not Ready until QA and Team 00 promotion.
+- Team 02 requirement lane refined `CF-W1-RH-01A` and updated priority queues; DOV/SPL are routed work, not fresh discovery.
+- Active implementation agents at checkpoint:
+  - Team 06 `019e6383-810a-70c2-822a-7604ecc086a9`: `CF-W2-SPL-01B`.
+  - Team 08 `019e6383-edb2-78e1-a823-f8bbf9aed494`: `CF-W2-DOV-01`.
+  - Team 04 `019e6383-007c-74d1-b0f1-b8a7ef7de36b`: `CF-W1-RH-01A` QA planning.
+- Next gates:
+  1. consume Team 06 and Team 08 developer handoffs;
+  2. route each accepted handoff to Team 04 QA Verification;
+  3. route QA-accepted work to Team 10 Code Review;
+  4. route review-accepted work to Team 03 Architect Signoff;
+  5. record delegated PO acceptance and scoped local commits if accepted;
+  6. keep Team 02 rolling on the next direct investor/trader-value requirement while implementation runs.
 
 This file exists and was updated after Team 00 accepted `CF-W3-MDPIPE-01B4-PIPELINE-COMMAND-API` for the Market Data pipeline redesign.
 

@@ -1,5 +1,45 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - DOV And SPL Ready Promotions
+
+Date: 2026-05-26
+
+Status:
+
+- Branch: `dev`.
+- Open decisions: 1, affecting only `CF-W1-DQ-02-RS1`.
+- Product Owner action required: no for current DOV/SPL workstreams.
+- Push performed: no.
+- Active docs agents: Team 02 rolling requirements and Team 03 `CF-W1-RH-01A` architecture continue in parallel.
+
+Gate movement:
+
+- Team 02 created `CF-W2-DOV-01` and `CF-W2-SPL-01B` requirement paths.
+- Team 03 completed architecture, contract, and work packets for both `CF-W2-DOV-01` and `CF-W2-SPL-01B`.
+- Team 08 completed the `CF-W2-DOV-01` UX plan.
+- Team 04 completed executable QA plans for both `CF-W2-DOV-01` and `CF-W2-SPL-01B`.
+- Team 00 promoted `CF-W2-DOV-01` to Team 08 as a frontend-only Daily Overview dashboard child.
+- Team 00 promoted `CF-W2-SPL-01B` to Team 06 as a backend-only Signal Position Ledger active-row read-model child.
+
+Parallelism:
+
+- `CF-W2-DOV-01` and `CF-W2-SPL-01B` can run in parallel because their write scopes do not overlap.
+- `CF-W2-DOV-01` reserves `frontend/src/app/HomePage.tsx`, the new `frontend/src/features/daily-overview-dashboard/**` feature, and `frontend/tests/ui/daily-overview-dashboard.spec.ts`.
+- `CF-W2-SPL-01B` reserves only the new backend `signal-position-ledger` module files and backend module tests.
+
+Teams ready to pick up new tasks:
+
+- Team 08: implement `CF-W2-DOV-01` in `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-01`.
+- Team 06: implement `CF-W2-SPL-01B` in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-01B`.
+- Team 04: QA Verification after either developer handoff.
+- Team 10: Code Review after QA acceptance.
+- Team 03: `CF-W1-RH-01A` architecture now, then Architect Signoff after Team 10 acceptance.
+- Team 02: rolling direct-value requirement discovery.
+
+Product Owner action required: no for DOV/SPL. The existing DQ-RS1 decision remains scoped to that affected workstream only.
+
+---
+
 ## Latest Runtime Checkpoint - Pause After Current Open Items
 
 Date: 2026-05-25

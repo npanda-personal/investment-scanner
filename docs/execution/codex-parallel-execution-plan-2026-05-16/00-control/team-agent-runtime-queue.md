@@ -8,6 +8,40 @@ Owner: Team 00 - Master Orchestrator / Integration
 
 Date: 2026-05-25
 
+## Latest Active Snapshot - DOV/SPL Parallel Implementation
+
+Date: 2026-05-26
+
+Current active agents:
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 06 - Strategy / Signal / Risk | `019e6383-810a-70c2-822a-7604ecc086a9` | `gpt-5.3-codex`, high | implementation | `CF-W2-SPL-01B` in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-01B` | active |
+| 2 | Team 08 - UX / Research / Copilot | `019e6383-edb2-78e1-a823-f8bbf9aed494` | `gpt-5.3-codex`, high | implementation | `CF-W2-DOV-01` in `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-01` | active |
+| 3 | Team 04 - QA Factory | `019e6383-007c-74d1-b0f1-b8a7ef7de36b` | `gpt-5.4`, medium | QA planning | `CF-W1-RH-01A` Research Hub evidence-date QA plan | active |
+| 4 | Open slot | none | pending | QA Verification | Team 04 verification after first DOV/SPL developer handoff | queued |
+| 5 | Open slot | none | pending | Code Review / Signoff | Team 10 then Team 03 after next QA ACCEPT | queued |
+| 6 | Open slot | none | pending | Requirements | Team 02 next rolling requirement cycle | queued |
+
+Current routing:
+
+- `CF-W2-DOV-01` and `CF-W2-SPL-01B` are Ready and may run in parallel because their file scopes do not overlap.
+- `CF-W2-DOV-01` is frontend-only and must keep unavailable dashboard ideas as `Coming soon`.
+- `CF-W2-SPL-01B` is backend-only and must not claim durable active/closed lifecycle truth.
+- `CF-W1-RH-01A` is architecture-complete and in QA planning; it is not implementation-ready.
+- `CF-W1-DQ-02-RS1` remains blocked only by its existing Decision Packet.
+
+Teams ready to pick up new tasks:
+
+- Team 06: active on `CF-W2-SPL-01B`.
+- Team 08: active on `CF-W2-DOV-01`.
+- Team 04: active on `CF-W1-RH-01A` QA planning; ready for implementation QA after DOV/SPL handoffs.
+- Team 10: ready for next QA-accepted review.
+- Team 03: ready for signoff after Team 10 acceptance.
+- Team 02: ready for rolling investor/trader-value discovery after docs checkpoint.
+
+---
+
 Current active agents:
 
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |

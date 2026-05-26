@@ -1,6 +1,43 @@
 # Team 00 Coordination Cycle Latest
 
-Date: 2026-05-25
+Date: 2026-05-26
+
+## Latest Runtime Checkpoint - DOV And SPL Ready Promotions
+
+Date: 2026-05-26
+
+Current status:
+
+- Branch: `dev`.
+- Open decisions: 1, scoped only to `CF-W1-DQ-02-RS1`.
+- Product Owner action required: no for the active Daily Overview and Signal Position Ledger workstreams.
+- Push performed: no.
+
+Gate movement:
+
+- `CF-W2-DOV-01` has requirement, UX plan, architecture review, contract, work packet, QA plan, and exact Team 08 file reservations.
+- `CF-W2-SPL-01B` has requirement, architecture review, contract, work packet, QA plan, and exact Team 06 file reservations.
+- Team 00 promoted both items to Ready.
+- The two items are independent and can run in parallel:
+  - `DOV-01`: frontend-only dashboard over existing read APIs.
+  - `SPL-01B`: backend-only active-row read-model foundation.
+- Team 02 rolling requirement discovery and Team 03 `CF-W1-RH-01A` architecture remain active.
+
+Implementation assignments:
+
+- Team 08: `CF-W2-DOV-01`, branch `codex/team08-ux-research/CF-W2-DOV-01`, worktree `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-01`.
+- Team 06: `CF-W2-SPL-01B`, branch `codex/team06-strategy-signal/CF-W2-SPL-01B`, worktree `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-01B`.
+
+Teams ready to pick up new tasks:
+
+- Team 08: implement `CF-W2-DOV-01` after docs checkpoint/worktree setup.
+- Team 06: implement `CF-W2-SPL-01B` after docs checkpoint/worktree setup.
+- Team 04: QA Verification after first developer handoff.
+- Team 10: Code Review after QA acceptance.
+- Team 03: continue `CF-W1-RH-01A` architecture; later signoff gates.
+- Team 02: continue rolling investor/trader-value requirements.
+
+---
 
 ## Latest Runtime Checkpoint - Pause After Current Open Items
 

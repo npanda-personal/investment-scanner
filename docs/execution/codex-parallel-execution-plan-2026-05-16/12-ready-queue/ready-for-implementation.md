@@ -4,7 +4,101 @@ Date: 2026-05-18
 
 ## Current Ready Queue
 
-No available application-code item is currently waiting unassigned in Ready.
+No available application-code item is currently waiting unassigned in Ready. The newly promoted items below are assigned immediately to their owning teams and should run in separate worktrees.
+
+2026-05-26 Team 00 Ready promotion - `CF-W2-DOV-01`:
+
+- `CF-W2-DOV-01` is promoted and assigned to Team 08.
+- Current gate state: Ready for Implementation after Team 02 requirement/product direction, Team 08 UX planning, Team 03 architecture/contract/work packet, Team 04 QA plan, exact file reservations, and affected-decision check.
+- Purpose: replace the static `/` launch-card body with a real Daily Overview dashboard using existing read APIs and explicit `Coming soon` placeholders for unavailable cross-system evidence.
+- Branch: `codex/team08-ux-research/CF-W2-DOV-01`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-01`.
+- Required base: Team 00 docs checkpoint commit containing `13-implementation-evidence/CF-W2-DOV-01-ready-promotion.md`.
+- Gate evidence:
+  - Requirement: `10-requirements/CF-W2-DOV-01-daily-overview-interactive-market-dashboard-requirement.md`
+  - UX plan: `05-ux/CF-W2-DOV-01-daily-overview-dashboard-ux-plan.md`
+  - Architecture review: `03-architecture/CF-W2-DOV-01-architecture-review.md`
+  - Contract: `06-contracts/CF-W2-DOV-01-daily-overview-dashboard-contract.md`
+  - Work packet: `08-work-packets/CF-W2-DOV-01-work-packet.md`
+  - QA plan: `04-qa/CF-W2-DOV-01-qa-plan.md`
+  - Ready promotion: `13-implementation-evidence/CF-W2-DOV-01-ready-promotion.md`
+  - Open decisions: one unrelated DQ-RS1 decision only.
+- Allowed implementation files:
+  - `frontend/src/app/HomePage.tsx`
+  - `frontend/src/features/daily-overview-dashboard/index.ts`
+  - `frontend/src/features/daily-overview-dashboard/types.ts`
+  - `frontend/src/features/daily-overview-dashboard/api/dailyOverviewDashboardApi.ts`
+  - `frontend/src/features/daily-overview-dashboard/hooks/useDailyOverviewDashboard.ts`
+  - `frontend/src/features/daily-overview-dashboard/components/**`
+  - `frontend/tests/ui/daily-overview-dashboard.spec.ts`
+- Allowed reporting docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-08-CF-W2-DOV-01-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W2-DOV-01-developer-handoff.md`
+- Forbidden scope:
+  - all backend files and backend tests
+  - frontend/backend route registries
+  - `frontend/src/app/navigationMetadata.tsx`
+  - shared UI, shared hooks, theme, or context rewrites
+  - package manifests, generated files, Prisma schema/migrations
+  - provider/live-data, pipeline command execution, hardcoded summaries, or replacing approved `Coming soon` placeholders with inferred evidence
+- Required validation:
+
+```powershell
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- daily-overview-dashboard.spec.ts --workers=1
+```
+
+Stop and return to Team 00 if implementation requires backend changes, route-registry edits, shared UI, package/schema/generated scope, provider/live refresh, pipeline command triggers, direct Smart Money or Backtests fanout beyond the approved read set, calibration aggregation from current calibration responses, or placeholder fakery.
+
+2026-05-26 Team 00 Ready promotion - `CF-W2-SPL-01B`:
+
+- `CF-W2-SPL-01B` is promoted and assigned to Team 06.
+- Current gate state: Ready for Implementation after Team 02 requirement/product direction, Team 03 architecture/contract/work packet, Team 04 QA plan, exact backend-only file reservations, and affected-decision check.
+- Purpose: create the backend-only active-row read model foundation for Signal Position Ledger without user-facing route/UI exposure or closed-history claims.
+- Branch: `codex/team06-strategy-signal/CF-W2-SPL-01B`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-01B`.
+- Required base: Team 00 docs checkpoint commit containing `13-implementation-evidence/CF-W2-SPL-01B-ready-promotion.md`.
+- Gate evidence:
+  - Requirement: `10-requirements/CF-W2-SPL-01B-signal-position-ledger-active-positions-read-model-requirement.md`
+  - Architecture review: `03-architecture/CF-W2-SPL-01B-architecture-review.md`
+  - Contract: `06-contracts/CF-W2-SPL-01B-active-position-read-model-contract.md`
+  - Work packet: `08-work-packets/CF-W2-SPL-01B-work-packet.md`
+  - QA plan: `04-qa/CF-W2-SPL-01B-qa-plan.md`
+  - Ready promotion: `13-implementation-evidence/CF-W2-SPL-01B-ready-promotion.md`
+  - Open decisions: one unrelated DQ-RS1 decision only.
+- Allowed implementation files:
+  - `backend/src/modules/signal-position-ledger/signal-position-ledger.module.ts`
+  - `backend/src/modules/signal-position-ledger/signal-position-ledger.router.ts`
+  - `backend/src/modules/signal-position-ledger/signal-position-ledger.controller.ts`
+  - `backend/src/modules/signal-position-ledger/signal-position-ledger.service.ts`
+  - `backend/src/modules/signal-position-ledger/signal-position-ledger.repository.ts`
+  - `backend/src/modules/signal-position-ledger/signal-position-ledger.validation.ts`
+  - `backend/src/modules/signal-position-ledger/signal-position-ledger.types.ts`
+  - `backend/src/modules/signal-position-ledger/signal-position-ledger.md`
+  - `backend/src/modules/signal-position-ledger/index.ts`
+  - `backend/tests/modules/signal-position-ledger/signal-position-ledger.service.test.ts`
+  - `backend/tests/modules/signal-position-ledger/signal-position-ledger.repository.test.ts`
+  - `backend/tests/modules/signal-position-ledger/signal-position-ledger.validation.test.ts`
+  - optional only if isolated module-local router assertions are added: `backend/tests/modules/signal-position-ledger/signal-position-ledger.routes.test.ts`
+- Allowed reporting docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-CF-W2-SPL-01B-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W2-SPL-01B-developer-handoff.md`
+- Forbidden scope:
+  - `backend/src/api/routes.ts`
+  - all frontend files and frontend tests
+  - Prisma schema/migrations, generated files, package manifests
+  - shared backend utilities or shared frontend components
+  - Today Review, Trade Plan, Portfolio, Backtesting, provider/live, startup/backfill, broker, durable lifecycle storage, closed history, target/R:R/advice semantics
+- Required validation:
+
+```powershell
+cd backend
+npm.cmd test -- signal-position-ledger.service.test.ts signal-position-ledger.repository.test.ts signal-position-ledger.validation.test.ts --runInBand
+npm.cmd run build
+```
+
+Stop and return to Team 00 if implementation requires route-registry wiring, frontend UI, shared utility/UI, schema/storage, generated/package changes, provider/live/startup/backfill behavior, Today Review/Trade Plan/Portfolio/Backtesting edits, closed-history proof, or target/R:R/advice wording.
 
 2026-05-25 Team 00 Ready promotion - `CF-W2-CAL-02A`:
 

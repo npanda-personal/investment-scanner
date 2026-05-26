@@ -2,6 +2,90 @@
 
 Date: 2026-05-20
 
+## Latest Assignment Override - 2026-05-26 SPL-01B
+
+Team 00 promotes `CF-W2-SPL-01B` as a bounded backend-only Signal Position Ledger implementation item.
+
+Work item:
+
+- `CF-W2-SPL-01B` - Signal Position Ledger active rows backend read model.
+
+Branch / worktree:
+
+- Branch: `codex/team06-strategy-signal/CF-W2-SPL-01B`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-01B`
+- Required base: Team 00 docs checkpoint commit containing `13-implementation-evidence/CF-W2-SPL-01B-ready-promotion.md`
+
+Evidence to use:
+
+- Requirement: `10-requirements/CF-W2-SPL-01B-signal-position-ledger-active-positions-read-model-requirement.md`
+- Architecture review: `03-architecture/CF-W2-SPL-01B-architecture-review.md`
+- Contract: `06-contracts/CF-W2-SPL-01B-active-position-read-model-contract.md`
+- Work packet: `08-work-packets/CF-W2-SPL-01B-work-packet.md`
+- QA plan: `04-qa/CF-W2-SPL-01B-qa-plan.md`
+- Ready promotion: `13-implementation-evidence/CF-W2-SPL-01B-ready-promotion.md`
+- Ready handoff: `12-ready-queue/ready-for-implementation.md`
+
+Allowed implementation files:
+
+- `backend/src/modules/signal-position-ledger/signal-position-ledger.module.ts`
+- `backend/src/modules/signal-position-ledger/signal-position-ledger.router.ts`
+- `backend/src/modules/signal-position-ledger/signal-position-ledger.controller.ts`
+- `backend/src/modules/signal-position-ledger/signal-position-ledger.service.ts`
+- `backend/src/modules/signal-position-ledger/signal-position-ledger.repository.ts`
+- `backend/src/modules/signal-position-ledger/signal-position-ledger.validation.ts`
+- `backend/src/modules/signal-position-ledger/signal-position-ledger.types.ts`
+- `backend/src/modules/signal-position-ledger/signal-position-ledger.md`
+- `backend/src/modules/signal-position-ledger/index.ts`
+- `backend/tests/modules/signal-position-ledger/signal-position-ledger.service.test.ts`
+- `backend/tests/modules/signal-position-ledger/signal-position-ledger.repository.test.ts`
+- `backend/tests/modules/signal-position-ledger/signal-position-ledger.validation.test.ts`
+- optional only if isolated module-local router assertions are added: `backend/tests/modules/signal-position-ledger/signal-position-ledger.routes.test.ts`
+
+Allowed reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-CF-W2-SPL-01B-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W2-SPL-01B-developer-handoff.md`
+
+Required behavior:
+
+- Create one paginated active-row read model inside the backend module.
+- Include only source-proven entry-trigger rows with timestamp and trigger price.
+- Compute current return percent only from source-proven entry price and latest trusted persisted price.
+- Keep DQ/trust status, strategy/rule/version provenance, trigger type, and reason summary visible where current source supports them.
+- Emit only `EXIT_TRIGGERED` or `RISK_WARNING` as limited compatibility health states; keep all other lifecycle evidence unavailable.
+- Keep wording research-support oriented.
+
+Forbidden files:
+
+- `backend/src/api/routes.ts`
+- all `frontend/src/**`
+- all `frontend/tests/**`
+- Today Review, Trade Plan, Portfolio, Backtesting, provider/live/startup/backfill source/tests
+- Prisma schema or migrations
+- generated files
+- package manifests and lockfiles
+- shared backend utilities
+- shared frontend components
+- durable lifecycle/open/closed storage
+- broker, portfolio P/L, account performance, target-price, reward/risk, `R:R`, or direct advice semantics
+
+Required validation:
+
+```powershell
+cd backend
+npm.cmd test -- signal-position-ledger.service.test.ts signal-position-ledger.repository.test.ts signal-position-ledger.validation.test.ts --runInBand
+npm.cmd run build
+```
+
+Expected handoff:
+
+- Update `17-team-outboxes/TEAM-06-CF-W2-SPL-01B-outbox.md`.
+- Create `18-integration-queue/CF-W2-SPL-01B-developer-handoff.md`.
+- Record exact branch/worktree, base commit, changed files, inspected files, behavior changed, tests run, skipped checks, forbidden files confirmed untouched, risks, blockers, and next gate: Team 04 QA Verification.
+
+Stop and return to Team 00 if implementation needs route-registry, frontend, shared utility/UI, schema/storage, generated/package, provider/live/startup/backfill, Today Review/Trade Plan/Portfolio/Backtesting edits, closed-history proof, or target/R:R/advice wording.
+
 ## Latest Assignment Override - 2026-05-25 CAL-02A
 
 Team 00 promotes `CF-W2-CAL-02A` as a bounded Signal Calibration implementation item.
