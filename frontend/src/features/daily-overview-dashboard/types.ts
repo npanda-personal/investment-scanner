@@ -3,6 +3,7 @@ import type { DataQualityReviewReadinessSummary, DataQualitySummary } from '@/fe
 import type { MarketContextSummary } from '@/features/market-context-intelligence/types';
 import type { PipelineStatusSnapshot } from '@/features/pipeline-ops/types';
 import type { ResearchOverview } from '@/features/research-hub/api/researchHubApi';
+import type { CalibrationPageSummary } from '@/features/signal-calibration-engine/types';
 import type { SignalGenerationRunAudit } from '@/features/signal-generation-engine/types';
 import type { TodayReviewCandidate, TodayReviewResponse } from '@/features/today-trade-review/types';
 
@@ -24,7 +25,10 @@ export interface DailyOverviewDeferredSections {
   dataQualitySummary: DashboardSectionState<DataQualitySummary>;
   latestSignalRun: DashboardSectionState<SignalGenerationRunAudit>;
   pipelineStatus: DashboardSectionState<PipelineStatusSnapshot>;
+  calibrationSummary: DashboardSectionState<CalibrationPageSummary>;
 }
+
+export type CalibrationEvidenceSummaryDisplayState = 'USABLE' | 'LIMITED' | 'UNAVAILABLE' | 'WAITING';
 
 export interface DailyOverviewDashboardState {
   scope: MarketScope;
@@ -35,6 +39,8 @@ export interface DailyOverviewDashboardState {
   refreshing: boolean;
   latestDashboardFetchedAt: string | null;
   latestSourceTimestamp: string | null;
+  calibrationHorizon: string;
+  setCalibrationHorizon: (horizon: string) => Promise<void>;
 }
 
 export type DailyPulseState = 'REVIEW_SUPPORTED' | 'REVIEW_LIMITED' | 'REVIEW_BLOCKED' | 'MIXED_EVIDENCE' | 'UNAVAILABLE';

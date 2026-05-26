@@ -3,11 +3,13 @@ import { fetchDataQualityReviewReadiness, fetchDataQualitySummary } from '@/feat
 import { fetchMarketContextSummary } from '@/features/market-context-intelligence/api/marketContextIntelligenceService';
 import { fetchPipelineStatus } from '@/features/pipeline-ops/api/pipelineOpsService';
 import { fetchResearchOverview } from '@/features/research-hub/api/researchHubApi';
+import { fetchCalibrationModel, fetchTopCalibratedSignals } from '@/features/signal-calibration-engine/api/signalCalibrationEngineService';
 import { fetchLatestSignalRun } from '@/features/signal-generation-engine/api/signalGenerationEngineService';
 import type { DataQualityReviewReadinessSummary, DataQualitySummary } from '@/features/data-quality-engine/types';
 import type { MarketContextSummary } from '@/features/market-context-intelligence/types';
 import type { PipelineStatusSnapshot } from '@/features/pipeline-ops/types';
 import type { ResearchOverview } from '@/features/research-hub/api/researchHubApi';
+import type { CalibrationPageSummary } from '@/features/signal-calibration-engine/types';
 import type { SignalGenerationRunAudit } from '@/features/signal-generation-engine/types';
 import type { TodayReviewResponse } from '@/features/today-trade-review/types';
 
@@ -49,4 +51,27 @@ export async function fetchDailyOverviewPipelineStatus(params: DailyOverviewScop
     pipelineKey: 'market-intelligence',
     limit: 100,
   });
+}
+
+export async function fetchDailyOverviewCalibrationSummary(params: DailyOverviewScopeParams & { horizon: string }): Promise<CalibrationPageSummary> {
+  const response = await fetchTopCalibratedSignals({
+    region: params.region,
+    assetType: params.assetType,
+    horizon: params.horizon,
+    limit: 25,
+    offset: 0,
+    sortBy: 'generatedAt',
+    sortDirection: 'desc',
+  });
+
+  if (!response.pageSummary) {
+    throw new Error('Calibration evidence summary is unavailable for this scope and horizon.');
+  }
+
+  return response.pageSummary;
+}
+
+export async function fetchDailyOverviewCalibrationDefaultHorizon() {
+  const model = await fetchCalibrationModel();
+  return model.defaultHorizon || '20D';
 }

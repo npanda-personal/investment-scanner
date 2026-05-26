@@ -23,6 +23,7 @@ import {
 } from '@mui/material';
 import { useMemo, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
+import { CalibrationEvidenceSummaryPanel } from './CalibrationEvidenceSummaryPanel';
 import { useDailyOverviewDashboard } from '../hooks/useDailyOverviewDashboard';
 import type {
   CandidateGroupKey,
@@ -148,7 +149,7 @@ export function DailyOverviewDashboardPage() {
     { label: 'Research Command Center', to: '/research', context: research?.nextActions?.[0]?.priority ? `${research.nextActions[0].priority} priority` : null },
     { label: 'Market Context', to: '/market-context', context: marketContext?.regime?.regime || null },
     { label: 'Raw Signals', to: '/signals', context: latestSignalRun?.status || null },
-    { label: 'Signal Calibration', to: '/signals/calibration', context: 'Evidence-through placeholder' },
+    { label: 'Signal Calibration', to: '/signals/calibration', context: 'Calibration evidence summary' },
     { label: 'Data Quality', to: '/data-quality', context: reviewReadiness?.trustStatus || null },
     { label: 'Smart Money', to: '/smart-money', context: research ? formatSmartMoneyContext(research.confirmationSummary?.smartMoneySummary) : null },
     { label: 'Pipeline Ops', to: '/pipeline-ops', context: pipelineRun?.status || null },
@@ -358,6 +359,13 @@ export function DailyOverviewDashboardPage() {
             </Paper>
           </Grid>
         </Grid>
+
+        <CalibrationEvidenceSummaryPanel
+          scopeLabel={`${dashboard.scope.region} / ${dashboard.scope.assetType}`}
+          horizon={dashboard.calibrationHorizon}
+          summary={dashboard.deferred.calibrationSummary}
+          onHorizonChange={dashboard.setCalibrationHorizon}
+        />
 
         <Grid container spacing={2}>
           <Grid item xs={12} lg={7}>

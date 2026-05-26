@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import {
+  fetchDailyOverviewCalibrationDefaultHorizon,
+  fetchDailyOverviewCalibrationSummary,
   fetchDailyOverviewDataQualitySummary,
   fetchDailyOverviewLatestSignalRun,
   fetchDailyOverviewMarketContext,
@@ -10,6 +12,7 @@ import {
   fetchDailyOverviewTodayReview,
 } from '../api/dailyOverviewDashboardApi';
 import type { DashboardSectionState, DailyOverviewDashboardState } from '../types';
+import type { CalibrationPageSummary } from '@/features/signal-calibration-engine/types';
 
 function emptySection<T>(): DashboardSectionState<T> {
   return {
@@ -32,10 +35,13 @@ function toErrorMessage(error: unknown, fallback: string) {
 export function useDailyOverviewDashboard(): DailyOverviewDashboardState & { refresh: () => Promise<void> } {
   const { scope } = useMarketScope();
   const requestRef = useRef(0);
+  const calibrationRequestRef = useRef(0);
+  const hasResolvedCalibrationDefaultHorizon = useRef(false);
 
   const [criticalLoading, setCriticalLoading] = useState(true);
   const [deferredLoading, setDeferredLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [calibrationHorizon, setCalibrationHorizonState] = useState('20D');
 
   const [todayReview, setTodayReview] = useState<DashboardSectionState<Awaited<ReturnType<typeof fetchDailyOverviewTodayReview>>>>(() => emptySection());
   const [researchOverview, setResearchOverview] = useState<DashboardSectionState<Awaited<ReturnType<typeof fetchDailyOverviewResearchOverview>>>>(() => emptySection());
@@ -44,6 +50,7 @@ export function useDailyOverviewDashboard(): DailyOverviewDashboardState & { ref
   const [dataQualitySummary, setDataQualitySummary] = useState<DashboardSectionState<Awaited<ReturnType<typeof fetchDailyOverviewDataQualitySummary>>>>(() => emptySection());
   const [latestSignalRun, setLatestSignalRun] = useState<DashboardSectionState<NonNullable<Awaited<ReturnType<typeof fetchDailyOverviewLatestSignalRun>>>>>(() => emptySection());
   const [pipelineStatus, setPipelineStatus] = useState<DashboardSectionState<Awaited<ReturnType<typeof fetchDailyOverviewPipelineStatus>>>>(() => emptySection());
+  const [calibrationSummary, setCalibrationSummary] = useState<DashboardSectionState<CalibrationPageSummary>>(() => emptySection());
 
   const runLoad = useCallback(async (mode: 'initial' | 'refresh') => {
     const requestId = requestRef.current + 1;
@@ -91,12 +98,29 @@ export function useDailyOverviewDashboard(): DailyOverviewDashboardState & { ref
     setDataQualitySummary((current) => ({ ...current, loading: true, error: null }));
     setLatestSignalRun((current) => ({ ...current, loading: true, error: null }));
     setPipelineStatus((current) => ({ ...current, loading: true, error: null }));
+    setCalibrationSummary((current) => ({ ...current, loading: true, error: null }));
 
-    const [marketContextResult, dataQualityResult, latestSignalRunResult, pipelineStatusResult] = await Promise.allSettled([
+    let effectiveCalibrationHorizon = calibrationHorizon;
+    if (!hasResolvedCalibrationDefaultHorizon.current) {
+      try {
+        const defaultHorizon = await fetchDailyOverviewCalibrationDefaultHorizon();
+        hasResolvedCalibrationDefaultHorizon.current = true;
+        effectiveCalibrationHorizon = defaultHorizon;
+        setCalibrationHorizonState(defaultHorizon);
+      } catch {
+        hasResolvedCalibrationDefaultHorizon.current = true;
+      }
+    }
+
+    const calibrationRequestId = calibrationRequestRef.current + 1;
+    calibrationRequestRef.current = calibrationRequestId;
+
+    const [marketContextResult, dataQualityResult, latestSignalRunResult, pipelineStatusResult, calibrationSummaryResult] = await Promise.allSettled([
       fetchDailyOverviewMarketContext(scopeParams),
       fetchDailyOverviewDataQualitySummary(scopeParams),
       fetchDailyOverviewLatestSignalRun(scopeParams),
       fetchDailyOverviewPipelineStatus(scopeParams),
+      fetchDailyOverviewCalibrationSummary({ ...scopeParams, horizon: effectiveCalibrationHorizon }),
     ]);
 
     if (requestRef.current !== requestId) return;
@@ -126,10 +150,27 @@ export function useDailyOverviewDashboard(): DailyOverviewDashboardState & { ref
       }
       return { ...current, loading: false, error: toErrorMessage(pipelineStatusResult.reason, 'Failed to load Pipeline status summary.') };
     });
+    if (calibrationRequestRef.current === calibrationRequestId) {
+      if (calibrationSummaryResult.status === 'fulfilled') {
+        setCalibrationSummary({
+          data: calibrationSummaryResult.value,
+          loading: false,
+          error: null,
+          dashboardFetchedAt: deferredFetchedAt,
+        });
+      } else {
+        setCalibrationSummary({
+          data: buildUnavailableCalibrationSummary(scope.region, scope.assetType, effectiveCalibrationHorizon, toErrorMessage(calibrationSummaryResult.reason, 'Calibration evidence summary is unavailable for this scope and horizon.')),
+          loading: false,
+          error: toErrorMessage(calibrationSummaryResult.reason, 'Calibration evidence summary is unavailable for this scope and horizon.'),
+          dashboardFetchedAt: deferredFetchedAt,
+        });
+      }
+    }
 
     setDeferredLoading(false);
     setRefreshing(false);
-  }, [scope.assetType, scope.region]);
+  }, [calibrationHorizon, scope.assetType, scope.region]);
 
   useEffect(() => {
     setTodayReview(emptySection());
@@ -139,11 +180,41 @@ export function useDailyOverviewDashboard(): DailyOverviewDashboardState & { ref
     setDataQualitySummary(emptySection());
     setLatestSignalRun(emptySection());
     setPipelineStatus(emptySection());
+    setCalibrationSummary(emptySection());
     setCriticalLoading(true);
     setDeferredLoading(true);
     setRefreshing(false);
     void runLoad('initial');
   }, [runLoad]);
+
+  const setCalibrationHorizon = useCallback(async (horizon: string) => {
+    if (!horizon || calibrationHorizon === horizon) return;
+    setCalibrationHorizonState(horizon);
+    const requestId = calibrationRequestRef.current + 1;
+    calibrationRequestRef.current = requestId;
+    setCalibrationSummary((current) => ({ ...current, loading: true, error: null }));
+    const scopeParams = { region: scope.region, assetType: scope.assetType };
+
+    try {
+      const summary = await fetchDailyOverviewCalibrationSummary({ ...scopeParams, horizon });
+      if (calibrationRequestRef.current !== requestId) return;
+      setCalibrationSummary({
+        data: summary,
+        loading: false,
+        error: null,
+        dashboardFetchedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      if (calibrationRequestRef.current !== requestId) return;
+      const errorMessage = toErrorMessage(error, 'Calibration evidence summary is unavailable for this scope and horizon.');
+      setCalibrationSummary({
+        data: buildUnavailableCalibrationSummary(scope.region, scope.assetType, horizon, errorMessage),
+        loading: false,
+        error: errorMessage,
+        dashboardFetchedAt: new Date().toISOString(),
+      });
+    }
+  }, [calibrationHorizon, scope.assetType, scope.region]);
 
   const latestDashboardFetchedAt = useMemo(() => {
     return latestTimestamp([
@@ -154,8 +225,10 @@ export function useDailyOverviewDashboard(): DailyOverviewDashboardState & { ref
       dataQualitySummary.dashboardFetchedAt,
       latestSignalRun.dashboardFetchedAt,
       pipelineStatus.dashboardFetchedAt,
+      calibrationSummary.dashboardFetchedAt,
     ]);
   }, [
+    calibrationSummary.dashboardFetchedAt,
     dataQualitySummary.dashboardFetchedAt,
     latestSignalRun.dashboardFetchedAt,
     marketContext.dashboardFetchedAt,
@@ -179,8 +252,12 @@ export function useDailyOverviewDashboard(): DailyOverviewDashboardState & { ref
       pipelineStatus.data?.generatedAt,
       pipelineStatus.data?.activeRun?.updatedAt,
       pipelineStatus.data?.lastRun?.updatedAt,
+      calibrationSummary.data?.calibrationEvidence?.evidenceBasis?.latestMeasurablePriceDate,
+      calibrationSummary.data?.calibrationEvidence?.evidenceBasis?.signalQualityGeneratedAt,
     ]);
   }, [
+    calibrationSummary.data?.calibrationEvidence?.evidenceBasis?.latestMeasurablePriceDate,
+    calibrationSummary.data?.calibrationEvidence?.evidenceBasis?.signalQualityGeneratedAt,
     dataQualitySummary.data?.latestEvaluationAt,
     latestSignalRun.data?.completedAt,
     latestSignalRun.data?.startedAt,
@@ -207,13 +284,56 @@ export function useDailyOverviewDashboard(): DailyOverviewDashboardState & { ref
       dataQualitySummary,
       latestSignalRun,
       pipelineStatus,
+      calibrationSummary,
     },
     criticalLoading,
     deferredLoading,
     refreshing,
     latestDashboardFetchedAt,
     latestSourceTimestamp,
+    calibrationHorizon,
+    setCalibrationHorizon,
     refresh: () => runLoad('refresh'),
+  };
+}
+
+function buildUnavailableCalibrationSummary(region: string, assetType: string, horizon: string, reasonSummary: string): CalibrationPageSummary {
+  return {
+    scope: { region, assetType, horizon },
+    itemsOnPage: 0,
+    totalScopedRows: 0,
+    calibrationReadiness: {
+      status: 'UNAVAILABLE',
+      confidenceTier: 'INSUFFICIENT_SAMPLE',
+      calibrationApplied: false,
+      adjustmentCapApplied: 0,
+      downstreamInfluence: 'NONE',
+      authoritativeScore: 'NO_SCORE',
+      reasons: [reasonSummary],
+      blockers: [reasonSummary],
+    },
+    calibrationEvidence: {
+      horizon,
+      overallEvaluatedSamples: 0,
+      groupEvaluatedSamples: 0,
+      minimumOverallSamples: 0,
+      minimumGroupSamples: 0,
+      requiredOverallSamples: 0,
+      requiredGroupSamples: 0,
+      horizonAvailability: {},
+      dataStatus: 'MISSING',
+      evidenceStatus: 'MISSING',
+      evidenceReasons: [reasonSummary],
+      evidenceWarnings: [reasonSummary],
+      warnings: [reasonSummary],
+      evidenceBasis: {
+        status: 'MISSING_SIGNAL_QUALITY_EVIDENCE',
+        signalQualityGeneratedAt: null,
+        latestMeasurablePriceDate: null,
+        nextEvaluableDate: null,
+        reasonSummary,
+      },
+    },
   };
 }
 

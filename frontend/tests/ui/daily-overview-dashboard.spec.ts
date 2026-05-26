@@ -206,7 +206,7 @@ function createResearchOverviewPayload() {
         calibrationReadiness: { status: 'INSUFFICIENT_DATA', label: 'Calibration Readiness', sourceModule: 'signal-calibration-engine', blocking: true, message: 'Calibration aggregate not available.' },
         strategyProof: { status: 'READY', label: 'Strategy Proof', sourceModule: 'strategy-framework', blocking: false, message: 'Proof is usable for multiple candidates.' },
         todayReviewReadiness: { status: 'LIMITED', label: 'Today Review Readiness', sourceModule: 'today-trade-review', blocking: false, message: 'Trusted universe is limited.' },
-        tradePlanReadiness: { status: 'INSUFFICIENT_DATA', label: 'Trade Plan Readiness', sourceModule: 'trade-plan-risk-engine', blocking: true, message: 'Trade-plan readiness is not the Daily Pulse authority.' },
+        tradePlanReadiness: { status: 'INSUFFICIENT_DATA', label: 'Risk Plan Readiness', sourceModule: 'trade-plan-risk-engine', blocking: true, message: 'Risk-plan readiness is not the Daily Pulse authority.' },
       },
       nextBestAction: null,
       blockers: [],
@@ -251,6 +251,97 @@ function createResearchOverviewPayload() {
   };
 }
 
+function createCalibrationTopPayload(input?: {
+  horizon?: string;
+  readinessStatus?: 'USABLE' | 'LIMITED' | 'UNAVAILABLE';
+  evidenceBasisStatus?: 'MEASURED' | 'HORIZON_LIMITED' | 'MISSING_SIGNAL_QUALITY_EVIDENCE';
+  signalQualityGeneratedAt?: string | null;
+  latestMeasurablePriceDate?: string | null;
+  nextEvaluableDate?: string | null;
+  reasonSummary?: string;
+}) {
+  const horizon = input?.horizon || '20D';
+  return {
+    items: [
+      {
+        id: 'cal-row-1',
+        signalResultId: 'signal-1',
+        instrumentId: 'inst-1',
+        symbol: 'ALPHA.NS',
+        companyName: 'Alpha Ltd',
+        sector: 'Financials',
+        country: 'IN',
+        exchange: 'NSE',
+        region: 'IN',
+        assetType: 'STOCK',
+        rawScore: 0.62,
+        calibratedScore: 0.66,
+        scoreDelta: 0.04,
+        rawDirection: 'LONG',
+        calibratedDirection: 'LONG',
+        rawConfidence: 'MEDIUM',
+        calibratedConfidence: 'MEDIUM',
+        boosts: [],
+        penalties: [],
+        calibrationReasons: ['Evidence supports mild uplift.'],
+        dataGaps: [],
+        calibrationModelVersion: 'cal-v1',
+        rawSignalModelVersion: 'sig-v1',
+        generatedAt: '2026-05-25T12:00:00.000Z',
+        dataStatus: 'COMPLETE',
+        researchUrl: '/research',
+      },
+    ],
+    totalCount: 1,
+    limit: 25,
+    offset: 0,
+    hasMore: false,
+    sortBy: 'generatedAt',
+    sortDirection: 'desc',
+    pageSummary: {
+      scope: {
+        region: 'IN',
+        assetType: 'STOCK',
+        horizon,
+      },
+      itemsOnPage: 1,
+      totalScopedRows: 1,
+      calibrationReadiness: {
+        status: input?.readinessStatus || 'USABLE',
+        confidenceTier: 'MEDIUM',
+        calibrationApplied: true,
+        adjustmentCapApplied: 0.15,
+        downstreamInfluence: 'NORMAL',
+        authoritativeScore: 'CALIBRATED_SCORE',
+        reasons: ['Scoped calibration evidence is usable.'],
+        blockers: [],
+      },
+      calibrationEvidence: {
+        horizon,
+        overallEvaluatedSamples: 120,
+        groupEvaluatedSamples: 66,
+        minimumOverallSamples: 50,
+        minimumGroupSamples: 20,
+        requiredOverallSamples: 50,
+        requiredGroupSamples: 20,
+        horizonAvailability: {},
+        dataStatus: 'COMPLETE',
+        evidenceStatus: 'SUFFICIENT',
+        evidenceReasons: [],
+        evidenceWarnings: [],
+        warnings: [],
+        evidenceBasis: {
+          status: input?.evidenceBasisStatus || 'MEASURED',
+          signalQualityGeneratedAt: input && Object.prototype.hasOwnProperty.call(input, 'signalQualityGeneratedAt') ? input.signalQualityGeneratedAt : '2026-05-24T10:00:00.000Z',
+          latestMeasurablePriceDate: input && Object.prototype.hasOwnProperty.call(input, 'latestMeasurablePriceDate') ? input.latestMeasurablePriceDate : '2026-05-23',
+          nextEvaluableDate: input && Object.prototype.hasOwnProperty.call(input, 'nextEvaluableDate') ? input.nextEvaluableDate : null,
+          reasonSummary: input?.reasonSummary || 'Measured calibration evidence is available for this scope and horizon.',
+        },
+      },
+    },
+  };
+}
+
 function forbiddenVisibleCopyPattern() {
   const phrases = [
     'buy ' + 'now',
@@ -287,6 +378,9 @@ test.describe('Daily Overview dashboard', () => {
       dataQuality: 0,
       signalRun: 0,
       pipeline: 0,
+      calibrationModel: 0,
+      calibrationTop: 0,
+      calibrationHealth: 0,
     };
     const queryMap: Record<string, string[]> = {
       todayReview: [],
@@ -296,6 +390,7 @@ test.describe('Daily Overview dashboard', () => {
       dataQuality: [],
       signalRun: [],
       pipeline: [],
+      calibrationTop: [],
     };
 
     await page.route('**/api/v1/today-review/latest**', async (route) => {
@@ -434,11 +529,36 @@ test.describe('Daily Overview dashboard', () => {
         },
       });
     });
+    await page.route('**/api/v1/signals/calibration/model', async (route) => {
+      calls.calibrationModel += 1;
+      await route.fulfill({
+        json: {
+          calibrationModelVersion: 'cal-v1',
+          qualityMetricWindow: '20D',
+          supportedHorizons: ['10D', '20D', '40D'],
+          defaultHorizon: '40D',
+          minSampleSize: 50,
+          perAdjustmentDeltaCap: 0.15,
+          totalDeltaCap: 0.3,
+          rules: ['Use scoped evidence basis only.'],
+        },
+      });
+    });
+    await page.route('**/api/v1/signals/calibration/top**', async (route) => {
+      calls.calibrationTop += 1;
+      const search = new URL(route.request().url()).search;
+      queryMap.calibrationTop.push(search);
+      await route.fulfill({ json: createCalibrationTopPayload({ horizon: '40D' }) });
+    });
+    await page.route('**/api/v1/signals/calibration/health**', async (route) => {
+      calls.calibrationHealth += 1;
+      await route.fulfill({ json: { status: 'OK' } });
+    });
 
     await visitAuthenticated(page, '/');
 
     await expect(page.locator('h4', { hasText: 'Daily Overview' })).toBeVisible();
-    await expect(page.getByText('IN / STOCK')).toBeVisible();
+    await expect(page.getByText('IN / STOCK', { exact: true })).toBeVisible();
     await expect(page.getByText('Research-support context only')).toBeVisible();
     await expect(page.getByText(/^Dashboard refetched:/)).toBeVisible();
     await expect(page.getByText(/^Latest source timestamp:/)).toBeVisible();
@@ -450,6 +570,7 @@ test.describe('Daily Overview dashboard', () => {
     await expect(page.getByText('Review mode: LIMITED_REVIEW')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'High-Priority Review Candidates' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Watch And Blocked' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Calibration Evidence-Through Summary' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Evidence Caveats' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Supporting Navigation' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Data Trust and Pipeline Health' })).toHaveCount(0);
@@ -457,6 +578,10 @@ test.describe('Daily Overview dashboard', () => {
     await expect(page.getByRole('heading', { name: 'Drilldown Strip' })).toHaveCount(0);
     await expect(page.getByText('Breadth: Mixed')).toBeVisible();
     await expect(page.getByText('Market context is region-level for this scope; asset-type specific context is still limited.')).toBeVisible();
+    await expect(page.getByText('Horizon: 40D')).toBeVisible();
+    await expect(page.getByText('Usable', { exact: true })).toBeVisible();
+    const measuredEvidenceDate = await page.evaluate(() => new Date('2026-05-23').toLocaleDateString());
+    await expect(page.getByText(`Latest measurable evidence: ${measuredEvidenceDate}`)).toBeVisible();
 
     await page.getByRole('button', { name: /Bearish review/ }).click();
     await expect(page.getByText('BETA.NS - SHORT REVIEW - RISK_BREAKDOWN v1.0.0')).toBeVisible();
@@ -486,6 +611,7 @@ test.describe('Daily Overview dashboard', () => {
     await expect.poll(() => calls.dataQuality).toBeGreaterThan(1);
     await expect.poll(() => calls.signalRun).toBeGreaterThan(1);
     await expect.poll(() => calls.pipeline).toBeGreaterThan(1);
+    await expect.poll(() => calls.calibrationTop).toBeGreaterThan(1);
 
     await expect.poll(() => queryMap.todayReview.some((q) => q.includes('region=IN') && q.includes('assetType=STOCK'))).toBe(true);
     await expect.poll(() => queryMap.research.some((q) => q.includes('region=IN') && q.includes('assetType=STOCK'))).toBe(true);
@@ -494,6 +620,11 @@ test.describe('Daily Overview dashboard', () => {
     await expect.poll(() => queryMap.signalRun.some((q) => q.includes('region=IN') && q.includes('assetType=STOCK'))).toBe(true);
     await expect.poll(() => queryMap.pipeline.some((q) => q.includes('region=IN') && q.includes('assetType=STOCK'))).toBe(true);
     await expect.poll(() => queryMap.marketContext.some((q) => q.includes('region=IN'))).toBe(true);
+    await expect.poll(() => queryMap.calibrationTop.some((q) => q.includes('region=IN') && q.includes('assetType=STOCK') && q.includes('horizon=40D'))).toBe(true);
+    expect(calls.calibrationHealth).toBe(0);
+
+    const panelHeadingOrder = await page.locator('h6').allInnerTexts();
+    expect(panelHeadingOrder.indexOf('Calibration Evidence-Through Summary')).toBeGreaterThan(panelHeadingOrder.indexOf('Watch And Blocked'));
 
     const body = await page.locator('body').innerText();
     expect(body).not.toMatch(forbiddenVisibleCopyPattern());
@@ -629,19 +760,241 @@ test.describe('Daily Overview dashboard', () => {
         },
       });
     });
+    await page.route('**/api/v1/signals/calibration/model', async (route) => {
+      await route.fulfill({
+        json: {
+          calibrationModelVersion: 'cal-v1',
+          qualityMetricWindow: '20D',
+          supportedHorizons: ['10D', '20D', '40D'],
+          defaultHorizon: '20D',
+          minSampleSize: 50,
+          perAdjustmentDeltaCap: 0.15,
+          totalDeltaCap: 0.3,
+          rules: ['Use scoped evidence basis only.'],
+        },
+      });
+    });
+    await page.route('**/api/v1/signals/calibration/top**', async (route) => {
+      await route.fulfill({
+        json: createCalibrationTopPayload({
+          horizon: '20D',
+          readinessStatus: 'LIMITED',
+          evidenceBasisStatus: 'HORIZON_LIMITED',
+          signalQualityGeneratedAt: null,
+          latestMeasurablePriceDate: null,
+          nextEvaluableDate: '2026-06-02',
+          reasonSummary: 'Waiting for maturity before measured evidence is available for this horizon.',
+        }),
+      });
+    });
+    await page.route('**/api/v1/signals/calibration/health**', async (route) => {
+      await route.fulfill({ json: { status: 'OK' } });
+    });
 
     await visitAuthenticated(page, '/');
 
-    await expect(page.getByText('IN / STOCK')).toBeVisible();
+    await expect(page.getByText('IN / STOCK', { exact: true })).toBeVisible();
     await expect(page.getByText(/^Dashboard refetched:/)).toBeVisible();
     await expect(page.getByText(/^Latest source timestamp:/)).toHaveCount(0);
     await expect(page.getByText(/^Latest loaded:/)).toHaveCount(0);
     await expect(page.getByText('Breadth: Unavailable')).toBeVisible();
     await expect(page.getByText('Breadth: PARTIAL')).toHaveCount(0);
     await expect(page.getByText('Market context is region-level for this scope; asset-type specific context is still limited.')).toBeVisible();
+    await expect(page.getByText('Waiting', { exact: true })).toBeVisible();
+    await expect(page.getByText(/^Waiting for maturity for 20D/)).toBeVisible();
+    await expect(page.getByText('Latest measurable evidence: Unavailable')).toBeVisible();
+  });
+
+  test('shows unavailable calibration status for successful missing signal quality evidence basis', async ({ page }) => {
+    let calibrationHealthCalls = 0;
+    await page.route('**/api/v1/today-review/latest**', async (route) => {
+      await route.fulfill({ json: createTodayReviewPayload() });
+    });
+    await page.route('**/api/v1/research/overview**', async (route) => {
+      await route.fulfill({ json: createResearchOverviewPayload() });
+    });
+    await page.route('**/api/v1/market-data/review-readiness-summary**', async (route) => {
+      await route.fulfill({
+        json: {
+          scope: { region: 'IN', assetType: 'STOCK' },
+          reviewMode: 'LIMITED_REVIEW',
+          trustStatus: 'PARTIAL',
+          userDecision: 'PROCEED_LIMITED',
+          reviewUniverse: {
+            catalogCount: 2910,
+            providerSupportedCount: 585,
+            trustedCount: 144,
+            targetTradingDate: '2026-05-26',
+            requiredDataThroughDate: '2026-05-26',
+            storedDataThroughDate: '2026-05-26',
+          },
+          readinessCounts: {
+            priceReady: 144,
+            reviewReady: 120,
+            missingLatestPrice: 4,
+            staleLatestPrice: 2,
+            inadequateHistory: 8,
+            missingRecentVolume: 10,
+          },
+          nextAction: null,
+          blockers: [],
+        },
+      });
+    });
+    await page.route('**/api/v1/market-context/summary**', async (route) => {
+      await route.fulfill({
+        json: {
+          regime: { regime: 'NEUTRAL', score: 55, explanation: 'Mixed data', updatedAt: '2026-05-26T05:00:00.000Z', dataStatus: 'PARTIAL' },
+          topSectors: [],
+          weakSectors: [],
+          breadth: {
+            percentAboveSma50: 0.58,
+            percentAboveSma200: 0.52,
+            advanceDeclineRatio: 1.1,
+            newHigh52WeekCount: 44,
+            newLow52WeekCount: 18,
+            bullishSignalCount: 90,
+            bearishSignalCount: 55,
+            instrumentCount: 300,
+            dataStatus: 'PARTIAL',
+          },
+          countryStrength: [],
+          macro: null,
+          explanation: ['Partial evidence'],
+          updatedAt: '2026-05-26T05:00:00.000Z',
+          dataStatus: 'PARTIAL',
+        },
+      });
+    });
+    await page.route('**/api/v1/data-quality/summary**', async (route) => {
+      await route.fulfill({
+        json: {
+          totalInstruments: 2910,
+          goodCoverageCount: 1400,
+          partialCoverageCount: 700,
+          poorCoverageCount: 500,
+          unusableCoverageCount: 310,
+          signalReadyCount: 1300,
+          notSignalReadyCount: 1610,
+          stalePriceCount: 22,
+          missingFundamentalsCount: 30,
+          missingSectorCount: 20,
+          missingIndustryCount: 20,
+          missingCountryCount: 0,
+          lowLiquidityCount: 25,
+          missingVolumeCount: 15,
+          latestEvaluationAt: '2026-05-26T04:40:00.000Z',
+          dataStatus: 'PARTIAL',
+        },
+      });
+    });
+    await page.route('**/api/v1/signals/runs/latest**', async (route) => {
+      await route.fulfill({
+        json: {
+          id: 'signal-run-with-missing-evidence-basis',
+          scope: { region: 'IN', assetType: 'STOCK' },
+          requestedByUserId: 'user-1',
+          status: 'COMPLETED',
+          modelVersion: 'v1',
+          rulesetVersion: 'v1',
+          sourceDataDate: '2026-05-26',
+          generatedDate: '2026-05-26',
+          batchSize: 25,
+          offset: 0,
+          totalCount: 300,
+          processedCount: 300,
+          generatedCount: 220,
+          updatedCount: 40,
+          noOpCount: 40,
+          duplicateOrIdempotentCount: 0,
+          skippedCount: 0,
+          failedCount: 0,
+          excludedByDataQuality: 20,
+          missingQualityEvaluationCount: 0,
+          durationMs: 12000,
+          startedAt: '2026-05-26T05:00:00.000Z',
+          completedAt: '2026-05-26T05:12:00.000Z',
+          warnings: [],
+        },
+      });
+    });
+    await page.route('**/api/v1/pipeline/status**', async (route) => {
+      await route.fulfill({
+        json: {
+          scope: { region: 'IN', assetType: 'STOCK', timeframe: '1d', pipelineKey: 'market-intelligence' },
+          generatedAt: '2026-05-26T05:03:00.000Z',
+          activeRun: null,
+          lastRun: {
+            id: 'last-run',
+            status: 'COMPLETED',
+            triggerType: 'SCHEDULED',
+            dataThroughDate: '2026-05-26',
+            changedInstrumentCount: 10,
+            totalCount: 2910,
+            processedCount: 2910,
+            succeededCount: 2910,
+            partialCount: 0,
+            failedCount: 0,
+            skippedCount: 0,
+            unchangedCount: 0,
+            sourceFingerprint: null,
+            startedAt: '2026-05-26T03:00:00.000Z',
+            completedAt: '2026-05-26T03:10:00.000Z',
+            durationMs: 600000,
+            warnings: [],
+            errors: [],
+            updatedAt: '2026-05-26T03:10:00.000Z',
+          },
+          stages: [],
+        },
+      });
+    });
+    await page.route('**/api/v1/signals/calibration/model', async (route) => {
+      await route.fulfill({
+        json: {
+          calibrationModelVersion: 'cal-v1',
+          qualityMetricWindow: '20D',
+          supportedHorizons: ['10D', '20D', '40D'],
+          defaultHorizon: '20D',
+          minSampleSize: 50,
+          perAdjustmentDeltaCap: 0.15,
+          totalDeltaCap: 0.3,
+          rules: ['Use scoped evidence basis only.'],
+        },
+      });
+    });
+    await page.route('**/api/v1/signals/calibration/top**', async (route) => {
+      await route.fulfill({
+        json: createCalibrationTopPayload({
+          horizon: '20D',
+          readinessStatus: 'USABLE',
+          evidenceBasisStatus: 'MISSING_SIGNAL_QUALITY_EVIDENCE',
+          signalQualityGeneratedAt: null,
+          latestMeasurablePriceDate: null,
+          nextEvaluableDate: null,
+          reasonSummary: 'Signal Quality evidence is missing for this scope and horizon. Generate Signal Quality before calibration evidence can be measured.',
+        }),
+      });
+    });
+    await page.route('**/api/v1/signals/calibration/health**', async (route) => {
+      calibrationHealthCalls += 1;
+      await route.fulfill({ json: { status: 'OK' } });
+    });
+
+    await visitAuthenticated(page, '/');
+
+    await expect(page.getByText('IN / STOCK', { exact: true })).toBeVisible();
+    await expect(page.getByText('Scope: IN / STOCK')).toBeVisible();
+    await expect(page.getByText('Horizon: 20D')).toBeVisible();
+    await expect(page.getByText('Unavailable', { exact: true })).toBeVisible();
+    await expect(page.getByText('Latest measurable evidence: Unavailable')).toBeVisible();
+    await expect(page.getByText('Signal Quality evidence is missing for this scope and horizon. Generate Signal Quality before calibration evidence can be measured.')).toBeVisible();
+    await expect(page.getByText(/^Calibration evidence summary is unavailable for this scope and horizon:/)).toHaveCount(0);
+    expect(calibrationHealthCalls).toBe(0);
   });
 
   test('shows explicit unavailable states and section-local research failures without synthetic fallback values', async ({ page }) => {
+    let calibrationHealthCalls = 0;
     await page.route('**/api/v1/today-review/latest**', async (route) => {
       await route.fulfill({
         json: {
@@ -709,6 +1062,27 @@ test.describe('Daily Overview dashboard', () => {
         },
       });
     });
+    await page.route('**/api/v1/signals/calibration/model', async (route) => {
+      await route.fulfill({
+        json: {
+          calibrationModelVersion: 'cal-v1',
+          qualityMetricWindow: '20D',
+          supportedHorizons: ['10D', '20D', '40D'],
+          defaultHorizon: '20D',
+          minSampleSize: 50,
+          perAdjustmentDeltaCap: 0.15,
+          totalDeltaCap: 0.3,
+          rules: ['Use scoped evidence basis only.'],
+        },
+      });
+    });
+    await page.route('**/api/v1/signals/calibration/top**', async (route) => {
+      await route.fulfill({ status: 500, json: { error: 'Calibration summary read failed for this scope.' } });
+    });
+    await page.route('**/api/v1/signals/calibration/health**', async (route) => {
+      calibrationHealthCalls += 1;
+      await route.fulfill({ json: { status: 'OK' } });
+    });
 
     await visitAuthenticated(page, '/');
 
@@ -719,9 +1093,12 @@ test.describe('Daily Overview dashboard', () => {
     await expect(page.getByText('Data quality: Unavailable')).toBeVisible();
     await expect(page.getByText('Signal run: Unavailable')).toBeVisible();
     await expect(page.getByText('Pipeline: Unavailable')).toBeVisible();
+    await expect(page.getByText('Calibration evidence summary is unavailable for this scope and horizon')).toBeVisible();
+    await expect(page.getByText('Latest measurable evidence: Unavailable')).toBeVisible();
 
     await page.getByRole('button', { name: /Bearish review/ }).click();
     await expect(page.getByText(/No bearish review rows are currently published/)).toBeVisible();
+    expect(calibrationHealthCalls).toBe(0);
 
     const body = await page.locator('body').innerText();
     expect(body).not.toContain('No run');
@@ -822,14 +1199,40 @@ test.describe('Daily Overview dashboard', () => {
         },
       });
     });
+    await page.route('**/api/v1/signals/calibration/model', async (route) => {
+      await route.fulfill({
+        json: {
+          calibrationModelVersion: 'cal-v1',
+          qualityMetricWindow: '20D',
+          supportedHorizons: ['10D', '20D', '40D'],
+          defaultHorizon: '20D',
+          minSampleSize: 50,
+          perAdjustmentDeltaCap: 0.15,
+          totalDeltaCap: 0.3,
+          rules: ['Use scoped evidence basis only.'],
+        },
+      });
+    });
+    await page.route('**/api/v1/signals/calibration/top**', async (route) => {
+      const url = new URL(route.request().url());
+      expect(url.searchParams.get('region')).toBe('US');
+      expect(url.searchParams.get('assetType')).toBe('ETF');
+      expect(url.searchParams.get('horizon')).toBe('20D');
+      await route.fulfill({ json: createCalibrationTopPayload({ horizon: '20D' }) });
+    });
+    await page.route('**/api/v1/signals/calibration/health**', async (route) => {
+      await route.fulfill({ json: { status: 'OK' } });
+    });
 
     await visitAuthenticated(page, '/');
 
     await expect(page.locator('h4', { hasText: 'Daily Overview' })).toBeVisible();
-    await expect(page.getByText('US / ETF')).toBeVisible();
+    await expect(page.getByText('US / ETF', { exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Market Pulse' })).toBeVisible();
     await expect(page.getByText('Market context summary unavailable for this scope right now.')).toBeVisible();
     await expect(page.getByText('Market context is region-level for this scope; asset-type specific context is still limited.')).toBeVisible();
+    await expect(page.getByText('Scope: US / ETF')).toBeVisible();
+    await expect(page.getByText('Horizon: 20D')).toBeVisible();
     await expect(page.getByText('Coming soon - Market Movers')).toBeVisible();
     await expect(page.getByText('Coming soon - FII/DII Activity')).toBeVisible();
   });
