@@ -1,5 +1,119 @@
 # TEAM-02 Requirement Factory
 
+## Team 02 Queue Reconciliation And Next Architecture Recommendation - 2026-05-26
+
+Root `AGENTS.md` was read first. Team 02 stayed docs-only and edited only the allowed Team 02 queue files plus one new requirement draft under `10-requirements/`.
+
+### Work Item
+
+Reconcile the Team 02 requirement queues to the current execution truth while Team 06 implements `CF-W2-SPL-02`, remove stale DOV/SPL queue language, identify the next direct-value candidates after the active SPL surface lane, and draft one bounded no-schema/no-shared-file requirement if a truthful candidate exists.
+
+### Files Inspected
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-UX-01-stock-research-workbench-trust-surfaces-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/09-summaries/CF-W1-UX-01-ux-source-mapping.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-L3-DQ-01A-lane-3-passive-readiness-dto-contract-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-SPL-02-signal-position-ledger-active-surface-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-RH-01A-research-hub-actionability-evidence-date-wiring-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-DOV-01-daily-overview-interactive-market-dashboard-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/active-work-board.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/team-agent-runtime-queue.md`
+- `backend/src/modules/stock-research-workbench/stock-research-workbench.types.ts`
+- `backend/src/modules/stock-research-workbench/stock-research-workbench.service.ts`
+- `frontend/src/features/stock-research-workbench/api/stockResearchWorkbenchService.ts`
+- `frontend/src/features/stock-research-workbench/components/StockResearchWorkbenchPage.tsx`
+- `frontend/src/features/stock-research-workbench/routes.tsx`
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-UX-01B-stock-research-workbench-trust-evidence-contract-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+### Queue Reconciliation Result
+
+Reconciled to current truth:
+
+- `CF-W2-DOV-01` accepted and locally committed as `a371e2f`
+- `CF-W2-SPL-01B` accepted and locally committed as `ca31d79`
+- `CF-W2-SPL-02` promoted and assigned to Team 06
+- `CF-W1-RH-01A` accepted and locally committed as `30460aa`
+- `CF-W2-CAL-02A` also corrected from stale "active" language to accepted/committed `1be7d1a`
+
+Removed stale Team 02 queue language that still implied:
+
+- DOV was waiting on a Team 02 refresh
+- `CF-W2-SPL-01B` was only routed
+- `CF-W2-SPL-02` sat behind DOV as a future queue-head
+- `CF-W1-RH-01A` was still the next architecture candidate
+- `CF-W2-CAL-02A` was still in active-implementation state
+
+### Requirement Created
+
+Created:
+
+- `CF-W1-UX-01B - Stock Research Workbench Trust Evidence Contract Requirement`
+
+Why this child was chosen:
+
+- it is the cleanest current no-schema/no-shared-file direct-value follow-on after active `CF-W2-SPL-02`
+- it uses the existing Workbench route and existing Workbench endpoint
+- accepted `CF-W1-UX-01A` solved conservative framing only; it left a real page-level trust-evidence gap behind
+- it does not pretend Signal Position Ledger closed-history proof exists
+
+### Current Top Candidates After Active `CF-W2-SPL-02`
+
+Consent-gated proposal front:
+
+1. `CF-W1-MD-02A`
+2. `CF-W1-SQLAB-02B`
+3. `CF-W1-STRAT-02B`
+
+Actionable docs-only refinement front:
+
+1. `CF-W1-UX-01B`
+2. `CF-W1-L3-DQ-01A`
+
+### Blocked / Consent-Gated Items
+
+- `CF-W1-MD-02A` stays blocked by schema/storage consent
+- `CF-W1-SQLAB-02B` stays blocked by storage consent
+- `CF-W1-STRAT-02B` stays blocked by schema/generated/repository consent
+- any future Signal Position Ledger closed-history child stays blocked by durable close-proof truth, not by queue wording
+
+### Recommended Next Team 03 Architecture Assignment
+
+Recommend Team 03 takes:
+
+- `CF-W1-UX-01B - Stock Research Workbench Trust Evidence Contract Requirement`
+
+Reason:
+
+- direct investor/trader research value
+- existing route and feature/module ownership already exist
+- no route-registry, navigation, shared-file, or schema change is required if Team 03 keeps the slice module-local
+- clearer next non-consent packet than another ledger child or passive Lane 3 DTO work
+
+### Tests Run / Skipped
+
+- Tests run: none
+- Tests skipped: all
+- Reason: docs-only requirement queue reconciliation and refinement pass
+
+### Constraints / Blockers
+
+- Team 02 did not edit Team 00 Ready docs, Team 06 inbox, active board, architecture docs, QA docs, or implementation docs
+- Existing requirement docs for `CF-W2-DOV-01` and `CF-W1-RH-01A` still contain stale state language, but those files were outside the allowed Team 02 edit scope for this pass
+- No app source, tests, Prisma, routes, package manifests, or generated files were changed
+
 ## Team 02 Signal Position Ledger Surface Follow-Up - 2026-05-26
 
 Root `AGENTS.md` was read first. Team 02 stayed docs-only and updated only requirement-lane artifacts plus this outbox.
